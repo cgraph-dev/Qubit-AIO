@@ -401,9 +401,15 @@ def test_skills_full_lifecycle_and_persistence(tmp_path, monkeypatch):
     shown = _run(cfg, "skills_show", {"skill_id": "weather.editor"})
     assert _res(shown)["skill"]["status"] == "staged"
     enabled = _full(cfg, "skills_enable", {"skill_id": "weather.editor"})
-    assert _res(enabled)["status"] == "active"
+    # _b_skills reports the canonical enabled/disabled boolean; the permissioned
+    # record's own stored status remains the persistence truth.
+    assert _res(enabled)["status"] == "enabled"
     listed = _run(cfg, "skills_list", {})
-    assert any(s["skill_id"] == "weather.editor"
+    # N14: a manifest-only permissioned record is a capability grant, not a
+    # model skill. It stays manageable (show/enable/disable/rollback/remove
+    # below) but is not listed as an agent-visible skill — listing it made
+    # `qubit skills list` disagree with the agent's directory scan.
+    assert all(s["skill_id"] != "weather.editor"
                for s in _res(listed)["skills"])
     disabled = _full(cfg, "skills_disable", {"skill_id": "weather.editor"})
     assert _res(disabled)["status"] == "disabled"
@@ -556,10 +562,14 @@ PAGE_ROWS = [
     # (row_id, component, alias, method, api, qubit_op)
     ("page_analyticspage", "AnalyticsPage", "/analytics", "GET",
      "/api/analytics", "insights"),
+    ("page_agentspage", "AgentsPage", None, "GET", "/api/qubit/agents",
+     "status"),
     ("page_channelspage", "ChannelsPage", "/channels", "GET",
      "/api/messaging/platforms", "channels_status"),
-    ("page_chatpage", "ChatPage", "/chat", "POST", "/api/qubit/chat",
+    ("page_chatpage", "ChatPage", "/qubit-chat", "POST", "/api/qubit/chat",
      "status"),
+    ("page_terminalchatpage", "TerminalChatPage", "/chat", "POST",
+     "/api/auth/ws-ticket", "tui_help"),
     ("page_configpage", "ConfigPage", "/config", "GET", "/api/config",
      "config_profiles"),
     ("page_cronpage", "CronPage", "/cron", "GET", "/api/cron/jobs",
@@ -591,9 +601,9 @@ PAGE_ROWS = [
 ]
 
 
-def test_every_hermes_web_page_served_through_real_route(tmp_path,
+def test_every_qubit_web_page_served_through_real_route(tmp_path,
                                                          monkeypatch):
-    """All 19 vendored baseline pages render/serve through the Qubit shell.
+    """All vendored baseline pages + the Qubit terminal page render/serve.
 
     For each ``page_*`` ledger row: the vendored component exists on disk, its
     Qubit route redirects into the Hermes shell, the page's compat API route is
@@ -601,18 +611,18 @@ def test_every_hermes_web_page_served_through_real_route(tmp_path,
     operation executes through ``dashboard_ops.run_op``. A fabricated route is
     a typed 404/NOT_FOUND, never a fabricated render.
     """
-    from voicebridge import hermes_compat as HC
-    from voicebridge.webui import hermes_alias_target
+    from voicebridge import qubit_compat as HC
+    from voicebridge.webui import qubit_alias_target
 
     cfg = _cfg(tmp_path, monkeypatch)
-    pages_dir = REPO_ROOT / "frontend" / "hermes-web" / "src" / "pages"
-    assert len(PAGE_ROWS) == 19
+    pages_dir = REPO_ROOT / "frontend" / "qubit-web" / "src" / "pages"
+    assert len(PAGE_ROWS) == 21
     for row_id, component, alias, method, api, op_id in PAGE_ROWS:
         assert row_id  # ledger row id literal for the proving-test index
         assert (pages_dir / f"{component}.tsx").is_file(), component
         target = alias if alias else None
         if alias:
-            assert hermes_alias_target(alias) == target, (row_id, alias)
+            assert qubit_alias_target(alias) == target, (row_id, alias)
         if api:
             route, _ = HC.match(method, api)
             assert route is not None, (row_id, method, api)
@@ -625,11 +635,57 @@ def test_every_hermes_web_page_served_through_real_route(tmp_path,
 
 
 def test_unknown_page_and_route_are_typed_negatives(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
-    from voicebridge.webui import hermes_alias_target
+    from voicebridge import qubit_compat as HC
+    from voicebridge.webui import qubit_alias_target
 
     cfg = _cfg(tmp_path, monkeypatch)
-    assert hermes_alias_target("/agent3-not-a-page") is None
+    assert qubit_alias_target("/agent3-not-a-page") is None
     status, body = HC.dispatch(cfg, "GET", "/api/agent3-not-a-route")
     assert status == 404, (status, body)
     assert body.get("code") == "NOT_FOUND", body
+
+
+def test_agents_route_is_a_shell_route_not_the_api_namespace():
+    """`/agents` is a real SPA page; only `/agent` (+ `/agent/...`) is API.
+
+    A prior regression matched any path starting with ``/agent``, so the
+    ``/agents`` page hard-loaded 404 while its client-side nav worked.
+    """
+    from voicebridge.webui import SPA_ROUTE_SET, qubit_alias_target
+
+    assert "/agents" in SPA_ROUTE_SET
+    assert qubit_alias_target("/agents") == "/agents"
+    assert qubit_alias_target("/agents/team-1") == "/agents/team-1"
+    # The SPA API namespace and the gone upstream mount stay non-shell.
+    assert qubit_alias_target("/agent") is None
+    assert qubit_alias_target("/agent/api/status") is None
+    assert qubit_alias_target("/hermes") is None
+
+
+def test_action_status_route_serves_the_real_recorded_outcome(
+        tmp_path, monkeypatch):
+    """`GET /api/actions/<name>/status` must answer the viewer's real shape.
+
+    The upstream action-log viewer polls this path. The generic
+    ``/api/actions/.*`` wildcard previously shadowed it and returned the
+    actions *list* shape, so ``lines`` was undefined and the page crashed.
+    """
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    # Isolate the process-local registry from any earlier action in this run.
+    HC._ACTION_STATUS.clear()
+    # A name that has not run is a typed refusal, never a fabricated success.
+    status, body = HC.dispatch(cfg, "GET", "/api/actions/doctor/status")
+    assert status == 404, (status, body)
+    assert body["ok"] is False
+    assert body["code"] == "ACTION_NOT_TRACKED"
+    # Running the real action records its terminal outcome under its name.
+    status, run = HC.dispatch(cfg, "POST", "/api/ops/doctor", body={})
+    assert status == 200, (status, run)
+    status, body = HC.dispatch(cfg, "GET", "/api/actions/doctor/status")
+    assert status == 200, (status, body)
+    assert body["name"] == "doctor"
+    assert body["running"] is False
+    assert body["exit_code"] == 0
+    assert isinstance(body["lines"], list) and body["lines"]

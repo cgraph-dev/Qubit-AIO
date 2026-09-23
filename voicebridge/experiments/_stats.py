@@ -1,7 +1,7 @@
 """Packet 8P controlled evaluation — pure statistics (no I/O).
 
 Adapted from the smallest tested concepts of Evolve (Apache-2.0 (c) 2026
-Kristian Baer / Northtek; docs/UPSTREAM_REUSE.md R27): per-session signal
+Kristian Baer / Northtek; docs/archive/2026-09-21/UPSTREAM_REUSE.md R27): per-session signal
 aggregation with explicit=5x implicit weighting, wins/losses binarization, a
 seeded Beta(1+wins,1+losses) Monte Carlo posterior, and the promotion decision
 (NeedMoreData below a minimum per-arm sample, Promote only at a high

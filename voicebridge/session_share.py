@@ -1,6 +1,6 @@
-"""Qubit-safe session sharing (OpenClaw v2026.9.4 delta D24).
+"""Qubit-safe session sharing (Qubit v2026.9.4 delta D24).
 
-OpenClaw publishes a read-only session transcript to a public URL. Qubit has
+Qubit publishes a read-only session transcript to a public URL. Qubit has
 no public listener and uploads nothing: this module is the Qubit-safe
 equivalent — a locally-served, token-scoped, expiring, revocable read-only
 view of a redacted action receipt.
@@ -322,6 +322,26 @@ def revoke(cfg: Any, share_id: str, *,
     _audit("revoke", share_id=sid, session_id=rec.get("session_id"))
     return {"schema": SCHEMA, "state": "OK", "code": "OK", "changed": True,
             "share": _public(rec)}
+
+
+def revoke_by_token(cfg: Any, token: str, *,
+                    confirmed: bool = False) -> Dict[str, Any]:
+    """Revoke the share a bearer *token* belongs to (constant-time hash match)."""
+    raw = token if isinstance(token, str) else ""
+    if not raw:
+        return _refuse("FAILED", BAD_INPUT_CODE, "token required",
+                       changed=False)
+    try:
+        state = _load(cfg)
+    except ShareError as exc:
+        return _refuse("UNAVAILABLE", exc.code, exc.detail, changed=False)
+    want = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    match = next((r for r in state["shares"].values()
+                  if isinstance(r, dict) and r.get("token_hash") == want), None)
+    if match is None:
+        return _refuse("NOT_FOUND", NOT_FOUND_CODE, "no share for token",
+                       changed=False)
+    return revoke(cfg, str(match.get("id") or ""), confirmed=confirmed)
 
 
 def resolve(cfg: Any, share_id: str, token: str) -> Dict[str, Any]:

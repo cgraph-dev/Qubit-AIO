@@ -2,7 +2,7 @@
 
 Adapted from AG-UI sdks/python/ag_ui/core/events.py, ag_ui/core/types.py and
 ag_ui/encoder/encoder.py at pinned commit 821b8c227c6fe7b78de2c8259173dd7cbbdf181b
-(MIT, Copyright (c) 2025). See docs/UPSTREAM_REUSE.md R1 and
+(MIT, Copyright (c) 2025). See docs/archive/2026-09-21/UPSTREAM_REUSE.md R1 and
 THIRD_PARTY_NOTICES.md. stdlib-only: the pydantic validation machinery is
 intentionally replaced by explicit per-type field specs (same wire contract,
 fail-closed validation, no undeclared dependency).

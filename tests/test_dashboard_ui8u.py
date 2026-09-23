@@ -16,7 +16,7 @@ pytestmark = _pytest.mark.ui
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-ROUTES = ["/", "/chat", "/sessions", "/files", "/models",
+ROUTES = ["/", "/chat", "/qubit-chat", "/sessions", "/files", "/models",
           "/analytics", "/logs", "/cron", "/skills", "/plugins", "/mcp",
           "/channels", "/webhooks", "/pairing", "/profiles", "/config",
           "/env", "/system", "/docs", "/activity", "/reports",
@@ -81,7 +81,7 @@ def _page(browser, base, route):
     return ctx, page, errors
 
 
-def test_every_route_loads_the_hermes_shell(tmp_path_factory):
+def test_every_route_loads_the_qubit_shell(tmp_path_factory):
     ui, pw, browser, base = _start(tmp_path_factory)
     try:
         for route in ROUTES:

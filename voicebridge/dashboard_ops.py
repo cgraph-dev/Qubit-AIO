@@ -81,6 +81,16 @@ REASON_VOICE_CANONICAL = (
 # id is removed here and the automatic all-three interface returns. Every
 # entry must still resolve to the same shared broker backend on the surfaces
 # it does declare.
+#
+# A14: this map is intentionally EMPTY because every registry op that the
+# catalog advertises as `cli` has a real `qubit <family> [<sub>]` production
+# path — either declared in `voice_commands.CLI_COVERAGE` or a native parser
+# subcommand (e.g. `vision_describe` -> `qubit vision describe`). The
+# `tests/test_qubit_command_parity8u.py` closure and
+# `tests/test_authority_unification8u.py::test_catalog_cli_claims_are_truthful`
+# re-derive that for every op, so a genuine orphan fails the gate instead of
+# being hidden here. Populate an id here only when a real CLI binding is
+# missing.
 CLI_PENDING: Dict[str, str] = {}
 
 
@@ -457,6 +467,45 @@ def _coerce_extra(spec: ExtraOp, args: Dict[str, Any]) -> Dict[str, Any]:
     return coerced
 
 
+# Backend result states meaning the requested work did NOT happen. A typed
+# refusal/denial is a successful *outcome* for the dedicated ``confirm=False``
+# refusal operations and for ops that deliver a gate denial as their honest
+# result (``actions_retry``), so those tokens only count as failures on the
+# confirmed mutation path, where a refusal means nothing changed.
+_EXTRA_FAILURE_STATES = frozenset({
+    "failed", "missing", "error", "unavailable", "invalid",
+    "estop", "refused", "rejected", "blocked",
+})
+_EXTRA_REFUSAL_STATES = frozenset({"refused", "rejected", "blocked", "delegated"})
+
+
+def _extra_result_failure(result: Any, *, refusals_are_failure: bool
+                          ) -> Optional[Dict[str, str]]:
+    """Typed failure for an op result whose top-level ``state`` is not success.
+
+    Extra ops return a structured ``{"state": ...}`` result; the envelope used
+    to hard-code ``executed`` regardless, so a failed/refused mutation (model
+    profile rollback, create without a key_ref, ...) looked like success. This
+    surfaces the true state. Results without a top-level ``state`` (nested
+    report shapes) and dedicated typed refusals on the unconfirmed path are
+    left to the envelope's existing behavior.
+    """
+    if not isinstance(result, dict):
+        return None
+    state = str(result.get("state") or "").strip().lower()
+    if not state or state not in _EXTRA_FAILURE_STATES:
+        return None
+    refusal = state in _EXTRA_REFUSAL_STATES
+    if refusal and not refusals_are_failure:
+        return None
+    return {
+        "state": "refused" if refusal else "failed",
+        "code": str(result.get("code") or "OPERATION_FAILED")[:80],
+        "detail": _redact(str(result.get("detail") or result.get("message")
+                              or state))[:300],
+    }
+
+
 def run_extra_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
                  actor: str = "dashboard:user",
                  session: str = "dashboard") -> Dict[str, Any]:
@@ -482,6 +531,13 @@ def run_extra_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
             _audit("failed", actor, {"op": op_id, "code": str(code)[:60]})
             return {"state": "failed", "code": str(code)[:60],
                     "detail": _redact(str(exc))[:300]}
+        failure = _extra_result_failure(result, refusals_are_failure=False)
+        if failure is not None:
+            _audit("failed", actor,
+                   {"op": op_id, "code": failure["code"]})
+            return {"state": failure["state"], "code": failure["code"],
+                    "detail": failure["detail"],
+                    "receipt": {"entry": op_id, "op": op_id, "result": result}}
         _audit("executed", actor, {"op": op_id, "session": session})
         return {"state": "executed", "speech": f"{spec.title}: done.",
                 "receipt": {"entry": op_id, "op": op_id, "result": result}}
@@ -567,6 +623,15 @@ def confirm_extra_op(cfg: Any, confirmation_id: str, *,
                {"op": op_id, "confirmation_id": target.id})
         return {"state": "failed", "code": str(code)[:60],
                 "detail": _redact(str(exc))[:300]}
+    failure = _extra_result_failure(result, refusals_are_failure=True)
+    if failure is not None:
+        _audit("confirmed_failed", actor,
+               {"op": op_id, "confirmation_id": target.id,
+                "code": failure["code"]})
+        return {"state": failure["state"], "code": failure["code"],
+                "detail": failure["detail"],
+                "receipt": {"op": op_id, "confirmation_id": target.id,
+                            "result": result}}
     _audit("confirmed_executed", actor,
            {"op": op_id, "confirmation_id": target.id})
     return {"state": "executed",
@@ -605,6 +670,252 @@ def cancel_extra_op(cfg: Any, confirmation_id: Optional[str] = None, *,
             "receipt": {"cancelled": count}}
 
 
+def cancel_compat_op(cfg: Any, confirmation_id: Optional[str] = None, *,
+                     actor: str = "dashboard:user",
+                     session: str = "dashboard") -> Dict[str, Any]:
+    """Deny staged ``qubit.*`` compat confirmations on the shared journal.
+
+    ``qubit_compat._stage_compat_confirm`` stages the confirm-gated compat
+    mutations (config write, toolset config, cron create/update/delete, MCP
+    server/auth) under a ``qubit.<action>`` capability with the dashboard
+    session. They have no dashboard-ops registry row, so before this the
+    pending-approvals banner's Cancel answered ``NOTHING_PENDING`` and a staged
+    config write could only expire. Deny them here with the same journal and
+    audit semantics ``confirm_op`` uses to settle them.
+    """
+    journal = _journal(cfg)
+    try:
+        items = [a for a in journal.pending()
+                 if str(getattr(a, "capability", "")).startswith("qubit.")
+                 and (getattr(a, "meta", {}) or {}).get("session", "dashboard")
+                 == session]
+    except Exception as exc:
+        return {"state": "failed", "code": "JOURNAL_ERROR",
+                "detail": _redact(str(exc))[:200]}
+    if confirmation_id:
+        items = [a for a in items if a.id == confirmation_id]
+    count = 0
+    for item in items:
+        try:
+            journal.respond(item.id, "deny")
+            count += 1
+        except Exception:
+            pass
+    if count:
+        _audit("cancelled", actor,
+               {"session": session, "count": count, "channel": "compat"})
+    if count == 0:
+        return {"state": "failed", "code": "NOTHING_PENDING",
+                "detail": "There's nothing pending."}
+    return {"state": "executed",
+            "speech": f"Cancelled {count} pending confirmation(s).",
+            "receipt": {"cancelled": count}}
+
+
+def cancel_skill_op(cfg: Any, confirmation_id: Optional[str] = None, *,
+                    actor: str = "dashboard:user",
+                    session: str = "dashboard") -> Dict[str, Any]:
+    """Deny staged ``skill.mutation`` confirmations on the shared journal.
+
+    The verified-skills channel stages create/edit/install/remove confirmations
+    under ``skill.mutation`` with the dashboard session. Without a cancel
+    branch (mirroring ``cancel_compat_op``/toolset cancel) the pending-
+    approvals banner's Cancel answered ``NOTHING_PENDING`` and a staged skill
+    mutation stayed ``in_progress`` until its TTL. Deny here with the same
+    journal + audit semantics the settle path uses.
+    """
+    from .verified_skills.mutations import SKILL_MUTATION_CAPABILITY
+
+    journal = _journal(cfg)
+    try:
+        items = [a for a in journal.pending()
+                 if str(getattr(a, "capability", "")) == SKILL_MUTATION_CAPABILITY
+                 and (getattr(a, "meta", {}) or {}).get("session", "dashboard")
+                 == session]
+    except Exception as exc:
+        return {"state": "failed", "code": "JOURNAL_ERROR",
+                "detail": _redact(str(exc))[:200]}
+    if confirmation_id:
+        items = [a for a in items if a.id == confirmation_id]
+    count = 0
+    for item in items:
+        try:
+            journal.respond(item.id, "deny")
+            count += 1
+        except Exception:
+            pass
+    if count:
+        _audit("cancelled", actor,
+               {"session": session, "count": count, "channel": "skill"})
+    if count == 0:
+        return {"state": "failed", "code": "NOTHING_PENDING",
+                "detail": "There's nothing pending."}
+    return {"state": "executed",
+            "speech": f"Cancelled {count} pending confirmation(s).",
+            "receipt": {"cancelled": count}}
+
+
+def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]]:
+    """The real canonical backend for a staged ``qubit.*`` action.
+
+    Returns ``None`` for a compat capability with no executable Qubit backend
+    (so a settle can never report fabricated success). ``config.write``
+    re-enters the SAME ``config_save`` handler the Settings PUT uses, with the
+    secret-filtered scalar payload recorded at stage time and ``confirm`` set
+    so the write applies exactly once. ``memory.reset`` and the hooks
+    ``declare``/``remove``/``update`` actions re-enter the same compat handlers
+    with the staged payload, so the pending-approvals banner's id-only Confirm
+    executes the real backend exactly once.
+    """
+    if action == "config.write":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            body: Dict[str, Any] = {"confirm": True}
+            if payload:
+                body["config"] = dict(payload)
+            return HC.config_save(cfg, {}, body, {})
+        return _run
+    if action == "memory.reset":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            target = str((payload or {}).get("target", "all") or "all")
+            return HC.h_mem_reset(cfg, {}, {"confirm": True, "target": target},
+                                  {})
+        return _run
+    if action == "hooks.declare":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            return HC.h_hooks_create(cfg, {}, {**dict(payload or {}),
+                                               "confirm": True}, {})
+        return _run
+    if action == "hooks.remove":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            return HC.hooks_delete(cfg, {}, {**dict(payload or {}),
+                                             "confirm": True}, {})
+        return _run
+    if action == "hooks.update":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            return HC.h_hooks_update(cfg, {}, {**dict(payload or {}),
+                                               "confirm": True}, {})
+        return _run
+    return None
+
+
+def _confirm_compat_one(cfg: Any, item: Any, *, actor: str, session: str,
+                        supplied: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Settle one ``qubit.*`` journal entry once and run its real backend."""
+    from .approvals import ABORTED, COMPLETE, DENIED
+
+    capability = str(getattr(item, "capability", "") or "")
+    meta = getattr(item, "meta", {}) or {}
+    action = str(meta.get("action") or capability[len("qubit."):] or "")
+    runner = _compat_runner(action)
+    if runner is None:
+        return {"state": "failed", "code": "CONFIRM_UNSUPPORTED",
+                "detail": f"No executable Qubit backend for {action!r}; "
+                          "cancel it instead."}
+    payload = dict(meta.get("payload") or meta.get("args") or {})
+    if isinstance(supplied, dict):
+        payload.update(supplied)
+    if _estop(cfg):
+        try:
+            _journal(cfg).respond(item.id, "deny")
+        except Exception:
+            pass
+        return {"state": "refused", "code": "ESTOP_LATCHED",
+                "detail": "Emergency stop is latched."}
+    journal = _journal(cfg)
+    try:
+        settled = journal.respond(item.id, "approve")
+    except Exception as exc:
+        return {"state": "failed", "code": "SETTLE_ERROR",
+                "detail": _redact(str(exc))[:200]}
+    if settled.state in (ABORTED, COMPLETE, DENIED):
+        return {"state": "failed", "code": "NO_CONFIRMATION",
+                "detail": "That confirmation is gone."}
+    if not _mark_executed(cfg, item.id):
+        return {"state": "failed", "code": "ALREADY_DONE",
+                "detail": "Already done."}
+    try:
+        outcome = runner(cfg, payload)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        _audit("confirmed_failed", actor,
+               {"action": action, "confirmation_id": item.id,
+                "code": str(code)[:60]})
+        return {"state": "failed", "code": str(code)[:60],
+                "detail": _redact(str(exc))[:300]}
+    http, body = outcome if isinstance(outcome, tuple) else (200, outcome)
+    ok = bool(isinstance(body, dict) and body.get("ok"))
+    if not ok:
+        code = str((body or {}).get("code") or "BACKEND_REFUSED")[:60]
+        _audit("confirmed_failed", actor,
+               {"action": action, "confirmation_id": item.id, "code": code})
+        return {"state": "failed", "code": code,
+                "detail": _redact(str((body or {}).get("detail", "")))[:300]}
+    _audit("confirmed_executed", actor,
+           {"action": action, "confirmation_id": item.id})
+    return {"state": "executed",
+            "speech": f"{action}: done.",
+            "receipt": {"action": action, "confirmation_id": item.id,
+                        "result": body}}
+
+
+def confirm_compat_op(cfg: Any, confirmation_id: Optional[str] = None, *,
+                      actor: str = "dashboard:user",
+                      session: str = "dashboard",
+                      args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Approve and execute staged ``qubit.*`` compat confirmations once.
+
+    Symmetric to ``cancel_compat_op``/``confirm_extra_op``: it settles on the
+    one shared approval journal, routes the recorded action to the real
+    canonical backend, and audits the outcome. Missing, expired, already
+    settled, or wrong-session confirmations fail closed with a typed code; a
+    successful settle consumes the journal entry exactly once, so a replay can
+    never double-apply.
+    """
+    journal = _journal(cfg)
+    try:
+        items = [a for a in journal.pending()
+                 if str(getattr(a, "capability", "")).startswith("qubit.")
+                 and (getattr(a, "meta", {}) or {}).get("session", "dashboard")
+                 == session]
+    except Exception as exc:
+        return {"state": "failed", "code": "JOURNAL_ERROR",
+                "detail": _redact(str(exc))[:200]}
+    if confirmation_id:
+        items = [a for a in items if a.id == confirmation_id]
+        if not items:
+            return {"state": "failed", "code": "NO_CONFIRMATION",
+                    "detail": "That confirmation is gone."}
+    if not items:
+        return {"state": "failed", "code": "NOTHING_PENDING",
+                "detail": "There's nothing pending."}
+    executed: list = []
+    last_failure: Optional[Dict[str, Any]] = None
+    for item in items:
+        out = _confirm_compat_one(cfg, item, actor=actor, session=session,
+                                  supplied=args)
+        if out["state"] == "executed":
+            executed.append(out)
+        else:
+            last_failure = out
+    if executed:
+        return {"state": "executed",
+                "speech": f"Confirmed {len(executed)} pending confirmation(s).",
+                "receipt": {"confirmed": len(executed),
+                            "results": [o.get("receipt") for o in executed]}}
+    return last_failure or {"state": "failed", "code": "NOTHING_PENDING",
+                            "detail": "There's nothing pending."}
+
+
 # ---------------------------------------------------------------- dispatch
 def run_op(cfg: Any, op_id: str, args: Dict[str, Any], *,
            actor: str = "dashboard:user",
@@ -629,18 +940,29 @@ def confirm_op(cfg: Any, confirmation_id: str, *,
     except Exception as exc:
         return {"state": "failed", "code": "JOURNAL_ERROR",
                 "detail": _redact(str(exc))[:200]}
-    target = pending.get(confirmation_id)
-    if target is None:
+    target = pending.get(confirmation_id) if confirmation_id else None
+    if target is not None:
+        capability = str(getattr(target, "capability", "") or "")
+        if capability.startswith("dashboard."):
+            return confirm_extra_op(cfg, confirmation_id, actor=actor,
+                                    session=session, sensitive=sensitive)
+        if capability.startswith("qubit."):
+            return confirm_compat_op(cfg, confirmation_id, actor=actor,
+                                     session=session, args=sensitive)
+        return confirm_registry_op(cfg, confirmation_id, actor=actor,
+                                   session=session)
+    if confirmation_id:
         # May already be settled, expired, or belong to a session the
         # registry path filters out: surface the honest typed state.
         return {"state": "failed", "code": "NO_CONFIRMATION",
                 "detail": "That confirmation is gone."}
-    capability = str(getattr(target, "capability", "") or "")
-    if capability.startswith("dashboard."):
-        return confirm_extra_op(cfg, confirmation_id, actor=actor,
-                                session=session, sensitive=sensitive)
-    return confirm_registry_op(cfg, confirmation_id, actor=actor,
-                               session=session)
+    # No id: confirm the session's pending compat and voice confirmations and
+    # report the honest aggregate (mirrors cancel_op's no-id path).
+    compat = confirm_compat_op(cfg, None, actor=actor, session=session,
+                               args=sensitive)
+    if compat["state"] == "executed":
+        return compat
+    return confirm_registry_op(cfg, "", actor=actor, session=session)
 
 
 def cancel_op(cfg: Any, confirmation_id: Optional[str] = None, *,
@@ -652,21 +974,53 @@ def cancel_op(cfg: Any, confirmation_id: Optional[str] = None, *,
     except Exception:
         pending = {}
     target = pending.get(confirmation_id) if confirmation_id else None
-    if target is not None and str(
-            getattr(target, "capability", "")).startswith("dashboard."):
-        return cancel_extra_op(cfg, confirmation_id, actor=actor,
-                               session=session)
     if target is not None:
+        capability = str(getattr(target, "capability", "") or "")
+        if capability.startswith("dashboard."):
+            return cancel_extra_op(cfg, confirmation_id, actor=actor,
+                                   session=session)
+        if capability.startswith("qubit."):
+            return cancel_compat_op(cfg, confirmation_id, actor=actor,
+                                    session=session)
+        from . import toolsets as TS
+        from .verified_skills.mutations import SKILL_MUTATION_CAPABILITY
+
+        if capability == SKILL_MUTATION_CAPABILITY:
+            # The verified-skills module owns its journal ids (settle-if-owned
+            # exists; cancel lives here as the symmetric deny path).
+            return cancel_skill_op(cfg, confirmation_id, actor=actor,
+                                   session=session)
+        if capability == TS.TOOLSET_CAPABILITY:
+            # The toolset mutation module owns its journal ids; try its
+            # cancel-if-owned contract before the registry fallback (mirrors
+            # h_ops_confirm's settle-if-owned branch).
+            owned = TS.cancel_toolset_mutation_if_owned(
+                cfg, confirmation_id, actor=actor, session=session)
+            if owned is not None:
+                return owned
         return cancel_registry_op(cfg, confirmation_id, actor=actor,
                                   session=session)
-    # No id (or unknown id): cancel session pending on both channels and
+    # No id (or unknown id): cancel session pending on all four channels and
     # report the honest aggregate.
+    from . import toolsets as TS
+
     reg = cancel_registry_op(cfg, confirmation_id, actor=actor,
                              session=session)
     ext = cancel_extra_op(cfg, confirmation_id, actor=actor, session=session)
-    if reg["state"] == "executed" or ext["state"] == "executed":
+    compat = cancel_compat_op(cfg, confirmation_id, actor=actor,
+                              session=session)
+    skill = cancel_skill_op(cfg, confirmation_id, actor=actor,
+                            session=session)
+    tool = TS.cancel_toolset_mutations(cfg, confirmation_id, actor=actor,
+                                       session=session)
+    if reg["state"] == "executed" or ext["state"] == "executed" \
+            or compat["state"] == "executed" or skill["state"] == "executed" \
+            or tool["state"] == "executed":
         total = int(reg.get("receipt", {}).get("cancelled", 0)) + \
-            int(ext.get("receipt", {}).get("cancelled", 0))
+            int(ext.get("receipt", {}).get("cancelled", 0)) + \
+            int(compat.get("receipt", {}).get("cancelled", 0)) + \
+            int(skill.get("receipt", {}).get("cancelled", 0)) + \
+            int(tool.get("receipt", {}).get("cancelled", 0))
         return {"state": "executed",
                 "speech": f"Cancelled {total} pending confirmation(s).",
                 "receipt": {"cancelled": total}}
@@ -1021,6 +1375,10 @@ def _extra_import_agent_import(cfg: Any, args: Dict[str, Any],
                "choices": ("run", "start", "stop", "restart", "install")},),
        confirm=False, interfaces=INTERFACES_DASHBOARD,
        interface_reason=REASON_DASHBOARD_REFUSAL,
+       # Canonical spoken counterpart: the gateway supervision refusal is
+       # already a real voice entry, so the dashboard control links to it
+       # instead of being dashboard-only (declared, never a duplicate entry).
+       voice_guard="gateway_supervision_refusal",
        parity=("gateway", "gateway-manage"))
 def _extra_gateway_supervision(cfg: Any, args: Dict[str, Any],
                                actor: str) -> Dict[str, Any]:
@@ -1172,6 +1530,50 @@ def _extra_kanban_delegated(cfg: Any, args: Dict[str, Any],
     from . import kanban as KB
 
     return KB.refuse_delegated(args["subcommand"])
+
+
+@extra("schedule_dispatch", group="schedules", title="Scheduled dispatch",
+       help="Run a due scheduled job through the canonical agent/automation "
+            "dispatcher. The job was pre-authorized when the user confirmed "
+            "the schedule; the monitor tick settles this op instead of "
+            "calling a private executor.",
+       args=(_req("task_text"), _opt("session"), _opt("now"),
+             {"name": "directive", "type": "choice", "required": False,
+              "choices": ("true", "false")}),
+       confirm=True, interfaces=INTERFACES_DASHBOARD,
+       interface_reason=REASON_VOICE_CANONICAL,
+       voice_guard="schedules_run_due", parity=("schedules",))
+def _extra_schedule_dispatch(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    """One canonical executor for scheduled jobs (free text or directive).
+
+    The free-text path resolves the selected model/provider profile through
+    the same ``chat_transport`` resolver+gateway CLI/dashboard use; the
+    directive path runs the real ``automation`` dispatcher. Both return the
+    typed per-job outcome the scheduler records (never a fabricated OK).
+    """
+    text = str(args.get("task_text", "") or "")
+    moment = None
+    if str(args.get("now", "") or "").strip():
+        try:
+            moment = float(str(args["now"]).strip())
+        except (TypeError, ValueError):
+            moment = None
+    if str(args.get("directive", "") or "").lower() == "true":
+        from .automation import run_directive
+
+        return run_directive(cfg, text, now=moment, requested_by=actor)
+    session = str(args.get("session", "") or "schedule")
+    from . import chat_transport as CT
+
+    res = CT.turn(cfg, text, session=session, role="coding")
+    if not isinstance(res, dict) or not res.get("ok"):
+        return {"state": "UNAVAILABLE",
+                "code": str((res or {}).get("code", "AGENT_ERROR")),
+                "detail": str((res or {}).get("detail")
+                              or (res or {}).get("error", ""))[:200]}
+    return {"state": "OK", "code": "OK",
+            "detail": str(res.get("reply", ""))[:300]}
 
 
 @extra("pets_downloads", group="themes", title="Pet gallery downloads",
@@ -1412,7 +1814,7 @@ def _op_test_model_profile(cfg: Any, args: Dict[str, Any],
           help="Register a model profile (non-secret fields only; key_ref is "
                "an env:/file: reference, never a raw key).",
           args=(_req("profile_id"),
-                _choice("kind", ("local", "api", "realtime")),
+                _choice("kind", ("local", "api", "realtime", "plugin")),
                 _opt("provider"), _opt("model"), _opt("base_url"),
                 {"name": "key_ref", "type": "str", "required": False,
                  "secret": True},
@@ -1494,4 +1896,160 @@ def _op_rollback_model_profile(cfg: Any, args: Dict[str, Any],
         cfg, args["profile_id"],
         session=args.get("session", "") or "dashboard",
         role=args.get("role", "") or "chat", confirm=True)
+
+
+# ===================================================== speech profiles
+# Canonical STT/TTS/realtime profile lifecycle. The SAME
+# ``voicebridge.providers.speech`` registry the orchestrator's ASR/TTS seams
+# resolve through, the CLI (``qubit profile speech ...``), the Qubit RPC
+# surface, and the voice registry all share. Reads execute immediately;
+# mutations stage on the one confirmation journal; ``key_ref`` is an
+# ``env:``/``file:`` reference only (a raw key is refused). These live in
+# MODEL_PROFILE_OPS so they flow through the identical run/confirm/audit/
+# journal/e-stop pipeline and never become a second mount of the provider.
+_SPEECH_ARGS = dict(
+    interfaces=INTERFACES_NO_VOICE,
+    interface_reason=REASON_VOICE_CANONICAL,
+    voice_guard="speech_profile_test",
+    parity=("config", "profile"),
+)
+
+
+def _bool(name: str, required: bool = False) -> Dict[str, Any]:
+    return {"name": name, "type": "bool", "required": required}
+
+
+def _speech_profile_from_args(args: Dict[str, Any]) -> Any:
+    from .providers.speech import SpeechProfile
+
+    fields = {
+        "id": str(args.get("profile_id") or "").strip(),
+        "kind": str(args.get("kind") or "speech_in"),
+        "provider": str(args.get("provider") or "").strip(),
+        "model": str(args.get("model") or "").strip(),
+        "voice": str(args.get("voice") or "").strip(),
+        "device": str(args.get("device") or "").strip(),
+        "language": str(args.get("language") or "").strip(),
+        "locality": str(args.get("locality") or "local"),
+        "egress_consent": str(args.get("egress_consent") or "deny"),
+        "key_ref": str(args.get("key_ref") or "").strip(),
+        "base_url": str(args.get("base_url") or "").strip(),
+        "engine": str(args.get("engine") or "").strip(),
+        "fallback_to": str(args.get("fallback_to") or "").strip(),
+    }
+    return SpeechProfile.from_record(fields)
+
+
+@model_op("list_speech_profiles", group="profile",
+          title="List speech profiles",
+          help="List the canonical STT/TTS/realtime speech profiles and gates.",
+          confirm=False, args=(_opt("kind"),), **_SPEECH_ARGS)
+def _op_list_speech_profiles(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    from .providers import resolver as R
+
+    return R.list_speech_profiles(cfg, args.get("kind") or None)
+
+
+@model_op("show_speech_profile", group="profile",
+          title="Show speech profile",
+          help="Show one speech profile (STT/TTS/realtime) with its effective "
+               "selection and gate.",
+          confirm=False, args=(_req("profile_id"),), **_SPEECH_ARGS)
+def _op_show_speech_profile(cfg: Any, args: Dict[str, Any],
+                            actor: str) -> Dict[str, Any]:
+    from .providers import resolver as R
+
+    return R.show_speech_profile(cfg, args["profile_id"])
+
+
+@model_op("test_speech_profile", group="profile",
+          title="Test speech profile",
+          help="Preflight the active (or named) speech profile (read-only).",
+          confirm=False, args=(_opt("profile_id"), _opt("kind")), **_SPEECH_ARGS)
+def _op_test_speech_profile(cfg: Any, args: Dict[str, Any],
+                            actor: str) -> Dict[str, Any]:
+    from .providers import resolver as R
+    from .providers import speech as SP
+
+    pid = str(args.get("profile_id") or "").strip()
+    kind = str(args.get("kind") or "").strip() or SP.SPEECH_IN
+    if pid:
+        return SP.show_speech_profile(cfg, pid)
+    eff = R.resolve_speech_in(cfg) if kind == SP.SPEECH_IN else (
+        R.resolve_speech_out(cfg) if kind == SP.SPEECH_OUT
+        else R.resolve_realtime(cfg))
+    return {"state": "OK", "kind": kind, "effective": eff.to_public_dict()}
+
+
+@model_op("create_speech_profile", group="profile",
+          title="Create speech profile",
+          help="Register a speech profile (non-secret fields only; key_ref is "
+               "an env:/file: reference, never a raw key).",
+          args=(_req("profile_id"),
+                _choice("kind", ("speech_in", "speech_out", "realtime")),
+                _opt("provider"), _opt("model"), _opt("voice"),
+                _opt("device"), _opt("language"),
+                _choice("locality", ("local", "external")),
+                _choice("egress_consent", ("deny", "allow")),
+                {"name": "key_ref", "type": "str", "required": False,
+                 "secret": True},
+                _opt("base_url"), _opt("engine"), _opt("fallback_to")),
+          **_SPEECH_ARGS)
+def _op_create_speech_profile(cfg: Any, args: Dict[str, Any],
+                              actor: str) -> Dict[str, Any]:
+    from .providers import resolver as R
+
+    return R.upsert_speech_profile(cfg, _speech_profile_from_args(args),
+                                   confirm=True)
+
+
+@model_op("clone_speech_profile", group="profile",
+          title="Clone speech profile",
+          help="Clone a speech profile under a new id (records the source as "
+               "the rollback target).",
+          args=(_req("source_id"), _req("new_id")), **_SPEECH_ARGS)
+def _op_clone_speech_profile(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    from .providers import resolver as R
+
+    return R.clone_speech_profile(cfg, args["source_id"], args["new_id"],
+                                  confirm=True)
+
+
+@model_op("remove_speech_profile", group="profile",
+          title="Remove speech profile",
+          help="Remove a non-default speech profile (refused while a session "
+               "selects it).",
+          args=(_req("profile_id"),), **_SPEECH_ARGS)
+def _op_remove_speech_profile(cfg: Any, args: Dict[str, Any],
+                              actor: str) -> Dict[str, Any]:
+    from .providers import resolver as R
+
+    return R.remove_speech_profile(cfg, args["profile_id"], confirm=True)
+
+
+@model_op("select_session_speech", group="profile",
+          title="Select session speech profile",
+          help="Select a speech profile for one session/kind (confirmed).",
+          args=(_req("session"), _req("profile_id"), _req("kind")),
+          **_SPEECH_ARGS)
+def _op_select_session_speech(cfg: Any, args: Dict[str, Any],
+                              actor: str) -> Dict[str, Any]:
+    from .providers import speech as SP
+
+    return SP.set_session_speech_profile(
+        cfg, args["session"], args["kind"], args["profile_id"], confirm=True)
+
+
+@model_op("clear_session_speech", group="profile",
+          title="Clear session speech profile",
+          help="Clear a session's speech profile override (confirmed).",
+          args=(_req("session"), _opt("kind")), **_SPEECH_ARGS)
+def _op_clear_session_speech(cfg: Any, args: Dict[str, Any],
+                             actor: str) -> Dict[str, Any]:
+    from .providers import speech as SP
+
+    return SP.clear_session_speech_profile(
+        cfg, args["session"], kind=(args.get("kind") or None), confirm=True)
 

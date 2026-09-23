@@ -622,7 +622,7 @@ def test_package_cli_dashboard_identity_parity(tmp_path):
 
 
 def test_physical_folder_migration_procedure(tmp_path):
-    """The exact procedure from docs/OPERATIONS_8S.md §3, rehearsed on a
+    """The exact procedure from docs/archive/2026-09-21/OPERATIONS_8S.md §3, rehearsed on a
     throwaway tree: hash, copy, re-hash, rename old aside, prove the new
     folder is the only active checkout."""
     import hashlib

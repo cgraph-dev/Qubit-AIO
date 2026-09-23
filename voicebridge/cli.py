@@ -157,16 +157,17 @@ _OP_LEAF_CLI = (
     ("prompt-budget", "prompt_budget", "context budget report (read-only)"),
 )
 
-# Whole Hermes CLI families served by the vendored fork (Wave 1). The
+# Whole Qubit CLI families served by the vendored fork (Wave 1). The
 # real dispatch is the pre-parse route in main() (same pattern as `agent` /
-# `hermes`), which preserves upstream argv/help/errors/exit status; these
+# `qubit`), which preserves upstream argv/help/errors/exit status; these
 # entries declare the family in the live parser tree, help, completions and the
 # gap ledger. Read-only subcommands forward verbatim, mutating subcommands
 # require Qubit's --confirm, and unclassified subcommands are typed refusals.
 _FAMILY_FORWARD_HELP = (
     ("bundles", "list/show/create/delete/reload skill bundles "
                 "(read-only list/show; writes need --confirm)"),
-    ("claw", "OpenClaw migration tools (confirm-gated; no silent secret import)"),
+    ("claw", "legacy-assistant migration tools (confirm-gated; no silent "
+             "secret import)"),
     ("console", "safe command console REPL (confirm-gated interactive)"),
     ("debug", "diagnostics share/delete (confirm-gated; nothing uploaded "
               "without confirmation)"),
@@ -210,14 +211,27 @@ _CLI_COVERAGE = {
     "portal": (),
     "prompt-size": (),
     "worktree": (),
+    # Packet 8U top-level families over existing backends. Each maps to the
+    # SAME voice-registry ids its `profile model` / `flags` / `package` /
+    # `schedules` counterpart already uses, so the single-clear invariant holds
+    # without a second store or a fabricated voice surface.
+    # Owner Decision #11: the sanctioned native update surface maps to the same
+    # `update_status` voice intent the dashboard update card uses.
+    "update": ("update_status",),
+    "model": ("config_profiles",),
+    "config": ("config_profiles", "auth_status"),
+    "doctor": ("doctor", "diagnostics"),
+    "cron": ("schedules_list", "schedules_create", "schedules_show",
+             "schedules_pause", "schedules_resume", "schedules_delete",
+             "schedules_history", "schedules_run_due"),
 }
 _CLI_VOICE_IMPOSSIBLE = {
     "backup.voice": "passphrase-sealed backups: use `qubit backup create` / "
                     "`qubit backup restore` in a terminal or the dashboard form",
     "bundles.voice": "skill-bundle bundles are a CLI/dashboard operation; no "
                      "spoken command mutates the bundle registry",
-    "claw.voice": "OpenClaw migration is an attended CLI/dashboard operation "
-                  "and never runs from a spoken command",
+    "claw.voice": "Legacy-assistant migration is an attended CLI/dashboard "
+                  "operation and never runs from a spoken command",
     "console.voice": "an interactive console REPL cannot run over the voice "
                      "surface; use `qubit console --confirm` in a terminal",
     "debug.voice": "debug bundles may contain logs; sharing is a confirm-gated "
@@ -253,6 +267,108 @@ def _sync_cli_coverage() -> None:
         VC.VOICE_IMPOSSIBLE.setdefault(key, reason)
 
 
+def _add_model_profile_subcommands(container, common) -> None:
+    """Register the canonical model-profile subcommands on *container*.
+
+    Shared by the top-level ``model`` family and ``profile model`` so both name
+    the SAME resolver-backed operations (one backend, one flag surface) rather
+    than a second store. Reads execute; mutations are dry-run unless --confirm
+    and accept only ``env:``/``file:`` secret references.
+    """
+    pmod_sub = container.add_subparsers(dest="profile_model_command")
+    pmod_list = pmod_sub.add_parser("list", parents=[common],
+                                    help="list model profiles + effective selection")
+    pmod_list.add_argument("--json", action="store_true")
+    pmod_show = pmod_sub.add_parser("show", parents=[common],
+                                    help="show one model profile (read-only)")
+    pmod_show.add_argument("profile")
+    pmod_show.add_argument("--json", action="store_true")
+    pmod_test = pmod_sub.add_parser("test", parents=[common],
+                                    help="preflight a model profile (read-only; --probe runs a local ping)")
+    pmod_test.add_argument("profile")
+    pmod_test.add_argument("--probe", action="store_true")
+    pmod_test.add_argument("--json", action="store_true")
+    pmod_create = pmod_sub.add_parser(
+        "create", parents=[common],
+        help="create a model profile (dry-run unless --confirm; non-secret flags only)")
+    pmod_create.add_argument("--id", required=True)
+    pmod_create.add_argument("--kind", choices=["local", "api", "realtime",
+                                                "plugin"],
+                             default="local")
+    pmod_create.add_argument("--provider", default="ollama")
+    pmod_create.add_argument("--model", default=None)
+    pmod_create.add_argument("--base-url", default="")
+    pmod_create.add_argument("--key-ref", default="",
+                             help="secret reference env:NAME or file:PATH (never a raw value)")
+    pmod_create.add_argument("--locality", choices=["local", "external"],
+                             default=None)
+    pmod_create.add_argument("--egress-consent", choices=["deny", "allow"],
+                             default=None)
+    pmod_create.add_argument("--roles", default=None,
+                             help="comma-separated roles (chat,hard,coding,tool,summarize,vision,classify)")
+    pmod_create.add_argument("--context-tokens", type=int, default=4096)
+    pmod_create.add_argument("--confirm", action="store_true",
+                             help="actually persist (default: dry-run)")
+    pmod_create.add_argument("--json", action="store_true")
+    pmod_clone = pmod_sub.add_parser(
+        "clone", parents=[common],
+        help="clone a model profile under a new id (dry-run unless --confirm)")
+    pmod_clone.add_argument("source")
+    pmod_clone.add_argument("new")
+    pmod_clone.add_argument("--confirm", action="store_true")
+    pmod_clone.add_argument("--json", action="store_true")
+    pmod_edit = pmod_sub.add_parser(
+        "edit", parents=[common],
+        help="edit a model profile (dry-run unless --confirm; non-secret flags only)")
+    pmod_edit.add_argument("profile")
+    pmod_edit.add_argument("--kind", choices=["local", "api", "realtime",
+                                              "plugin"],
+                           default=None)
+    pmod_edit.add_argument("--provider", default=None)
+    pmod_edit.add_argument("--model", default=None)
+    pmod_edit.add_argument("--base-url", default=None)
+    pmod_edit.add_argument("--key-ref", default=None,
+                           help="secret reference env:NAME or file:PATH (never a raw value)")
+    pmod_edit.add_argument("--locality", choices=["local", "external"],
+                           default=None)
+    pmod_edit.add_argument("--egress-consent", choices=["deny", "allow"],
+                           default=None)
+    pmod_edit.add_argument("--roles", default=None)
+    pmod_edit.add_argument("--context-tokens", type=int, default=None)
+    pmod_edit.add_argument("--confirm", action="store_true")
+    pmod_edit.add_argument("--json", action="store_true")
+    pmod_activate = pmod_sub.add_parser(
+        "activate", parents=[common],
+        help="select a profile for a session/role (dry-run unless --confirm)")
+    pmod_activate.add_argument("profile")
+    pmod_activate.add_argument("--session", default="cli")
+    pmod_activate.add_argument("--role", default="chat")
+    pmod_activate.add_argument("--confirm", action="store_true")
+    pmod_activate.add_argument("--json", action="store_true")
+    pmod_deactivate = pmod_sub.add_parser(
+        "deactivate", parents=[common],
+        help="clear a session profile override (dry-run unless --confirm)")
+    pmod_deactivate.add_argument("--session", default="cli")
+    pmod_deactivate.add_argument("--role", default="*",
+                                 help="role to clear, or * for the whole session")
+    pmod_deactivate.add_argument("--confirm", action="store_true")
+    pmod_deactivate.add_argument("--json", action="store_true")
+    pmod_rollback = pmod_sub.add_parser(
+        "rollback", parents=[common],
+        help="select a profile's rollback target for a session (dry-run unless --confirm)")
+    pmod_rollback.add_argument("profile")
+    pmod_rollback.add_argument("--session", default="cli")
+    pmod_rollback.add_argument("--role", default="chat")
+    pmod_rollback.add_argument("--confirm", action="store_true")
+    pmod_rollback.add_argument("--json", action="store_true")
+    pmod_remove = pmod_sub.add_parser(
+        "remove", parents=[common],
+        help="remove a non-default model profile (dry-run unless --confirm)")
+    pmod_remove.add_argument("profile")
+    pmod_remove.add_argument("--confirm", action="store_true")
+    pmod_remove.add_argument("--json", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     _sync_cli_coverage()
     # Provider choices come from the single messaging capability registry so a
@@ -268,13 +384,13 @@ def build_parser() -> argparse.ArgumentParser:
     # without SUPPRESS the subparser default would clobber a value the top level
     # already parsed (e.g. `--config X websites list` silently ignoring X).
     common.add_argument("--config", type=Path, default=argparse.SUPPRESS,
-                        help="path to voice.yaml (default ~/.config/qubit-voicebridge/voice.yaml; legacy openclaw-voice-bridge/qubit-voice-agent paths resolve via compat alias)")
+                        help="path to voice.yaml (default ~/.config/qubit-voicebridge/voice.yaml; legacy config paths resolve via compat alias)")
     common.add_argument("--no-hotkey", action="store_true",
                         default=argparse.SUPPRESS,
                         help="disable hotkey; use manual Enter PTT (headless/SSH)")
     common.add_argument("--dry-run", action="store_true",
                         default=argparse.SUPPRESS,
-                        help="never dispatch to OpenClaw; only speak the plan")
+                        help="never dispatch a tool action; only speak the plan")
     common.add_argument("--mute", action="store_true",
                         default=argparse.SUPPRESS,
                         help="start muted (no spoken output; logs still work)")
@@ -282,6 +398,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-hotkey", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--dry-run", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--mute", action="store_true", help=argparse.SUPPRESS)
+    # `qubit --version` prints the product identity and exits 0 (the canonical
+    # Qubit version, not the vendored runtime's). Honored before any family
+    # routing/dispatch so it works without config or audio hardware.
+    from .product import PRODUCT_VERSION as _PRODUCT_VERSION
+    p.add_argument("--version", action="version",
+                   version="%(prog)s " + _PRODUCT_VERSION)
     sub = p.add_subparsers(dest="command")
 
     def add(name, **kw):
@@ -323,6 +445,17 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_sub = mcp_p.add_subparsers(dest="mcp_command")
     mcp_sub.add_parser("status", parents=[common],
                        help="list configured MCP servers without mounting anything")
+    mcp_inv = mcp_sub.add_parser(
+        "invoke", parents=[common],
+        help="call a tool on a configured MCP server (brokered; confirmed)")
+    mcp_inv.add_argument("server", help="registered MCP server name")
+    mcp_inv.add_argument("--tool", default="", help="tool name to call")
+    mcp_inv.add_argument("--arg", action="append", default=[], metavar="K=V",
+                         help="tool argument (repeatable)")
+    mcp_inv.add_argument("--confirm", action="store_true",
+                         help="confirm the side-effecting call")
+    mcp_inv.add_argument("--confirmation-id", default="",
+                         help="settle a staged confirmation instead")
     worker_p = add("worker", help="Native Qubit worker-lane status (read-only)")
     worker_sub = worker_p.add_subparsers(dest="worker_command")
     worker_sub.add_parser("status", parents=[common],
@@ -390,6 +523,32 @@ def build_parser() -> argparse.ArgumentParser:
     sess_resume = sess_sub.add_parser("resume", parents=[common],
                                       help="resume/restore an archived or deleted session")
     sess_resume.add_argument("session_id")
+    # B-04M: the canonical chat-transcript authority (state.db) needs a CLI
+    # surface so migrated Qubit history is reachable from the terminal, not
+    # only the receipt-lifecycle ``sessions`` store.
+    cst = add("chat-sessions", aliases=["chat_sessions"],
+              help="Canonical chat transcripts from state.db (the ONE session "
+                   "authority: list/search/show/messages/export)")
+    cst_sub = cst.add_subparsers(dest="chat_sessions_command")
+    cst_list = cst_sub.add_parser("list", parents=[common],
+                                  help="list canonical chat sessions (read-only)")
+    cst_list.add_argument("--limit", type=int, default=20)
+    cst_list.add_argument("--archived", action="store_true",
+                          help="include archived sessions")
+    cst_show = cst_sub.add_parser("show", parents=[common],
+                                  help="show one canonical chat session")
+    cst_show.add_argument("session_id")
+    cst_msgs = cst_sub.add_parser("messages", parents=[common],
+                                  help="show messages for a canonical session")
+    cst_msgs.add_argument("session_id")
+    cst_msgs.add_argument("--limit", type=int, default=100)
+    cst_search = cst_sub.add_parser("search", parents=[common],
+                                    help="search canonical chat sessions")
+    cst_search.add_argument("query")
+    cst_search.add_argument("--limit", type=int, default=20)
+    cst_export = cst_sub.add_parser("export", parents=[common],
+                                    help="export a canonical session transcript")
+    cst_export.add_argument("session_id")
     cap = add("capability", help="capability catalog: typed state for any Qubit capability (read-only)")
     cap.add_argument("action", nargs="?", default="summary",
                      choices=["check", "list", "summary"],
@@ -434,6 +593,41 @@ def build_parser() -> argparse.ArgumentParser:
     froll.add_argument("name")
     froll.add_argument("--apply", action="store_true",
                        help="write the config with a timestamped backup (default: dry-run)")
+    cfgp = add("config", help="effective Qubit configuration + secret-reference "
+               "store (reads only; writes are confirm-gated and never store "
+               "secret values)")
+    cfgp_sub = cfgp.add_subparsers(dest="config_command")
+    cfgp_path = cfgp_sub.add_parser("path", parents=[common],
+                                    help="effective config file path (read-only)")
+    cfgp_path.add_argument("--json", action="store_true")
+    cfgp_show = cfgp_sub.add_parser("show", parents=[common],
+                                    help="effective config with secret-shaped "
+                                         "values masked (read-only)")
+    cfgp_show.add_argument("--json", action="store_true")
+    cfgp_check = cfgp_sub.add_parser("check", parents=[common],
+                                     help="load + validate the effective config "
+                                          "and reference store (read-only)")
+    cfgp_check.add_argument("--json", action="store_true")
+    cfgp_epath = cfgp_sub.add_parser("env-path", parents=[common],
+                                     help="secret-reference store path (read-only)")
+    cfgp_epath.add_argument("--json", action="store_true")
+    cfgp_elist = cfgp_sub.add_parser("env-list", parents=[common],
+                                     help="secret-reference names only, never "
+                                          "values (read-only)")
+    cfgp_elist.add_argument("--json", action="store_true")
+    cfgp_set = cfgp_sub.add_parser(
+        "set", parents=[common],
+        help="set a vault:/ref: secret reference (needs --confirm; a raw "
+             "secret value is refused)")
+    cfgp_set.add_argument("name", help="reference name, e.g. OPENAI_API_KEY")
+    cfgp_set.add_argument("ref", help="vault:NAME or ref:NAME (never a raw value)")
+    cfgp_set.add_argument("--confirm", action="store_true")
+    cfgp_set.add_argument("--json", action="store_true")
+    cfgp_unset = cfgp_sub.add_parser("unset", parents=[common],
+                                     help="remove a secret reference (needs --confirm)")
+    cfgp_unset.add_argument("name")
+    cfgp_unset.add_argument("--confirm", action="store_true")
+    cfgp_unset.add_argument("--json", action="store_true")
     drill = add("flag-drill", help="hermetic rollback drill: toggle + restore every flag on a temp config/state")
     pkg = add("package", help="download-and-run distribution surface (read-only)")
     pkg_sub = pkg.add_subparsers(dest="package_command")
@@ -458,6 +652,26 @@ def build_parser() -> argparse.ArgumentParser:
                                        "units, runbooks, upgrade/uninstall contract)")
     pkg_cert.add_argument("--json", action="store_true",
                           help="machine-readable certification report")
+    docp = add("doctor", help="host + capability diagnostics (read-only; same "
+               "checks as `package doctor` and the capability catalog)")
+    docp_sub = docp.add_subparsers(dest="doctor_command")
+    docp_run = docp_sub.add_parser("run", parents=[common],
+                                   help="hardware/resource + capability checks")
+    docp_run.add_argument("--json", action="store_true")
+    docp_check = docp_sub.add_parser("check", parents=[common],
+                                     help="one capability's typed state (read-only)")
+    docp_check.add_argument("name", help="capability name, e.g. chat, whatsapp")
+    docp_check.add_argument("--json", action="store_true")
+    docp_list = docp_sub.add_parser("list", parents=[common],
+                                    help="capability names, optionally state-filtered (read-only)")
+    docp_list.add_argument("--state", default=None,
+                           choices=["IMPLEMENTED", "BLOCKED", "REJECTED",
+                                    "NOT_UPSTREAM", "UNKNOWN"],
+                           help="only names in this typed state")
+    docp_list.add_argument("--json", action="store_true")
+    docp_sum = docp_sub.add_parser("summary", parents=[common],
+                                   help="capability counts by typed state (read-only)")
+    docp_sum.add_argument("--json", action="store_true")
     prod = add("product", help="Packet 8K-P product surface "
                "(paths/install/first-run/repair/migrate/service/shortcut/"
                "tray/capabilities/boundary/upgrade/rollback)")
@@ -499,6 +713,29 @@ def build_parser() -> argparse.ArgumentParser:
     prod_migroll.add_argument("--apply", action="store_true",
                               help="perform the rollback (default dry-run)")
     prod_migroll.add_argument("--backup-dir", type=Path, default=None)
+    # Real Qubit user-data migration (read-only source, backed up, idempotent,
+    # reversible). Distinct from the branding migration above.
+    prod_hinspect = prod_sub.add_parser(
+        "legacy-inspect", parents=[common],
+        help="read-only inventory of the operator's legacy agent home")
+    prod_hinspect.add_argument("--home", type=Path, default=None)
+    prod_hinspect.add_argument("--json", action="store_true")
+    prod_hmigrate = prod_sub.add_parser(
+        "legacy-migrate", parents=[common],
+        help="import legacy agent sessions/messages into the Qubit chat store "
+             "(dry-run unless --apply; backs up first)")
+    prod_hmigrate.add_argument("--apply", action="store_true",
+                               help="perform the import (default dry-run)")
+    prod_hmigrate.add_argument("--home", type=Path, default=None)
+    prod_hmigrate.add_argument("--backup-dir", type=Path, default=None)
+    prod_hmigrate.add_argument("--json", action="store_true")
+    prod_hroll = prod_sub.add_parser(
+        "legacy-rollback", parents=[common],
+        help="restore the chat store from a legacy-migrate backup")
+    prod_hroll.add_argument("--backup-dir", type=Path, required=True)
+    prod_hroll.add_argument("--apply", action="store_true",
+                            help="perform the rollback (default dry-run)")
+    prod_hroll.add_argument("--json", action="store_true")
     prod_svc = prod_sub.add_parser("service", parents=[common],
                                    help="service ownership contract (read-only)")
     prod_short = prod_sub.add_parser("shortcut", parents=[common],
@@ -590,96 +827,88 @@ def build_parser() -> argparse.ArgumentParser:
         "model", parents=[common],
         help="canonical model/provider profiles (list/show/test/create/clone/"
              "edit/activate/deactivate/rollback/remove)")
-    pmod_sub = prof_model.add_subparsers(dest="profile_model_command")
-    pmod_list = pmod_sub.add_parser("list", parents=[common],
-                                    help="list model profiles + effective selection")
-    pmod_list.add_argument("--json", action="store_true")
-    pmod_show = pmod_sub.add_parser("show", parents=[common],
-                                    help="show one model profile (read-only)")
-    pmod_show.add_argument("profile")
-    pmod_show.add_argument("--json", action="store_true")
-    pmod_test = pmod_sub.add_parser("test", parents=[common],
-                                    help="preflight a model profile (read-only; --probe runs a local ping)")
-    pmod_test.add_argument("profile")
-    pmod_test.add_argument("--probe", action="store_true")
-    pmod_test.add_argument("--json", action="store_true")
-    pmod_create = pmod_sub.add_parser(
+    _add_model_profile_subcommands(prof_model, common)
+    # Canonical speech (STT/TTS/realtime) profiles — the SAME registry the
+    # orchestrator ASR/TTS seams, the dashboard ops, the Qubit RPC surface,
+    # and the voice registry resolve through. Reads execute; mutations are
+    # dry-run unless --confirm; key_ref is an env:/file: reference only.
+    prof_speech = prof_sub.add_parser(
+        "speech", parents=[common],
+        help="canonical speech profiles (STT/TTS/realtime): list/show/test/"
+             "create/clone/remove/select/clear")
+    psp_sub = prof_speech.add_subparsers(dest="profile_speech_command")
+    psp_list = psp_sub.add_parser("list", parents=[common],
+                                  help="list speech profiles + effective selection")
+    psp_list.add_argument("--kind", choices=["speech_in", "speech_out",
+                                             "realtime"], default=None)
+    psp_list.add_argument("--json", action="store_true")
+    psp_show = psp_sub.add_parser("show", parents=[common],
+                                  help="show one speech profile (read-only)")
+    psp_show.add_argument("profile")
+    psp_show.add_argument("--json", action="store_true")
+    psp_test = psp_sub.add_parser("test", parents=[common],
+                                  help="preflight the active (or named) speech profile (read-only)")
+    psp_test.add_argument("profile", nargs="?", default="")
+    psp_test.add_argument("--kind", choices=["speech_in", "speech_out",
+                                             "realtime"], default="speech_in")
+    psp_test.add_argument("--json", action="store_true")
+    psp_create = psp_sub.add_parser(
         "create", parents=[common],
-        help="create a model profile (dry-run unless --confirm; non-secret flags only)")
-    pmod_create.add_argument("--id", required=True)
-    pmod_create.add_argument("--kind", choices=["local", "api", "realtime"],
-                             default="local")
-    pmod_create.add_argument("--provider", default="ollama")
-    pmod_create.add_argument("--model", default=None)
-    pmod_create.add_argument("--base-url", default="")
-    pmod_create.add_argument("--key-ref", default="",
-                             help="secret reference env:NAME or file:PATH (never a raw value)")
-    pmod_create.add_argument("--locality", choices=["local", "external"],
-                             default=None)
-    pmod_create.add_argument("--egress-consent", choices=["deny", "allow"],
-                             default=None)
-    pmod_create.add_argument("--roles", default=None,
-                             help="comma-separated roles (chat,hard,coding,tool,summarize,vision,classify)")
-    pmod_create.add_argument("--context-tokens", type=int, default=4096)
-    pmod_create.add_argument("--confirm", action="store_true",
-                             help="actually persist (default: dry-run)")
-    pmod_create.add_argument("--json", action="store_true")
-    pmod_clone = pmod_sub.add_parser(
+        help="create a speech profile (dry-run unless --confirm; non-secret flags only)")
+    psp_create.add_argument("--id", required=True)
+    psp_create.add_argument("--kind", choices=["speech_in", "speech_out",
+                                               "realtime"], default="speech_in")
+    psp_create.add_argument("--provider", required=True)
+    psp_create.add_argument("--model", default="")
+    psp_create.add_argument("--voice", default="")
+    psp_create.add_argument("--device", default="")
+    psp_create.add_argument("--language", default="")
+    psp_create.add_argument("--locality", choices=["local", "external"],
+                            default=None)
+    psp_create.add_argument("--egress-consent", choices=["deny", "allow"],
+                            default=None)
+    psp_create.add_argument("--key-ref", default="",
+                            help="secret reference env:NAME or file:PATH (never a raw value)")
+    psp_create.add_argument("--base-url", default="")
+    psp_create.add_argument("--engine", default="")
+    psp_create.add_argument("--fallback-to", default="")
+    psp_create.add_argument("--confirm", action="store_true")
+    psp_create.add_argument("--json", action="store_true")
+    psp_clone = psp_sub.add_parser(
         "clone", parents=[common],
-        help="clone a model profile under a new id (dry-run unless --confirm)")
-    pmod_clone.add_argument("source")
-    pmod_clone.add_argument("new")
-    pmod_clone.add_argument("--confirm", action="store_true")
-    pmod_clone.add_argument("--json", action="store_true")
-    pmod_edit = pmod_sub.add_parser(
-        "edit", parents=[common],
-        help="edit a model profile (dry-run unless --confirm; non-secret flags only)")
-    pmod_edit.add_argument("profile")
-    pmod_edit.add_argument("--kind", choices=["local", "api", "realtime"],
-                           default=None)
-    pmod_edit.add_argument("--provider", default=None)
-    pmod_edit.add_argument("--model", default=None)
-    pmod_edit.add_argument("--base-url", default=None)
-    pmod_edit.add_argument("--key-ref", default=None,
-                           help="secret reference env:NAME or file:PATH (never a raw value)")
-    pmod_edit.add_argument("--locality", choices=["local", "external"],
-                           default=None)
-    pmod_edit.add_argument("--egress-consent", choices=["deny", "allow"],
-                           default=None)
-    pmod_edit.add_argument("--roles", default=None)
-    pmod_edit.add_argument("--context-tokens", type=int, default=None)
-    pmod_edit.add_argument("--confirm", action="store_true")
-    pmod_edit.add_argument("--json", action="store_true")
-    pmod_activate = pmod_sub.add_parser(
-        "activate", parents=[common],
-        help="select a profile for a session/role (dry-run unless --confirm)")
-    pmod_activate.add_argument("profile")
-    pmod_activate.add_argument("--session", default="cli")
-    pmod_activate.add_argument("--role", default="chat")
-    pmod_activate.add_argument("--confirm", action="store_true")
-    pmod_activate.add_argument("--json", action="store_true")
-    pmod_deactivate = pmod_sub.add_parser(
-        "deactivate", parents=[common],
-        help="clear a session profile override (dry-run unless --confirm)")
-    pmod_deactivate.add_argument("--session", default="cli")
-    pmod_deactivate.add_argument("--role", default="*",
-                                 help="role to clear, or * for the whole session")
-    pmod_deactivate.add_argument("--confirm", action="store_true")
-    pmod_deactivate.add_argument("--json", action="store_true")
-    pmod_rollback = pmod_sub.add_parser(
-        "rollback", parents=[common],
-        help="select a profile's rollback target for a session (dry-run unless --confirm)")
-    pmod_rollback.add_argument("profile")
-    pmod_rollback.add_argument("--session", default="cli")
-    pmod_rollback.add_argument("--role", default="chat")
-    pmod_rollback.add_argument("--confirm", action="store_true")
-    pmod_rollback.add_argument("--json", action="store_true")
-    pmod_remove = pmod_sub.add_parser(
+        help="clone a speech profile (dry-run unless --confirm)")
+    psp_clone.add_argument("source")
+    psp_clone.add_argument("new")
+    psp_clone.add_argument("--confirm", action="store_true")
+    psp_clone.add_argument("--json", action="store_true")
+    psp_remove = psp_sub.add_parser(
         "remove", parents=[common],
-        help="remove a non-default model profile (dry-run unless --confirm)")
-    pmod_remove.add_argument("profile")
-    pmod_remove.add_argument("--confirm", action="store_true")
-    pmod_remove.add_argument("--json", action="store_true")
+        help="remove a non-default speech profile (dry-run unless --confirm)")
+    psp_remove.add_argument("profile")
+    psp_remove.add_argument("--confirm", action="store_true")
+    psp_remove.add_argument("--json", action="store_true")
+    psp_select = psp_sub.add_parser(
+        "select", parents=[common],
+        help="select a speech profile for a session/kind (dry-run unless --confirm)")
+    psp_select.add_argument("profile")
+    psp_select.add_argument("--session", default="cli")
+    psp_select.add_argument("--kind", choices=["speech_in", "speech_out",
+                                               "realtime"], required=True)
+    psp_select.add_argument("--confirm", action="store_true")
+    psp_select.add_argument("--json", action="store_true")
+    psp_clear = psp_sub.add_parser(
+        "clear", parents=[common],
+        help="clear a session speech override (dry-run unless --confirm)")
+    psp_clear.add_argument("--session", default="cli")
+    psp_clear.add_argument("--kind", choices=["speech_in", "speech_out",
+                                              "realtime"], default=None)
+    psp_clear.add_argument("--confirm", action="store_true")
+    psp_clear.add_argument("--json", action="store_true")
+    # Top-level family: `qubit model ...` names the SAME canonical
+    # resolver-backed model profiles `qubit profile model ...` exposes.
+    top_model = add("model", help="canonical model/provider profiles "
+                    "(same registry as `profile model`; dry-run unless --confirm)")
+    _add_model_profile_subcommands(top_model, common)
     brand = add("branding", help="Qubit VoiceBridge branding migration (dry-run/backup/verify/rollback)")
     brand_sub = brand.add_subparsers(dest="branding_command")
     brand_plan = brand_sub.add_parser("plan", parents=[common],
@@ -1004,6 +1233,33 @@ def build_parser() -> argparse.ArgumentParser:
                       help="refused: unpinned driver binaries are never downloaded")
     cu_sub.add_parser("session", parents=[common],
                       help="typed graphical-session probe: x11 | wayland | both | none (read-only)")
+    cu_sub.add_parser("ops", parents=[common],
+                      help="bounded allowlisted desktop ops: launch/PiP/present (read-only)")
+    cu_launch = cu_sub.add_parser("launch", parents=[common],
+                                  help="launch an approved app via an injected "
+                                       "launcher (needs --confirm; typed refusal "
+                                       "with no launcher)")
+    cu_launch.add_argument("app", help="approved app id (see `qubit computer-use ops`)")
+    cu_launch.add_argument("--target", default="desktop")
+    cu_launch.add_argument("--confirm", action="store_true")
+    cu_pip = cu_sub.add_parser("pip", parents=[common],
+                               help="Document Picture-in-Picture over an injected "
+                                    "Control-UI surface (needs --confirm)")
+    cu_pip.add_argument("--target", default="desktop")
+    cu_pip.add_argument("--width", type=int, default=640)
+    cu_pip.add_argument("--height", type=int, default=400)
+    cu_pip.add_argument("--confirm", action="store_true")
+    cu_present = cu_sub.add_parser("present", parents=[common],
+                                   help="persist a bounded presentation "
+                                        "descriptor (needs --confirm)")
+    cu_present.add_argument("mode", nargs="?", default="document",
+                            choices=("document", "dock", "fullscreen"))
+    cu_present.add_argument("--panes", default="",
+                            help="comma-separated pane ids (chat,files,...)")
+    cu_present.add_argument("--target", default="desktop")
+    cu_present.add_argument("--confirm", action="store_true")
+    cu_sub.add_parser("presentation", parents=[common],
+                      help="persisted presentation descriptor (read-only)")
     rt = add("runtime", help="Pinned confined runtimes (Qubit container equivalent; no daemon, no pulls)")
     rt_sub = rt.add_subparsers(dest="runtime_command")
     rt_sub.add_parser("images", parents=[common],
@@ -1025,6 +1281,29 @@ def build_parser() -> argparse.ArgumentParser:
                             help="staged artifact path (opencode-binary); "
                                  "else QUBIT_OPENCODE_PIN_BIN, operator "
                                  "install, or PATH")
+    # Owner Decision #11: the sanctioned Qubit update surface. Bare `update` is
+    # `--check` (read-only). The three verbs are mutually exclusive; a real
+    # apply/rollback needs no second --confirm because choosing the verb is the
+    # explicit operator intent.
+    up = add("update", help="Qubit update: --check (read-only, default), --apply, --rollback")
+    _up_verbs = up.add_mutually_exclusive_group()
+    _up_verbs.add_argument("--check", action="store_true",
+                           help="read-only update status: product version, install "
+                                "method, revision, runtime-image state (default)")
+    _up_verbs.add_argument("--apply", action="store_true",
+                           help="back up a timestamped snapshot, then fast-forward "
+                                "the checkout (never discards local work)")
+    _up_verbs.add_argument("--rollback", action="store_true",
+                           help="restore the recorded pre-apply revision from the "
+                                "most recent update backup")
+    up.add_argument("--json", action="store_true",
+                    help="emit the structured receipt as JSON")
+    up.add_argument("--source", default="",
+                    help="override the update source: a git remote name or a "
+                         "local repository/bundle path")
+    up.add_argument("--backup-dir", default=None,
+                    help="explicit update backup directory (default: the Qubit "
+                         "backup dir under <state>/backups/update/)")
     br = add("browser", help="Loopback browser tabs (read-only unless --confirm; profiles untouched)")
     br_sub = br.add_subparsers(dest="browser_command")
     br_sub.add_parser("status", parents=[common],
@@ -1084,6 +1363,21 @@ def build_parser() -> argparse.ArgumentParser:
                                   help="close a tab (needs --confirm)")
     br_tclose.add_argument("target", help="tab id")
     br_tclose.add_argument("--confirm", action="store_true")
+    br_fav = br_sub.add_parser("favicon", parents=[common],
+                               help="capture the current tab's favicon "
+                                    "(read-only; bounded same-origin image)")
+    br_fav.add_argument("--target", default="")
+    br_fav.add_argument("--max-bytes", type=int, default=0)
+    br_fc = br_sub.add_parser("favicon-cache", parents=[common],
+                              help="list the bounded favicon cache (read-only)")
+    br_fc.add_argument("--limit", type=int, default=32)
+    br_dl = br_sub.add_parser("download", parents=[common],
+                              help="save the displayed document into an "
+                                   "approved project root (needs --confirm)")
+    br_dl.add_argument("dest", help="destination path inside an approved project root")
+    br_dl.add_argument("--target", default="")
+    br_dl.add_argument("--max-bytes", type=int, default=0)
+    br_dl.add_argument("--confirm", action="store_true")
     acp = add("acp", help="Editor-integration checks + ACP external harness client (no ACP server shipped)")
     acp.add_argument("--accept-hooks", action="store_true",
                      help="refused: unseen hooks are never auto-approved")
@@ -1151,6 +1445,15 @@ def build_parser() -> argparse.ArgumentParser:
     pl_unreg.add_argument("--confirm", action="store_true")
     pl_sub.add_parser("doctor", parents=[common],
                       help="store/handlers/latch health (read-only)")
+    pl_sub.add_parser("catalog", parents=[common],
+                      help="installable plugin rows: built-ins, registered, "
+                           "reviewed local manifests (read-only)")
+    pl_inst = pl_sub.add_parser("install", parents=[common],
+                                help="install a reviewed catalog id or local "
+                                     "manifest path (needs --confirm)")
+    pl_inst.add_argument("identifier",
+                         help="reviewed catalog id or local *.json manifest path")
+    pl_inst.add_argument("--confirm", action="store_true")
     ch = add("channels", help="Inbound channel framework (references only; no listener starts)")
     ch_sub = ch.add_subparsers(dest="channels_command")
     ch_sub.add_parser("status", parents=[common],
@@ -1546,9 +1849,34 @@ def build_parser() -> argparse.ArgumentParser:
     gw_link = gw_sub.add_parser("link", parents=[common],
                                 help="typed link state (read-only)")
     gw_link.add_argument("gateway_id")
-    for _gw_no in ("run", "start", "stop", "restart", "install"):
+    # Qubit-owned gateway control (Owner Decision #10): `status` is real; `start`/
+    # `stop`/`restart` drive the real Qubit gateway supervisor through the one
+    # authority path (e-stop → confirmation → audit). `run`/`install` stay
+    # operator-owned.
+    gw_sub.add_parser("status", parents=[common],
+                      help="real Qubit gateway status (service, pid, health, restarts)")
+    for _gw_ctl in ("start", "stop", "restart"):
+        _gw_p = gw_sub.add_parser(
+            _gw_ctl, parents=[common],
+            help="control the Qubit gateway service (confirm-gated)")
+        _gw_p.add_argument("--confirm", action="store_true")
+    for _gw_no in ("run", "install"):
         gw_sub.add_parser(_gw_no, parents=[common],
                           help="refused: operator supervises gateway processes")
+    gw_sub.add_parser("protocol", parents=[common],
+                      help="read-only gateway protocol + RPC method inventory")
+    gw_neg = gw_sub.add_parser("negotiate", parents=[common],
+                               help="negotiate the gateway protocol version")
+    gw_neg.add_argument("--client-version", default=None)
+    gw_serve = gw_sub.add_parser("serve", parents=[common],
+                                 help="refused: no standalone gateway listener")
+    gw_serve.add_argument("--action", default="serve")
+    gw_rpc = gw_sub.add_parser(
+        "rpc", parents=[common],
+        help="in-process gateway RPC: list methods, or call one")
+    gw_rpc.add_argument("method", nargs="?", default="")
+    gw_rpc.add_argument("--params", default="{}",
+                        help="JSON params object for the method call")
     pe = add("peer", help="Peer gateways: registry, enrollment, typed delivery")
     pe_sub = pe.add_subparsers(dest="peer_command")
     pe_add = pe_sub.add_parser("add", parents=[common],
@@ -2061,6 +2389,8 @@ def build_parser() -> argparse.ArgumentParser:
     vs_export = vs_sub.add_parser("export", parents=[common],
                                   help="export a digest-verified snapshot to a file")
     vs_export.add_argument("--out", type=Path, required=True)
+    vs_sub.add_parser("bundled", parents=[common],
+                      help="list Qubit-bundled skill manifests (read-only; no network)")
 
     exp = add("experiments", help="Packet 8P controlled offline evaluation (disabled by default)")
     exp_sub = exp.add_subparsers(dest="experiments_command")
@@ -2227,6 +2557,47 @@ def build_parser() -> argparse.ArgumentParser:
     sc_deliv.add_argument("--limit", type=int, default=30)
     sc_sub.add_parser("run-due", parents=[common],
                       help="execute due jobs now (bounded; pre-authorized at creation)")
+    cr = add("cron", help="Scheduled jobs on the SAME canonical SQLite store "
+             "as `schedules` (mutations need --confirm)")
+    cr_sub = cr.add_subparsers(dest="cron_command")
+    cr_list = cr_sub.add_parser("list", parents=[common],
+                                help="list jobs, active and disabled (read-only)")
+    cr_list.add_argument("--active-only", action="store_true",
+                         help="omit disabled jobs (default: list all)")
+    cr_add = cr_sub.add_parser("add", parents=[common],
+                               help="schedule a task (needs --confirm)")
+    cr_add.add_argument("name", help="job name (<=80 chars)")
+    cr_add.add_argument("task_text", help="task to run (<=2000 chars)")
+    cr_add.add_argument("--when", required=True,
+                        help="'every N minutes|hours', 'daily HH[:MM][am|pm]', "
+                             "'once in N minutes|hours'")
+    cr_add.add_argument("--deliver-to", default="",
+                        help="delivery targets: channel:<account>:<recipient> "
+                             "and/or webhook:<sub_id>, comma separated")
+    cr_add.add_argument("--confirm", action="store_true")
+    cr_show = cr_sub.add_parser("show", parents=[common],
+                                help="show one job with recent runs (read-only)")
+    cr_show.add_argument("job_id", type=int)
+    cr_rm = cr_sub.add_parser("remove", parents=[common],
+                              help="delete a job, history retained (needs --confirm)")
+    cr_rm.add_argument("job_id", type=int)
+    cr_rm.add_argument("--confirm", action="store_true")
+    for _cr_name, _cr_help in (
+            ("enable", "enable a disabled job (needs --confirm)"),
+            ("disable", "disable a job, history retained (needs --confirm)")):
+        _p = cr_sub.add_parser(_cr_name, parents=[common], help=_cr_help)
+        _p.add_argument("job_id", type=int)
+        _p.add_argument("--confirm", action="store_true")
+    cr_run = cr_sub.add_parser("run", parents=[common],
+                               help="run due jobs now, or force one with --job-id")
+    cr_run.add_argument("--job-id", type=int, default=0,
+                        help="force one job id (default: run all due jobs)")
+    cr_status = cr_sub.add_parser("status", parents=[common],
+                                  help="scheduler posture: due + catch-up (read-only)")
+    cr_runs = cr_sub.add_parser("runs", parents=[common],
+                                help="run history, retained after delete (read-only)")
+    cr_runs.add_argument("--job-id", type=int, default=0)
+    cr_runs.add_argument("--limit", type=int, default=30)
     nd = add("node", help="Paired node host: inventory + capability dispatch "
              "(read-only except confirmed enroll/revoke)")
     nd_sub = nd.add_subparsers(dest="node_command")
@@ -2841,7 +3212,7 @@ def build_parser() -> argparse.ArgumentParser:
             _op_id=op_id,
             _op_argnames=[s[0].lstrip("-") for s in specs])
 
-    # Wave 1 Hermes CLI parity: whole families served by the vendored fork.
+    # Wave 1 Qubit CLI parity: whole families served by the vendored fork.
     # These parser entries declare each family in the live parser tree (help,
     # completions, ledger); main() routes the family pre-parse so upstream
     # argv/help/errors/exit status are preserved, exactly like `agent`.
@@ -2849,7 +3220,7 @@ def build_parser() -> argparse.ArgumentParser:
         _ffp = add(_ff_name, help=_ff_help)
         _ffp.add_argument(
             "fork_args", nargs=argparse.REMAINDER,
-            help=f"arguments forwarded to the Qubit-owned Hermes {_ff_name} "
+            help=f"arguments forwarded to the Qubit-owned fork {_ff_name} "
                  "command (read-only subcommands forward verbatim; mutating "
                  "subcommands require --confirm)")
 
@@ -3385,24 +3756,87 @@ def _run_integration(cfg, command, args):
     return _finish_integration(out)
 
 
+# `qubit chat` one-shot selectors. When any is present the vendored chat
+# answers and exits (no interactive session), so a TTY is never required.
+# `-z/--oneshot PROMPT` is a *top-level* vendored flag, not a `chat` flag, so
+# the in-`chat` boolean is `--oneshot` (dest ``oneshot_exit``).
+_CHAT_HEADLESS_FLAGS = frozenset({
+    "-q", "--query", "--query-file", "--oneshot", "-Q", "--quiet",
+})
+
+
+def _chat_requires_tty(tail: list) -> bool:
+    """True when an interactive ``qubit chat`` launch would need a TTY.
+
+    Help is always allowed through (pipable); so is any one-shot selector
+    (``-q/--query/--query-file/--oneshot/-Q/--quiet``), which the vendored chat
+    answers and exits without a TTY. Only a bare interactive launch on a
+    non-TTY stdin is gated.
+    """
+    for tok in tail:
+        if tok in ("-h", "--help"):
+            return False
+        if tok.split("=", 1)[0] in _CHAT_HEADLESS_FLAGS:
+            return False
+    try:
+        return not sys.stdin.isatty()
+    except Exception:  # no stdin object / closed: fail safe to the gate
+        return True
+
+
+def _chat_noninteractive_gate(tail: list):
+    """Typed, helpful result for an interactive ``qubit chat`` with no TTY.
+
+    Returns ``None`` when the interactive launch may proceed (a TTY, help, or a
+    one-shot selector), otherwise the envelope the caller prints. This is a
+    real capability boundary, not a refusal: it names the working
+    non-interactive counterparts.
+    """
+    if not _chat_requires_tty(tail):
+        return None
+    return {
+        "state": "needs-tty",
+        "code": "CHAT_REQUIRES_TTY",
+        "detail": ("`qubit chat` opens the interactive terminal chat and needs "
+                   "a TTY. For non-interactive use run `qubit chat -q \"...\"` "
+                   "(one-shot), `qubit run`, or the dashboard `/qubit-chat` "
+                   "surface."),
+        "alternatives": ["qubit chat -q \"...\"", "qubit agent chat -q \"...\"",
+                         "qubit run", "dashboard /qubit-chat"],
+    }
+
+
 def main(argv=None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
+    # Narrow legacy migration: adopt pre-rebrand env names for this process
+    # (never the external upstream home; see voicebridge.qubit_legacy).
+    from . import qubit_legacy
+    qubit_legacy.install()
+    # Migration-compat CLI aliases: old scripts may call the legacy-named
+    # subcommands; translate them to the canonical Qubit names before parsing
+    # so the product help/completions never advertise the upstream name.
+    _legacy_cmd_aliases = {"hermes-inspect": "legacy-inspect",
+                           "hermes-migrate": "legacy-migrate",
+                           "hermes-rollback": "legacy-rollback"}
+    raw = [_legacy_cmd_aliases.get(tok, tok) for tok in raw]
     # Passthrough to the vendored Qubit Agent runtime must not be re-parsed by
     # Qubit's argparse (leading --help/--version/--flags would be swallowed).
-    # `qubit agent <args…>` dispatches verbatim. `hermes` stays as an
+    # `qubit agent <args…>` dispatches verbatim. `qubit` stays as an
     # undeclared migration alias (never advertised in help/completions) so old
     # scripts keep working without carrying upstream identity in the product.
     if raw and raw[0] in ("agent", "hermes"):
-        from . import hermes_runtime
-        return hermes_runtime.run(raw[1:])
+        from . import qubit_runtime
+        from .branding import help_overlay
+        with help_overlay.active():
+            return qubit_runtime.run(raw[1:])
     # Agent 1: forward supported `<family> <sub>` pairs to the real vendored
     # fork (same in-process runtime as `qubit agent`). Only pairs the Qubit
     # parser does not own are routed, so native commands are never shadowed.
     # Wave 1 whole-family routes are resolved here too: read-only subcommands
     # forward verbatim, mutating subcommands need Qubit's --confirm, and
     # unclassified subcommands are typed refusals (never a raw bypass).
-    from . import cli_hermes_forward as _hermes_forward
-    _route = _hermes_forward.route(raw)
+    from . import cli_qubit_forward as _qubit_forward
+    _route = _qubit_forward.route(raw)
     if _route is not None:
         if _route.kind in ("needs-confirm", "refused"):
             envelope = {"state": _route.kind, "code": _route.code,
@@ -3411,9 +3845,21 @@ def main(argv=None) -> int:
                 envelope["argv"] = _route.argv
             print(json.dumps(envelope, indent=2, sort_keys=True))
             return 3
-        from . import hermes_runtime
-        return hermes_runtime.run(_route.argv)
-    args = build_parser().parse_args(argv)
+        # `qubit chat` is the real terminal chat (a classified forward to the
+        # vendored `chat` command). The interactive session needs a TTY: a
+        # non-TTY launch with no one-shot selector gets a typed, helpful result
+        # instead of a TUI that cannot read input. Help and one-shot paths
+        # (`-q/--query/--query-file/--oneshot/-Q/--quiet`) forward unchanged.
+        if raw and raw[0] == "chat":
+            gate = _chat_noninteractive_gate(raw[1:])
+            if gate is not None:
+                print(json.dumps(gate, indent=2, sort_keys=True))
+                return 2
+        from . import qubit_runtime
+        from .branding import help_overlay
+        with help_overlay.active():
+            return qubit_runtime.run(_route.argv)
+    args = build_parser().parse_args(raw)
     command = args.command or "run"
 
     # logging early so every event is captured
@@ -3429,6 +3875,19 @@ def main(argv=None) -> int:
     # and voice paths stage the same op through the shared journal).
     if command == "autonomy":
         return _cmd_autonomy(cfg, args)
+
+    # Packet 8U: real top-level families that delegate to the EXISTING canonical
+    # backends (model profiles / config + env refs / diagnostics / schedules) —
+    # the same stores the `profile model`, `flags`, `package`, and `schedules`
+    # surfaces use, never a second store or a demo route.
+    if command == "model":
+        return _cmd_profile_model(cfg, args)
+    if command == "config":
+        return _cmd_config(cfg, args, args.config)
+    if command == "doctor":
+        return _cmd_doctor(cfg, args)
+    if command == "cron":
+        return _cmd_cron(cfg, args)
 
     # Agent 1 integration wave: wired family subcommands execute their real
     # backend here, before the native family handlers below.
@@ -3448,6 +3907,8 @@ def main(argv=None) -> int:
             return _cmd_auth_verify(cfg, args)
         return _cmd_auth_status(cfg)
     if command == "mcp":
+        if getattr(args, "mcp_command", None) == "invoke":
+            return _cmd_mcp_invoke(cfg, args)
         return _cmd_mcp_status(cfg)
     if command == "worker":
         return _cmd_worker_status(cfg)
@@ -3459,6 +3920,8 @@ def main(argv=None) -> int:
         return _cmd_checkpoints(cfg, args)
     if command == "sessions":
         return _cmd_sessions(cfg, args)
+    if command in ("chat-sessions", "chat_sessions"):
+        return _cmd_chat_sessions(cfg, args)
     if command == "capability":
         return _cmd_capability(args.action, args.name, args.state)
     if command == "completion":
@@ -3497,6 +3960,10 @@ def main(argv=None) -> int:
         return _cmd_kanban(cfg, args)
     if command == "runtime":
         return _cmd_runtime(cfg, args)
+    # Owner Decision #11: the sanctioned native update surface (check/apply/
+    # rollback) — never a typed refusal and never fork-forwarded.
+    if command == "update":
+        return _cmd_update(cfg, args)
     if command == "computer-use":
         return _cmd_computer_use(cfg, args)
     if command == "browser":
@@ -3827,12 +4294,99 @@ def _cmd_sessions(cfg, args) -> int:
     return 3
 
 
+def _rebrand_chat_sessions_cli(out: Any) -> Any:
+    """Render a chat-session store result as Qubit at the CLI boundary.
+
+    The canonical store is durable history and may hold legacy upstream-authored
+    text (a session ``name``/``title``/``preview`` and message ``content``/
+    ``meta``). It is never rewritten; upstream product names are rendered as
+    Qubit only on the printed response, through the SAME helpers the dashboard
+    handlers use (``voicebridge.qubit_compat._rebrand_chat_record`` /
+    ``_rebrand_chat_messages``), so the CLI and the dashboard agree for
+    identical data. Only those served fields are touched: path fields such as
+    ``cwd`` and every other key stay byte-exact.
+    """
+    from .qubit_compat import _rebrand_chat_messages, _rebrand_chat_record
+
+    if not isinstance(out, dict):
+        return out
+    rebranded = dict(out)
+    if isinstance(rebranded.get("sessions"), list):
+        rebranded["sessions"] = [_rebrand_chat_record(row)
+                                 for row in rebranded["sessions"]]
+    if isinstance(rebranded.get("session"), dict):
+        rebranded["session"] = _rebrand_chat_record(rebranded["session"])
+    if isinstance(rebranded.get("messages"), list):
+        rebranded["messages"] = _rebrand_chat_messages(rebranded["messages"])
+    return rebranded
+
+
+def _cmd_chat_sessions(cfg, args) -> int:
+    """Canonical chat transcripts (state.db) — the ONE session authority.
+
+    B-04M: reads ``voicebridge.chat_transport.store`` (the same store the
+    terminal/agent, /chat, /qubit-chat, dashboard, and voice use), so migrated
+    Qubit history and native Qubit chats are visible from the CLI. Read-only;
+    lifecycle mutations stay on the confirmation-gated surfaces. The printed
+    result is rebranded by :func:`_rebrand_chat_sessions_cli` exactly like the
+    dashboard, so upstream product names in stored history render as Qubit.
+    """
+    from . import chat_transport as CT
+
+    store = CT.store(cfg)
+    sub = getattr(args, "chat_sessions_command", None) or "list"
+    if sub == "show":
+        out = store.show(str(getattr(args, "session_id", "") or ""))
+    elif sub == "messages":
+        out = store.messages(str(getattr(args, "session_id", "") or ""),
+                             limit=int(getattr(args, "limit", 100) or 100))
+    elif sub == "search":
+        out = store.list(limit=int(getattr(args, "limit", 20) or 20),
+                         query=str(getattr(args, "query", "") or ""))
+    elif sub == "export":
+        out = store.export(str(getattr(args, "session_id", "") or ""))
+    else:
+        out = store.list(limit=int(getattr(args, "limit", 20) or 20),
+                         include_archived=bool(getattr(args, "archived",
+                                                       False)))
+    print(json.dumps(_rebrand_chat_sessions_cli(out), indent=2))
+    return 0
+
+
 def _cmd_mcp_status(cfg) -> int:
     """MCP server inventory without mounting anything (read-only)."""
     from .integration_status import mcp_status
 
     print(json.dumps(mcp_status(cfg), indent=2))
     return 0
+
+
+def _cmd_mcp_invoke(cfg, args) -> int:
+    """Call a tool on a configured MCP server through the brokered client.
+
+    Confirmation/e-stop/allowlist/timeout are enforced by
+    :func:`voicebridge.mcp_servers.invoke_cli`; a refusal is typed and never a
+    fabricated success.
+    """
+    from . import mcp_servers as MS
+
+    tool_args = {}
+    for item in getattr(args, "arg", []) or []:
+        if "=" in item:
+            key, value = item.split("=", 1)
+            tool_args[key.strip()] = value
+    out = None
+    try:
+        out = MS.invoke_cli(
+            cfg, args.server, tool=getattr(args, "tool", "") or "",
+            args=tool_args or None,
+            confirmed=bool(getattr(args, "confirm", False)),
+            confirmation_id=str(getattr(args, "confirmation_id", "") or ""))
+    except MS.McpServerError as exc:
+        out = {"state": "REFUSED", "ok": False, "code": exc.code,
+               "detail": exc.detail}
+    print(json.dumps(out, indent=2))
+    return 0 if out.get("state") in ("OK", "APPROVAL_REQUIRED") else 1
 
 
 def _cmd_worker_status(cfg) -> int:
@@ -4048,12 +4602,24 @@ def _cmd_asr_test(cfg, file: Path) -> int:
     if not file.exists():
         print(f"file not found: {file}")
         return 1
-    from .asr.whisper import FasterWhisperASR
     asr_cfg = cfg.section("asr")
-    asr = FasterWhisperASR(model=asr_cfg.get("model", "base"), device=asr_cfg.get("device", "auto"))
+    provider = str(asr_cfg.get("provider", "sherpa") or "sherpa")
+    if provider == "whisper":
+        from .asr.whisper import FasterWhisperASR
+        asr = FasterWhisperASR(model=asr_cfg.get("model", "base"),
+                               device=asr_cfg.get("device", "auto"))
+    else:
+        from .asr.sherpa import SherpaASR
+        asr = SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
+                        model_dir=cfg.model_dir(),
+                        provider=asr_cfg.get("provider_ep", "cpu"),
+                        num_threads=int(asr_cfg.get("num_threads", 4)),
+                        language=asr_cfg.get("language"),
+                        hotwords=asr_cfg.get("hotwords", ""))
     asr.load()
     tr = asr.transcribe(file)
-    print(f"[{tr.provider}/{asr._actual_device}] conf={tr.confidence:.2f} dur={tr.duration_s:.1f}s")
+    device = getattr(asr, "_actual_device", getattr(asr, "provider", provider))
+    print(f"[{tr.provider}/{device}] conf={tr.confidence:.2f} dur={tr.duration_s:.1f}s")
     print(tr.text)
     return 0
 
@@ -4430,6 +4996,61 @@ def _cmd_product(cfg, args) -> int:
                                  backup_dir=args.backup_dir)
         print(_json.dumps(out, indent=2, sort_keys=True))
         return 0 if out["state"] in ("OK", "READY") else 1
+    if cmd in ("legacy-inspect", "hermes-inspect"):
+        from . import qubit_migration as HM
+        out = HM.inspect(cfg, home=getattr(args, "home", None))
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"runtime home: {out['home']} ({out['state']})")
+            for rel, entry in out.get("databases", {}).items():
+                counts = entry.get("counts", {})
+                detail = ", ".join(f"{k}={v}" for k, v in counts.items()) or "no rows"
+                print(f"  {rel}: {detail}")
+            cfg_info = out.get("config", {})
+            if cfg_info:
+                print(f"  model: {cfg_info.get('model_provider')}/"
+                      f"{cfg_info.get('model_default')}")
+            print(f"  secret refs: {len(out.get('secret_refs', []))}")
+            for sub, n in (out.get("dirs") or {}).items():
+                print(f"  {sub}: {n} file(s)")
+        return 0 if out["state"] == "OK" else 1
+    if cmd in ("legacy-migrate", "hermes-migrate"):
+        from . import qubit_migration as HM
+        out = HM.apply(cfg, confirm=bool(args.apply),
+                       backup_dir=getattr(args, "backup_dir", None),
+                       home=getattr(args, "home", None))
+        if getattr(args, "json", False):
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            print(f"migration: {out['state']}")
+            if out.get("dry_run"):
+                print(f"  source sessions={out.get('source_sessions')} "
+                      f"messages={out.get('source_messages')} "
+                      f"dest={out.get('destination')}")
+                print(f"  {out.get('detail', '')}")
+            else:
+                print(f"  imported sessions={out.get('imported_sessions')} "
+                      f"messages={out.get('imported_messages')} "
+                      f"skipped={out.get('skipped_sessions')}")
+                mp = out.get("model_profile") or {}
+                if mp:
+                    print(f"  model profile: {mp.get('profile_id')} "
+                          f"({mp.get('state')}) key_ref={mp.get('key_ref')}")
+                cron = out.get("cron") or {}
+                if cron:
+                    print(f"  schedules: +{cron.get('added')} job(s)")
+                print(f"  added files: {out.get('added_files')}")
+                print(f"  backup: {out.get('backup_dir')}")
+                for err in out.get("errors", [])[:5]:
+                    print(f"  error: {err}")
+        return 0 if out["state"] in ("OK", "PARTIAL", "DRY_RUN") else 1
+    if cmd in ("legacy-rollback", "hermes-rollback"):
+        from . import qubit_migration as HM
+        out = HM.rollback(cfg, backup_dir=args.backup_dir,
+                          confirm=bool(getattr(args, "apply", False)))
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out["state"] in ("OK", "DRY_RUN") else 1
     if cmd == "service":
         out = P.service_owner()
         print(_json.dumps(out, indent=2, sort_keys=True))
@@ -4762,10 +5383,11 @@ def _cmd_profile_model(cfg, args) -> int:
             if getattr(args, "json", False):
                 return _profile_model_emit(out)
             print(f"{'id':<24} {'kind':<9} {'provider':<12} {'model':<26} "
-                  f"{'locality':<9} {'gate':<8} default")
+                  f"{'locality':<9} {'ctx':>8} {'gate':<8} default")
             for p in out["profiles"]:
                 print(f"{p['id']:<24} {p['kind']:<9} {p['provider']:<12} "
                       f"{str(p['model']):<26} {p['locality']:<9} "
+                      f"{int(p.get('context_tokens') or 0):>8} "
                       f"{p['gate']:<8} {'yes' if p['default'] else ''}")
             print("count:", out["count"])
             return 0
@@ -4779,6 +5401,20 @@ def _cmd_profile_model(cfg, args) -> int:
             if guard:
                 return _profile_model_emit(guard)
             kind = args.kind or R.LOCAL
+            if kind == R.PLUGIN:
+                # Provider-plugin record (Radius adapter): credentials are an
+                # env:/file: reference only, and a default reference is valid
+                # without a present key (config-only until it resolves).
+                profile = R.radius_profile(
+                    args.id,
+                    model=(args.model if args.model is not None else "balanced"),
+                    roles=_profile_model_roles(args.roles) or [R.DEFAULT_ROLE],
+                    key_ref=(str(args.key_ref or "").strip()
+                             or R.RADIUS_KEY_REF),
+                    base_url=args.base_url or R.RADIUS_BASE_URL,
+                    egress_consent=args.egress_consent or "deny")
+                return _profile_model_emit(R.upsert_model_profile(
+                    cfg, profile, confirm=bool(args.confirm)))
             profile = R.ModelProfile(
                 id=args.id, kind=kind,
                 provider=args.provider or "ollama",
@@ -4873,6 +5509,92 @@ def _cmd_profile_model(cfg, args) -> int:
         return _profile_model_emit(detail)
 
 
+def _cmd_profile_speech(cfg, args) -> int:
+    """qubit profile speech list|show|test|create|clone|remove|select|clear —
+    canonical STT/TTS/realtime profiles on the resolver/speech registry.
+
+    Reads execute; mutations are dry-run unless --confirm. Secrets are
+    ``env:``/``file:`` references only.
+    """
+    import dataclasses
+    import json as _json
+
+    from .providers import resolver as R
+    from .providers import speech as SP
+
+    cmd = getattr(args, "profile_speech_command", None) or "list"
+    try:
+        if cmd == "list":
+            out = R.list_speech_profiles(cfg, getattr(args, "kind", None))
+            if getattr(args, "json", False):
+                return _profile_model_emit(out)
+            print(f"{'id':<26} {'kind':<10} {'provider':<12} {'target':<26} "
+                  f"{'locality':<9} {'gate':<8} default")
+            for p in out["profiles"]:
+                target = p.get("model") or p.get("voice") or p.get("engine")
+                print(f"{p['id']:<26} {p['kind']:<10} {p['provider']:<12} "
+                      f"{str(target):<26} {p['locality']:<9} "
+                      f"{p.get('gate', ''):<8} {'yes' if p['default'] else ''}")
+            print("count:", out["count"])
+            return 0
+        if cmd == "show":
+            return _profile_model_emit(
+                R.show_speech_profile(cfg, args.profile))
+        if cmd == "test":
+            pid = str(getattr(args, "profile", "") or "")
+            if pid:
+                return _profile_model_emit(SP.show_speech_profile(cfg, pid))
+            kind = getattr(args, "kind", SP.SPEECH_IN) or SP.SPEECH_IN
+            eff = (R.resolve_speech_in(cfg) if kind == SP.SPEECH_IN
+                   else R.resolve_speech_out(cfg) if kind == SP.SPEECH_OUT
+                   else R.resolve_realtime(cfg))
+            return _profile_model_emit(
+                {"state": "OK", "kind": kind,
+                 "effective": eff.to_public_dict()})
+        if cmd == "create":
+            profile = SP.SpeechProfile.from_record({
+                "id": args.id, "kind": args.kind, "provider": args.provider,
+                "model": args.model, "voice": args.voice,
+                "device": args.device, "language": args.language,
+                "locality": args.locality or (
+                    "external" if args.kind == SP.REALTIME else "local"),
+                "egress_consent": args.egress_consent or "deny",
+                "key_ref": str(args.key_ref or "").strip(),
+                "base_url": args.base_url, "engine": args.engine,
+                "fallback_to": args.fallback_to})
+            return _profile_model_emit(R.upsert_speech_profile(
+                cfg, profile, confirm=bool(args.confirm)))
+        if cmd == "clone":
+            return _profile_model_emit(R.clone_speech_profile(
+                cfg, args.source, args.new, confirm=bool(args.confirm)))
+        if cmd == "remove":
+            return _profile_model_emit(R.remove_speech_profile(
+                cfg, args.profile, confirm=bool(args.confirm)))
+        if cmd == "select":
+            if not args.confirm:
+                return _profile_model_emit(
+                    {"state": "OK", "dry_run": True, "action": "would select",
+                     "profile": args.profile, "session": args.session,
+                     "kind": args.kind})
+            return _profile_model_emit(SP.set_session_speech_profile(
+                cfg, args.session, args.kind, args.profile, confirm=True))
+        if cmd == "clear":
+            if not args.confirm:
+                return _profile_model_emit(
+                    {"state": "OK", "dry_run": True, "action": "would clear",
+                     "session": args.session, "kind": args.kind or "*"})
+            return _profile_model_emit(SP.clear_session_speech_profile(
+                cfg, args.session, kind=getattr(args, "kind", None)))
+        print(_json.dumps({"state": "FAILED", "code": "UNKNOWN_COMMAND",
+                           "detail": f"unknown profile speech command {cmd!r}"},
+                          indent=2))
+        return 2
+    except R.ResolverError as exc:
+        detail = exc.to_dict()
+        detail["state"] = "FAILED"
+        return _profile_model_emit(detail)
+
+
 def _cmd_profile(cfg, args) -> int:
     """voicebridge profile list|show|check|install|select|reset|upgrade|
     remove|rollback. Dry-run by default; JSON output."""
@@ -4881,6 +5603,8 @@ def _cmd_profile(cfg, args) -> int:
     cmd = getattr(args, "profile_command", None) or "list"
     if cmd == "model":
         return _cmd_profile_model(cfg, args)
+    if cmd == "speech":
+        return _cmd_profile_speech(cfg, args)
     if cmd == "list":
         out = P.profiles_list(cfg)
         if getattr(args, "json", False):
@@ -5115,16 +5839,26 @@ def _cmd_skills(cfg, args) -> int:
         return 3
     try:
         if cmd == "list":
+            # ONE read authority shared with the dashboard/voice: the
+            # permissioned store plus the vendored on-disk catalog, so the
+            # catalog count is the same on every surface.
+            from . import skill_catalog
+
             out = {"state": "OK",
-                   "skills": [s.to_dict() for s in store.skills()]}
+                   "skills": skill_catalog.merged_store_view(cfg)}
         elif cmd == "show":
-            s = store.skill(args.skill_id)
+            # ONE authority shared with the dashboard/voice: on-disk skills
+            # resolve through the fork's skill manager, permissioned-
+            # manifest-only skills through the permissioned store.
+            from . import skill_catalog as _SC
+
+            s = _SC.show_skill(cfg, args.skill_id)
             if s is None:
                 print(_json.dumps({"state": "MISSING",
                                    "detail": f"no skill {args.skill_id}"},
                                   indent=2))
                 return 1
-            out = s.to_dict()
+            out = s
         elif cmd == "check":
             man = _skills_load_manifest(args.manifest, _json, P, _PLUG)
             if isinstance(man, dict):  # typed refusal, already printed
@@ -5146,23 +5880,51 @@ def _cmd_skills(cfg, args) -> int:
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_enable": args.skill_id}
             else:
-                rec = store.enable_skill(args.skill_id, requested_by="cli:user",
-                                         confirmed=args.confirm)
-                out = {"state": "OK", "status": rec.status, "skill_id": rec.skill_id}
+                from . import skill_catalog as _SC
+
+                try:
+                    rec = _SC.set_skill_enabled(
+                        cfg, args.skill_id, True, requested_by="cli:user")
+                except _SC.SkillAuthorityError as exc:
+                    print(_json.dumps({"state": "failed", "code": exc.code,
+                                       "detail": exc.detail}, indent=2))
+                    return 2
+                out = {"state": "OK", "enabled": rec["enabled"],
+                       "origin": rec["origin"], "skill_id": rec["skill_id"]}
         elif cmd == "disable":
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_disable": args.skill_id}
             else:
-                rec = store.disable_skill(args.skill_id, requested_by="cli:user",
-                                          confirmed=args.confirm)
-                out = {"state": "OK", "status": rec.status, "skill_id": rec.skill_id}
+                from . import skill_catalog as _SC
+
+                try:
+                    rec = _SC.set_skill_enabled(
+                        cfg, args.skill_id, False, requested_by="cli:user")
+                except _SC.SkillAuthorityError as exc:
+                    print(_json.dumps({"state": "failed", "code": exc.code,
+                                       "detail": exc.detail}, indent=2))
+                    return 2
+                out = {"state": "OK", "enabled": rec["enabled"],
+                       "origin": rec["origin"], "skill_id": rec["skill_id"]}
         elif cmd == "remove":
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_remove": args.skill_id}
             else:
-                rec = store.remove_skill(args.skill_id, requested_by="cli:user",
-                                         confirmed=args.confirm)
-                out = {"state": "OK", "removed": rec.skill_id}
+                from . import skill_catalog as _SC
+
+                if _SC.find_skill_path(cfg, args.skill_id) is not None:
+                    try:
+                        _SC.delete_skill_file(
+                            cfg, args.skill_id, requested_by="cli:user")
+                    except _SC.SkillAuthorityError as exc:
+                        print(_json.dumps({"state": "failed", "code": exc.code,
+                                           "detail": exc.detail}, indent=2))
+                        return 2
+                    out = {"state": "OK", "removed": args.skill_id}
+                else:
+                    rec = store.remove_skill(args.skill_id, requested_by="cli:user",
+                                             confirmed=args.confirm)
+                    out = {"state": "OK", "removed": rec.skill_id}
         elif cmd == "rollback":
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_rollback": args.skill_id}
@@ -5487,6 +6249,157 @@ def _cmd_runtime(cfg, args) -> int:
         return rc
 
 
+def _update_runtime_state(cfg):
+    """Compact pinned-runtime-image state for `qubit update --check`.
+
+    Read-only; a probe failure is omitted (never fabricated) and never fails the
+    update check.
+    """
+    try:
+        from . import runtime_images as RI
+
+        st = RI.status(cfg)
+        return {
+            "state": st.get("state"),
+            "daemon": st.get("daemon"),
+            "images": [{"name": i.get("name"), "state": i.get("state")}
+                       for i in (st.get("runtimes") or [])],
+        }
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _update_rc(out) -> int:
+    """Map an update receipt to the sanctioned exit codes.
+
+    0 OK/restored · 1 operational failure · 2 typed refusal · 3 e-stop.
+    """
+    from . import update_manager as UM
+
+    code = str(out.get("code") or "")
+    state = str(out.get("state") or "")
+    if out.get("ok") is True or state == "OK":
+        return 0
+    if code == UM.ESTOP_CODE or state == "denied":
+        return 3
+    # A post-pull revision that does not match the update source is a typed
+    # artifact mismatch (rc 2), not a generic operational failure.
+    if state == "FAILED" and out.get("remote_verified") is False:
+        return 2
+    if code in (UM.WORKTREE_DIRTY_CODE, UM.OPERATOR_OWNED_CODE,
+                UM.UNAVAILABLE_CODE, UM.CONFIRM_CODE, UM.NO_BACKUP_CODE,
+                UM.BACKUP_INVALID_CODE):
+        return 2
+    return 1
+
+
+def _print_update_receipt(out, as_json: bool) -> None:
+    import json as _json
+
+    if as_json:
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return
+    state = out.get("state") or "UNKNOWN"
+    print(f"Qubit update: {state}")
+    if out.get("detail"):
+        print(f"  {out['detail']}")
+    if out.get("code"):
+        print(f"  code: {out['code']}")
+
+
+def _print_update_check(out) -> None:
+    print("Qubit update check")
+    print(f"  product version : {out.get('current_version') or 'unknown'}")
+    print(f"  install method  : {out.get('install_method') or 'unknown'}")
+    print(f"  revision        : {out.get('current_revision') or 'unknown'}")
+    remote = out.get("remote") or "?"
+    branch = out.get("branch") or "?"
+    head = out.get("remote_revision") or "unresolved"
+    print(f"  update source   : {remote}/{branch} ({head})")
+    print(f"  state           : {out.get('state')} — {out.get('message') or ''}")
+    rt = out.get("runtime_image")
+    if isinstance(rt, dict):
+        print(f"  runtime image   : {rt.get('state')} "
+              f"(daemon: {rt.get('daemon')})")
+
+
+def _cmd_update(cfg, args) -> int:
+    """qubit update --check|--apply|--rollback (Owner Decision #11).
+
+    The sanctioned Qubit update surface — no longer a typed refusal and never
+    forwarded to the vendored fork. `--check` (and a bare `update`) is a
+    read-only, truthful status: product version, install method, revision, and
+    pinned runtime-image state; a DEGRADED result is reported, never disguised
+    as "up to date". `--apply` writes a timestamped `git bundle` backup, then
+    runs the non-destructive fast-forward. `--rollback` restores the recorded
+    pre-apply revision from the most recent update backup and writes a
+    pre-rollback snapshot first, so the rollback is itself reversible.
+    """
+    import json as _json
+    from . import update_manager as UM
+
+    check = bool(getattr(args, "check", False))
+    do_apply = bool(getattr(args, "apply", False))
+    do_rollback = bool(getattr(args, "rollback", False))
+    verbs = [name for name, on in (("check", check), ("apply", do_apply),
+                                   ("rollback", do_rollback)) if on]
+    if len(verbs) > 1:
+        print(_json.dumps({"state": "FAILED", "code": "UPDATE_VERB_CONFLICT",
+                           "detail": "choose exactly one of --check, --apply, "
+                                     "--rollback"},
+                          indent=2, sort_keys=True))
+        return 2
+    verb = verbs[0] if verbs else "check"
+    source = str(getattr(args, "source", "") or "").strip() or None
+    backup_dir = getattr(args, "backup_dir", None) or None
+    as_json = bool(getattr(args, "json", False))
+
+    if verb == "check":
+        out = UM.check(cfg, source=source)
+        rt = _update_runtime_state(cfg)
+        if rt is not None:
+            out["runtime_image"] = rt
+        if as_json:
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            _print_update_check(out)
+        return 0 if out.get("state") == "OK" else 2
+
+    # Mutating verbs honor the shared top-level `--dry-run`: preview only.
+    if verb in ("apply", "rollback") and getattr(args, "dry_run", False):
+        print(_json.dumps({"state": "preview",
+                           "would": f"qubit update --{verb}",
+                           "detail": "dry-run: no backup written, no git "
+                                     "command run"},
+                          indent=2, sort_keys=True))
+        return 0
+
+    # Mutating verbs: fail closed on the single e-stop authority first.
+    if UM.estop_engaged(cfg):
+        out = {"ok": False, "state": "denied", "code": UM.ESTOP_CODE,
+               "detail": "emergency stop is latched; update refused",
+               "owner": "qubit-policy",
+               "rollback": "nothing changed; nothing to roll back"}
+        _print_update_receipt(out, as_json)
+        return 3
+
+    if verb == "apply":
+        snap = UM.snapshot(cfg, reason="pre-apply", source=source,
+                           backup_dir=backup_dir, actor="cli:update")
+        if not snap.get("ok"):
+            _print_update_receipt(snap, as_json)
+            return _update_rc(snap)
+        out = UM.apply(cfg, confirm=True, source=source, actor="cli:update")
+        out["backup_dir"] = snap.get("backup_dir")
+        out["backup_bundle"] = snap.get("bundle")
+        _print_update_receipt(out, as_json)
+        return _update_rc(out)
+
+    out = UM.rollback(cfg, backup_dir=backup_dir, actor="cli:update")
+    _print_update_receipt(out, as_json)
+    return _update_rc(out)
+
+
 def _cmd_computer_use(cfg, args) -> int:
     """voicebridge computer-use status|doctor|permissions|install.
 
@@ -5496,6 +6409,7 @@ def _cmd_computer_use(cfg, args) -> int:
     import json as _json
     from . import computer_use as CU
     cmd = getattr(args, "computer_use_command", None) or "status"
+    confirm = bool(getattr(args, "confirm", False))
     if cmd == "status":
         out = CU.status()
     elif cmd == "doctor":
@@ -5504,6 +6418,22 @@ def _cmd_computer_use(cfg, args) -> int:
         out = CU.permissions()
     elif cmd == "session":
         out = CU.desktop_session()
+    elif cmd == "ops":
+        out = CU.desktop_ops()
+    elif cmd == "launch":
+        out = CU.launch_app(cfg, args.app, target=args.target,
+                            requested_by="cli:user", confirmed=confirm)
+    elif cmd == "pip":
+        out = CU.picture_in_picture(cfg, target=args.target,
+                                    width=args.width, height=args.height,
+                                    requested_by="cli:user", confirmed=confirm)
+    elif cmd == "present":
+        panes = [q for q in str(getattr(args, "panes", "") or "")
+                 .replace(",", " ").split() if q] or None
+        out = CU.present(cfg, args.mode, panes=panes, target=args.target,
+                         requested_by="cli:user", confirmed=confirm)
+    elif cmd == "presentation":
+        out = CU.presentation_status(cfg)
     elif cmd == "install":
         print(_json.dumps(CU.refuse_install(), indent=2))
         return 2
@@ -5511,6 +6441,13 @@ def _cmd_computer_use(cfg, args) -> int:
         print(f"ERROR: unknown computer-use command {cmd!r}")
         return 2
     print(_json.dumps(out, indent=2, sort_keys=True))
+    code = str(out.get("code", "") or "")
+    if code in (CU.LAUNCH_CONFIRM_CODE, CU.PIP_CONFIRM_CODE,
+                CU.PRESENT_CONFIRM_CODE):
+        return 3
+    if cmd in ("launch", "pip", "present") and (
+            out.get("state") in ("REFUSED", "denied") or code):
+        return 2
     return 0
 
 
@@ -5528,7 +6465,7 @@ def _cmd_browser(cfg, args) -> int:
     cmd = getattr(args, "browser_command", None) or "status"
     confirm = bool(getattr(args, "confirm", False))
     _MUTATING = {"activate", "open", "open-browser", "navigate", "fill",
-                 "click", "close"}
+                 "click", "close", "download"}
     try:
         if cmd in _MUTATING and BT.estop_engaged(cfg):
             print(_json.dumps(BT.refuse_estop(f"browser {cmd}"), indent=2))
@@ -5585,6 +6522,20 @@ def _cmd_browser(cfg, args) -> int:
         elif cmd == "close":
             out = BT.close(cfg, args.target, requested_by="cli:user",
                            confirmed=confirm)
+        elif cmd == "favicon":
+            out = BT.favicon(
+                cfg, getattr(args, "target", "") or "",
+                max_bytes=(getattr(args, "max_bytes", 0)
+                           or BT.MAX_FAVICON_BYTES),
+                requested_by="cli:user")
+        elif cmd == "favicon-cache":
+            out = BT.favicon_cache(cfg, limit=getattr(args, "limit", 32))
+        elif cmd == "download":
+            out = BT.download(
+                cfg, args.dest, getattr(args, "target", "") or "",
+                max_bytes=(getattr(args, "max_bytes", 0)
+                           or BT.MAX_DOWNLOAD_BYTES),
+                requested_by="cli:user", confirmed=confirm)
         else:
             print(f"ERROR: unknown browser command {cmd!r}")
             return 2
@@ -5703,6 +6654,11 @@ def _cmd_plugins(cfg, args) -> int:
             out = PR.get_plugin(cfg, args.plugin_id)
         elif cmd == "doctor":
             out = PR.doctor(cfg)
+        elif cmd == "catalog":
+            out = PR.plugin_catalog(cfg)
+        elif cmd == "install":
+            out = PR.install(cfg, identifier=args.identifier,
+                             requested_by="cli:user", confirmed=confirm)
         elif cmd == "register":
             path = Path(args.manifest).expanduser()
             try:
@@ -6336,9 +7292,67 @@ def _cmd_gateway(cfg, args) -> int:
                                     requested_by="cli:user", confirmed=confirm)
         elif cmd == "link":
             out = GW.gateway_link(cfg, args.gateway_id)
-        elif cmd in ("run", "start", "stop", "restart", "install"):
+        elif cmd == "status":
+            # Owner Decision #10: real Qubit-owned gateway status.
+            from . import gateway_supervisor as GS
+
+            out = GS.status(cfg)
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0 if out.get("running") else 2
+        elif cmd in ("start", "stop", "restart"):
+            # Owner Decision #10: real control of the Qubit gateway service
+            # through the one authority path (e-stop → confirmation → audit).
+            from . import gateway_supervisor as GS
+
+            out = GS.control(cfg, cmd, confirmed=confirm, actor="cli:user")
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            if out.get("ok"):
+                return 0
+            code = str(out.get("code") or "")
+            return {"GATEWAY_CONFIRM_REQUIRED": 3, "GATEWAY_ESTOP": 3,
+                    "GATEWAY_SUPERVISION_UNAVAILABLE": 2}.get(code, 1)
+        elif cmd in ("run", "install"):
             print(_json.dumps(GW.refuse_supervision(cmd), indent=2))
             return 2
+        elif cmd == "protocol":
+            out = GW.protocol_doctor()
+        elif cmd == "negotiate":
+            out = GW.negotiate_protocol(
+                getattr(args, "client_version", None))
+        elif cmd == "serve":
+            print(_json.dumps(
+                GW.serve_refusal(getattr(args, "action", "serve")), indent=2))
+            return 2
+        elif cmd == "rpc":
+            # One in-process RPC path (no standalone listener): the same
+            # registry the gateway frame transport dispatches through.
+            from .gateway.rpc import default_registry
+
+            reg = default_registry()
+            method = str(getattr(args, "method", "") or "").strip()
+            if not method:
+                print(_json.dumps({"state": "OK", "methods": reg.names()},
+                                  indent=2))
+                return 0
+            try:
+                params = _json.loads(getattr(args, "params", "{}") or "{}")
+            except ValueError:
+                print(_json.dumps({"state": "FAILED",
+                                   "code": "BAD_PARAMS",
+                                   "detail": "--params must be a JSON object"},
+                                  indent=2))
+                return 2
+            try:
+                out = reg.handle(cfg, method, params)
+            except Exception as exc:  # noqa: BLE001 - typed RPC failure
+                print(_json.dumps({
+                    "state": "FAILED",
+                    "code": str(getattr(exc, "code", "GATEWAY_METHOD_FAILED")),
+                    "detail": str(getattr(exc, "detail", "") or exc)[:300]},
+                    indent=2))
+                return 2
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            return 0
         else:
             print(f"ERROR: unknown gateway command {cmd!r}")
             return 2
@@ -6835,28 +7849,73 @@ def _cmd_websites(cfg, args) -> int:
                              "(bounded read-only network access)"}
             _print_website_out(args, cmd, out)
             return 3
+        # The live probe dispatches through the ONE canonical broker (e-stop /
+        # policy / shared confirmation journal / audit) the planner and every
+        # other web path use, instead of opening its own ungated connection.
+        # register_web_tools builds the shared web.* surface; the probe joins it
+        # as a READ_ONLY capability and performs no e-stop/audit of its own, so
+        # the broker decides and audits exactly once.
+        from .broker import build_host_broker, register_web_tools
+        from .power import power_control
+
+        broker = build_host_broker(power_control=power_control(cfg), cfg=cfg)
+        register_web_tools(broker, cfg=cfg)
+        W.register_probe_tool(broker, cfg=cfg)
+        res = broker.execute(W.PROBE_CAPABILITY, {"url": args.url},
+                             source="user")
+        if res.denied:
+            out = {"state": "denied", "code": str(res.denied),
+                   "detail": "website probe refused by the shared power "
+                             "control"}
+            _print_website_out(args, cmd, out)
+            return 3
+        if not res.ok:
+            print(_json.dumps({"state": "failed",
+                               "detail": W.redact_text(str(res.error))[:300]},
+                              indent=2))
+            return 2
         try:
-            result = W.probe_url(args.url)
-        except W.WebsiteValidationError as exc:
-            print(_json.dumps({"state": "failed", "detail": str(exc)},
+            probe_dict = _json.loads(res.output)
+        except (TypeError, ValueError):
+            print(_json.dumps({"state": "failed",
+                               "detail": "probe returned a malformed result"},
                               indent=2))
             return 2
         out = {"state": "OK", "url": args.url,
-               "result": W.result_code_for_status(result.status,
-                                                   result.reason_code),
-               "probe": result.to_dict()}
+               "result": W.result_code_for_status(
+                   str(probe_dict.get("status") or ""),
+                   str(probe_dict.get("reason_code") or "")),
+               "probe": probe_dict}
         _print_website_out(args, cmd, out)
         return 0
 
     if cmd in ("fetch", "search"):
         from . import web_tool as WT
-        try:
-            out = (WT.fetch(cfg, args.url) if cmd == "fetch"
-                   else WT.search(cfg, args.query))
-        except WT.WebToolError as exc:
-            redact = getattr(WT, "redact_spec", str)
-            out = {"state": "denied", "code": getattr(exc, "code", "WEB_ERROR"),
-                   "detail": redact(getattr(exc, "detail", str(exc)))[:300]}
+        from .broker import build_host_broker, register_web_tools
+        from .power import power_control
+
+        # Dispatch the read-only web capability through the ONE canonical
+        # broker (e-stop / policy / shared confirmation journal / audit) the
+        # planner and every other channel use, instead of calling the SSRF
+        # web tool directly and bypassing the decision junction.
+        capability = "web.fetch" if cmd == "fetch" else "web.search"
+        target = ({"url": args.url} if cmd == "fetch"
+                  else {"query": args.query})
+        broker = build_host_broker(power_control=power_control(cfg), cfg=cfg)
+        register_web_tools(broker, cfg=cfg)
+        res = broker.execute(capability, target, source="user")
+        if res.denied:
+            out = {"state": "denied", "code": str(res.denied),
+                   "detail": "web access refused by the shared power control"}
+        elif not res.ok:
+            out = {"state": "denied", "code": "WEB_ERROR",
+                   "detail": WT.redact_text(str(res.error))[:300]}
+        else:
+            try:
+                out = _json.loads(res.output)
+            except (TypeError, ValueError):
+                out = {"state": "failed", "code": "WEB_ERROR",
+                       "detail": "web tool returned a malformed result"}
         _print_website_out(args, cmd, out)
         return 0 if out.get("state") == "OK" else 2
 
@@ -7569,6 +8628,8 @@ def _cmd_verified_skills(cfg, args) -> int:
             out = {"skills": [r.to_dict() for r in store.list()]}
         elif cmd == "list-status":
             out = {"skills": [r.to_dict() for r in store.list(status=args.status)]}
+        elif cmd == "bundled":
+            out = {"state": "OK", "bundled": store.bundled()}
         elif cmd == "show":
             rec = store.get(args.id)
             if rec is None:
@@ -8172,6 +9233,182 @@ def _cmd_ide(cfg, args) -> int:
                            "owner": "qubit-policy",
                            "rollback": "nothing launched; nothing to roll back"},
                           indent=2))
+        return rc
+
+
+def _cmd_config(cfg, args, explicit_config: Path | None) -> int:
+    """qubit config path|show|check|env-path|env-list|set|unset.
+
+    Reads delegate to ``config.py``/``env_store.py`` and execute. Writes are
+    confirm-gated and accept only ``vault:``/``ref:`` references, so no secret
+    value is ever read, printed, or stored; ``show`` masks secret-shaped values
+    before printing.
+    """
+    import json as _json
+    from . import env_store as ES
+    from .config import Config, resolve_config_path
+
+    cmd = getattr(args, "config_command", None) or "path"
+    as_json = bool(getattr(args, "json", False))
+    target = (explicit_config or getattr(cfg, "path", None)
+              or resolve_config_path())
+    try:
+        if cmd == "path":
+            out = {"state": "OK", "path": str(target)}
+        elif cmd == "show":
+            from .feature_flags import redact_config_yaml
+            text = redact_config_yaml(cfg)
+            if as_json:
+                print(_json.dumps({"state": "OK", "path": str(target),
+                                   "config": text}, indent=2, sort_keys=True))
+            else:
+                print(text)
+            return 0
+        elif cmd == "check":
+            loaded = Config.load(target)
+            names = ES.names(cfg)
+            out = {"state": "OK", "path": str(target),
+                   "sections": sorted(loaded.data.keys()),
+                   "env_refs": len(names)}
+        elif cmd == "env-path":
+            out = {"state": "OK", "path": str(ES.store_path(cfg))}
+        elif cmd == "env-list":
+            names = ES.names(cfg)
+            out = {"state": "OK", "count": len(names), "names": names}
+        elif cmd in ("set", "unset"):
+            if not bool(getattr(args, "confirm", False)):
+                print(_json.dumps(
+                    {"state": "denied", "code": "CONFIRM_REQUIRED",
+                     "detail": f"config {cmd} requires --confirm (explicit "
+                               "human authorization)"}, indent=2,
+                    sort_keys=True))
+                return 3
+            if cmd == "set":
+                out = {"state": "OK", **ES.set_ref(cfg, args.name, args.ref)}
+            else:
+                out = {"state": "OK", **ES.remove_ref(cfg, args.name)}
+        else:
+            print(f"ERROR: unknown config command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except ValueError as exc:
+        print(_json.dumps({"state": "FAILED", "code": "CONFIG_REF_INVALID",
+                           "detail": str(exc)[:300], "owner": "qubit-policy",
+                           "rollback": "reference store unchanged"},
+                          indent=2, sort_keys=True))
+        return 2
+    except Exception as exc:  # noqa: BLE001 - typed boundary, never a traceback
+        print(_json.dumps({"state": "FAILED", "code": "CONFIG_ERROR",
+                           "detail": str(exc)[:300], "owner": "qubit-policy",
+                           "rollback": "no state changed"}, indent=2,
+                          sort_keys=True))
+        return 2
+
+
+def _cmd_doctor(cfg, args) -> int:
+    """qubit doctor run|check|list|summary — host + capability diagnostics.
+
+    ``run`` delegates to ``distribution.doctor`` (the same checks as
+    ``package doctor``); ``check``/``list``/``summary`` delegate to the
+    capability catalog. Read-only; never a fabricated OK.
+    """
+    import json as _json
+    from . import capability_catalog as CC
+
+    cmd = getattr(args, "doctor_command", None) or "run"
+    as_json = bool(getattr(args, "json", False))
+    if cmd == "run":
+        from . import distribution as D
+        checks = D.doctor(cfg)
+        if as_json:
+            print(_json.dumps(checks, indent=2, sort_keys=True))
+        else:
+            for c in checks:
+                print(f"[{c['state']:>13}] {c['name']:<12} {c['detail']}")
+            print(D.doctor_summary(checks))
+        return 0 if all(c["state"] == "OK" for c in checks) else 1
+    if cmd == "check":
+        out = CC.check(args.name)
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0 if out.get("state") in ("IMPLEMENTED", "NOT_UPSTREAM") else 2
+    if cmd == "list":
+        names = CC.list_names(getattr(args, "state", None))
+        if as_json:
+            print(_json.dumps(names, indent=2, sort_keys=True))
+        else:
+            for name in names:
+                print(name)
+        return 0
+    if cmd == "summary":
+        print(_json.dumps(CC.summary(), indent=2, sort_keys=True))
+        return 0
+    print(f"ERROR: unknown doctor command {cmd!r}")
+    return 2
+
+
+def _cmd_cron(cfg, args) -> int:
+    """qubit cron list|add|show|remove|enable|disable|run|status|runs.
+
+    A second surface over the SAME canonical SQLite schedule store
+    (:mod:`voicebridge.schedules`): no second store, no fabricated rows.
+    Mutating ops preview under top-level --dry-run, require --confirm, and
+    refuse while the emergency stop is latched; run history survives deletion.
+    """
+    import json as _json
+    from . import schedules as SC
+
+    cmd = getattr(args, "cron_command", None) or "list"
+    confirm = bool(getattr(args, "confirm", False))
+    _MUTATING = {"add", "remove", "enable", "disable"}
+    try:
+        if cmd in _MUTATING and SC.estop_engaged(cfg):
+            print(_json.dumps(SC.refuse_estop(f"cron {cmd}"), indent=2))
+            return 3
+        if getattr(args, "dry_run", False) and cmd in _MUTATING:
+            print(_json.dumps({"state": "preview",
+                               "would": f"cron {cmd}"}, indent=2))
+            return 0
+        if cmd == "add":
+            out = SC.create(cfg, args.name, args.task_text, args.when,
+                            deliver_to=getattr(args, "deliver_to", "") or "",
+                            requested_by="cli:user", confirmed=confirm)
+        elif cmd == "list":
+            out = SC.list_jobs(
+                cfg,
+                include_disabled=not bool(getattr(args, "active_only", False)))
+        elif cmd == "show":
+            out = SC.show(cfg, args.job_id)
+        elif cmd == "remove":
+            out = SC.delete(cfg, args.job_id, requested_by="cli:user",
+                            confirmed=confirm)
+        elif cmd == "enable":
+            out = SC.resume(cfg, args.job_id, requested_by="cli:user",
+                            confirmed=confirm)
+        elif cmd == "disable":
+            out = SC.pause(cfg, args.job_id, requested_by="cli:user",
+                           confirmed=confirm)
+        elif cmd == "run":
+            out = SC.trigger(cfg, getattr(args, "job_id", 0) or 0,
+                             requested_by="cli:user")
+        elif cmd == "status":
+            out = SC.scheduler_status(cfg)
+        elif cmd == "runs":
+            out = SC.history(cfg, job_id=getattr(args, "job_id", 0) or 0,
+                             limit=getattr(args, "limit", 30) or 30)
+        else:
+            print(f"ERROR: unknown cron command {cmd!r}")
+            return 2
+        print(_json.dumps(out, indent=2, sort_keys=True))
+        return 0
+    except SC.SchedulesError as exc:
+        rc = 3 if exc.code == SC.CONFIRM_CODE else 2
+        print(_json.dumps({"state": "denied" if rc == 3 else "FAILED",
+                           "code": exc.code,
+                           "detail": SC.redact_spec(exc.detail)[:300],
+                           "owner": "qubit-policy",
+                           "rollback": "schedule store untouched; "
+                                       "nothing to roll back"}, indent=2))
         return rc
 
 

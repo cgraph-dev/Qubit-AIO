@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Qubit direct source inventory (Phase 1/2 of the code-readiness directive).
 
-Builds a deterministic, mechanical inventory directly from the pinned Hermes
-and OpenClaw source trees -- not from the gap ledger -- then reconciles that
-inventory against ``docs/QUBIT_GAP_LEDGER.{hermes,openclaw,qubit}.json`` and
+Builds a deterministic, mechanical inventory directly from the pinned upstream
+source trees -- not from the gap ledger -- then reconciles that
+inventory against ``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.{hermes,openclaw,qubit}.json`` and
 writes a candidate-work omissions report.
 
 Outputs (defaults, override with --out / --omissions):
-    docs/QUBIT_SOURCE_INVENTORY.json
-    docs/QUBIT_SOURCE_OMISSIONS.md
+    docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json
+    docs/archive/2026-09-21/QUBIT_SOURCE_OMISSIONS.md
 
 The script is read-only against the pinned trees and the repository except for
 the two generated artifacts above. No timestamps are embedded so regeneration
@@ -17,7 +17,7 @@ is byte-for-byte deterministic.
 Every non-evidence item is classified as either a **distinct capability** or a
 **parented surface** of a capability that already has a ledger row (CLI
 option/positional, model/provider entry, plugin asset/API/test/manifest,
-OpenClaw extension, workflow source file, dashboard component).  Each parented
+upstream extension, workflow source file, dashboard component).  Each parented
 surface records a deterministic ``parent_id`` and ``coverage`` kind, and is
 marked covered only when its parent row is IMPLEMENTED in the pinned ledger, so
 it never inflates the gap with a standalone MISSING row.  See
@@ -50,11 +50,18 @@ OPENCLAW_PIN = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
 OPENCLAW_TAG = "v2026.9.4"
 OPENCLAW_REPO = "https://github.com/openclaw/openclaw"
 
-# Verified waves-1-2 ledger baseline. The working-tree ledger is edited by
-# concurrent implementation agents, so the inventory reconciles against this
-# fixed baseline and separately records whether an omission has since been
-# closed in the working tree.
-LEDGER_REV = "f5fc5776"
+# Ledger revision the inventory reconciles against. The default is the live
+# working tree so a plain regeneration reflects the current implementations and
+# matches the committed docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json. Pass an explicit
+# revision (e.g. the verified waves-1-2 baseline ``f5fc5776``) to reconcile
+# against a historical baseline and report omissions that have since closed.
+LEDGER_REV = "working"
+
+# Canonical output/input home for regenerated artifacts. The generator writes
+# here by default; ``docs/archive/2026-09-21/`` holds the frozen historical
+# copies and is never written by a plain regeneration.
+CANONICAL_DIR = "docs/generated"
+CANONICAL_VENDOR_MANIFEST = f"{CANONICAL_DIR}/QUBIT_HERMES_VENDOR_MANIFEST.json"
 
 DEFAULT_HERMES = "/tmp/opencode/pinned/hermes-agent"
 DEFAULT_OPENCLAW = "/tmp/opencode/pinned/openclaw"
@@ -74,11 +81,11 @@ _EVIDENCE_CATEGORIES = {
 }
 
 _SURFACE_LABEL = {
-    "hermes_cli_command": "cli",
-    "hermes_cli_subcommand": "cli",
-    "hermes_cli_option": "cli",
-    "hermes_cli_positional": "cli",
-    "hermes_backend_route": "dashboard",
+    "qubit_cli_command": "cli",
+    "qubit_cli_subcommand": "cli",
+    "qubit_cli_option": "cli",
+    "qubit_cli_positional": "cli",
+    "qubit_backend_route": "dashboard",
     "hermes_dashboard_page": "dashboard",
     "hermes_dashboard_route": "dashboard",
     "hermes_dashboard_nav": "dashboard",
@@ -91,7 +98,7 @@ _SURFACE_LABEL = {
     "hermes_plugin_asset": "dashboard",
     "hermes_plugin_test": "dashboard",
     "hermes_tool": "backend",
-    "hermes_toolset": "backend",
+    "qubit_toolset": "backend",
     "hermes_skill": "backend",
     "hermes_model": "backend",
     "hermes_provider": "backend",
@@ -105,7 +112,7 @@ _SURFACE_LABEL = {
 # A *parented surface* is a sub-part of a parent capability that already has a
 # ledger row: a CLI flag of a command, a catalog entry of the model/provider
 # capability, a plugin asset/API/test of its plugin, an extension of an audited
-# OpenClaw capability, a workflow source file of its area, or a dashboard
+# upstream capability, a workflow source file of its area, or a dashboard
 # component of the dashboard.  A *distinct* capability has no parent and stays
 # an explicit open row.  The mapping is mechanical and auditable; the ledger
 # generator suppresses a parented surface's standalone MISSING row when its
@@ -114,8 +121,8 @@ _SURFACE_LABEL = {
 # ``coverage`` records *why* the item is a surface (CLI option, model entry,
 # plugin surface, ...); ``parent_id`` records the capability it belongs to.
 _COVERAGE_FOR_CATEGORY = {
-    "hermes_cli_option": "cli-option",
-    "hermes_cli_positional": "cli-option",
+    "qubit_cli_option": "cli-option",
+    "qubit_cli_positional": "cli-option",
     "hermes_model": "model-entry",
     "hermes_provider": "provider-entry",
     "hermes_plugin_api": "plugin-surface",
@@ -133,7 +140,7 @@ _COVERAGE_FOR_CATEGORY = {
     "hermes_upstream_test": "evidence-test",
 }
 
-# OpenClaw extension -> audited capability id (docs/AUDIT_OPENCLAW_*.md).  An
+# OpenClaw extension -> audited capability id (docs/archive/2026-09-21/AUDIT_OPENCLAW_*.md).  An
 # extension whose upstream name already matched an ``OC-*`` ledger row wins;
 # otherwise the first manifest category with a documented audited capability is
 # the parent.  ``tools`` is intentionally unmapped: a generic tool extension
@@ -163,7 +170,7 @@ _OPENCLAW_PARENT_BY_CATEGORY = {
     "context": "OC-D20",
 }
 
-# Hermes workflow area -> the Qubit capability row that owns it.
+# upstream workflow area -> the Qubit capability row that owns it.
 _WORKFLOW_PARENT_BY_AREA = {
     "browser": "browser_status",
     "coding": "opencode_status",
@@ -179,7 +186,7 @@ _WORKFLOW_PARENT_BY_AREA = {
 _DASHBOARD_PARENT = "webui_status"
 
 # Fork-runtime capability evidence (Wave 5).  Qubit executes the complete
-# pinned Hermes fork in-process, so an upstream agent tool, skill, or plugin is
+# pinned upstream fork in-process, so an upstream agent tool, skill, or plugin is
 # *not* a separate Qubit module: the fork's tool/toolset registry, skill tree,
 # and plugin fleet are the real backing surface.  Every tool/skill/plugin
 # inventory item is given an explicit typed disposition against that fork
@@ -200,9 +207,9 @@ _FORK_CAPABILITY_BY_CATEGORY = {
     "hermes_plugin": "fork_plugin_runtime",
 }
 _FORK_BACKEND_BY_CATEGORY = {
-    "hermes_tool": "qubit_hermes.tools.registry:registry",
-    "hermes_skill": "qubit_hermes.skills",
-    "hermes_plugin": "voicebridge.hermes_plugins.plugin_fleet_audit",
+    "hermes_tool": "qubit_runtime.tools.registry:registry",
+    "hermes_skill": "qubit_runtime.skills",
+    "hermes_plugin": "voicebridge.qubit_plugins.plugin_fleet_audit",
 }
 
 
@@ -213,15 +220,15 @@ def _fork_tool_names(repo: Path) -> set[str]:
     direct source of truth for what the fork runtime exposes.  The proving test
     additionally imports the live ``tools.registry`` and asserts membership.
     """
-    fork = repo / "qubit_hermes"
+    fork = repo / "qubit_runtime"
     if not fork.is_dir():
         return set()
-    return {str(it.get("name") or "") for it in extract_hermes_tools(fork)}
+    return {str(it.get("name") or "") for it in extract_qubit_tools(fork)}
 
 
 def _fork_plugin_names(repo: Path) -> set[str]:
     """Vendored fork plugin directories (the Qubit plugin-wrapper fleet)."""
-    plugins = repo / "qubit_hermes" / "plugins"
+    plugins = repo / "qubit_runtime" / "plugins"
     if not plugins.is_dir():
         return set()
     return {p.name for p in plugins.iterdir()
@@ -234,7 +241,7 @@ def _fork_skill_loadable(repo: Path, item: dict) -> bool:
     name = str(item.get("name") or "")
     if not root or not name:
         return False
-    skill_dir = repo / "qubit_hermes" / root / name
+    skill_dir = repo / "qubit_runtime" / root / name
     if not skill_dir.is_dir():
         return False
     return any(skill_dir.rglob("SKILL.md"))
@@ -277,7 +284,7 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
             return {
                 "status": "IMPLEMENTED", "capability": capability,
                 "backend": backend, "proving_test": _FORK_SKILL_TEST,
-                "reason": ("vendored under qubit_hermes/ with a loadable "
+                "reason": ("vendored under qubit_runtime/ with a loadable "
                            f"SKILL.md for {item.get('root')}/{name}; served by "
                            "the in-process fork skill runtime."),
                 "needs": "none",
@@ -296,8 +303,8 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
         return {
             "status": "IMPLEMENTED", "capability": capability,
             "backend": backend, "proving_test": _FORK_PLUGIN_TEST,
-            "reason": ("vendored under qubit_hermes/plugins/ and wrapped by "
-                       "voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / "
+            "reason": ("vendored under qubit_runtime/plugins/ and wrapped by "
+                       "voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / "
                        "plugin_fleet_audit; loadable in the fork plugin "
                        "runtime."),
             "needs": "none",
@@ -312,7 +319,7 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
 
 
 def _openclaw_disposition(item: dict) -> dict | None:
-    """Typed disposition for an OpenClaw extension not matched to a ledger row.
+    """Typed disposition for an upstream extension not matched to a ledger row.
 
     Consumes the wave-4 :data:`EXTENSION_MAP` (all 154 extensions) and the
     wave-5 form/proof table so the two never drift.  A ``parent``/``distinct``
@@ -365,11 +372,11 @@ def _parent_for(item: dict) -> tuple[str | None, str]:
     """
     cat = item["category"]
     coverage = _COVERAGE_FOR_CATEGORY.get(cat, "")
-    if cat in ("hermes_cli_option", "hermes_cli_positional"):
+    if cat in ("qubit_cli_option", "qubit_cli_positional"):
         cmd = str(item.get("command") or "")
         name = cmd[len("hermes "):] if cmd.startswith("hermes ") else cmd
         return (f"cli:{name}" if name else None, coverage)
-    if cat == "hermes_cli_subcommand" and item.get("is_alias_of"):
+    if cat == "qubit_cli_subcommand" and item.get("is_alias_of"):
         target = str(item["is_alias_of"])
         name = (target[len("hermes "):]
                 if target.startswith("hermes ") else target)
@@ -401,7 +408,7 @@ def _parent_for(item: dict) -> tuple[str | None, str]:
         return (None, coverage)
     if cat in ("hermes_i18n_key", "hermes_locale_key"):
         return (_DASHBOARD_PARENT, coverage)
-    if cat == "hermes_backend_route":
+    if cat == "qubit_backend_route":
         path = str(item.get("name") or item.get("path") or "")
         if "/assets/" in path or path.endswith((".css", ".js", ".svg")):
             # Static SPA assets are served by the dashboard static handler,
@@ -514,7 +521,7 @@ def _parse(src: str):
 
 
 # ---------------------------------------------------------------------------
-# Hermes CLI extraction (AST over parser modules)
+# upstream CLI extraction (AST over parser modules)
 # ---------------------------------------------------------------------------
 
 class _CliExtractor:
@@ -534,8 +541,8 @@ class _CliExtractor:
         self.items.append({
             "id": item_id,
             "source": "hermes",
-            "category": ("hermes_cli_command" if is_top
-                         else "hermes_cli_subcommand"),
+            "category": ("qubit_cli_command" if is_top
+                         else "qubit_cli_subcommand"),
             "name": "hermes " + name,
             "path": source,
             "help": help_text,
@@ -549,8 +556,8 @@ class _CliExtractor:
                 self.items.append({
                     "id": aid,
                     "source": "hermes",
-                    "category": ("hermes_cli_command" if len(apath) <= 1
-                                 else "hermes_cli_subcommand"),
+                    "category": ("qubit_cli_command" if len(apath) <= 1
+                                 else "qubit_cli_subcommand"),
                     "name": aid,
                     "path": source,
                     "help": help_text,
@@ -569,8 +576,8 @@ class _CliExtractor:
         self.items.append({
             "id": item_id,
             "source": "hermes",
-            "category": ("hermes_cli_option" if kind == "option"
-                         else "hermes_cli_positional"),
+            "category": ("qubit_cli_option" if kind == "option"
+                         else "qubit_cli_positional"),
             "name": opt,
             "command": "hermes " + " ".join(path),
             "path": source,
@@ -716,12 +723,23 @@ class _CliExtractor:
             handle_call(stmt.value, None)
 
 
-def extract_hermes_cli(repo: Path) -> list[dict]:
-    files = [repo / "hermes_cli" / "_parser.py", repo / "hermes_cli" / "main.py"]
-    files += sorted((repo / "hermes_cli" / "subcommands").glob("*.py"))
+def _cli_dir(repo: Path) -> str:
+    """CLI package directory name for a given tree.
+
+    The pinned upstream tree uses ``hermes_cli``; the shipped Qubit fork uses
+    the deep-rebranded ``qubit_cli``. Callers read whichever exists so the same
+    extractor can enumerate both the upstream surface and the local runtime.
+    """
+    return "qubit_cli" if (repo / "qubit_cli").is_dir() else "hermes_cli"
+
+
+def extract_qubit_cli(repo: Path) -> list[dict]:
+    d = _cli_dir(repo)
+    files = [repo / d / "_parser.py", repo / d / "main.py"]
+    files += sorted((repo / d / "subcommands").glob("*.py"))
     for extra in ("send_cmd.py", "portal_cli.py", "kanban.py",
                   "kanban_parser.py", "projects_cmd.py"):
-        files.append(repo / "hermes_cli" / extra)
+        files.append(repo / d / extra)
     lsp = repo / "agent" / "lsp" / "cli.py"
     if lsp.is_file():
         files.append(lsp)
@@ -743,7 +761,7 @@ def extract_hermes_cli(repo: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Hermes backend routes
+# upstream backend routes
 # ---------------------------------------------------------------------------
 
 _ROUTE_RE = re.compile(
@@ -752,9 +770,10 @@ _ROUTE_RE = re.compile(
 
 
 def extract_hermes_routes(repo: Path) -> list[dict]:
-    files = sorted(repo.glob("hermes_cli/web_server*.py"))
-    files += sorted((repo / "hermes_cli" / "web_routers").glob("*.py"))
-    files += [repo / "hermes_cli" / "dashboard_auth" / "routes.py"]
+    d = _cli_dir(repo)
+    files = sorted(repo.glob(f"{d}/web_server*.py"))
+    files += sorted((repo / d / "web_routers").glob("*.py"))
+    files += [repo / d / "dashboard_auth" / "routes.py"]
     items: list[dict] = []
     seen: set[str] = set()
     for path in files:
@@ -775,7 +794,7 @@ def extract_hermes_routes(repo: Path) -> list[dict]:
             items.append({
                 "id": item_id,
                 "source": "hermes",
-                "category": "hermes_backend_route",
+                "category": "qubit_backend_route",
                 "name": f"{method} {route}",
                 "path": f"{rel}:{lineno}",
                 "method": method,
@@ -785,7 +804,7 @@ def extract_hermes_routes(repo: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Hermes dashboard (pages, routes, nav, components)
+# upstream dashboard (pages, routes, nav, components)
 # ---------------------------------------------------------------------------
 
 _DIALOG = re.compile(r"Dialog|Modal|Confirm|Picker|Drawer|Popover")
@@ -854,10 +873,10 @@ def extract_hermes_dashboard(repo: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Hermes plugins
+# upstream plugins
 # ---------------------------------------------------------------------------
 
-def extract_hermes_plugins(repo: Path) -> list[dict]:
+def extract_qubit_plugins(repo: Path) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
 
@@ -908,10 +927,10 @@ def extract_hermes_plugins(repo: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Hermes tools / skills / models / providers / workflows
+# upstream tools / skills / models / providers / workflows
 # ---------------------------------------------------------------------------
 
-def extract_hermes_tools(repo: Path) -> list[dict]:
+def extract_qubit_tools(repo: Path) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
     names: set[str] = set()
@@ -973,8 +992,9 @@ _PROVIDER_ROW_RE = re.compile(r"\(\s*\"([a-z0-9][a-z0-9-]*)\"\s*,\s*\"[^\"]+\"")
 
 
 def extract_hermes_models_providers(repo: Path) -> tuple[list[dict], list[dict]]:
-    static = repo / "hermes_cli" / "models_catalog_static.py"
-    auth = repo / "hermes_cli" / "auth.py"
+    d = _cli_dir(repo)
+    static = repo / d / "models_catalog_static.py"
+    auth = repo / d / "auth.py"
     models: set[str] = set()
     providers: set[str] = set()
 
@@ -1038,11 +1058,11 @@ def extract_hermes_models_providers(repo: Path) -> tuple[list[dict], list[dict]]
 
     mitems = [{
         "id": f"model:{n}", "source": "hermes", "category": "hermes_model",
-        "name": n, "path": "hermes_cli/models_catalog_static.py",
+        "name": n, "path": f"{d}/models_catalog_static.py",
     } for n in sorted(models)]
     pitems = [{
         "id": f"provider:{n}", "source": "hermes", "category": "hermes_provider",
-        "name": n, "path": "hermes_cli/models_catalog_static.py",
+        "name": n, "path": f"{d}/models_catalog_static.py",
     } for n in sorted(providers)]
     return mitems, pitems
 
@@ -1070,9 +1090,13 @@ _WORKFLOW_PATTERNS = {
 def extract_hermes_workflows(repo: Path) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
+    d = _cli_dir(repo)
+    state = "qubit_state" if d == "qubit_cli" else "hermes_state"
     for area, patterns in _WORKFLOW_PATTERNS.items():
         hits: set[str] = set()
         for pattern in patterns:
+            pattern = pattern.replace("hermes_cli/", f"{d}/")
+            pattern = pattern.replace("hermes_state_", f"{state}_")
             for path in repo.glob(pattern):
                 if path.is_file():
                     hits.add(_rel(repo, path))
@@ -1089,7 +1113,7 @@ def extract_hermes_workflows(repo: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Hermes localization keys and upstream tests
+# upstream localization keys and upstream tests
 # ---------------------------------------------------------------------------
 
 _KEY_RE = re.compile(r"^(\s*)([A-Za-z0-9_]+):")
@@ -1174,7 +1198,7 @@ def extract_hermes_tests(repo: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# OpenClaw extensions
+# upstream extensions
 # ---------------------------------------------------------------------------
 
 def extract_openclaw_extensions(openclaw: Path, pin: str) -> list[dict]:
@@ -1221,7 +1245,7 @@ def extract_openclaw_extensions(openclaw: Path, pin: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Hermes pin vs qubit_hermes/ byte diff
+# upstream pin vs qubit_runtime/ byte diff
 # ---------------------------------------------------------------------------
 
 def _byte_skipped(rel: str) -> bool:
@@ -1231,7 +1255,8 @@ def _byte_skipped(rel: str) -> bool:
     return rel.endswith(_BYTE_SKIP_SUFFIX)
 
 
-def compute_hermes_byte_diff(repo: Path, hermes: Path) -> dict:
+def compute_hermes_byte_diff(repo: Path, hermes: Path,
+                             vendor_manifest: Path | None = None) -> dict:
     upstream: dict[str, str] = {}
     for line in _git(hermes, "ls-tree", "-r", "HEAD").splitlines():
         meta, path = line.split("\t", 1)
@@ -1240,7 +1265,20 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path) -> dict:
             continue
         upstream[path] = blob
 
-    local_root = repo / "qubit_hermes"
+    local_root = repo / "qubit_runtime"
+    # Untracked disposable dependency/build/cache trees are not part of the
+    # vendored source snapshot. Upstream-tracked files under the same directory
+    # names (e.g. plugin dashboard ``dist/*`` bundles) stay in the comparison.
+    disposable = {"node_modules", "dist", "build", ".cache", ".venv", "venv"}
+    tracked: set[str] = set()
+    if (repo / ".git").exists():
+        try:
+            for line in _git(repo, "ls-files", "--", "qubit_runtime").splitlines():
+                line = line.strip()
+                if line.startswith("qubit_runtime/"):
+                    tracked.add(line[len("qubit_runtime/"):])
+        except Exception:  # noqa: BLE001 - absent git index degrades to no skip
+            tracked = set()
     local: dict[str, str] = {}
     if local_root.is_dir():
         for path in sorted(local_root.rglob("*")):
@@ -1249,30 +1287,72 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path) -> dict:
             rel = path.relative_to(local_root).as_posix()
             if _byte_skipped(rel):
                 continue
+            if (disposable & set(Path(rel).parts)) and rel not in tracked:
+                continue
             local[rel] = _sha256_file(path)
 
+    # Deep source rebrand path-rename awareness (owner amendment 2026-09-19):
+    # a renamed module/dir/file is not a missing file. Reuse the vendor
+    # manifest's deterministic upstream -> Qubit path map so both artifacts
+    # agree.
+    try:
+        from hermes_vendor_manifest import _local_from_upstream
+    except Exception:  # noqa: BLE001 - degrade to identity if unavailable
+        def _local_from_upstream(rel: str) -> str:  # type: ignore[misc]
+            return rel
+
     missing, extra, changed = [], [], []
+    covered: set[str] = set()
     for rel, blob in upstream.items():
-        if rel not in local:
-            missing.append({"path": rel, "upstream_blob": blob})
+        lrel = _local_from_upstream(rel)
+        covered.add(lrel)
+        if lrel not in local:
+            missing.append({"path": rel, "expected_local": lrel,
+                            "upstream_blob": blob})
             continue
         up_file = hermes / rel
         if up_file.is_file():
             up_sha = _sha256_file(up_file)
         else:
             up_sha = None
-        if up_sha is not None and up_sha != local[rel]:
-            changed.append({"path": rel, "upstream_blob": blob,
-                            "upstream_sha256": up_sha, "local_sha256": local[rel]})
+        if up_sha is not None and up_sha != local[lrel]:
+            changed.append({"path": lrel, "upstream_path": rel,
+                            "upstream_blob": blob,
+                            "upstream_sha256": up_sha,
+                            "local_sha256": local[lrel]})
     for rel in local:
-        if rel not in upstream:
+        if rel not in covered:
             extra.append({"path": rel, "local_sha256": local[rel]})
+
+    # Reconcile with the canonical vendor manifest so the two regenerated
+    # artifacts agree by construction. The manifest's ``patched`` list is the
+    # authoritative set of changed files and ``extra_local`` the added ones;
+    # recording the comparison makes any future drift a visible data point
+    # instead of a silent mismatch between the two artifacts.
+    reconciliation = None
+    vm_path = vendor_manifest if vendor_manifest is not None \
+        else repo / CANONICAL_VENDOR_MANIFEST
+    if vm_path.is_file():
+        try:
+            vm = json.loads(vm_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            vm = None
+        if vm is not None:
+            patched = set(vm.get("patched") or [])
+            extra_local = set(vm.get("extra_local") or [])
+            reconciliation = {
+                "vendor_manifest": _rel(repo, vm_path),
+                "vendor_manifest_revision": vm.get("upstream_revision"),
+                "changed_equals_patched": {c["path"] for c in changed} == patched,
+                "extra_equals_extra_local": {e["path"] for e in extra}
+                == extra_local,
+            }
 
     return {
         "upstream_repo": HERMES_REPO,
         "upstream_revision": HERMES_PIN,
         "upstream_tag": HERMES_TAG,
-        "local_root": "qubit_hermes",
+        "local_root": "qubit_runtime",
         "counts": {
             "upstream_files": len(upstream),
             "local_files": len(local),
@@ -1284,6 +1364,7 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path) -> dict:
         "missing": sorted(missing, key=lambda x: x["path"]),
         "extra": sorted(extra, key=lambda x: x["path"]),
         "changed": sorted(changed, key=lambda x: x["path"]),
+        "manifest_reconciliation": reconciliation,
     }
 
 
@@ -1295,11 +1376,11 @@ def _load_ledger(repo: Path, name: str, rev: str | None = None) -> dict:
     """Load a ledger section from a git revision (default: working tree)."""
     if rev:
         try:
-            raw = _git(repo, "show", f"{rev}:docs/QUBIT_GAP_LEDGER.{name}.json")
+            raw = _git(repo, "show", f"{rev}:docs/archive/2026-09-21/QUBIT_GAP_LEDGER.{name}.json")
             return json.loads(raw)
         except (subprocess.CalledProcessError, ValueError):
             return {"rows": []}
-    path = repo / "docs" / f"QUBIT_GAP_LEDGER.{name}.json"
+    path = repo / "docs" / "archive" / "2026-09-21" / f"QUBIT_GAP_LEDGER.{name}.json"
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -1354,15 +1435,32 @@ def _ledger_index(ledgers: dict[str, dict]):
     return all_ids, find_by_name, row_blobs
 
 
+#: Upstream backend routes the deep source rebrand renamed to Qubit identity.
+#: The inventory enumerates the pinned upstream surface, while the coverage
+#: ledger keys the shipped Qubit route, so the mapping is applied before
+#: matching (owner amendment 2026-09-19 deep rebrand; ``/api/hermes/update``
+#: -> ``/api/qubit/update``, no external alias retained).
+_UPSTREAM_ROUTE_RENAMES = {
+    "/api/hermes/update": "/api/qubit/update",
+    "/api/hermes/update/check": "/api/qubit/update/check",
+    "/api/hermes/update/receipt": "/api/qubit/update/receipt",
+}
+
+
 def _match_hermes_item(item: dict, all_ids: set, find_by_name):
     cat = item["category"]
-    if cat in ("hermes_cli_command", "hermes_cli_subcommand"):
+    if cat in ("qubit_cli_command", "qubit_cli_subcommand"):
         lid = "cli:" + item["name"].replace("hermes ", "", 1)
         if lid in all_ids:
             return lid
-    elif cat == "hermes_backend_route":
+    elif cat == "qubit_backend_route":
         if item["id"] in all_ids:
             return item["id"]
+        renamed = _UPSTREAM_ROUTE_RENAMES.get(str(item.get("route") or ""))
+        if renamed:
+            candidate = f"api:{item.get('method')} {renamed}"
+            if candidate in all_ids:
+                return candidate
     elif cat == "hermes_dashboard_page":
         rid = f"dashboard:/{item['name'].replace('Page', '').lower()}"
         if rid in all_ids:
@@ -1413,7 +1511,7 @@ def reconcile(repo: Path, hermes_items: list[dict],
         else:
             unmatched += 1
 
-    # OpenClaw extensions: map to audit text or a ledger row.
+    # upstream extensions: map to audit text or a ledger row.
     oc_matched = oc_unmatched = 0
     for item in openclaw_items:
         name = item["extension_id"]
@@ -1555,7 +1653,7 @@ def render_omissions(inv: dict) -> str:
       f"(IMPLEMENTED {len(fork_impl)}, GATED {len(fork_gated)})\n")
     w(f"- Ledger IMPLEMENTED rows with unreproducible evidence: "
       f"**{len(lc['unreproducible_evidence'])}**\n")
-    w(f"- Hermes byte diff vs `qubit_hermes/`: "
+    w(f"- Hermes byte diff vs `qubit_runtime/`: "
       f"upstream={bd['upstream_files']} local={bd['local_files']} "
       f"identical={bd['identical']} missing={bd['missing']} "
       f"extra={bd['extra']} changed={bd['changed']}\n\n")
@@ -1674,19 +1772,20 @@ def render_omissions(inv: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def build_inventory(repo: Path, hermes: Path, openclaw: Path,
-                    ledger_rev: str | None = LEDGER_REV) -> dict:
-    hermes_cli = extract_hermes_cli(hermes)
+                    ledger_rev: str | None = LEDGER_REV,
+                    vendor_manifest: Path | None = None) -> dict:
+    qubit_cli = extract_qubit_cli(hermes)
     routes = extract_hermes_routes(hermes)
     dashboard = extract_hermes_dashboard(hermes)
-    plugins = extract_hermes_plugins(hermes)
-    tools = extract_hermes_tools(hermes)
+    plugins = extract_qubit_plugins(hermes)
+    tools = extract_qubit_tools(hermes)
     skills = extract_hermes_skills(hermes)
     models, providers = extract_hermes_models_providers(hermes)
     workflows = extract_hermes_workflows(hermes)
     i18n = extract_hermes_i18n(hermes)
     tests = extract_hermes_tests(hermes)
 
-    hermes_items = (hermes_cli + routes + dashboard + plugins + tools + skills
+    hermes_items = (qubit_cli + routes + dashboard + plugins + tools + skills
                     + models + providers + workflows + i18n + tests)
     for it in hermes_items:
         it.setdefault("ledger_match", None)
@@ -1705,13 +1804,13 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
                 continue
             except subprocess.CalledProcessError:
                 pass
-        path = repo / "docs" / doc
+        path = repo / "docs" / "archive" / "2026-09-21" / doc
         if path.is_file():
             audit_text += _read_text(path) + "\n"
 
     comparison = reconcile(repo, hermes_items, openclaw_items, audit_text,
                            ledger_rev)
-    byte_diff = compute_hermes_byte_diff(repo, hermes)
+    byte_diff = compute_hermes_byte_diff(repo, hermes, vendor_manifest)
 
     all_items = hermes_items + openclaw_items
 
@@ -1851,12 +1950,16 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--hermes", default=DEFAULT_HERMES)
     ap.add_argument("--openclaw", default=DEFAULT_OPENCLAW)
-    ap.add_argument("--out", default="docs/QUBIT_SOURCE_INVENTORY.json")
-    ap.add_argument("--omissions", default="docs/QUBIT_SOURCE_OMISSIONS.md")
+    ap.add_argument("--out", default=f"{CANONICAL_DIR}/QUBIT_SOURCE_INVENTORY.json")
+    ap.add_argument("--omissions", default=f"{CANONICAL_DIR}/QUBIT_SOURCE_OMISSIONS.md")
+    ap.add_argument("--vendor-manifest", default=CANONICAL_VENDOR_MANIFEST,
+                    help="canonical vendor manifest the byte diff reconciles "
+                         "against (default: %(default)s)")
     ap.add_argument("--ledger-rev", default=LEDGER_REV,
                     help="git revision the gap ledger is read from for the "
-                         "omission comparison (default: verified waves-1-2 "
-                         "baseline; use 'working' for the live working tree)")
+                         "omission comparison (default: the live working "
+                         "tree; pass a revision such as the waves-1-2 baseline "
+                         "to compare against a historical baseline)")
     args = ap.parse_args(argv)
 
     hermes = Path(args.hermes)
@@ -1890,7 +1993,9 @@ def main(argv=None) -> int:
             return 2
     else:
         ledger_rev = None
-    inv = build_inventory(REPO, hermes, openclaw, ledger_rev)
+    vm = (REPO / args.vendor_manifest) if not Path(args.vendor_manifest).is_absolute() \
+        else Path(args.vendor_manifest)
+    inv = build_inventory(REPO, hermes, openclaw, ledger_rev, vm)
 
     out = (REPO / args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

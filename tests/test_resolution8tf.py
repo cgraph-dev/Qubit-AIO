@@ -168,7 +168,7 @@ def test_production_estop_binding_present_and_safe(tmp_path, monkeypatch):
 # Matrix has zero unresolved rows
 # ---------------------------------------------------------------------------
 def test_matrix_fully_resolved():
-    matrix = json.loads((REPO_ROOT / "docs" / "MATRIX_8T_F.json").read_text())
+    matrix = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.json").read_text())
     for row in matrix["rows"]:
         assert row["verdict"] in ("REUSE", "ADAPT", "MISSING", "BLOCKED",
                                   "REJECTED"), row["id"]

@@ -28,6 +28,7 @@ keep working; the config keys are never removed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 
 from .resolver import (
@@ -46,6 +47,36 @@ from .resolver import (
 SPEECH_IN, SPEECH_OUT, REALTIME = "speech_in", "speech_out", "realtime"
 SPEECH_KINDS = (SPEECH_IN, SPEECH_OUT, REALTIME)
 SPEECH_SCHEMA = "qubit-speech-profile/1"
+
+# PRA-08: an explicit speech-profile selection that cannot be resolved or is
+# not executable must never be silently swallowed. The orchestrator records a
+# typed error here; it is surfaced on the same status surface as the rest of the
+# voice state (CLI `qubit status`, dashboard `/api/runtime`, voice status).
+_RESOLUTION_ERRORS: Dict[str, Dict[str, Any]] = {}
+_RESOLUTION_LOCK = threading.Lock()
+
+
+def record_resolution_error(kind: str, code: str, detail: str, *,
+                            profile_id: Optional[str] = None) -> None:
+    with _RESOLUTION_LOCK:
+        _RESOLUTION_ERRORS[str(kind)] = {
+            "state": "UNAVAILABLE", "code": str(code), "kind": str(kind),
+            "profile_id": profile_id, "detail": str(detail)[:400],
+            "owner": "qubit-policy",
+            "rollback": "select a resolvable profile or leave the shipped "
+                        "default; the hardware config path is unchanged",
+        }
+
+
+def clear_resolution_error(kind: str) -> None:
+    with _RESOLUTION_LOCK:
+        _RESOLUTION_ERRORS.pop(str(kind), None)
+
+
+def resolution_errors() -> Dict[str, Dict[str, Any]]:
+    with _RESOLUTION_LOCK:
+        return {k: dict(v) for k, v in _RESOLUTION_ERRORS.items()}
+
 REGISTRY_KEYS = {
     SPEECH_IN: "speech_in_profiles",
     SPEECH_OUT: "speech_out_profiles",
@@ -658,4 +689,5 @@ __all__ = [
     "set_session_speech_profile", "clear_session_speech_profile",
     "resolve_speech_in", "resolve_speech_out", "resolve_realtime",
     "resolve_speech", "resolve_speech_dict", "external_speech_guard",
+    "record_resolution_error", "clear_resolution_error", "resolution_errors",
 ]

@@ -1,6 +1,6 @@
 """L1 optional CPU semantic route matching (Packet 4C).
 
-ADAPT of pinned Semantic Router semantics (docs/UPSTREAM_REUSE.md R6):
+ADAPT of pinned Semantic Router semantics (docs/archive/2026-09-21/UPSTREAM_REUSE.md R6):
 per-route thresholds, top-one/top-two margin gate, explicit NO-MATCH,
 calibration/evaluation on labeled examples. stdlib-only: vectors are plain
 float lists, scoring is a dot product; embeddings come from the EXISTING
@@ -11,9 +11,7 @@ the caller is expected to verify zero generative-runner eviction.
 """
 from __future__ import annotations
 
-import json
 import math
-import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -44,35 +42,40 @@ class SemanticRouter:
     routes: Dict[str, List[str]]
     centroids: Dict[str, List[float]] = field(default_factory=dict)
     thresholds: Dict[str, float] = field(default_factory=dict)
+    # Canonical resolver config for the ``embedding`` role. When set, embedding
+    # requests resolve provider/model through the one resolver; the Ollama call
+    # itself lives only in ``providers.embedding``.
+    cfg: Any = None
     _embed_fn: Any = None
 
     # ---------------------------------------------------------- embedding
     @staticmethod
     def _default_embed(texts: List[str], url: str, model: str,
                        timeout_s: float) -> List[List[float]]:
-        vecs: List[List[float]] = []
-        for t in texts:
-            payload = {"model": model, "prompt": t,
-                       "options": {"num_gpu": 0}}   # CPU-only placement gate
-            req = urllib.request.Request(
-                f"{url.rstrip('/')}/api/embeddings",
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-                body = json.loads(resp.read().decode())
-            v = body.get("embedding")
-            if not v:
-                raise RuntimeError("empty embedding response")
-            vecs.append([float(x) for x in v])
-        return vecs
+        """Shared local embedding adapter (no per-caller Ollama request)."""
+        from ..providers import embedding as _embedding
+        try:
+            return _embedding.embed_local(texts, url=url, model=model,
+                                          timeout_s=timeout_s)
+        except _embedding.EmbeddingError as exc:
+            raise RuntimeError(exc.detail) from exc
 
     def embed(self, texts: List[str], *, query: bool = False,
               url: str = "http://127.0.0.1:11434",
               model: str = "nomic-embed-text", timeout_s: float = 10.0,
              ) -> List[List[float]]:
         prefix = QUERY_PREFIX if query else CLASSIFICATION_PREFIX
-        fn = self._embed_fn or self._default_embed
-        return fn([(prefix + t)[:600] for t in texts], url, model, timeout_s)
+        prepared = [(prefix + t)[:600] for t in texts]
+        if self._embed_fn is not None:
+            return self._embed_fn(prepared, url, model, timeout_s)
+        # Route through the canonical embedding role + shared adapter. The
+        # resolver's effective model applies unless a caller pinned one.
+        from ..providers import gateway as _gateway
+        try:
+            return _gateway.embed_texts(prepared, self.cfg, url=url, model=model,
+                                        timeout_s=timeout_s)
+        except Exception as exc:  # noqa: BLE001 - preserve RuntimeError contract
+            raise RuntimeError(str(exc)) from exc
 
     # ------------------------------------------------------------ fitting
     def fit(self, url: str = "http://127.0.0.1:11434",

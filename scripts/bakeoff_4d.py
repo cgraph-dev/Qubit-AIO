@@ -47,7 +47,7 @@ FILES = {
     "qubit-cand-q5": ("Qwen3-4B-Instruct-2507-Q5_K_M.gguf", 3000),
 }
 DOWNLOAD_DIR = Path.home() / ".cache" / "voicebridge" / "bakeoff-4d"
-OUT_JSON = REPO_ROOT / "docs" / "BAKEOFF_4D.json"
+OUT_JSON = REPO_ROOT / "docs/archive/2026-09-21" / "BAKEOFF_4D.json"
 LICENSE = "Apache-2.0"
 
 
@@ -95,9 +95,9 @@ def download(filename: str, expect_sha: str, expect_size: int) -> Path:
 
 
 def _aligned_persona() -> str:
-    """Winning persona from docs/ALIGN_4D_winner.json (acceptance-validated),
+    """Winning persona from docs/archive/2026-09-21/ALIGN_4D_winner.json (acceptance-validated),
     falling back to the v2 inline persona when alignment output is absent."""
-    winner = REPO_ROOT / "docs" / "ALIGN_4D_winner.json"
+    winner = REPO_ROOT / "docs/archive/2026-09-21" / "ALIGN_4D_winner.json"
     try:
         cfg = json.loads(winner.read_text())
         if cfg.get("persona"):
@@ -418,10 +418,10 @@ def first_audio_probe(alias: str) -> dict:
 
 
 def write_markdown(report: dict) -> None:
-    """Regenerate docs/BAKEOFF_4D.md from the JSON so numbers can never drift."""
+    """Regenerate docs/archive/2026-09-21/BAKEOFF_4D.md from the JSON so numbers can never drift."""
     pa = report["production_alias"]
     lines = [
-        "# Packet 4D bake-off (GENERATED from docs/BAKEOFF_4D.json)",
+        "# Packet 4D bake-off (GENERATED from docs/archive/2026-09-21/BAKEOFF_4D.json)",
         "",
         f"Generated: {report.get('finished', report['started'])} · "
         f"production alias `{pa['alias']}` untouched: "
@@ -463,7 +463,7 @@ def write_markdown(report: dict) -> None:
         "Rollback commands are recorded in the JSON manifest; production was ",
         "never modified (fingerprint-verified before/after).",
         ""]
-    (REPO_ROOT / "docs" / "BAKEOFF_4D.md").write_text("\n".join(lines))
+    (REPO_ROOT / "docs/archive/2026-09-21" / "BAKEOFF_4D.md").write_text("\n".join(lines))
 
 
 def main() -> int:

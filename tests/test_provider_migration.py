@@ -177,6 +177,11 @@ def test_orchestrator_chat_ollama_executes_through_gateway(monkeypatch):
         def _cur_ctx(self):
             return _Ctx()
 
+        def _voice_conv_prompt(self, _text):
+            # The canonical-store context builder; this test exercises gateway
+            # routing, not context assembly.
+            return ""
+
     fn = VoiceOrchestrator._chat_ollama.__get__(Self())
     assert fn("hello") == "reply text"
     assert len(rec.calls) == 1
@@ -248,8 +253,10 @@ def test_speech_override_prefers_explicit_profile(monkeypatch):
                     "provider": "piper", "voice": "custom-voice",
                     "settings": {}}
 
+    # Signature is resolve_speech(cfg, kind, ...): the previous test encoded
+    # the swapped call that made the speech registry dead in production.
     monkeypatch.setattr(SP, "resolve_speech",
-                        lambda kind, cfg: (calls.append(kind), _Eff())[1])
+                        lambda cfg, kind: (calls.append(kind), _Eff())[1])
     out = _speech_override(None, "speech_out")
     assert calls == ["speech_out"]
     assert out["voice"] == "custom-voice"
@@ -258,7 +265,7 @@ def test_speech_override_prefers_explicit_profile(monkeypatch):
         def to_public_dict(self):
             return {"source": "shipped-default", "executable": True}
 
-    monkeypatch.setattr(SP, "resolve_speech", lambda kind, cfg: _Shipped())
+    monkeypatch.setattr(SP, "resolve_speech", lambda cfg, kind: _Shipped())
     assert _speech_override(None, "speech_in") == {}
 
 

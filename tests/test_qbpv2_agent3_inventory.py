@@ -16,10 +16,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 FRONTEND = REPO_ROOT / "frontend"
-UPSTREAM_SRC = REPO_ROOT / "qubit_hermes" / "web" / "src"
-OVERLAY_SRC = FRONTEND / "hermes-web" / "src"
+UPSTREAM_SRC = REPO_ROOT / "qubit_runtime" / "web" / "src"
+OVERLAY_SRC = FRONTEND / "qubit-web" / "src"
 MAP = json.loads(
-    (REPO_ROOT / "docs" / "HERMES_FRONTEND_MAP.json").read_text(encoding="utf-8"))
+    (REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json").read_text(encoding="utf-8"))
 
 
 def _walk(root: Path):
@@ -68,7 +68,7 @@ def test_navigation_items_are_real_routes():
             known = path in webui.PUBLIC_ROUTE_ALIASES.values()
         if not known:
             fleet = json.loads(
-                (FRONTEND / "hermes-web" / "public" / "plugins" / "fleet.json")
+                (FRONTEND / "qubit-web" / "public" / "plugins" / "fleet.json")
                 .read_text(encoding="utf-8"))
             known = any(m.get("tab", {}).get("path") == path for m in fleet)
         assert known, f"nav item routes nowhere real: {item}"
@@ -76,22 +76,22 @@ def test_navigation_items_are_real_routes():
 
 def test_plugin_fleet_manifests_exist_and_are_registered():
     fleet = json.loads(
-        (FRONTEND / "hermes-web" / "public" / "plugins" / "fleet.json")
+        (FRONTEND / "qubit-web" / "public" / "plugins" / "fleet.json")
         .read_text(encoding="utf-8"))
     names = {m["name"] for m in fleet}
     assert {"hermes-achievements", "kanban"} <= names
     for m in fleet:
-        root = FRONTEND / "hermes-web" / "public" / "plugins" / m["name"]
+        root = FRONTEND / "qubit-web" / "public" / "plugins" / m["name"]
         assert (root / m["entry"]).is_file(), f"{m['name']} entry missing"
         if m.get("css"):
             assert (root / m["css"]).is_file(), f"{m['name']} css missing"
-        manifest = REPO_ROOT / "qubit_hermes" / "plugins" / m["name"] / \
+        manifest = REPO_ROOT / "qubit_runtime" / "plugins" / m["name"] / \
             "dashboard" / "manifest.json"
         assert manifest.is_file(), f"{m['name']} backend manifest missing"
 
 
 def test_overlay_plugins_each_have_manifest_and_entry():
-    overlay = FRONTEND / "hermes-qubit" / "plugins"
+    overlay = FRONTEND / "qubit-app" / "plugins"
     dirs = sorted(p for p in overlay.iterdir() if p.is_dir())
     assert len(dirs) >= 10, len(dirs)
     for d in dirs:

@@ -25,7 +25,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/kanban.py:417",
+    "path": "qubit_cli/kanban.py:417",
     "symbol": "_cmd_list",
     "mapping_status": "VERIFIED"
   },
@@ -34,7 +34,24 @@
     "symbol": "tasksHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Unified background-task ledger contract (read-only read model over opencode/schedules/kanban sources). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/kanban.py:417 (_cmd_list); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/tasks.ts:137 (tasksHandlers).",
+  "references": {
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "tasks",
+        "list",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "Lists tracked background tasks.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Unified background-task ledger contract (read-only read model over opencode/schedules/kanban sources). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/kanban.py:417 (_cmd_list); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/tasks.ts:137 (tasksHandlers). Pinned side-effect-free reference invocation(s) declared: `openclaw tasks list --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, direct_readonly).",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,

@@ -1,18 +1,18 @@
 """Agent D — real Achievements + Kanban workflow proof (Qubit parity).
 
-Complements ``tests/test_hermes_plugins.py`` (read routing + wire shape) by
+Complements ``tests/test_qubit_plugins.py`` (read routing + wire shape) by
 exercising the *complete* workflows end to end:
 
 * achievements: the full real catalog really evaluates (>=60 badges, unique
   ids, per-category spread, 5-tier ladders, secret redaction) from a seeded
-  ``hermes_state.SessionDB`` — no fabricated badges.
+  ``qubit_state.SessionDB`` — no fabricated badges.
 * kanban: the vendored dashboard reads are real; every vendored *write* is
   intentionally stopped by the shared Qubit broker gate
   (``KANBAN_WRITE_BROKERED``), and the counterpart the gate points at
   (``voicebridge.kanban`` + the dashboard ``/api/ops`` console) really performs
   the write.
 
-Hermetic: temp ``XDG_*`` + ``HERMES_HOME``; no network; no live services.
+Hermetic: temp ``XDG_*`` + ``QUBIT_HOME``; no network; no live services.
 """
 from __future__ import annotations
 
@@ -36,18 +36,18 @@ def _cfg(tmp_path, monkeypatch):
     return C.Config.load(p)
 
 
-def _hermes_home(cfg) -> Path:
+def _qubit_home(cfg) -> Path:
     return Path(cfg.state_dir()) / "hermes"
 
 
 def _seed_history(cfg, monkeypatch):
-    from voicebridge import hermes_runtime
+    from voicebridge import qubit_runtime
 
-    home = _hermes_home(cfg)
+    home = _qubit_home(cfg)
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    hermes_runtime.ensure_path()
-    from hermes_state import SessionDB
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    qubit_runtime.ensure_path()
+    from qubit_state import SessionDB
 
     db = SessionDB()
     try:
@@ -64,8 +64,8 @@ def _seed_history(cfg, monkeypatch):
 
 
 def test_achievements_full_real_catalog(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_compat as HC
+    from voicebridge import qubit_plugins as HP
 
     cfg = _cfg(tmp_path, monkeypatch)
     _seed_history(cfg, monkeypatch)
@@ -74,7 +74,7 @@ def test_achievements_full_real_catalog(tmp_path, monkeypatch):
     # The vendored engine serves a structurally-valid "pending" snapshot while
     # its first scan runs in the background (see plugin_api.evaluate_all), and
     # the dashboard polls /scan-status. Drive the documented synchronous rescan
-    # workflow (same as test_hermes_plugins.test_achievements_routes_compute_real_state)
+    # workflow (same as test_qubit_plugins.test_achievements_routes_compute_real_state)
     # so this test deterministically observes the real computed catalog.
     rcode, rout = HC.dispatch(
         cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
@@ -113,7 +113,7 @@ def test_achievements_full_real_catalog(tmp_path, monkeypatch):
 
 
 def test_kanban_vendored_reads_are_real(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge import kanban as N
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -139,22 +139,39 @@ def test_kanban_vendored_reads_are_real(tmp_path, monkeypatch):
 
 
 def test_kanban_write_gate_is_real_and_counterpart_writes(tmp_path, monkeypatch):
-    """Vendored writes are refused by the shared broker gate; the counterpart
-    the gate names (``voicebridge.kanban`` / the /api/ops console) performs the
-    same write for real against the Qubit board store."""
-    from voicebridge import hermes_compat as HC
+    """The core vendored board/task writes are REAL on the one native store
+    through the shared confirm path (staged 409, never a dead 403); a route with
+    no native-schema equivalent stays a typed ``KANBAN_WRITE_BROKERED`` refusal
+    naming its counterpart, and that counterpart performs the same write for
+    real against the Qubit board store."""
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    for method, path in (
-            ("POST", "/api/plugins/kanban/tasks"),
-            ("PATCH", "/api/plugins/kanban/tasks/1"),
-            ("POST", "/api/plugins/kanban/tasks/1/comments"),
-            ("POST", "/api/plugins/kanban/boards"),
-            ("PUT", "/api/plugins/kanban/orchestration")):
-        code, out = HC.dispatch(cfg, method, path, {}, {"title": "x"})
-        assert code == 403, (method, path, code)
-        assert out["code"] == "KANBAN_WRITE_BROKERED", (method, path, out)
-        assert out["qubit_counterpart"], out
+    # Core mutations are native-backed and confirm-gated. Create a real row
+    # first so the id-bearing edit/comment paths are exercised against it.
+    code, created = HC.dispatch(cfg, "POST", "/api/plugins/kanban/tasks", {},
+                                {"title": "Agent D gate", "confirm": True})
+    assert code == 200, (code, created)
+    tid = created["task"]["id"]
+
+    for method, path, body in (
+            ("POST", "/api/plugins/kanban/tasks", {"title": "x"}),
+            ("PATCH", f"/api/plugins/kanban/tasks/{tid}", {"status": "running"}),
+            ("POST", f"/api/plugins/kanban/tasks/{tid}/comments",
+             {"body": "hi"}),
+            ("POST", "/api/plugins/kanban/boards", {"slug": "agentd"})):
+        code, out = HC.dispatch(cfg, method, path, {}, body)
+        assert code == 409, (method, path, code, out)
+        assert out["code"] == "CONFIRM_REQUIRED", (method, path, out)
+        assert out["confirmation_id"], (method, path, out)
+
+    # Orchestration settings have no native-schema equivalent: still a typed
+    # gate that names the CLI/voice/overlay counterpart.
+    code, out = HC.dispatch(cfg, "PUT", "/api/plugins/kanban/orchestration", {},
+                            {})
+    assert code == 403, (code, out)
+    assert out["code"] == "KANBAN_WRITE_BROKERED", out
+    assert out["qubit_counterpart"], out
 
     # The named counterpart really writes: broker stages then executes.
     code, staged = HC.dispatch(

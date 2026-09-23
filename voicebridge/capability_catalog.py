@@ -19,15 +19,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load(name: str) -> Dict[str, Any]:
-    with open(resource_path(f"docs/{name}"), encoding="utf-8") as fh:
-        return json.load(fh)
+    candidates = (resource_path(f"docs/{name}"),
+                  REPO_ROOT / "docs" / "archive" / "2026-09-21" / name)
+    for path in candidates:
+        if path.is_file():
+            with open(path, encoding="utf-8") as fh:
+                return json.load(fh)
+    raise FileNotFoundError(f"docs/{name}")
 
 
 _IMPLEMENTED_VERDICTS = {"IMPLEMENTED", "REUSE", "ADAPT"}
 
 
 def _state_of(row: Dict[str, Any]) -> str:
-    # Honesty rule (OpenClaw audit §4.1): a row's own explicit ``status``
+    # Honesty rule (Qubit audit §4.1): a row's own explicit ``status``
     # field is authoritative. ``verdict`` is only a fallback for rows that
     # predate that field. In particular ``MISSING`` no longer silently means
     # IMPLEMENTED: it resolves to NOT_UPSTREAM (a Qubit-owned capability with

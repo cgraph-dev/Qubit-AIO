@@ -6,7 +6,7 @@
   "request": {
     "kind": null,
     "method": "GET",
-    "path": "/agent/api/qubit/recovery/status",
+    "path": "/api/runtime",
     "headers": {},
     "body": null,
     "event": null,
@@ -21,9 +21,9 @@
   "persisted_state_schema": {
     "type": "object",
     "properties": {
-      "schema": {"const": "qubit-recovery/1"},
-      "state_tree_verified": {"type": "boolean"},
-      "receipts": {"type": "array"}
+      "schema": {
+        "const": "qubit-runtime-inventory/1"
+      }
     }
   },
   "normalizers": [
@@ -35,10 +35,7 @@
   "expected": {
     "http_status": 200,
     "json_schema": {
-      "state": "OK"
-    },
-    "receipts": {
-      "schema": "qubit-recovery/1"
+      "schema": "qubit-runtime-inventory/1"
     }
   },
   "qubit": {
@@ -47,7 +44,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/_early_recovery.py:352",
+    "path": "qubit_cli/_early_recovery.py:352",
     "symbol": "recover_if_needed",
     "mapping_status": "VERIFIED"
   },
@@ -56,21 +53,21 @@
     "symbol": "resolveRecoveryPath",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Crash-recovery probe contract: bounded store commits are verified by re-reading the state tree and emitting a typed manifest/receipt. persistence_or_recovery_diff is a fail-closed gate. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/_early_recovery.py:352 (recover_if_needed); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: node-runtime-recovery.mjs:314 (resolveRecoveryPath).",
+  "notes": "Crash-recovery probe contract: the read-only runtime inventory backs the probe (webui.py:1676 /api/runtime -> runtime_inventory.py:251, schema qubit-runtime-inventory/1). Bounded store commits are verified by re-reading the state tree through the confirm-gated runtime_recover op. persistence_or_recovery_diff is a fail-closed gate. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/_early_recovery.py:352 (recover_if_needed); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: node-runtime-recovery.mjs:314 (resolveRecoveryPath). No reference declared: the only stable-looking upstream surface (`hermes doctor` / `openclaw doctor`) probes the live environment and flips provider labels run-to-run (exa/firecrawl/keenable), so its result hash is not deterministic; a nondeterministic reference must never be normalized into a false PASS. No stable side-effect-free equivalent exists, so this row is OPERATOR_ONLY and can never claim PASS.",
   "evidence": {
     "voice_utterance": null,
-    "dashboard_route": "/agent/api/qubit/recovery/status",
+    "dashboard_route": "/api/runtime",
     "dashboard_control": null,
     "request_schema": {
       "method": "GET",
-      "path": "/agent/api/qubit/recovery/status"
+      "path": "/api/runtime"
     },
     "broker_policy_decision": null,
     "runtime_provider": null,
-    "store_state_assertion": "bounded store commits re-read from the state tree",
+    "store_state_assertion": "runtime inventory read model re-read from the state tree",
     "output_event_assertion": null,
     "error_codes": null,
-    "retry_recovery_proof": "crash probe re-reads state tree and emits a typed manifest",
+    "retry_recovery_proof": "GET /api/runtime re-reads the runtime inventory; the mutating probe POST /agent/api/ops/run {id:runtime_recover} is confirm-gated",
     "audit_receipt_proof": "qubit-recovery/1 receipt",
     "security_resource_proof": null,
     "package_proof": null,
@@ -87,5 +84,7 @@
       "security_resource_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_URL and QUBIT_DIFFERENTIAL_QUBIT_TOKEN and a live instance for the Qubit side. The read-only probe is GET /api/runtime (webui.py:1676 runtime_inventory); the mutating recovery probe is the confirm-gated POST /agent/api/ops/run {\"id\":\"runtime_recover\"} (dashboard_ops.py:460-509). No stable side-effect-free upstream reference exists: `hermes doctor` / `openclaw doctor` output is nondeterministic (provider labels flip run-to-run), so this row is OPERATOR_ONLY and can never claim PASS."
 }

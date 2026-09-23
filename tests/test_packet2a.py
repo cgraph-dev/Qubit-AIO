@@ -1,6 +1,6 @@
 """Packet 2A tests: append-only ordered journal, RFC 6902 snapshot/delta
 subset, redaction boundary, fail-closed malformed input, and documented local
-divergences from the pinned AG-UI contract (docs/UPSTREAM_REUSE.md R1)."""
+divergences from the pinned AG-UI contract (docs/archive/2026-09-21/UPSTREAM_REUSE.md R1)."""
 from __future__ import annotations
 
 import json

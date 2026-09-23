@@ -29,8 +29,19 @@ from ._models import (COST_CHEAP, COST_EXPENSIVE, COST_NORMAL, DEFAULT_HOT_CAP,
                       normalize_words, recipe_embedding, recency_decay,
                       utility_score)
 from .store import VerifiedSkillStore, verified_skills_store
+from ._bundled import (BUNDLED_SKILLS, BUNDLED_SKILL_SCHEMA, BundledSkillError,
+                       bundled_skill_manifests, bundled_skill_names,
+                       bundled_skills, bundled_skills_root, get_bundled_skill,
+                       load_bundled_skill, load_bundled_skill_manifest,
+                       parse_skill_front_matter, register_bundled_skills,
+                       validate_bundled_skill_manifest)
 from .workshop import (COLLECTION_CONTRACTS, CURATOR_ROLES, WorkshopError,
                        SkillWorkshop, verified_skill_workshop)
+from .mutations import (SKILL_MUTATION_CAPABILITY, MUTATION_ACTIONS,
+                        MUTATION_RISK, SkillMutationError, apply_skill_mutation,
+                        handle_skill_mutation, mutation_risk,
+                        pending_skill_mutations, settle_skill_mutation,
+                        settle_skill_mutation_if_owned, stage_skill_mutation)
 
 __all__ = [
     "ST_QUARANTINED", "ST_VERIFIED", "ST_REFUTED", "ST_ARCHIVED",
@@ -47,7 +58,17 @@ __all__ = [
     "verified_skills_store",
     "SkillWorkshop", "verified_skill_workshop", "WorkshopError",
     "COLLECTION_CONTRACTS", "CURATOR_ROLES",
+    "BUNDLED_SKILLS", "BUNDLED_SKILL_SCHEMA", "BundledSkillError",
+    "bundled_skill_manifests", "bundled_skill_names", "bundled_skills",
+    "bundled_skills_root", "get_bundled_skill", "load_bundled_skill",
+    "load_bundled_skill_manifest", "parse_skill_front_matter",
+    "register_bundled_skills", "validate_bundled_skill_manifest",
     "acceptance_strength", "recipe_embedding", "cosine", "bound",
     "looks_secret", "digest", "normalize_words", "recency_decay",
     "utility_score",
+    "SKILL_MUTATION_CAPABILITY", "MUTATION_ACTIONS", "MUTATION_RISK",
+    "SkillMutationError", "mutation_risk", "stage_skill_mutation",
+    "settle_skill_mutation", "settle_skill_mutation_if_owned",
+    "apply_skill_mutation", "handle_skill_mutation",
+    "pending_skill_mutations",
 ]

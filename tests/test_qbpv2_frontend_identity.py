@@ -18,8 +18,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-SRC = REPO_ROOT / "frontend" / "hermes-web" / "src"
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+SRC = REPO_ROOT / "frontend" / "qubit-web" / "src"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 
 UPSTREAM = re.compile(r"\b(Hermes|OpenClaw)\b")
 

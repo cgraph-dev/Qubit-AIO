@@ -41,7 +41,7 @@ from .intent.state import ConfirmationState, ConversationState, StickyRouteState
 from .local import actions as local_actions
 from .agent import run_session as _agent_run_session, AgentDenied
 from .logging_setup import get_logger, log_event
-from .dispatch_guard import WorkerGuard
+from .dispatch_guard import DispatchBlocked, WorkerGuard
 from .redaction import redact_text
 from .task_templates import TaskTemplates
 from .safety.policy import SafetyPolicy
@@ -85,17 +85,56 @@ def _speech_override(cfg, kind: str) -> Dict[str, Any]:
     The canonical resolver owns speech selection; this returns the effective
     profile dict only when it is an explicit user/session/role selection that
     is executable. An empty dict means "use the existing config values", so the
-    shipped-default (and any resolver failure) never changes the hardware path.
+    shipped-default never changes the hardware path.
+
+    PRA-08: a resolver exception or a selected-but-not-executable explicit
+    profile is NOT swallowed. It is logged and recorded as a typed error that
+    ``runtime_inventory`` surfaces on CLI/dashboard/voice status.
     """
     try:
         from .providers import speech as _speech
-        eff = _speech.resolve_speech(kind, cfg)
+        eff = _speech.resolve_speech(cfg, kind)
         d = eff.to_public_dict()
-        if d.get("source") != "shipped-default" and d.get("executable"):
-            return d
+    except Exception as exc:  # noqa: BLE001 - typed and recorded, never silent
+        code = getattr(exc, "code", None) or type(exc).__name__
+        detail = getattr(exc, "detail", None) or str(exc)
+        try:
+            from .providers import speech as _speech
+            _speech.record_resolution_error(kind, code, detail)
+        except Exception:
+            pass
+        log_event("speech.profile.resolve.failed", kind=kind, code=code,
+                  error=str(detail)[:200])
+        return {}
+    if d.get("source") == "shipped-default":
+        try:
+            from .providers import speech as _speech
+            _speech.clear_resolution_error(kind)
+        except Exception:
+            pass
+        return {}
+    if not d.get("executable"):
+        detail = (
+            f"{kind} profile {d.get('profile_id')!r} selected "
+            f"(source={d.get('source')}) is not executable "
+            f"(route={d.get('route')}, egress_allowed={d.get('egress_allowed')}, "
+            f"allowlisted={d.get('allowlisted')})")
+        try:
+            from .providers import speech as _speech
+            _speech.record_resolution_error(
+                kind, "SPEECH_PROFILE_NOT_EXECUTABLE", detail,
+                profile_id=d.get("profile_id"))
+        except Exception:
+            pass
+        log_event("speech.profile.not_executable", kind=kind,
+                  profile_id=d.get("profile_id"), route=d.get("route"))
+        return {}
+    try:
+        from .providers import speech as _speech
+        _speech.clear_resolution_error(kind)
     except Exception:
         pass
-    return {}
+    return d
 
 
 def _attach_router_pipeline(classifier, cfg) -> None:
@@ -134,16 +173,30 @@ def _warn_legacy_env_once(path: str) -> None:
 
 
 def _legacy_default_model() -> str:
-    """Read the default model name from the legacy assistant config.
+    """Read the default model name, preferring the Qubit runtime config.
     Returns '' when unavailable."""
     try:
         import os
         import yaml
-        p = os.path.expanduser("~/.hermes/config.yaml")
-        if os.path.exists(p):
+        candidates = []
+        try:
+            from . import qubit_runtime as _HR
+            candidates.append(str(_HR.default_home() / "config.yaml"))
+        except Exception:
+            pass
+        # No ~/.hermes fallback: Qubit resolves its model from its own home
+        # (independence — the reference home is migration input only).
+        for p in candidates:
+            if not os.path.exists(p):
+                continue
             with open(p) as fh:
                 d = yaml.safe_load(fh) or {}
-            return str(d.get("model", "") or "")
+            model = d.get("model", "")
+            if isinstance(model, dict):
+                model = model.get("default", "")
+            model = str(model or "")
+            if model:
+                return model
     except Exception:
         pass
     return ""
@@ -318,6 +371,27 @@ def _cfg_session(cfg: Any) -> str:
         return ""
 
 
+def _resolve_agent_session(cfg: Any, requested: Any = None) -> str:
+    """Map a voice/PTT session id onto the canonical conversation.
+
+    Delegates to :func:`voicebridge.agent.resolve_session_id`: an empty or
+    voice-default alias converges on the one canonical conversation
+    (configurable via ``agent.session_id``), an explicit id is kept verbatim.
+    Never raises; on a resolution fault the requested id is returned truncated.
+    """
+    try:
+        from .agent import resolve_session_id
+
+        return resolve_session_id(cfg, requested)
+    except Exception:  # noqa: BLE001 - a resolution fault must not crash PTT
+        return str(requested or "").strip()[:80]
+
+
+def _canonical_agent_session(cfg: Any) -> str:
+    """Canonical conversation id for the desktop/PTT agent path."""
+    return _resolve_agent_session(cfg, None)
+
+
 def _operator_name(cfg: Any) -> str:
     """Resolve the operator's name from local knowledge — never baked in code.
 
@@ -342,11 +416,16 @@ def _operator_name(cfg: Any) -> str:
 
 class VoiceOrchestrator:
     def __init__(self, config: Config, mic_only: bool = False,
-                 no_hotkey: bool = False, dry_run: bool = False) -> None:
+                 no_hotkey: bool = False, dry_run: bool = False,
+                 headless: bool = False) -> None:
         self.cfg = config
         self.mic_only = mic_only
         self.no_hotkey = no_hotkey or not config.get("hotkey", "enabled", default=True)
         self.dry_run = dry_run  # global force: never dispatch, only speak plan
+        # Headless: built only so a caller (the voice ``task_run`` backend) can
+        # reuse the SAME worker dispatch path without touching audio hardware.
+        # ASR/TTS/mic are never loaded and no output sink is probed or muted.
+        self.headless = headless
 
         # state
         self.conversation = ConversationState(max_turns=int(config.get("conversation", "max_turns", default=8)))
@@ -398,6 +477,7 @@ class VoiceOrchestrator:
             self._broker = build_host_broker(
                 power_control=self._power_policy.control, cfg=self.cfg)
             register_worker_caps(self._broker.registry)
+            self._register_web_caps()
             self._worker_guard = WorkerGuard(self.cfg, engine=self._broker.engine)
         except Exception as exc:
             log_event("broker.init.failed", error=str(exc)[:200])
@@ -440,13 +520,14 @@ class VoiceOrchestrator:
             _playback_dev = None
             _playback_name = None
         self.playback = Playback(device=_playback_dev, device_name=_playback_name)
-        try:
-            _res = self.playback._resolve_device()
-            log_event("audio.pinned", index=_res, name=str(_playback_name),
-                      configured_index=str(_playback_dev))
-        except Exception:
-            pass
-        self._apply_output_volume()
+        if not headless:
+            try:
+                _res = self.playback._resolve_device()
+                log_event("audio.pinned", index=_res, name=str(_playback_name),
+                          configured_index=str(_playback_dev))
+            except Exception:
+                pass
+            self._apply_output_volume()
         self.classifier: Optional[Classifier] = None
         self._templates: Optional[TaskTemplates] = None
         self.safety = SafetyPolicy(config.section("safety"))
@@ -769,6 +850,15 @@ class VoiceOrchestrator:
         Capture pauses this stream; speak() re-uses it.
         """
         mic_cfg = mic_cfg or self.cfg.section("mic")
+        # Single audio owner across processes: if the Qubit service holds the
+        # device, a CLI process must not open a second InputStream (that is the
+        # documented cross-process ALSA poll-descriptor segfault below).
+        from .audio.devlock import is_service_owner, service_holds_audio
+        if not is_service_owner() and service_holds_audio():
+            self._barge_stream = None
+            log_event("barge_in.deferred_service_running",
+                      hint="the Qubit service owns the audio device; barge-in skipped")
+            return
         try:
             self._barge_stream = sd.InputStream(
                 samplerate=mic_cfg.get("sample_rate", 48000),
@@ -1184,6 +1274,79 @@ class VoiceOrchestrator:
         except Exception:
             pass
 
+    # ---------------------------------------------------- canonical chat store
+    def _voice_store(self):
+        """The ONE canonical chat store for the plain voice conversation.
+
+        Returns exactly ``chat_transport.store(cfg)`` —
+        :class:`~voicebridge.qubit_session_store.QubitSessionStore`, the strict
+        adapter over the vendored ``qubit_state.SessionDB`` (``state.db``) that
+        ``/qubit-chat``/terminal/CLI write — or ``None`` when it is unavailable.
+        Never a second store. Persistence is additive: a store fault is audited
+        and the spoken turn is unchanged.
+        """
+        try:
+            from .chat_transport import store as _chat_store
+            return _chat_store(self.cfg)
+        except Exception as exc:  # noqa: BLE001 - persistence is additive
+            log_event("conversation.store.unavailable", error=str(exc)[:160])
+            return None
+
+    def _voice_conv_prompt(self, text: str) -> str:
+        """Bounded prior-conversation context from the canonical chat store.
+
+        A voice turn sees prior ``/qubit-chat`` turns (and vice versa) through
+        the same :mod:`voicebridge.context_policy` the chat transport uses, on
+        the one canonical session id. Falls back to the per-request in-memory
+        snapshot when the store is empty or unavailable, so behavior is
+        unchanged when no canonical transcript exists.
+        """
+        store = self._voice_store()
+        if store is not None:
+            try:
+                from .agent import _session_context
+                sid = _canonical_agent_session(self.cfg)
+                ctx, _meta = _session_context(store, sid, self.cfg, text)
+                if ctx:
+                    return ctx
+            except Exception as exc:  # noqa: BLE001 - context is additive
+                log_event("conversation.store.context_error",
+                          error=str(exc)[:160])
+        _c = self._cur_ctx()
+        if _c is not None and _c.conv_snapshot:
+            return _c.conv_snapshot
+        try:
+            with _conv_lock:
+                return self.conversation.as_prompt()
+        except Exception:  # noqa: BLE001 - a context fault must not crash a turn
+            return ""
+
+    def _remember_voice_exchange(self, user_text: str, reply: str, *,
+                                 model: str = "") -> None:
+        """Record one voice exchange in the in-memory state AND the one store.
+
+        The in-memory rolling :class:`~voicebridge.intent.state.ConversationState`
+        is unchanged (same turns, same cap). The canonical chat store is written
+        best-effort so a spoken turn is visible to ``/qubit-chat`` (and a chat
+        turn is visible to voice on the next turn). A store fault never changes
+        the turn result or the return contract.
+        """
+        with _conv_lock:
+            self.conversation.add("user", user_text)
+            self.conversation.add("assistant", reply)
+        store = self._voice_store()
+        if store is None:
+            return
+        try:
+            from .agent import _persist_session_turn
+            sid = _canonical_agent_session(self.cfg)
+            _persist_session_turn(store, sid, "user", user_text,
+                                  model=model or None)
+            _persist_session_turn(store, sid, "assistant", reply,
+                                  model=model or None)
+        except Exception as exc:  # noqa: BLE001 - additive, non-fatal
+            log_event("conversation.store.persist_error", error=str(exc)[:160])
+
     def process_web_utterance(self, text: str) -> dict:
         """Phone/web roundtrip: route like the mic but return data, not audio.
 
@@ -1524,7 +1687,7 @@ class VoiceOrchestrator:
             self.task_queue.clear()
             self.speak("Okay, dropping the queued task.")
 
-    def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
+    def _augment_worker_text(self, task_text: str) -> str:
         # skills nudge: remind the agent to deliver the task through DECLARED
         # capabilities; it never holds implicit authority (Packet 7E replaced the
         # old "never ask permission / full PC shell" instruction).
@@ -1561,6 +1724,10 @@ class VoiceOrchestrator:
                 task_text = f"{_hist}\n\n---\n\nCurrent task: {task_text}"
         except Exception:
             pass
+        return task_text
+
+    def _launch_task(self, task_text: str, model: Optional[str] = None) -> None:
+        task_text = self._augment_worker_text(task_text)
         suffix = uuid.uuid4().hex[:8]
         if self._interrupted_session:
             # New instruction after an interrupt. NOTE: do NOT reuse the
@@ -1597,6 +1764,79 @@ class VoiceOrchestrator:
         self._spawn_session_worker(session_key, task_text, t0)
         self._await_session(session_key, task_text, t0)
         return
+
+    def run_worker_task(self, task_text: str, model: Optional[str] = None,
+                        *, session: str = "") -> Dict[str, Any]:
+        """Headless one-shot dispatch through the SAME worker the CLI ``task``
+        path runs (``_dispatch_coding``/``_launch_task`` -> ``agent.run_session``
+        behind the shared :class:`~voicebridge.dispatch_guard.WorkerGuard`).
+
+        Unlike ``_launch_task`` this starts no mic/ASR/TTS, speaks nothing, and
+        spawns no progress thread; it performs the identical safety check and
+        worker call and returns the truthful structured outcome. The voice
+        ``task_run``/``task_run_current`` backends call this so CLI, dashboard,
+        and voice all execute the orchestrator worker — never the parallel
+        ``chat_transport.turn`` path.
+        """
+        from .agent import run_session as _agent_run_session, AgentDenied
+
+        text = self._augment_worker_text(str(task_text or ""))
+        try:
+            verdict = self.safety.check(text)
+        except Exception:
+            verdict = None
+        if verdict is not None and verdict.blocked:
+            return {"state": "UNAVAILABLE", "code": "BLOCKED",
+                    "detail": str(verdict.deny_reason)[:200]}
+        if self.dry_run or (verdict is not None and verdict.dry_run):
+            return {"state": "UNAVAILABLE", "code": "DRY_RUN",
+                    "detail": "dry-run mode: nothing was dispatched"}
+        if verdict is not None and verdict.require_confirm:
+            # The orchestrator's own safety gate would stage a second, spoken
+            # confirmation; a headless one-shot never auto-confirms it.
+            return {"state": "UNAVAILABLE", "code": "SAFETY_CONFIRM_REQUIRED",
+                    "detail": str(verdict.confirm_reason)[:200]}
+        session_key = str(session or "").strip() or self.cfg.session_key(
+            f"voice-task-{uuid.uuid4().hex[:8]}")
+        # A bare voice/PTT alias (e.g. the voice-task command's ``qubit-voice``
+        # fallback) converges on the canonical conversation so the receipt and
+        # the persisted transcript name the same session; a per-task id is not
+        # an alias and is preserved.
+        session_key = _resolve_agent_session(self.cfg, session_key)
+
+        def _estop() -> bool:
+            state = getattr(self._power_policy.control, "state", None)
+            return bool(state.get("emergency_stop", False)) \
+                if isinstance(state, dict) else False
+
+        try:
+            res = self._worker_guard.run(
+                "agent.session",
+                lambda: _agent_run_session(
+                    self.cfg, text, session=session_key,
+                    execute_tool=self._agent_tool,
+                    cancelled=lambda: False,
+                    estop_engaged=_estop),
+                source="user", correlation_id=session_key)
+        except AgentDenied as exc:
+            return {"state": "UNAVAILABLE",
+                    "code": str(getattr(exc, "code", "") or "AGENT_DENIED"),
+                    "detail": str(exc)[:200]}
+        except Exception as exc:
+            return {"state": "UNAVAILABLE",
+                    "code": str(getattr(exc, "code", "") or "WORKER_ERROR"),
+                    "detail": str(exc)[:200]}
+        if not isinstance(res, dict) or res.get("state") != "OK":
+            return {"state": "UNAVAILABLE",
+                    "code": str((res or {}).get("code", "WORKER_ERROR")),
+                    "detail": str((res or {}).get("detail", ""))[:200]}
+        receipt = dict(res.get("receipt") or {})
+        receipt.update({"runtime": "orchestrator-worker",
+                        "path": "voicebridge.orchestrator.run_worker_task",
+                        "session": session_key})
+        return {"state": "OK", "runtime": "orchestrator-worker",
+                "reply": str(res.get("reply", "")), "session": session_key,
+                "receipt": receipt}
 
     def _progress_local_update(self, snippet: str) -> str:
         """One brokered local-model progress sentence (canonical gateway)."""
@@ -2182,9 +2422,7 @@ class VoiceOrchestrator:
                 _ctx_id.summary = reply
                 _ctx_id.route = "local"
                 _ctx_id.done.set()
-            with _conv_lock:
-                self.conversation.add("user", text)
-                self.conversation.add("assistant", reply)
+            self._remember_voice_exchange(text, reply)
             with self._web_lock:
                 self._last_web_summary = reply
                 self._last_web_route = "local"
@@ -2208,9 +2446,9 @@ class VoiceOrchestrator:
                         or (self.cfg.get("intent", "perplexity_enabled", default=True)
                             and _needs_web(text)))
         if not explicit_web and llm_cfg.get("enabled", True):
-            # Use per-request snapshot so concurrent EN/RO requests don't bleed
-            _ctx_for_llm = self._cur_ctx()
-            _conv_prompt = _ctx_for_llm.conv_snapshot if _ctx_for_llm is not None and _ctx_for_llm.conv_snapshot is not None else self.conversation.as_prompt()
+            # Canonical store context so a voice turn sees prior /qubit-chat
+            # turns (and vice versa); falls back to the per-request snapshot.
+            _conv_prompt = self._voice_conv_prompt(text)
             # Packet 4B: personal facts are served ONLY through the bounded
             # context compiler (local_llm._user_content -> compile_context,
             # secret-stripped, budget-capped). Raw file slices are NEVER
@@ -2245,9 +2483,9 @@ class VoiceOrchestrator:
                     ctx2.summary = trimmed
                     ctx2.route = "local"
                     ctx2.done.set()
-                with _conv_lock:
-                    self.conversation.add("user", text)
-                    self.conversation.add("assistant", reply)
+                self._remember_voice_exchange(
+                    text, reply,
+                    model=str(llm_cfg.get("model", "qubit-brain4")))
                 # Mirror so legacy pollers (_web_wait_for_summary waiting on global) also see it
                 with self._web_lock:
                     self._last_web_summary = trimmed
@@ -2319,9 +2557,7 @@ class VoiceOrchestrator:
         if not reply:
             reply = self._chat_ollama(text)
         if reply:
-            with _conv_lock:
-                self.conversation.add("user", text)
-                self.conversation.add("assistant", reply)
+            self._remember_voice_exchange(text, reply)
             if not spoke:
                 self.speak(trim_spoken(reply, 500))
             # sync fallback replies to dashboard too (Right Ctrl + web alike) — show what was HEARD
@@ -2423,7 +2659,7 @@ class VoiceOrchestrator:
             return ""
         url = self.cfg.get("intent", "deepseek_url",
                            default="https://api.deepseek.com/chat/completions")
-        ctx = self.conversation.as_prompt()
+        ctx = self._voice_conv_prompt(text)
         system = ("You are a concise, warm voice assistant. Answer briefly in "
                   "1-3 short sentences unless asked for detail. Be direct: "
                   "no emojis, no pleasantries, no filler words — say only "
@@ -2579,8 +2815,7 @@ class VoiceOrchestrator:
         from .providers import gateway as _gateway
         from .runner_contract import resolve
         _rc = resolve(self.cfg)
-        _c = self._cur_ctx()
-        ctx = _c.conv_snapshot if _c is not None and _c.conv_snapshot else self.conversation.as_prompt()
+        ctx = self._voice_conv_prompt(text)
         prompt = (f"Recent conversation:\n{ctx}\n\nUser: {text}\n\n"
                   "Assistant: /no_think")
         # Packet 4B: alias and runner options come ONLY from the canonical
@@ -2710,31 +2945,50 @@ class VoiceOrchestrator:
             c_actv.done.set()
         return True
 
+    def _register_web_caps(self) -> None:
+        """Bind the read-only ``web.*`` tools onto the shared host broker.
+
+        One decision point: a planner/model web call resolves through the same
+        registry/policy/e-stop/confirmation junction and audit as ``local.*``.
+        """
+        if self._broker is None:
+            return
+        from .broker import register_web_tools
+        register_web_tools(self._broker, cfg=self.cfg)
+
     def _agent_tool(self, tool: str, args: Dict[str, Any]) -> str:
-        """Execute one planner-proposed `local.*` tool behind the shared
-        worker guard (same policy path as every other channel). Unknown
-        tools fail closed; the guard's decision (deny/confirm) applies."""
+        """Execute one planner-proposed tool behind the shared broker.
+
+        Both ``local.*`` and the read-only ``web.*`` capabilities resolve
+        through the SAME registry/policy/e-stop/confirmation junction used by
+        every other channel; unknown tools fail closed and the broker's
+        decision (deny/confirm) applies. A planner/model-originated call is
+        dispatched with its TRUE origin ("model"), never rubber-stamped as
+        human input: reversible tools pass the policy engine,
+        MUTATING/DESTRUCTIVE tools are refused with DENY_CONFIRM_SOURCE (fail
+        closed) until a user-issued confirmation exists. This keeps the audit
+        trail honest and avoids the previous silent ``source="user"``
+        attribution. The shared broker path is the same one every other
+        channel uses, so grants/scopes/e-stop and resource limits all apply.
+        """
         name = str(tool or "")
-        if name.startswith("web."):
-            # Read-only, SSRF-guarded, estop-aware web tools. The module
-            # enforces its own bounded policy (scheme allowlist, private/
-            # metadata IP block, redirect re-validation, size/time caps,
-            # redaction) and returns typed errors; no shell, no second
-            # listener, no writes.
-            from . import web_tool as _wt
-            import json as _json
-            return _json.dumps(_wt.run(self.cfg, name, dict(args or {})),
-                               default=str)
         if name.startswith("local."):
-            name = name[len("local."):]
-        from .local import actions as _la
-        act = _la.ACTIONS.get(name)
-        if act is None:
+            from .local import actions as _la
+            if _la.ACTIONS.get(name[len("local."):]) is None:
+                raise ValueError(f"unknown agent tool {tool!r}")
+        elif not name.startswith("web."):
             raise ValueError(f"unknown agent tool {tool!r}")
-        match = _la.ActionMatch(name=name,
-                                params=dict(args or {}), text="")
-        return self._worker_guard.run(f"local.{name}", _la.execute,
-                                      match, source="user")
+        broker = getattr(self, "_broker", None)
+        if broker is None or not self.cfg.get("safety", "tool_broker",
+                                              default=True):
+            raise DispatchBlocked("BROKER_DISABLED", name)
+        res = broker.execute(name, dict(args or {}),
+                             source="model", session=_cfg_session(self.cfg))
+        if res.denied:
+            raise DispatchBlocked(res.denied, name)
+        if not res.ok:
+            raise RuntimeError(res.error or f"{name} failed")
+        return res.output
 
     def _handle_agent(self, task: str, notice: str = "") -> None:
         """Explicit agent delegation — background + interruptible.
@@ -2787,7 +3041,7 @@ class VoiceOrchestrator:
                 res = self._worker_guard.run(
                     "agent.task",
                     lambda t: _agent_run_session(
-                        self.cfg, t, session="qubit-voice",
+                        self.cfg, t, session=_canonical_agent_session(self.cfg),
                         execute_tool=self._agent_tool,
                         cancelled=lambda: bool(
                             self._interrupt_requested or self._stop.is_set()),
@@ -2933,7 +3187,7 @@ class VoiceOrchestrator:
             _sticky = self.classifier._sticky_route(text)
             if _sticky:
                 # pure routing preference (no task attached) -> just set and ack
-                _task_re = __import__("re").sub(r"route (this|it|everything|all)?\s*(to|through)\s+(agent|worker|browser|hermes|openclaw)\b|use (the )?(agent|worker|browser|hermes|openclaw)\b.*|always (use|route through) (agent|worker|browser|hermes|openclaw)\b", "", _low_sticky, flags=__import__("re").I).strip(" .,;:")
+                _task_re = __import__("re").sub(r"route (this|it|everything|all)?\s*(to|through)\s+(agent|worker|browser|qubit|qubit)\b|use (the )?(agent|worker|browser|qubit|qubit)\b.*|always (use|route through) (agent|worker|browser|qubit|qubit)\b", "", _low_sticky, flags=__import__("re").I).strip(" .,;:")
                 self.sticky_route.set(_sticky, reason=text[:120])
                 log_event("sticky_route.set", target=_sticky, text=text[:160])
                 if not _task_re or len(_task_re) < 4:
@@ -3075,7 +3329,7 @@ class VoiceOrchestrator:
             if not ws.exists():
                 # Migration grace: keep writing where the old notes live
                 # until the operator moves them (documented migration).
-                legacy = Path("~/.openclaw/workspace").expanduser()
+                legacy = Path("~/.qubit/workspace").expanduser()
                 if legacy.is_dir():
                     ws = legacy
             day = time.strftime("%Y-%m-%d")
@@ -3091,6 +3345,15 @@ class VoiceOrchestrator:
 
     # ------------------------------------------------------------------ loop
     def run(self) -> None:
+        # The service loop is the single audio owner: hold the cross-process
+        # lock so CLI commands defer instead of opening ALSA a second time
+        # (which crashes libasound in snd_pcm_poll_descriptors_revents).
+        self._audio_owner_lock = None
+        try:
+            from .audio.devlock import acquire_service_owner
+            self._audio_owner_lock = acquire_service_owner()
+        except Exception:
+            pass
         self.start()
         print("=" * 60)
         print("Qubit Agent (Qubit VoiceBridge) — push-to-talk")

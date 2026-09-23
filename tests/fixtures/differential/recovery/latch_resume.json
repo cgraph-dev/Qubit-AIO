@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "fixture_id": "recovery.estop.latch_resume",
+  "family": "recovery",
+  "command": null,
+  "request": {
+    "kind": null,
+    "method": "POST",
+    "path": "/agent/api/qubit/chat",
+    "headers": {},
+    "body": {
+      "text": "status"
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "sequence": [
+    {
+      "kind": "http",
+      "step": "latch-estop",
+      "method": "POST",
+      "path": "/api/power",
+      "body": {
+        "action": "emergency-stop",
+        "confirmed": true
+      },
+      "expect": {
+        "state": "OK",
+        "health": "degraded"
+      }
+    },
+    {
+      "kind": "http",
+      "step": "refuse-mutation",
+      "method": "POST",
+      "path": "/agent/api/qubit/chat",
+      "body": {
+        "text": "status"
+      },
+      "expect": {
+        "http_status": 403,
+        "code": "EMERGENCY_STOP"
+      }
+    },
+    {
+      "kind": "http",
+      "step": "lift-latch",
+      "method": "POST",
+      "path": "/api/power",
+      "body": {
+        "action": "reset",
+        "confirmed": true
+      },
+      "expect": {
+        "state": "OK",
+        "health": "disabled"
+      }
+    },
+    {
+      "kind": "http",
+      "step": "resume-mutation",
+      "method": "POST",
+      "path": "/agent/api/qubit/chat",
+      "body": {
+        "text": "status"
+      },
+      "expect": {
+        "http_status": 200
+      }
+    }
+  ],
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "estop_engaged": {
+        "type": "boolean"
+      },
+      "latch": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "code": {
+        "const": "EMERGENCY_STOP"
+      }
+    }
+  },
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "generated_hash"
+  ],
+  "expected": {
+    "http_status": 403,
+    "json_schema": {
+      "ok": false,
+      "state": "UNAVAILABLE",
+      "code": "EMERGENCY_STOP"
+    }
+  },
+  "state_changing": true,
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "State-changing and requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN. The sequence latches the e-stop (POST /api/power emergency-stop), asserts the typed refusal, lifts the latch (POST /api/power reset), and re-runs the mutation to prove resume. Never auto-run; never count the refusal as success.",
+  "qubit": {
+    "path": "voicebridge/qubit_compat.py:1868",
+    "caller": "h_chat_turn",
+    "approval": null
+  },
+  "hermes": {
+    "path": "agent/estop.py:122",
+    "symbol": "check_paused",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/suspend.ts:32",
+    "symbol": "suspendHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "P0 recovery.estop.latch_resume: latch e-stop -> every mutation path returns a typed refusal (403 EMERGENCY_STOP via h_chat_turn qubit_compat.py:1868), lift latch (POST /api/power action=reset, power.py:1551 PowerControl.reset) -> mutations resume. The latch itself is power.py:1514 PowerControl.emergency_stop. Expected is the typed refusal for the base mutation request; the sequence records the full latch/lift/resume cycle. Refusal is never a success. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: agent/estop.py:122 (check_paused); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/suspend.ts:32 (suspendHandlers). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "POST",
+      "path": "/agent/api/qubit/chat",
+      "body": {
+        "text": "status"
+      }
+    },
+    "broker_policy_decision": "e-stop latch covers every mutation path; typed refusal while latched",
+    "runtime_provider": null,
+    "store_state_assertion": "latch state persisted in the power control store",
+    "output_event_assertion": null,
+    "error_codes": [
+      "EMERGENCY_STOP"
+    ],
+    "retry_recovery_proof": "mutations resume only after POST /api/power action=reset",
+    "audit_receipt_proof": null,
+    "security_resource_proof": "e-stop latch covers every mutation path",
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  }
+}

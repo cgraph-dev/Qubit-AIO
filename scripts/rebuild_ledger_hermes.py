@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Regenerate ``docs/QUBIT_GAP_LEDGER.hermes.json`` deterministically.
+"""Regenerate ``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.hermes.json`` deterministically.
 
-The Hermes gap-ledger section is *evidence based*: a row is only reported
+The upstream gap-ledger section is *evidence based*: a row is only reported
 ``IMPLEMENTED`` when the real production caller works and a behavioural test
 exercises it.  No status is hand-flipped in the JSON.
 
@@ -9,17 +9,17 @@ Evidence sources
 ----------------
 API rows
     The upstream route decorators are re-extracted from the pinned
-    ``qubit_hermes/`` source, matched through
-    :func:`voicebridge.hermes_compat.match`, and classified from the route
+    ``qubit_runtime/`` source, matched through
+    :func:`voicebridge.qubit_compat.match`, and classified from the route
     disposition plus the handler classification (registered handler vs.
     typed gate vs. wire-shape stub).  A small, documented adjustment table
     records the handful of routes whose wire shape is honestly partial/gated;
     a route is never reported ``IMPLEMENTED`` when the cited compat handler is
-    not registered in ``hermes_compat.HANDLERS``.
+    not registered in ``qubit_compat.HANDLERS``.
 
 cli / cli-subcommand rows
     Status is derived from (a) whether ``voicebridge/cli.py`` /
-    ``voicebridge/cli_hermes_forward.py`` really owns or forwards the
+    ``voicebridge/cli_qubit_forward.py`` really owns or forwards the
     subcommand (live ``build_parser()`` tree + ``FORWARD_TABLE``), and (b)
     whether a test in ``tests/`` exercises that caller.  The test scan is an
     AST pass that mirrors ``/tmp/opencode/gen_ledger.py``: it marks test
@@ -53,16 +53,16 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from voicebridge import cli as _cli  # noqa: E402
-from voicebridge import cli_hermes_forward as _fwd  # noqa: E402
-from voicebridge import hermes_compat as _hc  # noqa: E402
-from voicebridge import hermes_plugins as _hp  # noqa: E402
+from voicebridge import cli_qubit_forward as _fwd  # noqa: E402
+from voicebridge import qubit_compat as _hc  # noqa: E402
+from voicebridge import qubit_plugins as _hp  # noqa: E402
 
 PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
-QH = "qubit_hermes/"
+QH = "qubit_runtime/"
 GENERATED = "2026-09-12"
-OUT_PATH = ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json"
+OUT_PATH = ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.hermes.json"
 
-# Fork-forward tables owned by voicebridge/cli_hermes_forward.py.  A forwarded
+# Fork-forward tables owned by voicebridge/cli_qubit_forward.py.  A forwarded
 # pair is a real production caller (the read-only table never routes a
 # gated/mutating surface; the confirm table requires explicit --confirm and the
 # whole-family table separates read-only from confirm subcommands), so they
@@ -72,13 +72,13 @@ _CONFIRM_TABLE = getattr(_fwd, "CONFIRM_TABLE", {})
 _FAMILY_FORWARD = getattr(_fwd, "FAMILY_FORWARD", {})
 
 UPSTREAM_GLOBS = (
-    "hermes_cli/web_routers/*.py",
-    "hermes_cli/web_server*.py",
-    "hermes_cli/memory_oauth.py",
-    "hermes_cli/dashboard_auth/routes.py",
+    "qubit_cli/web_routers/*.py",
+    "qubit_cli/web_server*.py",
+    "qubit_cli/memory_oauth.py",
+    "qubit_cli/dashboard_auth/routes.py",
 )
-UPSTREAM_EXCLUDE = {"hermes_cli/web_server_dashboard.py"}
-MEMORY_OAUTH = "hermes_cli/memory_oauth.py"
+UPSTREAM_EXCLUDE = {"qubit_cli/web_server_dashboard.py"}
+MEMORY_OAUTH = "qubit_cli/memory_oauth.py"
 
 _ROUTE_DECORATOR = re.compile(
     r'@(\w+)\.(get|post|put|patch|delete|websocket|head|options)'
@@ -242,87 +242,87 @@ AREA_META = {
     "audio-voice": dict(cli="qubit audio / asr-test / tts-test / mic-test",
                         dashboard="hermes-dist Chat/Models",
                         voice="qubit voice audio",
-                        test="tests/test_hermes_readsurfaces8u.py",
+                        test="tests/test_qubit_readsurfaces8u.py",
                         needs="hardware"),
     "git": dict(cli="qubit git status|log|diff|show",
                 dashboard="hermes-dist Sessions/Files", voice="none",
-                test="tests/test_hermes_readsurfaces8u.py", needs="none"),
+                test="tests/test_qubit_readsurfaces8u.py", needs="none"),
     "files-fs": dict(cli="qubit files list|read|inspect",
                      dashboard="hermes-dist Files", voice="qubit voice files",
-                     test="tests/test_hermes_readsurfaces8u.py", needs="none"),
+                     test="tests/test_qubit_readsurfaces8u.py", needs="none"),
     "local-models": dict(cli="qubit local-models * / runtime *",
                          dashboard="hermes-dist Models",
                          voice="voice local-models",
-                         test="tests/test_hermes_routes_parity8u.py",
+                         test="tests/test_qubit_routes_parity8u.py",
                          needs="hardware"),
     "profiles": dict(cli="qubit profile * / brain *",
                      dashboard="hermes-dist Profiles",
                      voice="voice profile/brain",
-                     test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                     test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "tools": dict(cli="qubit permissions / capability",
                   dashboard="hermes-dist System", voice="voice capability",
-                  test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                  test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "status-curator": dict(cli="qubit status / lessons / doctor",
                            dashboard="hermes-dist System/Analytics",
                            voice="voice status",
-                           test="tests/test_hermes_read_routes8u.py",
+                           test="tests/test_qubit_read_routes8u.py",
                            needs="none"),
     "sessions": dict(cli="qubit sessions / memory",
                      dashboard="hermes-dist Sessions", voice="voice sessions",
-                     test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                     test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "memory": dict(cli="qubit memory search / brain",
                    dashboard="hermes-dist Profiles", voice="voice memory",
-                   test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                   test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "mcp": dict(cli="qubit mcp status", dashboard="hermes-dist MCP",
-                voice="voice mcp", test="tests/test_hermes_routes_parity8u.py",
+                voice="voice mcp", test="tests/test_qubit_routes_parity8u.py",
                 needs="owner"),
     "skills": dict(cli="qubit skills / verified-skills",
                    dashboard="hermes-dist Skills", voice="voice skills",
-                   test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                   test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "config-env": dict(cli="qubit flags / capability / auth",
                        dashboard="hermes-dist Config/Keys",
                        voice="voice config",
-                       test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                       test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "provider-oauth": dict(cli="qubit auth login/logout",
                            dashboard="hermes-dist Keys/Config",
                            voice="voice auth",
-                           test="tests/test_hermes_routes_parity8u.py",
+                           test="tests/test_qubit_routes_parity8u.py",
                            needs="creds"),
     "models": dict(cli="qubit profile select / frontier",
                    dashboard="hermes-dist Models", voice="voice model",
-                   test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                   test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "cron": dict(cli="qubit schedules *", dashboard="hermes-dist Cron",
                  voice="voice schedules",
-                 test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                 test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "messaging": dict(cli="qubit msg * / channels",
                       dashboard="hermes-dist Channels", voice="voice channels",
-                      test="tests/test_hermes_routes_parity8u.py", needs="creds"),
+                      test="tests/test_qubit_routes_parity8u.py", needs="creds"),
     "ops": dict(cli="qubit checkpoints / hooks / product",
                 dashboard="hermes-dist System", voice="voice ops",
-                test="tests/test_hermes_routes_parity8u.py", needs="none"),
+                test="tests/test_qubit_routes_parity8u.py", needs="none"),
     "gateway-actions": dict(cli="qubit gateway / product upgrade",
                             dashboard="hermes-dist System",
                             voice="voice gateway",
-                            test="tests/test_hermes_routes_parity8u.py",
+                            test="tests/test_qubit_routes_parity8u.py",
                             needs="owner"),
     "analytics-config": dict(cli="qubit status / flags",
                              dashboard="hermes-dist Analytics/Config",
                              voice="voice analytics",
-                             test="tests/test_hermes_routes_parity8u.py",
+                             test="tests/test_qubit_routes_parity8u.py",
                              needs="none"),
     "dashboard-ui": dict(cli="qubit plugins / theme",
                          dashboard="hermes-dist Plugins/System",
                          voice="voice plugins",
-                         test="tests/test_hermes_routes_parity8u.py",
+                         test="tests/test_qubit_routes_parity8u.py",
                          needs="owner"),
     "dashboard-auth": dict(cli="qubit auth",
                            dashboard="hermes-dist (loopback identity)",
                            voice="none",
-                           test="tests/test_hermes_vendor8tf.py",
+                           test="tests/test_qubit_vendor8tf.py",
                            needs="owner"),
     "chat-websocket": dict(cli="qubit tui / voice",
                            dashboard="overlay Qubit Chat", voice="voice chat",
-                           test="tests/test_hermes_read_routes8u.py",
+                           test="tests/test_qubit_read_routes8u.py",
                            needs="none"),
 }
 
@@ -330,6 +330,54 @@ AREA_META = {
 # disposition + handler classification.  Each entry records the honest wire
 # shape where the compat table's disposition alone would over/under-claim.
 ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
+    # Memory reset is a real Qubit-backed reset (not a refusal): the compat
+    # handler stages the destructive action through the shared confirmation
+    # journal (409 + confirmation_id) and only deletes on ``confirm``. The
+    # ledger must record the implementation and its real on-disk proof.
+    ("GET", "/api/memory/reset"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:mem_reset",
+        test="tests/test_qubit_routes_parity8u.py::"
+             "test_memory_reset_confirms_and_deletes",
+        note=("Real Qubit-backed reset: 409 + confirmation_id, then deletes "
+              "local semantic memories / markdown workspace notes and returns "
+              "the deleted list.")),
+    ("POST", "/api/memory/reset"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:mem_reset",
+        test="tests/test_qubit_routes_parity8u.py::"
+             "test_memory_reset_confirms_and_deletes",
+        note=("Real Qubit-backed reset: 409 + confirmation_id, then deletes "
+              "local semantic memories / markdown workspace notes and returns "
+              "the deleted list.")),
+    ("GET", "/api/cron/jobs/{job_id}"): dict(
+        test="tests/test_route_wiring_fixes8u.py::"
+             "test_cron_read_and_write_share_one_store",
+        note=("Single schedules store read; create/list/show/delete round-trip "
+              "and show-after-delete 404 proven by the route-wiring suite.")),
+    # Fork-served reads: the vendored upstream runtime is the Qubit-owned
+    # backend (owner amendment 2026-09-11), so an upstream read the ingress
+    # policy proxies to it is a real Qubit backend path, not the old dead
+    # Qubit stub. The dashboard depends on these returning real data.
+    ("GET", "/api/providers/oauth"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_asgi.py:proxy",
+        test="tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
+        note=("Served redacted by the Qubit-owned vendored Hermes runtime via "
+              "the ingress proxy; OAuth mutations stay on the Qubit gate.")),
+    ("GET", "/api/providers/oauth/{provider_id}/poll/{session_id}"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_asgi.py:proxy",
+        test="tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
+        note=("Served by the Qubit-owned vendored Hermes runtime via the "
+              "ingress proxy; the flow mutation stays on the Qubit gate.")),
+    ("GET", "/api/credentials/pool"): dict(
+        status="GATED", code="SECRET_NEVER_SERVED",
+        backend="voicebridge/qubit_compat.py:_NO_SECRET",
+        note=("The vendored credential-pool payload carries token_preview "
+              "fragments, so Qubit gates the read and every mutation; "
+              "operators manage credentials via `qubit auth`.")),
+    ("GET", "/api/portal"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_asgi.py:proxy",
+        test="tests/test_ingress_confinement8u.py::test_fork_declared_reads_are_served_by_the_fork",
+        note=("Served by the Qubit-owned vendored Hermes runtime via the "
+              "ingress proxy; no secrets are exposed.")),
     ("GET", "/api/events"): dict(note=(
         "h_events reads the real state-dir event/audit journal (redacted); the "
         "upstream WS dialect is the separate WEBSOCKET row.")),
@@ -391,7 +439,7 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
     ("GET", "/dashboard-plugins/{plugin_name}/{file_path:path}"): dict(
         status="IMPLEMENTED",
         backend="voicebridge/webui.py:_serve_hermes_plugin",
-        test="tests/test_hermes_serve8tf.py",
+        test="tests/test_qubit_serve8tf.py",
         note=("Served by webui.py _serve_hermes_plugin (static assets), "
               "outside the ROUTES table.")),
     ("GET", "/api/memory/providers/{provider}/oauth/status"): dict(
@@ -404,10 +452,14 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
             "Mounted under /api/memory/providers; typed manual-handoff "
             "refusal.")),
     ("POST", "/api/dashboard/agent-plugins/install"): dict(
-        status="GATED", code="SKILL_MANIFEST_REQUIRED", note=(
-            "Specific typed install gate is registered ahead of the blanket "
-            "remote wildcard; direct dashboard installs are refused in favour "
-            "of a validated local manifest staged disabled.")),
+        status="IMPLEMENTED",
+        test=("tests/test_backend_routes_integration8u.py::"
+              "test_plugin_hub_and_install_use_plugin_runtime"),
+        note=(
+            "Real confirm-gated install through the canonical "
+            "plugin_runtime.install op: a reviewed catalog identifier or local "
+            "manifest installs over local state, while a remote identifier "
+            "stays a typed refusal (BLOCKED_REMOTE_PLUGIN).")),
     ("POST", "/api/dashboard/agent-plugins/{name:path}/update"): dict(
         status="GATED", code="SKILL_VERSIONED", note=(
             "In-place plugin updates are refused; versions are immutable. "
@@ -450,13 +502,13 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
         code="LOCAL_MODEL_BROKERED", note=(
             "Model removal is brokered; nothing deleted.")),
     ("POST", "/api/ops/backup"): dict(
-        test=("tests/test_hermes_routes_agent2b_wiring.py::"
+        test=("tests/test_qubit_routes_agent2b_wiring.py::"
               "test_ops_backup_is_real_passphrase_sealed"),
         note=("Runs the real passphrase-sealed portable backup through the "
               "shared ops broker (backup_create); staged 409 until confirmed "
               "with the passphrase re-supplied.")),
     ("POST", "/api/ops/import"): dict(
-        test=("tests/test_hermes_routes_agent2b_wiring.py::"
+        test=("tests/test_qubit_routes_agent2b_wiring.py::"
               "test_ops_import_is_real_staged_restore_review"),
         note=("Runs the real staged portable restore review through the shared "
               "ops broker (backup_restore): the bundle is decrypted into a "
@@ -478,7 +530,7 @@ def _sample(path: str, collapse: bool = False) -> str:
 
 
 def extract_upstream_routes() -> List[Dict[str, object]]:
-    root = ROOT / "qubit_hermes"
+    root = ROOT / "qubit_runtime"
     files = set()
     for pattern in UPSTREAM_GLOBS:
         files.update(root.glob(pattern))
@@ -761,7 +813,7 @@ def build_api_rows(index: Optional[ApiIndex] = None) -> List[Dict[str, str]]:
             if short_m is not None:
                 handler = str(short_route["handler"])
                 status = "PARTIAL"
-                backend = f"voicebridge/hermes_compat.py:{handler}"
+                backend = f"voicebridge/qubit_compat.py:{handler}"
                 note = ("Compat route serves single-segment ids only; the "
                         "upstream multi-segment :path form is not matched.")
             else:
@@ -771,7 +823,7 @@ def build_api_rows(index: Optional[ApiIndex] = None) -> List[Dict[str, str]]:
         else:
             handler = str(matched_route["handler"])
             disposition = str(matched_route["disposition"])
-            backend = f"voicebridge/hermes_compat.py:{handler}"
+            backend = f"voicebridge/qubit_compat.py:{handler}"
             gate = matched_route.get("gate") or {}
             code = str(gate.get("code", ""))
             if disposition == "gated":
@@ -800,7 +852,7 @@ def build_api_rows(index: Optional[ApiIndex] = None) -> List[Dict[str, str]]:
 
         # Never claim IMPLEMENTED for an unregistered compat handler.
         if status == "IMPLEMENTED" and \
-                backend.startswith("voicebridge/hermes_compat.py:"):
+                backend.startswith("voicebridge/qubit_compat.py:"):
             registered = HANDLERS.get(handler)
             if not callable(registered):
                 status = "UNVERIFIED"
@@ -1095,153 +1147,153 @@ def _derive_cli_status(surface: str, caller: bool, tested: bool,
 
 # ---------------------------------------------------------------------------
 # CLI tables.  ``surface`` is the audited relationship between the upstream
-# command and the Qubit CLI (docs/AUDIT_HERMES_2026-09-11.md); the *final*
+# command and the Qubit CLI (docs/archive/2026-09-21/AUDIT_HERMES_2026-09-11.md); the *final*
 # status is derived below from live callers + behavioural tests.
 # ---------------------------------------------------------------------------
 # (cmd, qfam, surface, qubit_backend, note, upstream_ref)
 CLI = [
-    ('acp', 'acp', 'IMPLEMENTED', 'qubit acp', 'Agent Client Protocol client/server commands.', 'hermes_cli/subcommands/acp.py:10'),
-    ('approvals', 'approvals', 'IMPLEMENTED', 'qubit approvals', 'Approval journal list/approve/test.', 'hermes_cli/subcommands/approvals.py:11'),
-    ('auth', 'auth', 'IMPLEMENTED', 'qubit auth status|login|verify|logout', 'Manual-handoff enrollment; token dance refused.', 'hermes_cli/subcommands/auth.py:8'),
-    ('backup', 'setup', 'PARTIAL', 'qubit export-state / setup backup', 'Passphrase-sealed bundles; no plain backup family.', 'hermes_cli/subcommands/backup.py:8'),
-    ('browser', 'browser', 'IMPLEMENTED', 'qubit browser *', 'Browser tab/read/navigate surface.', 'hermes_cli/subcommands/browser.py:8'),
-    ('bundles', 'bundles', 'MISSING', 'qubit bundles (read-only list/show; writes need --confirm)', 'Fork-backed family; read-only list/show forward verbatim, writes require --confirm.', 'hermes_cli/subcommands/bundles.py:6'),
-    ('chat', 'run', 'PARTIAL', 'qubit run/task/voice', 'No interactive chat CLI; voice/run agent entrypoints instead.', 'hermes_cli/_parser.py:189'),
-    ('checkpoints', 'checkpoints', 'IMPLEMENTED', 'qubit checkpoints list|write', 'Checkpoint store commands.', 'hermes_cli/subcommands/checkpoints.py:6'),
-    ('claw', 'claw', 'MISSING', 'qubit claw (confirm-gated)', 'Fork-backed migration family; mutating subcommands require --confirm.', 'hermes_cli/subcommands/claw.py:10'),
-    ('completion', 'completion', 'IMPLEMENTED', 'qubit completion', 'Shell completion generation.', 'hermes_cli/subcommands/completion.py:8'),
-    ('computer-use', 'computer-use', 'IMPLEMENTED', 'qubit computer-use status', 'Status only; grants are dashboard-gated.', 'hermes_cli/subcommands/computer_use.py:116'),
-    ('config', 'flags', 'PARTIAL', 'qubit flags / capability', 'No top-level config get/set/edit family.', 'hermes_cli/subcommands/config.py:10'),
-    ('console', 'console', 'MISSING', 'qubit console (confirm-gated REPL)', 'Fork-backed console REPL; confirm-gated interactive surface.', 'hermes_cli/subcommands/console.py:8'),
-    ('cron', 'schedules', 'PARTIAL', 'qubit schedules *', '8 of 17 subcommands; incidents/history/doctor/tick missing.', 'hermes_cli/subcommands/cron.py:14'),
-    ('curator', 'lessons', 'PARTIAL', 'qubit lessons', 'On-demand curation only; no background daemon.', 'hermes_cli/subcommands/curator.py:8'),
-    ('dashboard', 'webui', 'PARTIAL', 'qubit webui', 'Qubit webui/gateway instead of hermes dashboard.', 'hermes_cli/subcommands/dashboard.py:76'),
-    ('debug', 'debug', 'MISSING', 'qubit debug (confirm-gated share/delete)', 'Fork-backed debug family; share/delete require --confirm.', 'hermes_cli/subcommands/debug.py:9'),
-    ('desktop', 'desktop', 'MISSING', 'qubit desktop (confirm-gated)', 'Fork-backed desktop build/launch; confirm-gated.', 'hermes_cli/subcommands/gui.py:8'),
-    ('doctor', 'setup', 'PARTIAL', 'qubit setup diagnose / doctor', 'Setup health exists; not the full Hermes doctor family.', 'hermes_cli/subcommands/doctor.py:8'),
-    ('dump', 'dump', 'MISSING', 'qubit dump (read-only)', 'Fork-backed redacted support dump; read-only, forwards verbatim.', 'hermes_cli/subcommands/dump.py:8'),
-    ('egress', 'egress', 'MISSING', 'none', 'No egress proxy family.', 'hermes_cli/subcommands/egress.py:6'),
-    ('fallback', 'frontier', 'PARTIAL', 'qubit frontier', 'Ordered frontier fallback, not the hermes fallback surface.', 'hermes_cli/subcommands/fallback.py:6'),
-    ('gateway', 'gateway', 'IMPLEMENTED', 'qubit gateway', 'Gateway records/run; process supervision gated.', 'hermes_cli/subcommands/gateway.py:28'),
-    ('gui', 'gui', 'MISSING', 'qubit gui (confirm-gated)', 'Fork-backed desktop GUI build/launch; confirm-gated.', 'hermes_cli/subcommands/gui.py:8'),
-    ('hooks', 'hooks', 'IMPLEMENTED', 'qubit hooks list', 'Hooks list/declare surface.', 'hermes_cli/subcommands/hooks.py:8'),
-    ('import', 'import-state', 'IMPLEMENTED', 'qubit import-state', 'State import.', 'hermes_cli/subcommands/import_cmd.py:8'),
-    ('import-agent', 'import-agent', 'IMPLEMENTED', 'qubit import-agent inspect', 'Reviewed import inspection.', 'hermes_cli/subcommands/import_agent.py:10'),
-    ('insights', 'actions', 'PARTIAL', 'qubit actions/reports (partial)', 'No insights family; analytics is dashboard-only.', 'hermes_cli/subcommands/insights.py:8'),
-    ('journey', 'lessons', 'PARTIAL', 'qubit lessons (partial)', 'No journey graph command; LearningLedger via lessons.', 'hermes_cli/subcommands/journey.py:8'),
-    ('kanban', 'kanban', 'IMPLEMENTED', 'qubit kanban *', 'Full kanban board/card family.', 'hermes_cli/kanban.py:430'),
-    ('learning', 'lessons', 'PARTIAL', 'qubit lessons', 'LearningLedger exposed via lessons, not the hermes learning parser.', 'hermes_cli/main.py:2595'),
-    ('login', 'auth', 'IMPLEMENTED', 'qubit auth login', 'Manual-handoff guided enrollment.', 'hermes_cli/subcommands/login.py:8'),
-    ('logout', 'auth', 'IMPLEMENTED', 'qubit auth logout', 'Logout.', 'hermes_cli/subcommands/logout.py:8'),
-    ('logs', 'logs', 'MISSING', 'qubit logs', 'Top-level logs command present in the live parser tree.', 'hermes_cli/subcommands/logs.py:9'),
-    ('lsp', 'lsp', 'IMPLEMENTED', 'qubit lsp', 'LSP surface.', 'hermes_cli/main.py:2595'),
-    ('mcp', 'mcp', 'GATED', 'qubit mcp status', 'Qubit inventories MCP servers but never mounts; 1 of 14 subcommands.', 'hermes_cli/subcommands/mcp.py:11'),
-    ('memory', 'memory', 'PARTIAL', 'qubit memory search / brain', 'Search/status only; no full memory family.', 'hermes_cli/subcommands/memory.py:10'),
-    ('memory-graph', 'memory-graph', 'MISSING', 'qubit memory-graph (read-only list; writes need --confirm)', 'Fork-backed family; list forwards, edit/delete require --confirm.', 'hermes_cli/main.py:2595'),
-    ('migrate', 'product', 'IMPLEMENTED', 'qubit product migrate', 'Product migration.', 'hermes_cli/subcommands/migrate.py:6'),
-    ('moa', 'moa', 'MISSING', 'qubit moa (read-only list; configure/delete need --confirm)', 'Fork-backed MoA family; reads forward, writes require --confirm.', 'hermes_cli/subcommands/moa.py:6'),
-    ('model', 'profile', 'PARTIAL', 'qubit profile select / frontier', 'No direct model-switch command.', 'hermes_cli/subcommands/model.py:8'),
-    ('monitoring', 'monitor', 'PARTIAL', 'qubit monitor', 'Monitor exists, not the full monitoring surface.', 'hermes_cli/subcommands/monitoring.py:8'),
-    ('pairing', 'pairing', 'IMPLEMENTED', 'qubit pairing *', 'Pairing list/create/approve/revoke.', 'hermes_cli/subcommands/pairing.py:8'),
-    ('pause', 'pause', 'IMPLEMENTED', 'qubit pause --confirm', 'Qubit-owned ONE emergency stop via the shared PowerControl latch; no second fork ESTOP sentinel (bare `qubit pause` is a typed refusal).', 'hermes_cli/subcommands/pause.py:42'),
-    ('peer', 'peer', 'IMPLEMENTED', 'qubit peer *', 'Peer list/dm/run.', 'hermes_cli/subcommands/peer.py:383'),
-    ('pets', 'theme', 'PARTIAL', 'qubit theme (pets refusal)', 'No pets family; downloads refused.', 'hermes_cli/subcommands/pets.py:8'),
-    ('plugins', 'plugins', 'PARTIAL', 'qubit plugins *', 'Qubit plugin registry differs from hermes plugin packs.', 'hermes_cli/subcommands/plugins.py:10'),
-    ('portal', 'portal', 'MISSING', 'qubit portal (confirm-gated; operator-only)', 'Fork-backed portal; operator-only, confirm-gated.', 'hermes_cli/portal_cli.py:167'),
-    ('profile', 'profile', 'IMPLEMENTED', 'qubit profile * / brain *', 'Profiles family.', 'hermes_cli/subcommands/profile.py:8'),
-    ('project', 'project', 'IMPLEMENTED', 'qubit project *', 'Projects family.', 'hermes_cli/projects_cmd.py:12'),
-    ('prompt-size', 'prompt-size', 'MISSING', 'qubit prompt-size (read-only)', 'Fork-backed offline prompt/tool-schema byte report.', 'hermes_cli/subcommands/prompt_size.py:10'),
-    ('proxy', 'proxy', 'IMPLEMENTED', 'qubit proxy', 'Proxy command.', 'hermes_cli/proxy_cli.py:66'),
-    ('resume', 'sessions', 'PARTIAL', 'none', 'No top-level resume; sessions resume exists under sessions.', 'hermes_cli/main.py:2595'),
-    ('secrets', 'brain', 'PARTIAL', 'qubit brain vault', 'Vault references via brain; not the secrets parser surface.', 'hermes_cli/subcommands/secrets.py:6'),
-    ('security', 'setup', 'PARTIAL', 'qubit setup audit', 'Setup audit; not the full security family.', 'hermes_cli/subcommands/security.py:10'),
-    ('send', 'msg', 'PARTIAL', 'qubit msg send', 'Messaging send via msg family.', 'hermes_cli/send_cmd.py:251'),
-    ('serve', 'webui', 'PARTIAL', 'qubit webui / gateway run', 'Webui/gateway instead of hermes serve.', 'hermes_cli/subcommands/dashboard.py:62'),
-    ('sessions', 'sessions', 'GATED', 'qubit sessions list', '1 of 19; receipts are append-only (prune/import/rename gated).', 'hermes_cli/subcommands/sessions.py:15'),
-    ('setup', 'setup', 'IMPLEMENTED', 'qubit setup *', 'Setup family.', 'hermes_cli/subcommands/setup.py:8'),
-    ('skills', 'skills', 'GATED', 'qubit skills / verified-skills', 'Local reviewed installs; remote hub fetch/publish refused.', 'hermes_cli/subcommands/skills.py:20'),
-    ('skin', 'theme', 'IMPLEMENTED', 'qubit theme', 'Theme/skin.', 'hermes_cli/subcommands/skin.py:8'),
-    ('slack', 'msg', 'PARTIAL', 'qubit msg', 'Slack covered under msg family, not a slack parser.', 'hermes_cli/subcommands/slack.py:8'),
-    ('status', 'status', 'IMPLEMENTED', 'qubit status', 'Status.', 'hermes_cli/subcommands/status.py:8'),
-    ('sync', 'sync', 'IMPLEMENTED', 'qubit sync list|revoke', 'Sync family.', 'hermes_cli/subcommands/sync.py:15'),
-    ('tools', 'tools', 'MISSING', 'qubit tools (read-only list; writes need --confirm)', 'Fork-backed tools family; list forwards, writes require --confirm.', 'hermes_cli/subcommands/tools.py:8'),
-    ('uninstall', 'product', 'PARTIAL', 'qubit product uninstall / package', 'Product/package uninstall, not the hermes uninstall surface.', 'hermes_cli/subcommands/uninstall.py:10'),
-    ('update', 'product', 'PARTIAL', 'qubit product upgrade', 'Versioned staged upgrade, not in-place self-update.', 'hermes_cli/subcommands/update.py:8'),
-    ('verify', 'verify', 'IMPLEMENTED', 'qubit verify / verify-release', 'Verification.', 'hermes_cli/subcommands/verify.py:19'),
-    ('webhook', 'webhook', 'IMPLEMENTED', 'qubit webhook *', 'Webhook family.', 'hermes_cli/subcommands/webhook.py:8'),
-    ('whatsapp', 'msg', 'PARTIAL', 'qubit msg', 'WhatsApp under msg; onboarding gated.', 'hermes_cli/subcommands/whatsapp.py:8'),
-    ('whatsapp-cloud', 'msg', 'PARTIAL', 'qubit msg', 'WhatsApp Cloud under msg; onboarding gated.', 'hermes_cli/subcommands/whatsapp.py:16'),
-    ('worktree', 'worktree', 'IMPLEMENTED', 'qubit worktree (add/remove/switch confined git ops need --confirm; fork list/prune forwarded)', 'Qubit-native confined git-worktree lifecycle plus the fork read/prune surface.', 'hermes_cli/subcommands/worktree.py:6'),
+    ('acp', 'acp', 'IMPLEMENTED', 'qubit acp', 'Agent Client Protocol client/server commands.', 'qubit_cli/subcommands/acp.py:10'),
+    ('approvals', 'approvals', 'IMPLEMENTED', 'qubit approvals', 'Approval journal list/approve/test.', 'qubit_cli/subcommands/approvals.py:11'),
+    ('auth', 'auth', 'IMPLEMENTED', 'qubit auth status|login|verify|logout', 'Manual-handoff enrollment; token dance refused.', 'qubit_cli/subcommands/auth.py:8'),
+    ('backup', 'setup', 'PARTIAL', 'qubit export-state / setup backup', 'Passphrase-sealed bundles; no plain backup family.', 'qubit_cli/subcommands/backup.py:8'),
+    ('browser', 'browser', 'IMPLEMENTED', 'qubit browser *', 'Browser tab/read/navigate surface.', 'qubit_cli/subcommands/browser.py:8'),
+    ('bundles', 'bundles', 'MISSING', 'qubit bundles (read-only list/show; writes need --confirm)', 'Fork-backed family; read-only list/show forward verbatim, writes require --confirm.', 'qubit_cli/subcommands/bundles.py:6'),
+    ('chat', 'run', 'PARTIAL', 'qubit run/task/voice', 'No interactive chat CLI; voice/run agent entrypoints instead.', 'qubit_cli/_parser.py:189'),
+    ('checkpoints', 'checkpoints', 'IMPLEMENTED', 'qubit checkpoints list|write', 'Checkpoint store commands.', 'qubit_cli/subcommands/checkpoints.py:6'),
+    ('claw', 'claw', 'MISSING', 'qubit claw (confirm-gated)', 'Fork-backed migration family; mutating subcommands require --confirm.', 'qubit_cli/subcommands/claw.py:10'),
+    ('completion', 'completion', 'IMPLEMENTED', 'qubit completion', 'Shell completion generation.', 'qubit_cli/subcommands/completion.py:8'),
+    ('computer-use', 'computer-use', 'IMPLEMENTED', 'qubit computer-use status', 'Status only; grants are dashboard-gated.', 'qubit_cli/subcommands/computer_use.py:116'),
+    ('config', 'flags', 'PARTIAL', 'qubit flags / capability', 'No top-level config get/set/edit family.', 'qubit_cli/subcommands/config.py:10'),
+    ('console', 'console', 'MISSING', 'qubit console (confirm-gated REPL)', 'Fork-backed console REPL; confirm-gated interactive surface.', 'qubit_cli/subcommands/console.py:8'),
+    ('cron', 'schedules', 'PARTIAL', 'qubit schedules *', '8 of 17 subcommands; incidents/history/doctor/tick missing.', 'qubit_cli/subcommands/cron.py:14'),
+    ('curator', 'lessons', 'PARTIAL', 'qubit lessons', 'On-demand curation only; no background daemon.', 'qubit_cli/subcommands/curator.py:8'),
+    ('dashboard', 'webui', 'PARTIAL', 'qubit webui', 'Qubit webui/gateway instead of hermes dashboard.', 'qubit_cli/subcommands/dashboard.py:76'),
+    ('debug', 'debug', 'MISSING', 'qubit debug (confirm-gated share/delete)', 'Fork-backed debug family; share/delete require --confirm.', 'qubit_cli/subcommands/debug.py:9'),
+    ('desktop', 'desktop', 'MISSING', 'qubit desktop (confirm-gated)', 'Fork-backed desktop build/launch; confirm-gated.', 'qubit_cli/subcommands/gui.py:8'),
+    ('doctor', 'setup', 'PARTIAL', 'qubit setup diagnose / doctor', 'Setup health exists; not the full Hermes doctor family.', 'qubit_cli/subcommands/doctor.py:8'),
+    ('dump', 'dump', 'MISSING', 'qubit dump (read-only)', 'Fork-backed redacted support dump; read-only, forwards verbatim.', 'qubit_cli/subcommands/dump.py:8'),
+    ('egress', 'egress', 'MISSING', 'none', 'No egress proxy family.', 'qubit_cli/subcommands/egress.py:6'),
+    ('fallback', 'frontier', 'PARTIAL', 'qubit frontier', 'Ordered frontier fallback, not the hermes fallback surface.', 'qubit_cli/subcommands/fallback.py:6'),
+    ('gateway', 'gateway', 'IMPLEMENTED', 'qubit gateway', 'Gateway records/run; process supervision gated.', 'qubit_cli/subcommands/gateway.py:28'),
+    ('gui', 'gui', 'MISSING', 'qubit gui (confirm-gated)', 'Fork-backed desktop GUI build/launch; confirm-gated.', 'qubit_cli/subcommands/gui.py:8'),
+    ('hooks', 'hooks', 'IMPLEMENTED', 'qubit hooks list', 'Hooks list/declare surface.', 'qubit_cli/subcommands/hooks.py:8'),
+    ('import', 'import-state', 'IMPLEMENTED', 'qubit import-state', 'State import.', 'qubit_cli/subcommands/import_cmd.py:8'),
+    ('import-agent', 'import-agent', 'IMPLEMENTED', 'qubit import-agent inspect', 'Reviewed import inspection.', 'qubit_cli/subcommands/import_agent.py:10'),
+    ('insights', 'actions', 'PARTIAL', 'qubit actions/reports (partial)', 'No insights family; analytics is dashboard-only.', 'qubit_cli/subcommands/insights.py:8'),
+    ('journey', 'lessons', 'PARTIAL', 'qubit lessons (partial)', 'No journey graph command; LearningLedger via lessons.', 'qubit_cli/subcommands/journey.py:8'),
+    ('kanban', 'kanban', 'IMPLEMENTED', 'qubit kanban *', 'Full kanban board/card family.', 'qubit_cli/kanban.py:430'),
+    ('learning', 'lessons', 'PARTIAL', 'qubit lessons', 'LearningLedger exposed via lessons, not the hermes learning parser.', 'qubit_cli/main.py:2595'),
+    ('login', 'auth', 'IMPLEMENTED', 'qubit auth login', 'Manual-handoff guided enrollment.', 'qubit_cli/subcommands/login.py:8'),
+    ('logout', 'auth', 'IMPLEMENTED', 'qubit auth logout', 'Logout.', 'qubit_cli/subcommands/logout.py:8'),
+    ('logs', 'logs', 'MISSING', 'qubit logs', 'Top-level logs command present in the live parser tree.', 'qubit_cli/subcommands/logs.py:9'),
+    ('lsp', 'lsp', 'IMPLEMENTED', 'qubit lsp', 'LSP surface.', 'qubit_cli/main.py:2595'),
+    ('mcp', 'mcp', 'GATED', 'qubit mcp status', 'Qubit inventories MCP servers but never mounts; 1 of 14 subcommands.', 'qubit_cli/subcommands/mcp.py:11'),
+    ('memory', 'memory', 'PARTIAL', 'qubit memory search / brain', 'Search/status only; no full memory family.', 'qubit_cli/subcommands/memory.py:10'),
+    ('memory-graph', 'memory-graph', 'MISSING', 'qubit memory-graph (read-only list; writes need --confirm)', 'Fork-backed family; list forwards, edit/delete require --confirm.', 'qubit_cli/main.py:2595'),
+    ('migrate', 'product', 'IMPLEMENTED', 'qubit product migrate', 'Product migration.', 'qubit_cli/subcommands/migrate.py:6'),
+    ('moa', 'moa', 'MISSING', 'qubit moa (read-only list; configure/delete need --confirm)', 'Fork-backed MoA family; reads forward, writes require --confirm.', 'qubit_cli/subcommands/moa.py:6'),
+    ('model', 'profile', 'PARTIAL', 'qubit profile select / frontier', 'No direct model-switch command.', 'qubit_cli/subcommands/model.py:8'),
+    ('monitoring', 'monitor', 'PARTIAL', 'qubit monitor', 'Monitor exists, not the full monitoring surface.', 'qubit_cli/subcommands/monitoring.py:8'),
+    ('pairing', 'pairing', 'IMPLEMENTED', 'qubit pairing *', 'Pairing list/create/approve/revoke.', 'qubit_cli/subcommands/pairing.py:8'),
+    ('pause', 'pause', 'IMPLEMENTED', 'qubit pause --confirm', 'Qubit-owned ONE emergency stop via the shared PowerControl latch; no second fork ESTOP sentinel (bare `qubit pause` is a typed refusal).', 'qubit_cli/subcommands/pause.py:42'),
+    ('peer', 'peer', 'IMPLEMENTED', 'qubit peer *', 'Peer list/dm/run.', 'qubit_cli/subcommands/peer.py:383'),
+    ('pets', 'theme', 'PARTIAL', 'qubit theme (pets refusal)', 'No pets family; downloads refused.', 'qubit_cli/subcommands/pets.py:8'),
+    ('plugins', 'plugins', 'PARTIAL', 'qubit plugins *', 'Qubit plugin registry differs from hermes plugin packs.', 'qubit_cli/subcommands/plugins.py:10'),
+    ('portal', 'portal', 'MISSING', 'qubit portal (confirm-gated; operator-only)', 'Fork-backed portal; operator-only, confirm-gated.', 'qubit_cli/portal_cli.py:167'),
+    ('profile', 'profile', 'IMPLEMENTED', 'qubit profile * / brain *', 'Profiles family.', 'qubit_cli/subcommands/profile.py:8'),
+    ('project', 'project', 'IMPLEMENTED', 'qubit project *', 'Projects family.', 'qubit_cli/projects_cmd.py:12'),
+    ('prompt-size', 'prompt-size', 'MISSING', 'qubit prompt-size (read-only)', 'Fork-backed offline prompt/tool-schema byte report.', 'qubit_cli/subcommands/prompt_size.py:10'),
+    ('proxy', 'proxy', 'IMPLEMENTED', 'qubit proxy', 'Proxy command.', 'qubit_cli/proxy_cli.py:66'),
+    ('resume', 'sessions', 'PARTIAL', 'none', 'No top-level resume; sessions resume exists under sessions.', 'qubit_cli/main.py:2595'),
+    ('secrets', 'brain', 'PARTIAL', 'qubit brain vault', 'Vault references via brain; not the secrets parser surface.', 'qubit_cli/subcommands/secrets.py:6'),
+    ('security', 'setup', 'PARTIAL', 'qubit setup audit', 'Setup audit; not the full security family.', 'qubit_cli/subcommands/security.py:10'),
+    ('send', 'msg', 'PARTIAL', 'qubit msg send', 'Messaging send via msg family.', 'qubit_cli/send_cmd.py:251'),
+    ('serve', 'webui', 'PARTIAL', 'qubit webui / gateway run', 'Webui/gateway instead of hermes serve.', 'qubit_cli/subcommands/dashboard.py:62'),
+    ('sessions', 'sessions', 'GATED', 'qubit sessions list', '1 of 19; receipts are append-only (prune/import/rename gated).', 'qubit_cli/subcommands/sessions.py:15'),
+    ('setup', 'setup', 'IMPLEMENTED', 'qubit setup *', 'Setup family.', 'qubit_cli/subcommands/setup.py:8'),
+    ('skills', 'skills', 'GATED', 'qubit skills / verified-skills', 'Local reviewed installs; remote hub fetch/publish refused.', 'qubit_cli/subcommands/skills.py:20'),
+    ('skin', 'theme', 'IMPLEMENTED', 'qubit theme', 'Theme/skin.', 'qubit_cli/subcommands/skin.py:8'),
+    ('slack', 'msg', 'PARTIAL', 'qubit msg', 'Slack covered under msg family, not a slack parser.', 'qubit_cli/subcommands/slack.py:8'),
+    ('status', 'status', 'IMPLEMENTED', 'qubit status', 'Status.', 'qubit_cli/subcommands/status.py:8'),
+    ('sync', 'sync', 'IMPLEMENTED', 'qubit sync list|revoke', 'Sync family.', 'qubit_cli/subcommands/sync.py:15'),
+    ('tools', 'tools', 'MISSING', 'qubit tools (read-only list; writes need --confirm)', 'Fork-backed tools family; list forwards, writes require --confirm.', 'qubit_cli/subcommands/tools.py:8'),
+    ('uninstall', 'product', 'PARTIAL', 'qubit product uninstall / package', 'Product/package uninstall, not the hermes uninstall surface.', 'qubit_cli/subcommands/uninstall.py:10'),
+    ('update', 'product', 'PARTIAL', 'qubit product upgrade', 'Versioned staged upgrade, not in-place self-update.', 'qubit_cli/subcommands/update.py:8'),
+    ('verify', 'verify', 'IMPLEMENTED', 'qubit verify / verify-release', 'Verification.', 'qubit_cli/subcommands/verify.py:19'),
+    ('webhook', 'webhook', 'IMPLEMENTED', 'qubit webhook *', 'Webhook family.', 'qubit_cli/subcommands/webhook.py:8'),
+    ('whatsapp', 'msg', 'PARTIAL', 'qubit msg', 'WhatsApp under msg; onboarding gated.', 'qubit_cli/subcommands/whatsapp.py:8'),
+    ('whatsapp-cloud', 'msg', 'PARTIAL', 'qubit msg', 'WhatsApp Cloud under msg; onboarding gated.', 'qubit_cli/subcommands/whatsapp.py:16'),
+    ('worktree', 'worktree', 'IMPLEMENTED', 'qubit worktree (add/remove/switch confined git ops need --confirm; fork list/prune forwarded)', 'Qubit-native confined git-worktree lifecycle plus the fork read/prune surface.', 'qubit_cli/subcommands/worktree.py:6'),
 ]
 
 # (upstream_fam, sub, qfam, qsub, surface, qubit_backend, upstream_ref)
 SUBS = [
-    ('sessions', 'list', 'sessions', 'list', 'IMPLEMENTED', 'qubit sessions list', 'hermes_cli/subcommands/sessions.py:22'),
-    ('sessions', 'export', 'sessions', 'export', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py:15'),
-    ('sessions', 'delete', 'sessions', 'delete', 'GATED', 'qubit sessions (append-only)', 'hermes_cli/subcommands/sessions.py:100'),
-    ('sessions', 'prune', 'sessions', 'prune', 'GATED', 'qubit sessions (append-only)', 'hermes_cli/subcommands/sessions.py:15'),
-    ('sessions', 'stats', 'sessions', 'stats', 'IMPLEMENTED', 'qubit sessions stats', 'hermes_cli/subcommands/sessions.py:208'),
-    ('sessions', 'rename', 'sessions', 'rename', 'GATED', 'qubit sessions (append-only)', 'hermes_cli/subcommands/sessions.py:15'),
-    ('sessions', 'pin', 'sessions', 'pin', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py:229'),
-    ('sessions', 'optimize-storage', 'sessions', 'optimize-storage', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py:144'),
-    ('sessions', 'clean-markers', 'sessions', 'clean-markers', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py:129'),
-    ('mcp', 'add', 'mcp', 'add', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:27'),
-    ('mcp', 'remove', 'mcp', 'remove', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:44'),
-    ('mcp', 'test', 'mcp', 'test', 'GATED', 'qubit mcp test (MCP_NO_MOUNT; never mounts)', 'hermes_cli/subcommands/mcp.py:49'),
-    ('mcp', 'configure', 'mcp', 'configure', 'GATED', 'qubit mcp (inventory only)', 'hermes_cli/subcommands/mcp.py:52'),
-    ('mcp', 'catalog', 'mcp', 'catalog', 'GATED', 'qubit mcp catalog (MCP_NO_MOUNT; empty/refusal)', 'hermes_cli/subcommands/mcp.py:73'),
-    ('config', 'show', 'flags', 'show', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:17'),
-    ('config', 'edit', 'flags', 'edit', 'MISSING', 'qubit flags edit (confirm-gated)', 'hermes_cli/subcommands/config.py:18'),
-    ('config', 'get', 'flags', 'get', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:20'),
-    ('config', 'set', 'flags', 'set', 'GATED', 'qubit config profiles (staged)', 'hermes_cli/subcommands/config.py:24'),
-    ('config', 'unset', 'flags', None, 'GATED', 'qubit config profiles (staged)', 'hermes_cli/subcommands/config.py:33'),
-    ('config', 'path', 'flags', 'path', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:36'),
-    ('config', 'env-path', 'flags', 'env-path', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:37'),
-    ('config', 'check', 'flags', 'check', 'MISSING', 'none', 'hermes_cli/subcommands/config.py:38'),
-    ('config', 'migrate', 'product', 'migrate', 'IMPLEMENTED', 'qubit product migrate', 'hermes_cli/subcommands/config.py:39'),
-    ('plugins', 'enable', 'plugins', 'enable', 'PARTIAL', 'qubit plugins enable', 'hermes_cli/subcommands/plugins.py:72'),
-    ('plugins', 'install', 'plugins', 'install', 'GATED', 'qubit plugins (remote refused)', 'hermes_cli/console_engine.py:281'),
-    ('plugins', 'update', 'plugins', 'update', 'GATED', 'qubit plugins (remote refused)', 'hermes_cli/console_engine.py:281'),
-    ('plugins', 'remove', 'plugins', 'remove', 'PARTIAL', 'qubit plugins remove', 'hermes_cli/console_engine.py:281'),
-    ('plugins', 'capabilities', 'plugins', 'capabilities', 'MISSING', 'none', 'hermes_cli/console_engine.py:281'),
-    ('plugins', 'doctor', 'plugins', 'doctor', 'PARTIAL', 'qubit plugins doctor', 'hermes_cli/console_engine.py:281'),
-    ('cron', 'list', 'schedules', 'list', 'IMPLEMENTED', 'qubit schedules list', 'hermes_cli/subcommands/cron.py:20'),
-    ('cron', 'edit', 'schedules', 'edit', 'PARTIAL', 'qubit schedules (create/pause/resume/delete)', 'hermes_cli/subcommands/cron.py:88'),
-    ('cron', 'pause', 'schedules', 'pause', 'IMPLEMENTED', 'qubit schedules pause', 'hermes_cli/subcommands/cron.py:141'),
-    ('cron', 'resume', 'schedules', 'resume', 'IMPLEMENTED', 'qubit schedules resume', 'hermes_cli/subcommands/cron.py:144'),
-    ('cron', 'run', 'schedules', 'run', 'PARTIAL', 'qubit schedules run-due', 'hermes_cli/subcommands/cron.py:149'),
-    ('cron', 'status', 'schedules', 'status', 'PARTIAL', 'qubit schedules show', 'hermes_cli/subcommands/cron.py:157'),
-    ('cron', 'doctor', 'schedules', 'doctor', 'MISSING', 'none', 'hermes_cli/subcommands/cron.py:184'),
-    ('cron', 'tick', 'schedules', 'tick', 'MISSING', 'none', 'hermes_cli/subcommands/cron.py:186'),
-    ('skills', 'install', 'skills', 'install', 'GATED', 'qubit skills install (local manifest only)', 'hermes_cli/subcommands/skills.py:54'),
-    ('skills', 'update', 'skills', 'update', 'GATED', 'qubit skills (remote refused)', 'hermes_cli/subcommands/skills.py:79'),
-    ('skills', 'audit', 'skills', 'audit', 'GATED', 'qubit verified-skills (curated)', 'hermes_cli/subcommands/skills.py:85'),
-    ('skills', 'publish', 'skills', 'publish', 'GATED', 'qubit verified-skills submit', 'hermes_cli/subcommands/skills.py:148'),
-    ('skills', 'tap', 'skills', 'tap', 'GATED', 'qubit skills (remote refused)', 'hermes_cli/subcommands/skills.py:165'),
-    ('tools', 'disable', 'tools', 'disable', 'MISSING', 'qubit tools disable (confirm-gated)', 'hermes_cli/subcommands/tools.py:25'),
-    ('tools', 'enable', 'tools', 'enable', 'MISSING', 'qubit tools enable (confirm-gated)', 'hermes_cli/subcommands/tools.py:32'),
-    ('tools', 'list', 'tools', 'list', 'MISSING', 'qubit tools list (read-only)', 'hermes_cli/console_engine.py:278'),
-    ('tools', 'post-setup', 'tools', 'post-setup', 'MISSING', 'qubit tools post-setup (confirm-gated)', 'hermes_cli/console_engine.py:278'),
-    ('worktree', 'list', 'worktree', 'list', 'MISSING', 'qubit worktree list (read-only)', 'hermes_cli/subcommands/worktree.py:6'),
-    ('worktree', 'add', 'worktree', 'add', 'IMPLEMENTED', 'qubit worktree add (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
-    ('worktree', 'remove', 'worktree', 'remove', 'IMPLEMENTED', 'qubit worktree remove (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
-    ('worktree', 'switch', 'worktree', 'switch', 'IMPLEMENTED', 'qubit worktree switch (confined, needs --confirm)', 'hermes_cli/subcommands/worktree.py:6'),
+    ('sessions', 'list', 'sessions', 'list', 'IMPLEMENTED', 'qubit sessions list', 'qubit_cli/subcommands/sessions.py:22'),
+    ('sessions', 'export', 'sessions', 'export', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py:15'),
+    ('sessions', 'delete', 'sessions', 'delete', 'GATED', 'qubit sessions (append-only)', 'qubit_cli/subcommands/sessions.py:100'),
+    ('sessions', 'prune', 'sessions', 'prune', 'GATED', 'qubit sessions (append-only)', 'qubit_cli/subcommands/sessions.py:15'),
+    ('sessions', 'stats', 'sessions', 'stats', 'IMPLEMENTED', 'qubit sessions stats', 'qubit_cli/subcommands/sessions.py:208'),
+    ('sessions', 'rename', 'sessions', 'rename', 'GATED', 'qubit sessions (append-only)', 'qubit_cli/subcommands/sessions.py:15'),
+    ('sessions', 'pin', 'sessions', 'pin', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py:229'),
+    ('sessions', 'optimize-storage', 'sessions', 'optimize-storage', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py:144'),
+    ('sessions', 'clean-markers', 'sessions', 'clean-markers', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py:129'),
+    ('mcp', 'add', 'mcp', 'add', 'GATED', 'qubit mcp (inventory only)', 'qubit_cli/subcommands/mcp.py:27'),
+    ('mcp', 'remove', 'mcp', 'remove', 'GATED', 'qubit mcp (inventory only)', 'qubit_cli/subcommands/mcp.py:44'),
+    ('mcp', 'test', 'mcp', 'test', 'GATED', 'qubit mcp test (MCP_NO_MOUNT; never mounts)', 'qubit_cli/subcommands/mcp.py:49'),
+    ('mcp', 'configure', 'mcp', 'configure', 'GATED', 'qubit mcp (inventory only)', 'qubit_cli/subcommands/mcp.py:52'),
+    ('mcp', 'catalog', 'mcp', 'catalog', 'GATED', 'qubit mcp catalog (MCP_NO_MOUNT; empty/refusal)', 'qubit_cli/subcommands/mcp.py:73'),
+    ('config', 'show', 'flags', 'show', 'MISSING', 'none', 'qubit_cli/subcommands/config.py:17'),
+    ('config', 'edit', 'flags', 'edit', 'MISSING', 'qubit flags edit (confirm-gated)', 'qubit_cli/subcommands/config.py:18'),
+    ('config', 'get', 'flags', 'get', 'MISSING', 'none', 'qubit_cli/subcommands/config.py:20'),
+    ('config', 'set', 'flags', 'set', 'GATED', 'qubit config profiles (staged)', 'qubit_cli/subcommands/config.py:24'),
+    ('config', 'unset', 'flags', None, 'GATED', 'qubit config profiles (staged)', 'qubit_cli/subcommands/config.py:33'),
+    ('config', 'path', 'flags', 'path', 'MISSING', 'none', 'qubit_cli/subcommands/config.py:36'),
+    ('config', 'env-path', 'flags', 'env-path', 'MISSING', 'none', 'qubit_cli/subcommands/config.py:37'),
+    ('config', 'check', 'flags', 'check', 'MISSING', 'none', 'qubit_cli/subcommands/config.py:38'),
+    ('config', 'migrate', 'product', 'migrate', 'IMPLEMENTED', 'qubit product migrate', 'qubit_cli/subcommands/config.py:39'),
+    ('plugins', 'enable', 'plugins', 'enable', 'PARTIAL', 'qubit plugins enable', 'qubit_cli/subcommands/plugins.py:72'),
+    ('plugins', 'install', 'plugins', 'install', 'GATED', 'qubit plugins (remote refused)', 'qubit_cli/console_engine.py:281'),
+    ('plugins', 'update', 'plugins', 'update', 'GATED', 'qubit plugins (remote refused)', 'qubit_cli/console_engine.py:281'),
+    ('plugins', 'remove', 'plugins', 'remove', 'PARTIAL', 'qubit plugins remove', 'qubit_cli/console_engine.py:281'),
+    ('plugins', 'capabilities', 'plugins', 'capabilities', 'MISSING', 'none', 'qubit_cli/console_engine.py:281'),
+    ('plugins', 'doctor', 'plugins', 'doctor', 'PARTIAL', 'qubit plugins doctor', 'qubit_cli/console_engine.py:281'),
+    ('cron', 'list', 'schedules', 'list', 'IMPLEMENTED', 'qubit schedules list', 'qubit_cli/subcommands/cron.py:20'),
+    ('cron', 'edit', 'schedules', 'edit', 'PARTIAL', 'qubit schedules (create/pause/resume/delete)', 'qubit_cli/subcommands/cron.py:88'),
+    ('cron', 'pause', 'schedules', 'pause', 'IMPLEMENTED', 'qubit schedules pause', 'qubit_cli/subcommands/cron.py:141'),
+    ('cron', 'resume', 'schedules', 'resume', 'IMPLEMENTED', 'qubit schedules resume', 'qubit_cli/subcommands/cron.py:144'),
+    ('cron', 'run', 'schedules', 'run', 'PARTIAL', 'qubit schedules run-due', 'qubit_cli/subcommands/cron.py:149'),
+    ('cron', 'status', 'schedules', 'status', 'PARTIAL', 'qubit schedules show', 'qubit_cli/subcommands/cron.py:157'),
+    ('cron', 'doctor', 'schedules', 'doctor', 'MISSING', 'none', 'qubit_cli/subcommands/cron.py:184'),
+    ('cron', 'tick', 'schedules', 'tick', 'MISSING', 'none', 'qubit_cli/subcommands/cron.py:186'),
+    ('skills', 'install', 'skills', 'install', 'GATED', 'qubit skills install (local manifest only)', 'qubit_cli/subcommands/skills.py:54'),
+    ('skills', 'update', 'skills', 'update', 'GATED', 'qubit skills (remote refused)', 'qubit_cli/subcommands/skills.py:79'),
+    ('skills', 'audit', 'skills', 'audit', 'GATED', 'qubit verified-skills (curated)', 'qubit_cli/subcommands/skills.py:85'),
+    ('skills', 'publish', 'skills', 'publish', 'GATED', 'qubit verified-skills submit', 'qubit_cli/subcommands/skills.py:148'),
+    ('skills', 'tap', 'skills', 'tap', 'GATED', 'qubit skills (remote refused)', 'qubit_cli/subcommands/skills.py:165'),
+    ('tools', 'disable', 'tools', 'disable', 'MISSING', 'qubit tools disable (confirm-gated)', 'qubit_cli/subcommands/tools.py:25'),
+    ('tools', 'enable', 'tools', 'enable', 'MISSING', 'qubit tools enable (confirm-gated)', 'qubit_cli/subcommands/tools.py:32'),
+    ('tools', 'list', 'tools', 'list', 'MISSING', 'qubit tools list (read-only)', 'qubit_cli/console_engine.py:278'),
+    ('tools', 'post-setup', 'tools', 'post-setup', 'MISSING', 'qubit tools post-setup (confirm-gated)', 'qubit_cli/console_engine.py:278'),
+    ('worktree', 'list', 'worktree', 'list', 'MISSING', 'qubit worktree list (read-only)', 'qubit_cli/subcommands/worktree.py:6'),
+    ('worktree', 'add', 'worktree', 'add', 'IMPLEMENTED', 'qubit worktree add (confined, needs --confirm)', 'qubit_cli/subcommands/worktree.py:6'),
+    ('worktree', 'remove', 'worktree', 'remove', 'IMPLEMENTED', 'qubit worktree remove (confined, needs --confirm)', 'qubit_cli/subcommands/worktree.py:6'),
+    ('worktree', 'switch', 'worktree', 'switch', 'IMPLEMENTED', 'qubit worktree switch (confined, needs --confirm)', 'qubit_cli/subcommands/worktree.py:6'),
     # Direct-source-inventory subcommands (agent A's inventory): native Qubit
     # equivalences derive IMPLEMENTED; surfaces with no Qubit equivalent stay
     # honest MISSING open rows -- never fabricated.
-    ('approvals', 'suggest', 'approvals', 'suggest', 'MISSING', 'none', 'hermes_cli/subcommands/approvals.py:11'),
-    ('approvals', 'test', 'approvals', 'test', 'MISSING', 'none', 'hermes_cli/subcommands/approvals.py:11'),
-    ('debug', 'share', 'debug', 'share', 'MISSING', 'qubit debug share (confirm-gated)', 'hermes_cli/subcommands/debug.py:9'),
-    ('debug', 'delete', 'debug', 'delete', 'MISSING', 'qubit debug delete (confirm-gated)', 'hermes_cli/subcommands/debug.py:9'),
-    ('gateway', 'uninstall', 'gateway', 'uninstall', 'MISSING', 'none', 'hermes_cli/subcommands/gateway.py:28'),
-    ('pairing', 'approve', 'pairing', 'approve', 'MISSING', 'qubit pairing approve', 'hermes_cli/subcommands/pairing.py:8'),
-    ('profile', 'update', 'profile', 'update', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py:8'),
-    ('skills', 'config', 'skills', 'config', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py:20'),
-    ('skills', 'uninstall', 'skills', 'remove', 'MISSING', 'qubit skills remove', 'hermes_cli/subcommands/skills.py:20'),
-    ('slack', 'manifest', 'msg', 'manifest', 'MISSING', 'none', 'hermes_cli/subcommands/slack.py:8'),
+    ('approvals', 'suggest', 'approvals', 'suggest', 'MISSING', 'none', 'qubit_cli/subcommands/approvals.py:11'),
+    ('approvals', 'test', 'approvals', 'test', 'MISSING', 'none', 'qubit_cli/subcommands/approvals.py:11'),
+    ('debug', 'share', 'debug', 'share', 'MISSING', 'qubit debug share (confirm-gated)', 'qubit_cli/subcommands/debug.py:9'),
+    ('debug', 'delete', 'debug', 'delete', 'MISSING', 'qubit debug delete (confirm-gated)', 'qubit_cli/subcommands/debug.py:9'),
+    ('gateway', 'uninstall', 'gateway', 'uninstall', 'MISSING', 'none', 'qubit_cli/subcommands/gateway.py:28'),
+    ('pairing', 'approve', 'pairing', 'approve', 'MISSING', 'qubit pairing approve', 'qubit_cli/subcommands/pairing.py:8'),
+    ('profile', 'update', 'profile', 'update', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py:8'),
+    ('skills', 'config', 'skills', 'config', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py:20'),
+    ('skills', 'uninstall', 'skills', 'remove', 'MISSING', 'qubit skills remove', 'qubit_cli/subcommands/skills.py:20'),
+    ('slack', 'manifest', 'msg', 'manifest', 'MISSING', 'none', 'qubit_cli/subcommands/slack.py:8'),
 ]
 
-# Wave 5 Hermes CLI closure (agent 1): the remaining distinct uncovered
+# Wave 5 upstream CLI closure (agent 1): the remaining distinct uncovered
 # upstream subcommands. Rows whose upstream subcommand has a real Qubit
 # implementation are IMPLEMENTED; rows routed through the fork (read-only
 # FORWARD_TABLE, mutating CONFIRM_TABLE, or a FAMILY_FORWARD read/confirm
@@ -1249,146 +1301,146 @@ SUBS = [
 # on-disk test, never a hand-flip. A genuinely absent/nested surface that the
 # Qubit parser cannot expose as a distinct subcommand is an honest GATED row.
 WAVE5_SUBS = [
-    ('auth', 'add', 'auth', 'add', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'list', 'auth', 'list', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'logout', 'auth', 'logout', 'IMPLEMENTED', 'qubit auth logout', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'priority', 'auth', 'priority', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'refresh', 'auth', 'refresh', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'remove', 'auth', 'remove', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'reset', 'auth', 'reset', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'spotify', 'auth', 'spotify', 'MISSING', 'none', 'hermes_cli/subcommands/auth.py'),
-    ('auth', 'status', 'auth', 'status', 'IMPLEMENTED', 'qubit auth status', 'hermes_cli/subcommands/auth.py'),
-    ('browser', 'close-profile', 'browser', 'close-profile', 'IMPLEMENTED', 'qubit browser close-profile', 'hermes_cli/subcommands/browser.py'),
-    ('claw', 'cleanup', 'claw', 'cleanup', 'MISSING', 'none', 'hermes_cli/subcommands/claw.py'),
-    ('claw', 'migrate', 'claw', 'migrate', 'MISSING', 'none', 'hermes_cli/subcommands/claw.py'),
-    ('computer-use', 'doctor', 'computer-use', 'doctor', 'IMPLEMENTED', 'qubit computer-use doctor', 'hermes_cli/subcommands/computer_use.py'),
-    ('computer-use', 'install', 'computer-use', 'install', 'GATED', 'qubit computer-use install', 'hermes_cli/subcommands/computer_use.py'),
-    ('computer-use', 'permissions', 'computer-use', 'permissions', 'IMPLEMENTED', 'qubit computer-use permissions', 'hermes_cli/subcommands/computer_use.py'),
-    ('computer-use', 'permissions grant', 'computer-use', 'permissions', 'GATED', 'qubit computer-use permissions', 'hermes_cli/subcommands/computer_use.py'),
-    ('computer-use', 'permissions status', 'computer-use', 'permissions', 'IMPLEMENTED', 'qubit computer-use permissions', 'hermes_cli/subcommands/computer_use.py'),
-    ('computer-use', 'status', 'computer-use', 'status', 'IMPLEMENTED', 'qubit computer-use status', 'hermes_cli/subcommands/computer_use.py'),
-    ('cron', 'create', 'schedules', 'create', 'IMPLEMENTED', 'qubit schedules create', 'hermes_cli/subcommands/cron.py'),
-    ('cron', 'incidents', 'schedules', 'incidents', 'MISSING', 'none', 'hermes_cli/subcommands/cron.py'),
-    ('cron', 'notepad', 'schedules', 'notepad', 'MISSING', 'none', 'hermes_cli/subcommands/cron.py'),
-    ('cron', 'remove', 'schedules', 'remove', 'MISSING', 'none', 'hermes_cli/subcommands/cron.py'),
-    ('cron', 'runs', 'schedules', 'runs', 'MISSING', 'none', 'hermes_cli/subcommands/cron.py'),
-    ('dashboard', 'register', 'webui', 'register', 'MISSING', 'none', 'hermes_cli/subcommands/dashboard.py'),
-    ('fallback', 'add', 'frontier', 'add', 'MISSING', 'none', 'hermes_cli/subcommands/fallback.py'),
-    ('fallback', 'clear', 'frontier', 'clear', 'MISSING', 'none', 'hermes_cli/subcommands/fallback.py'),
-    ('fallback', 'list', 'frontier', 'list', 'MISSING', 'none', 'hermes_cli/subcommands/fallback.py'),
-    ('fallback', 'remove', 'frontier', 'remove', 'MISSING', 'none', 'hermes_cli/subcommands/fallback.py'),
-    ('gateway', 'enroll', 'gateway', 'enroll', 'MISSING', 'none', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'install', 'gateway', 'install', 'GATED', 'qubit gateway install', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'list', 'gateway', 'list', 'IMPLEMENTED', 'qubit gateway list', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'migrate-legacy', 'gateway', 'migrate-legacy', 'MISSING', 'none', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'restart', 'gateway', 'restart', 'GATED', 'qubit gateway restart', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'run', 'gateway', 'run', 'GATED', 'qubit gateway run', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'setup', 'gateway', 'setup', 'MISSING', 'none', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'start', 'gateway', 'start', 'GATED', 'qubit gateway start', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'status', 'gateway', 'status', 'MISSING', 'none', 'hermes_cli/subcommands/gateway.py'),
-    ('gateway', 'stop', 'gateway', 'stop', 'GATED', 'qubit gateway stop', 'hermes_cli/subcommands/gateway.py'),
-    ('hooks', 'doctor', 'hooks', 'doctor', 'IMPLEMENTED', 'qubit hooks doctor', 'hermes_cli/subcommands/hooks.py'),
-    ('hooks', 'list', 'hooks', 'list', 'IMPLEMENTED', 'qubit hooks list', 'hermes_cli/subcommands/hooks.py'),
-    ('hooks', 'revoke', 'hooks', 'revoke', 'IMPLEMENTED', 'qubit hooks revoke', 'hermes_cli/subcommands/hooks.py'),
-    ('hooks', 'test', 'hooks', 'test', 'IMPLEMENTED', 'qubit hooks test', 'hermes_cli/subcommands/hooks.py'),
-    ('mcp', 'config', 'mcp', 'config', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'install', 'mcp', 'install', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'list', 'mcp', 'list', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'login', 'mcp', 'login', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'ls', 'mcp', 'ls', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'picker', 'mcp', 'picker', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'reauth', 'mcp', 'reauth', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'rm', 'mcp', 'rm', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('mcp', 'serve', 'mcp', 'serve', 'MISSING', 'none', 'hermes_cli/subcommands/mcp.py'),
-    ('memory', 'off', 'memory', 'off', 'MISSING', 'none', 'hermes_cli/subcommands/memory.py'),
-    ('memory', 'reset', 'memory', 'reset', 'MISSING', 'none', 'hermes_cli/subcommands/memory.py'),
-    ('memory', 'setup', 'memory', 'setup', 'MISSING', 'none', 'hermes_cli/subcommands/memory.py'),
-    ('memory', 'status', 'memory', 'status', 'IMPLEMENTED', 'qubit memory status', 'hermes_cli/subcommands/memory.py'),
-    ('migrate', 'xai', 'product', 'xai', 'MISSING', 'none', 'hermes_cli/subcommands/migrate.py'),
-    ('moa', 'configure', 'moa', 'configure', 'MISSING', 'none', 'hermes_cli/subcommands/moa.py'),
-    ('moa', 'delete', 'moa', 'delete', 'MISSING', 'none', 'hermes_cli/subcommands/moa.py'),
-    ('moa', 'list', 'moa', 'list', 'MISSING', 'none', 'hermes_cli/subcommands/moa.py'),
-    ('monitoring', 'status', 'monitor', 'status', 'MISSING', 'none', 'hermes_cli/subcommands/monitoring.py'),
-    ('pairing', 'clear-pending', 'pairing', 'clear-pending', 'MISSING', 'none', 'hermes_cli/subcommands/pairing.py'),
-    ('pairing', 'list', 'pairing', 'list', 'IMPLEMENTED', 'qubit pairing list', 'hermes_cli/subcommands/pairing.py'),
-    ('pairing', 'revoke', 'pairing', 'revoke', 'IMPLEMENTED', 'qubit pairing revoke', 'hermes_cli/subcommands/pairing.py'),
-    ('peer', 'add', 'peer', 'add', 'IMPLEMENTED', 'qubit peer add', 'hermes_cli/subcommands/peer.py'),
-    ('peer', 'list', 'peer', 'list', 'IMPLEMENTED', 'qubit peer list', 'hermes_cli/subcommands/peer.py'),
-    ('peer', 'remove', 'peer', 'remove', 'IMPLEMENTED', 'qubit peer remove', 'hermes_cli/subcommands/peer.py'),
-    ('plugins', 'compat', 'plugins', 'compat', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'disable', 'plugins', 'disable', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'list', 'plugins', 'list', 'IMPLEMENTED', 'qubit plugins list', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'pack', 'plugins', 'pack', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'pack export', 'plugins', 'pack', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'pack install', 'plugins', 'pack', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'pack show', 'plugins', 'pack', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'search', 'plugins', 'search', 'MISSING', 'none', 'hermes_cli/subcommands/plugins.py'),
-    ('plugins', 'show', 'plugins', 'show', 'IMPLEMENTED', 'qubit plugins show', 'hermes_cli/subcommands/plugins.py'),
-    ('profile', 'alias', 'profile', 'alias', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'create', 'profile', 'create', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'delete', 'profile', 'delete', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'describe', 'profile', 'describe', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'export', 'profile', 'export', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'import', 'profile', 'import', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'info', 'profile', 'info', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'install', 'profile', 'install', 'IMPLEMENTED', 'qubit profile install', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'list', 'profile', 'list', 'IMPLEMENTED', 'qubit profile list', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'rename', 'profile', 'rename', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'show', 'profile', 'show', 'IMPLEMENTED', 'qubit profile show', 'hermes_cli/subcommands/profile.py'),
-    ('profile', 'use', 'profile', 'use', 'MISSING', 'none', 'hermes_cli/subcommands/profile.py'),
-    ('project', 'create', 'project', 'create', 'IMPLEMENTED', 'qubit project create', 'hermes_cli/projects_cmd.py'),
-    ('project', 'list', 'project', 'list', 'IMPLEMENTED', 'qubit project list', 'hermes_cli/projects_cmd.py'),
-    ('project', 'use', 'project', 'use', 'IMPLEMENTED', 'qubit project use', 'hermes_cli/projects_cmd.py'),
-    ('proxy', 'providers', 'proxy', 'providers', 'IMPLEMENTED', 'qubit proxy providers', 'hermes_cli/subcommands/gateway.py'),
-    ('proxy', 'start', 'proxy', 'start', 'IMPLEMENTED', 'qubit proxy start', 'hermes_cli/subcommands/gateway.py'),
-    ('proxy', 'status', 'proxy', 'status', 'IMPLEMENTED', 'qubit proxy status', 'hermes_cli/subcommands/gateway.py'),
-    ('secrets', 'bitwarden', 'brain', 'bitwarden', 'MISSING', 'none', 'hermes_cli/subcommands/secrets.py'),
-    ('secrets', 'onepassword', 'brain', 'onepassword', 'MISSING', 'none', 'hermes_cli/subcommands/secrets.py'),
-    ('security', 'audit', 'setup', 'audit', 'IMPLEMENTED', 'qubit setup audit', 'hermes_cli/subcommands/security.py'),
-    ('sessions', 'archive', 'sessions', 'archive', 'GATED', 'qubit sessions archive', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'browse', 'sessions', 'browse', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'import', 'sessions', 'import', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'pinned', 'sessions', 'pinned', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'recover', 'sessions', 'recover', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'repair', 'sessions', 'repair', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'repair-routing', 'sessions', 'repair-routing', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'retitle-skills', 'sessions', 'retitle-skills', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('sessions', 'unpin', 'sessions', 'unpin', 'MISSING', 'none', 'hermes_cli/subcommands/sessions.py'),
-    ('skills', 'browse', 'skills', 'browse', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'check', 'skills', 'check', 'IMPLEMENTED', 'qubit skills check', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'diff', 'skills', 'diff', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'inspect', 'skills', 'inspect', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'list', 'skills', 'list', 'IMPLEMENTED', 'qubit skills list', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'list-modified', 'skills', 'list-modified', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'opt-in', 'skills', 'opt-in', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'opt-out', 'skills', 'opt-out', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'repair-official', 'skills', 'repair-official', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'reset', 'skills', 'reset', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'search', 'skills', 'search', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'snapshot', 'skills', 'snapshot', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'snapshot export', 'skills', 'snapshot', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'snapshot import', 'skills', 'snapshot', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'tap add', 'skills', 'tap', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'tap list', 'skills', 'tap', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'tap remove', 'skills', 'tap', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'trust', 'skills', 'trust', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skills', 'untrust', 'skills', 'untrust', 'MISSING', 'none', 'hermes_cli/subcommands/skills.py'),
-    ('skin', 'list', 'theme', 'list', 'IMPLEMENTED', 'qubit theme list', 'hermes_cli/subcommands/skin.py'),
-    ('skin', 'set', 'theme', 'set', 'IMPLEMENTED', 'qubit theme set', 'hermes_cli/subcommands/skin.py'),
-    ('skin', 'use', 'theme', 'use', 'MISSING', 'none', 'hermes_cli/subcommands/skin.py'),
-    ('sync', 'device', 'sync', 'device', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'disable', 'sync', 'disable', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'enable', 'sync', 'enable', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'now', 'sync', 'now', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'propose', 'sync', 'propose', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'pull', 'sync', 'pull', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'push', 'sync', 'push', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('sync', 'status', 'sync', 'status', 'MISSING', 'none', 'hermes_cli/subcommands/sync.py'),
-    ('webhook', 'list', 'webhook', 'list', 'IMPLEMENTED', 'qubit webhook list', 'hermes_cli/subcommands/webhook.py'),
-    ('webhook', 'remove', 'webhook', 'remove', 'IMPLEMENTED', 'qubit webhook remove', 'hermes_cli/subcommands/webhook.py'),
-    ('webhook', 'subscribe', 'webhook', 'subscribe', 'MISSING', 'none', 'hermes_cli/subcommands/webhook.py'),
-    ('webhook', 'test', 'webhook', 'test', 'IMPLEMENTED', 'qubit webhook test', 'hermes_cli/subcommands/webhook.py'),
-    ('worktree', 'prune', 'worktree', 'prune', 'MISSING', 'none', 'hermes_cli/subcommands/worktree.py'),
+    ('auth', 'add', 'auth', 'add', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'list', 'auth', 'list', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'logout', 'auth', 'logout', 'IMPLEMENTED', 'qubit auth logout', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'priority', 'auth', 'priority', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'refresh', 'auth', 'refresh', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'remove', 'auth', 'remove', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'reset', 'auth', 'reset', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'spotify', 'auth', 'spotify', 'MISSING', 'none', 'qubit_cli/subcommands/auth.py'),
+    ('auth', 'status', 'auth', 'status', 'IMPLEMENTED', 'qubit auth status', 'qubit_cli/subcommands/auth.py'),
+    ('browser', 'close-profile', 'browser', 'close-profile', 'IMPLEMENTED', 'qubit browser close-profile', 'qubit_cli/subcommands/browser.py'),
+    ('claw', 'cleanup', 'claw', 'cleanup', 'MISSING', 'none', 'qubit_cli/subcommands/claw.py'),
+    ('claw', 'migrate', 'claw', 'migrate', 'MISSING', 'none', 'qubit_cli/subcommands/claw.py'),
+    ('computer-use', 'doctor', 'computer-use', 'doctor', 'IMPLEMENTED', 'qubit computer-use doctor', 'qubit_cli/subcommands/computer_use.py'),
+    ('computer-use', 'install', 'computer-use', 'install', 'GATED', 'qubit computer-use install', 'qubit_cli/subcommands/computer_use.py'),
+    ('computer-use', 'permissions', 'computer-use', 'permissions', 'IMPLEMENTED', 'qubit computer-use permissions', 'qubit_cli/subcommands/computer_use.py'),
+    ('computer-use', 'permissions grant', 'computer-use', 'permissions', 'GATED', 'qubit computer-use permissions', 'qubit_cli/subcommands/computer_use.py'),
+    ('computer-use', 'permissions status', 'computer-use', 'permissions', 'IMPLEMENTED', 'qubit computer-use permissions', 'qubit_cli/subcommands/computer_use.py'),
+    ('computer-use', 'status', 'computer-use', 'status', 'IMPLEMENTED', 'qubit computer-use status', 'qubit_cli/subcommands/computer_use.py'),
+    ('cron', 'create', 'schedules', 'create', 'IMPLEMENTED', 'qubit schedules create', 'qubit_cli/subcommands/cron.py'),
+    ('cron', 'incidents', 'schedules', 'incidents', 'MISSING', 'none', 'qubit_cli/subcommands/cron.py'),
+    ('cron', 'notepad', 'schedules', 'notepad', 'MISSING', 'none', 'qubit_cli/subcommands/cron.py'),
+    ('cron', 'remove', 'schedules', 'remove', 'MISSING', 'none', 'qubit_cli/subcommands/cron.py'),
+    ('cron', 'runs', 'schedules', 'runs', 'MISSING', 'none', 'qubit_cli/subcommands/cron.py'),
+    ('dashboard', 'register', 'webui', 'register', 'MISSING', 'none', 'qubit_cli/subcommands/dashboard.py'),
+    ('fallback', 'add', 'frontier', 'add', 'MISSING', 'none', 'qubit_cli/subcommands/fallback.py'),
+    ('fallback', 'clear', 'frontier', 'clear', 'MISSING', 'none', 'qubit_cli/subcommands/fallback.py'),
+    ('fallback', 'list', 'frontier', 'list', 'MISSING', 'none', 'qubit_cli/subcommands/fallback.py'),
+    ('fallback', 'remove', 'frontier', 'remove', 'MISSING', 'none', 'qubit_cli/subcommands/fallback.py'),
+    ('gateway', 'enroll', 'gateway', 'enroll', 'MISSING', 'none', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'install', 'gateway', 'install', 'GATED', 'qubit gateway install', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'list', 'gateway', 'list', 'IMPLEMENTED', 'qubit gateway list', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'migrate-legacy', 'gateway', 'migrate-legacy', 'MISSING', 'none', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'restart', 'gateway', 'restart', 'GATED', 'qubit gateway restart', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'run', 'gateway', 'run', 'GATED', 'qubit gateway run', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'setup', 'gateway', 'setup', 'MISSING', 'none', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'start', 'gateway', 'start', 'GATED', 'qubit gateway start', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'status', 'gateway', 'status', 'MISSING', 'none', 'qubit_cli/subcommands/gateway.py'),
+    ('gateway', 'stop', 'gateway', 'stop', 'GATED', 'qubit gateway stop', 'qubit_cli/subcommands/gateway.py'),
+    ('hooks', 'doctor', 'hooks', 'doctor', 'IMPLEMENTED', 'qubit hooks doctor', 'qubit_cli/subcommands/hooks.py'),
+    ('hooks', 'list', 'hooks', 'list', 'IMPLEMENTED', 'qubit hooks list', 'qubit_cli/subcommands/hooks.py'),
+    ('hooks', 'revoke', 'hooks', 'revoke', 'IMPLEMENTED', 'qubit hooks revoke', 'qubit_cli/subcommands/hooks.py'),
+    ('hooks', 'test', 'hooks', 'test', 'IMPLEMENTED', 'qubit hooks test', 'qubit_cli/subcommands/hooks.py'),
+    ('mcp', 'config', 'mcp', 'config', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'install', 'mcp', 'install', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'list', 'mcp', 'list', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'login', 'mcp', 'login', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'ls', 'mcp', 'ls', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'picker', 'mcp', 'picker', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'reauth', 'mcp', 'reauth', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'rm', 'mcp', 'rm', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('mcp', 'serve', 'mcp', 'serve', 'MISSING', 'none', 'qubit_cli/subcommands/mcp.py'),
+    ('memory', 'off', 'memory', 'off', 'MISSING', 'none', 'qubit_cli/subcommands/memory.py'),
+    ('memory', 'reset', 'memory', 'reset', 'MISSING', 'none', 'qubit_cli/subcommands/memory.py'),
+    ('memory', 'setup', 'memory', 'setup', 'MISSING', 'none', 'qubit_cli/subcommands/memory.py'),
+    ('memory', 'status', 'memory', 'status', 'IMPLEMENTED', 'qubit memory status', 'qubit_cli/subcommands/memory.py'),
+    ('migrate', 'xai', 'product', 'xai', 'MISSING', 'none', 'qubit_cli/subcommands/migrate.py'),
+    ('moa', 'configure', 'moa', 'configure', 'MISSING', 'none', 'qubit_cli/subcommands/moa.py'),
+    ('moa', 'delete', 'moa', 'delete', 'MISSING', 'none', 'qubit_cli/subcommands/moa.py'),
+    ('moa', 'list', 'moa', 'list', 'MISSING', 'none', 'qubit_cli/subcommands/moa.py'),
+    ('monitoring', 'status', 'monitor', 'status', 'MISSING', 'none', 'qubit_cli/subcommands/monitoring.py'),
+    ('pairing', 'clear-pending', 'pairing', 'clear-pending', 'MISSING', 'none', 'qubit_cli/subcommands/pairing.py'),
+    ('pairing', 'list', 'pairing', 'list', 'IMPLEMENTED', 'qubit pairing list', 'qubit_cli/subcommands/pairing.py'),
+    ('pairing', 'revoke', 'pairing', 'revoke', 'IMPLEMENTED', 'qubit pairing revoke', 'qubit_cli/subcommands/pairing.py'),
+    ('peer', 'add', 'peer', 'add', 'IMPLEMENTED', 'qubit peer add', 'qubit_cli/subcommands/peer.py'),
+    ('peer', 'list', 'peer', 'list', 'IMPLEMENTED', 'qubit peer list', 'qubit_cli/subcommands/peer.py'),
+    ('peer', 'remove', 'peer', 'remove', 'IMPLEMENTED', 'qubit peer remove', 'qubit_cli/subcommands/peer.py'),
+    ('plugins', 'compat', 'plugins', 'compat', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'disable', 'plugins', 'disable', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'list', 'plugins', 'list', 'IMPLEMENTED', 'qubit plugins list', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'pack', 'plugins', 'pack', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'pack export', 'plugins', 'pack', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'pack install', 'plugins', 'pack', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'pack show', 'plugins', 'pack', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'search', 'plugins', 'search', 'MISSING', 'none', 'qubit_cli/subcommands/plugins.py'),
+    ('plugins', 'show', 'plugins', 'show', 'IMPLEMENTED', 'qubit plugins show', 'qubit_cli/subcommands/plugins.py'),
+    ('profile', 'alias', 'profile', 'alias', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'create', 'profile', 'create', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'delete', 'profile', 'delete', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'describe', 'profile', 'describe', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'export', 'profile', 'export', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'import', 'profile', 'import', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'info', 'profile', 'info', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'install', 'profile', 'install', 'IMPLEMENTED', 'qubit profile install', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'list', 'profile', 'list', 'IMPLEMENTED', 'qubit profile list', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'rename', 'profile', 'rename', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'show', 'profile', 'show', 'IMPLEMENTED', 'qubit profile show', 'qubit_cli/subcommands/profile.py'),
+    ('profile', 'use', 'profile', 'use', 'MISSING', 'none', 'qubit_cli/subcommands/profile.py'),
+    ('project', 'create', 'project', 'create', 'IMPLEMENTED', 'qubit project create', 'qubit_cli/projects_cmd.py'),
+    ('project', 'list', 'project', 'list', 'IMPLEMENTED', 'qubit project list', 'qubit_cli/projects_cmd.py'),
+    ('project', 'use', 'project', 'use', 'IMPLEMENTED', 'qubit project use', 'qubit_cli/projects_cmd.py'),
+    ('proxy', 'providers', 'proxy', 'providers', 'IMPLEMENTED', 'qubit proxy providers', 'qubit_cli/subcommands/gateway.py'),
+    ('proxy', 'start', 'proxy', 'start', 'IMPLEMENTED', 'qubit proxy start', 'qubit_cli/subcommands/gateway.py'),
+    ('proxy', 'status', 'proxy', 'status', 'IMPLEMENTED', 'qubit proxy status', 'qubit_cli/subcommands/gateway.py'),
+    ('secrets', 'bitwarden', 'brain', 'bitwarden', 'MISSING', 'none', 'qubit_cli/subcommands/secrets.py'),
+    ('secrets', 'onepassword', 'brain', 'onepassword', 'MISSING', 'none', 'qubit_cli/subcommands/secrets.py'),
+    ('security', 'audit', 'setup', 'audit', 'IMPLEMENTED', 'qubit setup audit', 'qubit_cli/subcommands/security.py'),
+    ('sessions', 'archive', 'sessions', 'archive', 'GATED', 'qubit sessions archive', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'browse', 'sessions', 'browse', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'import', 'sessions', 'import', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'pinned', 'sessions', 'pinned', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'recover', 'sessions', 'recover', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'repair', 'sessions', 'repair', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'repair-routing', 'sessions', 'repair-routing', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'retitle-skills', 'sessions', 'retitle-skills', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('sessions', 'unpin', 'sessions', 'unpin', 'MISSING', 'none', 'qubit_cli/subcommands/sessions.py'),
+    ('skills', 'browse', 'skills', 'browse', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'check', 'skills', 'check', 'IMPLEMENTED', 'qubit skills check', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'diff', 'skills', 'diff', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'inspect', 'skills', 'inspect', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'list', 'skills', 'list', 'IMPLEMENTED', 'qubit skills list', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'list-modified', 'skills', 'list-modified', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'opt-in', 'skills', 'opt-in', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'opt-out', 'skills', 'opt-out', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'repair-official', 'skills', 'repair-official', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'reset', 'skills', 'reset', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'search', 'skills', 'search', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'snapshot', 'skills', 'snapshot', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'snapshot export', 'skills', 'snapshot', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'snapshot import', 'skills', 'snapshot', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'tap add', 'skills', 'tap', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'tap list', 'skills', 'tap', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'tap remove', 'skills', 'tap', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'trust', 'skills', 'trust', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skills', 'untrust', 'skills', 'untrust', 'MISSING', 'none', 'qubit_cli/subcommands/skills.py'),
+    ('skin', 'list', 'theme', 'list', 'IMPLEMENTED', 'qubit theme list', 'qubit_cli/subcommands/skin.py'),
+    ('skin', 'set', 'theme', 'set', 'IMPLEMENTED', 'qubit theme set', 'qubit_cli/subcommands/skin.py'),
+    ('skin', 'use', 'theme', 'use', 'MISSING', 'none', 'qubit_cli/subcommands/skin.py'),
+    ('sync', 'device', 'sync', 'device', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'disable', 'sync', 'disable', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'enable', 'sync', 'enable', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'now', 'sync', 'now', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'propose', 'sync', 'propose', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'pull', 'sync', 'pull', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'push', 'sync', 'push', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('sync', 'status', 'sync', 'status', 'MISSING', 'none', 'qubit_cli/subcommands/sync.py'),
+    ('webhook', 'list', 'webhook', 'list', 'IMPLEMENTED', 'qubit webhook list', 'qubit_cli/subcommands/webhook.py'),
+    ('webhook', 'remove', 'webhook', 'remove', 'IMPLEMENTED', 'qubit webhook remove', 'qubit_cli/subcommands/webhook.py'),
+    ('webhook', 'subscribe', 'webhook', 'subscribe', 'MISSING', 'none', 'qubit_cli/subcommands/webhook.py'),
+    ('webhook', 'test', 'webhook', 'test', 'IMPLEMENTED', 'qubit webhook test', 'qubit_cli/subcommands/webhook.py'),
+    ('worktree', 'prune', 'worktree', 'prune', 'MISSING', 'none', 'qubit_cli/subcommands/worktree.py'),
 ]
 
 SUBS = SUBS + WAVE5_SUBS
@@ -1402,80 +1454,80 @@ SUBS = SUBS + WAVE5_SUBS
 PAGES = [
     ('/', 'RootRedirect', '/sessions (redirect)', 'IMPLEMENTED',
      'Root redirects to /sessions; the served SPA shell answers 200.',
-     'qubit_hermes/web/src/App.tsx:157'),
+     'qubit_runtime/web/src/App.tsx:157'),
     ('/chat', 'ChatPage', 'overlay Qubit Chat', 'IMPLEMENTED',
      'Status/model backing route wired (GET /api/status 200); overlay Qubit '
      'chat transcript via POST /api/qubit/chat; the built-in xterm PTY WS is a '
      'typed policy gate (PTY_NO_SHELL).',
-     'qubit_hermes/web/src/App.tsx:139'),
+     'qubit_runtime/web/src/App.tsx:139'),
     ('/sessions', 'SessionsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Sessions list/search/show wired (GET /api/sessions 200); append-only '
      'write verbs are typed policy gates.',
-     'qubit_hermes/web/src/App.tsx:158'),
+     'qubit_runtime/web/src/App.tsx:158'),
     ('/files', 'FilesPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Directory/read wired (GET /api/files 200); binary download/stream is a '
      'typed policy gate (FILES_BINARY_STREAM).',
-     'qubit_hermes/web/src/App.tsx:159'),
+     'qubit_runtime/web/src/App.tsx:159'),
     ('/analytics', 'AnalyticsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Graphs load from GET /api/analytics 200; token/cost series are honest '
      'zeros (no local token economy).',
-     'qubit_hermes/web/src/App.tsx:160'),
+     'qubit_runtime/web/src/App.tsx:160'),
     ('/models', 'ModelsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Model info/options wired (GET /api/model/info 200); MoA fan-out is a '
      'typed policy gate (not shipped).',
-     'qubit_hermes/web/src/App.tsx:161'),
+     'qubit_runtime/web/src/App.tsx:161'),
     ('/logs', 'LogsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Logs read via h_logs (GET /api/logs 200).',
-     'qubit_hermes/web/src/App.tsx:162'),
+     'qubit_runtime/web/src/App.tsx:162'),
     ('/cron', 'CronPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Jobs/runs wired (GET /api/cron/jobs 200); blueprint instantiate is '
      'staged; external fire is a typed policy gate.',
-     'qubit_hermes/web/src/App.tsx:163'),
+     'qubit_runtime/web/src/App.tsx:163'),
     ('/skills', 'SkillsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Local skills wired (GET /api/skills 200); remote hub install/update are '
      'typed policy gates.',
-     'qubit_hermes/web/src/App.tsx:164'),
+     'qubit_runtime/web/src/App.tsx:164'),
     ('/plugins', 'PluginsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Local overlay manifests (GET /api/dashboard/plugins 200); remote '
      'agent-plugin install is a typed policy gate.',
-     'qubit_hermes/web/src/App.tsx:165'),
+     'qubit_runtime/web/src/App.tsx:165'),
     ('/mcp', 'McpPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Inventory served (GET /api/mcp 200); enable/mount is a typed policy '
      'gate (MCP_NO_MOUNT).',
-     'qubit_hermes/web/src/App.tsx:166'),
+     'qubit_runtime/web/src/App.tsx:166'),
     ('/pairing', 'PairingPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Pairing list/create/approve/revoke wired (GET /api/pairing 200).',
-     'qubit_hermes/web/src/App.tsx:167'),
+     'qubit_runtime/web/src/App.tsx:167'),
     ('/channels', 'ChannelsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Platform list/update wired (GET /api/messaging/platforms 200); '
      'onboarding flows are typed policy gates (ONBOARDING_GUIDED).',
-     'qubit_hermes/web/src/App.tsx:168'),
+     'qubit_runtime/web/src/App.tsx:168'),
     ('/webhooks', 'WebhooksPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Webhook list/add/remove/toggle wired (GET /api/webhooks 200).',
-     'qubit_hermes/web/src/App.tsx:169'),
+     'qubit_runtime/web/src/App.tsx:169'),
     ('/system', 'SystemPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Status/stats wired (GET /api/system/stats 200); gateway process control '
      'is a typed policy gate (GATEWAY_NO_SUPERVISION).',
-     'qubit_hermes/web/src/App.tsx:170'),
+     'qubit_runtime/web/src/App.tsx:170'),
     ('/profiles', 'ProfilesPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Sidebar/tree wired (GET /api/profiles 200); create/import/export are '
      'staged or typed policy gates.',
-     'qubit_hermes/web/src/App.tsx:171'),
+     'qubit_runtime/web/src/App.tsx:171'),
     ('/profiles/new', 'ProfileBuilderPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Profile create is staged (409 confirmation), never fabricated success; '
      'GET /api/profiles 200.',
-     'qubit_hermes/web/src/App.tsx:172'),
+     'qubit_runtime/web/src/App.tsx:172'),
     ('/config', 'ConfigPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Config reads wired (GET /api/config 200); raw config secrets are typed '
      'policy gates (SECRET_NEVER_SERVED); PUT gated.',
-     'qubit_hermes/web/src/App.tsx:173'),
+     'qubit_runtime/web/src/App.tsx:173'),
     ('/env', 'EnvPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Key names only (GET /api/env 200); reveal/credential-pool are typed '
      'policy gates (SECRET_NEVER_SERVED).',
-     'qubit_hermes/web/src/App.tsx:174'),
+     'qubit_runtime/web/src/App.tsx:174'),
     ('/docs', 'DocsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Docs page reachable via the served SPA shell (200).',
-     'qubit_hermes/web/src/App.tsx:175'),
+     'qubit_runtime/web/src/App.tsx:175'),
 ]
 
 # page -> (proving test id, evidence token). The id is an on-disk test that
@@ -1563,14 +1615,14 @@ def _sub_caller_proof(qfam, qsub, parser_families, index, forward):
 # Per-row typed gate/refusal evidence for CLI rows whose audited surface is a
 # policy gate but whose serialized note previously named no production refusal
 # code. Each entry is derived from the real live path and an on-disk test that
-# exercises it (see ``docs/QUBIT_SAFE_EQUIVALENTS.md`` §5a). The code is
+# exercises it (see ``docs/archive/2026-09-21/QUBIT_SAFE_EQUIVALENTS.md`` §5a). The code is
 # embedded in the row note so the SAFE_EQUIVALENT evidence check can resolve
 # it; a native/forwarded command that is genuinely implemented is recorded as
 # such instead. No row is stamped without a real proof test on disk.
 CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     "cli:mcp": {
         "code": "MCP_NO_MOUNT",
-        "proof": ("tests/test_hermes_routes_parity8u.py::"
+        "proof": ("tests/test_qubit_routes_parity8u.py::"
                   "test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass"),
         "needs": "owner",
         "note": ("Qubit inventories MCP servers but never mounts or configures "
@@ -1579,7 +1631,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:mcp add": {
         "code": "MCP_NO_MOUNT",
-        "proof": ("tests/test_hermes_routes_parity8u.py::"
+        "proof": ("tests/test_qubit_routes_parity8u.py::"
                   "test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass"),
         "needs": "owner",
         "note": ("No Qubit `mcp add` subcommand; mounting an MCP server is "
@@ -1587,7 +1639,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:mcp remove": {
         "code": "MCP_NO_MOUNT",
-        "proof": ("tests/test_hermes_routes_parity8u.py::"
+        "proof": ("tests/test_qubit_routes_parity8u.py::"
                   "test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass"),
         "needs": "owner",
         "note": ("No Qubit `mcp remove` subcommand; unmounting is refused by "
@@ -1595,7 +1647,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:mcp configure": {
         "code": "MCP_NO_MOUNT",
-        "proof": ("tests/test_hermes_routes_parity8u.py::"
+        "proof": ("tests/test_qubit_routes_parity8u.py::"
                   "test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass"),
         "needs": "owner",
         "note": ("No Qubit `mcp configure` subcommand; configuration/mounting "
@@ -1603,7 +1655,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:sessions": {
         "code": "SESSIONS_RECEIPT_STORE",
-        "proof": ("tests/test_hermes_routes_parity8u.py::"
+        "proof": ("tests/test_qubit_routes_parity8u.py::"
                   "test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass"),
         "needs": "owner",
         "note": ("Qubit sessions are append-only metadata tombstones over "
@@ -1621,7 +1673,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:sessions prune": {
         "code": "SESSIONS_RECEIPT_STORE",
-        "proof": ("tests/test_hermes_routes_parity8u.py::"
+        "proof": ("tests/test_qubit_routes_parity8u.py::"
                   "test_remaining_typed_rows_are_typed_and_confirm_cannot_bypass"),
         "needs": "creds",
         "note": ("No Qubit `sessions prune` subcommand; bulk receipt pruning "
@@ -1646,7 +1698,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:skills": {
         "code": "BLOCKED_REMOTE_SOURCE",
-        "proof": ("tests/test_hermes_routes_agent2b_wiring.py::"
+        "proof": ("tests/test_qubit_routes_agent2b_wiring.py::"
                   "test_skills_hub_reads_are_real_local_catalog"),
         "needs": "creds",
         "note": ("Qubit serves only locally reviewed skill manifests; remote "
@@ -1664,7 +1716,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:skills update": {
         "code": "BLOCKED_REMOTE_SOURCE",
-        "proof": ("tests/test_hermes_routes_agent2b_wiring.py::"
+        "proof": ("tests/test_qubit_routes_agent2b_wiring.py::"
                   "test_skills_hub_reads_are_real_local_catalog"),
         "needs": "creds",
         "note": ("No Qubit `skills update` subcommand; remote hub updates are "
@@ -1672,7 +1724,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:skills audit": {
         "code": "BLOCKED_REMOTE_SOURCE",
-        "proof": ("tests/test_hermes_routes_agent2b_wiring.py::"
+        "proof": ("tests/test_qubit_routes_agent2b_wiring.py::"
                   "test_skills_hub_reads_are_real_local_catalog"),
         "needs": "creds",
         "note": ("`qubit skills audit` reads the local curated catalog only; "
@@ -1680,7 +1732,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:skills publish": {
         "code": "BLOCKED_REMOTE_SOURCE",
-        "proof": ("tests/test_hermes_routes_agent2b_wiring.py::"
+        "proof": ("tests/test_qubit_routes_agent2b_wiring.py::"
                   "test_skills_hub_reads_are_real_local_catalog"),
         "needs": "creds",
         "note": ("No Qubit `skills publish` subcommand; publishing to a remote "
@@ -1697,7 +1749,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:plugins install": {
         "code": "BLOCKED_REMOTE_SOURCE",
-        "proof": ("tests/test_hermes_routes_agent2b_wiring.py::"
+        "proof": ("tests/test_qubit_routes_agent2b_wiring.py::"
                   "test_skills_hub_reads_are_real_local_catalog"),
         "needs": "creds",
         "note": ("No Qubit `plugins install` subcommand; remote plugin install "
@@ -1706,7 +1758,7 @@ CLI_GATE_EVIDENCE: Dict[str, Dict[str, str]] = {
     },
     "cli:plugins update": {
         "code": "BLOCKED_REMOTE_SOURCE",
-        "proof": ("tests/test_hermes_routes_agent2b_wiring.py::"
+        "proof": ("tests/test_qubit_routes_agent2b_wiring.py::"
                   "test_skills_hub_reads_are_real_local_catalog"),
         "needs": "creds",
         "note": ("No Qubit `plugins update` subcommand; remote plugin updates "
@@ -1972,25 +2024,25 @@ def build_dashboard_rows() -> List[Dict[str, str]]:
 
 # (plugin, area, capability, qubit_backend, status, proving_test, needs,
 #  dashboard, cli, voice, note, upstream_ref)
-# Hand-maintained because the plugin APIs live under qubit_hermes/plugins/*,
+# Hand-maintained because the plugin APIs live under qubit_runtime/plugins/*,
 # outside the web_routers glob the API extractor scans. Every row is IMPLEMENTED
 # only with a real registered compat caller AND an on-disk behavioural test in
-# tests/test_hermes_plugins.py; the kanban mutating surface is the one genuine
+# tests/test_qubit_plugins.py; the kanban mutating surface is the one genuine
 # typed policy gate and is tracked as its own GATED row, never folded into the
 # read row. CLI/voice are cited only where an existing Qubit surface already
 # reaches the same backend; a plugin with no such surface is recorded
 # dashboard-only with the reason in its note (no second authority invented).
 # The full 18-plugin vendored fleet (dashboard and non-dashboard) is audited
-# from ``voicebridge.hermes_plugins.plugin_fleet_audit`` and embedded in the
+# from ``voicebridge.qubit_plugins.plugin_fleet_audit`` and embedded in the
 # section's ``plugin_fleet`` metadata so no fleet plugin is silently dropped.
 PLUGINS = [
     ("hermes-achievements", "dashboard_plugin",
      "hermes dashboard plugin hermes-achievements (API + state)",
-     "voicebridge/hermes_compat.py:h_plugin_achievements", "IMPLEMENTED",
-     "tests/test_hermes_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
+     "voicebridge/qubit_compat.py:h_plugin_achievements", "IMPLEMENTED",
+     "tests/test_qubit_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
      "none", "hermes-dist Achievements tab (/achievements)", "", "",
-     "Real backend in voicebridge/hermes_plugins.py: reuses the vendored "
-     "achievement engine + hermes_state.SessionDB over the local session "
+     "Real backend in voicebridge/qubit_plugins.py: reuses the vendored "
+     "achievement engine + qubit_state.SessionDB over the local session "
      "history, persists snapshot/checkpoint/unlock state under the Qubit state "
      "dir (0600), serves /achievements (full unlocked/discovered/secret + tier "
      "wire shape), /scan-status (lifecycle), /recent-unlocks, "
@@ -1998,24 +2050,24 @@ PLUGINS = [
      "and a confirm-gated /reset-state. Dashboard-only by design: the vendored "
      "plugin ships no CLI/voice surface and Qubit invents none. The plugin JS "
      "bundle is served by the webui overlay path, not this compat backend.",
-     "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py:57"),
+     "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py:57"),
     ("kanban", "dashboard_plugin",
      "hermes dashboard plugin kanban (read API)",
-     "voicebridge/hermes_compat.py:h_plugin_kanban_board", "IMPLEMENTED",
-     "tests/test_hermes_plugins.py::test_kanban_read_routes_serve_real_board",
+     "voicebridge/qubit_compat.py:h_plugin_kanban_board", "IMPLEMENTED",
+     "tests/test_qubit_plugins.py::test_kanban_read_routes_serve_real_board",
      "none", "hermes-dist Kanban tab (/kanban)", "qubit kanban *",
      "voice kanban_*",
-     "Real read API in voicebridge/hermes_plugins.py backed by the vendored "
-     "hermes_cli.kanban_db (board/tasks incl. comments+links/boards/config/"
+     "Real read API in voicebridge/qubit_plugins.py backed by the vendored "
+     "qubit_cli.kanban_db (board/tasks incl. comments+links/boards/config/"
      "projects/workers/diagnostics/model-options/home-channels). The existing "
      "CLI and voice surfaces (`qubit kanban`, voice kanban_*) reach the same "
      "local backend. Task mutations are a typed policy gate, tracked separately "
      "as plugin:kanban-write-gate.",
-     "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:266"),
+     "qubit_runtime/plugins/kanban/dashboard/plugin_api.py:266"),
     ("kanban-write-gate", "dashboard_plugin",
      "hermes dashboard plugin kanban write surface (typed gate)",
-     "voicebridge/hermes_compat.py:__gate__", "GATED",
-     "tests/test_hermes_plugins.py::test_kanban_writes_stay_on_policy_gate",
+     "voicebridge/qubit_compat.py:__gate__", "GATED",
+     "tests/test_qubit_plugins.py::test_kanban_writes_stay_on_policy_gate",
      "owner", "hermes-dist Kanban tab write controls",
      "qubit kanban * (--confirm via approvals)", "voice kanban_* (confirm)",
      "Every pinned kanban write route (create/patch/delete/bulk task, comments, "
@@ -2024,16 +2076,16 @@ PLUGINS = [
      "resolves to the shared KANBAN_WRITE_BROKERED confirmation/broker gate; "
      "nothing is served as a direct dashboard write. The CLI/voice counterpart "
      "is `qubit kanban` + the pending-approvals banner.",
-     "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:373"),
+     "qubit_runtime/plugins/kanban/dashboard/plugin_api.py:373"),
     ("kanban-extra-reads", "dashboard_plugin",
      "hermes dashboard plugin kanban auxiliary reads",
-     "voicebridge/hermes_compat.py:h_plugin_kanban_task_log", "IMPLEMENTED",
-     "tests/test_hermes_plugins.py::test_kanban_aux_reads_are_real_or_typed",
+     "voicebridge/qubit_compat.py:h_plugin_kanban_task_log", "IMPLEMENTED",
+     "tests/test_qubit_plugins.py::test_kanban_aux_reads_are_real_or_typed",
      "owner", "hermes-dist Kanban drawers (runs/attachments/log/profile/"
      "orchestration)", "qubit kanban *", "",
      "GET /tasks/{id}/attachments, /tasks/{id}/log, /runs/{id}, "
      "/runs/{id}/inspect, /profiles and GET /orchestration are wired to the "
-     "vendored kanban_db through voicebridge/hermes_plugins.py. These are "
+     "vendored kanban_db through voicebridge/qubit_plugins.py. These are "
      "dashboard-only drawers (declared in the voice-coverage "
      "DASHBOARD_ONLY_PLUGIN_ROUTES audit); the spoken `kanban_fleet_*` surface "
      "covers board/task/stats/config/projects. The binary attachment download "
@@ -2041,11 +2093,11 @@ PLUGINS = [
      "JSON dispatcher serves no binary), and PUT /orchestration is the "
      "KANBAN_WRITE_BROKERED confirmation gate; both are documented gate "
      "surfaces, not fabricated successes.",
-     "qubit_hermes/plugins/kanban/dashboard/plugin_api.py:400"),
+     "qubit_runtime/plugins/kanban/dashboard/plugin_api.py:400"),
     ("fleet-discovery", "dashboard_plugin",
      "hermes dashboard plugin fleet discovery",
-     "voicebridge/hermes_compat.py:h_plugin_fleet", "IMPLEMENTED",
-     "tests/test_hermes_plugins.py::test_plugin_fleet_discovery_lists_vendored_plugins",
+     "voicebridge/qubit_compat.py:h_plugin_fleet", "IMPLEMENTED",
+     "tests/test_qubit_plugins.py::test_plugin_fleet_discovery_lists_vendored_plugins",
      "none", "hermes-dist Plugins page", "", "",
      "GET /api/dashboard/plugins/fleet returns the vendored plugin manifests "
      "(source=vendored) additively; the fixed ten-plugin overlay response at "
@@ -2053,7 +2105,7 @@ PLUGINS = [
      "CLI/voice command reads the vendored fleet. The full vendored fleet audit "
      "(which plugins declare a dashboard surface) is recorded in the section "
      "plugin_fleet metadata.",
-     "qubit_hermes/hermes_cli/web_server_dashboard.py:537"),
+     "qubit_runtime/qubit_cli/web_server_dashboard.py:537"),
 ]
 
 
@@ -2080,7 +2132,7 @@ def build_plugin_rows() -> List[Dict[str, str]]:
 
 # Gate-behavior proof used when a SAFE_EQUIVALENT row has no row-specific
 # proving test: the route-parity suite exercises every typed gate.
-_GATE_PROOF = ("tests/test_hermes_routes_parity8u.py::"
+_GATE_PROOF = ("tests/test_qubit_routes_parity8u.py::"
                "test_every_gated_route_is_typed")
 
 # A typed unavailable/refusal signal: an ALL_CAPS gate code (``FOO_BAR``) or a
@@ -2143,7 +2195,7 @@ def build_ledger() -> Dict[str, object]:
         "method": (
             "Evidence-based regeneration. API rows re-extract the pinned "
             "upstream route decorators and classify them from "
-            "voicebridge.hermes_compat.match disposition plus the handler's "
+            "voicebridge.qubit_compat.match disposition plus the handler's "
             "real behaviour (a handler whose normal exits are typed "
             "gates/refusals is GATED; a real read/write is IMPLEMENTED; a "
             "wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an "
@@ -2152,29 +2204,29 @@ def build_ledger() -> Dict[str, object]:
             "scan), so no row is IMPLEMENTED on a phantom caller. cli / "
             "cli-subcommand rows derive status from the live "
             "voicebridge.cli build_parser tree plus "
-            "voicebridge.cli_hermes_forward.FORWARD_TABLE and an AST scan of "
+            "voicebridge.cli_qubit_forward.FORWARD_TABLE and an AST scan of "
             "tests/ for the exercising caller. Plugin-fleet rows are declared "
             "explicitly and are IMPLEMENTED only when "
-            "tests/test_hermes_plugins.py dispatches the registered compat "
+            "tests/test_qubit_plugins.py dispatches the registered compat "
             "handler over real local state. The full vendored plugin fleet is "
-            "audited from voicebridge.hermes_plugins.plugin_fleet_audit (which "
+            "audited from voicebridge.qubit_plugins.plugin_fleet_audit (which "
             "plugin ships a dashboard/manifest.json) and embedded as the "
             "plugin_fleet metadata. No status is hand-flipped."
         ),
         "sources_reconciled": [
-            "voicebridge/hermes_compat.py",
-            "voicebridge/hermes_plugins.py",
+            "voicebridge/qubit_compat.py",
+            "voicebridge/qubit_plugins.py",
             "voicebridge/cli.py",
-            "voicebridge/cli_hermes_forward.py",
+            "voicebridge/cli_qubit_forward.py",
             "tests/ (AST caller evidence)",
-            "tests/test_hermes_plugins.py (plugin-fleet proof)",
-            "qubit_hermes/hermes_cli/web_routers",
-            "qubit_hermes/hermes_cli/web_server*.py",
-            "qubit_hermes/hermes_cli/memory_oauth.py",
-            "qubit_hermes/hermes_cli/dashboard_auth/routes.py",
-            "qubit_hermes/plugins/hermes-achievements/dashboard/plugin_api.py",
-            "qubit_hermes/plugins/kanban/dashboard/plugin_api.py",
-            "qubit_hermes/web/src/App.tsx",
+            "tests/test_qubit_plugins.py (plugin-fleet proof)",
+            "qubit_runtime/qubit_cli/web_routers",
+            "qubit_runtime/qubit_cli/web_server*.py",
+            "qubit_runtime/qubit_cli/memory_oauth.py",
+            "qubit_runtime/qubit_cli/dashboard_auth/routes.py",
+            "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py",
+            "qubit_runtime/plugins/kanban/dashboard/plugin_api.py",
+            "qubit_runtime/web/src/App.tsx",
         ],
         "plugin_fleet": _hp.plugin_fleet_audit(),
         "counts": {

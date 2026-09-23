@@ -14,7 +14,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-BOARDS_JS = (REPO_ROOT / "frontend" / "hermes-qubit" / "plugins"
+BOARDS_JS = (REPO_ROOT / "frontend" / "qubit-app" / "plugins"
              / "qubit-boards" / "qubit-boards.js")
 
 
@@ -24,7 +24,7 @@ def _cfg(tmp_path, monkeypatch):
         target.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(target))
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home" / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home" / ".hermes"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     from voicebridge.config import Config
@@ -68,7 +68,7 @@ def test_boards_plugin_exposes_the_full_card_lifecycle():
 
 
 def test_card_lifecycle_persists_through_the_broker(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
 
@@ -111,13 +111,18 @@ def test_card_lifecycle_persists_through_the_broker(tmp_path, monkeypatch):
 
 def test_vendored_kanban_writes_are_brokered_not_direct(tmp_path, monkeypatch):
     """The pinned plugin's direct writes must be a typed refusal, not a bypass."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = HC.dispatch(
         cfg, "POST", "/api/plugins/kanban/tasks", {},
         {"title": "direct write must not land"})
+    # A direct unconfirmed write never lands: it stages a real approval (409)
+    # or is a typed broker refusal, never a fabricated success.
     assert status != 200, payload
     assert payload.get("ok") is False
-    assert "KANBAN" in str(payload.get("code", "")).upper() or \
-        "BROKER" in str(payload.get("detail", "")).upper(), payload
+    code = str(payload.get("code", "")).upper()
+    assert code in ("CONFIRM_REQUIRED", "KANBAN_WRITE_BROKERED") or \
+        "KANBAN" in code or "BROKER" in code, payload
+    assert payload.get("confirmation_id") or payload.get("qubit_counterpart"), \
+        payload

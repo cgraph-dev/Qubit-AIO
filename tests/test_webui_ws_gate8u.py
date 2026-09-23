@@ -1,9 +1,15 @@
-"""Packet 8U: Hermes WebSocket refusal gate (audit 2026-09-11 §1D).
+"""Packet 8U: Hermes WebSocket gate + the one supported Qubit PTY socket.
 
-The vendored Hermes dashboard opens six WebSocket endpoints. Qubit serves a
-single SSE event path, so each must answer with a TYPED HTTP 426 JSON envelope
-carrying the existing GATED codes (``PTY_NO_SHELL`` / ``WS_SINGLE_PATH``) —
-never a bare connection error, a silent hang, or an uncaught exception.
+Qubit serves a single SSE event path, so the upstream dashboard's refuse-only
+WebSocket endpoints answer with a TYPED HTTP 426 JSON envelope carrying the
+existing GATED codes (``PTY_NO_SHELL`` / ``WS_SINGLE_PATH``) — never a bare
+connection error, a silent hang, or an uncaught exception.
+
+The single exception is Qubit's own terminal socket at ``/agent/api/pty``: it is
+a real, supported WebSocket (owner PTY-policy exception, docs/archive/2026-09-21/QUBIT_PTY_POLICY_EXCEPTION_2026-09-17.md)
+that requires a short-lived scoped ticket, so an unauthenticated upgrade is a
+typed 401 ``TICKET_REQUIRED`` rather than a 426 refusal. Raw ``/api/pty`` HTTP
+(no upgrade) and every other upstream socket stay refused.
 
 Hermetic live-server checks (no browser, no WS library): a real ``WebUI`` is
 booted on loopback and raw ``http.client`` requests carry the upgrade headers.
@@ -23,9 +29,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-# (path, expected typed code) for the six upstream WebSocket endpoints.
-# The public SPA reaches the API through the Qubit-owned ``/agent`` prefix;
-# the bare ``/api`` path is the internal compat form.
+# (path, expected typed code) for the upstream WebSocket endpoints that stay
+# refused. The public SPA reaches the API through the Qubit-owned ``/agent``
+# prefix; the bare ``/api`` path is the internal compat form.
 WS_API_PATHS = [
     ("/api/pty", "PTY_NO_SHELL"),
     ("/api/console", "PTY_NO_SHELL"),
@@ -37,7 +43,12 @@ WS_API_PATHS = [
     ("/api/plugins/kanban/events", "WS_SINGLE_PATH"),
 ]
 
-WS_PATHS = [("/agent" + path, code) for path, code in WS_API_PATHS]
+# The refused upgrade endpoints (all but the supported Qubit PTY terminal).
+WS_PATHS = [("/agent" + path, code) for path, code in WS_API_PATHS
+            if path != "/api/pty"]
+
+# Qubit's supported terminal socket: a real WS that requires a scoped ticket.
+PTY_WS_PATHS = ("/agent/api/pty", "/api/pty")
 
 
 def _start(tmp_path):
@@ -106,16 +117,16 @@ def _http(port, method, path, body=None, token="test-token"):
 
 
 def test_ws_gate_mapping_is_exactly_the_gated_endpoints():
-    from voicebridge.webui import HERMES_WS_GATE_CODES, hermes_ws_gate_code
-    assert len(HERMES_WS_GATE_CODES) == len(WS_API_PATHS) == 7
-    assert set(HERMES_WS_GATE_CODES) == {p for p, _ in WS_API_PATHS}
+    from voicebridge.webui import QUBIT_WS_GATE_CODES, qubit_ws_gate_code
+    assert len(QUBIT_WS_GATE_CODES) == len(WS_API_PATHS) == 7
+    assert set(QUBIT_WS_GATE_CODES) == {p for p, _ in WS_API_PATHS}
     for path, code in WS_API_PATHS:
-        assert hermes_ws_gate_code(path) == code, path
-        assert hermes_ws_gate_code("/agent" + path) == code, path
-        assert hermes_ws_gate_code("/agent" + path + "/") == code, path
-        assert hermes_ws_gate_code("/api/status") is None
+        assert qubit_ws_gate_code(path) == code, path
+        assert qubit_ws_gate_code("/agent" + path) == code, path
+        assert qubit_ws_gate_code("/agent" + path + "/") == code, path
+        assert qubit_ws_gate_code("/api/status") is None
         # The upstream mount is gone: an upstream path is not a public gate.
-        assert hermes_ws_gate_code("/hermes" + path) is None
+        assert qubit_ws_gate_code("/hermes" + path) is None
 
 
 @pytest.mark.parametrize("path,code", WS_PATHS)
@@ -134,17 +145,34 @@ def test_each_ws_upgrade_returns_426_typed(server, path, code):
 
 
 def test_ws_upgrade_needs_no_browser_token(server):
-    # A browser WebSocket() cannot attach X-Hermes-Session-Token; the gate
-    # must answer before auth (otherwise the client only sees a bare 401).
-    status, _, body = _upgrade(server, "/agent/api/pty", token=None)
+    # A browser WebSocket() cannot attach X-Hermes-Session-Token; the refusal
+    # gate must answer before auth (otherwise the client only sees a bare 401).
+    # /console is a still-refused socket, so it proves the pre-auth gate.
+    status, _, body = _upgrade(server, "/agent/api/console", token=None)
     assert status == 426, (status, body[:200])
     assert json.loads(body)["code"] == "PTY_NO_SHELL"
 
 
 def test_plain_api_alias_ws_is_gated(server):
-    status, _, body = _upgrade(server, "/api/pty")
+    status, _, body = _upgrade(server, "/api/console")
     assert status == 426, (status, body[:200])
     assert json.loads(body)["code"] == "PTY_NO_SHELL"
+
+
+@pytest.mark.parametrize("path", PTY_WS_PATHS)
+def test_pty_upgrade_requires_a_scoped_ticket(server, path):
+    # The Qubit terminal socket is a REAL supported WebSocket, not a 426 refusal.
+    # An upgrade without a minted ticket is a typed 401 TICKET_REQUIRED that names
+    # the owner and rollback; it never opens a PTY and is never a bare failure.
+    status, ctype, body = _upgrade(server, path)
+    assert status == 401, (path, status, body[:200])
+    assert "application/json" in ctype, (path, ctype)
+    out = json.loads(body)
+    assert out["code"] == "TICKET_REQUIRED", (path, out)
+    assert out["state"] == "UNAVAILABLE", (path, out)
+    assert out["ok"] is False, (path, out)
+    assert out["owner"] == "qubit-policy", (path, out)
+    assert out["rollback"], (path, out)
 
 
 def test_upstream_ws_path_is_gone(server):
@@ -155,14 +183,17 @@ def test_upstream_ws_path_is_gone(server):
 
 
 def test_normal_get_to_real_route_still_works(server):
-    # Cutover stage 2: safe reads are served by the vendored backend, so
-    # /agent/api/status carries the real status shape (version/overall),
-    # not the compat wrapper's `ok`. See docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
+    # Corrected cutover: /api/status is a fork-declared, non-sensitive read, so
+    # /agent/api/status serves the fork's real status payload (rebranded), not
+    # the empty Qubit compat envelope. The WS gate must not interfere with it.
+    # See docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md.
     status, ctype, body = _http(server, "GET", "/agent/api/status")
     assert status == 200, (status, body[:200])
     assert "application/json" in ctype
     served = json.loads(body)
-    assert served.get("version") and "overall" in served, served
+    assert served.get("schema") is None, served
+    assert served.get("version") and served.get("release_date"), served
+    assert "overall" in served and "components" in served, served
     status, _, body = _http(server, "GET", "/api/status")
     assert status == 200, (status, body[:200])
 
@@ -196,4 +227,9 @@ def test_no_ws_response_is_uncaught_or_500(server):
     for path, _ in WS_PATHS:
         status, _, body = _upgrade(server, path)
         assert status == 426, (path, status, body[:200])
+        assert status != 500, path
+    # The supported PTY terminal must also be a typed envelope (401), never 500.
+    for path in PTY_WS_PATHS:
+        status, _, body = _upgrade(server, path)
+        assert status == 401, (path, status, body[:200])
         assert status != 500, path

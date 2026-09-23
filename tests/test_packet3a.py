@@ -310,6 +310,24 @@ def test_cancelled_callable_cannot_create_a_later_side_effect(tmp_path):
         assert cid not in b._active    # registry cleaned after cancellation
 
 
+def test_early_cancel_prevents_execution_before_registration(tmp_path):
+    """A cancel in the receipt-running -> executor-registration window must
+    stop the run, not merely settle the receipt.
+
+    Regression for the in-flight cancel race: the runner writes the running
+    receipt before the broker registers the active run, so an operator cancel
+    arriving in that gap must be honoured when the executor starts (and must
+    not run the side effect)."""
+    b = build_host_broker()
+    marker = tmp_path / "early-cancel-effect"
+    _register_late_writer(b, marker, delay_s=1.0)
+    cid = "early-cancel-cid"
+    assert b.cancel(cid) is False          # nothing active yet; intent recorded
+    r = b.execute("t.late", {}, source="user", correlation_id=cid)
+    assert not r.ok and r.cancelled, r
+    assert not marker.exists(), "early-cancelled callable ran anyway"
+
+
 def test_callable_timeout_kills_child_no_late_side_effect(tmp_path):
     b = build_host_broker()
     marker = tmp_path / "timeout-effect"

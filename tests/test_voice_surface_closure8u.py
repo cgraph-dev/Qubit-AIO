@@ -52,7 +52,7 @@ def _guard_entry_id(op_id, declared_guard=""):
         return f"guard_{op_id}"
     # Dedicated spoken refusal entries shipped under the "<op>_refusal" (or
     # legacy "<op>_voice") convention are real typed-policy voice surfaces too
-    # -- the same convention test_hermes_command_parity8u relies on.
+    # -- the same convention test_qubit_command_parity8u relies on.
     for cand in (EXISTING_VOICE_GUARDS.get(op_id), f"{op_id}_refusal",
                  f"{op_id}_voice"):
         if cand and VC.REGISTRY.get(cand) is not None:

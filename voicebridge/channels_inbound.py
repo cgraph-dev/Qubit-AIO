@@ -1,6 +1,6 @@
-"""Qubit inbound channel framework breadth (OpenClaw audit #19/#20).
+"""Qubit inbound channel framework breadth (Qubit audit #19/#20).
 
-Qubit recognizes the OpenClaw-breadth channel set and gives each an honest,
+Qubit recognizes the Qubit-breadth channel set and gives each an honest,
 credential-reference-derived state. It starts NO socket listener and opens
 NO outbound connection: inbound delivery is expected to arrive through the
 dashboard/CLI HTTP ingress, which calls :func:`receive` with an
@@ -183,8 +183,8 @@ CHANNEL_CAPS: Dict[str, Dict[str, Any]] = {
               "credential_kind": "oidc-bearer", "available": False,
               "detail": "Pub/Sub push envelope verified; no mailbox watcher "
                         "transport runs in Qubit"},
-    # ---- OpenClaw wave-5 extension breadth (extensions/* bridges) ----
-    # Every remaining OpenClaw channel extension is recognized with a real
+    # ---- Qubit wave-5 extension breadth (extensions/* bridges) ----
+    # Every remaining Qubit channel extension is recognized with a real
     # bounded receive adapter (normalize_event + the injected ingest sink) and
     # an honest, typed credential/transport gate. No listener starts and no
     # channel is ever reported connected.

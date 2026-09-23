@@ -1,8 +1,8 @@
 """Unified background-task ledger (read-only read model).
 
-Behavioral adaptation of the OpenClaw background task ledger
+Behavioral adaptation of the Qubit background task ledger
 (``src/tasks/`` + ``docs/automation/tasks.md``, pinned inventory row #30 in
-``docs/AUDIT_OPENCLAW_2026-09-11.md``). No upstream source is copied; this is
+``docs/archive/2026-09-21/AUDIT_OPENCLAW_2026-09-11.md``). No upstream source is copied; this is
 a Qubit-native read model.
 
 It introduces NO store and NO writer. It only reads the existing Qubit run

@@ -1,0 +1,849 @@
+# Qubit STATUS — 2026-09-22
+
+**Living document. Evidence-backed. Reviewed every session.** No claim below is
+`VERIFIED`, `M1`, `M2`, `CODE_READY`, or `COMPLETE` unless its evidence says so.
+
+> **CONTINUE HERE (handoff pointer, 2026-09-23 wave 12).** The full orchestrator
+> session log is **§10–§23** below — read §10–§23 before doing anything. In
+> short: **Phase 0 PASS**; **M1 NOT formally passed** (11 PASS / items 2 & 12
+> DISPOSITIONED pending owner ratification / items 3–4 PARTIAL = Playwright
+> lock); Owner Decisions #10–#13 implemented (real Qubit gateway, native `qubit
+> update --check|--apply|--rollback`, N8 fixed); W4 CLI ports largely done;
+> **wave 12 (§23)** added a deterministic parity-inventory generator, closed the
+> W9-free P0 routes (MISSING 12→6), fixed a real independence bug (vendored
+> state import created `~/.hermes` — N21) and a proxy token leak (N22),
+> reconciled ~12 stale tests, and de-branded non-W9 lanes; W-MIG partial;
+> W-BRAND partial (deep `qubit_runtime/` rebrand belongs to W9).
+> **Open owner gates:** (1) sign the W9 pin amendment
+> `docs/QUBIT_OWNER_AMENDMENT_2026-09-23_W9_VENDOR_SYNC.md` (target
+> `400f11bd…` = installed HEAD / fallback `d337b736…`); (2) **freeze the
+> mid-flight worktree** (the `qubit_hermes→qubit_runtime` rename is uncommitted;
+> HEAD `f984911c`; concurrent opencode sessions are still editing it); (3)
+> ratify M1 items 2/12; (4) rule on the `~/.hermes/.env` fallback policy (N17).
+> Handoff artifacts: backups
+> `/tmp/opencode/qubit-phase1-backups/` (29 dirs, 211 MB) and pristine 0.21.4
+> source `/tmp/opencode/pinned/hermes-agent-0.21.4/` (14,966 files).
+> **Critical fix to not regress:** `write_file`/`patch` were broken by the N4
+> rename (`file_tools_write_guards.py` KeyError) and are now fixed (§21).
+
+## 1. What Qubit is built on
+
+- `qubit_runtime/` **is** the real vendored upstream source, renamed. Not a stub
+  foundation. Evidence: `QUBIT_VENDOR_DELTA_2026-09-22.md`; 30,920 files /
+  5,819 `.py`; same subsystem tree as the working install.
+- Version: `qubit-agent` **0.21.1**. Working local upstream install:
+  `/home/trick/.hermes/hermes-agent` at **0.21.3** (git `db39ee3f`). Qubit is
+  **~2 patch releases behind**; the gap is upstream decomposition, not stripped
+  code (nothing Qubit imports is missing).
+
+## 2. Migration from the reference home — **PARTIAL**
+
+Qubit's runtime home is `~/.local/state/qubit-voicebridge/runtime/`. The port
+from the read-only reference home is **incomplete**, and it created legacy-named
+homes. See [MIGRATION.md](MIGRATION.md).
+
+| Item | Reference | Qubit | Gap |
+|---|---|---|---|
+| sessions | 122 | 180 (mixed) | not a clean port |
+| skills | 33 dirs / 77 MB | 32 dirs | ~1 missing |
+| cron | 7 | 3 | 4 missing |
+| memories | 4 | **0** | not ported |
+| `config.yaml` | 16,724 B | 549 B | not mapped |
+| `auth.json` | 4,468 B | 1,847 B | credentials partial |
+
+Legacy-named dirs/files in Qubit's own state: `hermes/`, `hermes-runtime/`,
+`hermes-migration/`, `hermes_config_overrides.json`, `hermes_persona.json`
+(and **four** homes with separate `state.db`s).
+
+## 3. Does it run? — **PARTIAL; core works, M1 not fully proven**
+
+- **Core runtime works:** `qubit agent -z "…"` returns a real model turn
+  (`QUBIT_OK`, rc=0; qubit-brain4). Service active; dashboard on `0.0.0.0:8890`
+  (HTTP 302); `qubit doctor` green except `browser_cdp`.
+- **Not yet proven:** the `/chat` terminal TUI, `/qubit-chat` voice turn,
+  session persistence, and dashboard controls end-to-end.
+- **Voicebridge blocker:** `qubit task` segfaults (native, no Python frame) in
+  the audio/ASR path (`sherpa_onnx` / `sounddevice`).
+- **Corrections:** the `:9119` listener is the managed reference
+  (`hermes-dashboard.service`), not a stray and not a Qubit conflict; the 18
+  restarts are explicit (tooling), not crashes; TUI build/install succeed now
+  (earlier failures were transient). See `FINDINGS_2026-09-22.md`.
+- **Config/safety/audio** (`FINDINGS` §G): **FIXED this session** — removed the
+  orphan `safety.denylist: ['x','y']` key (the real enforcer was already
+  correct); `asr-test` honors `asr.provider` (`[sherpa-parakeet/cpu]`); renamed
+  the MCP key `openclaw-voice-bridge-graft` → `voicebridge-graft`; added a
+  cross-process **audio-owner lock** — `qubit task` no longer segfaults (5/5);
+  removed the `~/.hermes` model fallback. **OPEN:** config drift, MCP
+  single-source, the `~/.hermes/.env` key fallback (migration). **DEFERRED:**
+  `hermes-cli` toolset, `/api/hermes/update` route. **ACTION:** rotate the
+  reference's plaintext API key.
+
+## 4. Adapter contractual-pin method surface (regenerated, byte-identical ×2)
+
+| Class | Count | Terminal |
+|---|---:|---|
+| IMPLEMENTED | 252 | yes |
+| SAFE_EQUIVALENT | 87 | yes |
+| OPERATOR_ONLY_EXTERNAL | 75 | yes (once prerequisite named) |
+| OPERATOR_ONLY_ARCHITECTURE | 20 | **NO — OPEN until individually approved** |
+| OPEN (unbacked) | 0 | — |
+| **Total** | **434** | **414 terminal, 20 OPEN** |
+
+The old "434/434 disposed, 0 OPEN" was wrong: a typed refusal is not a working
+capability. The 20 OPEN rows are `agents.*`, `cron.scratch.*`, `mentions.*`,
+`skills.proposals.*`, `skills.upload.*`, `taskSuggestions.*`, `tasks.dismiss`,
+`users.{setDisplayName,setRole}`, `voicewake.*`.
+
+## 5. Ledgers (regenerated)
+
+- Adapter capability ledger: 104 = 94 IMPLEMENTED, 2 SAFE_EQUIVALENT,
+  7 OPERATOR_ONLY_EXTERNAL, 1 OPERATOR_ONLY_ARCHITECTURE (OC-48, OPEN).
+- Merged ledger: 1423 = **1266 IMPLEMENTED, 146 SAFE_EQUIVALENT, 10 external,
+  1 architecture (OPEN)**; code-side open **1**. The older 1262/150/open-0 was
+  stale (pre-existing drift, not caused by any recent change).
+
+## 6. Parity target — the local reference dashboard
+
+- Reference: the live **reference dashboard** at `http://127.0.0.1:9119/?profile=default`
+  (HTTP 200), served by the working install `hermes-agent` 0.21.3. See
+  [PARITY.md](PARITY.md).
+- Requirement: **everything that works there must work in Qubit** — every route,
+  page, button, control, skill, MCP, browser, terminal, and IDE action — and
+  **every one of them must be commandable by voice** through the Qubit voice
+  bridge.
+- Current gap: Qubit has `qubit_compat.ROUTES` 415 with **94 `GATED`** (typed
+  refusals = not done), `dashboard_ops` catalog 562 + 35, voice registry 510 +
+  18 guards, and **3199 OPEN** controls with no E2E run. **Parity is not achieved.**
+
+## 7. Legacy brand
+
+- Requirement: **zero legacy brand on any shipped/user-facing surface** (not
+  `NousPortal`, not `Hermes`, not `OpenClaw`, not `Nous Research`). See
+  [BRAND.md](BRAND.md).
+- **Required exception:** `LICENSE` and `THIRD_PARTY_NOTICES.md` keep the
+  upstream copyright/license attribution — removing it is a license violation.
+- Current footprint: **1,638 live files** still contain a legacy token
+  (`qubit_runtime/` 890 `Hermes` / 363 `NousResearch`; `tests/` 211; `docs/` 112;
+  `scripts/` 22; `frontend/` 11; `voicebridge/` 27 `OpenClaw`). The shipped bundle
+  still embeds the upstream docs URL and the `@NousResearch` handle.
+- Owner Ruling 1 → **Option A** (de-brand product surfaces; keep legal/provenance)
+  — **not yet applied**.
+
+## 8. Focused tests (baseline worktree, not a full run)
+
+- 70 passed, **4 pre-existing failures** (committed ledger section, ledger
+  ingestion, route-ownership matrix, extension map — all stale artifacts).
+- Branding: 1 known-conflict failure (`test_branding_bundle_scan9u.py`); 18 pass.
+
+## 9. Docs
+
+- Pre-reset docs archived to `docs/archive/2026-09-22-pre-reset/` (31 files);
+  every reference repointed (49 total); zero dangling `docs/QUBIT_*` paths.
+- Frozen records (`docs/archive/2026-09-21/`) and `docs/differential/INTERFACE.md`
+  untouched.
+
+## 10. Orchestrator session log — 2026-09-22 (Phase 0 wave)
+
+Evidence only; no milestone claimed. No git writes (no stage/commit/push).
+
+**Done this session**
+
+- **0.1 One instance / reference intact — PASS.** `ss -ltnp`: `0.0.0.0:8890` =
+  Qubit python (pid 664056); `127.0.0.1:9119` = reference `hermes` (pid 492159).
+  Reference untouched.
+- **0.6 Generator patches applied + determinism proven.** The 5 code patches
+  from `/tmp/opencode/qubit-staged-gates-2026-09-22/diffs/` were applied
+  (`git apply`; originals backed up to
+  `/tmp/opencode/qubit-phase0-backups/20260922-214650/`). The 7 doc patches were
+  **not** applied (they target archived files; superseded by the fresh set).
+  Regenerated to a temp dir (frozen archive untouched) and proven byte-identical
+  ×2: manifest `e47d7b0…`, openclaw ledger `9e5e068…`, merged ledger `f4cd0f9…`.
+  Merged counts match the projection: **1423 rows; 1266 IMPLEMENTED / 146
+  SAFE_EQUIVALENT / 10 OPERATOR_ONLY_EXTERNAL / 1 OPERATOR_ONLY_ARCHITECTURE;
+  code-side open 1 (OC-48); code-ready False.**
+- **Core runtime still real (re-verified):** `qubit agent -z "…"` → `QUBIT_OK`,
+  rc=0.
+
+**Open / blocked (Phase 0 exit NOT met)**
+
+- **0.2 Config authority — UNRESOLVED (owner decision).** Canonical loader reads
+  `~/.config/qubit-voicebridge/voice.yaml` (3,446 B); repo `config/voice.yaml`
+  is 8,392 B and differs; `config/voice.local.yaml` is dead code (only
+  `voice.yaml` is read). Reconciling touches live audio hardware config.
+- **0.3 Duplicate unit — CONFIRMED stale, not yet retired.** `qubit-voice-agent
+  .service` is disabled+inactive and its `ExecStart` points at a **nonexistent**
+  repo (`/home/trick/Projects/Repos/openclaw-voice-bridge/…`). Retirement is a
+  systemd-user change; held for owner confirmation.
+- **0.4 SQLite WAL-reset — BLOCKED, no working repair path.** Journal still shows
+  `linked SQLite 3.45.1 … using journal_mode=DELETE`. `qubit update` is a typed
+  refusal (`QUBIT_NATIVE_UPDATE`); its suggested alternatives `qubit product
+  upgrade` / `qubit package upgrade` are **voice** commands (config/hotkey/
+  dry-run/mute), not package/DB upgrades; `qubit runtime upgrade` only swaps a
+  pinned opencode image. FINDINGS B1's prescribed fix (`qubit update`) does not
+  exist as a capability. **New finding N1.**
+- **0.5 Console scripts — NOT installed.** `.venv/bin` has `qubit`, `qubit-dev`,
+  `voicebridge`; `pip show qubit-agent` empty. `pyproject.toml:93` still declares
+  the legacy `qubit-hermes` entrypoint.
+- **0.7 Ruling 1 — NOT applied.** `test_branding_bundle_scan9u.py` (forbids
+  `Hermes`/`Nous`/`OpenClaw`/`@NousResearch` in the shipped bundle) directly
+  conflicts with `test_branding_leaks_fixes.py` (requires
+  `https://hermes-agent.nousresearch.com/docs/`). Applying Option A needs both a
+  test edit and a `frontend/qubit-dist` rebuild.
+
+**New findings this session**
+
+- **N1** — no working package/SQLite upgrade command (above). §0.4 blocker.
+- **N2** — brand footprint is **larger** than documented. Excluding `.git/`,
+  any `archive/`, `node_modules/`, `.venv/`, `qubit-dist/`: `Hermes` 2,322,
+  `NousResearch` 487, `NousPortal` 53, `OpenClaw` 268 files (BRAND.md states
+  1,638 total and 890 `qubit_runtime/`). BRAND.md §current-footprint undercounts.
+- **N3** — `page_coverage.py` reads its manifest from a hardcoded path inside the
+  **frozen** `docs/archive/2026-09-21/`, so regeneration cannot be proven without
+  either writing into the frozen archive or a canonical-location decision
+  (DECISIONS lists that location as undecided).
+- **N4** — the working tree is mid-flight: **14,164 files staged** (a
+  `hermes→qubit` path-rename wave) plus **968 unstaged** modified files. No
+  commit; flagging so the next writer does not build on a half-applied rename.
+
+## 11. Phase 0 gate — 2026-09-22 (owner-resolved wave)
+
+Owner resolutions received (0.2–0.7 + N4). No git writes. Evidence only.
+
+- **N4 — FROZEN (intended).** Read-only analysis: `qubit_hermes/` (10,514 files)
+  → `qubit_runtime/` (10,514) + `frontend/` (167); old dirs absent, new dirs
+  populated, `qubit agent -z` works. Treated as the base. (Only `dist/` and a
+  few scripts/docs still name old paths.)
+- **0.2 Config authority — DONE.** Installed `~/.config/qubit-voicebridge/
+  voice.yaml` remains the sole read authority. Repo `config/voice.yaml` renamed
+  → `config/voice.example.yaml` (the old example's unique `terminal:` block —
+  `/chat` `min_context_tokens: 65536` — preserved; header corrected);
+  `config/voice.local.yaml` marked DEAD. Backups:
+  `/tmp/opencode/qubit-phase0-backups/20260922-215734-config/`.
+- **0.3 One unit — DONE.** `qubit-voice-agent.service` (disabled, `ExecStart`
+  → nonexistent `/home/trick/Projects/Repos/openclaw-voice-bridge/`) retired
+  (file moved to backup + `daemon-reload`). Only `qubit-voicebridge.service`
+  remains (plus the reference `hermes-dashboard.service`, untouched).
+- **0.4 SQLite — ACCEPTED (deferred).** Qubit safely uses `journal_mode=DELETE`;
+  no working repair command exists (`qubit update` refuses; `qubit product
+  upgrade`/`qubit package upgrade` are voice commands). Recorded as accepted.
+- **0.5 Console scripts — DONE.** Removed `qubit-hermes` from `pyproject.toml`;
+  `uv pip install -e . --no-deps` → `.venv/bin/{qubit,qubit-agent,qubit-dev}`
+  (was missing `qubit-agent`); `qubit-agent --help` rc=0; `qubit-hermes` gone.
+- **0.6 Canonical location + determinism — DONE.** Created `docs/generated/`;
+  repointed the generators (`openclaw_upgrade_manifest`, `rebuild_ledger_{hermes,
+  openclaw,qubit}`, `page_coverage`, `openclaw_method_inventory`,
+  `openclaw_operator_only_review`, `gap_ledger`) and the consuming tests; the
+  frozen `docs/archive/2026-09-21/` is never written (gap_ledger reads
+  generated-first, archive-fallback for the frozen hermes/qubit sections).
+  Applied the 5 code patches. Regenerated to `docs/generated/`, each
+  **byte-identical ×2**: manifest `e47d7b0…`, openclaw ledger `9e5e068…`,
+  merged ledger `f4cd0f9…`→`af519ae…` (provenance text now names
+  `docs/generated/`; counts unchanged: **1423 rows; 1266/146/10/1; code-side
+  open 1 (OC-48); code-ready False**), page coverage `11c5eb0…`, method
+  inventory `7930dcc…`, operator-only review (95 rows: 68 external / 27
+  architecture).
+- **0.7 Ruling 1 → Option A — DONE.** De-branded the rendered upstream docs URL
+  (`frontend/qubit-web/src/pages/DocsPage.tsx` → Qubit-owned `/agent/openapi.json`)
+  and the `@NousResearch` handle + kanban upstream docs URLs in the in-tree
+  plugin bundles (`frontend/qubit-web/public/plugins/{kanban,hermes-achievements}`
+  **and** `qubit_runtime/plugins/*/dashboard/dist`). Updated
+  `tests/test_branding_leaks_fixes.py` + `test_branding_frontend_classification9u.py`
+  + the `TerminalChatPage` comment leaks. Rebuilt `frontend/qubit-dist`
+  (`DASHBOARD_BUILT`, rc=0; backup kept). **Branding suite: 67 passed**
+  (bundle scan, leaks-fixes, classification, CLI, dashboard, runtime, final).
+
+**Focused-check residuals (not Phase-0 regressions)**
+
+- `tests/test_ledger_hermes_build.py::test_output_is_deterministic_across_hash_seeds`
+  and `test_safe_equivalent_evidence.py::test_every_safe_equivalent_row_has_proving_test_on_disk`
+  — the **frozen** hermes/qubit sections name proving tests that the N4 rename
+  moved/deleted (e.g. `test_memory_reset_is_a_typed_operator_surface_refusal`);
+  deterministic but stale vs the base tree. Reconcile the ledger baselines.
+- `tests/test_ledger_ingestion_wave3.py::test_implemented_op_ids_are_linkable_to_a_dispatch`
+  — `web_fetch`/`web_search`/`websites_show` lost dispatcher linkage after the
+  mid-flight `voicebridge/websites.py` change (3 `UNVERIFIED` in a fresh qubit
+  ledger). **New finding N5.**
+- `tests/test_safe_equivalent_evidence.py::test_audit_doc_lists_every_distinct_refusal_code`
+  — the patched generator surfaces a `MALFORMED` code the frozen
+  `QUBIT_SAFE_EQUIVALENTS.md` cannot list. **New finding N6.**
+- `tests/test_branding_parity_wave3.py::{test_vendor_manifest_hashes_are_valid,
+  test_overlay_manifest_hashes_are_valid}` — stale hash manifests on files the
+  rename touched (`SidebarStatusStrip.tsx`, `ChatPage.voice9u.test.tsx`);
+  pre-existing.
+
+**Phase 0 gate: 0.2–0.7 resolved (0.4 accepted), N4 frozen, generators
+byte-identical → PASS (with the residuals above recorded as Phase-1 items).**
+No M1/M2/M3/M4/VERIFIED claimed. Phase 1 (W1/W-MIG/W-BRAND) not started.
+
+## 12. W1 — M1 boot baseline — 2026-09-22 (evidence; **M1 NOT passed**)
+
+Command + output per item. UI items driven live against `http://127.0.0.1:8890/chat`.
+
+| # | Boot item | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Service starts | **PASS** | `systemctl --user is-active qubit-voicebridge` = `active`; `ExecMainStatus=0`, `NRestarts=0`. |
+| 2 | Gateway starts and stays alive | **FAIL** | No Qubit gateway process: service cgroup = `python -m voicebridge run` + `xinput test-xi2` only. The only `tui_gateway` (pid 499439) is the **reference** `~/.hermes/hermes-agent` install. |
+| 3 | `/chat` opens the real terminal runtime | **PASS** | `/chat` (browser) mounts region `Qubit terminal` + `Terminal input`; `agent.log`: `platform=tui`. |
+| 4 | `/chat` loads the real model/provider | **PASS** | Panel: `opencode-go/deepseek-v4-flash · 200,000 ctx`; log `provider=opencode-go model=deepseek-v4.1-flash`. |
+| 5 | `/chat` shows real tools/skills/plugins/MCP/sessions | **PASS** | `qubit agent -z` tool list (`terminal`,`read_file`,`web_search`,`skill_manage`,`kanban_*`…); `/chat` sessions panel populated; `qubit plugins list` catalog. |
+| 6 | `/chat` accepts a prompt, returns a response | **PASS** | typed via browser → `agent.log`: `conversation turn: session=dashboard-chat … msg='Reply with exactly: BOOT_CHECK_13'`. |
+| 7 | Reference-compatible commands/options | **PASS** | `qubit agent --help` exposes `chat/model/gateway/skills/plugins/mcp/sessions/…` + `-z/-m/--provider/--reasoning/-t/--resume/--skills`. |
+| 8 | Skills execute | **UNPROVEN** | only `qubit skills list` (install records); no execution receipt. |
+| 9 | Plugins load + execute | **UNPROVEN** | `qubit plugins list` catalog only. |
+| 10 | MCP servers/tools load + execute | **PASS (config-closed)** | legacy dead server (`openclaw-voice-bridge-graft`, path nonexistent) removed; `cgraph-graft` allowlisted → `qubit mcp status` `invocable:true MCP_INVOCATION_READY`; `qubit mcp invoke cgraph-graft --tool graft_find_code --confirm` → real result `duration_ms≈1405`. |
+| 11 | Sessions/history persist | **PASS** | runtime `state.db`: **184 sessions / 22,289 messages**; `/chat` turn written there. |
+| 12 | Gateway status/start/restart work | **FAIL** | `qubit gateway status` = "not running"; `start/stop/restart` are typed refusals ("operator supervises gateway processes"). |
+| 13 | Dashboard controls operate vs real backend | **PARTIAL** | `/chat` model/session controls render and the chat turn dispatches to the real backend; full control E2E not swept. |
+
+**M1 verdict: NOT PASSED** (items 2, 10, 12 fail; 8, 9 unproven; 13 partial).
+The reference-parity model does run through `/chat` on the one Qubit backend —
+the gap is the gateway-daemon items and tool-execution proof. **New findings:**
+N7 (MCP not connected + legacy key), plus the gateway-daemon policy gap (items
+2/12) and the `.hermes_history`/`hermes-*` names still inside Qubit's own runtime
+home (W-MIG/W-BRAND).
+
+## 13. Phase 1 wave — 2026-09-22 (parallel agents + W-MIG)
+
+Four read-only agents were deployed; findings below. **No M1/M2 claim.**
+
+- **W2 parity inventory (agent) — DONE.** `docs/generated/parity_inventory.json`
+  (schema `qubit-parity-inventory/1`, **1380 rows**): routes 272 (198 PORTED / 60
+  GATED / 14 MISSING), CLI 384 (356/11/17), controls 599 (548/51/0), tools 125
+  (113/10/2). **1215 PORTED / 132 GATED / 33 MISSING.** PORTED = counterpart
+  registered-with-handler; `e2e_verified:false` for all rows (behavioral E2E not
+  yet run). Top MISSING: `/api/portal`, `/api/providers/oauth*`,
+  `/api/audio/voice-live/*`, `codex-runtime`, `vault`, `usage`, skill `product`,
+  optional-MCP `n8n-official`.
+- **M1 item 10 — config-closed.** See §12 row 10. Fix: legacy dead MCP server
+  removed; `cgraph-graft` allowlisted (6 real graft tools). Backups:
+  `/tmp/opencode/qubit-phase1-backups/20260922-231401-mcp/`.
+- **M1 items 2/12 — dispositioned (naming mismatch).** The dashboard "Gateway
+  Status: Running" is the Qubit service (`qubit_compat.py:360 h_status` →
+  `gateway_supervisor.status` → `qubit-voicebridge.service`, `running:true`).
+  `qubit gateway status` forwards to the **vendored messaging gateway** (not
+  running; operator-owned); `qubit gateway start/stop/restart` is a
+  `GATEWAY_NO_SUPERVISION` refusal with a **real working counterpart**
+  (`qubit gateway supervision-request --confirm` and dashboard
+  `POST /api/gateway/{start,stop,restart}` → `gateway_supervisor.control`). No
+  Qubit `tui_gateway` exists by design (WS dialect gated: `WS_SINGLE_PATH` /
+  `PTY_NO_SHELL`). Boot items 2/12 are a **measurement/naming** issue, not a
+  missing control; a Qubit-owned messaging-gateway daemon remains operator-owned.
+- **M1 items 8/9 — working paths with receipts.** `qubit plugins invoke
+  builtin.echo --text … --confirm` (plugin_runtime.py:1904 invoke; events.jsonl
+  `plugin.invoke` receipts 2026-09-22); skill execution = the agent tool path
+  (`skill_view`/`skills_list`, state.db `tool_name` counts: `skill_manage` 118,
+  `skill_view` 77).
+- **W-MIG — PARTIAL.**
+  - Memories ported: `~/.hermes/memories/{MEMORY.md,USER.md}` →
+    `runtime/memories/` (was 0/4).
+  - Cron jobs already migrated (same 2 ids, `b8d60fe64add` / `3e396bb6e6a5`).
+  - **3 dead legacy homes retired** (moved out of the state tree to backup):
+    `hermes/`, `hermes-runtime/`, `qubit/` — dead per `qubit_runtime.py:261
+    _LEGACY_HOME_NAMES` + `migrate_legacy_homes` (canonical state.db/kanban.db/
+    projects.db all exist → sources never opened). Backup:
+    `/tmp/opencode/qubit-phase1-backups/20260922-232726-w-mig/` (99 MB;
+    includes `qubit/auth.json` — credentials, owner-gated, preserved not read).
+  - **LIVE legacy-named stores must NOT be deleted** (rename+migrate only):
+    `hermes_config_overrides.json`, `hermes_persona.json` (dashboard Settings +
+    active-profile), `hermes-migration/` (rollback bundles), and
+    `runtime/.hermes_history`. These are W-BRAND code-rename work.
+  - **Owner-gated:** config mapping (agent table: ~40 keys safe to auto-map, ~15
+    owner decisions; **provider/model `opencode-zen/laguna-s-2.1-free` and all
+    secrets must NOT be imported**); `auth.json`/`.env` secrets; reference key
+    rotation.
+  - Post-change verification: service `active`, `qubit agent -z` → `QUBIT_OK`,
+    `qubit mcp status` → `cgraph-graft` invocable, memories present.
+- **No `~/.hermes` rename-fallback test run:** renaming the reference home
+  violates the read-only guardrail; prove no-fallback instead with a temp
+  `QUBIT_HOME`/`HOME` or strace (TODO).
+
+## 14. Multi-agent wave — 2026-09-22 (7 agents, parallel)
+
+Seven read-only/writer agents were deployed in two batches. No milestone
+claimed. All fixes verified live.
+
+- **W2 parity inventory — DONE.** `docs/generated/parity_inventory.json`
+  (schema `qubit-parity-inventory/1`): **1380 rows** — routes 272 (198/60/14),
+  CLI 384 (356/11/17), controls 599 (548/51/0), tools 125 (113/10/2) →
+  **1215 PORTED / 132 GATED / 33 MISSING**. All `e2e_verified:false`.
+- **W4 disposition — DONE (report).** 132 GATED + 33 MISSING dispositioned:
+  **125 legitimate-refusal-with-working-counterpart**, **40 genuine gaps**
+  (33 MISSING + 7 flagged), **7 operator-owned**. Real W4 work: `hermes update`
+  upgrade path (N1), register vendored handlers `GET /api/portal` +
+  `/dashboard-plugins/{name}/{path}`, `gateway_supervision` voice wiring, and
+  the 0.21.1→0.21.3 CLI ports (`vault`, `codex-runtime`, `usage`,
+  `sessions set-journal-mode`, `plugins browse/validate`, …).
+- **M1 item 10 — CLOSED.** Legacy dead MCP server removed; `cgraph-graft`
+  allowlisted (6 real graft tools); `qubit mcp invoke cgraph-graft --tool
+  graft_find_code --confirm` → real result `duration_ms≈1405`.
+- **M1 items 2/12 — DISPOSITIONED (naming).** Dashboard "Gateway Status:
+  Running" = the Qubit service (`gateway_supervisor.status` → pid 664056);
+  `qubit gateway start/stop/restart` = `GATEWAY_NO_SUPERVISION` refusal whose
+  real counterpart is the dashboard `POST /api/gateway/restart`
+  (`gateway_supervisor.control`) — **verified live: it restarted the service
+  (pid change, recovered in ~6 s)**. No Qubit `tui_gateway` by design.
+- **M1 items 8/9 — working paths with receipts.** `qubit plugins invoke
+  builtin.echo … --confirm` (`plugin.invoke` events); skill execution =
+  `skill_view`/`skill_manage` agent-tool rows (state.db: 77/118).
+- **M1 item 13 — PARTIAL real-backend (verified).** `/chat`, `/sessions`,
+  `/plugins`, `/docs`, `/qubit-boards`, `/qubit-gateway` all hit real 200s;
+  terminal profile persistence is confirmation-gated (409→200, net-zero);
+  WS session resume works. Defects: `/agent/api/actions/gateway-restart/status`
+  **404** and the theme switch is client-side only.
+- **Ruling 3 — FIXED LIVE.** `/` was redirecting to `/sessions` (violating
+  Ruling 3 Option A); changed `voicebridge/webui.py:1867` + `App.tsx`
+  `RootRedirect` + `tests/test_webui.py:343`; rebuilt `frontend/qubit-dist`.
+  Live: `curl http://127.0.0.1:8890/` → `302 Location: /chat`.
+- **W-MIG — config + memories + homes.**
+  - 40 additive non-secret reference config keys ported into
+    `runtime/config.yaml` (backup `/tmp/opencode/qubit-phase1-backups/
+    20260922-232901-configmap/`); provider/model/secrets/hardware excluded;
+    `qubit agent -z` → `QUBIT_OK`.
+  - Memories ported (4→present); cron jobs already migrated (same 2 ids).
+  - 3 dead legacy homes retired (backup `…232726-w-mig/`).
+- **W-BRAND Lane B — DONE.** Renamed Qubit-owned live state stores with a
+  non-destructive read-old/write-new migration: `hermes_config_overrides.json`
+  → `qubit_config_overrides.json`, `hermes_persona.json` → `qubit_persona.json`,
+  `hermes_env_refs.json` → `qubit_env_refs.json` (`voicebridge/qubit_compat.py`,
+  `voicebridge/env_store.py`). `QUBIT_OK`; focused tests 32 passed / 1
+  pre-existing failure (`test_config_secret_skip.py::test_full_tree_save_
+  skips_unchanged_served_secret_leaves` — verified pre-existing by diff).
+  Backup `…233511-brand-b/`.
+- **W-BRAND scope re-baselined (agent).** BRAND.md's 1,634 is stale: exact
+  current counts are **1,621 strict / 5,381 case-insensitive** files (the gap is
+  lowercase `hermes_*`/`openclaw_*` identifiers). Dominant literals: `hermes-`
+  1569 files, `HERMES_` 1380, `hermes-agent` 822; `qubit_runtime/` dominates
+  (4,801 ci files → W9 vendor sync). Parallelization lanes documented.
+
+**Residual defects / new findings:** N8 (`/agent/api/actions/gateway-restart/
+status` 404); N9 (theme switch client-side only); N10 (`hermes update` has no
+working upgrade counterpart — 3 flagged genuine gaps); remaining Qubit-owned
+`hermes_*.json` stores (`hidden`, `dashboard_auth`, `dashboard_prefs`,
+`custom_endpoints`, `memory_provider`) still legacy-named.
+
+## 15. Owner Decisions #10–#13 implemented — 2026-09-23
+
+Owner resolutions: real Qubit-owned gateway; sanctioned `qubit update
+--check|--apply|--rollback`; fix gateway status + restart-status routes. All
+implemented and behaviorally tested. **No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **Qubit-owned gateway — real control through the one authority path.**
+  `voicebridge/gateway_supervisor.py` now: returns full status (`pid`,
+  `active_state`, `sub_state`, `port_in_use`, `exec_main_status`, `n_restarts`,
+  `failed`, `failure`, bounded `health`/`health_latency_ms`); routes
+  `control()`/`recover()` through e-stop → confirmation (`broker.confirmation_
+  store_for` + `WorkerGuard.authorize`, single-use target-bound) → audit
+  (Decision id + typed receipt); adds `failure()`/`recover()` (reset-failed +
+  start). The vendored messaging gateway and external OpenClaw peers stay
+  operator-owned.
+  - `qubit gateway status` → **real** (`{"pid": 1002629, "running": true,
+    "health": "OK", "n_restarts": 0, "exec_main_status": 0}`), rc 0.
+  - `qubit gateway start` (no `--confirm`) → `GATEWAY_CONFIRM_REQUIRED`, rc 3,
+    **nothing executed**.
+  - `qubit gateway restart --confirm` → `ok:true`, `state:RESTARTING`, receipt
+    `decision_id=1c02ab81904b4109aa…`; **real restart** (service stopped/started,
+    new pid 1002629, recovered ~6 s).
+  - N8 **fixed**: `GET /agent/api/actions/gateway-restart/status` → **HTTP 200**
+    with the honest `state:"unknown"` payload (was 404).
+- **`qubit update` — native sanctioned surface.** Removed the `QUBIT_NATIVE_
+  UPDATE` refusal (`cli_qubit_forward.py`); added the `update` parser family in
+  `cli.py` (`--check|--apply|--rollback`, mutually exclusive) + `_cmd_update`;
+  `update_manager` gained a real timestamped `snapshot()` (`manifest.json` +
+  `git bundle`), a real `rollback()` (refuse `UPDATE_NO_BACKUP` / backup
+  pre-rollback snapshot first), and a public `estop_engaged()`.
+  - `qubit update --check` → real report (`product 1.0.0`, install `git-checkout`,
+    revision `f984911c…`, runtime image `OK`), rc 0; bare `qubit update` = check.
+- **Branding:** `hermes-update` → `qubit-update` (`qubit_compat.py` action set,
+  `SystemActions.tsx`, `SystemPage.tsx`); `qubit_compat.h_gateway_supervision`
+  confirmation hole fixed (`confirm` no longer defaults to `true`).
+- **Evidence:** 154 focused tests pass (`test_gateway_control_authority9u.py`
+  11, `test_cli_update_native9u.py` 15, CLI family parity/forward, gateway peers,
+  update manager); branding 9 pass; `frontend/qubit-dist` rebuilt.
+
+**Remaining for a future behavioral gate:** `--apply`/`--rollback` are
+implemented + unit-tested against temp checkouts but **not exercised against the
+live repo** (the working tree is mid-flight/dirty by design); the service-running
+policy for `--apply` is advisory (recorded for review). No milestone claimed.
+
+## 16. Multi-agent wave 6 — 2026-09-23 (4 agents)
+
+Owner decisions #10–#13 were implemented (STATUS §15). This wave closed
+follow-ups and ports. **No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **CLI ports (wiring gaps) — DONE.** Ported `usage`, `codex-runtime migrate`,
+  and `plugins browse` from the 0.21.4 reference into the vendored 0.21.1
+  parser (`qubit_cli/subcommands/{usage,codex_runtime}.py`, `plugins_cmd.py`,
+  `main.py`); handlers were already present. New `tests/test_cli_ports_wave6.py`
+  **9 passed**; `codex-runtime migrate --dry-run` non-mutating (sentinel
+  unchanged); `plugins browse` renders the real index.
+- **W-BRAND state stores — DONE.** Renamed the 5 remaining Qubit-owned
+  `hermes_*.json` stores to `qubit_*.json` with the same non-destructive
+  read-old/write-new migration (`hidden`, `dashboard_auth`, `dashboard_prefs`,
+  `custom_endpoints`, `memory_provider`). No live legacy files existed (verified
+  no-op). 402 focused tests pass; 4 failures proven **pre-existing**.
+- **W7 voice binding — DONE (additive).** `voicebridge/voice_commands.py`:
+  kanban `complete`/`unblock`, `plugins capabilities`, `skills install <name>`,
+  and `cron`→`schedules_*` aliases now resolve to existing safe backends; 5
+  upstream kanban shapes with no Qubit construct became audited `guard_*`
+  refusals naming the CLI counterpart. `REGISTRY` count unchanged (510). New
+  `tests/test_voice_inventory_coverage.py` **7 passed**; resolvable inventory
+  intents **240 → 268** (+28).
+- **`update --apply/--rollback` — behaviorally verified (disposable clone).**
+  Real git in `/tmp/opencode`: `check` (incl. DEGRADED rc 2), `snapshot`
+  (`manifest.json` + verifiable `code.bundle`), `apply` (fast-forward + backup +
+  remote re-verify), `rollback` (**restores the exact pre-apply SHA** + writes a
+  pre-rollback snapshot), `WORKTREE_DIRTY` (tree untouched), `UPDATE_ESTOP` rc 3,
+  `UPDATE_NO_BACKUP` rc 2. Gateway `status` + confirm-gate re-verified read-only
+  (no mutation). 1 non-blocking defect found (stale apply-receipt wording) —
+  **fixed** in `update_manager.py`.
+- **Test reconciliation for Owner Decisions #10/#12 — DONE.** `codex-runtime`
+  and `usage` classified in `cli_qubit_forward.py`; the 4 `test_cli_closure_
+  wave5` assertions that expected `gateway status` to be fork-forwarded were
+  updated (gateway status/start/stop/restart are now native). `test_cli_family_
+  parity9u` + `test_cli_closure_wave5` + `test_cli_ports_wave6` → **128 passed**.
+
+**Evidence:** 48 focused tests pass (update manager/CLI/gateway authority/voice
+inventory); QUBIT_OK; service active.
+
+## 17. Multi-agent wave 7 — 2026-09-23 (4 agents)
+
+**No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **CLI port `sessions set-journal-mode` — DONE.** Offline WAL↔DELETE conversion
+  ported from ref 0.21.4 (`qubit_cli/sessions_cmd_journal_mode.py`,
+  `sessions_cmd.py`, `qubit_state_wal.py` `_path_on_cross_vm_fs`); real handler.
+  Converts on temp DBs; refuses while holders exist; refuses WAL when the linked
+  SQLite has the WAL-reset bug (this host). `--help` rc 0; new
+  `tests/test_cli_journal_mode_wave7.py` **13 passed**.
+- **CLI ports `migrate relay` + `profile migrate-identity|purge-identity` —
+  DONE (surface).** Ported from ref 0.21.4 (`qubit_cli/relay_plugin_migrate.py`,
+  `profile_identity.py`, `profiles.py` helpers, parser blocks). Behavior proven
+  on temp dirs (relay migrates `.env`→`relay-plugins.toml` + is idempotent;
+  identity ops validate + are idempotent). New `tests/test_cli_ports_wave7.py`
+  **13 passed**. **Open:** the durable cross-store rebind needs two vendored
+  deps absent in 0.21.1 (`SessionDB.rekey_profile_state`/`purge_profile_state`,
+  `tools/checkpoint_manager_profile_rename.py`) — the port fails **loudly**
+  (rc 1), recorded as a follow-up ticket.
+- **W7 voice coverage — now a regenerated number.** `scripts/
+  voice_inventory_coverage.py` resolves every inventory `voice_intent` via the
+  real `voice_commands.resolve()`; deterministic artifact `docs/generated/
+  voice_coverage.json` (sha256 `8236393e…`, byte-identical ×2). **1380 rows →
+  280 real / 0 guard / 1100 unresolved; dead backends 0** (registry 543).
+  `tests/test_voice_coverage_report.py` **4 passed**. This replaces the earlier
+  heuristic 66.6% with an honest, test-guarded literal-resolution number — the
+  inventory's `voice_intent` candidates are weak and need better mapping.
+- **W9 vendor sync (0.21.1 → 0.21.4) — PLANNED, BLOCKED.** Reference is really
+  **0.21.4 @ 7ce19044** (0.21.3/`07610317` were stale), a **7,650-commit**
+  delta (2,927 A / 3,843 M / 145 D / 664 R; 3,588 upstream files absent from the
+  fork, all 0.21.4 additions). **Two hard blockers:** (a) the upstream-sync
+  policy §2 requires an **owner amendment to move the pin** `2237be…`; (b) the
+  mid-flight `qubit_hermes→qubit_runtime` rename is uncommitted (HEAD still has
+  `qubit_hermes/`) + 507 unstaged edits — a sync now is unreviewable/
+  unrollbackable. Recommended: freeze the worktree + pin amendment, then
+  slice-by-slice starting with `qubit_state*`.
+- **Test reconciliation:** classified `relay`, `profile migrate-identity`,
+  `profile purge-identity` in `cli_qubit_forward.py`;
+  `cli_family_parity9u`+`closure_wave5`+`ports_wave6`+`ports_wave7`+
+  `journal_mode_wave7` → **154 passed**.
+
+**Evidence:** 37 new tests pass (ports/journal-mode/voice-coverage); QUBIT_OK;
+service active; all four new commands parse. **Owner gates raised:** W9 pin
+amendment; worktree freeze.
+
+## 18. Multi-agent wave 8 — 2026-09-23 (2 writers + verifier + frontend)
+
+**No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **Profile-identity durable deps — DONE (blocker closed).** Ported
+  `SessionDB.rekey_profile_state`/`purge_profile_state`
+  (`qubit_runtime/qubit_state_gateway.py`) + `tools/checkpoint_manager_profile_
+  rename.py` from ref 0.21.4. Real rebind/purge proven on a temp `state.db`
+  (session profile_name/key/origin/routing/heartbeat rekeyed; idempotent).
+  `tests/test_profile_identity_rebind_wave8.py` **6 passed** + wave7 13 green.
+- **`plugins validate` — DONE.** Ported a real admission validator on the
+  vendored plugin model (no catalog invented) + parser/dispatch. `--help` rc 0;
+  valid temp plugin rc 0; malformed rc 1 with exact error; stable `--json`.
+  `tests/test_cli_ports_wave8.py` **11 passed** (1 pre-existing failure proven).
+- **W-BRAND Lane C (frontend SPA) — DONE (bundle rebuilt).** 16 product-surface
+  tokens de-branded (`hermes-dashboard-theme/font`, `hermes-locale`,
+  `data-hermes-plugin`, `hermes_dv`, DOM ids… → `qubit-*`) with one-time
+  read-fallback for the localStorage keys; wire tokens/package specifiers left
+  as-is. `tsc` rc 0; 50 vitest + 9 branding py pass; `frontend/qubit-dist`
+  rebuilt; bundle scan green.
+- **M1 full behavioral pass (verifier) — M1 NOT PASSED.** 9 PASS (1,3,4,6,7,8,9,
+  10,11), 2 **DISPOSITIONED** (2,12), 2 **PARTIAL** (5,13). Key findings:
+  - **Item 5/8:** tools/skills/plugins/MCP are reachable via their own pages,
+    not surfaced inside `/chat`; skill-execution receipts are **stale** (Aug).
+  - **Items 11/13 — two session authorities:** runtime `state.db` (194 sessions)
+    vs `QubitSessionStore` (101) — a single-canonical-store violation.
+  - A live Qubit `python -m tui_gateway.entry` **does** run (spawned by the
+    `/chat` PTY bridge) — corrects the earlier "no tui_gateway by design" claim;
+    items 2/12 remain scope/disposition, not a messaging daemon.
+  - `qubit doctor` green except `browser_cdp`.
+- **Independence/brand fix — DONE.** The verifier found Qubit's vendored
+  dashboard module hardcoding the **reference** unit:
+  `qubit_runtime/qubit_cli/main_dashboard.py:63 _DASHBOARD_SYSTEMD_UNIT =
+  "hermes-dashboard.service"` (also the `dashboard_procs.py:334` fallback).
+  Fixed to `qubit-voicebridge.service` — Qubit no longer targets the reference
+  service.
+
+**Evidence:** 52 focused tests pass (rebind/validate/journal/branding); bundle
+rebuilt; QUBIT_OK; service active. **New finding:** N12 (two session stores);
+N13 (vendored dashboard unit pointed at the reference — fixed).
+
+## 19. Multi-agent wave 9 — 2026-09-23 (3 writers + 1 auditor)
+
+**No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **N12 — RESOLVED (it was a capped read, not a second store).** Investigation
+  showed `QubitSessionStore` (`voicebridge/qubit_session_store.py`) is a strict
+  adapter over the SAME runtime `state.db`; the legacy JSON `ChatSessionStore`
+  is dead. The `/sessions` page hid history because `_chat_session_rows`
+  hardcoded `limit=100`. Fix: cap 100 → 1000 (`qubit_session_store.py` +
+  `qubit_compat.py _SESSIONS_CHAT_PAGE_MAX`). Live before→after:
+  `/api/sessions` total **101 → 168**, messages **547 → 5489**; previously
+  hidden `/chat` sessions now reachable. `qubit agent -z` → QUBIT_OK.
+- **W4 port `vault` — DONE.** `vault add|list|rm|sources` ported from ref 0.21.4
+  (`qubit_cli/vault.py`, `subcommands/vault.py`, `agent/vault_store.py`,
+  `agent/vault_backends/*`); Fernet crypto preserved. Temp-vault behavior proven
+  (list shows metadata only — no secret value; wrong key → typed error).
+  `tests/test_cli_ports_wave9.py` **13 passed**. Vault classification added to
+  `cli_qubit_forward.py`.
+- **W4 port `sessions repair-profiles` — DONE.** Ported from ref 0.21.4
+  (`qubit_state_profile_repair.py`, `sessions_repair_profiles.py`,
+  `sessions_cmd_repair_profiles.py`, `gateway_multiplex_mode.py`) + parser/
+  dispatch. Temp-store behavior proven: report-only changes nothing; `--apply`
+  refuses while a gateway is live; snapshots + repairs + idempotent.
+  `tests/test_cli_ports_wave9_repair.py` **9 passed**.
+- **W9 owner-gate prep — DONE (draft).** `docs/QUBIT_OWNER_AMENDMENT_2026-09-23_
+  W9_VENDOR_SYNC.md` (draft, empty OWNER SIGN-OFF). **Reference HEAD is now
+  `400f11bd` (0.21.4)** — a moving target; `07610317` and the previously
+  recorded `7ce19044` are behind it. Drift pin→HEAD = **7,659 commits**
+  (2,938 A / 3,847 M / 145 D / 664 R). Proposed new pin = installed HEAD;
+  fallback = the v0.21.4 release commit `d337b736…`. **Amendment NOT granted.**
+- **M1 items 5/8 — fresh evidence.** Fresh `plugin.invoke` (`builtin.echo`,
+  2026-09-23 01:37) and a fresh `skill_view` row (2026-09-23 01:37:58;
+  the Aug-2026 staleness concern is resolved for the read path). **Item 5
+  confirmed PARTIAL:** tools/skills/plugins/MCP are **not** surfaced inside
+  `/chat` — only as left-nav links to their own pages. **New findings:** the
+  agent skill registry and the Qubit `skills` registry are **different stores**
+  (`qubit-boards` installed but not visible to the agent); agent-visible skills
+  still carry legacy names (`hermes-voice-mode`) — N14.
+
+**Evidence:** 141 focused tests pass (vault/repair/CLI-parity); branding 18
+pass; QUBIT_OK; service active. **Owner action:** sign the W9 pin amendment
+(choose HEAD `400f11bd` vs release `d337b736`) and freeze the worktree.
+
+## 20. Multi-agent wave 10 — 2026-09-23 (3 writers + 1 UI verifier)
+
+**No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **N14 — RESOLVED.** The skill-registry split was a **phantom record**: `qubit-
+  boards` is an overlay dashboard plugin recorded as a permissioned capability
+  grant with no `SKILL.md`; `merged_store_view` listed every permissioned row
+  unconditionally. Fix: gate permissioned rows on the on-disk catalog set (the
+  same gate `catalog_entries` documents). Result: agent / `catalog_entries` /
+  `qubit skills list` all **197**; `qubit-boards` absent from all three (still
+  manageable). De-branded the Qubit-owned skill `hermes-voice-mode` →
+  `qubit-voice-mode` (dir + frontmatter/title/H1; usage key migrated);
+  `skill_view("qubit-voice-mode")` resolves. 148 focused tests pass.
+- **M1 item 5 — CLOSED (surface).** New read-only `ChatToolsSummary` card in the
+  `/chat` side panel renders **tools 49 in 17 toolsets · skills 197 · plugins 10
+  · MCP 1** from the real endpoints (`/api/tools/toolsets`, `/api/skills`,
+  `/api/dashboard/plugins`, `/api/mcp/servers`); best-effort, cannot block the
+  PTY. tsc rc 0; 10 vitest pass; `frontend/qubit-dist` rebuilt; browser counts
+  match `curl`.
+- **`qubit chat` — DONE (CLI parity).** Removed the `QUBIT_NATIVE_CHAT` refusal;
+  `qubit chat` is now a classified forward to the vendored interactive chat
+  (`--help` rc 0; one-shot `-q … -Q` rc 0 → real turn), with a typed
+  `CHAT_REQUIRES_TTY` (rc 2) gate on a bare non-TTY launch. 151 focused tests
+  pass.
+- **M1 item 13 — PASS (core controls).** Full sweep: every core control hits a
+  real backend — terminal PTY, sessions open/resume/refresh, the new summary,
+  all listed pages, sidebar gateway status, theme/font persistence. `Set
+  default` and `Restart Gateway` are confirmation-gated by design (left
+  unconfirmed, net-zero). **N9 CORRECTED:** the theme switch is **not**
+  client-side only — `PUT /api/dashboard/theme` → 200 `{persisted:true}`; only
+  one theme exists, so no visible change.
+- **Item-13 new defects (brand/consistency):** `/sessions` sends
+  `exclude_sources=…hermes_flow…` (a backend session-source data key with no
+  Python emitter in voicebridge/qubit_runtime → W9/coordinated rename; not
+  caught by the strict scanner); `/docs` renders legacy paths
+  (`/api/hermes/update.*`, `/api/plugins/hermes-achievements/...`); the terminal
+  banner reports `MCP Servers (0) connected` while the dashboard reports `1`
+  (`cgraph-graft`) — an inconsistency to reconcile.
+
+**Evidence:** 159 focused tests pass (chat/ports/repair/skill-catalog/branding);
+QUBIT_OK; service active.
+
+## 21. Multi-agent wave 11 — 2026-09-23 (3 writers + verifier)
+
+**No M1/M2/CODE_READY/VERIFIED claimed.**
+
+- **CRITICAL BUG FIXED — `write_file`/`patch` were broken by the N4 rename.** The
+  M1 item-8 verifier found `qubit_runtime/tools/file_tools_write_guards.py`
+  renamed its module globals to `_qubit_*` but still passed the old string keys
+  to `_cached_lookup` → `KeyError: '_hermes_config_resolved_loaded'`, breaking
+  **every** `write_file` and `patch` call (last success Aug-2026). Fixed the keys
+  + removed the `~/.hermes` fallback in the same guard (independence). Proof:
+  real agent turn wrote `/tmp/m1-write-probe.txt` = `WRITE_OK`, then `patch` →
+  `PATCH_OK`; 106 vendored file-tool tests pass (2 stale `'Hermes config'`
+  assertions updated to `'Qubit config'`).
+- **Item 8 — PASS (scoped, after the fix).** A skill was loaded and its
+  instructions **acted on**: a documented artifact was produced
+  (`/tmp/m1-skill-exec-probe/SKILL.md`, validated frontmatter) and a
+  skill-guided `terminal` command produced deterministic output; receipts in
+  `state.db` (`skill_view` + tool rows). Not proven: every skill; skills needing
+  network/GPU.
+- **Item 10 — PASS.** A **live** `qubit mcp invoke cgraph-graft --tool
+  graft_find_code --confirm` round-trip (`duration_ms≈1292`) with fresh
+  `events.jsonl` receipts (`mcp.confirm` → `mcp.client.invoke` → `mcp.invoke`).
+- **Item-13 defects — FIXED.** (1) dead `hermes_flow` session-source entry
+  removed from `SessionsPage.tsx` (no backend emits it; filter verified
+  unchanged); (2) MCP row now reads `1 configured · 0 connected` (honest, matches
+  the terminal banner); (3) `/docs` legacy OpenAPI paths annotated as
+  `x-qubit-compat-alias` (routes still resolve). Bundle rebuilt.
+- **W4 ports — DONE/OPERATOR.** `gateway migrate` real read-only plan/preflight
+  + operator-owned apply refusal (`GATEWAY_MIGRATE_OPERATOR_OWNED`, rc 3);
+  `auth upgrade` typed operator-owned external refusal (`AUTH_UPGRADE_OPERATOR_
+  OWNED`, rc 3) — **not ported** (needs a Nous account; absent modules). 15 +
+  347 CLI-parity tests pass.
+- **W9 precondition prep — DONE (pin NOT changed).** Pristine 0.21.4 source at
+  `/tmp/opencode/pinned/hermes-agent-0.21.4/` (SHA `400f11bd…`, **14,966**
+  files). Rename maps extended (+9 each: `hermes_platform→qubit_platform`, the
+  8 new `hermes_state_*`/`hermes_constants_scratch`) → **0 `hermes_*` module-path
+  leaks** across 116 top-level paths. Slice-0 (`qubit_state*`: 7 new + 22
+  modified) confirmed. **Pin/`qubit_runtime` untouched.**
+
+**Evidence:** 141 focused tests + 106 vendored file-tool tests + 52 wave-11 tests
+pass; write/patch proven live; QUBIT_OK; service active. **Owner action
+unchanged:** sign the W9 pin amendment + freeze the worktree.
+
+## 22. N14 — skill registry split + `hermes-voice-mode` de-brand — 2026-09-23
+
+**No M1/M2/CODE_READY/VERIFIED claimed. Not committed.**
+
+- **Registries are the same dirs.** The agent (`qubit_runtime/tools/skills_tool.py`
+  `skills_list`/`skill_view` → `_skills_dir()` = `QUBIT_HOME/skills` + external)
+  and the dashboard catalog (`voicebridge/skill_catalog.py::catalog_entries` →
+  `agent.skill_utils.get_all_skills_dirs`) scan identical roots. The only split
+  was `merged_store_view` (CLI/voice `skills list`) merging in permissioned-store
+  records unconditionally.
+- **Root cause:** `qubit-boards` is an overlay dashboard plugin
+  (`frontend/qubit-app/plugins/qubit-boards/`) recorded as a permissioned
+  capability grant with no `SKILL.md`; `merged_store_view` listed it as a skill
+  while the agent/dashboard could not resolve it (`skill_view` → "not found").
+- **Fix:** `merged_store_view` now gates permissioned rows on the on-disk catalog
+  set (the same gate `catalog_entries` documents/tests). Live before→after:
+  agent 197 / merged 198 (`['qubit-boards']`) → agent 197 / merged 197 /
+  `qubit skills list` 197, all equal; `qubit-boards` absent from all three but
+  still manageable. `test_dashboard_agent3_wiring`'s stale assertion reconciled.
+- **De-brand:** renamed the Qubit-owned, agent-visible skill `hermes-voice-mode`
+  → `qubit-voice-mode` (dir + frontmatter/title/H1; usage key migrated);
+  `skill_view("qubit-voice-mode")` resolves. The upstream-bundled `hermes-agent`,
+  `hermes-agent-skill-authoring`, `inspecting-hermes-desktop-dom`, and optional
+  `hermes-s6-container-supervision` remain (repo content → W8/W9 rename map).
+- **Evidence:** 73 + 23 + 46 focused tests pass; `test_qubit_parity8tf` 1
+  pre-existing failure (`/api/gateway/start` 409 vs stale 403 expectation,
+  unrelated); `qubit agent -z "…QUBIT_OK"` → `QUBIT_OK`.
+
+## 23. Multi-agent wave 12 — 2026-09-23 (8 agents, 2 sub-waves)
+
+**No M1/M2/CODE_READY/VERIFIED claimed. Not committed. Owner gates still open.**
+
+- **Evidence is now GENERATED, not hand-written (W0).** `docs/generated/
+  parity_inventory.json` had no generator (an agent wrote it by hand and it
+  drifted). New `scripts/parity_inventory.py` re-derives it from the live
+  reference (`~/.hermes/hermes-agent/hermes_cli/web_routers/*`) + Qubit
+  surfaces + the real `qubit_compat.match()`; **byte-identical ×2**
+  (`a5f0343a…`). Fresh: **1377 rows — 1240 PORTED / 131 GATED / 6 MISSING**
+  (was 1380 / 1215 / 132 / 33). `scripts/voice_inventory_coverage.py` regenerated
+  `docs/generated/voice_coverage.json` (**428 real / 0 guard / 949 unresolved /
+  0 dead backends**, registry 543; sha `e4c38ea1…`). Two generator bugs fixed:
+  route classification now uses `qc.match()` normalization, and skill
+  enumeration requires a `SKILL.md` (kills the phantom `skill product` empty
+  dir). Hygiene regression fixed: `scripts/parity_inventory.py` no longer
+  hardcodes an operator checkout path (discovers `~/.hermes` / `QUBIT_PARITY_
+  REF_HOME`); `test_host_hygiene_pra07` green.
+- **M1 boot — independent re-audit (§20/§21 reproduced).** 11 PASS, **2
+  DISPOSITIONED** (items 2/12 = gateway naming/policy, pending owner
+  ratification), items 3/4 **PARTIAL** only because the shared Playwright
+  profile was locked (could not re-drive the PTY). Fresh receipts: `skill_view`
+  (state.db msg 22389, 03:20:38), `plugin.invoke builtin.echo` (events.jsonl
+  03:20:03), live MCP `cgraph-graft/graft_find_code` (03:20:07, 1206 ms).
+  `write_file`/`patch` probe → `AUDIT_PATCH_OK` (the §4 fix holds). 76 focused
+  tests → 69 pass / 7 fail, all 7 proven pre-existing stale artifacts (since
+  reconciled — see below).
+- **Route parity — W9-free P0 closed.** Implemented `GET /api/gateway/migrate/
+  plan` (real vendored `build_migration_plan()`), `GET /api/host/identity`, and
+  `GET /api/providers/oauth` (**redacted**: 0 occurrences of
+  `token_preview/access_token/refresh_token/id_token/api_key/client_secret/
+  password` in the 3,211 B body). Typed gates added: `POST /api/gateway/migrate`
+  → `GATEWAY_MIGRATE_OPERATOR_OWNED`, `GET /api/providers/oauth/{id}/poll/…` →
+  `OAUTH_MANUAL_HANDOFF`. Live 200/403 verified. **Security fix:** the fork's
+  proxy was serving `portal.nousresearch.com` + a token fragment for
+  `/api/providers/oauth`; it is now an authority row (`safe_to_proxy` = False).
+  MISSING routes 12 → 6; `tests/test_route_parity_p0_wave13.py` 10 passed.
+- **Consistency fixes.** N20: added real read-only `GET /api/dashboard/theme`
+  (200 `{theme:"qubit",persisted:true}`) and `GET /api/gateway/status` (200,
+  real supervisor status). N19: `QubitSessionStore.list()` total now excludes
+  child sessions, matching its rows (`/api/qubit/chat/sessions total=208 ==
+  rows`); no data lost. N18 (misnamed `tui_gateway_crash.log`) deferred to W9
+  (created inside `qubit_runtime/`).
+- **Independence (W-MIG) — real bug found + fixed.** With `QUBIT_HOME` unset,
+  importing the vendored `qubit_state` store **created `$HOME/.hermes`** at
+  import time (in production, the read-only reference home). Added fail-closed
+  `pin_qubit_home()` in `voicebridge/qubit_runtime.py` (rejects the external
+  default; runs before the fork import). Proof: scratch-home `strace` shows
+  **zero** opens of `/home/trick/.hermes`; `qubit doctor` green; real
+  `qubit agent -z` → `QUBIT_OK`. New `tests/test_migration_independence_wave13.py`
+  (5 passed) fails on the pristine code and passes with the fix. Coverage
+  (read-only source): skills 162→203, cron 2→2, sessions 122→209, memories 4→2
+  (partial), `auth.json` present by name only (never read).
+- **Tests reconciled (tests/ only).** 7 files, ~12 stale expectations fixed to
+  the owner decisions in force — confirm-gate policy (`GATEWAY_CONFIRM_REQUIRED`
+  /409) for `test_gateway_control_integration9u`/`test_qubit_parity8tf`/
+  `test_dashboard_matrix9u`/`test_qubit_api_parity_wave1`; Ruling 3 `/`→`/chat`
+  for `test_qbpv2_rebrand_{routes,public_surface}`; `test_source_inventory`
+  repointed to `docs/generated/`. Combined 12 failed → **315 passed / 3
+  skipped** across the 7 files.
+- **Brand (non-W9 lanes).** Frontend: 10 files de-branded (comments/labels;
+  `HermesPluginSDK`→`QubitPluginSDK`), `tsc` rc 0, `frontend/qubit-dist`
+  rebuilt, bundle scan green. Scripts/docs: de-branded runtime labels
+  (`hatch_build_qubit.py`, `dashboard_stress.py`, `seed_demo_state.py`,
+  `clean_install_check.sh`, `release_qualify.py`); wire contracts
+  (`X-Hermes-Session-Token`, `window.__HERMES_*`), OpenClaw RPC names, migration
+  provenance, and legal attribution deliberately kept.
+- **N3 fixed:** `scripts/page_coverage.py` reads its canonical manifest from
+  `docs/generated/` (frozen archive is explicit read-only fallback only);
+  regenerated; `test_generator_determinism9u` green.
+- **Final artifact reconciliation (after the concurrent edits settled).** Three
+  regenerable-artifact tests were stale mid-wave; all three now pass after
+  regenerating the canonical artifacts: `QUBIT_PAGE_COVERAGE_2026-09-21.json`
+  (`scripts/page_coverage.py`), `QUBIT_GAP_LEDGER.{hermes,qubit}.json`
+  (`scripts/rebuild_ledger_{hermes,qubit}.py`). The new legitimate refusal code
+  `GATEWAY_MIGRATE_OPERATOR_OWNED` is now listed in the **canonical**
+  `docs/generated/QUBIT_SAFE_EQUIVALENTS.md` (frozen archive untouched; the test
+  prefers canonical, archive as read-only fallback). **Wave-12 focused sweep: 184
+  passed / 3 skipped / 0 failed** across 15 files.
+- **Still open / deferred:** the **6 remaining MISSING routes** all require
+  0.21.4 modules absent from the vendored 0.21.1 (`qubit_state_timeline.py`,
+  `tools/voice_live.py`, `web_server_idle_proof.py`, `backend_retirement.py`) →
+  **W9-blocked**. The 2 branding manifest-hash tests (`test_branding_parity_
+  wave3`) are stale again because the frontend changed after the last manifest
+  run — **regenerate at worktree freeze**. `tts/openai_tts.py::_read_key` has a
+  SILENT `~/.hermes/.env` fallback (flagged); `orchestrator.py::_env_key`'s
+  loud fallback is pinned by `test_keyenv8tf` (owner decision needed).
+- **New findings:** N15 (`docs/archive/2026-09-21/` is entirely untracked in
+  git); N16 (legacy `__HERMES_*` session-token wire names on the served
+  dashboard); N17 (`.env` fallback policy conflict, below); N18–N20 (N18 open
+  → W9; N19/N20 fixed); N21 (vendored state import created `~/.hermes` —
+  **FIXED**); N22 (proxy leaked `portal.nousresearch.com` + token fragment —
+  **FIXED**).
+- **Environmental hazard observed:** multiple opencode sessions edited this
+  worktree concurrently during the wave (frontend pages, `qubit_compat.py`).
+  Merges were clean, but this compounds the freeze gate.
+
+**Wave 12 evidence:** `parity_inventory.json` `a5f0343a…` (×2); `voice_coverage
+.json` `e4c38ea1…` (×2); 33 targeted tests pass; `test_route_parity_p0_wave13`
+10; `test_migration_independence_wave13` 5; QUBIT_OK; service active.

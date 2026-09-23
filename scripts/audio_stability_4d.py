@@ -141,9 +141,9 @@ def main() -> int:
         print(f"  -> warm medians {medians} | warm max {warm_max} | "
               f"stable_pass={verdict['stable_pass']}")
 
-    (REPO_ROOT / "docs" / "AUDIO_STABILITY_4D.json").write_text(
+    (REPO_ROOT / "docs/archive/2026-09-21" / "AUDIO_STABILITY_4D.json").write_text(
         json.dumps(report, indent=2))
-    print("written docs/AUDIO_STABILITY_4D.json")
+    print("written docs/archive/2026-09-21/AUDIO_STABILITY_4D.json")
     return 0
 
 

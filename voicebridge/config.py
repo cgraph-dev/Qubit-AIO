@@ -117,6 +117,27 @@ def canonical_cache_dir() -> Path:
     return _xdg_base("XDG_CACHE_HOME", ".cache") / PRODUCT_NAME
 
 
+def canonical_runtime_home() -> Path:
+    """Canonical Qubit runtime (fork) home: ``<state_dir>/runtime``.
+
+    Matches ``voicebridge.qubit_runtime.default_home()`` for the default
+    profile — the one directory the vendored runtime, the session store, and
+    the PTY/TUI share. Never the operator's external ``~/.hermes``.
+    """
+    return canonical_state_dir() / "runtime"
+
+
+def canonical_runtime_env_path() -> Path:
+    """The canonical runtime ``.env`` holding provider keys (never committed).
+
+    Credential references of the form ``env:NAME`` fall back to this file when
+    the process environment does not carry ``NAME``. It is read server-side
+    only; the values are never logged, returned in diagnostics, printed, or
+    echoed to any surface.
+    """
+    return canonical_runtime_home() / ".env"
+
+
 def canonical_config_path() -> Path:
     return canonical_config_dir() / "voice.yaml"
 
@@ -205,7 +226,95 @@ def resolve_model_file(relative: Path | str) -> Path:
             continue
     return canon
 
+#: Allowed values for ``voice.input_engine`` (Qubit speech-INPUT selection).
+#: ``browser`` = supported Chrome SpeechRecognition, when available and
+#: permitted; ``local`` = Qubit's STT profile (``voicebridge/asr``); ``auto`` =
+#: prefer browser and fall back to local only with an explicit visible reason.
+#: Any other value is out of contract and normalizes to ``auto`` (the
+#: frontend ``normalizeVoiceEngine`` applies the same rule).
+VOICE_INPUT_ENGINES: tuple = ("browser", "local", "auto")
+
+
+def normalize_input_engine(value: Any) -> str:
+    """Canonicalize ``voice.input_engine``; unknown/missing fails to ``auto``.
+
+    This setting changes speech input only — never the model, session, tools,
+    policy, audit, confirmation, or e-stop path.
+    """
+    return value if value in VOICE_INPUT_ENGINES else "auto"
+
+
+def _coerce_bool(value: Any) -> Optional[bool]:
+    """Strict bool coercion mirroring the frontier policy parser.
+
+    Returns ``None`` for anything ambiguous so a malformed override is
+    dropped instead of silently treated as truthy.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        low = value.strip().lower()
+        if low in ("1", "true", "yes", "on"):
+            return True
+        if low in ("0", "false", "no", "off"):
+            return False
+    return None
+
+
+def model_profile_overrides(cfg: Any, profile_id: str) -> Dict[str, Any]:
+    """Validated per-profile selection overrides (fail-closed: ``{}``).
+
+    Reads ``intent.frontier.profile_overrides.<profile_id>`` from the
+    canonical config. Only the recognized, non-secret keys are returned and
+    only when well-formed:
+
+    * ``policy_enabled`` (bool) — overrides ``intent.frontier.enabled``;
+    * ``allowlisted`` (bool) — overrides the global ``provider/model`` check;
+    * ``context_tokens`` (int > 0) — overrides the profile's declared window.
+
+    Unknown keys and malformed values are dropped, so a typo can never widen
+    access. This never holds a credential value.
+    """
+    pid = str(profile_id or "").strip()
+    if not pid:
+        return {}
+    try:
+        node = cfg.get("intent", "frontier", "profile_overrides", default=None)
+    except Exception:
+        return {}
+    if not isinstance(node, dict):
+        return {}
+    entry = node.get(pid)
+    if not isinstance(entry, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    if "policy_enabled" in entry:
+        flag = _coerce_bool(entry.get("policy_enabled"))
+        if flag is not None:
+            out["policy_enabled"] = flag
+    if "allowlisted" in entry:
+        flag = _coerce_bool(entry.get("allowlisted"))
+        if flag is not None:
+            out["allowlisted"] = flag
+    if "context_tokens" in entry:
+        try:
+            tokens = int(entry.get("context_tokens"))
+        except (TypeError, ValueError):
+            tokens = 0
+        if tokens > 0:
+            out["context_tokens"] = tokens
+    return out
+
+
 DEFAULTS: Dict[str, Any] = {
+    # Speech input selection. Read-only setting for the /qubit-chat voice UI;
+    # the frontend reads ``voice.input_engine`` to choose Chrome
+    # SpeechRecognition (browser) vs Qubit's STT profile (local) vs auto
+    # (browser with a visible local fallback reason). It never changes the
+    # model, session, tools, policy, audit, confirmation, or e-stop path.
+    "voice": {
+        "input_engine": "auto",   # browser | local | auto
+    },
     "audio": {
         "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default
         "output_device_name": "",   # more robust: match by name substring (e.g. "ALC892 Analog")
@@ -284,6 +393,22 @@ DEFAULTS: Dict[str, Any] = {
         "max_history_chars": 12000,   # truncate history fed to summarizer
         "progress_updates": True,     # speak short status updates during long tasks
         "progress_min_interval_s": 45,
+        # Dynamic context policy (voicebridge/context_policy.py). Context size
+        # is a latency/resource setting, never an intelligence limit: a simple
+        # voice turn uses the fast window, a long/tool-heavy conversation
+        # expands, and a request the local window cannot hold escalates to
+        # ``escalation_model`` (an empty value fails closed with
+        # CONTEXT_ESCALATION_UNAVAILABLE rather than silently truncating).
+        "context": {
+            "min_tokens": 2048,       # fast window for simple turns
+            "default_tokens": 4096,   # window when history/complexity needs more
+            "max_tokens": 16384,      # largest window before escalation
+            "fast_messages": 6,       # rolling window for the fast tier
+            "default_messages": 16,   # rolling window for the expanded tier
+            "max_messages": 48,       # hard cap on messages fed to the model
+            "escalation_model": "",   # registered profile id; "" = fail closed
+            "summary_head_chars": 280,  # chars kept per older message in the summary
+        },
     },
     "local": {
         "enabled": True,                # whitelisted direct PC actions (volume, apps, ...)
@@ -345,14 +470,14 @@ DEFAULTS: Dict[str, Any] = {
         "classify_timeout_s": 8.0,
         "conversation_backend": "local",
         "templates_path": "~/.config/qubit-voicebridge/task-templates.yaml",  # daily-task templates (spoken phrase -> known task)    # bridge IS the voice: local model answers ALL chat instantly
-                                    # (chitchat + questions). Only TASKS go through OpenClaw/Hermes.
+                                    # (chitchat + questions). Only TASKS go through Qubit/Qubit.
                                     # deepseek/perplexity = last-resort fallbacks
         # Hybrid local LLM: tiny 3-4B answers SHORT conversational turns locally
         # (~0.3s, private), DeepSeek handles long/complex/web asks. Flip enabled
         # to false to go cloud-only (DeepSeek every turn, GPU idle).
         "local_llm": {
             "enabled": True,           # bridge responds to ALL chat itself (<0.5s);
-                                        # only tasks dispatch to OpenClaw/Hermes
+                                        # only tasks dispatch to Qubit/Qubit
             "model": "qubit-brain4",  # baked EN-only brain, no-think template (3.2GB resident).
                                     # phi-4-mini-abliterated is smarter in EN but BROKEN at RO (echoes/
                                     # wrong dates/hallucinates) — kept as optional EN-only smart mode.
@@ -404,6 +529,18 @@ DEFAULTS: Dict[str, Any] = {
             "max_concurrency": 2,
             "daily_usd": 1.0,
             "monthly_usd": 10.0,
+            # Per-profile selection overrides, keyed by profile id (for
+            # example the migrated ``qubit-model``). Fail-closed: an absent
+            # entry leaves the global policy/allowlist AND the profile's own
+            # declared context window unchanged. Only these three recognized,
+            # non-secret keys are honored:
+            #   policy_enabled: bool   -> overrides intent.frontier.enabled
+            #   allowlisted:    bool   -> overrides the global allowlist check
+            #   context_tokens: int>0  -> overrides the profile's declared window
+            # An unknown key or malformed value is ignored, so a typo can never
+            # silently widen access. The global gateway still enforces its own
+            # policy/allowlist at execution time.
+            "profile_overrides": {},
         },
     },
     "safety": {
@@ -617,7 +754,7 @@ class Config:
 
 
 # Map legacy assistant sections onto the unified `agent` section.
-# Documented migration compat (docs/QUBIT_MIGRATION.md); the legacy names
+# Documented migration compat (docs/archive/2026-09-21/QUBIT_MIGRATION.md); the legacy names
 # survive only here and in that doc, never in product behavior.
 _LEGACY_SECTION_MAP = {
     "openclaw": ("model", "session_prefix", "skills_nudge",
@@ -628,7 +765,7 @@ _LEGACY_SECTION_MAP = {
 
 
 def _migrate_legacy_sections(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Fold retired `openclaw`/`hermes` user keys into `agent`.
+    """Fold retired `qubit`/`qubit` user keys into `agent`.
 
     Explicit `agent` keys always win; legacy sections are dropped after
     folding so exactly one configuration tree remains at runtime.

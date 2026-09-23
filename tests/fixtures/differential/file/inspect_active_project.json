@@ -26,7 +26,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/web_routers/files.py:608",
+    "path": "qubit_cli/web_routers/files.py:608",
     "symbol": "fs_list",
     "mapping_status": "VERIFIED"
   },
@@ -35,7 +35,23 @@
     "symbol": "fsHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Scoped file inspection contract (read-only, project roots only). OPERATOR_PREREQUISITE: an active project folder must be selected (voicebridge project use) for a non-empty inspection. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/files.py:608 (fs_list); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/fs.ts:19 (fsHandlers).",
+  "references": {
+    "hermes": {
+      "kind": "cli",
+      "argv": [
+        "hermes",
+        "project",
+        "list"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "Lists registered multi-folder projects.",
+      "pinned_commit": "2237be355906fbe6065ce1815711eee52b2d646e"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Scoped file inspection contract (read-only, project roots only). OPERATOR_PREREQUISITE: an active project folder must be selected (voicebridge project use) for a non-empty inspection. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/files.py:608 (fs_list); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/fs.ts:19 (fsHandlers). Side-effect-free reference invocation(s) declared and pinnable: `hermes project list` (2237be355906fbe6065ce1815711eee52b2d646e, direct_readonly). The declared `hermes` reference is pinned: the pinned wrapper's probed `--version` prints `Hermes Agent v0.21.1 (2026.9.7) \u00b7 upstream <varies> \u00b7 local 2237be35 (+1 carried commit)`, and the `2237be35` token is a prefix of the contractual pin 2237be355906fbe6065ce1815711eee52b2d646e, so the runner's `_reference_is_pinned` resolves pinned=true from `--version` alone. No `pinned=false` override is declared and this fixture claims PASS. The pinned openclaw reference(s) (3a9d69db306cd7f081e06254cb89c4bcc14a7107) remain byte-comparable where declared.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,
@@ -69,6 +85,12 @@
       "audit_receipt_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface",
       "response_headers": "not exposed by this fixture's surface"
-    }
-  }
+    },
+    "test_ids": [
+      "tests/test_files_ide8u.py::test_inspect_active_folder"
+    ]
+  },
+  "test_ids": [
+    "tests/test_files_ide8u.py::test_inspect_active_folder"
+  ]
 }

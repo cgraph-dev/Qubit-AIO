@@ -34,6 +34,7 @@ import signal
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import cloudpickle
 from dataclasses import dataclass, field
@@ -42,7 +43,8 @@ from typing import Any, Callable, Dict, Optional
 from ._broker_worker import broker_child_main
 from .capabilities import (
     ActionRequest, CapabilityError, CapabilityRegistry, CapabilitySpec,
-    ConfirmationStore, Decision, PolicyEngine, Tier)
+    ConfirmationDenied, ConfirmationRecord, ConfirmationStore, Decision,
+    PolicyEngine, Tier)
 from .logging_setup import log_event
 from .redaction import redact_text
 from .sandbox import run_tool
@@ -57,6 +59,20 @@ _SHELL_META = re.compile(r"[;&|><`$]")
 
 _MAX_ARG_KEYS = 8
 _MAX_STR_ARG = 2000
+
+# Confirmation is a broker-level control, never a capability argument. A request
+# body may carry the dashboard's settle flags (``confirm`` / ``confirmation_id``)
+# alongside the real args; drop them here so (a) a strict capability arg
+# validator never rejects the forwarded body and (b) the confirmation
+# args-digest binds only the real inputs. The durable id still travels through
+# the dedicated ``confirmation_id`` parameter — a boolean is never authority.
+_CONFIRMATION_ARG_KEYS = frozenset({"confirm", "confirmation_id"})
+
+
+def _strip_confirmation_args(args: Any) -> Any:
+    if not isinstance(args, dict):
+        return args
+    return {k: v for k, v in args.items() if k not in _CONFIRMATION_ARG_KEYS}
 
 
 def _scalar_validator(allowed_keys: Optional[frozenset] = None):
@@ -85,6 +101,10 @@ class ToolBinding:
     fn: Optional[Callable[[Dict[str, Any]], str]] = None      # in-process tool
     argv_builder: Optional[Callable[[Dict[str, Any]], list]] = None
     preview: Optional[Callable[[Dict[str, Any]], str]] = None
+    # Per-binding output cap for the READ_ONLY in-process fast path. Local
+    # host actions keep the small default; the bounded web tools declare a
+    # larger cap so their already-redacted result is not silently truncated.
+    output_cap: int = _MAX_STR_ARG
 
 
 @dataclass
@@ -145,6 +165,212 @@ def estop_engaged(cfg: Any = None) -> bool:
         return True
 
 
+def confirmation_store_for(cfg: Any = None,
+                           *, default_ttl_s: float = 120.0) -> Any:
+    """The ONE confirmation authority for a broker/worker engine (A7).
+
+    Authoritative store: :class:`voicebridge.approvals.ApprovalJournal`, the
+    durable shared human-confirmation journal at ``<state>/approvals.jsonl``
+    (see :class:`voicebridge.approvals.ApprovalJournal` and
+    ``docs/archive/2026-09-21/SECURITY_AUDIT_WAVE4.md`` G5). The broker/worker engine no longer
+    keeps a second writable store in ``actions.json``: the returned adapter
+    (:class:`_JournalBackedConfirmationStore`) presents the journal through the
+    :class:`~voicebridge.capabilities.ConfirmationStore` contract, so a
+    confirmation minted by any broker, worker guard, or the human-facing
+    dashboard/voice/CLI/plugin surfaces is one and the same durable record and
+    is consumable by all of them.
+
+    The adapter still carries the ``ActionStore`` handle (``_pstore``) for
+    compatibility with callers that introspect it (e.g. the fork engine key)
+    but writes confirmations only to the journal. Pre-existing ``actions.json``
+    confirmations (the ``ActionRunner`` action flow) remain readable through the
+    inherited fallback.
+
+    Falls back to the in-memory :class:`ConfirmationStore` only when no state
+    tree can be resolved (hermetic tests, degraded config); the fallback never
+    creates a second writable store. A build error is treated as "no durable
+    store" rather than crashing a safety boundary, and is fail-safe because the
+    in-memory store still enforces single-use/expiry/digest binding.
+
+    Adapters (dispatch guard, fork-forward guard) MUST use this helper so there
+    is exactly one writable confirmation authority per state tree.
+    """
+    if cfg is not None:
+        try:
+            from .actions import actions_store
+            from .approvals import ApprovalJournal
+
+            journal = ApprovalJournal(
+                Path(cfg.state_dir()) / "approvals.jsonl",
+                default_ttl_s=default_ttl_s)
+            return _ephemeral_store_class()(
+                actions_store(cfg), journal=journal,
+                default_ttl_s=default_ttl_s)
+        except Exception:  # noqa: BLE001 - fall back, never fail open widened
+            pass
+    return ConfirmationStore(default_ttl_s=default_ttl_s)
+
+
+_EPHEMERAL_STORE_CLS: Optional[type] = None
+
+
+def _ephemeral_store_class() -> type:
+    """Build (once) the journal-backed durable store type.
+
+    Defined lazily because :mod:`voicebridge.actions` imports this module.
+    """
+    global _EPHEMERAL_STORE_CLS
+    if _EPHEMERAL_STORE_CLS is None:
+        from .actions import PersistentConfirmationStore
+
+        class _JournalBackedConfirmationStore(PersistentConfirmationStore):
+            """ConfirmationStore contract over the shared ApprovalJournal (A7).
+
+            The journal is the single durable confirmation authority; this
+            adapter binds its human approvals to the broker's capability + exact
+            argument digest so a confirmation minted by one broker/request is
+            consumable by the next with the full single-use / expiry / target
+            contract intact. ``_pstore`` is retained for introspection only and
+            receives no confirmations.
+            """
+
+            def __init__(self, store: Any, *, journal: Any,
+                         default_ttl_s: float = 300.0) -> None:
+                super().__init__(store, default_ttl_s=default_ttl_s)
+                # Reentrant: consume() holds the lock while delegating to the
+                # inherited in-memory fallback (which also takes the lock).
+                self._lock = threading.RLock()
+                self._journal = journal
+
+            # -- journal <-> ConfirmationRecord mapping -----------------------
+            @staticmethod
+            def _digest(args: Dict[str, Any]) -> str:
+                from .capabilities import _args_digest
+
+                return _args_digest(dict(args or {}))
+
+            def _record(self, item: Any, *, consumed: bool = False
+                        ) -> ConfirmationRecord:
+                meta = item.meta if isinstance(item.meta, dict) else {}
+                return ConfirmationRecord(
+                    id=item.id, capability=item.capability,
+                    args_digest=str(meta.get("args_digest", "")),
+                    issued_at=item.created_at, expires_at=item.expires_at,
+                    issued_by=str(meta.get("issued_by", "user")),
+                    consumed=consumed, consumed_at=item.settled_at)
+
+            def issue(self, capability: str, args: Dict[str, Any], *,
+                      issued_by: str,
+                      ttl_s: Optional[float] = None) -> ConfirmationRecord:
+                ConfirmationStore._require_human(issued_by)
+                ttl = float(ttl_s) if ttl_s is not None else self._ttl
+                if not (1.0 <= ttl <= 86400):
+                    raise ValueError("ttl_s outside [1, 86400]")
+                with self._lock:
+                    item = self._journal.create(
+                        capability,
+                        f"capability confirmation for {capability}"[:300],
+                        ttl_s=ttl, args_digest=self._digest(args),
+                        issued_by=issued_by)
+                return self._record(item)
+
+            def _settle(self, confirmation_id: str, capability: str,
+                        args: Dict[str, Any], *,
+                        consume: bool) -> ConfirmationRecord:
+                from .approvals import (ABORTED, COMPLETE, DENIED, EXECUTING,
+                                        IN_PROGRESS)
+
+                item = self._journal.get(confirmation_id)
+                if item is None:
+                    raise ConfirmationDenied("UNKNOWN_CONFIRMATION_ID")
+                meta = item.meta if isinstance(item.meta, dict) else {}
+                ConfirmationStore._require_human(
+                    str(meta.get("issued_by", "user")))
+                if item.state in (COMPLETE, ABORTED, DENIED):
+                    raise ConfirmationDenied("REPLAYED_CONFIRMATION")
+                if item.capability != capability:
+                    raise ConfirmationDenied("CAPABILITY_MISMATCH")
+                if str(meta.get("args_digest", "")) != self._digest(args):
+                    raise ConfirmationDenied("TARGET_MISMATCH")
+                now = self._clock()
+                if item.state == IN_PROGRESS and item.expires_at <= now:
+                    self._journal.abort(item.id)
+                    raise ConfirmationDenied("EXPIRED_CONFIRMATION")
+                if item.state == EXECUTING and item.expires_at <= now:
+                    raise ConfirmationDenied("EXPIRED_CONFIRMATION")
+                if consume:
+                    if item.state == IN_PROGRESS:
+                        item = self._journal.respond(item.id, "approve")
+                    if item.state == EXECUTING:
+                        item = self._journal.finish(item.id)
+                return self._record(item, consumed=consume)
+
+            def consume(self, confirmation_id: str, capability: str,
+                        args: Dict[str, Any]) -> ConfirmationRecord:
+                with self._lock:
+                    try:
+                        return self._settle(confirmation_id, capability, args,
+                                            consume=True)
+                    except ConfirmationDenied as exc:
+                        if exc.code != "UNKNOWN_CONFIRMATION_ID":
+                            raise
+                        # Pre-existing actions.json confirmation (ActionRunner).
+                        return super().consume(confirmation_id, capability, args)
+
+            def verify(self, confirmation_id: str, capability: str,
+                       args: Dict[str, Any]) -> ConfirmationRecord:
+                with self._lock:
+                    try:
+                        return self._settle(confirmation_id, capability, args,
+                                            consume=False)
+                    except ConfirmationDenied as exc:
+                        if exc.code != "UNKNOWN_CONFIRMATION_ID":
+                            raise
+                        return super().verify(confirmation_id, capability, args)
+
+        class _EphemeralCapableStore(_JournalBackedConfirmationStore):
+            """Journal-backed store that also supports an in-process ephemeral
+            mint.
+
+            The dispatch guard issues and consumes one internal confirmation
+            inside a single call, so it uses :meth:`issue_ephemeral` to stay
+            off disk (no second store, no cross-process visibility, identical
+            single-use/expiry/digest contract). Presented confirmations still
+            use the inherited durable :meth:`issue` (the journal).
+            """
+
+            def __init__(self, store: Any, **kwargs: Any) -> None:
+                super().__init__(store, **kwargs)
+                self._ephemeral: set = set()
+
+            def issue_ephemeral(self, capability: str,
+                                args: Dict[str, Any], *,
+                                issued_by: str,
+                                ttl_s: Optional[float] = None) -> Any:
+                rec = ConfirmationStore.issue(
+                    self, capability, args, issued_by=issued_by, ttl_s=ttl_s)
+                with self._lock:
+                    self._ephemeral.add(rec.id)
+                return rec
+
+            def consume(self, confirmation_id: str, capability: str,
+                        args: Dict[str, Any]) -> Any:
+                with self._lock:
+                    if confirmation_id in self._records \
+                            or confirmation_id in self._ephemeral:
+                        rec = ConfirmationStore.consume(
+                            self, confirmation_id, capability, args)
+                        ephemeral = rec.id in self._ephemeral
+                        self._ephemeral.discard(rec.id)
+                        if not ephemeral:
+                            self._pstore.save_confirmation(rec)
+                        return rec
+                    return super().consume(confirmation_id, capability, args)
+
+        _EPHEMERAL_STORE_CLS = _EphemeralCapableStore
+    return _EPHEMERAL_STORE_CLS
+
+
 class CapabilityBroker:
     """Decides, then executes trusted host tools; never falls back to shell."""
 
@@ -154,9 +380,20 @@ class CapabilityBroker:
         self.registry = CapabilityRegistry()
         self.engine = PolicyEngine(
             registry=self.registry,
-            confirmations=ConfirmationStore(default_ttl_s=default_ttl_s))
+            confirmations=confirmation_store_for(
+                cfg, default_ttl_s=default_ttl_s))
         self._bindings: Dict[str, ToolBinding] = {}
         self._active: Dict[str, _ActiveRun] = {}
+        # Correlation ids cancelled BEFORE their executor registered an active
+        # run. A cancel can only be issued once a running receipt exists, but
+        # the executor registers `_active` a few calls later; without this
+        # marker a cancel landing in that window would be reported as settled
+        # while the child still ran to completion (a cancelled action that
+        # still executes). The marker is consumed by `execute` (or by the
+        # executor registration) for that correlation id, and bounded so an
+        # id that never executes cannot grow the set without limit.
+        self._cancelled: set = set()
+        self._cancelled_cap = 1024
         self._lock = threading.Lock()
         # Packet 8O: optional shared PowerControl. When present, every execute
         # checks emergency stop / global disable / per-adapter circuit breaker,
@@ -242,9 +479,37 @@ class CapabilityBroker:
                            issued_by: str, ttl_s: float = 120.0):
         """User-path issuance; the store itself refuses issuer='model'."""
         return self.engine.confirmations.issue(
-            capability, dict(args), issued_by=issued_by, ttl_s=ttl_s)
+            capability, _strip_confirmation_args(dict(args)),
+            issued_by=issued_by, ttl_s=ttl_s)
 
     # ------------------------------------------------------------- cancellation
+    def _remember_cancelled(self, correlation_id: str) -> None:
+        """Record a cancel for a correlation id that may not be active yet."""
+        self._cancelled.add(correlation_id)
+        while len(self._cancelled) > self._cancelled_cap:
+            self._cancelled.pop()
+
+    def _consume_cancelled(self, correlation_id: str) -> bool:
+        """True (and clears the marker) when this id was cancelled early."""
+        with self._lock:
+            if correlation_id in self._cancelled:
+                self._cancelled.discard(correlation_id)
+                return True
+            return False
+
+    def _activate(self, cid: str, active: "_ActiveRun") -> None:
+        """Register an active run, honouring an early cancel marker.
+
+        The cancel may have arrived after the execute pre-check but before the
+        executor registered ``active``; in that case set the run's cancel event
+        now so the spawn/poll loop kills the child immediately.
+        """
+        with self._lock:
+            if cid in self._cancelled:
+                self._cancelled.discard(cid)
+                active.cancel_event.set()
+            self._active[cid] = active
+
     def cancel(self, correlation_id: str) -> bool:
         """Idempotent cooperative cancel; True only for the first request.
 
@@ -254,10 +519,15 @@ class CapabilityBroker:
         """
         with self._lock:
             active = self._active.get(correlation_id)
-        if active is None:
-            return False
-        first = active.request_cancel()
-        _kill_tree(active.pid)
+            already = correlation_id in self._cancelled
+            if active is not None:
+                first = active.request_cancel()
+            else:
+                first = False
+            if not already:
+                self._remember_cancelled(correlation_id)
+        if active is not None:
+            _kill_tree(active.pid)
         return first
 
     # ------------------------------------------------------------------ execute
@@ -274,6 +544,10 @@ class CapabilityBroker:
                 device: Optional[str] = None) -> ExecResult:
         if source not in ("user", "automation", "model"):
             raise ValueError(f"invalid dispatch source: {source!r}")
+        # A dashboard/mutation body may carry the settle flags alongside the
+        # real args; strip them so the capability validator and confirmation
+        # args-digest see only the declared inputs.
+        args = _strip_confirmation_args(args)
         cid = correlation_id or uuid.uuid4().hex[:16]
         kwargs_utterance = utterance
         t0 = time.perf_counter()
@@ -285,6 +559,14 @@ class CapabilityBroker:
 
         binding = self._bindings.get(capability)
         spec = binding.spec if binding else None
+        # An early cancel (issued after the running receipt was written but
+        # before this executor registered) must stop the run before any
+        # decision/execution, not merely mark the receipt settled.
+        if self._consume_cancelled(cid):
+            self._audit("denied", capability, spec, source, cid,
+                        Decision(False, "CANCELLED", capability))
+            return _res(ok=False, cancelled=True,
+                        error="cancelled before execution")
         # Packet 8O: the shared power control is checked BEFORE any decision or
         # execution — emergency stop / global disable / circuit breaker deny the
         # run across every channel that shares this broker.
@@ -453,8 +735,7 @@ class CapabilityBroker:
         registry.
         """
         active = _ActiveRun()
-        with self._lock:
-            self._active[cid] = active
+        self._activate(cid, active)
         try:
             out = binding.fn(dict(args))
         except BaseException as exc:
@@ -466,7 +747,8 @@ class CapabilityBroker:
             return ExecResult(ok=False, cancelled=True,
                               error="cancelled during execution")
         return ExecResult(ok=True,
-                          output=redact_text(str(out))[:_MAX_STR_ARG])
+                          output=redact_text(
+                              str(out))[:max(1, int(binding.output_cap))])
 
     def _run_callable(self, binding: ToolBinding, args: Dict[str, Any],
                       cid: str, timeout_s: float) -> ExecResult:
@@ -500,8 +782,7 @@ class CapabilityBroker:
                               error=f"callable not spawn-safe: {str(exc)[:200]}")
 
         proc = None
-        with self._lock:
-            self._active[cid] = active
+        self._activate(cid, active)
         proc = ctx.Process(target=broker_child_main,
                            args=(payload, child_conn), daemon=False)
         proc.start()
@@ -580,8 +861,7 @@ class CapabilityBroker:
             return ExecResult(denied="MALFORMED_INPUT",
                               error="argv must be a non-empty list of strings")
         active = _ActiveRun()
-        with self._lock:
-            self._active[cid] = active
+        self._activate(cid, active)
         r = run_tool(argv, timeout_s=max(1.0, float(timeout_s)),
                      max_output=max_output, shell=False,
                      cancel_check=active.cancel_event.is_set)
@@ -650,14 +930,169 @@ def build_host_broker(power_control: Optional[Any] = None,
     return broker
 
 
+_WEB_OUTPUT_CAP = 32_768
+
+
+def register_web_tools(broker: CapabilityBroker, cfg: Any = None) -> tuple:
+    """Register the SSRF-guarded, read-only ``web.*`` tools on ``broker``.
+
+    This makes a planner/model ``web.*`` call a first-class broker capability:
+    the orchestrator's ``_agent_tool`` dispatches it through the SAME
+    registry/policy/e-stop/confirmation junction (and audit) as ``local.*``,
+    instead of calling ``web_tool.run`` directly and returning before the
+    broker. The executor is the existing :mod:`voicebridge.web_tool` module, so
+    the scheme allowlist, private/metadata-IP block, redirect re-validation,
+    size/time caps and redaction are unchanged — only the decision path moves
+    onto the shared broker. Returns the capability names registered.
+    """
+    from . import web_tool as _wt
+
+    registered = []
+    for name, tool_spec in _wt.TOOL_SPECS.items():
+        def _run(args: Dict[str, Any], _name: str = name) -> str:
+            return json.dumps(_wt.run(cfg, _name, dict(args or {})),
+                              default=str)
+
+        spec = CapabilitySpec(
+            name=name, version="1.0.0", tier=Tier.READ_ONLY,
+            summary=str(tool_spec.get("summary", name))[:200],
+            scopes=("web",),
+            timeout_s=float(_wt.DEFAULT_TIMEOUT_S) + 5.0,
+            arg_validator=_scalar_validator(
+                frozenset(tool_spec.get("required", ()))))
+        broker.register(ToolBinding(
+            spec=spec,
+            side_effects="read-only bounded web access (GET/query); no local "
+                         "writes, no shell, no second listener",
+            fn=_run, output_cap=_WEB_OUTPUT_CAP))
+        registered.append(name)
+    return tuple(registered)
+
+
+_FILE_PATCH_OUTPUT_CAP = 32_768
+_FILE_PATCH_MAX_TEXT = 512 * 1024
+
+
+def _file_patch_validator(allowed: frozenset):
+    """Typed input schema for the confined file-write capabilities.
+
+    Unlike the generic scalar validator this permits the bounded-but-large
+    unified-diff ``patch_text`` (up to ``_FILE_PATCH_MAX_TEXT``) while still
+    rejecting undeclared keys and non-string values.
+    """
+    def _check(args: Dict[str, Any]) -> None:
+        if not isinstance(args, dict):
+            raise ValueError("args must be a mapping")
+        extra = set(args) - allowed
+        if extra:
+            raise ValueError(f"undeclared arg: {sorted(extra)}")
+        for key in ("target_path", "requested_by", "project_root"):
+            value = args.get(key)
+            if value is not None and not isinstance(value, str):
+                raise ValueError(f"arg {key} must be a string")
+        if "recursive" in args and not isinstance(args.get("recursive"), bool):
+            raise ValueError("arg recursive must be a boolean")
+        if "patch_text" in args:
+            text = args.get("patch_text")
+            if not isinstance(text, str):
+                raise ValueError("patch_text must be a string")
+            if len(text.encode("utf-8", "surrogatepass")) > _FILE_PATCH_MAX_TEXT:
+                raise ValueError("patch_text exceeds the bounded patch size")
+    return _check
+
+
+def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
+    """Register the confined, reversible file-write capabilities on ``broker``.
+
+    ``local.apply_patch`` and ``local.files_mkdir`` are MUTATING (a real on-disk
+    write that must be confirmed and is reversible from a durable backup). The
+    dashboard file routes, the planner/model ``apply_patch`` path, the CLI, and
+    voice now reach ONE decision point through the same registry, shared
+    e-stop/global-disable latch, shared confirmation journal, and audit the
+    ``local.*`` actions use. The executors invoke the existing
+    :mod:`voicebridge.file_patch` confinement/backup/rollback implementation
+    with ``confirmed=True`` because the broker decision — a durable, single-use
+    user confirmation — IS the confirmation; a client-supplied boolean never is.
+
+    Returns the capability names registered.
+    """
+    from . import file_patch as _fp
+
+    def _apply(args: Dict[str, Any]) -> str:
+        try:
+            receipt = _fp.apply_patch(
+                cfg, str(args.get("target_path", "")),
+                str(args.get("patch_text", "")),
+                requested_by=str(args.get("requested_by", "cli:user")),
+                confirmed=True,
+                project_root=str(args.get("project_root", "") or ""))
+            # The broker child returns one bounded message; drop the (up to
+            # 2 KB) redacted patch preview so the receipt envelope can never be
+            # truncated mid-JSON by that cap (the write already happened).
+            receipt.pop("preview", None)
+            return json.dumps({"ok": True, "receipt": receipt}, default=str)
+        except _fp.FilePatchError as exc:
+            return json.dumps({"ok": False, "code": exc.code,
+                               "detail": exc.detail}, default=str)
+
+    def _mkdir(args: Dict[str, Any]) -> str:
+        try:
+            receipt = _fp.mkdir_path(
+                cfg, str(args.get("target_path", "")),
+                requested_by=str(args.get("requested_by", "cli:user")),
+                confirmed=True,
+                project_root=str(args.get("project_root", "") or ""))
+            return json.dumps({"ok": True, "receipt": receipt}, default=str)
+        except _fp.FilePatchError as exc:
+            return json.dumps({"ok": False, "code": exc.code,
+                               "detail": exc.detail}, default=str)
+
+    def _delete(args: Dict[str, Any]) -> str:
+        try:
+            receipt = _fp.delete_path(
+                cfg, str(args.get("target_path", "")),
+                requested_by=str(args.get("requested_by", "cli:user")),
+                confirmed=True,
+                recursive=bool(args.get("recursive", False)),
+                project_root=str(args.get("project_root", "") or ""))
+            return json.dumps({"ok": True, "receipt": receipt}, default=str)
+        except _fp.FilePatchError as exc:
+            return json.dumps({"ok": False, "code": exc.code,
+                               "detail": exc.detail}, default=str)
+
+    specs = (
+        (_fp.capability_name(), _apply,
+         frozenset({"target_path", "patch_text", "requested_by",
+                    "project_root"}),
+         "confined atomic file patch; reversible from a durable backup"),
+        (_fp.mkdir_capability_name(), _mkdir,
+         frozenset({"target_path", "requested_by", "project_root"}),
+         "confined directory creation inside an approved project folder"),
+        (_fp.delete_capability_name(), _delete,
+         frozenset({"target_path", "requested_by", "project_root",
+                    "recursive"}),
+         "confined reversible file/folder delete archived to the Qubit "
+         "state store"),
+    )
+    registered = []
+    for name, fn, allowed, effects in specs:
+        spec = CapabilitySpec(
+            name=name, version="1.0.0", tier=Tier.MUTATING,
+            summary=effects[:200], scopes=("local",), timeout_s=30.0,
+            arg_validator=_file_patch_validator(allowed))
+        broker.register(ToolBinding(
+            spec=spec, side_effects=effects, fn=fn,
+            output_cap=_FILE_PATCH_OUTPUT_CAP))
+        registered.append(name)
+    return tuple(registered)
+
+
 def script_capability_name(template_name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", (template_name or "").lower()).strip("-")
     name = f"script.{slug or 'unnamed'}"
     if len(name) > 64:
         name = name[:64].rstrip("-")
     return name
-
-
 def register_script_tool(broker: CapabilityBroker, *, template_name: str,
                          script: str, timeout_s: float = 120.0) -> str:
     """Register a user-configured local-script template as an argv tool.

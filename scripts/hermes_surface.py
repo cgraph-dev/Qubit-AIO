@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Packet 8T-F — dump the pinned Hermes CLI surface from a real binary.
+"""Packet 8T-F — dump the pinned upstream CLI surface from a real binary.
 
 Runs `<binary> <cmd> --help` per subcommand against an ISOLATED install
 (never the operator binary) and records usage + options. Output feeds
-docs/PARITY_HERMES.json verdicts. Read-only; no model calls (help only).
+docs/archive/2026-09-21/PARITY_HERMES.json verdicts. Read-only; no model calls (help only).
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def main() -> int:
     home = sys.argv[2]
     out = sys.argv[3]
     env = {"PATH": os.environ.get("PATH", ""), "HOME": home,
-           "HERMES_HOME": home}
+           "QUBIT_HOME": home}
     rows = []
     for cmd in COMMANDS:
         try:

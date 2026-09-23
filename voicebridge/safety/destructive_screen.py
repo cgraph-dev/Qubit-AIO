@@ -6,7 +6,7 @@ at three independent layers:
   2. before the deterministic whitelist/local route,
   3. inside the capability broker before execution.
 
-Measured motivation (docs/BAKEOFF_4D.json): official Instruct-2507 quants
+Measured motivation (docs/archive/2026-09-21/BAKEOFF_4D.json): official Instruct-2507 quants
 routed unseen destructive phrasings ("wipe the demo database") to the
 immediate-action `local` class even with safety persona rules. This screen
 does not depend on model behavior at all.

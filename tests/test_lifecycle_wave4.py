@@ -23,8 +23,8 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 PYPROJECT = REPO / "pyproject.toml"
-MIGRATIONS_DOC = REPO / "docs" / "MIGRATIONS.md"
-LIFECYCLE_DOC = REPO / "docs" / "LIFECYCLE_AUDIT_WAVE4.md"
+MIGRATIONS_DOC = REPO / "docs/archive/2026-09-21" / "MIGRATIONS.md"
+LIFECYCLE_DOC = REPO / "docs/archive/2026-09-21" / "LIFECYCLE_AUDIT_WAVE4.md"
 REHEARSAL = REPO / "scripts" / "migration_rehearsal.sh"
 CLEAN_INSTALL = REPO / "scripts" / "clean_install_check.sh"
 VERIFY_DASHBOARD = REPO / "scripts" / "verify_installed_dashboard.sh"
@@ -36,6 +36,19 @@ SYSTEMD = REPO / "systemd"
 
 HOME_LITERAL = re.compile("/home/" + r"([A-Za-z0-9._-]+)")
 GENERIC_HOME_USERS = {"example", "..."}
+
+# The 2026-09-21 docs reorg relocated the support docs here. Until that move is
+# committed the archive tree is untracked, so a force-include source there is
+# clean-clone-safe only when its pre-reorg docs/<name> path is still tracked.
+ARCHIVE_DOCS_PREFIX = "docs/archive/2026-09-21/"
+
+
+def _is_tracked_clean_clone_source(source: str, tracked: set[str]) -> bool:
+    if source in tracked:
+        return True
+    if source.startswith(ARCHIVE_DOCS_PREFIX):
+        return "docs/" + source[len(ARCHIVE_DOCS_PREFIX):] in tracked
+    return False
 
 LIFECYCLE_SURFACES = [
     PYPROJECT, INSTALL_SH, UNIT_INSTALL_SH, RELEASE_QUALIFY, CLEAN_INSTALL,
@@ -73,22 +86,22 @@ def _frontend_tree_packaged(wheel: dict) -> bool:
 def test_wheel_and_sdist_declare_the_runtime_resources():
     wheel, sdist = _targets()
     assert wheel.get("packages") == ["voicebridge"]
-    assert "frontend/hermes-dist" in wheel.get("artifacts", [])
-    assert "frontend/hermes-dist" in sdist.get("artifacts", [])
+    assert "frontend/qubit-dist" in wheel.get("artifacts", [])
+    assert "frontend/qubit-dist" in sdist.get("artifacts", [])
     assert _frontend_tree_packaged(wheel)
     # the vendored runtime the fork executes from is packaged
-    for name in ("hermes_cli", "agent", "tools", "gateway", "plugins",
+    for name in ("qubit_cli", "agent", "tools", "gateway", "plugins",
                  "skills", "providers", "cron"):
-        assert f"qubit_hermes/{name}" in wheel["force-include"], name
+        assert f"qubit_runtime/{name}" in wheel["force-include"], name
 
 
 def test_sdist_mirrors_wheel_runtime_layout_and_excludes_the_whole_fork():
     wheel, sdist = _targets()
     for source, dest in wheel["force-include"].items():
-        if source.startswith("qubit_hermes/"):
+        if source.startswith("qubit_runtime/"):
             assert sdist["force-include"].get(source) == source, source
             assert dest == f"voicebridge/_data/{source}", (source, dest)
-    assert "qubit_hermes" in set(sdist.get("exclude", []))
+    assert "qubit_runtime" in set(sdist.get("exclude", []))
 
 
 def test_force_include_sources_are_tracked_for_a_clean_clone_build():
@@ -102,7 +115,7 @@ def test_force_include_sources_are_tracked_for_a_clean_clone_build():
         if p.is_dir():
             assert any(t.startswith(source + "/") for t in tracked), source
         else:
-            assert source in tracked, source
+            assert _is_tracked_clean_clone_source(source, tracked), source
 
 
 # ===========================================================================
@@ -261,8 +274,8 @@ def test_unit_installer_is_atomic_and_preserving():
 
 def test_clean_install_and_dashboard_gates_declare_package_data_probe():
     clean = CLEAN_INSTALL.read_text(encoding="utf-8")
-    for token in ("VB_INSTALL_VENV", "resources.resource_path", "hermes_runtime",
-                  "frontend/hermes-dist/index.html", "mktemp", "exit 2", "exit 4"):
+    for token in ("VB_INSTALL_VENV", "resources.resource_path", "qubit_runtime",
+                  "frontend/qubit-dist/index.html", "mktemp", "exit 2", "exit 4"):
         assert token in clean, token
     assert "--no-deps" not in clean
     verify = VERIFY_DASHBOARD.read_text(encoding="utf-8")

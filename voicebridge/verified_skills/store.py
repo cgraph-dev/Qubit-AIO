@@ -84,7 +84,25 @@ class VerifiedSkillStore(LifecycleMixin, RecallMixin, TransferMixin):
             "SELECT COUNT(*) AS n FROM skills WHERE pinned=1")
         pinned = int(cur.fetchone()["n"])
         return {"by_status": by_status, "pinned": pinned,
+                "bundled": len(self.bundled()),
                 "journal": self.journal_verify()}
+
+    # --- bundled Qubit skills (read-only; see _bundled.py) -----------------
+    def bundled(self) -> List[Dict[str, Any]]:
+        """Validated, Qubit-branded bundled skill manifests (no network)."""
+        from ._bundled import bundled_skill_manifests
+
+        return bundled_skill_manifests()
+
+    def bundled_skill(self, name: str) -> Optional[Dict[str, Any]]:
+        from ._bundled import get_bundled_skill
+
+        return get_bundled_skill(name)
+
+    def register_bundled_skills(self) -> Dict[str, Any]:
+        from ._bundled import register_bundled_skills
+
+        return register_bundled_skills(self)
 
 
 def verified_skills_store(cfg, *, path: Optional[Path | str] = None) -> VerifiedSkillStore:

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "generated_by": "scripts/differential_parity.py",
+  "artifact": "DIFFERENTIAL_SEED_DECLARATIONS",
+  "description": "Committed, deterministic declarations anchor for the differential parity runner. It is the seed companion to SEED_INVENTORY.json, not the shipped DECLARATIONS.json overlay. Every entry is a NON-SUCCESS terminal disposition (OPERATOR_ONLY or FAIL); a declaration can never manufacture PASS or SAFE_EQUIVALENT. Validated by `differential_parity.py self-check` (or `--self-check`) without executing anything.",
+  "declarations": [
+    {
+      "capability_id": "api.seed.status",
+      "family": "api",
+      "disposition": "OPERATOR_ONLY",
+      "declaration_class": "E_operator",
+      "basis": "seed anchor: the live status read requires an operator-healthy running Qubit instance and a pinned reference; no execution is claimed.",
+      "operator_prerequisite": "operator-held running Qubit instance (QUBIT_DIFFERENTIAL_QUBIT_URL) and a pinned Hermes/OpenClaw reference binary."
+    },
+    {
+      "capability_id": "voice.seed.status_read",
+      "family": "voice",
+      "disposition": "OPERATOR_ONLY",
+      "declaration_class": "E_operator",
+      "basis": "seed anchor: the live voice status read needs an operator-healthy running Qubit instance and a pinned reference; recorded as a typed OPERATOR_ONLY hold, never an unproven PASS.",
+      "operator_prerequisite": "operator-held running Qubit instance (QUBIT_DIFFERENTIAL_QUBIT_URL) and a pinned Hermes/OpenClaw reference; the runner never claims an unexecuted PASS."
+    }
+  ]
+}

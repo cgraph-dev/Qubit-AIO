@@ -1,6 +1,6 @@
 """Qubit Skill Workshop — agent-owned collection lifecycle (OC-41, OC-D29).
 
-The OpenClaw Skill Workshop is an *agent-owned* collection with explicit
+The Qubit Skill Workshop is an *agent-owned* collection with explicit
 backup/restore/rollback, curator status, and collection contracts. Qubit maps
 that onto the existing verified-skill store so the safety properties are
 preserved and the workshop adds only the authoring/collection layer:

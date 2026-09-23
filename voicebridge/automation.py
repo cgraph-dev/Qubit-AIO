@@ -1,6 +1,6 @@
 """Qubit automation: standing orders, flows, heartbeat, QA runner, yields.
 
-Closes the remaining OpenClaw automation rows that have no external
+Closes the remaining Qubit automation rows that have no external
 dependency, on top of the ONE existing scheduling authority
 (:mod:`voicebridge.schedules` / the monitor tick) and the EXISTING
 messaging/permission/audit/e-stop path — never a second scheduler, broker,
@@ -1115,7 +1115,7 @@ def yield_handoff(cfg: Any, session: str, *, reason: str, context: str,
                   confirmed: bool = False) -> Dict[str, Any]:
     """Persist a bounded, redacted continuation context for a delegated turn.
 
-    This is the Qubit-safe equivalent of an OpenClaw ``sessions_yield``
+    This is the Qubit-safe equivalent of an Qubit ``sessions_yield``
     handoff: recursive delegation is bounded by :data:`MAX_DEPTH`, the
     context is size-limited and redacted, and only a confirmed caller may
     create or consume one. The emergency stop refuses both directions.

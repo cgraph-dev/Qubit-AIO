@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate ``docs/QUBIT_GAP_LEDGER.qubit.json`` deterministically.
+"""Regenerate ``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.qubit.json`` deterministically.
 
 The Qubit gap-ledger section is *evidence based*: a row is only reported
 ``IMPLEMENTED`` when
@@ -27,12 +27,12 @@ catalog rows
     and the registry.
 
 gated rows
-    Distinct ``voicebridge.hermes_compat.GATED`` codes (a typed policy gate is
+    Distinct ``voicebridge.qubit_compat.GATED`` codes (a typed policy gate is
     never ``IMPLEMENTED``).
 
 dashboard / page rows
-    ``frontend/hermes-qubit/plugins/*/manifest.json`` overlay pages and the
-    vendored ``frontend/hermes-web/src/pages/*.tsx`` baseline.  A page or
+    ``frontend/qubit-app/plugins/*/manifest.json`` overlay pages and the
+    vendored ``frontend/qubit-web/src/pages/*.tsx`` baseline.  A page or
     plugin declares only the dashboard surface (no CLI/voice interface by
     design): when a ``tests/`` production-route test proves it the dashboard
     surface is *complete*, so the row is ``IMPLEMENTED``; without an on-disk
@@ -50,7 +50,7 @@ The output keeps the schema and exact row keys required by
 ``scripts/gap_ledger.py`` plus the provenance fields.
 
 The direct source inventory
-    ``docs/QUBIT_SOURCE_INVENTORY.json`` (agent A) is ingested last: every
+    ``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json`` (agent A) is ingested last: every
     non-evidence item is either matched to a real merged-ledger row, covered as
     a *parented surface* of an IMPLEMENTED parent capability (with no
     standalone row), or emitted as an explicit ``MISSING`` open row classified
@@ -84,11 +84,11 @@ if str(ROOT) not in sys.path:
 
 from voicebridge import cli as CLI  # noqa: E402
 from voicebridge import dashboard_ops as DO  # noqa: E402
-from voicebridge import hermes_compat as HC  # noqa: E402
+from voicebridge import qubit_compat as HC  # noqa: E402
 from voicebridge import voice_commands as VC  # noqa: E402
 
 GENERATED = "2026-09-12"
-OUT_PATH = ROOT / "docs" / "QUBIT_GAP_LEDGER.qubit.json"
+OUT_PATH = ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.qubit.json"
 INTERFACES = ("cli", "dashboard", "voice")
 SURFACE_ONLY = {
     "cli": "CLI_ONLY",
@@ -227,12 +227,12 @@ CATALOG_IDS = {o["id"] for o in DO.catalog()} | set(DO.EXTRA_OPS)
 
 def _plugin_manifest_paths() -> List[Path]:
     return sorted(Path(p) for p in glob.glob(
-        str(ROOT / "frontend/hermes-qubit/plugins/*/manifest.json")))
+        str(ROOT / "frontend/qubit-app/plugins/*/manifest.json")))
 
 
 def _page_paths() -> List[Path]:
     return sorted(p for p in
-                  (ROOT / "frontend/hermes-web/src/pages").glob("*.tsx")
+                  (ROOT / "frontend/qubit-web/src/pages").glob("*.tsx")
                   if not p.name.endswith(".test.tsx"))
 
 
@@ -436,13 +436,21 @@ class TestIndex:
         except (OSError, SyntaxError):
             return
         aliases: Dict[str, str] = {}
+        # ``from voicebridge.<mod> import <fn>`` binds ``<fn>`` to a real
+        # production callable, so a bare ``<fn>(...)`` call is dispatcher
+        # evidence exactly like ``<mod>.<fn>(...)``.  Without this the index
+        # misses every directly-imported backend a test invokes.
+        direct_imports: Dict[str, Tuple[str, str]] = {}
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module and \
                     node.module.startswith("voicebridge"):
                 parts = node.module.split(".")
                 base = parts[1] if len(parts) > 1 else None
                 for alias in node.names:
-                    aliases[alias.asname or alias.name] = base or alias.name
+                    local = alias.asname or alias.name
+                    aliases[local] = base or alias.name
+                    if base is not None:
+                        direct_imports[local] = (base, alias.name)
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name.startswith("voicebridge"):
@@ -521,6 +529,10 @@ class TestIndex:
                         if base in aliases:
                             self.module_calls[(aliases[base], func.attr)].add(
                                 (rel, node.name))
+                    elif isinstance(func, ast.Name) and \
+                            func.id in direct_imports:
+                        self.module_calls[direct_imports[func.id]].add(
+                            (rel, node.name))
 
 
 def build_test_index() -> TestIndex:
@@ -600,7 +612,32 @@ def _cli_tables(tree: Dict[str, List[str]]):
                  "remove_model_profile": "profile model remove",
                  "select_session_model": "profile model activate",
                  "clear_session_model": "profile model deactivate",
-                 "rollback_model_profile": "profile model rollback"}
+                 "rollback_model_profile": "profile model rollback",
+                 # Canonical chat-history reads are the `qubit chat-sessions`
+                 # family (list/show/messages/search/export).
+                 "chat_sessions": "chat-sessions list",
+                 "chat_session_show": "chat-sessions show",
+                 "chat_session_search": "chat-sessions search",
+                 # Canonical speech-profile lifecycle is the
+                 # `qubit profile speech ...` family (PRB-05). Both the
+                 # dashboard op ids (MODEL_PROFILE_OPS) and the voice registry
+                 # entry ids are bound.
+                 "list_speech_profiles": "profile speech list",
+                 "show_speech_profile": "profile speech show",
+                 "test_speech_profile": "profile speech test",
+                 "create_speech_profile": "profile speech create",
+                 "clone_speech_profile": "profile speech clone",
+                 "remove_speech_profile": "profile speech remove",
+                 "select_session_speech": "profile speech select",
+                 "clear_session_speech": "profile speech clear",
+                 "speech_profile_list": "profile speech list",
+                 "speech_profile_show": "profile speech show",
+                 "speech_profile_test": "profile speech test",
+                 "speech_profile_create": "profile speech create",
+                 "speech_profile_clone": "profile speech clone",
+                 "speech_profile_remove": "profile speech remove",
+                 "speech_profile_select": "profile speech select",
+                 "speech_profile_clear": "profile speech clear"}
     return join, reverse_cov, extra_cli
 
 
@@ -790,7 +827,7 @@ def build_catalog_rows(catalog: Dict[str, Dict[str, object]],
 
 
 # ---------------------------------------------------------------------------
-# Hermes gated upstream surface (distinct gate codes)
+# upstream gated surface (distinct gate codes)
 # ---------------------------------------------------------------------------
 def _gate_sample(pattern: str) -> str:
     """Build a concrete path for a compat regex pattern (best effort)."""
@@ -800,7 +837,7 @@ def _gate_sample(pattern: str) -> str:
 
 
 def _handler_kind(name: str) -> str:
-    """Reuse the Hermes generator's live handler classification."""
+    """Reuse the upstream generator's live handler classification."""
     try:
         scripts_dir = str(Path(__file__).resolve().parent)
         if scripts_dir not in sys.path:
@@ -815,7 +852,7 @@ _API_INDEX_CACHE: Optional[object] = None
 
 
 def _api_proof(handler: str) -> str:
-    """On-disk proving test for ``handler`` (Hermes generator's own index)."""
+    """On-disk proving test for ``handler`` (upstream generator's own index)."""
     global _API_INDEX_CACHE
     try:
         scripts_dir = str(Path(__file__).resolve().parent)
@@ -896,7 +933,7 @@ def build_gated_rows() -> List[Dict[str, str]]:
             "area": "hermes_gated",
             "capability": "Gated upstream route: " + code,
             "upstream_ref": "hermes-agent",
-            "qubit_backend": "voicebridge.hermes_compat",
+            "qubit_backend": "voicebridge.qubit_compat",
             "cli": "",
             "dashboard": str(info["counterpart"]),
             "voice": "",
@@ -911,7 +948,7 @@ def build_gated_rows() -> List[Dict[str, str]]:
 # ---------------------------------------------------------------------------
 # Fork-runtime capability rows (Wave 5: tools / skills / plugins)
 # ---------------------------------------------------------------------------
-# Qubit executes the complete pinned Hermes fork in-process, so upstream agent
+# Qubit executes the complete pinned upstream fork in-process, so upstream agent
 # tools, skills, and plugins are *not* separate Qubit modules: the fork's
 # tool/toolset registry, skill tree, and plugin fleet are the real backing
 # surface.  These aggregate capability rows are the fork-runtime rows that each
@@ -933,8 +970,8 @@ def build_fork_rows() -> List[Dict[str, str]]:
             "area": "tools",
             "capability": ("In-process fork agent tool registry "
                            "(pinned Hermes tools + toolsets)"),
-            "upstream_ref": "qubit_hermes/toolsets.py",
-            "qubit_backend": "qubit_hermes.tools.registry:registry",
+            "upstream_ref": "qubit_runtime/toolsets.py",
+            "qubit_backend": "qubit_runtime.tools.registry:registry",
             "cli": "",
             "dashboard": "",
             "voice": "",
@@ -951,8 +988,8 @@ def build_fork_rows() -> List[Dict[str, str]]:
             "area": "skills",
             "capability": ("In-process fork skill runtime "
                            "(vendored skills + optional-skills)"),
-            "upstream_ref": "qubit_hermes/skills",
-            "qubit_backend": "qubit_hermes.skills",
+            "upstream_ref": "qubit_runtime/skills",
+            "qubit_backend": "qubit_runtime.skills",
             "cli": "",
             "dashboard": "",
             "voice": "",
@@ -969,8 +1006,8 @@ def build_fork_rows() -> List[Dict[str, str]]:
             "area": "plugins",
             "capability": ("In-process fork plugin fleet "
                            "(vendored agent/provider/dashboard plugins)"),
-            "upstream_ref": "qubit_hermes/plugins",
-            "qubit_backend": "voicebridge.hermes_plugins.plugin_fleet_audit",
+            "upstream_ref": "qubit_runtime/plugins",
+            "qubit_backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
             "cli": "",
             "dashboard": "",
             "voice": "",
@@ -978,7 +1015,7 @@ def build_fork_rows() -> List[Dict[str, str]]:
             "proving_test": FORK_PLUGIN_PROOF,
             "note": ("Every vendored non-dashboard plugin is covered by the "
                      "Qubit plugin wrapper "
-                     "(voicebridge.hermes_plugins.VENDORED_PLUGIN_FLEET / "
+                     "(voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / "
                      "plugin_fleet_audit); the Wave 5 test asserts the fleet "
                      "covers every inventory plugin item."),
             "needs": "none",
@@ -1038,7 +1075,7 @@ def build_plugin_rows(index: TestIndex,
             "area": "dashboard_plugin",
             "capability": str(data.get("label") or name),
             "upstream_ref": "qubit-overlay",
-            "qubit_backend": "voicebridge.hermes_compat+frontend/hermes-qubit",
+            "qubit_backend": "voicebridge.qubit_compat+frontend/qubit-app",
             "cli": "",
             "dashboard": f"{name}:{tab}",
             "voice": "",
@@ -1051,7 +1088,7 @@ def build_plugin_rows(index: TestIndex,
 
 
 # ---------------------------------------------------------------------------
-# Hermes-web baseline pages (vendored, surfaced through the compat shell)
+# Upstream web baseline pages (vendored, surfaced through the compat shell)
 # ---------------------------------------------------------------------------
 def build_page_rows(index: TestIndex,
                     pages: Optional[List[Path]] = None
@@ -1072,9 +1109,9 @@ def build_page_rows(index: TestIndex,
             "area": "hermes_web_page",
             "capability": f"Hermes web page {name}",
             "upstream_ref": "hermes-agent@2237be3",
-            "qubit_backend": "voicebridge.hermes_compat",
+            "qubit_backend": "voicebridge.qubit_compat",
             "cli": "",
-            "dashboard": f"hermes-web:/{name.lower()}",
+            "dashboard": f"qubit-web:/{name.lower()}",
             "voice": "",
             "status": status,
             "proving_test": proof,
@@ -1093,7 +1130,7 @@ def build_page_rows(index: TestIndex,
 # item is matched to a real ledger row (across all three sections) or recorded
 # as an explicit open row.  Absence/unreadability of the inventory is tolerated
 # and recorded in the section provenance, never treated as "complete".
-INVENTORY_PATH = ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
+INVENTORY_PATH = ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
 OTHER_SECTIONS = ("hermes", "openclaw")
 # Cross-cutting evidence surfaces (i18n/locale keys, upstream tests) are
 # counted but are not standalone capability rows (mirrors source_inventory.py).
@@ -1177,7 +1214,7 @@ def _resolve_parent_id(parent_id: str,
 
 
 def load_source_inventory(path: Optional[Path] = None) -> Dict[str, object]:
-    """Tolerant reader for ``docs/QUBIT_SOURCE_INVENTORY.json``.
+    """Tolerant reader for ``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json``.
 
     Never raises.  A missing, malformed, or schema-shifted inventory yields a
     report whose ``present``/``error`` fields record exactly what happened and
@@ -1492,7 +1529,7 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
 # ---------------------------------------------------------------------------
 # Assemble
 # ---------------------------------------------------------------------------
-_GATE_PROOF = ("tests/test_hermes_routes_parity8u.py::"
+_GATE_PROOF = ("tests/test_qubit_routes_parity8u.py::"
                "test_every_gated_route_is_typed")
 
 # A typed unavailable/refusal signal: an ALL_CAPS gate code (``FOO_BAR``) or a
@@ -1511,8 +1548,8 @@ def _has_typed_evidence(note: str) -> bool:
 
 # Per-row canonical evidence for the terminal gate rows whose raw audit surface
 # is ``PARTIAL``/``GATED``.  Determined from the live production path and the
-# on-disk test that exercises it (docs/OPERATOR_QUALIFICATION.md and
-# docs/QUBIT_SAFE_EQUIVALENTS.md):
+# on-disk test that exercises it (docs/archive/2026-09-21/OPERATOR_QUALIFICATION.md and
+# docs/archive/2026-09-21/QUBIT_SAFE_EQUIVALENTS.md):
 #
 # * ``browser_close`` / ``browser_close_refusal`` are a typed refusal of the
 #   unsafe raw upstream behavior (closing a personal browser profile) ->
@@ -1608,9 +1645,11 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             build_page_rows(index))
 
     inventory = load_source_inventory(inventory_path)
-    known_ids = {r["id"] for r in rows} | _load_section_ids(ROOT / "docs")
+    known_ids = {r["id"] for r in rows} | _load_section_ids(
+        ROOT / "docs" / "archive" / "2026-09-21")
     known_status = {r["id"]: r["status"] for r in rows}
-    known_status.update(_load_section_status(ROOT / "docs"))
+    known_status.update(_load_section_status(
+        ROOT / "docs" / "archive" / "2026-09-21"))
     inventory_rows, inventory_summary = build_inventory_rows(
         inventory, known_ids, known_status)
     rows = _finalize_terminal_statuses(rows + inventory_rows)
@@ -1665,22 +1704,22 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
             "voicebridge/voice_commands.py (REGISTRY/_BACKENDS/CLI_COVERAGE)",
             "voicebridge/dashboard_ops.py (catalog/EXTRA_OPS)",
             "voicebridge/cli.py (build_parser)",
-            "voicebridge/hermes_compat.py (ROUTES/GATED)",
-            "voicebridge/hermes_plugins.py (vendored plugin fleet wrapper)",
-            "qubit_hermes/toolsets.py + tools/registry.py (fork tool runtime)",
-            "qubit_hermes/skills + optional-skills (fork skill runtime)",
+            "voicebridge/qubit_compat.py (ROUTES/GATED)",
+            "voicebridge/qubit_plugins.py (vendored plugin fleet wrapper)",
+            "qubit_runtime/toolsets.py + tools/registry.py (fork tool runtime)",
+            "qubit_runtime/skills + optional-skills (fork skill runtime)",
             "tests/ (AST caller evidence)",
-            "frontend/hermes-qubit/plugins/*/manifest.json",
-            "frontend/hermes-web/src/pages/*.tsx",
-            "docs/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)",
+            "frontend/qubit-app/plugins/*/manifest.json",
+            "frontend/qubit-web/src/pages/*.tsx",
+            "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)",
         ],
         "generated_from": {
             "voice_commands.REGISTRY": len(VC.REGISTRY),
             "dashboard_ops.catalog": len(catalog),
             "dashboard_ops.EXTRA_OPS": len(DO.EXTRA_OPS),
             "voice_commands.CLI_COVERAGE": len(VC.CLI_COVERAGE),
-            "hermes_compat.ROUTES": len(HC.ROUTES),
-            "hermes_compat.GATED": len(HC.GATED),
+            "qubit_compat.ROUTES": len(HC.ROUTES),
+            "qubit_compat.GATED": len(HC.GATED),
             "cli_families": len(tree),
             "source_inventory.items": inventory_summary.get("items_total", 0),
             "source_inventory.surface_items": inventory_summary.get(
@@ -1727,7 +1766,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--inventory", default=None,
         help=("direct source inventory JSON (default: "
-              "docs/QUBIT_SOURCE_INVENTORY.json; absent is tolerated)"))
+              "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json; absent is tolerated)"))
     args = parser.parse_args(argv)
 
     data = build_ledger(Path(args.inventory) if args.inventory else None)

@@ -63,7 +63,7 @@
     "dom_snapshot_ref": {"type": ["string", "object", "null"]},
     "a11y_snapshot_ref": {"type": ["string", "object", "null"]},
     "raw_hash": {"$ref": "#/$defs/hashOrNull"},
-    "transport": {"enum": ["cli", "http", "sse", "ws", "rpc", null]},
+    "transport": {"enum": ["cli", "http", "sse", "ws", "rpc", "voice", null]},
     "headers": {"type": ["object", "null"]},
     "events": {"type": ["array", "null"]},
     "persisted_state": {},

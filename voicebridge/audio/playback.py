@@ -161,6 +161,14 @@ class Playback:
         unavailable" from a slow-to-handshake USB headset), it retries on the
         system default sink so audio is never silently dropped.
         """
+        # Single audio owner: if the Qubit service is running it owns the ALSA
+        # device. Opening it from a second process crashes libasound
+        # (snd_pcm_poll_descriptors_revents), so a CLI command defers instead.
+        from .devlock import is_service_owner, service_holds_audio
+        if not is_service_owner() and service_holds_audio():
+            _log("playback.deferred_service_running",
+                 hint="the Qubit service owns the audio device; CLI audio skipped")
+            return False
         with self._lock:
             if self._playing:
                 # Interrupt whatever is playing first (we are the only speaker).

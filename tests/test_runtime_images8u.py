@@ -230,7 +230,7 @@ def test_staged_pin_binary_proof(tmp_path, monkeypatch):
     """Operator-qualification: the exact pinned OpenCode binary, when staged
     via QUBIT_OPENCODE_PIN_BIN, installs READY with a matching digest.
 
-    Procedure (also in docs/MIGRATION_JOURNAL_8TF.md): download
+    Procedure (also in docs/archive/2026-09-21/MIGRATION_JOURNAL_8TF.md): download
     opencode-linux-x64.tar.gz for v1.18.29 from the pinned release into a
     disposable dir outside the repo, verify `opencode --version` reports
     1.18.29, set QUBIT_OPENCODE_PIN_BIN to the binary, run this test.

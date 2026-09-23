@@ -4,7 +4,7 @@ The 14 ``dashboard:/...`` pages closed this wave (``/analytics``, ``/channels``,
 ``/chat``, ``/config``, ``/cron``, ``/env``, ``/files``, ``/mcp``, ``/models``,
 ``/plugins``, ``/profiles``, ``/profiles/new``, ``/skills``, ``/system``) plus
 the rest of the Hermes information architecture are each driven through the
-real production dispatcher (:func:`voicebridge.hermes_compat.dispatch`) or the
+real production dispatcher (:func:`voicebridge.qubit_compat.dispatch`) or the
 served HTTP boundary. Every test asserts a truthful 200 success (or a typed
 gate with a code) and never a fabricated success.
 
@@ -24,8 +24,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-VENDORED_APP = REPO_ROOT / "qubit_hermes" / "web" / "src" / "App.tsx"
-OVERLAY_APP = REPO_ROOT / "frontend" / "hermes-web" / "src" / "App.tsx"
+VENDORED_APP = REPO_ROOT / "qubit_runtime" / "web" / "src" / "App.tsx"
+OVERLAY_APP = REPO_ROOT / "frontend" / "qubit-web" / "src" / "App.tsx"
 
 # page -> real backing API GET route (the primary read each page loads).
 PAGE_BACKING = {
@@ -59,7 +59,7 @@ def _cfg(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("HERMES_HOME", str(home / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(home / ".hermes"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\nwebui:\n  token: t\n")
     from voicebridge.config import Config
@@ -69,7 +69,7 @@ def _cfg(tmp_path, monkeypatch):
 
 def _dispatch(cfg, route):
     """Drive one GET route through the production compat dispatcher."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     status, body = HC.dispatch(cfg, "GET", route, {}, {})
     assert status in (200, 202), (route, status, str(body)[:200])
@@ -250,8 +250,10 @@ def _routes_in(path: Path) -> set:
                       text, re.S)
     assert block, f"BUILTIN_ROUTES_CORE not found in {path}"
     routes = set(re.findall(r'"([^"]+)":', block.group(1)))
-    if '"/chat": ChatRouteSink' in text:
+    if '"/chat": ChatRouteSink' in text or '"/chat": TerminalChatPage' in text:
         routes.add("/chat")
+    if '"/qubit-chat": ChatRouteSink' in text:
+        routes.add("/qubit-chat")
     return routes
 
 
@@ -264,6 +266,37 @@ def test_vendored_and_overlay_route_maps_keep_every_page():
     for route in ("/", "/docs", "/profiles/new"):
         assert route in vendored, route
         assert route in overlay, route
+
+
+def test_chat_routes_are_two_surfaces_one_backend():
+    """Owner chat mapping (2026-09-17).
+
+    `/chat` renders the real Hermes terminal frontend (xterm over the single
+    Qubit PTY WebSocket). `/qubit-chat` keeps the Qubit-native ChatPage. They
+    share the backend but are intentionally distinct surfaces; neither
+    redirects and the old card-only overlay plugin is gone.
+    """
+    text = OVERLAY_APP.read_text(encoding="utf-8")
+    assert '"/chat": TerminalChatPage' in text
+    assert '"/qubit-chat": ChatRouteSink' in text
+    for bad in ('<Navigate to="/chat"', '<Navigate to="/qubit-chat"'):
+        assert bad not in text, bad
+    assert 'from "@/lib/chat-routes"' in text
+    assert "isNativeChatPath(pathname)" in text
+    # The terminal surface is a real xterm host, not the native transcript.
+    terminal = (REPO_ROOT / "frontend" / "qubit-web" / "src" / "pages"
+                / "TerminalChatPage.tsx")
+    assert terminal.is_file(), terminal
+    assert 'aria-label="Qubit terminal"' in terminal.read_text(encoding="utf-8")
+    # The old card-only overlay plugin is gone.
+    plugdir = REPO_ROOT / "frontend" / "qubit-app" / "plugins"
+    names = sorted(p.parent.name for p in plugdir.glob("*/manifest.json"))
+    assert "qubit-chat" not in names, names
+    path = REPO_ROOT / "frontend" / "qubit-web" / "src" / "lib" / "chat-routes.ts"
+    assert path.is_file(), path
+    body = path.read_text(encoding="utf-8")
+    assert '"/chat"' in body and '"/qubit-chat"' in body, body
+
 
 
 def test_generator_dashboard_proof_covers_every_page():

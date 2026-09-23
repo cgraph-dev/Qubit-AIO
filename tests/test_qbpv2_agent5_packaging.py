@@ -95,7 +95,7 @@ def test_sdist_excludes_untracked_docs_with_a_developer_home_path():
 
     Extends the frozen tracked-docs gate to untracked working-tree docs (a
     working-tree build sweeps them). The prior wave fixed
-    docs/OPERATOR_QUALIFICATION.md; this pins docs/QUBIT_WAVE2_EVIDENCE.md and
+    docs/OPERATOR_QUALIFICATION.md; this pins docs/archive/2026-09-21/QUBIT_WAVE2_EVIDENCE.md and
     any future offender.
     """
     excludes = _sdist_excludes()
@@ -115,7 +115,7 @@ def test_sdist_excludes_untracked_docs_with_a_developer_home_path():
 
 def test_sdist_excludes_the_untracked_wave2_evidence_and_allowlist():
     excludes = _sdist_excludes()
-    for rel in ("docs/QUBIT_WAVE2_EVIDENCE.md", "docs/QUBIT_REBRAND_ALLOWLIST.md"):
+    for rel in ("docs/archive/2026-09-21/QUBIT_WAVE2_EVIDENCE.md", "docs/archive/2026-09-21/QUBIT_REBRAND_ALLOWLIST.md"):
         assert _is_excluded(rel, excludes), rel
 
 
@@ -160,7 +160,7 @@ def test_build_dashboard_check_exit_codes_are_typed():
 def test_clean_install_gate_stashes_and_verifies_absent_node_modules():
     """Hatchling force-include ignores .gitignore, and the frozen pyproject
     maps the whole ``frontend`` tree, so the gate must stash
-    ``frontend/hermes-web/node_modules`` around the build and prove the wheel
+    ``frontend/qubit-web/node_modules`` around the build and prove the wheel
     carries zero build-only members."""
     for script in (CLEAN_INSTALL, REPO / "scripts/verify_installed_dashboard.sh"):
         text = script.read_text(encoding="utf-8")

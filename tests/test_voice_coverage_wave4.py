@@ -1,7 +1,7 @@
 """Wave 4 — voice coverage for the new surfaces (Hermes plugin fleet + CLI union).
 
 This is the wave-4 verification layer over the frozen voice-completeness gate
-(``docs/QUBIT_FULL_PARITY_CONTRACT.md`` / ``docs/VOICE_BRIDGE_SYSTEM.md``).  It
+(``docs/archive/2026-09-21/QUBIT_FULL_PARITY_CONTRACT.md`` / ``docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md``).  It
 closes the last silent gaps left after waves 1-3 without touching the frozen
 wave-1/2/3 example tables:
 
@@ -9,12 +9,12 @@ wave-1/2/3 example tables:
    registry entry or an explicit, tested ``VOICE_IMPOSSIBLE`` reason — the
    union the ledger derives is asserted equal to the parser tree (no drift);
 2. every wave-3 vendored dashboard-plugin compat route (the
-   ``hermes-achievements`` + kanban plugin fleet, ``hermes_plugins.py``) has a
-   real voice entry that dispatches the *same* ``hermes_compat`` route the
+   ``hermes-achievements`` + kanban plugin fleet, ``qubit_plugins.py``) has a
+   real voice entry that dispatches the *same* ``qubit_compat`` route the
    dashboard SPA calls — no unspoken plugin route, and the one dashboard-only
    control is explicitly declared;
 3. the fleet entries execute through the shared production pipeline
-   (``voice_say`` -> ``execute`` -> ``hermes_compat.dispatch``), return the
+   (``voice_say`` -> ``execute`` -> ``qubit_compat.dispatch``), return the
    real computed payload, and bind no second listener/backend;
 4. representative fleet behavior: a confirm-tier fleet write stages exactly one
    durable confirmation that can be cancelled, replayed (single-use), and is
@@ -22,9 +22,9 @@ wave-1/2/3 example tables:
    failures, never fabricated success;
 5. model/page/tool sources can never stage or execute a fleet entry.
 
-Hermetic: temp ``XDG_*`` + ``HERMES_HOME``; no network; no live services.  The
+Hermetic: temp ``XDG_*`` + ``QUBIT_HOME``; no network; no live services.  The
 achievement engine runs the vendored production engine over a seeded
-``hermes_state.SessionDB`` and the kanban reads run over a seeded
+``qubit_state.SessionDB`` and the kanban reads run over a seeded
 ``kanban_db`` — no mock replaces the production caller.
 """
 from __future__ import annotations
@@ -44,6 +44,9 @@ sys.path.insert(0, str(REPO_ROOT))
 # omission. Each route stays reachable from the dashboard SPA.
 DASHBOARD_ONLY_PLUGIN_ROUTES = {
     "h_plugin_visibility_set",
+    # Static dashboard-plugin asset bytes (JS/CSS served to the browser). There
+    # is no spoken form for fetching an asset file.
+    "h_plugin_asset",
     # Kanban auxiliary drawers: raw task logs, binary attachment listings,
     # worker-run internals, profile roster and orchestration knobs. These are
     # inspected in the dashboard, not driven by voice; the spoken kanban
@@ -58,6 +61,18 @@ DASHBOARD_ONLY_PLUGIN_ROUTES = {
     # Live-update poll for the board tab (real task_events read); the spoken
     # kanban surface covers board/task/stats/config/projects.
     "h_plugin_kanban_events",
+    # Vendored kanban WRITE controls. They are native-backed on the one board
+    # store (confirm-gated); the capability is spoken through the Tier-1
+    # ``kanban_*`` entries (``kanban_create``/``kanban_move``/``kanban_comment``
+    # ...) which drive the same native store through the ops broker. The
+    # vendored plugin route is the dashboard UI for that mutation, not a second
+    # spoken backend.
+    "h_plugin_kanban_boards_create",
+    "h_plugin_kanban_tasks_create",
+    "h_plugin_kanban_tasks_patch",
+    "h_plugin_kanban_tasks_delete",
+    "h_plugin_kanban_tasks_bulk",
+    "h_plugin_kanban_tasks_comment",
 }
 
 # Representative fleet reads: (spoken alias, voice entry id, compat handler).
@@ -96,19 +111,19 @@ def _ctx(cfg, session="wave4", source="user"):
     return VC.make_ctx(cfg, actor="voice:user", session=session, source=source)
 
 
-def _hermes_home(cfg) -> Path:
+def _qubit_home(cfg) -> Path:
     return Path(cfg.state_dir()) / "hermes"
 
 
 def _seed_history(cfg, monkeypatch):
-    """Seed a real SessionDB under the Qubit HERMES_HOME (achievements input)."""
-    from voicebridge import hermes_runtime
+    """Seed a real SessionDB under the Qubit QUBIT_HOME (achievements input)."""
+    from voicebridge import qubit_runtime
 
-    home = _hermes_home(cfg)
+    home = _qubit_home(cfg)
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    hermes_runtime.ensure_path()
-    from hermes_state import SessionDB
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    qubit_runtime.ensure_path()
+    from qubit_state import SessionDB
 
     db = SessionDB()
     try:
@@ -146,7 +161,7 @@ def _families():
 
 def _plugin_routes():
     """Every compat route served for the vendored dashboard-plugin fleet."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     routes = []
     for route in HC.ROUTES:
@@ -185,7 +200,7 @@ def test_every_cli_family_has_a_voice_surface_or_typed_reason():
 # --------------------------------------------------- 2. plugin-fleet routes
 def test_every_vendored_plugin_route_has_a_voice_entry():
     """No vendored dashboard-plugin route is silently unspoken."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge import voice_commands as VC
 
     unspoken = []
@@ -237,8 +252,8 @@ def test_fleet_entry_aliases_resolve_to_their_own_entry():
 # ---------------------------------------------- 3. same backend as dashboard
 def test_fleet_reads_share_the_compat_backend_result(tmp_path, monkeypatch):
     """Voice and the dashboard compt route return the same computed payload."""
-    from voicebridge import hermes_compat as HC
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_compat as HC
+    from voicebridge import qubit_plugins as HP
     from voicebridge import voice_commands as VC
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -282,7 +297,7 @@ def test_fleet_reads_share_the_compat_backend_result(tmp_path, monkeypatch):
 
 def test_achievements_compute_real_state_not_badges(tmp_path, monkeypatch):
     """The spoken rescan runs the vendored engine over real history."""
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_plugins as HP
     from voicebridge import voice_commands as VC
 
     cfg = _cfg(tmp_path, monkeypatch)

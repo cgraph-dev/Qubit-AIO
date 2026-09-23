@@ -192,6 +192,8 @@ def _collect_migrations() -> List[str]:
     from .resources import resource_path
     mig = resource_path("docs/MIGRATIONS.md")
     if not mig.exists():
+        mig = resource_path("docs/archive/2026-09-21/MIGRATIONS.md")
+    if not mig.exists():
         return []
     return [ln[4:].split("|")[0].strip()
             for ln in mig.read_text().splitlines()

@@ -26,7 +26,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/web_routers/ops.py:146",
+    "path": "qubit_cli/web_routers/ops.py:146",
     "symbol": "list_webhooks",
     "mapping_status": "VERIFIED"
   },
@@ -35,7 +35,23 @@
     "symbol": "resolveWebhooksPluginConfig",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Webhook subscription inventory contract (HMAC verification, no listener in-process). Secrets are reference-only; receipts record verdicts. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/ops.py:146 (list_webhooks); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: extensions/webhooks/src/config.ts:43 (resolveWebhooksPluginConfig).",
+  "references": {
+    "hermes": {
+      "kind": "cli",
+      "argv": [
+        "hermes",
+        "webhook",
+        "list"
+      ],
+      "env": {},
+      "equivalent_kind": "exact_equivalent",
+      "expectation": "PASS",
+      "notes": "Lists webhook subscriptions.",
+      "pinned_commit": "2237be355906fbe6065ce1815711eee52b2d646e"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Webhook subscription inventory contract (HMAC verification, no listener in-process). Secrets are reference-only; receipts record verdicts. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/ops.py:146 (list_webhooks); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: extensions/webhooks/src/config.ts:43 (resolveWebhooksPluginConfig). Side-effect-free reference invocation(s) declared and pinnable: `hermes webhook list` (2237be355906fbe6065ce1815711eee52b2d646e, exact_equivalent). The declared `hermes` reference is pinned: the pinned wrapper's probed `--version` prints `Hermes Agent v0.21.1 (2026.9.7) \u00b7 upstream <varies> \u00b7 local 2237be35 (+1 carried commit)`, and the `2237be35` token is a prefix of the contractual pin 2237be355906fbe6065ce1815711eee52b2d646e, so the runner's `_reference_is_pinned` resolves pinned=true from `--version` alone. No `pinned=false` override is declared and this fixture claims PASS. The pinned openclaw reference(s) (3a9d69db306cd7f081e06254cb89c4bcc14a7107) remain byte-comparable where declared.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,
@@ -69,6 +85,12 @@
       "audit_receipt_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface",
       "response_headers": "not exposed by this fixture's surface"
-    }
-  }
+    },
+    "test_ids": [
+      "tests/test_webhooks8tf.py::test_add_list_show_remove_roundtrip"
+    ]
+  },
+  "test_ids": [
+    "tests/test_webhooks8tf.py::test_add_list_show_remove_roundtrip"
+  ]
 }

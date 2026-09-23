@@ -6,7 +6,7 @@ used only when the owner requests a bounded coding run. OpenCode's ability to
 run tools is never treated as permission for Qubit to run arbitrary shell or
 edit arbitrary files.
 
-Upstream posture (docs/UPSTREAM_REUSE.md R8R): DOCUMENT-ONLY reference plus
+Upstream posture (docs/archive/2026-09-21/UPSTREAM_REUSE.md R8R): DOCUMENT-ONLY reference plus
 WRAP of the existing 8F action machinery. No upstream code is vendored; the
 local ``opencode`` executable (pinned version below) is invoked at arm's
 length as ``opencode run --format json --dir <workdir> <task>``. Never

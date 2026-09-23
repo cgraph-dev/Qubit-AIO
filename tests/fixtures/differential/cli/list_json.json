@@ -39,7 +39,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/subcommands/model.py:8",
+    "path": "qubit_cli/subcommands/model.py:8",
     "symbol": "build_model_parser",
     "mapping_status": "VERIFIED"
   },
@@ -48,7 +48,24 @@
     "symbol": "buildModelsListResult",
     "mapping_status": "VERIFIED"
   },
-  "notes": "CLI JSON contract for the canonical model-profile registry (resolver.list_profiles). Template list asserts the shipped Qubit-Brain4 default record. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/subcommands/model.py:8 (build_model_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/models-list-result.ts:246 (buildModelsListResult).",
+  "references": {
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "models",
+        "list",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "JSON model catalog list.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "CLI JSON contract for the canonical model-profile registry (resolver.list_profiles). Template list asserts the shipped Qubit-Brain4 default record. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/subcommands/model.py:8 (build_model_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/models-list-result.ts:246 (buildModelsListResult). Pinned side-effect-free reference invocation(s) declared: `openclaw models list --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, direct_readonly).",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,

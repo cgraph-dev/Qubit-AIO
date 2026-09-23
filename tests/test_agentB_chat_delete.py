@@ -20,7 +20,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-_DIST = REPO_ROOT / "frontend" / "hermes-dist"
+_DIST = REPO_ROOT / "frontend" / "qubit-dist"
 _needs_dist = pytest.mark.skipif(
     not (_DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")

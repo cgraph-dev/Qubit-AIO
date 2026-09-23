@@ -1,18 +1,22 @@
 """Agent 3 — Qubit overlay dashboard plugins are real, not tiles.
 
-The eleven ``dashboard_plugin`` ledger rows (``plugin_qubit-*``) must be backed
+The ``dashboard_plugin`` ledger rows (``plugin_qubit-*``) must be backed
 by a real Hermes workspace and a real Qubit backend. This suite proves, from
 the shipped frontend source and the production compat dispatcher:
 
 * every manifest has a served tab target and a real entry bundle;
 * every ``/api/ops/<name>`` an entry bundle calls is mapped by the real
-  ``hermes_compat.h_ops`` dispatcher to a Qubit operation (no fabricated
+  ``qubit_compat.h_ops`` dispatcher to a Qubit operation (no fabricated
   frontend-only success, no dead endpoint);
 * every other ``/api/...`` endpoint an entry bundle calls exists in the
   registered compat route table;
 * labels/descriptions carry no upstream product branding;
 * an unknown/fabricated endpoint is refused with a typed code, so a future
   fabricated tile would fail this check.
+
+``/qubit-chat`` is NOT an overlay plugin: per the owner chat mapping it is a
+built-in route rendering the same ChatPage as ``/chat`` (see
+``tests/test_dashboard_page_closure_wave2.py::test_chat_routes_share_one_implementation``).
 """
 from __future__ import annotations
 
@@ -23,10 +27,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-PLUGDIR = REPO_ROOT / "frontend" / "hermes-qubit" / "plugins"
+PLUGDIR = REPO_ROOT / "frontend" / "qubit-app" / "plugins"
 MANIFESTS = sorted(PLUGDIR.glob("*/manifest.json"))
 EXPECTED = [
-    "qubit-approvals", "qubit-boards", "qubit-brand", "qubit-chat",
+    "qubit-approvals", "qubit-boards", "qubit-brand",
     "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
     "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
@@ -47,8 +51,8 @@ def _cfg(tmp_path, monkeypatch):
     return C.Config.load(p)
 
 
-def test_all_ten_plugin_manifests_have_real_entry_bundles():
-    assert len(MANIFESTS) == 11, MANIFESTS
+def test_all_plugin_manifests_have_real_entry_bundles():
+    assert len(MANIFESTS) == 10, MANIFESTS
     assert sorted(p.parent.name for p in MANIFESTS) == EXPECTED
     for mf in MANIFESTS:
         import json
@@ -79,7 +83,7 @@ def _entry_endpoints():
 
 def test_every_ops_endpoint_in_plugin_source_is_a_real_operation(tmp_path,
                                                                  monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     endpoints = _entry_endpoints()
@@ -100,7 +104,7 @@ def test_every_ops_endpoint_in_plugin_source_is_a_real_operation(tmp_path,
 
 
 def test_every_non_ops_endpoint_in_plugin_source_is_registered():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     known = [r["pattern"] for r in HC.ROUTES]
     missing = []
@@ -126,7 +130,7 @@ def test_ops_plugin_uses_the_shared_run_confirm_cancel_broker():
 
 def test_fabricated_ops_endpoint_is_typed_not_fabricated_success(tmp_path,
                                                                  monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, body = HC.dispatch(cfg, "GET", "/api/ops/agent-fabricated-op")
@@ -137,7 +141,7 @@ def test_fabricated_ops_endpoint_is_typed_not_fabricated_success(tmp_path,
 def test_every_manifest_tab_is_served_and_unique():
     import json
 
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     manifests = HC._overlay_manifests()
     tabs = []
@@ -147,7 +151,7 @@ def test_every_manifest_tab_is_served_and_unique():
         assert route.startswith("/hermes/"), (man["name"], route)
         assert route not in tabs, (man["name"], route)
         tabs.append(route)
-    assert len(tabs) == len(manifests) == 11
+    assert len(tabs) == len(manifests) == 10
     # the plugin response is the real served manifest set
     served = {m["name"] for m in HC.plugins_response()["plugins"]}
     assert served == set(EXPECTED)
@@ -164,13 +168,12 @@ def test_every_manifest_entry_registers_its_plugin_component():
         assert "return" in text or "function" in text, man["name"]
 
 
-# Ledger row ids for the eleven overlay plugin pages, plus a representative
+# Ledger row ids for the ten overlay plugin pages, plus a representative
 # read-only Qubit operation each plugin drives through the shared dispatcher.
 PLUGIN_ROW_IDS = {
     "qubit-approvals": "plugin_qubit-approvals",
     "qubit-boards": "plugin_qubit-boards",
     "qubit-brand": "plugin_qubit-brand",
-    "qubit-chat": "plugin_qubit-chat",
     "qubit-devices": "plugin_qubit-devices",
     "qubit-gateway": "plugin_qubit-gateway",
     "qubit-memory": "plugin_qubit-memory",
@@ -183,7 +186,6 @@ PLUGIN_READ_OPS = {
     "qubit-approvals": ("approvals", {}),
     "qubit-boards": ("kanban_boards", {}),
     "qubit-brand": ("themes", {}),
-    "qubit-chat": ("status", {}),
     "qubit-devices": ("runtime_status", {}),
     "qubit-gateway": ("gateway", {}),
     "qubit-memory": ("memory_search", {"query": "agent3"}),
@@ -207,12 +209,12 @@ def test_every_plugin_manifest_served_through_real_route(tmp_path,
     """Each overlay page: served tab + registered entry + real ops route.
 
     On-disk proof for ``plugin_qubit-*`` rows: the manifest is returned by the
-    production ``hermes_compat.plugins_response`` loader, its tab is a served
+    production ``qubit_compat.plugins_response`` loader, its tab is a served
     ``/hermes/...`` workspace, its entry bundle registers the component, and
     the page's own read operation executes through ``dashboard_ops.run_op``.
     A fabricated endpoint stays a typed ``OPS_UNKNOWN`` refusal.
     """
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     served = {m["name"]: m for m in HC.plugins_response()["plugins"]}

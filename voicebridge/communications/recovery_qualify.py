@@ -114,6 +114,32 @@ def isolate_cfg(cfg: Config, state_dir: Path) -> Config:
     return Config(data=data, path=cfg.path)
 
 
+def _isolated_from_production(iso: Path, prod: Path) -> Tuple[bool, bool]:
+    """Prove ``iso`` is safely isolated from the production state dir ``prod``.
+
+    ``iso`` must not be ``prod`` nor contain it, and it must never sit beside
+    production stores. The harness owns a reserved private workspace
+    (``QUALIFY_STATE_DIR``) inside the config state tree, so the default run's
+    per-run isolated roots nest there by design: any isolated root inside
+    ``prod`` MUST be confined to that reserved workspace, while a fully
+    external ``--state-dir`` is outside production entirely. Both paths are
+    resolved first so a ``..`` segment or a symlink back into production cannot
+    masquerade as isolated. Returns ``(ok, confined)``.
+    """
+    iso = Path(iso).resolve()
+    prod = Path(prod).resolve()
+    try:
+        rel = iso.relative_to(prod)
+    except ValueError:
+        confined = True          # outside the production state tree
+    else:
+        # inside the tree: only the reserved qualification workspace is
+        # allowed; the production state area itself is forbidden.
+        confined = rel.parts[:1] == (QUALIFY_STATE_DIR,)
+    ok = iso != prod and not prod.is_relative_to(iso) and confined
+    return ok, confined
+
+
 # --------------------------------------------------------------------- helpers
 def _mkstate(root: Path) -> Path:
     """A unique per-call private state dir so stages never share a store."""
@@ -1961,14 +1987,20 @@ def qualify_hermetic(cfg: Config, state_dir: Path) -> Dict[str, Any]:
     checks["hermetic_private_permissions"] = {
         "state": "OK" if perms_ok else "failed", "too_loose": bad[:10]}
 
-    # 2) the isolated state dir is NOT the production state dir.
+    # 2) the isolated state dir a redirected config resolves to is NOT the
+    #    production state dir and never writes beside production stores. The
+    #    default run places its per-run roots under the harness's reserved
+    #    private workspace (``QUALIFY_STATE_DIR``); those count as isolated,
+    #    while the production state area itself is forbidden (see
+    #    ``_isolated_from_production``).
     isolated = isolate_cfg(cfg, root / "state-root")
     prod = Path(cfg.state_dir()).resolve()
     iso = Path(isolated.state_dir()).resolve()
+    isolated_ok, confined = _isolated_from_production(iso, prod)
     checks["hermetic_isolated_from_production"] = {
-        "state": "OK" if iso != prod and not str(iso).startswith(str(prod))
-        else "failed",
-        "isolated": str(iso), "production": str(prod)}
+        "state": "OK" if isolated_ok else "failed",
+        "isolated": str(iso), "production": str(prod),
+        "confined_to_qualification_workspace": confined}
 
     # 3) network is blocked in a child BEFORE any workload (actual result).
     r = root / "net"

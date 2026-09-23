@@ -43,7 +43,7 @@ MODEL_ARTIFACT = {
     "alias": "qubit-brain4",
     "kind": "ollama-model",
     "license": "Apache-2.0 (Qwen3-4B-Instruct-2507-derived; see "
-               "docs/UPSTREAM_REUSE.md)",
+               "docs/archive/2026-09-21/UPSTREAM_REUSE.md)",
     "revision": "resolved-at-runtime",   # replaced by doctor with /api/show digest
     "checksum": "resolved-at-runtime",   # replaced by doctor with X-Ollama-Digest
     "disk_cost_mib": "measured-at-runtime",
@@ -368,7 +368,7 @@ DISTRIBUTABLE_FILES = [
     ("config/voice.example.yaml", "config-template"),
     ("systemd/qubit-voicebridge.service", "systemd-template"),
     ("pyproject.toml", "metadata"),
-    ("docs/OPERATIONS_7C.md", "metadata"),
+    ("docs/archive/2026-09-21/OPERATIONS_7C.md", "metadata"),
 ]
 
 

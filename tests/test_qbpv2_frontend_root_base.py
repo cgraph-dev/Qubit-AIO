@@ -21,8 +21,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
-SRC = REPO_ROOT / "frontend" / "hermes-web" / "src"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
+SRC = REPO_ROOT / "frontend" / "qubit-web" / "src"
 DIST_BUILT = (DIST / "index.html").is_file()
 
 
@@ -42,10 +42,10 @@ def _all_dist_text() -> str:
 # Source contract
 # ---------------------------------------------------------------------------
 def test_vite_builds_at_the_root_base():
-    cfg = (REPO_ROOT / "frontend" / "hermes-web" / "vite.config.ts").read_text(
+    cfg = (REPO_ROOT / "frontend" / "qubit-web" / "vite.config.ts").read_text(
         encoding="utf-8")
     assert re.search(r'base:\s*"/"', cfg), "vite base must be the root"
-    assert "../hermes-dist" in cfg, "build must emit frontend/hermes-dist"
+    assert "../qubit-dist" in cfg, "build must emit frontend/qubit-dist"
 
 
 def test_spa_reads_the_qubit_owned_api_prefix():
@@ -64,7 +64,10 @@ def test_spa_reads_the_qubit_owned_api_prefix():
 def test_chat_is_the_real_client_route():
     app = (SRC / "App.tsx").read_text(encoding="utf-8")
     assert 'path: "/chat"' in app
-    assert '"/chat": ChatRouteSink' in app
+    # /chat is the Qubit-branded Hermes terminal page; /qubit-chat keeps the
+    # native Qubit ChatPage host. Both are real client routes.
+    assert '"/chat": TerminalChatPage' in app
+    assert '"/qubit-chat": ChatRouteSink' in app
     assert "/hermes/chat" not in app
 
 
@@ -72,7 +75,7 @@ def test_chat_is_the_real_client_route():
 # Built artifact contract
 # ---------------------------------------------------------------------------
 @pytest.mark.skipif(not DIST_BUILT, reason="hermes-dist not built")
-def test_built_shell_has_root_asset_paths_and_no_hermes_base():
+def test_built_shell_has_root_asset_paths_and_no_qubit_base():
     html = _index_html()
     assert "<title>Qubit Agent" in html
     assert "/hermes/" not in html
@@ -85,7 +88,7 @@ def test_built_shell_has_root_asset_paths_and_no_hermes_base():
 
 
 @pytest.mark.skipif(not DIST_BUILT, reason="hermes-dist not built")
-def test_built_assets_use_no_hermes_asset_or_base_path():
+def test_built_assets_use_no_qubit_asset_or_base_path():
     text = _all_dist_text()
     # No asset/base/util URL under a /hermes/ prefix (plugins, fonts, public).
     for banned in ("/hermes/assets", "/hermes/favicon", "/hermes/fonts",

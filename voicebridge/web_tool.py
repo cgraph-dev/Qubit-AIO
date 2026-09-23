@@ -253,7 +253,7 @@ def readable_text(body: Any, *,
                   max_chars: int = DEFAULT_MAX_READABLE_CHARS) -> Dict[str, Any]:
     """Extract bounded readable article text from fetched HTML.
 
-    Qubit-owned equivalent of the OpenClaw ``web-readability`` extension. It is
+    Qubit-owned equivalent of the Qubit ``web-readability`` extension. It is
     pure and offline: it prefers an ``<article>``/``<main>`` region, drops page
     chrome, then applies the same whitespace normalization as
     :func:`_visible_text`. It never executes markup, never egresses, and never

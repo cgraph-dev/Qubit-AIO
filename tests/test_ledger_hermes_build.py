@@ -3,7 +3,7 @@
 The regenerator (``scripts/rebuild_ledger_hermes.py``) must be deterministic
 and must never claim ``IMPLEMENTED`` without a behavioural proof: every
 ``IMPLEMENTED`` row carries a non-empty ``proving_test`` that exists on disk,
-and no ``IMPLEMENTED`` row cites an unregistered ``hermes_compat`` handler.
+and no ``IMPLEMENTED`` row cites an unregistered ``qubit_compat`` handler.
 """
 from __future__ import annotations
 
@@ -31,10 +31,10 @@ def _load_module(name: str, filename: str):
 rebuild = _load_module("rebuild_ledger_hermes", "rebuild_ledger_hermes.py")
 gap_ledger = _load_module("gap_ledger", "gap_ledger.py")
 
-from voicebridge import hermes_compat as HC  # noqa: E402
+from voicebridge import qubit_compat as HC  # noqa: E402
 
-SECTION_PATH = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json"
-_HANDLER_RE = re.compile(r"^voicebridge/hermes_compat\.py:(\w+)$")
+SECTION_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.hermes.json"
+_HANDLER_RE = re.compile(r"^voicebridge/qubit_compat\.py:(\w+)$")
 
 
 def _section() -> dict:

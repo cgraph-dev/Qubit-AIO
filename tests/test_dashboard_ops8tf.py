@@ -87,7 +87,7 @@ def test_parity_rows_reachable_via_ops(tmp_path, monkeypatch):
     from voicebridge import voice_commands as VC
 
     _cfg(tmp_path, monkeypatch)
-    par = json.loads((REPO_ROOT / "docs" / "PARITY_HERMES.json").read_text())
+    par = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "PARITY_HERMES.json").read_text())
     covered = set()
     for item in OPS.catalog():
         covered.update(item.get("parity", ()))

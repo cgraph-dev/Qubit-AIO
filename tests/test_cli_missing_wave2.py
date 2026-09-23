@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge import cli as CLI  # noqa: E402
-from voicebridge import cli_hermes_forward as HF  # noqa: E402
+from voicebridge import cli_qubit_forward as HF  # noqa: E402
 
 
 def _run(argv):
@@ -47,7 +47,7 @@ def _fixture(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("HERMES_HOME", str(home / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(home / ".hermes"))
     cfgp = tmp_path / "voice.yaml"
     cfgp.write_text("logging:\n  jsonl: false\n")
     repo = tmp_path / "repo"

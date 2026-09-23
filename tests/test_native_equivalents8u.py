@@ -16,7 +16,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 def _rows():
     data = json.loads(
-        (REPO / "docs" / "NATIVE_EQUIVALENTS_8U.json").read_text())
+        (REPO / "docs/archive/2026-09-21" / "NATIVE_EQUIVALENTS_8U.json").read_text())
     assert data["schema"] == "qubit-native-equivalents/1"
     return data["rows"]
 
@@ -26,7 +26,7 @@ def test_matrix_schema_and_companion():
     assert len(rows) >= 15
     ids = [r["id"] for r in rows]
     assert len(set(ids)) == len(ids), "duplicate row ids"
-    md = (REPO / "docs" / "NATIVE_EQUIVALENTS_8U.md").read_text()
+    md = (REPO / "docs/archive/2026-09-21" / "NATIVE_EQUIVALENTS_8U.md").read_text()
     for r in rows:
         assert r["status"] in ("IMPLEMENTED", "IMPLEMENTED-EQUIVALENT",
                                "OPERATOR-QUALIFICATION",

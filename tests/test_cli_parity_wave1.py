@@ -1,7 +1,7 @@
 """Wave 1 Hermes CLI parity — whole ``cli`` families + ``cli-subcommand`` rows.
 
 Every case executes the real production caller (:func:`voicebridge.cli.main`)
-and captures the fork argv handed to :func:`voicebridge.hermes_runtime.run`
+and captures the fork argv handed to :func:`voicebridge.qubit_runtime.run`
 (the same in-process runtime used by ``qubit agent`` and the dashboard ASGI
 bridge):
 
@@ -33,8 +33,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge import cli as CLI  # noqa: E402
-from voicebridge import cli_hermes_forward as HF  # noqa: E402
-from voicebridge import hermes_runtime  # noqa: E402
+from voicebridge import cli_qubit_forward as HF  # noqa: E402
+from voicebridge import qubit_runtime  # noqa: E402
 
 
 def _capture(monkeypatch):
@@ -45,7 +45,7 @@ def _capture(monkeypatch):
         calls.append(list(argv or []))
         return 0
 
-    monkeypatch.setattr(hermes_runtime, "run", _fake_run)
+    monkeypatch.setattr(qubit_runtime, "run", _fake_run)
     return calls
 
 
@@ -297,7 +297,7 @@ def _cfg(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     (home / ".hermes").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(home / ".hermes"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\nwebui:\n  port: 1\n")
     return p
@@ -349,8 +349,8 @@ def test_confirm_table_targets_exist_in_fork_parser():
 
     script = (
         "import json,sys,argparse;"
-        f"sys.path.insert(0,{str(REPO_ROOT / 'qubit_hermes')!r});"
-        "import hermes_cli.main as m;"
+        f"sys.path.insert(0,{str(REPO_ROOT / 'qubit_runtime')!r});"
+        "import qubit_cli.main as m;"
         "p,sub=m._build_cli_parser();"
         "out={f:None for f in sub.choices};"
         "[(out.__setitem__(f, sorted(a.choices.keys()))) "
@@ -384,7 +384,7 @@ def _sandbox_env(tmp_path):
         target = home / var.lower()
         target.mkdir(parents=True, exist_ok=True)
         env[var] = str(target)
-    env["HERMES_HOME"] = str(home / ".hermes")
+    env["QUBIT_HOME"] = str(home / ".hermes")
     env.pop("PYTHONPATH", None)
     return env
 

@@ -7,7 +7,7 @@ and rejects unknown, expired, and already-answered (replay) prompts. Voice
 and CLI render the choices through :func:`render`.
 
 Provenance: tool/media delta D21 in
-``docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md`` (upstream
+``docs/archive/2026-09-21/AUDIT_OPENCLAW_V2026_9_4_DELTA.md`` (upstream
 ``src/agents/tools/question-prompt-send.ts``).
 """
 from __future__ import annotations

@@ -18,7 +18,7 @@ They cover:
    parity) stay recorded and hash-valid.
 
 The dead surfaces are reported — not silently fixed — because the owning files
-are outside this agent's write scope. See ``docs/QUBIT_REACHABILITY_AUDIT.md``.
+are outside this agent's write scope. See ``docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md``.
 """
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-APP_TSX = REPO / "frontend/hermes-web/src/App.tsx"
-PAGES = REPO / "frontend/hermes-web/src/pages"
-MANIFEST = REPO / "docs/QUBIT_HERMES_VENDOR_MANIFEST.json"
+APP_TSX = REPO / "frontend/qubit-web/src/App.tsx"
+PAGES = REPO / "frontend/qubit-web/src/pages"
+MANIFEST = REPO / "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
 
 # Exact dead voice dispatch slots discovered by runtime introspection. If a
 # future wave wires one of these (or adds a new orphan), this test fails and
@@ -91,7 +91,7 @@ def test_dead_voice_backend_slots_are_exactly_documented():
     used = {e.backend for e in VC._iter_entries()}
     unused = sorted(set(VC._BACKENDS) - used)
     assert unused == DEAD_VOICE_BACKENDS, (
-        "dead voice dispatch slots changed; update docs/QUBIT_REACHABILITY_AUDIT.md"
+        "dead voice dispatch slots changed; update docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md"
     )
     for name in DEAD_VOICE_BACKENDS:
         assert name in VC._BACKENDS
@@ -103,7 +103,7 @@ def test_dead_voice_summary_handler_is_exactly_documented():
     used = {e.summary for e in VC._iter_entries()}
     unused = sorted(set(VC._SUMMARIES) - used)
     assert unused == DEAD_VOICE_SUMMARIES, (
-        "dead voice summary handlers changed; update docs/QUBIT_REACHABILITY_AUDIT.md"
+        "dead voice summary handlers changed; update docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md"
     )
 
 
@@ -112,7 +112,7 @@ def test_dead_voice_summary_handler_is_exactly_documented():
 # ---------------------------------------------------------------------------
 def test_every_cli_parser_command_is_dispatched():
     from voicebridge import cli as C
-    from voicebridge import cli_hermes_forward as F
+    from voicebridge import cli_qubit_forward as F
 
     parser = C.build_parser()
     sub = next(a for a in parser._actions
@@ -166,18 +166,19 @@ def test_every_frontend_page_component_is_lazy_imported_and_mounted():
 
 
 def test_every_webui_route_alias_resolves_to_a_real_route():
-    from voicebridge.webui import HERMES_ROUTE_ALIASES
+    from voicebridge.webui import QUBIT_ROUTE_ALIASES
 
     builtin = _builtin_route_keys()
     plugin_tabs = {
         json.loads(p.read_text(encoding="utf-8"))["tab"]["path"]
-        for p in (REPO / "frontend/hermes-qubit/plugins").glob("*/manifest.json")
+        for p in (REPO / "frontend/qubit-app/plugins").glob("*/manifest.json")
     }
-    # "/" is the root redirect and "/chat" is the persistent chat host
-    # rendered outside <Routes> (see App.tsx ChatRouteSink), so neither is a
-    # key in BUILTIN_ROUTES_CORE. Each alias now maps to the root route itself.
-    known = builtin | plugin_tabs | {"/", "/chat"}
-    stale = [(src, tgt) for src, tgt in HERMES_ROUTE_ALIASES.items()
+    # "/" is the root redirect; "/chat" and "/qubit-chat" are the persistent
+    # chat host routes rendered outside <Routes> (see App.tsx ChatRouteSink),
+    # so none is a key in BUILTIN_ROUTES_CORE. Each alias maps to the root
+    # route itself.
+    known = builtin | plugin_tabs | {"/", "/chat", "/qubit-chat"}
+    stale = [(src, tgt) for src, tgt in QUBIT_ROUTE_ALIASES.items()
              if (tgt or "/") not in known]
     assert not stale, f"stale dashboard route aliases: {stale}"
 
@@ -186,7 +187,7 @@ def test_every_webui_route_alias_resolves_to_a_real_route():
 # 4. Compat route table integrity + known shadowed route
 # ---------------------------------------------------------------------------
 def test_compat_has_no_same_method_duplicate_route_patterns():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     seen: set[tuple] = set()
     duplicates = []
@@ -200,7 +201,7 @@ def test_compat_has_no_same_method_duplicate_route_patterns():
 
 def test_compat_get_sessions_empty_count_is_reachable(tmp_path):
     """The path the dashboard actually calls (GET .../empty/count) works."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     code, out = HC.dispatch(_cfg(tmp_path), "GET",
                             "/api/sessions/empty/count", {}, {})
@@ -209,7 +210,7 @@ def test_compat_get_sessions_empty_count_is_reachable(tmp_path):
 
 
 def test_compat_bare_get_sessions_empty_is_reachable(tmp_path):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     code, out = HC.dispatch(_cfg(tmp_path), "GET",
                             "/api/sessions/empty", {}, {})
@@ -220,13 +221,12 @@ def test_compat_bare_get_sessions_empty_is_reachable(tmp_path):
 # ---------------------------------------------------------------------------
 # 5. Vendored-fork byte/mode/symlink parity (Task 1 tie-in)
 # ---------------------------------------------------------------------------
-EOL_NORMALIZED_COUNT = 13
+EOL_NORMALIZED_COUNT = 5
 # Upstream files that exist byte-identically on disk in the fork but are not
-# in the local git index: the vendored upstream .gitignore excludes them and
-# they were never force-added, so a fresh clone lacks them. Content is
-# identical (verified below); this is a tracking/provenance gap, not a byte
-# mismatch. Documented in docs/QUBIT_REACHABILITY_AUDIT.md (R5).
-GIT_INDEX_GAP_COUNT = 26
+# in the local git index. The vendored upstream .gitignore excluded 27 such
+# files; they are now force-added, so the gap is closed. Documented in
+# docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md (R5).
+GIT_INDEX_GAP_COUNT = 0
 
 
 def test_vendor_manifest_documents_eol_normalized_fork_files():
@@ -234,14 +234,22 @@ def test_vendor_manifest_documents_eol_normalized_fork_files():
     counts = manifest["classification_counts"]
     assert counts["MISSING"] == 0
     assert counts["UNEXPLAINED"] == 0
-    assert counts["QUBIT_PATCHED"] == 0
+    # Qubit's source-level rebrand carries a deterministic, owned patch manifest
+    # (owner amendment 2026-09-18): every patched file is recorded with a
+    # reason, so "patched" is an explained set, never silent divergence.
+    patch_manifest = manifest.get("patch_manifest") or {}
+    assert counts["QUBIT_PATCHED"] == len(manifest["patched"]) == len(patch_manifest)
+    for rel, entry in patch_manifest.items():
+        assert entry.get("patch"), rel
+        assert entry.get("reason"), rel
     assert counts["OPENCLAW_OVERLAY"] == 0
     assert counts["QUBIT_ADDED"] == 0
-    assert counts["UNCHANGED"] + counts["EOL_NORMALIZED"] == manifest["file_count"]
+    assert (counts["UNCHANGED"] + counts["EOL_NORMALIZED"]
+            + counts["QUBIT_PATCHED"]) == manifest["file_count"]
     assert manifest["eol_normalized_count"] == len(manifest["eol_normalized"])
     assert manifest["eol_normalized_count"] == EOL_NORMALIZED_COUNT
     for entry in manifest["eol_normalized"]:
-        path = REPO / "qubit_hermes" / entry["path"]
+        path = REPO / "qubit_runtime" / entry["path"]
         assert path.is_file(), entry["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == \
             entry["local_sha256"], entry["path"]
@@ -283,7 +291,7 @@ def test_vendor_manifest_git_index_gaps_are_byte_identical():
     assert manifest["local_git_file_count"] == \
         manifest["upstream_file_count"] - len(gaps)
     for gap in gaps:
-        path = REPO / "qubit_hermes" / gap["path"]
+        path = REPO / "qubit_runtime" / gap["path"]
         assert path.is_file(), gap["path"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == \
             gap["on_disk_sha256"], gap["path"]

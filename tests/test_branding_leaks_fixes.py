@@ -1,9 +1,10 @@
-"""Impl-4 branding-leak repairs.
+"""Branding-leak repairs (owner Ruling 1 → Option A).
 
 The branding-only artifacts (TS/TSX, the vendored kanban dist, the optional-MCP
 manifest) have no Python call path, so these checks read the owned artifacts and
-assert the required Qubit/upstream labels while proving the genuine provenance
-URLs are preserved (origin is never hidden).
+assert the product surface carries **zero** legacy brand. Upstream provenance is
+attribution-only and lives in ``LICENSE`` / ``THIRD_PARTY_NOTICES.md``, not on a
+rendered surface.
 """
 from __future__ import annotations
 
@@ -11,28 +12,41 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 
-DOCS = REPO / "frontend/hermes-web/src/pages/DocsPage.tsx"
-ENV = REPO / "frontend/hermes-web/src/pages/EnvPage.tsx"
-KANBAN = REPO / "frontend/hermes-web/public/plugins/kanban/dist/index.js"
-MANIFEST = REPO / "qubit_hermes/optional-mcps/n8n/manifest.yaml"
+DOCS = REPO / "frontend/qubit-web/src/pages/DocsPage.tsx"
+ENV = REPO / "frontend/qubit-web/src/pages/EnvPage.tsx"
+KANBAN = REPO / "frontend/qubit-web/public/plugins/kanban/dist/index.js"
+MANIFEST = REPO / "qubit_runtime/optional-mcps/n8n/manifest.yaml"
 
 
-def test_docs_page_labels_upstream_and_keeps_provenance_url():
+def test_docs_page_is_qubit_branded_not_upstream():
+    """DocsPage renders a Qubit-owned OpenAPI reference, not the upstream URL.
+
+    Option A: the upstream docs URL is not a product surface. Provenance lives
+    in LICENSE / THIRD_PARTY_NOTICES.md.
+    """
     text = DOCS.read_text(encoding="utf-8")
-    assert "https://hermes-agent.nousresearch.com/docs/" in text, \
-        "the real upstream docs URL must be preserved for provenance"
+    assert "https://hermes-agent.nousresearch.com" not in text, \
+        "the upstream docs URL must not be rendered on a product surface"
+    assert "Nous Research" not in text, \
+        "upstream company name must not be rendered as product branding"
+    assert 'export const UPSTREAM_DOCS_URL = ' in text, text
     assert "UPSTREAM_DOCS_LABEL" in text, text
-    assert "Upstream vendor documentation (Nous Research)" in text, text
-    assert "src={UPSTREAM_DOCS_URL}" in text, text
+    # the URL is rendered as a link in at least two places: the page-header
+    # action and the inline attribution paragraph.
+    assert text.count("href={UPSTREAM_DOCS_URL}") >= 2, text
+    assert text.count("{UPSTREAM_DOCS_LABEL}") >= 2, text
     assert "title={UPSTREAM_DOCS_LABEL}" in text, text
+    assert "aria-label={UPSTREAM_DOCS_LABEL}" in text, text
+    # the superseded iframe wrapper must not come back
+    assert "src={UPSTREAM_DOCS_URL}" not in text, text
 
 
-def test_kanban_docs_link_labels_upstream():
+def test_kanban_docs_link_is_qubit_branded():
     text = KANBAN.read_text(encoding="utf-8")
-    assert ("https://hermes-agent.nousresearch.com/docs/user-guide/features/"
-            "kanban") in text, "the real kanban docs URL must be preserved"
+    assert "hermes-agent.nousresearch.com" not in text, \
+        "the upstream kanban docs URL must not be rendered on a product surface"
+    assert "Nous Research" not in text, text
     assert "DOCS_UPSTREAM_LABEL" in text, text
-    assert "Upstream vendor Kanban docs (Nous Research)" in text, text
     assert '"aria-label": DOCS_UPSTREAM_LABEL' in text, text
 
 
@@ -43,11 +57,11 @@ def test_n8n_manifest_stays_byte_faithful_and_serves_qubit_branded():
     genuine third-party source URL and stays byte-identical to the pinned
     upstream fork. The normal dashboard renders upstream product names as
     Qubit through the serve-layer rebrand
-    (``voicebridge.hermes_plugins._rebrand_product``), so the vendored file is
+    (``voicebridge.qubit_plugins._rebrand_product``), so the vendored file is
     never rewritten to hide origin.
     """
     import re
-    from voicebridge.hermes_plugins import _rebrand_product
+    from voicebridge.qubit_plugins import _rebrand_product
 
     text = MANIFEST.read_text(encoding="utf-8")
     # genuine third-party provenance URL retained, never hidden or falsified
@@ -73,7 +87,7 @@ def test_env_page_qwen_prefix_is_labeled_legacy():
 def test_kanban_plugin_surface_resolves_through_production():
     """The rebranded kanban docs link belongs to the vendored dashboard plugin;
     prove that plugin surface still resolves through the real backend."""
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_plugins as HP
 
     surface = HP.dashboard_surface("kanban")
     assert surface is not None and surface.is_file(), surface

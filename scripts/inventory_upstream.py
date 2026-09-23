@@ -12,10 +12,10 @@ import json
 import sys
 from pathlib import Path
 
-# Area verdicts for hermes-agent (see docs/MATRIX_8T_F.json for rationale).
+# Area verdicts for hermes-agent (see docs/archive/2026-09-21/MATRIX_8T_F.json for rationale).
 HERMES_AREAS = {
-    "agent": "ADAPT", "hermes_cli": "ADAPT", "tools": "ADAPT",
-    "hermes_state_sessions.py": "BLOCKED", "hermes_state": "BLOCKED",
+    "agent": "ADAPT", "qubit_cli": "ADAPT", "tools": "ADAPT",
+    "qubit_state_sessions.py": "BLOCKED", "qubit_state": "BLOCKED",
     "gateway": "BLOCKED", "cron": "BLOCKED", "tui_gateway": "BLOCKED",
     "web": "REJECTED", "ui-tui": "REJECTED", "apps": "REJECTED",
     "providers": "ADAPT", "plugins": "BLOCKED", "skills": "BLOCKED",

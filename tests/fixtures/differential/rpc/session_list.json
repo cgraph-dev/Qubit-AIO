@@ -2,11 +2,12 @@
   "schema_version": 1,
   "fixture_id": "rpc.methodregistry.session_list",
   "family": "rpc",
+  "read_only": true,
   "command": null,
   "request": {
     "kind": "rpc",
     "method": "POST",
-    "path": "/agent/api/qubit/gateway/rpc",
+    "path": null,
     "headers": {},
     "body": {
       "type": "req",
@@ -24,15 +25,33 @@
     "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
   },
   "sequence": [
-    {"kind": "rpc", "step": "request", "method": "ui.panels", "params": {}},
-    {"kind": "rpc", "step": "reconnect", "attempts": 1}
+    {
+      "kind": "rpc",
+      "step": "request",
+      "method": "ui.panels",
+      "params": {}
+    },
+    {
+      "kind": "rpc",
+      "step": "reconnect",
+      "attempts": 1
+    }
   ],
   "persisted_state_schema": {
     "type": "object",
     "properties": {
-      "connected": {"type": "boolean"},
-      "scopes": {"type": "array", "items": {"type": "string"}},
-      "reconnect_attempts": {"type": "integer"}
+      "connected": {
+        "type": "boolean"
+      },
+      "scopes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "reconnect_attempts": {
+        "type": "integer"
+      }
     }
   },
   "normalizers": [
@@ -40,7 +59,6 @@
     "generated_hash"
   ],
   "expected": {
-    "http_status": 200,
     "json_schema": {
       "type": "res",
       "id": 1,
@@ -62,7 +80,7 @@
     "symbol": "coreGatewayHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "RPC req/res framing contract: one shared MethodRegistry; a request frame returns {type:res,id,ok,payload} and never raises. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: tui_gateway/server.py:757 (dispatch); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/core-handlers.ts:166 (coreGatewayHandlers).",
+  "notes": "RPC req/res framing contract for the shared in-process MethodRegistry (gateway/rpc.py:266 default_registry, :284 handle_request). A request frame returns {type:res,id,ok,payload} and never raises. There is no HTTP/WS route that exposes the registry (rpc_network_methods=0). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: tui_gateway/server.py:757 (dispatch); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/core-handlers.ts:166 (coreGatewayHandlers). No side-effect-free pinned reference equivalent exists for this fixture: the capability surface is Qubit-specific (HTTP/RPC/WS/SSE/voice) or the upstream operation requires a running Gateway, credentials, or mutates state; it is therefore classified OPERATOR_ONLY and can never claim PASS without a side-effect-free equivalent.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,
@@ -73,7 +91,7 @@
       "method": "ui.panels",
       "params": {}
     },
-    "broker_policy_decision": null,
+    "broker_policy_decision": "in-process MethodRegistry; no network RPC transport",
     "runtime_provider": null,
     "store_state_assertion": null,
     "output_event_assertion": {
@@ -84,22 +102,22 @@
     "error_codes": null,
     "retry_recovery_proof": null,
     "audit_receipt_proof": null,
-    "security_resource_proof": null,
+    "security_resource_proof": "in-process only; no socket is opened",
     "package_proof": null,
     "response_headers": null,
     "evidence_notes": {
       "voice_utterance": "not exposed by this fixture's surface",
       "dashboard_route": "not exposed by this fixture's surface",
       "dashboard_control": "not exposed by this fixture's surface",
-      "broker_policy_decision": "not exposed by this fixture's surface",
       "runtime_provider": "not exposed by this fixture's surface",
       "store_state_assertion": "not exposed by this fixture's surface",
       "error_codes": "not exposed by this fixture's surface",
       "retry_recovery_proof": "not exposed by this fixture's surface",
       "audit_receipt_proof": "not exposed by this fixture's surface",
-      "security_resource_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface",
       "response_headers": "not exposed by this fixture's surface"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "No network RPC transport exists: Qubit serves GATEWAY_NO_SERVER and the MethodRegistry is in-process only. Enumerate via the CLI `qubit gateway protocol` / `qubit gateway negotiate` (gateway_peers.py:782-810 protocol_doctor) or dispatch gateway_ws.FrameReader.dispatch_request in-process; requires QUBIT_DIFFERENTIAL_QUBIT_BIN."
 }

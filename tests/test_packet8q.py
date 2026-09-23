@@ -645,3 +645,40 @@ def test_gateway_creates_no_files(tmp_path, monkeypatch):
                           provider="zen", model="m1"),
           cfg, catalog=_cat(), transport=lambda *a: (200, _ok_body()))
     assert list(tmp_path.iterdir()) == []
+
+
+def test_urllib_transport_sends_browser_user_agent(monkeypatch):
+    """Cloudflare-fronted relays 403 urllib's default signature (error
+    1010); the transport must present a browser User-Agent while letting
+    caller headers win. Proven against opencode-zen 2026-09-22."""
+    import io
+    import urllib.request as _ureq
+
+    seen = {}
+
+    class _Resp:
+        status = 200
+
+        def read(self):
+            return b'{"choices": [{"message": {"content": "hi"}}]}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def _capture(req, timeout=None):
+        seen.update({k.lower(): v for k, v in req.header_items()})
+        return _Resp()
+
+    monkeypatch.setattr(_ureq, "urlopen", _capture)
+    status, body = urllib_transport("http://x/chat/completions", {}, {}, 1.0)
+    assert status == 200, body
+    assert "mozilla" in seen.get("user-agent", "").lower(), seen
+
+    seen.clear()
+    status, _ = urllib_transport("http://x/chat/completions",
+                                 {"User-Agent": "custom/1.0"}, {}, 1.0)
+    assert status == 200
+    assert seen.get("user-agent") == "custom/1.0", seen

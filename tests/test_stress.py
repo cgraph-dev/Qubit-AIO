@@ -11,7 +11,7 @@ import concurrent.futures
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 # Use the ACTIVE interpreter (sys.executable) so the suite never depends on a
 # repository-local .venv existing — works from a clean clone with any
-# documented environment (see docs/WEBSITES_8E.md "Clean-checkout reproducibility").
+# documented environment (see docs/archive/2026-09-21/WEBSITES_8E.md "Clean-checkout reproducibility").
 PY = sys.executable
 
 def test_py_compile_three_files():

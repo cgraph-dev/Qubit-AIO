@@ -1,0 +1,27 @@
+{
+  "command": null,
+  "disposition": "OPERATOR_ONLY",
+  "expected": {},
+  "family": "api",
+  "fixture_id": "api.route.get-sessions-session_id-badges.74dce249",
+  "hermes": {
+    "path": "plugins/hermes-achievements/dashboard/plugin_api.py:845",
+    "symbol": "http_route"
+  },
+  "normalizers": [],
+  "notes": "Hermes C_compat http_route row: api.route.get-sessions-session_id-badges.74dce249; basis: Qubit compat handler serves this route; held OPERATOR_ONLY pending A3.",
+  "openclaw": {
+    "path": null,
+    "symbol": null
+  },
+  "operator_hold": true,
+  "operator_prerequisite": "A3 pending (product/locked): the Qubit compat handler must be made authoritative over the vendored fork proxy for this route before it can be differentially executed. Operator hold: no socket is opened.",
+  "qubit": {
+    "approval": null,
+    "caller": "GATED",
+    "path": "voicebridge/qubit_compat.py:1"
+  },
+  "request": null,
+  "schema_version": 1,
+  "transport": "http"
+}

@@ -76,16 +76,16 @@ def _http_status_location(port, path):
 def test_every_normal_route_serves_the_spa_shell(tmp_path):
     """Qubit rebrand: every normal dashboard route serves the root-served
     SPA shell (200); nothing redirects into an upstream-named prefix."""
-    from voicebridge.webui import hermes_alias_target
+    from voicebridge.webui import qubit_alias_target
     ui, port = _start(tmp_path)
     try:
-        # root is the SPA, reached via the public /chat route
+        # root is the SPA, reached via the public /sessions route
         status, loc = _http_status_location(port, "/")
-        assert (status, loc) == (302, "/chat"), (status, loc)
+        assert (status, loc) == (302, "/sessions"), (status, loc)
         for page in PAGES:
             if page in ("/classic/", "/token-setup"):
                 continue
-            target = hermes_alias_target(page)
+            target = qubit_alias_target(page)
             assert target is not None, page
             assert "hermes" not in target.lower(), (page, target)
             status, ctype, body = _http(port, "GET", page)
@@ -118,10 +118,10 @@ def test_normal_routes_never_serve_static_qubit_html(tmp_path):
     """No normal route returns the legacy static markup; every normal route
     serves the SPA shell (or the dashboard-not-built gate), never the old
     horizontal nav."""
-    from voicebridge.webui import hermes_alias_target
+    from voicebridge.webui import qubit_alias_target
     ui, port = _start(tmp_path)
     try:
-        for page in [p for p in PAGES if hermes_alias_target(p)]:
+        for page in [p for p in PAGES if qubit_alias_target(p)]:
             status, _, body = _http(port, "GET", page)  # follows redirect
             if status == 404:
                 continue  # dashboard build absent in this checkout

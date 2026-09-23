@@ -3,9 +3,9 @@
 Machine-checked gates over the release surface, hermetic (no network, no
 build, no install):
 
-1. pyproject ships the built dashboard (frontend/hermes-dist) in both the
+1. pyproject ships the built dashboard (frontend/qubit-dist) in both the
    wheel and the sdist artifacts, force-includes the frontend tree, and the
-   dashboard source (frontend/hermes-web) is present;
+   dashboard source (frontend/qubit-web) is present;
 2. the dashboard source declares the build/lint/test toolchain it actually
    imports in eslint.config.js and needs for vitest — every tool is a
    declared devDependency (never an undeclared ``--no-save`` install);
@@ -35,8 +35,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-WEB = REPO / "frontend" / "hermes-web"
-DIST = REPO / "frontend" / "hermes-dist"
+WEB = REPO / "frontend" / "qubit-web"
+DIST = REPO / "frontend" / "qubit-dist"
 COMPLETIONS = REPO / "voicebridge" / "_data" / "completions"
 
 needs_dist = pytest.mark.skipif(
@@ -97,8 +97,8 @@ def test_pyproject_ships_dashboard_in_wheel_and_sdist():
     data = _pyproject()
     wheel = data["tool"]["hatch"]["build"]["targets"]["wheel"]
     sdist = data["tool"]["hatch"]["build"]["targets"]["sdist"]
-    assert "frontend/hermes-dist" in wheel.get("artifacts", []), wheel
-    assert "frontend/hermes-dist" in sdist.get("artifacts", []), sdist
+    assert "frontend/qubit-dist" in wheel.get("artifacts", []), wheel
+    assert "frontend/qubit-dist" in sdist.get("artifacts", []), sdist
     # The frontend tree is force-included under voicebridge/_data/frontend,
     # either as a direct directory mapping or via the filtered custom build hook
     # (scripts/hatch_build_qubit.py) that prunes the git-ignored dev trees
@@ -173,7 +173,7 @@ def test_build_script_carries_build_contract():
 # ---------------------------------------------------------------------------
 
 def test_overlay_manifests_complete_and_debranded():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     manifests = HC._overlay_manifests()
     assert manifests, "no overlay plugin manifests found"
     plugdir = HC.OVERLAY_DIR / "plugins"

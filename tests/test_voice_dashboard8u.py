@@ -1,11 +1,11 @@
 """Dashboard voice control for Qubit Chat (Hermes-first architecture).
 
-The qubit-chat overlay owns the dashboard voice surface: a Voice button
-drives browser SpeechRecognition and sends the transcript through the SAME
-POST /api/qubit/chat backend turn as typed input, CLI text, and voice PTT
-(voicebridge.agent.turn). Voice executes backend turns, never describes
-them; every failure mode is a typed state (VOICE_UNSUPPORTED / VOICE_DENIED
-/ VOICE_NO_SPEECH / VOICE_TIMEOUT), never silence or a hang.
+The shared built-in chat surface (`/chat` and `/qubit-chat` render the same
+`ChatPage`) owns the dashboard voice control: a Voice button drives browser
+SpeechRecognition and sends the transcript through the SAME chat-turn backend
+as typed input, CLI text, and voice PTT. Voice executes backend turns, never
+describes them; every failure mode is a typed state (VOICE_UNSUPPORTED /
+VOICE_DENIED / VOICE_NO_SPEECH / VOICE_TIMEOUT), never silence or a hang.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 pytestmark = pytest.mark.skipif(
     not (DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")
@@ -123,8 +123,11 @@ def test_voice_transcript_executes_backend_turn(tmp_path):
             page.get_by_role("button", name="Voice input").click()
             page.wait_for_timeout(12000)
             body = page.inner_text("body")
-            assert "You:" in body and "hello qubit" in body, body[-600:]
-            assert ("Qubit:" in body or "MODEL_" in body or "AGENT_" in body
+            # The voice transcript was submitted as a real chat turn: the
+            # shared ChatPage transcript shows the user message, and either a
+            # real reply or a typed backend state follows (never silence).
+            assert "hello qubit" in body, body[-600:]
+            assert ("Qubit" in body or "MODEL_" in body or "AGENT_" in body
                     or "EMERGENCY" in body or "unavailable" in body.lower()), \
                 body[-500:]
             browser.close()

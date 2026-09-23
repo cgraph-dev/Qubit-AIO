@@ -1,20 +1,20 @@
 """Wave 4 — per-file dashboard provenance completeness.
 
-Required by ``docs/QUBIT_DASHBOARD_REBUILD_PLAN.md`` (acceptance gate) and the
+Required by ``docs/archive/2026-09-21/QUBIT_DASHBOARD_REBUILD_PLAN.md`` (acceptance gate) and the
 owner amendment 2026-09-11: every vendored Hermes frontend file carries an
 upstream path, an upstream blob sha256, a local sha256, and either byte-equality
 or a documented Qubit patch with a reason and an affected regression test.
 
 This test reconciles the pinned Hermes frontend
-(``/tmp/opencode/pinned/hermes-agent/{web,apps/shared}``) against the vendored
-copies (``frontend/hermes-web`` / ``frontend/hermes-shared``) and asserts:
+(``/tmp/opencode/pinned/hermes-agent/{web,qubit-shared}``) against the vendored
+copies (``frontend/qubit-web`` / ``frontend/qubit-shared``) and asserts:
 
 1. zero unexplained differences: every missing file is absent, every extra file
    is a documented Qubit addition, and every diverging file has a ``rows[]``
    patch entry whose ``qubit_sha256`` matches disk;
 2. every documented divergence/addition names an on-disk affected regression
    test;
-3. ``docs/HERMES_FRONTEND_MAP.json`` no longer claims React/TS cannot execute
+3. ``docs/archive/2026-09-21/HERMES_FRONTEND_MAP.json`` no longer claims React/TS cannot execute
    in Qubit's stack (the stale adaptation rule);
 4. a Wave 4 handoff diff, when present, is merged into the manifest.
 
@@ -31,23 +31,24 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = REPO_ROOT / "docs" / "HERMES_SOURCE_COMPARISON.json"
-FRONTEND_MAP = REPO_ROOT / "docs" / "HERMES_FRONTEND_MAP.json"
-AUDIT = REPO_ROOT / "docs" / "PROVENANCE_AUDIT_WAVE4.md"
-WAVE4_DIFF = REPO_ROOT / "docs" / "HERMES_SOURCE_COMPARISON.wave4.diff"
+MANIFEST = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_SOURCE_COMPARISON.json"
+FRONTEND_MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
+AUDIT = REPO_ROOT / "docs/archive/2026-09-21" / "PROVENANCE_AUDIT_WAVE4.md"
+WAVE4_DIFF = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_SOURCE_COMPARISON.wave4.diff"
+REBRAND_MANIFEST = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_REBRAND_MANIFEST.json"
 
 UPSTREAM = Path("/tmp/opencode/pinned/hermes-agent")
-HERMES_REV = "2237be355906fbe6065ce1815711eee52b2d646e"
+QUBIT_REV = "2237be355906fbe6065ce1815711eee52b2d646e"
 
 VENDOR_PAIRS = [
-    (UPSTREAM / "web", REPO_ROOT / "frontend" / "hermes-web"),
-    (UPSTREAM / "apps" / "shared", REPO_ROOT / "frontend" / "hermes-shared"),
+    (UPSTREAM / "web", REPO_ROOT / "frontend" / "qubit-web"),
+    (UPSTREAM / "apps" / "shared", REPO_ROOT / "frontend" / "qubit-shared"),
 ]
 EXCLUDE_DIRS = {"node_modules", "dist", "build", ".git", "__pycache__"}
 EXCLUDE_NAMES = {"package-lock.json", "npm-shrinkwrap.json", "yarn.lock",
                  "pnpm-lock.yaml"}
 
-FRONTEND_SCOPES = {"hermes-agent/web", "hermes-agent/apps/shared",
+FRONTEND_SCOPES = {"hermes-agent/web", "hermes-agent/qubit-shared",
                    "hermes-agent/plugins"}
 
 
@@ -81,12 +82,17 @@ def _documented_patches(man: dict) -> dict[str, dict]:
 
 
 def _documented_additions(man: dict) -> dict[str, dict]:
-    """qubit path -> added entry (wave3/wave4) for Qubit-only files."""
+    """qubit path -> added/overlay entry (wave3/wave4) for Qubit-only files.
+
+    Explicitly recorded removals are included too: a file that a later owner
+    directive deleted is still accounted for (not silently dropped), so a
+    historical handoff diff referencing it reconciles against the manifest."""
     added: dict[str, dict] = {}
     for wave in ("wave3", "wave4"):
         block = man.get(wave, {}) or {}
         for entry in list(block.get("added", []) or []) + \
-                list(block.get("overlay", []) or []):
+                list(block.get("overlay", []) or []) + \
+                list(block.get("removed", []) or []):
             if entry.get("qubit"):
                 added[entry["qubit"]] = entry
     return added
@@ -103,7 +109,7 @@ def _all_documented(man: dict) -> set[str]:
                     reason="pinned Hermes oracle absent")
 def test_vendored_frontend_reconciles_with_pinned_source():
     man = _manifest()
-    assert man["hermes"]["rev"] == HERMES_REV
+    assert man["hermes"]["rev"] == QUBIT_REV
     rows = {r["qubit"]: r for r in man["rows"] if r.get("qubit")}
     patches = _documented_patches(man)
     additions = _documented_additions(man)
@@ -114,6 +120,24 @@ def test_vendored_frontend_reconciles_with_pinned_source():
         up = _tree_files(up_root)
         q = _tree_files(q_root)
         prefix = q_root.relative_to(REPO_ROOT).as_posix()
+
+        # Documented path renames (deep rebrand) map an upstream file to a
+        # differently-named shipped path. Align ``q`` back to the upstream
+        # relative name so the missing-file and divergence checks below still
+        # validate the row (patch hash/reason) instead of reporting a false
+        # "missing" file.
+        up_prefix = up_root.relative_to(UPSTREAM).as_posix() + "/"
+        renamed: dict[str, str] = {}
+        for row in man["rows"]:
+            u = str(row.get("upstream") or "")
+            qp = str(row.get("qubit") or "")
+            if not (u.startswith(up_prefix) and qp.startswith(prefix + "/")):
+                continue
+            rel = u[len(up_prefix):]
+            shipped = REPO_ROOT / qp
+            if rel not in q and shipped.is_file():
+                q[rel] = shipped
+                renamed[rel] = qp
 
         missing = sorted(set(up) - set(q))
         assert not missing, f"vendored files missing from {prefix}: {missing[:10]}"
@@ -130,7 +154,7 @@ def test_vendored_frontend_reconciles_with_pinned_source():
         for rel in sorted(up):
             if _sha(up[rel]) == _sha(q[rel]):
                 continue
-            qrel = f"{prefix}/{rel}"
+            qrel = renamed.get(rel, f"{prefix}/{rel}")
             row = rows.get(qrel)
             assert row is not None and row.get("patch") and row.get("reason"), (
                 f"diverging vendored file lacks a documented patch: {qrel}")
@@ -193,9 +217,9 @@ def test_frontend_map_has_no_stale_react_runtime_rule():
     # the map records the real vendored runtime + provenance manifest
     assert "vendoring" in doc, "frontend map missing the vendored-runtime block"
     vend = doc["vendoring"]
-    assert vend["dashboard_baseline"].startswith("frontend/hermes-web")
-    assert vend["shared_library"].startswith("frontend/hermes-shared")
-    assert vend["pinned_revision"] == HERMES_REV
+    assert vend["dashboard_baseline"].startswith("frontend/qubit-web")
+    assert vend["shared_library"].startswith("frontend/qubit-shared")
+    assert vend["pinned_revision"] == QUBIT_REV
     for field in ("upstream", "upstream_blob_sha256", "qubit_sha256",
                   "patch", "reason", "affected_regression_test"):
         assert field in vend["per_file_fields"], field
@@ -204,11 +228,36 @@ def test_frontend_map_has_no_stale_react_runtime_rule():
 # ---------------------------------------------------------------------------
 # 4. Wave 4 handoff diff, when present, is merged
 # ---------------------------------------------------------------------------
+def _canonicalize_rebrand_path(path: str) -> str:
+    """Map a pre-rebrand path to its shipped path via the rebrand manifest.
+
+    The Wave 4 handoff diff predates the deep rebrand, so its paths use the
+    pre-rebrand layout (e.g. ``frontend/hermes-qubit/...``). The rebrand
+    manifest records the directory/module renames; canonicalize the reference
+    before reconciling against the current manifest so a documented rename is
+    not reported as an unmerged path. Only simple path renames are applied
+    (human-readable description entries are skipped).
+    """
+    try:
+        data = json.loads(REBRAND_MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return path
+    for entry in data.get("path_renames", []) or []:
+        old = str(entry.get("old", "")).rstrip("/")
+        new = str(entry.get("new", "")).rstrip("/")
+        if not old or not new or " " in old or " " in new or "(" in old:
+            continue
+        if path == old or path.startswith(old + "/"):
+            return new + path[len(old):]
+    return path
+
+
 def test_wave4_handoff_diff_is_merged_when_present():
     if not WAVE4_DIFF.is_file():
         pytest.skip("no Wave 4 handoff diff produced yet")
     text = WAVE4_DIFF.read_text(encoding="utf-8")
-    referenced = set(re.findall(r'"qubit"\s*:\s*"([^"]+)"', text))
+    referenced = {_canonicalize_rebrand_path(p)
+                  for p in re.findall(r'"qubit"\s*:\s*"([^"]+)"', text)}
     assert referenced, WAVE4_DIFF.name
     documented = _all_documented(_manifest())
     missing = sorted(p for p in referenced if p not in documented)

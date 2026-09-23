@@ -50,7 +50,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/providers.py:164",
+    "path": "qubit_cli/providers.py:164",
     "symbol": "normalize_provider",
     "mapping_status": "VERIFIED"
   },
@@ -59,7 +59,7 @@
     "symbol": "collectConfiguredModelRefs",
     "mapping_status": "VERIFIED"
   },
-  "notes": "OpenRouter API profile provisioning contract (dry-run; no --confirm so nothing is persisted). Credentials are reference-only (env:OPENROUTER_API_KEY); a raw key is refused with RAW_SECRET. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/providers.py:164 (normalize_provider); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: packages/model-catalog-core/src/configured-model-refs.ts:52 (collectConfiguredModelRefs).",
+  "notes": "OpenRouter API profile provisioning contract (dry-run; no --confirm so nothing is persisted). Credentials are reference-only (env:OPENROUTER_API_KEY); a raw key is refused with RAW_SECRET. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/providers.py:164 (normalize_provider); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: packages/model-catalog-core/src/configured-model-refs.ts:52 (collectConfiguredModelRefs). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,
@@ -97,5 +97,8 @@
       "package_proof": "not exposed by this fixture's surface",
       "response_headers": "not exposed by this fixture's surface"
     }
-  }
+  },
+  "state_changing": true,
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "No side-effect-free pinned equivalent exists for profile provisioning (upstream has no read-only create; only a model catalog). The Qubit CLI runs from QUBIT_DIFFERENTIAL_QUBIT_BIN; any reference would need QUBIT_DIFFERENTIAL_OPENCLAW_BIN. A nearest-surface match is never accepted as PASS; classified OPERATOR_ONLY."
 }

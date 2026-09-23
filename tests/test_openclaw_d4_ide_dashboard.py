@@ -120,7 +120,7 @@ def test_ocd20_extract_confirmation_escape_and_empty_pdf(tmp_path,
 # ------------------------------------------------------------------ OC-69
 def test_oc69_compat_routes_and_real_registry_dispatch(tmp_path, monkeypatch):
     from voicebridge import dashboard_ops as OPS
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     route, _ = HC.match("GET", "/api/analytics")

@@ -1164,7 +1164,7 @@ def test_cli_help_and_docs_syntax_identical(tmp_path):
     assert "VOICE_BRIDGE_MONITOR_ENABLE" in help_text
     # the invalid documented syntax is gone from the repo
     assert "--dry-run=false" not in help_text
-    docs = (REPO_ROOT / "docs" / "OPERATIONS_8D.md").read_text()
+    docs = (REPO_ROOT / "docs/archive/2026-09-21" / "OPERATIONS_8D.md").read_text()
     assert "--dry-run=false" not in docs
     assert "VOICE_BRIDGE_MONITOR_ENABLE=1" in docs
     assert "--install --enable" in docs

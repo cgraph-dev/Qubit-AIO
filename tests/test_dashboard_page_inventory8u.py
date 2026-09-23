@@ -1,10 +1,10 @@
 """Agent 3 (role C) — dashboard page inventory: every inventoried page is
 reachable through the real served SPA and backed by a real compat route.
 
-Complements ``test_hermes_frontend_inventory8u.py`` by exercising the served
+Complements ``test_qubit_frontend_inventory8u.py`` by exercising the served
 HTTP boundary: the built dashboard at ``/`` answers every baseline
 route, every page's declared backing route resolves through the production
-``voicebridge.hermes_compat`` dispatcher, and the page inventory never points
+``voicebridge.qubit_compat`` dispatcher, and the page inventory never points
 at a file or route that does not exist.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-MAP = REPO_ROOT / "docs" / "HERMES_FRONTEND_MAP.json"
+MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
 
 
 def _doc():
@@ -32,7 +32,7 @@ def _cfg(tmp_path, monkeypatch):
         target.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(target))
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home" / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home" / ".hermes"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     from voicebridge.config import Config
@@ -89,7 +89,7 @@ def test_page_inventory_files_and_backends_exist():
 
 
 def test_every_inventoried_backend_route_dispatches(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     for row in _doc()["inventory"]["pages"]:

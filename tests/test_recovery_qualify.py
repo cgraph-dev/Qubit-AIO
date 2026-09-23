@@ -30,7 +30,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge.communications.recovery_qualify import (  # noqa: E402
-    _guard_newer_schema, _persist_summary, _persist_summary_boundaries,
+    _guard_newer_schema, _isolated_from_production, _persist_summary,
+    _persist_summary_boundaries,
     _run_sigkill_file, _run_sigkill_store, _run_fault_file, _scan_for_secrets,
     _snapshot_state, deny_live, qualify_action_receipts,
     qualify_atomic_boundaries, qualify_concurrent, qualify_corrupt_sqlite,
@@ -454,6 +455,44 @@ def test_hermetic_stage(tmp_path):
     assert checks["hermetic_network_blocked"]["state"] == "OK"
     assert checks["hermetic_network_blocked"]["probe"]["blocked"] is True
     assert checks["hermetic_live_fails_closed"]["state"] == "OK"
+
+
+def test_hermetic_default_state_dir_proves_isolation(tmp_path):
+    """Regression for the packaging/lifecycle gate: the DEFAULT run (no
+    ``--state-dir``) nests each per-run root under
+    ``<config state>/qualification-recovery``. The isolation check must accept
+    that reserved workspace (and prove the root is not production) instead of
+    failing on a naive prefix test."""
+    cfg = _cfg(tmp_path)                     # production state = tmp_path/state
+    out = run_rehearsal(cfg, dry_run=True, stages=["hermetic"])
+    assert out["state"] == "OK", out.get("failed")
+    check = out["stages"]["hermetic"]["checks"][
+        "hermetic_isolated_from_production"]
+    assert check["state"] == "OK"
+    prod = Path(cfg.state_dir()).resolve()
+    iso = Path(check["isolated"]).resolve()
+    assert iso != prod
+    assert not prod.is_relative_to(iso)
+    # default layout: confined to the harness's reserved qualification subtree
+    assert iso.is_relative_to(prod / "qualification-recovery")
+    assert check["confined_to_qualification_workspace"] is True
+
+
+def test_isolated_from_production_property_not_weakened(tmp_path):
+    """The isolation predicate must still reject production paths: the state
+    dir itself, a store directly inside it, a parent that contains it, and a
+    symlink that resolves back into production."""
+    prod = (tmp_path / "state").resolve()
+    prod.mkdir()
+    assert _isolated_from_production(tmp_path / "external", prod) == (True, True)
+    assert _isolated_from_production(
+        prod / "qualification-recovery" / "runs" / "r1", prod) == (True, True)
+    assert _isolated_from_production(prod, prod)[0] is False
+    assert _isolated_from_production(prod / "communications.db", prod)[0] is False
+    assert _isolated_from_production(tmp_path, prod)[0] is False
+    link = tmp_path / "sneaky"
+    link.symlink_to(prod)
+    assert _isolated_from_production(link, prod)[0] is False
 
 
 # -------------------------------------------------- summary persistence

@@ -4,12 +4,12 @@
   "family": "recovery",
   "command": null,
   "request": {
-    "kind": "http",
+    "kind": null,
     "method": "POST",
-    "path": "/agent/api/qubit/dashboard/op",
+    "path": "/agent/api/qubit/chat",
     "headers": {},
     "body": {
-      "op": "power.emergency-stop"
+      "text": "status"
     },
     "event": null,
     "argv": []
@@ -23,9 +23,12 @@
   "persisted_state_schema": {
     "type": "object",
     "properties": {
-      "estop_engaged": {"type": "boolean"},
-      "latch": {"type": ["string", "null"]},
-      "code": {"const": "EMERGENCY_STOP"}
+      "estop_engaged": {
+        "type": "boolean"
+      },
+      "code": {
+        "const": "EMERGENCY_STOP"
+      }
     }
   },
   "normalizers": [
@@ -37,7 +40,7 @@
     "http_status": 403,
     "json_schema": {
       "ok": false,
-      "state": "REFUSED",
+      "state": "UNAVAILABLE",
       "code": "EMERGENCY_STOP"
     }
   },
@@ -56,26 +59,26 @@
     "symbol": "suspendHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "E-stop refusal contract: while the latch is engaged every mutation path returns a typed refusal (never counted as success). Route/op is the shared dashboard registry so voice/CLI/dashboard agree. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: agent/estop.py:122 (check_paused); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/suspend.ts:32 (suspendHandlers).",
+  "notes": "E-stop refusal contract: while the latch is engaged every mutation path returns a typed refusal (never counted as success). The real route is the compat chat turn POST /agent/api/qubit/chat -> h_chat_turn (qubit_compat.py:1862), which answers 403 EMERGENCY_STOP. The latch is set by POST /api/power (webui.py:2802-2860). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: agent/estop.py:122 (check_paused); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/suspend.ts:32 (suspendHandlers). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
   "evidence": {
     "voice_utterance": null,
-    "dashboard_route": "/agent/api/qubit/dashboard/op",
+    "dashboard_route": "/api/power",
     "dashboard_control": "power.emergency-stop",
     "request_schema": {
       "method": "POST",
-      "path": "/agent/api/qubit/dashboard/op",
+      "path": "/agent/api/qubit/chat",
       "body": {
-        "op": "power.emergency-stop"
+        "text": "status"
       }
     },
-    "broker_policy_decision": "typed refusal while the ESTOP latch is engaged",
+    "broker_policy_decision": "typed refusal while the ESTOP latch is engaged (qubit_compat.py:1862-1890 h_chat_turn _estop)",
     "runtime_provider": null,
     "store_state_assertion": null,
     "output_event_assertion": null,
     "error_codes": [
       "EMERGENCY_STOP"
     ],
-    "retry_recovery_proof": "mutations resume only after the latch is lifted (recovery.probe)",
+    "retry_recovery_proof": "mutations resume after the latch is lifted via POST /api/power {action:reset,confirmed:true}",
     "audit_receipt_proof": null,
     "security_resource_proof": "e-stop latch covers every mutation path",
     "package_proof": null,
@@ -90,5 +93,8 @@
       "audit_receipt_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface"
     }
-  }
+  },
+  "state_changing": true,
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "State-changing and requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN. Engage the latch first with POST /api/power {\"action\":\"emergency-stop\",\"confirmed\":true} (webui.py:2802-2860); lift it with action=reset. run_op's e-stop refusal is {state:refused,code:ESTOP_LATCHED} HTTP 200, not 403 EMERGENCY_STOP."
 }

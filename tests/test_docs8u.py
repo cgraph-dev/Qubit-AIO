@@ -129,4 +129,5 @@ def test_user_docs_allowlist_matches_shipped_files():
     assert [d[0] for d in W.USER_DOCS] == ["howto", "audio", "system",
                                           "migration"]
     for _, _, filename in W.USER_DOCS:
-        assert (REPO_ROOT / "docs" / filename).is_file(), filename
+        assert (REPO_ROOT / "docs" / "archive" / "2026-09-21"
+                / filename).is_file(), filename

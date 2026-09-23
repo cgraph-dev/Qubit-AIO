@@ -34,10 +34,16 @@ def _read_key(env_path: Optional[Path] = None) -> str:
         v = os.environ.get(name, "").strip().strip('"').strip("'")
         if v:
             return v
-    # then the legacy ~/.hermes/.env (migration compat)
+    # then the canonical Qubit runtime .env, then the legacy ~/.hermes/.env
+    # (migration compat only; never the primary source)
     candidates = []
     if env_path:
         candidates.append(Path(env_path).expanduser())
+    try:
+        from .. import config as _cfg
+        candidates.append(_cfg.canonical_runtime_env_path())
+    except Exception:
+        pass
     candidates.append(Path.home() / ".hermes" / ".env")
     for p in candidates:
         try:

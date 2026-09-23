@@ -1,7 +1,7 @@
 """Qubit-safe chat transport for the dashboard.
 
-The vendored Hermes Chat tab drives a raw ``/api/pty`` WebSocket (an xterm
-mirror of ``hermes --tui``). Qubit shell policy forbids a raw shell/PTY spawn,
+The vendored Qubit Chat tab drives a raw ``/api/pty`` WebSocket (an xterm
+mirror of ``qubit --tui``). Qubit shell policy forbids a raw shell/PTY spawn,
 so that path is a typed ``PTY_NO_SHELL`` refusal and the page reconnect-loops.
 This module is the Qubit-safe equivalent: an agent-backed chat transport on the
 SAME backend every other surface uses — :func:`voicebridge.agent.turn` /
@@ -129,7 +129,9 @@ class ChatSessionStore:
     # -- lifecycle ---------------------------------------------------------
     def create(self, name: str = "", *, session_id: Optional[str] = None,
                model: Optional[str] = None,
-               identity: str = "dashboard:user") -> Dict[str, Any]:
+               identity: str = "dashboard:user",
+               created_at: Optional[float] = None,
+               updated_at: Optional[float] = None) -> Dict[str, Any]:
         with self._lock:
             sid = _bounded(session_id, 80).strip() if session_id else ""
             if not sid:
@@ -138,8 +140,15 @@ class ChatSessionStore:
                 return {"state": "EXISTS", "code": "SESSION_EXISTS",
                         "detail": f"session {sid!r} already exists"}
             now = self._clock()
+            created = (float(created_at)
+                       if isinstance(created_at, (int, float)) and created_at > 0
+                       else now)
+            updated = (float(updated_at)
+                       if isinstance(updated_at, (int, float)) and updated_at > 0
+                       else created)
             rec = {"id": sid, "name": _bounded(name, MAX_NAME_CHARS) or None,
-                   "model": model or None, "created_at": now, "updated_at": now,
+                   "model": model or None, "created_at": created,
+                   "updated_at": updated,
                    "archived": False, "message_count": 0, "identity": identity}
             self._state["sessions"][sid] = rec
             self._state["messages"][sid] = []
@@ -261,7 +270,8 @@ class ChatSessionStore:
 
     def append(self, session_id: str, role: str, content: str, *,
                meta: Optional[Dict[str, Any]] = None,
-               model: Optional[str] = None) -> Dict[str, Any]:
+               model: Optional[str] = None,
+               timestamp: Optional[float] = None) -> Dict[str, Any]:
         with self._lock:
             sid = _bounded(session_id, 80)
             rec = self._record(sid)
@@ -269,8 +279,11 @@ class ChatSessionStore:
                 return {"state": "MISSING", "code": "SESSION_NOT_FOUND",
                         "detail": f"no chat session {sid!r}"}
             msgs = self._state["messages"].setdefault(sid, [])
+            ts = (float(timestamp)
+                  if isinstance(timestamp, (int, float)) and timestamp > 0
+                  else self._clock())
             msg = {"role": str(role), "content": _bounded(content, MAX_TEXT_CHARS),
-                   "timestamp": self._clock()}
+                   "timestamp": ts}
             if meta:
                 msg["meta"] = {k: v for k, v in meta.items() if v is not None}
             if model:
@@ -324,12 +337,16 @@ class ChatSessionStore:
                 return {"state": "EXISTS", "code": "SESSION_EXISTS",
                         "detail": f"session {sid!r} already exists"}
             created = self.create(name, session_id=sid or None,
-                                  model=src.get("model"), identity=identity)
+                                  model=src.get("model"), identity=identity,
+                                  created_at=src.get("created_at"),
+                                  updated_at=src.get("updated_at"))
             if created.get("state") == "EXISTS" and overwrite:
                 self._state["sessions"].pop(sid, None)
                 self._state["messages"].pop(sid, None)
                 created = self.create(name, session_id=sid, model=src.get("model"),
-                                      identity=identity)
+                                      identity=identity,
+                                      created_at=src.get("created_at"),
+                                      updated_at=src.get("updated_at"))
             if created.get("state") != "OK":
                 return created
             real = created["session"]["id"]
@@ -342,25 +359,178 @@ class ChatSessionStore:
                         "user", "assistant", "system"):
                     continue
                 self.append(real, m.get("role"), m.get("content", ""),
-                            meta=m.get("meta") if isinstance(m.get("meta"), dict) else None)
+                            meta=m.get("meta") if isinstance(m.get("meta"), dict) else None,
+                            timestamp=m.get("timestamp"))
                 count += 1
             return {"state": "OK", "session": self._record(real),
                     "imported": count}
 
 
-def store(cfg: Any) -> ChatSessionStore:
-    state_dir = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(".")
-    st = ChatSessionStore(Path(state_dir))
-    st.reload()
-    return st
+def store(cfg: Any) -> Any:
+    """Return the ONE canonical chat store (C7).
+
+    The authoritative store is the vendored ``qubit_state.SessionDB`` (the same
+    SQLite ``state.db`` the terminal/TUI/agent writes) reached through the
+    strict native-contract adapter :class:`QubitSessionStore`. There is no
+    second writable chat store and no copy-sync.
+    """
+    from .qubit_session_store import QubitSessionStore
+
+    return QubitSessionStore(cfg)
+
+
+# ---------------------------------------------------------------------------
+# Single session authority (A10)
+# ---------------------------------------------------------------------------
+#: The canonical authority class for chat transcripts. The backed store is the
+#: vendored ``qubit_state.SessionDB`` (``state.db`` under the Qubit runtime
+#: home); the adapter and the terminal write the SAME database.
+SESSION_AUTHORITY = "voicebridge.qubit_session_store.QubitSessionStore"
+
+
+def session_authority() -> Dict[str, Any]:
+    """The one session-authority contract, read from its canonical owner.
+
+    Chat session list/lifecycle read through exactly one authority:
+    :class:`voicebridge.qubit_session_store.QubitSessionStore`, a strict
+    adapter over the vendored ``qubit_state.SessionDB``. The terminal/TUI/agent
+    and every native surface (``/qubit-chat``, CLI, dashboard, voice) read and
+    write that one ``state.db``; no second writable chat store exists.
+    """
+    from . import auth_status
+
+    return auth_status.session_authority()
+
+
+def session_reasoning(cfg: Any, session_id: str) -> Optional[str]:
+    """Session-persisted reasoning preference (None = model default).
+
+    Reads the ``reasoning`` key from the session's ``model_config`` metadata
+    (written via the session PATCH route, validated there). An unreadable or
+    invalid stored value degrades to None (audited) so a corrupt preference
+    can never brick a session; per-request values always win.
+    """
+    try:
+        meta = store(cfg).meta_get(session_id).get("meta", {})
+        level = (meta or {}).get("reasoning")
+        if level is None:
+            return None
+        from .local_llm import normalize_reasoning_level
+
+        return normalize_reasoning_level(level)
+    except Exception as exc:  # noqa: BLE001 - preference is advisory
+        try:
+            _audit("reasoning_preference_ignored", session=session_id,
+                   error=str(exc)[:120])
+        except Exception:
+            pass
+        return None
+
+
+def store_boundary() -> Dict[str, Any]:
+    """The non-overlapping store-ownership contract (delegated, read-only)."""
+    from . import auth_status
+
+    return auth_status.store_boundary()
+
+
+def owns_chat_session_authority() -> bool:
+    """True when this module is still the named chat-transcript authority."""
+    contract = session_authority().get("writable_authorities", {}) or {}
+    return contract.get("chat_transcript") == SESSION_AUTHORITY
+
+
+# ---------------------------------------------------------------------------
+# Packet 8U projection adapters (S5) — delegated, never a second writer
+# ---------------------------------------------------------------------------
+def _bind_session_check(store_obj: Any, check: Callable[[str], Any],
+                        *methods: str) -> Any:
+    """Bind the canonical authority's ``show`` as each store's session guard.
+
+    The S5 stores accept a per-call ``session_check``; binding it here means a
+    draft/comment/CI row may only reference a session the single chat authority
+    knows, and the S5 stores stay in their own files (never a second writer of
+    ``chat_sessions.json``). An explicit per-call ``session_check`` still wins.
+    """
+    for name in methods:
+        original = getattr(store_obj, name, None)
+        if original is None:
+            continue
+
+        def _bound(*args: Any, _orig: Any = original, _check: Any = check,
+                   **kwargs: Any) -> Any:
+            kwargs.setdefault("session_check", _check)
+            return _orig(*args, **kwargs)
+
+        setattr(store_obj, name, _bound)
+    return store_obj
+
+
+def draft_store(cfg: Any) -> Any:
+    """Per-session file-draft store, guarded by the chat session authority."""
+    from . import chat_stores as CS
+
+    return _bind_session_check(CS.draft_store(cfg), store(cfg).show, "put")
+
+
+def comment_store(cfg: Any) -> Any:
+    """Per-session comment/CI store, guarded by the chat session authority."""
+    from . import chat_stores as CS
+
+    return _bind_session_check(CS.comment_store(cfg), store(cfg).show,
+                               "add_comment", "add_ci_detail")
+
+
+def build_projection(cfg: Any, session_id: str, **kwargs: Any) -> Dict[str, Any]:
+    """Session activity projection for one session.
+
+    The canonical chat store is injected as ``session_store`` so the summary
+    section reads the same single transcript authority as the chat surface.
+    """
+    from . import session_activity as SA
+
+    kwargs.setdefault("session_store", store(cfg))
+    return SA.build_projection(cfg, session_id, **kwargs)
+
+
+def record_activity(cfg: Any, session_id: str, assistant_text: str, *,
+                    actor: str = "dashboard:user") -> Dict[str, Any]:
+    """Append a ``summary`` activity event after a successful turn.
+
+    Best-effort projection glue: the turn already succeeded, so a failure here
+    is audited and typed but never fabricates or masks a turn result.
+    """
+    try:
+        from . import session_activity as SA
+
+        return SA.store(cfg).record(session_id, "summary",
+                                    detail=assistant_text, actor=actor)
+    except Exception as exc:  # noqa: BLE001 - typed, audited, non-fatal
+        _audit("activity_error", session=session_id, error=str(exc))
+        return {"state": "FAILED", "code": "SESSION_ACTIVITY_ERROR",
+                "detail": _redact(str(exc))[:300]}
 
 
 # ---------------------------------------------------------------------------
 # Model routing / guards
 # ---------------------------------------------------------------------------
 def configured_model(cfg: Any) -> str:
+    """Canonical default chat model (never a hard-coded alias).
+
+    An explicit ``agent.model`` override wins; otherwise the ONE resolver answers
+    the effective model for the chat role, honoring the operator-configured
+    default (the reference's resolution: the ``model`` setting / Qubit runtime
+    default, when it maps to a registered profile) before the shipped default.
+    Because ``/api/model/info`` and the ``/qubit-chat`` turn path resolve through
+    that same function, all surfaces report the same default (PV-02).
+    """
     try:
-        return str(cfg.get("agent", "model", default="") or DEFAULT_MODEL)
+        from .providers import resolver as _resolver
+
+        configured = _resolver.configured_default_model(cfg)
+        if configured:
+            return configured
+        return _resolver.resolve(cfg, role="chat").model
     except Exception:
         return DEFAULT_MODEL
 
@@ -463,17 +633,69 @@ def _resolve_session(st: ChatSessionStore, session: Optional[str], *,
     return st.ensure(sid, model=model)
 
 
+#: How many transcript rows are read to build/compact context. Larger than the
+#: fed window so older turns can still contribute a deterministic summary.
+_CONTEXT_READ_LIMIT = 200
+
+
 def _context_prompt(st: ChatSessionStore, session_id: str,
-                    exclude_last: bool = False) -> str:
-    """Bounded transcript of prior turns passed to the model as context."""
-    msgs = st.messages(session_id, limit=CONTEXT_MESSAGES).get("messages", [])
+                    exclude_last: bool = False, *,
+                    cfg: Any = None,
+                    model_context_tokens: Optional[int] = None,
+                    pending_text: str = ""
+                    ) -> "tuple[str, dict, Any]":
+    """Bounded, dynamic context for prior turns.
+
+    Returns ``(text, meta, decision)``. The policy picks a fast window for a
+    simple voice turn and expands (with a deterministic summary of older turns)
+    when history/context requires it. Instruction/system messages are always
+    retained. ``cfg`` is optional for callers that only want the legacy string
+    shape (a Config-less call falls back to the policy defaults).
+
+    ``pending_text`` is the in-flight user turn. It is counted by the policy so
+    a single large request still triggers expansion/escalation, but it is NOT
+    rendered into the context block (the caller appends it separately).
+    """
+    from . import context_policy as CTX
+
+    msgs = st.messages(session_id, limit=_CONTEXT_READ_LIMIT).get("messages", [])
     if exclude_last and msgs:
         msgs = msgs[:-1]
-    lines = []
-    for m in msgs:
-        role = "User" if m.get("role") == "user" else "Qubit"
-        lines.append(f"{role}: {str(m.get('content', ''))[:1200]}")
-    return "\n".join(lines)[-CONTEXT_CHARS:]
+    decision_msgs = list(msgs)
+    if pending_text:
+        decision_msgs = decision_msgs + [{"role": "user",
+                                          "content": pending_text}]
+    decision = CTX.decide_context(cfg, decision_msgs,
+                                  model_context_tokens=model_context_tokens)
+    text, meta = CTX.build_context_prompt(msgs, decision)
+    return text, meta, decision
+
+
+def _escalation_route(cfg: Any, decision: Any,
+                      routed: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve the escalation target for a decision, or a typed refusal.
+
+    Escalation is opt-in: with no ``agent.context.escalation_model`` configured
+    there is no target and the caller fails closed with a typed code rather
+    than silently truncating or switching to an unapproved provider. When a
+    target is configured it resolves through the same canonical resolver, so
+    egress/policy/credential checks still apply.
+    """
+    from . import context_policy as CTX
+
+    pinned = CTX.escalation_target(cfg, routed)
+    if not pinned:
+        return {"ok": False, "code": "CONTEXT_ESCALATION_UNAVAILABLE",
+                "detail": "the request needs a larger context window than the "
+                          "local model provides; configure "
+                          "agent.context.escalation_model or raise "
+                          "agent.context.max_tokens (no silent fallback)"}
+    escalated = resolve_route(cfg, pinned, session=None, role="chat")
+    if not escalated.get("ok"):
+        return {"ok": False, "code": "CONTEXT_ESCALATION_DENIED",
+                "detail": f"escalation profile {pinned!r} is not executable: "
+                          f"{escalated.get('detail') or escalated.get('code')}"}
+    return escalated
 
 
 def _cancel_event(session_id: str) -> threading.Event:
@@ -510,14 +732,27 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
          model: Optional[str] = None, timeout_s: Optional[float] = None,
          cancel: Optional[Callable[[], bool]] = None,
          role: str = "chat",
-         actor: str = "dashboard:user") -> Dict[str, Any]:
-    """Run one persisted agent turn on the shared Qubit brain path."""
+         actor: str = "dashboard:user",
+         reasoning: Optional[str] = None) -> Dict[str, Any]:
+    """Run one persisted agent turn on the shared Qubit brain path.
+
+    ``reasoning`` (None/minimal/low/medium/high/max) is validated FIRST so
+    an unknown level fails typed before any session/message write, then
+    threaded as a real per-request output budget to the resolved model.
+    """
     if _estop(cfg):
         return {"ok": False, "state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
                 "detail": "emergency stop latched; agent turn refused"}
     if not _agent_enabled(cfg):
         return {"ok": False, "state": "UNAVAILABLE", "code": "AGENT_DISABLED",
                 "detail": "agent turns are off (agent.enabled=false)"}
+    try:
+        from .local_llm import normalize_reasoning_level
+
+        reasoning_level = normalize_reasoning_level(reasoning)
+    except Exception as exc:
+        return {"ok": False, "state": "FAILED", "code": "REASONING_INVALID",
+                "detail": str(exc)[:200]}
     routed = resolve_route(cfg, model, session=session, role=role)
     if not routed.get("ok"):
         return routed
@@ -534,19 +769,43 @@ def turn(cfg: Any, text: str, *, session: Optional[str] = None,
         return {"ok": False, "state": "FAILED", "code": "MALFORMED",
                 "detail": "turn needs non-empty text", "session_id": sid}
 
-    context = _context_prompt(st, sid)
+    context, ctx_meta, decision = _context_prompt(
+        st, sid, cfg=cfg, model_context_tokens=routed.get("context_tokens"),
+        pending_text=clean)
+    # Resolve escalation BEFORE persisting the user row: a pre-execution refusal
+    # (no escalation target / denied profile) must leave no orphan turn in the
+    # transcript. A post-append failure is retryable by design (retry_last
+    # re-runs the stored user message), but a turn refused before it ever ran
+    # has nothing to retry and must not be recorded as one.
+    if decision.requires_escalation:
+        escalated = _escalation_route(cfg, decision, routed)
+        if not escalated.get("ok"):
+            return {"ok": False, "state": "UNAVAILABLE",
+                    "code": escalated.get("code"),
+                    "detail": escalated.get("detail"),
+                    "session_id": sid, "context": decision.public()}
+        routed = escalated
+        resolved_model = routed["model"]
+        _audit("context_escalated", session=sid,
+               reason=",".join(decision.reasons),
+               model=resolved_model, tier=decision.tier)
     appended = st.append(sid, "user", clean)
     if appended.get("state") != "OK":
         return {"ok": False, "state": "FAILED", "code": appended.get("code"),
                 "detail": appended.get("detail", "")}
     return _generate(cfg, sid, clean, resolved_model, context,
-                     timeout_s=timeout_s, cancel=cancel, routed=routed)
+                     timeout_s=timeout_s, cancel=cancel, routed=routed,
+                     role=role, context_meta=ctx_meta, decision=decision,
+                     reasoning=reasoning_level)
 
 
 def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
                      routed: Dict[str, Any], *,
                      timeout_s: Optional[float],
-                     cancel: Optional[Callable[[], bool]]) -> Dict[str, Any]:
+                     cancel: Optional[Callable[[], bool]],
+                     context_meta: Optional[Dict[str, Any]] = None,
+                     decision: Any = None,
+                     reasoning: Optional[str] = None) -> Dict[str, Any]:
     """Execute one turn on a registered non-local profile via the gateway.
 
     Truthful receipts: identity/provider/model come from the gateway result;
@@ -580,7 +839,7 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
         model=str(routed.get("model") or ""),
         idempotency_key=f"{sid}:{time.monotonic_ns()}")
     try:
-        res = GW.run(req, cfg, cancel=_stopped)
+        res = GW.run(req, cfg, cancel=_stopped, reasoning=reasoning)
     except Exception as exc:  # noqa: BLE001 - typed, redacted
         _release_cancel(sid, ev)
         _audit("turn_remote_error", session=sid, error=str(exc))
@@ -593,6 +852,16 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
                "model": res.model, "identity": res.identity,
                "profile": routed.get("profile_id"),
                "path": "voicebridge.providers.gateway.run"}
+    _applied = (res.details or {}).get("reasoning_applied")
+    if _applied is not None:
+        receipt["reasoning_applied"] = dict(_applied)
+    elif reasoning is not None:
+        receipt["reasoning_applied"] = {"level": reasoning,
+                                        "max_tokens": None}
+    if context_meta is not None:
+        receipt["context"] = dict(context_meta)
+        if decision is not None:
+            receipt["context"]["routing"] = decision.public()
     if res.usage is not None:
         receipt["usage"] = {
             "provider": res.usage.provider, "model": res.usage.model,
@@ -619,6 +888,7 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
                       meta={"model": res.model, "provider": res.provider,
                             "profile": routed.get("profile_id"),
                             "elapsed_ms": elapsed_ms})
+    record_activity(cfg, sid, safe)
     _audit("turn_remote", session=sid, elapsed_ms=elapsed_ms, ok=True)
     return {"ok": True, "reply": safe, "session": sid, "session_id": sid,
             "elapsed_ms": elapsed_ms, "message": saved.get("message"),
@@ -628,12 +898,16 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
 def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
               context: str, *, timeout_s: Optional[float],
               cancel: Optional[Callable[[], bool]],
-              routed: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+              routed: Optional[Dict[str, Any]] = None,
+              role: str = "chat",
+              context_meta: Optional[Dict[str, Any]] = None,
+              decision: Any = None,
+              reasoning: Optional[str] = None) -> Dict[str, Any]:
     """Run an already-persisted user turn through the resolved model path.
 
     Local/local-default profiles run through ``voicebridge.agent.turn`` (the
-    same Brain4 path Qubit Chat/CLI use). A registered non-local profile runs
-    through the single provider gateway
+    same gateway-backed Brain4 path Qubit Chat/CLI use). A registered non-local
+    profile runs through the single provider gateway
     (``voicebridge.providers.gateway.run``) so an approved API model is a real
     adapter, never a local model pretending to be remote — and never a remote
     call pretending to be local.
@@ -642,9 +916,11 @@ def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
     (which has no conversation-prompt parameter) still sees bounded context;
     the persisted transcript keeps only the clean user message.
     """
-    if routed and str(routed.get("kind")) in ("api", "realtime"):
+    if routed and str(routed.get("kind")) in ("api", "realtime", "plugin"):
         return _generate_remote(cfg, sid, clean, context, routed,
-                                timeout_s=timeout_s, cancel=cancel)
+                                timeout_s=timeout_s, cancel=cancel,
+                                context_meta=context_meta, decision=decision,
+                                reasoning=reasoning)
     from . import agent as AG
 
     st = store(cfg)
@@ -658,6 +934,9 @@ def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
         res = AG.turn(cfg, prompt, session=sid,
                       timeout_s=min(timeout_s or 120.0, 300.0),
                       model=resolved_model,
+                      role=role,
+                      profile_id=(routed or {}).get("profile_id"),
+                      reasoning=reasoning,
                       estop_engaged=lambda: _estop(cfg) or ev.is_set()
                       or (cancel is not None and bool(cancel())))
     except AG.AgentDenied as exc:
@@ -688,10 +967,18 @@ def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
                 "elapsed_ms": elapsed_ms}
     safe = _redact(_sanitize(str(res.get("reply", "")).strip()))
     saved = st.append(sid, "assistant", safe,
-                      meta={"model": resolved_model, "elapsed_ms": elapsed_ms})
+                      meta={"model": resolved_model,
+                            "elapsed_ms": elapsed_ms})
+    record_activity(cfg, sid, safe)
     receipt = dict(res.get("receipt") or {})
     receipt.setdefault("transport", "voicebridge.chat_transport.turn")
-    _audit("turn", session=sid, elapsed_ms=elapsed_ms, ok=True)
+    if context_meta is not None:
+        receipt["context"] = dict(context_meta)
+        if decision is not None:
+            receipt["context"]["routing"] = decision.public()
+    _audit("turn", session=sid, elapsed_ms=elapsed_ms, ok=True,
+           context_tier=(decision.tier if decision is not None else None),
+           context_window=(decision.window_tokens if decision is not None else None))
     return {"ok": True, "reply": safe, "session": sid, "session_id": sid,
             "elapsed_ms": elapsed_ms,
             "message": saved.get("message"),
@@ -702,13 +989,15 @@ def _generate(cfg: Any, sid: str, clean: str, resolved_model: str,
 def retry_last(cfg: Any, session: Optional[str] = None, *,
                model: Optional[str] = None, timeout_s: Optional[float] = None,
                cancel: Optional[Callable[[], bool]] = None,
-               role: str = "chat") -> Dict[str, Any]:
+               role: str = "chat",
+               reasoning: Optional[str] = None) -> Dict[str, Any]:
     """Re-run the model for a session's last unanswered user message.
 
     A failed turn persists the user message but no assistant reply, so retry
     re-invokes the model WITHOUT duplicating the transcript. Typed refusal when
     there is nothing to retry (the last turn already produced an assistant
-    message)."""
+    message). ``reasoning`` reuses the same validated selector as
+    :func:`turn`."""
     if _estop(cfg):
         return {"ok": False, "state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
                 "detail": "emergency stop latched; agent turn refused"}
@@ -731,9 +1020,30 @@ def retry_last(cfg: Any, session: Optional[str] = None, *,
                 "detail": "the last turn already has an assistant reply",
                 "session_id": sid}
     clean = _bounded(msgs[-1].get("content", ""), MAX_TEXT_CHARS)
-    context = _context_prompt(st, sid, exclude_last=True)
+    context, ctx_meta, decision = _context_prompt(
+        st, sid, exclude_last=True, cfg=cfg,
+        model_context_tokens=routed.get("context_tokens"),
+        pending_text=clean)
+    if decision.requires_escalation:
+        escalated = _escalation_route(cfg, decision, routed)
+        if not escalated.get("ok"):
+            return {"ok": False, "state": "UNAVAILABLE",
+                    "code": escalated.get("code"),
+                    "detail": escalated.get("detail"), "session_id": sid,
+                    "context": decision.public()}
+        routed = escalated
+        resolved_model = routed["model"]
+    try:
+        from .local_llm import normalize_reasoning_level
+
+        retry_reasoning = normalize_reasoning_level(reasoning)
+    except Exception as exc:
+        return {"ok": False, "state": "FAILED", "code": "REASONING_INVALID",
+                "detail": str(exc)[:200], "session_id": sid}
     return _generate(cfg, sid, clean, resolved_model, context,
-                     timeout_s=timeout_s, cancel=cancel, routed=routed)
+                     timeout_s=timeout_s, cancel=cancel, routed=routed,
+                     role=role, context_meta=ctx_meta, decision=decision,
+                     reasoning=retry_reasoning)
 
 
 # ---------------------------------------------------------------------------
@@ -769,7 +1079,8 @@ def stream_preflight(cfg: Any, text: str, model: Optional[str] = None, *,
 
 def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
                    routed: Dict[str, Any], timeout_s: Optional[float],
-                   cancel: Optional[Callable[[], bool]]
+                   cancel: Optional[Callable[[], bool]],
+                   reasoning: Optional[str] = None
                    ) -> Iterator[Dict[str, Any]]:
     """Streaming envelope for a registered non-local profile.
 
@@ -786,7 +1097,18 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
                "detail": created.get("detail", "")}
         return
     sid = created["session"]["id"]
-    context = _context_prompt(st, sid)
+    context, ctx_meta, decision = _context_prompt(
+        st, sid, cfg=cfg, model_context_tokens=routed.get("context_tokens"),
+        pending_text=clean)
+    # Atomic ordering: a refused escalation must not leave an orphan user row
+    # (same contract as the non-streaming turn).
+    if decision.requires_escalation:
+        escalated = _escalation_route(cfg, decision, routed)
+        if not escalated.get("ok"):
+            yield {"event": "error", "code": escalated.get("code"),
+                   "detail": escalated.get("detail"), "session_id": sid}
+            return
+        routed = escalated
     appended = st.append(sid, "user", clean)
     if appended.get("state") != "OK":
         yield {"event": "error", "code": appended.get("code"),
@@ -794,9 +1116,12 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
         return
     yield {"event": "start", "session_id": sid, "session": sid,
            "model": routed.get("model"), "provider": routed.get("provider"),
-           "streaming": False, "message": appended.get("message")}
+           "streaming": False, "message": appended.get("message"),
+           "context": decision.public()}
     res = _generate_remote(cfg, sid, clean, context, routed,
-                           timeout_s=timeout_s, cancel=cancel)
+                           timeout_s=timeout_s, cancel=cancel,
+                           context_meta=ctx_meta, decision=decision,
+                           reasoning=reasoning)
     if not res.get("ok"):
         yield {"event": "error", "code": res.get("code"),
                "detail": res.get("detail"), "session_id": sid}
@@ -810,18 +1135,29 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
 
 
 def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
-                model: Optional[str] = None, timeout_s: Optional[float] = None,
-                cancel: Optional[Callable[[], bool]] = None,
-                role: str = "chat",
-                actor: str = "dashboard:user") -> Iterator[Dict[str, Any]]:
+         model: Optional[str] = None, timeout_s: Optional[float] = None,
+         cancel: Optional[Callable[[], bool]] = None,
+         role: str = "chat",
+         actor: str = "dashboard:user",
+         reasoning: Optional[str] = None) -> Iterator[Dict[str, Any]]:
     """Yield typed streaming events for one persisted agent turn.
 
     Event shapes: ``{"event": "start"}``, ``{"event": "delta", "text": ...}``,
     ``{"event": "done", "reply": ..., "receipt": ...}``,
     ``{"event": "cancelled"}``, ``{"event": "error", "code": ...}``. Deltas
     are real completed sentences streamed from ``local_llm``; nothing is
-    synthesized when the model fails.
+    synthesized when the model fails. ``reasoning`` is validated before any
+    session write and threaded as a real output budget on both the local
+    streaming worker and the remote path.
     """
+    try:
+        from .local_llm import normalize_reasoning_level
+
+        reasoning_level = normalize_reasoning_level(reasoning)
+    except Exception as exc:
+        yield {"event": "error", "code": "REASONING_INVALID",
+               "detail": str(exc)[:200]}
+        return
     status, refusal, resolved_model = stream_preflight(cfg, text, model,
                                                        session=session,
                                                        role=role)
@@ -829,10 +1165,10 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         yield refusal
         return
     routed_probe = resolve_route(cfg, model, session=session, role=role)
-    if routed_probe.get("kind") in ("api", "realtime"):
+    if routed_probe.get("kind") in ("api", "realtime", "plugin"):
         yield from _stream_remote(cfg, text, session=session,
                                   routed=routed_probe, timeout_s=timeout_s,
-                                  cancel=cancel)
+                                  cancel=cancel, reasoning=reasoning_level)
         return
 
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
@@ -843,7 +1179,24 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                "detail": created.get("detail", "")}
         return
     sid = created["session"]["id"]
-    context = _context_prompt(st, sid)
+    from . import context_policy as CTX
+
+    msgs = st.messages(sid, limit=_CONTEXT_READ_LIMIT).get("messages", [])
+    decision = CTX.decide_context(
+        cfg, msgs + [{"role": "user", "content": clean}],
+        model_context_tokens=routed_probe.get("context_tokens"))
+    if decision.requires_escalation:
+        escalated = _escalation_route(cfg, decision, routed_probe)
+        if not escalated.get("ok"):
+            yield {"event": "error", "code": escalated.get("code"),
+                   "detail": escalated.get("detail"), "session_id": sid,
+                   "context": decision.public()}
+            return
+        yield from _stream_remote(cfg, text, session=session,
+                                  routed=escalated, timeout_s=timeout_s,
+                                  cancel=cancel)
+        return
+    context, ctx_meta = CTX.build_context_prompt(msgs, decision)
     appended = st.append(sid, "user", clean)
     if appended.get("state") != "OK":
         yield {"event": "error", "code": appended.get("code"),
@@ -853,7 +1206,8 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     ev.clear()
     started = time.monotonic()
     yield {"event": "start", "session_id": sid, "session": sid,
-           "model": resolved_model, "message": appended.get("message")}
+           "model": resolved_model, "message": appended.get("message"),
+           "context": decision.public()}
 
     out: "queue.Queue[Any]" = queue.Queue()
     done = object()
@@ -884,13 +1238,23 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
 
     def _worker() -> None:
         try:
-            from .local_llm import chat_local_stream
-            reply = chat_local_stream(
-                clean, conversation_prompt=context, model=resolved_model,
-                timeout_s=min(timeout_s or 120.0, 300.0), max_tokens=1024,
+            from .providers import gateway as _gateway
+            res = _gateway.run_role(
+                clean, cfg, role=role,
+                profile_id=(routed_probe or {}).get("profile_id"),
+                model=resolved_model,
+                max_tokens=1024,
+                timeout_s=min(timeout_s or 120.0, 300.0),
+                local_mode="chat", conversation_prompt=context,
                 on_sentence=_on_sentence,
-                should_stop=lambda: ev.is_set() or (cancel is not None and bool(cancel())))
-            out.put(("reply", reply))
+                should_stop=lambda: ev.is_set()
+                or (cancel is not None and bool(cancel())),
+                reasoning=reasoning_level)
+            if res.ok:
+                out.put(("reply", res.text))
+                out.put(("identity", res))
+            else:
+                out.put(("error", res))
         except Exception as exc:  # noqa: BLE001 - surfaced as a typed event
             out.put(("error", exc))
         finally:
@@ -901,6 +1265,7 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     thread.start()
     streamed = ""
     final_reply = ""
+    identity_res = None
     try:
         while True:
             item = out.get()
@@ -912,10 +1277,22 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                 yield {"event": "delta", "text": value, "session_id": sid}
             elif kind == "reply":
                 final_reply = value or ""
+            elif kind == "identity":
+                identity_res = value
             elif kind == "error":
-                _audit("stream_error", session=sid, error=str(value))
-                yield {"event": "error", "code": "MODEL_ERROR",
-                       "detail": _redact(str(value))[:300], "session_id": sid}
+                if hasattr(value, "code"):
+                    code = ("MODEL_UNAVAILABLE"
+                            if getattr(value, "code", "") in
+                            ("MODEL_UNAVAILABLE", "EMPTY_EMBEDDING")
+                            else "MODEL_ERROR")
+                    detail = _redact(str(getattr(value, "message", "")
+                                         or "model provider refused"))[:300]
+                else:
+                    code = "MODEL_ERROR"
+                    detail = _redact(str(value))[:300]
+                _audit("stream_error", session=sid, code=code)
+                yield {"event": "error", "code": code,
+                       "detail": detail, "session_id": sid}
                 return
     finally:
         _release_cancel(sid, ev)
@@ -936,15 +1313,46 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
         return
     safe = _redact(_sanitize(full.strip()))
     saved = st.append(sid, "assistant", safe,
-                      meta={"model": resolved_model, "elapsed_ms": elapsed_ms,
-                            "streamed": True})
-    _audit("stream_done", session=sid, elapsed_ms=elapsed_ms)
+                      meta={"model": resolved_model,
+                            "elapsed_ms": elapsed_ms, "streamed": True})
+    record_activity(cfg, sid, safe)
+    _audit("stream_done", session=sid, elapsed_ms=elapsed_ms,
+           context_tier=decision.tier, context_window=decision.window_tokens)
+    receipt = {"runtime": "qubit-native", "model": resolved_model,
+               "path": "voicebridge.chat_transport.stream_turn",
+               "streaming": True,
+               "context": dict(ctx_meta, routing=decision.public())}
+    if reasoning_level is not None:
+        from .local_llm import resolve_reasoning_budget
+
+        receipt["reasoning_applied"] = {
+            "level": reasoning_level,
+            "max_tokens": resolve_reasoning_budget(reasoning_level)}
+    if identity_res is not None:
+        receipt["provider"] = identity_res.provider
+        receipt["identity"] = identity_res.identity
+        details = dict(getattr(identity_res, "details", None) or {})
+        for key in ("profile", "role", "source", "route", "locality",
+                    "reasoning_applied"):
+            if details.get(key) not in (None, ""):
+                receipt[key] = details[key]
+        usage = getattr(identity_res, "usage", None)
+        if usage is not None:
+            receipt["usage"] = {
+                "provider": usage.provider, "model": usage.model,
+                "identity": usage.identity,
+                "prompt_tokens": usage.prompt_tokens,
+                "completion_tokens": usage.completion_tokens,
+                "latency_ms": usage.latency_ms,
+                "cost_usd_est": usage.cost_usd_est,
+                "fallback": usage.fallback,
+                "fallback_reason": usage.fallback_reason,
+            }
     yield {"event": "done", "ok": True, "reply": safe, "session_id": sid,
            "session": sid, "elapsed_ms": elapsed_ms,
            "message": saved.get("message"),
            "message_count": saved.get("message_count"),
-           "receipt": {"runtime": "qubit-native", "model": resolved_model,
-                       "path": "voicebridge.chat_transport.stream_turn"}}
+           "receipt": receipt}
 
 
 def sse_encode(event: Dict[str, Any]) -> str:
@@ -1105,4 +1513,7 @@ __all__ = [
     "ChatSessionStore", "AgentPtySession", "store", "turn", "retry_last",
     "stream_preflight", "stream_turn", "stream_sse", "sse_encode", "cancel",
     "resolve_model", "resolve_route", "configured_model", "pty_feed", "pty_session",
+    "SESSION_AUTHORITY", "session_authority", "store_boundary",
+    "owns_chat_session_authority", "draft_store", "comment_store",
+    "build_projection", "record_activity",
 ]

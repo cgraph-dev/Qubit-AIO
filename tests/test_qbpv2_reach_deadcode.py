@@ -20,7 +20,7 @@ registries) rather than by trusting catalogs or status tiles:
    in flight).
 
 Findings that require an edit outside W1's ownership are reported in
-``docs/QUBIT_REACHABILITY_AUDIT.md`` as cross-boundary handoffs. This module
+``docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md`` as cross-boundary handoffs. This module
 never edits production code.
 """
 from __future__ import annotations
@@ -31,26 +31,35 @@ import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-PLUGINS = REPO / "frontend/hermes-qubit/plugins"
-FLEET = REPO / "frontend/hermes-web/public/plugins/fleet.json"
+PLUGINS = REPO / "frontend/qubit-app/plugins"
+FLEET = REPO / "frontend/qubit-web/public/plugins/fleet.json"
 
-# ``voicebridge/hermes_backend.py`` is a programmatic entry point that no
+# ``voicebridge/qubit_backend.py`` is a programmatic entry point that no
 # production module, test, or script currently imports (cross-boundary handoff
 # W1-1, owner W2). Pinned so a *new* unreferenced module fails this gate.
 KNOWN_UNREFERENCED_MODULES: set = set()
 
 # Test files that assert repository artifacts (docs/manifests/scans) rather
-# than exercising ``voicebridge``/``qubit_hermes`` code. They are not "dead
+# than exercising ``voicebridge``/``qubit_runtime`` code. They are not "dead
 # tests" — they guard generated artifacts. Pinned so a new production-dead test
 # is surfaced for review. ``test_qbpv2_*`` wave files are exempt.
 ARTIFACT_ONLY_TESTS = {
     "test_branding_scan8tf.py",
     "test_clean_clone_wave5.py",
+    # Guards the generated route-ownership matrix / compat-handler reachability
+    # artifact (scripts/route_ownership_matrix.py, scripts/compat_handler_reachability.py)
+    # by loading the generator by path; it does not import production modules.
+    "test_compat_handler_reachability.py",
+    "test_route_ownership_matrix.py",
+    # Guards the generated config/env binding manifest
+    # (scripts/config_binding_manifest.py -> docs/archive/2026-09-21/QUBIT_CONFIG_BINDING_MANIFEST.json)
+    # by loading the generator by path; it does not import production modules.
+    "test_config_binding_manifest_d3.py",
     # Loads the differential-parity runner (scripts/differential_parity.py) by
     # path to guard that artifact; it does not import production modules.
     "test_differential_parity8u.py",
     "test_frontend_hygiene.py",
-    "test_hermes_frontend_map8u.py",
+    "test_qubit_frontend_map8u.py",
     "test_matrix_final8u.py",
     "test_operator_only_evidence.py",
     "test_packet7a.py",
@@ -62,8 +71,8 @@ ARTIFACT_ONLY_TESTS = {
 
 _PROD_IMPORT_RE = re.compile(
     r"(from\s+voicebridge|import\s+voicebridge"
-    r"|from\s+qubit_hermes|import\s+qubit_hermes"
-    r"|import_module\(\s*[\"'](?:voicebridge|qubit_hermes))")
+    r"|from\s+qubit_runtime|import\s+qubit_runtime"
+    r"|import_module\(\s*[\"'](?:voicebridge|qubit_runtime))")
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +180,7 @@ def test_no_unreachable_voicebridge_modules():
 # 2. Compat route handler integrity (fake / missing handlers)
 # ---------------------------------------------------------------------------
 def test_every_compat_route_has_a_real_handler_or_typed_gate():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     missing: list[tuple] = []
     bad_gate: list[tuple] = []
@@ -190,7 +199,7 @@ def test_every_compat_route_has_a_real_handler_or_typed_gate():
 
 
 def test_compat_route_patterns_compile_and_methods_are_known():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     known = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "WEBSOCKET"}
     for route in HC.ROUTES:
@@ -202,7 +211,7 @@ def test_compat_route_patterns_compile_and_methods_are_known():
 # 3. Overlay plugin registration (unused / orphaned plugins)
 # ---------------------------------------------------------------------------
 def test_every_overlay_plugin_dir_is_registered_and_loadable():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     disk = {d.name for d in PLUGINS.iterdir() if d.is_dir()}
     registered = {m["name"] for m in HC._overlay_manifests()}

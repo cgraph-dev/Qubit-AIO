@@ -27,7 +27,7 @@ log = get_logger()
 _BROKEN_MAP = {
     "open claw": "worker", "openclaw": "worker",
     "hermes": "agent",
-    "root to": "route to",  # "root to open claw" ~ "route to openclaw"
+    "root to": "route to",  # "root to open claw" ~ "route to qubit"
     "trickish": "tricky", "micky": "mickey", "miki": "mickey",
 }
 _FUZZY_TASK_VERBS = r"\b(creat|creaet|cretae|make|do|put|write|ad|add|build|fix|open|update|change|delete|remove|move|copy)\w*\b"
@@ -72,15 +72,15 @@ _WAKE_STRIP_RE = re.compile(r"^(?:hey\s+|ok\s+|okay\s+)?qubit[,.]?\s+",
 
 # Sticky routing — explicit user preference that survives turns
 STICKY_PATTERNS = [
-    (r"\broute (this|it|everything|all)?\s*(to|through)\s+(agent|worker|browser|hermes|openclaw|open claw)\b", "route"),
-    (r"\buse (the )?(agent|worker|browser|hermes|openclaw|open claw)\b( for (this|now|everything|all))?", "use"),
-    (r"\b(always )?(use|route through) (agent|hermes)\b", "agent"),
-    (r"\b(always )?(use|route through) (worker|openclaw|open claw)\b", "worker"),
+    (r"\broute (this|it|everything|all)?\s*(to|through)\s+(agent|worker|browser|qubit|hermes|openclaw|open claw)\b", "route"),
+    (r"\buse (the )?(agent|worker|browser|qubit|hermes|openclaw|open claw)\b( for (this|now|everything|all))?", "use"),
+    (r"\b(always )?(use|route through) (agent|qubit|hermes)\b", "agent"),
+    (r"\b(always )?(use|route through) (worker|qubit|openclaw|open claw)\b", "worker"),
     (r"\b(always )?(use|route through) browser\b", "browser"),
 ]
 
-# Explicit delegation ("ask Qubit to ...", "Qubit, ..."; legacy "ask
-# Hermes/OpenClaw" phrasing still matches and runs on the Qubit agent).
+# Explicit delegation ("ask Qubit to ...", "Qubit, ..."; legacy-brand
+# phrasing still matches and runs on the Qubit agent).
 AGENT_PATTERNS = [
     r"\b(ask|tell|have|let|get)\s+(qubit|agent|worker|hermes|openclaw)\b",
     r"^\s*(qubit|agent|hermes)[,:]?\s+",
@@ -267,8 +267,8 @@ class Classifier:
                     if t in low[m.start():m.end()+20] or t in m.group(0):
                         return t
                 # legacy spoken names map to native lanes
-                for spoken, t in (("hermes", "agent"), ("openclaw", "worker"),
-                                  ("open claw", "worker")):
+                for spoken, t in (("qubit", "agent"), ("hermes", "agent"),
+                                  ("openclaw", "worker"), ("open claw", "worker")):
                     if spoken in low:
                         return t
         return None
@@ -365,7 +365,7 @@ class Classifier:
 
         # Identity-fact fast-path: "what's my instagram/github/phone/..."
         # are served from compiled core-fact context (Packet 4B; formerly baked). Routing them to the
-        # coding agent made Qubit spin up Hermes for a fact it knows cold.
+        # coding agent made Qubit spin up Qubit for a fact it knows cold.
         if re.search(r"(?:what(?:'?s| is)|whats|tell\s+me|give\s+me|remind\s+me|"
                      r"do\s+you\s+(?:know|remember)|which\s+is)[^.?!]{0,28}"
                      r"\b(my|mi)\s+(instagram|insta|github|discord|telegram|"
@@ -382,7 +382,7 @@ class Classifier:
                           reason="chitchat fast-path (skip LLM)")
         # Explicit STOP while something is actually running -> cancel NOW,
         # never a chitchat answer claiming the task was stopped (2026-08-24:
-        # 'stop the task' reached the LLM, got downgraded to chat, and Hermes
+        # 'stop the task' reached the LLM, got downgraded to chat, and Qubit
         # kept grinding while Qubit said "I'll stop it").
         if task_score == 0.0 and self.busy_fn() and re.search(
                 r"\b(stop|cancel|abort|kill|halt)\b.*\b(task|work|it|that|them|this|job|agent)\b|\b(stop it|stop now|abort)\b",
@@ -390,7 +390,7 @@ class Classifier:
             return Intent("cancel", confidence=0.92, task_text=text,
                           reason="explicit stop while task running")
         # Non-English / unintelligible guard: garbage-in must NEVER become a
-        # coding task (a garbled Romanian sentence once dispatched Hermes to
+        # coding task (a garbled Romanian sentence once dispatched Qubit to
         # "understand the code"). Ask for clarification instead.
         if task_score == 0.0 and len(text) > 8 and _input_looks_non_english(text):
             return Intent("clarify", confidence=0.7, task_text=text,
@@ -409,7 +409,7 @@ class Classifier:
                 conf = float(llm.get("confidence", 0.6))
                 # confirm needs a pending confirmation; cancel needs a pending
                 # confirmation OR a running task. Downgrading 'cancel' to chat
-                # while Hermes was mid-task made "stop the task" a lie — the
+                # while Qubit was mid-task made "stop the task" a lie — the
                 # agent kept working and Qubit claimed it had stopped.
                 if kind == "confirm" and not self.confirmations.pending:
                     kind = "conversation"

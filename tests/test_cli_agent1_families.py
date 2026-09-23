@@ -3,7 +3,7 @@
 Each remaining hermes cli family is mapped to a live ``qubit`` surface:
 
 * forward-mapped families run the real vendored fork handler through
-  ``hermes_runtime.run`` (safe reads only);
+  ``qubit_runtime.run`` (safe reads only);
 * native families run their real Qubit backend handler;
 * interactive-only families (chat/serve/dashboard) are proven through the real
   Qubit equivalent (``run``/``webui``/``setup``), never a stub.
@@ -36,7 +36,7 @@ def _cfg(tmp_path, monkeypatch) -> Path:
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     (home / ".hermes").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(home / ".hermes"))
     p = tmp_path / "voice.yaml"
     # A closed port keeps the webui probe hermetic (no ambient dashboard).
     p.write_text("logging:\n  jsonl: false\nwebui:\n  port: 1\n")
@@ -108,7 +108,7 @@ def test_family_unknown_subcommand_is_typed(tmp_path, monkeypatch, family):
 
 def test_forward_mapped_families_reach_the_fork_argv(monkeypatch):
     """The remaining forward-mapped reads translate to the real fork argv."""
-    from voicebridge.cli_hermes_forward import translate
+    from voicebridge.cli_qubit_forward import translate
 
     assert translate(["flags", "show"]) == ["config", "show"]
     assert translate(["schedules", "doctor"]) == ["cron", "doctor"]
@@ -160,7 +160,7 @@ def test_remaining_family_argv_surfaces_reach_a_real_surface():
     """Every remaining family's argv reaches a real forward or parser
     subcommand (also the inline argv proof the ledger scanner indexes)."""
     from voicebridge.cli import build_parser
-    from voicebridge.cli_hermes_forward import translate
+    from voicebridge.cli_qubit_forward import translate
 
     import argparse
     top = {}

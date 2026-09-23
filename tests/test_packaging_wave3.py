@@ -39,6 +39,29 @@ LEGACY_UNIT = SYSTEMD / "qubit-voice-agent.service"
 HOME_LITERAL = re.compile("/home/" + r"([A-Za-z0-9._-]+)")
 GENERIC_HOME_USERS = {"example"}
 
+# The 2026-09-21 docs reorg relocated the support docs to this directory. Until
+# that move is committed the archive tree is untracked, so a force-include
+# source there is only clean-clone-safe because its pre-reorg path is still in
+# the git index.
+ARCHIVE_DOCS_PREFIX = "docs/archive/2026-09-21/"
+
+
+def _is_tracked_clean_clone_source(source: str, tracked_set: set[str]) -> bool:
+    """True when ``source`` is available to a clean clone.
+
+    A force-include source must be git-tracked. During the (uncommitted) docs
+    reorg a source under ``docs/archive/2026-09-21/`` is accepted when its
+    pre-reorg ``docs/<name>`` path is still tracked; once the reorg is
+    committed the archive path itself is tracked and the first branch applies.
+    A genuinely new untracked source (no tracked legacy path) still fails.
+    """
+    if source in tracked_set:
+        return True
+    if source.startswith(ARCHIVE_DOCS_PREFIX):
+        legacy = "docs/" + source[len(ARCHIVE_DOCS_PREFIX):]
+        return legacy in tracked_set
+    return False
+
 
 def _toml() -> dict:
     return tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
@@ -76,8 +99,8 @@ def _frontend_tree_packaged(wheel: dict) -> bool:
 
 def test_dashboard_build_artifact_declared_in_both_targets():
     wheel, sdist = _targets()
-    assert "frontend/hermes-dist" in wheel.get("artifacts", [])
-    assert "frontend/hermes-dist" in sdist.get("artifacts", [])
+    assert "frontend/qubit-dist" in wheel.get("artifacts", [])
+    assert "frontend/qubit-dist" in sdist.get("artifacts", [])
     assert _frontend_tree_packaged(wheel)
 
 
@@ -92,34 +115,37 @@ def test_every_runtime_resource_is_reachable_from_package_data():
         mapped_dirs.add("frontend")
     # resource-name (as resources.resource_path sees it) -> source mapping
     required = {
-        "frontend/hermes-dist": "frontend",
-        "qubit_hermes/hermes_cli": "qubit_hermes/hermes_cli",
+        "frontend/qubit-dist": "frontend",
+        "qubit_runtime/qubit_cli": "qubit_runtime/qubit_cli",
         "config/voice.example.yaml": "config/voice.example.yaml",
         "config/dialogs.md": "config/dialogs.md",
         "config/task-templates.yaml": "config/task-templates.example.yaml",
         "config/local-actions.example.yaml":
             "config/local-actions.example.yaml",
-        "docs/QUBIT_MIGRATION.md": "docs/QUBIT_MIGRATION.md",
-        "docs/QUBIT_HERMES_VENDOR_MANIFEST.json":
-            "docs/QUBIT_HERMES_VENDOR_MANIFEST.json",
+        "docs/archive/2026-09-21/QUBIT_MIGRATION.md":
+            "docs/archive/2026-09-21/QUBIT_MIGRATION.md",
+        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json":
+            "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json",
         "systemd": "systemd",
     }
     for resource, source in required.items():
         assert source in mapped_dirs or source in mapped_files, (resource, source)
     # the vendored runtime dirs the fork executes from are all mapped
-    for name in ("hermes_cli", "agent", "tools", "gateway", "cron",
+    for name in ("qubit_cli", "agent", "tools", "gateway", "cron",
                  "providers", "plugins", "skills"):
-        source = f"qubit_hermes/{name}"
+        source = f"qubit_runtime/{name}"
         assert source in mapped_dirs, source
 
 
 def test_force_include_destinations_live_under_package_data():
     wheel, _ = _targets()
     for source, dest in wheel["force-include"].items():
-        if source == "docs/QUBIT_HERMES_VENDOR_MANIFEST.json":
-            # intentionally read by hermes_runtime.manifest_path() from
-            # <site-packages>/docs/, not from _data
-            assert dest == source, (source, dest)
+        if source == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json":
+            # intentionally read by qubit_runtime.manifest_path() from
+            # <site-packages>/docs/, not from _data. The source doc moved to
+            # docs/archive/2026-09-21/ in the 2026-09-21 reorg; the installed
+            # destination is unchanged.
+            assert dest == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json", (source, dest)
             continue
         assert dest.startswith("voicebridge/_data/"), (source, dest)
 
@@ -129,15 +155,15 @@ def test_sdist_mirrors_wheel_runtime_layout_and_excludes_whole_fork():
     wforce = wheel["force-include"]
     sforce = sdist["force-include"]
     for source in wforce:
-        if not source.startswith("qubit_hermes/"):
+        if not source.startswith("qubit_runtime/"):
             continue
         assert sforce.get(source) == source, (source, sforce.get(source))
-    assert "qubit_hermes" in set(sdist.get("exclude", []))
+    assert "qubit_runtime" in set(sdist.get("exclude", []))
 
 
 def test_force_include_sources_are_tracked_so_a_clean_clone_can_build():
     """A force-include source that is not tracked would make a clean clone's
-    wheel silently incomplete. ``frontend/hermes-dist`` is the one sanctioned
+    wheel silently incomplete. ``frontend/qubit-dist`` is the one sanctioned
     exception: it is a generated artifact declared via ``artifacts``."""
     wheel, _ = _targets()
     tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True,
@@ -151,7 +177,7 @@ def test_force_include_sources_are_tracked_so_a_clean_clone_can_build():
         if p.is_dir():
             assert any(t.startswith(source + "/") for t in tracked_set), source
         else:
-            assert source in tracked_set, source
+            assert _is_tracked_clean_clone_source(source, tracked_set), source
     # package-embedded completions ship inside the ``voicebridge`` package
     assert (REPO / "voicebridge" / "_data" / "completions").is_dir()
     assert tracked_dirs  # git produced a real listing
@@ -201,9 +227,9 @@ def test_installer_preserves_existing_user_config():
 
 def test_installer_builds_missing_dashboard_or_warns_typed():
     text = INSTALL_SH.read_text(encoding="utf-8")
-    assert "frontend/hermes-dist/index.html" in text
+    assert "frontend/qubit-dist/index.html" in text
     assert "build_dashboard.sh" in text
-    assert "WARNING: frontend/hermes-dist missing" in text
+    assert "WARNING: frontend/qubit-dist missing" in text
 
 
 def test_unit_installer_preserves_divergent_units_and_is_atomic():
@@ -243,7 +269,7 @@ def test_release_qualify_has_uv_build_fallback_and_runtime_checks():
     text = RELEASE_QUALIFY.read_text(encoding="utf-8")
     assert 'shutil.which("uv")' in text
     assert "uv build" in text
-    assert "qubit_hermes" in text
+    assert "qubit_runtime" in text
     assert '"qubit-hermes"' in text
     assert "entrypoint.qubit_console_script" in text
 

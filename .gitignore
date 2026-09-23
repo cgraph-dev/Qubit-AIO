@@ -35,7 +35,19 @@ config/task-templates.yaml
 # Packet 8K release certification output (wheel/sdist + clean-HOME installs).
 /dist/
 
-# Vendored Hermes dashboard build artifacts (regenerable; see
-# frontend/hermes-qubit/README.md). Vendored SOURCES are committed.
-frontend/hermes-web/node_modules/
-frontend/hermes-dist/
+# Vendored dashboard build artifacts (regenerable; see
+# frontend/qubit-app/README.md). Vendored SOURCES are committed.
+frontend/qubit-web/node_modules/
+frontend/qubit-dist/
+
+# Runtime state artifacts that must never be committed (created under CWD by
+# some tests when no state dir is injected).
+session_activity.json
+chat_sessions.json
+chat_file_drafts.json
+chat_comments.json
+approvals.jsonl
+power-control.json
+
+# pytest scratch cache (never committed).
+.pytest-cache/

@@ -20,7 +20,7 @@ from .logging_setup import log_event
 from .redaction import redact_obj, redact_text
 from .capabilities import (
     ActionRequest, CapabilityRegistry, CapabilitySpec, ConfirmationDenied,
-    ConfirmationStore, Decision, PolicyEngine, Tier)
+    Decision, PolicyEngine, Tier)
 
 
 class DispatchBlocked(RuntimeError):
@@ -44,13 +44,19 @@ def register_worker_caps(registry: CapabilityRegistry) -> None:
                                          scopes=(scope,), timeout_s=900.0))
 
 
-def build_worker_engine(mode: str = "confirm") -> tuple:
+def build_worker_engine(mode: str = "confirm", cfg: Any = None) -> tuple:
     if mode not in ("confirm", "deny"):
         raise ValueError("safety.worker_dispatch must be 'confirm' or 'deny'")
     reg = CapabilityRegistry()
     register_worker_caps(reg)
-    return PolicyEngine(registry=reg,
-                        confirmations=ConfirmationStore(default_ttl_s=120.0)), mode
+    # One confirmation authority (A7): the shared durable ApprovalJournal
+    # (approvals.jsonl) when a real config is present (cross-process /
+    # multi-request confirmations), else the in-memory store for
+    # hermetic/degraded callers. Never a second writer.
+    from .broker import confirmation_store_for
+    return PolicyEngine(
+        registry=reg,
+        confirmations=confirmation_store_for(cfg, default_ttl_s=120.0)), mode
 
 
 class WorkerGuard:
@@ -69,7 +75,25 @@ class WorkerGuard:
         if engine is not None:
             self.engine, self.mode = engine, mode
         else:
-            self.engine, self.mode = build_worker_engine(mode)
+            self.engine, self.mode = build_worker_engine(mode, cfg)
+
+    def _issue_internal(self, capability: str, req_args: dict, *,
+                        issued_by: str):
+        """Mint the internal auto-confirmation on the engine's store.
+
+        Uses the store's ephemeral (in-memory, non-durable) mint when
+        available: this guard issues and consumes the confirmation inside one
+        call, so nothing can present it across a process boundary. Presented
+        confirmations still use the one durable authority (the shared
+        ApprovalJournal) via ``CapabilityBroker``.
+        """
+        store = self.engine.confirmations
+        issue_ephemeral = getattr(store, "issue_ephemeral", None)
+        if callable(issue_ephemeral):
+            return issue_ephemeral(capability, req_args,
+                                   issued_by=issued_by, ttl_s=120)
+        return store.issue(capability, req_args,
+                           issued_by=issued_by, ttl_s=120)
 
     def authorize(self, capability: str, args: Optional[dict] = None, *,
                   source: str, correlation_id: Optional[str] = None) -> Decision:
@@ -89,9 +113,9 @@ class WorkerGuard:
             raise DispatchBlocked("WORKER_DISPATCH_DENIED", capability)
         req_args = redact_obj(dict(args or {}))
         try:
-            rec = self.engine.confirmations.issue(
+            rec = self._issue_internal(
                 capability, req_args,
-                issued_by="user" if source == "user" else source, ttl_s=120)
+                issued_by="user" if source == "user" else source)
         except ConfirmationDenied as exc:
             raise DispatchBlocked(exc.code, capability) from None
         d = self.engine.decide(ActionRequest(
@@ -114,9 +138,9 @@ class WorkerGuard:
         task_repr = next((str(a) for a in args if isinstance(a, str)), "")[:2000]
         req_args = {"task": redact_text(task_repr)}  # secrets stripped before workers/prompts
         try:
-            rec = self.engine.confirmations.issue(
+            rec = self._issue_internal(
                 capability, req_args,
-                issued_by="user" if source == "user" else source, ttl_s=120)
+                issued_by="user" if source == "user" else source)
         except ConfirmationDenied as exc:
             # Uniform failure contract: even issuance-level refusals (model)
             # surface as typed dispatch blocks.

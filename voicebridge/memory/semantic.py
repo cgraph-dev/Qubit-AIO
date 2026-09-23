@@ -1,6 +1,6 @@
 """Packet 8M: optional GENOME-compatible semantic memory adapter.
 
-Adapts the pinned GENOME contract (docs/UPSTREAM_REUSE.md R23) as a narrow,
+Adapts the pinned GENOME contract (docs/archive/2026-09-21/UPSTREAM_REUSE.md R23) as a narrow,
 disabled-by-default wrapper over the existing 5B ``MemoryStore``:
 
 - temporal/bi-temporal belief facts (``valid_from`` inclusive,
@@ -476,23 +476,36 @@ class HashProjection:
 
 
 class OllamaEmbed:
-    """Optional embedding via the EXISTING Ollama ``nomic-embed-text``
-    endpoint (same CPU-only placement contract as router/l1.py). Typed
-    failures; never falls back silently to another model."""
+    """Optional embedding via the canonical ``embedding`` role.
+
+    Requests are routed through :func:`voicebridge.providers.gateway.embed_texts`
+    (the one embedding entry point) which resolves the effective embedding
+    profile and calls the shared local Ollama adapter (same CPU-only placement
+    contract as router/l1.py). Typed failures; never falls back silently to
+    another model.
+    """
 
     def __init__(self, url: str = "http://127.0.0.1:11434",
-                 model: str = "nomic-embed-text", timeout_s: float = 10.0) -> None:
+                 model: str = "nomic-embed-text", timeout_s: float = 10.0,
+                 cfg: Any = None) -> None:
         self.url = url
         self.model = model
         self.timeout_s = float(timeout_s)
+        self.cfg = cfg
         self.name = "ollama:" + model
 
     def embed(self, texts: List[str]) -> List[List[float]]:
-        from ..router.l1 import SemanticRouter
+        from ..providers import gateway as _gateway
+        from ..providers.embedding import EmbeddingError
         try:
-            return SemanticRouter._default_embed(
-                texts, self.url, self.model, self.timeout_s)
-        except Exception as exc:
+            return _gateway.embed_texts(
+                texts, self.cfg, url=self.url, model=self.model,
+                timeout_s=self.timeout_s)
+        except EmbeddingError as exc:
+            raise SemanticProviderUnavailable(
+                f"embedding provider unavailable: {str(exc.detail)[:120]}"
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 - typed provider failure
             raise SemanticProviderUnavailable(
                 f"embedding provider unavailable: {str(exc)[:120]}") from exc
 
@@ -541,7 +554,8 @@ class SemanticMemory:
                  embed_model: str = "nomic-embed-text",
                  ollama_url: str = "http://127.0.0.1:11434",
                  timeout_s: float = 10.0, top_k: int = 5,
-                 journal_path: Optional[Path | str] = None) -> None:
+                 journal_path: Optional[Path | str] = None,
+                 cfg: Any = None) -> None:
         if isinstance(path_or_store, MemoryStore):
             self.store = path_or_store
         else:
@@ -553,7 +567,7 @@ class SemanticMemory:
         self._journal = Journal(self._journal_path) if self._journal_path else None
         self._journal_degraded = False
         self.set_provider(provider, embed_model=embed_model,
-                          ollama_url=ollama_url, timeout_s=timeout_s)
+                          ollama_url=ollama_url, timeout_s=timeout_s, cfg=cfg)
         self.set_top_k(top_k)
 
     # -------------------------------------------------------------- config
@@ -567,7 +581,7 @@ class SemanticMemory:
 
     def set_provider(self, provider: str, *, embed_model: str = "nomic-embed-text",
                      ollama_url: str = "http://127.0.0.1:11434",
-                     timeout_s: float = 10.0) -> None:
+                     timeout_s: float = 10.0, cfg: Any = None) -> None:
         if provider not in PROVIDERS:
             raise SemanticMemoryError(
                 f"unknown provider {provider!r}; choose one of {PROVIDERS}")
@@ -588,7 +602,7 @@ class SemanticMemory:
             self._embed = HashProjection()
         elif provider == "ollama":
             self._embed = OllamaEmbed(url=ollama_url, model=embed_model,
-                                      timeout_s=timeout_s)
+                                      timeout_s=timeout_s, cfg=cfg)
         else:
             self._embed = None
 

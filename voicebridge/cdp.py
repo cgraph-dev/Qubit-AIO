@@ -8,7 +8,7 @@ host is refused before any byte is sent (SSRF-by-config is impossible).
 Qubit resolves user-supplied loopback CDP endpoints only
 (``tools/browser_tool_cdp.py`` ``_resolve_cdp_override``); Qubit
 deliberately narrows to loopback-only and records the divergence in
-``docs/UPSTREAM_REUSE.md`` (independent rewrite, behavior compared).
+``docs/archive/2026-09-21/UPSTREAM_REUSE.md`` (independent rewrite, behavior compared).
 """
 from __future__ import annotations
 

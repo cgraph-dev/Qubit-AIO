@@ -2,8 +2,8 @@
 
 The provider/profile parity plan requires a regression test that fails when a
 NEW direct provider path bypasses the canonical gateway/resolver authority
-(``docs/QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md`` Workstream P0, and
-``docs/QUBIT_CURRENT_ARCHITECTURE_GAP_AUDIT_2026-09-15.md`` PV-03).
+(``docs/archive/2026-09-21/QUBIT_PROVIDER_VOICE_PARITY_PLAN_2026-09-15.md`` Workstream P0, and
+``docs/archive/2026-09-21/QUBIT_CURRENT_ARCHITECTURE_GAP_AUDIT_2026-09-15.md`` PV-03).
 
 This test does not pretend the existing bypasses are gone. It records them as
 tracked migration debt and *ratchets*: any module that is not in the recorded

@@ -35,8 +35,8 @@ OWNED_SCRIPTS = (
 # home path or are agent wave prompts (privacy + reproducibility).
 INTERNAL_SDIST_DOCS = (
     "docs/OPERATOR_QUALIFICATION.md",
-    "docs/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
-    "docs/QUBIT_FINAL_CODE_READY_PROMPT.md",
+    "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
+    "docs/archive/2026-09-21/QUBIT_FINAL_CODE_READY_PROMPT.md",
 )
 
 
@@ -57,7 +57,7 @@ def test_sdist_excludes_internal_developer_docs():
 
     Regression for the frozen-commit failure where
     ``docs/OPERATOR_QUALIFICATION.md`` (real home path) and the untracked
-    ``docs/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md`` were swept into the sdist.
+    ``docs/archive/2026-09-21/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md`` were swept into the sdist.
     """
     sdist = _targets()[1]
     excluded = set(sdist.get("exclude", []))
@@ -90,20 +90,22 @@ def _frontend_tree_packaged(wheel: dict) -> bool:
 def test_wheel_and_sdist_carry_runtime_dashboard_and_metadata():
     wheel, sdist = _targets()
     # the generated dashboard bake ships in both artifacts
-    assert "frontend/hermes-dist" in wheel.get("artifacts", [])
-    assert "frontend/hermes-dist" in sdist.get("artifacts", [])
+    assert "frontend/qubit-dist" in wheel.get("artifacts", [])
+    assert "frontend/qubit-dist" in sdist.get("artifacts", [])
     # the runtime subset, resources, and license/provenance ship in the wheel
     include = wheel["force-include"]
     assert "templates" in include
     assert _frontend_tree_packaged(wheel)
     assert "systemd" in include
-    assert any(k.startswith("qubit_hermes/") for k in include)
-    assert "qubit_hermes/LICENSE" in include
-    assert "qubit_hermes/pyproject.toml" in include
-    assert "docs/QUBIT_HERMES_VENDOR_MANIFEST.json" in include
+    assert any(k.startswith("qubit_runtime/") for k in include)
+    assert "qubit_runtime/LICENSE" in include
+    assert "qubit_runtime/pyproject.toml" in include
+    assert include.get(
+        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+    ) == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
     # sdist mirrors the runtime subset so a wheel rebuilds without network
     sinclude = sdist["force-include"]
-    assert any(k.startswith("qubit_hermes/") for k in sinclude)
+    assert any(k.startswith("qubit_runtime/") for k in sinclude)
 
 
 def test_project_metadata_declares_license_notices_and_entry_points():
@@ -113,7 +115,9 @@ def test_project_metadata_declares_license_notices_and_entry_points():
     # the public launcher plus the vendored-runtime launcher are real
     scripts = project["scripts"]
     assert scripts["qubit"] == "voicebridge.cli:main"
-    assert scripts["qubit-hermes"] == "voicebridge.hermes_runtime:entry"
+    assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:entry"
+    # hidden compatibility alias for pre-rebrand installs
+    assert scripts["qubit-hermes"] == "voicebridge.qubit_runtime:entry"
     # private developer state and build tooling stay out of the sdist
     excluded = set(_targets()[1].get("exclude", []))
     for private in ("config/voice.yaml", "config/task-templates.yaml",
@@ -147,9 +151,11 @@ def test_install_time_docs_are_packaged_under_package_data():
     ``voicebridge/_data/docs`` for the resolver fallback.
     """
     include = _targets()[0]["force-include"]
-    for source in ("docs/PARITY_HERMES.json", "docs/MATRIX_8T_F.json",
-                   "docs/MIGRATIONS.md"):
-        assert include.get(source) == f"voicebridge/_data/{source}", source
+    # source docs moved to docs/archive/2026-09-21/ in the docs reorg; the
+    # installed resource names (``_data/docs/<name>``) are unchanged.
+    for name in ("PARITY_HERMES.json", "MATRIX_8T_F.json", "MIGRATIONS.md"):
+        source = f"docs/archive/2026-09-21/{name}"
+        assert include.get(source) == f"voicebridge/_data/docs/{name}", source
 
 
 # ===========================================================================
@@ -188,7 +194,7 @@ def test_clean_install_and_migration_scripts_are_hermetic_and_typed():
 
     verify = (REPO / "scripts" / "verify_installed_dashboard.sh").read_text()
     assert "site-packages" in verify
-    assert "hermes_runtime" in verify and "runtime_probe" in verify
+    assert "qubit_runtime" in verify and "runtime_probe" in verify
 
 
 # ===========================================================================
@@ -303,17 +309,17 @@ def test_built_wheel_ships_fork_dashboard_and_licenses():
     import zipfile
 
     names = zipfile.ZipFile(wheels[0]).namelist()
-    assert any(n.endswith("_data/frontend/hermes-dist/index.html")
+    assert any(n.endswith("_data/frontend/qubit-dist/index.html")
                for n in names)
-    assert any(n.endswith("_data/qubit_hermes/hermes_cli/main.py")
+    assert any(n.endswith("_data/qubit_runtime/qubit_cli/main.py")
                for n in names)
-    assert any(n.endswith("_data/qubit_hermes/LICENSE") for n in names)
+    assert any(n.endswith("_data/qubit_runtime/LICENSE") for n in names)
     assert any("dist-info/licenses/THIRD_PARTY_NOTICES.md" in n
                for n in names)
     # node_modules is a git-ignored build artifact; build_dashboard.sh removes
     # it. Only assert it is absent when the checkout is free of it (a dirty
     # tree can legitimately bake it in, which the release build gate blocks).
-    if not (REPO / "frontend" / "hermes-web" / "node_modules").exists():
+    if not (REPO / "frontend" / "qubit-web" / "node_modules").exists():
         assert not any("node_modules" in n for n in names)
     assert not any("/home/" + "trick" in n for n in names)
     entry_points = zipfile.ZipFile(wheels[0]).read(
@@ -322,7 +328,9 @@ def test_built_wheel_ships_fork_dashboard_and_licenses():
     assert "[console_scripts]" in entry_points
     assert re.search(r"^qubit\s*=\s*voicebridge\.cli:main$", entry_points,
                      re.M)
-    assert re.search(r"^qubit-hermes\s*=\s*voicebridge\.hermes_runtime:entry$",
+    assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:entry$",
+                     entry_points, re.M)
+    assert re.search(r"^qubit-hermes\s*=\s*voicebridge\.qubit_runtime:entry$",
                      entry_points, re.M)
 
 

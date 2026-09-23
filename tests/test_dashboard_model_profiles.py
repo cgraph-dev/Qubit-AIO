@@ -17,7 +17,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-PLUGIN = REPO_ROOT / "frontend" / "hermes-qubit" / "plugins" / "qubit-models"
+PLUGIN = REPO_ROOT / "frontend" / "qubit-app" / "plugins" / "qubit-models"
 ENTRY = PLUGIN / "qubit-models.js"
 MANIFEST = PLUGIN / "manifest.json"
 
@@ -234,7 +234,7 @@ def test_plugin_manifest_and_entry_are_real():
 
 
 def test_plugin_is_registered_by_the_backend_overlay_loader():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     names = {m["name"] for m in HC._overlay_manifests()}
     assert "qubit-models" in names, sorted(names)
@@ -254,7 +254,7 @@ def test_models_plugin_confirm_renders_typed_refusal():
     false 'Confirmed: done' (V3 fix)."""
     from pathlib import Path
     js = (Path(__file__).resolve().parents[1] /
-          "frontend/hermes-qubit/plugins/qubit-models/qubit-models.js"
+          "frontend/qubit-app/plugins/qubit-models/qubit-models.js"
           ).read_text(encoding="utf-8")
     assert "res.receipt && res.receipt.result" in js, js[:400]
 

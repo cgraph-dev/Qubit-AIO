@@ -4,7 +4,7 @@ Adapts the pinned CopilotKit state machine (InProgress -> Executing -> Complete,
 respond exposed only while executing, settle exactly once, abort settles
 pending work as an explicit outcome) to a restart-safe Python store backed by
 an append-only JSONL journal. Divergence from upstream (documented in
-docs/UPSTREAM_REUSE.md R2): records survive bridge restarts; CopilotKit's hook
+docs/archive/2026-09-21/UPSTREAM_REUSE.md R2): records survive bridge restarts; CopilotKit's hook
 is in-memory only.
 """
 from __future__ import annotations
@@ -122,6 +122,25 @@ class ApprovalJournal:
         with self._lock:
             live = [a for a in self._items.values() if a.state == IN_PROGRESS]
         return [a for a in live if a.expires_at > now]
+
+    def history(self, *, kind: str = "", limit: int = 50, offset: int = 0
+                ) -> Dict[str, Any]:
+        """Terminal approval records (settled/aborted/denied/expired), newest
+        first. *kind* filters by capability prefix; *limit*/*offset* page."""
+        now = self._clock()
+        with self._lock:
+            items = [a for a in self._items.values()
+                     if a.state in TERMINAL
+                     or (a.state == IN_PROGRESS and a.expires_at <= now)]
+        prefix = str(kind or "").strip()
+        if prefix:
+            items = [a for a in items if str(a.capability).startswith(prefix)]
+        items.sort(key=lambda a: a.created_at, reverse=True)
+        total = len(items)
+        start = max(0, int(offset))
+        page = items[start:start + max(1, int(limit))]
+        next_cursor = start + len(page) if start + len(page) < total else None
+        return {"items": page, "total": total, "next_cursor": next_cursor}
 
     def respond(self, approval_id: str, decision: str) -> Approval:
         """Settle exactly once; second responses are no-ops returning the

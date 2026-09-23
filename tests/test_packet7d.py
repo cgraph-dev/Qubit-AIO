@@ -267,8 +267,10 @@ def _staged_repo(tmp_path: Path) -> Path:
             if not p.is_file():
                 continue
             relp = p.relative_to(src)
+            out = dst / relp
+            out.parent.mkdir(parents=True, exist_ok=True)
             try:
-                shutil.copy2(p, dst / relp)
+                shutil.copy2(p, out)
             except OSError:
                 continue
     # normalize to the pre-branding identity so the transition is observable
@@ -335,12 +337,12 @@ def test_branding_verify_reports_partial_and_planned(tmp_path):
 
 
 def test_branding_historical_ref_reported_but_does_not_fail(tmp_path):
-    """Approved historical migration text in docs/AGENT_PROMPT_PACK.md (e.g.
+    """Approved historical migration text in docs/archive/2026-09-21/AGENT_PROMPT_PACK.md (e.g.
     'rename from openclaw-voice-bridge to qubit-voice-agent') is REPORTED by
     the verifier but never fails branding, and apply preserves it."""
     cfg = _cfg(tmp_path)
     repo = _staged_repo(tmp_path)
-    hist = repo / "docs" / "AGENT_PROMPT_PACK.md"
+    hist = repo / "docs/archive/2026-09-21" / "AGENT_PROMPT_PACK.md"
     hist_text = hist.read_text()
     assert "openclaw-voice-bridge" in hist_text   # pre-staged repo has the text
     bdir = tmp_path / "b"
@@ -348,7 +350,7 @@ def test_branding_historical_ref_reported_but_does_not_fail(tmp_path):
     v = P.branding_verify(cfg, repo=repo)
     assert v["state"] == "VERIFIED", v
     # the historical reference is REPORTED, not hidden
-    assert v["historical_references"].get("docs/AGENT_PROMPT_PACK.md", 0) > 0
+    assert v["historical_references"].get("docs/archive/2026-09-21/AGENT_PROMPT_PACK.md", 0) > 0
     # and the intentional historical migration text was preserved (not rewritten)
     assert "openclaw-voice-bridge" in hist.read_text()
 
@@ -678,7 +680,7 @@ def test_api_audio_and_permissions_and_device(tmp_path, monkeypatch):
         assert st == 200 and "items" in body
         st, body = _get(ui, "/api/device/status")
         assert st == 200
-        st, body = _post(ui, "/api/device/enroll", {})
+        st, body = _post(ui, "/api/device/enroll", {"confirm": True})
         assert st == 200 and body["enrolled"] is True
     finally:
         ui.stop()
@@ -693,7 +695,7 @@ def test_api_branding_and_export_state(tmp_path, monkeypatch):
         assert body["state"] in ("VERIFIED", "PARTIAL", "PLANNED")
         # export-state requires enrollment + passphrase; missing passphrase
         # (after enroll) -> DENIED
-        _post(ui, "/api/device/enroll", {})
+        _post(ui, "/api/device/enroll", {"confirm": True})
         st, body = _post(ui, "/api/export-state", {})
         assert body["state"] == "DENIED"
     finally:
@@ -774,7 +776,7 @@ def test_api_import_state_preview_then_apply(tmp_path, monkeypatch):
     ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
     try:
         # enroll so the import gate passes
-        _post(ui, "/api/device/enroll", {})
+        _post(ui, "/api/device/enroll", {"confirm": True})
         # export a bundle via the real exporter
         pw = "import-pass"
         b64 = __import__("base64").b64encode(P.export_bundle(cfg, pw)).decode()
@@ -796,7 +798,7 @@ def test_api_import_state_rejects_wrong_passphrase(tmp_path, monkeypatch):
     from voicebridge import portable as P
     ui, orch, cfg = _make_ui(tmp_path, monkeypatch)
     try:
-        _post(ui, "/api/device/enroll", {})
+        _post(ui, "/api/device/enroll", {"confirm": True})
         b64 = __import__("base64").b64encode(
             P.export_bundle(cfg, "right")).decode()
         st, body = _post(ui, "/api/import-state",
@@ -818,8 +820,8 @@ def test_api_profiles_upgrade_performs_real_upgrade(tmp_path, monkeypatch):
             id="amy-2", kind="voice", source="test", revision="r1",
             license="MIT", checksum="", hardware="cpu", languages=["en"],
             vram_mib=0, ram_mib=0, latency_ms=250.0,
-            quality_evidence="docs/AUDIO_SETUP.md",
-            safety_evidence="docs/OPERATIONS_7A.md",
+            quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
+            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md",
             rollback_to="en_US-amy-medium",
             config_path=("tts", "voice"), config_value="amy-2")
         P.install_manifest(cfg, man)
@@ -841,8 +843,8 @@ def test_api_profiles_remove_non_default_real(tmp_path, monkeypatch):
             id="amy-2", kind="voice", source="test", revision="r1",
             license="MIT", checksum="", hardware="cpu", languages=["en"],
             vram_mib=0, ram_mib=0, latency_ms=250.0,
-            quality_evidence="docs/AUDIO_SETUP.md",
-            safety_evidence="docs/OPERATIONS_7A.md",
+            quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
+            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md",
             rollback_to="en_US-amy-medium",
             config_path=("tts", "voice"), config_value="amy-2")
         P.install_manifest(cfg, man)

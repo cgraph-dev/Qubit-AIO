@@ -1,8 +1,8 @@
 """Agent 1 wave 5 — closure of the remaining distinct uncovered Hermes CLI
-subcommands (``inv:hermes_*`` work list from ``docs/QUBIT_SOURCE_OMISSIONS.md``).
+subcommands (``inv:hermes_*`` work list from ``docs/archive/2026-09-21/QUBIT_SOURCE_OMISSIONS.md``).
 
 Every case executes the real production entrypoint :func:`voicebridge.cli.main`
-(or :func:`voicebridge.cli_hermes_forward.translate`) and proves the routing:
+(or :func:`voicebridge.cli_qubit_forward.translate`) and proves the routing:
 
 * read-only/diagnostic subcommands forward into the vendored fork verbatim;
 * mutating/credentialed subcommands are confirm-gated — the fork is never
@@ -33,8 +33,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge import cli as CLI  # noqa: E402
-from voicebridge import cli_hermes_forward as HF  # noqa: E402
-from voicebridge import hermes_runtime  # noqa: E402
+from voicebridge import cli_qubit_forward as HF  # noqa: E402
+from voicebridge import qubit_runtime  # noqa: E402
 
 
 def _capture(monkeypatch):
@@ -44,7 +44,7 @@ def _capture(monkeypatch):
         calls.append(list(argv or []))
         return 0
 
-    monkeypatch.setattr(hermes_runtime, "run", _fake_run)
+    monkeypatch.setattr(qubit_runtime, "run", _fake_run)
     return calls
 
 
@@ -57,7 +57,6 @@ def test_wave5_readonly_routes_forward_fork_argv(monkeypatch):
         (["approvals", "suggest"], ["approvals", "suggest"]),
         (["auth", "list"], ["auth", "list"]),
         (["schedules", "notepad"], ["cron", "notepad"]),
-        (["gateway", "status"], ["gateway", "status"]),
         (["mcp", "config"], ["mcp", "config"]),
         (["mcp", "ls"], ["mcp", "ls"]),
         (["mcp", "picker"], ["mcp", "picker"]),
@@ -84,7 +83,7 @@ def test_wave5_readonly_routes_forward_fork_argv(monkeypatch):
 def test_wave5_readonly_pairs_are_in_forward_table():
     for pair in (
         ("approvals", "suggest"), ("auth", "list"), ("schedules", "notepad"),
-        ("gateway", "status"), ("mcp", "config"), ("mcp", "ls"),
+        ("mcp", "config"), ("mcp", "ls"),
         ("mcp", "picker"), ("plugins", "search"), ("profile", "alias"),
         ("profile", "describe"), ("profile", "info"), ("sessions", "browse"),
         ("skills", "browse"), ("skills", "diff"), ("skills", "inspect"),
@@ -250,17 +249,14 @@ SAFE_EQUIVALENT_ROUTES = (
     ["computer-use", "permissions", "grant"],
     ["computer-use", "install"],
     ["gateway", "install"],
-    ["gateway", "restart"],
     ["gateway", "run"],
-    ["gateway", "start"],
-    ["gateway", "stop"],
     ["sessions", "archive"],
 )
 
 
-def test_safe_equivalent_routes_are_declared_in_the_hermes_ledger():
+def test_safe_equivalent_routes_are_declared_in_the_qubit_ledger():
     section = json.loads(
-        (REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
+        (REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
     rows = {r["id"]: r for r in section["rows"]}
     for qargv in SAFE_EQUIVALENT_ROUTES:
         row = rows.get("cli:" + " ".join(qargv))
@@ -284,7 +280,7 @@ def test_wave5_forward_pairs_do_not_shadow_native_subcommands():
                 parser_fams[fam] = subs
     for pair in (
         ("approvals", "suggest"), ("auth", "list"), ("schedules", "notepad"),
-        ("gateway", "status"), ("mcp", "config"), ("mcp", "ls"),
+        ("mcp", "config"), ("mcp", "ls"),
         ("mcp", "picker"), ("plugins", "search"), ("profile", "alias"),
         ("profile", "describe"), ("profile", "info"), ("sessions", "browse"),
         ("skills", "browse"), ("skills", "diff"), ("skills", "inspect"),
@@ -296,8 +292,8 @@ def test_wave5_forward_pairs_do_not_shadow_native_subcommands():
 def test_wave5_confirm_targets_exist_in_fork_parser():
     script = (
         "import json,sys,argparse;"
-        f"sys.path.insert(0,{str(REPO_ROOT / 'qubit_hermes')!r});"
-        "import hermes_cli.main as m;"
+        f"sys.path.insert(0,{str(REPO_ROOT / 'qubit_runtime')!r});"
+        "import qubit_cli.main as m;"
         "p,sub=m._build_cli_parser();"
         "out={f:None for f in sub.choices};"
         "[(out.__setitem__(f, sorted(a.choices.keys()))) "
@@ -311,7 +307,7 @@ def test_wave5_confirm_targets_exist_in_fork_parser():
     tree = json.loads(r.stdout.strip().splitlines()[-1])
     for qpair in (
         ("approvals", "suggest"), ("auth", "list"), ("schedules", "notepad"),
-        ("gateway", "status"), ("mcp", "config"), ("mcp", "ls"),
+        ("mcp", "config"), ("mcp", "ls"),
         ("mcp", "picker"), ("plugins", "search"), ("profile", "alias"),
         ("profile", "describe"), ("profile", "info"), ("sessions", "browse"),
         ("skills", "browse"), ("skills", "diff"), ("skills", "inspect"),
@@ -325,9 +321,9 @@ def test_wave5_confirm_targets_exist_in_fork_parser():
         assert hsub in (tree[hfam] or []), (hfam, hsub)
 
 
-def test_wave5_rows_are_in_the_hermes_ledger():
+def test_wave5_rows_are_in_the_qubit_ledger():
     section = json.loads(
-        (REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
+        (REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
     rows = {r["id"]: r for r in section["rows"]}
     for qargv in (
         ["approvals", "suggest"], ["approvals", "test"], ["auth", "add"],
@@ -361,7 +357,7 @@ def _sandbox_env(tmp_path):
         target = home / var.lower()
         target.mkdir(parents=True, exist_ok=True)
         env[var] = str(target)
-    env["HERMES_HOME"] = str(home / ".hermes")
+    env["QUBIT_HOME"] = str(home / ".hermes")
     env.pop("PYTHONPATH", None)
     return env
 

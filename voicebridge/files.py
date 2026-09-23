@@ -11,7 +11,7 @@ Qubit implements scoped file read/write/search with write guards
 (``tools/file_operations*.py``, ``tools/file_tools_write_guards.py``);
 Qubit implements the read half natively (writes stay behind the brokered
 local-script/isolated-execution paths). Provenance and the deliberate
-divergence are recorded in ``docs/UPSTREAM_REUSE.md``.
+divergence are recorded in ``docs/archive/2026-09-21/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 

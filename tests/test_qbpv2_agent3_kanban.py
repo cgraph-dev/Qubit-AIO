@@ -15,9 +15,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-BOARDS_JS = (REPO_ROOT / "frontend" / "hermes-qubit" / "plugins"
+BOARDS_JS = (REPO_ROOT / "frontend" / "qubit-app" / "plugins"
              / "qubit-boards" / "qubit-boards.js")
-BOARDS_DIST = (REPO_ROOT / "frontend" / "hermes-web" / "public" / "plugins"
+BOARDS_DIST = (REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
                / "kanban" / "dist" / "index.js")
 
 
@@ -27,14 +27,14 @@ def _cfg(tmp_path, monkeypatch):
     for var in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"):
         (tmp_path / var.lower()).mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(tmp_path / var.lower()))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home" / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home" / ".hermes"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)
 
 
 def _run(cfg, op, args):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     status, payload = HC.dispatch(
         cfg, "POST", "/api/ops/run", {}, {"id": op, "args": args})
@@ -42,7 +42,7 @@ def _run(cfg, op, args):
 
 
 def _settle(cfg, op, args):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     status, payload = _run(cfg, op, args)
     if status == 409:
@@ -59,7 +59,7 @@ def _tasks(cfg, board, status=""):
     query = {"board": board}
     if status:
         query["status"] = status
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     st, payload = HC.dispatch(cfg, "GET", "/api/ops/kanban", query, {})
     assert st == 200 and payload.get("ok"), payload
@@ -70,7 +70,7 @@ def test_full_card_lifecycle_persists_through_the_broker(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
 
     _settle(cfg, "kanban_boards_create", {"board": "ag3", "name": "AG3"})
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     st, payload = HC.dispatch(cfg, "GET", "/api/ops/boards", {}, {})
     assert "ag3" in [b["board"] for b in payload["result"]["boards"]]
@@ -124,7 +124,7 @@ def test_canvas_tabs_widgets_and_snapshot_restore_are_real(tmp_path,
 
     _settle(cfg, "kanban_tab_create",
             {"board": "canvas", "slug": "notes", "name": "Notes"})
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     st, payload = HC.dispatch(
         cfg, "POST", "/api/ops/run", {},
@@ -215,15 +215,15 @@ def test_kanban_events_ws_is_the_typed_safe_gate_not_pty():
     listener offers a real REST read on the same path instead of a bypass."""
     from voicebridge import webui
 
-    assert webui.HERMES_WS_GATE_CODES["/api/plugins/kanban/events"] == \
+    assert webui.QUBIT_WS_GATE_CODES["/api/plugins/kanban/events"] == \
         "WS_SINGLE_PATH"
-    assert webui.hermes_ws_gate_code("/api/plugins/kanban/events") == \
+    assert webui.qubit_ws_gate_code("/api/plugins/kanban/events") == \
         "WS_SINGLE_PATH"
     # The agent-prefixed path used by the SPA resolves to the same gate.
-    assert webui.hermes_ws_gate_code(
+    assert webui.qubit_ws_gate_code(
         "/agent/api/plugins/kanban/events") == "WS_SINGLE_PATH"
     # The gate is not a raw-PTY refusal.
-    assert webui.hermes_ws_gate_code("/api/plugins/kanban/events") != \
+    assert webui.qubit_ws_gate_code("/api/plugins/kanban/events") != \
         "PTY_NO_SHELL"
 
 
@@ -239,8 +239,8 @@ def test_kanban_bundle_polls_the_safe_read_route_not_a_websocket():
 
 def test_kanban_plugin_manifest_matches_served_bundle():
     manifest = json.loads(
-        (REPO_ROOT / "qubit_hermes" / "plugins" / "kanban" / "dashboard"
+        (REPO_ROOT / "qubit_runtime" / "plugins" / "kanban" / "dashboard"
          / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["tab"]["path"] == "/kanban"
-    assert (REPO_ROOT / "frontend" / "hermes-web" / "public" / "plugins"
+    assert (REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
             / "kanban" / "dist" / "index.js").is_file()

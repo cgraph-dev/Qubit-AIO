@@ -1,6 +1,6 @@
 """Wave 4 security-parity adversarial tests (Agent I).
 
-Closes the six gaps recorded in ``docs/SECURITY_AUDIT_WAVE3.md`` for the
+Closes the six gaps recorded in ``docs/archive/2026-09-21/SECURITY_AUDIT_WAVE3.md`` for the
 Agent-I-owned modules:
 
 * **G1** the CLI fork ``--confirm`` routes were a boolean presence check with
@@ -15,7 +15,7 @@ Agent-I-owned modules:
   confirmation (or a single-use, expiring approval id) and cannot replay.
 
 Every test is hermetic: tmp XDG state, no network, no real mutation, no live
-service. Out-of-scope gaps (G2 receipts, G4 opt-in scopes, G6 hermes_compat
+service. Out-of-scope gaps (G2 receipts, G4 opt-in scopes, G6 qubit_compat
 fail-open) live outside the Agent-I-owned files and are recorded for the
 orchestrator, not edited here.
 """
@@ -77,7 +77,7 @@ SECRET = "sk-live-0123456789abcdef"
 
 
 def test_g1_no_confirm_is_still_needs_confirm_and_unclassified_refused():
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     assert FW.route_family(["bundles", "delete"]).kind == "needs-confirm"
     r = FW.route_family(["bundles", "purge-everything"])
@@ -90,7 +90,7 @@ def test_g1_no_confirm_is_still_needs_confirm_and_unclassified_refused():
 def test_g1_estop_blocks_confirmed_fork_mutation(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     _latch(cfg)
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     for route in (FW.route_family(["bundles", "delete", "--confirm"], cfg=cfg),
                   FW.confirm_pair(["plugins", "enable", "--confirm"],
@@ -108,14 +108,14 @@ def test_g1_estop_probe_error_fails_closed(tmp_path, monkeypatch):
         raise RuntimeError("latch unreadable")
 
     monkeypatch.setattr(broker, "estop_engaged", _boom)
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     r = FW.route_family(["bundles", "delete", "--confirm"], cfg=cfg)
     assert r.kind == "refused" and r.code == "EMERGENCY_STOP"
 
 
 def test_g1_unavailable_guard_refuses_never_forwards(monkeypatch):
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     monkeypatch.setattr(FW, "_fork_cfg", lambda: None)
     r = FW.route_family(["bundles", "delete", "--confirm"])
@@ -126,7 +126,7 @@ def test_g1_unavailable_guard_refuses_never_forwards(monkeypatch):
 def test_g1_policy_deny_mode_blocks_confirmed_fork_mutation(tmp_path,
                                                             monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch, worker_dispatch="deny")
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     r = FW.route_family(["bundles", "delete", "--confirm"], cfg=cfg)
     assert r.kind == "refused" and r.code == "WORKER_DISPATCH_DENIED"
@@ -140,7 +140,7 @@ def test_g1_confirmed_route_records_policy_decision(tmp_path, monkeypatch):
     orig = caps.log_event
     caps.log_event = lambda e, **f: events.append((e, f))
     try:
-        from voicebridge import cli_hermes_forward as FW
+        from voicebridge import cli_qubit_forward as FW
 
         r = FW.route_family(["bundles", "delete", "--confirm"], cfg=cfg)
         assert r.kind == "forward"
@@ -153,7 +153,7 @@ def test_g1_confirmed_route_records_policy_decision(tmp_path, monkeypatch):
 
 
 def test_g1_confirmation_single_use_expiry_target_and_scope():
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
     from voicebridge.capabilities import (
         ActionRequest, ConfirmationDenied, ConfirmationStore, PolicyEngine)
 
@@ -211,7 +211,7 @@ def test_g1_secret_in_confirmed_argv_is_redacted_from_audit(tmp_path,
     orig = caps.log_event
     caps.log_event = lambda e, **f: events.append((e, f))
     try:
-        from voicebridge import cli_hermes_forward as FW
+        from voicebridge import cli_qubit_forward as FW
 
         r = FW.route_family(["bundles", "delete", "--confirm",
                              f"--token={SECRET}"], cfg=cfg)
@@ -226,7 +226,7 @@ def test_g1_secret_in_confirmed_argv_is_redacted_from_audit(tmp_path,
 def test_g1_injection_text_cannot_confirm_a_fork_mutation(tmp_path,
                                                           monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     # "SYSTEM already approved" in argv is data, not authorization: the route
     # still needs the human --confirm flag and the policy decision.

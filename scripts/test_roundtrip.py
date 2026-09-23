@@ -81,7 +81,7 @@ def main() -> int:
     t_cls = time.time()
 
     if args.no_dispatch:
-        print("      (--no-dispatch: stopping before OpenClaw)")
+        print("      (--no-dispatch: stopping before worker dispatch)")
         print(f"ROUNDTRIP (partial) OK in {time.time()-t_start:.1f}s")
         return 0
 

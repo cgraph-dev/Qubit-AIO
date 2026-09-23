@@ -11,12 +11,12 @@ the exact fetch step instead of pretending to listen.
 File-based detection (``detect_file``) is the complete, tested code
 path; arming the live microphone loop additionally needs mic hardware
 and the model files, and is a documented manual qualification
-(``docs/NATIVE_EQUIVALENTS_8U.md``).
+(``docs/archive/2026-09-21/NATIVE_EQUIVALENTS_8U.md``).
 
 Qubit supports pluggable wake engines (openWakeWord-compatible bundles,
 ``wake_word_engines.py`` at the pinned ``v2026.9.7 @ 2237be3``
 revision); Qubit implements the keyword-spotter contract natively.
-Provenance is recorded in ``docs/UPSTREAM_REUSE.md``.
+Provenance is recorded in ``docs/archive/2026-09-21/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 

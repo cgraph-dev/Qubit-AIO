@@ -1,7 +1,7 @@
 """Evidence invariants for every OPERATOR_ONLY gap-ledger row.
 
 Owner decision 2026-09-13
-(`docs/QUBIT_OWNER_AMENDMENT_2026-09-13_TERMINAL_STATUSES.md`): an
+(`docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-13_TERMINAL_STATUSES.md`): an
 ``OPERATOR_ONLY`` row is code-complete and hermetically tested, but execution
 requires a genuine live prerequisite (credentials/hardware/owner). Each such
 row must therefore carry, on disk:
@@ -11,7 +11,7 @@ row must therefore carry, on disk:
   ``none``);
 - a typed unavailable/refusal state in its ledger note, with the canonical
   typed code recorded in the operator runbook; and
-- an entry in ``docs/OPERATOR_QUALIFICATION.md`` (and the terminal statuses in
+- an entry in ``docs/archive/2026-09-21/OPERATOR_QUALIFICATION.md`` (and the terminal statuses in
   the 2026-09-13 amendment).
 
 The row set is pinned: a new ``OPERATOR_ONLY`` row with no evidence fails, and
@@ -31,7 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-DOCS = REPO_ROOT / "docs"
+DOCS = REPO_ROOT / "docs" / "archive" / "2026-09-21"
 RUNBOOK = DOCS / "OPERATOR_QUALIFICATION.md"
 AMENDMENT = DOCS / "QUBIT_OWNER_AMENDMENT_2026-09-13_TERMINAL_STATUSES.md"
 LEDGERS = (

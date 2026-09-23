@@ -34,7 +34,7 @@ _LIVE_SECRET_PATTERNS = (
 
 _SCAN_SUFFIXES = {".py", ".js", ".mjs", ".ts", ".tsx", ".json", ".yaml",
                   ".yml", ".sh", ".md", ".html", ".css", ".env", ".toml"}
-_SCAN_SKIP_PARTS = {"node_modules", "hermes-dist", "_data", "__pycache__",
+_SCAN_SKIP_PARTS = {"node_modules", "qubit-dist", "_data", "__pycache__",
                     ".venv", ".git", "dist"}
 
 
@@ -53,7 +53,7 @@ def _cfg(tmp_path, monkeypatch):
 def test_egress_guard_denies_non_loopback_inside_fork_scope():
     import socket
 
-    from voicebridge import hermes_egress_guard as G
+    from voicebridge import qubit_egress_guard as G
 
     G._reset_for_tests()
     try:
@@ -204,9 +204,9 @@ def test_legal_notices_and_attribution_are_intact():
         assert required in notices, f"missing attribution: {required}"
 
     # the vendored Hermes runtime ships its own MIT LICENSE untouched
-    hermes_license = (REPO / "qubit_hermes" / "LICENSE").read_text()
-    assert "MIT License" in hermes_license
-    assert "Nous Research" in hermes_license
+    qubit_license = (REPO / "qubit_runtime" / "LICENSE").read_text()
+    assert "MIT License" in qubit_license
+    assert "Nous Research" in qubit_license
 
     # the project LICENSE is Qubit's, not applied to upstream material
     license_text = LICENSE.read_text(encoding="utf-8")
@@ -225,7 +225,7 @@ def test_project_license_metadata_does_not_relicense_upstream():
 
 def test_vendored_runtime_provenance_manifest_declares_the_pin():
     manifest = json.loads(
-        (REPO / "docs" / "QUBIT_HERMES_VENDOR_MANIFEST.json").read_text())
+        (REPO / "docs/archive/2026-09-21" / "QUBIT_HERMES_VENDOR_MANIFEST.json").read_text())
     blob = json.dumps(manifest)
     assert "2237be355906fbe6065ce1815711eee52b2d646e" in blob
     # the per-file manifest must carry upstream blob hashes, not just paths

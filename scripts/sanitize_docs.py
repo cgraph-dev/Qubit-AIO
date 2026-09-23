@@ -43,12 +43,12 @@ PLACEHOLDER = "$HOME"
 # rewrite. The untracked final-prompt path is listed defensively (git ls-files
 # already excludes it, but ``--check`` from a future date must stay honest).
 EXCLUDED = frozenset({
-    "docs/QUBIT_FROZEN_ACCEPTANCE_CONTRACT.md",
-    "docs/QUBIT_OWNER_AMENDMENT_2026-09-11.md",
-    "docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md",
-    "docs/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md",
-    "docs/AGENT_PROMPT_PACK.md",
-    "docs/QUBIT_FINAL_CODE_READY_PROMPT.md",
+    "docs/archive/2026-09-21/QUBIT_FROZEN_ACCEPTANCE_CONTRACT.md",
+    "docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11.md",
+    "docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md",
+    "docs/archive/2026-09-21/QUBIT_EXECUTION_DIRECTIVE_2026-09-12.md",
+    "docs/archive/2026-09-21/AGENT_PROMPT_PACK.md",
+    "docs/archive/2026-09-21/QUBIT_FINAL_CODE_READY_PROMPT.md",
 })
 
 

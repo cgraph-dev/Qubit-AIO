@@ -86,34 +86,87 @@ def _git(*args: str) -> str:
         return f"(git unavailable: {exc})"
 
 
+# The vendored pinned fork and the built dashboard are byte-faithful
+# upstream/build artifacts, not Qubit changes; listing their paths (which can
+# contain arbitrary upstream words) would both misdescribe the change set and
+# trip the secret-word guard on unrelated filenames. `qubit_hermes/` is the
+# pre-rename vendor path, still present as deletion records until the rename
+# is staged.
+_VENDOR_PREFIXES = (
+    "qubit_runtime/",
+    "qubit_hermes/",
+    "frontend/qubit-dist/",
+    "frontend/hermes-dist/",
+)
+
+
+def _is_vendor_path(path: str) -> bool:
+    return any(path.startswith(p) for p in _VENDOR_PREFIXES)
+
+
 def _status_short() -> str:
     out = _git("status", "--short")
     if not out:
         return "(clean tree)"
-    # The vendored pinned fork and the built dashboard are byte-faithful
-    # upstream/build artifacts, not Qubit changes; listing their paths (which
-    # can contain arbitrary upstream words) would both misdescribe the change
-    # set and trip the secret-word guard on unrelated filenames.
-    vendor_prefixes = ("qubit_hermes/", "frontend/hermes-dist/")
     lines = []
     for line in out.splitlines():
         path = line[3:] if len(line) > 3 else line
         path = path.split(" -> ")[-1].strip()
-        if any(path.startswith(p) for p in vendor_prefixes):
+        if _is_vendor_path(path):
             continue
         lines.append(line)
     return "\n".join(lines) if lines else "(only vendored/upstream files changed)"
 
 
 def _diff_stat() -> str:
-    out = _git("diff", "--stat")
-    return out or "(no staged/working diff)"
+    # `git diff --stat` truncates long paths (e.g. ".../tests/qubit_cli/x.py"),
+    # so it cannot be filtered reliably; `--numstat` always prints full paths.
+    out = _git("diff", "--numstat")
+    if not out:
+        return "(no staged/working diff)"
+    rows = []
+    adds = dels = 0
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        added, removed, path = parts
+        if _is_vendor_path(path):
+            continue
+        rows.append(f"{path} | +{added} -{removed}")
+        if added.isdigit():
+            adds += int(added)
+        if removed.isdigit():
+            dels += int(removed)
+    if not rows:
+        out2 = _git("diff", "--stat")
+        return out2 or "(only vendored/upstream files changed)"
+    rows.append(f"{len(rows)} files changed, +{adds} -{dels}")
+    return "\n".join(rows)
+
+
+def _redact(text: str) -> str:
+    """Mask real secret VALUES line-by-line with the canonical guard.
+
+    ``voicebridge.redaction.redact_text`` only masks a secret-shaped key/value
+    assignment (``token=…``, ``api_key: …``, ``sk-…``, JWTs, private keys), so a
+    harmless vendor filename such as ``test_api_key_providers.py`` or
+    ``1password/SKILL.md`` is left untouched. Per-line application avoids the
+    helper's whole-string length cap truncating a large report. Best effort:
+    a missing helper never fails a report.
+    """
+    try:
+        from voicebridge.redaction import redact_text
+    except Exception:
+        return text
+    out = "\n".join(redact_text(line) for line in text.splitlines())
+    return out + "\n" if text.endswith("\n") else out
 
 
 def build_report(title: str, tests: str, bench: str, risks: str,
                  rollback: str) -> str:
     now = _dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
-    return "\n".join([
+    return _redact("\n".join([
         f"# Change report — {title}",
         "",
         f"Generated: {now}",
@@ -141,7 +194,7 @@ def build_report(title: str, tests: str, bench: str, risks: str,
         "## Rollback",
         rollback,
         "",
-    ])
+    ]))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -158,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
 
     md = build_report(args.title, args.tests, args.bench, args.risks, args.rollback)
     section, att = policy_section()
-    md = md + section
+    md = _redact(md + section)
     out = args.out
     if out is None:
         OUT_DIR.mkdir(parents=True, exist_ok=True)

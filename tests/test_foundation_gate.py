@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HERMES_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
+QUBIT_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
 
 from voicebridge import foundation as F  # noqa: E402
@@ -67,14 +67,14 @@ def test_no_foreign_assistant_entry_points():
 # Inventories complete
 # ---------------------------------------------------------------------------
 def _load_inventory(name):
-    path = REPO_ROOT / "docs" / name
+    path = REPO_ROOT / "docs" / "archive" / "2026-09-21" / name
     assert path.is_file(), f"missing inventory: {name}"
     return json.loads(path.read_text())
 
 
-def test_hermes_inventory_complete():
+def test_qubit_inventory_complete():
     m = _load_inventory("INVENTORY_HERMES.json")
-    assert m["commit"] == HERMES_PIN
+    assert m["commit"] == QUBIT_PIN
     assert m["count"] >= 1000, "inventory must cover the full tree"
     valid = {"PRESERVE", "INTEGRATE", "ADAPT", "BLOCKED", "REJECTED"}
     for row in m["files"]:
@@ -100,7 +100,7 @@ def test_openclaw_inventory_complete():
 
 
 def test_matrix_covers_inventory_areas():
-    matrix = json.loads((REPO_ROOT / "docs" / "MATRIX_8T_F.json").read_text())
+    matrix = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.json").read_text())
     assert len(matrix["rows"]) >= 30
 
 

@@ -1,9 +1,10 @@
 """Packet 8Q — credential references.
 
-Keys live ONLY in environment variables or an OS-secret reference (a file path
-outside git whose *contents* are never logged). Qubit never reads OpenCode's
-private auth database and never stores keys in config, frontend, prompts,
-logs, reports, or telemetry.
+Keys live ONLY in environment variables, the canonical Qubit runtime ``.env``
+(``<state_dir>/runtime/.env``), or an OS-secret reference (a file path outside
+git whose *contents* are never logged). Qubit never reads OpenCode's private
+auth database and never stores keys in config, frontend, prompts, logs,
+reports, or telemetry.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -77,15 +79,70 @@ def redact_secret_ref(ref: SecretRef | Mapping[str, str] | str) -> str:
     return "missing"
 
 
+def _canonical_runtime_env_path() -> Optional[Path]:
+    """The canonical runtime ``.env`` path, or ``None`` when unresolvable.
+
+    Imported lazily so this leaf module stays dependency-light and cannot
+    create an import cycle through :mod:`voicebridge.config`.
+    """
+    try:
+        from .. import config as _config
+        return Path(_config.canonical_runtime_env_path())
+    except Exception:  # noqa: BLE001 - credential resolution must fail closed
+        return None
+
+
+def _env_file_value(name: str) -> str:
+    """Look ``name`` up in the canonical runtime ``.env`` (dotenv style).
+
+    Returns ``""`` when the file or the key is absent, or on any read error.
+    Only the requested variable is ever returned; sibling values are never
+    logged, cached, or surfaced. The fixed canonical path is re-checked against
+    the browser-secret / OpenCode-private-db refusals so a misdirected state
+    tree cannot turn this into a credential-harvesting read.
+    """
+    if not name:
+        return ""
+    path = _canonical_runtime_env_path()
+    if path is None:
+        return ""
+    low = str(path).lower()
+    if looks_like_browser_secret(low) or looks_like_opencode_private_db(low):
+        return ""
+    try:
+        if not path.is_file():
+            return ""
+        text = path.read_text(errors="replace")
+    except Exception:  # noqa: BLE001 - unreadable .env -> typed missing
+        return ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, sep, value = line.partition("=")
+        if not sep or key.strip() != name:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        return value
+    return ""
+
+
 def resolve_key(provider: str, ref: str) -> tuple[str, str]:
     """Resolve a credential reference.
 
     ``ref`` forms:
-      - "env:NAME" -> os.environ["NAME"]
+      - "env:NAME" -> ``os.environ["NAME"]``, else ``NAME`` from the canonical
+        runtime ``.env`` (``<state_dir>/runtime/.env``); the process
+        environment always wins
       - "file:/path" -> first line of file (path must exist, never logged)
       - "" -> missing
     Returns (key, code) where code is "" on success else "AUTH_MISSING".
-    The key itself must never be logged by callers.
+    The key itself must never be logged by callers; no diagnostic, redaction,
+    or typed public field ever carries the value.
     """
     ref = (ref or "").strip()
     if not ref:
@@ -95,6 +152,8 @@ def resolve_key(provider: str, ref: str) -> tuple[str, str]:
         if not name:
             return "", "AUTH_MISSING"
         val = os.environ.get(name, "")
+        if not val:
+            val = _env_file_value(name)
         return (val, "") if val else ("", "AUTH_MISSING")
     if ref.startswith("file:"):
         p = Path(ref[len("file:"):].strip()).expanduser()

@@ -1,7 +1,7 @@
 """Agent 1 — `qubit <family> <sub>` routing into the vendored Hermes fork.
 
 Proves the production caller: `voicebridge.cli.main` forwards the mapped pairs
-straight into `voicebridge.hermes_runtime.run` (the same in-process runtime as
+straight into `voicebridge.qubit_runtime.run` (the same in-process runtime as
 `qubit agent`), preserves trailing args, keeps native Qubit commands untouched,
 and surfaces the upstream parser's error exit code.
 
@@ -22,7 +22,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from voicebridge.cli_hermes_forward import FORWARD_TABLE  # noqa: E402
+from voicebridge.cli_qubit_forward import FORWARD_TABLE  # noqa: E402
 
 
 def _qubit_subcommands() -> dict:
@@ -62,7 +62,7 @@ def test_mcp_list_is_forwarded_because_qubit_has_only_status():
 def test_every_forward_pair_dispatches_to_fork(monkeypatch, pair):
     """Every table row is a real production caller, not a dead mapping."""
     from voicebridge import cli as CLI
-    from voicebridge import hermes_runtime
+    from voicebridge import qubit_runtime
 
     fam, sub = pair
     calls = []
@@ -71,7 +71,7 @@ def test_every_forward_pair_dispatches_to_fork(monkeypatch, pair):
         calls.append(list(argv or []))
         return 0
 
-    monkeypatch.setattr(hermes_runtime, "run", _fake_run)
+    monkeypatch.setattr(qubit_runtime, "run", _fake_run)
     assert CLI.main([fam, sub]) == 0
     assert calls == [[*FORWARD_TABLE[pair]]]
 
@@ -82,8 +82,8 @@ def test_forward_targets_exist_in_fork_parser(tmp_path):
 
     script = (
         "import json,sys;"
-        f"sys.path.insert(0,{str(REPO_ROOT / 'qubit_hermes')!r});"
-        "import hermes_cli.main as m;"
+        f"sys.path.insert(0,{str(REPO_ROOT / 'qubit_runtime')!r});"
+        "import qubit_cli.main as m;"
         "p,sub=m._build_cli_parser();"
         "out={f:None for f in sub.choices};"
         "import argparse;"
@@ -105,7 +105,7 @@ def test_forward_targets_exist_in_fork_parser(tmp_path):
 
 
 def test_translate_maps_family_and_preserves_trailing_args():
-    from voicebridge.cli_hermes_forward import translate
+    from voicebridge.cli_qubit_forward import translate
 
     assert translate(["schedules", "doctor"]) == ["cron", "doctor"]
     assert translate(["flags", "path"]) == ["config", "path"]
@@ -123,7 +123,7 @@ def test_translate_maps_family_and_preserves_trailing_args():
 
 
 def test_curator_reads_do_not_shadow_native_lessons():
-    from voicebridge.cli_hermes_forward import FORWARD_TABLE
+    from voicebridge.cli_qubit_forward import FORWARD_TABLE
 
     assert _qubit_subcommands()["lessons"] == {"list", "promote", "remove"}
     for sub in ("status", "ledger", "usage", "list-archived",
@@ -133,7 +133,7 @@ def test_curator_reads_do_not_shadow_native_lessons():
 
 
 def test_translate_strips_qubit_only_globals():
-    from voicebridge.cli_hermes_forward import translate
+    from voicebridge.cli_qubit_forward import translate
 
     assert translate(["plugins", "capabilities", "--config", "/tmp/x.yaml",
                       "--dry-run"]) == ["plugins", "capabilities"]
@@ -142,7 +142,7 @@ def test_translate_strips_qubit_only_globals():
 
 
 def test_translate_ignores_unmapped_and_short_calls():
-    from voicebridge.cli_hermes_forward import translate
+    from voicebridge.cli_qubit_forward import translate
 
     assert translate(["skills", "install", "manifest.json"]) is None
     assert translate(["schedules"]) is None
@@ -152,7 +152,7 @@ def test_translate_ignores_unmapped_and_short_calls():
 
 def test_cli_main_dispatches_mapped_pair_to_fork(monkeypatch):
     from voicebridge import cli as CLI
-    from voicebridge import hermes_runtime
+    from voicebridge import qubit_runtime
 
     calls = []
 
@@ -160,7 +160,7 @@ def test_cli_main_dispatches_mapped_pair_to_fork(monkeypatch):
         calls.append(list(argv or []))
         return 0
 
-    monkeypatch.setattr(hermes_runtime, "run", _fake_run)
+    monkeypatch.setattr(qubit_runtime, "run", _fake_run)
     rc = CLI.main(["schedules", "doctor", "--config", "/tmp/ignored.yaml"])
     assert rc == 0
     assert calls == [["cron", "doctor"]]
@@ -168,12 +168,12 @@ def test_cli_main_dispatches_mapped_pair_to_fork(monkeypatch):
 
 def test_cli_main_keeps_native_qubit_command_off_the_fork(monkeypatch):
     from voicebridge import cli as CLI
-    from voicebridge import hermes_runtime
+    from voicebridge import qubit_runtime
 
     def _boom(argv=None):  # pragma: no cover - must not be reached
         raise AssertionError("native command must not be forwarded")
 
-    monkeypatch.setattr(hermes_runtime, "run", _boom)
+    monkeypatch.setattr(qubit_runtime, "run", _boom)
     # `skills install` is a declared Qubit subcommand; the pre-parse forwarder
     # must decline it so the native parser owns it. `--help` exits 0 without
     # ever touching the fork.
@@ -191,7 +191,7 @@ def _sandbox_env(tmp_path) -> dict:
         target = home / var.lower()
         target.mkdir(parents=True, exist_ok=True)
         env[var] = str(target)
-    env["HERMES_HOME"] = str(home / ".hermes")
+    env["QUBIT_HOME"] = str(home / ".hermes")
     env.pop("PYTHONPATH", None)
     return env
 

@@ -18,7 +18,7 @@ from ..logging_setup import log_event
 from .contracts import ProviderRequest, ProviderResult, UsageRecord
 
 # Documented endpoint contracts (source: provider docs at implementation
-# time; recorded in docs/UPSTREAM_REUSE.md R8Q; catalog snapshots carry
+# time; recorded in docs/archive/2026-09-21/UPSTREAM_REUSE.md R8Q; catalog snapshots carry
 # source+timestamp and stale data fails closed). Only endpoints whose
 # contract is verified are listed here — every other provider MUST set an
 # explicit operator base_url or the gateway returns NOT_CONFIGURED.
@@ -32,8 +32,16 @@ Transport = Callable[[str, Dict[str, str], Dict[str, Any], float],
 
 def urllib_transport(url: str, headers: Dict[str, str], payload: Dict[str, Any],
                      timeout_s: float) -> tuple[int, Dict[str, Any]]:
+    # Cloudflare-fronted relays (opencode-zen returns 403/error 1010) refuse
+    # the stdlib urllib signature; send the same browser User-Agent a real
+    # client would. Caller-supplied headers still win on conflict.
+    merged = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/126.0 Safari/537.36",
+              "Accept": "application/json"}
+    merged.update(headers or {})
     req = urllib.request.Request(url, data=json.dumps(payload).encode(),
-                                 headers=headers, method="POST")
+                                 headers=merged, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
             status = getattr(resp, "status", 200) or 200

@@ -1,3 +1,8 @@
+# DEAD FILE — not loaded by any Qubit runtime code path.
+# The only config the bridge reads is the canonical
+# ~/.config/qubit-voicebridge/voice.yaml (or $VOICE_BRIDGE_CONFIG).
+# This file is excluded from shipped artifacts (release.ARTIFACT_FORBIDDEN)
+# and kept for historical reference only. Do not edit expecting an effect.
 hotkey:
   hold_key: ctrl_r
   tap_ms: 300
@@ -8,7 +13,7 @@ hotkey:
 mic:
   device: null
   sample_rate: 48000
-  channels: 1            # mono USB headset mic (see docs/AUDIO_SETUP.md)
+  channels: 1            # mono USB headset mic (see docs/archive/2026-09-21/AUDIO_SETUP.md)
   blocksize: 480
   gain: 3.0              # >4x amplifies hiss on typical USB mics (AUDIO_SETUP rule 3)
   min_rms: 0.0008

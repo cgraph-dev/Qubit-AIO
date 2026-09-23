@@ -50,6 +50,10 @@ def build_pipeline(cfg: Any) -> RouterPipeline:
     if pipe.l1_enabled:
         from .l1 import SemanticRouter, load_default_routes
         router = SemanticRouter(routes=load_default_routes())
+        # The canonical embedding role (resolver) decides provider/model and
+        # the shared adapter performs the request; the pipeline only supplies
+        # the config.
+        router.cfg = cfg
         url = cfg.get("intent", "local_llm", "url", default=None) \
             or "http://127.0.0.1:11434"
         model = cfg.get("intent", "router", "embed_model",

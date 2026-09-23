@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 ROOT = Path(__file__).resolve().parents[1]
 # Use the ACTIVE interpreter (sys.executable): the suite must not depend on a
-# repository-local .venv existing (see docs/WEBSITES_8E.md).
+# repository-local .venv existing (see docs/archive/2026-09-21/WEBSITES_8E.md).
 VENV = sys.executable
 SCRIPTS_DIR = ROOT / "scripts"
 WEB_SEARCH = SCRIPTS_DIR / "web_search.py"

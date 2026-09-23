@@ -2,9 +2,9 @@
 
 Qubit ships a Qubit-native Kanban store (``voicebridge.kanban`` at
 ``<state>/kanban.db``, board ``main``) used by the CLI, voice, the operations
-catalog and the ``/qubit-boards`` dashboard tab. The vendored Hermes kanban
-dashboard plugin (``qubit_hermes/plugins/kanban``) uses the fork's own
-``hermes_cli.kanban_db`` store (``<HERMES_HOME>/kanban.db``, board ``default``).
+catalog and the ``/qubit-boards`` dashboard tab. The vendored Qubit kanban
+dashboard plugin (``qubit_runtime/plugins/kanban``) uses the fork's own
+``qubit_cli.kanban_db`` store (``<QUBIT_HOME>/kanban.db``, board ``default``).
 
 The two use different schemas, so instead of a risky cross-schema rewrite this
 module is the single, explicit compatibility boundary required by the owner:
@@ -42,7 +42,7 @@ _STATUS_MAP = {
 _STATE_NAME = "kanban-migration.json"
 
 #: The single writable board authority contract. Qubit-native ``kanban.py`` is
-#: the only surface that mutates board state; the vendored Hermes kanban store
+#: the only surface that mutates board state; the vendored Qubit kanban store
 #: is a read-only legacy source whose data converges onto the native store only
 #: through :func:`migrate`. The dashboard plugin's vendored write routes are
 #: typed-refused with :data:`VENDORED_WRITE_CODE`; :func:`vendored_write` is the
@@ -66,7 +66,7 @@ def _priority(raw: str) -> str:
 
 
 def _vendored(cfg: Any):
-    from . import hermes_plugins as HP
+    from . import qubit_plugins as HP
 
     engine = HP._kanban_engine(cfg)
     return engine, engine.kanban_db

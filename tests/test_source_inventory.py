@@ -18,19 +18,24 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "source_inventory.py"
-INV_JSON = REPO_ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
-OM_MD = REPO_ROOT / "docs" / "QUBIT_SOURCE_OMISSIONS.md"
+# Canonical regenerated artifacts (Owner resolution 0.6): the frozen
+# docs/archive/2026-09-21/ records are read-only history, never the live
+# output of the generators.
+GENERATED = REPO_ROOT / "docs" / "generated"
+INV_JSON = GENERATED / "QUBIT_SOURCE_INVENTORY.json"
+OM_MD = GENERATED / "QUBIT_SOURCE_OMISSIONS.md"
+VENDOR_MANIFEST = GENERATED / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 LEDGER_NAMES = ["hermes", "openclaw", "qubit"]
 LEDGER_BASELINE_REV = "f5fc5776"
-HERMES_PIN = Path("/tmp/opencode/pinned/hermes-agent")
+QUBIT_PIN = Path("/tmp/opencode/pinned/hermes-agent")
 OPENCLAW_PIN = Path("/tmp/opencode/pinned/openclaw")
 
 # Categories the inventory must always cover (mechanical counts, not statuses).
 REQUIRED_CATEGORIES = {
-    "hermes_cli_command",
-    "hermes_cli_subcommand",
-    "hermes_cli_option",
-    "hermes_backend_route",
+    "qubit_cli_command",
+    "qubit_cli_subcommand",
+    "qubit_cli_option",
+    "qubit_backend_route",
     "hermes_dashboard_page",
     "hermes_dashboard_component",
     "hermes_dashboard_plugin",
@@ -51,7 +56,7 @@ REQUIRED_CATEGORIES = {
 
 
 def _pins_available() -> bool:
-    return ((HERMES_PIN / ".git").exists()
+    return ((QUBIT_PIN / ".git").exists()
             and (OPENCLAW_PIN / ".git").exists())
 
 
@@ -61,7 +66,7 @@ def _baseline_ledger_text() -> dict[str, str]:
     for name in LEDGER_NAMES:
         proc = subprocess.run(
             ["git", "show",
-             f"{LEDGER_BASELINE_REV}:docs/QUBIT_GAP_LEDGER.{name}.json"],
+             f"{LEDGER_BASELINE_REV}:docs/archive/2026-09-21/QUBIT_GAP_LEDGER.{name}.json"],
             cwd=str(REPO_ROOT), capture_output=True, text=True,
         )
         out[name] = proc.stdout if proc.returncode == 0 else ""
@@ -71,7 +76,7 @@ def _baseline_ledger_text() -> dict[str, str]:
 def _build(out: Path, omissions: Path,
            ledger_rev: str = LEDGER_BASELINE_REV) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--hermes", str(HERMES_PIN),
+        [sys.executable, str(SCRIPT), "--hermes", str(QUBIT_PIN),
          "--openclaw", str(OPENCLAW_PIN), "--out", str(out),
          "--omissions", str(omissions), "--ledger-rev", ledger_rev],
         cwd=str(REPO_ROOT), capture_output=True, text=True,
@@ -80,13 +85,13 @@ def _build(out: Path, omissions: Path,
 
 @pytest.fixture(scope="module")
 def inventory() -> dict:
-    assert INV_JSON.is_file(), "docs/QUBIT_SOURCE_INVENTORY.json missing"
+    assert INV_JSON.is_file(), f"{INV_JSON} missing"
     return json.loads(INV_JSON.read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
 def omissions_text() -> str:
-    assert OM_MD.is_file(), "docs/QUBIT_SOURCE_OMISSIONS.md missing"
+    assert OM_MD.is_file(), f"{OM_MD} missing"
     return OM_MD.read_text(encoding="utf-8")
 
 
@@ -159,7 +164,7 @@ def test_parent_mapping_rules(inventory):
     assert comp["parent_id"] == "webui_status"
 
     sub = next(i for i in inventory["items"]
-               if i["category"] == "hermes_cli_subcommand"
+               if i["category"] == "qubit_cli_subcommand"
                and not i.get("is_alias_of"))
     assert sub["coverage"] == ""
     assert sub["parent_id"] is None
@@ -218,8 +223,8 @@ def test_known_mechanical_counts(inventory):
     counts = inventory["counts_by_category"]
     # Hermes route decorators and top-level CLI commands reconcile exactly with
     # the pinned upstream surface.
-    assert counts["hermes_backend_route"] == 276
-    assert counts["hermes_cli_command"] == 72
+    assert counts["qubit_backend_route"] == 276
+    assert counts["qubit_cli_command"] == 72
     assert counts["openclaw_extension"] == 154
     assert counts["hermes_dashboard_plugin"] == 2
     assert counts["hermes_plugin_test"] == 1
@@ -227,10 +232,21 @@ def test_known_mechanical_counts(inventory):
 
 def test_byte_diff_is_reported(inventory):
     bd = inventory["hermes_byte_diff"]
-    assert bd["counts"]["upstream_files"] == bd["counts"]["local_files"]
+    # The vendored tree is the pinned upstream plus the recorded extra local
+    # files, with no missing files; the canonical manifest owns both added sets
+    # (extra_local) and the changed set (patched).
+    manifest = json.loads(VENDOR_MANIFEST.read_text(encoding="utf-8"))
+    extra_local = manifest.get("extra_local") or []
+    assert bd["counts"]["local_files"] == (bd["counts"]["upstream_files"]
+                                           + bd["counts"]["extra"])
     assert bd["counts"]["missing"] == 0
-    assert bd["counts"]["extra"] == 0
-    assert bd["counts"]["changed"] == 0
+    assert bd["counts"]["extra"] == len(extra_local), (
+        bd["counts"]["extra"], len(extra_local))
+    recorded = set(manifest.get("patched") or [])
+    changed = {c["path"] for c in bd["changed"]}
+    assert changed == recorded, changed ^ recorded
+    assert bd["counts"]["changed"] == len(recorded)
+    assert len(manifest.get("patch_manifest") or {}) == len(recorded)
 
 
 def test_omissions_report_consistent(inventory, omissions_text):
@@ -293,10 +309,10 @@ def test_achievements_plugin_represented_and_closed_in_ledger(inventory,
     # The example the directive named is now CLOSED: the live Hermes ledger
     # carries a real plugin:hermes-achievements row with a backend and an
     # on-disk proving test, and the inventory surfaces reconcile to it.
-    hermes_rows = json.loads(
-        (REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.hermes.json").read_text(
+    qubit_rows = json.loads(
+        (REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.hermes.json").read_text(
             encoding="utf-8"))["rows"]
-    row = next((r for r in hermes_rows
+    row = next((r for r in qubit_rows
                 if r["id"] == "plugin:hermes-achievements"), None)
     assert row is not None, "achievements plugin has no live ledger row"
     assert row["status"] == "IMPLEMENTED", row

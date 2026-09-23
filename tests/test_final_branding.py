@@ -4,7 +4,7 @@ The chat-session store is durable history and may contain legacy upstream-
 authored text (tracked defect D4: a stored ``/chat`` message that says
 ``"developed as OpenClaw"``). The transcript bytes are never rewritten; the
 upstream product name is rendered as Qubit only at the served response
-boundary, through the shared ``hermes_plugins._rebrand_product`` convention.
+boundary, through the shared ``qubit_plugins._rebrand_product`` convention.
 
 These tests seed a legacy transcript on disk, dispatch the real compat routes,
 and assert (a) the served payload is Qubit-branded with no upstream product
@@ -37,40 +37,15 @@ def _cfg(tmp_path, monkeypatch):
 
 
 def _seed_legacy_store(cfg, session_id="legacy-chat"):
-    """Write a legacy chat session + transcript straight to the store file."""
+    """Write a legacy chat session + transcript into the canonical store."""
     from voicebridge import chat_transport as CT
 
-    state = Path(cfg.state_dir())
-    state.mkdir(parents=True, exist_ok=True)
-    now = 1_700_000_000.0
-    store = {
-        "schema": CT.SESSION_SCHEMA,
-        "sessions": {
-            session_id: {
-                "id": session_id,
-                "name": "OpenClaw handoff",
-                "model": None,
-                "created_at": now,
-                "updated_at": now,
-                "archived": False,
-                "message_count": 2,
-                "identity": "dashboard:user",
-            },
-        },
-        "messages": {
-            session_id: [
-                {"role": "user", "content": "Who made this?",
-                 "timestamp": now},
-                {"role": "assistant", "content": LEGACY_TEXT,
-                 "timestamp": now + 1,
-                 "meta": {"model": "OpenClaw-local"}},
-            ],
-        },
-        "tombstones": {},
-    }
-    path = state / CT.STORE_FILE
-    path.write_text(json.dumps(store, ensure_ascii=False), encoding="utf-8")
-    return path
+    store = CT.store(cfg)
+    store.create("OpenClaw handoff", session_id=session_id)
+    store.append(session_id, "user", "Who made this?")
+    store.append(session_id, "assistant", LEGACY_TEXT,
+                 meta={"model": "OpenClaw-local"})
+    return store
 
 
 def _dump(value) -> str:
@@ -79,12 +54,14 @@ def _dump(value) -> str:
 
 def test_d4_legacy_message_served_as_qubit_but_store_unchanged(
         tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    store_path = _seed_legacy_store(cfg)
-    before = store_path.read_text(encoding="utf-8")
-    assert "OpenClaw" in before, "fixture must actually contain the legacy text"
+    store = _seed_legacy_store(cfg)
+    # Fixture sanity: the CANONICAL store holds the upstream-authored text.
+    stored_before = [m["content"] for m in store._messages("legacy-chat")]
+    assert LEGACY_TEXT in stored_before, stored_before
+    raw_name_before = store._session("legacy-chat")["display_name"]
 
     code, out = HC.dispatch(
         cfg, "GET", "/api/qubit/chat/sessions/legacy-chat/messages", {}, {})
@@ -100,13 +77,16 @@ def test_d4_legacy_message_served_as_qubit_but_store_unchanged(
     assert not UPSTREAM.search(served_show), served_show
     assert out["session"]["name"] == "Qubit handoff", out["session"]
 
-    after = store_path.read_text(encoding="utf-8")
-    assert after == before, "the stored transcript bytes must be untouched"
-    assert "OpenClaw" in after
+    # The canonical store content is untouched: only the served boundary
+    # rebrands, the persisted transcript/name bytes stay as authored.
+    stored_after = [m["content"] for m in store._messages("legacy-chat")]
+    assert stored_after == stored_before, stored_after
+    assert store._session("legacy-chat")["display_name"] == raw_name_before
+    assert "OpenClaw" in raw_name_before
 
 
 def test_d4_export_and_sessions_list_are_rebranded(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     _seed_legacy_store(cfg)
@@ -127,8 +107,8 @@ def test_d4_export_and_sessions_list_are_rebranded(tmp_path, monkeypatch):
 def test_chat_compat_boundary_has_no_upstream_product_token(
         tmp_path, monkeypatch):
     """Normal-surface scan: every persisted-chat serve path is Qubit-branded."""
-    from voicebridge import hermes_compat as HC
-    from voicebridge.hermes_plugins import _rebrand_product
+    from voicebridge import qubit_compat as HC
+    from voicebridge.qubit_plugins import _rebrand_product
 
     # the shared convention renders both upstream product names as Qubit
     assert _rebrand_product(LEGACY_TEXT) == \

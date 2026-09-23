@@ -69,8 +69,9 @@ _SERVED_SECRET_GATE = re.compile(
     r"(?i)(sk-|eyJ|bearer[ \t]|basic[ \t]|token|secret|password|passwd|"
     r"api[_-]?key|authorization|cookie|://)")
 _SERVED_SECRET_KEY = re.compile(
-    r"(?i)\b(token|secret|password|passwd|api[_-]?key|authorization|"
-    r"cookie|credential)\b")
+    r"(?i)(?:^|[._\- ])(?:secrets?|passwords?|passwd|tokens?|credentials?|"
+    r"api[_-]?key|apikey|access[_-]?key|private[_-]?key|client[_-]?secret|"
+    r"authorization|cookie|preview|redacted)(?:$|[._\- ])")
 _SERVED_REDACT_DEPTH = 12
 
 
@@ -102,6 +103,35 @@ def _redact_served(obj: Any, _depth: int = 0,
     return obj
 
 
+def _fill_config_defaults(served: Any) -> Any:
+    """Ensure the Qubit-owned ``voice`` section the fork payload omits is served.
+
+    The default runtime proxies ``/api/config`` to the vendored fork, whose
+    payload omits Qubit-owned keys such as ``voice.input_engine`` (defined in
+    ``voicebridge.config.DEFAULTS``), so the Settings form and the voice UI read
+    a setting that is never served. Only the canonical ``voice`` section is
+    filled: it is Qubit-owned, carries no secret-shaped leaves, and any value the
+    fork did serve wins. Other fork keys are left byte-for-byte untouched so the
+    served shape (and the ``config_save`` secret-skip comparison) is unchanged.
+    """
+    from . import config as C
+
+    if not isinstance(served, dict):
+        return served
+    canonical = C.DEFAULTS.get("voice")
+    if not isinstance(canonical, dict):
+        return served
+    out = dict(served)
+    current = out.get("voice")
+    if isinstance(current, dict):
+        merged = dict(canonical)
+        merged.update(current)
+        out["voice"] = merged
+    else:
+        out["voice"] = dict(canonical)
+    return out
+
+
 # --------------------------------------------------------------------------
 # Fork read-proxy branding seam
 # --------------------------------------------------------------------------
@@ -126,7 +156,7 @@ def _rebrand_proxied_json(value: Any, key: str = "") -> Any:
     if isinstance(value, list):
         return [_rebrand_proxied_json(v, key) for v in value]
     if isinstance(value, str) and key not in _PROXY_UNREBRANDED_KEYS:
-        from . import hermes_plugins as _HP
+        from . import qubit_plugins as _HP
         if key == "gateway_start_command":
             return re.sub(r"(?i)\bhermes\b", "qubit", value)
         return _HP._rebrand_product(value)
@@ -772,6 +802,7 @@ SPA_ROUTE_PATHS = (
     "/chat", "/sessions", "/files", "/models", "/analytics", "/logs",
     "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
     "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
+    "/agents",
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
@@ -801,7 +832,7 @@ PUBLIC_ROUTE_ALIASES = {
 # Internal compatibility identifier: the old alias table is retained under
 # its historical name so callers/scripts that import it keep working. Values
 # are root-served Qubit client routes; no value carries an upstream name.
-HERMES_ROUTE_ALIASES = ({p: p for p in SPA_ROUTE_PATHS}
+QUBIT_ROUTE_ALIASES = ({p: p for p in SPA_ROUTE_PATHS}
                         | dict(PUBLIC_ROUTE_ALIASES))
 
 
@@ -814,19 +845,21 @@ def _normalize_route(path: str) -> str:
     return clean or "/"
 
 
-def hermes_alias_target(path: str) -> Optional[str]:
+def qubit_alias_target(path: str) -> Optional[str]:
     """Return the root SPA route served for a normal dashboard path, or None.
 
     Internal compatibility identifier (historical name). A canonical route maps
     to itself; a Qubit family alias maps to its real Qubit target. ``/api/*``,
-    ``/agent/*`` and any ``/hermes`` path are never shell routes.
+    ``/agent/*`` and any ``/hermes`` path are never shell routes. The
+    ``/hermes`` upstream mount is a compatibility identifier: it must stay a
+    hard 404, never a shell route (rebrand allowlist).
     """
-    if (path.startswith("/api/") or path.startswith("/agent")
-            or path.startswith("/hermes")):
+    if (path.startswith("/api/") or path == "/agent"
+            or path.startswith("/agent/") or path.startswith("/hermes")):
         return None
     clean = _normalize_route(path)
-    if clean in HERMES_ROUTE_ALIASES:
-        return HERMES_ROUTE_ALIASES[clean]
+    if clean in QUBIT_ROUTE_ALIASES:
+        return QUBIT_ROUTE_ALIASES[clean]
     # SPA deep link (/sessions/<id>, /profiles/new, ...).
     seg = clean.strip("/").split("/")[0]
     if seg in SPA_ROUTE_ROOTS:
@@ -835,22 +868,189 @@ def hermes_alias_target(path: str) -> Optional[str]:
 
 
 # Public-route resolver, same behavior under the Qubit name.
-spa_route_target = hermes_alias_target
+spa_route_target = qubit_alias_target
+
+
+# Qubit-authoritative reads (isolated-sweep fix): these compat handlers read the
+# SAME store the matching writes / CLI / voice use, so they must never be
+# shadowed by the vendored fork proxy even when the fork declares the path.
+# Without this the cron/skills/toolset read path returned the fork's empty
+# store while the write path wrote the Qubit store (read/write split-brain).
+QUBIT_READ_AUTHORITY: tuple = (
+    "/api/cron/jobs",
+    "/api/skills",
+    "/api/tools/toolsets",
+    # Model identity is a Qubit provider-routing concern: the canonical
+    # provider/model comes from the Qubit resolver, not the vendored runtime's
+    # (unconfigured) model home. Without this quarantine the fork proxy serves a
+    # blank model to /chat and /qubit-chat, so the model line renders "—".
+    "/api/model/info",
+    "/api/model/options",
+    # The canonical conversation history lives in the ONE chat-session
+    # authority (state.db via QubitSessionStore, C7). Serving the Sessions
+    # surface from a separate store split-brained the dashboard: 26 Qubit chats
+    # showed on /qubit-chat while /sessions said "No sessions yet".
+    "/api/sessions",
+    # The DocsPage browser reads the Qubit-branded OpenAPI document generated
+    # from the canonical compat route table (no fork /openapi.json proxy, no
+    # upstream branding in the served doc).
+    "/openapi.json",
+    # PRB-01: the canonical MCP server registry (voicebridge.mcp_servers) backs
+    # GET/POST/DELETE/test/auth; the read must come from the same store the
+    # writes use, not the fork's ``config.yaml mcp_servers`` via the proxy.
+    "/api/mcp/servers",
+    # PRB-03: the canonical webhook subscription registry
+    # (voicebridge.webhooks) backs GET/POST/DELETE/enable; without this the
+    # read is served by the fork proxy's empty store while enable/add/delete
+    # write the Qubit store (read/write split-brain: a successful enable still
+    # rendered "disabled" and subscription lists never updated).
+    "/api/webhooks",
+    # PRB-02: the canonical env reference registry backs GET/PUT/DELETE; the
+    # read must come from the same store the writes use, not the fork's ``.env``
+    # via the proxy.
+    "/api/env",
+    # Pairing read/write split-brain (audit 2026-09-23 D-1): GET was proxied to
+    # the vendored fork's gateway PairingStore (always empty) while the
+    # mutations wrote ``voicebridge.pairing``. Serve GET from the same Qubit
+    # handler (``h_pairing_list``) the writes, CLI, and voice use, so a created
+    # or approved request is actually visible on /pairing.
+    "/api/pairing",
+    # Channels read/write split-brain (audit 2026-09-23): GET was proxied to the
+    # vendored fork's static platform catalog while PUT enable/disable wrote
+    # the Qubit account registry (``voicebridge.messaging``), so toggling a
+    # platform 404'd MSG_NOT_FOUND. Serve GET from the same handler
+    # (``h_platforms``) the writes use.
+    "/api/messaging/platforms",
+    # PRB-09: the profile list/show route must serve the Qubit shape (redacted,
+    # canonical active selection) instead of the fork's raw profile records,
+    # which expose absolute runtime paths.
+    "/api/profiles",
+    # PRA-03: the debug overlay's ``api.getRuntime()`` is rewritten by the SPA
+    # prefix seam to ``/agent/api/runtime``. The compat handler must serve the
+    # canonical runtime inventory on that path (same function as the classic
+    # ``/api/runtime`` branch), or the overlay 404s and renders nothing.
+    "/api/runtime",
+    # Gateway supervision authority: the sidebar status + System gateway card
+    # read the Qubit service supervision (systemd + port probe) from
+    # ``h_status``. Without this the fork proxy serves the fork's own status
+    # whose gateway fields describe the unsupervised fork gateway (nulls),
+    # so the dashboard permanently reads Off. The classic raw ``/api/status``
+    # branch (bridge health for the fallback page/CLI) is untouched — this
+    # only affects the ``/agent/api/*`` SPA prefix.
+    "/api/status",
+    # Wave 4: the portal read must be served by the Qubit compat handler so its
+    # payload is de-branded at the Qubit boundary (the fork proxy would return
+    # the upstream portal host verbatim; BRAND.md requires zero legacy brand on
+    # the served surface).
+    "/api/portal",
+)
+
+
+def qubit_read_authority(path: str) -> bool:
+    """True when ``path`` must be served by the Qubit compat handler.
+
+    Segment-aware: ``/api/cron/jobs`` matches itself and any child route
+    (``/api/cron/jobs/1/runs``) but not an unrelated ``/api/cron/jobsX``.
+    """
+    clean = path.split("?")[0]
+    if len(clean) > 1:
+        clean = clean.rstrip("/")
+    for prefix in QUBIT_READ_AUTHORITY:
+        if clean == prefix or clean.startswith(prefix + "/"):
+            return True
+    return False
+
+
+def query_params(path: str) -> Dict[str, str]:
+    """Parse a request path's query string into a flat string map."""
+    raw = path.split("?", 1)[1] if "?" in path else ""
+    out: Dict[str, str] = {}
+    for kv in raw.split("&"):
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            out[k] = __import__("urllib.parse").parse.unquote_plus(v)
+    return out
+
+
+def parse_multipart_form(raw: bytes,
+                         content_type: str) -> Optional[Dict[str, Any]]:
+    """Parse a ``multipart/form-data`` body into a compat request dict.
+
+    The Qubit API dispatcher is JSON-first; file uploads (``/files``) send
+    ``multipart/form-data`` instead (the SPA's ``uploadFile`` uses FormData),
+    so an unconditional ``json.loads`` answered every upload with a bare
+    ``400 bad json body`` before any handler ran (audit 2026-09-23 D-3 for
+    /files). This parses the body into the same dict the JSON path produces:
+    text fields decode to ``str``; file fields are delivered as ``bytes``
+    under their field name with metadata under ``_files``. When a file field
+    is present its bytes are also exposed as ``content_base64`` (and as
+    ``content`` when they decode as UTF-8) so the confined text-upload handler
+    can consume it without a second parser. Returns ``None`` when the boundary
+    is missing or the body is unparseable, so the caller can answer 400.
+    """
+    boundary = ""
+    for part in str(content_type or "").split(";")[1:]:
+        name, _, value = part.strip().partition("=")
+        if name.strip().lower() == "boundary":
+            boundary = value.strip().strip('"')
+            break
+    if not boundary:
+        return None
+    try:
+        from email.parser import BytesParser
+        from email.policy import default as _email_policy
+        header = (f"Content-Type: multipart/form-data; "
+                  f"boundary={boundary}\r\nMIME-Version: 1.0\r\n\r\n").encode()
+        msg = BytesParser(policy=_email_policy).parsebytes(header + raw)
+    except Exception:  # noqa: BLE001 - malformed multipart -> caller 400s
+        return None
+    out: Dict[str, Any] = {}
+    files: Dict[str, Any] = {}
+    for part in msg.iter_parts():
+        if "form-data" not in str(
+                part.get("content-disposition", "")).lower():
+            continue
+        field = str(part.get_param("name", header="content-disposition")
+                    or "")
+        if not field:
+            continue
+        payload = part.get_payload(decode=True) or b""
+        filename = part.get_filename()
+        if filename is not None:
+            files[field] = {"filename": str(filename),
+                            "content_type": part.get_content_type(),
+                            "size": len(payload)}
+            out[field] = payload
+        else:
+            charset = part.get_content_charset() or "utf-8"
+            out[field] = payload.decode(charset, "replace")
+    if files:
+        out["_files"] = files
+        first = next(iter(files))
+        blob = out.get(first)
+        if isinstance(blob, bytes):
+            import base64 as _b64
+            out.setdefault("content_base64", _b64.b64encode(blob).decode())
+            try:
+                out.setdefault("content", blob.decode("utf-8"))
+            except UnicodeDecodeError:
+                pass
+    return out
 
 
 # --------------------------------------------------------------------------
-# Hermes WebSocket refusal (audit 2026-09-11 §1D)
+# Qubit WebSocket refusal (audit 2026-09-11 §1D)
 # --------------------------------------------------------------------------
-# Qubit keeps a single event path (SSE + ops); the vendored Hermes
+# Qubit keeps a single event path (SSE + ops); the vendored Qubit
 # dashboard's WebSocket endpoints must never hang or raise a bare
 # connection error. An ``Upgrade: websocket`` request for one of these
 # paths gets an HTTP 426 + typed JSON envelope carrying the existing GATED
-# codes from ``voicebridge.hermes_compat`` (never a new dialect, never a
+# codes from ``voicebridge.qubit_compat`` (never a new dialect, never a
 # WS server). Keys are the API path with the Qubit SPA API prefix
 # ``/agent`` stripped, so ``/agent/api/*`` resolves to the protected
-# ``/api/*`` path. Public ``/hermes/*`` requests are not gated here: they
+# ``/api/*`` path. Public ``/qubit/*`` requests are not gated here: they
 # fall through to a plain 404.
-HERMES_WS_GATE_CODES: Dict[str, str] = {
+QUBIT_WS_GATE_CODES: Dict[str, str] = {
     "/api/pty": "PTY_NO_SHELL",
     "/api/console": "PTY_NO_SHELL",
     "/api/ws": "WS_SINGLE_PATH",
@@ -860,38 +1060,38 @@ HERMES_WS_GATE_CODES: Dict[str, str] = {
     "/api/plugins/kanban/events": "WS_SINGLE_PATH",
 }
 
-HERMES_WS_GATE_DETAIL: Dict[str, str] = {
+QUBIT_WS_GATE_DETAIL: Dict[str, str] = {
     "PTY_NO_SHELL": (
         "Qubit forbids raw shell/PTY spawn; the xterm mirror cannot attach. "
         "Use Qubit Chat (streaming agent turns) or the TUI live board."),
     "WS_SINGLE_PATH": (
-        "The Hermes WebSocket dialect is not served; Qubit keeps one event "
-        "path (SSE feed + ops). Chat uses Qubit Chat."),
+        "The upstream tui_gateway WebSocket dialect is not served; Qubit keeps "
+        "one event path (SSE feed + ops). Chat uses Qubit Chat."),
 }
 
-HERMES_WS_GATE_COUNTERPART: Dict[str, str] = {
+QUBIT_WS_GATE_COUNTERPART: Dict[str, str] = {
     "PTY_NO_SHELL": "overlay Qubit Chat tab (POST /api/qubit/chat) + CLI `qubit tui`",
     "WS_SINGLE_PATH": "GET /api/events/stream (SSE) + POST /api/qubit/chat",
 }
 
-HERMES_WS_OWNER = "qubit-policy"
-HERMES_WS_ROLLBACK = "nothing started; nothing to roll back"
+QUBIT_WS_OWNER = "qubit-policy"
+QUBIT_WS_ROLLBACK = "nothing started; nothing to roll back"
 
 
-def hermes_ws_gate_code(path: str) -> Optional[str]:
+def qubit_ws_gate_code(path: str) -> Optional[str]:
     """Return the GATED code for a WebSocket-upgrade API path, or None.
 
     Pure path lookup (query string ignored); used by the request handler and
     directly testable. Only the six upstream WS endpoints are listed. The
-    Qubit SPA API prefix ``/agent`` is stripped; an upstream ``/hermes`` path
+    Qubit SPA API prefix ``/agent`` is stripped; an upstream ``/qubit`` path
     is deliberately NOT recognized (it has no public route).
     """
     clean = path.split("?")[0]
-    if clean.startswith("/agent"):
+    if clean == "/agent" or clean.startswith("/agent/"):
         clean = clean[len("/agent"):]
     if len(clean) > 1:
         clean = clean.rstrip("/")
-    return HERMES_WS_GATE_CODES.get(clean)
+    return QUBIT_WS_GATE_CODES.get(clean)
 
 
 # --------------------------------------------------------------------------
@@ -917,6 +1117,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             for k, v in cors_headers_for(self.app.allowed_origins, origin):
                 self.send_header(k, v)
             self.end_headers()
+            if getattr(self, "_head_only", False):
+                return  # HEAD: same status/headers as GET, no body
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass  # client disconnected (refresh/cancel/navigate) — not an error
@@ -960,6 +1162,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
+            if getattr(self, "_head_only", False):
+                return  # HEAD: advertise the redirect, send no body
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
@@ -1014,6 +1218,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                      self.headers.get("Origin", "")):
             self.send_header(k, v)
         self.end_headers()
+        if getattr(self, "_head_only", False):
+            return  # HEAD: headers only; never open the SSE loop
         sub = hub.subscribe(last_event_id=cursor, run_id=run_filter)
         try:
             self.wfile.write(b"retry: 3000\n\n")
@@ -1037,7 +1243,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
 
     def do_HEAD(self) -> None:  # noqa: N802  (some browsers preload with HEAD)
-        # Reuse GET logic but don't send body
+        # HEAD mirrors GET: same routing/status/headers, never a body. The
+        # ``_head_only`` flag makes the shared senders suppress the body, so a
+        # gated HEAD returns the SAME typed envelope status as its GET (e.g.
+        # HEAD /agent/api/files/stream -> 403 FILES_BINARY_STREAM) instead of a
+        # bare 404.
         path = self.path.split("?")[0]
         if path.startswith("/static/"):
             name = path.split("/", 2)[-1]
@@ -1069,25 +1279,29 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
                 return
-        # fallback: try GET path handling but just send headers
-        self.send_response(404)
-        self.send_header("Content-Length", "0")
-        self.end_headers()
+        self._head_only = True
+        if path.startswith("/agent/"):
+            # The SPA API prefix must reach the SAME dispatcher as GET so the
+            # typed gate (or real read) answers.
+            self._qubit_api("HEAD")
+            return
+        # Everything else reuses the GET path logic with the body suppressed.
+        self.do_GET()
 
     def log_message(self, format: str, *args: Any) -> None:  # silence noise
         pass
 
     # -- Qubit dashboard compat (owner amendment 2026-09-11) ------------
-    # Serves the vendored dashboard build (frontend/hermes-dist/, built from
-    # frontend/hermes-web/) from Qubit-owned root paths with the loopback
+    # Serves the vendored dashboard build (frontend/qubit-dist/, built from
+    # frontend/qubit-web/) from Qubit-owned root paths with the loopback
     # session token + base path injected server-side. The SPA API lives under
     # the Qubit-owned ``/agent`` prefix and dispatches through
-    # voicebridge/hermes_compat.py on the same backend modules as CLI/voice.
-    def _hermes_token_ok(self) -> bool:
-        hermes_tok = self.headers.get("X-Hermes-Session-Token", "")
-        if hermes_tok:
+    # voicebridge/qubit_compat.py on the same backend modules as CLI/voice.
+    def _qubit_token_ok(self) -> bool:
+        qubit_tok = self.headers.get("X-Hermes-Session-Token", "")
+        if qubit_tok:
             qp = "token=" in self.path.split("?", 1)[-1]
-            ok, _reason = token_ok(self.app.api_token, hermes_tok, qp)
+            ok, _reason = token_ok(self.app.api_token, qubit_tok, qp)
             if not ok:
                 return False
             if not self.app.api_token:
@@ -1097,20 +1311,20 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return True
         return self._api_token_ok()
 
-    def _hermes_dist(self) -> "Path":
-        # Resolve the built Hermes dashboard from package data first (a clean
-        # wheel install ships frontend/hermes-dist under voicebridge/_data/),
+    def _qubit_dist(self) -> "Path":
+        # Resolve the built Qubit dashboard from package data first (a clean
+        # wheel install ships frontend/qubit-dist under voicebridge/_data/),
         # then from the checkout. This is the single resolution point so an
         # isolated install serves the real dashboard.
         from . import resources as _resources
-        return _resources.resource_path("frontend/hermes-dist")
+        return _resources.resource_path("frontend/qubit-dist")
 
-    def _serve_hermes_index(self) -> None:
-        dist = self._hermes_dist()
+    def _serve_qubit_index(self) -> None:
+        dist = self._qubit_dist()
         fp = dist / "index.html"
         if not fp.is_file():
             self._send(404, b"dashboard not built (see "
-                            b"frontend/hermes-qubit/README.md)")
+                            b"frontend/qubit-app/README.md)")
             return
         try:
             html = fp.read_text(encoding="utf-8")
@@ -1141,8 +1355,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         html = html.replace('"/hermes/', '"/')
         self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
-    def _serve_hermes_static(self, sub: str) -> None:
-        dist = self._hermes_dist()
+    def _serve_qubit_static(self, sub: str) -> None:
+        dist = self._qubit_dist()
         rel = sub.lstrip("/").split("?")[0]
         if not rel or ".." in rel.split("/"):
             self._send(404, b"not found")
@@ -1165,39 +1379,81 @@ class WebUIHandler(BaseHTTPRequestHandler):
         else: ctype = "application/octet-stream"
         self._file(fp, ctype)
 
-    def _serve_hermes_plugin(self, sub: str) -> None:
+    def _serve_qubit_plugin(self, sub: str) -> None:
         from . import resources as _resources
-        plugdir = _resources.resource_path("frontend/hermes-qubit/plugins")
         rel = sub.lstrip("/").split("?")[0]
         parts = [p for p in rel.split("/") if p not in ("", ".")]
-        if not parts or ".." in parts or len(parts) > 3:
-            self._send(404, b"not found")
+        # Overlay plugin bundles first (the SPA's own plugins).
+        if parts and ".." not in parts and len(parts) <= 3:
+            plugdir = _resources.resource_path("frontend/qubit-app/plugins")
+            try:
+                resolved = plugdir.joinpath(*parts).resolve()
+                if (plugdir.resolve() in resolved.parents and resolved.is_file()
+                        and resolved.suffix in (".js", ".json", ".css")):
+                    ctype = {"js": "application/javascript",
+                             "json": "application/json",
+                             "css": "text/css"}[resolved.suffix.lstrip(".")]
+                    self._file(resolved, ctype)
+                    return
+            except OSError:
+                pass
+        # Vendored user/bundled dashboard plugins: the same resolution the
+        # ``/agent`` compat route uses (activation gate, path confinement,
+        # suffix allowlist), served raw for the browser's ``<script src>``.
+        from . import qubit_compat as HC
+        status, ctype, body, _meta = HC.resolve_plugin_asset(
+            parts[0] if parts else "", "/".join(parts[1:]))
+        if body is None:
+            self._send(status, b"not found")
             return
-        fp = plugdir.joinpath(*parts)
-        try:
-            resolved = fp.resolve()
-            if plugdir.resolve() not in resolved.parents:
-                self._send(404, b"not found")
-                return
-        except OSError:
-            self._send(404, b"not found")
-            return
-        if not resolved.is_file() or resolved.suffix not in (".js", ".json", ".css"):
-            self._send(404, b"not found")
-            return
-        ctype = {"js": "application/javascript", "json": "application/json",
-                 "css": "text/css"}[resolved.suffix.lstrip(".")]
-        self._file(resolved, ctype)
+        self._send(status, body, ctype)
 
-    def _hermes_api(self, method: str) -> None:
-        if not self._hermes_token_ok():
+    def _device_enroll_impl(self, body: Dict[str, Any]) -> None:
+        """Confirmed, audited device enrollment (one authority).
+
+        Shared by the classic token route (``/api/device/enroll``) and the SPA
+        prefix route (``/agent/api/device/enroll``). A bare POST is staged
+        through the shared confirmation contract (e-stop + journal) and answers
+        a typed 409; enrollment only runs after an explicit ``confirm`` (or a
+        consumed ``confirmation_id``) and always writes a ``device.enroll``
+        audit receipt. The old unconditional
+        ``require_new_authorization=False`` bypass is gone.
+        """
+        from . import qubit_compat as HC
+        guard = HC._compat_confirm(
+            self.app.orch.cfg, "device.enroll",
+            "device enrollment requires explicit authorization: re-POST with "
+            "{\"confirm\": true}", query_params(self.path), body)
+        if guard is not None:
+            code, out = guard
+            self._json(out, code)
+            return
+        try:
+            from . import device as Dev
+            alias = str(body.get("model_alias", "") or "").strip() or None
+            rec = Dev.enroll(self.app.orch.cfg, model_alias=alias,
+                             require_new_authorization=False)
+            HC.audit_event("device.enroll", "dashboard:user", {
+                "machine_id": str(rec.get("machine_id", ""))[:64],
+                "model_alias": str(rec.get("model_alias", ""))[:80],
+                "via": "dashboard"})
+            self._json({"ok": True, "enrolled": True,
+                        "detail": "device enrolled",
+                        "machine_id": rec.get("machine_id")})
+        except Exception as exc:
+            self._json({"ok": False, "enrolled": False,
+                        "code": "DEVICE_ENROLL_FAILED",
+                        "detail": redact_obj(str(exc))[:160]}, 403)
+
+    def _qubit_api(self, method: str) -> None:
+        if not self._qubit_token_ok():
             self._send(401, b"unauthorized")
             return
         raw = self.path
         # Qubit SPA API prefix: ``/agent/api/<x>`` -> compat ``/api/<x>``.
         # Callers only reach here for ``/agent/`` paths (the SPA prefix); the
-        # upstream ``/hermes`` mount is refused with 404 in ``do_GET``.
-        if raw.startswith("/agent"):
+        # upstream ``/qubit`` mount is refused with 404 in ``do_GET``.
+        if raw == "/agent" or raw.startswith("/agent/"):
             sub = raw[len("/agent"):]
         else:
             sub = raw
@@ -1208,27 +1464,170 @@ class WebUIHandler(BaseHTTPRequestHandler):
             for k, v in _up.parse_qsl(raw.split("?", 1)[1], keep_blank_values=True):
                 query[k] = v
         body: Dict[str, Any] = {}
-        if method in ("POST", "PUT", "PATCH"):
+        if method in ("POST", "PUT", "PATCH", "DELETE"):
+            # DELETE bodies are parsed too: the confirm-gated delete handlers
+            # (cron/schedules, sessions, ...) read ``{"confirm": true}`` from
+            # the body; skipping it made every documented DELETE uninterruptible.
             try:
                 length = int(self.headers.get("Content-Length", 0))
             except ValueError:
                 length = 0
+            # A ``multipart/form-data`` upload (the SPA's /files uploader) is
+            # parsed into the same dict the JSON path produces; only a JSON
+            # body that fails to parse is the typed 400. Without this branch
+            # every multipart request died at ``json.loads`` before any handler
+            # ran (audit 2026-09-23 /files upload ``400 bad json body``).
+            ctype = str(self.headers.get("Content-Type", "") or "")
             if length:
                 try:
-                    raw_body = self.rfile.read(length).decode("utf-8", "replace")
-                    body = json.loads(raw_body) if raw_body.strip() else {}
-                except ValueError:
-                    self._send(400, b"bad json body")
+                    raw_bytes = self.rfile.read(length)
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    raw_bytes = b""
+                if ctype.lower().split(";", 1)[0].strip() == \
+                        "multipart/form-data":
+                    parsed_form = parse_multipart_form(raw_bytes, ctype)
+                    if parsed_form is None:
+                        self._send(400, b"bad multipart body")
+                        return
+                    body = parsed_form
+                else:
+                    try:
+                        raw_body = raw_bytes.decode("utf-8", "replace")
+                        body = json.loads(raw_body) if raw_body.strip() else {}
+                    except ValueError:
+                        self._send(400, b"bad json body")
+                        return
+                    if not isinstance(body, dict):
+                        body = {"_list": body}
+        # Qubit device surface (audit 2026-09-23 item 6): the classic
+        # ``/api/device/*`` handlers are X-Api-Token gated and unreachable from
+        # the SPA prefix, so ``/agent/api/device*`` 404'd. Serve the SAME device
+        # authority under the SPA session token (already authenticated above)
+        # instead of a dead end. Enrollment shares the confirmed, audited path.
+        _device_path = api_path.rstrip("/")
+        if _device_path in ("/api/device", "/api/device/status",
+                            "/api/device/current"):
+            if method not in ("GET", "HEAD"):
+                self._json({"ok": False, "code": "METHOD_NOT_ALLOWED",
+                            "detail": "GET only"}, 405)
+                return
+            from . import device as Dev
+            try:
+                self._json({"ok": True, **Dev.profile(self.app.orch.cfg)})
+            except Exception as exc:
+                self._json({"ok": False, "code": "DEVICE_ERROR",
+                            "detail": redact_obj(str(exc))[:160]}, 500)
+            return
+        if _device_path == "/api/device/enroll":
+            if method != "POST":
+                self._json({"ok": False, "code": "METHOD_NOT_ALLOWED",
+                            "detail": "POST only"}, 405)
+                return
+            self._device_enroll_impl(body)
+            return
+        # Raw-YAML config save (audit 2026-09-23 D-6). The generic secret gate
+        # answers a *save* with ``SECRET_NEVER_SERVED`` and a credential-status
+        # counterpart, so the ConfigPage YAML editor only ever returned a
+        # misleading "secret" error (a dead control). Qubit policy keeps the
+        # raw-config GET gate (the raw document can carry secret material), but
+        # a save is a brokered write: refuse it with an accurate, actionable
+        # typed refusal naming the working confirm-gated path. The canonical
+        # compat gate (``HC.dispatch``) is untouched, so route parity holds.
+        if method == "PUT" and _device_path == "/api/config/raw":
+            self._json({
+                "ok": False, "state": "UNAVAILABLE", "code": "WRITE_BROKERED",
+                "detail": "Raw-YAML config saves are refused; settings run "
+                          "through the confirm-gated Config form.",
+                "qubit_counterpart": "dashboard Config form Save "
+                                     "(PUT /api/config) / CLI `qubit config set`",
+                "owner": "qubit-policy",
+                "rollback": "read-only; nothing to roll back"}, 403)
+            return
+        # Short-lived, single-use, scoped PTY ticket. The long-lived API token
+        # is never accepted on the WebSocket URL; the browser mints a ticket
+        # over this authenticated HTTP route and presents it once.
+        if method == "POST" and api_path.rstrip("/") == "/api/auth/ws-ticket":
+            from .pty_ws import SCOPE_PTY
+            from .gateway.rpc_ws import SCOPE_RPC
+            scope = str(body.get("scope", "") or SCOPE_PTY).strip().lower()
+            if scope not in (SCOPE_PTY, SCOPE_RPC):
+                scope = SCOPE_PTY
+            # /chat context floor: surface the typed configuration error here so
+            # the terminal UI can display it (a WS-upgrade body is not visible
+            # to JS). Production spawn only; injected test doubles are exempt.
+            # The RPC-dialect scope does not spawn a terminal, so it is exempt.
+            # The client's requested Qubit model profile is threaded through so
+            # an unknown id is a typed refusal, never a silent substitution.
+            requested_profile = str(body.get("profile", "") or "")
+            guard: Optional[Dict[str, Any]] = None
+            if scope == SCOPE_PTY:
+                guard = self.app.pty_ws._resolve_guard(requested_profile)
+                if isinstance(guard, dict) and guard.get("ok") is False:
+                    self.app.pty_ws.journal_context_refusal(
+                        guard, requested_profile=requested_profile,
+                        via="ws-ticket",
+                        session=str(body.get("session", "") or ""),
+                        owner=str(body.get("owner", "") or "dashboard:user"),
+                        target=str(body.get("target", "") or ""))
+                    refusal: Dict[str, Any] = {
+                        "ok": False, "state": "UNAVAILABLE",
+                        "code": str(guard.get("code")
+                                    or "TERMINAL_CONTEXT_BELOW_MINIMUM"),
+                        "detail": str(guard.get("detail") or ""),
+                        "owner": "qubit-policy",
+                        "rollback": "nothing started; nothing to roll back",
+                    }
+                    # Non-secret verification provenance so the terminal UI can
+                    # explain a refusal (e.g. real window smaller than declared).
+                    for _k in ("context_verification", "context_window_source",
+                               "context_verified", "real_context_tokens",
+                               "declared_context_tokens"):
+                        if guard.get(_k) is not None:
+                            refusal[_k] = guard[_k]
+                    # Mirror the pre-spawn ``serve`` status mapping so the
+                    # ws-ticket gate and the WS gate agree: an unverifiable
+                    # window is 503, every other context/policy refusal is 409.
+                    _status = (503 if refusal["code"]
+                               == "TERMINAL_CONTEXT_UNVERIFIED" else 409)
+                    self._json(refusal, code=_status)
                     return
-                if not isinstance(body, dict):
-                    body = {"_list": body}
+            ticket, ttl = self.app.pty_ws.tickets.mint(
+                scope=scope,
+                session=str(body.get("session", "") or ""),
+                owner=str(body.get("owner", "") or "dashboard:user"),
+                target=str(body.get("target", "") or ""))
+            # The ticket is returned exactly once and never logged or audited.
+            # The non-secret model profile is surfaced so the terminal shows the
+            # active model/context and a switch is visible.
+            payload: Dict[str, Any] = {"ok": True, "ticket": ticket,
+                                       "expires_in": ttl, "scope": scope}
+            if scope == SCOPE_PTY and isinstance(guard, dict):
+                payload.update({
+                    "profile_id": str(guard.get("profile_id") or ""),
+                    "provider": str(guard.get("provider") or ""),
+                    "model": str(guard.get("model") or ""),
+                    "context_tokens": int(guard.get("context_tokens") or 0),
+                    "min_context_tokens": int(
+                        guard.get("min_context_tokens") or 0),
+                })
+                # Surface whether the declared window was cross-checked against
+                # the vendored resolver's real window. An unverified window
+                # (when_available with no cache/resolve) must be visible in the
+                # terminal chrome, never silently trusted. References only:
+                # never key_ref or base_url.
+                for _k in ("context_verification", "context_window_source",
+                           "context_verified", "real_context_tokens"):
+                    if guard.get(_k) is not None:
+                        payload[_k] = guard[_k]
+            self._json(payload)
+            return
         # Qubit-safe streaming chat (no raw PTY): SSE over the same agent.turn
         # backend the non-streaming /api/qubit/chat and CLI/voice use. The path
         # is declared ONCE in the compat route authority
-        # (hermes_compat.ROUTES, disposition "stream"); this dispatcher owns the
+        # (qubit_compat.ROUTES, disposition "stream"); this dispatcher owns the
         # socket and iterates the registered handler, so there is no second
         # route table and no duplicated preflight. Raw /api/pty stays typed.
-        from . import hermes_compat as HC
+        from . import qubit_compat as HC
         if method == "POST":
             _route, _rparams = HC.match(method, api_path.rstrip("/") or "/")
         else:
@@ -1266,16 +1665,23 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
             return
-        # Cutover stage 2 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): safe reads
-        # are served by the vendored Hermes backend in-process (single
-        # listener, no second server); every Qubit-gated/sensitive surface and
-        # all writes stay on the Qubit permissions/confirmation/audit path.
-        # The fork runs under a fail-closed egress guard. 404/405/5xx fall back
-        # to the compatibility layer so a degraded fork never blanks the UI.
-        if method in ("GET", "HEAD") and self._hermes_backend_enabled():
+        # Cutover stage 2b (docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md): non-gated
+        # reads are proxy-first to the fork (the Qubit-owned Qubit runtime), so
+        # the preserved Qubit dashboard keeps real data. Qubit stays
+        # authoritative only for its explicitly gated surfaces -- sensitive
+        # prefixes (raw config, auth, secrets, confined fs/files) and the
+        # Qubit-owned dashboard/ops prefixes -- plus the narrow
+        # ``QUBIT_READ_AUTHORITY`` exempt list of handlers whose store would
+        # otherwise split-brain against the matching Qubit write. The former
+        # "all implemented handlers are no-proxy" rule is retired; ``gated_path``
+        # is still checked explicitly so a Qubit-gated path can never reach the
+        # fork proxy even if the allow/route tables change underneath it.
+        if method in ("GET", "HEAD") and self._qubit_backend_enabled() \
+                and not qubit_read_authority(api_path):
             try:
-                from . import hermes_asgi as HA
-                if HA.safe_to_proxy(method, api_path):
+                from . import qubit_asgi as HA
+                if not HA.gated_path(api_path) and \
+                        HA.safe_to_proxy(method, api_path):
                     code, hdrs, rbody = HA.call(
                         method, api_path, query=query,
                         headers={"accept": "application/json"})
@@ -1284,27 +1690,54 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         if "json" in ctype:
                             try:
                                 parsed = json.loads(rbody.decode("utf-8"))
+                                # The vendored runtime is the canonical
+                                # Qubit-compatible reader, but its payloads can
+                                # carry credential material (env
+                                # ``redacted_value``, config ``secrets``,
+                                # oauth ``token_preview``). Redact at the served
+                                # boundary so the populated page never leaks a
+                                # secret, then rebrand free-text product names.
+                                if api_path.rstrip("/") == "/api/config":
+                                    # Reflect confirm-gated dashboard config
+                                    # overrides on the served runtime record so
+                                    # the Settings save round-trips.
+                                    try:
+                                        from . import qubit_compat as _HC
+                                        parsed = _HC._merge_config_overrides(
+                                            self.app.orch.cfg, parsed)
+                                    except Exception:
+                                        pass
+                                    # Serve Qubit-owned keys the fork payload
+                                    # omits (e.g. `voice.input_engine`) from the
+                                    # canonical defaults, so the Settings form
+                                    # and the voice UI see the real setting on
+                                    # the default proxy-first runtime.
+                                    parsed = _fill_config_defaults(parsed)
+                                # B-03: redact AFTER the override merge, so a
+                                # persisted secret leaf can never be re-served
+                                # unredacted by the merge.
+                                parsed = _redact_served(parsed)
                                 rbody = json.dumps(
                                     _rebrand_proxied_json(parsed)).encode()
                             except (ValueError, UnicodeDecodeError):
                                 pass
                         self._send(code, rbody, ctype)
                         return
-                    log_event("webui.hermes_backend.degraded",
+                    log_event("webui.qubit_backend.degraded",
                               path=api_path[:120], status=code)
             except Exception as exc:
-                log_event("webui.hermes_backend.fallback",
+                log_event("webui.qubit_backend.fallback",
                           error=str(exc)[:160])
-        # Cutover stage 3 (docs/QUBIT_HERMES_CUTOVER_MIGRATION.md): when
+        # Cutover stage 3 (docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md): when
         # `webui.hermes_writes` is on, a mutating request that the operator has
         # explicitly allowlisted runs the Qubit policy middleware first (e-stop
         # + typed compat gate + audit) and only then executes in the fork. The
         # allowlist is empty by default, so writes fall through to the Qubit
         # compat path unchanged -- a reversible, fail-closed stage.
         if method in ("POST", "PUT", "PATCH", "DELETE") and \
-                self._hermes_writes_enabled():
+                self._qubit_writes_enabled():
             try:
-                from . import hermes_asgi as HA
+                from . import qubit_asgi as HA
                 allowed, refusal = HA.write_policy(
                     self.app.orch.cfg, method, api_path)
                 if refusal is not None:
@@ -1329,32 +1762,48 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 log_event("webui.hermes_writes.fallback",
                           error=str(exc)[:160])
         try:
-            from . import hermes_compat as HC
+            from . import qubit_compat as HC
             code, out = HC.dispatch(self.app.orch.cfg, method, api_path,
                                     query, body)
         except Exception as exc:
             self._json({"ok": False, "code": "EXECUTOR_ERROR",
                         "detail": redact_obj(str(exc))[:200]}, 500)
             return
+        # Keys-page presence truth (audit 2026-09-23 D-4): the compat handler
+        # derived ``is_set`` only from the reference registry, so every catalog
+        # key read false even when present in Qubit's own runtime ``.env``.
+        # Upgrade presence here at the Qubit read boundary using names only
+        # (never a value); a provider-derived true is never downgraded and no
+        # secret material is read or returned.
+        if method in ("GET", "HEAD") and api_path.rstrip("/") == "/api/env" \
+                and code == 200 and isinstance(out, dict):
+            try:
+                from . import env_store as _ES
+                present = _ES.present_names(self.app.orch.cfg)
+                for _k, _v in out.items():
+                    if isinstance(_v, dict) and _k in present:
+                        _v["is_set"] = True
+            except Exception:
+                pass
         self._json(out, code)
 
-    def _hermes_backend_enabled(self) -> bool:
-        """Cutover flag: serve safe dashboard reads from the vendored Hermes
+    def _qubit_backend_enabled(self) -> bool:
+        """Cutover flag: serve safe dashboard reads from the vendored Qubit
         backend. Stage 2 default is on: the Qubit-owned fork is the runtime
-        authority for safe reads. Set ``webui.hermes_backend: false`` (or
+        authority for safe reads. Set ``webui.qubit_backend: false`` (or
         revert the Stage 2 commit) to fall back to the compatibility layer."""
         try:
-            return bool(self.app.orch.cfg.get("webui", "hermes_backend",
+            return bool(self.app.orch.cfg.get("webui", "qubit_backend",
                                               default=True))
         except Exception:
             return True
 
-    def _hermes_writes_enabled(self) -> bool:
+    def _qubit_writes_enabled(self) -> bool:
         """Cutover stage 3 flag: run the Qubit write-policy middleware before
         an allowlisted mutation executes in the fork. Default off (writes take
         the Qubit compat path); set ``webui.hermes_writes: true`` to enable the
         middleware for routes the operator has added to
-        ``hermes_asgi.WRITE_PROXY_ALLOWLIST``."""
+        ``qubit_asgi.WRITE_PROXY_ALLOWLIST``."""
         try:
             return bool(self.app.orch.cfg.get("webui", "hermes_writes",
                                               default=False))
@@ -1378,7 +1827,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             query = dict(_up.parse_qsl(raw.split("?", 1)[1],
                                        keep_blank_values=True))
         try:
-            from . import hermes_compat as HC
+            from . import qubit_compat as HC
             code, out = HC.dispatch(self.app.orch.cfg, "GET", target,
                                     query, {})
         except Exception as exc:
@@ -1503,11 +1952,67 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._json({"state": "failed", "code": exc.code,
                         "detail": redact_obj(exc.detail)[:200]}, status)
 
-    def _refuse_hermes_ws(self) -> bool:
-        """Typed HTTP 426 refusal for a Hermes WebSocket upgrade (audit §1D).
+    def _maybe_pty_upgrade(self) -> bool:
+        """Serve the one WebSocket upgrade Qubit owns: ``/agent/api/pty``.
+
+        Returns True when the request was a PTY upgrade and was handled (either
+        accepted or rejected with a typed HTTP status). Returns False for every
+        other path / non-upgrade request so normal HTTP routing and the
+        single-event-path WS refusal stay authoritative. No second listener.
+        """
+        if self.headers.get("Upgrade", "").strip().lower() != "websocket":
+            return False
+        api_path = self.path.split("?")[0]
+        if api_path.startswith("/agent"):
+            api_path = api_path[len("/agent"):]
+        if api_path.rstrip("/") != "/api/pty":
+            return False
+        from . import pty_ws as P
+        q = query_params(self.path)
+
+        def _int(name: str, default: int) -> int:
+            try:
+                return max(1, min(int(q.get(name, "")), 1000))
+            except Exception:
+                return default
+
+        self.app.pty_ws.serve(
+            self, ticket_value=q.get("ticket", ""),
+            cols=_int("cols", 80), rows=_int("rows", 24),
+            resume=q.get("resume", ""), profile=q.get("profile", ""),
+            origin_ok=P.origin_allowed(self, self.app.allowed_origins),
+            peer_ok=P.peer_allowed(self))
+        return True
+
+    def _maybe_gateway_rpc_upgrade(self) -> bool:
+        """Serve the Qubit-dialect RPC WebSocket: ``/agent/api/gateway/ws``.
+
+        Owner decision 2026-09-18 (D2): the RPC/WS capability runs on the
+        existing single listener, sharing the one ticket authority and the
+        origin/peer/e-stop checks. Returns True when handled (accepted or
+        typed-rejected); False for any other path so normal routing and the
+        single-event-path WS refusal stay authoritative.
+        """
+        if self.headers.get("Upgrade", "").strip().lower() != "websocket":
+            return False
+        api_path = self.path.split("?")[0]
+        if api_path.startswith("/agent"):
+            api_path = api_path[len("/agent"):]
+        if api_path.rstrip("/") != "/api/gateway/ws":
+            return False
+        from . import pty_ws as P
+        q = query_params(self.path)
+        self.app.rpc_ws.serve(
+            self, ticket_value=q.get("ticket", ""),
+            origin_ok=P.origin_allowed(self, self.app.allowed_origins),
+            peer_ok=P.peer_allowed(self))
+        return True
+
+    def _refuse_qubit_ws(self) -> bool:
+        """Typed HTTP 426 refusal for a Qubit WebSocket upgrade (audit §1D).
 
         Returns True when the request was an ``Upgrade: websocket`` for a
-        gated Hermes path and the typed envelope was written. No WS server is
+        gated Qubit path and the typed envelope was written. No WS server is
         started; the connection is closed cleanly. Auth is intentionally not
         consulted: browser WebSocket clients cannot attach the session-token
         header, and a policy refusal is not secret — requiring auth would
@@ -1520,15 +2025,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
             api_path = api_path[len("/agent"):]
         if len(api_path) > 1:
             api_path = api_path.rstrip("/")
-        code = HERMES_WS_GATE_CODES.get(api_path)
+        code = QUBIT_WS_GATE_CODES.get(api_path)
         if not code:
             return False
-        detail = HERMES_WS_GATE_DETAIL.get(code, "")
-        counterpart = HERMES_WS_GATE_COUNTERPART.get(code, "")
+        detail = QUBIT_WS_GATE_DETAIL.get(code, "")
+        counterpart = QUBIT_WS_GATE_COUNTERPART.get(code, "")
         # One policy source: reuse the GATED row's detail/counterpart when the
         # same GET path already carries this code (pty/console/ws).
         try:
-            from . import hermes_compat as HC
+            from . import qubit_compat as HC
             route, _ = HC.match("GET", api_path)
             if route and route.get("disposition") == "gated":
                 gate = route.get("gate") or {}
@@ -1539,23 +2044,27 @@ class WebUIHandler(BaseHTTPRequestHandler):
             pass
         self.close_connection = True
         self._json({"ok": False, "state": "UNAVAILABLE", "code": code,
-                    "detail": detail, "owner": HERMES_WS_OWNER,
-                    "rollback": HERMES_WS_ROLLBACK, "ws": "single-sse",
+                    "detail": detail, "owner": QUBIT_WS_OWNER,
+                    "rollback": QUBIT_WS_ROLLBACK, "ws": "single-sse",
                     "qubit_counterpart": counterpart}, 426)
         # Route through the handler's log hook (no-op here by design) and the
         # audit journal. Only the path + code — never headers or query tokens.
-        self.log_message("hermes websocket refused: %s code=%s", api_path, code)
+        self.log_message("qubit websocket refused: %s code=%s", api_path, code)
         log_event("webui.hermes.ws_refused", path=api_path, code=code,
                   state="UNAVAILABLE")
         return True
 
     # -- routes ----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
-        if self._refuse_hermes_ws():
+        if self._maybe_pty_upgrade():
+            return
+        if self._maybe_gateway_rpc_upgrade():
+            return
+        if self._refuse_qubit_ws():
             return
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
-            # Qubit rebrand: the public dashboard lives at /chat.
+            # Ruling 3 → Option A: the root lands on the Qubit chat workspace.
             self._redirect("/chat")
             return
         if path == "/hermes" or path.startswith("/hermes/"):
@@ -1566,29 +2075,29 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if path.startswith("/agent/"):
             # Qubit-owned SPA API prefix -> native compat dispatch
             # (``/agent/api/<x>`` is rewritten to ``/api/<x>``).
-            self._hermes_api("GET")
+            self._qubit_api("GET")
             return
         # Built dashboard assets are served from Qubit-owned root paths.
         if (path.startswith("/assets/") or path.startswith("/fonts/")
                 or path.startswith("/fonts-terminal/")
                 or path.startswith("/plugins/")):
-            self._serve_hermes_static(path)
+            self._serve_qubit_static(path)
             return
         if path.startswith("/dashboard-plugins/"):
-            self._serve_hermes_plugin(path[len("/dashboard-plugins/"):])
+            self._serve_qubit_plugin(path[len("/dashboard-plugins/"):])
             return
         if path == "/favicon.ico":
-            self._serve_hermes_static("/favicon.ico")
+            self._serve_qubit_static("/favicon.ico")
             return
         # Every canonical public dashboard route renders the root-served SPA
         # shell; Qubit family aliases redirect to their real Qubit route. No
         # redirect into an upstream-named prefix, ever.
-        _alias = hermes_alias_target(path)
+        _alias = qubit_alias_target(path)
         if _alias is not None:
             if _alias != _normalize_route(path):
                 self._redirect(_alias)
             else:
-                self._serve_hermes_index()
+                self._serve_qubit_index()
             return
         if path == "/classic/" or path == "/classic/index.html":
             fp = self._frontend_file("index.html")
@@ -1672,6 +2181,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
+            # B-01R: the classic ``/api/status`` is the native Qubit runtime
+            # contract (``bridge``/``route``/``busy``/``web_active``/
+            # ``uptime_s``/``awaiting_input``/``tts``) that terminal status and
+            # health, the CLI, and the classic dashboard poll. The
+            # Qubit-compatible status document lives on the SPA prefix
+            # (``/agent/api/status`` -> ``qubit_compat.h_status`` / fork
+            # proxy), so both contracts coexist under one authority each.
             self._json(self.app.status())
         elif path == "/api/runtime":
             # Backend-authoritative runtime inventory (product, agent
@@ -1882,20 +2398,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self._json({"state": "degraded", "detail": str(exc)[:160]})
         elif path == "/api/profiles":
-            # Packet 7D: provider/profile registry (read-only list/show/check).
+            # PRB-09 one authority: the Qubit handler serves the redacted
+            # profile shape + canonical active selection; `/api/profiles` is in
+            # QUBIT_READ_AUTHORITY, so both prefixes resolve to it (never the
+            # fork's raw profile records, which expose absolute paths).
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
-            from . import profiles as P
-            kind = None
-            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-            for kv in qs.split("&"):
-                if kv.startswith("kind="):
-                    kind = kv.split("=", 1)[1]
-            if kind and kind in ("brain", "stt", "tts", "voice", "audio"):
-                self._json(P.profiles_show(self.app.orch.cfg, kind))
-                return
-            self._json(P.profiles_list(self.app.orch.cfg))
+            self._qubit_api("GET")
         elif path == "/api/profiles/check":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -2137,48 +2647,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self._json({"state": "degraded", "detail": str(exc)[:200]})
         elif path == "/api/power":
-            # Packet 8O: one authenticated policy path. Read-only inventory +
-            # control/grant status here; mutations go through POST with explicit
-            # confirmation. Never executes or launches anything.
+            # Packet 8O: one authenticated policy path. Delegates to the SAME
+            # compat handler the SPA's /agent/api/power reaches, so the classic
+            # dashboard and the SPA share one power/e-stop implementation.
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
-            try:
-                from . import power as PW
-                qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-                params = {}
-                for kv in qs.split("&"):
-                    if "=" in kv:
-                        k, v = kv.split("=", 1)
-                        params[k] = __import__(
-                            "urllib.parse").parse.unquote_plus(v)
-                if params.get("capability"):
-                    policy = PW.power_policy(self.app.orch.cfg)
-                    out = policy.check(
-                        params["capability"],
-                        scopes=tuple(params.get("scope", "").split(",")) if
-                        params.get("scope") else (),
-                        target=params.get("target", "") or "",
-                        role=params.get("role", "") or "",
-                        account_scope=params.get("account", "") or "")
-                    out["state"] = "OK" if out["allowed"] else "denied"
-                    self._json(out)
-                    return
-                store = PW.power_grant_store(self.app.orch.cfg)
-                self._json({
-                    "state": "OK",
-                    "profile": PW.power_profile(self.app.orch.cfg),
-                    "grant": store.grant().to_dict() if store.grant() else None,
-                    "grant_health": store.health(),
-                    "control": PW.power_control(self.app.orch.cfg).status(),
-                    "mcp": PW.mcp_status(self.app.orch.cfg),
-                })
-            except PW.PowerError as exc:
-                self._json({"state": "failed",
-                            "code": getattr(exc, "code", "POWER_ERROR"),
-                            "detail": str(exc)[:200]})
-            except Exception as exc:
-                self._json({"state": "degraded", "detail": str(exc)[:200]})
+            from . import qubit_compat as _HC
+            code, out = _HC.h_power(self.app.orch.cfg,
+                                    query_params(self.path), {}, {})
+            self._json(out, code)
         elif path == "/api/device/status":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -2199,20 +2677,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
-            # ?limit=200&q=foo&since=<unix ts>
-            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
-            params: Dict[str, str] = {}
-            for kv in qs.split("&"):
-                if "=" in kv:
-                    k, v = kv.split("=", 1)
-                    params[k] = v
-            limit = min(int(params.get("limit", "200")), 500)
-            q = params.get("q", "").strip()[:80]
-            try:
-                since = float(params.get("since", ""))
-            except Exception:
-                since = 0.0
-            self._json({"items": self.app.logs(limit=limit, q=q, since=since)})
+            # B-01 one authority: the fork's LogsResponse (``{file, lines}``)
+            # the SPA expects, served on both prefixes (the old classic
+            # ``{items}`` branch was the conflicting shadow).
+            self._qubit_api("GET")
         elif path == "/api/shared":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
@@ -2292,10 +2760,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # as /achievements or /kanban, or a deep link). Serve the shell;
             # the client router resolves it or renders its own not-found. The
             # API/compat namespaces stay honest 404s.
-            if path.startswith(("/api/", "/agent", "/hermes")):
+            if (path.startswith(("/api/", "/hermes")) or path == "/agent"
+                    or path.startswith("/agent/")):
                 self._send(404, b"not found")
             else:
-                self._serve_hermes_index()
+                self._serve_qubit_index()
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
@@ -2570,23 +3039,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return
             try:
                 from . import dashboard_ops as OPS
+                from . import qubit_compat as HC
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length).decode() or "{}")
                 cfg = self.app.orch.cfg
+                # One canonical operation path: the classic surface and the
+                # SPA compat route share these helpers (same dashboard_ops
+                # contract, same journal), so /api/ops/run and /api/ops/confirm
+                # are implemented once (audit finding.same_path_dup_8).
                 if path == "/api/ops/run":
-                    args = body.get("args")
-                    out = OPS.run_op(cfg, str(body.get("id", "")),
-                                     dict(args) if isinstance(args, dict)
-                                     else {},
-                                     actor="dashboard:user",
-                                     session="dashboard")
+                    out = HC.ops_run_request(cfg, body)
                 elif path == "/api/ops/confirm":
-                    sensitive = body.get("sensitive")
-                    out = OPS.confirm_op(
-                        cfg, str(body.get("confirmation_id", "")),
-                        actor="dashboard:user", session="dashboard",
-                        sensitive=dict(sensitive)
-                        if isinstance(sensitive, dict) else None)
+                    out = HC.ops_confirm_request(cfg, body)
                 elif path == "/api/approvals/respond":
                     # Approvals page: approve executes the staged backend
                     # exactly once (same path as ops confirm + CLI
@@ -2800,112 +3264,44 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self._json({"state": "FAILED", "detail": str(exc)[:160]}, 409)
         elif path == "/api/power":
-            # Packet 8O: mutating power-control/grant actions (explicit confirm).
+            # Packet 8O: mutating power-control/grant actions (explicit
+            # confirm). Delegates to the SAME compat handler the SPA's
+            # /agent/api/power reaches: one power/e-stop authority.
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
             try:
-                from . import power as PW
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length).decode() or "{}")
-                action = str(body.get("action", ""))
-                confirmed = bool(body.get("confirmed", False))
-                store = PW.power_grant_store(self.app.orch.cfg)
-                control = PW.power_control(self.app.orch.cfg)
-                if action == "grant":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "grant requires explicit "
-                                              "confirmation"})
-                        return
-                    g = store.issue(
-                        browsers=tuple(body.get("browsers") or ()),
-                        apps=tuple(body.get("apps") or ()),
-                        accounts=tuple(body.get("accounts") or ()),
-                        origins=tuple(body.get("origins") or ()),
-                        directories=tuple(body.get("directories") or ()),
-                        scopes=tuple(body.get("scopes") or ()),
-                        capabilities=tuple(body.get("capabilities") or ()),
-                        ttl_s=body.get("ttl"),
-                        note=str(body.get("note", ""))[:2000],
-                        issued_by="dashboard")
-                    self._json({"state": "OK", "grant": g.to_dict()})
-                elif action == "revoke":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "revoke requires explicit "
-                                              "confirmation"})
-                        return
-                    g = store.revoke(str(body.get("grant_id", "")),
-                                     issued_by="dashboard")
-                    self._json({"state": "OK", "revoked": g.to_dict()})
-                elif action == "reset-grant":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "reset-grant requires explicit "
-                                              "confirmation"})
-                        return
-                    store.reset(issued_by="dashboard")
-                    self._json({"state": "OK", "grant": None})
-                elif action == "emergency-stop":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "emergency stop requires explicit "
-                                              "confirmation"})
-                        return
-                    self._json(control.emergency_stop(issued_by="dashboard"))
-                elif action == "reset":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "reset requires explicit human "
-                                              "confirmation"})
-                        return
-                    self._json(control.reset(issued_by="dashboard"))
-                elif action == "disable":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "disable requires explicit "
-                                              "confirmation"})
-                        return
-                    self._json(control.global_disable(issued_by="dashboard"))
-                elif action == "enable":
-                    if not confirmed:
-                        self._json({"state": "denied",
-                                    "code": "CONFIRMATION_REQUIRED",
-                                    "detail": "enable requires explicit "
-                                              "confirmation"})
-                        return
-                    self._json(control.global_enable(issued_by="dashboard"))
-                else:
-                    self._json({"state": "failed",
-                                "detail": f"unknown action {action}"}, 400)
-            except PW.PowerDenied as exc:
-                self._json({"state": "denied", "code": exc.code,
-                            "detail": exc.detail})
-            except PW.PowerError as exc:
-                self._json({"state": "failed",
-                            "code": getattr(exc, "code", "POWER_ERROR"),
-                            "detail": str(exc)[:200]})
-            except Exception as exc:
-                self._json({"state": "failed", "detail": str(exc)[:200]})
+            except ValueError:
+                self._json({"state": "failed", "code": "MALFORMED",
+                            "detail": "bad json body"}, 400)
+                return
+            from . import qubit_compat as _HC
+            code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})
+            self._json(out, code)
             return
         elif path == "/api/device/enroll":
             if not self._api_token_ok():
                 self._send(401, b"unauthorized")
                 return
+            body: Dict[str, Any] = {}
             try:
-                from . import device as Dev
-                rec = Dev.enroll(self.app.orch.cfg, require_new_authorization=False)
-                self._json({"enrolled": True, "detail": "device enrolled",
-                            "machine_id": rec.get("machine_id")})
-            except Exception as exc:
-                self._json({"enrolled": False, "detail": str(exc)[:160]}, 403)
+                length = int(self.headers.get("Content-Length", 0))
+            except (TypeError, ValueError):
+                length = 0
+            if length:
+                try:
+                    parsed = json.loads(
+                        self.rfile.read(length).decode("utf-8", "replace")
+                        or "{}")
+                except ValueError:
+                    parsed = {}
+                if isinstance(parsed, dict):
+                    body = parsed
+            # Same confirmed, audited authority as the SPA prefix route; the
+            # old unconditional enrollment bypass is gone.
+            self._device_enroll_impl(body)
         elif path == "/api/setup/run":
             # Packet 8T: staged setup run. Dry-run preview by default;
             # mutations need explicit {"apply": true, "confirm": true}.
@@ -3233,31 +3629,31 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # Authentication is the per-channel HMAC signature, never the
             # dashboard token; unsigned/unknown requests fail closed typed.
             self._channel_ingress(path)
-        elif path.startswith("/agent/api/"):
+        elif path.startswith("/agent/"):
             # Qubit SPA POST backend (compat, same modules as CLI/voice).
             # Auth: X-Hermes-Session-Token or X-Api-Token.
-            self._hermes_api("POST")
+            self._qubit_api("POST")
         else:
             self._send(404, b"not found")
 
     def do_PUT(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
-        if path.startswith("/agent/api/"):
-            self._hermes_api("PUT")
+        if path.startswith("/agent/"):
+            self._qubit_api("PUT")
         else:
             self._send(404, b"not found")
 
     def do_PATCH(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
-        if path.startswith("/agent/api/"):
-            self._hermes_api("PATCH")
+        if path.startswith("/agent/"):
+            self._qubit_api("PATCH")
         else:
             self._send(404, b"not found")
 
     def do_DELETE(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
-        if path.startswith("/agent/api/"):
-            self._hermes_api("DELETE")
+        if path.startswith("/agent/"):
+            self._qubit_api("DELETE")
         else:
             self._send(404, b"not found")
 
@@ -3265,7 +3661,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
 REPO_FRONTEND = resources.resource_path("frontend")
 
 
-# Curated user guide for the dashboard /docs page (Hermes DocsPage
+# Curated user guide for the dashboard /docs page (Qubit DocsPage
 # equivalent). Allowlisted files only: user-facing, secret-scanned, no
 # machine-specific paths. Served from the installed package data when
 # present, else the repository docs/ checkout; absent in minimal
@@ -3287,7 +3683,8 @@ def _docs_dir() -> Optional[Path]:
             return installed
     except OSError:
         pass
-    repo = Path(__file__).resolve().parents[1] / "docs"
+    repo = (Path(__file__).resolve().parents[1] / "docs"
+            / "archive" / "2026-09-21")
     try:
         if (repo / "HowTo.md").is_file():
             return repo
@@ -3410,11 +3807,17 @@ class WebUI:
         self._asr_factory = asr_factory or _default_asr_factory(orchestrator)
         self._tts = tts
         self._state_dir = state_dir or Path("/tmp")
-        # Point the vendored Hermes backend at a Qubit-owned runtime home (never
-        # the operator's real ~/.hermes) before the in-process bridge starts.
+        # Point the vendored Qubit backend at the single Qubit-owned runtime
+        # home for THIS instance's config (``cfg.state_dir()/runtime``) before
+        # the in-process bridge starts. Never the operator's real ~/.hermes and
+        # never a second ``<state>/qubit`` home: the CLI, dashboard bridge, and
+        # voice must all open the exact same state.db/kanban.db (audit A8),
+        # and PRB-03 requires the home to follow ``cfg.state_dir()``.
         try:
-            from . import hermes_asgi as _HA
-            _HA.set_home(str(self._state_dir / "qubit"))
+            from . import qubit_asgi as _HA
+            from . import qubit_runtime as _HR
+            _HA.set_home(str(_HR.runtime_home_for_cfg(
+                getattr(self.orch, "cfg", None))))
         except Exception:
             pass
         # pre-seed the live feed from the persisted event journal so the
@@ -3447,6 +3850,13 @@ class WebUI:
         # optional shared secret for tunneled/external access (config: webui.token)
         self.api_token: str = orchestrator.cfg.get("webui", "token", default="") if orchestrator is not None else ""
         self.allowed_origins = orchestrator.cfg.get("webui", "allowed_origins", default=[]) if orchestrator is not None else []
+        # Qubit terminal WebSocket (/agent/api/pty): one upgrade path on THIS
+        # listener, no second server. Lazily constructed so the module (and the
+        # vendored fork) load only when /chat actually opens a terminal.
+        self._pty_ws: Optional[Any] = None
+        # Qubit-dialect RPC WebSocket (/agent/api/gateway/ws): the D2 adapter
+        # on the SAME listener, sharing the one ticket authority. Lazy.
+        self._rpc_ws: Optional[Any] = None
         _sd = state_dir or Path("/tmp")
         try:
             from .approvals import ApprovalJournal
@@ -3530,6 +3940,33 @@ class WebUI:
             return
         self.runs.cancel(run_id, reason=reason)
 
+    @property
+    def pty_ws(self) -> Any:
+        """The single PTY-WebSocket authority for this listener (lazy)."""
+        srv = getattr(self, "_pty_ws", None)
+        if srv is None:
+            from . import pty_ws as _pty
+            srv = _pty.PtyWsServer(
+                cfg=(self.orch.cfg if self.orch is not None else None))
+            self._pty_ws = srv
+        return srv
+
+    @property
+    def rpc_ws(self) -> Any:
+        """The single Qubit-dialect RPC-WebSocket authority (D2).
+
+        Shares the listener's one PTY ticket store (single-use, single
+        authority) so an RPC socket consumes a scoped ticket minted over the
+        authenticated HTTP route; no second listener or ticket authority."""
+        srv = getattr(self, "_rpc_ws", None)
+        if srv is None:
+            from .gateway import rpc_ws as _rw
+            srv = _rw.RpcWsServer(
+                cfg=(self.orch.cfg if self.orch is not None else None),
+                tickets=self.pty_ws.tickets)
+            self._rpc_ws = srv
+        return srv
+
     # -- lifecycle --------------------------------------------------------
     def start(self) -> None:
         loopback = self.host in ("127.0.0.1", "localhost", "::1")
@@ -3556,6 +3993,12 @@ class WebUI:
         # blocking server_close() (ThreadingHTTPServer joins handler threads
         # when block_on_close is set; an open stream would otherwise stall the
         # accept loop and the test suite in selectors.py).
+        pty = getattr(self, "_pty_ws", None)
+        if pty is not None:
+            try:
+                pty.cancel_all()
+            except Exception:
+                log.exception("webui.stop: pty cancel_all failed")
         hub = getattr(self, "_events_hub", None)
         if hub is not None:
             try:

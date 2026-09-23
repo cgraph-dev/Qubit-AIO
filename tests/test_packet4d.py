@@ -230,7 +230,7 @@ def test_create_candidate_uses_aligned_persona_not_inline_v2():
     assert "_aligned_persona()" in body
     # and the aligned refusal line must exist in the winner config
     winner = json.loads(
-        (REPO_ROOT / "docs" / "ALIGN_4D_winner.json").read_text())
+        (REPO_ROOT / "docs/archive/2026-09-21" / "ALIGN_4D_winner.json").read_text())
     assert "REFUSE IMMEDIATE ACTIONS FOR DESTRUCTION" in winner["persona"]
 
 
@@ -271,6 +271,6 @@ def test_created_modelfile_carries_aligned_system(tmp_path):
     assert m.group(1).strip(), f"EMPTY persona:\n{mf[:400]}"
     sys_text = m.group(1)
     winner = json.loads(
-        (REPO_ROOT / "docs" / "ALIGN_4D_winner.json").read_text())
+        (REPO_ROOT / "docs/archive/2026-09-21" / "ALIGN_4D_winner.json").read_text())
     assert "REFUSE IMMEDIATE ACTIONS FOR DESTRUCTION" in sys_text
     assert sys_text.strip().startswith(winner["persona"].strip()[:40])

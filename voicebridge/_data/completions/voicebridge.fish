@@ -16,6 +16,8 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a browser
 complete -c voicebridge -n '__fish_use_subcommand' -f -a bundles
 complete -c voicebridge -n '__fish_use_subcommand' -f -a capability
 complete -c voicebridge -n '__fish_use_subcommand' -f -a channels
+complete -c voicebridge -n '__fish_use_subcommand' -f -a chat-sessions
+complete -c voicebridge -n '__fish_use_subcommand' -f -a chat_sessions
 complete -c voicebridge -n '__fish_use_subcommand' -f -a checkpoints
 complete -c voicebridge -n '__fish_use_subcommand' -f -a claw
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion

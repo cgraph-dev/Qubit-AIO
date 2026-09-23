@@ -5,7 +5,7 @@ Qubit surfaces on the SAME backend function:
 
 * ``voicebridge.voice_commands`` (spoken registry: resolve -> execute/confirm);
 * ``voicebridge.cli`` (``qubit transfers|recall|documents|ask|shares``);
-* ``voicebridge.hermes_compat`` (dashboard HTTP compat routes), including the
+* ``voicebridge.qubit_compat`` (dashboard HTTP compat routes), including the
   public ``GET /share/{id}`` view authenticated by the SHARE token alone.
 
 Every assertion is a real read/mutation over isolated temp state: no skips,
@@ -24,7 +24,7 @@ from voicebridge import active_memory as AM
 from voicebridge import cli as CLI
 from voicebridge import doc_extract as DE
 from voicebridge import file_transfer as FT
-from voicebridge import hermes_compat as HC
+from voicebridge import qubit_compat as HC
 from voicebridge import node_host as NH
 from voicebridge import projects as PJ
 from voicebridge import question_prompt as QP

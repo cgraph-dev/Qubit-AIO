@@ -24,15 +24,15 @@ PYPROJECT = REPO / "pyproject.toml"
 
 # Internal agent reports/evidence that must never reach the release sdist.
 INTERNAL_SDIST_DOCS = (
-    "docs/QUBIT_QBPV2_PACKAGING.md",
-    "docs/QUBIT_QBPV_PACKAGING_SECURITY.md",
-    "docs/QUBIT_BYTE_PARITY_EVIDENCE.md",
-    "docs/QUBIT_REACHABILITY_AUDIT.md",
+    "docs/archive/2026-09-21/QUBIT_QBPV2_PACKAGING.md",
+    "docs/archive/2026-09-21/QUBIT_QBPV_PACKAGING_SECURITY.md",
+    "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_EVIDENCE.md",
+    "docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md",
 )
 
-PLUGINS = ("qubit-approvals", "qubit-boards", "qubit-brand", "qubit-chat",
-           "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-ops",
-           "qubit-reports", "qubit-runtime")
+PLUGINS = ("qubit-approvals", "qubit-boards", "qubit-brand",
+           "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
+           "qubit-ops", "qubit-reports", "qubit-runtime")
 
 
 def _targets() -> tuple[dict, dict]:
@@ -68,19 +68,22 @@ def _frontend_tree_packaged(wheel: dict) -> bool:
 def test_pyproject_ships_fork_dashboard_and_plugins():
     wheel, sdist = _targets()
     # dashboard bake ships in both artifacts
-    assert "frontend/hermes-dist" in wheel["artifacts"]
-    assert "frontend/hermes-dist" in sdist["artifacts"]
+    assert "frontend/qubit-dist" in wheel["artifacts"]
+    assert "frontend/qubit-dist" in sdist["artifacts"]
     include = wheel["force-include"]
     # fork runtime + package data + license
-    assert any(k.startswith("qubit_hermes/") for k in include)
-    assert include.get("qubit_hermes/LICENSE") == \
-        "voicebridge/_data/qubit_hermes/LICENSE"
+    assert any(k.startswith("qubit_runtime/") for k in include)
+    assert include.get("qubit_runtime/LICENSE") == \
+        "voicebridge/_data/qubit_runtime/LICENSE"
     # whole frontend tree (dashboard + hermes-qubit plugin assets) is packaged
     assert _frontend_tree_packaged(wheel)
-    # provenance manifest travels with the installed runtime
-    assert "docs/QUBIT_HERMES_VENDOR_MANIFEST.json" in include
+    # provenance manifest travels with the installed runtime (source moved to
+    # docs/archive/2026-09-21/ in the docs reorg; wheel keeps docs/ dest)
+    assert include.get(
+        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+    ) == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
     # the sdist mirrors the fork subset so a wheel can be rebuilt offline
-    assert any(k.startswith("qubit_hermes/") for k in sdist["force-include"])
+    assert any(k.startswith("qubit_runtime/") for k in sdist["force-include"])
 
 
 def test_pyproject_excludes_internal_wave_docs_from_sdist():
@@ -96,7 +99,7 @@ def test_pyproject_metadata_declares_launchers_and_licenses():
     assert "THIRD_PARTY_NOTICES.md" in project["license-files"]
     scripts = project["scripts"]
     assert scripts["qubit"] == "voicebridge.cli:main"
-    assert scripts["qubit-hermes"] == "voicebridge.hermes_runtime:entry"
+    assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:entry"
 
 
 # ===========================================================================
@@ -110,16 +113,16 @@ def test_wheel_contains_fork_dashboard_plugins_and_metadata():
     assert len(wheels) == 1, f"expected one wheel in {art}: {wheels}"
     with zipfile.ZipFile(wheels[0]) as z:
         names = z.namelist()
-        assert any(n.endswith("_data/qubit_hermes/hermes_cli/main.py")
+        assert any(n.endswith("_data/qubit_runtime/qubit_cli/main.py")
                    for n in names), "fork runtime missing from wheel"
-        assert any(n.endswith("_data/qubit_hermes/LICENSE") for n in names)
-        assert any(n.endswith("_data/frontend/hermes-dist/index.html")
+        assert any(n.endswith("_data/qubit_runtime/LICENSE") for n in names)
+        assert any(n.endswith("_data/frontend/qubit-dist/index.html")
                    for n in names), "dashboard bundle missing from wheel"
         for plugin in PLUGINS:
             assert any(n.endswith(
-                f"_data/frontend/hermes-qubit/plugins/{plugin}/"
+                f"_data/frontend/qubit-app/plugins/{plugin}/"
                 f"{plugin}.js") for n in names), f"plugin asset missing: {plugin}"
-        assert any(n.endswith("docs/QUBIT_HERMES_VENDOR_MANIFEST.json")
+        assert any(n.endswith("docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json")
                    for n in names)
         assert any("dist-info/licenses/THIRD_PARTY_NOTICES.md" in n
                    for n in names)
@@ -127,7 +130,7 @@ def test_wheel_contains_fork_dashboard_plugins_and_metadata():
         entry = z.read(next(n for n in names
                             if n.endswith("dist-info/entry_points.txt"))).decode()
         assert re.search(r"^qubit\s*=\s*voicebridge\.cli:main$", entry, re.M)
-        assert re.search(r"^qubit-hermes\s*=\s*voicebridge\.hermes_runtime:entry$",
+        assert re.search(r"^qubit-runtime\s*=\s*voicebridge\.qubit_runtime:entry$",
                          entry, re.M)
         _assert_clean(names, "wheel")
 
@@ -140,14 +143,14 @@ def test_sdist_contains_fork_dashboard_plugins_and_metadata():
     assert len(sdists) == 1, f"expected one sdist in {art}: {sdists}"
     with tarfile.open(sdists[0]) as t:
         names = t.getnames()
-        assert any(n.endswith("/qubit_hermes/hermes_cli/main.py")
+        assert any(n.endswith("/qubit_runtime/qubit_cli/main.py")
                    for n in names), "fork runtime missing from sdist"
-        assert any(n.endswith("/qubit_hermes/LICENSE") for n in names)
-        assert any(n.endswith("/frontend/hermes-dist/index.html")
+        assert any(n.endswith("/qubit_runtime/LICENSE") for n in names)
+        assert any(n.endswith("/frontend/qubit-dist/index.html")
                    for n in names), "dashboard bundle missing from sdist"
         for plugin in PLUGINS:
             assert any(n.endswith(
-                f"/frontend/hermes-qubit/plugins/{plugin}/{plugin}.js")
+                f"/frontend/qubit-app/plugins/{plugin}/{plugin}.js")
                 for n in names), f"plugin asset missing: {plugin}"
         assert any(n.endswith("/pyproject.toml") for n in names)
         assert any(n.endswith("/PKG-INFO") for n in names)

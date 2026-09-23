@@ -131,7 +131,7 @@ def _stub_stream(monkeypatch, reply="stream reply"):
 
     def _fake(text, conversation_prompt="", model="qubit-brain4",
               timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
-              should_stop=None, num_ctx=None):
+              should_stop=None, num_ctx=None, reasoning=None):
         seen.append({"text": text, "model": model})
         if on_sentence:
             on_sentence(reply)
@@ -147,8 +147,8 @@ def _stub_stream(monkeypatch, reply="stream reply"):
 # ------------------------------------------- streaming model authority
 def test_chat_stream_route_is_declared_in_the_route_authority():
     """The Qubit streaming front door is a first-class route in the single
-    authority (hermes_compat.ROUTES), not a webui-only hardcoded string."""
-    from voicebridge import hermes_compat as HC
+    authority (qubit_compat.ROUTES), not a webui-only hardcoded string."""
+    from voicebridge import qubit_compat as HC
 
     route, _params = HC.match("POST", "/api/qubit/chat/stream")
     assert route is not None, "POST /api/qubit/chat/stream is not declared"
@@ -361,20 +361,19 @@ def test_retry_after_error_completes_without_duplicating(tmp_path, monkeypatch):
     assert again["code"] == "NOTHING_TO_RETRY"
 
 
-# --------------------------------------------- WS gate: no raw PTY / 1006
-def test_ws_upgrade_to_pty_is_typed_426_not_a_loop(tmp_path, monkeypatch):
-    """The Hermes PTY/WS endpoints answer a WebSocket upgrade with a typed
-    HTTP 426 and NO upgrade headers, so a browser can never hold a socket that
-    drops with code 1006 and reconnect-loops."""
+# --------------------------------------------- WS gate: scoped PTY ticket
+def test_ws_upgrade_to_pty_requires_ticket_not_a_loop(tmp_path, monkeypatch):
+    """The `/chat` terminal upgrade is served only with a short-lived scoped
+    ticket. A ticketless upgrade is a typed HTTP 401 (no hang, no 1006
+    reconnect loop); an unknown WS upgrade path is a plain 404. Owner decision
+    2026-09-17 replaced the blanket PTY refusal with this authenticated path."""
     cfg, state = _cfg(tmp_path, monkeypatch)
     ui, port = _start_webui(cfg, state)
     try:
         status, headers, out = _http(
             port, "GET", "/agent/api/pty", upgrade_ws=True)
-        assert status == 426
-        assert out["code"] == "PTY_NO_SHELL"
-        assert out["ws"] == "single-sse"
-        assert "Upgrade" not in headers
+        assert status == 401
+        assert out["code"] == "TICKET_REQUIRED"
         assert "Sec-WebSocket-Accept" not in headers
         # An unknown WS upgrade path is a plain 404 (no hang, no socket).
         status2, _, _ = _http(port, "GET", "/agent/api/unknown",
@@ -389,10 +388,10 @@ def test_normal_chat_page_uses_no_raw_pty_route(tmp_path, monkeypatch):
     PTY stream; the WS gate code mapping must classify /api/pty as PTY."""
     from voicebridge import webui as W
 
-    assert W.hermes_ws_gate_code("/agent/api/pty") == "PTY_NO_SHELL"
-    assert W.hermes_ws_gate_code("/api/console") == "PTY_NO_SHELL"
-    assert W.hermes_ws_gate_code("/api/qubit/chat") is None
-    assert W.hermes_ws_gate_code("/agent/api/qubit/chat/stream") is None
+    assert W.qubit_ws_gate_code("/agent/api/pty") == "PTY_NO_SHELL"
+    assert W.qubit_ws_gate_code("/api/console") == "PTY_NO_SHELL"
+    assert W.qubit_ws_gate_code("/api/qubit/chat") is None
+    assert W.qubit_ws_gate_code("/agent/api/qubit/chat/stream") is None
 
 
 def test_activity_alias_redirects_to_logs(tmp_path, monkeypatch):
@@ -400,9 +399,9 @@ def test_activity_alias_redirects_to_logs(tmp_path, monkeypatch):
     removing the unreachable static-page branch preserves the 302 redirect."""
     from voicebridge import webui as W
 
-    assert W.hermes_alias_target("/activity") == "/logs"
-    assert W.hermes_alias_target("/activity.html") == "/logs"
-    assert W.HERMES_ROUTE_ALIASES["/activity"] == "/logs"
+    assert W.qubit_alias_target("/activity") == "/logs"
+    assert W.qubit_alias_target("/activity.html") == "/logs"
+    assert W.QUBIT_ROUTE_ALIASES["/activity"] == "/logs"
     # The legacy constant stays defined (referenced by the rebrand suite).
     assert "Qubit Agent" in W.ACTIVITY_PAGE
     cfg, state = _cfg(tmp_path, monkeypatch)
@@ -418,7 +417,7 @@ def test_activity_alias_redirects_to_logs(tmp_path, monkeypatch):
 def test_served_chat_chunk_opens_no_raw_pty_websocket():
     """The built normal-chat chunks must not open a WebSocket or a raw
     /api/pty path (that is what produced the code-1006 reconnect loop)."""
-    dist = REPO_ROOT / "frontend" / "hermes-dist" / "assets"
+    dist = REPO_ROOT / "frontend" / "qubit-dist" / "assets"
     chunks = sorted(dist.glob("ChatPage-*.js"))
     if not chunks:
         pytest.skip("hermes-dist not built (npm build step)")
@@ -505,7 +504,7 @@ def test_cli_dashboard_voice_share_brain4_authority(tmp_path, monkeypatch):
     compat model surfaces all resolve the same configured Qubit brain."""
     from voicebridge import agent as AG
     from voicebridge import chat_transport as CT
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg, _ = _cfg(tmp_path, monkeypatch)
     assert CT.configured_model(cfg) == "qubit-brain4"
@@ -515,13 +514,13 @@ def test_cli_dashboard_voice_share_brain4_authority(tmp_path, monkeypatch):
 
 
 # --------------------------------------------- one fork home (never ~/.hermes)
-def test_hermes_runtime_home_is_qubit_owned(tmp_path, monkeypatch):
+def test_qubit_runtime_home_is_qubit_owned(tmp_path, monkeypatch):
     """The fork's home resolves to the Qubit-owned runtime dir, and the
     dashboard bridge resolves the exact same home (one authority)."""
-    from voicebridge import hermes_runtime as HR
+    from voicebridge import qubit_runtime as HR
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
 
     home = HR.default_home()
@@ -529,44 +528,44 @@ def test_hermes_runtime_home_is_qubit_owned(tmp_path, monkeypatch):
     assert home != tmp_path / ".hermes"
     assert HR._external_default_home() == tmp_path / ".hermes"
 
-    saved = os.environ.get("HERMES_HOME")
+    saved = os.environ.get("QUBIT_HOME")
     try:
         resolved = HR.use_qubit_home()
         assert resolved == home
-        assert os.environ["HERMES_HOME"] == str(home)
+        assert os.environ["QUBIT_HOME"] == str(home)
     finally:
         if saved is None:
-            os.environ.pop("HERMES_HOME", None)
+            os.environ.pop("QUBIT_HOME", None)
         else:
-            os.environ["HERMES_HOME"] = saved
+            os.environ["QUBIT_HOME"] = saved
 
     # The dashboard bridge delegates to the same resolver (single home).
-    from voicebridge import hermes_asgi as HA
+    from voicebridge import qubit_asgi as HA
     src = HA.__file__
     assert src  # module importable
 
 
-def test_fork_get_hermes_home_is_the_qubit_home(tmp_path, monkeypatch):
+def test_fork_get_qubit_home_is_the_qubit_home(tmp_path, monkeypatch):
     """The vendored fork's own resolver returns the Qubit home after
-    ``use_qubit_home()`` (proves the fork env var is HERMES_HOME)."""
-    from voicebridge import hermes_runtime as HR
+    ``use_qubit_home()`` (proves the fork env var is QUBIT_HOME)."""
+    from voicebridge import qubit_runtime as HR
 
     script = (
         "import os\n"
-        "os.environ.pop('HERMES_HOME', None)\n"
-        "from voicebridge import hermes_runtime as HR\n"
+        "os.environ.pop('QUBIT_HOME', None)\n"
+        "from voicebridge import qubit_runtime as HR\n"
         "h = HR.use_qubit_home()\n"
         "HR.ensure_path()\n"
-        "from hermes_constants import get_hermes_home\n"
+        "from qubit_constants import get_qubit_home\n"
         "print(str(h))\n"
-        "print(str(get_hermes_home()))\n"
+        "print(str(get_qubit_home()))\n"
     )
     home = tmp_path / "home"
     home.mkdir()
     env = dict(os.environ)
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / "state")
-    env.pop("HERMES_HOME", None)
+    env.pop("QUBIT_HOME", None)
     env.pop("PYTHONPATH", None)
     proc = subprocess.run(
         [sys.executable, "-c", script], cwd=str(REPO_ROOT), env=env,
@@ -578,7 +577,7 @@ def test_fork_get_hermes_home_is_the_qubit_home(tmp_path, monkeypatch):
     assert str(home / ".hermes") not in lines[-1]
 
 
-def test_external_hermes_home_is_not_consulted(tmp_path):
+def test_external_qubit_home_is_not_consulted(tmp_path):
     """``qubit agent status`` uses the Qubit home and never reads (or writes)
     the external ``~/.hermes`` config."""
     home = tmp_path / "home"
@@ -593,7 +592,7 @@ def test_external_hermes_home_is_not_consulted(tmp_path):
     env["XDG_STATE_HOME"] = str(home / "state")
     env["XDG_CONFIG_HOME"] = str(home / ".config")
     env["XDG_DATA_HOME"] = str(home / ".local" / "share")
-    env.pop("HERMES_HOME", None)
+    env.pop("QUBIT_HOME", None)
     env.pop("PYTHONPATH", None)
     proc = subprocess.run(
         [sys.executable, "-m", "voicebridge", "agent", "status"],

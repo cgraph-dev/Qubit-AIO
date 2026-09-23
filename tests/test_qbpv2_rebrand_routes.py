@@ -2,7 +2,7 @@
 
 Proves the owner-agreed routing table against a real local WebUI listener:
 
-- ``/`` redirects to ``/chat`` (never ``/hermes``);
+- ``/`` redirects to ``/chat`` (Ruling 3 Option A; never ``/hermes``);
 - every public client route serves the SPA shell with the root div;
 - ``/hermes`` and ``/hermes/*`` are 404 with no redirect;
 - the SPA API prefix ``/agent/api/*`` reaches the compat backend;
@@ -28,6 +28,7 @@ CANONICAL_ROUTES = (
     "/chat", "/sessions", "/files", "/models", "/analytics", "/logs",
     "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
     "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
+    "/agents",
 )
 FAMILY_ROUTES = (
     "/activity", "/reports", "/operations", "/ops", "/approvals",
@@ -39,7 +40,7 @@ PLUGIN_ROUTES = (
     "/achievements", "/kanban", "/sessions/deep-link",
     "/profiles/new",
 )
-HERMES_PATHS = (
+QUBIT_PATHS = (
     "/hermes",
     "/hermes/",
     "/hermes/chat",
@@ -62,7 +63,7 @@ def _start(tmp_path):
     state.mkdir(exist_ok=True)
     p = tmp_path / "voice.yaml"
     p.write_text(f"logging:\n  jsonl_path: '{state}'\n"
-                 f"webui:\n  token: test-token\n  hermes_backend: false\n")
+                 f"webui:\n  token: test-token\n  qubit_backend: false\n")
     cfg = Config.load(p)
 
     class _FakeOrch:
@@ -136,8 +137,8 @@ def test_plugin_and_deep_link_routes_serve_spa_shell(server, route):
     assert b'id="root"' in body, route
 
 
-@pytest.mark.parametrize("path", HERMES_PATHS)
-def test_no_hermes_route_exists(server, path):
+@pytest.mark.parametrize("path", QUBIT_PATHS)
+def test_no_qubit_route_exists(server, path):
     status, loc, _, body = _raw(server, path)
     assert status == 404, (path, status, body[:120])
     assert loc is None, (path, loc)
@@ -151,10 +152,28 @@ def test_agent_prefix_reaches_compat_backend(server):
     assert "application/json" in ctype, ctype
     out = json.loads(body)
     # Flag off -> the compat status shape, not the fork's raw /api/status.
-    assert out.get("schema") == "qubit-hermes-status/1", out
+    assert out.get("schema") == "qubit-runtime-status/1", out
 
 
 def test_agent_prefix_requires_auth(server):
+    status, _, _, _ = _raw(server, "/agent/api/status")
+    assert status == 401, status
+
+
+def test_agents_page_is_not_shadowed_by_the_agent_api_prefix(server):
+    """``/agents`` is a shell page; only ``/agent`` (+ ``/agent/...``) is API.
+
+    A prior regression treated any path starting with ``/agent`` as the API
+    namespace, so the ``/agents`` page hard-loaded 404 while client-side nav
+    still worked.
+    """
+    status, loc, ctype, body = _raw(server, "/agents")
+    if status == 404 and b"not built" in body:
+        pytest.skip("dashboard build absent in this checkout")
+    assert status == 200, (status, body[:120])
+    assert "text/html" in ctype, ctype
+    assert b'id="root"' in body
+    # The API namespace itself is unchanged and still authenticated.
     status, _, _, _ = _raw(server, "/agent/api/status")
     assert status == 401, status
 
@@ -165,7 +184,7 @@ def test_native_api_status_unchanged(server):
     assert status == 200, (status, body[:200])
     out = json.loads(body)
     assert out.get("bridge") == "up", out
-    assert out.get("schema") != "qubit-hermes-status/1"
+    assert out.get("schema") != "qubit-runtime-status/1"
 
 
 def test_agent_chat_route_reaches_compat_backend(server):

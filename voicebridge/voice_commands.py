@@ -311,19 +311,158 @@ def _iter_entries():
 
     ``REGISTRY`` is the frozen CLI-parity surface audited by the wave-1..3
     example/coverage tables. ``PLUGIN_FLEET_REGISTRY`` adds the wave-4
-    vendored dashboard-plugin fleet. Both flow through the same
+    vendored dashboard-plugin fleet. ``CLI_BRIDGE_REGISTRY`` adds the W7
+    CLI-subcommand bridges/guards. All flow through the same
     resolve/execute/confirm pipeline, the same journal, and the same
     redaction/audit path — there is still one listener and one authority.
     """
     yield from REGISTRY.values()
     yield from PLUGIN_FLEET_REGISTRY.values()
     yield from MODEL_PROFILE_REGISTRY.values()
+    yield from CLI_BRIDGE_REGISTRY.values()
 
 
 def _lookup_entry(entry_id: str) -> Optional[VoiceCommand]:
-    """Find an entry in either registry (execute paths never assume one)."""
+    """Find an entry in any registry (execute paths never assume one)."""
     return (REGISTRY.get(entry_id) or PLUGIN_FLEET_REGISTRY.get(entry_id)
-            or MODEL_PROFILE_REGISTRY.get(entry_id))
+            or MODEL_PROFILE_REGISTRY.get(entry_id)
+            or CLI_BRIDGE_REGISTRY.get(entry_id))
+
+
+def voice_backend_coverage() -> Dict[str, Any]:
+    """Mechanical tri-surface coverage for every declared voice backend.
+
+    For every entry in ``REGISTRY`` / ``PLUGIN_FLEET_REGISTRY`` /
+    ``MODEL_PROFILE_REGISTRY`` this asserts:
+
+    * the declared ``backend`` resolves to a real ``_BACKENDS`` callable; and
+    * a real production caller exists on the CLI (a top-level ``qubit`` family,
+      a ``CLI_COVERAGE`` target, a declared parity family, or an explicit
+      ``profile model`` subcommand), on the dashboard (a ``dashboard_ops``
+      Tier-1 registry op / Tier-2 extra / model-profile op), through the
+      canonical plugin-fleet ``qubit_compat`` routes, or through the canonical
+      resolver op in :mod:`voicebridge.providers.resolver`.
+
+    Returns exact total/covered/uncovered counts plus the uncovered rows and
+    the entries that are still missing a CLI/dashboard binding, so a new entry
+    whose backend resolves nowhere fails loudly and reproducibly.
+    """
+    entries: Dict[str, VoiceCommand] = {}
+    for reg in (REGISTRY, PLUGIN_FLEET_REGISTRY, MODEL_PROFILE_REGISTRY):
+        entries.update(reg)
+
+    cli_families: set = set()
+    model_subcommands: set = set()
+    try:
+        import argparse as _argparse
+
+        from .cli import build_parser
+
+        parser = build_parser()
+        for action in parser._actions:
+            if isinstance(action, _argparse._SubParsersAction):
+                cli_families.update(action.choices.keys())
+                if "profile" in action.choices:
+                    prof = action.choices["profile"]
+                    for pact in getattr(prof, "_actions", []):
+                        if isinstance(pact, _argparse._SubParsersAction) \
+                                and "model" in pact.choices:
+                            model_node = pact.choices["model"]
+                            for mact in getattr(model_node, "_actions", []):
+                                if isinstance(mact,
+                                              _argparse._SubParsersAction):
+                                    model_subcommands.update(
+                                        mact.choices.keys())
+    except Exception:
+        pass
+    cli_targets: set = set()
+    for targets in CLI_COVERAGE.values():
+        cli_targets.update(targets)
+
+    catalog: set = set()
+    model_ops: set = set()
+    extra_ops: set = set()
+    try:
+        from . import dashboard_ops as OPS
+
+        catalog = {row["id"] for row in OPS.catalog()}
+        model_ops = set(OPS.MODEL_PROFILE_OPS)
+        extra_ops = set(OPS.EXTRA_OPS)
+    except Exception:
+        pass
+
+    # Explicit cross-registry production callers.
+    plugin_fleet_backend = "plugin_fleet"   # qubit_compat plugin-fleet routes
+    # Canonical resolver-backed voice backends (providers.resolver ops).
+    resolver_backends = {
+        "model_profile_local", "model_profile_use", "model_profile_status",
+        "model_profile_test", "model_profile_realtime", "model_profile_coding",
+        "model_profile_local_only", "speech_profile_test",
+        "model_profile_set_active",
+    }
+    # Model-profile voice backend -> the ``qubit profile model <sub>`` it shares.
+    model_profile_cli_sub = {
+        "model_profile_local": "activate",
+        "model_profile_use": "activate",
+        "model_profile_research": "activate",
+        "model_profile_realtime": "activate",
+        "model_profile_coding": "activate",
+        "model_profile_local_only": "deactivate",
+        "model_profile_status": "show",
+        "model_profile_test": "test",
+        "speech_profile_test": "test",
+        # model_profile_set_active: no CLI subcommand wired yet (A20).
+    }
+    # Model-profile voice backend -> the dashboard MODEL_PROFILE_OPS it shares.
+    model_profile_dash_op = {
+        "model_profile_local": "select_session_model",
+        "model_profile_use": "select_session_model",
+        "model_profile_research": "select_session_model",
+        "model_profile_realtime": "select_session_model",
+        "model_profile_coding": "select_session_model",
+        "model_profile_local_only": "clear_session_model",
+        "model_profile_status": "show_model_profile",
+        "model_profile_test": "test_model_profile",
+        "speech_profile_test": "test_model_profile",
+        # model_profile_set_active: no dashboard model op wired yet (A20).
+    }
+
+    rows: List[Dict[str, Any]] = []
+    for entry_id, entry in sorted(entries.items()):
+        backend = entry.backend
+        backend_ok = bool(backend) and backend in _BACKENDS
+        cli_caller = bool(
+            entry_id in cli_targets
+            or backend in cli_families
+            or (set(entry.parity or ()) & cli_families)
+            or model_profile_cli_sub.get(backend) in model_subcommands)
+        dashboard_caller = bool(
+            entry_id in catalog or entry_id in model_ops
+            or entry_id in extra_ops or backend == plugin_fleet_backend
+            or model_profile_dash_op.get(backend) in model_ops)
+        canonical_caller = backend in resolver_backends
+        covered = bool(backend_ok and (cli_caller or dashboard_caller
+                                       or canonical_caller))
+        rows.append({
+            "id": entry_id, "backend": backend, "backend_ok": backend_ok,
+            "cli_caller": cli_caller, "dashboard_caller": dashboard_caller,
+            "canonical_caller": canonical_caller, "covered": covered,
+        })
+    uncovered = [r["id"] for r in rows if not r["covered"]]
+    pending = [r["id"] for r in rows
+               if r["covered"] and not (r["cli_caller"] or
+                                        r["dashboard_caller"])]
+    return {
+        "total": len(rows),
+        "covered": len(rows) - len(uncovered),
+        "uncovered": len(uncovered),
+        "uncovered_ids": uncovered,
+        "dead_backends": [r["id"] for r in rows if not r["backend_ok"]],
+        "pending_cli_dashboard_wiring": pending,
+        "cli_families": len(cli_families),
+        "model_subcommands": len(model_subcommands),
+        "dashboard_ops": len(catalog) + len(model_ops) + len(extra_ops),
+    }
 
 
 def resolve(text: str) -> Resolution:
@@ -431,10 +570,33 @@ def _voice_board_principal(args: Dict[str, Any]) -> Tuple[str, str]:
                        flags=re.I).strip()
     return board or "main", principal
 
+def _cli_stdout(handler, *args, **kwargs):
+    """Call a canonical ``voicebridge.cli`` handler and capture its stdout.
+
+    Several CLI operations are print-based (they emit a completion script or a
+    single JSON document). Capturing the real handler keeps the voice backend
+    on the EXACT CLI code path instead of a parallel projection; callers parse
+    the returned text. Never raises from the handler's output itself.
+    """
+    import contextlib
+    import io
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = handler(*args, **kwargs)
+    return rc, buf.getvalue()
+
+
 def _b_status(ctx, args):
+    # Shared runtime inventory source. The CLI `status` op additionally loads
+    # ASR/TTS and the voice-ID model (hardware), which voice must never do; the
+    # projection is therefore the inventory plus an explicit authority note.
     from .runtime_inventory import runtime_inventory
 
-    return {"inventory": runtime_inventory(ctx.cfg)}
+    return {"inventory": runtime_inventory(ctx.cfg),
+            "authority": "runtime inventory is the shared source; ASR/TTS/"
+                         "voice-ID live probes stay CLI-only (`qubit status`) "
+                         "because they load audio hardware"}
 
 
 def _b_pause(ctx, args):
@@ -620,6 +782,37 @@ def _b_sessions(ctx, args):
     return {"sessions": recent_sessions(ctx.cfg, limit)}
 
 
+def _b_chat_sessions(ctx, args):
+    """Canonical chat sessions (state.db) — migrated Qubit history included.
+
+    B-04: this reads the ONE chat-session authority the terminal/agent,
+    /qubit-chat, dashboard, and CLI use, so migrated chats are visible by
+    voice. Read-only (list/show/search/messages); lifecycle mutations stay on
+    the confirmation-gated surfaces.
+    """
+    from . import chat_transport as CT
+
+    store = CT.store(ctx.cfg)
+    action = str(args.get("action", "list") or "list")
+    sid = str(args.get("session_id", "") or "")
+    if action == "show":
+        return {"session": store.show(sid)}
+    if action == "messages":
+        try:
+            limit = int(args.get("limit", 50) or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        return {"session_id": sid, "messages": store.messages(sid, limit=limit)}
+    if action == "search":
+        return {"sessions": store.list(limit=20,
+                                       query=str(args.get("query", "") or ""))}
+    try:
+        limit = int(args.get("limit", 20) or 20)
+    except (TypeError, ValueError):
+        limit = 20
+    return {"sessions": store.list(limit=limit)}
+
+
 def _b_capability(ctx, args):
     from .capability_catalog import check, list_names, summary
 
@@ -677,6 +870,22 @@ def _b_auth_logout(ctx, args):
 def _b_mcp(ctx, args):
     from .integration_status import mcp_status
 
+    action = str(args.get("action", "list") or "list")
+    if action in ("invoke", "call"):
+        from . import mcp_servers as MS
+
+        try:
+            out = MS.invoke_voice(
+                ctx.cfg, str(args.get("server") or args.get("name") or ""),
+                tool=str(args.get("tool") or ""),
+                args=args.get("tool_args")
+                if isinstance(args.get("tool_args"), dict) else None,
+                confirmed=bool(args.get("confirm", False)),
+                confirmation_id=str(args.get("confirmation_id") or ""))
+        except MS.McpServerError as exc:
+            out = {"state": "REFUSED", "ok": False, "code": exc.code,
+                   "detail": exc.detail}
+        return {"mcp": out}
     return {"mcp": mcp_status(ctx.cfg)}
 
 
@@ -687,53 +896,101 @@ def _b_worker(ctx, args):
 
 
 def _b_memory(ctx, args):
-    from .memory.store import MemoryStore
+    # Canonical memory authority: the SAME GENOME ``SemanticMemory`` adapter the
+    # CLI ``memory`` family builds over ``<state_dir>/memory/memory.db`` with the
+    # validated ``semantic.json`` enable/provider/health state. Voice never opens
+    # a bare MemoryStore, so provider selection and the degraded/newer gate are
+    # honoured identically on every surface. Disabled is still the read-only FTS5
+    # baseline (never a silent reset), matching the CLI.
+    from .memory import (SemanticMemory, load_semantic_state, redact_secrets)
 
+    base = Path(ctx.cfg.state_dir()) / "memory"
+    base.mkdir(parents=True, exist_ok=True)
+    state_path = base / "semantic.json"
+    st, health = load_semantic_state(
+        state_path,
+        enabled_default=ctx.cfg.get("memory", "semantic", "enabled",
+                                    default=False),
+        provider_default=ctx.cfg.get("memory", "semantic", "provider",
+                                     default="none"),
+        embed_model_default=ctx.cfg.get("memory", "semantic", "embed_model",
+                                        default="nomic-embed-text"),
+        ollama_url_default=ctx.cfg.get("memory", "semantic", "ollama_url",
+                                       default="http://127.0.0.1:11434"),
+        timeout_s_default=ctx.cfg.get("memory", "semantic", "timeout_s",
+                                      default=10.0),
+        top_k_default=ctx.cfg.get("memory", "semantic", "top_k", default=5))
+    sm = SemanticMemory(
+        base / "memory.db", enabled=bool(st["enabled"]),
+        provider=st["provider"], embed_model=st["embed_model"],
+        ollama_url=st["ollama_url"], timeout_s=st["timeout_s"],
+        top_k=st["top_k"], journal_path=base / "memory.db.journal")
+    gate = {"state": health["state"], "detail": health["detail"] or None}
     action = args.get("action", "search")
-    # Canonical personal-memory store (same file the compiler reads).
-    store = MemoryStore(Path(ctx.cfg.state_dir()) / "memory" / "memory.db")
     try:
         if action == "search":
-            return {"results": store.search(str(args.get("query", "")))[:5]}
+            out = sm.recall(str(args.get("query", "")))
+            return {"results": out.get("results", [])[:5],
+                    "provider": out.get("provider", "none"),
+                    "engine": out.get("engine", "fts5"),
+                    "degraded": bool(out.get("degraded", False)),
+                    "semantic": gate}
         if action == "remember":
-            store.remember(str(args.get("text", "")))
-            return {"remembered": True}
+            rec = sm.remember(str(args.get("text", "")))
+            return {"remembered": True, "memory_id": rec.get("id"),
+                    "text": redact_secrets(str(rec.get("text", ""))),
+                    "semantic": gate}
         if action == "forget":
-            store.forget(int(args.get("memory_id", 0)))
-            return {"forgotten": True}
+            sm.forget(int(args.get("memory_id", 0)), requested_by="user")
+            return {"forgotten": True, "semantic": gate}
         raise ValueError(f"unknown memory action {action!r}")
     finally:
         try:
-            store.close()
+            sm.close()
         except Exception:
             pass
 
 
 def _b_skills(ctx, args):
+    # ONE skills authority shared with the dashboard/CLI (voicebridge.
+    # skill_catalog): on-disk skills resolve through the fork's skill manager
+    # and the vendored disabled set; permissioned-manifest-only skills keep
+    # the permissioned store. The registry's confirm journals gate mutations
+    # before this body runs.
+    from . import skill_catalog
     from .permissions import permissions_store
 
-    store = permissions_store(ctx.cfg)
     action = args.get("action", "list")
     if action == "list":
-        return {"skills": [s.to_dict() for s in store.skills()]}
+        return {"skills": skill_catalog.merged_store_view(ctx.cfg)}
     if action == "show":
-        rec = store.skill(str(args.get("skill_id", "")))
-        return {"skill": rec.to_dict() if rec else None}
-    if action == "enable":
-        rec = store.enable_skill(str(args.get("skill_id", "")), requested_by="voice:user",
-                                 confirmed=True)
-        return {"status": rec.status, "skill_id": rec.skill_id}
-    if action == "disable":
-        rec = store.disable_skill(str(args.get("skill_id", "")), requested_by="voice:user",
-                                  confirmed=True)
-        return {"status": rec.status, "skill_id": rec.skill_id}
+        return {"skill": skill_catalog.show_skill(
+            ctx.cfg, str(args.get("skill_id", "")))}
+    if action in ("enable", "disable"):
+        try:
+            rec = skill_catalog.set_skill_enabled(
+                ctx.cfg, str(args.get("skill_id", "")),
+                action == "enable", requested_by="voice:user")
+        except skill_catalog.SkillAuthorityError as exc:
+            raise ValueError(f"{exc.code}: {exc.detail}")
+        return {"status": "enabled" if rec["enabled"] else "disabled",
+                "skill_id": rec["skill_id"]}
     if action == "remove":
-        rec = store.remove_skill(str(args.get("skill_id", "")),
-                                 requested_by="voice:user", confirmed=True)
+        name = str(args.get("skill_id", ""))
+        if skill_catalog.find_skill_path(ctx.cfg, name) is not None:
+            try:
+                skill_catalog.delete_skill_file(
+                    ctx.cfg, name, requested_by="voice:user")
+            except skill_catalog.SkillAuthorityError as exc:
+                raise ValueError(f"{exc.code}: {exc.detail}")
+            return {"status": "removed", "skill_id": name}
+        rec = permissions_store(ctx.cfg).remove_skill(
+            name, requested_by="voice:user", confirmed=True)
         return {"status": "removed", "skill_id": rec.skill_id}
     if action == "rollback":
-        rec = store.rollback_skill(str(args.get("skill_id", "")),
-                                   requested_by="voice:user", confirmed=True)
+        rec = permissions_store(ctx.cfg).rollback_skill(
+            str(args.get("skill_id", "")), requested_by="voice:user",
+            confirmed=True)
         return {"status": rec.status, "skill_id": rec.skill_id}
     raise ValueError(f"unknown skills action {action!r}")
 
@@ -1489,12 +1746,24 @@ def _b_monitor(ctx, args):
 
 
 def _b_frontier(ctx, args):
-    from .providers.policy import FrontierPolicy
+    """Model/frontier status — the EXACT CLI ``_cmd_frontier status`` payload
+    (effective_default, limits, providers, terms), never a narrower projection.
 
-    policy = FrontierPolicy.from_config(ctx.cfg)
-    return {"frontier": {"enabled": policy.enabled, "route": policy.route,
-                         "allowlist": policy.allowlist,
-                         "privacy_tier": policy.privacy_tier}}
+    The CLI parser has no ``model`` subcommand, so ``qubit model``/voice
+    ``which model`` resolve here and the ``frontier status`` CLI op is the one
+    canonical reader of ``FrontierPolicy``.
+    """
+    import json
+
+    from . import cli as CLI
+
+    _rc, text = _cli_stdout(CLI._cmd_frontier, ctx.cfg,
+                            SimpleNamespace(frontier_command="status"))
+    try:
+        out = json.loads(text)
+    except ValueError:
+        out = {"state": "UNAVAILABLE", "detail": text.strip()[:200]}
+    return {"frontier": out}
 
 
 def _b_audio(ctx, args):
@@ -1567,10 +1836,22 @@ def _b_approvals(ctx, args):
 
 
 def _b_tools(ctx, args):
-    from .broker import build_host_broker
+    # Canonical toolset catalog — the SAME source the dashboard `h_toolsets`
+    # and the CLI `qubit tools` read. The broker action inventory (single
+    # `local.*` capabilities) is a different concept and made voice the only
+    # surface reading a divergent registry.
+    from . import qubit_runtime as _HR
 
+    names = []
     try:
-        names = sorted(build_host_broker().registry.names())
+        _HR.ensure_path()
+        try:
+            _HR.use_qubit_home(getattr(ctx, "cfg", None))
+        except Exception:  # noqa: BLE001 - keep serving the catalog
+            pass
+        from qubit_cli.tools_config import _get_effective_configurable_toolsets  # type: ignore
+
+        names = sorted({str(n) for n, _label, _desc in _get_effective_configurable_toolsets()})
     except Exception:
         names = []
     return {"tools": {"count": len(names), "names": names[:100]}}
@@ -1592,15 +1873,33 @@ def _b_worktree(ctx, args):
 
 
 def _b_completions(ctx, args):
+    """Shipped shell completions — the EXACT scripts the CLI
+    ``qubit completion <shell> --cmd <cmd>`` op emits (same ``resources``
+    resolution), never a parallel shell-name inventory. Read-only: the emitted
+    script text is returned for the dashboard/CLI to display; it is never
+    spoken."""
+    import hashlib
 
-    root = Path(__file__).resolve().parents[1] / "voicebridge" / "_data" / \
-        "completions"
-    try:
-        shells = sorted(p.suffix.lstrip(".") for p in root.iterdir()
-                        if p.name.startswith("voicebridge."))
-    except OSError:
-        shells = []
-    return {"completions": {"shells": shells, "progs": ["qubit", "voicebridge", "qubit-dev"] if shells else []}}
+    from . import cli as CLI
+
+    scripts = []
+    missing = []
+    for cmd in ("qubit", "voicebridge", "qubit-dev"):
+        for shell in ("bash", "zsh", "fish"):
+            _rc, text = _cli_stdout(CLI._cmd_completion, shell, cmd)
+            if _rc != 0 or not text:
+                missing.append({"cmd": cmd, "shell": shell})
+                continue
+            scripts.append({
+                "cmd": cmd, "shell": shell, "bytes": len(text),
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "script": text,
+            })
+    return {"completions": {
+        "state": "OK" if scripts else "UNAVAILABLE",
+        "count": len(scripts), "scripts": scripts, "missing": missing,
+        "authority": "generated completion scripts (read-only); identical to "
+                     "`qubit completion <shell> --cmd <cmd>`"}}
 
 
 def _b_files(ctx, args):
@@ -1755,7 +2054,7 @@ def _b_schedules(ctx, args):
 
 
 def _b_automation(ctx, args):
-    """OpenClaw automation: standing orders, flows, heartbeat, QA, yields.
+    """Qubit automation: standing orders, flows, heartbeat, QA, yields.
 
     Writes call the REAL production ``automation.*`` function immediately,
     through the canonical ``automation: <verb> key=value`` directive that
@@ -1811,9 +2110,14 @@ def _b_console_guidance(ctx, args):
 
 
 def _b_mic_guidance(ctx, args):
-    return {"guidance": "microphone checks run from the CLI: "
+    # Typed guidance, not a fake execution: the canonical `mic-test` op does a
+    # 5-second hardware capture and stays CLI-only (voice never activates the
+    # mic). The guidance names the exact canonical command.
+    return {"state": "OK", "code": "VOICE_CLI_HARDWARE_OP",
+            "guidance": "microphone checks run from the CLI: "
                         "`qubit mic-test` records five seconds "
-                        "and reports levels"}
+                        "and reports levels",
+            "authority": "hardware capture is CLI-only; voice returns guidance"}
 
 
 def _b_acp(ctx, args):
@@ -1848,31 +2152,40 @@ def _b_lsp(ctx, args):
 
 
 def _b_browser(ctx, args):
-    # Direct loopback probe (no communications import: Packet 8A boundary
-    # reserves that package to cli.py/webui.py/scripts). Same endpoint the
-    # 8B path checks; UNAVAILABLE covers both down and restart-required
-    # (the CLI `browser status` distinguishes them).
-    import urllib.request as _u
-
+    """Browser status through the CLI canonical op ``_cmd_browser status``
+    (``browser.status(communications.monitor.cdp_precondition(cfg))``): the
+    configured CDP precondition, not a hard-coded loopback probe. The cli
+    module is the allowlisted bridge to the communications package (Packet 8A),
+    so voice never imports it directly. ``close`` stays the typed refusal."""
     if str(args.get("action", "status")) == "close":
         from . import browser as BW
 
         return {"refused": BW.refuse_close_profile(
             str(args.get("profile", "")))}
+    import json
+
+    from . import cli as CLI
+
+    _rc, text = _cli_stdout(
+        CLI._cmd_browser, ctx.cfg,
+        SimpleNamespace(browser_command="status", profile="",
+                        dry_run=False, confirm=False))
     try:
-        with _u.urlopen("http://127.0.0.1:9222/json/version",
-                        timeout=2) as resp:
-            ok = resp.status == 200
-    except Exception:
-        ok = False
-    if ok:
-        return {"browser": {"state": "OK", "cdp": True,
-                            "authority": "loopback CDP read-only (Packet 8B); "
-                                         "personal profiles are never touched"}}
-    return {"browser": {"state": "UNAVAILABLE", "cdp": False,
-                         "detail": "no loopback CDP endpoint",
-                         "authority": "loopback CDP read-only (Packet 8B); "
-                                      "personal profiles are never touched"}}
+        out = json.loads(text)
+    except ValueError:
+        out = {"state": "UNAVAILABLE", "schema": "qubit-browser/1",
+               "cdp": False, "detail": text.strip()[:200],
+               "authority": "loopback CDP read-only (Packet 8B); personal "
+                            "profiles are never touched"}
+    # Voice-safe projection: the voice surface has always reported only
+    # OK/UNAVAILABLE. Keep that contract while preserving the canonical
+    # distinction (BROWSER_RESTART_REQUIRED) in `canonical_state` so nothing
+    # is hidden and the CLI/voice still read the same precondition.
+    canonical_state = str(out.get("state", "UNAVAILABLE"))
+    if canonical_state not in ("OK", "UNAVAILABLE"):
+        out["canonical_state"] = canonical_state
+        out["state"] = "UNAVAILABLE"
+    return {"browser": out}
 
 
 def _b_tabs(ctx, args):
@@ -1931,6 +2244,18 @@ def _b_tabs(ctx, args):
     if action == "close":
         return {"browser": BT.close(
             ctx.cfg, "", requested_by="voice:user", confirmed=True)}
+    if action == "favicon":
+        # Read-only same-origin metadata (e-stop-gated inside browser_tabs).
+        return {"favicon": BT.favicon(
+            ctx.cfg, requested_by="voice:user")}
+    if action == "favicon_cache":
+        return {"favicon_cache": BT.favicon_cache(ctx.cfg)}
+    if action == "download":
+        # Confirmation-gated write into an approved project root (the same
+        # files.py root gate the CLI/dashboard use); never outside a root.
+        return {"download": BT.download(
+            ctx.cfg, str(args.get("dest", "") or ""),
+            requested_by="voice:user", confirmed=True)}
     raise ValueError(f"unknown browser-tabs action {action!r}")
 
 
@@ -1970,15 +2295,52 @@ def _b_power_status(ctx, args):
                       "total": len(profile.get("capabilities", []))}}
 
 
+def _web_via_broker(ctx, action: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    """Dispatch a voice ``web.fetch``/``web.search`` through the ONE broker.
+
+    The ``web_fetch``/``web_search`` entries are read-only (``confirm=False``),
+    so the confirm-tier e-stop gate in :func:`execute` is skipped. Routing the
+    capability through the canonical broker re-applies the SAME
+    e-stop/policy/audit junction the planner and every other channel use: the
+    broker's shared power-control check refuses ``EMERGENCY_STOP`` before any
+    network work. A broker denial is re-raised as the typed ``web_tool`` error,
+    so the voice error shape (a code + detail, never a fabricated success) is
+    preserved and :func:`execute` reports a refusal.
+    """
+    import json as _json
+
+    from . import web_tool as WT
+    from .broker import build_host_broker, register_web_tools
+    from .power import power_control
+
+    if action == "fetch":
+        capability = "web.fetch"
+        target = {"url": str(args.get("url", "") or "")}
+    else:
+        capability = "web.search"
+        target = {"query": str(args.get("query", "") or "")}
+    broker = build_host_broker(power_control=power_control(ctx.cfg),
+                               cfg=ctx.cfg)
+    register_web_tools(broker, cfg=ctx.cfg)
+    res = broker.execute(capability, target, source="user")
+    if res.denied:
+        raise WT.WebToolError(str(res.denied), "web access refused by policy")
+    if not res.ok:
+        raise WT.WebToolError("WEB_ERROR", WT.redact_text(str(res.error))[:300])
+    try:
+        out = _json.loads(res.output)
+    except (TypeError, ValueError) as exc:
+        raise WT.WebToolError(
+            "WEB_ERROR", "web tool returned a malformed result") from exc
+    return {"web": out}
+
+
 def _b_websites(ctx, args):
     from . import websites as WS
 
     action = str(args.get("action", "list") or "list")
     if action in ("fetch", "search"):
-        from . import web_tool as WT
-        if action == "fetch":
-            return {"web": WT.fetch(ctx.cfg, str(args.get("url", "") or ""))}
-        return {"web": WT.search(ctx.cfg, str(args.get("query", "") or ""))}
+        return _web_via_broker(ctx, action, args)
     store = WS.website_integrations_store(ctx.cfg)
     try:
         items = list(store.integrations())
@@ -2021,6 +2383,27 @@ def _b_computer(ctx, args):
         return {"permissions": CU.permissions()}
     if action == "install":
         return {"refused": CU.refuse_install()}
+    if action == "desktop_ops":
+        return {"desktop": CU.desktop_ops()}
+    if action == "launch":
+        # Bounded, allowlisted, confirmation- and e-stop-gated; with no injected
+        # launcher boundary this is an honest typed refusal, never a fake launch.
+        return {"desktop": CU.launch_app(
+            ctx.cfg, str(args.get("app", "") or ""),
+            target=str(args.get("target", "") or "desktop"),
+            requested_by="voice:user", confirmed=True)}
+    if action == "pip":
+        return {"desktop": CU.picture_in_picture(
+            ctx.cfg, target=str(args.get("target", "") or "desktop"),
+            requested_by="voice:user", confirmed=True)}
+    if action == "present":
+        return {"desktop": CU.present(
+            ctx.cfg, str(args.get("mode", "") or "document"),
+            panes=str(args.get("panes", "") or "") or None,
+            target=str(args.get("target", "") or "desktop"),
+            requested_by="voice:user", confirmed=True)}
+    if action == "presentation_status":
+        return {"desktop": CU.presentation_status(ctx.cfg)}
     return {"computer": CU.status()}
 
 
@@ -2043,9 +2426,19 @@ def _b_plugins_install(ctx, args):
                           "manifest'",
                 "owner": "qubit-policy",
                 "rollback": "nothing installed or enabled"}
+    from . import plugins as _PL
     from .permissions import SkillManifest, permissions_store
 
-    manifest = Path(str(args.get("manifest", ""))).expanduser()
+    spec = str(args.get("manifest", ""))
+    try:
+        verdict = _PL.classify_install_source(spec)
+    except Exception:
+        verdict = {"kind": "missing-file", "path": spec}
+    if verdict.get("kind") == "remote":
+        # Same typed remote refusal the CLI `skills install` emits: a spoken
+        # identifier is never fetched.
+        return _PL.refuse_remote(str(verdict.get("identifier", spec)))
+    manifest = Path(str(verdict.get("path") or spec)).expanduser()
     try:
         data = _json.loads(manifest.read_text(encoding="utf-8"))
         validated = SkillManifest.from_dict(data)
@@ -2174,6 +2567,20 @@ def _b_model_profile_test(ctx, args):
         return {"model_profile": exc.to_dict()}
 
 
+_SPEECH_KINDS = ("speech_in", "speech_out", "realtime")
+
+
+def _speech_kind(args, default: str = "speech_in") -> str:
+    kind = str(args.get("kind", "") or default).strip() or default
+    return kind if kind in _SPEECH_KINDS else default
+
+
+def _speech_result(state: str, **fields):
+    out = {"state": state}
+    out.update({k: v for k, v in fields.items() if v is not None})
+    return {"speech_profiles": out}
+
+
 def _b_speech_profile_test(ctx, args):
     """Read-only preflight of the active (or named) speech profile.
 
@@ -2200,6 +2607,121 @@ def _b_speech_profile_test(ctx, args):
             "state": "FAILED", "kind": kind,
             "code": getattr(exc, "code", type(exc).__name__),
             "detail": str(exc)[:200]}}
+
+
+# PRB-05: the eight speech-profile lifecycle operations, spoken. Every backend
+# calls the SAME canonical resolver/dashboard ops used by CLI and dashboard;
+# reads execute immediately, mutations run on the voice confirmation path
+# (``entry.confirm``) and then call the resolver with confirm=True.
+def _b_speech_profile_list(ctx, args):
+    from .providers import resolver as R
+
+    try:
+        return _speech_result("OK",
+                              profiles=R.list_speech_profiles(
+                                  ctx.cfg, args.get("kind") or None))
+    except Exception as exc:  # noqa: BLE001 - typed, no fabrication
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
+
+
+def _b_speech_profile_show(ctx, args):
+    from .providers import resolver as R
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    if not pid:
+        return _speech_result("FAILED", code="MALFORMED",
+                              detail="which speech profile? name one.")
+    try:
+        return _speech_result("OK", profile=R.show_speech_profile(ctx.cfg, pid))
+    except Exception as exc:  # noqa: BLE001
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
+
+
+def _b_speech_profile_create(ctx, args):
+    from . import dashboard_ops as OPS
+    from .providers import resolver as R
+
+    profile = OPS._speech_profile_from_args(args)
+    if not profile.id or not profile.provider or not profile.model:
+        return _speech_result("FAILED", code="MALFORMED",
+                              detail="a speech profile needs id, provider, and "
+                                     "model.")
+    try:
+        return _speech_result("OK", result=R.upsert_speech_profile(
+            ctx.cfg, profile, confirm=True))
+    except Exception as exc:  # noqa: BLE001
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
+
+
+def _b_speech_profile_clone(ctx, args):
+    from .providers import resolver as R
+
+    source = str(args.get("source_id", "") or "").strip()
+    new_id = str(args.get("new_id", "") or "").strip()
+    if not source or not new_id:
+        return _speech_result("FAILED", code="MALFORMED",
+                              detail="cloning needs the source id and the new id.")
+    try:
+        return _speech_result("OK", result=R.clone_speech_profile(
+            ctx.cfg, source, new_id, confirm=True))
+    except Exception as exc:  # noqa: BLE001
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
+
+
+def _b_speech_profile_remove(ctx, args):
+    from .providers import resolver as R
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    if not pid:
+        return _speech_result("FAILED", code="MALFORMED",
+                              detail="which speech profile should be removed?")
+    try:
+        return _speech_result("OK", result=R.remove_speech_profile(
+            ctx.cfg, pid, confirm=True))
+    except Exception as exc:  # noqa: BLE001
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
+
+
+def _b_speech_profile_select(ctx, args):
+    from .providers import speech as SP
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    kind = _speech_kind(args)
+    session = str(args.get("session", "") or ctx.session or "voice")
+    if not pid:
+        return _speech_result("FAILED", code="MALFORMED",
+                              detail="which speech profile for this session?")
+    try:
+        return _speech_result("OK", result=SP.set_session_speech_profile(
+            ctx.cfg, session, kind, pid, confirm=True))
+    except Exception as exc:  # noqa: BLE001
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
+
+
+def _b_speech_profile_clear(ctx, args):
+    from .providers import speech as SP
+
+    kind = str(args.get("kind", "") or "").strip() or None
+    session = str(args.get("session", "") or ctx.session or "voice")
+    try:
+        return _speech_result("OK", result=SP.clear_session_speech_profile(
+            ctx.cfg, session, kind=kind, confirm=True))
+    except Exception as exc:  # noqa: BLE001
+        return _speech_result("FAILED",
+                              code=getattr(exc, "code", type(exc).__name__),
+                              detail=str(exc)[:200])
 
 
 def _b_model_profile_local(ctx, args):
@@ -2284,6 +2806,33 @@ def _b_model_profile_local_only(ctx, args):
                               "cleared": cleared, "selected": out}}
 
 
+def _b_model_profile_set_active(ctx, args):
+    """Persist the canonical active provider/model profile (confirm-gated).
+
+    Calls the SAME resolver op the dashboard set-active control uses
+    (``providers.resolver.set_active_profile``); explicit requests and
+    per-session overrides still win, so this is a default selection, never a
+    silent substitution.
+    """
+    from .providers import resolver as R
+
+    pid = str(args.get("profile_id", "") or "").strip()
+    if not pid:
+        return {"model_profile": {
+            "state": "FAILED", "code": "MALFORMED",
+            "detail": "which provider profile? name one to set it active."}}
+    try:
+        out = R.set_active_profile(ctx.cfg, pid, role=_mp_role(args),
+                                   confirm=True)
+    except R.ResolverError as exc:
+        return {"model_profile": exc.to_dict()}
+    return {"model_profile": {
+        "state": out.get("state", "OK"),
+        "active": out.get("active", pid),
+        "role": out.get("role", _mp_role(args)),
+        "selected": out}}
+
+
 def _b_migrate_status(ctx, args):
     from . import product as P
 
@@ -2322,21 +2871,50 @@ def _b_task_run(ctx, args):
                 str(task.get("body", ""))).strip()
     if not text:
         raise ValueError("missing task text")
-    # Canonical operation path: the task resolves the selected model/provider
-    # profile through the same chat_transport resolver+gateway CLI/dashboard
-    # use, so a chosen profile is honored and the receipt is truthful.
+    # Resolve the selected model/provider through the SAME canonical
+    # chat_transport resolver the CLI/dashboard use, so an explicit selection is
+    # validated and reported on the receipt (no hidden model swap). This is
+    # resolution only: dispatch still goes through the orchestrator worker,
+    # never the parallel chat_transport.turn path.
     from . import chat_transport as _CT
 
-    res = _CT.turn(ctx.cfg, text, session=ctx.session or "qubit-voice",
-                   role="coding")
-    if not isinstance(res, dict) or not res.get("ok"):
-        code = str((res or {}).get("code", "AGENT_ERROR"))
-        detail = str((res or {}).get("detail")
-                     or (res or {}).get("error", ""))[:200]
+    try:
+        _routed = _CT.resolve_route(
+            ctx.cfg, session=str(getattr(ctx, "session", "") or ""),
+            role="coding")
+    except Exception:  # pragma: no cover - defensive; never block dispatch
+        _routed = {}
+    _profile: Dict[str, Any] = {}
+    if isinstance(_routed, dict) and _routed.get("ok"):
+        _profile = {"provider": str(_routed.get("provider", "")),
+                    "model": str(_routed.get("model", "")),
+                    "profile_id": str(_routed.get("profile_id", "")),
+                    "kind": str(_routed.get("kind", "")),
+                    "route": str(_routed.get("route", ""))}
+    # Canonical operation path: the SAME orchestrator worker the CLI ``task``
+    # command drives (``VoiceOrchestrator.process_text`` ->
+    # ``_dispatch_coding``/``_launch_task`` -> guarded ``agent.run_session``).
+    # Built headless so no mic/ASR/TTS or output sink is touched; the worker
+    # itself is byte-identical to the CLI path and returns a truthful receipt.
+    from .orchestrator import VoiceOrchestrator
+
+    orch = VoiceOrchestrator(ctx.cfg, no_hotkey=True, headless=True)
+    try:
+        res = orch.run_worker_task(
+            text, session=str(getattr(ctx, "session", "") or "qubit-voice"))
+    finally:
+        try:
+            orch.stop()
+        except Exception:
+            pass
+    if not isinstance(res, dict) or res.get("state") != "OK":
+        code = str((res or {}).get("code", "WORKER_ERROR"))
+        detail = str((res or {}).get("detail", ""))[:200]
         return {"task": {"state": "UNAVAILABLE", "code": code,
                          "detail": detail}}
-    return {"task": {"state": "OK", "runtime": "qubit",
+    return {"task": {"state": "OK", "runtime": "orchestrator-worker",
                      "reply": str(res.get("reply", "")),
+                     "model": _profile,
                      "receipt": res.get("receipt", {})}}
 
 
@@ -2785,6 +3363,10 @@ def _b_verified(ctx, args):
     if action == "unpin":
         rec = store.unpin(str(args.get("skill_id", "")), requested_by="voice:user")
         return {"id": rec.id, "pinned": rec.pinned}
+    if action == "bundled":
+        # Read-only Qubit-bundled skill manifests (validated from skills/*,
+        # no network); they never contaminate the advisory memory list.
+        return {"bundled": store.bundled()}
     raise ValueError(f"unknown verified action {action!r}")
 
 
@@ -2961,24 +3543,25 @@ def _b_reports(ctx, args):
 
 
 def _b_webui(ctx, args):
-    """Local dashboard probe (same loopback check the CLI runs; the token
-    is never placed in a URL, argument, or output)."""
-    import urllib.request as _url
+    """Local dashboard probe — the EXACT CLI canonical op ``_cmd_webui`` with
+    ``--json`` (same configured host/port probe; the token is never placed in a
+    URL, argument, or output; no second bridge is started and no browser is
+    opened)."""
+    import json
 
+    from . import cli as CLI
+
+    _rc, text = _cli_stdout(
+        CLI._cmd_webui, ctx.cfg,
+        SimpleNamespace(port=None, open=False, json=True))
     try:
-        host = ctx.cfg.get("webui", "host", default="127.0.0.1") or "127.0.0.1"
-        port = int(ctx.cfg.get("webui", "port", default=8890) or 8890)
-    except Exception:
-        host, port = "127.0.0.1", 8890
-    url = f"http://{host}:{port}/"
-    try:
-        with _url.urlopen(url, timeout=1.5) as resp:
-            reachable = resp.status == 200
-    except Exception:
-        reachable = False
-    return {"dashboard": {"state": "READY" if reachable else "UNAVAILABLE",
-                          "url": url, "token_in_url": False,
-                          "started_second_bridge": False}}
+        out = json.loads(text)
+    except ValueError:
+        out = {"state": "UNAVAILABLE", "detail": text.strip()[:200],
+               "token_in_url": False, "started_second_bridge": False}
+    out.setdefault("token_in_url", False)
+    out.setdefault("started_second_bridge", False)
+    return {"dashboard": out}
 
 
 def _b_frontier_show(ctx, args):
@@ -3401,6 +3984,22 @@ def _b_plugin_runtime(ctx, args):
                 ctx.cfg, str(args.get("plugin_id", "") or ""))}
         if action == "doctor":
             return {"plugins_runtime": PR.doctor(ctx.cfg)}
+        if action == "catalog":
+            # Canonical installable catalog rows (built-ins + registered +
+            # reviewed local manifests); remote entries stay a typed refusal.
+            return {"plugins_runtime": PR.plugin_catalog(ctx.cfg)}
+        if action == "capabilities":
+            # Host-owned adapter capabilities invocable in-process — the same
+            # read `plugin_runtime.host_capabilities` exposes to CLI/dashboard.
+            return {"plugins_runtime": PR.host_capabilities(ctx.cfg)}
+        if action == "install":
+            # Same canonical plugin_runtime.install the CLI/dashboard call:
+            # a reviewed catalog identifier or a local reviewed manifest path;
+            # e-stop and the shared confirmation journal apply unchanged.
+            return {"installed": PR.install(
+                ctx.cfg,
+                identifier=str(args.get("identifier", "") or ""),
+                confirmed=True, requested_by="voice:user")}
         if action == "register":
             manifest_path = Path(
                 str(args.get("manifest", "") or "")).expanduser()
@@ -3461,9 +4060,9 @@ class PluginFleetError(Exception):
 
 
 def _b_plugin_fleet(ctx, args):
-    """Vendored Hermes dashboard-plugin fleet, dispatched in-process.
+    """Vendored Qubit dashboard-plugin fleet, dispatched in-process.
 
-    Every entry names an exact ``hermes_compat`` route (the same route table
+    Every entry names an exact ``qubit_compat`` route (the same route table
     the dashboard SPA calls on the existing listener — no second server) via
     :data:`PLUGIN_FLEET_OPS`. Reads execute immediately; the plugin's own
     ``rescan``/``reset-state`` handlers keep their e-stop and confirm gates
@@ -3472,7 +4071,7 @@ def _b_plugin_fleet(ctx, args):
     typed :class:`PluginFleetError`, so a refused/estop/engine-unavailable
     route can never be reported as success.
     """
-    from . import hermes_compat as HC
+    from . import qubit_compat as HC
 
     op = str(args.get("op", "") or "")
     spec = PLUGIN_FLEET_OPS.get(op)
@@ -4054,6 +4653,7 @@ _BACKENDS: Dict[str, Callable] = {
     "backup": _b_backup,
     "voice_unsupported": _b_voice_unsupported,
     "sessions": _b_sessions,
+    "chat_sessions": _b_chat_sessions,
     "capability": _b_capability,
     "checkpoints": _b_checkpoints,
     "auth_status": _b_auth_status,
@@ -4104,11 +4704,19 @@ _BACKENDS: Dict[str, Callable] = {
     "model_profile_status": _b_model_profile_status,
     "model_profile_test": _b_model_profile_test,
     "speech_profile_test": _b_speech_profile_test,
+    "speech_profile_list": _b_speech_profile_list,
+    "speech_profile_show": _b_speech_profile_show,
+    "speech_profile_create": _b_speech_profile_create,
+    "speech_profile_clone": _b_speech_profile_clone,
+    "speech_profile_remove": _b_speech_profile_remove,
+    "speech_profile_select": _b_speech_profile_select,
+    "speech_profile_clear": _b_speech_profile_clear,
     "model_profile_local": _b_model_profile_local,
     "model_profile_use": _b_model_profile_use,
     "model_profile_realtime": _b_model_profile_realtime,
     "model_profile_coding": _b_model_profile_coding,
     "model_profile_local_only": _b_model_profile_local_only,
+    "model_profile_set_active": _b_model_profile_set_active,
     "migrate_status": _b_migrate_status,
     "acp": _b_acp,
     "lsp": _b_lsp,
@@ -4813,12 +5421,13 @@ _E("import_state_voice", "Import state (voice refusal)",
    fixed=(("action", "import_refused"),), summary="guidance",
    examples=("qubit, import my state",),
    help="Refused with guidance: secrets are never spoken.")
-_E("sessions", "Recent sessions",
+_E("sessions", "Recent action-receipt sessions",
    ("list sessions", "recent sessions", "show sessions", "session history",
     "show my sessions", "list my sessions", "my sessions"),
    "sessions", ("sessions", "--resume/--continue"),
    summary="sessions", examples=("qubit, show my sessions",),
-   help="Session receipts and journals.")
+   help="Action-receipt sessions and journals (canonical chat transcripts: "
+        "say chat_sessions).")
 _E("sessions_search", "Search sessions",
    ("search sessions", "find session", "search my sessions"),
    "sessions", ("sessions",), args=(_R("query"),),
@@ -4855,6 +5464,25 @@ _E("session_resume", "Resume a session",
    fixed=(("action", "resume"),), confirm=True, summary="sessions",
    examples=("qubit, resume session 12",),
    help="Restore a deleted or archived session (confirmed).")
+_E("chat_sessions", "List chat sessions",
+   ("list chat sessions", "show chat sessions", "my chat history",
+    "list my chats", "show my chats"),
+   "chat_sessions", ("sessions",),
+   fixed=(("action", "list"),), summary="sessions",
+   examples=("qubit, list my chats",),
+   help="Canonical chat sessions (state.db), including migrated legacy history.")
+_E("chat_session_show", "Show a chat session",
+   ("show chat session", "show my chat", "open chat session"),
+   "chat_sessions", ("sessions",), args=(_S("session_id", True),),
+   fixed=(("action", "show"),), summary="sessions",
+   examples=("qubit, show chat session abc123",),
+   help="One canonical chat session with its transcript.")
+_E("chat_session_search", "Search chat sessions",
+   ("search chat sessions", "find chat session", "search my chats"),
+   "chat_sessions", ("sessions",), args=(_R("query"),),
+   fixed=(("action", "search"),), summary="sessions",
+   examples=("qubit, search my chats invoice",),
+   help="Search canonical chat sessions by title/preview.")
 _E("capability", "Capability check",
    ("check capability", "rx:is (.+) available", "can you"),
    "capability", ("tools",), args=(_R("name"),),
@@ -4906,6 +5534,12 @@ _E("mcp", "MCP servers",
    "mcp", ("mcp",),
    examples=("qubit, list mcp servers",),
    help="MCP inventory (never mounts).")
+_E("mcp_invoke", "Call MCP tool",
+   ("call mcp tool", "invoke mcp", "run mcp tool"),
+   "mcp", ("mcp",), args=(_R("server"), _R("tool")),
+   fixed=(("action", "invoke"),), confirm=True,
+   examples=("qubit, call mcp tool cgraph-graft search",),
+   help="Call a tool on a configured MCP server (confirmed, brokered).")
 _E("worker", "Worker status",
    ("worker status", "agent status", "worker lane", "is the worker ready",
     "claw status"),
@@ -5026,7 +5660,8 @@ _E("kanban_claim", "Claim task",
    examples=("qubit, claim task 5",),
    help="Claim a task (confirmed).")
 _E("kanban_complete", "Complete task",
-   ("complete task", "finish task", "done with task", "close task"),
+   ("complete task", "finish task", "done with task", "close task",
+    "kanban complete", "complete kanban task", "mark task complete"),
    "kanban", ("kanban",), args=(_I("task_id"),),
    fixed=(("action", "complete"),), confirm=True,
    examples=("qubit, complete task 5",),
@@ -5292,7 +5927,7 @@ _E("tools", "Tool inventory",
    ("list tools", "tool status", "what tools"),
    "tools", ("tools",),
    examples=("qubit, list tools",),
-   help="Brokered tool names.")
+   help="Toolset catalog (same source as the dashboard and CLI).")
 _E("secrets", "Secret status",
    ("secret status", "vault status", "credential references"),
    "secrets", ("secrets/egress",),
@@ -5431,6 +6066,29 @@ _E("browser_close_tab", "Close a tab",
    summary="tabs_action",
    examples=("qubit, close this tab",),
    help="Close the current tab; profiles untouched (confirmed).")
+_E("browser_favicon", "Read this page's favicon",
+   ("read this page favicon", "get the page icon", "show the site icon",
+    "what is this page's favicon"),
+   "browser_tabs", ("browser",),
+   fixed=(("action", "favicon"),),
+   examples=("qubit, get the page icon",),
+   help="Bounded same-origin favicon capture (untrusted page image; "
+        "read-only, e-stop-gated).")
+_E("browser_favicon_cache", "List favicon cache",
+   ("list favicon cache", "show cached favicons", "favicon cache"),
+   "browser_tabs", ("browser",),
+   fixed=(("action", "favicon_cache"),),
+   examples=("qubit, list favicon cache",),
+   help="Bounded favicon cache by origin (read-only).")
+_E("browser_download", "Download this page",
+   ("download this page", "save this page", "download the document",
+    "save the current page"),
+   "browser_tabs", ("browser",),
+   args=(_R("dest"),), fixed=(("action", "download"),), confirm=True,
+   split="path",
+   examples=("qubit, download this page to /tmp/page.html",),
+   help="Save the displayed document into an approved project root "
+        "(confirmed; same-origin bytes only).")
 _E("computer_status", "Desktop capability",
    ("desktop status", "computer status", "can you control the desktop"),
    "computer", ("computer-use",),
@@ -5438,6 +6096,46 @@ _E("computer_status", "Desktop capability",
    fixed=(("action", "status"),),
    examples=("qubit, desktop status",),
    help="Control DISABLED; probes only.")
+_E("computer_ops", "Desktop operation catalog",
+   ("desktop operations", "list desktop operations", "desktop op catalog",
+    "what desktop operations"),
+   "computer", ("computer-use",),
+   fixed=(("action", "desktop_ops"),),
+   examples=("qubit, list desktop operations",),
+   help="Bounded allowlisted desktop ops (launch/PiP/present); no shell, "
+        "no argv, no window manager.")
+_E("computer_launch", "Launch an approved app",
+   ("launch app", "open app", "launch browser", "open the browser app",
+    "launch terminal"),
+   "computer", ("computer-use",),
+   args=(_R("app"), _S("target")), fixed=(("action", "launch"),), confirm=True,
+   split="first-rest",
+   examples=("qubit, launch app browser",),
+   help="Allowlisted app through an injected launcher (confirmed, "
+        "e-stop-gated); without a launcher it is a typed refusal.")
+_E("computer_pip", "Picture-in-picture the desktop",
+   ("picture in picture", "open picture in picture", "pip the desktop",
+    "show picture in picture"),
+   "computer", ("computer-use",),
+   args=(_S("target"),), fixed=(("action", "pip"),), confirm=True,
+   examples=("qubit, picture in picture",),
+   help="Bounded Document Picture-in-Picture over an injected Control-UI "
+        "surface (confirmed, e-stop-gated); typed refusal with none.")
+_E("computer_present", "Present the Control UI",
+   ("present the screen", "start presenting", "enter presentation mode",
+    "present document"),
+   "computer", ("computer-use",),
+   args=(_S("mode"), _S("panes")), fixed=(("action", "present"),), confirm=True,
+   split="first-rest",
+   examples=("qubit, present the screen",),
+   help="Persist a bounded presentation descriptor (confirmed, "
+        "e-stop-gated); no window manager or display access.")
+_E("computer_presentation_status", "Presentation status",
+   ("presentation status", "am i presenting", "show presentation status"),
+   "computer", ("computer-use",),
+   fixed=(("action", "presentation_status"),),
+   examples=("qubit, presentation status",),
+   help="Persisted presentation descriptor (read-only).")
 _E("plugins_install", "Install plugin",
    ("install plugin", "add plugin", "install skill from file",
     "install this reviewed skill", "install reviewed skill",
@@ -5813,7 +6511,8 @@ _E("kanban_block", "Block task",
    examples=("qubit, block task 3",),
    help="Mark a task blocked (confirmed).")
 _E("kanban_unblock", "Unblock task",
-   ("unblock task", "mark task ready"),
+   ("unblock task", "mark task ready", "kanban unblock",
+    "unblock kanban task"),
    "kanban", ("kanban",), args=(_I("task_id"),),
    fixed=(("action", "unblock"),), confirm=True,
    examples=("qubit, unblock task 3",),
@@ -6198,7 +6897,8 @@ _E("task_run_current", "Run this task",
 # ------------------------------------------- schedules (user cron native)
 _E("schedules_create", "Schedule this task",
    ("schedule this task", "schedule this", "schedule task", "create schedule",
-    "new schedule", "schedule for me"),
+    "new schedule", "schedule for me", "cron create", "create cron job",
+    "new cron job", "schedule a cron job"),
    "schedules", ("cron",),
    args=(_R("task_text",
             clarifier="What task should I schedule?"),
@@ -6211,49 +6911,55 @@ _E("schedules_create", "Schedule this task",
    help="Schedule a task on interval/daily/once (confirmed).")
 _E("schedules_list", "List schedules",
    ("list schedules", "show my schedules", "what is scheduled",
-    "my schedules", "list scheduled tasks"),
+    "my schedules", "list scheduled tasks", "cron list", "list cron jobs",
+    "cron jobs", "show cron jobs"),
    "schedules", ("cron",),
    fixed=(("action", "list"),), summary="schedules",
    examples=("qubit, list schedules",),
    help="Scheduled jobs with states (read-only).")
 _E("schedules_show", "Show schedule",
-   ("show schedule", "describe schedule", "schedule details"),
+   ("show schedule", "describe schedule", "schedule details", "cron show",
+    "show cron job", "cron job details"),
    "schedules", ("cron",), args=(_I("job_id"),),
    fixed=(("action", "show"),), summary="schedules",
    examples=("qubit, show schedule 2",),
    help="One job with recent runs.")
 _E("schedules_pause", "Pause schedule",
-   ("pause schedule", "stop schedule", "unschedule", "pause my schedule"),
+   ("pause schedule", "stop schedule", "unschedule", "pause my schedule",
+    "cron pause", "pause cron job"),
    "schedules", ("cron",), args=(_I("job_id"),),
    fixed=(("action", "pause"),), confirm=True, summary="schedules",
    examples=("qubit, pause schedule 2",),
    help="Pause a job (confirmed).")
 _E("schedules_resume", "Resume schedule",
-   ("resume schedule", "restart schedule", "unpause schedule"),
+   ("resume schedule", "restart schedule", "unpause schedule", "cron resume",
+    "resume cron job"),
    "schedules", ("cron",), args=(_I("job_id"),),
    fixed=(("action", "resume"),), confirm=True, summary="schedules",
    examples=("qubit, resume schedule 2",),
    help="Resume a job (confirmed).")
 _E("schedules_delete", "Delete schedule",
-   ("delete schedule", "remove schedule", "cancel schedule"),
+   ("delete schedule", "remove schedule", "cancel schedule", "cron delete",
+    "delete cron job", "remove cron job"),
    "schedules", ("cron",), args=(_I("job_id"),),
    fixed=(("action", "delete"),), confirm=True, summary="schedules",
    examples=("qubit, delete schedule 2",),
    help="Delete a job, history retained (confirmed).")
 _E("schedules_history", "Schedule history",
-   ("schedule history", "show schedule runs", "scheduled runs"),
+   ("schedule history", "show schedule runs", "scheduled runs",
+    "cron history", "cron job history"),
    "schedules", ("cron",),
    fixed=(("action", "history"),), summary="schedules",
    examples=("qubit, schedule history",),
    help="Run history, retained after delete.")
 _E("schedules_run_due", "Run scheduled tasks",
    ("run scheduled tasks", "run due schedules", "run my schedules",
-    "run due jobs"),
+    "run due jobs", "cron run", "run cron jobs", "run due cron jobs"),
    "schedules", ("cron",),
    fixed=(("action", "run_due"),), confirm=True, summary="schedules",
    examples=("qubit, run due schedules",),
    help="Execute due jobs now, typed per-job results (confirmed).")
-# ------------------------------ OpenClaw automation (OC-31/OC-D05/OC-D25)
+# ------------------------------ Qubit automation (OC-31/OC-D05/OC-D25)
 # Standing orders / auto-reply, flows, heartbeat, QA scenarios, and subagent
 # yield handoffs. Writes compose the canonical `automation: <verb> key=value`
 # directive and run it through the ONE production directive dispatcher the
@@ -6748,6 +7454,12 @@ _E("verified_unpin", "Unpin verified skill",
    fixed=(("action", "unpin"),), confirm=True,
    examples=("qubit, unpin skill",),
    help="Unpin a skill (confirmed).")
+_E("verified_bundled", "List bundled skills",
+   ("list bundled skills", "bundled skills", "built in skills"),
+   "verified", ("skills",),
+   fixed=(("action", "bundled"),),
+   examples=("qubit, list bundled skills",),
+   help="Qubit-bundled skill manifests (read-only; no network).")
 _E("experiments_status", "Experiment status",
    ("experiment status", "experiments status", "trial status"),
    "experiments", ("experiments",), fixed=(("action", "status"),),
@@ -7205,7 +7917,7 @@ _E("local_models_quickstart", "Local model quickstart",
    help="Typed gate: one-click runtime+model setup is brokered.")
 
 
-# --- OpenClaw backends: plugin host / inbound channels / ACP harness client
+# --- Qubit backends: plugin host / inbound channels / ACP harness client
 # (Packet 8U). Every operation executes the SAME backend module function the
 # CLI and dashboard call; raw-byte receive is a typed refusal guard.
 from .acp_client import HARNESSES as _AC_HARNESSES  # noqa: E402
@@ -7256,6 +7968,22 @@ _E("plugins_doctor", "Plugin runtime health",
    fixed=(("action", "doctor"),),
    examples=("qubit, plugin doctor",),
    help="Store health, handlers, and the emergency-stop latch.")
+_E("plugins_catalog", "Plugin install catalog",
+   ("plugin catalog", "list installable plugins", "show plugin catalog",
+    "installable plugins"),
+   "plugin_runtime", ("plugins-install",),
+   fixed=(("action", "catalog"),),
+   examples=("qubit, show plugin catalog",),
+   help="Installable rows: built-ins, registered, reviewed local manifests "
+        "(remote entries stay a typed refusal).")
+_E("plugins_runtime_install", "Install reviewed plugin",
+   ("install reviewed plugin", "install plugin runtime", "install catalog plugin"),
+   "plugin_runtime", ("plugins-install",),
+   args=(_R("identifier"),), fixed=(("action", "install"),), confirm=True,
+   split="path",
+   examples=("qubit, install plugin runtime acme",),
+   help="Install a reviewed catalog id or local manifest path through the "
+        "canonical plugin_runtime.install (confirmed, e-stop-gated).")
 _E("channels_status", "Inbound channel status",
    ("channels status", "channel inbound status", "inbound channel status"),
    "channels", (),
@@ -7352,7 +8080,7 @@ _E("acp_client_receipts", "Harness receipts",
    help="Redacted ACP receipts (bounded tail).")
 
 
-# --- OpenClaw delta Wave 3 (D3/D4/D20/D21/D24): node-host file transfer,
+# --- Qubit delta Wave 3 (D3/D4/D20/D21/D24): node-host file transfer,
 # active-recall memory, bounded document extraction, structured question
 # prompts, and Qubit-safe session sharing. Every entry executes the SAME
 # backend module function the CLI and dashboard call; raw-byte/secret/nested
@@ -7845,6 +8573,8 @@ CLI_COVERAGE = {
         "session_delete",
         "session_resume",
     ),
+    "chat-sessions": ("chat_sessions",),
+    "chat_sessions": ("chat_sessions",),
     "capability": ("capability", "capabilities_list"),
     "roundtrip": ("roundtrip_test",),
     "enroll": ("enroll_voice",),
@@ -7898,6 +8628,7 @@ CLI_COVERAGE = {
         "verified_verdict",
         "verified_pin",
         "verified_unpin",
+        "verified_bundled",
         "skills_workshop",
         "skills_workshop_backups",
         "skills_workshop_curator",
@@ -7912,6 +8643,7 @@ CLI_COVERAGE = {
         "verified_verdict",
         "verified_pin",
         "verified_unpin",
+        "verified_bundled",
     ),
     "project": ("projects_list", "projects_show", "projects_active"),
     "kanban": (
@@ -7939,6 +8671,11 @@ CLI_COVERAGE = {
         "computer_screen",
         "computer_screen_panes",
         "computer_screen_arrange",
+        "computer_ops",
+        "computer_launch",
+        "computer_pip",
+        "computer_present",
+        "computer_presentation_status",
     ),
     "browser": (
         "browser_status",
@@ -7954,6 +8691,9 @@ CLI_COVERAGE = {
         "browser_fill",
         "browser_click",
         "browser_close_tab",
+        "browser_favicon",
+        "browser_favicon_cache",
+        "browser_download",
         "browser_profiles",
         "browser_profile_create",
         "browser_profile_open",
@@ -7979,6 +8719,8 @@ CLI_COVERAGE = {
         "plugins_invoke",
         "plugins_unregister",
         "plugins_doctor",
+        "plugins_catalog",
+        "plugins_runtime_install",
     ),
     "channels": (
         "channels_status",
@@ -8013,7 +8755,7 @@ CLI_COVERAGE = {
     ),
     "peer": ("peer_list", "peer_dm", "peer_run"),
     "tui": ("tui_help",),
-    "vision": ("vision_status",),
+    "vision": ("vision_status", "vision_describe"),
     "import-agent": ("import_inspect",),
     "lessons": ("lessons_list", "lessons_promote", "lessons_remove"),
     "memory": ("memory_search",),
@@ -8464,16 +9206,296 @@ def _register_voice_guards() -> None:
 _register_voice_guards()
 
 
+# --------------------------------------- wave 7: CLI-subcommand bridges
+# Canonical CLI subcommands that had no reachable spoken form. These are
+# additive entries that must NOT disturb the frozen CLI-parity ``REGISTRY``
+# whose example table ``tests/test_voice_commands8tf.py`` pins exactly (the
+# same reason ``PLUGIN_FLEET_REGISTRY`` exists). They flow through the one
+# resolve/execute/confirm pipeline, one journal, one redactor, and one e-stop.
+#
+# * real bindings reuse the SAME backend the CLI/dashboard already calls:
+#   `plugins capabilities` -> ``plugin_runtime.host_capabilities`` and
+#   `skills install` -> ``permissions_store.install_skill`` (via the existing
+#   ``plugins_install`` backend, which stages the manifest disabled);
+# * refusal guards: upstream kanban lifecycle shapes with no Qubit construct
+#   (``request-review``/``request-changes``/``reopen-review``/``link``/
+#   ``unlink``) are audited ``voice_unsupported`` refusals naming the exact CLI
+#   counterpart — never silently unbound, never a fabricated success.
+CLI_BRIDGE_REGISTRY: Dict[str, VoiceCommand] = {}
+
+
+def _CB(entry_id: str, title: str, aliases: Tuple[str, ...], backend: str,
+        args: Tuple[VoiceArg, ...] = (),
+        fixed: Tuple[Tuple[str, str], ...] = (), confirm: bool = False,
+        summary: str = "generic", examples: Tuple[str, ...] = (),
+        split: str = "", help: str = "") -> VoiceCommand:
+    entry = VoiceCommand(id=entry_id, title=title, aliases=tuple(aliases),
+                         args=tuple(args), backend=backend,
+                         fixed=tuple(fixed), scope=("voice",),
+                         confirm=confirm, summary=summary,
+                         examples=tuple(examples), parity=(), help=help,
+                         split=split)
+    CLI_BRIDGE_REGISTRY[entry_id] = entry
+    return entry
+
+
+_CB("plugins_capabilities", "Plugin host capabilities",
+    ("plugins capabilities", "plugin capabilities",
+     "list plugin capabilities", "what capabilities do plugins have"),
+    "plugin_runtime", fixed=(("action", "capabilities"),),
+    examples=("qubit, plugins capabilities",),
+    help="In-process host-adapter capabilities invocable through the plugin "
+         "host (read-only; same backend as the CLI/dashboard).")
+_CB("skills_install", "Install a skill manifest",
+    ("skills install", "install skill", "install a skill",
+     "install a skill manifest"),
+    "plugins_install", args=(_R("manifest"),),
+    fixed=(("action", "install"),), confirm=True, split="path",
+    examples=("qubit, skills install",),
+    help="Validate + stage a local reviewed skill manifest disabled; remote "
+         "identifiers are typed-refused and never fetched (confirmed).")
+
+# Upstream kanban lifecycle shapes with NO Qubit construct (the Qubit CLI
+# refuses them typed). Spoken attempts get the same audited refusal and name
+# the exact CLI counterpart instead of silently doing nothing.
+KANBAN_NO_CONSTRUCT = {
+    "request_review": ("kanban request review",
+                       "request review of a kanban task",
+                       "request-review a kanban task"),
+    "request_changes": ("kanban request changes",
+                        "request changes on a kanban task",
+                        "request-changes a kanban task"),
+    "reopen_review": ("kanban reopen review",
+                      "reopen review of a kanban task",
+                      "reopen-review a kanban task"),
+    "link": ("kanban link task", "link a kanban task", "link kanban tasks"),
+    "unlink": ("kanban unlink task", "unlink a kanban task",
+               "unlink kanban tasks"),
+}
+for _kb_sub, _kb_aliases in KANBAN_NO_CONSTRUCT.items():
+    _kb_flag = _kb_sub.replace("_", "-")
+    _CB(f"guard_kanban_{_kb_sub}",
+        f"Kanban {_kb_flag.replace('-', ' ')} (voice guard)",
+        tuple(_kb_aliases), "voice_unsupported",
+        fixed=(("op", f"kanban_{_kb_sub}"),
+               ("guidance", "no Qubit construct yet: use the dashboard boards "
+                            f"form or `qubit kanban {_kb_flag}` in a terminal"),
+               ("code", "VOICE_UNSUPPORTED")),
+        summary="guidance",
+        examples=(f"qubit, {_kb_aliases[0]}",),
+        help="Typed refusal with guidance: this kanban shape has no Qubit "
+             "construct; the spoken attempt never claims success.")
+
+
+# --------------------------------------- wave 12: CLI-family read bridges
+# The parity inventory's ``voice_intent`` candidates name the canonical CLI
+# families (``qubit logs``, ``qubit acp``, ``qubit config`` …) but the frozen
+# wave-1..3 ``REGISTRY`` aliases are spoken phrases, so those intents resolved
+# nowhere. These additive CLI_BRIDGE entries bind each family to the SAME
+# read-only backend the CLI/dashboard already call — no new backend, no stub,
+# no fabricated success.
+#
+# Every alias is an ANCHORED ``rx:`` match for the exact CLI-family phrase
+# (``rx:^tools( list)?$``), never a bare single word: an unanchored ``tools``
+# alias would also capture ``qubit tools enable a2a`` and misroute a mutating
+# intent to a list read. Anchoring keeps the bridge honest — only the exact
+# read the backend performs resolves here; anything longer stays unresolved
+# (and therefore visible as a gap) rather than silently succeeding.
+#
+# Every entry below is a read (list/status/show/catalog/kinds/flows), so none
+# mutates and none needs a confirmation. They flow through the one
+# resolve/execute/confirm pipeline, one journal, one redactor, and one e-stop,
+# exactly like the W7 bridges.
+_CB("cli_logs", "Show runtime logs",
+    ("rx:^logs$",), "logs",
+    examples=("qubit, logs",),
+    help="Recent redacted runtime log lines (same events.jsonl the CLI reads).")
+_CB("cli_insights", "Activity insights",
+    ("rx:^insights$",), "insights",
+    examples=("qubit, insights",),
+    help="Recent session activity summary (read-only).")
+_CB("cli_acp", "ACP editor integration status",
+    ("rx:^acp$",), "acp",
+    examples=("qubit, acp",),
+    help="Editor ACP integration check (same reader the CLI/dashboard use).")
+_CB("cli_lsp", "Language server status",
+    ("rx:^lsp( list)?$",), "lsp", fixed=(("action", "list"),),
+    examples=("qubit, lsp",),
+    help="Installed/available language servers (read-only).")
+_CB("cli_browser", "Browser status",
+    ("rx:^browser$",), "browser",
+    examples=("qubit, browser",),
+    help="Configured CDP browser precondition (read-only; never a profile).")
+_CB("cli_hooks", "List event hooks",
+    ("rx:^hooks( list)?$",), "hooks", fixed=(("action", "list"),),
+    examples=("qubit, hooks",),
+    help="Declared event-hook subscriptions (read-only).")
+_CB("cli_worktree", "Worktree status",
+    ("rx:^worktree$",), "worktree",
+    examples=("qubit, worktree",),
+    help="Orphaned worktree sweep report (read-only).")
+_CB("cli_completion", "Shell completions",
+    ("rx:^completions?$",), "completions",
+    examples=("qubit, completions",),
+    help="Shipped shell completion scripts, hashed (read-only).")
+_CB("cli_config", "Show configuration profiles",
+    ("rx:^config( show| profiles)?$",), "config_profiles",
+    fixed=(("action", "list"),),
+    examples=("qubit, config",),
+    help="Provider/config profile registry (same profiles reader as the CLI).")
+_CB("cli_commands", "List voice commands",
+    ("rx:^commands( list)?$",), "commands",
+    examples=("qubit, commands",),
+    help="Every registered voice command with its spoken aliases (read-only).")
+_CB("cli_curator", "Curator status",
+    ("rx:^curator$",), "curator",
+    examples=("qubit, curator",),
+    help="Verified-skill curator statistics (read-only).")
+_CB("cli_themes", "Show theme",
+    ("rx:^themes$",), "themes", fixed=(("action", "show"),),
+    examples=("qubit, themes",),
+    help="Active dashboard theme (same themes reader the CLI uses).")
+_CB("cli_tools", "List tools",
+    ("rx:^tools( list)?$",), "tools",
+    examples=("qubit, tools",),
+    help="Effective configurable toolset catalog (read-only).")
+_CB("cli_pairing", "List pairing codes",
+    ("rx:^pairing( list)?$",), "pairing", fixed=(("action", "list"),),
+    examples=("qubit, pairing",),
+    help="Pending/active device pairing codes (read-only).")
+_CB("cli_webhooks", "List webhooks",
+    ("rx:^webhooks$",), "webhook", fixed=(("action", "list"),),
+    examples=("qubit, webhooks",),
+    help="Webhook subscriptions (read-only; secrets never returned).")
+_CB("cli_projects", "List projects",
+    ("rx:^projects$",), "projects", fixed=(("action", "list"),),
+    examples=("qubit, projects",),
+    help="Registered projects (read-only).")
+_CB("cli_reports", "List reports",
+    ("rx:^reports( list)?$",), "reports", fixed=(("action", "list"),),
+    examples=("qubit, reports",),
+    help="Published report-bundle manifests, newest first (read-only).")
+_CB("cli_sessions", "List sessions",
+    ("rx:^sessions( list)?$",), "sessions", fixed=(("action", "list"),),
+    examples=("qubit, sessions",),
+    help="Recent action-receipt sessions (read-only; say chat sessions for "
+         "canonical transcripts).")
+_CB("cli_sessions_search", "Search sessions",
+    ("rx:^sessions? search\\b",), "sessions",
+    args=(_R("query"),), fixed=(("action", "search"),),
+    examples=("qubit, sessions search invoice",),
+    help="Search session names and receipts (read-only).")
+_CB("cli_skills", "List skills",
+    ("rx:^skills (list|catalog)$",), "skills", fixed=(("action", "list"),),
+    examples=("qubit, skills list",),
+    help="On-disk skills merged with the permissioned store (read-only).")
+_CB("cli_memory_search", "Search memory",
+    ("rx:^(memory search|search my memory)\\b",), "memory",
+    args=(_R("query"),), fixed=(("action", "search"),),
+    examples=("qubit, memory search invoices",),
+    help="Search remembered memories (read-only).")
+_CB("cli_egress", "Egress guard status",
+    ("rx:^egress$",), "egress", fixed=(("action", "status"),),
+    examples=("qubit, egress",),
+    help="Network egress guard status (read-only).")
+_CB("cli_usage", "Usage analytics",
+    ("rx:^usage( report)?$",), "usage",
+    examples=("qubit, usage",),
+    help="Local token/cost usage ledger (read-only).")
+_CB("cli_receipts", "Receipt ledger",
+    ("rx:^receipts( ledger)?$",), "receipts_ledger",
+    examples=("qubit, receipts",),
+    help="Execution-identity receipt ledger + hash-chain verification "
+         "(read-only; absent ledger is a typed state).")
+_CB("cli_logbook", "Work logbook",
+    ("rx:^logbook$",), "logbook", fixed=(("action", "entries"),),
+    examples=("qubit, logbook",),
+    help="Append-only work-journal entries (read-only).")
+_CB("cli_telemetry", "Telemetry status",
+    ("rx:^telemetry$",), "telemetry", fixed=(("action", "status"),),
+    examples=("qubit, telemetry",),
+    help="Opt-in telemetry gate status (read-only; no transport is created).")
+_CB("cli_media", "Media catalog",
+    ("rx:^media gen catalog$",), "media_gen", fixed=(("action", "catalog"),),
+    examples=("qubit, media gen catalog",),
+    help="Media-generation provider catalog (read-only).")
+_CB("cli_documents", "Document kinds",
+    ("rx:^documents kinds$",), "doc_extract", fixed=(("action", "kinds"),),
+    examples=("qubit, documents kinds",),
+    help="Supported document-extraction kinds (read-only).")
+_CB("cli_acp_client", "ACP harness catalog",
+    ("rx:^acp client catalog$",), "acp_client",
+    fixed=(("action", "catalog"),),
+    examples=("qubit, acp client catalog",),
+    help="External ACP harness catalog (read-only; PATH presence only).")
+_CB("cli_automation", "Automation flows",
+    ("rx:^automation flows$",), "automation", fixed=(("action", "flows"),),
+    examples=("qubit, automation flows",),
+    help="Registered automation flows (read-only).")
+_CB("cli_approvals", "Pending approvals",
+    ("rx:^approvals$",), "approvals",
+    examples=("qubit, approvals",),
+    help="Pending confirmation-journal approvals (read-only).")
+_CB("cli_node_host", "List paired nodes",
+    ("rx:^(nodes|paired nodes)$",), "node_host", fixed=(("action", "list"),),
+    examples=("qubit, nodes",),
+    help="Paired node-host registry (read-only).")
+_CB("cli_channels", "Channels status",
+    ("rx:^channels$",), "channels", fixed=(("action", "status"),),
+    examples=("qubit, channels",),
+    help="Inbound channel framework status (read-only; payloads never bound).")
+_CB("cli_permissions", "Permission mode",
+    ("rx:^permissions$",), "permissions",
+    examples=("qubit, permissions",),
+    help="Current permission mode and scopes (read-only).")
+_CB("cli_flags", "Feature flags",
+    ("rx:^flags$",), "flags",
+    examples=("qubit, flags",),
+    help="Effective feature-flag values (read-only).")
+_CB("cli_secrets", "Credential references",
+    ("rx:^secrets$",), "secrets",
+    examples=("qubit, secrets",),
+    help="Credential references by name only (read-only; never values).")
+_CB("cli_vision", "Vision status",
+    ("rx:^vision$",), "vision_status",
+    examples=("qubit, vision",),
+    help="Vision subsystem status (read-only).")
+_CB("cli_proxy", "Proxy status",
+    ("rx:^proxy$",), "proxy", fixed=(("action", "status"),),
+    examples=("qubit, proxy",),
+    help="Provider proxy status (read-only).")
+_CB("cli_audio", "Audio status",
+    ("rx:^audio$",), "audio",
+    examples=("qubit, audio",),
+    help="Enumerated input/output audio devices (read-only).")
+_CB("cli_device", "Device status",
+    ("rx:^device$",), "device",
+    examples=("qubit, device",),
+    help="This machine's enrollment identity (read-only).")
+_CB("cli_runtime", "Runtime status",
+    ("rx:^runtime$",), "runtime", fixed=(("action", "status"),),
+    examples=("qubit, runtime",),
+    help="Pinned runtime image status (read-only).")
+_CB("cli_frontier", "Frontier/model status",
+    ("rx:^frontier$",), "frontier",
+    examples=("qubit, frontier",),
+    help="Effective model/frontier policy status (read-only).")
+_CB("cli_brain", "Brain principals",
+    ("rx:^brain$",), "brain", fixed=(("action", "principals"),),
+    examples=("qubit, brain",),
+    help="Brain principal registry (read-only).")
+
+
 # ------------------------------------------------- wave 4: plugin fleet
-# The pinned Hermes dashboard plugin fleet (``hermes-achievements`` + the full
+# The pinned Qubit dashboard plugin fleet (``hermes-achievements`` + the full
 # kanban plugin API) has a real in-process Qubit backend since wave 3
-# (``voicebridge/hermes_plugins.py``). Those routes are dashboard/compat
+# (``voicebridge/qubit_plugins.py``). Those routes are dashboard/compat
 # surfaces, so they are NOT part of the frozen CLI-parity ``REGISTRY`` whose
 # example table ``tests/test_voice_commands8tf.py`` pins exactly. They live in
 # their own registry and still flow through the one resolve/execute/confirm
 # pipeline, one journal, one redactor, and one e-stop.
 #
-# ``PLUGIN_FLEET_OPS`` maps a spoken entry to the exact ``hermes_compat``
+# ``PLUGIN_FLEET_OPS`` maps a spoken entry to the exact ``qubit_compat``
 # (method, path, fixed-body) the dashboard SPA calls — same backend, same
 # listener. ``PLUGIN_FLEET_VOICE`` declares the compat route handler -> voice
 # entry so the wave-4 audit can prove there is no silently unspoken route.
@@ -8592,7 +9614,7 @@ _FE("kanban_fleet_board", "Vendored kanban board",
     examples=("qubit, fleet kanban board",),
     help="Vendored kanban plugin board (read-only, real kanban_db).")
 _FE("kanban_fleet_task", "Vendored kanban task",
-    ("rx:fleet kanban task (.+)", "rx:hermes kanban task (.+)"),
+    ("rx:fleet kanban task (.+)", "rx:kanban task (.+)"),
     args=(_S("task_id", True),),
     examples=("qubit, fleet kanban task abc123",),
     help="One vendored kanban task by id.")
@@ -8633,6 +9655,91 @@ _FE("kanban_fleet_home_channels", "Vendored kanban channels",
      "fleet home channels"),
     examples=("qubit, fleet kanban channels",),
     help="Home channel bindings of the vendored kanban plugin.")
+
+
+# ---------------------------------------------------- speech-profile voice
+# PRB-05: the eight speech-profile lifecycle operations live in the main
+# REGISTRY and dispatch to the SAME provider/speech resolver the CLI
+# (`qubit profile speech ...`) and dashboard (MODEL_PROFILE_OPS) use. Reads
+# execute immediately; mutations are confirm-gated by the shared voice journal.
+# Entry ids are deliberately distinct from the dashboard MODEL_PROFILE_OPS ids
+# (`list_speech_profiles`, ...) so the catalog has one registry-tier entry and
+# one extra-tier entry per operation, with no id collision. Each backend still
+# reaches the SAME resolver/dashboard op. Args are validated by the backend, so
+# the spoken aliases resolve (and stage a confirmation for mutations) without
+# requiring structured arguments to be captured from speech.
+_E("speech_profile_list", "List speech profiles",
+   ("list speech profiles", "list my speech profiles",
+    "what speech profiles are there"),
+   "speech_profile_list", ("config", "profile"),
+   args=(_C("kind", _SPEECH_KINDS, required=False),),
+   summary="model_profile", examples=("qubit, list speech profiles",),
+   help="List the canonical STT/TTS/realtime speech profiles.")
+_E("speech_profile_show", "Show speech profile",
+   ("show speech profile", "show my speech profile",
+    r"rx:show speech profile (.+)$"),
+   "speech_profile_show", ("config", "profile"),
+   args=(_S("profile_id"),), summary="model_profile",
+   examples=("qubit, show speech profile",),
+   help="Show one speech profile and its effective gate.")
+_E("speech_profile_test", "Test speech profile",
+   ("test my speech profile", "test my voice profile",
+    "test the speech profile"),
+   "speech_profile_test", ("config", "profile"),
+   args=(_S("profile_id"), _S("kind")), summary="model_profile",
+   examples=("qubit, test my speech profile",),
+   help="Preflight the active (or named) speech profile (ASR/TTS/realtime).")
+_E("speech_profile_create", "Create speech profile",
+   ("create a speech profile", "add a speech profile",
+    "register a speech profile"),
+   "speech_profile_create", ("config", "profile"), confirm=True,
+   args=(_S("profile_id"), _C("kind", _SPEECH_KINDS, required=False),
+         _S("provider"), _S("model"), _S("voice"), _S("device"),
+         _S("language"), _C("locality", ("local", "external"), required=False),
+         _C("egress_consent", ("deny", "allow"), required=False),
+         _S("key_ref"), _S("base_url"), _S("engine"), _S("fallback_to")),
+   summary="model_profile",
+   examples=("qubit, create a speech profile",),
+   help="Register a speech profile (non-secret fields; key_ref is an "
+        "env:/file: reference, never a raw key).")
+_E("speech_profile_clone", "Clone speech profile",
+   ("clone speech profile", "copy speech profile",
+    "clone a speech profile"),
+   "speech_profile_clone", ("config", "profile"), confirm=True,
+   args=(_S("source_id"), _S("new_id")), summary="model_profile",
+   examples=("qubit, clone speech profile",),
+   help="Clone a speech profile under a new id.")
+_E("speech_profile_remove", "Remove speech profile",
+   ("remove speech profile", "delete speech profile",
+    "remove a speech profile"),
+   "speech_profile_remove", ("config", "profile"), confirm=True,
+   args=(_S("profile_id"),), summary="model_profile",
+   examples=("qubit, remove speech profile",),
+   help="Remove a non-default speech profile.")
+_E("speech_profile_select", "Select session speech profile",
+   ("select speech profile for this session",
+    "use speech profile for this session",
+    "set session speech profile"),
+   "speech_profile_select", ("config", "profile"), confirm=True,
+   args=(_S("profile_id"), _C("kind", _SPEECH_KINDS, required=False)),
+   summary="model_profile",
+   examples=("qubit, select speech profile for this session",),
+   help="Select a speech profile for the current session (confirmed).")
+_E("speech_profile_clear", "Clear session speech profile",
+   ("clear session speech", "reset session speech profile",
+    "clear the session speech profile"),
+   "speech_profile_clear", ("config", "profile"), confirm=True,
+   args=(_C("kind", _SPEECH_KINDS, required=False),), summary="model_profile",
+   examples=("qubit, clear session speech",),
+   help="Clear the session's speech profile override (confirmed).")
+
+#: Speech-profile entry ids whose args can carry a credential reference; the
+#: execute() raw-secret guard covers them like the model-profile intents.
+_SPEECH_VOICE_IDS = frozenset({
+    "speech_profile_list", "speech_profile_show", "speech_profile_test",
+    "speech_profile_create", "speech_profile_clone", "speech_profile_remove",
+    "speech_profile_select", "speech_profile_clear",
+})
 
 
 # ------------------------------------------------------ model-profile voice
@@ -8681,13 +9788,6 @@ _MP("model_profile_test", "Test model profile",
     "model_profile_test", args=(_S("profile_id"),),
     examples=("qubit, test my model profile",),
     help="Preflight the active (or named) language-model profile, read-only.")
-_MP("speech_profile_test", "Test speech profile",
-    ("test my speech profile", "test my voice profile",
-     "test the speech profile"),
-    "speech_profile_test", args=(_S("profile_id"), _S("kind")),
-    examples=("qubit, test my speech profile",),
-    help="Preflight the active (or named) speech profile (ASR/TTS/realtime), "
-         "read-only.")
 _MP("model_profile_realtime", "Use realtime voice profile",
     ("use the realtime voice profile", "use my realtime voice profile",
      "switch to the realtime voice profile", "use realtime voice"),
@@ -8707,6 +9807,14 @@ _MP("model_profile_local_only", "Return to local-only mode",
     "model_profile_local_only", confirm=True,
     examples=("qubit, return to local-only mode",),
     help="Clear this session's model overrides and reselect the local brain.")
+_MP("model_profile_set_active", "Set the active provider profile",
+    (r"rx:set (?:my )?([a-z0-9_\-]+) as the active (?:provider )?profile$",
+     r"rx:make (?:my )?([a-z0-9_\-]+) the active (?:provider )?profile$"),
+    "model_profile_set_active", args=(_S("profile_id", True),), confirm=True,
+    examples=("qubit, set research as the active provider profile",),
+    help="Persist the registered profile as the active provider/model "
+         "selection (confirmed); explicit requests and session overrides still "
+         "win.")
 
 
 # ---------------------------------------------------------------- execution
@@ -8774,7 +9882,7 @@ def execute(ctx, resolution: Resolution) -> Outcome:
     # Model-profile intents must never take a raw key by voice. A pasted
     # secret is refused typed BEFORE it can reach a journal, receipt, spoken
     # summary, or audit meta — the secret stays out of every spoken path.
-    if entry.id in MODEL_PROFILE_REGISTRY:
+    if entry.id in MODEL_PROFILE_REGISTRY or entry.id in _SPEECH_VOICE_IDS:
         from .providers.resolver import looks_like_raw_secret as _looks
         for _v in merged.values():
             if isinstance(_v, str) and _looks(_v):
@@ -8830,6 +9938,15 @@ def execute(ctx, resolution: Resolution) -> Outcome:
         result = backend(ctx, merged)
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
+        # A canonical-broker power denial (e.g. a read-only web capability that
+        # the broker refused because the shared e-stop is latched) is a typed
+        # REFUSAL, not a failure: report the same refusal the confirm-tier
+        # e-stop gate emits, with no receipt.
+        if str(code) in ("EMERGENCY_STOP", "POWER_DISABLED"):
+            _audit("estop", ctx.actor,
+                   {"entry": entry.id, "session": ctx.session})
+            return Outcome(REFUSED, entry,
+                           "Emergency stop is latched. Reset it first.", {})
         _audit("failed", ctx.actor,
                {"entry": entry.id, "code": str(code)[:60],
                 "session": ctx.session})
@@ -8962,12 +10079,15 @@ def voice_say(cfg: Any, text: str, *, actor: str = "voice:user",
             out["candidates"] = [e.id for e in resolution.candidates]
         return out
     entry = resolution.entry
-    if entry.backend == "plugin_fleet" or entry.id in MODEL_PROFILE_REGISTRY:
-        # Wave-4 vendored-plugin entries and the resolver-backed model-profile
-        # intents are not dashboard_ops rows; they run through the shared
-        # execute/confirm pipeline so staging, session isolation, e-stop,
-        # redaction, and single-use confirmations are the exact same code
-        # path — not a parallel dispatcher.
+    if (entry.backend == "plugin_fleet"
+            or entry.id in MODEL_PROFILE_REGISTRY
+            or entry.id in CLI_BRIDGE_REGISTRY):
+        # Wave-4 vendored-plugin entries, the resolver-backed model-profile
+        # intents, and the W7 CLI-subcommand bridges/guards are not
+        # dashboard_ops rows; they run through the shared execute/confirm
+        # pipeline so staging, session isolation, e-stop, redaction, and
+        # single-use confirmations are the exact same code path — not a
+        # parallel dispatcher.
         ctx = make_ctx(cfg, actor=actor, session=session, source=source)
         out = execute(ctx, resolution)
         payload: Dict[str, Any] = {

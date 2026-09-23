@@ -1,4 +1,4 @@
-"""Tests for the STEAL_LIST implementations (docs/STEAL_LIST.md).
+"""Tests for the STEAL_LIST implementations (docs/archive/2026-09-21/STEAL_LIST.md).
 
 Covers: qubit-brain4 thinking fallback (AirLLM), auto-preference CLHF
 (CopilotKit), classifier tool-schema parsing (CopilotKit), activity delta

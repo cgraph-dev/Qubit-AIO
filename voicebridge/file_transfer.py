@@ -1,4 +1,4 @@
-"""Packet 8U / OpenClaw D3 — Qubit-safe node-host file transfer kernel.
+"""Packet 8U / Qubit D3 — Qubit-safe node-host file transfer kernel.
 
 Qubit implements the File Transfer delta (node directory list, bounded fetch,
 stream planning, resumable chunks) entirely over the existing confined model:
@@ -15,8 +15,8 @@ spec, so a tampered plan, a changed file, or a replayed request is detected.
 The emergency stop is the same durable latch the broker, CLI, dashboard, and
 node host observe (fail closed).
 
-Deliberate divergences from OpenClaw's transport (no listener, no remote
-stream, confirmed reads) are recorded in ``docs/UPSTREAM_REUSE.md``.
+Deliberate divergences from Qubit's transport (no listener, no remote
+stream, confirmed reads) are recorded in ``docs/archive/2026-09-21/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 

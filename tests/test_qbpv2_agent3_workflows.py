@@ -19,7 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 pytestmark = pytest.mark.skipif(
     not (DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")
@@ -58,7 +58,11 @@ def _start(tmp_path):
     state = tmp_path / "state"
     state.mkdir(exist_ok=True)
     p = tmp_path / "voice.yaml"
-    p.write_text(f"logging:\n  jsonl_path: '{state}'\nwebui:\n  token: test-token\n")
+    # This crawl only renders the dashboard; the shipped /chat floor is 65536
+    # (covered by tests/test_terminal_context_floor.py). Lower it here so the
+    # hermetic local default can open /chat without a configured API profile.
+    p.write_text(f"logging:\n  jsonl_path: '{state}'\nwebui:\n  token: test-token\n"
+                 "terminal:\n  min_context_tokens: 4096\n")
     cfg = Config.load(p)
 
     class _FakeOrch:

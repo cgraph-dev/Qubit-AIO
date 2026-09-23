@@ -40,19 +40,74 @@ After big code changes, refresh the graph with `graft build` (deterministic,
 no API key, $0).
 <!-- graft:end -->
 
+## Documentation authority (read first)
+- The **fresh docs set is authoritative and living**: `docs/README.md` (index +
+  review checklist), `docs/STATUS.md` (current evidence-backed truth),
+  `docs/PARITY.md` (the parity target + method), `docs/MIGRATION.md` (port from
+  the reference home), `docs/BRAND.md` (zero legacy brand),   `docs/PLAN.md` (milestones/critical path), `docs/EXECUTION_PLAN.md` (sequenced
+  workstreams W0–W9), `docs/CHECKLIST.md` (the master tick-list),
+  `docs/DECISIONS.md` (owner rulings in force),
+  `docs/ARCHITECTURE.md`. Read them before any Qubit task and update
+  `STATUS.md` every session.
+- **Owner directives in force:** everything that works on the local reference
+  dashboard `http://127.0.0.1:9119/?profile=default` must work in Qubit and be
+  commandable by voice (`docs/PARITY.md`); zero legacy brand on product surfaces,
+  with legal attribution the required exception (`docs/BRAND.md`).
+- Owner rulings in force — staged gates (`M1`/`M2` as progress markers only,
+  `VERIFIED` remains the sole release verdict), the `OPERATOR_ONLY` split, and the
+  three rulings — are in `docs/DECISIONS.md` and
+  `docs/QUBIT_OWNER_AMENDMENT_2026-09-22_STAGED_GATES_AND_RULINGS.md`.
+- Frozen contracts and owner amendments are authoritative by content and are
+  preserved under `docs/archive/2026-09-21/` (see its `README.md`). Never edit a
+  frozen contract; changing a requirement needs owner sign-off. Do not edit
+  `docs/differential/INTERFACE.md`.
+- The **pre-reset docs** (the 2026-09-21 authoritative contracts and the former
+  active brief) are preserved under `docs/archive/2026-09-22-pre-reset/`. They
+  remain the definition of done, **amended by `docs/DECISIONS.md`**, and must not
+  override it.
+- Status comes from freshly regenerated ledgers/manifests (`QUBIT_GAP_LEDGER.*`,
+  `QUBIT_*_MANIFEST.json`, `QUBIT_*_INVENTORY.json`), not prose. Re-run the
+  generators; do not trust any prior completion claim without verifying against
+  the worktree.
+- Never claim VERIFIED, M1, M2, CODE_READY, COMPLETE, 100%, or 1:1 without the
+  behavioral evidence required by the archived release gate and `docs/PLAN.md`.
+- **A typed refusal is never a working capability.** Preserve the
+  voice-actionability, full-parity, and deep-rebrand requirements.
+- Graft (v0.12.0) indexes code only; markdown docs are NOT in the graph. Doc
+  authority is carried by this file and the `opencode.json` `instructions` list.
+
 ## Voice Bridge docs (read before editing audio/voice)
-- `docs/AUDIO_SETUP.md` — the WORKING HyperX audio config (mic = mono USB,
-  output = HyperX digital; keep output_device EMPTY; speak_web_locally=false).
-- `docs/STEAL_LIST.md` — what to implement next from CopilotKit/AirLLM/OpenSandbox
-  (smarter 4B model tier, live streaming, tool schema, etc).
-- `docs/VOICE_BRIDGE_SYSTEM.md` — full pipeline + roadmap.
+These were preserved under `docs/archive/2026-09-21/`:
+- `docs/archive/2026-09-21/AUDIO_SETUP.md` — the WORKING HyperX audio config
+  (mic = mono USB, output = HyperX digital; keep output_device EMPTY;
+  speak_web_locally=false).
+- `docs/archive/2026-09-21/STEAL_LIST.md` — what to implement next from
+  CopilotKit/AirLLM/OpenSandbox (smarter 4B model tier, live streaming, tool
+  schema, etc).
+- `docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md` — full pipeline + roadmap.
 
 ## Licensing and upstream reuse
 - `LICENSE` applies only to original Qubit material; it does not relicense
   third-party or upstream-derived code.
-- Read `docs/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
-  `docs/UPSTREAM_REUSE.md` before copying or adapting external source.
+- Read `docs/archive/2026-09-21/LICENSING.md`, `THIRD_PARTY_NOTICES.md`, and
+  `docs/archive/2026-09-21/UPSTREAM_REUSE.md` before copying or adapting
+  external source.
 - Record the exact upstream repository, commit, source path, license, and
   local changes before implementation. Preserve required copyright/license
   notices and stop with `BLOCKED — LICENSE REVIEW REQUIRED` when provenance or
   license compatibility is uncertain.
+
+## Implementation-first verification cadence
+
+Follow `docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-18_IMPLEMENTATION_FIRST_VERIFICATION.md`.
+Finish code-side implementation and inventory work before running expensive
+verification. Until the integration lead declares `IMPLEMENTATION_COMPLETE`,
+do not run the full pytest suite, broad Vitest/Playwright sweeps, complete
+differential parity, packaging/release waves, or independent verification.
+Use Graft, upstream comparison, AST/reachability analysis, manifests, and
+written handoffs during implementation. Minimal syntax/type or focused checks
+are allowed only to prevent damage to files being edited; they are not proof of
+completion and must not become a repeated test/fix loop. After implementation
+is frozen, run the final matrix once. If it fails, repair the affected area
+with focused checks and rerun the final matrix only after the repair. Do not
+commit or push before independent verification passes.

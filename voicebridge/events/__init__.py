@@ -2,7 +2,7 @@
 
 Public surface for the Phase 2 event stream. 2A: contract, journal, RFC 6902
 subset. 2B: hub replay, run coordination, snapshot/delta tracking, SSE
-serving. Upstream provenance: docs/UPSTREAM_REUSE.md R1/R15.
+serving. Upstream provenance: docs/archive/2026-09-21/UPSTREAM_REUSE.md R1/R15.
 """
 from .core import (CONTENT_TYPE, SCHEMA_VERSION, TERMINAL_EVENT_TYPES,
                    EventEncoder, EventValidationError, EventType,

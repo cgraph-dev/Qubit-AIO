@@ -20,9 +20,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
-PUBLIC = REPO_ROOT / "frontend" / "hermes-web" / "public"
-SRC = REPO_ROOT / "frontend" / "hermes-web" / "src"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
+PUBLIC = REPO_ROOT / "frontend" / "qubit-web" / "public"
+SRC = REPO_ROOT / "frontend" / "qubit-web" / "src"
 
 REBRAND_FILES = [
     SRC / "lib" / "rebrand.ts",

@@ -4,7 +4,7 @@ Every ledger row whose status is ``SAFE_EQUIVALENT`` must be provable against
 the owner criteria: a real Qubit backend, an explicit typed refusal/gate for
 the unsafe raw upstream behavior, a valid non-empty gate ``needs``, and an
 on-disk proving test. This module is the machine check behind
-``docs/QUBIT_SAFE_EQUIVALENTS.md``.
+``docs/archive/2026-09-21/QUBIT_SAFE_EQUIVALENTS.md``.
 
 Rows that do **not** meet a criterion are reported (not hidden) for the
 orchestrator to reclassify. They are enumerated in
@@ -30,11 +30,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 SECTION_FILES = (
-    "docs/QUBIT_GAP_LEDGER.hermes.json",
-    "docs/QUBIT_GAP_LEDGER.openclaw.json",
-    "docs/QUBIT_GAP_LEDGER.qubit.json",
+    "docs/generated/QUBIT_GAP_LEDGER.hermes.json",
+    "docs/generated/QUBIT_GAP_LEDGER.openclaw.json",
+    "docs/generated/QUBIT_GAP_LEDGER.qubit.json",
 )
-AUDIT_DOC = REPO_ROOT / "docs" / "QUBIT_SAFE_EQUIVALENTS.md"
+AUDIT_DOC = REPO_ROOT / "docs/generated" / "QUBIT_SAFE_EQUIVALENTS.md"
+if not AUDIT_DOC.is_file():
+    AUDIT_DOC = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_SAFE_EQUIVALENTS.md"
 
 # A typed refusal/gate code: an ALL_CAPS token with at least one underscore word.
 CODE_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
@@ -79,8 +81,8 @@ def _row_ids() -> set[str]:
 # ------------------------------------------------------------- live evidence
 @functools.lru_cache(maxsize=1)
 def _live() -> tuple:
-    """(hermes_compat, rebuild_ledger_hermes) loaded once for gate resolution."""
-    from voicebridge import hermes_compat as hc  # noqa: PLC0415
+    """(qubit_compat, rebuild_ledger_hermes) loaded once for gate resolution."""
+    from voicebridge import qubit_compat as hc  # noqa: PLC0415
 
     scripts = REPO_ROOT / "scripts"
     if str(scripts) not in sys.path:
@@ -262,8 +264,8 @@ def _compliant_row() -> dict:
     return _fabricated_row(
         id="api:POST /api/example/gated",
         capability="POST /api/example/gated",
-        qubit_backend="voicebridge/hermes_compat.py:__gate__",
-        proving_test=("tests/test_hermes_routes_parity8u.py::"
+        qubit_backend="voicebridge/qubit_compat.py:__gate__",
+        proving_test=("tests/test_qubit_routes_parity8u.py::"
                       "test_new_gates_dispatch_exact_typed_code"),
         note="Typed policy gate EXAMPLE_GATE via compat dispatcher.",
         needs="owner",
@@ -280,7 +282,7 @@ def test_negative_fabricated_row_without_test_or_backend_is_rejected() -> None:
 
 def test_negative_fabricated_row_with_missing_test_file_is_rejected() -> None:
     row = _fabricated_row(
-        qubit_backend="voicebridge/hermes_compat.py:__gate__",
+        qubit_backend="voicebridge/qubit_compat.py:__gate__",
         proving_test="tests/does_not_exist.py::test_nope",
         note="Typed policy gate EXAMPLE_GATE via compat dispatcher.",
         needs="owner",
@@ -295,8 +297,8 @@ def test_negative_fabricated_row_with_bad_need_is_rejected() -> None:
 
 def test_negative_fabricated_row_without_typed_code_is_rejected() -> None:
     row = _fabricated_row(
-        qubit_backend="voicebridge/hermes_compat.py:__gate__",
-        proving_test=("tests/test_hermes_routes_parity8u.py::"
+        qubit_backend="voicebridge/qubit_compat.py:__gate__",
+        proving_test=("tests/test_qubit_routes_parity8u.py::"
                       "test_new_gates_dispatch_exact_typed_code"),
         note="refused",
         needs="owner",

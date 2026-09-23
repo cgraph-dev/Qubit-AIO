@@ -6,7 +6,7 @@
   "request": {
     "kind": null,
     "method": "GET",
-    "path": "/agent/api/qubit/device/profile",
+    "path": "/api/device/status",
     "headers": {},
     "body": null,
     "event": null,
@@ -27,10 +27,7 @@
   "expected": {
     "http_status": 200,
     "json_schema": {
-      "schema": "qubit-device/1"
-    },
-    "backend_operation": {
-      "op": "device.profile"
+      "enrolled": false
     }
   },
   "qubit": {
@@ -39,7 +36,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/gateway_enroll.py:108",
+    "path": "qubit_cli/gateway_enroll.py:108",
     "symbol": "cmd_gateway_enroll",
     "mapping_status": "VERIFIED"
   },
@@ -48,14 +45,14 @@
     "symbol": "deviceHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Desktop/device capability contract. VISUAL family: requires a real canonical backend operation; the device profile is read-only about the host and enrollment is explicit. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/gateway_enroll.py:108 (cmd_gateway_enroll); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/devices.ts:226 (deviceHandlers).",
+  "notes": "Desktop/device capability contract. VISUAL family: requires a real canonical backend operation; the device profile is a read-only host snapshot with an explicit enrollment step (device.profile has no /agent alias). Expected enrolled=false in an unenrolled fixture state. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/gateway_enroll.py:108 (cmd_gateway_enroll); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/devices.ts:226 (deviceHandlers). No side-effect-free pinned reference equivalent exists for this fixture: the capability surface is Qubit-specific (HTTP/RPC/WS/SSE/voice) or the upstream operation requires a running Gateway, credentials, or mutates state; it is therefore classified OPERATOR_ONLY and can never claim PASS without a side-effect-free equivalent.",
   "evidence": {
     "voice_utterance": null,
-    "dashboard_route": "/agent/api/qubit/device/profile",
-    "dashboard_control": "device.profile",
+    "dashboard_route": "/api/device/status",
+    "dashboard_control": "device",
     "request_schema": {
       "method": "GET",
-      "path": "/agent/api/qubit/device/profile"
+      "path": "/api/device/status"
     },
     "broker_policy_decision": null,
     "runtime_provider": null,
@@ -92,5 +89,7 @@
       "kind": "a11y",
       "ref": "evidence:desktop.device.profile/a11y.json"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN and a live instance. The real read is the bare native branch GET /api/device/status (webui.py:2182 -> device.py:87 profile). Enrollment is explicit and never automatic."
 }

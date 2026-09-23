@@ -1,7 +1,7 @@
 """Qubit paired-node host: enrollment, capability inventory, dispatch gates.
 
 Qubit opens no public listener and runs no second authority, so this module
-is the code-side enrollment kernel for OpenClaw's paired node host
+is the code-side enrollment kernel for Qubit's paired node host
 (``src/node-host/``, ``docs/nodes/*``): it records operator-approved node
 endpoints, declares their capabilities honestly, and routes capability calls
 through explicit gates.
@@ -617,7 +617,7 @@ def refuse_unavailable(op: str, detail: str = "") -> Dict[str, Any]:
 def geolocate(ip: Any, *, resolver: Any = None) -> Dict[str, Any]:
     """Coarse, node-side IP geolocation behind an injected resolver.
 
-    Qubit-owned equivalent of the OpenClaw ``geolocation`` node capability.
+    Qubit-owned equivalent of the Qubit ``geolocation`` node capability.
     The IP is validated locally (IPv4/IPv6) and the coarse city is only ever
     produced by a caller-supplied ``resolver``; with no resolver the result is
     a typed ``NODE_GEO_UNAVAILABLE``. Nothing egresses and no database ships.

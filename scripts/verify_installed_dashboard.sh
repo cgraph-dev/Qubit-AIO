@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Isolated-install proof: build the wheel, install it into a throwaway venv
-# with --no-deps, and confirm (a) the REAL Hermes-based Qubit dashboard is
-# served from package data and (b) the Qubit-owned Hermes runtime
-# (voicebridge/_data/qubit_hermes) ships and imports from the install. No
+# with --no-deps, and confirm (a) the REAL Qubit dashboard is
+# served from package data and (b) the Qubit-owned upstream runtime
+# (voicebridge/_data/qubit_runtime) ships and imports from the install. No
 # checkout on sys.path, no untracked files. This is the packaging acceptance
 # gate for the active dashboard + runtime.
 #
@@ -13,9 +13,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/qubit-install-XXXXXX")"
 # pyproject force-includes the whole frontend/ tree (a frozen mapping) and
 # hatchling force-include does NOT honor .gitignore, so a leftover
-# frontend/hermes-web/node_modules would ship ~21.6k build-only members into
+# frontend/qubit-web/node_modules would ship ~21.6k build-only members into
 # the wheel. Stash it for the build and restore it on exit.
-NODE_MODULES="$REPO_ROOT/frontend/hermes-web/node_modules"
+NODE_MODULES="$REPO_ROOT/frontend/qubit-web/node_modules"
 NODE_MODULES_STASH="$WORK/node_modules.stash"
 cleanup() {
   if [ -d "$NODE_MODULES_STASH" ]; then mv "$NODE_MODULES_STASH" "$NODE_MODULES"; fi
@@ -27,16 +27,16 @@ PY="${PYTHON:-$REPO_ROOT/.venv/bin/python}"
 command -v uv >/dev/null 2>&1 || {
   echo "ERROR: uv is required for the isolated install gate" >&2; exit 1; }
 
-# frontend/hermes-dist is a git-ignored build artifact; without it the wheel
+# frontend/qubit-dist is a git-ignored build artifact; without it the wheel
 # would silently install with no dashboard. Build it deterministically when
 # node/npm are available, otherwise stop with a typed DEGRADED (exit 4).
-if [ ! -f "$REPO_ROOT/frontend/hermes-dist/index.html" ]; then
+if [ ! -f "$REPO_ROOT/frontend/qubit-dist/index.html" ]; then
   if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     echo "== dashboard bundle missing — building deterministically =="
     "$REPO_ROOT/scripts/build_dashboard.sh" || {
       echo "DEGRADED: dashboard build failed (node/npm present)" >&2; exit 4; }
   else
-    echo "DEGRADED: frontend/hermes-dist missing and node/npm not found —" >&2
+    echo "DEGRADED: frontend/qubit-dist missing and node/npm not found —" >&2
     echo "          install node/npm or use a release sdist that ships it" >&2
     exit 4
   fi
@@ -108,7 +108,7 @@ try:
     st, loc, _ = raw("/")
     assert (st, loc) == (302, "/chat"), (st, loc)
     # /activity is a public alias for the Qubit /logs route
-    # (PUBLIC_ROUTE_ALIASES); a legacy Hermes path must redirect to the real
+    # (PUBLIC_ROUTE_ALIASES); a legacy upstream path must redirect to the real
     # Qubit page, never serve the stale activity.html shell with a 200.
     st, loc, _ = raw("/activity")
     assert (st, loc) == (302, "/logs"), (st, loc)
@@ -142,15 +142,15 @@ finally:
 PY
 "$WORK/venv/bin/python" "$WORK/probe.py"
 
-echo "== installed Hermes runtime probe =="
+echo "== installed upstream runtime probe =="
 # The vendored fork's env_loader imports python-dotenv at module load; that and
-# pyyaml are the only third-party imports needed for hermes_cli.main to import.
+# pyyaml are the only third-party imports needed for qubit_cli.main to import.
 uv pip install --quiet --python "$WORK/venv/bin/python" python-dotenv
 cat > "$WORK/runtime_probe.py" <<'PY'
 from pathlib import Path
 
 import voicebridge
-from voicebridge import hermes_runtime as hr
+from voicebridge import qubit_runtime as hr
 
 PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 
@@ -164,10 +164,10 @@ assert st["upstream_revision"] == PIN, st
 
 root = Path(hr.runtime_root()).resolve()
 assert "site-packages" in str(root), f"runtime not under install: {root}"
-assert (root / "hermes_cli" / "main.py").is_file(), root
+assert (root / "qubit_cli" / "main.py").is_file(), root
 
 hr.ensure_path()
-import hermes_cli.main as m  # noqa: E402  (forced by ensure_path above)
+import qubit_cli.main as m  # noqa: E402  (forced by ensure_path above)
 
 mod = Path(m.__file__).resolve()
 assert mod.is_relative_to(root), (mod, root)
@@ -179,4 +179,4 @@ PY
 ( cd "$WORK" && env -u PYTHONPATH "$WORK/venv/bin/python" "$WORK/runtime_probe.py" )
 
 echo "installed dashboard gate: PASS"
-echo "installed Hermes runtime gate: PASS"
+echo "installed upstream runtime gate: PASS"

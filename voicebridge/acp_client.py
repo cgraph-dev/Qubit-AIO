@@ -1,4 +1,4 @@
-"""Qubit ACP external harness client (OpenClaw audit #58).
+"""Qubit ACP external harness client (Qubit audit #58).
 
 Qubit recognizes the external agent harnesses (Claude Code, Cursor, Gemini,
 Codex, Droid, opencode) and provides a real *client contract*: a registry,

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Reproducible build of the vendored Hermes dashboard served by Qubit.
+# Reproducible build of the vendored upstream dashboard served by Qubit.
 #
-# The Hermes React/Vite source lives in frontend/hermes-web/ (pinned
+# The upstream React/Vite source lives in frontend/qubit-web/ (pinned
 # hermes-agent@2237be3); the generated bundle is written to
-# frontend/hermes-dist/ and is served by voicebridge.webui from Qubit-owned
+# frontend/qubit-dist/ and is served by voicebridge.webui from Qubit-owned
 # root paths (base "/") and packaged into wheel/sdist via pyproject
-# `artifacts`. Qubit overlay additions live in frontend/hermes-qubit/ and are
+# `artifacts`. Qubit overlay additions live in frontend/qubit-app/ and are
 # NOT part of this build -- they are served as runtime plugins from
-# frontend/hermes-qubit/plugins/.
+# frontend/qubit-app/plugins/.
 #
 # Usage:  scripts/build_dashboard.sh [--check]
 #
@@ -18,15 +18,15 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WEB_DIR="$REPO_ROOT/frontend/hermes-web"
+WEB_DIR="$REPO_ROOT/frontend/qubit-web"
 APPS_DIR="$REPO_ROOT/frontend/apps"
-DIST_DIR="$REPO_ROOT/frontend/hermes-dist"
+DIST_DIR="$REPO_ROOT/frontend/qubit-dist"
 DIST_INDEX="$DIST_DIR/index.html"
 
 unavailable() {
   echo "DASHBOARD_UNAVAILABLE: $*" >&2
   echo "  run scripts/build_dashboard.sh on a host with node/npm + network," >&2
-  echo "  or install from a release archive that ships frontend/hermes-dist" >&2
+  echo "  or install from a release archive that ships frontend/qubit-dist" >&2
   exit 3
 }
 build_failed() {
@@ -45,7 +45,7 @@ if [ "${1:-}" = "--check" ]; then
     echo "DASHBOARD_BUILDABLE: bundle missing; node+npm available to build it"
     exit 0
   fi
-  unavailable "frontend/hermes-dist is not built and node/npm are not installed"
+  unavailable "frontend/qubit-dist is not built and node/npm are not installed"
 fi
 
 command -v node >/dev/null 2>&1 || \
@@ -53,10 +53,10 @@ command -v node >/dev/null 2>&1 || \
 command -v npm >/dev/null 2>&1 || \
   unavailable "npm is required to build the dashboard"
 
-# The shared workspace package is imported as @hermes/shared; the monorepo
-# layout expects frontend/apps/shared -> ../hermes-shared.
+# The shared workspace package is imported as @qubit/shared; the monorepo
+# layout expects frontend/qubit-shared -> ../qubit-shared.
 mkdir -p "$APPS_DIR"
-ln -sfn ../hermes-shared "$APPS_DIR/shared"
+ln -sfn ../qubit-shared "$APPS_DIR/shared"
 
 cd "$WEB_DIR"
 npm install --legacy-peer-deps --no-audit --no-fund \

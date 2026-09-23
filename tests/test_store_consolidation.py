@@ -12,7 +12,7 @@ Proves the ownership contract the final wave requires:
     session store (``sessions.json``) are disjoint authorities: different
     files, schemas, record namespaces, and neither writes the other's records.
 
-Hermetic: temp ``XDG_*`` + ``HERMES_HOME``; no network; no live services.
+Hermetic: temp ``XDG_*`` + ``QUBIT_HOME``; no network; no live services.
 """
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ def _cfg(tmp_path, monkeypatch):
     for var in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"):
         (tmp_path / var.lower()).mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(tmp_path / var.lower()))
-    hermes = tmp_path / "home" / ".hermes"
-    hermes.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes))
+    qubit = tmp_path / "home" / ".hermes"
+    qubit.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("QUBIT_HOME", str(qubit))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)
@@ -43,7 +43,7 @@ def _cfg(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 def test_single_writable_board_authority_is_typed_refused(
         tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge import kanban as N
     from voicebridge import kanban_bridge as KBG
 
@@ -59,18 +59,32 @@ def test_single_writable_board_authority_is_typed_refused(
     assert vendored["writable"] is False and vendored["authoritative"] is False
     assert vendored["read_only"] is True
 
-    # The vendored compat write path is a typed refusal on every verb.
-    for method, path in (
-            ("POST", "/api/plugins/kanban/tasks"),
-            ("PATCH", "/api/plugins/kanban/tasks/task-1"),
-            ("DELETE", "/api/plugins/kanban/tasks/task-1"),
-            ("POST", "/api/plugins/kanban/boards"),
-            ("PUT", "/api/plugins/kanban/orchestration")):
-        status, out = HC.dispatch(cfg, method, path, {}, {"title": "x"})
-        assert status == 403, (method, path, status, out)
-        assert out.get("ok") is False, (method, path, out)
-        assert out.get("code") == "KANBAN_WRITE_BROKERED", (method, path, out)
-        assert out.get("qubit_counterpart"), (method, path, out)
+    # A route with no native-schema equivalent is a typed refusal on the one
+    # shared gate; core board/task writes are native-backed (one authority) and
+    # stage a real approval rather than a second-store write.
+    for method, path, body in (
+            ("POST", "/api/plugins/kanban/tasks", {"title": "x"}),
+            ("POST", "/api/plugins/kanban/boards", {"slug": "probe"})):
+        status, out = HC.dispatch(cfg, method, path, {}, body)
+        assert status == 409, (method, path, status, out)
+        assert out.get("code") == "CONFIRM_REQUIRED", (method, path, out)
+        assert out.get("confirmation_id"), (method, path, out)
+
+    status, out = HC.dispatch(cfg, "PUT",
+                              "/api/plugins/kanban/orchestration", {}, {})
+    assert status == 403, (status, out)
+    assert out.get("code") == "KANBAN_WRITE_BROKERED", out
+    assert out.get("qubit_counterpart"), out
+
+    # A confirmed compat write lands on the NATIVE store (the one writable
+    # authority), never the vendored store.
+    status, made = HC.dispatch(
+        cfg, "POST", "/api/plugins/kanban/tasks", {},
+        {"title": "native-via-compat", "confirm": True})
+    assert status == 200 and made.get("ok") is True, (status, made)
+    native_titles = {t["title"] for t in N.list_tasks(
+        cfg, board="main")["tasks"]}
+    assert "native-via-compat" in native_titles, native_titles
 
     # The in-process compatibility boundary refuses the same way.
     refused = KBG.vendored_write("create", board="default", title="nope")
@@ -86,14 +100,16 @@ def test_single_writable_board_authority_is_typed_refused(
     stores = KBG.stores(cfg)
     assert stores["authoritative"] == "qubit-native"
     assert stores["writable"] == "qubit-native"
-    assert stores["native"]["task_count"] == 1
+    # Two native rows: the direct ``N.create`` above plus the compat-confirmed
+    # create (which also landed on the native store, never the vendored one).
+    assert stores["native"]["task_count"] == 2
     assert stores["vendored"]["task_count"] == 0
 
 
 def test_vendored_seed_is_not_a_competing_authority(tmp_path, monkeypatch):
     """A legacy vendored row is neither served nor silently merged."""
-    from voicebridge import hermes_compat as HC
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_compat as HC
+    from voicebridge import qubit_plugins as HP
     from voicebridge import kanban as N
     from voicebridge import kanban_bridge as KBG
 
@@ -131,7 +147,7 @@ def test_vendored_seed_is_not_a_competing_authority(tmp_path, monkeypatch):
 # (b) board data survives a reload; vendored read path serves the authority
 # ---------------------------------------------------------------------------
 def test_board_data_survives_reload_and_vendored_read(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge import kanban as N
     from voicebridge import kanban_bridge as KBG
 
@@ -163,11 +179,13 @@ def test_session_stores_are_disjoint_authorities(tmp_path, monkeypatch):
     from voicebridge import auth_status as AS
     from voicebridge import chat_transport as CT
 
-    state = tmp_path / "state"
-    state.mkdir()
+    cfg = _cfg(tmp_path, monkeypatch)
+    state = Path(cfg.state_dir())
+    state.mkdir(parents=True, exist_ok=True)
 
-    # Chat transcript authority: own session + conversation turn.
-    chat = CT.ChatSessionStore(state)
+    # Canonical chat transcript authority (C7): own session + conversation turn
+    # in the vendored state.db the terminal/agent and every native surface use.
+    chat = CT.store(cfg)
     assert chat.create("Chat One", session_id="chat-1")["state"] == "OK"
     assert chat.append("chat-1", "user", "hello transcript")["state"] == "OK"
 
@@ -180,22 +198,16 @@ def test_session_stores_are_disjoint_authorities(tmp_path, monkeypatch):
     renamed = sess.rename("r1", "Receipt One")
     assert renamed["state"] == "OK", renamed
 
-    # Two files, two schemas, no shared record namespace.
-    chat_file = state / CT.STORE_FILE
+    # Two stores, two schemas, no shared record namespace.
     sess_file = state / AS.SessionStore.STORE_FILE
-    assert chat_file.name == "chat_sessions.json"
-    assert sess_file.name == "sessions.json"
-    assert chat_file != sess_file and chat_file.is_file() and sess_file.is_file()
-    chat_doc = json.loads(chat_file.read_text(encoding="utf-8"))
+    assert sess_file.name == "sessions.json" and sess_file.is_file()
     sess_doc = json.loads(sess_file.read_text(encoding="utf-8"))
-    assert chat_doc["schema"] == AS.CHAT_TRANSCRIPT_SCHEMA
     assert sess_doc["schema"] == AS.LIFECYCLE_SCHEMA
-    assert set(chat_doc["sessions"]).isdisjoint(set(sess_doc["sessions"]))
-    # Neither authority writes the other's records.
+    export_doc = chat.export("chat-1")
+    assert export_doc["session"]["id"] == "chat-1"
+    assert "r1" not in json.dumps(export_doc)
     assert "chat-1" not in sess_doc["sessions"]
-    assert "r1" not in chat_doc["sessions"]
     assert "messages" not in sess_doc
-    assert "audit" not in chat_doc
     assert "hello transcript" not in json.dumps(sess_doc)
 
     # The boundary is documented and names both authorities + exclusions.
@@ -204,8 +216,8 @@ def test_session_stores_are_disjoint_authorities(tmp_path, monkeypatch):
     assert boundary["sessions"]["authority"] == \
         "voicebridge.auth_status.SessionStore"
     assert boundary["chat"]["authority"] == \
-        "voicebridge.chat_transport.ChatSessionStore"
+        "voicebridge.qubit_session_store.QubitSessionStore"
     assert boundary["sessions"]["file"] == "sessions.json"
-    assert boundary["chat"]["file"] == "chat_sessions.json"
-    assert "chat_sessions.json" in boundary["sessions"]["not_owner_of"]
+    assert boundary["chat"]["file"] == "state.db"
+    assert "state.db" in boundary["sessions"]["not_owner_of"]
     assert "sessions.json" in boundary["chat"]["not_owner_of"]

@@ -25,7 +25,7 @@ REPO = Path(__file__).resolve().parents[1]
 PIN = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
 TAG = "v2026.9.4"
 PIN_TREE = Path("/tmp/opencode/pinned/openclaw")
-LEDGER = REPO / "docs" / "QUBIT_GAP_LEDGER.openclaw.json"
+LEDGER = REPO / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
 GEN = REPO / "scripts" / "rebuild_ledger_openclaw.py"
 
 

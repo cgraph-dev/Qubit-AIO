@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://qubit.local/schemas/differential/fixture.schema.json",
   "title": "Differential Fixture (INTERFACE v1.2)",
-  "description": "Fixture object consumed by scripts/differential_parity.py. Mirrors /tmp/qubit-differential/INTERFACE.md (v1.2). A fixture has EITHER a command block (CLI argv) or a request block; the unused one may be null. v1.2 adds transport, base_url_ref, auth, sequence, events_expected and persisted_state_schema (all optional).",
+  "description": "Fixture object consumed by scripts/differential_parity.py. Mirrors /tmp/qubit-differential/INTERFACE.md (v1.2). A fixture has EITHER a command block (CLI argv) or a request block; the unused one may be null. v1.2 adds transport, base_url_ref, auth, sequence, events_expected and persisted_state_schema (all optional). v1.3 adds the voice transport and the optional voice fields utterance, expected_operation, expected_args, confirmation_required, cancel_semantics, expiry_seconds and replay_protection (all optional; none is required, matching the runner).",
   "type": "object",
   "required": [
     "schema_version",
@@ -71,8 +71,37 @@
       ]
     },
     "transport": {
-      "enum": ["http", "sse", "ws", "rpc"],
-      "description": "INTERFACE v1.2 transport kind for a request fixture."
+      "enum": ["http", "sse", "ws", "rpc", "voice"],
+      "description": "INTERFACE v1.2 transport kind for a request fixture. v1.3 adds voice for utterance-driven fixtures."
+    },
+    "utterance": {
+      "type": ["string", "object", "array", "null"],
+      "description": "Optional. Voice input for a voice fixture: the spoken/text utterance that must resolve to expected_operation. Never a secret."
+    },
+    "expected_operation": {
+      "type": ["string", "object", "array", "null"],
+      "description": "Optional. Canonical operation the utterance is expected to resolve to; must match the CLI/dashboard operation."
+    },
+    "expected_args": {
+      "type": ["object", "array", "null"],
+      "description": "Optional. Canonical arguments the resolved operation is expected to carry."
+    },
+    "confirmation_required": {
+      "type": ["boolean", "null"],
+      "description": "Optional. True when the resolved operation must stage in the shared confirmation journal before it can execute."
+    },
+    "cancel_semantics": {
+      "type": ["string", "object", "null"],
+      "description": "Optional. Declared cancel behavior for a confirm-required voice operation (for example that cancel/deny executes nothing)."
+    },
+    "expiry_seconds": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Optional. Lifetime in seconds of a staged voice confirmation before it expires."
+    },
+    "replay_protection": {
+      "type": ["boolean", "object", "null"],
+      "description": "Optional. Replay-protection declaration for a voice operation (single-use utterance/confirmation token)."
     },
     "base_url_ref": {"$ref": "#/$defs/envRef"},
     "auth": {"$ref": "#/$defs/authSpec"},
@@ -87,6 +116,18 @@
       "items": {"$ref": "#/$defs/eventExpectation"}
     },
     "persisted_state_schema": {"type": ["object", "null"]},
+    "read_only": {
+      "type": "boolean",
+      "description": "Optional. True when this fixture only reads canonical state and performs no state-changing operation. Defaults to false when absent."
+    },
+    "state_changing": {
+      "type": "boolean",
+      "description": "Optional. True when executing this fixture mutates persistent/canonical state. Defaults to false when absent."
+    },
+    "allow_state_changing": {
+      "type": "boolean",
+      "description": "Optional runner opt-in. When true the runner is permitted to execute a state_changing fixture; when false/absent a state_changing row is skipped rather than executed."
+    },
     "normalizers": {"$ref": "#/$defs/normalizerList"},
     "expected": {"type": "object"},
     "qubit": {"$ref": "#/$defs/qubitMapping"},
@@ -94,7 +135,7 @@
     "openclaw": {"$ref": "#/$defs/upstreamMapping"},
     "references": {
       "type": "object",
-      "description": "Optional real tri-way upstream invocations. Each key is an upstream project (hermes|openclaw); each value is a reference spec run through that project's binary. Absent references mean the row is OPERATOR_ONLY, never PASS.",
+      "description": "Optional real tri-way upstream invocations. Each key is an upstream project (hermes|openclaw); each value is a reference spec run through that project's binary/transport. Absent references mean the row is OPERATOR_ONLY, never PASS.",
       "additionalProperties": {"$ref": "#/$defs/referenceSpec"}
     },
     "notes": {"type": "string", "minLength": 1}
@@ -105,6 +146,11 @@
       "type": "string",
       "pattern": "^(\\$[A-Za-z_][A-Za-z0-9_]*|\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}|env:[A-Za-z_][A-Za-z0-9_]*)$",
       "description": "Environment reference ($NAME, ${NAME} or env:NAME). Never the secret value."
+    },
+    "envName": {
+      "type": "string",
+      "pattern": "^([A-Za-z_][A-Za-z0-9_]*|\\$[A-Za-z_][A-Za-z0-9_]*|\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}|env:[A-Za-z_][A-Za-z0-9_]*)$",
+      "description": "Environment variable NAME (bare, $NAME, ${NAME} or env:NAME). Never the variable's value."
     },
     "authSpec": {
       "type": "object",
@@ -119,7 +165,7 @@
       "type": "object",
       "description": "One step of a v1.2 sequence: a CLI/HTTP/SSE/WS/RPC step spec.",
       "properties": {
-        "kind": {"enum": ["cli", "http", "sse", "ws", "rpc"]},
+        "kind": {"enum": ["cli", "http", "sse", "ws", "rpc", "voice"]},
         "method": {"type": ["string", "null"]},
         "path": {"type": ["string", "null"]},
         "headers": {"type": "object"},
@@ -145,8 +191,10 @@
     },
     "referenceSpec": {
       "type": "object",
-      "required": ["argv"],
+      "description": "One real upstream reference invocation (INTERFACE v1.2). Either a CLI argv spec (kind:cli + argv) or a transport spec (kind/transport + request/path/messages/params). env_ref/bin_ref name the environment variables that resolve the project binary and env; the VALUES never appear in the fixture. No single key is required because the runner derives the kind from argv/request/path.",
       "properties": {
+        "kind": {"enum": ["cli", "http", "sse", "ws", "rpc", "voice"]},
+        "transport": {"enum": ["http", "sse", "ws", "rpc", "voice"]},
         "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "stdin": {"type": ["string", "null"]},
         "env": {
@@ -154,7 +202,42 @@
           "additionalProperties": {"type": "string"},
           "description": "Env var NAMES mapped to $NAME / env:NAME references only. Never a secret value."
         },
-        "cwd": {"type": ["string", "null"]}
+        "env_ref": {"$ref": "#/$defs/envName", "description": "Name of the env var holding this reference's environment (never the value)."},
+        "bin_ref": {"$ref": "#/$defs/envName", "description": "Name of the env var resolving this reference's binary/URL (never the value)."},
+        "cwd": {"type": ["string", "null"]},
+        "request": {
+          "type": ["object", "null"],
+          "description": "Nested transport request; falls back to this spec's own method/path/headers/body/messages.",
+          "properties": {
+            "method": {"type": ["string", "null"]},
+            "path": {"type": ["string", "null"]},
+            "headers": {"type": "object"},
+            "body": {},
+            "event": {},
+            "messages": {"type": "array"},
+            "params": {}
+          },
+          "additionalProperties": true
+        },
+        "method": {"type": ["string", "null"]},
+        "path": {"type": ["string", "null"]},
+        "headers": {"type": "object"},
+        "body": {},
+        "event": {},
+        "messages": {"type": "array"},
+        "params": {},
+        "base_url": {"type": ["string", "null"]},
+        "base_url_ref": {"$ref": "#/$defs/envRef"},
+        "auth": {"$ref": "#/$defs/authSpec"},
+        "sequence": {
+          "type": "array",
+          "description": "Multi-step handshake/reconnect steps for this reference.",
+          "items": {"$ref": "#/$defs/stepSpec"}
+        },
+        "nondeterministic": {
+          "type": "boolean",
+          "description": "Optional. When true the reference reports a runtime-selected backend and cannot be pinned; the runner still executes it for evidence but never derives an upstream_result_hash or a PASS from its payload. Defaults to false when absent."
+        }
       },
       "additionalProperties": true
     },

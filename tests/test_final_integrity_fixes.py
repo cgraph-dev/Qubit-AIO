@@ -262,20 +262,42 @@ def test_external_speech_guard_emergency_stop_and_consent(monkeypatch):
 
 
 # --------------------------------------------------------------- fix 5
-def test_schedule_executor_uses_canonical_chat_transport(monkeypatch):
+def test_schedule_executor_uses_canonical_dashboard_ops_dispatch(monkeypatch):
+    """S3 moved scheduled dispatch onto the one-operation broker.
+
+    ``_default_executor`` (with a real ``cfg``) must route through
+    ``schedules._contract_dispatch`` → ``dashboard_ops.run_op`` with op
+    ``schedule_dispatch`` under the monitor actor, and must never bypass the
+    broker by calling ``chat_transport.turn`` directly.
+    """
     from voicebridge import chat_transport as CT
+    from voicebridge import dashboard_ops as OPS
     from voicebridge import schedules as S
 
     seen: dict = {}
 
-    def _fake_turn(cfg, text, *, session=None, role="chat", **kw):
-        seen["text"] = text
-        seen["role"] = role
-        return {"ok": True, "reply": "done", "receipt": {}}
+    def _fake_run_op(cfg, op_id, args, *, actor=None, session=None, **kw):
+        seen["op"] = op_id
+        seen["args"] = dict(args)
+        seen["actor"] = actor
+        seen["session"] = session
+        return {"state": "executed", "code": "OK",
+                "receipt": {"result": {"state": "OK", "code": "OK",
+                                       "detail": "done"}}}
 
-    monkeypatch.setattr(CT, "turn", _fake_turn)
+    def _boom(*a, **k):
+        raise AssertionError(
+            "scheduled dispatch must not bypass dashboard_ops.run_op")
+
+    monkeypatch.setattr(OPS, "run_op", _fake_run_op)
+    monkeypatch.setattr(CT, "turn", _boom)
+
     out = S._default_executor("do the thing", session="job:1",
                               estop_engaged=lambda: False, cfg=object())
     assert out["state"] == "OK"
-    assert seen["text"] == "do the thing"
-    assert seen["role"] == "coding"
+    assert seen["op"] == "schedule_dispatch"
+    assert seen["args"]["task_text"] == "do the thing"
+    assert seen["args"]["session"] == "job:1"
+    assert seen["args"]["directive"] == "false"
+    assert seen["actor"] == S.MONITOR_ACTOR
+    assert seen["session"] == "job:1"

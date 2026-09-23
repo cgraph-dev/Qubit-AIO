@@ -217,7 +217,6 @@ _VOICE_INTENTS = {
     "use my local brain": "model_profile_local",
     "use my research model for this session": "model_profile_use",
     "what model and voice are active?": "model_profile_status",
-    "test my speech profile": "speech_profile_test",
     "use the realtime voice profile": "model_profile_realtime",
     "run this task with my coding model": "model_profile_coding",
     "return to local-only mode": "model_profile_local_only",
@@ -233,6 +232,13 @@ def test_voice_intents_resolve_to_their_backend():
         assert res.entry is not None and res.entry.backend == backend, text
         assert res.entry.id in VC.MODEL_PROFILE_REGISTRY
         assert res.entry.scope == ("model-profile",)
+
+    # PRB-05: the speech-profile lifecycle lives in the main REGISTRY (not the
+    # model-profile registry) and still resolves through the speech resolver.
+    speech = VC.REGISTRY.get("speech_profile_test")
+    assert speech is not None and speech.backend == "speech_profile_test"
+    res = VC.resolve("test my speech profile")
+    assert res.kind == VC.MATCH and res.entry.id == "speech_profile_test"
 
 
 def test_voice_selection_is_confirm_gated_and_applies(tmp_path, monkeypatch):

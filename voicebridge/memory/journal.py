@@ -1,7 +1,7 @@
 """Deterministic memory journal + replay (Packet 8M).
 
 ADAPT of the pinned GENOME journal contract
-(docs/UPSTREAM_REUSE.md R23): an append-only JSONL of store mutations with a
+(docs/archive/2026-09-21/UPSTREAM_REUSE.md R23): an append-only JSONL of store mutations with a
 monotonic sequence and a chained per-line SHA-256 ``line_hash`` so that a
 removed, edited, or reordered line is detectable; torn-tail recovery; and
 replay that reproduces the live store so ``verify`` can compare canonical

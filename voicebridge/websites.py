@@ -709,6 +709,59 @@ def probe_url(url: str, *, probe: Callable[[str], Dict[str, Any]] = probe_page,
     return result
 
 
+# Canonical broker capability name for the bounded live probe.
+PROBE_CAPABILITY = "web.probe"
+
+
+def register_probe_tool(broker: Any, cfg: Any = None) -> Tuple[str, ...]:
+    """Register the bounded live website probe as a READ_ONLY web capability.
+
+    ``qubit websites probe --live`` used to open its own bounded network
+    connection with no broker/e-stop/policy gate, the last web-egress path that
+    bypassed the canonical decision junction. It now joins the same ``web.*``
+    surface :func:`voicebridge.broker.register_web_tools` builds, so the ONE
+    shared power-control latch (emergency stop / global disable / circuit
+    breaker), the policy engine, the shared confirmation journal and the broker
+    audit decide the run exactly once.
+
+    The executor is the existing bounded :func:`probe_url` (scheme/origin/SSRF,
+    redirect, content-type, size and time limits; redaction unchanged), and
+    this module performs NO e-stop check or audit of its own — the broker stays
+    the single decision/audit authority, so there is no double audit. The probe
+    persists nothing.
+    """
+    from .broker import ToolBinding
+    from .capabilities import CapabilitySpec, Tier
+
+    def _validate(args: Dict[str, Any]) -> None:
+        if not isinstance(args, dict):
+            raise ValueError("args must be a mapping")
+        extra = set(args) - {"url"}
+        if extra:
+            raise ValueError(f"undeclared arg: {sorted(extra)}")
+        url = args.get("url")
+        if not isinstance(url, str) or not url.strip():
+            raise ValueError("url is required")
+
+    def _run(args: Dict[str, Any]) -> str:
+        result = probe_url(str(args.get("url", "")))
+        return json.dumps(result.to_dict(), default=str)
+
+    spec = CapabilitySpec(
+        name=PROBE_CAPABILITY, version="1.0.0", tier=Tier.READ_ONLY,
+        summary="bounded read-only live probe of a public HTTPS website",
+        scopes=("web",),
+        timeout_s=float(DEFAULT_TIMEOUT_S) + 5.0,
+        arg_validator=_validate)
+    broker.register(ToolBinding(
+        spec=spec,
+        side_effects="read-only bounded website probe (one HTTPS GET, public "
+                     "origins only); no local writes, no shell, no second "
+                     "listener, persists nothing",
+        fn=_run, output_cap=32_768))
+    return (PROBE_CAPABILITY,)
+
+
 def result_code_for_status(status: str, reason: str = "") -> str:
     """Map a discovery status to the probe result vocabulary.
 

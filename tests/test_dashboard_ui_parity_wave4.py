@@ -32,14 +32,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-OVERLAY = REPO_ROOT / "frontend" / "hermes-qubit"
+OVERLAY = REPO_ROOT / "frontend" / "qubit-app"
 PLUGDIR = OVERLAY / "plugins"
 THEME = OVERLAY / "qubit-theme.json"
-WEB_SRC = REPO_ROOT / "frontend" / "hermes-web" / "src"
-PUBLIC_PLUGINS = REPO_ROOT / "frontend" / "hermes-web" / "public" / "plugins"
+WEB_SRC = REPO_ROOT / "frontend" / "qubit-web" / "src"
+PUBLIC_PLUGINS = REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
 
 EXPECTED_PLUGINS = [
-    "qubit-approvals", "qubit-boards", "qubit-brand", "qubit-chat",
+    "qubit-approvals", "qubit-boards", "qubit-brand",
     "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
     "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
@@ -133,7 +133,7 @@ def test_all_ten_overlay_plugins_still_register_and_are_qubit_labelled():
 
 def test_every_overlay_backend_literal_is_real_or_known():
     """Each /api literal is either a known Qubit route or resolves in compat."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     known_patterns = [r["pattern"] for r in HC.ROUTES]
     seen = set()
@@ -227,9 +227,9 @@ def test_kanban_and_achievements_have_host_localization_namespaces():
 # Visible tabs point at real routes (no dead nav targets)
 # ---------------------------------------------------------------------------
 def test_visible_overlay_tabs_target_real_routes():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
-    app = (REPO_ROOT / "frontend" / "hermes-web" / "src" / "App.tsx").read_text()
+    app = (REPO_ROOT / "frontend" / "qubit-web" / "src" / "App.tsx").read_text()
     core = set(re.findall(r'"([^"]+)":', re.search(
         r"const BUILTIN_ROUTES_CORE[^{]*\{(.*?)\n\};", app, re.S).group(1)))
     served = {m["tab"]["path"] for m in HC.plugins_response()["plugins"]}
@@ -263,15 +263,39 @@ def test_no_placeholder_tokens_in_overlay_or_vendored_source():
 
 
 def test_vendored_dashboard_has_no_tiny_placeholder_page():
-    """The 19 route pages are all substantial real workspaces (a stub page
-    would be a handful of lines); DocsPage is the only wrapper and still
-    renders the real docs iframe + plugin slots."""
+    """Every route page is a substantial real workspace — DocsPage included.
+
+    S6 replaced the old docs iframe wrapper with a live OpenAPI reference, so
+    DocsPage must now stand on its own: it fetches the canonical Qubit
+    ``/openapi.json``, flattens real operations, groups them, renders
+    parameters/responses, and reports typed loading/error/empty states. The
+    tiny placeholder wrapper (``<iframe``) must not return.
+    """
     pages = sorted((WEB_SRC / "pages").glob("*.tsx"))
     real = [p for p in pages if not p.name.endswith(".test.tsx")]
-    assert len(real) == 19, [p.name for p in real]
+    # 21 pages: the 19 preserved dashboard pages plus the Qubit-added
+    # TerminalChatPage (`/chat` real terminal; ChatPage owns `/qubit-chat`)
+    # and AgentsPage (`/agents` canonical roster).
+    assert len(real) == 21, [p.name for p in real]
     for p in real:
-        if p.name == "DocsPage.tsx":
-            continue
         assert len(p.read_text(encoding="utf-8").splitlines()) >= 100, p.name
     docs = (WEB_SRC / "pages" / "DocsPage.tsx").read_text(encoding="utf-8")
-    assert "<iframe" in docs and 'PluginSlot name="docs:top"' in docs
+    # a real OAS reference, not a wrapper: canonical doc fetch + parser
+    for needle in (
+            "/openapi.json",
+            "flattenOperations",
+            "groupKey",
+            "operations",
+            "groups",
+            "parameters",
+            "responses",
+            "deprecated",
+            'data-state="loading"',
+            'data-state="error"',
+            'data-state="empty"',
+            'PluginSlot name="docs:top"',
+            'PluginSlot name="docs:bottom"',
+    ):
+        assert needle in docs, f"DocsPage missing real OAS reference marker {needle!r}"
+    assert "<iframe" not in docs, \
+        "DocsPage must be a real OAS reference, not the placeholder iframe"

@@ -336,8 +336,8 @@ def test_resource_ceilings_recorded():
 
 def test_operator_runbook_check_includes_8k():
     results = {c["name"]: c for c in R.operator_runbook_check(REPO)}
-    assert results["docs.docs/OPERATIONS_8K.md"]["state"] == "OK"
-    assert results["docs.docs/MIGRATIONS.md"]["state"] == "OK"
+    assert results["docs.docs/archive/2026-09-21/OPERATIONS_8K.md"]["state"] == "OK"
+    assert results["docs.docs/archive/2026-09-21/MIGRATIONS.md"]["state"] == "OK"
 
 
 def test_backup_migration_check_passes():

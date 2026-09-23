@@ -75,17 +75,17 @@ EXIT_BLOCKED = 8
 # by the packaged HowTo doc ("do not copy this author's home directory").
 GENERIC_PATH_TOKENS = {"/home" + "/example", "/home" + "/...", "Projects"}
 
-# The Qubit-owned vendored Hermes runtime (voicebridge/_data/qubit_hermes) is a
+# The Qubit-owned vendored upstream runtime (voicebridge/_data/qubit_runtime) is a
 # local source tree explicitly exempt from the Qubit secret/machine-path gates
 # (voicebridge/release.py _VENDORED_UPSTREAM; its own provenance gate covers
 # it). artifact_content_scan/artifact_member_hits do not apply that exemption,
 # so the release qualifier filters vendored members before gating.
-VENDORED_MEMBER = "_data/qubit_hermes/"
+VENDORED_MEMBER = "_data/qubit_runtime/"
 
-# The built dashboard (frontend/hermes-dist) is a git-ignored build artifact.
+# The built dashboard (frontend/qubit-dist) is a git-ignored build artifact.
 # A clean clone builds a wheel/sdist silently without it, so a release
 # artifact must be rejected unless it actually ships the dashboard bundle.
-DASHBOARD_SUFFIX = "frontend/hermes-dist/index.html"
+DASHBOARD_SUFFIX = "frontend/qubit-dist/index.html"
 
 
 def _has_dashboard(members: list[str]) -> bool:
@@ -93,11 +93,11 @@ def _has_dashboard(members: list[str]) -> bool:
 
 
 def _is_vendored_member(name: str) -> bool:
-    # Match the fork at either layout: <pkg>/_data/qubit_hermes/ (wheel) or
-    # <sdist-root>/qubit_hermes/ (sdist). Requires a full path segment so a
-    # sibling module named qubit_hermes.py is not exempted.
+    # Match the fork at either layout: <pkg>/_data/qubit_runtime/ (wheel) or
+    # <sdist-root>/qubit_runtime/ (sdist). Requires a full path segment so a
+    # sibling module named qubit_runtime.py is not exempted.
     n = "/" + name.replace("\\", "/").lstrip("/")
-    return "/qubit_hermes/" in n
+    return "/qubit_runtime/" in n
 
 
 def _which(name: str) -> Path | None:
@@ -237,12 +237,12 @@ def inspect_artifacts(build_dir: Path) -> dict:
         bad_noncore = {rel: toks for rel, toks in noncore.items()
                        if any(tok not in GENERIC_PATH_TOKENS for tok in toks)}
         # A release artifact must ship the built dashboard; a clean clone built
-        # without frontend/hermes-dist is a typed FAIL, never a silent OK.
+        # without frontend/qubit-dist is a typed FAIL, never a silent OK.
         has_dashboard = _has_dashboard(members)
         reasons = []
         if not has_dashboard:
             reasons.append(
-                "dashboard bundle missing (frontend/hermes-dist index.html "
+                "dashboard bundle missing (frontend/qubit-dist index.html "
                 "not shipped; build it before packaging)")
         if forbidden:
             reasons.append("forbidden members present")
@@ -274,7 +274,7 @@ def inspect_artifacts(build_dir: Path) -> dict:
                 "state": "OK" if has_dashboard else "MISSING",
                 "detail": ("built dashboard shipped in the artifact"
                            if has_dashboard else
-                           "frontend/hermes-dist/index.html not shipped; the "
+                           "frontend/qubit-dist/index.html not shipped; the "
                            "dashboard cannot be served from this artifact"),
             },
             "signature": sig,
@@ -348,7 +348,7 @@ def install_step(out_dir: Path) -> dict:
     # imports
     for mod in ("voicebridge", "voicebridge.release", "voicebridge.cli",
                 "voicebridge.config", "voicebridge.resources",
-                "voicebridge.hermes_runtime"):
+                "voicebridge.qubit_runtime"):
         checks.append(run_check(
             f"import.{mod}",
             py + ["-c", f"import {mod}"]))
@@ -362,8 +362,8 @@ def install_step(out_dir: Path) -> dict:
                             [str(venv / "bin" / "voicebridge"), "--help"]))
     checks.append(run_check("entrypoint.qubit-dev", [str(venv / "bin" / "qubit-dev"),
                                                      "--help"]))
-    checks.append(run_check("entrypoint.qubit-hermes",
-                            [str(venv / "bin" / "qubit-hermes"), "--help"],
+    checks.append(run_check("entrypoint.qubit-agent",
+                            [str(venv / "bin" / "qubit-agent"), "--help"],
                             timeout=120))
 
     # packaged resources resolve from the installed package data
@@ -371,19 +371,19 @@ def install_step(out_dir: Path) -> dict:
         "from voicebridge import resources;\n"
         "import sys;\n"
         "need = {'frontend': resources.resource_path('frontend').is_dir(),\n"
-        "        'hermes_dist': resources.resource_path("
-        "'frontend/hermes-dist/index.html').is_file(),\n"
+        "        'qubit_dist': resources.resource_path("
+        "'frontend/qubit-dist/index.html').is_file(),\n"
         "        'config_example': resources.resource_path("
         "'config/voice.example.yaml').is_file(),\n"
         "        'dialogs': resources.resource_path('config/dialogs.md').is_file(),\n"
         "        'templates': resources.resource_path('config/task-templates.yaml').is_file(),\n"
         "        'systemd': resources.resource_path('systemd').is_dir(),\n"
-        "        'hermes_runtime': resources.resource_path("
-        "'qubit_hermes/hermes_cli/main.py').is_file(),\n"
+        "        'qubit_runtime': resources.resource_path("
+        "'qubit_runtime/qubit_cli/main.py').is_file(),\n"
         "        'migration_doc': resources.resource_path("
-        "'docs/QUBIT_MIGRATION.md').is_file(),\n"
+        "'docs/archive/2026-09-21/QUBIT_MIGRATION.md').is_file(),\n"
         "        'vendor_manifest': resources.resource_path("
-        "'docs/QUBIT_HERMES_VENDOR_MANIFEST.json').is_file()}\n"
+        "'docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json').is_file()}\n"
         "sys.exit(0 if all(need.values()) else 1)\n"
     )
     checks.append(run_check("resources.packaged", py + ["-c", res_code]))
@@ -396,13 +396,13 @@ def install_step(out_dir: Path) -> dict:
         "import voicebridge;\n"
         "pkg = pathlib.Path(voicebridge.__file__).resolve();\n"
         "assert venv in pkg.parents, f'package not installed under venv: {pkg}';\n"
-        "from voicebridge import hermes_runtime as hr;\n"
+        "from voicebridge import qubit_runtime as hr;\n"
         "st = hr.status();\n"
         "assert st['present'] is True and st['importable'] is True, st;\n"
         "root = pathlib.Path(hr.runtime_root()).resolve();\n"
         "assert venv in root.parents, f'runtime not under venv: {root}';\n"
         "hr.ensure_path();\n"
-        "import hermes_cli.main as m;\n"
+        "import qubit_cli.main as m;\n"
         "mod = pathlib.Path(m.__file__).resolve();\n"
         "assert mod.is_relative_to(root), (mod, root);\n"
         "print('runtime-ok', root);\n"

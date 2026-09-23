@@ -1,4 +1,4 @@
-"""STRICT tests for every STEAL_LIST item (docs/STEAL_LIST.md §5, items 1-7).
+"""STRICT tests for every STEAL_LIST item (docs/archive/2026-09-21/STEAL_LIST.md §5, items 1-7).
 
 Layers:
   * deterministic unit tests      — must pass everywhere, no GPU/network

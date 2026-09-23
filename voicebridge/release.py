@@ -200,7 +200,7 @@ _CONFIG_EXT = {".yaml", ".yml", ".env", ".service", ".timer", ".json",
 
 # Machine-specific PATH tokens in shipped code. Device-name tokens
 # (Scarlett/HyperX/AT2020) are NOT here: they are the documented stable
-# device-name matching feature (docs/AUDIO_SETUP.md), not path dependencies —
+# device-name matching feature (docs/archive/2026-09-21/AUDIO_SETUP.md), not path dependencies —
 # the portable-CONFIG leak check for those tokens lives in
 # filesystem_modes_check, mirroring the config doctor.
 MACHINE_PATH_SHAPES = (
@@ -279,7 +279,7 @@ def _is_skipped(rel: str, skip: set) -> bool:
     """Segment-aware skip: a path is skipped when it equals a skip entry
     (possibly a multi-segment prefix) or contains a skipped directory as a
     path segment. This keeps nested trees (e.g. vendored
-    ``frontend/hermes-web/node_modules``) out of the shipped-code scans."""
+    ``frontend/qubit-web/node_modules``) out of the shipped-code scans."""
     if rel in skip:
         return True
     parts = rel.split("/")
@@ -295,20 +295,20 @@ def _is_skipped(rel: str, skip: set) -> bool:
     return False
 
 
-# Pinned upstream fork vendored into the product (Qubit-owned Hermes runtime,
-# see docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). Every file is
+# Pinned upstream fork vendored into the product (Qubit-owned Qubit runtime,
+# see docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). Every file is
 # byte-identical to the pinned upstream and carries per-file provenance in
-# docs/QUBIT_HERMES_VENDOR_MANIFEST.json. Upstream test fixtures legitimately
+# docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json. Upstream test fixtures legitimately
 # contain secret-shaped strings and absolute example paths, so the Qubit
 # secret/machine-path gates never scan it; the fork's own provenance gate
-# (tests/test_hermes_runtime_vendor8u.py) covers it instead.
-_VENDORED_UPSTREAM = {"qubit_hermes"}
+# (tests/test_qubit_runtime_vendor8u.py) covers it instead.
+_VENDORED_UPSTREAM = {"qubit_runtime"}
 
 
 def _iter_tree(root: Path, pattern: str, skip: set):
     """Yield files matching ``pattern`` while pruning skipped directories.
 
-    ``Path.rglob`` enumerates the whole tree (the vendored ``qubit_hermes/``
+    ``Path.rglob`` enumerates the whole tree (the vendored ``qubit_runtime/``
     fork is ~12k files) before filtering, which made the static release scan
     slow enough to time out the dashboard. Pruning at the directory level
     keeps the shipped-code scans fast without changing what they skip."""
@@ -473,7 +473,7 @@ def sbom(repo: Optional[Path] = None) -> Dict[str, Any]:
         "python": platform.python_version(),
         "main": recs,
         "optional": deps["extras"],
-        "notices": "THIRD_PARTY_NOTICES.md + docs/UPSTREAM_REUSE.md",
+        "notices": "THIRD_PARTY_NOTICES.md + docs/archive/2026-09-21/UPSTREAM_REUSE.md",
         "project_license": _project_license_text(root),
     }
 
@@ -494,6 +494,28 @@ def _installed_versions() -> Dict[str, str]:
     return out
 
 
+def _vendored_top_level_names(base: Path) -> set[str]:
+    """Top-level import names of the installed vendored Qubit runtime.
+
+    ``base`` is the installed ``voicebridge`` package directory; the fork ships
+    as package data under ``base/_data/qubit_runtime``. Each sub-directory with
+    an ``__init__.py`` and each top-level ``*.py`` module is a valid import name
+    once ``qubit_runtime.ensure_path()`` puts that tree on ``sys.path``, so it
+    is a local module, not an undeclared PyPI dependency.
+    """
+    root = Path(base) / "_data" / "qubit_runtime"
+    names: set[str] = set()
+    if not root.is_dir():
+        return names
+    for entry in root.iterdir():
+        if entry.is_dir():
+            if (entry / "__init__.py").is_file():
+                names.add(entry.name)
+        elif entry.suffix == ".py" and entry.name != "__init__.py":
+            names.add(entry.stem)
+    return names
+
+
 def import_scan_installed(base: Path, declared: set[str],
                           stdlib: Optional[set[str]] = None,
                           guarded: Optional[set[str]] = None) -> List[str]:
@@ -508,20 +530,26 @@ def import_scan_installed(base: Path, declared: set[str],
     declared = {_normalize_import(d) for d in declared}
     import ast
     local = {"voicebridge", "scripts", "browser_auto",
-             # Qubit-owned vendored Hermes fork (qubit_hermes/): a local
+             # Qubit-owned vendored Qubit fork (qubit_runtime/): a local
              # source tree, not a PyPI distribution. See the owner amendment
-             # docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md.
+             # docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md.
              # ``toolsets`` is a vendored top-level module reached through the
-             # runtime path shim from ``voicebridge/hermes_asgi.py`` (guarded).
-             "hermes_cli", "toolsets"}
+             # runtime path shim from ``voicebridge/qubit_asgi.py`` (guarded).
+             "qubit_cli", "toolsets"}
+    # Every top-level module of the installed vendored runtime is a local
+    # module reached through ``qubit_runtime.ensure_path()`` (agent, tools,
+    # providers, qubit_state, …), never a PyPI dependency. Derive the names
+    # from the shipped ``_data/qubit_runtime`` tree so the allowlist cannot
+    # drift from the vendored source.
+    local |= _vendored_top_level_names(base)
     failures: List[str] = []
     for py in _walk_py_files(base):
         rel_path = py.relative_to(base)
-        # ``_data`` is shipped package *data*: the Qubit-owned vendored Hermes
+        # ``_data`` is shipped package *data*: the Qubit-owned vendored Qubit
         # runtime plus completions/templates. It is a separate source tree with
-        # its own pinned dependency contract (qubit_hermes/pyproject.toml,
+        # its own pinned dependency contract (qubit_runtime/pyproject.toml,
         # verified by tests/test_qbpv_pkg5_packaging.py) and imports its own
-        # local top-level modules (agent, tools, toolsets, hermes_cli, …). It is
+        # local top-level modules (agent, tools, toolsets, qubit_cli, …). It is
         # not part of the voicebridge import contract, so scanning it here would
         # report thousands of false undeclared-import failures.
         if "_data" in rel_path.parts:
@@ -559,7 +587,7 @@ def declared_module_names(pyproject: Optional[Path] = None) -> set[str]:
 _DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper"}
 
 # Modules imported through guarded optional paths (try/except ImportError) as
-# inventoried in docs/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
+# inventoried in docs/archive/2026-09-21/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
 # gracefully, so their absence is a warning, not a fresh-install failure
 # (mirrors scripts/config_doctor.OPTIONAL_GUARDED).
 OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
@@ -837,13 +865,13 @@ def operator_runbook_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     required = [
         "README.md",
         "LICENSE",
-        "docs/VOICE_BRIDGE_SYSTEM.md",
-        "docs/AUDIO_SETUP.md",
-        "docs/VOICE_BRIDGE_TROUBLESHOOTING.md",
-        "docs/OPERATIONS_8J.md",
-        "docs/OPERATIONS_8K.md",
-        "docs/MIGRATIONS.md",
-        "docs/UPSTREAM_REUSE.md",
+        "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md",
+        "docs/archive/2026-09-21/AUDIO_SETUP.md",
+        "docs/archive/2026-09-21/VOICE_BRIDGE_TROUBLESHOOTING.md",
+        "docs/archive/2026-09-21/OPERATIONS_8J.md",
+        "docs/archive/2026-09-21/OPERATIONS_8K.md",
+        "docs/archive/2026-09-21/MIGRATIONS.md",
+        "docs/archive/2026-09-21/UPSTREAM_REUSE.md",
         "THIRD_PARTY_NOTICES.md",
     ]
     results: List[Dict[str, str]] = []
@@ -863,11 +891,11 @@ def backup_migration_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     """Migration history + newer-schema refusal + atomic restore contract."""
     root = Path(root) if root else REPO
     results: List[Dict[str, str]] = []
-    mig = root / "docs/MIGRATIONS.md"
+    mig = root / "docs/archive/2026-09-21/MIGRATIONS.md"
     results.append({
         "name": "migration.history",
         "state": "OK" if mig.exists() else "MISSING",
-        "detail": "docs/MIGRATIONS.md" if mig.exists() else "absent",
+        "detail": "docs/archive/2026-09-21/MIGRATIONS.md" if mig.exists() else "absent",
     })
     portable_text = _read_capped(root / "voicebridge/portable.py")
     recov_text = _read_capped(root / "voicebridge/communications/recovery_qualify.py")
@@ -1077,8 +1105,8 @@ def support_matrix_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
         "detail": f"{platform.python_version()} (documented: >= "
                   f"{target.get('python_min', '3.11')})",
     })
-    for doc in ("docs/AUDIO_SETUP.md", "docs/VOICE_BRIDGE_SYSTEM.md",
-                "docs/VOICE_BRIDGE_TROUBLESHOOTING.md"):
+    for doc in ("docs/archive/2026-09-21/AUDIO_SETUP.md", "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md",
+                "docs/archive/2026-09-21/VOICE_BRIDGE_TROUBLESHOOTING.md"):
         p = root / doc
         results.append({
             "name": f"support.documented.{Path(doc).stem}",

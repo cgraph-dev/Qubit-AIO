@@ -27,7 +27,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BOARDS_JS = (REPO_ROOT / "frontend" / "hermes-qubit" / "plugins"
+BOARDS_JS = (REPO_ROOT / "frontend" / "qubit-app" / "plugins"
              / "qubit-boards" / "qubit-boards.js")
 
 

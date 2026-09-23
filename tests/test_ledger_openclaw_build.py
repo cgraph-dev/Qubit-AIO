@@ -31,7 +31,7 @@ def _load_module(name: str, filename: str):
 rebuild = _load_module("rebuild_ledger_openclaw", "rebuild_ledger_openclaw.py")
 gap_ledger = _load_module("gap_ledger", "gap_ledger.py")
 
-SECTION_PATH = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.openclaw.json"
+SECTION_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.openclaw.json"
 
 
 def _section() -> dict:
@@ -45,8 +45,12 @@ def test_schema_is_valid() -> None:
     assert validated["source"] == "openclaw"
     assert validated["rows"]
     for row in data["rows"]:
-        assert set(row) == set(gap_ledger.ROW_KEYS), sorted(
-            set(row) ^ set(gap_ledger.ROW_KEYS))
+        # The amendment (2026-09-22) permits an optional ``gate_class`` on
+        # refusal rows; every core row key must still be present.
+        assert set(gap_ledger.ROW_KEYS) <= set(row), sorted(
+            set(gap_ledger.ROW_KEYS) - set(row))
+        assert set(row) <= set(gap_ledger.ROW_KEYS) | {"gate_class"}, sorted(
+            set(row) - set(gap_ledger.ROW_KEYS) - {"gate_class"})
     ids = [row["id"] for row in data["rows"]]
     assert len(ids) == len(set(ids)), "duplicate ledger row ids"
 
@@ -131,12 +135,15 @@ def test_agent_wave_rows_are_derived() -> None:
         assert rows[rid]["status"] == "IMPLEMENTED", rid
         assert rows[rid]["proving_test"], rid
     # External dependency remains: the local part is proven; the code path is
-    # complete and typed, so it is OPERATOR_ONLY (owner decision 2026-09-13).
-    for rid, need in (("OC-48", "creds"), ("OC-51", "hardware"),
-                      ("OC-D16", "creds")):
+    # complete and typed. OC-48 is an architecture row and stays OPEN until the
+    # owner approves it individually (amendment 2026-09-22); OC-51 / OC-D16 are
+    # external-prerequisite rows, terminal once named.
+    for rid, need in (("OC-51", "hardware"), ("OC-D16", "creds")):
         assert rows[rid]["status"] == "OPERATOR_ONLY", rid
         assert rows[rid]["needs"] == need, rid
         assert rows[rid]["proving_test"], rid
+    assert rows["OC-48"]["status"] == "OPERATOR_ONLY_ARCHITECTURE"
+    assert rows["OC-48"]["needs"] == "creds"
 
 
 def test_f2_rows_closed_or_honestly_reclassified() -> None:
@@ -181,11 +188,12 @@ def test_genuine_gates_stay_open() -> None:
 
 
 def test_all_rows_are_terminal() -> None:
-    """Every committed row is a code-ready terminal status."""
+    """Every committed row is terminal except owner-gated architecture rows."""
     rows = _section()["rows"]
     non_terminal = [(r["id"], r["status"]) for r in rows
                     if r["status"] not in gap_ledger.TERMINAL_STATUSES]
-    assert non_terminal == [], non_terminal
+    # OPERATOR_ONLY_ARCHITECTURE rows are OPEN until individually approved.
+    assert non_terminal == [("OC-48", "OPERATOR_ONLY_ARCHITECTURE")], non_terminal
     for stale in ("GATED", "PARTIAL", "MISSING", "UNVERIFIED", "CLI_ONLY",
                   "DASHBOARD_ONLY", "VOICE_ONLY"):
         assert not [r["id"] for r in rows if r["status"] == stale], stale

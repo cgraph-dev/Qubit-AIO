@@ -24,7 +24,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CLONE = Path(os.environ.get("QUBIT_8TF_HERMES_CLONE",
                             "/tmp/upstream-8tfv3/hermes-agent"))
-MATRIX = REPO_ROOT / "docs" / "MATRIX_8T_F.json"
+MATRIX = REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.json"
 
 from voicebridge import sqlstore as V_SQL  # noqa: E402
 from voicebridge import textutil as V_STRIP  # noqa: E402
@@ -236,7 +236,7 @@ def test_skill_manifest_validation_rejects_unlicensed(tmp_path):
 # Matrix honesty
 # ---------------------------------------------------------------------------
 def test_matrix_complete_and_honest():
-    matrix = json.loads((REPO_ROOT / "docs" / "MATRIX_8T_F.json").read_text())
+    matrix = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.json").read_text())
     assert matrix["upstreams"]["hermes-agent"]["commit"] == \
         "2237be355906fbe6065ce1815711eee52b2d646e"
     assert matrix["upstreams"]["openclaw"]["commit"] == \
@@ -262,6 +262,6 @@ def test_matrix_complete_and_honest():
         f"final parity leaves no BLOCKED rows: {[r['id'] for r in matrix['rows'] if r['status'] == 'BLOCKED']}"
     assert "REJECTED" not in {r["status"] for r in matrix["rows"]}, \
         "final parity leaves no REJECTED rows; unsafe variants stay refused by typed errors + absence tests"
-    companion = (REPO_ROOT / "docs" / "MATRIX_8T_F.md").read_text()
+    companion = (REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.md").read_text()
     for row in matrix["rows"]:
         assert row["id"] in companion, f"id missing from MD: {row['id']}"

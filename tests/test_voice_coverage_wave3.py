@@ -2,7 +2,7 @@
 CLI and dashboard operations.
 
 This is the wave-3 verification layer over the frozen voice-completeness gate
-(``docs/QUBIT_FULL_PARITY_CONTRACT.md`` / ``docs/VOICE_BRIDGE_SYSTEM.md``).  It
+(``docs/archive/2026-09-21/QUBIT_FULL_PARITY_CONTRACT.md`` / ``docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md``).  It
 audits the production voice registry against the live CLI parser tree and the
 dashboard op catalog, and then exercises the real pipeline end to end:
 
@@ -37,7 +37,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
-LEDGER = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.qubit.json"
+LEDGER = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.qubit.json"
 
 # Tier-2 extras whose canonical spoken surface lives under a different Tier-1
 # registry id (same backend). Mirrors the declarations the audit verifies and

@@ -15,7 +15,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def _rows():
-    m = json.loads((REPO / "docs" / "MATRIX_8T_F.json").read_text())
+    m = json.loads((REPO / "docs/archive/2026-09-21" / "MATRIX_8T_F.json").read_text())
     assert m["upstreams"]["hermes-agent"]["commit"] == \
         "2237be355906fbe6065ce1815711eee52b2d646e"
     assert m["upstreams"]["openclaw"]["commit"] == \

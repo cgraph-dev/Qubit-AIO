@@ -40,7 +40,7 @@ def _load_module(name: str, filename: str):
 rebuild = _load_module("rebuild_ledger_qubit", "rebuild_ledger_qubit.py")
 gap_ledger = _load_module("gap_ledger", "gap_ledger.py")
 
-SECTION_PATH = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.qubit.json"
+SECTION_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.qubit.json"
 
 
 def _section() -> dict:
@@ -196,8 +196,8 @@ def test_page_plugin_evidence_rule_branches(tmp_path) -> None:
     # these families declare only the dashboard surface
     assert set(rebuild.PAGE_PLUGIN_INTERFACES) == {"dashboard"}
 
-    real_page = (REPO_ROOT / "frontend/hermes-web/src/pages/AnalyticsPage.tsx")
-    real_manifest = (REPO_ROOT / "frontend/hermes-qubit/plugins/qubit-ops/"
+    real_page = (REPO_ROOT / "frontend/qubit-web/src/pages/AnalyticsPage.tsx")
+    real_manifest = (REPO_ROOT / "frontend/qubit-app/plugins/qubit-ops/"
                      "manifest.json")
     assert real_page.is_file() and real_manifest.is_file()
 
@@ -341,7 +341,7 @@ def test_missing_registry_entry_is_flagged_not_fatal() -> None:
 
 
 def test_all_sections_merge_without_schema_violation() -> None:
-    docs = REPO_ROOT / "docs"
+    docs = REPO_ROOT / "docs" / "archive" / "2026-09-21"
     sections, missing, warnings = gap_ledger.load_sections(docs)
     assert missing == [], f"missing required ledger sections: {missing}"
     assert {s["file_section"] for s in sections} == set(gap_ledger.SECTIONS)

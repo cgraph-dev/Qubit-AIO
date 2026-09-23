@@ -439,6 +439,49 @@ def token_revoke(cfg: Any, token_id: str, *, requested_by: str = "cli:user",
     return {"state": "OK", "revoked": rec["id"]}
 
 
+def token_rename(cfg: Any, token_id: str, label: str, *,
+                 requested_by: str = "cli:user",
+                 confirmed: bool = False) -> Dict[str, Any]:
+    """Rename a device token's operator label (confirmed, audited).
+
+    Also accepts a ``device_id`` when it names exactly one token, so an
+    operator can rename a paired device without knowing its token id.
+    """
+    if _estop(cfg):
+        return refuse_estop("device token rename")
+    if not confirmed:
+        return {"state": "denied", "code": TOKEN_CONFIRM_CODE,
+                "detail": "renaming a device token requires explicit --confirm",
+                "owner": "qubit-policy",
+                "rollback": "label unchanged; nothing to roll back"}
+    clean_label = str(label or "").strip()[:64]
+    if not clean_label:
+        return {"state": "FAILED", "code": TOKEN_BAD_INPUT_CODE,
+                "detail": "label must be a non-empty string",
+                "owner": "qubit-policy"}
+    key = str(token_id or "").strip()
+    state = _load_tokens(cfg)
+    rec = state["tokens"].get(key)
+    if rec is None:
+        matches = [r for r in state["tokens"].values()
+                   if str(r.get("device_id") or "") == key]
+        if len(matches) == 1:
+            rec = matches[0]
+        elif len(matches) > 1:
+            return {"state": "FAILED", "code": TOKEN_BAD_INPUT_CODE,
+                    "detail": f"device_id {key!r} names multiple tokens; use "
+                              "a token id",
+                    "owner": "qubit-policy"}
+    if rec is None:
+        return {"state": "NOT_FOUND", "code": TOKEN_NOT_FOUND_CODE,
+                "detail": f"no device token {key!r}"}
+    rec["label"] = clean_label
+    _save_tokens(cfg, state)
+    _token_audit("rename", requested_by,
+                 {"token_id": rec["id"], "label": clean_label})
+    return {"state": "OK", "token": _token_public(rec)}
+
+
 def token_verify(cfg: Any, token: str, *, required_scopes: Any = None,
                  touch: bool = False) -> Dict[str, Any]:
     """Constant-time device-token verification + scope check (fail closed).

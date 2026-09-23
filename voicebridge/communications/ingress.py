@@ -1,6 +1,6 @@
-"""OpenClaw messaging/webhook ingress bridge (Agent 6).
+"""Qubit messaging/webhook ingress bridge (Agent 6).
 
-One inbound path for the OpenClaw channel set and verified webhook
+One inbound path for the Qubit channel set and verified webhook
 subscriptions into the existing Qubit communications package. It adds the
 three pieces the 2026-09-11 audit left open without starting a second
 listener or duplicating the verification kernels:

@@ -21,7 +21,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 pytestmark = pytest.mark.skipif(
     not (DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")
@@ -77,7 +77,7 @@ def test_chat_sidebar_uses_the_chat_store_and_loads_the_transcript(tmp_path):
                         f"?{parsed.query}" if parsed.query else ""))
 
             page.on("request", _record)
-            page.goto(f"http://127.0.0.1:{port}/chat?resume={SEED_ID}",
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat?resume={SEED_ID}",
                       timeout=30000)
             page.wait_for_timeout(3000)
             body = page.inner_text("body")
@@ -106,7 +106,7 @@ def test_chat_transcript_survives_a_full_reload(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(viewport={"width": 1280, "height": 800})
-            page.goto(f"http://127.0.0.1:{port}/chat?resume={SEED_ID}",
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat?resume={SEED_ID}",
                       timeout=30000)
             page.wait_for_selector("text=seeded assistant answer", timeout=30000)
             page.reload(timeout=30000)

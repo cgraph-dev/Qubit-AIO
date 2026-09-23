@@ -6,8 +6,11 @@
   "request": {
     "kind": "ws",
     "method": "GET",
-    "path": "/agent/api/qubit/gateway/ws",
-    "headers": {},
+    "path": "/api/ws",
+    "headers": {
+      "Connection": "Upgrade",
+      "Upgrade": "websocket"
+    },
     "body": null,
     "event": null,
     "argv": []
@@ -19,20 +22,41 @@
     "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
   },
   "sequence": [
-    {"kind": "ws", "step": "connect", "path": "/agent/api/qubit/gateway/ws"},
-    {"kind": "ws", "step": "handshake", "expect": {"type": "hello", "protocol": "qubit-gateway/1"}},
-    {"kind": "ws", "step": "reconnect", "attempts": 1}
+    {
+      "kind": "ws",
+      "step": "connect",
+      "path": "/api/ws"
+    },
+    {
+      "kind": "ws",
+      "step": "handshake",
+      "expect": {
+        "type": "hello",
+        "protocol": "qubit-gateway/1"
+      }
+    },
+    {
+      "kind": "ws",
+      "step": "reconnect",
+      "attempts": 1
+    }
   ],
-  "events_expected": [
-    {"event": "hello", "order": 1},
-    {"event": "status", "order": 2}
-  ],
+  "events_expected": [],
   "persisted_state_schema": {
     "type": "object",
     "properties": {
-      "handshake": {"type": "object"},
-      "scopes": {"type": "array", "items": {"type": "string"}},
-      "reconnect_attempts": {"type": "integer"}
+      "handshake": {
+        "type": "object"
+      },
+      "scopes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "reconnect_attempts": {
+        "type": "integer"
+      }
     }
   },
   "normalizers": [
@@ -41,18 +65,8 @@
     "timestamp"
   ],
   "expected": {
-    "handshake": {
-      "type": "hello",
-      "protocol": "qubit-gateway/1"
-    },
-    "scopes": [
-      "gateway:read"
-    ],
-    "events": [
-      {
-        "event": "status"
-      }
-    ]
+    "http_status": 426,
+    "events": []
   },
   "qubit": {
     "path": "voicebridge/gateway/gateway_ws.py:130",
@@ -69,28 +83,26 @@
     "symbol": "isGatewayEventFrame",
     "mapping_status": "VERIFIED"
   },
-  "notes": "WS handshake+scope+event contract. FrameGuard.check_raw rejects oversize/malformed frames; dispatch_request routes req frames through the same rpc registry; event frames reach the event_cb. The ws adapter projects each frame to {event:<name>} so ordering is asserted without volatile payloads. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: tui_gateway/ws.py:239 (handle_ws); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: packages/gateway-protocol/src/frame-guards.ts:32 (isGatewayEventFrame).",
+  "notes": "WS handshake+scope+event contract. Qubit intentionally runs zero WebSocket servers; the observable refusal is HTTP 426 WS_SINGLE_PATH at /api/ws (webui.py:1506-1550). FrameGuard.check_raw/dispatch_request are exercised only in-process (gateway/gateway_ws.py:109-179). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: tui_gateway/ws.py:239 (handle_ws); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: packages/gateway-protocol/src/frame-guards.ts:32 (isGatewayEventFrame). No side-effect-free pinned reference equivalent exists for this fixture: the capability surface is Qubit-specific (HTTP/RPC/WS/SSE/voice) or the upstream operation requires a running Gateway, credentials, or mutates state; it is therefore classified OPERATOR_ONLY and can never claim PASS without a side-effect-free equivalent.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,
     "dashboard_control": null,
     "request_schema": {
       "method": "GET",
-      "path": "/agent/api/qubit/gateway/ws"
+      "path": "/api/ws",
+      "headers": {
+        "Connection": "Upgrade",
+        "Upgrade": "websocket"
+      }
     },
-    "broker_policy_decision": null,
+    "broker_policy_decision": "typed HTTP 426 WS_SINGLE_PATH refusal; WS dialect is not served",
     "runtime_provider": null,
     "store_state_assertion": null,
-    "output_event_assertion": {
-      "handshake": {
-        "type": "hello",
-        "protocol": "qubit-gateway/1"
-      },
-      "events": [
-        "status"
-      ]
-    },
-    "error_codes": null,
+    "output_event_assertion": [],
+    "error_codes": [
+      "WS_SINGLE_PATH"
+    ],
     "retry_recovery_proof": null,
     "audit_receipt_proof": null,
     "security_resource_proof": null,
@@ -100,15 +112,15 @@
       "voice_utterance": "not exposed by this fixture's surface",
       "dashboard_route": "not exposed by this fixture's surface",
       "dashboard_control": "not exposed by this fixture's surface",
-      "broker_policy_decision": "not exposed by this fixture's surface",
       "runtime_provider": "not exposed by this fixture's surface",
       "store_state_assertion": "not exposed by this fixture's surface",
-      "error_codes": "not exposed by this fixture's surface",
       "retry_recovery_proof": "not exposed by this fixture's surface",
       "audit_receipt_proof": "not exposed by this fixture's surface",
       "security_resource_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface",
       "response_headers": "not exposed by this fixture's surface"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Qubit serves NO WebSocket server by design (single event path; ws_servers=0). A live WS handshake cannot execute. The only observable transport is the typed HTTP 426 WS_SINGLE_PATH refusal at /api/ws (webui.py:853-861, 1506-1550, live-verified); the frame machinery (gateway/gateway_ws.py:109-179) is in-process only. Requires QUBIT_DIFFERENTIAL_QUBIT_URL (and QUBIT_DIFFERENTIAL_QUBIT_TOKEN) to observe the refusal."
 }

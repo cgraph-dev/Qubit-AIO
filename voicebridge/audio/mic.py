@@ -151,7 +151,7 @@ MIC_SELFCHECK_HINTS = {
                    "and that no other app holds it",
     "SILENT": "microphone delivers ~no signal — enable 48V phantom power, raise "
               "the Scarlett input gain, and check the USB port "
-              "(docs/AUDIO_SETUP.md)",
+              "(docs/archive/2026-09-21/AUDIO_SETUP.md)",
     "DEGRADED": "microphone is very quiet — raise the input gain / check the "
                 "cable",
     "HEALTHY": "microphone signal chain OK",

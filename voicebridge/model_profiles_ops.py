@@ -25,11 +25,14 @@ OP_GROUP = "profile"
 PROFILE_PARITY = ("config", "profile")
 VOICE_GUARD = "config_profiles"
 
-LOCAL, API, REALTIME = R.LOCAL, R.API, R.REALTIME
+LOCAL, API, REALTIME, PLUGIN = R.LOCAL, R.API, R.REALTIME, R.PLUGIN
 KINDS = R.KINDS
 ROLES = R.ROLES
 DEFAULT_ROLE = R.DEFAULT_ROLE
 DEFAULT_LOCAL_ID = R.DEFAULT_LOCAL_ID
+RADIUS_PROVIDER = R.RADIUS_PROVIDER
+RADIUS_KEY_REF = R.RADIUS_KEY_REF
+RADIUS_BASE_URL = R.RADIUS_BASE_URL
 
 _RAW_SECRET_DETAIL = (
     "raw secret refused: key_ref is a secret reference only "
@@ -159,6 +162,22 @@ def create_model_profile(
     if k not in KINDS:
         return {"state": "FAILED", "code": "BAD_KIND",
                 "detail": f"unknown kind {kind!r}"}
+    if k == PLUGIN:
+        # Provider-plugin (Radius adapter) record: provider identity, default
+        # base URL, and an env:/file: key reference only (never a raw value).
+        prof = R.radius_profile(
+            pid,
+            model=str(model or "balanced").strip(),
+            roles=_roles(roles),
+            key_ref=str(key_ref or "").strip() or RADIUS_KEY_REF,
+            base_url=str(base_url or "").strip() or RADIUS_BASE_URL,
+            egress_consent=str(egress_consent or "deny").strip())
+        try:
+            out = R.upsert_model_profile(cfg, prof, confirm=bool(confirm))
+        except ResolverError as exc:
+            return _err(exc)
+        return _state(out, "OK" if out.get("state") == "OK"
+                      else out.get("state"))
     prof = R.ModelProfile(
         id=pid, kind=k,
         provider=str(provider or ("ollama" if k == LOCAL else "")).strip(),
@@ -179,6 +198,38 @@ def create_model_profile(
         fallback_to=str(fallback_to or "").strip(),
         rollback_to=str(rollback_to or pid).strip() or pid,
     )
+    try:
+        out = R.upsert_model_profile(cfg, prof, confirm=bool(confirm))
+    except ResolverError as exc:
+        return _err(exc)
+    return _state(out, "OK" if out.get("state") == "OK" else out.get("state"))
+
+
+def create_radius_profile(
+    cfg: Any, *, profile_id: str = RADIUS_PROVIDER,
+    model: str = "balanced", roles: Any = None,
+    key_ref: str = RADIUS_KEY_REF, base_url: str = RADIUS_BASE_URL,
+    egress_consent: str = "deny", confirm: bool = False,
+) -> Dict[str, Any]:
+    """Create the provider-plugin Radius record (env:/file: key ref only).
+
+    A thin typed wrapper over :func:`voicebridge.providers.resolver.radius_profile`
+    so the CLI and dashboard share the exact same constructor: a raw key value
+    is refused before anything is staged or written, and the default reference
+    (``env:RADIUS_API_KEY``) is config-only until it resolves.
+    """
+    pid = str(profile_id or "").strip()
+    if not pid:
+        return {"state": "FAILED", "code": "MISSING_ID",
+                "detail": "profile needs an id"}
+    guard = check_secret_ref(key_ref)
+    if guard["state"] != "OK":
+        return guard
+    prof = R.radius_profile(
+        pid, model=str(model or "balanced").strip(), roles=_roles(roles),
+        key_ref=str(key_ref or "").strip() or RADIUS_KEY_REF,
+        base_url=str(base_url or "").strip() or RADIUS_BASE_URL,
+        egress_consent=str(egress_consent or "deny").strip())
     try:
         out = R.upsert_model_profile(cfg, prof, confirm=bool(confirm))
     except ResolverError as exc:
@@ -261,9 +312,10 @@ def rollback_model_profile(cfg: Any, profile_id: str, *,
 
 __all__ = [
     "OP_GROUP", "PROFILE_PARITY", "VOICE_GUARD", "LOCAL", "API", "REALTIME",
-    "KINDS", "ROLES", "DEFAULT_ROLE", "DEFAULT_LOCAL_ID",
+    "PLUGIN", "KINDS", "ROLES", "DEFAULT_ROLE", "DEFAULT_LOCAL_ID",
+    "RADIUS_PROVIDER", "RADIUS_KEY_REF", "RADIUS_BASE_URL",
     "check_secret_ref", "list_model_profiles", "show_model_profile",
-    "create_model_profile", "clone_model_profile", "remove_model_profile",
-    "test_model_profile", "select_session_model", "clear_session_model",
-    "rollback_model_profile",
+    "create_model_profile", "create_radius_profile", "clone_model_profile",
+    "remove_model_profile", "test_model_profile", "select_session_model",
+    "clear_session_model", "rollback_model_profile",
 ]

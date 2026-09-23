@@ -1,7 +1,7 @@
 """Clean-clone install reproducibility (Wave 5, agent G).
 
 The verifier flagged that the clean-install gate could only PASS because the
-git-ignored ``frontend/hermes-dist`` dashboard build happened to exist in the
+git-ignored ``frontend/qubit-dist`` dashboard build happened to exist in the
 developer checkout. A fresh clone does not carry that artifact, so a
 node-less/network-less host could not serve the dashboard and the "clean"
 install was unproven.
@@ -49,7 +49,7 @@ def _tracked_clone(dest: Path) -> None:
 
     ``git ls-files`` lists tracked paths only; the tar stream copies their
     current working-tree content and preserves symlinks. Git-ignored build
-    artifacts (``frontend/hermes-dist``, ``node_modules``, ``.venv``) are
+    artifacts (``frontend/qubit-dist``, ``node_modules``, ``.venv``) are
     intentionally absent, exactly like a clean clone.
     """
     dest.mkdir(parents=True, exist_ok=True)
@@ -87,10 +87,10 @@ def clean_clone(tmp_path: Path) -> Path:
 # 1. Premise: a fresh checkout has no git-ignored dashboard artifact
 # ===========================================================================
 def test_fresh_clone_omits_the_gitignored_dashboard(clean_clone: Path):
-    assert not (clean_clone / "frontend" / "hermes-dist").exists()
+    assert not (clean_clone / "frontend" / "qubit-dist").exists()
     # ... but the tracked dashboard source is present, so it can be built.
-    assert (clean_clone / "frontend" / "hermes-web" / "package.json").is_file()
-    assert (clean_clone / "frontend" / "hermes-web" / "vite.config.ts").is_file()
+    assert (clean_clone / "frontend" / "qubit-web" / "package.json").is_file()
+    assert (clean_clone / "frontend" / "qubit-web" / "vite.config.ts").is_file()
 
 
 # ===========================================================================
@@ -109,7 +109,7 @@ def test_build_dashboard_check_is_typed_when_node_is_missing(clean_clone, tmp_pa
     out = r.stdout + r.stderr
     assert r.returncode == 3, out
     assert "DASHBOARD_UNAVAILABLE" in out
-    assert "frontend/hermes-dist" in out
+    assert "frontend/qubit-dist" in out
 
 
 def test_build_dashboard_check_reports_present_or_buildable(clean_clone):
@@ -137,7 +137,7 @@ def test_clean_install_degrades_typed_on_a_node_less_clone(clean_clone, tmp_path
     out = r.stdout + r.stderr
     assert r.returncode == 4, out
     assert "DEGRADED" in out
-    assert "frontend/hermes-dist" in out
+    assert "frontend/qubit-dist" in out
     # stopped at the typed preflight, before any wheel/venv/network work
     assert "clean install check: PASS" not in out
     assert "== toolchain:" not in out
@@ -170,7 +170,7 @@ def test_clean_clone_wheel_without_dashboard_is_a_typed_fail(clean_clone, tmp_pa
     out = tmp_path / "dist"
     wheel = _uv_wheel(clean_clone, out)
     names = _members(wheel)
-    assert not any("hermes-dist" in n for n in names), names[:5]
+    assert not any("qubit-dist" in n for n in names), names[:5]
 
     import scripts.release_qualify as RQ
 
@@ -183,12 +183,12 @@ def test_clean_clone_wheel_without_dashboard_is_a_typed_fail(clean_clone, tmp_pa
 
 def test_tree_with_built_dashboard_produces_a_shipping_wheel(clean_clone, tmp_path):
     # simulate the release-tree path: the tree already carries the built bundle
-    shutil.copytree(REPO / "frontend" / "hermes-dist",
-                    clean_clone / "frontend" / "hermes-dist")
+    shutil.copytree(REPO / "frontend" / "qubit-dist",
+                    clean_clone / "frontend" / "qubit-dist")
     out = tmp_path / "dist"
     wheel = _uv_wheel(clean_clone, out)
     names = _members(wheel)
-    assert any(n.endswith("_data/frontend/hermes-dist/index.html")
+    assert any(n.endswith("_data/frontend/qubit-dist/index.html")
                for n in names), names[:10]
 
     import scripts.release_qualify as RQ
@@ -208,12 +208,12 @@ def test_installer_has_typed_dashboard_degradation_gate():
     assert 'DASHBOARD_STATE="build_failed"' in text
     assert "exit 4" in text
     # the established warning contract is preserved
-    assert "WARNING: frontend/hermes-dist missing" in text
+    assert "WARNING: frontend/qubit-dist missing" in text
 
 
 def test_clean_install_preflights_dashboard_before_building():
     text = CLEAN_INSTALL.read_text(encoding="utf-8")
-    assert "frontend/hermes-dist/index.html" in text
+    assert "frontend/qubit-dist/index.html" in text
     assert 'build_dashboard.sh' in text
     assert "dashboard bundle" in text
     assert "degrade" in text
@@ -225,7 +225,7 @@ def test_pyproject_declares_the_dashboard_artifact_and_documents_reproducibility
     data = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
     targets = data["tool"]["hatch"]["build"]["targets"]
     for name in ("wheel", "sdist"):
-        assert "frontend/hermes-dist" in targets[name].get("artifacts", []), name
+        assert "frontend/qubit-dist" in targets[name].get("artifacts", []), name
     text = PYPROJECT.read_text(encoding="utf-8")
     assert "CLEAN_CLONE_AUDIT_WAVE5.md" in text
 

@@ -25,6 +25,21 @@ from .egress import classify_and_sanitize
 from .policy import FrontierPolicy, disclosure_block, get_governor
 
 
+def _default_local_model(cfg: Any) -> str:
+    """Canonical local model alias for truthful error identities.
+
+    Uses the one resolver instead of a hard-coded alias so a replaced default
+    profile is reported instead of a stale literal. The runner-contract alias
+    is only a last-resort fallback when resolution itself is unavailable.
+    """
+    try:
+        from . import resolver
+        return resolver.resolve(cfg, role=resolver.DEFAULT_ROLE).model
+    except Exception:
+        from ..runner_contract import DEFAULT_ALIAS
+        return DEFAULT_ALIAS
+
+
 def _estimate_cost(entry: Optional[ModelEntry], pcfg: dict,
                    prompt_chars: int, max_tokens: int) -> float:
     """Cost estimate honoring catalog prices, else operator price overrides.
@@ -64,36 +79,54 @@ def _local_complete(prompt: str, cfg: Any, max_tokens: int, *,
     """
     try:
         from ..local_llm import chat_local, chat_local_stream
+        from ..runner_contract import DEFAULT_URL as _RUNNER_DEFAULT_URL
         from ..runner_contract import resolve
         rc = resolve(cfg)
         alias = (model or "").strip() or rc.alias
         timeout = 8.0 if timeout_s is None else float(timeout_s)
+        # Only pass an explicit endpoint when it differs from the adapter's own
+        # default; the local adapter already defaults to the resident runner
+        # URL, and redundant defaults must not change the adapter call contract.
+        extra = {"url": rc.url} if rc.url and rc.url != _RUNNER_DEFAULT_URL else {}
         t0 = time.time()
         if on_sentence is not None:
             text = chat_local_stream(
-                prompt, conversation_prompt, model=alias, url=rc.url,
+                prompt, conversation_prompt, model=alias,
                 timeout_s=timeout, max_tokens=max_tokens, context=context,
                 num_ctx=num_ctx or rc.num_ctx, on_sentence=on_sentence,
-                should_stop=should_stop)
+                should_stop=should_stop, reasoning=reasoning, **extra)
         else:
             text = chat_local(prompt[:2000], conversation_prompt,
-                              model=alias, url=rc.url, timeout_s=timeout,
+                              model=alias, timeout_s=timeout,
                               max_tokens=max_tokens, context=context,
                               num_ctx=num_ctx or rc.num_ctx,
-                              reasoning=reasoning)
+                              reasoning=reasoning, **extra)
         ms = int((time.time() - t0) * 1000)
         if not text:
-            return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
-                                  message="local model unavailable",
+            # Distinct from a transport exception so callers can map an empty
+            # local reply to MODEL_UNAVAILABLE and an outage to MODEL_ERROR.
+            return ProviderResult(ok=False, code="MODEL_UNAVAILABLE",
+                                  message="local model returned no content",
                                   provider="local", model=alias,
                                   identity=f"local/{alias}")
+        from ..local_llm import (  # noqa: E402 - keep the adapter lazy
+            normalize_reasoning_level,
+            resolve_reasoning_budget,
+        )
+
+        details: dict = {}
+        if reasoning is not None:
+            level = normalize_reasoning_level(reasoning)
+            details["reasoning_applied"] = {
+                "level": level,
+                "max_tokens": resolve_reasoning_budget(level)}
         usage = UsageRecord(provider="local", model=alias,
                             identity=f"local/{alias}", latency_ms=ms)
         return ProviderResult(ok=True, text=text, provider="local",
                               model=alias, identity=f"local/{alias}",
-                              usage=usage)
+                              usage=usage, details=details)
     except Exception as exc:
-        _m = (model or "").strip() or "qubit-brain4"
+        _m = (model or "").strip() or _default_local_model(cfg)
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
                               provider="local", model=_m,
@@ -151,7 +184,7 @@ def _local_generate(prompt: str, cfg: Any, max_tokens: int, *,
             usage=UsageRecord(provider="local", model=alias,
                               identity=f"local/{alias}", latency_ms=ms))
     except Exception as exc:
-        _m = (model or "").strip() or "qubit-brain4"
+        _m = (model or "").strip() or _default_local_model(cfg)
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
                               provider="local", model=_m,
@@ -208,7 +241,7 @@ def _local_chat_raw(messages: Any, cfg: Any, max_tokens: int, *,
             usage=UsageRecord(provider="local", model=alias,
                               identity=f"local/{alias}", latency_ms=ms))
     except Exception as exc:
-        _m = (model or "").strip() or "qubit-brain4"
+        _m = (model or "").strip() or _default_local_model(cfg)
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
                               message=redact_text(str(exc))[:200],
                               provider="local", model=_m,
@@ -257,6 +290,16 @@ def resolve_role(cfg: Any, role: str = "chat", *,
                             session=session)
 
 
+def _resolved_identity(eff: Any, role: str, route: str = "") -> dict:
+    """Resolved provider/model/role identity for receipt propagation (PV-04)."""
+    return {
+        "profile": eff.profile_id, "role": role, "source": eff.source,
+        "provider": eff.provider, "model": eff.model, "kind": eff.kind,
+        "route": route or eff.route, "locality": eff.locality,
+        "executable": bool(eff.executable),
+    }
+
+
 def run_role(prompt: str, cfg: Any, *, role: str = "chat",
              profile_id: Optional[str] = None,
              session: Optional[str] = None,
@@ -301,7 +344,8 @@ def run_role(prompt: str, cfg: Any, *, role: str = "chat",
                                session=session)
     except resolver.ResolverError as exc:
         return ProviderResult(ok=False, code=exc.code, message=exc.detail,
-                              provider="", model="", identity="resolver")
+                              provider="", model="", identity="resolver",
+                              details={"role": role})
     if not eff.executable:
         code = ("EGRESS_DENIED" if eff.egress_required
                 and not eff.egress_allowed else "PROFILE_NOT_EXECUTABLE")
@@ -312,7 +356,8 @@ def run_role(prompt: str, cfg: Any, *, role: str = "chat",
                      f"allowlisted={eff.allowlisted} "
                      f"egress_allowed={eff.egress_allowed}"),
             provider=eff.provider, model=eff.model,
-            identity=f"{eff.provider}/{eff.model}")
+            identity=f"{eff.provider}/{eff.model}",
+            details=_resolved_identity(eff, role))
     route = "local" if eff.is_local else eff.route
     if route not in ("local", "frontier", "auto"):
         # A realtime/duplex kind is a speech adapter, not a text runner: never
@@ -322,7 +367,8 @@ def run_role(prompt: str, cfg: Any, *, role: str = "chat",
             message=f"profile {eff.profile_id!r} kind {eff.kind!r} has no "
                     f"text-runner route",
             provider=eff.provider, model=eff.model,
-            identity=f"{eff.provider}/{eff.model}")
+            identity=f"{eff.provider}/{eff.model}",
+            details=_resolved_identity(eff, role))
     req = ProviderRequest(
         prompt=prompt, max_tokens=int(max_tokens),
         timeout_s=float(timeout_s) if timeout_s is not None else 20.0,
@@ -332,15 +378,59 @@ def run_role(prompt: str, cfg: Any, *, role: str = "chat",
         structured_schema=structured_schema,
         require_tools=require_tools, require_streaming=require_streaming,
         context_chars=context_chars or len(prompt or ""))
-    return run(req, cfg, cancel=cancel, allow_private=allow_private,
-               base_url=base_url or ("" if eff.is_local else eff.base_url),
-               api_key=api_key,
-               key_ref="" if eff.is_local else eff.key_ref,
-               local_mode=local_mode, conversation_prompt=conversation_prompt,
-               context=context, timeout_s=timeout_s,
-               system_prompt=system_prompt, messages=messages, options=options,
-               keep_alive=keep_alive, on_sentence=on_sentence,
-               should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx)
+    res = run(req, cfg, cancel=cancel, allow_private=allow_private,
+              base_url=base_url or ("" if eff.is_local else eff.base_url),
+              api_key=api_key,
+              key_ref="" if eff.is_local else eff.key_ref,
+              local_mode=local_mode, conversation_prompt=conversation_prompt,
+              context=context, timeout_s=timeout_s,
+              system_prompt=system_prompt, messages=messages, options=options,
+              keep_alive=keep_alive, on_sentence=on_sentence,
+              should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx)
+    # PV-04: carry the resolved provider/model/role identity so CLI/dashboard/
+    # voice receipts report the same authority that actually executed.
+    res.details.update(_resolved_identity(eff, role, route))
+    return res
+
+
+def embed_texts(texts: Any, cfg: Any = None, *, role: str = "embedding",
+                profile_id: Optional[str] = None,
+                session: Optional[str] = None, url: str = "", model: str = "",
+                timeout_s: Optional[float] = None,
+                num_gpu: int = 0) -> list:
+    """Embed texts through the canonical embedding role + shared adapter.
+
+    Resolves ``embedding`` via the one resolver (local synthetic default unless
+    a profile/session overrides it), refuses a non-executable external profile
+    with a typed :class:`~voicebridge.providers.embedding.EmbeddingError`, and
+    performs the Ollama call only in
+    :mod:`voicebridge.providers.embedding`. This is the single embedding entry
+    point the L1 router and semantic memory share.
+    """
+    from . import embedding as _embedding
+    from . import resolver
+
+    eff = None
+    try:
+        eff = resolver.resolve(cfg, role=role, profile_id=profile_id,
+                               session=session)
+    except resolver.ResolverError as exc:
+        raise _embedding.EmbeddingError(exc.code, exc.detail) from exc
+    if not eff.executable:
+        raise _embedding.EmbeddingError(
+            "EGRESS_DENIED" if eff.egress_required and not eff.egress_allowed
+            else "PROFILE_NOT_EXECUTABLE",
+            f"embedding profile {eff.profile_id!r} is not executable")
+    if not eff.is_local:
+        raise _embedding.EmbeddingError(
+            "PROFILE_NOT_EXECUTABLE",
+            f"external embedding profile {eff.provider}/{eff.model} has no "
+            "configured adapter")
+    base = str(url or "").strip() or _embedding.runner_url(cfg)
+    return _embedding.embed_local(
+        list(texts), url=base, model=str(model or "").strip() or eff.model,
+        timeout_s=10.0 if timeout_s is None else float(timeout_s),
+        num_gpu=num_gpu)
 
 
 def run(req: ProviderRequest, cfg: Any,
@@ -544,6 +634,21 @@ def run(req: ProviderRequest, cfg: Any,
                               identity=f"{provider}/{model}")
 
     max_tokens = min(int(req.max_tokens or policy.max_tokens), policy.max_tokens)
+    reasoning_applied: Optional[dict] = None
+    if reasoning is not None:
+        # A reasoning level is a real per-request output budget on the
+        # frontier path too (sent as the request's max_tokens, still capped
+        # by policy) — never silently dropped. Levels are validated by the
+        # caller; resolve here is defense in depth with the same mapping.
+        from ..local_llm import (  # noqa: E402 - heavy adapter, keep lazy
+            normalize_reasoning_level,
+            resolve_reasoning_budget,
+        )
+
+        level = normalize_reasoning_level(reasoning)
+        budget = resolve_reasoning_budget(level)
+        max_tokens = min(int(budget), policy.max_tokens)
+        reasoning_applied = {"level": level, "max_tokens": max_tokens}
     est = _estimate_cost(entry, pcfg, len(eg.sanitized), max_tokens)
 
     gov = get_governor()
@@ -564,6 +669,10 @@ def run(req: ProviderRequest, cfg: Any,
                               provider=provider, model=model,
                               identity=f"{provider}/{model}")
 
+    if reasoning_applied is not None:
+        import dataclasses as _dc
+
+        req = _dc.replace(req, max_tokens=int(reasoning_applied["max_tokens"]))
     client = _frontier.FrontierClient(base_url, key, provider, model,
                                      timeout_s=min(req.timeout_s, policy.timeout_s),
                                      max_retries=policy.max_retries,
@@ -578,6 +687,8 @@ def run(req: ProviderRequest, cfg: Any,
                               message=redact_text(str(exc))[:200],
                               provider=provider, model=model,
                               identity=f"{provider}/{model}")
+    if reasoning_applied is not None:
+        res.details["reasoning_applied"] = dict(reasoning_applied)
     gov.release(provider, res.ok,
                 cost=((res.usage.cost_usd_est if res.usage else 0.0) or est)
                 if res.ok else 0.0)

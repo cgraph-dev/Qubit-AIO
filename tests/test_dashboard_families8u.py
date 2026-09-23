@@ -95,14 +95,14 @@ def _start(tmp_path):
     return ui, ui._server.server_address[1]
 
 
-def _http(port, method, path, body=None, token="test-token", hermes=False):
+def _http(port, method, path, body=None, token="test-token", qubit=False):
     import urllib.error
     import urllib.request
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
                                  method=method, data=data)
     if token:
-        req.add_header("X-Hermes-Session-Token" if hermes else "X-Api-Token",
+        req.add_header("X-Hermes-Session-Token" if qubit else "X-Api-Token",
                        token)
     if data is not None:
         req.add_header("Content-Type", "application/json")
@@ -125,9 +125,9 @@ def _raw(port, path):
     return status, loc
 
 
-def test_every_family_alias_maps_to_a_real_hermes_workspace():
-    from voicebridge import hermes_compat as HC
-    from voicebridge.webui import HERMES_ROUTE_ALIASES
+def test_every_family_alias_maps_to_a_real_qubit_workspace():
+    from voicebridge import qubit_compat as HC
+    from voicebridge.webui import QUBIT_ROUTE_ALIASES
     plugin_paths = {m["tab"]["path"] for m in HC._overlay_manifests()}
     builtin = {
         "/chat", "/sessions", "/files", "/models",
@@ -138,24 +138,24 @@ def test_every_family_alias_maps_to_a_real_hermes_workspace():
     }
     known = builtin | plugin_paths
     for alias, target in FAMILY_TARGETS.items():
-        assert HERMES_ROUTE_ALIASES.get(alias) == target, (alias, target)
+        assert QUBIT_ROUTE_ALIASES.get(alias) == target, (alias, target)
         assert target in known, (alias, target, sorted(known))
     for route in REQUIRED_ROUTES:
         if route == "/":
             continue
-        assert route in HERMES_ROUTE_ALIASES, route
+        assert route in QUBIT_ROUTE_ALIASES, route
 
 
 def test_every_normal_route_redirects_into_the_shell(tmp_path):
-    from voicebridge.webui import hermes_alias_target
+    from voicebridge.webui import qubit_alias_target
     ui, port = _start(tmp_path)
     try:
         status, loc = _raw(port, "/")
-        assert (status, loc) == (302, "/chat")
+        assert (status, loc) == (302, "/sessions")
         for route in REQUIRED_ROUTES:
             if route == "/":
                 continue
-            target = hermes_alias_target(route)
+            target = qubit_alias_target(route)
             assert target is not None, route
             status, loc = _raw(port, route)
             if target != route:
@@ -172,7 +172,7 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
     ui, port = _start(tmp_path)
     try:
         status, ctype, body = _http(port, "GET", "/agent/api/ops",
-                                    hermes=True)
+                                    qubit=True)
         assert status == 200, (status, body[:200])
         out = json.loads(body)
         assert out["count"] == len(OPS.catalog())
@@ -185,7 +185,7 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
                         candidates[0])
             status, _, body = _http(
                 port, "POST", "/agent/api/ops/run",
-                {"id": read["id"], "args": {}}, hermes=True)
+                {"id": read["id"], "args": {}}, qubit=True)
             assert status in (200, 400, 409), (group, read["id"], status)
             out2 = json.loads(body)
             assert out2.get("state") in ("executed", "failed", "refused",
@@ -194,10 +194,10 @@ def test_ops_catalog_matches_registry_and_runs(tmp_path):
             if out2.get("confirmation_id"):
                 _http(port, "POST", "/agent/api/ops/cancel",
                       {"confirmation_id": out2["confirmation_id"]},
-                      hermes=True)
+                      qubit=True)
         # unknown op is typed, never a fabricated success
         status, _, body = _http(port, "POST", "/agent/api/ops/run",
-                                {"id": "no-such-op", "args": {}}, hermes=True)
+                                {"id": "no-such-op", "args": {}}, qubit=True)
         assert status == 400
         assert json.loads(body)["code"] == "UNKNOWN_OP"
     finally:
@@ -220,7 +220,7 @@ def test_ops_api_stays_header_token_authenticated(tmp_path):
 # Browser rendering (opt-in ui mark): Hermes shell landmarks, no JS errors
 # ---------------------------------------------------------------------------
 @pytest.mark.ui
-def test_family_routes_render_hermes_shell(tmp_path_factory):
+def test_family_routes_render_qubit_shell(tmp_path_factory):
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:

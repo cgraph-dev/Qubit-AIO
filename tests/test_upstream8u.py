@@ -21,11 +21,11 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MATRIX_JSON = REPO_ROOT / "docs" / "FEATURE_MATRIX_8U.json"
-MATRIX_MD = REPO_ROOT / "docs" / "FEATURE_MATRIX_8U.md"
-UPSTREAM_REUSE = REPO_ROOT / "docs" / "UPSTREAM_REUSE.md"
+MATRIX_JSON = REPO_ROOT / "docs/archive/2026-09-21" / "FEATURE_MATRIX_8U.json"
+MATRIX_MD = REPO_ROOT / "docs/archive/2026-09-21" / "FEATURE_MATRIX_8U.md"
+UPSTREAM_REUSE = REPO_ROOT / "docs/archive/2026-09-21" / "UPSTREAM_REUSE.md"
 
-HERMES_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
+QUBIT_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
 
 @pytest.fixture()
@@ -132,7 +132,7 @@ REQUIRED_AREAS = [
 def test_matrix_json_schema_and_coverage():
     matrix = json.loads(MATRIX_JSON.read_text())
     assert matrix["schema"] == "qubit-feature-matrix/1"
-    assert matrix["upstreams"]["hermes-agent"]["commit"] == HERMES_PIN
+    assert matrix["upstreams"]["hermes-agent"]["commit"] == QUBIT_PIN
     assert matrix["upstreams"]["openclaw"]["commit"] == OPENCLAW_PIN
     for key in ("url", "tag", "license"):
         assert matrix["upstreams"]["hermes-agent"][key]
@@ -151,13 +151,13 @@ def test_matrix_json_md_parity():
     md = MATRIX_MD.read_text()
     for item in matrix["items"]:
         assert item["id"] in md, f"matrix id not in MD companion: {item['id']}"
-    assert HERMES_PIN[:7] in md and OPENCLAW_PIN[:7] in md
+    assert QUBIT_PIN[:7] in md and OPENCLAW_PIN[:7] in md
 
 
 def test_provenance_pins_recorded():
     text = UPSTREAM_REUSE.read_text()
     for pin, url in (
-            (HERMES_PIN, "https://github.com/NousResearch/hermes-agent"),
+            (QUBIT_PIN, "https://github.com/NousResearch/hermes-agent"),
             (OPENCLAW_PIN, "https://github.com/openclaw/openclaw")):
         assert pin in text, f"pin missing: {pin}"
         assert url in text, f"url missing: {url}"

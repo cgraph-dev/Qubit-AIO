@@ -4,7 +4,7 @@
 # Builds the wheel, installs it (with its declared dependencies) into a
 # throwaway venv under /tmp with a throwaway HOME, then proves the INSTALLED
 # package — never the checkout — serves the dashboard and imports the
-# vendored Hermes runtime and every console entry point.
+# vendored upstream runtime and every console entry point.
 #
 # Usage: scripts/clean_install_check.sh [--require-network]
 #
@@ -30,10 +30,10 @@ REQUIRE_NETWORK=0
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/qubit-clean-install-XXXXXX")"
 # pyproject force-includes the whole frontend/ tree (a frozen mapping) and
 # hatchling force-include does NOT honor .gitignore, so a leftover
-# frontend/hermes-web/node_modules would ship ~21.6k build-only members
+# frontend/qubit-web/node_modules would ship ~21.6k build-only members
 # (~405 MB) into the wheel. Stash it for the duration of the build and restore
 # it on exit — never delete a developer's node_modules in a gate.
-NODE_MODULES="$REPO_ROOT/frontend/hermes-web/node_modules"
+NODE_MODULES="$REPO_ROOT/frontend/qubit-web/node_modules"
 NODE_MODULES_STASH="$WORK/node_modules.stash"
 cleanup() {
   if [ -d "$NODE_MODULES_STASH" ]; then mv "$NODE_MODULES_STASH" "$NODE_MODULES"; fi
@@ -61,18 +61,18 @@ fail() { echo "FAIL: $*" >&2; exit 2; }
 SYS_PY="${PYTHON:-python3}"
 
 # ------------------------------------------------- dashboard reproducibility
-# frontend/hermes-dist is a git-ignored build artifact: a clean clone cannot
+# frontend/qubit-dist is a git-ignored build artifact: a clean clone cannot
 # ship it, so the wheel would silently install a package with no dashboard.
 # Build it deterministically here when node/npm are available; otherwise stop
 # with a typed DEGRADED (never build a dashboard-less wheel and report PASS).
-if [ ! -f "$REPO_ROOT/frontend/hermes-dist/index.html" ]; then
+if [ ! -f "$REPO_ROOT/frontend/qubit-dist/index.html" ]; then
   if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     echo "== dashboard bundle missing — building deterministically =="
     if ! "$REPO_ROOT/scripts/build_dashboard.sh" >"$WORK/dashboard-build.log" 2>&1; then
       degrade "dashboard build failed (node/npm present but build/network failed); see $WORK/dashboard-build.log"
     fi
   else
-    degrade "dashboard bundle frontend/hermes-dist missing and node/npm not found — cannot build from a clean clone; install node/npm or use a release sdist that ships the built dashboard (docs/CLEAN_CLONE_AUDIT_WAVE5.md)"
+    degrade "dashboard bundle frontend/qubit-dist missing and node/npm not found — cannot build from a clean clone; install node/npm or use a release sdist that ships the built dashboard (docs/archive/2026-09-21/CLEAN_CLONE_AUDIT_WAVE5.md)"
   fi
 fi
 
@@ -116,8 +116,8 @@ import zipfile
 
 with zipfile.ZipFile(sys.argv[1]) as z:
     names = z.namelist()
-assert any(n.endswith("_data/frontend/hermes-dist/index.html") for n in names), \
-    "wheel is missing voicebridge/_data/frontend/hermes-dist/index.html"
+assert any(n.endswith("_data/frontend/qubit-dist/index.html") for n in names), \
+    "wheel is missing voicebridge/_data/frontend/qubit-dist/index.html"
 # Force-include ignores .gitignore, so prove the build-only node_modules tree
 # never leaked into the wheel (the stash above must have worked).
 leaked = [n for n in names if "node_modules/" in n]
@@ -144,7 +144,7 @@ fi
 
 # ---------------------------------------------------------------- entry points
 echo "== console entry points =="
-for exe in qubit voicebridge qubit-dev qubit-hermes; do
+for exe in qubit voicebridge qubit-dev qubit-agent; do
   if ! "$VENV/bin/$exe" --help >"$WORK/$exe.out" 2>&1; then
     fail "entry point '$exe --help' failed: $(tail -c 300 "$WORK/$exe.out" | tr '\n' ' ')"
   fi
@@ -177,13 +177,13 @@ assert venv in pkg.parents, f"voicebridge not imported from install: {pkg}"
 # Package-data completeness: every runtime resource must resolve from the
 # installed package data, not a checkout.
 need = {
-    "frontend_dist": resources.resource_path("frontend/hermes-dist/index.html"),
-    "hermes_runtime": resources.resource_path("qubit_hermes/hermes_cli/main.py"),
+    "frontend_dist": resources.resource_path("frontend/qubit-dist/index.html"),
+    "qubit_runtime": resources.resource_path("qubit_runtime/qubit_cli/main.py"),
     "vendor_manifest": resources.resource_path(
-        "docs/QUBIT_HERMES_VENDOR_MANIFEST.json"),
+        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"),
     "config_example": resources.resource_path("config/voice.example.yaml"),
     "systemd": resources.resource_path("systemd"),
-    "migration_doc": resources.resource_path("docs/QUBIT_MIGRATION.md"),
+    "migration_doc": resources.resource_path("docs/archive/2026-09-21/QUBIT_MIGRATION.md"),
 }
 missing = [k for k, v in need.items() if not v.exists()]
 assert not missing, f"packaged resources missing: {missing}"
@@ -224,8 +224,8 @@ def raw(path, headers=None):
 
 try:
     st, loc, _ = raw("/")
-    assert (st, loc) == (302, "/chat"), (st, loc)
-    st, _, body = raw("/chat")
+    assert (st, loc) == (302, "/sessions"), (st, loc)
+    st, _, body = raw("/sessions")
     assert st == 200 and b"__HERMES_BASE_PATH__" in body, st
     assert b'__HERMES_BASE_PATH__=""' in body, "base path not root"
     asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()
@@ -241,14 +241,14 @@ finally:
     ui.stop()
 
 # Vendored runtime resolves and imports from the install.
-from voicebridge import hermes_runtime as hr
+from voicebridge import qubit_runtime as hr
 
 st = hr.status()
 assert st["present"] is True and st["importable"] is True, st
 root = pathlib.Path(hr.runtime_root()).resolve()
 assert venv in root.parents, f"runtime not under install: {root}"
 hr.ensure_path()
-import hermes_cli.main as m  # noqa: E402  (forced by ensure_path above)
+import qubit_cli.main as m  # noqa: E402  (forced by ensure_path above)
 mod = pathlib.Path(m.__file__).resolve()
 assert mod.is_relative_to(root), (mod, root)
 

@@ -11,7 +11,16 @@
     }
   },
   "instructions": [
-    "docs/OPENCODE_WORKFLOW.md"
+    "docs/README.md",
+    "docs/STATUS.md",
+    "docs/PARITY.md",
+    "docs/MIGRATION.md",
+    "docs/BRAND.md",
+    "docs/PLAN.md",
+    "docs/EXECUTION_PLAN.md",
+    "docs/CHECKLIST.md",
+    "docs/DECISIONS.md",
+    "docs/ARCHITECTURE.md"
   ],
   "compaction": {
     "auto": true,

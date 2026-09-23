@@ -1,6 +1,6 @@
 """Packet 5B: scoped SQLite/FTS5 personal-memory store.
 
-Contract adapted from the pinned Mem0 record (docs/UPSTREAM_REUSE.md R8):
+Contract adapted from the pinned Mem0 record (docs/archive/2026-09-21/UPSTREAM_REUSE.md R8):
 add/search/update/delete/history semantics with normalized-hash
 deduplication and per-record provenance. Local extensions mandated by the
 plan: core/working/recall/archive tiers, scope isolation, expiry,

@@ -215,7 +215,7 @@ def run_cycle(base: str, token: str, wav: Path,
     import errno
     import fcntl
     results = []
-    lf = open("/tmp/openclaw-dashboard-stress.lock", "w")
+    lf = open("/tmp/qubit-dashboard-stress.lock", "w")
     deadline = time.time() + max(0.0, lock_wait_s)
     got = False
     while time.time() < deadline:
@@ -266,7 +266,7 @@ def watch(interval: int, base: str, token: str, wav: Path,
                      # the first cycle — otherwise we race its model reload
     while True:
         try:
-            with open("/tmp/openclaw-dashboard-stress.lock", "w") as lf:
+            with open("/tmp/qubit-dashboard-stress.lock", "w") as lf:
                 fcntl.flock(lf, fcntl.LOCK_EX)
                 results = run_cycle(base, token, wav)
             bad = [r for r in results if not r["ok"]]

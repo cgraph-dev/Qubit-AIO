@@ -1,0 +1,27 @@
+{
+  "command": null,
+  "disposition": "OPERATOR_ONLY",
+  "expected": {},
+  "family": "provider",
+  "fixture_id": "provider.plugin.radius",
+  "hermes": {
+    "path": null,
+    "symbol": null
+  },
+  "normalizers": [],
+  "notes": "OpenClaw latest-main delta row provider.plugin.radius: Qubit mapping voicebridge/plugin_runtime.py:600 (register); held OPERATOR_ONLY pending locked product work A45 pending (product/locked): the provider-plugin kind + Radius adapter is not yet implemented. Operator hold.",
+  "openclaw": {
+    "path": "extensions/radius/package.json:8",
+    "symbol": "@openclaw/radius-provider"
+  },
+  "operator_hold": true,
+  "operator_prerequisite": "A45 pending (product/locked): the provider-plugin kind + Radius adapter is not yet implemented. Operator hold.",
+  "qubit": {
+    "approval": null,
+    "caller": "register",
+    "path": "voicebridge/plugin_runtime.py:600"
+  },
+  "request": null,
+  "schema_version": 1,
+  "transport": "rpc"
+}

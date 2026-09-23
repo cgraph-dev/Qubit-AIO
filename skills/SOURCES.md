@@ -16,6 +16,7 @@ to the snapshots: none.
 | `ui-ux-pro-max/` | `nextlevelbuilder/ui-ux-pro-max-skill`, `.claude/skills/ui-ux-pro-max` | `4aad0584d92131626b16d4ff4d77f0455385013c` | MIT repository license |
 | `bencium-controlled-ux-designer/` | `bencium/bencium-marketplace`, `bencium-controlled-ux-designer/skills/bencium-controlled-ux-designer` | `8b152ec07240cf671340b96cea6bb3442f697205` | MIT repository license |
 | `accesslint/` | `AccessLint/skills`, `plugins/accesslint/skills/{accessibility-audit,accessibility-diff,accessibility-fix,accessibility-inspect,accessibility-scan}` | `2e9d7336678302d0bc08848e92542560295b34d3` | MIT declared by `plugins/accesslint/.claude-plugin/plugin.json` |
+| `visualize/` | `openclaw/openclaw`, `skills/visualize/SKILL.md` (adapted to the Qubit `show_widget` contract; see `visualize/NOTICE`) | `43286efa75666f29030bdd9c93873410698dc79c` | MIT (Copyright (c) 2026 OpenClaw Foundation); retained in `visualize/NOTICE` |
 
 ## Deliberately not imported
 

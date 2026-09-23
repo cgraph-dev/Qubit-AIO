@@ -1,7 +1,7 @@
 """OC-48 (no-credential parts): markdown workspace memory + dreaming.
 
 The Packet 5B :class:`voicebridge.memory.store.MemoryStore` (SQLite/FTS5) is
-the structured memory authority. Upstream OpenClaw additionally offers a
+the structured memory authority. Upstream Qubit additionally offers a
 *markdown workspace* memory: agent notes in the workspace and a periodic
 "dreaming" consolidation pass. This module provides that surface locally:
 

@@ -15,7 +15,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-CHAT_PAGE = (REPO_ROOT / "frontend" / "hermes-web" / "src" / "pages"
+CHAT_PAGE = (REPO_ROOT / "frontend" / "qubit-web" / "src" / "pages"
              / "ChatPage.tsx")
 
 
@@ -25,7 +25,7 @@ def _cfg(tmp_path, monkeypatch):
         target.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(target))
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home" / ".hermes"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home" / ".hermes"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     from voicebridge.config import Config
@@ -58,7 +58,7 @@ def test_chat_page_has_typed_states_and_persistence():
 
 
 def test_backend_chat_turn_returns_a_real_brain4_reply(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = HC.dispatch(
@@ -74,7 +74,7 @@ def test_backend_chat_turn_returns_a_real_brain4_reply(tmp_path, monkeypatch):
 
 
 def test_chat_map_records_no_pty_transport():
-    doc = json.loads((REPO_ROOT / "docs" / "HERMES_FRONTEND_MAP.json")
+    doc = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json")
                      .read_text(encoding="utf-8"))
     route = doc["routes"]["/chat"]
     assert "api/qubit/chat" in route["note"]

@@ -1,7 +1,7 @@
 """Canonical model/provider profile resolver + chat integration.
 
 Covers the required first implementation slice from
-``docs/QUBIT_CURRENT_ARCHITECTURE_GAP_AUDIT_2026-09-15.md``:
+``docs/archive/2026-09-21/QUBIT_CURRENT_ARCHITECTURE_GAP_AUDIT_2026-09-15.md``:
 
 * one resolver answers "which provider/model/policy is effective" for a
   session/task role (PV-01, PV-09);
@@ -244,7 +244,7 @@ def test_chat_stream_api_profile_emits_truthful_envelope(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------- session stats
 def test_sessions_stats_does_not_raise_on_any_state(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = HC.h_sessions_stats(cfg, {}, {}, {})

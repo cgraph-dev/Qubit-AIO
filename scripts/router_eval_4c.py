@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Packet 4C evaluation: L0/L1 metrics on the HELD-OUT corpus split.
 
-Writes docs/router_4c_report.json + prints a summary. The acceptance split
+Writes docs/archive/2026-09-21/router_4c_report.json + prints a summary. The acceptance split
 is used only for L1 threshold calibration; the held-out split is scored
 exactly once for the report and never used to tune anything.
 
@@ -26,7 +26,7 @@ from voicebridge.router.l1 import SemanticRouter, load_default_routes  # noqa: E
 from voicebridge.router.pipeline import _calibration_examples  # noqa: E402
 
 CORPUS_DIR = REPO_ROOT / "benchmarks" / "corpus"
-OUT_JSON = REPO_ROOT / "docs" / "router_4c_report.json"
+OUT_JSON = REPO_ROOT / "docs/archive/2026-09-21" / "router_4c_report.json"
 
 # category -> expected route label for routing eval (None = not a routing case)
 CATEGORY_ROUTE = {

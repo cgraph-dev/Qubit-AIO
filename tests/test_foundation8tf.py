@@ -227,7 +227,7 @@ def test_uninstall_preserves_state_by_default():
 
 
 def test_provenance_pins_match_matrix():
-    matrix = json.loads((REPO_ROOT / "docs" / "FEATURE_MATRIX_8U.json").read_text())
+    matrix = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "FEATURE_MATRIX_8U.json").read_text())
     for key in ("hermes-agent", "openclaw"):
         pin = matrix["upstreams"][key]["commit"]
         assert len(pin) == 40 and all(c in "0123456789abcdef" for c in pin)

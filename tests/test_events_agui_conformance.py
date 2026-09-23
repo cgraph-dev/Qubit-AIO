@@ -2,7 +2,7 @@
 
 Each test mirrors the identically-named upstream vector in
 sdks/python/tests/test_encoder.py @ ag-ui commit
-821b8c227c6fe7b78de2c8259173dd7cbbdf181b (MIT) — see docs/UPSTREAM_REUSE.md R1.
+821b8c227c6fe7b78de2c8259173dd7cbbdf181b (MIT) — see docs/archive/2026-09-21/UPSTREAM_REUSE.md R1.
 The local adaptation is stdlib-only (dicts + explicit field specs instead of
 pydantic), so pydantic-specific assertions (model_dump_json / model_validate)
 map onto to_wire/encode_sse/from_wire round-trips.

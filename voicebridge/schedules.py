@@ -35,7 +35,7 @@ Qubit implements cron jobs, a scheduler, executions, and a ledger
 Qubit implements the user-facing scheduling contract natively with a
 narrower scope (interval/daily/once, no detached workers, no prompt
 rewriting). Provenance and the deliberate divergence are recorded in
-``docs/UPSTREAM_REUSE.md``.
+``docs/archive/2026-09-21/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 
@@ -464,18 +464,56 @@ def _check_targets(cfg: Any, targets: List[Dict[str, str]]) -> str:
     return ",".join(_target_key(t) for t in targets)
 
 
-# ------------------------------------------------------------------ CRUD
-def create(cfg: Any, name: str, task_text: str, when: str, *,
-           deliver_to: str = "", requested_by: str = "cli:user",
-           confirmed: bool = False) -> Dict[str, Any]:
-    """Stage a scheduled job (confirmation required: unattended work).
+# ------------------------------------------------------- confirmation input
+def _confirm_truthy(value: Any) -> bool:
+    """Coerce a wire ``confirm`` value (bool/str/int) to a strict bool.
 
-    ``deliver_to`` names zero or more delivery targets to receive the run's
-    bounded, redacted result: ``channel:<account>:<recipient>`` and/or
-    ``webhook:<sub_id>``, comma separated. Only configuration is stored here
-    (the reference must already exist); nothing is delivered at create time.
+    The dashboard SPA sends ``{"confirm": true}``; older/curl callers may send
+    ``"true"``/``"1"`` in a query string. Anything unrecognized is False so an
+    ambiguous value can never satisfy a confirmation gate.
     """
-    if not confirmed:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in (
+        "1", "true", "yes", "on", "confirm", "confirmed")
+
+
+def confirm_requested(body: Optional[Dict[str, Any]] = None,
+                      query: Optional[Dict[str, Any]] = None) -> bool:
+    """Read the confirmation flag from a request body OR query string.
+
+    ``DELETE`` bodies are not parsed reliably by every HTTP hop (the SPA's
+    ``/agent`` dispatcher only reads a body for POST/PUT/PATCH), so a mutating
+    route may receive the flag only in the query string. Both sources are
+    accepted; the body wins when both are present. This is the single helper
+    the route layer calls so the store's gates cannot diverge per verb.
+    """
+    for source in (body, query):
+        if isinstance(source, dict) and "confirm" in source:
+            return _confirm_truthy(source.get("confirm"))
+    return False
+
+
+# ------------------------------------------------------------------ CRUD
+def create_job(cfg: Any, name: str, task_text: str, when: str, *,
+               deliver_to: str = "", requested_by: str = "cli:user",
+               confirmed: bool = False,
+               body: Optional[Dict[str, Any]] = None,
+               query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create a scheduled job (confirmation required: unattended work).
+
+    This is the single write authority for the ``schedules.db`` store the
+    compat handlers, CLI, dashboard, and voice all read. ``deliver_to`` names
+    zero or more delivery targets to receive the run's bounded, redacted
+    result: ``channel:<account>:<recipient>`` and/or ``webhook:<sub_id>``,
+    comma separated. Only configuration is stored here (the reference must
+    already exist); nothing is delivered at create time.
+    """
+    if not (confirmed or confirm_requested(body=body, query=query)):
         raise SchedulesError(CONFIRM_CODE,
                              "scheduling unattended work requires explicit "
                              "--confirm")
@@ -506,6 +544,14 @@ def create(cfg: Any, name: str, task_text: str, when: str, *,
         conn.close()
 
 
+def create(cfg: Any, name: str, task_text: str, when: str, *,
+           deliver_to: str = "", requested_by: str = "cli:user",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Back-compat alias for :func:`create_job` (CLI/voice call site)."""
+    return create_job(cfg, name, task_text, when, deliver_to=deliver_to,
+                      requested_by=requested_by, confirmed=confirmed)
+
+
 def list_jobs(cfg: Any, *, include_disabled: bool = True,
               limit: int = 50) -> Dict[str, Any]:
     """List jobs newest-first (read-only, bounded)."""
@@ -532,8 +578,13 @@ def _get(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row:
     return row
 
 
-def show(cfg: Any, job_id: int) -> Dict[str, Any]:
-    """Show one job with its recent runs (read-only)."""
+def get_job(cfg: Any, job_id: int) -> Dict[str, Any]:
+    """Get one job (with its recent runs) from the single store.
+
+    Raises :class:`SchedulesError` ``SCHEDULES_NOT_FOUND`` for an unknown id;
+    never fabricates a job. The return envelope matches the read handlers so
+    the route layer can serve it directly.
+    """
     conn = _connect(cfg)
     try:
         _migrate(conn)
@@ -550,6 +601,11 @@ def show(cfg: Any, job_id: int) -> Dict[str, Any]:
         return {"state": "OK", "job": job}
     finally:
         conn.close()
+
+
+def show(cfg: Any, job_id: int) -> Dict[str, Any]:
+    """Back-compat alias for :func:`get_job` (CLI/dashboard read)."""
+    return get_job(cfg, job_id)
 
 
 def _set_enabled(cfg: Any, job_id: int, enabled: bool, *,
@@ -572,24 +628,49 @@ def _set_enabled(cfg: Any, job_id: int, enabled: bool, *,
         conn.close()
 
 
+def set_paused(cfg: Any, job_id: int, paused: bool, *,
+               requested_by: str = "cli:user", confirmed: bool = False,
+               body: Optional[Dict[str, Any]] = None,
+               query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Pause (``paused=True``) or resume a job in the single store.
+
+    Confirmation is required and may arrive in the explicit ``confirmed``
+    argument or in the request ``body``/``query`` (both are accepted so the
+    route layer never has to special-case a verb). The enabled-state transition
+    and its audit receipt are the same as the CLI/voice path.
+    """
+    return _set_enabled(
+        cfg, job_id, not paused, requested_by=requested_by,
+        confirmed=bool(confirmed or confirm_requested(body=body, query=query)),
+        op="pause" if paused else "resume")
+
+
 def pause(cfg: Any, job_id: int, *, requested_by: str = "cli:user",
           confirmed: bool = False) -> Dict[str, Any]:
-    """Pause a job (confirmation required)."""
-    return _set_enabled(cfg, job_id, False, requested_by=requested_by,
-                        confirmed=confirmed, op="pause")
+    """Back-compat alias: pause a job (confirmation required)."""
+    return set_paused(cfg, job_id, True, requested_by=requested_by,
+                      confirmed=confirmed)
 
 
 def resume(cfg: Any, job_id: int, *, requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
-    """Resume a job (confirmation required)."""
-    return _set_enabled(cfg, job_id, True, requested_by=requested_by,
-                        confirmed=confirmed, op="resume")
+    """Back-compat alias: resume a job (confirmation required)."""
+    return set_paused(cfg, job_id, False, requested_by=requested_by,
+                      confirmed=confirmed)
 
 
-def delete(cfg: Any, job_id: int, *, requested_by: str = "cli:user",
-           confirmed: bool = False) -> Dict[str, Any]:
-    """Delete a job (confirmation required); run history is retained."""
-    if not confirmed:
+def delete_job(cfg: Any, job_id: int, *, requested_by: str = "cli:user",
+               confirmed: bool = False,
+               body: Optional[Dict[str, Any]] = None,
+               query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Delete a job from the single store; run history is retained.
+
+    Confirmation is required. The flag is read from the explicit argument, the
+    request ``body``, OR the request ``query`` -- the SPA's ``/agent``
+    dispatcher does not parse a DELETE body, so a query ``?confirm=true`` must
+    be honored identically to a JSON body ``{"confirm": true}``.
+    """
+    if not (confirmed or confirm_requested(body=body, query=query)):
         raise SchedulesError(CONFIRM_CODE,
                              "schedule delete requires explicit --confirm")
     conn = _connect(cfg)
@@ -604,6 +685,13 @@ def delete(cfg: Any, job_id: int, *, requested_by: str = "cli:user",
                 "history_retained": True}
     finally:
         conn.close()
+
+
+def delete(cfg: Any, job_id: int, *, requested_by: str = "cli:user",
+           confirmed: bool = False) -> Dict[str, Any]:
+    """Back-compat alias for :func:`delete_job` (CLI/voice/route call site)."""
+    return delete_job(cfg, job_id, requested_by=requested_by,
+                      confirmed=confirmed)
 
 
 def history(cfg: Any, job_id: int = 0, limit: int = 30) -> Dict[str, Any]:
@@ -875,36 +963,67 @@ def delivery_history(cfg: Any, job_id: int = 0,
 
 
 # --------------------------------------------------------------- execution
+def _contract_dispatch(cfg: Any, task_text: str, *, session: str,
+                       directive: bool,
+                       now: Optional[float] = None) -> Dict[str, Any]:
+    """Route one scheduled job through the canonical operation contract.
+
+    Every scheduled/automation dispatch funnels through
+    :func:`voicebridge.dashboard_ops.run_op` (op ``schedule_dispatch``) — the
+    same one-operation broker the CLI, dashboard, and voice use — instead of a
+    private executor. The user pre-authorized the job when the confirmed
+    schedule was created, so the monitor actor settles the staged confirmation
+    through the shared journal; the op then runs the exact backend. Failures
+    are typed and never fabricated.
+    """
+    from . import dashboard_ops as OPS
+
+    payload: Dict[str, Any] = {
+        "task_text": str(task_text or ""),
+        "session": str(session or ""),
+        "directive": "true" if directive else "false",
+    }
+    if now is not None:
+        payload["now"] = str(float(now))
+    try:
+        out = OPS.run_op(cfg, "schedule_dispatch", payload,
+                         actor=MONITOR_ACTOR, session=session)
+        if out.get("state") == "needs-confirm" and out.get("confirmation_id"):
+            out = OPS.confirm_op(cfg, out["confirmation_id"],
+                                 actor=MONITOR_ACTOR, session=session)
+    except Exception as exc:  # noqa: BLE001 — fail closed, typed
+        return {"state": "UNAVAILABLE", "code": "DISPATCH_ERROR",
+                "detail": str(exc)[:200]}
+    if out.get("state") == "executed":
+        result = (out.get("receipt") or {}).get("result")
+        if isinstance(result, dict):
+            return result
+        return {"state": "OK", "code": "OK", "detail": str(result)[:300]}
+    return {"state": "UNAVAILABLE",
+            "code": str(out.get("code")
+                        or "SCHEDULE_DISPATCH_UNAVAILABLE"),
+            "detail": str(out.get("detail") or out.get("speech") or "")[:200]}
+
+
 def _default_executor(task_text: str, *, session: str,
                       estop_engaged: Callable[[], bool],
                       cfg: Any = None) -> Dict[str, Any]:
     """Dispatch one due job through the canonical Qubit operation path.
 
     When a ``cfg`` is supplied (all real callers), the job runs through
-    :func:`voicebridge.chat_transport.turn` so the selected model/provider
-    profile, resolver, gateway policy, and one session store are honored —
-    the same path CLI/dashboard/voice use. A direct ``agent.turn`` is used
-    only for the legacy no-config test seam. Typed unavailable states, never
-    fake OK."""
+    :func:`voicebridge.dashboard_ops.run_op` (op ``schedule_dispatch``) so the
+    selected model/provider profile, resolver, gateway policy, and one session
+    store are honored — the same contract CLI/dashboard/voice use. A direct
+    ``agent.turn`` is used only for the legacy no-config test seam. Typed
+    unavailable states, never fake OK."""
     from .agent import AgentDenied, turn as agent_turn
 
     if estop_engaged():
         return {"state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
                 "detail": "emergency stop latched"}
     if cfg is not None:
-        try:
-            from . import chat_transport as CT
-            res = CT.turn(cfg, task_text, session=session, role="coding")
-        except Exception as exc:  # noqa: BLE001 — fail closed, typed
-            return {"state": "UNAVAILABLE", "code": "AGENT_ERROR",
-                    "detail": str(exc)[:200]}
-        if not isinstance(res, dict) or not res.get("ok"):
-            return {"state": "UNAVAILABLE",
-                    "code": str((res or {}).get("code", "AGENT_ERROR")),
-                    "detail": str((res or {}).get("detail")
-                                  or (res or {}).get("error", ""))[:200]}
-        return {"state": "OK", "code": "OK",
-                "detail": str(res.get("reply", ""))[:300]}
+        return _contract_dispatch(cfg, task_text, session=session,
+                                  directive=False)
     try:
         res = agent_turn(None, task_text, session=session,
                          estop_engaged=estop_engaged)
@@ -935,25 +1054,35 @@ def _directive_task(task_text: Any) -> bool:
 def _run_automation_directive(cfg: Any, task_text: str, *,
                               estop_engaged: Callable[[], bool],
                               now: Optional[float]) -> Dict[str, Any]:
-    """Dispatch a scheduled automation directive (fail-closed, never raises)."""
-    from .automation import run_directive
+    """Dispatch a scheduled automation directive through the operation contract.
 
-    out = run_directive(cfg, task_text, estop=estop_engaged, now=now,
-                        requested_by=MONITOR_ACTOR)
-    if not isinstance(out, dict):
-        return {"state": "FAILED", "code": RUNTIME_CODE,
-                "detail": "automation directive produced no result"}
-    return out
+    Routes through :func:`voicebridge.dashboard_ops.run_op` (op
+    ``schedule_dispatch``, directive form) so the one scheduler uses the same
+    canonical broker/dispatcher as every other surface. The confirmed job is
+    the user's pre-authorization; fail-closed and never raises.
+    """
+    if estop_engaged():
+        return {"state": "UNAVAILABLE", "code": "EMERGENCY_STOP",
+                "detail": "emergency stop latched"}
+    return _contract_dispatch(cfg, task_text, session=MONITOR_ACTOR,
+                              directive=True, now=now)
 
 
 def run_due(cfg: Any, *, requested_by: str = "cli:user",
             executor: Optional[Callable[..., Dict[str, Any]]] = None,
             now: Optional[float] = None,
             estop_engaged: Optional[Callable[[], bool]] = None,
-            limit: int = 10) -> Dict[str, Any]:
+            limit: int = 10, only_job_id: int = 0,
+            force: bool = False) -> Dict[str, Any]:
     """Execute due jobs oldest-first (bounded). Each job result is a typed
     state recorded in history; a failing job never blocks later jobs, and
-    nothing is fabricated when the runtime is unprovisioned."""
+    nothing is fabricated when the runtime is unprovisioned.
+
+    ``only_job_id`` narrows the pass to one job (``0`` = every due job) and
+    ``force`` ignores the due/enabled predicates so an operator request can
+    run one job immediately. Both are used by :func:`trigger`; the default
+    (``0``/False) is the unchanged autonomous/monitor behavior.
+    """
     from .plugins import estop_engaged as _engaged
 
     moment = now if now is not None else _now()
@@ -970,12 +1099,22 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
         # (BEGIN IMMEDIATE serializes concurrent run-due callers; the
         # last_run_at compare-and-swap is the lease).
         conn.execute("BEGIN IMMEDIATE")
-        rows = conn.execute(
-            "SELECT * FROM jobs WHERE enabled=1 ORDER BY id").fetchall()
+        if only_job_id:
+            if force:
+                rows = conn.execute(
+                    "SELECT * FROM jobs WHERE id=?",
+                    (int(only_job_id),)).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM jobs WHERE id=? AND enabled=1",
+                    (int(only_job_id),)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM jobs WHERE enabled=1 ORDER BY id").fetchall()
         claimed: List[Dict[str, Any]] = []
         for row in rows:
             job = _job_dict(row)
-            if not _due(job, moment):
+            if not force and not _due(job, moment):
                 continue
             if len(claimed) >= max(1, min(int(limit or 10), 25)):
                 break
@@ -1036,6 +1175,29 @@ def run_due(cfg: Any, *, requested_by: str = "cli:user",
                 "catch_up": sum(int(r.get("catch_up", 0)) for r in results)}
     finally:
         conn.close()
+
+
+def trigger(cfg: Any, job_id: int = 0, *, requested_by: str = "cli:user",
+            executor: Optional[Callable[..., Dict[str, Any]]] = None,
+            now: Optional[float] = None,
+            estop_engaged: Optional[Callable[[], bool]] = None,
+            limit: int = 10) -> Dict[str, Any]:
+    """Run one job now (or every due job when ``job_id`` is 0).
+
+    A targeted trigger verifies the job exists in the single store (typed
+    ``SCHEDULES_NOT_FOUND`` otherwise) and forces one execution regardless of
+    its schedule/enabled state; the run still records a normal history row and
+    is estop-aware. ``job_id=0`` preserves the historical global ``run_due``
+    behavior the dashboard trigger used. The result envelope matches
+    :func:`run_due`.
+    """
+    if not job_id:
+        return run_due(cfg, requested_by=requested_by, executor=executor,
+                       now=now, estop_engaged=estop_engaged, limit=limit)
+    get_job(cfg, job_id)  # typed NOT_FOUND before any claim
+    return run_due(cfg, requested_by=requested_by, executor=executor,
+                   now=now, estop_engaged=estop_engaged, limit=limit,
+                   only_job_id=int(job_id), force=True)
 
 
 def scheduler_status(cfg: Any, *, now: Optional[float] = None) -> Dict[str, Any]:

@@ -1,6 +1,6 @@
 """Qubit media generation: image / music / video / speech adapters (typed).
 
-OpenClaw ships provider-backed media generation under ``src/image-generation``,
+Qubit ships provider-backed media generation under ``src/image-generation``,
 ``src/music-generation``, ``src/video-generation`` and the shared
 ``src/media-generation`` registry. Qubit implements the code-side contract the
 same way it implements messaging transports: the registry, request shaping and
@@ -64,7 +64,7 @@ UNAVAILABLE_CODE = "MEDIA_GEN_UNAVAILABLE"
 BAD_INPUT_CODE = "MEDIA_BAD_INPUT"
 UPSTREAM_CODE = "MEDIA_UPSTREAM"
 
-# Kinds are the OpenClaw media-generation surface plus the overlapping speech.
+# Kinds are the Qubit media-generation surface plus the overlapping speech.
 KINDS = ("image", "music", "video", "speech")
 
 KIND_META: Dict[str, Dict[str, Any]] = {

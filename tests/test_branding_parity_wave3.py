@@ -11,7 +11,7 @@ and by validating the Qubit overlay / vendor provenance:
 4. dashboard shell title/nav + served SPA + the built bundle;
 5. the overlay theme + plugin manifests/bundles;
 6. the minimal Qubit HTML pages and setup/support docs;
-7. ``docs/HERMES_SOURCE_COMPARISON.json`` vendor + overlay hashes;
+7. ``docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json`` vendor + overlay hashes;
 8. the served Qubit theme carries the full visual identity (colors, fonts,
    spacing, responsive layout, accessibility, motion, and the loading /
    empty / degraded / approval / cancellation / recovery states).
@@ -19,7 +19,7 @@ and by validating the Qubit overlay / vendor provenance:
 Upstream names may survive only in legal/attribution/provenance/
 source-comparison/migration/compat/developer records. Every permitted
 survivor is enumerated in ``ALLOWED_SURFACE_PHRASES`` and classified with a
-file:line in ``docs/BRANDING_AUDIT_WAVE3.md``.
+file:line in ``docs/archive/2026-09-21/BRANDING_AUDIT_WAVE3.md``.
 """
 from __future__ import annotations
 
@@ -36,13 +36,32 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-OVERLAY = REPO_ROOT / "frontend" / "hermes-qubit"
+OVERLAY = REPO_ROOT / "frontend" / "qubit-app"
 THEME = OVERLAY / "qubit-theme.json"
 COMPLETIONS = REPO_ROOT / "voicebridge" / "_data" / "completions"
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
-MANIFEST = REPO_ROOT / "docs" / "HERMES_SOURCE_COMPARISON.json"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
+MANIFEST = REPO_ROOT / "docs/generated" / "HERMES_SOURCE_COMPARISON.json"
 
 _UPSTREAM = re.compile(r"\bHermes\b|\bOpenClaw\b")
+
+# Required legal / provenance attribution. Upstream-derived material ships
+# with copyright and licence notices the MIT terms require to be retained
+# (THIRD_PARTY_NOTICES.md, docs/archive/2026-09-21/LICENSING.md, docs/archive/2026-09-21/UPSTREAM_REUSE.md). The
+# frozen identity promise permits "required legal attribution, provenance,
+# comparison fixtures, and migration compatibility records" to keep those
+# names. Every entry below is the copyright holder (an entity, never the
+# product) or the exact licence notice naming it -- no user-facing product
+# string is allowlisted here.
+LEGAL_ATTRIBUTION_PHRASES = [
+    "MIT (OpenClaw Foundation); see THIRD_PARTY_NOTICES.md",
+    "MIT License, Copyright (c) 2025 Nous Research",
+    "Copyright (c) 2025 Nous Research",
+    "Copyright (c) 2026 OpenClaw Foundation",
+    "https://github.com/NousResearch/hermes-agent",
+    "https://github.com/openclaw/openclaw",
+    "OpenClaw Foundation",
+    "Nous Research",
+]
 
 # Substrings that legitimately keep an upstream name. Each is a
 # migration/compat/developer record, not normal product identity:
@@ -56,6 +75,7 @@ _UPSTREAM = re.compile(r"\bHermes\b|\bOpenClaw\b")
 #   * "no Hermes gateway process" / "Hermes WebSocket dialect ... not served"
 #                                   -> typed compat refusal details
 #   * "in-process Hermes backend"   -> egress-guard developer diagnostics
+#   * LEGAL_ATTRIBUTION_PHRASES     -> required copyright/licence notices
 ALLOWED_SURFACE_PHRASES = [
     "X-Hermes-Session-Token",
     "never dispatch to OpenClaw; only speak the plan",
@@ -69,6 +89,7 @@ ALLOWED_SURFACE_PHRASES = [
     "Hermes WebSocket dialect is not served",
     "Hermes tui_gateway WS dialect is not served",
     "in-process Hermes backend",
+    *LEGAL_ATTRIBUTION_PHRASES,
 ]
 
 # Bundle identifiers/globals that are wire protocol or developer API, not
@@ -229,8 +250,8 @@ def test_minimal_frontend_pages_are_qubit_branded():
 
 
 def test_support_docs_are_qubit_branded():
-    for rel in ("README.md", "docs/AUDIO_SETUP.md",
-                "docs/VOICE_BRIDGE_SYSTEM.md", "docs/HowTo.md"):
+    for rel in ("README.md", "docs/archive/2026-09-21/AUDIO_SETUP.md",
+                "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md", "docs/archive/2026-09-21/HowTo.md"):
         text = (REPO_ROOT / rel).read_text(encoding="utf-8")
         residual = _residual(text)
         assert not residual, f"{rel}: support doc names upstream {residual}"
@@ -289,7 +310,7 @@ def test_served_spa_shell_and_plugins_are_qubit_branded(tmp_path):
         plugins = json.loads(body)
         if isinstance(plugins, dict):
             plugins = plugins.get("plugins", [])
-        assert len(plugins) == 11, plugins
+        assert len(plugins) == 10, plugins
         for man in plugins:
             blob = f'{man.get("label", "")} {man.get("description", "")}'
             assert not _residual(blob), (man.get("name"), blob)
@@ -300,7 +321,7 @@ def test_served_spa_shell_and_plugins_are_qubit_branded(tmp_path):
 def test_built_spa_bundle_is_qubit_branded():
     index = DIST / "index.html"
     if not index.is_file():
-        pytest.skip("frontend/hermes-dist not built in this checkout")
+        pytest.skip("frontend/qubit-dist not built in this checkout")
     html = index.read_text(encoding="utf-8")
     assert "<title>Qubit Agent" in html, html[:200]
 
@@ -328,7 +349,7 @@ def test_spa_shipped_fleet_bundles_are_qubit_branded():
     SPA (`public/plugins` -> `dist/plugins`), so their rendered text is a
     normal product-facing surface. Comments and wire/cookie identifiers are
     not product text; everything else must read as Qubit."""
-    roots = [REPO_ROOT / "frontend" / "hermes-web" / "public" / "plugins",
+    roots = [REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins",
              DIST / "plugins"]
     seen = 0
     hits = []
@@ -400,14 +421,14 @@ def test_overlay_manifest_hashes_are_valid():
     assert disk == set(listed), \
         f"overlay manifest drift missing={disk - set(listed)} " \
         f"extra={set(listed) - disk}"
-    assert listed["frontend/hermes-qubit/qubit-theme.json"]
+    assert listed["frontend/qubit-app/qubit-theme.json"]
 
 
 # ---------------------------------------------------------------------------
 # 6. Served Qubit theme = full visual identity
 # ---------------------------------------------------------------------------
 def test_served_theme_carries_full_visual_identity(tmp_path):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge.config import Config
 
     state = tmp_path / "state"

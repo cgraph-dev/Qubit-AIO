@@ -45,7 +45,7 @@ def _stub_chat_local(monkeypatch, reply="stub chat reply"):
 
     def _fake_stream(text, conversation_prompt="", model="qubit-brain4",
                      timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
-                     should_stop=None, num_ctx=None):
+                     should_stop=None, num_ctx=None, reasoning=None):
         stream_calls.append({"text": text, "model": model})
         for sentence in (reply,):
             if on_sentence:
@@ -254,7 +254,7 @@ def test_stream_turn_emits_real_deltas_and_persists(tmp_path, monkeypatch):
 
     def _fake_stream(text, conversation_prompt="", model="qubit-brain4",
                      timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
-                     should_stop=None, num_ctx=None):
+                     should_stop=None, num_ctx=None, reasoning=None):
         for sentence in ("Hello.", " World."):
             if on_sentence:
                 on_sentence(sentence)
@@ -297,7 +297,8 @@ def test_stream_sse_frames_are_typed(tmp_path, monkeypatch):
         _llm, "chat_local_stream",
         lambda text, conversation_prompt="", model="qubit-brain4", timeout_s=4.0,
         max_tokens=100, context="", on_sentence=None, should_stop=None,
-        num_ctx=None: (on_sentence and on_sentence("Done."), "Done.")[1])
+        num_ctx=None, reasoning=None: (on_sentence and on_sentence("Done."),
+                                       "Done.")[1])
     frames = list(CT.stream_sse(cfg, "x", session="sse"))
     assert frames[0].startswith("event: start\ndata: ")
     assert any(f.startswith("event: delta\ndata: ") for f in frames)
@@ -376,3 +377,54 @@ def test_pty_feed_assembles_keystrokes_across_frames(tmp_path, monkeypatch):
     assert frame["ok"] is True
     assert b"frame reply" in base64.b64decode(frame["output"])
     assert CT.store(cfg).show("pty-2")["messages"][-1]["content"] == "frame reply"
+
+
+# ------------------------------------------------- S5 activity projection hook
+def test_turn_records_session_activity_summary(tmp_path, monkeypatch):
+    from voicebridge import chat_transport as CT
+    from voicebridge import session_activity as SA
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _stub_chat_local(monkeypatch, "the answer is 4")
+    res = CT.turn(cfg, "what is 2+2", session="act")
+    assert res["ok"] is True, res
+
+    acts = SA.store(cfg).list("act")
+    assert acts["total"] == 1
+    event = acts["events"][0]
+    assert event["kind"] == "summary"
+    assert event["detail"] == "the answer is 4"
+
+
+def test_stream_turn_records_session_activity_summary(tmp_path, monkeypatch):
+    from voicebridge import chat_transport as CT
+    from voicebridge import session_activity as SA
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    import voicebridge.local_llm as _llm
+
+    def _fake_stream(text, conversation_prompt="", model="qubit-brain4",
+                     timeout_s=4.0, max_tokens=100, context="", on_sentence=None,
+                     should_stop=None, num_ctx=None, reasoning=None):
+        if on_sentence:
+            on_sentence("Streamed answer.")
+        return "Streamed answer."
+
+    monkeypatch.setattr(_llm, "chat_local_stream", _fake_stream)
+    events = list(CT.stream_turn(cfg, "q", session="sact"))
+    assert events[-1]["event"] == "done", events
+
+    acts = SA.store(cfg).list("sact")
+    assert acts["total"] == 1
+    assert acts["events"][0]["detail"] == "Streamed answer."
+
+
+def test_failed_turn_records_no_activity(tmp_path, monkeypatch):
+    from voicebridge import chat_transport as CT
+    from voicebridge import session_activity as SA
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _stub_chat_local(monkeypatch, "")
+    res = CT.turn(cfg, "hi", session="noact")
+    assert res["ok"] is False
+    assert SA.store(cfg).list("noact")["total"] == 0

@@ -151,7 +151,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         " created_at REAL NOT NULL);"
         "CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);")
     # Additive-only: remembers the status a task held before it was archived so
-    # a later restore returns it there (OpenClaw workboard "Restore from
+    # a later restore returns it there (Qubit workboard "Restore from
     # archive" parity) instead of silently resetting to ``open``.
     _ensure_column(conn, "tasks", "archived_from", "TEXT")
 
@@ -589,7 +589,7 @@ def archive_task(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
 
 def restore_task(cfg: Any, task_id: int, *, requested_by: str = "cli:user",
                  confirmed: bool = False) -> Dict[str, Any]:
-    """Restore an archived task (OpenClaw workboard "Restore from archive").
+    """Restore an archived task (Qubit workboard "Restore from archive").
 
     Returns the task to the exact status it held before archiving when the
     store recorded it, else to ``open``. Non-archived tasks are a typed state
@@ -917,14 +917,36 @@ def import_snapshot(cfg: Any, snapshot: Dict[str, Any], *,
         conn.close()
 
 
+#: Vendored Qubit kanban write surfaces (the upstream plugin's own verbs).
+#: Any request naming one of these boards/tasks mutations is answered by the
+#: single in-process board-write boundary ``kanban_bridge.vendored_write`` —
+#: the production caller that keeps the vendored store read-only everywhere,
+#: not just at the dashboard route layer.
+VENDORED_WRITE_SUBCOMMANDS = frozenset({
+    "tasks", "task", "boards", "board", "profiles", "profile",
+    "orchestration",
+})
+
+
 def refuse_delegated(subcommand: str) -> Dict[str, Any]:
     """Typed delegation notice for execution-shaped subcommands.
 
     Nothing is ever started here: each known subcommand names the Qubit
     authority that owns it. An unknown subcommand returns the same typed
     ``KANBAN_DELEGATED`` state (never an untyped ``KeyError``) and lists the
-    known set so CLI and dashboard dispatch stay equivalent."""
+    known set so CLI and dashboard dispatch stay equivalent.
+
+    A vendored-store write verb (``tasks``/``boards``/``orchestration``/…) is
+    answered by :func:`voicebridge.kanban_bridge.vendored_write` with the
+    single ``KANBAN_WRITE_BROKERED`` refusal, so an in-process caller can never
+    mutate the read-only legacy store by reaching it directly."""
     name = str(subcommand or "").strip()
+    if name in VENDORED_WRITE_SUBCOMMANDS:
+        from . import kanban_bridge as KBG
+
+        refusal = KBG.vendored_write(name, board="")
+        refusal["state"] = "REFUSED"
+        return refusal
     reason = DELEGATED.get(name)
     if reason is None:
         return {"state": "DELEGATED", "code": DELEGATED_CODE,

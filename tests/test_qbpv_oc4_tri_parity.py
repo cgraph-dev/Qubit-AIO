@@ -79,7 +79,10 @@ def test_no_voice_ops_name_a_real_guard():
     from voicebridge import dashboard_ops as OPS
     from voicebridge import voice_commands as VC
 
-    registry = set(VC.REGISTRY)
+    # Both voice registries are real: the general REGISTRY and the
+    # MODEL_PROFILE_REGISTRY (which holds speech_profile_test and the profile
+    # lifecycle commands).
+    registry = set(VC.REGISTRY) | set(VC.MODEL_PROFILE_REGISTRY)
     gaps = []
     for item in OPS.catalog():
         if "voice" in item["interfaces"]:

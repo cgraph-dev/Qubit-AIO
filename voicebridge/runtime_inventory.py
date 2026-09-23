@@ -45,6 +45,13 @@ def _voice(cfg: Any) -> Dict[str, Any]:
     get = (lambda *p, default=None: cfg.get(*p, default=default)) \
         if hasattr(cfg, "get") else (lambda *p, default=None: default)
     asr = cfg.section("asr") if hasattr(cfg, "section") else {}
+    # PRA-08: surface any explicit speech-profile resolve/executability failure
+    # recorded by the orchestrator, so CLI/dashboard/voice status report it.
+    try:
+        from .providers import speech as _sp
+        profile_errors = _sp.resolution_errors()
+    except Exception:
+        profile_errors = {}
     return {"asr_provider": str(asr.get("provider", "sherpa")
                                 if isinstance(asr, dict) else "sherpa"),
             "asr_engine": str(asr.get("engine", "moonshine")
@@ -52,6 +59,7 @@ def _voice(cfg: Any) -> Dict[str, Any]:
             "tts_provider": str(get("tts", "provider", default="piper")),
             "tts_voice": str(get("tts", "voice", default="en_US-amy-medium")),
             "hotkey": str(get("hotkey", "hold_key", default="ctrl_r")),
+            "profile_errors": profile_errors,
             "dashboard_voice": "webui talk/type intake"}
 
 

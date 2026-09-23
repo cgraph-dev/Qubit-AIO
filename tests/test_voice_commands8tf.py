@@ -37,9 +37,9 @@ def _ctx(cfg, session="voice", source="user"):
 def test_registry_covers_every_implemented_row():
     from voicebridge import voice_commands as VC
 
-    par = json.loads((Path(VC.__file__).resolve().parents[1] / "docs" /
+    par = json.loads((Path(VC.__file__).resolve().parents[1] / "docs/archive/2026-09-21" /
                       "PARITY_HERMES.json").read_text())
-    mat = json.loads((Path(VC.__file__).resolve().parents[1] / "docs" /
+    mat = json.loads((Path(VC.__file__).resolve().parents[1] / "docs/archive/2026-09-21" /
                       "MATRIX_8T_F.json").read_text())
     covered = set()
     for entry in VC.REGISTRY.values():
@@ -217,6 +217,9 @@ COMPLETE_EXAMPLES = {
     "session_archive": "qubit, archive session 12",
     "session_delete": "qubit, delete session 12",
     "session_resume": "qubit, resume session 12",
+    "chat_sessions": "qubit, list my chats",
+    "chat_session_show": "qubit, show chat session abc123",
+    "chat_session_search": "qubit, search my chats invoice",
     "capability": "qubit, is whatsapp available",
     "capabilities_list": "qubit, show available capabilities",
     "checkpoints_list": "qubit, list checkpoints",
@@ -226,6 +229,7 @@ COMPLETE_EXAMPLES = {
     "auth_verify": "qubit, is xai configured",
     "auth_logout": "qubit, logout check",
     "mcp": "qubit, list mcp servers",
+    "mcp_invoke": "qubit, call mcp tool cgraph-graft search",
     "worker": "qubit, worker status",
     "memory_search": "qubit, what do you remember about invoices",
     "memory_remember": "qubit, remember the gate code",
@@ -691,6 +695,28 @@ COMPLETE_EXAMPLES = {
     "autonomy_resume": "qubit, resume autonomy nightly",
     "autonomy_revoke": "qubit, revoke autonomy nightly",
     "autonomy_expire": "qubit, expire autonomy profiles",
+    # S8 bounded desktop/browser metadata ops (A38/A39)
+    "computer_ops": "qubit, list desktop operations",
+    "computer_launch": "qubit, launch app browser",
+    "computer_pip": "qubit, picture in picture",
+    "computer_present": "qubit, present the screen",
+    "computer_presentation_status": "qubit, presentation status",
+    "browser_favicon": "qubit, get the page icon",
+    "browser_favicon_cache": "qubit, list favicon cache",
+    "browser_download": "qubit, download this page to /tmp/page.html",
+    # S9 plugin runtime catalog/install + bundled skills
+    "plugins_catalog": "qubit, show plugin catalog",
+    "plugins_runtime_install": "qubit, install plugin runtime acme",
+    "verified_bundled": "qubit, list bundled skills",
+    # PRB-05 speech-profile lifecycle (main registry, canonical resolver).
+    "speech_profile_list": "qubit, list speech profiles",
+    "speech_profile_show": "qubit, show speech profile",
+    "speech_profile_test": "qubit, test my speech profile",
+    "speech_profile_create": "qubit, create a speech profile",
+    "speech_profile_clone": "qubit, clone speech profile",
+    "speech_profile_remove": "qubit, remove speech profile",
+    "speech_profile_select": "qubit, select speech profile for this session",
+    "speech_profile_clear": "qubit, clear session speech",
 }
 
 

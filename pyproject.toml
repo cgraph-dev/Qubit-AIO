@@ -38,11 +38,11 @@ dependencies = [
     "onnx>=1.14",             # Parakeet ONNX metadata patcher (scripts/install.sh) + guarded sherpa fallback
     "playwright>=1.49",       # browser inbox reader (Gmail/IG/FB/TikTok via persistent profiles)
 
-    # --- Qubit-owned Hermes runtime (vendored fork in qubit_hermes/) ---------
+    # --- Qubit-owned runtime (vendored fork in qubit_runtime/) ----------------
     # The product's agent loop/CLI/dashboard execute from the vendored fork
-    # (docs/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). These are the
-    # pinned upstream core dependencies (qubit_hermes/pyproject.toml), declared
-    # here so a clean install runs the runtime with no external Hermes.
+    # (docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11_HERMES_RUNTIME.md). These are the
+    # pinned upstream core dependencies (qubit_runtime/pyproject.toml), declared
+    # here so a clean install runs the runtime with no external upstream install.
     "openai==2.24.0",
     "certifi==2026.5.20",
     "python-dotenv==1.2.2",
@@ -85,9 +85,9 @@ test = ["pytest>=8"]
 qubit = "voicebridge.cli:main"
 voicebridge = "voicebridge.cli:main"
 qubit-dev = "voicebridge.terminal:main"
-# Direct launcher for the vendored Qubit-owned Hermes runtime (same backend the
-# `qubit hermes …` subcommand and the dashboard dispatch to).
-qubit-hermes = "voicebridge.hermes_runtime:entry"
+# Direct launcher for the vendored Qubit-owned runtime (same backend the
+# `qubit agent …` subcommand and the dashboard dispatch to).
+qubit-agent = "voicebridge.qubit_runtime:entry"
 
 [build-system]
 requires = ["hatchling"]
@@ -95,22 +95,22 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["voicebridge"]
-# The built Hermes dashboard (frontend/hermes-dist) is generated from
-# frontend/hermes-web with `npm run build` (see frontend/hermes-qubit/
+# The built Qubit dashboard (frontend/qubit-dist) is generated from
+# frontend/qubit-web with `npm run build` (see frontend/qubit-app/
 # README.md and scripts/build_dashboard.sh). It is a build artifact, so it
 # is listed under `artifacts` (hatchling only ships VCS-ignored paths when
 # they are declared here) — a clean wheel install then serves the real
 # dashboard without any checkout or untracked file.
 #
 # Reproducibility (Wave 5): a clean git clone does NOT contain
-# frontend/hermes-dist (it is git-ignored), so a wheel/sdist built from a bare
+# frontend/qubit-dist (it is git-ignored), so a wheel/sdist built from a bare
 # clone is dashboard-less. scripts/install.sh and scripts/clean_install_check.sh
 # therefore build it deterministically when node/npm are available and fail
 # with a TYPED degradation otherwise; scripts/release_qualify.py rejects a
 # dashboard-less artifact. The release sdist (built from a tree that already
-# carries frontend/hermes-dist) ships the bundle, so downstream wheel rebuilds
+# carries frontend/qubit-dist) ships the bundle, so downstream wheel rebuilds
 # need no npm. See docs/CLEAN_CLONE_AUDIT_WAVE5.md.
-artifacts = ["frontend/hermes-dist"]
+artifacts = ["frontend/qubit-dist"]
 
 # The wheel force-includes the frontend tree for the packaged dashboard.
 # Hatchling `exclude` does not filter `force-include`, so a custom build hook
@@ -139,92 +139,100 @@ path = "scripts/hatch_build_qubit.py"
 "config/voice.example.yaml" = "voicebridge/_data/config/voice.example.yaml"
 # curated user guide for the dashboard /docs page (no secrets, no
 # machine-specific paths; secret-scanned like the rest of the tree).
-"docs/HowTo.md" = "voicebridge/_data/docs/HowTo.md"
-"docs/AUDIO_SETUP.md" = "voicebridge/_data/docs/AUDIO_SETUP.md"
-"docs/VOICE_BRIDGE_SYSTEM.md" = "voicebridge/_data/docs/VOICE_BRIDGE_SYSTEM.md"
-"docs/QUBIT_MIGRATION.md" = "voicebridge/_data/docs/QUBIT_MIGRATION.md"
+# The docs reorg (2026-09-21) moved the source docs under
+# docs/archive/2026-09-21/; the installed resource names/destinations are
+# unchanged so voicebridge/resources.py and install-time readers keep working.
+"docs/archive/2026-09-21/HowTo.md" = "voicebridge/_data/docs/HowTo.md"
+"docs/archive/2026-09-21/AUDIO_SETUP.md" = "voicebridge/_data/docs/AUDIO_SETUP.md"
+"docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md" = "voicebridge/_data/docs/VOICE_BRIDGE_SYSTEM.md"
+"docs/archive/2026-09-21/QUBIT_MIGRATION.md" = "voicebridge/_data/docs/archive/2026-09-21/QUBIT_MIGRATION.md"
 "systemd" = "voicebridge/_data/systemd"
 
-# --- Qubit-owned Hermes runtime (Packet 8U, owner amendment 2026-09-11) ----
+# --- Qubit-owned runtime (Packet 8U, owner amendment 2026-09-11) ----------
 # A clean install ships the runtime subset under
-# ``voicebridge/_data/qubit_hermes`` — the path
-# ``voicebridge.hermes_runtime.runtime_root()`` resolves first, before the
+# ``voicebridge/_data/qubit_runtime`` — the path
+# ``voicebridge.qubit_runtime.runtime_root()`` resolves first, before the
 # checkout. The fork's tests/, apps/, website/, contributors/, evals/,
 # lockfiles and other non-runtime material are intentionally NOT packaged.
 # Hatchling force-include walks each mapped directory recursively but does not
 # support globs, so the runtime dirs are mapped individually and the fork's
 # top-level modules are listed explicitly.
-"qubit_hermes/hermes_cli" = "voicebridge/_data/qubit_hermes/hermes_cli"
-"qubit_hermes/agent" = "voicebridge/_data/qubit_hermes/agent"
-"qubit_hermes/tools" = "voicebridge/_data/qubit_hermes/tools"
-"qubit_hermes/gateway" = "voicebridge/_data/qubit_hermes/gateway"
-"qubit_hermes/plugins" = "voicebridge/_data/qubit_hermes/plugins"
-"qubit_hermes/skills" = "voicebridge/_data/qubit_hermes/skills"
-"qubit_hermes/optional-skills" = "voicebridge/_data/qubit_hermes/optional-skills"
-"qubit_hermes/cron" = "voicebridge/_data/qubit_hermes/cron"
-"qubit_hermes/providers" = "voicebridge/_data/qubit_hermes/providers"
-"qubit_hermes/ui-tui" = "voicebridge/_data/qubit_hermes/ui-tui"
-"qubit_hermes/tui_gateway" = "voicebridge/_data/qubit_hermes/tui_gateway"
-"qubit_hermes/native" = "voicebridge/_data/qubit_hermes/native"
-"qubit_hermes/locales" = "voicebridge/_data/qubit_hermes/locales"
-"qubit_hermes/assets" = "voicebridge/_data/qubit_hermes/assets"
-"qubit_hermes/mcp-research-data" = "voicebridge/_data/qubit_hermes/mcp-research-data"
-"qubit_hermes/web" = "voicebridge/_data/qubit_hermes/web"
-"qubit_hermes/batch_runner.py" = "voicebridge/_data/qubit_hermes/batch_runner.py"
-"qubit_hermes/cli.py" = "voicebridge/_data/qubit_hermes/cli.py"
-"qubit_hermes/hermes_bootstrap.py" = "voicebridge/_data/qubit_hermes/hermes_bootstrap.py"
-"qubit_hermes/hermes_constants.py" = "voicebridge/_data/qubit_hermes/hermes_constants.py"
-"qubit_hermes/hermes_logging.py" = "voicebridge/_data/qubit_hermes/hermes_logging.py"
-"qubit_hermes/hermes_startup_watchdog.py" = "voicebridge/_data/qubit_hermes/hermes_startup_watchdog.py"
-"qubit_hermes/hermes_state.py" = "voicebridge/_data/qubit_hermes/hermes_state.py"
-"qubit_hermes/hermes_state_common.py" = "voicebridge/_data/qubit_hermes/hermes_state_common.py"
-"qubit_hermes/hermes_state_compression.py" = "voicebridge/_data/qubit_hermes/hermes_state_compression.py"
-"qubit_hermes/hermes_state_dbfile.py" = "voicebridge/_data/qubit_hermes/hermes_state_dbfile.py"
-"qubit_hermes/hermes_state_errors.py" = "voicebridge/_data/qubit_hermes/hermes_state_errors.py"
-"qubit_hermes/hermes_state_fts.py" = "voicebridge/_data/qubit_hermes/hermes_state_fts.py"
-"qubit_hermes/hermes_state_gateway.py" = "voicebridge/_data/qubit_hermes/hermes_state_gateway.py"
-"qubit_hermes/hermes_state_guard.py" = "voicebridge/_data/qubit_hermes/hermes_state_guard.py"
-"qubit_hermes/hermes_state_holders.py" = "voicebridge/_data/qubit_hermes/hermes_state_holders.py"
-"qubit_hermes/hermes_state_maintenance.py" = "voicebridge/_data/qubit_hermes/hermes_state_maintenance.py"
-"qubit_hermes/hermes_state_messages.py" = "voicebridge/_data/qubit_hermes/hermes_state_messages.py"
-"qubit_hermes/hermes_state_portability.py" = "voicebridge/_data/qubit_hermes/hermes_state_portability.py"
-"qubit_hermes/hermes_state_readpool.py" = "voicebridge/_data/qubit_hermes/hermes_state_readpool.py"
-"qubit_hermes/hermes_state_registry.py" = "voicebridge/_data/qubit_hermes/hermes_state_registry.py"
-"qubit_hermes/hermes_state_repair.py" = "voicebridge/_data/qubit_hermes/hermes_state_repair.py"
-"qubit_hermes/hermes_state_schema.py" = "voicebridge/_data/qubit_hermes/hermes_state_schema.py"
-"qubit_hermes/hermes_state_search.py" = "voicebridge/_data/qubit_hermes/hermes_state_search.py"
-"qubit_hermes/hermes_state_sessions.py" = "voicebridge/_data/qubit_hermes/hermes_state_sessions.py"
-"qubit_hermes/hermes_state_telegram.py" = "voicebridge/_data/qubit_hermes/hermes_state_telegram.py"
-"qubit_hermes/hermes_state_titles.py" = "voicebridge/_data/qubit_hermes/hermes_state_titles.py"
-"qubit_hermes/hermes_state_usage.py" = "voicebridge/_data/qubit_hermes/hermes_state_usage.py"
-"qubit_hermes/hermes_state_wal.py" = "voicebridge/_data/qubit_hermes/hermes_state_wal.py"
-"qubit_hermes/hermes_time.py" = "voicebridge/_data/qubit_hermes/hermes_time.py"
-"qubit_hermes/mcp_serve.py" = "voicebridge/_data/qubit_hermes/mcp_serve.py"
-"qubit_hermes/mini_swe_runner.py" = "voicebridge/_data/qubit_hermes/mini_swe_runner.py"
-"qubit_hermes/model_tools.py" = "voicebridge/_data/qubit_hermes/model_tools.py"
-"qubit_hermes/registration_lifecycle.py" = "voicebridge/_data/qubit_hermes/registration_lifecycle.py"
-"qubit_hermes/run_agent.py" = "voicebridge/_data/qubit_hermes/run_agent.py"
-"qubit_hermes/setup.py" = "voicebridge/_data/qubit_hermes/setup.py"
-"qubit_hermes/toolset_distributions.py" = "voicebridge/_data/qubit_hermes/toolset_distributions.py"
-"qubit_hermes/toolsets.py" = "voicebridge/_data/qubit_hermes/toolsets.py"
-"qubit_hermes/trajectory_compressor.py" = "voicebridge/_data/qubit_hermes/trajectory_compressor.py"
-"qubit_hermes/utils.py" = "voicebridge/_data/qubit_hermes/utils.py"
-"qubit_hermes/LICENSE" = "voicebridge/_data/qubit_hermes/LICENSE"
-"qubit_hermes/pyproject.toml" = "voicebridge/_data/qubit_hermes/pyproject.toml"
-# ``hermes_runtime.status()`` reads the provenance manifest from
-# ``<site-packages>/docs/QUBIT_HERMES_VENDOR_MANIFEST.json`` (see
-# voicebridge/hermes_runtime.manifest_path()); ship it at that path so a clean
-# install reports upstream_revision/patched/file_count.
-"docs/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/QUBIT_HERMES_VENDOR_MANIFEST.json"
+"qubit_runtime/qubit_cli" = "voicebridge/_data/qubit_runtime/qubit_cli"
+"qubit_runtime/agent" = "voicebridge/_data/qubit_runtime/agent"
+"qubit_runtime/tools" = "voicebridge/_data/qubit_runtime/tools"
+"qubit_runtime/gateway" = "voicebridge/_data/qubit_runtime/gateway"
+"qubit_runtime/plugins" = "voicebridge/_data/qubit_runtime/plugins"
+"qubit_runtime/skills" = "voicebridge/_data/qubit_runtime/skills"
+"qubit_runtime/optional-skills" = "voicebridge/_data/qubit_runtime/optional-skills"
+"qubit_runtime/cron" = "voicebridge/_data/qubit_runtime/cron"
+"qubit_runtime/providers" = "voicebridge/_data/qubit_runtime/providers"
+"qubit_runtime/ui-tui" = "voicebridge/_data/qubit_runtime/ui-tui"
+"qubit_runtime/tui_gateway" = "voicebridge/_data/qubit_runtime/tui_gateway"
+"qubit_runtime/native" = "voicebridge/_data/qubit_runtime/native"
+"qubit_runtime/locales" = "voicebridge/_data/qubit_runtime/locales"
+"qubit_runtime/assets" = "voicebridge/_data/qubit_runtime/assets"
+"qubit_runtime/mcp-research-data" = "voicebridge/_data/qubit_runtime/mcp-research-data"
+"qubit_runtime/web" = "voicebridge/_data/qubit_runtime/web"
+"qubit_runtime/batch_runner.py" = "voicebridge/_data/qubit_runtime/batch_runner.py"
+"qubit_runtime/cli.py" = "voicebridge/_data/qubit_runtime/cli.py"
+"qubit_runtime/qubit_bootstrap.py" = "voicebridge/_data/qubit_runtime/qubit_bootstrap.py"
+"qubit_runtime/qubit_constants.py" = "voicebridge/_data/qubit_runtime/qubit_constants.py"
+"qubit_runtime/qubit_logging.py" = "voicebridge/_data/qubit_runtime/qubit_logging.py"
+"qubit_runtime/qubit_startup_watchdog.py" = "voicebridge/_data/qubit_runtime/qubit_startup_watchdog.py"
+"qubit_runtime/qubit_state.py" = "voicebridge/_data/qubit_runtime/qubit_state.py"
+"qubit_runtime/qubit_state_common.py" = "voicebridge/_data/qubit_runtime/qubit_state_common.py"
+"qubit_runtime/qubit_state_compression.py" = "voicebridge/_data/qubit_runtime/qubit_state_compression.py"
+"qubit_runtime/qubit_state_dbfile.py" = "voicebridge/_data/qubit_runtime/qubit_state_dbfile.py"
+"qubit_runtime/qubit_state_errors.py" = "voicebridge/_data/qubit_runtime/qubit_state_errors.py"
+"qubit_runtime/qubit_state_fts.py" = "voicebridge/_data/qubit_runtime/qubit_state_fts.py"
+"qubit_runtime/qubit_state_gateway.py" = "voicebridge/_data/qubit_runtime/qubit_state_gateway.py"
+"qubit_runtime/qubit_state_guard.py" = "voicebridge/_data/qubit_runtime/qubit_state_guard.py"
+"qubit_runtime/qubit_state_holders.py" = "voicebridge/_data/qubit_runtime/qubit_state_holders.py"
+"qubit_runtime/qubit_state_maintenance.py" = "voicebridge/_data/qubit_runtime/qubit_state_maintenance.py"
+"qubit_runtime/qubit_state_messages.py" = "voicebridge/_data/qubit_runtime/qubit_state_messages.py"
+"qubit_runtime/qubit_state_portability.py" = "voicebridge/_data/qubit_runtime/qubit_state_portability.py"
+"qubit_runtime/qubit_state_readpool.py" = "voicebridge/_data/qubit_runtime/qubit_state_readpool.py"
+"qubit_runtime/qubit_state_registry.py" = "voicebridge/_data/qubit_runtime/qubit_state_registry.py"
+"qubit_runtime/qubit_state_repair.py" = "voicebridge/_data/qubit_runtime/qubit_state_repair.py"
+"qubit_runtime/qubit_state_schema.py" = "voicebridge/_data/qubit_runtime/qubit_state_schema.py"
+"qubit_runtime/qubit_state_search.py" = "voicebridge/_data/qubit_runtime/qubit_state_search.py"
+"qubit_runtime/qubit_state_sessions.py" = "voicebridge/_data/qubit_runtime/qubit_state_sessions.py"
+"qubit_runtime/qubit_state_telegram.py" = "voicebridge/_data/qubit_runtime/qubit_state_telegram.py"
+"qubit_runtime/qubit_state_titles.py" = "voicebridge/_data/qubit_runtime/qubit_state_titles.py"
+"qubit_runtime/qubit_state_usage.py" = "voicebridge/_data/qubit_runtime/qubit_state_usage.py"
+"qubit_runtime/qubit_state_wal.py" = "voicebridge/_data/qubit_runtime/qubit_state_wal.py"
+"qubit_runtime/qubit_time.py" = "voicebridge/_data/qubit_runtime/qubit_time.py"
+"qubit_runtime/mcp_serve.py" = "voicebridge/_data/qubit_runtime/mcp_serve.py"
+"qubit_runtime/mini_swe_runner.py" = "voicebridge/_data/qubit_runtime/mini_swe_runner.py"
+"qubit_runtime/model_tools.py" = "voicebridge/_data/qubit_runtime/model_tools.py"
+"qubit_runtime/registration_lifecycle.py" = "voicebridge/_data/qubit_runtime/registration_lifecycle.py"
+"qubit_runtime/run_agent.py" = "voicebridge/_data/qubit_runtime/run_agent.py"
+"qubit_runtime/setup.py" = "voicebridge/_data/qubit_runtime/setup.py"
+"qubit_runtime/toolset_distributions.py" = "voicebridge/_data/qubit_runtime/toolset_distributions.py"
+"qubit_runtime/toolsets.py" = "voicebridge/_data/qubit_runtime/toolsets.py"
+"qubit_runtime/trajectory_compressor.py" = "voicebridge/_data/qubit_runtime/trajectory_compressor.py"
+"qubit_runtime/utils.py" = "voicebridge/_data/qubit_runtime/utils.py"
+"qubit_runtime/LICENSE" = "voicebridge/_data/qubit_runtime/LICENSE"
+"qubit_runtime/pyproject.toml" = "voicebridge/_data/qubit_runtime/pyproject.toml"
+# ``qubit_runtime.status()`` reads the provenance manifest from
+# ``<site-packages>/docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json`` (see
+# voicebridge/qubit_runtime.manifest_path()); ship it at that path so a clean
+# install reports upstream_revision/patched/file_count. The source moved under
+# docs/archive/2026-09-21/ in the docs reorg; the installed destination is
+# unchanged.
+"docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
 # Wave 5: ship the small, secret-free matrices/docs that install-time code
 # reads. They land under package data so the resolver can reach them with the
 # installed path preferred and the checkout as fallback. voicebridge/
 # capability_catalog.py and voicebridge/portable.py must resolve these through
 # ``voicebridge.resources`` (reported as a cross-boundary repair) — a wheel-root
-# ``docs/`` mapping is not permitted by the packaging contract.
-"docs/PARITY_HERMES.json" = "voicebridge/_data/docs/PARITY_HERMES.json"
-"docs/MATRIX_8T_F.json" = "voicebridge/_data/docs/MATRIX_8T_F.json"
-"docs/MIGRATIONS.md" = "voicebridge/_data/docs/MIGRATIONS.md"
+# ``docs/`` mapping is not permitted by the packaging contract. The source
+# docs moved under docs/archive/2026-09-21/ in the 2026-09-21 reorg; the
+# installed resource names (``docs/<name>``) are unchanged so
+# voicebridge/capability_catalog.py and voicebridge/portable.py resolve them.
+"docs/archive/2026-09-21/PARITY_HERMES.json" = "voicebridge/_data/docs/PARITY_HERMES.json"
+"docs/archive/2026-09-21/MATRIX_8T_F.json" = "voicebridge/_data/docs/MATRIX_8T_F.json"
+"docs/archive/2026-09-21/MIGRATIONS.md" = "voicebridge/_data/docs/MIGRATIONS.md"
 
 [tool.hatch.build.targets.sdist]
 # The generated dashboard build ships in the sdist too (reproducible build
@@ -232,7 +240,7 @@ path = "scripts/hatch_build_qubit.py"
 # been built before packaging; scripts/install.sh builds it deterministically
 # from a clean clone when node/npm are available and otherwise fails typed
 # (see the wheel comment above and docs/CLEAN_CLONE_AUDIT_WAVE5.md).
-artifacts = ["frontend/hermes-dist"]
+artifacts = ["frontend/qubit-dist"]
 # NEVER ship the developer's live config, private browser state, or accidental
 # dirty/untracked files (Packet 8K "no private developer state in the release").
 # The sdist carries the portable example config only.
@@ -247,6 +255,9 @@ exclude = [
   # internal dev change reports carry machine-specific history; not needed to
   # build, run, or test the release
   "docs/CHANGE_REPORTS",
+  # the 2026-09-22 docs reset archived the pre-reset docs here; they are
+  # internal history (some carry a developer home path) and must not ship.
+  "docs/archive/2026-09-22-pre-reset",
   # working-tree documents the developer edits in parallel with packaging; they
   # carry machine-specific history and must not ship (Packet 8K sdist privacy)
   "docs/UNIFIED_AGENT_PLAN.md",
@@ -261,29 +272,41 @@ exclude = [
   "docs/BAKEOFF_4D.json",
   "docs/BAKEOFF_4D.md",
   "docs/OPERATIONS_8S.md",
-  "docs/QUBIT_COMPLETION_EVIDENCE.md",
-  "docs/QUBIT_FINAL_CODE_READY_PROMPT.md",
+  "docs/archive/2026-09-21/QUBIT_COMPLETION_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_FINAL_CODE_READY_PROMPT.md",
   "docs/OPERATOR_QUALIFICATION.md",
   "docs/SECURITY_AUDIT_WAVE4.md",
   # Wave 5: an untracked agent wave prompt is swept into the sdist by the
   # working-tree build; it is internal and carries the developer home path, so
   # exclude it (a clean release is built from a committed tree anyway).
-  "docs/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
   # Wave 2 (full-parity): internal agent reports/evidence that are untracked
   # working-tree artifacts. They are not product docs, and one carries a real
   # developer home path, so they must never be swept into the release sdist.
-  "docs/QUBIT_QBPV2_PACKAGING.md",
-  "docs/QUBIT_QBPV_PACKAGING_SECURITY.md",
-  "docs/QUBIT_BYTE_PARITY_EVIDENCE.md",
-  "docs/QUBIT_REACHABILITY_AUDIT.md",
+  "docs/archive/2026-09-21/QUBIT_QBPV2_PACKAGING.md",
+  "docs/archive/2026-09-21/QUBIT_QBPV_PACKAGING_SECURITY.md",
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_REACHABILITY_AUDIT.md",
   # Wave 2 (Agent 5 re-audit): untracked internal evidence/allowlist docs swept
   # into the sdist by a working-tree build. QUBIT_WAVE2_EVIDENCE.md carries a
   # real developer home path, so the release must not ship either file.
-  "docs/QUBIT_WAVE2_EVIDENCE.md",
-  "docs/QUBIT_REBRAND_ALLOWLIST.md",
+  "docs/archive/2026-09-21/QUBIT_WAVE2_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_REBRAND_ALLOWLIST.md",
   # untracked agent execution prompt swept in by a working-tree build; carries
   # a real developer home path, so the release must not ship it.
-  "docs/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
+  "docs/archive/2026-09-21/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
+  # The 2026-09-21 docs reorg relocated the internal evidence/prompt docs under
+  # docs/archive/2026-09-21/. These mirror the home-path-bearing entries above
+  # now that the working-tree build sweeps the archive location instead.
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_EVIDENCE.md",
+  "docs/archive/2026-09-21/QUBIT_BYTE_PARITY_VERIFICATION_PROMPT.md",
+  "docs/archive/2026-09-21/QUBIT_FINAL_CODE_READY_PROMPT.md",
+  "docs/archive/2026-09-21/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
+  "docs/archive/2026-09-21/QUBIT_QBPV_PACKAGING_SECURITY.md",
+  "docs/archive/2026-09-21/QUBIT_WAVE2_EVIDENCE.md",
+  # The active 2026-09-21 execution brief is an internal contract that records
+  # the developer's repo path; it is not a shipped product doc.
+  "docs/archive/2026-09-22-pre-reset/QUBIT_ACTIVE_EXECUTION_BRIEF_2026-09-21.md",
   "tests/test_new_features.py",
   # tests that reference a concrete developer home path as a fixture or
   # scan pattern are source-only; keep the release sdist free of dev paths.
@@ -317,70 +340,80 @@ exclude = [
   "deintegratecuritate.md",
   "docs/OPENCODE_WORKFLOW.md",
   # The whole vendored fork is excluded from the default sdist tree walk; the
-  # runtime subset is force-included below at its original qubit_hermes/
+  # runtime subset is force-included below at its original qubit_runtime/
   # layout (mirrors the wheel subset) so the sdist still rebuilds the wheel
   # without shipping the fork's tests/, apps/, website/, evals/, lockfiles, etc.
-  "qubit_hermes",
+  "qubit_runtime",
 ]
 
-# Sdist mirror of the wheel's Qubit-owned Hermes runtime subset (Packet 8U).
-# Files land at their original qubit_hermes/ paths so a wheel can be rebuilt
+# Sdist mirror of the wheel's Qubit-owned runtime subset (Packet 8U).
+# Files land at their original qubit_runtime/ paths so a wheel can be rebuilt
 # from the sdist with the wheel force-include table above.
 [tool.hatch.build.targets.sdist.force-include]
-"qubit_hermes/hermes_cli" = "qubit_hermes/hermes_cli"
-"qubit_hermes/agent" = "qubit_hermes/agent"
-"qubit_hermes/tools" = "qubit_hermes/tools"
-"qubit_hermes/gateway" = "qubit_hermes/gateway"
-"qubit_hermes/plugins" = "qubit_hermes/plugins"
-"qubit_hermes/skills" = "qubit_hermes/skills"
-"qubit_hermes/optional-skills" = "qubit_hermes/optional-skills"
-"qubit_hermes/cron" = "qubit_hermes/cron"
-"qubit_hermes/providers" = "qubit_hermes/providers"
-"qubit_hermes/ui-tui" = "qubit_hermes/ui-tui"
-"qubit_hermes/tui_gateway" = "qubit_hermes/tui_gateway"
-"qubit_hermes/native" = "qubit_hermes/native"
-"qubit_hermes/locales" = "qubit_hermes/locales"
-"qubit_hermes/assets" = "qubit_hermes/assets"
-"qubit_hermes/mcp-research-data" = "qubit_hermes/mcp-research-data"
-"qubit_hermes/web" = "qubit_hermes/web"
-"qubit_hermes/batch_runner.py" = "qubit_hermes/batch_runner.py"
-"qubit_hermes/cli.py" = "qubit_hermes/cli.py"
-"qubit_hermes/hermes_bootstrap.py" = "qubit_hermes/hermes_bootstrap.py"
-"qubit_hermes/hermes_constants.py" = "qubit_hermes/hermes_constants.py"
-"qubit_hermes/hermes_logging.py" = "qubit_hermes/hermes_logging.py"
-"qubit_hermes/hermes_startup_watchdog.py" = "qubit_hermes/hermes_startup_watchdog.py"
-"qubit_hermes/hermes_state.py" = "qubit_hermes/hermes_state.py"
-"qubit_hermes/hermes_state_common.py" = "qubit_hermes/hermes_state_common.py"
-"qubit_hermes/hermes_state_compression.py" = "qubit_hermes/hermes_state_compression.py"
-"qubit_hermes/hermes_state_dbfile.py" = "qubit_hermes/hermes_state_dbfile.py"
-"qubit_hermes/hermes_state_errors.py" = "qubit_hermes/hermes_state_errors.py"
-"qubit_hermes/hermes_state_fts.py" = "qubit_hermes/hermes_state_fts.py"
-"qubit_hermes/hermes_state_gateway.py" = "qubit_hermes/hermes_state_gateway.py"
-"qubit_hermes/hermes_state_guard.py" = "qubit_hermes/hermes_state_guard.py"
-"qubit_hermes/hermes_state_holders.py" = "qubit_hermes/hermes_state_holders.py"
-"qubit_hermes/hermes_state_maintenance.py" = "qubit_hermes/hermes_state_maintenance.py"
-"qubit_hermes/hermes_state_messages.py" = "qubit_hermes/hermes_state_messages.py"
-"qubit_hermes/hermes_state_portability.py" = "qubit_hermes/hermes_state_portability.py"
-"qubit_hermes/hermes_state_readpool.py" = "qubit_hermes/hermes_state_readpool.py"
-"qubit_hermes/hermes_state_registry.py" = "qubit_hermes/hermes_state_registry.py"
-"qubit_hermes/hermes_state_repair.py" = "qubit_hermes/hermes_state_repair.py"
-"qubit_hermes/hermes_state_schema.py" = "qubit_hermes/hermes_state_schema.py"
-"qubit_hermes/hermes_state_search.py" = "qubit_hermes/hermes_state_search.py"
-"qubit_hermes/hermes_state_sessions.py" = "qubit_hermes/hermes_state_sessions.py"
-"qubit_hermes/hermes_state_telegram.py" = "qubit_hermes/hermes_state_telegram.py"
-"qubit_hermes/hermes_state_titles.py" = "qubit_hermes/hermes_state_titles.py"
-"qubit_hermes/hermes_state_usage.py" = "qubit_hermes/hermes_state_usage.py"
-"qubit_hermes/hermes_state_wal.py" = "qubit_hermes/hermes_state_wal.py"
-"qubit_hermes/hermes_time.py" = "qubit_hermes/hermes_time.py"
-"qubit_hermes/mcp_serve.py" = "qubit_hermes/mcp_serve.py"
-"qubit_hermes/mini_swe_runner.py" = "qubit_hermes/mini_swe_runner.py"
-"qubit_hermes/model_tools.py" = "qubit_hermes/model_tools.py"
-"qubit_hermes/registration_lifecycle.py" = "qubit_hermes/registration_lifecycle.py"
-"qubit_hermes/run_agent.py" = "qubit_hermes/run_agent.py"
-"qubit_hermes/setup.py" = "qubit_hermes/setup.py"
-"qubit_hermes/toolset_distributions.py" = "qubit_hermes/toolset_distributions.py"
-"qubit_hermes/toolsets.py" = "qubit_hermes/toolsets.py"
-"qubit_hermes/trajectory_compressor.py" = "qubit_hermes/trajectory_compressor.py"
-"qubit_hermes/utils.py" = "qubit_hermes/utils.py"
-"qubit_hermes/LICENSE" = "qubit_hermes/LICENSE"
-"qubit_hermes/pyproject.toml" = "qubit_hermes/pyproject.toml"
+"qubit_runtime/qubit_cli" = "qubit_runtime/qubit_cli"
+"qubit_runtime/agent" = "qubit_runtime/agent"
+"qubit_runtime/tools" = "qubit_runtime/tools"
+"qubit_runtime/gateway" = "qubit_runtime/gateway"
+"qubit_runtime/plugins" = "qubit_runtime/plugins"
+"qubit_runtime/skills" = "qubit_runtime/skills"
+"qubit_runtime/optional-skills" = "qubit_runtime/optional-skills"
+"qubit_runtime/cron" = "qubit_runtime/cron"
+"qubit_runtime/providers" = "qubit_runtime/providers"
+"qubit_runtime/ui-tui" = "qubit_runtime/ui-tui"
+"qubit_runtime/tui_gateway" = "qubit_runtime/tui_gateway"
+"qubit_runtime/native" = "qubit_runtime/native"
+"qubit_runtime/locales" = "qubit_runtime/locales"
+"qubit_runtime/assets" = "qubit_runtime/assets"
+"qubit_runtime/mcp-research-data" = "qubit_runtime/mcp-research-data"
+"qubit_runtime/web" = "qubit_runtime/web"
+"qubit_runtime/batch_runner.py" = "qubit_runtime/batch_runner.py"
+"qubit_runtime/cli.py" = "qubit_runtime/cli.py"
+"qubit_runtime/qubit_bootstrap.py" = "qubit_runtime/qubit_bootstrap.py"
+"qubit_runtime/qubit_constants.py" = "qubit_runtime/qubit_constants.py"
+"qubit_runtime/qubit_logging.py" = "qubit_runtime/qubit_logging.py"
+"qubit_runtime/qubit_startup_watchdog.py" = "qubit_runtime/qubit_startup_watchdog.py"
+"qubit_runtime/qubit_state.py" = "qubit_runtime/qubit_state.py"
+"qubit_runtime/qubit_state_common.py" = "qubit_runtime/qubit_state_common.py"
+"qubit_runtime/qubit_state_compression.py" = "qubit_runtime/qubit_state_compression.py"
+"qubit_runtime/qubit_state_dbfile.py" = "qubit_runtime/qubit_state_dbfile.py"
+"qubit_runtime/qubit_state_errors.py" = "qubit_runtime/qubit_state_errors.py"
+"qubit_runtime/qubit_state_fts.py" = "qubit_runtime/qubit_state_fts.py"
+"qubit_runtime/qubit_state_gateway.py" = "qubit_runtime/qubit_state_gateway.py"
+"qubit_runtime/qubit_state_guard.py" = "qubit_runtime/qubit_state_guard.py"
+"qubit_runtime/qubit_state_holders.py" = "qubit_runtime/qubit_state_holders.py"
+"qubit_runtime/qubit_state_maintenance.py" = "qubit_runtime/qubit_state_maintenance.py"
+"qubit_runtime/qubit_state_messages.py" = "qubit_runtime/qubit_state_messages.py"
+"qubit_runtime/qubit_state_portability.py" = "qubit_runtime/qubit_state_portability.py"
+"qubit_runtime/qubit_state_readpool.py" = "qubit_runtime/qubit_state_readpool.py"
+"qubit_runtime/qubit_state_registry.py" = "qubit_runtime/qubit_state_registry.py"
+"qubit_runtime/qubit_state_repair.py" = "qubit_runtime/qubit_state_repair.py"
+"qubit_runtime/qubit_state_schema.py" = "qubit_runtime/qubit_state_schema.py"
+"qubit_runtime/qubit_state_search.py" = "qubit_runtime/qubit_state_search.py"
+"qubit_runtime/qubit_state_sessions.py" = "qubit_runtime/qubit_state_sessions.py"
+"qubit_runtime/qubit_state_telegram.py" = "qubit_runtime/qubit_state_telegram.py"
+"qubit_runtime/qubit_state_titles.py" = "qubit_runtime/qubit_state_titles.py"
+"qubit_runtime/qubit_state_usage.py" = "qubit_runtime/qubit_state_usage.py"
+"qubit_runtime/qubit_state_wal.py" = "qubit_runtime/qubit_state_wal.py"
+"qubit_runtime/qubit_time.py" = "qubit_runtime/qubit_time.py"
+"qubit_runtime/mcp_serve.py" = "qubit_runtime/mcp_serve.py"
+"qubit_runtime/mini_swe_runner.py" = "qubit_runtime/mini_swe_runner.py"
+"qubit_runtime/model_tools.py" = "qubit_runtime/model_tools.py"
+"qubit_runtime/registration_lifecycle.py" = "qubit_runtime/registration_lifecycle.py"
+"qubit_runtime/run_agent.py" = "qubit_runtime/run_agent.py"
+"qubit_runtime/setup.py" = "qubit_runtime/setup.py"
+"qubit_runtime/toolset_distributions.py" = "qubit_runtime/toolset_distributions.py"
+"qubit_runtime/toolsets.py" = "qubit_runtime/toolsets.py"
+"qubit_runtime/trajectory_compressor.py" = "qubit_runtime/trajectory_compressor.py"
+"qubit_runtime/utils.py" = "qubit_runtime/utils.py"
+"qubit_runtime/LICENSE" = "qubit_runtime/LICENSE"
+"qubit_runtime/pyproject.toml" = "qubit_runtime/pyproject.toml"
+
+# Sdist mirror of the wheel's dev-tree pruning. Hatchling force-include walks a
+# directory mapping recursively and only skips the names in its own
+# EXCLUDED_DIRECTORIES set (which omits ``node_modules``), so the git-ignored
+# ``qubit_runtime/ui-tui/node_modules`` tree would otherwise enter the sdist.
+# The shared hook extends that exclusion set for the build (and stages the
+# wheel's frontend tree per-file); it does not reparent the frontend for the
+# sdist, which keeps its normal layout.
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "scripts/hatch_build_qubit.py"

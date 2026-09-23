@@ -17,9 +17,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-BUNDLE = (REPO_ROOT / "frontend" / "hermes-web" / "public" / "plugins"
+BUNDLE = (REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
           / "hermes-achievements" / "dist" / "index.js")
-ENGINE_API = (REPO_ROOT / "qubit_hermes" / "plugins" / "hermes-achievements"
+ENGINE_API = (REPO_ROOT / "qubit_runtime" / "plugins" / "hermes-achievements"
               / "dashboard" / "plugin_api.py")
 
 
@@ -29,14 +29,14 @@ def _cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes-home"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)
 
 
 def _dispatch(cfg, method, path, query=None, body=None):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     return HC.dispatch(cfg, method, path, query or {}, body or {})
 
@@ -101,7 +101,7 @@ def test_rescan_persists_real_state_across_reload(tmp_path, monkeypatch):
 
     import os
 
-    state_root = Path(os.environ["HERMES_HOME"]) / "plugin-data" / \
+    state_root = Path(os.environ["QUBIT_HOME"]) / "plugin-data" / \
         "hermes-achievements"
     assert state_root.is_dir(), state_root
     assert (state_root / "state.json").exists() or \

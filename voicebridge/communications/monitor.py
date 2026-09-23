@@ -423,7 +423,7 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
         return {"state": "denied", "code": "POWER_DISABLED",
                 "detail": "power-control unavailable; monitor scan refused",
                 "exit_code": 3}
-    # Autonomous scheduler parity (OpenClaw): fire due scheduled jobs through
+    # Autonomous scheduler parity (Qubit): fire due scheduled jobs through
     # the one bounded, idempotent entry point. Dry-runs never execute. Placed
     # before the monitor overlap lease so a long agent turn does not extend
     # it; the run_due DB lease already prevents double-fire across ticks.

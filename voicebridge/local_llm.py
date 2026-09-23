@@ -38,6 +38,24 @@ REASONING_BUDGETS = {"none": 64, "minimal": 128, "low": 256,
 DEFAULT_REASONING_BUDGET = 100
 
 
+class ReasoningInvalidError(ValueError):
+    """Unknown reasoning level: the caller must fail typed, never silently
+    substitute the default budget (a quiet substitution would lie about the
+    effort the operator selected)."""
+
+
+def normalize_reasoning_level(level: str | None) -> str | None:
+    """Validate a reasoning level; ``None`` (model default) passes through."""
+    if level is None:
+        return None
+    key = str(level).strip().lower()
+    if key not in REASONING_BUDGETS:
+        raise ReasoningInvalidError(
+            f"unknown reasoning level {level!r} "
+            f"(choose one of {sorted(REASONING_BUDGETS)})")
+    return key
+
+
 def resolve_reasoning_budget(level: str | None) -> int:
     """Map a reasoning-effort level to a bounded output budget."""
     if level is None:
@@ -442,7 +460,8 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
                       model: str = "qubit-brain4", url: str = "http://127.0.0.1:11434",
                       timeout_s: float = 4.0, max_tokens: int = 100,
                       context: str = "", on_sentence=None,
-                      should_stop=None, num_ctx: Optional[int] = None) -> str:
+                      should_stop=None, num_ctx: Optional[int] = None,
+                      reasoning: Optional[str] = None) -> str:
     """Stream a local reply; emit completed sentences via on_sentence(str)
     as they arrive so TTS can start synthesizing while the model is still
     generating (STEAL_LIST item 6 — pipeline overlap, ~0.3-0.5s faster turns).
@@ -450,11 +469,16 @@ def chat_local_stream(text: str, conversation_prompt: str = "",
     Returns the full reply, or "" on any failure (caller falls back to the
     non-streaming path / cloud).
     `should_stop` = callable -> True aborts the stream mid-generation.
+    `reasoning` selects the same per-request output budget as
+    :func:`chat_local` so the streaming (default) path honors the selector
+    instead of silently dropping it.
     """
+    if reasoning is not None:
+        max_tokens = resolve_reasoning_budget(reasoning)
     if on_sentence is None:
         return chat_local(text, conversation_prompt, model=model, url=url,
                           timeout_s=timeout_s, max_tokens=max_tokens,
-                          context=context)
+                          context=context, reasoning=reasoning)
     payload = _chat_payload(text, conversation_prompt, model, max_tokens,
                             context, stream=True, num_ctx=num_ctx)
     req = urllib.request.Request(

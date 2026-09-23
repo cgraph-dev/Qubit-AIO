@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Generate docs/HERMES_FRONTEND_MAP.json: machine-readable Hermes web/src
+"""Generate docs/archive/2026-09-21/HERMES_FRONTEND_MAP.json: machine-readable Hermes web/src
 inventory mapped to Qubit equivalents.
 
 Hermes pin: https://github.com/NousResearch/hermes-agent @
 2237be355906fbe6065ce1815711eee52b2d646e (tag v2026.9.7), MIT.
 Oracle: /tmp/pinned-upstream/hermes-agent (read-only; verified rev-parse).
 
-Adaptation rule (standing stack constraint: Python/static-JS only, no
-React/Node runtime): no .tsx can execute byte-identical in Qubit, so every
-file maps to a Qubit static-JS adapter, a shared backend op, a tested
-policy refusal, or a documented omission with owner. MIT notices retained
-in THIRD_PARTY_NOTICES.md (see docs/UPSTREAM_REUSE.md R34).
+Adaptation rule (owner amendment 2026-09-11): the pinned upstream
+React/Vite/Node frontend is vendored into frontend/qubit-web and
+frontend/qubit-shared and built with Vite; React/TS is a supported Qubit
+dashboard runtime. Every upstream file maps to a byte-identical vendored
+file or a documented Qubit patch/rebrand recorded in
+docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json; routes/endpoints additionally map to
+shared Qubit backend operations, tested policy refusals, or documented
+omissions. MIT notices retained in THIRD_PARTY_NOTICES.md (see
+docs/archive/2026-09-21/UPSTREAM_REUSE.md R34).
 """
 from __future__ import annotations
 
@@ -24,12 +28,54 @@ REPO = Path(__file__).resolve().parents[1]
 REVISION = "2237be355906fbe6065ce1815711eee52b2d646e"
 REPO_URL = "https://github.com/NousResearch/hermes-agent"
 
+#: Qubit-side path/identifier renames applied to the preserved hand-maintained
+#: audit sections so a regenerated map never records a pre-rebrand path. The
+#: upstream ``files[*].path`` values (``web/src/...``) and each dialog's
+#: ``upstream`` field are deliberately not touched: they name the pinned
+#: upstream file, which did not move.
+_REBRAND_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    ("qubit_hermes/", "qubit_runtime/"),
+    ("frontend/qubit-web/src/components/HermesConsoleModal.tsx",
+     "frontend/qubit-web/src/components/QubitConsoleModal.tsx"),
+    ("voicebridge.hermes_plugins", "voicebridge.qubit_plugins"),
+    ("voicebridge.hermes_compat", "voicebridge.qubit_compat"),
+    ("tests/test_hermes_plugins.py", "tests/test_qubit_plugins.py"),
+    ("tests/test_hermes_frontend_inventory8u.py",
+     "tests/test_qubit_frontend_inventory8u.py"),
+    # The local base-path constant is QUBIT_BASE_PATH; the injected browser
+    # global keeps the upstream wire name and is masked around this rename.
+    ("HERMES_BASE_PATH", "QUBIT_BASE_PATH"),
+)
+#: Injected browser global keeps the upstream wire name; mask it so the bare
+#: ``HERMES_BASE_PATH`` rename above cannot rewrite ``window.__HERMES_BASE_PATH__``.
+_WIRE_BASE_PATH = "window.__HERMES_BASE_PATH__"
+_WIRE_BASE_PATH_MASK = "\x00__HERMES_WIRE_BASE_PATH__\x00"
+#: Category labels the deep rebrand rewrote in the vendored Achievements engine.
+_REBRAND_CATEGORY = {"Hermes Native": "Qubit Native"}
+
+
+def _canonicalize(value):
+    """Rewrite pre-rebrand Qubit paths inside a preserved audit section."""
+    if isinstance(value, dict):
+        return {k: _canonicalize(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_canonicalize(v) for v in value]
+    if isinstance(value, str):
+        value = value.replace(_WIRE_BASE_PATH, _WIRE_BASE_PATH_MASK)
+        for old, new in _REBRAND_REPLACEMENTS:
+            value = value.replace(old, new)
+        return value.replace(_WIRE_BASE_PATH_MASK, _WIRE_BASE_PATH)
+    return value
+
 # route -> (qubit route, disposition, note)
 ROUTES = {
-    "/chat": ("/", "adapted",
-              "Talk workspace: streaming transcript, PTT voice, text turns, "
-              "approvals via stream; Hermes xterm PTY spawn refused "
-              "(shell policy) — transcript streaming is the equivalent."),
+    "/chat": ("/chat", "adapted",
+              "Qubit-safe native chat: POST /api/qubit/chat "
+              "(voicebridge.agent.turn, the same module as CLI text and voice "
+              "PTT) with typed loading/empty/error/retry states, browser speech "
+              "input, per-session transcript persistence, and the sessions "
+              "switcher. /api/pty is refused (PTY_NO_SHELL); the page no longer "
+              "opens or retries it."),
     "/sessions": ("/sessions", "adapted",
                   "sessions op (receipt sessions) + actions receipts; "
                   "Hermes rename/export/import/prune/search/stats map to "
@@ -137,11 +183,18 @@ ENDPOINTS = {
     "/api/ops/prompt-size": ("prompt_budget", "adapted"),
     "/api/ops/security-audit": ("security/verify_release", "adapted"),
     "/api/pairing": ("pairing", "adapted"),
-    "/api/plugins/kanban/events": ("kanban", "adapted:board+journal"),
+    "/api/plugins/kanban/events": (
+        "qubit-boards (ops) + /api/events SSE",
+        "partial: plugin WS upgrade refused by the single event path; board "
+        "reads stay live via /api/plugins/kanban/board and all mutations run "
+        "through /api/ops/* + /api/ops/confirm"),
     "/api/portal": ("—", "OMITTED:EXTERNAL_PORTAL (external account console; guidance only)"),
     "/api/profiles": ("brain/config_profiles", "adapted"),
     "/api/providers/oauth": ("auth_login", "adapted:key-refs,live-dance-provider-side"),
-    "/api/pty": ("—", "OMITTED:PTY (browser PTY spawn refused; transcript+TUI equivalent)"),
+    "/api/pty": (
+        "POST /api/qubit/chat",
+        "REFUSED:PTY_NO_SHELL (Qubit-safe equivalent = native chat turn; "
+        "frontend no longer connects the raw WS)"),
     "/api/sessions": ("sessions/memory", "adapted:receipts+stores"),
     "/api/skills": ("skills", "adapted"),
     "/api/skills/hub": ("—", "REFUSED:REMOTE_PLUGIN (reviewed-only, tested)"),
@@ -180,7 +233,10 @@ def inventory_files():
         elif kind == "test":
             disposition = "covered-by-qubit-tests (behavior re-proven in Qubit suites, not ported)"
         else:
-            disposition = "adapted (static-JS adapter or shared backend op; see routes/endpoints)"
+            disposition = ("vendored Hermes React/Vite source (byte-identical "
+                           "or documented Qubit patch; see "
+                           "docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json; "
+                           "routes/endpoints below)")
         items.append({
             "path": f"web/src/{rel}",
             "bytes": len(data),
@@ -202,18 +258,46 @@ def main():
         "source": {"repo": REPO_URL, "revision": REVISION,
                    "tag": "v2026.9.7", "license": "MIT (Nous Research)",
                    "oracle": str(ORACLE), "verified_rev": rev},
-        "adaptation_rule": ("React/TS cannot execute in Qubit's "
-                            "Python/static-JS stack (no React/Node runtime "
-                            "per project constraints); every file maps to a "
-                            "static-JS adapter, shared backend op, tested "
-                            "policy refusal, or documented omission."),
+        "adaptation_rule": (
+            "Per the owner amendment 2026-09-11 and "
+            "docs/archive/2026-09-21/QUBIT_DASHBOARD_REBUILD_PLAN.md, the pinned Hermes "
+            "React/Vite/Node frontend is vendored into frontend/qubit-web "
+            "(from hermes-agent/web) and frontend/qubit-shared (from "
+            "hermes-agent/qubit-shared) and is built with Vite; React/TS is a "
+            "supported Qubit dashboard runtime and the former static-only "
+            "runtime constraint no longer applies. Every upstream file maps to "
+            "a byte-identical vendored file or a documented Qubit "
+            "patch/rebrand carrying upstream+Qubit hashes, a reason, and an "
+            "affected regression test in docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json; "
+            "routes/endpoints additionally map to shared Qubit backend "
+            "operations, tested policy refusals, or documented omissions."),
         "routes": {k: {"qubit": v[0], "disposition": v[1], "note": v[2]}
                    for k, v in ROUTES.items()},
         "endpoints": {k: {"qubit": v[0], "disposition": v[1]}
                       for k, v in ENDPOINTS.items()},
         "files": inventory_files(),
     }
-    out = REPO / "docs" / "HERMES_FRONTEND_MAP.json"
+    out = REPO / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
+    # The map also carries hand-maintained audit sections (vendoring hashes,
+    # inventory detail, per-plugin audits, open items, live-verification
+    # records). Regeneration owns the mechanical keys above and must preserve
+    # those audited sections verbatim rather than dropping them.
+    preserved_keys = ("vendoring", "inventory", "achievements_audit",
+                      "missing_paths", "frontend_repairs", "kanban_audit",
+                      "live_verification")
+    if out.is_file():
+        try:
+            existing = json.loads(out.read_text(encoding="utf-8"))
+        except ValueError:
+            existing = {}
+        for key in preserved_keys:
+            if key in existing:
+                doc[key] = _canonicalize(existing[key])
+        audit = doc.get("achievements_audit")
+        if isinstance(audit, dict) and isinstance(audit.get("categories"),
+                                                   list):
+            audit["categories"] = [
+                _REBRAND_CATEGORY.get(c, c) for c in audit["categories"]]
     out.write_text(json.dumps(doc, indent=1) + "\n")
     kinds = {}
     for f in doc["files"]:

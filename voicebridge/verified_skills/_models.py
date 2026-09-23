@@ -1,7 +1,7 @@
 """Packet 8P verified-skill memory — pure data + helpers (no I/O).
 
 Adapted from the smallest tested concepts of Praxis (MIT (c) 2026 Kristian
-Baer / Northtek; docs/UPSTREAM_REUSE.md R26). Holds the constants, the
+Baer / Northtek; docs/archive/2026-09-21/UPSTREAM_REUSE.md R26). Holds the constants, the
 `SkillProposal`/`SkillRecord` dataclasses, and the deterministic embedding,
 syntactic acceptance-strength, secret detection, and utility helpers. No store
 or journal code lives here.

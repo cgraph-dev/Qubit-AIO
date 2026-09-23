@@ -1,6 +1,6 @@
 """W2 — chat transport served through the production compat dispatcher.
 
-Every request below goes through ``voicebridge.hermes_compat.dispatch`` — the
+Every request below goes through ``voicebridge.qubit_compat.dispatch`` — the
 exact function ``voicebridge.webui`` calls for every ``/agent/api/*`` (and
 ``/api/*``) dashboard request — so the proof exercises the real caller, not a
 handler in isolation. The model transport is stubbed; the live Brain4 proof is
@@ -42,11 +42,12 @@ def _stub(monkeypatch, reply="route reply"):
         _llm, "chat_local_stream",
         lambda text, conversation_prompt="", model="qubit-brain4", timeout_s=4.0,
         max_tokens=100, context="", on_sentence=None, should_stop=None,
-        num_ctx=None: (on_sentence and on_sentence(reply), reply)[1])
+        num_ctx=None, reasoning=None:
+        (on_sentence and on_sentence(reply), reply)[1])
 
 
 def test_every_chat_route_is_registered_and_reaches_a_handler():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     expected = {
         ("POST", "/api/qubit/chat"): "h_chat_turn",
@@ -74,7 +75,7 @@ def test_every_chat_route_is_registered_and_reaches_a_handler():
 
 
 def test_turn_via_dispatch_persists_and_reloads(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     _stub(monkeypatch, "the route answer")
@@ -102,7 +103,7 @@ def test_turn_via_dispatch_persists_and_reloads(tmp_path, monkeypatch):
 
 
 def test_session_crud_via_dispatch(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     _stub(monkeypatch)
@@ -132,7 +133,7 @@ def test_session_crud_via_dispatch(tmp_path, monkeypatch):
 
 
 def test_export_import_via_dispatch(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     _stub(monkeypatch, "exportable")
@@ -155,7 +156,7 @@ def test_export_import_via_dispatch(tmp_path, monkeypatch):
 
 
 def test_cancel_and_pty_via_dispatch(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     _stub(monkeypatch, "pty reply")
@@ -177,7 +178,7 @@ def test_cancel_and_pty_via_dispatch(tmp_path, monkeypatch):
 
 
 def test_retry_via_dispatch(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     import voicebridge.local_llm as _llm
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -206,7 +207,7 @@ def test_retry_via_dispatch(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # Live HTTP: the actual WebUI listener serving the chat transport routes.
 # ---------------------------------------------------------------------------
-_DIST = REPO_ROOT / "frontend" / "hermes-dist"
+_DIST = REPO_ROOT / "frontend" / "qubit-dist"
 _needs_dist = pytest.mark.skipif(
     not (_DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")

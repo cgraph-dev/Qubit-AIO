@@ -49,7 +49,7 @@ MAX_EMISSIONS = 200
 MAX_PAYLOAD_KEYS = 32
 
 # Documented core lifecycle events a Qubit caller may emit into the registry
-# (OpenClaw hooks event-types parity, execution stays disarmed).
+# (Qubit hooks event-types parity, execution stays disarmed).
 EVENT_TYPES = (
     "session.started", "session.completed",
     "task.started", "task.completed", "task.failed",
@@ -61,7 +61,7 @@ EVENT_TYPES = (
 )
 
 # Review-only authoring templates for the hooks Qubit ships "bundled"
-# (OpenClaw bundled-hooks parity, OC-D23). Metadata only: nothing is
+# (Qubit bundled-hooks parity, OC-D23). Metadata only: nothing is
 # auto-declared and the registry never executes a shell. ``bundled`` surfaces
 # them as starting points and ``doctor`` reports their names; a caller still
 # runs ``declare --confirm`` to create a review-only subscription.
@@ -257,7 +257,7 @@ def list_hooks(cfg: Any) -> Dict[str, Any]:
 def bundled() -> Dict[str, Any]:
     """Qubit-bundled hook authoring templates (metadata only).
 
-    Mirrors OpenClaw's bundled hooks as review-only starting points: no
+    Mirrors Qubit's bundled hooks as review-only starting points: no
     subscription is created and no shell is ever executed. Callers still use
     ``declare(..., confirmed=True)`` to subscribe.
     """

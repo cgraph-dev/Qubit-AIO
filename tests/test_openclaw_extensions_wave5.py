@@ -38,8 +38,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-SECTION_PATH = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.openclaw.json"
-QUBIT_SECTION_PATH = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.qubit.json"
+SECTION_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
+QUBIT_SECTION_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.qubit.json"
 
 SECRET = "wave5-channel-secret"
 SECRET_ENV = "WAVE5_CHANNEL_SECRET"

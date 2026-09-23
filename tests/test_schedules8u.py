@@ -108,6 +108,90 @@ def test_create_validation(tmp_path, monkeypatch):
     assert SC.list_jobs(cfg)["jobs"] == []
 
 
+def test_public_store_api_round_trip_is_one_authority(tmp_path, monkeypatch):
+    """create_job -> list_jobs -> get_job -> delete_job, one SQLite store."""
+    from voicebridge import schedules as SC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    created = SC.create_job(cfg, "api job", "check inbox",
+                            "every 30 minutes", confirmed=True)
+    job_id = created["job"]["id"]
+
+    listed = SC.list_jobs(cfg)["jobs"]
+    assert [j["id"] for j in listed] == [job_id]
+
+    got = SC.get_job(cfg, job_id)
+    assert got["state"] == "OK"
+    assert got["job"]["name"] == "api job"
+    assert got["job"]["task_text"] == "check inbox"
+    assert got["job"]["recent_runs"] == []
+
+    paused = SC.set_paused(cfg, job_id, True, confirmed=True)
+    assert paused["job"]["enabled"] is False
+    assert SC.list_jobs(cfg, include_disabled=False)["jobs"] == []
+    resumed = SC.set_paused(cfg, job_id, False, confirmed=True)
+    assert resumed["job"]["enabled"] is True
+
+    # Every call operates on the same on-disk authority: the schedules.db the
+    # compat handlers/CLI/voice read, and nothing else.
+    assert SC._db_path(cfg).exists()
+    assert SC._db_path(cfg).name == "schedules.db"
+
+    deleted = SC.delete_job(cfg, job_id, confirmed=True)
+    assert deleted["deleted"] == job_id
+    assert SC.list_jobs(cfg)["jobs"] == []
+    with pytest.raises(SC.SchedulesError) as exc:
+        SC.get_job(cfg, job_id)
+    assert exc.value.code == SC.NOT_FOUND_CODE
+
+
+def test_delete_job_accepts_confirm_from_body_or_query(tmp_path, monkeypatch):
+    """DELETE confirm is honored from a JSON body OR a query string."""
+    from voicebridge import schedules as SC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    first = SC.create_job(cfg, "via body", "a", "every 30 minutes",
+                          confirmed=True)["job"]["id"]
+    second = SC.create_job(cfg, "via query", "b", "every 30 minutes",
+                           confirmed=True)["job"]["id"]
+
+    # Missing confirm on either source is still a typed refusal.
+    with pytest.raises(SC.SchedulesError) as exc:
+        SC.delete_job(cfg, first)
+    assert exc.value.code == SC.CONFIRM_CODE
+    with pytest.raises(SC.SchedulesError) as exc:
+        SC.delete_job(cfg, first, body={}, query={})
+    assert exc.value.code == SC.CONFIRM_CODE
+
+    assert SC.delete_job(cfg, first, body={"confirm": True})["deleted"] == first
+    assert SC.delete_job(cfg, second,
+                         query={"confirm": "true"})["deleted"] == second
+    assert SC.list_jobs(cfg)["jobs"] == []
+
+
+def test_trigger_runs_one_job_now_and_unknown_is_typed(tmp_path, monkeypatch):
+    """trigger(job_id) forces one immediate run, regardless of due window."""
+    from voicebridge import schedules as SC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    job_id = SC.create_job(cfg, "on demand", "do it", "every 30 minutes",
+                           confirmed=True)["job"]["id"]
+
+    out = SC.trigger(cfg, job_id, executor=lambda *a, **k: _ok(*a, **k),
+                     now=_t0())
+    assert out["ran"] == 1
+    assert out["results"][0]["job_id"] == job_id
+    assert out["results"][0]["state"] == "OK"
+
+    # The forced run is recorded in the same store's history.
+    hist = SC.history(cfg, job_id)
+    assert len(hist["runs"]) == 1 and hist["runs"][0]["state"] == "OK"
+
+    with pytest.raises(SC.SchedulesError) as exc:
+        SC.trigger(cfg, 999999, executor=lambda *a, **k: _ok(*a, **k))
+    assert exc.value.code == SC.NOT_FOUND_CODE
+
+
 # ------------------------------------------------------------------- due
 def test_run_due_interval_and_lease(tmp_path, monkeypatch):
     from voicebridge import schedules as SC

@@ -34,7 +34,7 @@ def test_no_second_server_commands():
         assert absent not in names, f"no second-server stub: {absent}"
     # `desktop`/`gui` are Qubit-owned fork CLI families (native desktop app
     # build/launch), confirm-gated mutating routes, never a second server.
-    from voicebridge import cli_hermes_forward as HF
+    from voicebridge import cli_qubit_forward as HF
 
     for family in ("desktop", "gui"):
         assert family in names, family

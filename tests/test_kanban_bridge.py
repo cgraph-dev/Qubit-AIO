@@ -1,7 +1,7 @@
 """Kanban compatibility layer (``voicebridge/kanban_bridge.py``).
 
 The Qubit-native store is authoritative; the vendored Hermes kanban dashboard
-uses the fork's own ``hermes_cli.kanban_db`` store. These tests prove both
+uses the fork's own ``qubit_cli.kanban_db`` store. These tests prove both
 stores are reported truthfully and that the explicit migration converges the
 vendored data onto the native store idempotently. Hermetic: temp ``XDG_*``.
 """
@@ -20,14 +20,14 @@ def _cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
-    monkeypatch.delenv("HERMES_HOME", raising=False)
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)
 
 
 def _seed_vendored(cfg, title="VENDORED-task"):
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_plugins as HP
 
     engine = HP._kanban_engine(cfg)
     conn = engine._conn(board=None)

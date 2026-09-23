@@ -27,7 +27,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/web_routers/messaging.py:766",
+    "path": "qubit_cli/web_routers/messaging.py:766",
     "symbol": "get_messaging_platforms",
     "mapping_status": "VERIFIED"
   },
@@ -36,7 +36,24 @@
     "symbol": "channelsHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Brokered messaging account inventory contract. Credentials are reference-only; sends are credential-gated and e-stop aware. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/messaging.py:766 (get_messaging_platforms); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/channels.ts:363 (channelsHandlers).",
+  "references": {
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "channels",
+        "list",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "Lists configured chat channels.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Brokered messaging account inventory contract. Credentials are reference-only; sends are credential-gated and e-stop aware. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/messaging.py:766 (get_messaging_platforms); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/channels.ts:363 (channelsHandlers). Pinned side-effect-free reference invocation(s) declared: `openclaw channels list --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, direct_readonly).",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,

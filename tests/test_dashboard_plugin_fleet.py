@@ -12,7 +12,7 @@ production compat dispatcher:
   manifests, and its entry/CSS bundles are served and register their
   components;
 * the plugin backend route (``/api/plugins/kanban/events``) is dispatched
-  through the real ``voicebridge.hermes_compat`` dispatcher and over the
+  through the real ``voicebridge.qubit_compat`` dispatcher and over the
   served HTTP boundary;
 * unknown plugin routes stay typed ``NOT_FOUND`` — no fabricated success.
 """
@@ -27,13 +27,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-WEB = REPO_ROOT / "frontend" / "hermes-web"
+WEB = REPO_ROOT / "frontend" / "qubit-web"
 APP_TSX = WEB / "src" / "App.tsx"
 USE_PLUGINS = WEB / "src" / "plugins" / "usePlugins.ts"
 FLEET_TS = WEB / "src" / "plugins" / "fleet.ts"
 PUBLIC_FLEET = WEB / "public" / "plugins" / "fleet.json"
-PINNED = REPO_ROOT / "qubit_hermes" / "plugins"
-FRONTEND_MAP = REPO_ROOT / "docs" / "HERMES_FRONTEND_MAP.json"
+PINNED = REPO_ROOT / "qubit_runtime" / "plugins"
+FRONTEND_MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
 
 # The complete baseline route set preserved from the pinned dashboard.
 BASELINE_ROUTES = {
@@ -110,8 +110,10 @@ def _app_routes() -> set:
                       text, re.S)
     assert block, "BUILTIN_ROUTES_CORE not found in App.tsx"
     routes = set(re.findall(r'"([^"]+)":', block.group(1)))
-    if '"/chat": ChatRouteSink' in text:
+    if '"/chat": TerminalChatPage' in text or '"/chat": ChatRouteSink' in text:
         routes.add("/chat")
+    if '"/qubit-chat":' in text:
+        routes.add("/qubit-chat")
     return routes
 
 
@@ -131,7 +133,7 @@ def test_every_baseline_page_route_present():
 
 def test_baseline_named_pages_drive_real_backing_routes(tmp_path, monkeypatch):
     """The four IA pages called out for closure reach a real compat route."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     for route in ("/api/logs", "/api/pairing", "/api/webhooks"):
@@ -144,7 +146,7 @@ def test_baseline_named_pages_drive_real_backing_routes(tmp_path, monkeypatch):
 
 def test_every_registered_plugin_backend_route_is_live(tmp_path, monkeypatch):
     """Every registered ``/api/plugins/...`` compat route answers typed."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     patterns = [r["pattern"] for r in HC.ROUTES
@@ -226,9 +228,9 @@ def test_static_fleet_manifest_mirrors_pinned_plugins():
             # patch (exact hash + reason) in the provenance manifest.
             import hashlib
             man = json.loads(
-                (REPO_ROOT / "docs" / "HERMES_SOURCE_COMPARISON.json")
+                (REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_SOURCE_COMPARISON.json")
                 .read_text(encoding="utf-8"))
-            q = (f"frontend/hermes-web/public/plugins/{name}/{rel}")
+            q = (f"frontend/qubit-web/public/plugins/{name}/{rel}")
             row = next((r for r in man["rows"] if r.get("qubit") == q), None)
             assert row and row.get("patch") and row.get("reason"), (
                 q, "divergent vendored asset without a documented patch")
@@ -289,7 +291,7 @@ def test_served_spa_answers_every_baseline_route(tmp_path):
 
 
 def test_plugin_backend_route_dispatched_through_compat(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     route, _params = HC.match("GET", "/api/plugins/kanban/events")
@@ -320,7 +322,7 @@ def test_plugin_backend_route_over_http_boundary(tmp_path):
 
 
 def test_unknown_plugin_route_is_typed_not_fabricated(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, body = HC.dispatch(
@@ -340,7 +342,7 @@ def test_fleet_plugins_carry_no_unrebranded_product_name():
 
 # ---------------------------------------------------------------------------
 # Ledger proof: the plugin_fleet rows are dashboard-only surfaces. The
-# generator derives them from the plugin manifests (``frontend/hermes-qubit``
+# generator derives them from the plugin manifests (``frontend/qubit-app``
 # today; the pinned fleet once ``_plugin_manifest_paths`` is extended). These
 # row-id literals plus a real production compat-dispatcher call are the
 # on-disk proof the generator's ``find_page_plugin_proof`` looks for.
@@ -356,7 +358,7 @@ PLUGIN_FLEET_READ_ROUTE = {
 
 
 def test_plugin_fleet_rows_have_real_route_proofs(tmp_path, monkeypatch):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     for name, row_id in PLUGIN_FLEET_ROW_IDS.items():

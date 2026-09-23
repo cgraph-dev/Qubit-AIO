@@ -16,6 +16,8 @@ complete -c qubit -n '__fish_use_subcommand' -f -a browser
 complete -c qubit -n '__fish_use_subcommand' -f -a bundles
 complete -c qubit -n '__fish_use_subcommand' -f -a capability
 complete -c qubit -n '__fish_use_subcommand' -f -a channels
+complete -c qubit -n '__fish_use_subcommand' -f -a chat-sessions
+complete -c qubit -n '__fish_use_subcommand' -f -a chat_sessions
 complete -c qubit -n '__fish_use_subcommand' -f -a checkpoints
 complete -c qubit -n '__fish_use_subcommand' -f -a claw
 complete -c qubit -n '__fish_use_subcommand' -f -a completion

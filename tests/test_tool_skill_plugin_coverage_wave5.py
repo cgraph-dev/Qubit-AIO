@@ -14,13 +14,13 @@ This test locks the Wave 5 disposition rules:
   inventory tool/toolset is exposed and dispatchable;
 * the skill proof asserts every IMPLEMENTED skill is vendored with a loadable
   ``SKILL.md``; the plugin proof asserts every plugin is in the Qubit wrapper
-  fleet (``voicebridge.hermes_plugins``);
-* the Qubit agent dispatch path (``voicebridge.hermes_runtime`` -> fork
+  fleet (``voicebridge.qubit_plugins``);
+* the Qubit agent dispatch path (``voicebridge.qubit_runtime`` -> fork
   ``model_tools``) resolves to the same fork registry object;
 * the gap-ledger generator emits a typed row for every dispositioned item, so
   an IMPLEMENTED item can never remain an unexplained omission.
 
-Hermetic: temp ``HERMES_HOME``; no network, no live services, no tool execution.
+Hermetic: temp ``QUBIT_HOME``; no network, no live services, no tool execution.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-INVENTORY_PATH = REPO_ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
+INVENTORY_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
 COVERED_CATEGORIES = frozenset({"hermes_tool", "hermes_skill", "hermes_plugin"})
 # Source-inventory ``fork_disposition`` statuses (unchanged by the owner's
 # terminal-status decision).
@@ -76,18 +76,18 @@ def _load_module(name: str, filename: str):
 
 @pytest.fixture(scope="module")
 def inventory() -> dict:
-    assert INVENTORY_PATH.is_file(), "docs/QUBIT_SOURCE_INVENTORY.json missing"
+    assert INVENTORY_PATH.is_file(), "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json missing"
     return json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
 
 
 @pytest.fixture()
 def fork_path(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a temp dir and put the vendored fork on sys.path."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
-    from voicebridge import hermes_runtime
+    """Point QUBIT_HOME at a temp dir and put the vendored fork on sys.path."""
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes"))
+    from voicebridge import qubit_runtime
 
-    hermes_runtime.ensure_path()
-    return hermes_runtime
+    qubit_runtime.ensure_path()
+    return qubit_runtime
 
 
 def _covered_items(inventory: dict):
@@ -207,7 +207,7 @@ def test_all_inventory_skills_vendored_and_loadable(inventory, fork_path):
         disposition = it.get("fork_disposition") or {}
         root = str(it.get("root") or "")
         name = str(it.get("name") or "")
-        skill_dir = REPO_ROOT / "qubit_hermes" / root / name
+        skill_dir = REPO_ROOT / "qubit_runtime" / root / name
         has_skill = skill_dir.is_dir() and any(skill_dir.rglob("SKILL.md"))
         if disposition.get("status") == "IMPLEMENTED":
             if not has_skill:
@@ -225,7 +225,7 @@ def test_all_inventory_skills_vendored_and_loadable(inventory, fork_path):
 # ---------------------------------------------------------------------------
 def test_all_vendored_plugin_items_have_a_wrapper(inventory, fork_path):
     """The cited plugin proof: every plugin item is in the wrapper fleet."""
-    from voicebridge import hermes_plugins as HP
+    from voicebridge import qubit_plugins as HP
 
     fleet = set(HP.VENDORED_PLUGIN_FLEET)
     audited = {row["name"] for row in HP.plugin_fleet_audit()}
@@ -235,7 +235,7 @@ def test_all_vendored_plugin_items_have_a_wrapper(inventory, fork_path):
     offenders = []
     for it in plugin_items:
         name = str(it.get("name") or "")
-        directory = REPO_ROOT / "qubit_hermes" / "plugins" / name
+        directory = REPO_ROOT / "qubit_runtime" / "plugins" / name
         disposition = it.get("fork_disposition") or {}
         if name not in fleet:
             offenders.append((it["id"], "not in VENDORED_PLUGIN_FLEET"))
@@ -255,13 +255,13 @@ def test_fork_runtime_is_the_qubit_agent_dispatch_path(fork_path):
     """The Qubit-owned runtime resolves to the fork, whose agent loop
     (``model_tools``) dispatches against the exact registry the tool proof
     introspects."""
-    from voicebridge import hermes_runtime
+    from voicebridge import qubit_runtime
     from tools.registry import registry as fork_registry
     import model_tools
 
-    root = hermes_runtime.runtime_root()
-    assert root.name == "qubit_hermes", root
-    assert root == REPO_ROOT / "qubit_hermes"
+    root = qubit_runtime.runtime_root()
+    assert root.name == "qubit_runtime", root
+    assert root == REPO_ROOT / "qubit_runtime"
     # one in-process registry authority for the fork agent path
     assert model_tools.registry is fork_registry
     assert callable(model_tools.handle_function_call)

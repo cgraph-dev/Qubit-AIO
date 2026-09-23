@@ -8,7 +8,7 @@ extractor (pypdf / PyPDF2). When no PDF extractor is present the module
 returns a typed ``DOC_EXTRACT_UNAVAILABLE`` with install guidance and never
 fabricates text. Everything else is a typed ``DOC_EXTRACT_UNSUPPORTED``.
 
-Provenance: Tool/media delta D20 in ``docs/AUDIT_OPENCLAW_V2026_9_4_DELTA.md``
+Provenance: Tool/media delta D20 in ``docs/archive/2026-09-21/AUDIT_OPENCLAW_V2026_9_4_DELTA.md``
 (upstream ``src/agents/tools/pdf-tool*``, ``transcripts-tool-result.ts``).
 """
 from __future__ import annotations

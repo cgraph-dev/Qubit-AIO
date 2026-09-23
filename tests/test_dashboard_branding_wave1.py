@@ -1,12 +1,12 @@
 """Wave 1 — dashboard workflow parity, route map, and Qubit rebrand.
 
-Covers the 14 open ``dashboard:/...`` pages from ``docs/QUBIT_GAP_LEDGER.md``
+Covers the 14 open ``dashboard:/...`` pages from ``docs/archive/2026-09-21/QUBIT_GAP_LEDGER.md``
 (``/analytics``, ``/channels``, ``/chat``, ``/config``, ``/cron``, ``/env``,
 ``/files``, ``/mcp``, ``/models``, ``/plugins``, ``/profiles``,
 ``/profiles/new``, ``/skills``, ``/system``):
 
 1. route presence — each baseline page route exists in the vendored SPA
-   route map (``App.tsx`` + ``docs/HERMES_FRONTEND_MAP.json``) and the
+   route map (``App.tsx`` + ``docs/archive/2026-09-21/HERMES_FRONTEND_MAP.json``) and the
    served SPA answers it with the real shell;
 2. rebrand — the served shell, the Qubit overlay source, and the patched
    product-surface baseline files expose no unrebranded product-facing
@@ -32,12 +32,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-WEB_SRC = REPO_ROOT / "frontend" / "hermes-web" / "src"
-SHARED_SRC = REPO_ROOT / "frontend" / "hermes-shared" / "src"
-INDEX_HTML = REPO_ROOT / "frontend" / "hermes-web" / "index.html"
+WEB_SRC = REPO_ROOT / "frontend" / "qubit-web" / "src"
+SHARED_SRC = REPO_ROOT / "frontend" / "qubit-shared" / "src"
+INDEX_HTML = REPO_ROOT / "frontend" / "qubit-web" / "index.html"
 APP_TSX = WEB_SRC / "App.tsx"
-OVERLAY = REPO_ROOT / "frontend" / "hermes-qubit"
-FRONTEND_MAP = REPO_ROOT / "docs" / "HERMES_FRONTEND_MAP.json"
+OVERLAY = REPO_ROOT / "frontend" / "qubit-app"
+FRONTEND_MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
 
 # page route -> primary real backing Qubit/Hermes-compat GET route.
 PAGE_BACKING = {
@@ -64,23 +64,23 @@ PROTOCOL_ALLOWED = {"X-Hermes-Session-Token"}
 # Product-surface baseline files rebranded under the owner directive; each
 # carries a recorded patch in docs/HERMES_SOURCE_COMPARISON.json.
 PATCHED_PRODUCT_FILES = [
-    "frontend/hermes-web/index.html",
-    "frontend/hermes-web/src/App.tsx",
-    "frontend/hermes-web/src/components/HermesConsoleModal.tsx",
-    "frontend/hermes-web/src/lib/gatewayClient.ts",
-    "frontend/hermes-web/src/pages/ChannelsPage.tsx",
-    "frontend/hermes-web/src/pages/ChatPage.tsx",
-    "frontend/hermes-web/src/pages/ConfigPage.tsx",
-    "frontend/hermes-web/src/pages/McpPage.tsx",
-    "frontend/hermes-web/src/pages/PluginsPage.tsx",
-    "frontend/hermes-web/src/pages/SkillsPage.tsx",
-    "frontend/hermes-web/src/pages/SystemPage.tsx",
-    "frontend/hermes-web/src/themes/presets.ts",
-    "frontend/hermes-shared/src/json-rpc-gateway.ts",
-    "frontend/hermes-shared/src/websocket-url.ts",
+    "frontend/qubit-web/index.html",
+    "frontend/qubit-web/src/App.tsx",
+    "frontend/qubit-web/src/components/QubitConsoleModal.tsx",
+    "frontend/qubit-web/src/lib/gatewayClient.ts",
+    "frontend/qubit-web/src/pages/ChannelsPage.tsx",
+    "frontend/qubit-web/src/pages/ChatPage.tsx",
+    "frontend/qubit-web/src/pages/ConfigPage.tsx",
+    "frontend/qubit-web/src/pages/McpPage.tsx",
+    "frontend/qubit-web/src/pages/PluginsPage.tsx",
+    "frontend/qubit-web/src/pages/SkillsPage.tsx",
+    "frontend/qubit-web/src/pages/SystemPage.tsx",
+    "frontend/qubit-web/src/themes/presets.ts",
+    "frontend/qubit-shared/src/json-rpc-gateway.ts",
+    "frontend/qubit-shared/src/websocket-url.ts",
 ]
 PATCHED_PRODUCT_FILES += [
-    "frontend/hermes-web/src/i18n/%s.ts" % n
+    "frontend/qubit-web/src/i18n/%s.ts" % n
     for n in ("af", "ar", "de", "en", "es", "fr", "ga", "hu", "it", "ja",
               "ko", "pt", "ru", "tr", "uk", "zh", "zh-hant")
 ]
@@ -128,7 +128,7 @@ def _start(tmp_path):
     return ui, ui._server.server_address[1]
 
 
-def _get(port, path, token="test-token", hermes=True):
+def _get(port, path, token="test-token", qubit=True):
     import urllib.error
     import urllib.request
 
@@ -136,7 +136,7 @@ def _get(port, path, token="test-token", hermes=True):
         "http://127.0.0.1:%d%s" % (port, path), method="GET")
     if token:
         req.add_header(
-            "X-Hermes-Session-Token" if hermes else "X-Api-Token", token)
+            "X-Hermes-Session-Token" if qubit else "X-Api-Token", token)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
@@ -153,9 +153,13 @@ def _app_routes() -> set:
                       text, re.S)
     assert block, "BUILTIN_ROUTES_CORE not found in App.tsx"
     routes = set(re.findall(r'"([^"]+)":', block.group(1)))
-    # /chat is registered conditionally when embedded chat is enabled.
-    if '"/chat": ChatRouteSink' in text:
+    # /chat (Hermes-style terminal) and /qubit-chat (native Qubit chat) are
+    # registered conditionally when embedded chat is enabled. /chat maps to the
+    # Qubit terminal page; /qubit-chat keeps the native ChatPage host.
+    if '"/chat": TerminalChatPage' in text or '"/chat": ChatRouteSink' in text:
         routes.add("/chat")
+    if '"/qubit-chat":' in text:
+        routes.add("/qubit-chat")
     return routes
 
 
@@ -236,10 +240,10 @@ def test_vendored_source_has_no_unrebranded_product_names():
 def test_built_spa_bundle_has_no_product_facing_upstream_names():
     """When the canonical dashboard build is present, the generated SPA shell
     and bundles must be Qubit-branded (skipped on a source-only checkout)."""
-    dist = REPO_ROOT / "frontend" / "hermes-dist"
+    dist = REPO_ROOT / "frontend" / "qubit-dist"
     index = dist / "index.html"
     if not index.is_file():
-        pytest.skip("frontend/hermes-dist not built in this checkout")
+        pytest.skip("frontend/qubit-dist not built in this checkout")
     html = index.read_text(encoding="utf-8")
     assert "<title>Qubit Agent" in html, html[:200]
     banned = ("Hermes Agent", "Hermes Console", "Hermes Teal",
@@ -275,7 +279,7 @@ def test_theme_overlay_hides_any_residual_wordmark():
 # 3. Drive the real backing route for every page (production dispatcher)
 # ---------------------------------------------------------------------------
 def test_every_page_backing_route_is_truthful(tmp_path):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge.config import Config
 
     state = tmp_path / "state"
@@ -303,7 +307,7 @@ def test_every_page_backing_route_is_truthful(tmp_path):
 def test_page_backing_routes_over_http_boundary(tmp_path):
     """Same routes, driven through the authenticated served HTTP boundary
     (server -> compat dispatcher), proving the dashboard's real path."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     ui, port = _start(tmp_path)
     try:
@@ -336,7 +340,7 @@ def test_fork_proxied_payloads_are_rebranded(tmp_path):
 
 
 def test_unknown_backing_route_is_typed_not_500(tmp_path):
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
     from voicebridge.config import Config
 
     state = tmp_path / "state"

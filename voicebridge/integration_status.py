@@ -11,18 +11,50 @@ from typing import Any, Dict, List
 
 
 def mcp_status(cfg: Any) -> Dict[str, Any]:
-    """Configured MCP servers (names only) + mounting policy."""
-    get = (lambda *p, default=None: cfg.get(*p, default=default)) \
-        if hasattr(cfg, "get") else (lambda *p, default=None: default)
-    raw = get("mcp", "servers", default=[])
-    servers: List[str] = []
-    if isinstance(raw, dict):
-        servers = sorted(str(k) for k in raw.keys())
-    elif isinstance(raw, list):
-        servers = sorted(str(x if isinstance(x, str) else x.get("name", ""))
-                         for x in raw if isinstance(x, (str, dict)))
-    servers = [s for s in servers if s]
+    """Configured MCP servers + mounting policy (read-only, redacted).
+
+    PRB-01: reads the ONE canonical MCP store
+    (``voicebridge.mcp_servers.list_servers``) — the same function the
+    dashboard ``GET /api/mcp/servers`` handler calls — so CLI, voice,
+    dashboard, and this status helper can never diverge on which servers exist
+    or whether they are enabled. ``servers`` stays a names-only list for
+    compatibility; ``records`` carries the per-server enabled/source state the
+    dashboard already exposes (``enabled``, ``source``).
+    """
+    records: List[Dict[str, Any]] = []
+    try:
+        from . import mcp_servers as MS
+
+        for s in MS.list_servers(cfg).get("servers", []):
+            if not isinstance(s, dict) or not s.get("name"):
+                continue
+            records.append({
+                "name": str(s.get("name")),
+                "enabled": bool(s.get("enabled")),
+                "source": str(s.get("source", "qubit-registry")),
+                "connected": bool(s.get("connected", False)),
+                "status": str(s.get("status", "")),
+                # Client invocation is a typed OPERATOR_ONLY disposition until a
+                # sanctioned transport exists; every surface reads it here so
+                # none can imply a server is callable.
+                "invocable": bool(s.get("invocable", False)),
+                "invocation_code": str(s.get("invocation_code", "")),
+            })
+    except Exception:
+        # Degrade to the read-only config inventory rather than fabricate.
+        from . import mcp_servers as MS
+
+        records = [{"name": name, "enabled": False, "source": "qubit-config",
+                    "connected": False, "status": "configured-not-connected",
+                    "invocable": False,
+                    "invocation_code": MS.INVOKE_OPERATOR_CODE}
+                   for name in MS.config_server_names(cfg)]
+    records.sort(key=lambda r: r["name"])
+    servers = [r["name"] for r in records]
     return {"schema": "qubit-mcp-status/1", "servers": servers,
+            "records": records,
+            "invocable": False,
+            "invocation_code": MS.INVOKE_OPERATOR_CODE,
             "mount_policy": "no unauthenticated MCP mounting; research-only "
                             "use stays separately authorized and broker-gated",
             "state": "OK" if not servers else "CONFIGURED"}

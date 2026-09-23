@@ -23,7 +23,18 @@ _SECRET_KEY = re.compile(
     r"auth[_-]?token|token|secret|client[_-]?secret|password|passwd|pwd|"
     r"authorization|cookie|session[_-]?id|private[_-]?key|credentials?)"
     r"\b(\"?\s*[=:]\s*\"?)([^\s,&\"']+)")
-_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
+# A scheme word ("bearer"/"basic") is credential material only when the token
+# after it looks like one. Requiring at least one non-letter (a digit or one of
+# ``._~+/=-``) stops ordinary prose such as ``"basic lifecycle"`` from being
+# masked, while real base64/opaque credentials — which are never a plain
+# alphabetic word run — still redact. Tradeoff: a purely alphabetic token is
+# left alone, since it is indistinguishable from prose; JWT/``sk-``/URL
+# credential shapes stay covered by their own matchers below.
+_BEARER = re.compile(
+    r"(?i)\b(bearer|basic)\s+"
+    r"(?=[A-Za-z0-9._~+/=-]{8,}(?![A-Za-z0-9._~+/=-]))"
+    r"(?=[A-Za-z0-9._~+/=-]*[0-9._~+/=-])"
+    r"[A-Za-z0-9._~+/=-]{8,}")
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}")
 _SK_KEY = re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b")
 _URL_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^@\s]+)@")

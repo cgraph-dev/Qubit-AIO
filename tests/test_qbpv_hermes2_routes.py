@@ -2,19 +2,19 @@
 
 Two byte-parity defects were found by comparing the pinned Hermes backend
 (``/tmp/opencode/pinned/hermes-agent`` @ ``2237be35``) and the vendored fork
-(``qubit_hermes/``) against the live Qubit compat dispatcher
-(``voicebridge.hermes_compat``):
+(``qubit_runtime/``) against the live Qubit compat dispatcher
+(``voicebridge.qubit_compat``):
 
 1. ``PUT /api/plugins/kanban/orchestration`` (pinned
    ``plugins/kanban/dashboard/plugin_api.py``) mutates ``config.yaml``. It was
-   registered by neither ``hermes_compat`` nor the empty write-proxy allowlist,
+   registered by neither ``qubit_compat`` nor the empty write-proxy allowlist,
    so the active backend answered a bare ``404 NOT_FOUND`` -- not a typed
    Qubit-safe gate. The dashboard plugin UI calls it
-   (``frontend/hermes-web/public/plugins/kanban/dist/index.js``
+   (``frontend/qubit-web/public/plugins/kanban/dist/index.js``
    ``saveSettings``), so the workflow silently failed.
 
 2. ``DELETE /api/sessions/empty`` (pinned
-   ``hermes_cli/web_routers/sessions.py``) is the bulk "delete every empty
+   ``qubit_cli/web_routers/sessions.py``) is the bulk "delete every empty
    session" endpoint (backing ``api.deleteEmptySessions``). The generic
    ``DELETE /api/sessions/{id}`` pattern swallowed it first, so the request was
    treated as "delete the session literally named ``empty``" and answered
@@ -22,7 +22,7 @@ Two byte-parity defects were found by comparing the pinned Hermes backend
 
 Both repairs route the surface onto the existing typed Qubit policy gate; no
 safety gate is weakened. The tests execute the production dispatcher
-(:func:`voicebridge.hermes_compat.dispatch`) -- the same function
+(:func:`voicebridge.qubit_compat.dispatch`) -- the same function
 ``voicebridge/webui.py::_hermes_api`` calls for every dashboard API request --
 through the real Qubit config/policy stores.
 """
@@ -50,7 +50,7 @@ def _cfg(tmp_path, monkeypatch):
 
 
 # Every pinned kanban plugin write route (pinned plugin_api.py decorators,
-# verified against qubit_hermes/plugins/kanban/dashboard/plugin_api.py). Each
+# verified against qubit_runtime/plugins/kanban/dashboard/plugin_api.py). Each
 # must resolve to the one shared typed broker gate -- never a fabricated 2xx,
 # never a bare 404. ``PUT /orchestration`` is the row the previous list missed.
 KANBAN_WRITE_ROUTES = [
@@ -85,16 +85,28 @@ KANBAN_WRITE_ROUTES = [
 ]
 
 
-def test_every_pinned_kanban_write_is_the_typed_gate(tmp_path, monkeypatch):
-    """No pinned kanban write may 404 or fabricate success (regression: PUT
-    orchestration). The production dispatcher must answer the shared typed
-    broker gate."""
-    from voicebridge import hermes_compat as HC
+def test_every_pinned_kanban_write_is_native_or_the_typed_gate(tmp_path,
+                                                               monkeypatch):
+    """No pinned kanban write may be a bare route-404 or fabricate success
+    (regression: PUT orchestration).
+
+    Core board/task writes are now native-backed (one authoritative board
+    store) and confirm-gated; a route with no native-schema equivalent must
+    still answer the shared typed broker gate. ``confirm`` can never bypass a
+    gated route into the fork/plugin."""
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     for method, path in KANBAN_WRITE_ROUTES:
         route, _ = HC.match(method, path)
         assert route is not None, (method, path)
+        if route["disposition"] == "implemented":
+            # Native-backed: an unconfirmed/ill-formed request is a typed
+            # 4xx, never a fabricated 2xx success.
+            code, out = HC.dispatch(cfg, method, path, {}, {"mode": "auto"})
+            assert code in (400, 404, 409), (method, path, code, out)
+            assert out.get("ok") is not True, (method, path, out)
+            continue
         assert route["disposition"] == "gated", (method, path, route)
         code, out = HC.dispatch(cfg, method, path, {}, {"mode": "auto"})
         assert code == 403, (method, path, code, out)
@@ -111,7 +123,7 @@ def test_every_pinned_kanban_write_is_the_typed_gate(tmp_path, monkeypatch):
 def test_put_kanban_orchestration_never_mutates_config(tmp_path, monkeypatch):
     """The orchestration PUT is a config write; the active Qubit backend must
     refuse it with a typed gate and never touch config.yaml."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     state = Path(cfg.state_dir())
@@ -135,7 +147,7 @@ def test_delete_sessions_empty_is_bulk_gate_not_single_session(tmp_path,
     of a session named ``empty``. It must be the typed receipt-store gate, and
     a real session id must still reach the confirm-gated single-session delete.
     """
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
 
@@ -166,7 +178,7 @@ def test_implemented_routes_all_reach_a_live_handler():
     """Registry invariant: every implemented compat route names a handler that
     exists, so the dispatcher can never answer NO_HANDLER for a declared
     surface. Gated routes must carry a typed code and a Qubit counterpart."""
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     missing = [r for r in HC.ROUTES
                if r["disposition"] == "implemented"

@@ -28,10 +28,10 @@
   "expected": {
     "http_status": 200,
     "json_schema": {
-      "ok": true,
-      "schema": "qubit-hermes-status/1",
-      "gateway_running": false,
-      "gateway_state": "not-supervised"
+      "version": "0.21.1",
+      "release_date": "2026.9.7",
+      "can_update_hermes": true,
+      "gateway_running": false
     }
   },
   "qubit": {
@@ -40,7 +40,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/web_routers/status.py:378",
+    "path": "qubit_cli/web_routers/status.py:378",
     "symbol": "get_status",
     "mapping_status": "VERIFIED"
   },
@@ -49,7 +49,7 @@
     "symbol": "healthHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "API route status+wire-schema contract. Handler is the shared compat route authority (hermes_compat.ROUTES /api/status -> h_status, qubit-hermes-status/1). Gateway supervision is an honest policy negative (GATEWAY_NO_SUPERVISION), never a fabricated 200. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/status.py:378 (get_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/health.ts:115 (healthHandlers).",
+  "notes": "API route status wire-schema contract for the SPA prefix. The vendored-fork proxy wins for /agent/api/status (qubit_asgi.safe_to_proxy at qubit_asgi.py:282-293; the fork OpenAPI declares GET /api/status), so the served body is the rebranded fork StatusResponse, NOT the compat qubit-runtime-status/1 handler (qubit_compat.py:4380 h_status), which is shadowed/dead on this authority. Gateway supervision stays an honest negative (gateway_running=false), never a fabricated 200. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/status.py:378 (get_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/health.ts:115 (healthHandlers). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": "/agent/api/status",
@@ -58,7 +58,7 @@
       "method": "GET",
       "path": "/agent/api/status"
     },
-    "broker_policy_decision": "GATEWAY_NO_SUPERVISION for gateway supervision",
+    "broker_policy_decision": "fork proxy wins for /agent/api/status (qubit_asgi.safe_to_proxy; fork declares GET /api/status); gateway supervision is the honest negative GATEWAY_NO_SUPERVISION (gateway_running=false)",
     "runtime_provider": null,
     "store_state_assertion": null,
     "output_event_assertion": null,
@@ -82,5 +82,7 @@
       "security_resource_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_URL and QUBIT_DIFFERENTIAL_QUBIT_TOKEN (X-Api-Token) against a live instance; /agent/api/status is 401 without the token. No side-effect-free upstream equivalent exists for this Qubit-specific HTTP schema, so the row remains OPERATOR_ONLY and never claims PASS."
 }

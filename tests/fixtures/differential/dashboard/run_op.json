@@ -2,14 +2,15 @@
   "schema_version": 1,
   "fixture_id": "dashboard.control.run_op",
   "family": "dashboard",
+  "read_only": true,
   "command": null,
   "request": {
-    "kind": "http",
+    "kind": null,
     "method": "POST",
-    "path": "/agent/api/qubit/dashboard/op",
+    "path": "/agent/api/ops/run",
     "headers": {},
     "body": {
-      "op": "status.read",
+      "id": "product_status",
       "args": {}
     },
     "event": null,
@@ -31,10 +32,7 @@
   "expected": {
     "http_status": 200,
     "json_schema": {
-      "state": "OK"
-    },
-    "backend_operation": {
-      "op": "status.read"
+      "ok": true
     }
   },
   "qubit": {
@@ -43,7 +41,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/web_routers/actions.py:342",
+    "path": "qubit_cli/web_routers/actions.py:342",
     "symbol": "get_action_status",
     "mapping_status": "VERIFIED"
   },
@@ -52,20 +50,20 @@
     "symbol": "createRequestGatewayMethodRegistry",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Dashboard control contract. VISUAL family: a control must reach a canonical dashboard_ops operation (run_op/confirm_op/cancel_op), not merely render. Sensitive ops require the shared approval journal and are e-stop aware. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/actions.py:342 (get_action_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods.ts:223 (createRequestGatewayMethodRegistry).",
+  "notes": "Dashboard control contract. VISUAL family: a control must reach a canonical dashboard_ops operation (run_op/confirm_op/cancel_op), not merely render. The real transport is POST /agent/api/ops/run with a catalogue op id; the pinned read-only op used here is product_status. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/actions.py:342 (get_action_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods.ts:223 (createRequestGatewayMethodRegistry). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
   "evidence": {
     "voice_utterance": null,
-    "dashboard_route": "/agent/api/qubit/dashboard/op",
-    "dashboard_control": "status.read",
+    "dashboard_route": "/agent/api/ops/run",
+    "dashboard_control": "product_status",
     "request_schema": {
       "method": "POST",
-      "path": "/agent/api/qubit/dashboard/op",
+      "path": "/agent/api/ops/run",
       "body": {
-        "op": "string",
+        "id": "product_status",
         "args": "object"
       }
     },
-    "broker_policy_decision": "run_op dispatch through dashboard_ops registry; sensitive ops require approval",
+    "broker_policy_decision": "run_op dispatch through the shared dashboard_ops registry; sensitive ops require the shared approval journal and are e-stop aware",
     "runtime_provider": null,
     "store_state_assertion": null,
     "output_event_assertion": null,
@@ -100,5 +98,7 @@
       "kind": "a11y",
       "ref": "evidence:dashboard.control.run_op/a11y.json"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN and a live instance. The op id 'status.read' is not a catalogue op; use product_status / runtime_status / browser_status via POST /agent/api/ops/run (qubit_compat.py:4474 h_ops_run -> dashboard_ops.py:609 run_op)."
 }

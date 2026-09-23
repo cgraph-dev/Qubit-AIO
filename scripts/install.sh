@@ -116,25 +116,25 @@ if [ ! -x "$VENV/bin/python" ]; then
   command -v uv >/dev/null || { echo "ERROR: uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
   (cd "$PROJECT_DIR" && uv venv --python 3.12 .venv)
 fi
-# The dashboard bundle (frontend/hermes-dist) is a build artifact and is not
+# The dashboard bundle (frontend/qubit-dist) is a build artifact and is not
 # tracked in git; a fresh checkout/sdist without it would install a package
 # that cannot serve the dashboard. Build it deterministically when node/npm are
 # available; otherwise record a typed DEGRADED state that fails loudly at the
 # end of the install (never a silent skip, never a dashboard-less PASS).
 DASHBOARD_STATE="present"
-if [ ! -f "$PROJECT_DIR/frontend/hermes-dist/index.html" ]; then
+if [ ! -f "$PROJECT_DIR/frontend/qubit-dist/index.html" ]; then
   if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-    echo "==> building dashboard (frontend/hermes-dist missing)"
+    echo "==> building dashboard (frontend/qubit-dist missing)"
     if "$PROJECT_DIR/scripts/build_dashboard.sh"; then
       DASHBOARD_STATE="built"
     else
       DASHBOARD_STATE="build_failed"
-      echo "    WARNING: frontend/hermes-dist missing — the dashboard build failed;"
+      echo "    WARNING: frontend/qubit-dist missing — the dashboard build failed;"
       echo "             re-run scripts/build_dashboard.sh once the toolchain/network is fixed"
     fi
   else
     DASHBOARD_STATE="toolchain_missing"
-    echo "    WARNING: frontend/hermes-dist missing and node/npm not found —"
+    echo "    WARNING: frontend/qubit-dist missing and node/npm not found —"
     echo "             the dashboard will be unavailable until you run scripts/build_dashboard.sh"
   fi
 fi
@@ -341,7 +341,7 @@ if [ "$DASHBOARD_STATE" = "toolchain_missing" ] || \
   echo "  The Qubit CLI and runtime are installed, but the dashboard cannot be served."
   echo "  Action: install node/npm and run:"
   echo "      $PROJECT_DIR/scripts/build_dashboard.sh"
-  echo "  or install from a release archive that already contains frontend/hermes-dist."
+  echo "  or install from a release archive that already contains frontend/qubit-dist."
   echo "  Typed DEGRADED install (exit 4)."
   exit 4
 fi

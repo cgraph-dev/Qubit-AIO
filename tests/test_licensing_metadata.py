@@ -84,12 +84,12 @@ def test_sbom_license_is_not_fabricated_when_pyproject_absent(tmp_path):
 
 
 def test_docs_and_notices_exist_and_are_referenced():
-    for rel in ("THIRD_PARTY_NOTICES.md", "docs/UPSTREAM_REUSE.md",
-                "docs/LICENSING.md", "LICENSE"):
+    for rel in ("THIRD_PARTY_NOTICES.md", "docs/archive/2026-09-21/UPSTREAM_REUSE.md",
+                "docs/archive/2026-09-21/LICENSING.md", "LICENSE"):
         assert (REPO / rel).exists(), rel
     notice = (REPO / "THIRD_PARTY_NOTICES.md").read_text()
     assert "upstream-derived" in notice.lower()
-    licensing = (REPO / "docs/LICENSING.md").read_text()
+    licensing = (REPO / "docs/archive/2026-09-21/LICENSING.md").read_text()
     assert "not an OSI-approved open-source project" in licensing
 
 

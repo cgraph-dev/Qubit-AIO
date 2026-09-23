@@ -27,7 +27,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/web_routers/ops.py:435",
+    "path": "qubit_cli/web_routers/ops.py:435",
     "symbol": "get_memory_status",
     "mapping_status": "VERIFIED"
   },
@@ -36,7 +36,37 @@
     "symbol": "memorySearchHandlers",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Semantic memory store status contract (GENOME contract; disabled by default). The same store backs remember/search/correct/forget; secrets are rejected at the write boundary (SecretRejectedError). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/web_routers/ops.py:435 (get_memory_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/memory-search.ts:70 (memorySearchHandlers).",
+  "references": {
+    "hermes": {
+      "kind": "cli",
+      "argv": [
+        "hermes",
+        "memory",
+        "status"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "Shows external memory provider status.",
+      "pinned_commit": "2237be355906fbe6065ce1815711eee52b2d646e"
+    },
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "memory",
+        "status",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "Shows memory index status.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Semantic memory store status contract (GENOME contract; disabled by default). The same store backs remember/search/correct/forget; secrets are rejected at the write boundary (SecretRejectedError). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/ops.py:435 (get_memory_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/memory-search.ts:70 (memorySearchHandlers). Side-effect-free reference invocation(s) declared and pinnable: `hermes memory status` (2237be355906fbe6065ce1815711eee52b2d646e, direct_readonly); `openclaw memory status --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, direct_readonly). The declared `hermes` reference is pinned: the pinned wrapper's probed `--version` prints `Hermes Agent v0.21.1 (2026.9.7) \u00b7 upstream <varies> \u00b7 local 2237be35 (+1 carried commit)`, and the `2237be35` token is a prefix of the contractual pin 2237be355906fbe6065ce1815711eee52b2d646e, so the runner's `_reference_is_pinned` resolves pinned=true from `--version` alone. No `pinned=false` override is declared and this fixture claims PASS. The pinned openclaw reference(s) (3a9d69db306cd7f081e06254cb89c4bcc14a7107) remain byte-comparable where declared.",
   "evidence": {
     "voice_utterance": null,
     "dashboard_route": null,
@@ -70,6 +100,12 @@
       "audit_receipt_proof": "not exposed by this fixture's surface",
       "package_proof": "not exposed by this fixture's surface",
       "response_headers": "not exposed by this fixture's surface"
-    }
-  }
+    },
+    "test_ids": [
+      "tests/test_oc_state_agent9_memory.py::test_remember_search_forget_roundtrip_and_persistence"
+    ]
+  },
+  "test_ids": [
+    "tests/test_oc_state_agent9_memory.py::test_remember_search_forget_roundtrip_and_persistence"
+  ]
 }

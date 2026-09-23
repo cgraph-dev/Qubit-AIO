@@ -1,6 +1,6 @@
-"""Qubit-scoped read-only git inspection (safe Hermes web_git equivalent).
+"""Qubit-scoped read-only git inspection (safe Qubit web_git equivalent).
 
-Hermes exposed git state inside its files/projects dashboard. Qubit keeps
+Qubit exposed git state inside its files/projects dashboard. Qubit keeps
 the workflow (status, log, diff, show) but only as bounded read-only
 operations: fixed argv, no shell, project-root confinement, no network,
 no checkout/commit/reset/push/fetch/pull/clone. Anything mutating is a

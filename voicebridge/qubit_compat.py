@@ -1,0 +1,11893 @@
+"""Qubit-dashboard compatibility backend (owner amendment 2026-09-11).
+
+Serves the vendored Qubit dashboard (``frontend/qubit-web/``, byte-identical
+at pinned hermes-agent@2237be3) from the Qubit backend. Every route calls the
+SAME Qubit operation modules as the CLI (``voicebridge/cli.py``) and voice
+(``voicebridge/voice_commands.py``): same stores, same permission broker, same
+confirmation journal, same audit/redaction, same emergency stop.
+
+Unsafe upstream actions (raw PTY spawn, file mkdir/upload-stream, secret
+reveal, credential pool, config-raw dump, debug-share state dump, gateway
+process supervision, remote hub fetch, external update/portal, OAuth token
+dance) stay behind Qubit policy and return typed unavailable/refused states
+(amendment point 9) — never fabricated success.
+
+Vendored frontend files are NEVER modified here; Qubit additions (brand
+theme, Qubit Chat, Qubit tabs) are served as plugin manifests + bundles
+from ``frontend/qubit-app/`` (overlay).
+"""
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+import re
+import time
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+# Overlay (theme + plugins) resolution: package data first (clean wheel
+# install), then the checkout. Keeps an isolated install self-contained.
+from . import resources as _resources  # noqa: E402
+from . import qubit_plugins as _qubit_plugins  # noqa: E402
+OVERLAY_DIR = _resources.resource_path("frontend/qubit-app")
+
+Handler = Callable[..., Tuple[int, Dict[str, Any]]]
+
+
+def _redact(text: Any) -> str:
+    try:
+        from .redaction import redact_text
+        return redact_text(str(text))
+    except Exception:
+        return str(text)
+
+
+def _audit(op: str, actor: str, detail: Dict[str, Any]) -> None:
+    try:
+        from .logging_setup import log_event
+        # ``log_event(event, **fields)`` takes keyword fields only. Passing the
+        # detail dict positionally raised ``TypeError`` here and the bare
+        # ``except`` swallowed it, so every compat audit write was a silent
+        # no-op. Pass the fields as keywords so the journal is actually written.
+        fields = {k: _redact(v)[:160] for k, v in detail.items()}
+        fields["actor"] = actor
+        log_event(f"qubit_compat.{op}", **fields)
+    except Exception:
+        pass
+
+
+def audit_event(op: str, actor: str, detail: Dict[str, Any]) -> None:
+    """Public single-audit-path writer for CLI/voice/dashboard/bridge callers."""
+    _audit(op, actor, detail)
+
+
+def _estop(cfg: Any) -> bool:
+    # Fail closed: if the single e-stop authority cannot be read, treat the
+    # system as stopped rather than allowing a mutating path to proceed.
+    try:
+        from .broker import estop_engaged
+        return bool(estop_engaged(cfg))
+    except Exception:
+        try:
+            from . import power as PW
+            return bool(PW.estop_engaged(cfg))
+        except Exception:
+            return True
+
+
+def _gate(code: str, detail: str, counterpart: str,
+          http: int = 403, owner: str = "qubit-policy",
+          rollback: str = "nothing changed; nothing to roll back",
+          **extra: Any) -> Tuple[int, Dict[str, Any]]:
+    out: Dict[str, Any] = {"ok": False, "state": "UNAVAILABLE", "code": code,
+                           "detail": detail, "qubit_counterpart": counterpart,
+                           "owner": owner, "rollback": rollback}
+    if extra:
+        out.update(extra)
+    return http, out
+
+
+def _ok(**fields: Any) -> Tuple[int, Dict[str, Any]]:
+    out = {"ok": True}
+    out.update(fields)
+    return 200, out
+
+
+def _staged(detail: str, confirmation_id: str,
+            extra: Optional[Dict[str, Any]] = None) -> Tuple[int, Dict[str, Any]]:
+    """Staged-confirmation response: HTTP 409, never 2xx.
+
+    The vendored Qubit UI treats any 2xx as executed success (the Skills
+    page flips its toggle and toasts success on resolve), so a staged
+    confirmation answered 202 would render fabricated success. 409 forces
+    the UI error path; the typed envelope plus the pending-approvals
+    banner (GET/POST /api/ops/approvals|confirm|cancel, same journal as
+    CLI/voice/classic) is the real completion path. One journal, one path.
+    """
+    out: Dict[str, Any] = {
+        "ok": False, "state": "NEEDS_CONFIRMATION",
+        "code": "CONFIRM_REQUIRED", "detail": detail,
+        "confirmation_id": confirmation_id,
+        "qubit_counterpart": "pending-approvals banner "
+                             "(POST /api/ops/confirm) + CLI "
+                             "`qubit approvals respond` + voice yes",
+    }
+    if extra:
+        out.update(extra)
+    return 409, out
+
+
+def _truthy(value: Any) -> bool:
+    """Wire-truth for a confirm flag: ``True``, ``"true"``, ``1``, ``"yes"``."""
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _mutation_envelope(out: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    """Adapt a canonical mutation-contract dict to the compat wire envelope.
+
+    The ``verified_skills.mutations`` / ``toolsets`` contracts return the exact
+    HTTP status under ``http`` (409 needs-confirm, 400/403/409 typed refusal,
+    200 executed); the compat layer only re-emits it so the SPA sees the same
+    typed code + populated ``confirmation_id`` the CLI/voice/banner share.
+    """
+    http = int(out.get("http", 200) or 200)
+    return http, out
+
+
+def _stage_compat_confirm(cfg: Any, action: str, detail: str,
+                          payload: Optional[Dict[str, Any]] = None) -> str:
+    """Mint a single-use confirmation on the shared journal; return its id.
+
+    Used by the compat helpers that have no canonical mutation module (cron).
+    ``payload`` is the already-validated, secret-filtered scalar set the write
+    would apply; it is recorded on the journal entry so the pending-approvals
+    banner's id-only Confirm (``POST /api/ops/confirm``) can execute the real
+    backend instead of only settling the entry. Empty string on failure so the
+    caller still returns the typed 409 with an honest (if unusable) id rather
+    than a fabricated success.
+    """
+    try:
+        from .dashboard_ops import _journal
+        approval = _journal(cfg).create(
+            "qubit." + str(action), detail, ttl_s=120.0,
+            session="dashboard", actor="dashboard:user", action=str(action),
+            payload=dict(payload) if isinstance(payload, dict) else None)
+        _audit("needs_confirm", "dashboard:user",
+               {"action": str(action), "confirmation_id": approval.id})
+        return approval.id
+    except Exception:
+        return ""
+
+
+def _compat_confirm(cfg: Any, action: str, detail: str,
+                    query: Optional[Dict[str, str]] = None,
+                    body: Optional[Dict[str, Any]] = None,
+                    payload: Optional[Dict[str, Any]] = None
+                    ) -> Optional[Tuple[int, Dict[str, Any]]]:
+    """Shared confirm contract for compat mutations without a canonical module.
+
+    Returns ``None`` when the request may proceed: either an explicit
+    ``confirm`` (body or query) is truthy, or a ``confirmation_id`` staged by a
+    prior call for the SAME action is present and still pending (it is consumed
+    here, exactly once). Otherwise stages a fresh single-use approval — with
+    ``payload`` (the validated scalar set) recorded on it — and returns a typed
+    409 whose ``confirmation_id`` is real and usable by both the re-issue path
+    and the id-only ``POST /api/ops/confirm`` path.
+    """
+    b = body or {}
+    q = query or {}
+    # Emergency stop is the single mutation gate: a confirm-gated compat
+    # mutation must refuse while it is latched, before staging or consuming any
+    # approval. This covers every handler that routes through _compat_confirm
+    # (cron, mcp, webhooks, profiles, ...) from one place.
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; mutation refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    if _truthy(b.get("confirm")) or _truthy(q.get("confirm")):
+        return None
+    cid = str(b.get("confirmation_id", "")
+              or q.get("confirmation_id", "") or "").strip()
+    if cid:
+        try:
+            from .dashboard_ops import _journal
+            from . import voice_commands as VC
+            journal = _journal(cfg)
+            target = journal.get(cid)
+            if target is not None and target.state == "in_progress" \
+                    and str(target.capability) == "qubit." + str(action):
+                journal.respond(cid, "approve")
+                if VC._mark_executed(cfg, cid):
+                    return None
+        except Exception:
+            pass
+    return _staged(detail, _stage_compat_confirm(cfg, action, detail, payload))
+
+
+def _jsonable(value: Any) -> Any:
+    """Recursively convert non-JSON scalars (``Path``) to strings.
+
+    The vendored discovery returns ``Path`` objects for plugin dirs (the
+    upstream web layer has a Path-aware encoder; Qubit's ``_json`` does not),
+    so the compat boundary normalises them rather than emitting a 500.
+    """
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return value
+
+
+def _res(out: Dict[str, Any]) -> Any:
+    """Unwrap a dashboard_ops envelope to its structured result.
+
+    run_op returns voice-pipeline outcomes whose ``receipt`` nests the real
+    payload under ``result`` ({entry, session, result}); handlers adapt the
+    inner result to Qubit wire shapes, not the speech envelope.
+    """
+    rec = out.get("receipt")
+    if isinstance(rec, dict) and "result" in rec:
+        return rec["result"]
+    return rec
+
+
+def _fail(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    return 500, {"ok": False, "state": "FAILED", "code": "EXECUTOR_ERROR",
+                 "detail": _redact(str(exc))[:300]}
+
+
+# ---------------------------------------------------------------------------
+# Power / e-stop (ONE authority: same PowerControl the CLI/voice/classic page use)
+# ---------------------------------------------------------------------------
+
+def h_power(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/power (and the SPA alias /agent/api/power).
+
+    Read-only grant/control/MCP inventory, plus an optional capability policy
+    check. Never mutates; mutations are :func:`power_action` with explicit
+    confirmation. Delegates to ``voicebridge.power`` so the classic dashboard and
+    the SPA observe the SAME e-stop latch.
+    """
+    from . import power as PW
+    try:
+        if q.get("capability"):
+            policy = PW.power_policy(cfg)
+            out = policy.check(
+                q["capability"],
+                scopes=tuple(str(q.get("scope", "")).split(","))
+                if q.get("scope") else (),
+                target=q.get("target", "") or "",
+                role=q.get("role", "") or "",
+                account_scope=q.get("account", "") or "")
+            out["state"] = "OK" if out.get("allowed") else "denied"
+            return 200, out
+        store = PW.power_grant_store(cfg)
+        return 200, {
+            "state": "OK",
+            "profile": PW.power_profile(cfg),
+            "grant": store.grant().to_dict() if store.grant() else None,
+            "grant_health": store.health(),
+            "control": PW.power_control(cfg).status(),
+            "mcp": PW.mcp_status(cfg),
+        }
+    except PW.PowerError as exc:
+        return 200, {"state": "failed",
+                     "code": getattr(exc, "code", "POWER_ERROR"),
+                     "detail": _redact(str(exc))[:200]}
+    except Exception as exc:
+        return 200, {"state": "degraded", "detail": _redact(str(exc))[:200]}
+
+
+def power_action(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/power (and the SPA alias /agent/api/power).
+
+    Confirm-gated mutations on the shared power authority: grant/revoke/
+    reset-grant and the e-stop verbs emergency-stop/reset/disable/enable. A
+    request without explicit confirmation is a typed ``CONFIRMATION_REQUIRED``
+    denial; it never latches the e-stop or grants a capability by accident.
+    """
+    from . import power as PW
+    action = str(b.get("action", "") or "")
+    # ``confirmed`` is the classic wire flag; ``confirm`` is accepted too so the
+    # SPA's standard settle contract works on the alias.
+    confirmed = _truthy(b.get("confirmed")) or _truthy(b.get("confirm"))
+    try:
+        store = PW.power_grant_store(cfg)
+        control = PW.power_control(cfg)
+        if action == "grant":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "grant requires explicit confirmation"}
+            g = store.issue(
+                browsers=tuple(b.get("browsers") or ()),
+                apps=tuple(b.get("apps") or ()),
+                accounts=tuple(b.get("accounts") or ()),
+                origins=tuple(b.get("origins") or ()),
+                directories=tuple(b.get("directories") or ()),
+                scopes=tuple(b.get("scopes") or ()),
+                capabilities=tuple(b.get("capabilities") or ()),
+                ttl_s=b.get("ttl"),
+                note=str(b.get("note", ""))[:2000],
+                issued_by="dashboard")
+            return 200, {"state": "OK", "grant": g.to_dict()}
+        if action == "revoke":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "revoke requires explicit confirmation"}
+            g = store.revoke(str(b.get("grant_id", "")), issued_by="dashboard")
+            return 200, {"state": "OK", "revoked": g.to_dict()}
+        if action == "reset-grant":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "reset-grant requires explicit "
+                                       "confirmation"}
+            store.reset(issued_by="dashboard")
+            return 200, {"state": "OK", "grant": None}
+        if action == "emergency-stop":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "emergency stop requires explicit "
+                                       "confirmation"}
+            return 200, control.emergency_stop(issued_by="dashboard")
+        if action == "reset":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "reset requires explicit human "
+                                       "confirmation"}
+            return 200, control.reset(issued_by="dashboard")
+        if action == "disable":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "disable requires explicit "
+                                       "confirmation"}
+            return 200, control.global_disable(issued_by="dashboard")
+        if action == "enable":
+            if not confirmed:
+                return 200, {"state": "denied", "code": "CONFIRMATION_REQUIRED",
+                             "detail": "enable requires explicit confirmation"}
+            return 200, control.global_enable(issued_by="dashboard")
+        return 400, {"state": "failed",
+                     "detail": f"unknown action {action}"}
+    except PW.PowerDenied as exc:
+        return 200, {"state": "denied", "code": exc.code,
+                     "detail": _redact(exc.detail)[:200]}
+    except PW.PowerError as exc:
+        return 200, {"state": "failed",
+                     "code": getattr(exc, "code", "POWER_ERROR"),
+                     "detail": _redact(str(exc))[:200]}
+    except Exception as exc:
+        return 200, {"state": "failed", "detail": _redact(str(exc))[:200]}
+
+
+# ---------------------------------------------------------------------------
+# Readers (shared Qubit modules — same functions CLI/voice call)
+# ---------------------------------------------------------------------------
+
+def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_inventory as RI
+    # One canonical runtime inventory (the same function the CLI `qubit status`
+    # and voice `system status` call). Never return a 200 with an empty
+    # backend payload.
+    inv = RI.runtime_inventory(cfg) if hasattr(RI, "runtime_inventory") else {}
+    if not isinstance(inv, dict):
+        inv = {}
+    core = inv
+    model = ""
+    try:
+        from . import agent as AG
+        model = AG._model(cfg)
+    except Exception:
+        model = ""
+    try:
+        state_dir = str(Path(cfg.state_dir()))
+    except Exception:
+        state_dir = ""
+    try:
+        from . import distribution as D
+        version = str(getattr(D, "VERSION", "1.0.0"))
+    except Exception:
+        version = "1.0.0"
+    sessions_count = 0
+    try:
+        from .auth_status import recent_sessions as _rs
+        sessions_count = int(_rs(cfg, 100).get("count", 0))
+    except Exception:
+        sessions_count = 0
+    # StatusResponse wire shape (web/src/lib/api.ts). Gateway-process fields
+    # come from the real supervisor (systemd + port probe), not a hard-coded
+    # negative: a running Qubit service is reported running, and a host with
+    # no systemd reports a typed UNAVAILABLE state.
+    gw: Dict[str, Any] = {}
+    try:
+        from . import gateway_supervisor as GS
+
+        gw = GS.status(cfg)
+    except Exception:  # noqa: BLE001 - status must never crash the route
+        gw = {}
+    return _ok(schema="qubit-runtime-status/1",
+               model=model, qubit=core,
+               active_sessions=sessions_count,
+               auth_required=False, auth_providers=[], auth_flows=[],
+               can_update_qubit=False,
+               config_path=state_dir, config_version=1, env_path=state_dir,
+               gateway_exit_reason=None, gateway_health_url=None,
+               gateway_pid=gw.get("pid"), gateway_platforms={},
+               gateway_running=bool(gw.get("running")),
+               gateway_state=(gw.get("state") if gw.get("running")
+                              else (gw.get("active_state") or "unknown")),
+               gateway_updated_at=None,
+               gateway_service_unit=gw.get("service_unit"),
+               gateway_detail=gw.get("detail", ""),
+               qubit_home=state_dir, latest_config_version=1,
+               release_date="2026-09-11", version="qubit-" + version,
+               detail="Qubit single-authority backend; gateway process "
+                      "supervision runs through the Qubit-owned service unit")
+
+
+def h_runtime(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Canonical runtime inventory on the SPA-prefixed API path.
+
+    The product SPA rewrites every ``/api/*`` call to ``/agent/api/*`` (see
+    ``web/src/lib/api.ts``), so the debug overlay's ``api.getRuntime()`` reaches
+    ``/agent/api/runtime``. The classic ``webui.py`` branch serves
+    ``/api/runtime`` directly; without this compat route the SPA path 404'd and
+    the overlay silently rendered no inventory. Both routes call the same
+    ``runtime_inventory`` so there is one authority and one wire shape.
+    """
+    from .runtime_inventory import runtime_inventory
+    inv = runtime_inventory(cfg)
+    if not isinstance(inv, dict):
+        inv = {}
+    return _ok(**inv)
+
+
+def h_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Lightweight liveness (HealthResponse wire shape): ok/version/auth_required.
+
+    Backed by the real installation-health inventory
+    (``voicebridge.lifecycle.health_inventory``) — the same module
+    ``qubit setup health`` calls. A DEGRADED aggregate is reported verbatim;
+    liveness itself is never fabricated READY when the probe raises.
+    """
+    code, status_out = h_status(cfg, q, b, p)
+    if code != 200:
+        return code, status_out
+    state = "READY"
+    detail = "Qubit backend process is live"
+    try:
+        from .lifecycle import health_inventory
+        inv = health_inventory(cfg)
+        if isinstance(inv, dict) and inv.get("state"):
+            state = str(inv["state"])
+    except Exception as exc:
+        state = "DEGRADED"
+        detail = "installation-health inventory unavailable: " + \
+            _redact(str(exc))[:160]
+    return _ok(version=status_out.get("version", "qubit-1.0.0"),
+               auth_required=False, state=state, detail=detail)
+
+
+def h_auth_me(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # AuthMeResponse wire shape: local loopback operator identity.
+    return _ok(user_id="local-operator", email="", display_name="Qubit Operator",
+               org_id="local", provider="loopback", expires_at=0,
+               authenticated=True, actor="dashboard:user", mode="loopback-token",
+               detail="loopback session-token auth; no OAuth dance")
+
+
+def h_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    try:
+        from .webui import WebUI  # noqa
+    except Exception:
+        pass
+    items: List[Dict[str, Any]] = []
+    try:
+        state_dir = Path(cfg.state_dir())
+        for name in ("webui_events.jsonl", "events.jsonl", "audit.jsonl"):
+            fp = state_dir / name
+            if not fp.exists():
+                continue
+            lines = fp.read_text(errors="replace").splitlines()[-100:]
+            for line in lines:
+                try:
+                    ev = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(ev, dict):
+                    items.append({k: _redact(v)[:300] if isinstance(v, str) else v
+                                  for k, v in ev.items()})
+            if items:
+                break
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(events=items[-int(q.get("limit", "100") or "100"):],
+               count=len(items))
+
+
+def h_pub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST/WEBSOCKET /api/pub -> publish into the single Qubit event journal.
+
+    The upstream ``/api/pub`` is a WebSocket channel broadcaster. Qubit keeps
+    one event path and never starts a second WS server, so the Qubit-safe
+    equivalent appends the redacted, validated event to the same
+    ``<state_dir>/typed-events.jsonl`` journal the dashboard feed and
+    communications runtime read. It returns the durable ``seq``.
+    """
+    channel = str(b.get("channel", b.get("name", "dashboard")) or "dashboard")
+    message = b.get("data", b.get("message", b.get("text", "")))
+    try:
+        from .events.journal import EventJournal
+        journal = EventJournal(_store_path(cfg, "typed-events.jsonl"))
+        record = journal.append("CUSTOM", name=channel, value=message)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("pub", "dashboard:user", {"channel": channel,
+                                     "seq": record.get("seq")})
+    return _ok(ok=True, channel=channel, seq=record.get("seq"),
+               published=True,
+               detail="published to the single Qubit event journal")
+
+
+# ---------------------------------------------------------------------------
+# A10 — one session authority. Every receipt-lifecycle reader resolves the
+# store through ``auth_status.session_authority()`` (the single declared
+# contract) instead of importing a private store, so the dashboard cannot
+# drift onto a second writable session store or the fork's read-only state.db.
+# ---------------------------------------------------------------------------
+RECEIPT_SESSION_AUTHORITY = "voicebridge.auth_status.SessionStore"
+#: The single *chat transcript* authority (C7): the strict adapter
+#: ``QubitSessionStore`` over the vendored ``qubit_state.SessionDB``
+#: (``state.db``). The terminal/TUI/agent and the dashboard Sessions surface
+#: and ``/qubit-chat`` all read/write that ONE database, so conversation
+#: history is visible identically on every surface.
+CHAT_SESSION_AUTHORITY = "voicebridge.qubit_session_store.QubitSessionStore"
+#: Maximum canonical chat sessions one dashboard sessions-page read returns.
+#: The adapter's own page cap is 100; the page must not silently hide the
+#: sessions past the first page (the single ``state.db`` holds the full agent
+#: history, so a capped read understated both the list and the stats totals).
+_SESSIONS_CHAT_PAGE_MAX = 1000
+
+
+def session_authority_contract() -> Dict[str, Any]:
+    """The single session-authority contract (delegated, read-only)."""
+    from . import auth_status as AS
+
+    return AS.session_authority()
+
+
+def _chat_session_store(cfg: Any) -> Any:
+    """Open the chat-transcript store named by the session authority.
+
+    Fails closed with a typed error if the declared authority ever changes, so
+    a dashboard reader can never silently read a different store or the fork's
+    read-only ``state.db`` (the split-brain the single-authority contract
+    forbids).
+    """
+    from . import chat_transport as CT
+
+    writable = session_authority_contract().get("writable_authorities", {}) or {}
+    if writable.get("chat_transcript") != CHAT_SESSION_AUTHORITY:
+        raise RuntimeError(
+            "session authority contract drift: chat_transcript is "
+            f"{writable.get('chat_transcript')!r}, expected "
+            f"{CHAT_SESSION_AUTHORITY!r}")
+    return CT.store(cfg)
+
+
+def _receipt_session_store(cfg: Any) -> Any:
+    """Open the receipt-lifecycle store named by the session authority.
+
+    Fails closed with a typed error if the declared authority ever changes,
+    so a reader can never silently read a different store.
+    """
+    from . import auth_status as AS
+
+    writable = session_authority_contract().get("writable_authorities", {}) or {}
+    if writable.get("receipt_lifecycle") != RECEIPT_SESSION_AUTHORITY:
+        raise RuntimeError(
+            "session authority contract drift: receipt_lifecycle is "
+            f"{writable.get('receipt_lifecycle')!r}, expected "
+            f"{RECEIPT_SESSION_AUTHORITY!r}")
+    return AS.session_store(cfg)
+
+
+def _chat_session_rows(cfg: Any, *, query: str = "",
+                       limit: int = _SESSIONS_CHAT_PAGE_MAX,
+                       offset: int = 0) -> Dict[str, Any]:
+    """Canonical chat-transcript sessions (single authority: ChatSessionStore).
+
+    The store already returns the ``SessionInfo`` shape (``source="qubit-chat"``)
+    so the dashboard Sessions surface reflects the same rows ``/qubit-chat``
+    writes. ``limit`` defaults to the full page bound so a read cannot silently
+    hide canonical sessions behind the adapter's per-call page. A read failure
+    degrades to an empty list; it never fabricates rows.
+    """
+    try:
+        res = _chat_session_store(cfg).list(limit=limit, offset=offset,
+                                            query=query)
+    except Exception:
+        return {"sessions": [], "total": 0}
+    rows = [_rebrand_chat_record(r) for r in res.get("sessions", [])]
+    return {"sessions": rows, "total": int(res.get("total", len(rows)))}
+
+
+def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    try:
+        limit = max(1, min(int(q.get("limit", "50") or "50"), 100))
+    except ValueError:
+        limit = 50
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    query = str(q.get("q", q.get("query", "")) or "").strip()
+    # Source filters + ordering the SPA sends (api.ts appendSessionFilters).
+    # ``sources``/``exclude_sources`` arrive comma-joined; a single ``source``
+    # is an exact match. Ignoring these made the Chats/Automation/All segments
+    # and the source popover no-ops.
+    source = str(q.get("source", "") or "").strip()
+    sources = [s.strip() for s in str(q.get("sources", "") or "").split(",")
+               if s.strip()]
+    exclude = [s.strip() for s in str(q.get("exclude_sources", "") or "")
+               .split(",") if s.strip()]
+    order = str(q.get("order", "") or "").strip().lower()
+    # The canonical chat transcripts (the single session authority) come first,
+    # then the receipt-lifecycle rows the automation lane writes. Both are real
+    # store reads; neither is synthesized, and a shared id is never duplicated.
+    merged: Dict[str, Dict[str, Any]] = {}
+    for row in _chat_session_rows(cfg, query=query)["sessions"]:
+        rid = str(row.get("id", ""))
+        if rid:
+            merged[rid] = row
+    store = _receipt_session_store(cfg)
+    if query:
+        res = store.search(query, 200)
+    else:
+        res = store.list(200)
+    for r in res.get("sessions", []):
+        rid = str(r.get("receipt_id") or r.get("action_id") or r.get("id", ""))
+        if not rid or rid in merged:
+            continue
+        merged[rid] = {
+            "id": rid,
+            "source": "qubit-receipts",
+            "model": None,
+            "title": (r.get("name") or (r.get("detail") or "")[:80] or rid) or None,
+            "name": r.get("name"),
+            "archived": bool(r.get("archived", False)),
+            "started_at": r.get("created_at") or 0,
+            "ended_at": None,
+            "last_active": r.get("created_at") or 0,
+            "is_active": False,
+            "message_count": 0,
+            "tool_call_count": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "preview": (r.get("detail") or "")[:200],
+            "state": r.get("state"),
+            "code": r.get("code"),
+            "receipt_id": r.get("receipt_id"),
+            "action_id": r.get("action_id"),
+        }
+    rows = list(merged.values())
+    if source:
+        rows = [r for r in rows if str(r.get("source", "")) == source]
+    if sources:
+        allowed = set(sources)
+        rows = [r for r in rows if str(r.get("source", "")) in allowed]
+    if exclude:
+        blocked = set(exclude)
+        rows = [r for r in rows if str(r.get("source", "")) not in blocked]
+    if order == "created":
+        rows.sort(key=lambda r: r.get("started_at") or 0, reverse=True)
+    else:
+        rows.sort(key=lambda r: r.get("last_active") or 0, reverse=True)
+    return _ok(sessions=rows[offset:offset + limit], total=len(rows),
+               limit=limit, offset=offset, store_state=res.get("state", "OK"),
+               store_authority=CHAT_SESSION_AUTHORITY + "+"
+                               + RECEIPT_SESSION_AUTHORITY)
+
+
+def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    chat_items = _chat_session_rows(cfg).get("sessions", [])
+    res = _receipt_session_store(cfg).list(100)
+    items = res.get("sessions", [])
+    by_state: Dict[str, int] = {}
+    for r in items:
+        key = str(r.get("state", "?"))
+        by_state[key] = by_state.get(key, 0) + 1
+    archived = sum(1 for r in chat_items if r.get("archived"))
+    messages = sum(int(r.get("message_count", 0) or 0) for r in chat_items)
+    total = len(chat_items) + len(items)
+    # SessionStoreStats wire shape (web/src/lib/api.ts): total, active_store,
+    # archived, messages, by_source. Receipts are append-only: archived=0.
+    return _ok(total=total, active_store=total - archived, archived=archived,
+               messages=messages,
+               by_source={"qubit-chat": len(chat_items),
+                          "qubit-receipts": len(items)},
+               by_state=by_state,
+               store_authority=CHAT_SESSION_AUTHORITY + "+"
+                               + RECEIPT_SESSION_AUTHORITY)
+
+
+def h_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    rid = p.get("id", "")
+    # Canonical chat transcript first: the user's real conversations live in
+    # the single chat-session authority, not the receipt journal.
+    try:
+        chat = _chat_session_store(cfg).show(rid)
+    except Exception:
+        chat = {"state": "MISSING"}
+    if str(chat.get("state")) == "OK" and isinstance(chat.get("session"), dict):
+        rec = _rebrand_chat_record(chat["session"])
+        preview = None
+        for m in reversed(chat.get("messages", []) or []):
+            if m.get("role") == "assistant" and m.get("content"):
+                preview = str(m["content"])[:200]
+                break
+        return _ok(id=rec.get("id", rid), source="qubit-chat",
+                   model=rec.get("model"),
+                   title=rec.get("name") or (preview[:80] if preview else rid),
+                   name=rec.get("name"),
+                   archived=bool(rec.get("archived", False)),
+                   started_at=rec.get("created_at", 0), ended_at=None,
+                   last_active=rec.get("updated_at", 0), is_active=False,
+                   message_count=int(rec.get("message_count", 0) or 0),
+                   tool_call_count=0, input_tokens=0, output_tokens=0,
+                   preview=preview, store_authority=CHAT_SESSION_AUTHORITY)
+    try:
+        res = _receipt_session_store(cfg).show(rid)
+    except Exception as exc:
+        return _fail(exc)
+    if str(res.get("state")) != "OK" or not isinstance(res.get("session"), dict):
+        return 404, {"ok": False, "code": res.get("code", "NOT_FOUND"),
+                     "detail": res.get("detail", f"no session {rid!r}")}
+    r = res["session"]
+    detail = str(r.get("detail", "") or "")
+    try:
+        created = float(r.get("created_at", 0) or 0)
+    except (TypeError, ValueError):
+        created = 0.0
+    # SessionInfo wire shape (web/src/lib/api.ts).
+    return _ok(id=rid, source="qubit-receipts", model=None,
+               title=(r.get("name") or detail[:80] or rid) or None,
+               name=r.get("name"), archived=bool(r.get("archived", False)),
+               started_at=created, ended_at=None, last_active=created,
+               is_active=False, message_count=0, tool_call_count=0,
+               input_tokens=0, output_tokens=0,
+               preview=detail[:200] or None,
+               state=str(r.get("state", "") or ""),
+               store_authority=RECEIPT_SESSION_AUTHORITY)
+
+
+def h_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Rename / archive a session (canonical chat store, then receipts)."""
+    rid = p.get("id", "")
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session change refused"}
+    if "name" not in b and b.get("archived") is None:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "patch needs name or archived"}
+    # Chat transcripts rename/archive in the single session authority the
+    # /qubit-chat surface lists; never a receipt-only shadow row. Resolve the
+    # raw row (``rename``/``archive`` do not gate on ``show``), because
+    # ``show`` reports an archived session as MISSING — gating on it made an
+    # archived session un-restorable/un-renamable from the dashboard.
+    try:
+        cs: Any = _chat_session_store(cfg)
+    except Exception:
+        cs = None
+    if cs is not None:
+        try:
+            if "name" in b:
+                res = cs.rename(rid, str(b.get("name", "")))
+            else:
+                res = cs.archive(rid, bool(b.get("archived")))
+        except Exception as exc:
+            return _fail(exc)
+        if str(res.get("state")) != "MISSING":
+            ok = str(res.get("state")) == "OK"
+            if ok:
+                _audit("session.patch", "dashboard:user",
+                       {"id": str(rid), "action": "name" if "name" in b
+                        else "archived"})
+            return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                          "code": res.get("code"),
+                                          "detail": _redact(
+                                              res.get("detail", ""))[:200],
+                                          "session": res.get("session")}
+    store = _receipt_session_store(cfg)
+    try:
+        if "name" in b:
+            res = store.rename(rid, str(b.get("name", "")))
+        elif b.get("archived") is not None:
+            res = (store.archive(rid) if b.get("archived")
+                   else store.resume(rid))
+        else:
+            return 400, {"ok": False, "code": "MALFORMED",
+                         "detail": "patch needs name or archived"}
+    except Exception as exc:
+        return _fail(exc)
+    ok = str(res.get("state")) == "OK"
+    if ok:
+        _audit("session.patch", "dashboard:user",
+               {"id": str(rid), "action": "name" if "name" in b
+                else "archived"})
+    return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                  "code": res.get("code"),
+                                  "detail": _redact(
+                                      res.get("detail", ""))[:200],
+                                  "session": res.get("session")}
+
+
+def h_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Delete a session (canonical chat store, then receipt tombstone)."""
+    rid = p.get("id", "")
+    confirm = bool(b.get("confirm", False))
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session delete refused"}
+    # The canonical chat store deletes the real transcript (recoverable from a
+    # backup); a receipt row deletes its lifecycle tombstone. ``delete`` does
+    # not gate on ``show``, so an already-archived chat row is still handled
+    # here rather than falling through to a 404 receipt lookup.
+    try:
+        cs: Any = _chat_session_store(cfg)
+    except Exception:
+        cs = None
+    if cs is not None:
+        try:
+            res = cs.delete(rid, confirm=confirm)
+        except Exception as exc:
+            return _fail(exc)
+        if str(res.get("state")) != "MISSING":
+            if not confirm:
+                return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
+                             "code": res.get("code", "CONFIRM_REQUIRED"),
+                             "detail": res.get("detail", ""),
+                             "qubit_counterpart": "re-DELETE with "
+                                                  "{\"confirm\": true}"}
+            ok = str(res.get("state")) == "OK"
+            if ok:
+                _audit("session.delete", "dashboard:user", {"id": str(rid)})
+            return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                          "code": res.get("code"),
+                                          "detail": _redact(
+                                              res.get("detail", ""))[:200],
+                                          "session": res.get("session")}
+    try:
+        res = _receipt_session_store(cfg).delete(rid, confirm=confirm)
+    except Exception as exc:
+        return _fail(exc)
+    if not confirm:
+        return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
+                     "code": res.get("code", "CONFIRM_REQUIRED"),
+                     "detail": res.get("detail", ""),
+                     "qubit_counterpart": "re-DELETE with {\"confirm\": true}; "
+                                          "recover with POST resume"}
+    ok = str(res.get("state")) == "OK"
+    if ok:
+        _audit("session.delete", "dashboard:user", {"id": str(rid)})
+    return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                  "code": res.get("code"),
+                                  "detail": _redact(
+                                      res.get("detail", ""))[:200],
+                                  "session": res.get("session")}
+
+
+def h_session_resume(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    rid = p.get("id", "")
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session resume refused"}
+    # Un-archive a chat transcript in the canonical store first. ``restore``
+    # (like ``archive``) does not gate on ``show``, so an archived session —
+    # which ``show`` reports as MISSING — is still restorable here.
+    try:
+        cs: Any = _chat_session_store(cfg)
+    except Exception:
+        cs = None
+    if cs is not None:
+        try:
+            res = cs.restore(rid)
+        except Exception as exc:
+            return _fail(exc)
+        if str(res.get("state")) != "MISSING":
+            ok = str(res.get("state")) == "OK"
+            if ok:
+                _audit("session.resume", "dashboard:user", {"id": str(rid)})
+            return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                          "code": res.get("code"),
+                                          "detail": _redact(
+                                              res.get("detail", ""))[:200]}
+    try:
+        res = _receipt_session_store(cfg).resume(rid)
+    except Exception as exc:
+        return _fail(exc)
+    ok = str(res.get("state")) == "OK"
+    if ok:
+        _audit("session.resume", "dashboard:user", {"id": str(rid)})
+    return (200 if ok else 400), {"ok": ok, "state": res.get("state"),
+                                  "code": res.get("code"),
+                                  "detail": _redact(
+                                      res.get("detail", ""))[:200]}
+
+
+def h_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    rid = p.get("id", "")
+    try:
+        limit = max(1, min(int(q.get("limit", "500") or "500"), 1000))
+    except ValueError:
+        limit = 500
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    # The canonical chat transcript is the real session history: return its
+    # messages so the dashboard can reopen a conversation, not a receipt stub.
+    try:
+        chat = _chat_session_store(cfg).messages(rid, limit=limit, offset=offset)
+    except Exception:
+        chat = {"state": "MISSING"}
+    if str(chat.get("state")) == "OK":
+        return _ok(session_id=chat["session_id"],
+                   messages=_rebrand_chat_messages(chat["messages"]),
+                   total=chat["total"],
+                   pagination={"limit": chat["limit"], "offset": chat["offset"],
+                               "order": "asc", "returned": len(chat["messages"]),
+                               "total": chat["total"]},
+                   store_authority=CHAT_SESSION_AUTHORITY)
+    code, out = h_session_show(cfg, q, b, p)
+    if code != 200:
+        return code, out
+    # SessionMessagesResponse wire shape; receipt rows hold no chat transcript.
+    return _ok(session_id=rid,
+               messages=[{"role": "system",
+                          "content": _redact(json.dumps(out))[:2000],
+                          "timestamp": out.get("last_active", 0)}],
+               pagination={"limit": 500, "offset": 0, "order": "latest",
+                           "returned": 1},
+               detail="Qubit receipt rows are audit receipts, not chat "
+                      "transcripts; live conversation runs in Qubit Chat "
+                      "(agent.turn)")
+
+
+def _config_field_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    if isinstance(value, list):
+        return "list"
+    if isinstance(value, dict):
+        return "object"
+    return "string"
+
+
+def _config_fields(schema: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Flat ``dot.path -> field descriptor`` view of a nested config schema.
+
+    The served ConfigPage binds ``getSchema() -> {fields, category_order}``;
+    deriving the descriptors from the live ``Config`` defaults keeps the form
+    shape tied to the real settings tree instead of a wire-shape stub."""
+    fields: Dict[str, Dict[str, Any]] = {}
+
+    def walk(node: Dict[str, Any], prefix: str) -> None:
+        for key in sorted(node):
+            if str(key).startswith("_"):
+                continue
+            value = node[key]
+            full = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(value, dict):
+                walk(value, full)
+                continue
+            fields[full] = {
+                "type": _config_field_type(value),
+                "description": full.replace(".", " \u2192 ").replace("_", " ").title(),
+                "category": prefix.split(".")[0] if prefix else "general",
+                "default": value,
+            }
+
+    walk(schema, "")
+    return fields
+
+
+def _config_defaults() -> Dict[str, Any]:
+    from . import config as C
+    return _redact_config_tree(json.loads(json.dumps(C.DEFAULTS, default=str)))
+
+
+def _set_dotted(data: Dict[str, Any], dotted: str, value: Any) -> None:
+    parts = [p for p in str(dotted).split(".") if p]
+    if not parts:
+        return
+    node = data
+    for part in parts[:-1]:
+        nxt = node.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            node[part] = nxt
+        node = nxt
+    node[parts[-1]] = value
+
+
+def _flatten_config(data: Any, prefix: str = "") -> Dict[str, Any]:
+    """Flatten a nested settings body to ``dot.path -> scalar`` overrides.
+
+    The served ConfigPage sends ``{"config": {<nested tree>}}``; the override
+    store is a flat mapping. Walking both shapes here is what stops the nested
+    body from being silently dropped (fabricated success)."""
+    out: Dict[str, Any] = {}
+    if not isinstance(data, dict):
+        return out
+    for key, value in data.items():
+        if str(key) == "confirm":
+            continue
+        full = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            out.update(_flatten_config(value, full))
+        elif value is None or isinstance(value, (str, int, float, bool, list)):
+            out[full] = value
+    return out
+
+
+def _config_scalar_paths(defaults: Any, prefix: str = "") -> Dict[str, Any]:
+    """Map every real scalar setting to its ``dot.path`` and default value.
+
+    Used to reject unknown/mistyped settings writes instead of silently
+    persisting an arbitrary key (which would fabricate success)."""
+    out: Dict[str, Any] = {}
+    if not isinstance(defaults, dict):
+        return out
+    for key, value in defaults.items():
+        if str(key).startswith("_"):
+            continue
+        full = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            out.update(_config_scalar_paths(value, full))
+        else:
+            out[full] = value
+    return out
+
+
+def _merge_config_overrides(cfg: Any, data: Any) -> Any:
+    """Deep-merge persisted dashboard config overrides onto a served record.
+
+    The served ConfigPage reads the vendored runtime's config; overrides saved
+    through the confirm-gated dashboard write must be reflected on the next
+    read or the control would look dead. Redaction already ran, so this only
+    re-applies non-secret scalar overrides.
+    """
+    if not isinstance(data, dict):
+        return data
+    for dotted, value in _load_json_store(_config_overrides_read_path(cfg)).items():
+        try:
+            _set_dotted(data, dotted, value)
+        except Exception:
+            continue
+    return data
+
+
+def _is_secret_config_key(key: str) -> bool:
+    """True when a dotted config path names a secret-shaped leaf.
+
+    Matches both underscore and dotted paths (``dashboard.basic_auth.password``
+    and ``webui.token``), so the read side can redact exactly the leaves the
+    write side refuses.
+    """
+    leaf = str(key).rsplit(".", 1)[-1].lower()
+    return leaf in {
+        "password", "passwd", "secret", "token", "api_key", "apikey",
+        "access_key", "private_key", "client_secret", "auth_token",
+        "refresh_token", "bearer_token",
+    } or leaf.endswith(("_password", "_secret", "_token", "_key"))
+
+
+def _redact_config_tree(data: Any, prefix: str = "") -> Any:
+    """Replace secret-shaped scalar leaves with ``[REDACTED]``.
+
+    ``GET /api/config`` is a Settings read surface, not a secret-reveal route
+    (``/api/config/raw`` stays gated); the served tree must never carry a raw
+    secret value.
+    """
+    if isinstance(data, dict):
+        out: Dict[str, Any] = {}
+        for key, value in data.items():
+            full = f"{prefix}.{key}" if prefix else str(key)
+            if not isinstance(value, (dict, list)) \
+                    and _is_secret_config_key(full) \
+                    and value not in (None, "", "[REDACTED]"):
+                out[key] = "[REDACTED]"
+            else:
+                out[key] = _redact_config_tree(value, full)
+        return out
+    if isinstance(data, list):
+        return [_redact_config_tree(v, prefix) for v in data]
+    return data
+
+
+def _config_live(cfg: Any) -> Dict[str, Any]:
+    """The live Qubit config record: defaults deep-merged with the loaded YAML
+    plus any confirm-gated dashboard overrides, in the nested shape the served
+    Settings form reads and writes. Secret-shaped leaves are redacted."""
+    from . import config as C
+    base = getattr(cfg, "data", None)
+    data = json.loads(json.dumps(base if isinstance(base, dict) else C.DEFAULTS,
+                                 default=str))
+    for dotted, value in _load_json_store(_config_overrides_read_path(cfg)).items():
+        _set_dotted(data, dotted, value)
+    return _redact_config_tree(data)
+
+
+def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/config -> the live Qubit settings record (``Record<string, unknown>``).
+
+    The served ConfigPage binds ``getConfig()`` to this nested record; returning
+    the real tree (defaults + YAML + applied overrides) is what makes the form
+    render actual values rather than an empty shell.
+    """
+    try:
+        return 200, _config_live(cfg)
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_config_defaults(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/config/defaults -> the live Qubit default record."""
+    try:
+        return 200, _config_defaults()
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_config_schema(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/config/schema -> real ``{fields, category_order}`` descriptors.
+
+    Descriptors are derived from the live Qubit config schema (``Config``
+    defaults), so the Settings form groups and renders every real field instead
+    of the previous shape-only stub.
+    """
+    try:
+        from . import config as C
+        fields = _config_fields(C.DEFAULTS)
+        categories = {f["category"] for f in fields.values()}
+        order = [str(k) for k in C.DEFAULTS.keys()
+                 if str(k) in categories and not str(k).startswith("_")]
+        return 200, {"fields": fields, "category_order": order}
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_egress_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Egress proxy status (EgressStatusResponse wire shape: ``text``).
+
+    Backed by ``voicebridge.proxy_status`` (the proxy inventory) plus the
+    frontier network policy (``voicebridge.providers.policy``). No forwarding
+    server runs, so the text is the real typed policy, never a fake "up".
+    """
+    from . import proxy_status as PS
+    try:
+        proxy = PS.status()
+    except Exception as exc:
+        return _fail(exc)
+    frontier: Dict[str, Any] = {}
+    try:
+        from .providers.policy import FrontierPolicy
+        pol = FrontierPolicy.from_config(cfg)
+        frontier = {"enabled": bool(pol.enabled), "route": pol.route,
+                    "allowlist_count": len(pol.allowlist),
+                    "privacy_tier": pol.privacy_tier}
+    except Exception:
+        frontier = {}
+    text = (f"proxy: {proxy.get('state', 'UNKNOWN')}; "
+            f"frontier: {'enabled' if frontier.get('enabled') else 'disabled'}; "
+            f"{proxy.get('policy', '')}")
+    return _ok(text=text, proxy=proxy, frontier=frontier)
+
+
+def _qubit_model(cfg: Any) -> Dict[str, Any]:
+    from . import agent as AG
+    from . import dashboard_ops as OPS
+    name = ""
+    try:
+        name = AG._model(cfg)
+    except Exception:
+        name = "qubit-brain4"
+    ctx = 4096
+    try:
+        out = OPS.run_op(cfg, "prompt_budget", {}, actor="dashboard:user",
+                         session="dashboard")
+        res = _res(out) or {}
+        ctx = int((res.get("prompt_budget", {}) or {}).get("num_ctx", 4096))
+    except Exception:
+        pass
+    return {"name": name or "qubit-brain4", "ctx": ctx}
+
+
+def _resolved_model(cfg: Any) -> Dict[str, Any]:
+    """Effective provider/model/context from the canonical resolver.
+
+    Never hardcodes a synthetic provider: the dashboard model surfaces must
+    report the same effective selection as CLI/voice/``/chat``.
+    """
+    m = _qubit_model(cfg)
+    try:
+        from .providers import resolver as R
+
+        eff = R.resolve_model(cfg)
+    except Exception:
+        eff = None
+    if isinstance(eff, dict) and eff.get("ok"):
+        ctx = int(eff.get("context_tokens") or 0) or m["ctx"]
+        return {"model": str(eff.get("model") or m["name"]),
+                "provider": str(eff.get("provider") or ""),
+                "ctx": ctx,
+                "profile_id": str(eff.get("profile_id") or ""),
+                "kind": str(eff.get("kind") or ""),
+                "locality": str(eff.get("locality") or "")}
+    return {"model": m["name"], "provider": "ollama", "ctx": m["ctx"],
+            "profile_id": m["name"], "kind": "local", "locality": "local"}
+
+
+def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    r = _resolved_model(cfg)
+    ctx = r["ctx"]
+    # ModelInfoResponse wire shape.
+    return _ok(model=r["model"], provider=r["provider"],
+               auto_context_length=ctx, config_context_length=ctx,
+               effective_context_length=ctx,
+               capabilities={"supports_tools": True, "supports_vision": False,
+                             "supports_reasoning": False,
+                             "context_window": ctx,
+                             "max_output_tokens": 1024,
+                             "model_family": ("qwen3-4b"
+                                              if r["kind"] == "local"
+                                              else r["provider"])})
+
+
+def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    r = _resolved_model(cfg)
+    groups: Dict[str, Dict[str, Any]] = {}
+    try:
+        from .providers import resolver as R
+
+        for pr in R.list_profiles(cfg).get("profiles", []):
+            prov = str(pr.get("provider") or "")
+            mid = str(pr.get("model") or "")
+            if not prov:
+                continue
+            g = groups.setdefault(prov, {
+                "name": prov, "slug": prov, "models": [],
+                "is_current": False,
+                "is_user_defined": pr.get("kind") != "local",
+                "source": "qubit-model-profiles",
+                "authenticated": (pr.get("locality") == "local")
+                or bool(pr.get("has_secret_ref")),
+            })
+            if mid and mid not in g["models"]:
+                g["models"].append(mid)
+            if pr.get("id") == r["profile_id"]:
+                g["is_current"] = True
+    except Exception:
+        groups = {}
+    if not groups:
+        groups["ollama"] = {
+            "name": "ollama", "slug": "ollama", "models": [r["model"]],
+            "is_current": True, "is_user_defined": False,
+            "source": "qubit-brain4", "authenticated": True}
+    providers = []
+    for g in groups.values():
+        if not g["models"]:
+            g["models"] = [r["model"]]
+        g["total_models"] = len(g["models"])
+        providers.append(g)
+    if not any(x["is_current"] for x in providers):
+        providers[0]["is_current"] = True
+    # ModelOptionsResponse wire shape.
+    return _ok(model=r["model"], provider=r["provider"], providers=providers)
+
+
+def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Recommended default model (RecommendedDefaultResponse wire shape).
+
+    Resolved through the same Qubit model info path as ``h_model_info`` /
+    ``h_model_options`` (``agent._model`` + the config profiles brain). Qubit
+    ships a single local brain, so the recommendation is that resolved model; a
+    requested cloud provider slug is echoed honestly with an empty model since
+    no cloud curation exists — never a silently-picked paid default.
+    """
+    m = _qubit_model(cfg)
+    requested = str(q.get("provider", "") or "").strip().lower()
+    local_slugs = {"", "local", "ollama", "ollama-local", "qubit-local"}
+    if requested not in local_slugs:
+        return _ok(provider=requested, model="", free_tier=None,
+                   detail="Qubit routes through the local configured brain; "
+                          "no cloud provider curation is performed")
+    provider = "ollama-local"
+    return _ok(provider=provider, model=m["name"], free_tier=None,
+               detail="recommended default = configured Qubit brain profile")
+
+
+def h_model_auxiliary(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    m = _qubit_model(cfg)
+    # AuxiliaryModelsResponse wire shape; no aux pins exist.
+    return _ok(tasks=[], main={"provider": "ollama-local",
+                               "model": m["name"]})
+
+
+def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    # MoaConfigResponse wire shape; MoA is superseded by the ordered-fallback
+    # gateway (8Q): no reference/aggregator fan-out exists to configure.
+    slot = {"provider": "", "model": "", "enabled": False}
+    return _ok(default_preset="none", active_preset="none", presets={},
+               reference_models=[], aggregator=slot,
+               reference_temperature=0.0, aggregator_temperature=0.0,
+               reference_timeout=None, degraded_reference_policy="loud",
+               enabled=False,
+               detail="MoA fan-out is not shipped; ordered provider fallback "
+                      "(8Q gateway) is the Qubit counterpart")
+
+
+def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    scope = str(b.get("scope", "main") or "main")
+    if scope != "main":
+        return 400, {"ok": False, "code": "AUX_PIN_REFUSED",
+                     "detail": "auxiliary task pins are not offered; the main "
+                               "profile owns routing"}
+    model = str(b.get("model") or "")
+    if not model:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "model assignment needs a model name"}
+    if b.get("confirm_expensive_model") or b.get("confirmed"):
+        # Upstream retry shape: the Models dialog re-POSTs with the flag
+        # after showing confirm_required. Settle the staged journal
+        # approval for the same model instead of staging a second one
+        # (one confirmation path, settle-once journal).
+        try:
+            from .approvals import ApprovalJournal
+            journal = ApprovalJournal(
+                Path(cfg.state_dir()) / "approvals.jsonl",
+                default_ttl_s=120.0)
+            cands = [a for a in journal.pending()
+                     if a.capability == "voice.profile_select"
+                     and (a.meta or {}).get("session") == "dashboard"
+                     and (a.meta or {}).get("args", {}).get("profile") == model]
+        except Exception:
+            cands = []
+        if cands:
+            from . import dashboard_ops as OPS
+            latest = max(cands, key=lambda a: a.created_at)
+            out = OPS.confirm_op(cfg, latest.id, actor="dashboard:user",
+                                 session="dashboard")
+            ok = out.get("state") == "executed"
+            return (200 if ok else 400), {
+                "ok": ok, "scope": "main", "provider": "ollama-local",
+                "model": model,
+                "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+        # No staged approval (expired or restarted since): fall through and
+        # stage a fresh one below so the dialog has something to confirm.
+    out = OPS.run_op(cfg, "profile_select",
+                     {"kind": "brain", "profile": model},
+                     actor="dashboard:user", session="dashboard")
+    if out.get("confirmation_id"):
+        # ModelAssignmentResponse confirm flow (409, never 2xx: see _staged).
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"],
+                       {"confirm_required": True,
+                        "confirm_message": _redact(out.get("speech", ""))[:300]})
+    ok = out.get("state") == "executed"
+    # ModelAssignmentResponse wire shape.
+    return (200 if ok else 400), {
+        "ok": ok, "scope": "main", "provider": "ollama-local", "model": model,
+        "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles -> the registry the profile ROW ACTIONS target.
+
+    The dashboard profile list and every row action (rename/model/description/
+    soul/delete/active) must address the SAME store, or the list shows rows
+    whose controls cannot resolve. Qubit's principal registry
+    (``voicebridge.brain`` — the store ``qubit brain principal-add``, the
+    dashboard create, and the row actions all write) is therefore the single
+    profile authority. Each row's model/provider/description are read from that
+    principal's real profile fields (never a fabricated ``ollama-local``); a
+    principal without them reports null. Absolute filesystem paths are never
+    served (``path`` is the display name only).
+    """
+    from . import brain as B
+    from .permissions import permissions_store
+
+    try:
+        state = B._load(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    principals = state.get("principals", {}) if isinstance(state, dict) else {}
+    stored_profiles = state.get("profiles", {}) if isinstance(state, dict) else {}
+    try:
+        skill_count = len(permissions_store(cfg).skills())
+    except Exception:
+        skill_count = 0
+    # The canonical active selection: the explicit persona, else the resolved
+    # chat model profile. Resolved from the provider resolver (never a path).
+    default_id = _persona_active(cfg)
+    active_model = active_provider = ""
+    try:
+        from .providers import resolver as _R
+
+        _eff = _R.resolve(cfg, role=_R.DEFAULT_ROLE)
+        if not default_id:
+            default_id = str(_eff.profile_id or "")
+        active_model = str(_eff.model or "")
+        active_provider = str(_eff.provider or "")
+    except Exception:  # noqa: BLE001 - never fail the profile read
+        pass
+    kind = (p.get("kind") or "").strip()
+    if kind == "active":
+        # ActiveProfileInfo wire shape.
+        return _ok(active=default_id, current=default_id)
+
+    def _stored_value(pid: str, key: str) -> str:
+        pkey = B._profile_key(pid, "default")
+        fields = (stored_profiles.get(pkey) or {}).get("fields", {}) or {}
+        field = fields.get(key) or {}
+        return str(field.get("value", "") or "")
+
+    active_payload = {"id": default_id, "brain": default_id,
+                      "model": active_model, "provider": active_provider}
+    items = []
+    for pid in sorted(principals):
+        rec = principals.get(pid)
+        rec = rec if isinstance(rec, dict) else {}
+        model = _stored_value(pid, "model") or None
+        provider = _stored_value(pid, "provider") or None
+        description = _stored_value(pid, "description")
+        items.append({
+            "name": pid, "path": "", "is_default": pid == default_id,
+            "model": model, "provider": provider,
+            "has_env": False, "skill_count": skill_count,
+            "gateway_running": False,
+            "description": description[:200],
+            "description_auto": False,
+            "display_name": str(rec.get("label") or pid),
+            "distribution_name": None,
+            "distribution_version": None, "distribution_source": None,
+            "has_alias": False,
+        })
+    # {profiles: ProfileInfo[]} wire shape (+ the canonical active selection).
+    return _ok(profiles=items, active=active_payload)
+
+
+def h_profile_soul(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    try:
+        res = B.profile_show(cfg, name)
+    except Exception as exc:
+        return _fail(exc)
+    if isinstance(res, dict) and res.get("ok") is False:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no profile {name!r}"}
+    text = ""
+    if isinstance(res, dict):
+        text = str(res.get("profile", res.get("soul", "")) or "")
+    return _ok(content=text, exists=bool(text))
+
+
+def h_profile_setup_command(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET setup-command -> real command for the registered principal."""
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required",
+                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
+    try:
+        state = B._load(cfg)
+        principals = state.get("principals", {})
+    except Exception as exc:
+        return _fail(exc)
+    if name not in principals:
+        return _ok(command=f"qubit brain principal-add {name} --kind person "
+                           f"--label {name}",
+                   principal=name, registered=False,
+                   detail="profile is not a registered Qubit principal",
+                   qubit_counterpart="CLI `qubit brain principal-add`")
+    return _ok(command=f"qubit brain profile-show {name}",
+               principal=name, registered=True,
+               qubit_counterpart="CLI `qubit brain principal-add`")
+
+
+def h_skills(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Any]:
+    # SkillInfo[] wire shape (web/src/lib/api.ts). ONE read authority shared
+    # with the CLI/voice so the three surfaces cannot drift (voicebridge.
+    # skill_catalog merges the permissioned store with the vendored on-disk
+    # catalog the Qubit shim must not hide).
+    from . import skill_catalog
+
+    return 200, skill_catalog.catalog_entries(cfg)
+
+
+def _skill_authority_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    """Map a skills-authority failure to its typed wire envelope."""
+    from .skill_catalog import SkillAuthorityError
+
+    if isinstance(exc, SkillAuthorityError):
+        # Wire stability: the historical compat envelope reports a missing
+        # skill as NOT_FOUND; the authority's internal code is preserved in
+        # the detail-adjacent mapping only.
+        code = ("NOT_FOUND" if exc.code == SkillAuthorityError.NOT_FOUND
+                else exc.code)
+        http = 404 if exc.code == SkillAuthorityError.NOT_FOUND else 400
+        return http, {"ok": False, "code": code,
+                      "detail": _redact(exc.detail)[:400]}
+    return _fail(exc)
+
+
+def h_skill_content(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/skills/content -> raw SKILL.md for the dashboard editor.
+
+    Ported from the upstream reference ``get_skill_content``: resolves through the
+    on-disk skill (``skill_manager_tool._find_skill`` under the Qubit-owned
+    home) so every catalog entry opens — a permissioned-manifest-only skill
+    falls back to its manifest text. 404 only when neither authority holds
+    the name.
+    """
+    from . import skill_catalog
+
+    name = str(q.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "skill name required"}
+    try:
+        res = skill_catalog.read_skill_content(cfg, name)
+    except Exception as exc:
+        return _skill_authority_error(exc)
+    if res is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no skill {name!r}"}
+    # SkillContent wire shape.
+    return _ok(name=name, content=res["content"], path=res["path"],
+               origin=res.get("origin", ""))
+
+
+def h_skills_toggle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    name = str(b.get("name") or b.get("skill") or "")
+    enable = bool(b.get("enabled", b.get("enable", True)))
+    out = OPS.run_op(cfg, "skills_enable" if enable else "skills_disable",
+                     {"skill_id": name} if name else {},
+                     actor="dashboard:user", session="dashboard")
+    if out.get("confirmation_id"):
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    ok = out.get("state") == "executed"
+    return (200 if ok else 400), {"ok": ok,
+                                  "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_terminal_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/terminal/profiles -> model profiles for the ``/chat`` picker.
+
+    Non-secret summaries (no ``key_ref`` values, no credentials) with the
+    per-profile ``/chat`` context-guard verdict, so the terminal UI can offer
+    exactly the profiles that meet the floor and explain the ones that do
+    not. Read-only.
+    """
+    from .providers import resolver as R
+
+    try:
+        current = str(cfg.get("terminal", "profile", default="") or "")
+    except Exception:
+        current = ""
+    rows: List[Dict[str, Any]] = []
+    try:
+        profiles = R.load_profiles(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    for prof in profiles:
+        try:
+            guard = R.terminal_context_guard(cfg, profile_id=prof.id)
+        except Exception as exc:  # noqa: BLE001 - one bad profile hides none
+            guard = {"ok": False, "code": type(exc).__name__,
+                     "detail": _redact(str(exc))[:200], "context_tokens": 0}
+        rows.append({
+            "id": prof.id,
+            "kind": str(getattr(prof, "kind", "") or ""),
+            "provider": str(getattr(prof, "provider", "") or ""),
+            "model": str(getattr(prof, "model", "") or ""),
+            "locality": str(getattr(prof, "locality", "") or ""),
+            "enabled": bool(getattr(prof, "enabled", False)),
+            "default": prof.id == current,
+            "context_tokens": int(guard.get("context_tokens")
+                                  or getattr(prof, "context_tokens", 0) or 0),
+            "min_context_tokens": int(guard.get("min_context_tokens") or 0),
+            "meets_floor": bool(guard.get("ok")),
+            "code": str(guard.get("code") or "OK"),
+            "has_credential": bool(str(getattr(prof, "key_ref", "")
+                                       or "").strip()),
+        })
+    return 200, rows
+
+
+def terminal_profile_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/terminal/profile -> persist the ``/chat`` model profile.
+
+    Writes ``terminal.profile`` into the canonical voice.yaml (atomic +
+    timestamped backup + audit) — the same key ``terminal_context_guard``
+    reads, so the picker selection and the spawn guard can never diverge
+    into two authorities. Confirm-gated on the shared journal. Only a known
+    registry id is accepted; the guard verdict for the chosen profile rides
+    along so the UI can warn when it does not meet the floor.
+    """
+    from .providers import resolver as R
+
+    pid = str(b.get("profile_id", "") or q.get("profile_id", "") or "").strip()
+    if not pid:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile_id required"}
+    try:
+        known = R.get_profile(cfg, pid)
+    except Exception as exc:
+        return _fail(exc)
+    if known is None:
+        return 404, {"ok": False, "code": "UNKNOWN_PROFILE",
+                     "detail": f"no model profile {pid!r}"}
+    guard = _compat_confirm(
+        cfg, "terminal_profile_set",
+        f"setting the /chat model profile to {pid!r} requires explicit "
+        "confirmation: re-PUT with {\"confirm\": true}", q, b,
+        payload={"profile_id": pid})
+    if guard is not None:
+        return guard
+    try:
+        from . import config as C
+
+        path = getattr(cfg, "path", None) or C.resolve_config_path()
+        target = Path(path)
+        data: Dict[str, Any] = {}
+        if target.is_file():
+            import yaml
+
+            loaded = yaml.safe_load(target.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        node = data.get("terminal")
+        if not isinstance(node, dict):
+            node = {}
+        node["profile"] = pid
+        data["terminal"] = node
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_file():
+            bak = target.with_name(
+                f"{target.name}.terminal-profile.{int(time.time())}.bak")
+            bak.write_bytes(target.read_bytes())
+        tmp = target.with_name(target.name + ".qubit-tmp")
+        import yaml
+
+        tmp.write_text(yaml.safe_dump(data, sort_keys=False),
+                       encoding="utf-8")
+        tmp.replace(target)
+        _audit("terminal_profile_set", "dashboard:user", {"profile_id": pid})
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        verdict = R.terminal_context_guard(cfg, profile_id=pid)
+    except Exception as exc:  # noqa: BLE001 - persist won; report guard state
+        verdict = {"ok": False, "code": type(exc).__name__,
+                   "detail": _redact(str(exc))[:200]}
+    return _ok(ok=True, profile_id=pid, meets_floor=bool(verdict.get("ok")),
+               code=str(verdict.get("code") or "OK"),
+               detail=_redact(str(verdict.get("detail") or ""))[:300],
+               qubit_counterpart="CLI `qubit profile model list`")
+
+
+def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Any]:
+    from . import toolsets as TS
+    # The canonical toolset catalog is the vendored configurable toolset list
+    # (the same list `qubit tools` and the runtime resolver use), NOT the broker
+    # action inventory: broker actions (``local.*``) are single capabilities,
+    # not toolsets, and rendering them produced placeholder rows with no label.
+    names: List[str] = []
+    meta: Dict[str, Dict[str, Any]] = {}
+    enabled: Dict[str, bool] = {}
+    resolve = None
+    try:
+        from . import qubit_runtime
+
+        qubit_runtime.ensure_path()
+        # Resolve the Qubit-owned runtime home explicitly; never let the catalog
+        # read the vendored config/registry through the external ~/.hermes.
+        try:
+            qubit_runtime.use_qubit_home(cfg)
+        except Exception:  # noqa: BLE001 - keep serving the catalog on a resolution miss
+            pass
+        from qubit_cli.tools_config import (  # type: ignore
+            _get_effective_configurable_toolsets,
+            _get_platform_tools,
+        )
+        from qubit_cli.config import load_config as _load_qubit_config  # type: ignore
+        from toolsets import resolve_toolset  # type: ignore
+
+        resolve = resolve_toolset
+        platform_on = set(_get_platform_tools(_load_qubit_config(), "cli"))
+        for name, label, desc in _get_effective_configurable_toolsets():
+            key = str(name)
+            meta[key] = {"label": str(label or name),
+                         "description": str(desc or "")}
+            enabled[key] = key in platform_on
+            names.append(key)
+    except Exception:
+        meta = {}
+        enabled = {}
+    # A toolset with a persisted dashboard state still belongs in the list, and
+    # its settled enabled/disabled state overrides the resolved default.
+    for _name, _is_on in TS.toolset_states(cfg).items():
+        if _name not in names:
+            names.append(_name)
+        enabled[_name] = _is_on
+    rows = TS.toolset_rows(cfg, names)
+    for row in rows:
+        key = str(row.get("name"))
+        m = meta.get(key)
+        if m:
+            row["label"] = m["label"]
+            row["description"] = m["description"]
+        if key in enabled:
+            row["enabled"] = enabled[key]
+        if resolve is not None:
+            try:
+                row["tools"] = sorted(set(resolve(key)))
+            except Exception:
+                pass
+    return 200, rows
+
+
+def _epoch_to_iso(value: Any) -> Optional[str]:
+    """Epoch seconds -> ISO-8601 UTC string, or ``None`` for an unset value.
+
+    The SPA formats timestamps with ``new Date(value)``; the schedules store
+    keeps epoch SECONDS (``time.time()``), so serving the raw number made the
+    UI treat it as milliseconds and render 1970. ISO-8601 is timezone-explicit
+    and unambiguous on the wire.
+    """
+    try:
+        ts = float(value or 0)
+    except (TypeError, ValueError):
+        return None
+    if ts <= 0:
+        return None
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ts)) + "Z"
+
+
+def _cron_next_run(j: Dict[str, Any]) -> Optional[float]:
+    """Best-effort next-due epoch for an enabled schedule (``None`` unknown).
+
+    Derived from the SAME fields ``schedules._due`` evaluates, so the page's
+    "Next" column is a real projection of the store, not a hardcoded null.
+    """
+    if not j.get("enabled"):
+        return None
+    kind = str(j.get("kind", "") or "")
+    now = time.time()
+    try:
+        base = float(j.get("last_run_at") or j.get("created_at") or 0.0)
+    except (TypeError, ValueError):
+        base = 0.0
+    if kind == "interval":
+        try:
+            step = float(j.get("interval_min") or 0) * 60.0
+        except (TypeError, ValueError):
+            return None
+        if step <= 0:
+            return None
+        return (base or now) + step
+    if kind == "daily":
+        try:
+            hour = int(j.get("hour", -1))
+            minute = int(j.get("minute", 0))
+        except (TypeError, ValueError):
+            return None
+        if hour < 0:
+            return None
+        day_start = now - (now % 86400.0)
+        target = day_start + hour * 3600.0 + minute * 60.0
+        if target <= now:
+            target += 86400.0
+        return target
+    if kind == "once":
+        try:
+            at = float(j.get("at_ts") or 0)
+        except (TypeError, ValueError):
+            return None
+        return at if at > 0 and base <= 0 else None
+    return None
+
+
+def _cron_shape(j: Dict[str, Any]) -> Dict[str, Any]:
+    # CronJob wire shape (web/src/lib/api.ts); Qubit schedules are the store.
+    return {
+        "id": str(j.get("id", "")), "profile": None, "profile_name": None,
+        "hermes_home": None, "is_default_profile": True,
+        "name": j.get("name"), "prompt": j.get("task_text"),
+        "script": None, "skills": None,
+        "schedule": {"kind": str(j.get("kind", "")),
+                     "expr": str(j.get("interval_min") or j.get("at_ts") or ""),
+                     "display": str(j.get("kind", ""))},
+        "schedule_display": str(j.get("kind", "")),
+        "repeat": None, "enabled": bool(j.get("enabled", False)),
+        "state": str(j.get("last_state", "") or ""),
+        "deliver": j.get("deliver_to") or None,
+        "model": None, "provider": None, "base_url": None,
+        "no_agent": None, "context_from": None, "enabled_toolsets": None,
+        "workdir": None,
+        "last_run_at": _epoch_to_iso(j.get("last_run_at")),
+        "next_run_at": _epoch_to_iso(_cron_next_run(j)),
+        "last_status": j.get("last_state"), "last_error": None,
+        "last_delivery_error": j.get("last_delivery_error"),
+    }
+
+
+def h_cron_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    from . import schedules as S
+    try:
+        res = S.list_jobs(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    jobs = res.get("jobs", res) if isinstance(res, dict) else res
+    return 200, [_cron_shape(j) for j in (jobs or [])]
+
+
+def h_cron_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    reader = getattr(S, "get_job", None) or getattr(S, "show", None)
+    try:
+        res = reader(cfg, int(p.get("id", "0")))
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        http = 404 if "NOT_FOUND" in str(code).upper() else 400
+        return http, {"ok": False, "code": code,
+                      "detail": _redact(str(exc))[:200]}
+    if isinstance(res, dict) and res.get("ok") is False:
+        return 404, {"ok": False, "code": res.get("code", "NOT_FOUND"),
+                     "detail": _redact(res.get("error", ""))[:200]}
+    job = res.get("job", res) if isinstance(res, dict) else {}
+    return 200, _cron_shape(job if isinstance(job, dict) else {})
+
+
+def h_cron_job_runs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Run history for one schedule ({"runs": CronRun[], "limit": int}).
+
+    Backed by ``voicebridge.schedules.history`` (the same SQLite run log
+    ``qubit schedules history`` reads). Schedule ids are numeric; a non-numeric
+    upstream job id honestly reports no runs instead of scanning every job.
+    """
+    from . import schedules as S
+    raw = str(p.get("id", "") or "")
+    try:
+        limit = max(1, min(int(q.get("limit", "20") or "20"), 100))
+    except ValueError:
+        limit = 20
+    try:
+        job_id = int(raw)
+    except ValueError:
+        job_id = 0
+    if not job_id:
+        return _ok(runs=[], limit=limit, count=0,
+                   detail=f"schedule {raw!r} has no numeric id; no runs")
+    try:
+        res = S.history(cfg, job_id, limit)
+    except Exception as exc:
+        return _fail(exc)
+    runs = res.get("runs", []) if isinstance(res, dict) else []
+    now = time.time()
+    shaped = []
+    for r in runs if isinstance(runs, list) else []:
+        started = r.get("started_at") or 0
+        finished = r.get("finished_at") or 0
+        shaped.append({
+            "id": r.get("id"), "job_id": r.get("job_id"),
+            "started_at": started, "ended_at": finished or None,
+            "finished_at": finished, "state": str(r.get("state", "") or ""),
+            "code": str(r.get("code", "") or ""),
+            "detail": str(r.get("detail", "") or ""),
+            "is_active": not finished and (now - started) < 300,
+            "archived": False,
+        })
+    return _ok(runs=shaped, limit=limit, count=len(shaped),
+               state=str(res.get("state", "OK") if isinstance(res, dict)
+                         else "OK"))
+
+
+def _cron_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
+                 b: Dict[str, Any], p: Dict[str, str]
+                 ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/cron/jobs/{id}/pause|resume|trigger.
+
+    Pause/resume are schedule mutations and share the same confirmation
+    contract as create/update/delete: ``_compat_confirm`` checks the shared
+    e-stop latch, consumes a pending approval exactly once, and otherwise
+    stages a typed 409 with a real ``confirmation_id``. The canonical
+    ``schedules.set_paused`` (the CLI/voice store) performs the transition and
+    audits it. A trigger addresses the exact job in the path -- never a
+    blanket ``run_due`` over every due job.
+    """
+    from . import schedules as S
+    try:
+        job_id = int(p.get("id", "0") or "0")
+    except (TypeError, ValueError):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "schedule id must be numeric"}
+    try:
+        if fn_name in ("pause", "resume"):
+            paused = fn_name == "pause"
+            guard = _compat_confirm(
+                cfg, f"cron.{fn_name}",
+                f"schedule {fn_name} requires explicit confirmation: "
+                "re-POST with {\"confirm\": true}", q, b,
+                payload={"id": job_id})
+            if guard is not None:
+                return guard
+            res = S.set_paused(cfg, job_id, paused,
+                               requested_by="dashboard:user", confirmed=True)
+            ok = not (isinstance(res, dict) and res.get("ok") is False)
+            return (200 if ok else 400), {"ok": ok, "result": res,
+                                          "enabled": not paused,
+                                          "qubit_counterpart":
+                                          "CLI `qubit schedules pause|resume`"}
+        if fn_name == "run_due":
+            # A path id targets exactly that job (forced); the legacy global
+            # ``run_due`` behavior is preserved only when no id was supplied.
+            if job_id:
+                res = S.trigger(cfg, job_id, requested_by="dashboard:user")
+            else:
+                res = S.run_due(cfg, requested_by="dashboard:user")
+            return 200, {"ok": True, "result": res}
+        res = getattr(S, fn_name)(cfg, job_id, requested_by="dashboard:user")
+    except Exception as exc:
+        return _fail(exc)
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    try:
+        limit = max(1, min(int(q.get("limit", q.get("lines", "100")) or "100"), 500))
+    except ValueError:
+        limit = 100
+    out = OPS.run_op(cfg, "logs", {"limit": limit},
+                     actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    rows = res.get("logs", []) if isinstance(res, dict) else []
+    lines = []
+    for r in rows if isinstance(rows, list) else []:
+        lines.append(r if isinstance(r, str) else _redact(json.dumps(r))[:500])
+    # LogsResponse wire shape (web/src/lib/api.ts).
+    try:
+        fname = str(Path(cfg.state_dir()) / "webui_events.jsonl")
+    except Exception:
+        fname = "webui_events.jsonl"
+    return _ok(file=fname, lines=lines)
+
+
+def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    import os
+    import platform as _pl
+    try:
+        from . import distribution as D
+        qv = str(getattr(D, "VERSION", "1.0.0"))
+    except Exception:
+        qv = "1.0.0"
+    # SystemStats wire shape; hermes_version carries the Qubit product
+    # version (wire-compat label, honest value + provenance in detail).
+    return _ok(os=_pl.system(), os_release=_pl.release(),
+               os_version=_pl.version(), platform=_pl.system().lower(),
+               arch=_pl.machine(), hostname=_pl.node(),
+               python_version=_pl.python_version(),
+               python_impl=_pl.python_implementation(),
+               qubit_version="qubit-" + qv, cpu_count=os.cpu_count(),
+               psutil=False,
+               detail="Qubit single-authority host; no upstream gateway process")
+
+
+def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp -> the real configured MCP inventory.
+
+    Delegates to the canonical ``h_mcp_servers`` (same store the writes and
+    CLI/voice read) so this bare route can never contradict
+    ``/api/mcp/servers`` with a hardcoded empty list.
+    """
+    return h_mcp_servers(cfg, q, b, p)
+
+
+def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/servers -> real configured MCP inventory (names only).
+
+    Reads the same ``voicebridge.integration_status.mcp_status`` the CLI and
+    voice surfaces use. Qubit never mounts a server, so each row is
+    inventory-only with the mount policy attached; no command, URL, or
+    credential reference is exposed.
+    """
+    from . import mcp_servers as MS
+    try:
+        listing = MS.list_servers(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    # PRB-01: emit the full ``McpServer`` wire shape the SPA reads (url,
+    # command, args, env, tools), not a names-only summary. This route is now
+    # the canonical reader (added to webui.QUBIT_READ_AUTHORITY) so the
+    # dashboard list, CLI, and voice all read the same registry the writes use.
+    _AUTH = {"header", "oauth"}
+    servers = [{
+        "name": str(s.get("name")),
+        "transport": (str(s.get("transport"))
+                      if str(s.get("transport")) in ("http", "stdio")
+                      else "unknown"),
+        "url": s.get("url"),
+        "command": s.get("command"),
+        "args": list(s.get("args") or []),
+        "env": dict(s.get("env") or {}),
+        "auth": (str(s.get("auth")) if str(s.get("auth")) in _AUTH else None),
+        "enabled": bool(s.get("enabled")),
+        # The invocation disposition + tool allowlist are part of the canonical
+        # row (``MS.list_servers`` -> ``_public``); carry them so the dashboard
+        # can show why a server is/ isn't invocable and how many tools it
+        # declares. Absent values are honest, never fabricated.
+        "capabilities": list(s.get("capabilities") or []),
+        "invocable": bool(s.get("invocable")),
+        "invocation_code": s.get("invocation_code"),
+        "tools": None,
+        "connected": False,
+        "status": str(s.get("status", "")),
+        "source": str(s.get("source", "qubit-registry")),
+        "policy": "config registry; no unauthenticated mount",
+    } for s in listing.get("servers", [])]
+    return _ok(servers=servers, state="OK" if not servers else "CONFIGURED",
+               mount_policy="no unauthenticated MCP mounting; research-only "
+                            "use stays separately authorized and broker-gated",
+               detail="registered inventory; Qubit never mounts or connects "
+                      "MCP servers")
+
+
+def h_mcp_catalog_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/catalog -> real local MCP inventory as the catalog.
+
+    No remote catalog is fetched (network probe refused by policy); the
+    catalog is the configured local inventory from
+    ``integration_status.mcp_status``, each entry flagged as self-hosted and
+    inventory-only, with the refusal recorded as a diagnostic.
+    """
+    from . import mcp_servers as MS
+    try:
+        listing = MS.list_servers(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    # B-08D: emit the COMPLETE ``McpCatalogEntry`` wire shape (the SPA reads
+    # ``entry.bootstrap.length`` / ``entry.required_env`` unconditionally). The
+    # rows carry real registry transport fields where recorded; absent detail is
+    # an honest empty/null value, never a missing key.
+    entries = [{
+        "name": str(s.get("name")), "title": str(s.get("name")),
+        "description": "",
+        "source": str(s.get("source", "qubit-registry")),
+        "transport": str(s.get("transport", "stdio")),
+        "auth_type": str(s.get("auth", "none")), "required_env": [],
+        "command": s.get("command"), "args": list(s.get("args") or []),
+        "url": s.get("url"),
+        "install_url": None, "install_ref": None, "bootstrap": [],
+        "default_enabled": None, "post_install": "",
+        "needs_install": False, "installed": True,
+        "enabled": bool(s.get("enabled")),
+        "on_disk": True, "install_action": None,
+        "policy": "config registry; no unauthenticated mount",
+    } for s in listing.get("servers", [])]
+    return _ok(entries=entries, total=len(entries),
+               diagnostics=[{
+                   "name": "catalog",
+                   "kind": "info",
+                   "level": "info",
+                   "message": "remote catalog fetch refused; serving the "
+                              "reviewed local inventory only"}],
+               mount_policy="no unauthenticated MCP mounting; research-only "
+                            "use stays separately authorized and broker-gated")
+
+
+def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str], ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/servers/{name}/test -> the real validation/probe result.
+
+    ``MS.test`` validates the record and, when the server is enabled and
+    runnable, performs a live ``tools/list`` probe. Its ``connected``,
+    ``probe`` and ``network_probe`` fields are the truth; this handler must
+    return them verbatim (hardcoding ``connected=False``/``local-validation``
+    contradicted a successful probe that already returned real tools).
+    """
+    from . import mcp_servers as MS
+    name = str(p.get("name", p.get("id", "")) or "")
+    try:
+        out = MS.test(cfg, name)
+    except Exception as exc:
+        return _mcp_error(exc)
+    return _ok(ok=True, name=out["name"], tools=out["tools"],
+               connected=bool(out.get("connected", False)),
+               valid=out["valid"], errors=out["errors"],
+               code=out["code"], state=out["state"],
+               probe=str(out.get("probe", "local-validation")),
+               network_probe=bool(out.get("network_probe", False)),
+               detail=out["detail"])
+
+
+def h_pairing_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import pairing as P
+    try:
+        res = P.list_codes(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    codes = res.get("codes", []) if isinstance(res, dict) else []
+    pending, approved = [], []
+    for c in codes if isinstance(codes, list) else []:
+        if not isinstance(c, dict):
+            continue
+        code_id = str(c.get("id", "") or "")
+        # ``request_id`` must be usable: the SPA's Approve sends it back as the
+        # target (api.ts approvePairing), so it has to carry the real code id
+        # the store can resolve -- never an empty string.
+        user = {"platform": str(c.get("account", "") or "qubit"),
+                "user_id": code_id,
+                "user_name": str(c.get("label", "") or ""),
+                "request_id": code_id,
+                "label": str(c.get("label", "") or ""),
+                "scopes": list(c.get("scopes", []) or []),
+                "expires_at": c.get("expires_at"),
+                "revoked": bool(c.get("revoked", False))}
+        (approved if c.get("approved") else pending).append(user)
+    # PairingResponse wire shape.
+    return _ok(pending=pending, approved=approved)
+
+
+_PAIRING_HTTP = {
+    "PAIRING_BAD_CODE": 400,
+    "PAIRING_BAD_LABEL": 400,
+    "PAIRING_BAD_SCOPE": 400,
+    "PAIRING_BAD_TTL": 400,
+    "PAIRING_NOT_FOUND": 404,
+    "PAIRING_NOT_BOUND": 404,
+    "PAIRING_CONFIRM_REQUIRED": 409,
+    "PAIRING_REVOKED": 409,
+    "PAIRING_USED": 409,
+    "PAIRING_EXPIRED": 410,
+    "PAIRING_LOCKED": 429,
+    "PAIRING_LIMIT": 429,
+    "PAIRING_ESTOP": 403,
+}
+
+
+def _pairing_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    """Map a typed ``PairingError`` to its HTTP status (never a flat 500)."""
+    code = str(getattr(exc, "code", None) or type(exc).__name__)
+    detail = _redact(getattr(exc, "detail", None) or str(exc))[:300]
+    if code == "PAIRING_CONFIRM_REQUIRED":
+        return _staged(detail, "")
+    status = _PAIRING_HTTP.get(code, 500)
+    if status >= 500:
+        return 500, {"ok": False, "state": "FAILED", "code": code,
+                     "detail": detail}
+    return status, {"ok": False, "code": code, "detail": detail}
+
+
+def h_pairing_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
+                     b: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/pairing[/approve|/revoke] -> confirmed, typed pairing mutation.
+
+    Accepts the SPA's field names (``approve`` sends ``request_id``; ``revoke``
+    sends ``user_id``) as aliases, requires the shared confirmation (e-stop +
+    journal) like every other mutation, and maps the canonical ``PairingError``
+    codes to typed 4xx/429 statuses instead of collapsing them to a 500.
+    """
+    from . import pairing as P
+    guard = _compat_confirm(
+        cfg, f"pairing.{fn_name}",
+        f"pairing {fn_name} requires explicit confirmation: "
+        "re-POST with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        if fn_name == "create":
+            res = P.create(cfg, str(b.get("label", "dashboard")),
+                           list(b.get("scopes", ["chat"])),
+                           account=str(b.get("account", "")),
+                           requested_by="dashboard:user", confirmed=True)
+        elif fn_name == "approve":
+            target = str(b.get("code") or b.get("request_id") or "")
+            res = P.approve(cfg, target, requested_by="dashboard:user",
+                            confirmed=True)
+        elif fn_name == "revoke":
+            target = str(b.get("code_id") or b.get("id")
+                         or b.get("user_id") or "")
+            res = P.revoke(cfg, target, requested_by="dashboard:user",
+                           confirmed=True)
+        else:
+            res = {"ok": True, "cleared": True}
+    except Exception as exc:
+        return _pairing_error(exc)
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_pairing_clear_pending(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/pairing/clear-pending -> revoke every live pending code.
+
+    Uses the same ``pairing`` store the CLI/voice use: each non-approved,
+    unused, unrevoked code is tombstoned (confirmed + audited), so pending
+    device requests are cleared without touching approved grants. The clear
+    itself is a mutation and shares the e-stop + confirmation contract.
+    """
+    from . import pairing as P
+    guard = _compat_confirm(
+        cfg, "pairing.clear_pending",
+        "clearing every pending pairing request requires explicit "
+        "confirmation: re-POST with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        codes = P.list_codes(cfg).get("codes", [])
+    except Exception as exc:
+        return _fail(exc)
+    revoked: List[str] = []
+    for rec in codes if isinstance(codes, list) else []:
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("approved") or rec.get("used") or rec.get("revoked"):
+            continue
+        code_id = str(rec.get("id", "") or "")
+        if not code_id:
+            continue
+        try:
+            P.revoke(cfg, code_id, requested_by="dashboard:user",
+                     confirmed=True)
+            revoked.append(code_id)
+        except Exception:
+            continue
+    return _ok(ok=True, cleared=len(revoked), revoked=revoked)
+
+
+def h_webhooks_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import webhooks as W
+    try:
+        res = W.list_subs(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    subs = res.get("subscriptions", []) if isinstance(res, dict) else []
+    routes = []
+    for s in subs if isinstance(subs, list) else []:
+        if not isinstance(s, dict):
+            continue
+        routes.append({
+            "name": str(s.get("sub_id", s.get("id", ""))),
+            "description": str(s.get("label", "") or ""),
+            "events": list(s.get("events", []) or []),
+            "deliver": "hmac-freshness-replay-store",
+            "deliver_only": True,
+            "prompt": "",
+            "skills": [],
+            "created_at": None,
+            "url": str(s.get("url", "")),
+            "secret_set": bool(s.get("secret_ref") or s.get("secret")),
+            "enabled": bool(s.get("enabled", True)),
+        })
+    # WebhooksResponse wire shape; secret values never leave the vault.
+    try:
+        store_enabled = W.is_enabled(cfg)
+    except Exception:
+        store_enabled = True
+    return _ok(enabled=store_enabled, base_url="", subscriptions=routes)
+
+
+def _webhook_slug(text: Any) -> str:
+    """Derive a canonical subscription id (``^[a-z0-9][a-z0-9_.-]{0,63}$``).
+
+    The SPA's create form collects a human ``name``; the canonical store keys
+    subscriptions by a slug id. Lowercase and map any run of unsupported
+    characters to ``-`` (the same shape the store's ``_ID_RE`` accepts).
+    """
+    slug = re.sub(r"[^a-z0-9_.-]+", "-", str(text or "").strip().lower())
+    slug = slug.strip("-._")[:64]
+    return slug
+
+
+def _webhook_route(sub: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonical subscription record -> the SPA ``WebhookRoute`` wire shape."""
+    return {
+        "name": str(sub.get("id", "")),
+        "description": "",
+        "events": list(sub.get("events", []) or []),
+        "deliver": "hmac-freshness-replay-store",
+        "deliver_only": True,
+        "prompt": "",
+        "skills": [],
+        "created_at": sub.get("created_at"),
+        "url": str(sub.get("url", "")),
+        "secret_set": bool(sub.get("secret")),
+        "enabled": bool(sub.get("enabled", True)),
+        # ``secret`` here is the redacted reference KIND (``env:<reference>``),
+        # never a secret value; the SPA renders it as the stored reference.
+        "secret": str(sub.get("secret", "")),
+    }
+
+
+def _webhook_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    """Map a canonical ``WebhookError`` to a typed HTTP envelope."""
+    code = getattr(exc, "code", None) or type(exc).__name__
+    detail = _redact(getattr(exc, "detail", None) or str(exc))[:300]
+    if code == "WEBHOOK_NOT_FOUND":
+        return 404, {"ok": False, "code": code, "detail": detail}
+    if code in ("WEBHOOK_BAD_INPUT", "WEBHOOK_BAD_URL", "WEBHOOK_EXISTS",
+                "WEBHOOK_STORE_CORRUPT"):
+        return 400, {"ok": False, "code": code, "detail": detail}
+    if code == "WEBHOOK_CONFIRM_REQUIRED":
+        return _staged(detail, "")
+    return 400, {"ok": False, "code": code, "detail": detail}
+
+
+def h_webhooks_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
+                      b: Dict[str, Any], p: Dict[str, str]
+                      ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/webhooks (add) and POST /api/webhooks/{id} (remove/test/show).
+
+    The SPA's create form collects ``name``/``url``/``events``/``secret_ref``
+    while the canonical store (``voicebridge.webhooks``, the same one the CLI
+    and voice use) keys by ``id``. Map the SPA payload onto the canonical
+    contract here — the single alignment point — so a create never 500s on a
+    shape mismatch and typed validation still runs (bad URL/events/secret are
+    typed 400s, never a fabricated success). A create is a real subscription
+    mutation, so it shares the confirmation contract (e-stop + shared journal)
+    with delete/enable; the canonical ``W.add`` audits the execution.
+    """
+    from . import webhooks as W
+    try:
+        if fn_name == "add":
+            sub_id = str(b.get("id") or b.get("sub_id")
+                         or _webhook_slug(b.get("name", "")))
+            guard = _compat_confirm(
+                cfg, "webhook_create",
+                f"creating webhook subscription {_redact(sub_id)!r} requires "
+                "explicit confirmation: re-POST with {\"confirm\": true}",
+                q, b, payload={"id": sub_id})
+            if guard is not None:
+                return guard
+            url = str(b.get("url") or b.get("deliver_url") or "")
+            secret_ref = str(b.get("secret_ref") or b.get("secret") or "")
+            res = W.add(cfg, sub_id, url, list(b.get("events", []) or []),
+                        secret_ref, requested_by="dashboard:user",
+                        confirmed=True)
+        elif fn_name == "remove":
+            res = W.remove(cfg, str(b.get("id") or p.get("id", "")),
+                           requested_by="dashboard:user", confirmed=True)
+        elif fn_name == "test":
+            res = W.test_plan(cfg, str(b.get("id") or p.get("id", "")))
+        else:
+            res = W.show(cfg, str(p.get("id", "")))
+    except Exception as exc:
+        return _webhook_error(exc)
+    if fn_name == "add":
+        sub = res.get("subscription", {}) if isinstance(res, dict) else {}
+        route = _webhook_route(sub)
+        return _ok(subscription=route, **route)
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res}
+
+
+def h_platforms(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import messaging as M
+    try:
+        res = M.account_list(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    accounts = res.get("accounts", []) if isinstance(res, dict) else []
+    # Link-state -> wire state. Never report a fabricated "connected": an
+    # account with no credential is unconfigured, and a channel with no Qubit
+    # transport adapter is honestly unavailable (typed code attached).
+    link_map = {
+        "LINKED": ("connected", True, None, None),
+        "DEGRADED": ("degraded", True, "LINK_DEGRADED", None),
+        "NO_CREDENTIAL": ("unconfigured", False, "NO_CREDENTIAL",
+                          "credential reference unresolvable"),
+        "NO_ACCOUNT": ("unconfigured", False, "NO_ACCOUNT", None),
+        "UNAVAILABLE": ("unavailable", True, M.UNAVAILABLE_CODE,
+                        "no Qubit transport adapter for this channel"),
+    }
+    platforms = []
+    for a in accounts if isinstance(accounts, list) else []:
+        if not isinstance(a, dict):
+            continue
+        aid = str(a.get("account_id", a.get("id", "")))
+        provider = str(a.get("provider", ""))
+        try:
+            linked = M.link(cfg, aid)
+        except Exception:  # noqa: BLE001 — typed degraded, never fabricated
+            linked = {"state": "UNAVAILABLE", "code": M.UNAVAILABLE_CODE}
+        st, configured, code, msg = link_map.get(
+            str(linked.get("state", "")),
+            ("unavailable", False, linked.get("code") or M.UNAVAILABLE_CODE,
+             linked.get("detail")))
+        platforms.append({
+            "id": aid, "name": str(a.get("label", aid) or aid),
+            "description": f"{provider} account reference (vault-only credential)",
+            "docs_url": "", "enabled": bool(a.get("enabled", True)),
+            "configured": configured, "gateway_running": False,
+            "state": st,
+            "error_code": code,
+            "error_message": (str(msg)[:160] if msg else None),
+            "updated_at": None, "home_channel": None,
+            "whatsapp_setup": None, "env_vars": [],
+        })
+    return _ok(env_path="~/.qubit/.env",
+               gateway_start_command="qubit gateway start",
+               platforms=platforms)
+
+
+def h_memory(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/memory -> live local memory store status (MemoryStatus shape)."""
+    from . import active_memory as AM
+    from . import brain as B
+    try:
+        status = AM.status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        principals = len(B.principal_list(cfg).get("principals", []))
+    except Exception:
+        principals = 0
+    state = str(status.get("state", "OK"))
+    memories = status.get("memories")
+    return _ok(active="qubit-local",
+               providers=[{
+                   "name": "qubit-local",
+                   "description": "local-only SQLite/FTS5 MemoryStore "
+                                  "(core/working/recall/archive tiers)",
+                   "available": state in ("OK", "EMPTY", "DEGRADED"),
+                   "configured": True,
+                   "status": ("ready" if state == "OK" else
+                              "empty" if state == "EMPTY" else "degraded"),
+                   "detail": str(status.get("store_state", "") or "")}],
+               builtin_files={"memory": int(memories or 0),
+                              "user": principals},
+               store_state=status.get("store_state"),
+               store_path=status.get("store_path"),
+               enabled=bool(status.get("enabled", True)),
+               status=status)
+
+
+def h_analytics(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .qubit_session_store import analytics_usage
+
+    try:
+        days = max(1, min(int(q.get("days", "30") or "30"), 365))
+    except (TypeError, ValueError):
+        days = 30
+    usage = analytics_usage(cfg, days=days)
+    empty_skills = {"summary": {"total_skill_loads": 0,
+                                "total_skill_edits": 0,
+                                "total_skill_actions": 0,
+                                "distinct_skills_used": 0},
+                    "top_skills": []}
+    if usage is None:
+        # No canonical store yet: an honest empty answer, never fabricated
+        # billing numbers.
+        empty = {"total_input": 0, "total_output": 0, "total_cache_read": 0,
+                 "total_reasoning": 0, "total_estimated_cost": 0.0,
+                 "total_actual_cost": 0.0, "total_sessions": 0,
+                 "total_api_calls": 0}
+        if p.get("kind") == "models":
+            return _ok(models=[], totals={**empty, "distinct_models": 0},
+                       period_days=days, detail="no usage recorded yet")
+        return _ok(daily=[], by_model=[], totals=empty, skills=empty_skills)
+    totals = usage["totals"]
+    if p.get("kind") == "models":
+        models = [{
+            "model": m["model"], "provider": m["provider"],
+            "input_tokens": m["input_tokens"], "output_tokens": m["output_tokens"],
+            "cache_read_tokens": m["cache_read_tokens"],
+            "reasoning_tokens": m["reasoning_tokens"],
+            "estimated_cost": m["estimated_cost"],
+            "actual_cost": m["actual_cost"], "sessions": m["sessions"],
+            "api_calls": m["api_calls"], "tool_calls": m["tool_calls"],
+            "last_used_at": m["last_used_at"],
+            "avg_tokens_per_session": m["avg_tokens_per_session"],
+            "capabilities": {},
+        } for m in usage["by_model"]]
+        return _ok(models=models,
+                   totals={**totals, "distinct_models": len(models)},
+                   period_days=days)
+    by_model = [{
+        "model": m["model"], "input_tokens": m["input_tokens"],
+        "output_tokens": m["output_tokens"], "estimated_cost": m["estimated_cost"],
+        "sessions": m["sessions"], "api_calls": m["api_calls"],
+    } for m in usage["by_model"]]
+    return _ok(daily=usage["daily"], by_model=by_model, totals=totals,
+               skills=empty_skills)
+
+
+def _files_root(cfg: Any) -> str:
+    try:
+        from . import projects as PJ
+        active = PJ.active(cfg) if hasattr(PJ, "active") else {}
+        if isinstance(active, dict):
+            for key in ("folder", "path", "root"):
+                if active.get(key):
+                    return str(active[key])
+    except Exception:
+        pass
+    return ""
+
+
+def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import files as FI
+    import base64
+    if q.get("path") or p.get("kind") == "read":
+        path = str(q.get("path", b.get("path", "")) or "")
+        try:
+            res = FI.read_file(cfg, path)
+        except Exception as exc:
+            code = getattr(exc, "code", "FILES_ERROR")
+            return 400, {"ok": False, "code": code,
+                         "detail": _redact(str(exc))[:300]}
+        text = res.get("text", res.get("content", "")) if isinstance(res, dict) else ""
+        data_url = ("data:text/plain;base64,"
+                    + base64.b64encode(str(text).encode("utf-8",
+                                                        "replace")).decode())
+        # ManagedFileReadResponse wire shape.
+        return _ok(name=Path(path).name, path=path,
+                   size=len(str(text).encode("utf-8", "replace")),
+                   mime_type="text/plain", data_url=data_url,
+                   root=_files_root(cfg) or None, locked_root=None,
+                   can_change_path=False)
+    folder = str(q.get("path", "") or "") or _files_root(cfg)
+    if not folder:
+        return _ok(root=None, path="", parent=None, locked_root=None,
+                   can_change_path=False, entries=[],
+                   detail="no active project folder; register one with "
+                          "`qubit project add-folder`")
+    try:
+        res = FI.list_dir(cfg, folder)
+    except Exception as exc:
+        code = getattr(exc, "code", "FILES_ERROR")
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    raw_entries = res.get("entries", []) if isinstance(res, dict) else []
+    entries = []
+    for en in raw_entries if isinstance(raw_entries, list) else []:
+        if not isinstance(en, dict):
+            continue
+        entries.append({
+            "name": str(en.get("name", "")),
+            "path": str(en.get("path", "")),
+            "is_directory": bool(en.get("is_dir", en.get("is_directory", False))),
+            "size": en.get("size"), "mtime": en.get("mtime", 0),
+            "mime_type": en.get("mime_type"),
+        })
+    # ManagedFilesResponse wire shape.
+    return _ok(root=folder, path=folder, parent=None, locked_root=folder,
+               can_change_path=False, entries=entries)
+
+
+def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    from . import gateway_supervisor as GS
+
+    out = OPS.run_op(cfg, "gateway", {}, actor="dashboard:user", session="dashboard")
+    st = GS.status(cfg)
+    # ``supervision`` is the SPA's refusal signal: empty when the real
+    # supervisor is available (Start/Stop/Restart enabled), and the typed
+    # reason only when this host genuinely cannot supervise a service.
+    supervision = "" if st.get("available") else (
+        f"{GS.UNAVAILABLE_CODE}: {st.get('detail', '')}")
+    return _ok(gateway=_res(out), state=out.get("state"),
+               supervision=supervision, process=st)
+
+
+def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/gateway/drain -> real reversible Qubit drain marker.
+
+    Mirrors the upstream drain control channel without a second listener or
+    process supervision: ``action: "drain"`` atomically writes a redacted
+    ``<state_dir>/gateway_drain.json`` marker (audited); ``action: "cancel"``
+    removes it. It never starts/stops a process (supervision stays
+    GATEWAY_NO_SUPERVISION) and is idempotent.
+    """
+    action = str(b.get("action", "drain") or "drain").strip().lower()
+    if action not in ("drain", "cancel"):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": f"unknown drain action {action!r}; expected "
+                               "'drain' or 'cancel'",
+                     "qubit_counterpart": "CLI `qubit gateway` + operator"}
+    path = _store_path(cfg, "gateway_drain.json")
+    if action == "cancel":
+        existed = False
+        try:
+            existed = path.exists()
+            if existed:
+                path.unlink()
+        except OSError as exc:
+            return _fail(exc)
+        _audit("gateway_drain", "dashboard:user", {"action": "cancel",
+                                                   "existed": existed})
+        return _ok(ok=True, action="cancel", was_draining=existed,
+                   draining=False)
+    payload = {"schema": "qubit-gateway-drain/1",
+               "requested_at": time.time(), "requested_by": "dashboard:user",
+               "suppress_notification": bool(b.get("suppress_notification",
+                                                   False))}
+    try:
+        _save_json_store(path, payload)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("gateway_drain", "dashboard:user", {"action": "drain"})
+    return _ok(ok=True, action="drain", requested_at=payload["requested_at"],
+               draining=True,
+               suppress_notification=payload["suppress_notification"])
+
+
+def h_gateway_supervision(action: str) -> Handler:
+    """POST /api/gateway/{start,stop,restart} -> real gateway control.
+
+    With no ``gateway_id`` the action controls the Qubit-owned service unit
+    through :mod:`voicebridge.gateway_supervisor` (confirmed, audited,
+    idempotent; restart/stop detached). With a ``gateway_id`` the request
+    transitions a recorded gateway through the same approval-gated
+    ``gateway_peers.supervision_request`` the CLI/voice use.
+    """
+    counterpart = ("CLI `qubit gateway supervision-request <id> <action> "
+                   "--confirm` + operator approval (gateway.supervise grant)")
+
+    def _handler(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+        from . import gateway_peers as GW
+        gw_id = str(b.get("gateway_id", b.get("id",
+                                              q.get("gateway_id", ""))) or "").strip()
+        if not gw_id:
+            from . import gateway_supervisor as GS
+
+            out = GS.control(cfg, action, confirmed=bool(b.get("confirm", False)),
+                             actor="dashboard:user")
+            code = str(out.get("code") or "")
+            if out.get("ok"):
+                return 200, out
+            http = {"GATEWAY_CONFIRM_REQUIRED": 409, "GATEWAY_ESTOP": 403,
+                    "GATEWAY_SUPERVISION_UNAVAILABLE": 503,
+                    "GATEWAY_BAD_INPUT": 400}.get(code, 500)
+            return http, out
+        try:
+            out = GW.supervision_request(
+                cfg, gw_id, action,
+                approval_id=str(b.get("approval_id", "") or ""),
+                requested_by="dashboard:user",
+                confirmed=bool(b.get("confirm")))
+        except GW.GatewayError as exc:
+            code = getattr(exc, "code", None) or "GATEWAY_ERROR"
+            http = {"GW_CONFIRM_REQUIRED": 409, "GW_ESTOP": 403,
+                    "GW_NOT_FOUND": 404, "GW_BAD_INPUT": 400}.get(code, 403)
+            return http, {
+                "ok": False, "code": code,
+                "detail": _redact(getattr(exc, "detail", str(exc)))[:300],
+                "qubit_counterpart": counterpart, "owner": "qubit-policy",
+                "rollback": "no process touched; nothing to roll back"}
+        except Exception as exc:
+            return _fail(exc)
+        state = str(out.get("state", ""))
+        body = {"ok": state == "OK", "qubit_counterpart": counterpart}
+        body.update(out)
+        if state == "OK":
+            return 200, body
+        if state == "APPROVAL_REQUIRED":
+            return 409, body
+        return 403, body
+
+    return _handler
+
+
+def h_gateway_restart(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/gateway/restart -> real detached service restart."""
+    return h_gateway_supervision("restart")(cfg, q, b, p)
+
+
+_CURATOR_CONTROL_SCHEMA = "qubit-curator-control/1"
+
+
+def _curator_control_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / "curator_control.json"
+
+
+def _load_curator_control(cfg: Any) -> Dict[str, Any]:
+    """Read the persisted on-demand curator control (never fabricated)."""
+    raw = _load_json_store(_curator_control_path(cfg))
+    return {"schema": _CURATOR_CONTROL_SCHEMA,
+            "paused": bool(raw.get("paused", False)),
+            "last_run_at": raw.get("last_run_at"),
+            "run_count": int(raw.get("run_count", 0) or 0)}
+
+
+def _save_curator_control(cfg: Any, state: Dict[str, Any]) -> None:
+    state = dict(state)
+    state["schema"] = _CURATOR_CONTROL_SCHEMA
+    state["updated_at"] = time.time()
+    _save_json_store(_curator_control_path(cfg), state)
+
+
+def h_curator(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "curator", {}, actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    cur = res.get("curator", {}) if isinstance(res, dict) else {}
+    ctrl = _load_curator_control(cfg)
+    # CuratorStatus wire shape; curation is on-demand (no daemon) and the
+    # pause/run controls persist to ``curator_control.json`` so a reload shows
+    # the real state the operator set.
+    return _ok(enabled=True, paused=bool(ctrl["paused"]), interval_hours=None,
+               last_run_at=ctrl.get("last_run_at"),
+               run_count=int(ctrl.get("run_count", 0) or 0),
+               min_idle_hours=None, stale_after_days=None,
+               archive_after_days=None, summary=cur)
+
+
+def h_curator_paused(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/curator/paused -> persist the on-demand pause flag.
+
+    Real, e-stop-gated, audited state: ``POST /api/curator/run`` refuses with
+    ``CURATOR_PAUSED`` while the flag is set, and the next ``GET /api/curator``
+    reads the flag back. There is no background daemon to stop; this is the
+    operator's control over the on-demand pass.
+    """
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; mutation refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    if "paused" not in b:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "curator pause needs a boolean 'paused' field"}
+    paused = _truthy(b.get("paused"))
+    state = _load_curator_control(cfg)
+    state["paused"] = paused
+    _save_curator_control(cfg, state)
+    _audit("curator_paused", "dashboard:user", {"paused": paused})
+    return _ok(ok=True, paused=paused, enabled=True,
+               qubit_counterpart="CLI `qubit lessons` (same LearningLedger)")
+
+
+def h_curator_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/curator/run -> run a real on-demand curation pass.
+
+    Reads the canonical verified-skills curator status and the LearningLedger
+    review set, records the run (timestamp + count) in
+    ``curator_control.json``, and audits it. Promotions stay reviewed: this
+    pass summarises and records, it never auto-promotes a staged lesson.
+    """
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; mutation refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    state = _load_curator_control(cfg)
+    if state["paused"]:
+        return 409, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "CURATOR_PAUSED",
+                     "detail": "curator is paused; resume it before running a "
+                               "pass",
+                     "qubit_counterpart":
+                         "PUT /api/curator/paused {\"paused\": false}",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    from .learning import LearningLedger
+    from .verified_skills import verified_skill_workshop
+
+    try:
+        summary = verified_skill_workshop(cfg).curator_status()
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        reviews = LearningLedger(Path(cfg.state_dir())).reviews()
+    except Exception:
+        reviews = []
+    if not isinstance(reviews, list):
+        reviews = []
+    state["last_run_at"] = time.time()
+    state["run_count"] = int(state.get("run_count", 0) or 0) + 1
+    _save_curator_control(cfg, state)
+    _audit("curator_run", "dashboard:user",
+           {"run_count": state["run_count"], "reviews": len(reviews)})
+    return _ok(ok=True, state="executed", run_count=state["run_count"],
+               last_run_at=state["last_run_at"], reviews=len(reviews),
+               summary=summary,
+               detail="on-demand curation pass recorded; promotions remain "
+                      "reviewed (CLI `qubit lessons promote <id>`)")
+
+
+def _reset_active_memories(cfg: Any) -> List[str]:
+    """Tombstone every active record in the canonical local memory store."""
+    from . import active_memory as AM
+    from .memory import MemoryStore
+
+    db = AM.memory_db_path(cfg)
+    if not db.exists():
+        return []
+    store = MemoryStore(db)
+    try:
+        rows = store.export()
+        ids = [int(r["id"]) for r in rows if isinstance(r, dict) and "id" in r]
+        for mid in ids:
+            store.forget(mid, reason="dashboard-reset")
+        return [f"memory#{mid}" for mid in ids]
+    finally:
+        store.close()
+
+
+def _reset_workspace_notes(cfg: Any) -> List[str]:
+    """Forget every local markdown memory-workspace note (canonical op)."""
+    from .memory import workspace as WS
+
+    try:
+        notes = WS.list_notes(cfg).get("notes", [])
+    except Exception:
+        return []
+    deleted: List[str] = []
+    for note in notes if isinstance(notes, list) else []:
+        if not isinstance(note, dict):
+            continue
+        name = str(note.get("name", "") or "")
+        if not name:
+            continue
+        out = WS.forget_note(cfg, name, requested_by="dashboard:user",
+                             confirmed=True)
+        if str(out.get("state", "")) == "OK":
+            deleted.append(name)
+    return deleted
+
+
+def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "auth_status", {}, actor="dashboard:user", session="dashboard")
+    res = _res(out) or {}
+    # Record<string, EnvVarInfo> wire shape: references only, never values.
+    # PRB-02: read the SAME canonical reference registry that ``env_write`` /
+    # ``env_delete`` write (``qubit_env_refs.json``), so a set/delete through
+    # the dashboard is observable on the next list. Provider credential
+    # references are projected from ``auth_status``.
+    env: Dict[str, Any] = {}
+    providers = res.get("providers", []) if isinstance(res, dict) else []
+    for prov in providers if isinstance(providers, list) else []:
+        if not isinstance(prov, dict):
+            continue
+        name = str(prov.get("provider", ""))
+        if not name:
+            continue
+        env[f"{name.upper()}_KEY_REF"] = {
+            "is_set": bool(prov.get("configured", False)),
+            "redacted_value": None,
+            "description": f"{name} credential reference "
+                           f"({prov.get('key_ref', 'vault')})",
+            "url": None, "category": "providers",
+            "is_password": True, "tools": [], "advanced": False,
+            "channel_managed": False, "custom": False,
+        }
+    refs = _load_json_store(_env_refs_path(cfg))
+    # ``is_set`` must reflect the REAL presence of a key, not only the
+    # vault-reference registry: Qubit's own runtime ``.env`` (and the process
+    # env it was loaded into) hold provider keys that were reported as unset.
+    # Names only — a value is never read, cached, or returned.
+    try:
+        from .env_store import present_names as _present_names
+
+        present_names = set(_present_names(cfg)) | set(os.environ.keys())
+    except Exception:
+        present_names = set(refs) | set(os.environ.keys())
+    for key, ref in sorted(refs.items()):
+        env[str(key)] = {
+            "is_set": True,
+            "redacted_value": None,
+            "description": f"Qubit vault reference ({ref})",
+            "url": None, "category": "references",
+            "is_password": True, "tools": [], "advanced": False,
+            "channel_managed": False, "custom": True,
+        }
+    # Merge the canonical upstream env-var catalog so the Env page shows the
+    # real supported keys (is_set reflects the Qubit reference registry, never
+    # a value). This is the same schema the CLI provider registry declares.
+    try:
+        from . import qubit_runtime
+
+        qubit_runtime.ensure_path()
+        from qubit_cli.config import OPTIONAL_ENV_VARS  # type: ignore
+
+        from .qubit_plugins import _rebrand_product
+
+        for var, info in OPTIONAL_ENV_VARS.items():
+            if var in env:
+                continue
+            info = info if isinstance(info, dict) else {}
+            env[str(var)] = {
+                "is_set": var in refs or var in present_names,
+                "redacted_value": None,
+                "description": _rebrand_product(
+                    info.get("description", "") or ""),
+                "url": info.get("url"),
+                "category": str(info.get("category", "") or ""),
+                "is_password": bool(info.get("password", False)),
+                "tools": list(info.get("tools", []) or []),
+                "advanced": bool(info.get("advanced", False)),
+                "channel_managed": False, "custom": False,
+            }
+    except Exception:  # noqa: BLE001 - catalog is additive, never fatal
+        pass
+    return 200, env
+
+
+def h_ops(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    name = p.get("name", "")
+    mapping = {
+        "doctor": ("doctor", {}), "dump": ("diagnostics", {}),
+        "backup": ("backup_create", {}),
+        "prompt-size": ("prompt_budget", {}), "security-audit": ("security", {}),
+        "import": ("backup_restore", {}),
+        "config-migrate": ("product_migrate", {}),
+        "kanban": ("kanban_list", {}), "boards": ("kanban_boards", {}),
+        "boards-create": ("kanban_boards_create", {}),
+        "cards-create": ("kanban_create", {}),
+        "cards-move": ("kanban_move", {}),
+        "cards-complete": ("kanban_complete", {}),
+        "gateways": ("gateway", {}),
+        "gateway-add": ("gateway_add", {}),
+        "gateway-show": ("gateway_show", {}),
+        "gateway-link": ("gateway_link", {}),
+        "gateway-remove": ("gateway_remove", {}),
+        "msg-accounts": ("msg_accounts", {}),
+        "msg-account-add": ("msg_account_add", {}),
+        "msg-account-show": ("msg_account_show", {}),
+        "msg-account-remove": ("msg_account_remove", {}),
+        "runtime": ("runtime_status", {}),
+    }
+    if name not in mapping:
+        return _gate("OPS_UNKNOWN", f"unknown ops endpoint {name!r}",
+                     "use the Qubit operations console (/ops) or CLI", 404)
+    op_id, args = mapping[name]
+    if b and name in ("checkpoints", "hooks", "import", "backup",
+                      "boards-create",
+                      "cards-create", "cards-move", "cards-complete",
+                      "kanban", "boards", "gateways",
+                      "gateway-add", "gateway-show", "gateway-link",
+                      "gateway-remove", "msg-accounts",
+                      "msg-account-add", "msg-account-show",
+                      "msg-account-remove"):
+        args = {k: v for k, v in b.items() if isinstance(v, (str, int, float, bool))}
+        # ``confirm`` is the pipeline signal, not an op arg.
+        args.pop("confirm", None)
+        if name == "backup":
+            args.pop("output", None)
+        if name == "import":
+            # The dashboard sends ``{archive, force}``; the canonical
+            # backup_restore op takes ``{bundle, passphrase, apply}``.
+            if "archive" in args and "bundle" not in args:
+                args["bundle"] = args.pop("archive")
+            if "force" in args and "apply" not in args:
+                args["apply"] = "true" if args.pop("force") else "false"
+    if q and name in ("kanban", "boards", "gateways",
+                      "gateway-show", "gateway-link", "msg-accounts",
+                      "msg-account-show"):
+        # Filtered reads: ?board= / ?gateway_id= / ?account_id= (validated
+        # by run_op against the voice arg specs; unknown keys fail typed).
+        for k, v in q.items():
+            if isinstance(v, str) and v:
+                args[k] = v
+    out = OPS.run_op(cfg, op_id, args, actor="dashboard:user", session="dashboard")
+    # B-08: an explicit dashboard action (backup/import) that arrives with
+    # ``confirm`` settles its own staged confirmation, re-supplying only the
+    # secret args (passphrase) that were withheld from the journal. Without
+    # this the control staged a confirmation the UI could never settle.
+    if name in ("backup", "import") and b.get("confirm") \
+            and out.get("confirmation_id") \
+            and out.get("state") != "executed":
+        sensitive = {k: b[k] for k in (out.get("sensitive_required") or [])
+                     if k in b}
+        out = OPS.confirm_op(cfg, str(out["confirmation_id"]),
+                             actor="dashboard:user", session="dashboard",
+                             sensitive=sensitive)
+    ok = out.get("state") == "executed"
+    record_action_status(op_id, out)
+    record_action_status(name, out)
+    if out.get("confirmation_id") and not ok:
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    # B-08/B-15: the Operations console keys its action-log viewer off the
+    # response ``name``; return the resolved op id so it renders.
+    return (200 if ok else 400), {"ok": ok, "name": op_id, "action": name,
+                                  "result": _res(out),
+                                  "state": out.get("state"), "code": out.get("code"),
+                                  "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def h_ops_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Machine-readable operations catalog (same registry as CLI/voice).
+
+    Backs the Qubit-shell operations console: every entry carries its
+    group, args schema, and confirmation flag so the React page can render
+    real forms and settle staged mutations on the shared journal.
+    """
+    from . import dashboard_ops as OPS
+    try:
+        ops = OPS.catalog()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ops=ops, count=len(ops))
+
+
+def _ops_result(out: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    ok = out.get("state") == "executed"
+    if out.get("confirmation_id") and not ok:
+        return _staged(_redact(out.get("speech", ""))[:300],
+                       out["confirmation_id"])
+    return (200 if ok else 400), {
+        "ok": ok, "result": _res(out), "state": out.get("state"),
+        "code": out.get("code"),
+        "detail": _redact(out.get("speech", out.get("detail", "")))[:400]}
+
+
+def ops_run_request(cfg: Any, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonical ``POST /api/ops/run`` execution.
+
+    The single request-parsing/dispatch implementation behind both the classic
+    dashboard surface (``webui``) and the SPA compat route: it calls the shared
+    ``dashboard_ops.run_op`` operation contract the CLI and voice surfaces use,
+    and returns the raw ``dashboard_ops`` envelope. Each transport adapts that
+    envelope to its own wire shape (audit ``finding.same_path_dup_8``).
+    """
+    from . import dashboard_ops as OPS
+    op_id = str(body.get("id", "") or "").strip()
+    if not op_id:
+        return {"state": "failed", "code": "MALFORMED",
+                "detail": "id required"}
+    raw_args = body.get("args")
+    if raw_args is None:
+        raw_args = {}
+    if not isinstance(raw_args, dict):
+        return {"state": "failed", "code": "MALFORMED",
+                "detail": "args must be an object"}
+    args = {k: v for k, v in raw_args.items()
+            if isinstance(v, (str, int, float, bool))}
+    out = OPS.run_op(cfg, op_id, args, actor="dashboard:user",
+                     session="dashboard")
+    record_action_status(op_id, out)
+    return out
+
+
+def _run_catalog_op(cfg: Any, op_id: str,
+                    args: Optional[Dict[str, Any]] = None
+                    ) -> Tuple[int, Dict[str, Any]]:
+    """Run one operation-catalog id on the shared broker.
+
+    The desktop/browser compat routes below are thin adapters: they forward to
+    the SAME canonical op id in ``dashboard_ops`` the CLI and voice read, so
+    confirmation staging, the emergency stop, and audit stay on one path.
+    """
+    try:
+        out = ops_run_request(cfg, {"id": op_id, "args": args or {}})
+    except Exception as exc:
+        return _fail(exc)
+    if str(out.get("code")) == "MALFORMED":
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": _redact(str(out.get("detail", "")))[:300]}
+    return _ops_result(out)
+
+
+def ops_confirm_request(cfg: Any, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonical ``POST /api/ops/confirm`` execution.
+
+    One implementation for the classic and SPA surfaces; returns the raw
+    ``dashboard_ops`` envelope (audit ``finding.same_path_dup_8``)."""
+    from . import dashboard_ops as OPS
+    cid = str(body.get("confirmation_id", body.get("id", "")) or "")
+    if not cid:
+        return {"state": "failed", "code": "MALFORMED",
+                "detail": "confirmation_id required"}
+    sensitive = body.get("sensitive")
+    return OPS.confirm_op(
+        cfg, cid, actor="dashboard:user", session="dashboard",
+        sensitive=dict(sensitive) if isinstance(sensitive, dict) else None)
+
+
+def h_ops_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Run any catalog operation on the shared broker (same path as CLI/voice).
+
+    Body: ``{"id": <op-id>, "args": {...}}``. Reads execute immediately;
+    confirmed mutations stage a single-use confirmation on the shared
+    journal and answer 409 (never a fabricated 2xx).
+    """
+    try:
+        out = ops_run_request(cfg, b)
+    except Exception as exc:
+        return _fail(exc)
+    if str(out.get("code", "")) == "MALFORMED":
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": _redact(str(out.get("detail", "")))[:300]}
+    return _ops_result(out)
+
+
+def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Pending confirmations on the SHARED journal (same records CLI
+    `qubit approvals`, voice yes/no, and the classic dashboard settle).
+    The pending-approvals banner polls this; confirm/cancel below settle
+    through the same OPS journal path — one permission/confirmation path.
+    """
+    from .approvals import ApprovalJournal
+    try:
+        journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
+                                  default_ttl_s=120.0)
+        items = [{"id": a.id, "capability": str(a.capability or ""),
+                  "summary": _redact(a.summary)[:300],
+                  "created_at": a.created_at, "expires_at": a.expires_at,
+                  "state": a.state}
+                 for a in journal.pending()]
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(approvals=items, count=len(items))
+
+
+def _confirm_payload(out: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    ok = out.get("state") == "executed"
+    return (200 if ok else 400), {
+        "ok": ok, "state": out.get("state"), "code": out.get("code"),
+        "detail": _redact(out.get("speech", out.get("detail", "")))[:400],
+        "receipt": out.get("receipt")}
+
+
+def h_ops_confirm(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    cid = str(b.get("confirmation_id", b.get("id", "")) or "").strip()
+    if cid:
+        # The canonical skill/toolset mutation contracts own their journal ids;
+        # try them before the dashboard-ops registry so /api/ops/confirm is the
+        # ONE standard settle for every staged mutation. Foreign ids return
+        # ``None`` and fall through unchanged.
+        from .verified_skills import mutations as SM
+        owned = SM.settle_skill_mutation_if_owned(
+            cfg, cid, actor="dashboard:user", session="dashboard")
+        if owned is not None:
+            return _mutation_envelope(owned)
+        from . import toolsets as TS
+        owned = TS.settle_toolset_mutation_if_owned(
+            cfg, cid, actor="dashboard:user", session="dashboard")
+        if owned is not None:
+            return _mutation_envelope(owned)
+    out = ops_confirm_request(cfg, b)
+    if str(out.get("code", "")) == "MALFORMED":
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": _redact(str(out.get("detail", "")))[:300]}
+    return _confirm_payload(out)
+
+
+def h_ops_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    cid = str(b.get("confirmation_id", b.get("id", "")) or "") or None
+    out = OPS.cancel_op(cfg, cid, actor="dashboard:user",
+                        session="dashboard")
+    return _confirm_payload(out)
+
+
+def _rebrand_chat_message(message: Any) -> Any:
+    """Render one persisted chat message as Qubit at the served boundary.
+
+    The chat-session store is durable history and may hold legacy
+    upstream-authored text (D4: ``"developed as Qubit"``). It is never
+    rewritten; upstream product names are rendered as Qubit only on the served
+    response through the shared ``qubit_plugins._rebrand_product`` convention,
+    so the stored transcript bytes stay unchanged.
+    """
+    if not isinstance(message, dict):
+        return message
+    out = dict(message)
+    if isinstance(out.get("content"), str):
+        out["content"] = _qubit_plugins._rebrand_product(out["content"])
+    meta = out.get("meta")
+    if isinstance(meta, dict):
+        out["meta"] = {
+            key: (_qubit_plugins._rebrand_product(value)
+                  if isinstance(value, str) else value)
+            for key, value in meta.items()}
+        # The persisted transcript nests the model's tool calls and reasoning
+        # under ``meta`` (QubitSessionStore._msg). The Sessions SPA reads them
+        # at the TOP level (api.ts SessionMessage: tool_calls/tool_name/
+        # tool_call_id), so a nested-only message rendered the tool-result
+        # bubble but never the assistant's ``write_file`` invocation or its
+        # reasoning. Surface the same values top-level; ``meta`` is preserved.
+        for key in ("tool_calls", "tool_name", "tool_call_id",
+                    "reasoning", "reasoning_content"):
+            if key in meta and key not in out:
+                out[key] = meta[key]
+    return out
+
+
+def _rebrand_chat_messages(messages: Any) -> Any:
+    if isinstance(messages, list):
+        return [_rebrand_chat_message(m) for m in messages]
+    return messages
+
+
+def _rebrand_chat_record(record: Any) -> Any:
+    if not isinstance(record, dict):
+        return record
+    out = dict(record)
+    for key in ("name", "title", "preview"):
+        if isinstance(out.get(key), str):
+            out[key] = _qubit_plugins._rebrand_product(out[key])
+    return out
+
+
+def _rebrand_chat_result(res: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(res)
+    if isinstance(out.get("reply"), str):
+        out["reply"] = _qubit_plugins._rebrand_product(out["reply"])
+    if isinstance(out.get("message"), dict):
+        out["message"] = _rebrand_chat_message(out["message"])
+    return out
+
+
+class _ReasoningInvalid(ValueError):
+    """Per-request reasoning selector failed validation (typed 400)."""
+
+
+def _chat_effective_reasoning(cfg: Any, session: str,
+                              requested: Any) -> Optional[str]:
+    """Effective reasoning level for a turn: the per-request selector wins,
+    otherwise the session-persisted preference. Unknown levels raise
+    :class:`_ReasoningInvalid` (typed refusal, never a silent default)."""
+    from . import chat_transport as CT
+    from .local_llm import normalize_reasoning_level
+
+    if requested is not None:
+        try:
+            return normalize_reasoning_level(requested)
+        except Exception as exc:
+            raise _ReasoningInvalid(str(exc))
+    try:
+        return CT.session_reasoning(cfg, session)
+    except Exception:
+        return None
+
+
+def h_chat_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Qubit Chat (overlay): one persisted native agent turn, same module as
+    CLI/voice. The turn is written to the Qubit chat-session store so the
+    dashboard can reload it; nothing is fabricated on model failure."""
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; agent turn refused"}
+    text = str(b.get("text", "") or "")
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)[:80]
+    model = b.get("model")
+    try:
+        reasoning = _chat_effective_reasoning(cfg, session, b.get("reasoning"))
+    except _ReasoningInvalid as exc:
+        return 400, {"ok": False, "code": "REASONING_INVALID",
+                     "detail": str(exc)[:200]}
+    try:
+        res = CT.turn(cfg, text, session=session, model=model,
+                      reasoning=reasoning)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("chat_turn", "dashboard:user", {"session": session,
+                                           "ok": bool(res.get("ok"))})
+    if res.get("ok"):
+        return 200, _rebrand_chat_result(res)
+    status = {"EMERGENCY_STOP": 403, "AGENT_DISABLED": 403,
+              "MALFORMED": 400, "MODEL_NOT_ALLOWED": 400,
+              "CANCELLED": 409}.get(str(res.get("code")), 502)
+    return status, res
+
+
+def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions -> persisted chat sessions."""
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "50") or "50"), 100))
+    except ValueError:
+        limit = 50
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    query = str(q.get("q", q.get("query", "")) or "")
+    res = CT.store(cfg).list(limit=limit, offset=offset, query=query)
+    return _ok(sessions=[_rebrand_chat_record(row) for row in res["sessions"]],
+               total=res["total"],
+               limit=res["limit"], offset=res["offset"],
+               state="OK", code=None, source="qubit-chat-store")
+
+
+def h_chat_session_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session create refused"}
+    routed = CT.resolve_model(cfg, b.get("model"))
+    if not routed.get("ok"):
+        return 400, routed
+    res = CT.store(cfg).create(str(b.get("name", "") or ""),
+                               session_id=b.get("id"), model=routed["model"])
+    if res.get("state") == "OK":
+        return _ok(session=_rebrand_chat_record(res["session"]),
+                   messages=res.get("messages", []))
+    status = 409 if res.get("state") == "EXISTS" else 400
+    return status, {"ok": False, "code": res.get("code"),
+                    "detail": res.get("detail", "")}
+
+
+def h_chat_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    res = CT.store(cfg).show(p.get("id", ""))
+    if res.get("state") != "OK":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    try:
+        meta = CT.store(cfg).meta_get(p.get("id", "")).get("meta", {})
+    except Exception:
+        meta = {}
+    return _ok(session=_rebrand_chat_record(res["session"]),
+               messages=_rebrand_chat_messages(res.get("messages", [])),
+               message_count=res.get("message_count", 0),
+               meta=meta if isinstance(meta, dict) else {})
+
+
+def h_chat_session_messages(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "500") or "500"), 1000))
+    except ValueError:
+        limit = 500
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except ValueError:
+        offset = 0
+    res = CT.store(cfg).messages(p.get("id", ""), limit=limit, offset=offset)
+    if res.get("state") != "OK":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(session_id=res["session_id"],
+               messages=_rebrand_chat_messages(res["messages"]),
+               total=res["total"],
+               pagination={"limit": res["limit"], "offset": res["offset"],
+                           "order": "asc", "returned": len(res["messages"]),
+                           "total": res["total"]})
+
+
+# ---------------------------------------------------------------------------
+# S5 — chat projection reads (session activity / file drafts / comments + CI).
+#
+# Every handler delegates to the ``chat_transport`` adapters, which inject the
+# single chat-session authority (:class:`ChatSessionStore`) as the writer guard,
+# so a projection row can only reference a session the authority knows. Reads
+# are side-effect free; typed ``ChatStoreError`` codes map to HTTP 400.
+# ---------------------------------------------------------------------------
+def _chat_store_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    code = getattr(exc, "code", None) or type(exc).__name__
+    return 400, {"ok": False, "code": code,
+                 "detail": _redact(str(exc))[:300],
+                 "qubit_counterpart": "Qubit Chat session projection "
+                                      "(same store as chat)"}
+
+
+def h_chat_session_activity(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions/{id}/activity -> read-only projection."""
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "20") or "20"), 200))
+    except (TypeError, ValueError):
+        limit = 20
+    git_root = str(q.get("git_root", "") or "")
+    try:
+        out = CT.build_projection(cfg, p.get("id", ""), git_root=git_root,
+                                  limit=limit)
+    except Exception as exc:
+        return _chat_store_error(exc)
+    ok = str(out.get("state")) == "OK"
+    return (200 if ok else 400), {"ok": ok, **out}
+
+
+def h_chat_session_drafts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions/{id}/drafts -> per-session file drafts."""
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except (TypeError, ValueError):
+        offset = 0
+    include_content = str(
+        q.get("include_content", "true") or "true").strip().lower() not in (
+            "0", "false", "no", "off")
+    try:
+        out = CT.draft_store(cfg).list(p.get("id", ""), limit=limit,
+                                       offset=offset,
+                                       include_content=include_content)
+    except Exception as exc:
+        return _chat_store_error(exc)
+    return _ok(**out)
+
+
+def h_chat_session_draft_content(cfg: Any, q: Dict[str, str],
+                                 b: Dict[str, Any],
+                                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions/{id}/draft?path=... -> one draft body."""
+    from . import chat_transport as CT
+    path = str(q.get("path", b.get("path", "")) or "")
+    if not path:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "path is required",
+                     "qubit_counterpart": "Qubit Chat file drafts"}
+    try:
+        out = CT.draft_store(cfg).get(p.get("id", ""), path)
+    except Exception as exc:
+        return _chat_store_error(exc)
+    if str(out.get("state")) != "OK":
+        return 404, {"ok": False, "code": out.get("code", "DRAFT_NOT_FOUND"),
+                     "detail": out.get("detail", "")}
+    return _ok(**out)
+
+
+def h_chat_session_comments(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions/{id}/comments -> operator comments."""
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except (TypeError, ValueError):
+        offset = 0
+    target = str(q.get("target", "") or "")
+    try:
+        out = CT.comment_store(cfg).list_comments(
+            p.get("id", ""), limit=limit, offset=offset, target=target)
+    except Exception as exc:
+        return _chat_store_error(exc)
+    return _ok(**out)
+
+
+def h_chat_session_ci(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/chat/sessions/{id}/ci -> structured CI-detail rows."""
+    from . import chat_transport as CT
+    try:
+        limit = max(1, min(int(q.get("limit", "100") or "100"), 500))
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        offset = max(0, int(q.get("offset", "0") or "0"))
+    except (TypeError, ValueError):
+        offset = 0
+    check = str(q.get("check", "") or "")
+    try:
+        out = CT.comment_store(cfg).list_ci_details(
+            p.get("id", ""), limit=limit, offset=offset, check=check)
+    except Exception as exc:
+        return _chat_store_error(exc)
+    return _ok(**out)
+
+
+_CHAT_IMAGE_MIME_EXT = {
+    "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif",
+    "image/webp": "webp", "image/bmp": "bmp",
+}
+_CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+_CHAT_DATA_URL_RE = re.compile(
+    r"^data:(image/(?:png|jpeg|gif|webp|bmp));base64,([A-Za-z0-9+/=\s]+)$")
+
+
+def h_chat_vision(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/vision -> describe a pasted chat image (A35).
+
+    Decodes the browser data URL, validates the mime/size whitelist, writes the
+    bytes ONLY under the Qubit state dir (mode 0600, bounded), then runs the
+    canonical ``vision.describe`` (confirmed, audited) and removes the temp
+    file. No browser path is ever trusted and no secret is involved.
+    """
+    import base64 as _b64
+    import hashlib as _hl
+    if not bool(b.get("confirm", False)):
+        return 400, {"ok": False, "code": "CONFIRM_REQUIRED",
+                     "detail": "describing a chat image requires confirm",
+                     "qubit_counterpart": "Qubit Chat attach + vision"}
+    match = _CHAT_DATA_URL_RE.match(str(b.get("data_url", "") or ""))
+    if not match:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "data_url must be a base64 png/jpeg/gif/webp/"
+                               "bmp data URL"}
+    mime, b64 = match.group(1), match.group(2)
+    try:
+        raw = _b64.b64decode(re.sub(r"\s+", "", b64), validate=True)
+    except Exception:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": "image data URL is not valid base64"}
+    if not raw or len(raw) > _CHAT_IMAGE_MAX_BYTES:
+        return 400, {"ok": False, "code": "BAD_IMAGE",
+                     "detail": f"image must be 1..{_CHAT_IMAGE_MAX_BYTES} bytes"}
+    import os as _os
+    from pathlib import Path as _Path
+    ext = _CHAT_IMAGE_MIME_EXT[mime]
+    digest = _hl.sha256(raw).hexdigest()
+    root = _Path(cfg.state_dir()) / "chat_attachments"
+    root.mkdir(parents=True, exist_ok=True)
+    dest = root / f"{digest}.{ext}"
+    tmp = root / f".{digest}.tmp"
+    try:
+        fd = _os.open(str(tmp), _os.O_WRONLY | _os.O_CREAT | _os.O_TRUNC, 0o600)
+        with _os.fdopen(fd, "wb") as fh:
+            fh.write(raw)
+        tmp.replace(dest)
+    except OSError as exc:
+        return _fail(exc)
+    try:
+        from . import vision as V
+        out = V.describe(cfg, str(dest),
+                         prompt=str(b.get("prompt", "") or ""),
+                         requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or "VISION_FAILED"
+        detail = getattr(exc, "detail", None) or str(exc)
+        return 502, {"ok": False, "code": str(code),
+                     "detail": _redact(str(detail))[:200]}
+    finally:
+        try:
+            dest.unlink()
+        except OSError:
+            pass
+    return _ok(description=out.get("description", ""),
+               image=out.get("image", {}), model=out.get("model", ""),
+               authority="canonical vision.describe over a bounded, "
+                         "state-dir-only temp image")
+
+
+def h_chat_session_patch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session change refused"}
+    st = CT.store(cfg)
+    if "name" in b:
+        res = st.rename(p.get("id", ""), str(b.get("name", "")))
+    elif b.get("archived") is not None:
+        res = st.archive(p.get("id", ""), bool(b.get("archived")))
+    elif "reasoning" in b:
+        from .local_llm import normalize_reasoning_level
+
+        try:
+            level = normalize_reasoning_level(b.get("reasoning"))
+        except Exception as exc:
+            return 400, {"ok": False, "code": "REASONING_INVALID",
+                         "detail": str(exc)[:200]}
+        res = st.meta_patch(p.get("id", ""), {"reasoning": level})
+    else:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "patch needs name, archived, or reasoning"}
+    if res.get("state") == "MISSING":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    if res.get("state") != "OK":
+        return 400, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(session=_rebrand_chat_record(res["session"]))
+
+
+def h_chat_session_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session delete refused"}
+    # HTTP DELETE bodies are not parsed by ``webui._hermes_api`` (only
+    # POST/PUT/PATCH are), so a body-only ``confirm`` is unreachable from the
+    # listener. Honor the query string too so the documented confirmation
+    # actually settles the delete.
+    confirmed = bool(b.get("confirm", False)) or str(
+        q.get("confirm", "") or "").strip().lower() in (
+            "1", "true", "yes", "on")
+    res = CT.store(cfg).delete(p.get("id", ""), confirm=confirmed)
+    if res.get("state") == "MISSING":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    if res.get("state") == "CONFIRM_REQUIRED":
+        return 409, {"ok": False, "state": "CONFIRM_REQUIRED",
+                     "code": "CONFIRM_REQUIRED", "detail": res.get("detail", ""),
+                     "session": _rebrand_chat_record(res.get("session")),
+                     "qubit_counterpart": "re-DELETE with {\"confirm\": true} "
+                                          "or ?confirm=true"}
+    if res.get("state") != "OK":
+        return 400, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(state="OK", session=_rebrand_chat_record(res.get("session")))
+
+
+def h_chat_session_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    res = CT.store(cfg).export(p.get("id", ""))
+    if res.get("state") != "OK":
+        return 404, {"ok": False, "code": res.get("code"),
+                     "detail": res.get("detail", "")}
+    return _ok(schema=res["schema"], session=_rebrand_chat_record(res["session"]),
+               messages=_rebrand_chat_messages(res["messages"]),
+               exported_at=res["exported_at"])
+
+
+def h_chat_session_import(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; session import refused"}
+    payload = b.get("envelope") if isinstance(b.get("envelope"), dict) else b
+    res = CT.store(cfg).import_session(
+        payload, overwrite=bool(b.get("overwrite", False)))
+    if res.get("state") == "OK":
+        return _ok(session=res.get("session"), imported=res.get("imported", 0))
+    status = 409 if res.get("state") == "EXISTS" else 400
+    return status, {"ok": False, "code": res.get("code"),
+                    "detail": res.get("detail", "")}
+
+
+def h_chat_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/cancel -> stop the in-flight turn on a session."""
+    from . import chat_transport as CT
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    res = CT.cancel(session)
+    return (200 if res.get("ok") else 404), res
+
+
+def h_chat_retry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/retry -> re-run the last unanswered user message.
+
+    A failed turn keeps the user message and no assistant reply; retry
+    re-invokes the model without duplicating the transcript. Nothing is
+    fabricated when the model is still unavailable.
+    """
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; agent turn refused"}
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    res = CT.retry_last(cfg, session, model=b.get("model"))
+    if res.get("ok"):
+        return 200, _rebrand_chat_result(res)
+    status = {"SESSION_NOT_FOUND": 404, "NOTHING_TO_RETRY": 409,
+              "EMERGENCY_STOP": 403, "AGENT_DISABLED": 403,
+              "MALFORMED": 400, "MODEL_NOT_ALLOWED": 400}.get(
+                  str(res.get("code")), 502)
+    return status, res
+
+
+def h_chat_pty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/chat/pty -> PTY-shaped, agent-backed frame (base64).
+
+    No shell or PTY is spawned: the input line runs one persisted agent turn
+    and the reply is returned as terminal bytes for the xterm UI.
+    """
+    from . import chat_transport as CT
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; chat session refused"}
+    res = CT.pty_feed(cfg,
+                      str(b.get("session", CT.DEFAULT_SESSION) or
+                          CT.DEFAULT_SESSION),
+                      str(b.get("input", "") or ""), model=b.get("model"),
+                      reset=bool(b.get("reset", False)))
+    return (200 if res.get("ok") else 400), res
+
+
+def h_chat_stream(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]):
+    """Streaming chat handler for the ``disp="stream"`` route.
+
+    Returns an iterator of SSE frames -- a real implementation, not a JSON
+    ``(status, dict)`` envelope, which is why the route kind exists. The webui
+    dispatcher consumes the route's ``stream`` disposition and iterates this;
+    :func:`dispatch` never calls it (JSON cannot express an event stream).
+    Preflight (model/empty/e-stop) runs in ``chat_transport.stream_turn`` via
+    the shared ``chat_transport.stream_preflight``.
+    """
+    from . import chat_transport as CT
+    text = str(b.get("text", "") or "")
+    session = str(b.get("session", CT.DEFAULT_SESSION) or CT.DEFAULT_SESSION)
+    try:
+        reasoning = _chat_effective_reasoning(cfg, session, b.get("reasoning"))
+    except _ReasoningInvalid as exc:
+        # Bind the message BEFORE defining the generator: Python deletes the
+        # ``except`` scope variable at the end of the block, so a nested
+        # generator that closed over ``exc`` raised NameError when iterated
+        # (headers already sent 200, empty body). A plain local survives.
+        detail = str(exc)[:200]
+
+        def _refused() -> Iterator[str]:
+            from .chat_transport import sse_encode
+
+            yield sse_encode({"event": "error", "code": "REASONING_INVALID",
+                              "detail": detail, "session_id": session})
+
+        return _refused()
+    return CT.stream_sse(cfg, text, session=session, model=b.get("model"),
+                         reasoning=reasoning)
+
+
+# ---------------------------------------------------------------------------
+# Packet 8U read surfaces: scoped Git / Files / Audio (audit §1 absent reads)
+#
+# Read-only compat routes backed by the SAME modules the CLI/voice call:
+# ``git_scope`` (status/log/diff/show), ``files`` (list/tree/stat/read), and
+# ``audio.settings`` (mic/output status + device inventory). Binary streams
+# and mutating verbs stay typed-gated; nothing is fabricated 2xx.
+# ---------------------------------------------------------------------------
+
+_FS_LANGUAGE_BY_EXT = {
+    ".c": "c", ".conf": "ini", ".cpp": "cpp", ".css": "css", ".csv": "csv",
+    ".go": "go", ".h": "c", ".hpp": "cpp", ".html": "html", ".java": "java",
+    ".js": "javascript", ".json": "json", ".jsx": "jsx", ".kt": "kotlin",
+    ".lua": "lua", ".md": "markdown", ".mjs": "javascript", ".py": "python",
+    ".rb": "ruby", ".rs": "rust", ".sh": "shell", ".sql": "sql",
+    ".svg": "xml", ".toml": "toml", ".ts": "typescript", ".tsx": "tsx",
+    ".txt": "text", ".xml": "xml", ".yaml": "yaml", ".yml": "yaml",
+    ".zsh": "shell",
+}
+_FS_MIME_BY_EXT = {
+    ".css": "text/css", ".csv": "text/csv", ".html": "text/html",
+    ".js": "application/javascript", ".json": "application/json",
+    ".md": "text/markdown", ".py": "text/x-python", ".sh": "text/x-shellscript",
+    ".ts": "application/typescript", ".xml": "application/xml",
+    ".yaml": "text/yaml", ".yml": "text/yaml",
+}
+
+
+def _active_folder(cfg: Any) -> str:
+    """First folder of the active Qubit project (the scoped read root)."""
+    try:
+        from . import projects as PJ
+        active = PJ.active_project(cfg)
+        if active.get("state") == "OK" and active.get("project"):
+            folders = active["project"].get("folders", []) or []
+            if folders:
+                return str(folders[0])
+    except Exception:
+        pass
+    return ""
+
+
+def _query_text(q: Dict[str, str], b: Dict[str, Any], *keys: str) -> str:
+    for src in (q, b):
+        if not isinstance(src, dict):
+            continue
+        for key in keys:
+            value = src.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return ""
+
+
+def _git_query_root(q: Dict[str, str], b: Dict[str, Any]) -> str:
+    return _query_text(q, b, "root", "repo", "path")
+
+
+def _git_query_file(q: Dict[str, str], b: Dict[str, Any]) -> str:
+    return _query_text(q, b, "file", "file_path")
+
+
+def _git_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    from . import git_scope as GI
+    pub = GI.public_error(exc)
+    return 400, {"ok": False, "state": "FAILED", "code": pub["code"],
+                 "detail": pub["detail"],
+                 "qubit_counterpart": "CLI `qubit git status|log|diff|show`"}
+
+
+def _git_no_project(**extra: Any) -> Tuple[int, Dict[str, Any]]:
+    """Honest empty read when no active project root is registered."""
+    out: Dict[str, Any] = {
+        "schema": "qubit-runtime-git/1", "root": "", "git": None,
+        "state": "EMPTY", "code": "NO_ACTIVE_PROJECT",
+        "detail": "no active project folder; set one with "
+                  "`qubit project use <slug> --confirm`",
+    }
+    out.update(extra)
+    return _ok(**out)
+
+
+def _git_ready(cfg: Any, root: str) -> bool:
+    return bool(root) or bool(_active_folder(cfg))
+
+
+def h_git_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/status -> scoped read-only work-tree status."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(status="")
+    try:
+        res = GI.status(cfg, root, requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-runtime-git/1", root=res.get("root", ""),
+               status=res.get("status", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_log(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/log -> bounded commit log."""
+    from . import git_scope as GI
+    try:
+        limit = max(1, min(int(q.get("limit", "10") or "10"), GI.MAX_LOG_COUNT))
+    except (TypeError, ValueError):
+        limit = 10
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(entries=[])
+    try:
+        res = GI.log(cfg, root, limit, requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-runtime-git/1", root=res.get("root", ""),
+               entries=res.get("entries", []),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_diff(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/diff -> bounded unstaged diff (tree or one file)."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(path="", stat="", patch="")
+    try:
+        res = GI.diff(cfg, root, _git_query_file(q, b),
+                      requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-runtime-git/1", root=res.get("root", ""),
+               path=res.get("path", ""), stat=res.get("stat", ""),
+               patch=res.get("patch", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/show -> one committed file version at HEAD/HEAD~N."""
+    from . import git_scope as GI
+    ref = str(q.get("ref", b.get("ref", "HEAD")) or "HEAD")
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(ref=ref, path="", content="")
+    try:
+        res = GI.show(cfg, root, ref, _git_query_file(q, b),
+                      requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-runtime-git/1", root=res.get("root", ""),
+               ref=res.get("ref", ref), path=res.get("path", ""),
+               content=res.get("content", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+def h_git_file_diff(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/diff|file-diff -> working-tree-vs-HEAD diff."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return _git_no_project(path="", diff="", stat="")
+    try:
+        res = GI.diff(cfg, root, _git_query_file(q, b),
+                      requested_by="dashboard:user")
+    except GI.GitError as exc:
+        return _git_error(exc)
+    return _ok(schema="qubit-runtime-git/1", root=res.get("root", ""),
+               path=res.get("path", ""), diff=res.get("patch", ""),
+               stat=res.get("stat", ""),
+               truncated=bool(res.get("truncated", False)), git=res)
+
+
+# ---------------------------------------------------------------------------
+# Git review reads (audit §1 git.py reads): branches / worktrees / review list /
+# commit context / rev-parse. All execute ``git`` ONLY through git_scope's
+# existing fixed-argv, root-confined ``_run`` (no shell, no new subprocess path,
+# no network). Mutating verbs and the credentialed ``gh`` surfaces stay gated.
+# ---------------------------------------------------------------------------
+
+_REV_PARSE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/@~^{}:+-]{0,199}$")
+
+
+def _git_line(root: Path, argv: List[str]) -> str:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, argv)
+    except GI.GitError:
+        return ""
+    return text.splitlines()[0].strip() if text.strip() else ""
+
+
+def _git_origin_head(root: Path) -> str:
+    return _git_line(root,
+                     ["symbolic-ref", "--quiet", "--short",
+                      "refs/remotes/origin/HEAD"])
+
+
+def _git_origin_head_abbrev(root: Path) -> str:
+    return _git_line(root, ["rev-parse", "--abbrev-ref", "origin/HEAD"])
+
+
+def _git_ref_exists(root: Path, ref: str) -> bool:
+    from . import git_scope as GI
+    try:
+        GI._run(root, ["rev-parse", "--verify", "--quiet", ref])
+        return True
+    except GI.GitError:
+        return False
+
+
+def _git_default_branch(root: Path) -> str:
+    head = _git_origin_head_abbrev(root)
+    if head and head != "origin/HEAD":
+        return head.split("/", 1)[-1]
+    for ref in ("refs/heads/main", "refs/heads/master",
+                "refs/remotes/origin/main", "refs/remotes/origin/master"):
+        if _git_ref_exists(root, ref):
+            return ref.split("/")[-1]
+    return ""
+
+
+def _git_ref_names(root: Path, *patterns: str) -> List[str]:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(
+            root, ["for-each-ref", "--format=%(refname:short)",
+                   "--sort=-committerdate", *patterns])
+    except GI.GitError:
+        return []
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def _git_worktree_rows(root: Path) -> List[Dict[str, Any]]:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, ["worktree", "list", "--porcelain"])
+    except GI.GitError:
+        return []
+    trees: List[Dict[str, Any]] = []
+    for line in text.splitlines():
+        if line.startswith("worktree "):
+            trees.append({"path": line[9:].strip(), "branch": None,
+                          "isMain": not trees, "detached": False,
+                          "locked": False})
+        elif not trees:
+            continue
+        elif line.startswith("branch "):
+            trees[-1]["branch"] = line[7:].strip().replace(
+                "refs/heads/", "", 1)
+        elif line == "detached":
+            trees[-1]["detached"] = True
+        elif line.startswith("locked"):
+            trees[-1]["locked"] = True
+    return trees
+
+
+def _resolve_rename_path(raw: str) -> str:
+    path = str(raw or "").strip()
+    if " => " not in path:
+        return path
+    head, _, tail = path.partition("{")
+    if tail and "}" in tail:
+        inner, _, suffix = tail.partition("}")
+        _, _, to = inner.partition(" => ")
+        return f"{head}{to}{suffix}".replace("//", "/")
+    return path.split(" => ")[-1].strip()
+
+
+def _git_numstat(root: Path, *args: str) -> Dict[str, Tuple[int, int]]:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, ["diff", "--numstat", *args])
+    except GI.GitError:
+        return {}
+    counts: Dict[str, Tuple[int, int]] = {}
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3:
+            added = 0 if parts[0] == "-" else int(parts[0] or 0)
+            removed = 0 if parts[1] == "-" else int(parts[1] or 0)
+            counts[_resolve_rename_path(parts[2])] = (added, removed)
+    return counts
+
+
+def _git_untracked_insertions(root: Path, rel: str) -> int:
+    try:
+        base = Path(root).resolve()
+        target = (base / rel).resolve()
+        target.relative_to(base)
+        if not target.is_file() or target.stat().st_size > 2_000_000:
+            return 0
+        data = target.read_bytes()
+        if b"\0" in data:
+            return 0
+        lines = data.count(b"\n")
+        return lines + 1 if data and not data.endswith(b"\n") else lines
+    except (OSError, ValueError):
+        return 0
+
+
+def _git_status_raw(root: Path) -> str:
+    from . import git_scope as GI
+    try:
+        text, _trunc = GI._run(root, ["status", "--porcelain=v2", "-z"])
+    except GI.GitError:
+        return ""
+    return text
+
+
+def _porcelain_entries(raw: str):
+    records = iter(raw.split("\0"))
+    for rec in records:
+        if not rec:
+            continue
+        tag = rec[0]
+        if tag == "?":
+            yield "?", "??", rec[2:]
+        elif tag == "u":
+            parts = rec.split(" ")
+            yield "u", parts[1] if len(parts) > 1 else ".", parts[-1]
+        elif tag in ("1", "2"):
+            parts = rec.split(" ")
+            xy = parts[1] if len(parts) > 1 else ".."
+            path = (rec.split(" ", 8)[-1] if tag == "1"
+                    else rec.split(" ", 9)[-1])
+            if tag == "2":
+                next(records, None)
+            yield tag, xy, _resolve_rename_path(path)
+
+
+def _git_status_letter(tag: str, xy: str) -> str:
+    if tag in ("?", "u"):
+        return tag.upper()
+    code = xy[0] if xy[0] != "." else (xy[1] if len(xy) > 1 else ".")
+    return (code if code != "." else "M").upper()
+
+
+def _git_branch_base(root: Path) -> str:
+    from . import git_scope as GI
+    head = _git_origin_head_abbrev(root)
+    candidates = ([head] if head else []) + [
+        "origin/main", "origin/master", "main", "master"]
+    for ref in candidates:
+        try:
+            text, _trunc = GI._run(root, ["merge-base", "HEAD", ref])
+        except GI.GitError:
+            continue
+        line = text.splitlines()[0].strip() if text.strip() else ""
+        if line:
+            return line
+    return ""
+
+
+def _git_resolved_root(cfg: Any, q: Dict[str, str],
+                       b: Dict[str, Any]):
+    """(resolved_root, error_response) for a scoped repo read."""
+    from . import git_scope as GI
+    root = _git_query_root(q, b)
+    if not _git_ready(cfg, root):
+        return None, None
+    try:
+        resolved = GI.resolve_root(cfg, root)
+        GI._check_repo(resolved)
+    except GI.GitError as exc:
+        return None, _git_error(exc)
+    return resolved, None
+
+
+def _review_files(root: Path, files: List[Dict[str, Any]], base: Optional[str],
+                  scope: str) -> Tuple[int, Dict[str, Any]]:
+    files.sort(key=lambda f: f["path"])
+    for f in files:
+        if f["status"] == "?" and f["added"] == 0 and f["removed"] == 0:
+            f["added"] = _git_untracked_insertions(root, f["path"])
+    return _ok(schema="qubit-runtime-git/1", root=str(root), files=files,
+               base=base, scope=scope)
+
+
+def h_git_worktrees(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/worktrees -> scoped ``git worktree list`` (read-only)."""
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(worktrees=[])
+    return _ok(schema="qubit-runtime-git/1", root=str(resolved),
+               worktrees=_git_worktree_rows(resolved))
+
+
+def h_git_branches(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/branches -> local + remote-tracking branch picker rows."""
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(branches=[])
+    locals_ = _git_ref_names(resolved, "refs/heads")
+    if not locals_:
+        return _ok(schema="qubit-runtime-git/1", root=str(resolved),
+                   branches=[])
+    path_by_branch = {t["branch"]: t["path"]
+                      for t in _git_worktree_rows(resolved) if t.get("branch")}
+    trunk = _git_default_branch(resolved)
+    local_set = set(locals_)
+    remotes = [name for name in _git_ref_names(resolved, "refs/remotes")
+               if not name.endswith("/HEAD")
+               and name.split("/", 1)[-1] not in local_set]
+    branches = [
+        {"name": name, "checkedOut": name in path_by_branch,
+         "isDefault": bool(trunk and name == trunk), "isRemote": False,
+         "worktreePath": path_by_branch.get(name)} for name in locals_]
+    branches += [
+        {"name": name, "checkedOut": False, "isDefault": False,
+         "isRemote": True, "worktreePath": None} for name in remotes]
+    return _ok(schema="qubit-runtime-git/1", root=str(resolved),
+               branches=branches)
+
+
+def h_git_base_branches(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/base-branches -> base-branch picker rows (trunk flagged)."""
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(branches=[])
+    names = _git_ref_names(resolved, "refs/heads", "refs/remotes")
+    default = _git_origin_head(resolved) or _git_default_branch(resolved)
+    branches = [{"name": name, "isRemote": name.startswith("origin/"),
+                 "isDefault": bool(default and name == default)}
+                for name in names]
+    return _ok(schema="qubit-runtime-git/1", root=str(resolved),
+               branches=branches)
+
+
+def h_git_review_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/list -> changed files for a review scope."""
+    from . import git_scope as GI
+    scope = str(q.get("scope", b.get("scope", "uncommitted"))
+                or "uncommitted")
+    base_ref = _query_text(q, b, "base")
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(files=[], base=None, scope=scope)
+    if scope in ("branch", "lastTurn"):
+        base = _git_branch_base(resolved) if scope == "branch" else base_ref
+        if scope == "lastTurn" and base and (
+                base.startswith("-") or not _REV_PARSE_RE.match(base)):
+            return _git_error(GI.GitError(GI.INPUT_CODE, "bad base ref"))
+        if not base:
+            return _ok(schema="qubit-runtime-git/1", root=str(resolved),
+                       files=[], base=None, scope=scope)
+        rng = f"{base}...HEAD" if scope == "branch" else base
+        counts = _git_numstat(resolved, rng)
+        files = [{"path": path, "added": a, "removed": r,
+                  "status": "M", "staged": False}
+                 for path, (a, r) in counts.items()]
+        if scope == "lastTurn":
+            seen = {f["path"] for f in files}
+            for tag, _xy, path in _porcelain_entries(
+                    _git_status_raw(resolved)):
+                if tag == "?" and path not in seen:
+                    files.append({"path": path, "added": 0, "removed": 0,
+                                  "status": "?", "staged": False})
+        return _review_files(resolved, files, base, scope)
+    raw = _git_status_raw(resolved)
+    staged = _git_numstat(resolved, "--cached")
+    unstaged = _git_numstat(resolved)
+    files = []
+    for tag, xy, path in _porcelain_entries(raw):
+        sa, sr = staged.get(path, (0, 0))
+        ua, ur = unstaged.get(path, (0, 0))
+        files.append({
+            "path": path, "added": sa + ua, "removed": sr + ur,
+            "status": _git_status_letter(tag, xy),
+            "staged": tag in ("1", "2") and xy[0] not in (".", "?")})
+    return _review_files(resolved, files, None, scope)
+
+
+def h_git_review_commit_context(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/commit-context -> staged/worktree diff + recents."""
+    from . import git_scope as GI
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(diff="", recent="")
+    raw = _git_status_raw(resolved)
+    entries = list(_porcelain_entries(raw))
+    staged = any(tag in ("1", "2") and xy[0] not in (".", "?")
+                 for tag, xy, _path in entries)
+    try:
+        diff, _trunc = GI._run(
+            resolved, ["diff", "--cached"] if staged else ["diff", "HEAD"])
+    except GI.GitError:
+        diff = ""
+    maxchars = 20000
+    if len(diff) > maxchars:
+        omitted = len(diff) - maxchars
+        diff = diff[:maxchars] + \
+            f"\n# diff truncated: {omitted} chars omitted\n"
+    untracked = [path for tag, _xy, path in entries if tag == "?"]
+    if untracked:
+        visible = untracked[:50]
+        diff += "\n# New (untracked) files:\n" + \
+            "".join(f"#   {path}\n" for path in visible)
+        if len(untracked) > len(visible):
+            diff += f"#   ... {len(untracked) - len(visible)} more omitted\n"
+    recent = _git_line(resolved,
+                       ["log", "-n", "10", "--pretty=format:%s"])
+    return _ok(schema="qubit-runtime-git/1", root=str(resolved),
+               diff=diff or "", recent=recent)
+
+
+def h_git_review_rev_parse(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/git/review/rev-parse -> resolved object name for one ref."""
+    from . import git_scope as GI
+    ref = str(q.get("ref", b.get("ref", "HEAD")) or "HEAD").strip()
+    resolved, err = _git_resolved_root(cfg, q, b)
+    if resolved is None:
+        return err or _git_no_project(ref=ref, sha=None)
+    if not _REV_PARSE_RE.match(ref) or ref.startswith("-"):
+        return _git_error(GI.GitError(GI.INPUT_CODE, "bad ref"))
+    try:
+        text, _trunc = GI._run(
+            resolved, ["rev-parse", "--verify", "--quiet", ref])
+    except GI.GitError:
+        return _ok(schema="qubit-runtime-git/1", root=str(resolved), ref=ref,
+                   sha=None)
+    sha = text.splitlines()[0].strip() if text.strip() else None
+    return _ok(schema="qubit-runtime-git/1", root=str(resolved), ref=ref,
+               sha=sha)
+
+
+def _files_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    from . import files as FI
+    return 400, {"ok": False, "state": "FAILED",
+                 "code": getattr(exc, "code", FI.BAD_INPUT_CODE),
+                 "detail": _redact(str(exc))[:300],
+                 "qubit_counterpart":
+                     "CLI `qubit files list|read` (scoped project folders)"}
+
+
+def _fs_entries(res: Dict[str, Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for entry in (res.get("entries", []) if isinstance(res, dict) else []):
+        if not isinstance(entry, dict):
+            continue
+        out.append({"name": entry.get("name", ""),
+                    "path": entry.get("rel", ""),
+                    "isDirectory": bool(entry.get("dir", False)),
+                    "size": entry.get("size")})
+    return out
+
+
+def h_fs_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/list -> project-root directory listing (read-only)."""
+    from . import files as FI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return _ok(entries=[], folder=None, truncated=False,
+                   detail="no active project folder; register one with "
+                          "`qubit project add-folder`")
+    try:
+        res = FI.list_dir(cfg, path)
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    return _ok(entries=_fs_entries(res), folder=res.get("folder", path),
+               truncated=bool(res.get("truncated", False)))
+
+
+def h_fs_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/tree -> bounded directory tree (depth 1..4)."""
+    from . import files as FI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    try:
+        depth = max(1, min(int(q.get("depth", "2") or "2"), FI.MAX_DEPTH))
+    except (TypeError, ValueError):
+        depth = 2
+    if not path:
+        return _ok(entries=[], folder=None, depth=depth, truncated=False,
+                   detail="no active project folder; register one with "
+                          "`qubit project add-folder`")
+    try:
+        res = FI.list_dir(cfg, path, depth=depth)
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    return _ok(entries=_fs_entries(res), folder=res.get("folder", path),
+               depth=depth, truncated=bool(res.get("truncated", False)))
+
+
+def h_fs_stat(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/stat -> inspect a folder listing or file metadata."""
+    from . import files as FI
+    try:
+        res = FI.inspect(cfg, _query_text(q, b, "path"))
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    return _ok(stat=res)
+
+
+def _fs_kind(path: str) -> Tuple[str, str]:
+    suffix = Path(str(path or "")).suffix.lower()
+    return (_FS_LANGUAGE_BY_EXT.get(suffix, "text"),
+            _FS_MIME_BY_EXT.get(suffix, "text/plain"))
+
+
+def h_fs_read_text(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/read-text -> bounded, redacted text file read."""
+    from . import files as FI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return 400, {"ok": False, "code": FI.BAD_INPUT_CODE,
+                     "detail": "a file path is required",
+                     "qubit_counterpart": "CLI `qubit files read <path>`"}
+    try:
+        res = FI.read_file(cfg, path)
+    except FI.FilesError as exc:
+        if getattr(exc, "code", "") == FI.BINARY_CODE:
+            language, mime = _fs_kind(path)
+            return _ok(binary=True, byteSize=0, language=language,
+                       mimeType=mime, path=str(path), text="",
+                       truncated=False,
+                       detail="binary file; content not shown")
+        return _files_error(exc)
+    target = str(res.get("file", path) or path)
+    language, mime = _fs_kind(target)
+    return _ok(binary=False, byteSize=int(res.get("size", 0) or 0),
+               language=language, mimeType=mime, path=target,
+               text=res.get("text", ""),
+               truncated=bool(res.get("clipped", False)))
+
+
+def h_fs_read_data_url(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/read-data-url -> text file as a redacted data URL."""
+    from . import files as FI
+    import base64
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return 400, {"ok": False, "code": FI.BAD_INPUT_CODE,
+                     "detail": "a file path is required",
+                     "qubit_counterpart": "CLI `qubit files read <path>`"}
+    try:
+        res = FI.read_file(cfg, path)
+    except FI.FilesError as exc:
+        return _files_error(exc)
+    target = str(res.get("file", path) or path)
+    _language, mime = _fs_kind(target)
+    encoded = base64.b64encode(
+        str(res.get("text", "")).encode("utf-8", "replace")).decode("ascii")
+    return _ok(dataUrl=f"data:{mime};base64,{encoded}", path=target,
+               mimeType=mime)
+
+
+def _find_git_root(start: Path) -> Optional[Path]:
+    try:
+        directory = start if start.is_dir() else start.parent
+    except OSError:
+        return None
+    for _ in range(50):
+        try:
+            if (directory / ".git").exists():
+                return directory
+        except OSError:
+            return None
+        parent = directory.parent
+        if parent == directory:
+            return None
+        directory = parent
+    return None
+
+
+def h_fs_git_root(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/git-root -> git root discovery inside an approved root."""
+    from . import git_scope as GI
+    path = _query_text(q, b, "path") or _active_folder(cfg)
+    if not path:
+        return _ok(root=None)
+    try:
+        resolved = GI.resolve_root(cfg, path)
+    except GI.GitError:
+        return _ok(root=None)
+    found = _find_git_root(Path(resolved))
+    return _ok(root=(str(found) if found else None))
+
+
+def _git_branch(cfg: Any, root: str) -> str:
+    from . import git_scope as GI
+    try:
+        res = GI.status(cfg, root, requested_by="dashboard:user")
+    except GI.GitError:
+        return ""
+    for line in str(res.get("status", "")).splitlines():
+        if line.startswith("# branch.head "):
+            head = line[len("# branch.head "):].strip()
+            return "" if head == "(detached)" else head
+    return ""
+
+
+def h_fs_default_cwd(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/fs/default-cwd -> active project folder + its branch."""
+    cwd = _active_folder(cfg)
+    if not cwd:
+        try:
+            cwd = str(Path.cwd())
+        except Exception:
+            cwd = ""
+    return _ok(cwd=cwd, branch=(_git_branch(cfg, cwd) if cwd else ""))
+
+
+def h_audio_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/status -> real mic/output status (audio.settings)."""
+    from .audio import settings as AS
+    try:
+        st = AS.status(cfg)
+    except AS.AudioSettingsError as exc:
+        miss = {"state": "MISSING", "detail": _redact(str(exc))[:200]}
+        return _ok(mic=miss, output=dict(miss), schema="qubit-runtime-audio/1")
+    return _ok(schema="qubit-runtime-audio/1",
+               mic=st.get("mic", {}), output=st.get("output", {}))
+
+
+def _device_rows(devices: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for dev in (devices if isinstance(devices, list) else []):
+        rows.append({"stable_id": getattr(dev, "stable_id", ""),
+                     "name": getattr(dev, "name", ""),
+                     "backend": getattr(dev, "backend", ""),
+                     "is_default": bool(getattr(dev, "is_default", False))})
+    return rows
+
+
+def h_audio_devices(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/list|devices -> real device inventory (audio.settings)."""
+    from .audio import settings as AS
+    try:
+        devs = AS.list_devices()
+    except AS.AudioSettingsError as exc:
+        return _ok(inputs=[], outputs=[], state="MISSING",
+                   detail=_redact(str(exc))[:200])
+    return _ok(inputs=_device_rows(devs.get("inputs", [])),
+               outputs=_device_rows(devs.get("outputs", [])))
+
+
+# ---------------------------------------------------------------------------
+# Audio HTTP actions (audit §1A audio.py reads): voice-config (profile refs),
+# transcribe (local ASR over a bounded upload), speak (local TTS -> data URL).
+# Streaming/WS, external catalogs, and desktop leases stay typed-gated.
+# ---------------------------------------------------------------------------
+
+_AUDIO_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+_AUDIO_MIME_EXT = {
+    "audio/aac": ".aac", "audio/flac": ".flac", "audio/m4a": ".m4a",
+    "audio/mp3": ".mp3", "audio/mp4": ".mp4", "audio/mpeg": ".mp3",
+    "audio/ogg": ".ogg", "audio/wav": ".wav", "audio/wave": ".wav",
+    "audio/webm": ".webm", "audio/x-m4a": ".m4a", "audio/x-wav": ".wav",
+    "video/webm": ".webm",
+}
+
+
+def _asr_from_cfg(cfg: Any):
+    """Build the configured ASR provider (same selection as the orchestrator)."""
+    from .asr.sherpa import SherpaASR
+    from .asr.whisper import FasterWhisperASR
+    try:
+        asr_cfg = cfg.section("asr")
+    except Exception:
+        asr_cfg = {}
+    provider = asr_cfg.get("provider", "sherpa")
+    if provider == "personaplex":
+        provider = "sherpa"
+    model_dir = cfg.model_dir()
+    if provider == "sherpa":
+        return SherpaASR(engine=asr_cfg.get("engine", "moonshine"),
+                         model_dir=model_dir,
+                         provider=asr_cfg.get("provider_ep", "cpu"),
+                         num_threads=int(asr_cfg.get("num_threads", 4)),
+                         language=asr_cfg.get("language"),
+                         hotwords=asr_cfg.get("hotwords", ""),
+                         hotwords_score=float(
+                             asr_cfg.get("hotwords_score", 1.5)))
+    return FasterWhisperASR(model=asr_cfg.get("model", "base"),
+                            device=asr_cfg.get("device", "auto"),
+                            compute_type=asr_cfg.get("compute_type",
+                                                     "float16"),
+                            language=asr_cfg.get("language"),
+                            beam_size=asr_cfg.get("beam_size", 1),
+                            model_dir=model_dir)
+
+
+def _tts_from_cfg(cfg: Any):
+    """Build the configured TTS provider (same selection as the orchestrator)."""
+    from .tts.piper import PiperTTS
+    from .providers.speech import external_speech_guard
+    _egress = external_speech_guard(cfg)
+    provider = cfg.get("tts", "provider", default="piper")
+    if provider == "edge":
+        from .tts.edge import EdgeTTS
+        edge = EdgeTTS(
+            voice=cfg.get("tts", "edge", "voice",
+                          default="en-US-JennyNeural"),
+            rate=cfg.get("tts", "edge", "rate", default="+0%"),
+            egress_guard=_egress)
+        if edge.available():
+            return edge
+    if provider == "hybrid":
+        from .tts.hybrid import HybridTTS
+        h = cfg.get("tts", "hybrid", default={})
+        h = h if isinstance(h, dict) else {}
+        return HybridTTS(
+            model_dir=cfg.model_dir(),
+            piper_voice=h.get("piper_voice",
+                              cfg.get("tts", "voice",
+                                      default="en_US-amy-medium")),
+            openai_voice=h.get("openai_voice", "nova"),
+            openai_model=h.get("openai_model", "gpt-4o-mini-tts"),
+            key_env=cfg.get("tts", "openai", "key_env",
+                            default="~/.config/qubit-voicebridge/.env"),
+            instructions=cfg.get("tts", "openai", "instructions", default=""),
+            threshold_words=int(h.get("threshold_words", 18)),
+            egress_guard=_egress)
+    if provider == "openai":
+        from .tts.openai_tts import OpenAITTS
+        tts = OpenAITTS(
+            voice=cfg.get("tts", "openai", "voice", default="nova"),
+            model=cfg.get("tts", "openai", "model",
+                          default="gpt-4o-mini-tts"),
+            key_env=cfg.get("tts", "openai", "key_env",
+                            default="~/.config/qubit-voicebridge/.env"),
+            instructions=cfg.get("tts", "openai", "instructions", default=""),
+            egress_guard=_egress)
+        if tts.available():
+            return tts
+    if provider == "kokoro":
+        from .tts.kokoro import KokoroTTS
+        tts = KokoroTTS(model_dir=cfg.model_dir(),
+                        voice_sid=int(cfg.get("tts", "kokoro", "voice_sid",
+                                              default=0)))
+        if tts.available():
+            return tts
+    return PiperTTS(model_dir=cfg.model_dir(),
+                    voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
+
+
+def h_audio_voice_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/voice-config -> active STT/TTS profile + audio refs.
+
+    Resolves the active profile per component from ``voicebridge.profiles`` and
+    the live mic/output contract from ``voicebridge.audio.settings``. Qubit
+    providers run host-side, so every provider resolves to ``mode: relay`` and
+    NO provider key or credential is ever exported (references only).
+    """
+    from . import profiles as PR
+    from .audio import settings as AS
+    try:
+        current = PR.current_profiles(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        status = AS.status(cfg)
+    except AS.AudioSettingsError as exc:
+        miss = {"state": "MISSING", "detail": _redact(str(exc))[:200]}
+        status = {"mic": dict(miss), "output": dict(miss)}
+
+    def _relay(entry: Dict[str, Any], kind: str) -> Dict[str, Any]:
+        value = entry.get("value")
+        provider = value if isinstance(value, (str, int, float)) else ""
+        return {
+            "mode": "relay", "kind": kind,
+            "profile": str(entry.get("id", "") or ""),
+            "state": str(entry.get("state", "") or ""),
+            "provider": str(provider or ""),
+            "detail": "Qubit runs this provider host-side; the client keeps "
+                      "the local audio relay and no provider key is exported",
+        }
+
+    voice = current.get("voice", {}) or {}
+    return _ok(schema="qubit-runtime-audio/1", mode="relay",
+               stt=_relay(current.get("stt", {}), "stt"),
+               tts=_relay(current.get("tts", {}), "tts"),
+               voice={"profile": str(voice.get("id", "") or ""),
+                      "name": str(voice.get("value", "") or "")},
+               audio=status,
+               detail="STT/TTS resolve to host-side Qubit providers; no "
+                      "provider credential is served")
+
+
+def h_audio_transcribe(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/audio/transcribe -> local ASR over a bounded data URL body.
+
+    Strict caps: audio/* (or video/webm), valid base64, non-empty, <= 25 MiB;
+    the temp file is always removed. A missing model is a typed
+    ``AUDIO_ASR_UNAVAILABLE`` refusal, never a fabricated transcript.
+    """
+    import base64
+    import binascii
+    import os
+    import tempfile
+    from .asr.base import ASRUnavailable
+    counterpart = "Qubit Chat voice (local mic capture) + CLI `qubit asr-test`"
+    data_url = str(b.get("data_url", b.get("dataUrl", "")) or "").strip()
+    if not data_url:
+        return _gate("AUDIO_PAYLOAD_REQUIRED",
+                     "transcription needs a base64 audio data URL",
+                     counterpart, 400)
+    if not data_url.startswith("data:") or "," not in data_url:
+        return _gate("AUDIO_BAD_PAYLOAD", "invalid audio payload",
+                     counterpart, 400)
+    header, encoded = data_url.split(",", 1)
+    if ";base64" not in header:
+        return _gate("AUDIO_BAD_PAYLOAD",
+                     "audio payload must be base64 encoded", counterpart, 400)
+    mime = str(b.get("mime_type", b.get("mimeType", ""))
+               or header[5:].split(";", 1)[0] or "audio/webm").strip()
+    norm = mime.split(";", 1)[0].lower()
+    if not (norm.startswith("audio/") or norm == "video/webm"):
+        return _gate("AUDIO_BAD_PAYLOAD",
+                     "payload must be an audio recording", counterpart, 400)
+    # Cap the ENCODED length before decoding so an oversized body cannot force
+    # a huge base64 allocation (25 MiB decoded ~= 33.4 MiB encoded).
+    if len(encoded) > (_AUDIO_MAX_UPLOAD_BYTES // 3) * 4 + 8:
+        return _gate("AUDIO_TOO_LARGE", "audio recording is too large",
+                     counterpart, 413)
+    try:
+        audio_bytes = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return _gate("AUDIO_BAD_PAYLOAD",
+                     "audio payload is not valid base64", counterpart, 400)
+    if not audio_bytes:
+        return _gate("AUDIO_BAD_PAYLOAD", "audio recording is empty",
+                     counterpart, 400)
+    if len(audio_bytes) > _AUDIO_MAX_UPLOAD_BYTES:
+        return _gate("AUDIO_TOO_LARGE", "audio recording is too large",
+                     counterpart, 413)
+    temp_path = ""
+    try:
+        suffix = _AUDIO_MIME_EXT.get(norm, ".webm")
+        with tempfile.NamedTemporaryFile(
+                prefix="qubit-runtime-voice-", suffix=suffix,
+                delete=False) as tmp:
+            tmp.write(audio_bytes)
+            temp_path = tmp.name
+        asr = _asr_from_cfg(cfg)
+        asr.load()
+        transcript = asr.transcribe(temp_path)
+        if getattr(transcript, "empty", False):
+            return _ok(transcript="", provider=transcript.provider,
+                       detail="no speech detected")
+        return _ok(transcript=str(transcript.text),
+                   provider=transcript.provider,
+                   language=transcript.language,
+                   confidence=transcript.confidence,
+                   duration_s=transcript.duration_s)
+    except ASRUnavailable as exc:
+        return _gate("AUDIO_ASR_UNAVAILABLE",
+                     "local ASR model is unavailable: "
+                     + _redact(str(exc))[:160],
+                     "install the configured sherpa/whisper model + CLI "
+                     "`qubit asr-test`")
+    except Exception as exc:
+        return _fail(exc)
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
+def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/audio/speak -> local TTS rendered as a base64 data URL.
+
+    Runs the SAME provider chain the orchestrator selects. An unavailable
+    provider is a typed ``AUDIO_TTS_UNAVAILABLE`` refusal; the temp file is
+    always removed and no on-disk path is returned.
+    """
+    import base64
+    import os
+    import tempfile
+    from .tts.base import TTSUnavailable
+    counterpart = "Qubit Chat voice + CLI `qubit tts-test`"
+    text = str(b.get("text", "") or "").strip()
+    if not text:
+        return _gate("AUDIO_TEXT_REQUIRED", "text is required",
+                     counterpart, 400)
+    out = Path(tempfile.gettempdir()) / (
+        f"qubit-runtime-tts-{os.getpid()}-{abs(hash(text)) % 10 ** 8}.wav")
+    try:
+        tts = _tts_from_cfg(cfg)
+        tts.load()
+        tts.synthesize(text[:4000], out)
+        data = out.read_bytes()
+        mime = ("audio/wav" if out.suffix.lower() == ".wav"
+                else "audio/mpeg")
+        encoded = base64.b64encode(data).decode("ascii")
+        return _ok(data_url=f"data:{mime};base64,{encoded}", mime_type=mime,
+                   provider=str(getattr(tts, "name", "") or ""))
+    except TTSUnavailable as exc:
+        return _gate("AUDIO_TTS_UNAVAILABLE",
+                     "local TTS provider is unavailable: "
+                     + _redact(str(exc))[:160],
+                     "install the configured piper voice + CLI `qubit tts-test`")
+    except Exception as exc:
+        return _fail(exc)
+    finally:
+        try:
+            if out.exists():
+                out.unlink()
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Packet 8U closure: local models / custom endpoints / profiles / tools /
+# learning (audit §1A absent reads) + remaining wrong-verb gates (audit §1B).
+#
+# Reads execute the SAME Qubit modules the CLI uses (``local_models``,
+# ``providers.policy``, ``projects``, ``learning``, ``capability_catalog``,
+# ``computer_use``). Writes never fabricate success: local-model verbs reuse
+# the module's typed refusal, and pure policy boundaries are typed gates.
+# ---------------------------------------------------------------------------
+
+_LOCAL_MODEL_COUNTERPART = (
+    "CLI `qubit runtime status|install <image> --confirm` + supervised "
+    "opencode path (pinned, confined, audited)")
+
+_PROVIDER_ENDPOINT_COUNTERPART = (
+    "dashboard Settings (classic) + CLI config profiles")
+
+
+def h_local_models_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/status -> real local-runtime state."""
+    from . import local_models as LM
+    return _ok(**LM.status(cfg))
+
+
+def h_local_models_hardware(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/hardware -> real GPU/VRAM gauges."""
+    from . import local_models as LM
+    return _ok(**LM.hardware(cfg))
+
+
+def h_local_models_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/catalog -> configured/observed local models."""
+    from . import local_models as LM
+    return _ok(**LM.catalog(cfg))
+
+
+def h_local_models_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/jobs -> typed-empty install job history."""
+    from . import local_models as LM
+    return _ok(**LM.jobs(cfg))
+
+
+def h_local_models_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/local-models/jobs/{id} -> one job or an honest miss."""
+    from . import local_models as LM
+    base = LM.jobs(cfg)
+    jobs = base.get("jobs", []) if isinstance(base, dict) else []
+    jobs = jobs if isinstance(jobs, list) else []
+    want = str(p.get("id", "") or "")
+    found = None
+    for job in jobs:
+        if isinstance(job, dict) and str(job.get("id", "")) == want:
+            found = job
+            break
+    return _ok(jobs=jobs, job=found, count=len(jobs),
+               state=base.get("state", "EMPTY"),
+               code=base.get("code"), detail=base.get("detail", ""),
+               rollback=base.get("rollback",
+                                 "read-only; nothing to roll back"))
+
+
+def _local_model_refusal(res: Any) -> Tuple[int, Dict[str, Any]]:
+    out: Dict[str, Any] = {"ok": False}
+    out.update(res if isinstance(res, dict) else {})
+    out.setdefault("state", "REFUSED")
+    out.setdefault("code", "LOCAL_MODEL_BROKERED")
+    out.setdefault("owner", "qubit-policy")
+    out.setdefault("guidance", _BROKERED_GUIDANCE_LOCAL)
+    out.setdefault("rollback", "nothing was downloaded, started, ejected, "
+                               "activated, or written; nothing to roll back")
+    out.setdefault("qubit_counterpart", _LOCAL_MODEL_COUNTERPART)
+    state = str(out.get("state", ""))
+    http = 200 if state in ("OK", "AVAILABLE") and not out.get("code") else 403
+    return http, out
+
+
+_BROKERED_GUIDANCE_LOCAL = (
+    "local-model runtime management is brokered in Qubit; use "
+    "`qubit runtime status` and `qubit runtime install <image> --confirm` "
+    "(pinned, confined, digest-verified), or the supervised opencode path. "
+    "No download is performed or queued by this surface")
+
+
+def h_local_models_runtime_install(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any],
+                                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    return _local_model_refusal(
+        LM.runtime_install(cfg, backend=b.get("backend"),
+                           requested_by="dashboard:user",
+                           confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_download(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model", "model_id", "id")
+    return _local_model_refusal(
+        LM.download(cfg, model=model, requested_by="dashboard:user",
+                    confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = str(p.get("model_id", "") or "")
+    if not model:
+        return _local_model_refusal(
+            LM.public_error(LM.BAD_INPUT_CODE, "model_id is required"))
+    return _local_model_refusal(
+        LM.public_error(LM.BROKERED_CODE,
+                        f"removing local model {model!r} is brokered; nothing "
+                        "was deleted"))
+
+
+def h_local_models_quickstart(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model") or None
+    return _local_model_refusal(
+        LM.quickstart(cfg, model=model, requested_by="dashboard:user",
+                      confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_server(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    action = _query_text(q, b, "action") or "start"
+    return _local_model_refusal(
+        LM.server(cfg, action, requested_by="dashboard:user",
+                  confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_eject(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model", "model_id")
+    return _local_model_refusal(
+        LM.eject(cfg, model=model, requested_by="dashboard:user",
+                 confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_activate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = _query_text(q, b, "model", "model_id")
+    return _local_model_refusal(
+        LM.activate(cfg, model=model, requested_by="dashboard:user",
+                    confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_sideload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    path = _query_text(q, b, "path")
+    return _local_model_refusal(
+        LM.sideload(cfg, path=path, requested_by="dashboard:user",
+                    confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_search(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    return _local_model_refusal(
+        LM.public_error(LM.UNAVAILABLE_CODE,
+                        "remote local-model search is not performed; Qubit "
+                        "downloads nothing from a model hub"))
+
+
+def h_local_models_search_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_local_models_search(cfg, q, b, p)
+
+
+def h_local_models_download_browsed(cfg: Any, q: Dict[str, str],
+                                    b: Dict[str, Any],
+                                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    return _local_model_refusal(
+        LM.public_error(LM.BROKERED_CODE,
+                        "browsed model download is brokered; nothing was "
+                        "downloaded or queued"))
+
+
+def h_custom_endpoints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/providers/custom-endpoints -> configured + staged endpoints."""
+    from .providers.policy import FrontierPolicy
+    try:
+        policy = FrontierPolicy.from_config(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    endpoints: List[Dict[str, Any]] = []
+    providers = getattr(policy, "providers", {}) or {}
+    for provider_id, pcfg in providers.items():
+        if not isinstance(pcfg, dict):
+            continue
+        base = str(pcfg.get("base_url", pcfg.get("url", "")) or "")
+        models = pcfg.get("models")
+        models = models if isinstance(models, list) else []
+        endpoints.append({
+            "id": str(provider_id), "name": str(pcfg.get("name", provider_id)
+                                                or provider_id),
+            "base_url": _redact(base),
+            "model": str(pcfg.get("model", "") or ""),
+            "models": [str(m) for m in models],
+            "context_length": pcfg.get("context_length"),
+            "discover_models": bool(pcfg.get("discover_models", True)),
+            "has_api_key": bool(pcfg.get("key_ref") or pcfg.get("api_key")),
+            "api_key_preview": None,
+            "is_current": False, "source": "intent.frontier.providers",
+        })
+    staged = _load_json_store(_custom_endpoints_read_path(cfg))
+    seen = {row["id"] for row in endpoints}
+    for ident in sorted(staged):
+        rec = staged[ident]
+        if not isinstance(rec, dict) or ident in seen:
+            continue
+        endpoints.append({
+            "id": ident, "name": str(rec.get("name", ident) or ident),
+            "base_url": _redact(str(rec.get("base_url", rec.get("url", "")))),
+            "model": str(rec.get("model", "") or ""),
+            "models": [str(m) for m in (rec.get("models") or [])
+                       if isinstance(m, str)],
+            "context_length": rec.get("context_length"),
+            "discover_models": bool(rec.get("discover_models", True)),
+            "has_api_key": False, "api_key_preview": None,
+            "is_current": bool(rec.get("active", False)),
+            "source": "qubit-settings",
+        })
+    active = str(staged.get("_active", "") or "")
+    return _ok(endpoints=endpoints,
+               current={"provider": active or str(getattr(policy, "route", "")
+                                                  or ""),
+                        "model": "", "base_url": ""})
+
+
+def _custom_endpoints_path(cfg: Any) -> Path:
+    # Canonical Qubit store (the write target).
+    return _store_path(cfg, "qubit_custom_endpoints.json")
+
+
+def _custom_endpoints_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name until the next save.
+    return _migrated_read_path(cfg, "qubit_custom_endpoints.json",
+                               "hermes_custom_endpoints.json")
+
+
+def _custom_endpoint_id(b: Dict[str, Any], p: Dict[str, str]) -> str:
+    raw = str(p.get("id", "") or b.get("id", b.get("endpoint_id",
+                                                     b.get("name", ""))) or "")
+    return re.sub(r"[^a-z0-9_.-]+", "-", raw.strip().lower()).strip("-")[:64]
+
+
+def h_custom_endpoints_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/providers/custom-endpoints -> real settings-console write.
+
+    Persists the endpoint into the same state-dir settings store the config
+    console uses (atomic backup + audit). Confirm-gated; a malformed body or
+    missing id is a typed 400. Staged endpoints are visible via the GET above
+    and are never auto-activated or probed.
+    """
+    if not isinstance(b, dict) or not b:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "endpoint body required",
+                     "qubit_counterpart": "dashboard Settings (classic)"}
+    ident = _custom_endpoint_id(b, p)
+    if not ident:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "endpoint id/name required",
+                     "qubit_counterpart": "dashboard Settings (classic)"}
+    if not b.get("confirm"):
+        return _staged(
+            f"custom endpoint {ident!r} is a settings write: re-POST with "
+            "{\"confirm\": true} plus a fresh approval", "",
+            {"qubit_counterpart": "CLI `qubit config` profiles + dashboard "
+                                  "Settings (classic)"})
+    values = {k: v for k, v in b.items()
+              if k != "confirm" and isinstance(v, (str, int, float, bool))}
+    values["id"] = ident
+    path = _custom_endpoints_path(cfg)
+    try:
+        store = _load_json_store(_custom_endpoints_read_path(cfg))
+        previous = store.get(ident)
+        store[ident] = values
+        _save_json_store(path, store)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, id=ident, endpoint=values,
+               replaced=isinstance(previous, dict), count=len(store),
+               qubit_counterpart="dashboard Settings (classic) + CLI config "
+                                 "profiles")
+
+
+def h_custom_endpoints_activate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST .../{id}/activate -> real confirm-gated active-endpoint selection."""
+    ident = _custom_endpoint_id(b, p)
+    if not ident:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "endpoint id required",
+                     "qubit_counterpart": "dashboard Settings (classic)"}
+    if not b.get("confirm"):
+        return _staged(
+            f"activating custom endpoint {ident!r} requires confirmation: "
+            "re-POST with {\"confirm\": true}", "")
+    path = _custom_endpoints_path(cfg)
+    store = _load_json_store(_custom_endpoints_read_path(cfg))
+    if ident not in store:
+        return 404, {"ok": False, "code": "ENDPOINT_NOT_FOUND",
+                     "detail": f"no staged endpoint {ident!r}",
+                     "qubit_counterpart": "dashboard Settings (classic)"}
+    try:
+        store["_active"] = ident
+        _save_json_store(path, store)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, id=ident, active=ident,
+               qubit_counterpart="dashboard Settings (classic) + CLI config "
+                                 "profiles")
+
+
+def h_custom_endpoints_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/providers/custom-endpoints/{id} -> real confirm-gated remove."""
+    ident = _custom_endpoint_id(b, p)
+    if not ident:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "endpoint id required",
+                     "qubit_counterpart": "dashboard Settings (classic)"}
+    if not b.get("confirm"):
+        return _staged(
+            f"removing custom endpoint {ident!r} requires confirmation: "
+            "re-POST with {\"confirm\": true}", "")
+    path = _custom_endpoints_path(cfg)
+    try:
+        store = _load_json_store(_custom_endpoints_read_path(cfg))
+        existed = ident in store
+        store.pop(ident, None)
+        if store.get("_active") == ident:
+            store.pop("_active", None)
+        _save_json_store(path, store)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, id=ident, removed=existed, count=len(store),
+               qubit_counterpart="dashboard Settings (classic) + CLI config "
+                                 "profiles")
+
+
+def h_profiles_sessions(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles/sessions -> unified receipts list (one profile)."""
+    try:
+        limit = max(1, min(int(q.get("limit", "20") or "20"), 500))
+    except (TypeError, ValueError):
+        limit = 20
+    code, out = h_sessions_list(cfg, {"limit": str(limit)}, b, p)
+    if code != 200:
+        return code, out
+    total = int(out.get("total", 0) or 0)
+    return _ok(sessions=out.get("sessions", []), total=total,
+               profile_totals={"default": total}, limit=limit,
+               offset=int(out.get("offset", 0) or 0), errors=[],
+               store_authority=out.get("store_authority",
+                                       RECEIPT_SESSION_AUTHORITY))
+
+
+def h_profiles_sessions_sidebar(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles/sessions/sidebar -> recents slice (real receipts)."""
+    try:
+        recents_limit = max(1, min(int(q.get("recents_limit", "20") or "20"),
+                                   500))
+    except (TypeError, ValueError):
+        recents_limit = 20
+    code, out = h_sessions_list(cfg, {"limit": str(recents_limit)}, b, p)
+    sessions = out.get("sessions", []) if code == 200 else []
+    return _ok(recents={"sessions": sessions, "profiles_truncated": {},
+                        "profiles_usage": {}},
+               cron={"sessions": []},
+               messaging={"sessions": [], "total": 0},
+               errors=[],
+               store_authority=out.get("store_authority",
+                                       RECEIPT_SESSION_AUTHORITY))
+
+
+def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/profiles/projects/tree -> real Qubit project folders."""
+    from . import projects as PJ
+    try:
+        res = PJ.list_projects(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    projects = []
+    for rec in res.get("projects", []) if isinstance(res, dict) else []:
+        if not isinstance(rec, dict):
+            continue
+        folders = rec.get("folders", []) or []
+        projects.append({
+            "id": str(rec.get("slug", "")),
+            "name": str(rec.get("name", "") or ""),
+            "path": str(folders[0]) if folders else None,
+            "isAuto": False, "repos": [], "sessionCount": 0,
+            "totalTokens": 0, "totalCostUsd": 0.0,
+            "lastActive": rec.get("updated_at"), "previewSessions": [],
+        })
+    active = res.get("active_slug") if isinstance(res, dict) else None
+    return _ok(projects=projects, active_id=active, scoped_session_ids=[],
+               errors=[])
+
+
+def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/profiles -> real confirm-gated principal registration.
+
+    Registers the profile in the same ``brain`` principal registry the CLI
+    (``qubit brain principal-add``) and voice use. Without ``confirm`` it
+    stages a typed 409 on the shared journal carrying a REAL single-use
+    ``confirmation_id`` (settleable by re-issue or the approvals banner); with
+    it the principal is created (audited) and a duplicate is a typed 400. It
+    never fabricates success.
+    """
+    from . import brain as B
+    name = str(b.get("name", "") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required",
+                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
+    guard = _compat_confirm(
+        cfg, "profile_create",
+        f"profile {_redact(name)!r} creation stages through the Qubit "
+        "principal registry; re-POST with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    kind = str(b.get("kind", "person") or "person")
+    label = str(b.get("label", name) or name)
+    try:
+        res = B.principal_add(cfg, name, kind, label,
+                              requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit brain principal-add`"}
+    # Honor the fields the builder submitted (description/provider/model) by
+    # writing them as real profile fields on the just-created principal — the
+    # SAME store the list and the row editors read. They used to be dropped,
+    # so the created row came back empty.
+    stored: Dict[str, Any] = {"model": "", "provider": "", "description": ""}
+    for key in ("description", "model", "provider"):
+        value = str(b.get(key, "") or "").strip()
+        if not value:
+            continue
+        try:
+            B.profile_set(cfg, name, key, value,
+                          requested_by="dashboard:user", confirmed=True)
+        except Exception as exc:
+            code = getattr(exc, "code", None) or type(exc).__name__
+            return 400, {"ok": False, "code": code,
+                         "detail": _redact(str(exc))[:300],
+                         "qubit_counterpart": "CLI `qubit brain profile-set`"}
+        # model/provider/description are not secret-class: echo the value that
+        # was just persisted (the write succeeded), not the masked listing form.
+        stored[key] = value
+    return _ok(ok=True, name=name, principal=res.get("principal"),
+               model=stored["model"], provider=stored["provider"],
+               description=stored["description"],
+               qubit_counterpart="CLI `qubit brain principal-add`")
+
+
+def h_profile_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/profiles/{name}/export -> real confirm-gated Brain export.
+
+    Reads the scoped profile data held by the same ``brain`` store the CLI
+    (``qubit brain export``) and dashboard /ops use. Confirm-gated and typed:
+    an unknown principal is a 404, never a fabricated export.
+    """
+    from . import brain as B
+    name = str(p.get("name", "") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required",
+                     "qubit_counterpart": "CLI `qubit brain export <principal>`"}
+    if not b.get("confirm"):
+        return _staged(
+            f"profile {_redact(name)!r} export reads scoped profile data and "
+            "requires confirmation: re-POST with {\"confirm\": true}", "")
+    try:
+        res = B.profile_export(cfg, name,
+                               identity=str(b.get("identity", "") or ""))
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit brain export <principal>`"}
+    return _ok(ok=True, principal=res.get("principal", name),
+               profiles=res.get("profiles", {}),
+               qubit_counterpart="CLI `qubit brain export <principal>`")
+
+
+def h_terminal_backends(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/tools/terminal/backends -> real local backend inventory."""
+    from . import capability_catalog as CC
+    try:
+        local = CC.check("terminal")
+    except Exception:
+        local = {"state": "UNKNOWN", "explanation": ""}
+    ready = str(local.get("state", "")) in ("IMPLEMENTED", "NOT_UPSTREAM")
+    backends = [{
+        "name": "local", "label": "Qubit local (brokered sandbox)",
+        "description": str(local.get("explanation", "")
+                           or "Qubit local command execution")[:200],
+        "active": True, "status": "ready" if ready else "needs_setup",
+        "detail": "single Qubit sandbox backend; no remote terminal pool",
+    }]
+    return _ok(active="local", backends=backends)
+
+
+def h_terminal_backend_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/tools/terminal/backend -> real confirm-gated capability grant.
+
+    Qubit runs exactly one local brokered sandbox; the requested backend is
+    recorded as a capability grant (``terminal.backend``) in the same
+    ``PermissionsStore`` CLI/voice use, with audit and confirmation. It never
+    starts a remote terminal pool or fabricates an active switch.
+    """
+    from .permissions import permissions_store
+    backend = str(b.get("backend", b.get("name", "local")) or "local").strip()
+    if not backend:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "backend required",
+                     "qubit_counterpart": "CLI `qubit permissions`"}
+    if not b.get("confirm"):
+        return _staged(
+            f"terminal backend {backend!r} selection requires confirmation: "
+            "re-POST with {\"confirm\": true}", "")
+    try:
+        grant = permissions_store(cfg).grant(
+            "terminal.backend", requested_by="dashboard:user", confirmed=True,
+            scopes=(backend,),
+            note="dashboard terminal backend selection (local sandbox only)")
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit permissions`"}
+    return _ok(ok=True, active="local", backend=backend, grant_id=grant.id,
+               qubit_counterpart="CLI `qubit permissions` + `qubit setup` "
+                                 "(single local sandbox backend)")
+
+
+def h_computer_use_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/tools/computer-use/status -> real readiness probes."""
+    from . import computer_use as CU
+    try:
+        res = CU.status()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**res)
+
+
+def h_computer_use_grant(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/tools/computer-use/permissions/grant -> real audited grant.
+
+    Records a desktop-control capability grant (``computer_use.access``) in
+    the shared ``PermissionsStore`` the CLI/voice use, confirm-gated and
+    audited. It never downloads an unpinned driver (``computer_use`` keeps
+    that a separate typed refusal).
+    """
+    from . import computer_use as CU
+    from .permissions import permissions_store
+    scope = str(b.get("scope", b.get("capability", "desktop")) or "desktop")
+    if not b.get("confirm"):
+        return _staged(
+            "desktop-control permission grant requires confirmation: re-POST "
+            "with {\"confirm\": true}", "")
+    try:
+        grant = permissions_store(cfg).grant(
+            "computer_use.access", requested_by="dashboard:user",
+            confirmed=True, scopes=(scope,),
+            note="dashboard computer-use permission grant (accessibility)")
+        try:
+            status = CU.status()
+        except Exception:
+            status = {}
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit computer-use permissions`"}
+    return _ok(ok=True, grant_id=grant.id, scope=scope, status=status,
+               qubit_counterpart="CLI `qubit computer-use permissions` "
+                                 "(Packet 8V accessibility)")
+
+
+
+def h_learning_graph(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/learning/graph -> lessons ledger as a graph."""
+    from . import learning as L
+    try:
+        lessons = L.LearningLedger(Path(cfg.state_dir())).lessons()
+    except Exception as exc:
+        return _fail(exc)
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    seen_evidence: set = set()
+    for lesson in lessons if isinstance(lessons, list) else []:
+        if not isinstance(lesson, dict):
+            continue
+        lid = str(lesson.get("lesson_id", "") or "")
+        if not lid:
+            continue
+        nodes.append({"id": lid, "type": "lesson",
+                      "label": str(lesson.get("text", ""))[:80],
+                      "kind": lesson.get("kind"),
+                      "confidence": lesson.get("confidence"),
+                      "source": lesson.get("source")})
+        for ev in lesson.get("evidence_ids", []) or []:
+            ev = str(ev)
+            if ev and ev not in seen_evidence:
+                seen_evidence.add(ev)
+                nodes.append({"id": ev, "type": "evidence", "label": ev})
+            if ev:
+                edges.append({"source": ev, "target": lid, "kind": "supports"})
+        for other in lesson.get("conflict_with", []) or []:
+            edges.append({"source": lid, "target": str(other),
+                          "kind": "conflicts"})
+    lessons_n = sum(1 for n in nodes if n["type"] == "lesson")
+    evidence_n = sum(1 for n in nodes if n["type"] == "evidence")
+    return _ok(nodes=nodes, edges=edges,
+               stats={"lessons": lessons_n, "evidence": evidence_n,
+                      "nodes": len(nodes), "edges": len(edges)})
+
+
+def h_learning_node(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/learning/node -> one lesson's stored provenance."""
+    from . import learning as L
+    lid = str(q.get("id", b.get("id", "")) or "").strip()
+    if not lid:
+        return _ok(found=False, id="", node=None,
+                   detail="learning node id required",
+                   qubit_counterpart="CLI `qubit lessons show <id>`")
+    try:
+        detail = L.LearningLedger(Path(cfg.state_dir())).explain(lid)
+    except Exception as exc:
+        return _fail(exc)
+    if detail is None:
+        return _ok(found=False, id=lid, node=None,
+                   detail=f"no learning node {lid!r}",
+                   qubit_counterpart="CLI `qubit lessons` (same LearningLedger)")
+    return _ok(found=True, id=lid, node={"id": lid, **detail})
+
+
+def h_learning_node_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/learning/node -> real confirm-gated lesson promotion.
+
+    Lessons are append-only; the only in-place mutation is promoting a staged
+    review item to authoritative (the same ``LearningLedger.promote`` the CLI
+    ``qubit lessons promote`` calls). Without ``confirm`` it stages a typed
+    409; an unknown id is a typed 404 -- never a fabricated write.
+    """
+    from . import learning as L
+    lid = str(q.get("id", b.get("id", "")) or "").strip()
+    if not lid:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "learning node id required",
+                     "qubit_counterpart": "CLI `qubit lessons show <id>`"}
+    if not b.get("confirm"):
+        return _staged(
+            "learning node promotion stages through the Qubit lessons ledger "
+            "with confirmation; nothing was written", "")
+    try:
+        promoted = L.LearningLedger(Path(cfg.state_dir())).promote(lid)
+    except Exception as exc:
+        return _fail(exc)
+    if promoted is None:
+        return 404, {"ok": False, "code": "LESSON_NOT_FOUND",
+                     "detail": f"no learning node {lid!r}",
+                     "qubit_counterpart": "CLI `qubit lessons`"}
+    return _ok(ok=True, id=lid, node={"id": lid, **promoted},
+               qubit_counterpart="CLI `qubit lessons promote <id>`")
+
+
+def h_learning_node_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/learning/node -> real confirm-gated lesson tombstone.
+
+    Runs the same ``LearningLedger.remove`` the CLI ``qubit lessons forget``
+    calls (tombstone + audit; history retained). Confirm-gated; an unknown id
+    is a typed 404, never a false success.
+    """
+    from . import learning as L
+    lid = str(q.get("id", b.get("id", "")) or "").strip()
+    if not lid:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "learning node id required",
+                     "qubit_counterpart": "CLI `qubit lessons forget <id>`"}
+    if not b.get("confirm"):
+        return _staged(
+            "learning node deletion stages through the Qubit lessons ledger "
+            "with confirmation; nothing was removed", "")
+    try:
+        removed = L.LearningLedger(Path(cfg.state_dir())).remove(lid)
+    except Exception as exc:
+        return _fail(exc)
+    if not removed:
+        return 404, {"ok": False, "code": "LESSON_NOT_FOUND",
+                     "detail": f"no learning node {lid!r}",
+                     "qubit_counterpart": "CLI `qubit lessons`"}
+    return _ok(ok=True, id=lid, removed=True,
+               qubit_counterpart="CLI `qubit lessons forget <id>`")
+
+
+# ---------------------------------------------------------------------------
+# Qubit-owned dashboard auth: loopback identity + RFC 8252 native handshake.
+#
+# The vendored dashboard ships an OAuth round trip
+# (qubit_runtime/qubit_cli/dashboard_auth/routes.py). Qubit has no external
+# IDP: its dashboard identity is the loopback operator with a loopback
+# session token (voicebridge/webui.py:token_ok). These handlers are the
+# Qubit-safe local equivalent: provider listing and manual-handoff guidance
+# come from voicebridge.auth_status / voicebridge.auth_login, and the native
+# loopback handshake (RFC 8252 + PKCE S256, single-use codes, short TTL,
+# hashed at rest) is served locally by Qubit itself. No outbound request, no
+# external credential capture, no query-string token, no second listener.
+# Raw tokens are returned once; only their SHA-256 hash is persisted (0600).
+# ---------------------------------------------------------------------------
+
+_AUTH_SCHEMA = "qubit-dashboard-auth/1"
+_AUTH_CODE_TTL = 300.0
+_AUTH_ACCESS_TTL = 12 * 3600.0
+_AUTH_REFRESH_TTL = 30 * 86400.0
+_AUTH_LOOPBACK_HOSTS = ("127.0.0.1", "::1")
+
+
+def _auth_store_path(cfg: Any) -> Path:
+    # Canonical Qubit store (the write target).
+    return _store_path(cfg, "qubit_dashboard_auth.json")
+
+
+def _auth_store_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name until the next save.
+    return _migrated_read_path(cfg, "qubit_dashboard_auth.json",
+                               "hermes_dashboard_auth.json")
+
+
+def _auth_store(cfg: Any) -> Dict[str, Any]:
+    state = _load_json_store(_auth_store_read_path(cfg))
+    state.setdefault("schema", _AUTH_SCHEMA)
+    for key in ("pending", "codes", "session", "refresh"):
+        if not isinstance(state.get(key), dict):
+            state[key] = {}
+    return state
+
+
+def _auth_flush(cfg: Any, state: Dict[str, Any]) -> None:
+    path = _auth_store_path(cfg)
+    _save_json_store(path, state)
+    try:
+        import os as _os
+        _os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def _auth_hash(value: Any) -> str:
+    import base64 as _b64
+    import hashlib as _hl
+    return _b64.urlsafe_b64encode(
+        _hl.sha256(str(value).encode("utf-8")).digest()).decode("ascii")
+
+
+def _auth_ct_eq(a: Any, b: Any) -> bool:
+    import hmac as _hmac
+    return bool(a) and bool(b) and _hmac.compare_digest(str(a), str(b))
+
+
+def _auth_new_token(nbytes: int = 32) -> str:
+    import secrets as _secrets
+    return _secrets.token_urlsafe(nbytes)
+
+
+def _auth_prune(state: Dict[str, Any], now: Optional[float] = None) -> None:
+    moment = time.time() if now is None else now
+    for key in ("pending", "codes"):
+        recs = state.get(key) or {}
+        for rid in list(recs):
+            rec = recs.get(rid) or {}
+            if float(rec.get("expires_at", 0) or 0) < moment:
+                recs.pop(rid, None)
+
+
+def _auth_issue(state: Dict[str, Any], provider: str, now: float,
+                user_id: str = "local-operator") -> Tuple[str, str]:
+    access = _auth_new_token()
+    refresh = _auth_new_token()
+    state["session"] = {"token_hash": _auth_hash(access), "provider": provider,
+                        "user_id": user_id, "issued_at": now,
+                        "expires_at": now + _AUTH_ACCESS_TTL}
+    state["refresh"] = {"token_hash": _auth_hash(refresh), "provider": provider,
+                        "user_id": user_id, "issued_at": now,
+                        "expires_at": now + _AUTH_REFRESH_TTL}
+    return access, refresh
+
+
+def _auth_bearer(access: str, refresh: str, provider: str,
+                 now: float) -> Dict[str, Any]:
+    return {"access_token": access, "refresh_token": refresh,
+            "token_type": "Bearer", "expires_at": now + _AUTH_ACCESS_TTL,
+            "provider": provider, "user_id": "local-operator"}
+
+
+def _auth_providers(cfg: Any) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    try:
+        from .auth_status import auth_status as _inv
+        for rec in _inv(cfg).get("providers", []):
+            name = str(rec.get("provider", "") or "")
+            if not name:
+                continue
+            rows.append({"name": name, "display_name": name,
+                         "supports_password": False,
+                         "configured": bool(rec.get("configured")),
+                         "key_ref": str(rec.get("key_ref", ""))})
+    except Exception:
+        pass
+    return rows
+
+
+def h_auth_providers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/auth/providers -> real local provider inventory.
+
+    Reports the loopback identity plus every configured frontier provider
+    (names + credential-reference kind only, never values). External
+    provider sign-in is manual-handoff, so ``supports_password`` is False.
+    """
+    return _ok(providers=_auth_providers(cfg),
+               identity="local-operator", mode="loopback-token",
+               detail="Qubit loopback dashboard identity; external provider "
+                      "sign-in is manual-handoff (no OAuth token dance)")
+
+
+def h_login_page(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /login -> real Qubit loopback login bootstrap (no IDP redirect)."""
+    return _ok(ok=True, identity="local-operator", mode="loopback-token",
+               loopback=True, providers=_auth_providers(cfg),
+               next=str(q.get("next", "") or ""),
+               detail="Qubit loopback login; no external IDP redirect")
+
+
+def h_auth_login(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /auth/login -> real manual-handoff enrollment plan for a provider."""
+    from .auth_login import login_plan
+    provider = str(q.get("provider", "") or "")
+    plan = login_plan(cfg, provider)
+    if plan.get("state") != "OK":
+        return 404, {
+            "ok": False, "code": plan.get("code", "AUTH_UNKNOWN_PROVIDER"),
+            "detail": _redact(plan.get("detail", "unknown provider"))[:300],
+            "qubit_counterpart": "CLI `qubit auth login --provider`",
+            "known_providers": plan.get("known_providers", []),
+        }
+    return _ok(ok=True, provider=plan.get("provider", provider),
+               next=str(q.get("next", "") or ""), handoff=plan,
+               detail="manual-handoff enrollment; Qubit never performs the "
+                      "provider login or captures the credential")
+
+
+def h_auth_native_authorize(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /auth/native/authorize -> Qubit-local RFC 8252 + PKCE S256 start.
+
+    Only ``http://`` loopback redirect URIs are accepted (an open redirect
+    would leak a live code), the challenge method must be S256, and the
+    one-time code/verifier challenge is stored hashed with a short TTL.
+    """
+    from urllib.parse import urlencode, urlparse
+    method = str(q.get("code_challenge_method", "") or "").upper()
+    challenge = str(q.get("code_challenge", "") or "")
+    redirect_uri = str(q.get("redirect_uri", "") or "")
+    if method != "S256":
+        return 400, {"ok": False, "code": "AUTH_BAD_CHALLENGE_METHOD",
+                     "detail": "code_challenge_method must be S256",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    if not challenge:
+        return 400, {"ok": False, "code": "AUTH_BAD_CHALLENGE",
+                     "detail": "code_challenge required",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    parsed = urlparse(redirect_uri)
+    if parsed.scheme != "http" or \
+            (parsed.hostname or "").lower() not in _AUTH_LOOPBACK_HOSTS:
+        return 400, {"ok": False, "code": "AUTH_BAD_REDIRECT",
+                     "detail": "native redirect_uri must be http:// on the "
+                               "loopback interface (127.0.0.1 / ::1)",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    provider = str(q.get("provider", "") or "loopback").strip() or "loopback"
+    client_state = str(q.get("state", "") or "")
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    broker_state = _auth_new_token(16)
+    code = _auth_new_token(24)
+    state["codes"][_auth_hash(code)] = {
+        "challenge": challenge, "redirect_uri": redirect_uri,
+        "client_state": client_state, "provider": provider,
+        "broker_state": broker_state, "expires_at": now + _AUTH_CODE_TTL,
+        "used": False,
+    }
+    _auth_flush(cfg, state)
+    sep = "&" if "?" in redirect_uri else "?"
+    authorize_url = redirect_uri + sep + urlencode(
+        {"code": code, "state": broker_state})
+    _audit("auth_authorize", "dashboard:user",
+           {"provider": provider, "redirect_host": parsed.hostname or ""})
+    return _ok(ok=True, broker_state=broker_state, provider=provider,
+               redirect_uri=redirect_uri, authorize_url=authorize_url,
+               code=code, expires_in=_AUTH_CODE_TTL,
+               detail="Qubit-local loopback authorization "
+                      "(RFC 8252 + PKCE S256); no external IDP")
+
+
+def h_auth_callback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /auth/callback -> redeem a Qubit-local code into a session."""
+    raw = str(q.get("code", "") or "")
+    state_param = str(q.get("state", "") or "")
+    if not raw:
+        return 400, {"ok": False, "code": "AUTH_MISSING_CODE",
+                     "detail": "Missing authorization code",
+                     "qubit_counterpart": "GET /login"}
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    key = _auth_hash(raw)
+    rec = state["codes"].get(key)
+    if not rec or rec.get("used"):
+        return 400, {"ok": False, "code": "AUTH_BAD_CODE",
+                     "detail": "Invalid or expired authorization code",
+                     "qubit_counterpart": "GET /login"}
+    if state_param and rec.get("broker_state") and \
+            not _auth_ct_eq(state_param, rec["broker_state"]):
+        return 400, {"ok": False, "code": "AUTH_STATE_MISMATCH",
+                     "detail": "OAuth state mismatch (CSRF check failed)",
+                     "qubit_counterpart": "GET /login"}
+    rec["used"] = True
+    provider = str(rec.get("provider", "loopback") or "loopback")
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_callback", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, next="/", provider=provider,
+               session=_auth_bearer(access, refresh, provider, now))
+
+
+def h_auth_native_token(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/native/token -> verify PKCE and exchange the code for tokens.
+
+    The code is consumed on every path (no verifier oracle, no replay); any
+    failure is a generic typed 400. Tokens go in the JSON body.
+    """
+    raw = str(b.get("code", "") or "")
+    verifier = str(b.get("code_verifier", "") or "")
+    if not raw or not verifier:
+        return 400, {"ok": False, "code": "AUTH_MISSING_CODE",
+                     "detail": "Invalid or expired authorization code.",
+                     "qubit_counterpart": "GET /login"}
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    key = _auth_hash(raw)
+    rec = state["codes"].get(key)
+    if not rec or rec.get("used"):
+        return 400, {"ok": False, "code": "AUTH_BAD_CODE",
+                     "detail": "Invalid or expired authorization code.",
+                     "qubit_counterpart": "GET /login"}
+    state["codes"].pop(key, None)
+    if not _auth_ct_eq(_auth_hash(verifier), rec.get("challenge", "")):
+        _auth_flush(cfg, state)
+        return 400, {"ok": False, "code": "AUTH_BAD_CODE",
+                     "detail": "Invalid or expired authorization code.",
+                     "qubit_counterpart": "GET /login"}
+    provider = str(rec.get("provider", "loopback") or "loopback")
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_native_token", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, **_auth_bearer(access, refresh, provider, now))
+
+
+def h_auth_native_refresh(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/native/refresh -> rotate a desktop-held refresh token."""
+    raw = str(b.get("refresh_token", "") or "")
+    provider_hint = str(b.get("provider", "") or "")
+    if not raw:
+        return 400, {"ok": False, "code": "AUTH_MISSING_REFRESH",
+                     "detail": "refresh_token required",
+                     "qubit_counterpart": "GET /login"}
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    rec = state.get("refresh") or {}
+    valid = (rec and float(rec.get("expires_at", 0) or 0) >= now
+             and _auth_ct_eq(_auth_hash(raw), rec.get("token_hash", ""))
+             and (not provider_hint or provider_hint == rec.get("provider", "")))
+    if not valid:
+        return 401, {"ok": False, "state": "UNAUTHORIZED",
+                     "code": "AUTH_SESSION_EXPIRED",
+                     "detail": "Refresh token expired or invalid; start a new "
+                               "sign-in.",
+                     "qubit_counterpart": "GET /login"}
+    provider = str(rec.get("provider", "loopback") or "loopback")
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_native_refresh", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, **_auth_bearer(access, refresh, provider, now))
+
+
+def h_auth_password_login(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/password-login -> verify the Qubit loopback credential.
+
+    Qubit keeps no password store. The local equivalent accepts either a
+    token previously issued by the loopback native flow or the configured
+    dashboard token (``webui.token_ok``, constant-time, never a query-string
+    token). Unknown/mismatched credentials are a generic 401.
+    """
+    supplied = str(b.get("token", b.get("password", "")) or "")
+    provider = str(b.get("provider", "") or "loopback") or "loopback"
+    now = time.time()
+    state = _auth_store(cfg)
+    _auth_prune(state, now)
+    sess = state.get("session") or {}
+    ok = bool(supplied) and _auth_ct_eq(_auth_hash(supplied),
+                                        sess.get("token_hash", ""))
+    if not ok and supplied:
+        try:
+            from .webui import token_ok
+            cfg_token = str(getattr(cfg, "api_token", "") or "")
+            if cfg_token:
+                ok, _reason = token_ok(cfg_token, supplied, False)
+        except Exception:
+            ok = False
+    if not ok:
+        return 401, {"ok": False, "state": "UNAUTHORIZED",
+                     "code": "AUTH_INVALID_CREDENTIALS",
+                     "detail": "Invalid credentials",
+                     "qubit_counterpart": "GET /login (loopback session)"}
+    access, refresh = _auth_issue(state, provider, now)
+    _auth_flush(cfg, state)
+    _audit("auth_password_login", "dashboard:user", {"provider": provider})
+    return _ok(ok=True, next="/", **_auth_bearer(access, refresh, provider,
+                                                now))
+
+
+def h_auth_logout(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /auth/logout -> revoke the loopback session + credential check."""
+    from .integration_status import logout_check
+    state = _auth_store(cfg)
+    revoked = bool(state.get("session") or state.get("refresh")
+                   or state.get("codes") or state.get("pending"))
+    state["session"] = {}
+    state["refresh"] = {}
+    state["pending"] = {}
+    state["codes"] = {}
+    _auth_flush(cfg, state)
+    _audit("auth_logout", "dashboard:user", {"revoked": revoked})
+    return _ok(ok=True, logged_out=True, revoked=revoked, next="/login",
+               check=logout_check(cfg),
+               detail="loopback session revoked; no server-side cookie")
+
+
+# ---------------------------------------------------------------------------
+# Route table: (method, regex, handler, disposition)
+# disposition is implemented|gated; gated rows carry code+reason+counterpart.
+# ---------------------------------------------------------------------------
+
+Route = Tuple[str, str, str]
+
+ROUTES: List[Dict[str, Any]] = []
+
+def _r(method: str, pattern: str, handler: str, disp: str = "implemented",
+       gate: Optional[Dict[str, str]] = None) -> None:
+    ROUTES.append({"method": method, "pattern": pattern, "handler": handler,
+                   "disposition": disp, "gate": gate or {}})
+
+
+def _g(code: str, detail: str, counterpart: str,
+       owner: str = "qubit-policy",
+       rollback: str = "read-only; nothing to roll back") -> Dict[str, str]:
+    return {"code": code, "detail": detail, "counterpart": counterpart,
+            "owner": owner, "rollback": rollback}
+
+
+_NO_PTY = _g("PTY_NO_SHELL",
+             "Qubit forbids raw shell/PTY spawn; the xterm mirror cannot attach. "
+             "Use Qubit Chat (streaming agent turns) or the TUI live board.",
+             "overlay Qubit Chat tab (POST /api/qubit/chat) + CLI `qubit tui`")
+# The Qubit listener does not mount the curated console WebSocket (it runs one
+# brokered event path). The refusal is accurate for /api/console: it points at
+# the real Qubit safe consoles instead of claiming a raw PTY is being denied.
+_NO_CONSOLE = _g("PTY_NO_SHELL",
+                 "This listener serves Qubit Chat and the Qubit Operations "
+                 "console; the curated console WebSocket is not mounted here. "
+                 "No raw shell/PTY is exposed.",
+                 "overlay Operations tab (/operations) + CLI `qubit console`")
+_NO_WRITE = _g("WRITE_BROKERED",
+               "Direct file writes are refused; writes run only as brokered, "
+               "confirmed argv actions with audit receipts.",
+               "CLI `qubit opencode` / projects + dashboard /ops + approvals")
+_NO_SECRET = _g("SECRET_NEVER_SERVED",
+                "Secret values never leave the vault; only references are listed.",
+                "CLI `qubit auth status` (names only)")
+_NO_SUPERVISION = _g("GATEWAY_NO_SUPERVISION",
+                     "Qubit keeps a single event path; process supervision stays "
+                     "with the operator.",
+                     "operator systemd units + `qubit gateway` records")
+# Multiplex migration folds per-profile gateways into one multiplexer and
+# rewrites service units; it is operator-owned, so the dashboard POST is a
+# typed refusal. The read-only plan (GET /api/gateway/migrate/plan) IS served.
+_GATE_GATEWAY_MIGRATE = _g("GATEWAY_MIGRATE_OPERATOR_OWNED",
+                           "Gateway multiplex migration rewrites service units "
+                           "and live gateway processes; it is operator-owned. "
+                           "Preflight is read-only (GET /api/gateway/migrate/plan).",
+                           "CLI `qubit gateway migrate` (operator-run)")
+_NO_REMOTE = _g("BLOCKED_REMOTE_SOURCE",
+                "Remote fetch is refused; only local reviewed manifests install "
+                "with explicit confirmation.",
+                "CLI `qubit skills install <local-manifest>` + 7E validation")
+_NO_OAUTH = _g("OAUTH_MANUAL_HANDOFF",
+               "No live OAuth token dance is performed; enrollment is a manual "
+               "handoff in the user's own browser.",
+               "CLI `qubit auth login` (manual-handoff guided enrollment)")
+_NO_UPDATE = _g("UPDATE_OPERATOR_OWNED",
+                "In-place self-update from the dashboard is refused; upgrades are "
+                "versioned, staged, and reversible.",
+                "CLI `qubit product_*` / package + dashboard Setup page")
+_NO_GIT_READ = _g("GIT_READ_SCOPED",
+                  "Qubit git is a scoped read surface (status/log/diff/show); "
+                  "this review verb has no dedicated backend here.",
+                  "CLI `qubit git status|log|diff|show` + `qubit project`")
+_NO_GH_AUTH = _g("GH_AUTH_OPERATOR",
+                 "GitHub CLI auth status is never probed from the dashboard: "
+                 "`gh auth status` shells out to a credentialed CLI and can "
+                 "hang on a prompt. Qubit performs no network auth probe and "
+                 "serves no token.",
+                 "operator-run `gh auth status` + CLI `qubit auth status` "
+                 "(names only)")
+_NO_GIT_SHIP = _g("GIT_SHIP_GH_EXTERNAL",
+                  "PR ship info needs the GitHub CLI (credentialed network); "
+                  "Qubit never shells out to `gh` from the dashboard. Shipping "
+                  "runs through the operator's own authenticated gh session.",
+                  "operator `gh pr view` + CLI `qubit opencode` worktree flow")
+_NO_CRON_FIRE = _g("CRON_FIRE_EXTERNAL",
+                   "Managed-cron fire is an external NAS→agent webhook and is "
+                   "not exposed through the dashboard; Qubit schedules run on "
+                   "an estop-checked, audited tick.",
+                   "CLI `qubit schedules run-due` + dashboard /ops "
+                   "schedules_run_due",
+                   owner="qubit-policy",
+                   rollback="nothing fired; nothing to roll back")
+_NO_PROFILE_PR = _g("GH_PR_EXTERNAL",
+                    "Session PR association needs the GitHub CLI (credentialed "
+                    "network); Qubit never shells out to `gh` from the "
+                    "dashboard and serves no PR cache.",
+                    "operator `gh pr list/view` + CLI `qubit sessions`",
+                    owner="qubit-policy",
+                    rollback="read-only; nothing to roll back")
+_NO_GIT_WRITE = _g("GIT_WRITE_BROKERED",
+                   "Qubit git is read-only; staging, commits, pushes, "
+                   "worktrees, and branch switches run through the brokered "
+                   "opencode worktree flow with confirmation.",
+                   "CLI `qubit opencode` / `qubit project` + approvals")
+_NO_MEDIA = _g("MEDIA_NOT_SERVED",
+               "Gateway-local binary media data URLs are not served through "
+               "the JSON compat API; Qubit file reads return bounded, redacted "
+               "text only.",
+               "CLI `qubit files read` + Qubit Chat attachment vision")
+_NO_BINARY = _g("FILES_BINARY_STREAM",
+                "Binary file download/stream responses are not served through "
+                "the JSON compat dispatcher; managed files are read as bounded "
+                "text or data URLs.",
+                "GET /api/files/read + GET /api/fs/read-text")
+_NO_AUDIO_RELAY = _g("AUDIO_RELAY_ONLY",
+                     "Client-direct STT/TTS provider keys are never exported; "
+                     "voice audio relays through the local Qubit pipeline.",
+                     "classic /api/audio/status + Qubit Chat voice")
+_NO_AUDIO_EXTERNAL = _g("PROVIDER_EXTERNAL",
+                        "External voice catalogs (ElevenLabs) are not fetched; "
+                        "TTS runs through the local provider chain.",
+                        "local TTS providers (piper/edge/kokoro)")
+_NO_AUDIO_ACTION = _g("AUDIO_ACTION_LOCAL",
+                      "Audio synthesis/transcription runs only through the "
+                      "local voice pipeline, never as a raw compat action.",
+                      "Qubit Chat voice + CLI `qubit voice`")
+_NO_AUDIO_LEASE = _g("AUDIO_LEASE_DESKTOP",
+                     "TTS engine warm-up/release leases are desktop-only; the "
+                     "local pipeline manages model residency itself.",
+                     "Qubit voice pipeline (lazy model load)")
+_NO_AUDIO_STREAM = _g("AUDIO_STREAM_LOCAL",
+                      "Streaming PCM TTS is served by the local voice "
+                      "pipeline, not as a compat WebSocket.",
+                      "classic Qubit voice playback + Qubit Chat")
+_NO_NETWORK_PROBE = _g("NETWORK_PROBE_BLOCKED",
+                       "Live endpoint/credential probes open outbound sockets "
+                       "from the dashboard; Qubit verifies providers through "
+                       "the local governed gateway instead.",
+                       "CLI `qubit auth status` + Qubit provider gateway "
+                       "(audited, budgeted)")
+_GATE_PROFILE_IMPORT = _g("PROFILE_IMPORT_REVIEW",
+                          "Profile archives enter quarantine for review; a "
+                          "reviewed archive imports via the Qubit principal "
+                          "registry, never straight from the dashboard.",
+                          "CLI `qubit import-state inspect` + `qubit brain "
+                          "principal-add`")
+_GATE_DESKTOP_OVERLAY = _g("DESKTOP_OVERLAY_ONLY",
+                           "Desktop appearance overlays are a desktop-client "
+                           "feature; the Qubit dashboard ships one theme and "
+                           "serves no per-profile overlay.",
+                           "Qubit theme (GET /api/dashboard/themes)")
+_GATE_SESSIONS_RECEIPT = {
+    **_g("SESSIONS_RECEIPT_STORE",
+         "Qubit sessions are append-only audit receipts; owner back-fill is "
+         "not offered. Memory tombstones/corrections own forgetting.",
+         "CLI/voice memory_forget/correct (same stores)"),
+    "http": 501,
+}
+# Typed gates for upstream dashboard plugin / MCP / checkpoint / import /
+# provider-OAuth mutations. These were previously bare-string GATED entries,
+# which the ledger generator rendered as misleading "STUB_" pseudo-codes; each
+# is a genuine operator-only Qubit-safe refusal with a real code, reason, and
+# counterpart (never an unfinished stub).
+_GATE_SKILL_MANIFEST = _g(
+    "SKILL_MANIFEST_REQUIRED",
+    "Direct dashboard plugin installs are refused; install a validated local "
+    "manifest staged disabled instead.",
+    "CLI `qubit skills install <manifest>` + 7E validation")
+_GATE_SKILL_VERSIONED = _g(
+    "SKILL_VERSIONED",
+    "In-place plugin updates are refused; versions are immutable. Remove and "
+    "reinstall the new validated version.",
+    "CLI `qubit skills remove/rollback/install`")
+_GATE_CKPT_PRUNE = _g(
+    "CHECKPOINT_CONFIRM_REQUIRED",
+    "Checkpoint prune is metadata-destructive: confirm in the Qubit operations "
+    "console with explicit scope.",
+    "dashboard /ops checkpoints + CLI")
+_GATE_IMPORT_REVIEW = _g(
+    "IMPORT_REVIEW_REQUIRED",
+    "Uploads enter quarantine for review; reviewed artifacts install via "
+    "skills install. Nothing executes on upload.",
+    "CLI `qubit import-agent inspect`")
+_GATE_KANBAN_WRITE = _g(
+    "KANBAN_WRITE_BROKERED",
+    "This kanban mutation has no Qubit-native equivalent: the vendored "
+    "sub-columns, links, runs, attachments and board transfer are not part of "
+    "the Qubit board schema. Board/task create, edit, move, complete, archive, "
+    "comment and bulk update are native and confirmed on the one board store.",
+    "CLI `qubit kanban` + dashboard /qubit-boards + pending-approvals banner")
+_GATE_OAUTH_DELETE = {
+    **_g("OAUTH_MANUAL_HANDOFF",
+         "No OAuth sessions are stored server-side; enrollment is a manual "
+         "handoff in your own browser.",
+         "CLI `qubit auth login` (manual-handoff guided enrollment)"),
+    "http": 404,
+}
+
+_r("GET", r"/api/status", "h_status")
+_r("GET", r"/api/runtime", "h_runtime")
+_r("GET", r"/api/health", "h_health")
+_r("GET", r"/api/auth/me", "h_auth_me")
+_r("GET", r"/api/events", "h_events")
+_r("GET", r"/api/sessions", "h_sessions_list")
+_r("GET", r"/api/sessions/stats", "h_sessions_stats")
+_r("GET", r"/api/sessions/search", "h_sessions_list")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/export", "h_session_show")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/latest-descendant", "h_session_show")
+_r("GET", r"/api/sessions/(?P<id>[^/]+)/messages", "h_session_messages")
+# Negative lookahead keeps the dedicated /api/sessions/shares collection from
+# being captured as a session id by the generic show route below. The specific
+# ``/api/sessions/empty[*]`` read (pinned bulk empty-session listing) must
+# precede the generic id pattern or a bare ``/api/sessions/empty`` is misread
+# as a session named ``empty``.
+_r("GET", r"/api/sessions/empty.*", "sess_empty")
+_r("GET", r"/api/sessions/(?!shares$)(?P<id>[^/]+)", "h_session_show")
+_r("GET", r"/api/config", "h_config")
+_r("GET", r"/api/config/schema", "h_config_schema")
+_r("GET", r"/api/config/defaults", "h_config_defaults")
+_r("GET", r"/api/egress/status", "h_egress_status")
+_r("GET", r"/api/model/info", "h_model_info")
+_r("GET", r"/api/model/recommended-default", "h_model_recommended_default")
+_r("GET", r"/api/model/options", "h_model_options")
+_r("GET", r"/api/model/moa", "h_model_moa")
+_r("PUT", r"/api/model/moa", "moa_put")
+_r("GET", r"/api/model/auxiliary", "h_model_auxiliary")
+_r("POST", r"/api/model/set", "h_model_set")
+_r("GET", r"/api/profiles", "h_profiles")
+_r("GET", r"/api/profiles/active", "h_profiles_active")
+_r("POST", r"/api/profiles/active", "profiles_active_set")
+_r("GET", r"/api/profiles/(?P<name>[^/]+)/setup-command", "h_profile_setup_command")
+_r("GET", r"/api/profiles/(?P<name>[^/]+)/soul", "h_profile_soul")
+_r("PUT", r"/api/profiles/(?P<name>[^/]+)/soul", "profile_soul_set")
+_r("PUT", r"/api/profiles/(?P<name>[^/]+)/description", "profile_desc")
+_r("POST", r"/api/profiles/(?P<name>[^/]+)/describe-auto", "profile_describe_auto")
+_r("PUT", r"/api/profiles/(?P<name>[^/]+)/model", "profile_model")
+_r("PATCH", r"/api/profiles/(?P<name>[^/]+)", "profile_rename")
+_r("DELETE", r"/api/profiles/(?P<name>[^/]+)", "profile_delete")
+_r("GET", r"/api/skills", "h_skills")
+_r("GET", r"/api/skills/content", "h_skill_content")
+_r("POST", r"/api/skills", "skill_create")
+_r("PUT", r"/api/skills/content", "skill_update")
+_r("DELETE", r"/api/skills", "skill_delete")
+_r("PUT", r"/api/skills/toggle", "h_skills_toggle")
+_r("GET", r"/api/terminal/profiles", "h_terminal_profiles")
+_r("PUT", r"/api/terminal/profile", "terminal_profile_set")
+_r("GET", r"/api/tools/toolsets", "h_toolsets")
+# Bare toolset toggle (SPA ``PUT /api/tools/toolsets/{name}`` with {enabled})
+# must precede the ``.*`` config-write row so the persisted enable/disable
+# contract owns it; sub-resource writes (/model, /provider, /env, /post-setup)
+# keep the config-grant handler.
+_r("PUT", r"/api/tools/toolsets/(?P<id>[^/]+)", "h_toolset_toggle")
+# One power/e-stop authority for both the classic page and the SPA alias.
+_r("GET", r"/api/power", "h_power")
+_r("POST", r"/api/power", "power_action")
+_r("GET", r"/api/cron/jobs", "h_cron_jobs")
+_r("POST", r"/api/cron/jobs", "cron_create")
+_r("PUT", r"/api/cron/jobs/(?P<id>[^/]+)", "cron_update")
+_r("DELETE", r"/api/cron/jobs/(?P<id>[^/]+)", "cron_delete")
+_r("GET", r"/api/cron/jobs/(?P<id>[^/]+)/runs", "h_cron_job_runs")
+_r("GET", r"/api/cron/jobs/(?P<id>[^/]+)", "h_cron_job_show")
+_r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/pause", "cron_pause")
+_r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/resume", "cron_resume")
+_r("POST", r"/api/cron/jobs/(?P<id>[^/]+)/trigger", "cron_trigger")
+_r("GET", r"/api/logs", "h_logs")
+_r("GET", r"/api/system/stats", "h_system_stats")
+_r("GET", r"/api/mcp", "h_mcp")
+_r("GET", r"/api/mcp/servers", "h_mcp_servers")
+_r("POST", r"/api/mcp/servers", "mcp_create")
+_r("PUT", r"/api/mcp/servers", "mcp_update")
+_r("DELETE", r"/api/mcp/servers/(?P<id>[^/]+)", "mcp_delete")
+# B-H1: MCP server CRUD/test/auth are real operations on the canonical Qubit
+# MCP registry (:mod:`voicebridge.mcp_servers`). They persist config and
+# reference-only credentials and never open a network mount. Registered ahead
+# of the retired MCP_NO_MOUNT blanket gate.
+_r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
+_r("PUT", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
+_r("GET", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth_status")
+_r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth")
+_r("GET", r"/api/mcp/catalog", "h_mcp_catalog_live")
+_r("POST", r"/api/pub", "h_pub")
+_r("WEBSOCKET", r"/api/pub", "h_pub")
+_r("GET", r"/api/pairing", "h_pairing_list")
+_r("POST", r"/api/pairing", "pairing_create")
+_r("POST", r"/api/pairing/approve", "pairing_approve")
+_r("POST", r"/api/pairing/revoke", "pairing_revoke")
+_r("POST", r"/api/pairing/clear-pending", "pairing_clear_pending")
+_r("GET", r"/api/webhooks", "h_webhooks_list")
+_r("POST", r"/api/webhooks", "webhooks_add")
+_r("POST", r"/api/webhooks/enable", "webhooks_enable")
+_r("PUT", r"/api/webhooks/(?P<id>[^/]+)/enabled", "webhooks_enabled")
+_r("DELETE", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_delete")
+_r("GET", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_show")
+_r("POST", r"/api/webhooks/(?P<id>[^/]+)", "webhooks_mutate")
+_r("GET", r"/api/messaging/platforms", "h_platforms")
+_r("PUT", r"/api/messaging/platforms/(?P<id>[^/]+)", "msg_update")
+_r("GET", r"/api/memory", "h_memory")
+_r("GET", r"/api/memory/provider", "h_memory")
+_r("GET", r"/api/analytics", "h_analytics")
+_r("GET", r"/openapi.json", "h_openapi")
+_r("GET", r"/api/analytics/usage", "h_analytics")
+_r("GET", r"/api/analytics/models", "h_analytics_models")
+_r("GET", r"/api/files", "h_files")
+_r("GET", r"/api/files/read", "h_files_read")
+_r("DELETE", r"/api/files", "files_delete")
+_r("GET", r"/api/gateway", "h_gateway")
+# Read-only method-symmetric alias: the SPA reads ``/api/gateway``; a
+# ``/api/gateway/status`` GET returns the same gateway/process status body so
+# the surface is symmetric with the mutating ``POST /api/gateway/*`` family.
+_r("GET", r"/api/gateway/status", "h_gateway")
+_r("GET", r"/api/gateway/rpc", "h_gateway_rpc_methods")
+_r("POST", r"/api/gateway/rpc", "h_gateway_rpc")
+_r("POST", r"/api/gateway/drain", "h_gateway_drain")
+# W13 P0 route parity (no vendor sync required). ``GET /api/gateway/migrate/plan``
+# is the read-only multiplex preflight the reference SPA's
+# ``api.getGatewayMigratePlan`` calls (reference web_routers/actions.py:147); it
+# returns the real vendored ``MigrationPlan.to_dict()``. The companion
+# ``POST /api/gateway/migrate`` stays an operator-owned typed refusal (GATED
+# below), so a read never fabricates a migration.
+_r("GET", r"/api/gateway/migrate/plan", "h_gateway_migrate_plan")
+# Reference ``GET /api/host/identity`` (web_routers/status.py:122): proves WHO
+# owns this port. Served on the session-token-gated ``/agent`` compat surface
+# (``webui._qubit_api`` enforces ``X-Hermes-Session-Token`` before dispatch), so
+# the reference's per-route ``_require_token`` is the same one gate.
+_r("GET", r"/api/host/identity", "h_host_identity")
+# The redacted OAuth provider catalog is registered in the GATED authority table
+# below (as a real handler, like ``blueprints``/``delivery``) so the proxy-first
+# read path cannot serve the fork's raw record (legacy portal host + token
+# fragment). See the GET /api/providers/oauth row there.
+_r("GET", r"/api/curator", "h_curator")
+# Real on-demand curator control (persisted pause flag + explicit pass). The
+# routes are implemented here, ahead of the GATED table, so the operator
+# controls are real rather than the old CURATOR_ON_DEMAND refusal.
+_r("PUT", r"/api/curator/paused", "h_curator_paused")
+_r("POST", r"/api/curator/run", "h_curator_run")
+_r("GET", r"/api/env", "h_env")
+_r("GET", r"/api/ops/hooks", "h_hooks")
+_r("POST", r"/api/ops/hooks", "h_hooks_create")
+_r("PUT", r"/api/ops/hooks", "h_hooks_update")
+_r("GET", r"/api/ops/checkpoints", "h_ckpt")
+_r("GET", r"/api/ops", "h_ops_catalog")
+_r("GET", r"/api/ops/approvals", "h_approvals_list")
+_r("POST", r"/api/ops/run", "h_ops_run")
+_r("POST", r"/api/ops/confirm", "h_ops_confirm")
+_r("POST", r"/api/ops/cancel", "h_ops_cancel")
+# Specific ops mutations must precede the generic `/api/ops/<name>` dispatch,
+# otherwise they are swallowed by h_ops and answer OPS_UNKNOWN instead of their
+# real operation / typed gate.
+_r("POST", r"/api/ops/debug-share", "debug_share")
+_r("POST", r"/api/ops/import-upload", "__gate__", "gated", _GATE_IMPORT_REVIEW)
+_r("GET", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
+_r("POST", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
+_r("DELETE", r"/api/ops/hooks", "hooks_delete")
+_r("GET", r"/api/plugins/kanban/events", "h_plugin_kanban_events")
+# Vendored dashboard plugin fleet (hermes-achievements + kanban). Real
+# backends live in voicebridge/qubit_plugins.py and read the same local
+# session history / kanban DB the Qubit-owned Qubit runtime uses. Read routes
+# precede the GATED kanban write wildcard below so they are never shadowed.
+_r("GET", r"/api/plugins/hermes-achievements/achievements",
+   "h_plugin_achievements")
+_r("GET", r"/api/plugins/hermes-achievements/scan-status",
+   "h_plugin_achievements_scan_status")
+_r("GET", r"/api/plugins/hermes-achievements/recent-unlocks",
+   "h_plugin_achievements_recent_unlocks")
+_r("GET", r"/api/plugins/hermes-achievements/sessions/(?P<session_id>[^/]+)/badges",
+   "h_plugin_achievements_session_badges")
+_r("POST", r"/api/plugins/hermes-achievements/rescan",
+   "h_plugin_achievements_rescan")
+_r("POST", r"/api/plugins/hermes-achievements/reset-state",
+   "h_plugin_achievements_reset_state")
+_r("GET", r"/api/plugins/kanban/board", "h_plugin_kanban_board")
+_r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)", "h_plugin_kanban_task")
+_r("GET", r"/api/plugins/kanban/stats", "h_plugin_kanban_stats")
+_r("GET", r"/api/plugins/kanban/assignees", "h_plugin_kanban_assignees")
+_r("GET", r"/api/plugins/kanban/boards", "h_plugin_kanban_boards")
+_r("GET", r"/api/plugins/kanban/config", "h_plugin_kanban_config")
+_r("GET", r"/api/plugins/kanban/projects", "h_plugin_kanban_projects")
+_r("GET", r"/api/plugins/kanban/workers/active", "h_plugin_kanban_workers")
+_r("GET", r"/api/plugins/kanban/diagnostics", "h_plugin_kanban_diagnostics")
+_r("GET", r"/api/plugins/kanban/model-options", "h_plugin_kanban_model_options")
+_r("GET", r"/api/plugins/kanban/home-channels", "h_plugin_kanban_home_channels")
+_r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/log",
+   "h_plugin_kanban_task_log")
+_r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/attachments",
+   "h_plugin_kanban_task_attachments")
+_r("GET", r"/api/plugins/kanban/runs/(?P<run_id>[^/]+)/inspect",
+   "h_plugin_kanban_run_inspect")
+_r("GET", r"/api/plugins/kanban/runs/(?P<run_id>[^/]+)",
+   "h_plugin_kanban_run")
+_r("GET", r"/api/plugins/kanban/profiles", "h_plugin_kanban_profiles")
+_r("GET", r"/api/plugins/kanban/orchestration",
+   "h_plugin_kanban_orchestration")
+# Binary-capable attachment download. The vendored dashboard calls
+# GET /api/plugins/kanban/attachments/{id} and downloads the bytes; the compat
+# dispatcher is a JSON surface, so the handler serves the SAME vendored kanban
+# store as the attachments listing, base64-encoded with real filename/type.
+# No dead 404: a missing attachment is a typed PLUGIN_HTTP 404.
+_r("GET", r"/api/plugins/kanban/attachments/(?P<attachment_id>[^/]+)",
+   "h_plugin_kanban_attachment_download")
+# Kanban WRITE surface -> the SAME authoritative native board store the read
+# routes above synthesize from. Registered BEFORE the blanket
+# ``_GATE_KANBAN_WRITE`` block so the real board/task controls dispatch to a
+# native-backed handler through the shared confirm/audit/e-stop path instead of
+# a dead 403. Routes with no native-schema equivalent remain gated (and name
+# the CLI/voice/overlay counterpart) rather than silently no-op.
+_r("POST", r"/api/plugins/kanban/boards", "h_plugin_kanban_boards_create")
+_r("POST", r"/api/plugins/kanban/tasks", "h_plugin_kanban_tasks_create")
+_r("PATCH", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)",
+   "h_plugin_kanban_tasks_patch")
+_r("DELETE", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)",
+   "h_plugin_kanban_tasks_delete")
+_r("POST", r"/api/plugins/kanban/tasks/bulk", "h_plugin_kanban_tasks_bulk")
+_r("POST", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)/comments",
+   "h_plugin_kanban_tasks_comment")
+# Discovery for the vendored plugin fleet. The existing
+# /api/dashboard/plugins response stays fixed to the Qubit overlay set; this
+# additive view reports the vendored manifests without changing that contract.
+_r("GET", r"/api/dashboard/plugins/fleet", "h_plugin_fleet")
+_r("POST", r"/api/qubit/chat", "h_chat_turn")
+# Qubit-safe streaming chat. ``stream`` disposition: the handler yields SSE
+# frames (``h_chat_stream``) rather than a JSON envelope, so webui's dispatcher
+# owns the socket while THIS table stays the single route authority.
+_r("POST", r"/api/qubit/chat/stream", "h_chat_stream", "stream")
+# Qubit-safe chat transport: persisted sessions + a PTY-shaped, agent-backed
+# terminal frame. Literal rows precede the parameterized session id so
+# /sessions/import and /sessions/<id> never collide. No shell/PTY is spawned.
+_r("GET", r"/api/qubit/chat/sessions", "h_chat_sessions_list")
+_r("POST", r"/api/qubit/chat/sessions/import", "h_chat_session_import")
+_r("POST", r"/api/qubit/chat/sessions", "h_chat_session_create")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/messages",
+   "h_chat_session_messages")
+# S5 projection reads: specific subpaths precede the bare session-id row.
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/activity",
+   "h_chat_session_activity")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/drafts",
+   "h_chat_session_drafts")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/draft",
+   "h_chat_session_draft_content")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/comments",
+   "h_chat_session_comments")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/ci",
+   "h_chat_session_ci")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)/export",
+   "h_chat_session_export")
+_r("GET", r"/api/qubit/chat/sessions/(?P<id>[^/]+)", "h_chat_session_show")
+_r("PATCH", r"/api/qubit/chat/sessions/(?P<id>[^/]+)", "h_chat_session_patch")
+_r("DELETE", r"/api/qubit/chat/sessions/(?P<id>[^/]+)",
+   "h_chat_session_delete")
+_r("POST", r"/api/qubit/chat/cancel", "h_chat_cancel")
+_r("POST", r"/api/qubit/chat/retry", "h_chat_retry")
+_r("POST", r"/api/qubit/chat/vision", "h_chat_vision")
+_r("POST", r"/api/qubit/chat/pty", "h_chat_pty")
+_r("GET", r"/api/dashboard/plugins", "h_plugins")
+# Real local plugin catalog (D-1): every entry has a real manifest + loader +
+# provenance. The upstream remote curated index is a typed BLOCKED_REMOTE_PLUGIN
+# refusal, never fetched. The detail route adds validation + dependency checks.
+_r("GET", r"/api/dashboard/plugins/catalog", "plugins_catalog")
+_r("GET", r"/api/dashboard/plugins/catalog/(?P<id>.+)", "plugin_catalog_detail")
+_r("POST", r"/api/dashboard/plugins/reload", "plugins_reload")
+_r("GET", r"/api/dashboard/themes", "h_themes")
+_r("GET", r"/api/dashboard/theme", "h_theme_get")
+_r("PUT", r"/api/dashboard/theme", "h_theme_set")
+
+# Packet 8U read surfaces: scoped Git / Files / Audio (audit §1 absent reads)
+_r("GET", r"/api/git/status", "h_git_status")
+_r("GET", r"/api/git/log", "h_git_log")
+_r("GET", r"/api/git/diff", "h_git_diff")
+_r("GET", r"/api/git/show", "h_git_show")
+_r("GET", r"/api/git/review/diff", "h_git_file_diff")
+_r("GET", r"/api/git/file-diff", "h_git_file_diff")
+_r("GET", r"/api/git/worktrees", "h_git_worktrees")
+_r("GET", r"/api/git/branches", "h_git_branches")
+_r("GET", r"/api/git/base-branches", "h_git_base_branches")
+_r("GET", r"/api/git/review/list", "h_git_review_list")
+_r("GET", r"/api/git/review/commit-context", "h_git_review_commit_context")
+_r("GET", r"/api/git/review/rev-parse", "h_git_review_rev_parse")
+_r("GET", r"/api/fs/list", "h_fs_list")
+_r("GET", r"/api/fs/tree", "h_fs_tree")
+_r("GET", r"/api/fs/stat", "h_fs_stat")
+_r("GET", r"/api/fs/read", "h_fs_read_text")
+_r("GET", r"/api/fs/read-text", "h_fs_read_text")
+_r("GET", r"/api/fs/read-data-url", "h_fs_read_data_url")
+_r("GET", r"/api/fs/git-root", "h_fs_git_root")
+_r("GET", r"/api/fs/default-cwd", "h_fs_default_cwd")
+_r("GET", r"/api/audio/status", "h_audio_status")
+_r("GET", r"/api/audio/list", "h_audio_devices")
+_r("GET", r"/api/audio/devices", "h_audio_devices")
+_r("GET", r"/api/audio/voice-config", "h_audio_voice_config")
+_r("POST", r"/api/audio/transcribe", "h_audio_transcribe")
+_r("POST", r"/api/audio/speak", "h_audio_speak")
+
+# Packet 8U closure: local-models reads, custom endpoints, profile reads,
+# tools/learning reads, auth providers (audit §1A absent reads).
+_r("GET", r"/api/local-models/status", "h_local_models_status")
+_r("GET", r"/api/local-models/hardware", "h_local_models_hardware")
+_r("GET", r"/api/local-models/catalog", "h_local_models_catalog")
+_r("GET", r"/api/local-models/jobs/(?P<id>[^/]+)", "h_local_models_job_show")
+_r("GET", r"/api/local-models/jobs", "h_local_models_jobs")
+_r("POST", r"/api/local-models/runtime/install", "h_local_models_runtime_install")
+_r("POST", r"/api/local-models/download", "h_local_models_download")
+_r("DELETE", r"/api/local-models/models/(?P<model_id>[^/]+)",
+   "h_local_models_delete")
+_r("POST", r"/api/local-models/quickstart", "h_local_models_quickstart")
+_r("POST", r"/api/local-models/server", "h_local_models_server")
+_r("POST", r"/api/local-models/eject", "h_local_models_eject")
+_r("POST", r"/api/local-models/activate", "h_local_models_activate")
+_r("POST", r"/api/local-models/sideload", "h_local_models_sideload")
+_r("GET", r"/api/local-models/search/files", "h_local_models_search_files")
+_r("GET", r"/api/local-models/search", "h_local_models_search")
+_r("POST", r"/api/local-models/download-browsed",
+   "h_local_models_download_browsed")
+_r("GET", r"/api/providers/custom-endpoints", "h_custom_endpoints")
+_r("GET", r"/api/profiles/sessions/sidebar", "h_profiles_sessions_sidebar")
+_r("GET", r"/api/profiles/sessions", "h_profiles_sessions")
+_r("GET", r"/api/profiles/projects/tree", "h_profiles_projects_tree")
+_r("POST", r"/api/profiles", "h_profile_create")
+_r("GET", r"/api/tools/terminal/backends", "h_terminal_backends")
+_r("GET", r"/api/tools/computer-use/status", "h_computer_use_status")
+_r("GET", r"/api/learning/graph", "h_learning_graph")
+_r("GET", r"/api/learning/node", "h_learning_node")
+_r("PUT", r"/api/learning/node", "h_learning_node_update")
+_r("DELETE", r"/api/learning/node", "h_learning_node_delete")
+_r("GET", r"/api/auth/providers", "h_auth_providers")
+# Qubit-owned dashboard auth flow (loopback identity + native handshake).
+_r("GET", r"/login", "h_login_page")
+_r("GET", r"/auth/login", "h_auth_login")
+_r("GET", r"/auth/native/authorize", "h_auth_native_authorize")
+_r("GET", r"/auth/callback", "h_auth_callback")
+_r("POST", r"/auth/password-login", "h_auth_password_login")
+_r("POST", r"/auth/logout", "h_auth_logout")
+_r("POST", r"/api/auth/logout", "h_auth_logout")
+_r("POST", r"/auth/native/token", "h_auth_native_token")
+_r("POST", r"/auth/native/refresh", "h_auth_native_refresh")
+
+# Qubit delta Wave 3 (D3/D4/D20/D21/D24): file transfer, active recall,
+# document extraction, question prompts, and session sharing. Specific paths
+# precede parameterized rows so re.fullmatch resolves deterministically.
+_r("GET", r"/api/transfers/status", "h_transfers_status")
+_r("GET", r"/api/transfers/list", "h_transfers_list")
+_r("POST", r"/api/transfers/fetch", "h_transfers_fetch")
+_r("POST", r"/api/transfers/plan", "h_transfers_plan")
+_r("GET", r"/api/transfers/resume", "h_transfers_resume")
+_r("GET", r"/api/recall/status", "h_recall_status")
+_r("GET", r"/api/recall/policy", "h_recall_policy_get")
+_r("POST", r"/api/recall/policy", "h_recall_policy_set")
+_r("GET", r"/api/recall/resolve", "h_recall_resolve")
+_r("GET", r"/api/recall", "h_recall_query")
+_r("POST", r"/api/recall/escalate", "h_recall_escalate")
+_r("GET", r"/api/documents/status", "h_documents_status")
+_r("GET", r"/api/documents/kinds", "h_documents_kinds")
+_r("POST", r"/api/documents/extract", "h_documents_extract")
+_r("GET", r"/api/ask/status", "h_ask_status")
+_r("GET", r"/api/ask/pending", "h_ask_pending")
+_r("POST", r"/api/ask/answer", "h_ask_answer")
+_r("POST", r"/api/ask", "h_ask_create")
+_r("GET", r"/api/shares/status", "h_session_share_status")
+_r("GET", r"/api/sessions/shares", "h_session_shares_list")
+_r("POST", r"/api/sessions/shares/purge", "h_session_shares_purge")
+_r("DELETE", r"/api/sessions/shares/(?P<share_id>[^/]+)",
+   "h_session_share_revoke")
+_r("POST", r"/api/sessions/(?P<session_id>[^/]+)/share",
+   "h_session_share_publish")
+# Public, locally-served share view: authenticated by the SHARE token in the
+# query (constant-time checked in the module), NOT the dashboard token.
+_r("GET", r"/share/(?P<share_id>[^/]+)", "h_share_resolve")
+
+# Agent 5-10 capabilities served at the Qubit-owned /api/qubit/* front door.
+# These are NEVER proxied to the fork (qubit_asgi.QUBIT_OWNED_PREFIXES) and
+# every handler calls the SAME module the CLI (`qubit gateway`, `qubit
+# runtime`, `qubit egress`, `qubit policy`, `qubit usage`, `qubit receipts`,
+# `qubit logbook`, `qubit browser`, `qubit local-models`) and voice surfaces
+# call: same stores, same redaction, same read-only authority.
+_r("GET", r"/api/qubit/gateway/discovery", "h_qubit_gateway_discovery")
+_r("GET", r"/api/qubit/agents", "h_agents")
+_r("GET", r"/api/qubit/credentials/pool", "h_credentials_pool")
+_r("POST", r"/api/qubit/credentials/pool", "h_credentials_pool_add")
+_r("DELETE", r"/api/qubit/credentials/pool/(?P<provider>[^/]+)/(?P<index>[0-9]+)",
+   "h_credentials_pool_remove")
+_r("GET", r"/api/qubit/runtime/discovery", "h_qubit_runtime_discovery")
+_r("GET", r"/api/qubit/runtime/marketplace", "h_qubit_runtime_marketplace")
+_r("GET", r"/api/qubit/runtime/history", "h_qubit_runtime_history")
+_r("GET", r"/api/qubit/runtime/update-report", "h_qubit_runtime_update_report")
+_r("GET", r"/api/qubit/runtime/status", "h_qubit_runtime_status")
+_r("GET", r"/api/qubit/runtime/images", "h_qubit_runtime_images")
+_r("GET", r"/api/qubit/runtime/doctor", "h_qubit_runtime_doctor")
+_r("GET", r"/api/qubit/egress/status", "h_qubit_egress_status")
+_r("GET", r"/api/qubit/egress/providers", "h_qubit_egress_providers")
+_r("GET", r"/api/qubit/egress/check", "h_qubit_egress_check")
+_r("GET", r"/api/qubit/policy/conformance", "h_qubit_policy_conformance")
+_r("GET", r"/api/qubit/policy/attest", "h_qubit_policy_attest")
+_r("GET", r"/api/qubit/hooks/doctor", "h_qubit_hooks_doctor")
+_r("GET", r"/api/qubit/usage", "h_qubit_usage")
+_r("GET", r"/api/qubit/receipts", "h_qubit_receipts")
+_r("GET", r"/api/qubit/logbook", "h_qubit_logbook")
+_r("GET", r"/api/qubit/browser/profiles", "h_qubit_browser_profiles")
+# S8 — desktop/browser operation routes. Specific paths are literal so they
+# precede any broader parameterized row; every handler forwards to the one
+# operation-catalog id (shared broker/confirm/e-stop/audit).
+_r("GET", r"/api/qubit/desktop/ops", "h_op_computer_ops")
+_r("GET", r"/api/qubit/desktop/presentation", "h_op_computer_presentation_status")
+_r("POST", r"/api/qubit/desktop/launch", "h_op_computer_launch")
+_r("POST", r"/api/qubit/desktop/pip", "h_op_computer_pip")
+_r("POST", r"/api/qubit/desktop/present", "h_op_computer_present")
+_r("GET", r"/api/qubit/browser/favicon-cache", "h_op_browser_favicon_cache")
+_r("GET", r"/api/qubit/browser/favicon", "h_op_browser_favicon")
+_r("POST", r"/api/qubit/browser/download", "h_op_browser_download")
+_r("GET", r"/api/qubit/local-models/fallback", "h_qubit_local_models_fallback")
+# Update CHECK is a real read-only version probe (the SPA System page calls it
+# on mount); it answers the UpdateCheckResponse wire shape, not a blanket
+# refusal. The mutating `POST /api/qubit/update` is now a real, confirmed,
+# non-destructive handler (git pull --ff-only; dirty worktree refused). Both
+# precede the remaining GATED `GET /api/qubit/update.*` alias so the specific
+# rows win (audit A29 + objective C).
+_r("GET", r"/api/qubit/update/check", "h_qubit_update_check")
+_r("POST", r"/api/qubit/update", "h_qubit_update_apply")
+
+# Wave 2 conversions: previously-blanket mutating refusals now run the real
+# Qubit permission/confirmation/audit operation (same module/store as CLI and
+# voice). These precede the GATED table so the implemented handler matches.
+_r("POST", r"/api/gateway/start", "h_gateway_start")
+_r("POST", r"/api/gateway/stop", "h_gateway_stop")
+_r("POST", r"/api/gateway/restart", "h_gateway_restart")
+_r("POST", r"/api/providers/custom-endpoints", "h_custom_endpoints_write")
+_r("POST", r"/api/providers/custom-endpoints/(?P<id>[^/]+)/activate",
+   "h_custom_endpoints_activate")
+_r("DELETE", r"/api/providers/custom-endpoints/(?P<id>[^/]+)",
+   "h_custom_endpoints_delete")
+_r("PUT", r"/api/tools/terminal/backend", "h_terminal_backend_set")
+_r("POST", r"/api/tools/computer-use/permissions/grant", "h_computer_use_grant")
+_r("POST", r"/api/profiles/(?P<name>[^/]+)/export", "h_profile_export")
+
+# Wave 4 genuine gaps: the vendored portal read (de-branded at the Qubit
+# boundary) and the dashboard plugin asset route. `GET /api/portal` is added to
+# webui.QUBIT_READ_AUTHORITY so this compat handler answers instead of the fork
+# proxy (whose payload would carry the upstream portal host verbatim).
+_r("GET", r"/api/portal", "h_portal")
+_r("GET", r"/dashboard-plugins/(?P<plugin_name>[^/]+)/(?P<file_path>.+)",
+   "h_plugin_asset")
+
+# Wave 3: skills hub served from the Qubit-reviewed LOCAL catalog (remote
+# fetches refused). Specific routes precede the GATED hub wildcard so unknown
+# subpaths still fall through to the typed remote refusal.
+_r("GET", r"/api/skills/hub/official", "h_skills_hub_official")
+_r("GET", r"/api/skills/hub/sources", "h_skills_hub_sources")
+_r("GET", r"/api/skills/hub/search", "h_skills_hub_search")
+_r("GET", r"/api/skills/hub/preview", "h_skills_hub_preview")
+_r("GET", r"/api/skills/hub/scan", "h_skills_hub_scan")
+_r("POST", r"/api/skills/hub/install", "h_skills_hub_install")
+_r("POST", r"/api/skills/hub/uninstall", "h_skills_hub_uninstall")
+_r("POST", r"/api/skills/hub/update", "h_skills_hub_update")
+
+# Wave 3 real reads that must precede the parameterized GATED wildcards:
+# provider config (the memory-provider wildcard would otherwise shadow it) and
+# the toolset config/model matrix.
+_r("GET", r"/api/memory/providers/(?P<id>[^/]+)/config", "mem_config")
+_r("GET", r"/api/tools/toolsets/(?P<id>[^/]+)/config", "toolset_config")
+_r("GET", r"/api/tools/toolsets/(?P<id>[^/]+)/models", "toolset_models")
+# B-08D: the SPA's toolset env drawer (``{env, profile}``) and the Plugins page
+# context-engine control (``{context_engine}``) must reach a handler that
+# PERSISTS what they send. Without these rows the generic ``toolset_write``
+# wildcard below silently granted a generic permission and dropped the value.
+_r("PUT", r"/api/tools/toolsets/(?P<id>[^/]+)/env", "toolset_env_write")
+_r("PUT", r"/api/dashboard/plugin-providers", "plugin_providers_write")
+
+# Wave 4 real brokered writes (staged -> confirm -> apply): confined file
+# patches, brokered git-write authorizations, and blueprint instantiation.
+_r("POST", r"/api/fs/write-text", "h_fs_write_text")
+_r("POST", r"/api/files/upload", "h_files_upload")
+_r("POST", r"/api/files/upload-stream", "h_files_upload")
+_r("POST", r"/api/files/mkdir", "h_files_mkdir")
+_r("POST", r"/api/git/review/stage", "h_git_stage")
+_r("POST", r"/api/git/review/unstage", "h_git_unstage")
+_r("POST", r"/api/git/review/revert", "h_git_revert")
+_r("POST", r"/api/git/review/commit", "h_git_commit")
+_r("POST", r"/api/git/worktree/add", "h_git_worktree_add")
+_r("POST", r"/api/git/worktree/remove", "h_git_worktree_remove")
+_r("POST", r"/api/git/branch/switch", "h_git_branch_switch")
+_r("POST", r"/api/cron/blueprints/instantiate", "h_blueprint_instantiate")
+
+# Dashboard agent-plugin mutations: the specific typed routes precede the
+# blanket `/api/dashboard/agent-plugins/.*` remote gate below. INSTALL runs the
+# canonical `plugin_runtime.install` op (reviewed local manifests only; shared
+# confirmation journal + e-stop), and enable/disable run the real permission
+# toggle. `{name:path}` upstream ids are multi-segment, hence `.+`.
+_r("POST", r"/api/dashboard/agent-plugins/install", "h_agent_plugin_install")
+_r("POST", r"/api/dashboard/agent-plugins/(?P<id>.+)/enable", "agent_enable")
+_r("POST", r"/api/dashboard/agent-plugins/(?P<id>.+)/disable", "agent_disable")
+_r("POST", r"/api/dashboard/agent-plugins/(?P<id>.+)/update", "__gate__",
+   "gated", _GATE_SKILL_VERSIONED)
+
+GATED: List[Dict[str, Any]] = [
+    ("GET", r"/api/pty", _NO_PTY), ("POST", r"/api/pty", _NO_PTY),
+    ("GET", r"/api/ws", _g("WS_SINGLE_PATH",
+                           "The upstream tui_gateway WS dialect is not served; Qubit keeps "
+                           "one event path (SSE feed + ops). Chat uses Qubit Chat.",
+                           "GET /api/events (SSE) + POST /api/qubit/chat")),
+    ("POST", r"/api/auth/ws-ticket", _g("WS_SINGLE_PATH",
+                           "No WS tickets are minted; Qubit serves no WS gateway dialect. "
+                           "Loopback clients use the session token directly.",
+                           "GET /api/events (SSE) + POST /api/qubit/chat")),
+    ("GET", r"/api/console", _NO_CONSOLE),
+    ("POST", r"/api/gateway/migrate", _GATE_GATEWAY_MIGRATE),
+    ("GET", r"/api/config/raw", _NO_SECRET),
+    ("PUT", r"/api/config/raw", _NO_SECRET),
+    ("GET", r"/api/env/reveal", _NO_SECRET),
+    ("POST", r"/api/env/reveal", _NO_SECRET),
+    # The vendored credential-pool response carries token_preview fragments, so
+    # Qubit gates the GET as well as every mutation: secret material never
+    # reaches the browser. Operators manage credentials via `qubit auth`.
+    ("GET", r"/api/credentials/pool.*", _NO_SECRET),
+    ("POST", r"/api/credentials/pool.*", _NO_SECRET),
+    ("PUT", r"/api/credentials/pool.*", _NO_SECRET),
+    ("DELETE", r"/api/credentials/pool.*", _NO_SECRET),
+    ("POST", r"/api/chat/image-upload", _g("CHAT_IMAGE_OVERLAY",
+                                           "Built-in xterm chat image paste is superseded by "
+                                           "Qubit Chat attachments (vision_describe backend).",
+                                            "overlay Qubit Chat tab + `qubit vision describe`")),
+    # Public Qubit path + migration-only upstream-compat alias (allowed:
+    # migration/compatibility record; the public frontend uses /api/qubit/*).
+    # `POST /api/qubit/update` is a real handler (registered above); only the
+    # unknown `GET /api/qubit/update.*` subpaths fall through to this gate.
+    ("GET", r"/api/qubit/update.*", _NO_UPDATE),
+    # Upstream-compatible wire alias (migration/compatibility): old clients
+    # that call /api/hermes/update keep the typed operator-owned refusal; the
+    # product advertises only the Qubit path.
+    ("GET", r"/api/hermes/update.*", _NO_UPDATE),
+    ("POST", r"/api/hermes/update.*", _NO_UPDATE),
+
+    ("GET", r"/api/ssh/ownership", _g("SSH_OWNERSHIP_OPERATOR",
+        "Qubit owns the host shell surface; no remote SSH ownership nonce is "
+        "minted or served to the dashboard. Host control stays with the operator.",
+        "CLI `qubit setup health` + `qubit doctor` (local, operator-run)")),
+    # GET provider/OAuth metadata is served (redacted) by the Qubit compat
+    # handler. Registered in this authority table (as a real handler, the same
+    # pattern as ``/api/cron/blueprints``) so ``qubit_asgi.gated_path`` keeps
+    # the read on the Qubit path: the proxy-first path would return the fork's
+    # raw record (legacy portal host + a token fragment). POST (starting an
+    # OAuth flow) stays on the Qubit gate.
+    ("GET", r"/api/providers/oauth", "h_providers_oauth"),
+    ("POST", r"/api/providers/oauth.*", _NO_OAUTH),
+    # The reference's in-browser device-code poll has no Qubit construct: no
+    # live OAuth session is ever started, so there is nothing to poll. Typed
+    # manual-handoff refusal naming `qubit auth login` (not a bare 404).
+    ("GET", r"/api/providers/oauth/(?P<provider_id>[^/]+)/poll/(?P<session_id>[^/]+)",
+     _NO_OAUTH),
+    ("GET", r"/api/mcp/oauth/flows", _NO_OAUTH),
+    ("GET", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
+    # Curator pause/run are real implemented routes above; they are no longer
+    # gated here.
+    ("GET", r"/api/ops/backup/download", _g("BACKUP_PASSPHRASE",
+        "Backup bundles are passphrase-encrypted on creation and never stored "
+        "server-side; there is no archive to download. Create one with a "
+        "passphrase resupply at confirmation time.",
+        "dashboard /ops backup_create + CLI backup (passphrase resupply)")),
+    ("POST", r"/api/skills/hub/.*", _NO_REMOTE),
+    ("GET", r"/api/skills/hub/.*", _NO_REMOTE),
+    ("POST", r"/api/mcp/catalog/install", _NO_REMOTE),
+    ("POST", r"/api/dashboard/agent-plugins/.*", _NO_REMOTE),
+    ("GET", r"/api/dashboard/plugin-providers", _g("PLUGIN_PROVIDERS_QUBIT",
+        "Plugin providers resolve through the Qubit skill manifest registry.",
+        "GET /api/skills + CLI `qubit skills list`")),
+    ("GET", r"/api/cron/blueprints", "blueprints"),
+    ("GET", r"/api/cron/delivery-targets", "delivery"),
+    ("POST", r"/api/sessions/import", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/sessions/prune", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/sessions/bulk-delete", _GATE_SESSIONS_RECEIPT),
+    # ``DELETE /api/sessions/empty`` is the pinned bulk "delete every empty
+    # session" endpoint (backing ``api.deleteEmptySessions``), not a session
+    # named ``empty``. It must precede the generic id pattern or it is
+    # misrouted to the single-session delete. Qubit receipts are append-only,
+    # so the bulk sweep is the same typed gate as POST /api/sessions/bulk-delete.
+    ("DELETE", r"/api/sessions/empty", _GATE_SESSIONS_RECEIPT),
+    ("DELETE", r"/api/sessions/(?P<id>[^/]+)", "h_session_delete"),
+    ("PATCH", r"/api/sessions/(?P<id>[^/]+)", "h_session_patch"),
+    ("POST", r"/api/sessions/(?P<id>[^/]+)/resume", "h_session_resume"),
+    ("GET", r"/api/memory/reset", "mem_reset_status"),
+    ("POST", r"/api/memory/reset", "mem_reset"),
+    # Provider OAuth status is a credential surface (the fork polls a live
+    # OAuth flow). Qubit performs no live token dance, so it is a typed
+    # manual-handoff gate, not the local memory-provider stub. Specific route
+    # must precede the memory-providers wildcard so it is not captured by
+    # ``mem_prov``.
+    ("GET", r"/api/memory/providers/[^/]+/oauth/status", _NO_OAUTH),
+    ("GET", r"/api/memory/providers/.*", "mem_prov"),
+    ("GET", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
+        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
+        "CLI `qubit auth login` + msg account ops")),
+    ("DELETE", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
+        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
+        "CLI `qubit auth login` + msg account ops")),
+    ("POST", r"/api/messaging/.*/onboarding.*", _g("ONBOARDING_GUIDED",
+        "Channel onboarding runs as guided manual enrollment, not an automatic token flow.",
+        "CLI `qubit auth login` + msg account ops")),
+    ("POST", r"/api/messaging/platforms/(?P<id>[^/]+)/test", "h_msg_test_live"),
+    ("POST", r"/api/mcp/servers/(?P<name>[^/]+)/test", "h_mcp_test_local"),
+    ("PUT", r"/api/tools/toolsets/[^/]+/.+", "toolset_write"),
+    ("POST", r"/api/tools/toolsets/.*/post-setup", "toolset_write"),
+    ("PUT", r"/api/config", "config_save"),
+    # Agent-plugin install/enable/disable/update are registered above (ahead of
+    # the blanket remote gate) so the precise typed operation answers; only the
+    # DELETE remove route stays here (it is unshadowed and real).
+    ("DELETE", r"/api/dashboard/agent-plugins/(?P<id>.+)", "agent_remove"),
+    ("GET", r"/api/dashboard/plugins/hub", "plugins_hub"),
+    ("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", _GATE_OAUTH_DELETE),
+    ("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", _GATE_OAUTH_DELETE),
+    ("PUT", r"/api/env", "env_write"),
+    ("DELETE", r"/api/env", "env_delete"),
+    ("PUT", r"/api/memory/provider", "mem_provider_set"),
+    ("PUT", r"/api/memory/providers/(?P<id>[^/]+)/config", "mem_config_write"),
+    ("POST", r"/api/memory/providers/(?P<id>[^/]+)/setup", "mem_config_write"),
+    ("GET", r"/api/dashboard/plugins/rescan", "plugins_rescan"),
+    ("POST", r"/api/dashboard/plugins/(?P<id>.+)/visibility", "h_plugin_visibility_set"),
+    # debug-share and import-upload are registered above (ahead of the generic
+    # /api/ops/<name> dispatch) so their real op / typed gate answers.
+    ("POST", r"/api/ops/checkpoints/prune", _GATE_CKPT_PRUNE),
+    ("GET", r"/api/ops/checkpoints.*", "ckpt"),
+    ("GET", r"/api/actions/(?P<name>[^/]+)/status", "action_status"),
+    ("GET", r"/api/actions/.*", "actions_read"),
+    ("GET", r"/api/dashboard/font", "font"),
+    ("PUT", r"/api/dashboard/font", "font_set"),
+    # --- Packet 8U: Git writes + credentialed gh surfaces stay typed.
+    # Local review writes (stage/unstage/revert/commit/worktree/branch-switch)
+    # were converted to real brokered grants (Wave 4) and precede this table;
+    # network/gh verbs stay typed here.
+    ("GET", r"/api/git/gh-auth", _NO_GH_AUTH),
+    ("GET", r"/api/git/review/ship-info", _NO_GIT_SHIP),
+    ("POST", r"/api/git/review/pr-list", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/push", _NO_GIT_WRITE),
+    ("POST", r"/api/git/review/create-pr", _NO_GIT_WRITE),
+    # --- Packet 8U: Files/FS binary + writes stay typed ---
+    ("GET", r"/api/media", _NO_MEDIA),
+    ("GET", r"/api/files/download", _NO_BINARY),
+    ("GET", r"/api/files/stream", _NO_BINARY),
+    ("HEAD", r"/api/files/stream", _NO_BINARY),
+    ("GET", r"/api/fs/download", _NO_BINARY),
+    # --- Packet 8U: external catalog / desktop lease / WS stay typed ---
+    ("GET", r"/api/audio/elevenlabs/voices", _NO_AUDIO_EXTERNAL),
+    ("POST", r"/api/audio/tts-lease", _NO_AUDIO_LEASE),
+    ("GET", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
+    ("POST", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
+    # --- Packet 8U closure: provider/profile/tool/learning writes + the
+    # remaining wrong-verb gates (audit §1B). Specific paths precede any
+    # parameterized row so re.fullmatch resolves deterministically.
+    # custom-endpoints POST/activate/DELETE, terminal/backend, computer-use
+    # grant, and profile export were converted to real Qubit
+    # confirmation/audit operations (Wave 2) and now precede the GATED table.
+    ("POST", r"/api/providers/custom-endpoints/validate", _NO_NETWORK_PROBE),
+    ("POST", r"/api/providers/validate", _NO_NETWORK_PROBE),
+    ("POST", r"/api/profiles/import", _GATE_PROFILE_IMPORT),
+    ("POST", r"/api/profiles/[^/]+/open-terminal", _NO_PTY),
+    ("GET", r"/api/profiles/[^/]+/desktop-overlay", _GATE_DESKTOP_OVERLAY),
+    ("POST", r"/api/sessions/owner-backfill", _GATE_SESSIONS_RECEIPT),
+    ("POST", r"/api/cron/fire", _NO_CRON_FIRE),
+    ("POST", r"/api/profiles/sessions/pull-requests", _NO_PROFILE_PR),
+    ("POST", r"/api/memory/providers/[^/]+/oauth/start", _NO_OAUTH),
+    ("DELETE", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
+    ("GET", r"/api/mcp/oauth/callback.*", _NO_OAUTH),
+    # Vendored kanban dashboard plugin: reads are served by
+    # voicebridge/qubit_plugins.py; task mutations stay on the shared Qubit
+    # confirmation/broker path (`qubit kanban` + approvals) rather than the
+    # plugin's direct server-side writes.
+    ("POST", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+    ("PATCH", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+    ("DELETE", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+    # ``PUT /api/plugins/kanban/orchestration`` writes orchestration knobs to
+    # config.yaml (pinned plugin_api.py). It was previously unrouted and the
+    # active backend answered a bare 404; the dashboard plugin ``saveSettings``
+    # calls it. Same shared broker gate as every other kanban write.
+    ("PUT", r"/api/plugins/kanban/.*", _GATE_KANBAN_WRITE),
+]
+
+for _m, _p, _ginfo in GATED:
+    if isinstance(_ginfo, dict):
+        _r(_m, _p, "__gate__", "gated", _ginfo)
+    else:
+        _r(_m, _p, _ginfo, "implemented")
+
+
+def h_blueprints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    try:
+        jobs = S.list_jobs(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    names = sorted({str(j.get("name", "")) for j in jobs.get("jobs", [])} if isinstance(jobs, dict) else [])
+    return _ok(blueprints=[{"name": n, "kind": "schedule-template",
+                            "instantiate": "POST /api/cron/blueprints/instantiate (staged, confirmed)"}
+                           for n in names])
+
+
+def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import messaging as M
+    try:
+        res = M.account_list(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(delivery_targets=res)
+
+
+def h_sess_empty(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Real read: receipts whose detail is empty (no recorded activity)."""
+    res = _receipt_session_store(cfg).list(100)
+    empty = [r for r in res.get("sessions", []) if not (r.get("detail") or "").strip()]
+    return _ok(count=len(empty),
+               sessions=[{"id": r.get("receipt_id") or r.get("action_id"),
+                          "created_at": r.get("created_at")} for r in empty],
+               store_authority=RECEIPT_SESSION_AUTHORITY)
+
+
+def h_mem_reset_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/memory/reset -> read-only status (never stages a mutation).
+
+    A GET must not stage a destructive confirmation: the dashboard may probe
+    the endpoint to render state, and a 409 NEEDS_CONFIRMATION on a read was a
+    dead read surface. The destructive path stays on POST (``h_mem_reset``).
+    """
+    return _ok(ok=True, targets=["all", "memory", "user"],
+               destructive=True, confirm_required=True,
+               detail="POST /api/memory/reset with {\"confirm\": true} to "
+                      "reset; GET is a read-only status",
+               qubit_counterpart="CLI `qubit memory workspace forget <name>`")
+
+
+def h_mem_reset(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/memory/reset -> real reset of Qubit-owned local memory.
+
+    Upstream resets the built-in MEMORY.md/USER.md files. Qubit's memory
+    authority is the local semantic store (``memory.db``) plus the markdown
+    memory workspace, so the reset maps onto the canonical Qubit forget ops:
+
+    * ``target=memory`` — tombstone every active record in the local memory
+      store (the MEMORY.md analog);
+    * ``target=user``   — forget every note in the markdown memory workspace
+      (the USER.md analog);
+    * ``target=all``    — both.
+
+    Confirmed through the one shared journal, e-stop-gated, audited, and it
+    returns the real deleted identifiers (an honest empty list when there was
+    nothing to delete — never a fabricated success).
+    """
+    target = str(b.get("target", "") or "").strip().lower() or "all"
+    if target not in ("all", "memory", "user"):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "memory reset target must be all|memory|user"}
+    gate = _compat_confirm(
+        cfg, "memory.reset",
+        f"memory reset is destructive ({target}): re-POST with "
+        "{\"confirm\": true} or settle the staged approval",
+        query=q, body=b, payload={"target": target})
+    if gate is not None:
+        return gate
+    deleted: List[str] = []
+    try:
+        if target in ("memory", "all"):
+            deleted += _reset_active_memories(cfg)
+        if target in ("user", "all"):
+            deleted += _reset_workspace_notes(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("memory_reset", "dashboard:user",
+           {"target": target, "deleted": len(deleted)})
+    return _ok(ok=True, target=target, deleted=deleted, count=len(deleted),
+               qubit_counterpart="CLI `qubit memory workspace forget <name>`")
+
+
+def h_mem_provider(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/memory/providers/<name> -> live local provider status.
+
+    ``qubit-local`` is the only provider; the response reads the real local
+    active-memory store state (never a static shape), and any other name is an
+    honest typed 404 -- no cloud provider can be selected.
+    """
+    name = str(p.get("id", p.get("name", "")) or "")
+    if name and name != "qubit-local":
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no memory provider {name!r}",
+                     "qubit_counterpart": "CLI `qubit memory` (same local store)"}
+    from . import active_memory as AM
+    try:
+        status = AM.status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    state = str(status.get("state", "OK") or "OK")
+    return _ok(provider="qubit-local", active="qubit-local",
+               tiers=["core", "working", "recall", "archive"],
+               state=state,
+               enabled=bool(status.get("enabled", True)),
+               store_state=status.get("store_state"),
+               detail="local-only SQLite/FTS5 MemoryStore; cloud sync refused "
+                      "by policy")
+
+
+def h_msg_test_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/messaging/platforms/{platform_id}/test -> real link state.
+
+    Runs the same ``messaging.link`` credential/transport probe the CLI and
+    dashboard platform list use: it reports LINKED / DEGRADED /
+    NO_CREDENTIAL / UNAVAILABLE from the vault reference and transport
+    availability. It never sends a message and never opens a provider socket.
+    """
+    from . import messaging as M
+    platform_id = str(p.get("id", p.get("platform_id", "")) or "")
+    if not platform_id:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "platform_id required",
+                     "qubit_counterpart": "CLI `qubit msg accounts`"}
+    try:
+        linked = M.link(cfg, platform_id)
+    except Exception as exc:
+        return _fail(exc)
+    state = str(linked.get("state", "UNAVAILABLE") or "UNAVAILABLE")
+    reachable = state in ("LINKED", "DEGRADED")
+    return _ok(ok=True, platform=platform_id, state=state.lower(),
+               reachable=reachable, link=linked,
+               error_code=linked.get("code"),
+               detail="credential/transport link state; no message sent")
+
+
+def h_toolset_toggle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/tools/toolsets/{name} -> persisted enable/disable contract.
+
+    The SPA toggle body is ``{enabled, profile}`` (the name is in the path), so
+    the previous handler read an empty name and answered ``MALFORMED``. Here the
+    path id is authoritative and the mutation runs through
+    ``voicebridge.toolsets`` -- the same shared-journal contract the CLI/voice
+    use -- returning a populated ``confirmation_id`` on the 409 and consuming it
+    exactly once on settle. A body without ``enabled`` (the legacy config-grant
+    shape) falls through to :func:`h_toolset_write` unchanged.
+    """
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    enabled = b.get("enabled")
+    if enabled is None:
+        return h_toolset_write(cfg, q, b, p)
+    from . import toolsets as TS
+    cid = str(b.get("confirmation_id", "")
+              or q.get("confirmation_id", "") or "")
+    out = TS.handle_toolset_mutation(
+        cfg, name, _truthy(enabled), confirmation_id=cid,
+        actor="dashboard:user", session="dashboard")
+    if out.get("state") == "needs-confirm" and _truthy(b.get("confirm")):
+        # Backward-compatible boolean settle: stage then immediately consume the
+        # real id (idempotent, single-use, audited).
+        out = TS.settle_toolset_mutation(cfg, out["confirmation_id"],
+                                         actor="dashboard:user",
+                                         session="dashboard")
+    return _mutation_envelope(out)
+
+
+def h_toolset_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT/POST toolset config -> real confirm-gated capability grant.
+
+    A toolset's env/model/provider change is a capability-scoped permission
+    write. It records a real grant (``toolset.<name>``) in the same
+    ``PermissionsStore`` the CLI/voice use, with backup + audit, and returns
+    409 until confirmed. It never writes a secret value.
+    """
+    from .permissions import permissions_store
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "toolset name required"}
+    detail = (f"toolset {name!r} config change requires explicit confirmation: "
+              "re-POST with {\"confirm\": true}")
+    guard = _compat_confirm(cfg, f"toolset.{name}", detail, q, b)
+    if guard is not None:
+        return guard
+    scope = str(b.get("scope", "toolset") or "toolset")
+    try:
+        grant = permissions_store(cfg).grant(
+            f"toolset.{name}", requested_by="dashboard:user", confirmed=True,
+            scopes=(scope,),
+            note="dashboard toolset config " + ", ".join(
+                sorted(k for k in b if k not in ("confirm", "name")))[:120])
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, name=name, grant_id=grant.id, scope=scope,
+               qubit_counterpart="CLI `qubit permissions` + dashboard "
+                                 "Settings (classic)")
+
+
+# Qubit Labs auth + Tool Gateway routing status. The vendored handler
+# (``qubit_runtime/qubit_cli/web_routers/status.py::get_portal_status``) serves a
+# snapshot that authors the upstream portal host (its hardcoded
+# ``subscription_url`` is ``https://portal.nousresearch.com/manage-subscription``
+# and the auth snapshot's ``portal_url``/``inference_url`` are the same host).
+# BRAND.md requires zero legacy brand on a served product surface, so the compat
+# handler serves the same real snapshot with any legacy-host URL scrubbed at the
+# Qubit boundary. If Qubit Labs later gets its own portal host, the owner sets
+# it here instead of the empty value.
+_LEGACY_PORTAL_HOST = "nousresearch.com"
+
+
+def _scrub_portal_urls(value: Any) -> Any:
+    """Recursively blank any string URL that names the upstream portal host."""
+    if isinstance(value, dict):
+        return {k: _scrub_portal_urls(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_scrub_portal_urls(v) for v in value]
+    if isinstance(value, str) and _LEGACY_PORTAL_HOST in value.lower():
+        return ""
+    return value
+
+
+def h_portal(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/portal -> the vendored Qubit Labs routing snapshot, de-branded."""
+    try:
+        from qubit_cli.web_routers.status import _get_portal_status_sync
+        payload = _get_portal_status_sync()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**_scrub_portal_urls(payload or {}))
+
+
+# W13 P0 route parity handlers. Redaction policy for the OAuth read: the
+# vendored status card embeds ``token_preview`` (a token fragment); Qubit never
+# serves secret material, so every provider record is passed through
+# ``_strip_secret_fields``. The denylist is exact key names (NOT a substring
+# match) so non-secret booleans like ``has_refresh_token`` survive.
+_PROVIDER_SECRET_KEYS = frozenset({
+    "token", "token_preview", "access_token", "refresh_token", "id_token",
+    "api_key", "apikey", "secret", "client_secret", "password",
+    "private_key", "credential", "credentials",
+})
+
+
+def _strip_secret_fields(obj: Any) -> Any:
+    """Recursively drop secret-shaped keys; values never leave the vault."""
+    if isinstance(obj, dict):
+        return {k: _strip_secret_fields(v) for k, v in obj.items()
+                if str(k).lower() not in _PROVIDER_SECRET_KEYS}
+    if isinstance(obj, list):
+        return [_strip_secret_fields(x) for x in obj]
+    return obj
+
+
+def _vendored_runtime(cfg: Any) -> None:
+    """Put the vendored fork on ``sys.path`` and bind the Qubit home."""
+    from . import qubit_runtime
+    qubit_runtime.ensure_path()
+    try:
+        qubit_runtime.use_qubit_home(cfg)
+    except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
+        pass
+
+
+def h_gateway_migrate_plan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/gateway/migrate/plan -> real read-only multiplex preflight.
+
+    Mirrors reference ``web_routers/actions.py:147`` (same JSON as the CLI
+    plan). Builds the vendored ``MigrationPlan`` and returns its
+    ``to_dict()``; performs no mutation. The companion
+    ``POST /api/gateway/migrate`` remains an operator-owned typed refusal.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.gateway_migrate import build_migration_plan  # type: ignore
+        plan = build_migration_plan()
+        out = plan.to_dict()
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**out)
+
+
+def h_host_identity(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/host/identity -> this process owns the port (reference status.py:122).
+
+    The whole ``/agent`` compat surface is behind the webui session-token gate
+    (``webui._qubit_api`` -> ``_qubit_token_ok``), which is the same one gate the
+    reference applies per-route. ``servesSpa`` is true: this listener serves the
+    Qubit dashboard SPA.
+    """
+    return _ok(protocolVersion=1, pid=os.getpid(), role="serve", servesSpa=True)
+
+
+def h_providers_oauth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/providers/oauth -> the redacted OAuth provider catalog.
+
+    Reference shape (``web_routers/oauth.py`` GET handler), with secrets
+    stripped: ``_strip_secret_fields`` removes ``token_preview`` and every other
+    token/secret-shaped key from each provider record (and nested status).
+    Returns ``{providers: [...]}``; the SPA Accounts page consumes it.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.web_routers import oauth as _oauth  # type: ignore
+        providers: List[Dict[str, Any]] = []
+        for rec in _oauth._build_oauth_catalog():
+            status = _oauth._resolve_provider_status(rec["id"],
+                                                     rec.get("status_fn"))
+            disconnect_hint = _oauth._oauth_provider_disconnect_hint(rec, status)
+            providers.append({
+                "id": rec["id"], "name": rec["name"], "flow": rec["flow"],
+                "cli_command": _oauth._external_process_cli_command(
+                    rec["id"], rec.get("cli_command", "")),
+                "docs_url": rec.get("docs_url", ""),
+                "disconnect_hint": disconnect_hint,
+                "disconnect_command": _oauth._oauth_provider_disconnect_command(rec),
+                "disconnectable": disconnect_hint is None,
+                "status": status,
+            })
+    except Exception as exc:
+        return _fail(exc)
+    # Secrets first (never leave the vault), then the established brand
+    # boundary: any legacy-host URL is blanked, matching ``h_portal``.
+    return _ok(providers=_scrub_portal_urls(_strip_secret_fields(providers)))
+
+
+# Dashboard plugin assets (upstream ``GET /dashboard-plugins/<name>/<path>``).
+# The vendored handler
+# (``qubit_runtime/qubit_cli/web_routers/dashboard_ui.py::serve_plugin_asset``)
+# serves a discovered plugin's ``dashboard/`` directory behind an activation
+# gate, ``resolve().is_relative_to()`` confinement, and a browser-asset suffix
+# allowlist (a plugin's ``.py`` backend never leaves the box). Qubit's SPA serves
+# overlay bundles from the same path; this resolver adds the vendored
+# user/bundled plugin dirs on ONE resolution shared by the ``/agent`` compat
+# route and the raw browser path (``webui._serve_qubit_plugin``).
+def resolve_plugin_asset(plugin_name: str, file_path: str
+                         ) -> Tuple[int, str, Optional[bytes], Dict[str, Any]]:
+    """Resolve one dashboard plugin asset: real bytes, or a typed miss."""
+    from qubit_cli.web_server import _get_dashboard_plugins
+    from qubit_cli.web_routers.dashboard_ui import (
+        _PLUGIN_ASSET_CONTENT_TYPES, _plugin_activated, _plugin_enable_sets)
+
+    name = str(plugin_name or "").strip()
+    plugin = next((p for p in _get_dashboard_plugins()
+                   if p.get("name") == name), None)
+    if not plugin or not _plugin_activated(plugin, *_plugin_enable_sets()):
+        return 404, "application/json", None, {
+            "ok": False, "code": "PLUGIN_NOT_FOUND",
+            "detail": f"dashboard plugin {name!r} is not installed or not enabled",
+            "qubit_counterpart": "CLI `qubit plugins list|enable <name>`"}
+    base = Path(plugin["_dir"])
+    target = (base / str(file_path or "")).resolve()
+    if not target.is_relative_to(base.resolve()):
+        return 403, "application/json", None, {
+            "ok": False, "code": "PLUGIN_PATH_BLOCKED",
+            "detail": "path traversal blocked",
+            "qubit_counterpart": "CLI `qubit plugins list`"}
+    media_type = _PLUGIN_ASSET_CONTENT_TYPES.get(target.suffix.lower())
+    if media_type is None or not target.is_file():
+        return 404, "application/json", None, {
+            "ok": False, "code": "PLUGIN_ASSET_NOT_FOUND",
+            "detail": f"{file_path!r} is not a servable asset of {name!r}",
+            "qubit_counterpart": "CLI `qubit plugins list`"}
+    try:
+        body = target.read_bytes()
+    except OSError as exc:
+        return 404, "application/json", None, {
+            "ok": False, "code": "PLUGIN_ASSET_NOT_FOUND",
+            "detail": _redact(str(exc))[:200],
+            "qubit_counterpart": "CLI `qubit plugins list`"}
+    return 200, media_type, body, {"name": name, "path": str(file_path or ""),
+                                   "content_type": media_type}
+
+
+def h_plugin_asset(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /dashboard-plugins/<plugin>/<path> -> real plugin asset bytes.
+
+    The compat dispatcher is JSON, so the bytes ride base64-encoded with the real
+    content type (the same envelope the kanban attachment read uses). Browsers
+    load the raw asset from the shared ``resolve_plugin_asset`` resolution via
+    ``webui._serve_qubit_plugin``.
+    """
+    status, ctype, body, meta = resolve_plugin_asset(
+        str(p.get("plugin_name", "") or ""), str(p.get("file_path", "") or ""))
+    if body is None:
+        return status, meta
+    return _ok(**meta, size=len(body),
+               data_base64=base64.b64encode(body).decode("ascii"))
+
+
+def h_plugins_rescan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    manifests = _overlay_manifests()
+    return _ok(rescanned=True, count=len(manifests), plugins=[m["name"] for m in manifests])
+
+
+def h_plugin_visibility(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/dashboard/plugins/{name}/visibility -> real persisted toggle.
+
+    The per-user hidden set is persisted in ``<state_dir>/qubit_hidden.json``
+    (the same store ``plugins_hub`` reads) with an atomic write + audit, so a
+    hidden overlay plugin stays hidden across dashboard reloads.
+    """
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "plugin name required",
+                     "qubit_counterpart": "CLI `qubit plugins`"}
+    hidden = _hidden_set(cfg)
+    # B-08: the dashboard API sends ``{hidden: bool}`` (setPluginVisibility),
+    # while an older caller may send ``{visible: bool}``. Honour ``hidden`` when
+    # present; a bare ``visible`` is the inverse. Reading only ``visible`` made
+    # the "hide" control a silent no-op that always re-showed the plugin.
+    if "hidden" in b:
+        want_hidden = bool(b.get("hidden"))
+    else:
+        want_hidden = not bool(b.get("visible", True))
+    if want_hidden:
+        hidden.add(name)
+    else:
+        hidden.discard(name)
+    try:
+        _hidden_save(cfg, hidden)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("plugin_visibility", "dashboard:user",
+           {"name": name, "visible": name not in hidden})
+    return _ok(name=name, visible=name not in hidden,
+               hidden=sorted(hidden),
+               detail="persisted per-user visibility")
+
+
+def h_debug_share(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "diagnostics", {}, actor="dashboard:user", session="dashboard")
+    # B-08/B-14: the SPA reads ``urls``/``redacted``/``auto_delete_seconds``/
+    # ``failures``. Qubit never uploads to an external share service, so the
+    # response is honest: the redacted bundle plus an empty share set, not a
+    # missing shape that throws client-side.
+    return _ok(bundle=_res(out), urls={}, failures=[],
+               redacted=bool(b.get("redact", True)), auto_delete_seconds=0,
+               external_share=False,
+               detail="redacted diagnostic bundle (never secrets); external "
+                      "share is disabled by Qubit policy — no URL is created")
+
+
+def h_hooks(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as H
+    try:
+        res = H.list_hooks(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    recs = res.get("hooks", []) if isinstance(res, dict) else []
+    entries = []
+    for r in recs if isinstance(recs, list) else []:
+        if not isinstance(r, dict):
+            continue
+        entries.append({
+            "event": str(r.get("event", "")),
+            "matcher": str(r.get("name", "")),
+            "command": None,
+            "timeout": None,
+            "allowed": str(r.get("status", "")) == "active",
+            "approved_at": None,
+            "executable": False,
+        })
+    # HooksResponse wire shape; shells never execute (broker-audited
+    # delivery only), so command stays null by policy.
+    return _ok(hooks=entries, valid_events=["*"])
+
+
+def h_hooks_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as H
+    event = str(b.get("event", "") or "")
+    shell = str(b.get("command", b.get("shell", "")) or "")
+    name = str(b.get("name", "") or "")
+    if not event:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "hook event required"}
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; mutation refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    approved = (_truthy(b.get("confirm")) or _truthy(b.get("approved"))
+                or _truthy(b.get("approve")) or _truthy(q.get("confirm")))
+    if not approved:
+        # Stage a real, settleable journal confirmation instead of a bare
+        # boolean refusal; the pending-approvals banner can execute it.
+        gate = _compat_confirm(
+            cfg, "hooks.declare",
+            "hook declare (shell stored disabled, never runs) requires "
+            "explicit confirmation",
+            query=q, body=b,
+            payload={"name": name, "event": event, "command": shell})
+        if gate is not None:
+            return gate
+    if not name:
+        name = re.sub(r"[^a-z0-9]+", "-", event.lower()).strip("-")[:40] or "hook"
+    try:
+        res = H.declare(cfg, name, event, shell,
+                        requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    hook = res.get("hook", {}) if isinstance(res, dict) else {}
+    return _ok(ok=True, event=str(hook.get("event", event)),
+               command="", approved=False)
+
+
+def h_ckpt(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "checkpoints_list", {}, actor="dashboard:user",
+                     session="dashboard")
+    res = _res(out) or {}
+    recs = res.get("checkpoints", []) if isinstance(res, dict) else []
+    sessions = []
+    total = 0
+    for r in recs if isinstance(recs, list) else []:
+        if not isinstance(r, dict):
+            continue
+        size = int(r.get("bytes", r.get("size", 0)) or 0)
+        total += size
+        sessions.append({"session": str(r.get("name", r.get("session", ""))),
+                         "files": int(r.get("files", 0) or 0), "bytes": size})
+    # CheckpointsResponse wire shape.
+    return _ok(sessions=sessions, total_bytes=total)
+
+
+def h_actions_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import dashboard_ops as OPS
+    out = OPS.run_op(cfg, "actions_list", {"limit": 50},
+                     actor="dashboard:user", session="dashboard")
+    return _ok(actions=_res(out), state=out.get("state"))
+
+
+# --------------------------------------------------------------------------
+# Action-status registry (upstream action-log viewer parity)
+# --------------------------------------------------------------------------
+# The vendored dashboard's action-log viewer polls
+# ``GET /api/actions/<name>/status`` while a spawned admin action runs. Qubit
+# executes its admin operations synchronously on the one broker, so there is
+# no long-lived child process to supervise; this records the real terminal
+# outcome of each named action and serves the truthful status. A name with no
+# recorded outcome is a typed ACTION_NOT_TRACKED refusal, never a fabricated
+# "running" or success state.
+_ACTION_STATUS: Dict[str, Dict[str, Any]] = {}
+_ACTION_STATUS_CAP = 64
+_ACTION_TERMINAL_STATES = ("executed", "failed", "blocked", "cancelled",
+                           "rejected")
+
+# Process-supervision/update actions the dashboard polls by name. They are
+# triggered by their own dedicated endpoints (``POST /api/gateway/*``,
+# ``POST /api/qubit/update``) rather than the ops registry, and a gateway
+# restart replaces the dashboard process, so the in-memory registry is
+# legitimately empty afterwards. The vendored status endpoint 404s only an
+# *unknown* action and answers the real wire shape for every known one
+# (``qubit_runtime/qubit_cli/web_routers/actions.py::get_action_status`` over
+# ``web_server_gateway._ACTION_LOG_FILES``); these names are that known set,
+# so an unrecorded poll must return the honest not-running payload (N8) — never
+# a bare 404 the UI treats as a transient fetch error and polls forever.
+_SUPERVISION_ACTION_NAMES = frozenset({
+    "gateway-restart", "gateway-start", "gateway-stop", "qubit-update",
+})
+
+
+def record_action_status(name: str, out: Dict[str, Any]) -> None:
+    """Record the real terminal outcome of one named dashboard action."""
+    name = str(name or "").strip()
+    state = str((out or {}).get("state") or "")
+    if not name or state not in _ACTION_TERMINAL_STATES:
+        return
+    lines: List[str] = []
+    detail = _redact(str(out.get("speech") or out.get("detail") or ""))
+    if detail:
+        lines.append(detail)
+    code = out.get("code")
+    if code:
+        lines.append(f"code: {code}")
+    result = out.get("result")
+    if result is not None:
+        try:
+            lines.append(json.dumps(result, indent=2, sort_keys=True)[:8000])
+        except (TypeError, ValueError):
+            lines.append(str(result)[:8000])
+    _ACTION_STATUS[name] = {
+        "name": name, "running": False,
+        "exit_code": 0 if state == "executed" else 1,
+        "pid": None, "state": state, "code": code, "lines": lines,
+    }
+    while len(_ACTION_STATUS) > _ACTION_STATUS_CAP:
+        _ACTION_STATUS.pop(next(iter(_ACTION_STATUS)))
+
+
+def h_action_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/actions/<name>/status -> the recorded real outcome."""
+    name = str(p.get("name", "") or "").strip()
+    if not name:
+        return _gate("ACTION_NAME_REQUIRED", "an action name is required",
+                     "run the action from /system or /operations", 400)
+    rec = _ACTION_STATUS.get(name)
+    if rec is None:
+        if name in _SUPERVISION_ACTION_NAMES:
+            # Known action, no recorded outcome in *this* process: a gateway
+            # restart replaces the dashboard process, so the new listener has
+            # an empty registry. Report the upstream not-running shape (the UI
+            # polls it) instead of the untracked-name 404.
+            return _ok(name=name, running=False, exit_code=None, pid=None,
+                       state="unknown", lines=[],
+                       detail="no outcome recorded in this process; a gateway "
+                              "restart replaces the dashboard process")
+        return _gate(
+            "ACTION_NOT_TRACKED",
+            f"no action named {name!r} has run on this listener",
+            "run the action from /system, /operations, or `qubit ops run`",
+            404)
+    return _ok(**rec)
+
+
+def _prefs_path(cfg: Any) -> Path:
+    # Canonical Qubit store (the write target).
+    return _store_path(cfg, "qubit_dashboard_prefs.json")
+
+
+def _prefs_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name until the next save.
+    return _migrated_read_path(cfg, "qubit_dashboard_prefs.json",
+                               "hermes_dashboard_prefs.json")
+
+
+def _prefs(cfg: Any) -> Dict[str, Any]:
+    return _load_json_store(_prefs_read_path(cfg))
+
+
+def h_font(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str], setter: bool = False) -> Tuple[int, Dict[str, Any]]:
+    """GET/PUT /api/dashboard/font -> real persisted dashboard font pref."""
+    prefs = _prefs(cfg)
+    if setter:
+        font = str(b.get("font", "system") or "system").strip() or "system"
+        prefs["font"] = font
+        try:
+            _save_json_store(_prefs_path(cfg), prefs)
+        except Exception as exc:
+            return _fail(exc)
+        _audit("dashboard_font", "dashboard:user", {"font": font})
+        return _ok(font=font, persisted=True)
+    return _ok(font=str(prefs.get("font", "system") or "system"))
+
+
+def h_plugins(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Any]:
+    # Wire shape is a bare manifest array (api.getPlugins: PluginManifestResponse[]).
+    return 200, _overlay_manifests()
+
+
+def h_themes(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    out = themes_response(cfg)
+    active = str(_prefs(cfg).get("theme", "") or "").strip()
+    if active and any(t.get("name") == active for t in out.get("themes", [])):
+        out["active"] = active
+    return _ok(**out)
+
+
+def h_theme_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/dashboard/theme -> real persisted theme selection."""
+    name = str(b.get("theme", "qubit") or "qubit").strip() or "qubit"
+    available = {t.get("name") for t in themes_response(cfg).get("themes", [])}
+    if name not in available:
+        return _ok(ok=True, theme="qubit", persisted=False,
+                   detail=f"only the Qubit theme ships in this packet; "
+                          f"{name!r} is not installed (session keeps qubit)")
+    prefs = _prefs(cfg)
+    prefs["theme"] = name
+    try:
+        _save_json_store(_prefs_path(cfg), prefs)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("dashboard_theme", "dashboard:user", {"theme": name})
+    return _ok(ok=True, theme=name, persisted=True)
+
+
+def h_theme_get(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/dashboard/theme -> current persisted theme (read-only).
+
+    Method-symmetric counterpart to ``PUT /api/dashboard/theme``: the PUT
+    persists a selection, the GET reports it with no side effect. A stored
+    selection is reported only while it is still installed; otherwise the
+    shipped theme is the active one (mirrors ``h_themes``).
+    """
+    out = themes_response(cfg)
+    available = {t.get("name") for t in out.get("themes", [])}
+    stored = str(_prefs(cfg).get("theme", "") or "").strip()
+    theme = stored if stored in available else str(out.get("active", "") or "")
+    return _ok(ok=True, theme=theme, persisted=stored in available)
+
+
+def _need_confirm(action: str) -> Tuple[int, Dict[str, Any]]:
+    return _staged(f"{action} requires explicit confirmation: re-POST "
+                   "with {\"confirm\": true}", "")
+
+
+def _persona_path(cfg: Any) -> Path:
+    # Canonical Qubit persona store (the write target).
+    return _store_path(cfg, "qubit_persona.json")
+
+
+def _persona_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name until the next save.
+    return _migrated_read_path(cfg, "qubit_persona.json",
+                               "hermes_persona.json")
+
+
+def _persona_active(cfg: Any) -> str:
+    try:
+        raw = json.loads(_persona_read_path(cfg).read_text())
+        return str(raw.get("active", "") or "")
+    except (OSError, ValueError):
+        return ""
+
+
+def _persona_save(cfg: Any, name: str) -> None:
+    _persona_path(cfg).write_text(json.dumps({"active": name}))
+
+
+def _hidden_path(cfg: Any) -> Path:
+    # Canonical Qubit store (the write target).
+    return _store_path(cfg, "qubit_hidden.json")
+
+
+def _hidden_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name until the next save.
+    return _migrated_read_path(cfg, "qubit_hidden.json", "hermes_hidden.json")
+
+
+def _hidden_set(cfg: Any) -> set:
+    try:
+        raw = json.loads(_hidden_read_path(cfg).read_text())
+        return set(raw.get("hidden", []) or [])
+    except (OSError, ValueError):
+        return set()
+
+
+def _hidden_save(cfg: Any, hidden: set) -> None:
+    _hidden_path(cfg).write_text(json.dumps({"hidden": sorted(hidden)}))
+
+
+def h_profiles_active(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_profiles(cfg, q, b, {**p, "kind": "active"})
+
+
+def profiles_active_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    name = str(b.get("active", b.get("name", "")) or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "active profile name required"}
+    try:
+        _persona_save(cfg, name)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, active=name)
+
+
+def _profile_field_value(b: Dict[str, Any], key: str) -> Any:
+    """Extract the submitted value for *key* from the SPA body.
+
+    The editor posts the value under the field's own name (``description``,
+    ``model``, ``soul``) or a generic ``value``/``content``; reading only the
+    generic keys silently wrote an empty string while echoing the request's
+    value back as success (the fabricated ``ollama-local`` bug).
+    """
+    for candidate in (key, "value", "content", "text"):
+        if candidate in b and b[candidate] is not None:
+            return b[candidate]
+    return ""
+
+
+def _profile_field(cfg: Any, b: Dict[str, Any], p: Dict[str, str],
+                   key: str) -> Tuple[int, Dict[str, Any]]:
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    value = _profile_field_value(b, key)
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
+    if not b.get("confirm"):
+        return _need_confirm(f"profile {key} update")
+    try:
+        res = B.profile_set(cfg, name, key, str(value or ""),
+                            requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, field=res.get("field", {}))
+
+
+def profile_soul_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _profile_field(cfg, b, p, "soul")
+
+
+def profile_desc(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _profile_field(cfg, b, p, "description")
+
+
+def profile_model(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/profiles/{name}/model -> persist provider + model, return stored.
+
+    The editor submits ``{provider, model, confirm}``. Both fields are written
+    into the principal's profile and the response echoes the STORED values
+    (never a hardcoded ``ollama-local``/request echo).
+    """
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "profile name required"}
+    model = str(b.get("model", b.get("value", "")) or "")
+    provider = str(b.get("provider", "") or "")
+    if not model:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "model required"}
+    if not b.get("confirm"):
+        return _need_confirm("profile model update")
+    stored: Dict[str, Any] = {}
+    try:
+        B.profile_set(cfg, name, "model", model,
+                      requested_by="dashboard:user", confirmed=True)
+        # model/provider are not secret-class: echo the values just persisted
+        # (the write succeeded), never a masked placeholder or a hardcoded
+        # ``ollama-local``.
+        stored["model"] = model
+        if provider:
+            B.profile_set(cfg, name, "provider", provider,
+                          requested_by="dashboard:user", confirmed=True)
+            stored["provider"] = provider
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, model=stored.get("model", model),
+               provider=stored.get("provider", provider))
+
+
+def profile_describe_auto(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("DESCRIBE_AUTO_MANUAL",
+                 "Model-generated profile copy is not offered; write the "
+                 "description explicitly so it stays reviewable.",
+                 "PUT /api/profiles/{name}/description with {\"confirm\": true}")
+
+
+def profile_rename(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("PERSONA_IMMUTABLE_ID",
+                 "Persona identities are immutable once created (memory "
+                 "provenance keys on them); create a new principal instead.",
+                 "CLI `qubit brain principal-add` (same Brain store)", 501)
+
+
+def profile_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/profiles/{name} -> remove the principal record it claims to.
+
+    ``brain.profile_forget`` only clears a principal's scoped profile fields;
+    the principal row survives and its name stays occupied (a re-create then
+    400s ``BRAIN_EXISTS``). A dashboard delete must remove the record the list
+    showed, so the principal is removed from the same store and the removal is
+    audited. The profile-field forget runs first (idempotent, audited).
+    """
+    from . import brain as B
+    name = str(p.get("name", "") or "")
+    if not b.get("confirm"):
+        return _need_confirm("profile delete")
+    try:
+        res = B.profile_forget(cfg, name, requested_by="dashboard:user",
+                               confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    try:
+        state = B._load(cfg)
+        pid = B._check_id(name, "principal")
+        B._get_principal(state, pid)
+        state["principals"].pop(pid, None)
+        B._save(cfg, state)
+        B._audit("principal.remove", "dashboard:user", {"principal": pid})
+    except B.BrainError as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    except Exception as exc:
+        return _fail(exc)
+    return 200, {"ok": True, "removed": True,
+                 "forgotten_profiles": (res or {}).get("forgotten_profiles", [])}
+
+
+_SCHEDULE_SHORTHAND = re.compile(
+    r"^\s*every\s+(\d+)\s*([mhd])\s*$", re.IGNORECASE)
+
+
+def _normalize_schedule_expr(when: str) -> str:
+    """Accept the SPA's ``every 30m``/``2h``/``1d`` shorthand.
+
+    The canonical parser (and every CLI/voice path) speaks ``every 30 minutes``
+    etc.; the dashboard editor sends the compact form, so normalize it at this
+    single ingress rather than rejecting a valid user intent.
+    """
+    m = _SCHEDULE_SHORTHAND.match(when or "")
+    if not m:
+        return when
+    unit = {"m": "minutes", "h": "hours", "d": "days"}[m.group(2).lower()]
+    return f"every {m.group(1)} {unit}"
+
+
+def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    name = str(b.get("name", "") or "")
+    task_text = str(b.get("prompt", b.get("task_text", "")) or "")
+    when = str(b.get("when", "") or "")
+    if isinstance(b.get("schedule"), dict):
+        when = str(b["schedule"].get("expr", "") or when)
+    elif isinstance(b.get("schedule"), str) and not when:
+        # The SPA editor sends ``schedule`` as a plain string ("every 30m").
+        when = str(b["schedule"] or "")
+    if not when and isinstance(b.get("repeat"), dict):
+        when = str(b["repeat"].get("expr", "") or "")
+    when = _normalize_schedule_expr(when)
+    detail = ("schedule create (unattended work) requires explicit "
+              "confirmation: re-POST with {\"confirm\": true}")
+    guard = _compat_confirm(cfg, "cron.create", detail, q, b)
+    if guard is not None:
+        return guard
+    try:
+        res = S.create(cfg, name, task_text, when,
+                       requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    job = res.get("job", {}) if isinstance(res, dict) else {}
+    return 200, _cron_shape(job if isinstance(job, dict) else {})
+
+
+def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/cron/jobs/{job_id} -> real enabled-state transition.
+
+    The only in-place schedule mutation Qubit offers is enable/disable (pause
+    or resume); task text/schedule are immutable (delete + recreate retains
+    run history). Without ``confirm`` the write stages a typed 409 on the
+    shared journal; with it the same ``schedules`` store the CLI/voice use
+    performs the transition and records an audit receipt.
+    """
+    from . import schedules as S
+    try:
+        job_id = int(p.get("id", "0"))
+    except (TypeError, ValueError):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "schedule id must be numeric"}
+    enabled = b.get("enabled")
+    if enabled is None:
+        return _gate("CRON_UPDATE_IMMUTABLE",
+                     "Task text and schedule timing are immutable in place; "
+                     "disable, delete, and recreate to change them.",
+                     "DELETE then POST /api/cron/jobs (same schedules store)")
+    enabled = bool(enabled)
+    detail = (f"schedule {'resume' if enabled else 'pause'} requires explicit "
+              "confirmation: re-POST with {\"confirm\": true}")
+    guard = _compat_confirm(cfg, "cron.update", detail, q, b)
+    if guard is not None:
+        return guard
+    try:
+        # Pause == not enabled. The confirm was already settled above, so pass
+        # it through to the single-store setter (avoids a second confirm).
+        res = S.set_paused(cfg, job_id, not enabled,
+                           requested_by="dashboard:user",
+                           confirmed=True, body=b, query=q)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    ok = not (isinstance(res, dict) and res.get("ok") is False)
+    return (200 if ok else 400), {"ok": ok, "result": res,
+                                  "enabled": enabled,
+                                  "qubit_counterpart":
+                                  "CLI `qubit schedules pause|resume`"}
+
+
+def cron_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import schedules as S
+    detail = ("schedule delete requires explicit confirmation: re-POST with "
+              "{\"confirm\": true}")
+    # Read the confirm/id from BOTH the parsed body and the query string, so
+    # ``DELETE .../1?confirm=true`` and ``DELETE .../1 {"confirm": true}`` both
+    # settle (previously only a body was read and it was never parsed).
+    guard = _compat_confirm(cfg, "cron.delete", detail, q, b)
+    if guard is not None:
+        return guard
+    try:
+        S.delete(cfg, int(p.get("id", "0")), requested_by="dashboard:user",
+                 confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True)
+
+
+def skill_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/skills -> create a skill through the real skill-manager path.
+
+    Ported from the upstream reference ``create_skill``: the SPA editor payload
+    (``{manifest: {skill_id/name, instructions/content, category}}``) is
+    created via the fork's ``_create_skill`` (frontmatter validation, atomic
+    write, security scan, prompt-cache clear) under the Qubit-owned home.
+    Confirm-gated on the shared journal (``_compat_confirm``: staged 409 with
+    a real id, or settle via ``confirm: true`` re-issue) and audited. The
+    manifest-install lane (``verified_skills.mutations``, SPDX license gate)
+    is untouched — this is the editor-create lane.
+    """
+    from . import skill_catalog
+
+    man = b.get("manifest")
+    src: Dict[str, Any] = man if isinstance(man, dict) else b
+    name = str(src.get("skill_id", "") or src.get("name", "") or "").strip()
+    content = src.get("instructions", src.get("content", ""))
+    if not isinstance(content, str):
+        content = ""
+    category = str(src.get("category", "") or "").strip() or None
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "skill name required"}
+    guard = _compat_confirm(
+        cfg, "skills_create",
+        f"creating skill {name!r} requires explicit confirmation: "
+        "re-POST with {\"confirm\": true}", q, b,
+        payload={"skill_id": name})
+    if guard is not None:
+        return guard
+    try:
+        out = skill_catalog.create_skill_file(
+            cfg, name, content, category, requested_by="dashboard:user")
+    except Exception as exc:
+        return _skill_authority_error(exc)
+    return _ok(ok=True, success=True, skill_id=name,
+               message=str(out.get("message", "")),
+               path=str(out.get("skill_md", out.get("path", ""))),
+               qubit_counterpart="CLI `qubit skills show` (same on-disk skill)")
+
+
+def skill_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/skills/content -> replace a skill's SKILL.md (full rewrite).
+
+    Ported from the upstream reference ``update_skill_content``: the editor payload
+    (``{name, content}``) is applied via the fork's ``_edit_skill``
+    (frontmatter/size validation, guarded atomic write, security scan,
+    prompt-cache clear) under the Qubit-owned home — the supplied content is
+    actually persisted, not dropped. Confirm-gated on the shared journal and
+    audited; 404 only when the skill resolves in neither authority.
+    """
+    from . import skill_catalog
+
+    name = str(p.get("id", "") or b.get("skill_id", b.get("name", "")) or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "skill name required"}
+    content = b.get("content", "")
+    if not isinstance(content, str):
+        content = ""
+    guard = _compat_confirm(
+        cfg, "skills_update",
+        f"rewriting skill {name!r} requires explicit confirmation: "
+        "re-POST with {\"confirm\": true}", q, b,
+        payload={"skill_id": name})
+    if guard is not None:
+        return guard
+    try:
+        out = skill_catalog.edit_skill_file(
+            cfg, name, content, requested_by="dashboard:user")
+    except Exception as exc:
+        return _skill_authority_error(exc)
+    return _ok(ok=True, success=True, skill_id=name,
+               message=str(out.get("message", "")),
+               path=str(out.get("path", "")),
+               qubit_counterpart="CLI `qubit skills show` (same on-disk skill)")
+
+
+def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/skills -> delete an on-disk skill (confirm-gated).
+
+    Ported from the fork's ``_delete_skill`` (curator archive guards and
+    pinned-skill guards preserved). A permissioned-manifest-only skill (no
+    on-disk file) is removed from the permissioned store instead. Confirm-
+    gated on the shared journal and audited.
+    """
+    from . import skill_catalog
+    from .permissions import permissions_store
+
+    name = str(q.get("name", "") or b.get("name", b.get("skill_id", "")) or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "skill name required"}
+    guard = _compat_confirm(
+        cfg, "skills_delete",
+        f"deleting skill {name!r} requires explicit confirmation: "
+        "re-DELETE with {\"confirm\": true}", q, b,
+        payload={"skill_id": name})
+    if guard is not None:
+        return guard
+    try:
+        if skill_catalog.find_skill_path(cfg, name) is not None:
+            out = skill_catalog.delete_skill_file(
+                cfg, name, requested_by="dashboard:user")
+            return _ok(ok=True, success=True, skill_id=name,
+                       message=str(out.get("message", "")),
+                       qubit_counterpart="CLI `qubit skills` (same on-disk skill)")
+        store = permissions_store(cfg)
+        rec = store.skill(name)
+        if rec is None:
+            return 404, {"ok": False, "code": "NOT_FOUND",
+                         "detail": f"no skill {name!r}"}
+        removed = store.remove_skill(name, requested_by="dashboard:user",
+                                     confirmed=True)
+        return _ok(ok=True, success=True, skill_id=removed.skill_id,
+                   message=f"Skill {name!r} removed from the permissioned store.",
+                   qubit_counterpart="CLI `qubit skills remove`")
+    except Exception as exc:
+        return _skill_authority_error(exc)
+
+
+def moa_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _gate("MOA_SUPERSEDED",
+                 "MoA fan-out presets are not executed by Qubit; the ordered "
+                 "provider fallback gateway (8Q) is the counterpart.",
+                 "Models page provider/fallback display + 8Q gateway", 501)
+
+
+def _mcp_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    code = getattr(exc, "code", None) or type(exc).__name__
+    detail = getattr(exc, "detail", None) or str(exc)
+    if code == "MCP_NOT_FOUND":
+        return 404, {"ok": False, "code": code, "detail": _redact(str(detail))[:300]}
+    if code in ("MCP_BAD_INPUT", "MCP_STORE_CORRUPT"):
+        return 400, {"ok": False, "code": code, "detail": _redact(str(detail))[:300]}
+    if code == "SECRET_WRITE_REFUSED":
+        return _gate(code, str(detail)[:300],
+                     "CLI `qubit auth login` (references only)")
+    return 400, {"ok": False, "code": code,
+                 "detail": _redact(str(detail))[:300]}
+
+
+_MCP_CAP_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}$")
+_MCP_MAX_CAPABILITIES = 64
+
+
+def _mcp_capabilities_from_body(b: Dict[str, Any]) -> Optional[List[str]]:
+    """Validated tool allowlist from the SPA body (``capabilities``).
+
+    The canonical store gates client invocation on a non-empty allowlist, so a
+    create/update that drops ``capabilities`` makes the server permanently
+    un-invocable with no surface to declare its tools. Validate here (bounded
+    count, tool-name shape) and return ``None`` when the body omitted it so an
+    update never wipes an existing allowlist.
+    """
+    from . import mcp_servers as MS
+    raw = b.get("capabilities", b.get("allowed_tools"))
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, (list, tuple)):
+        raise MS.McpServerError("MCP_BAD_INPUT",
+                                "capabilities must be a list of tool names")
+    clean: List[str] = []
+    for item in list(raw)[:_MCP_MAX_CAPABILITIES]:
+        name = str(item or "").strip()
+        if not name or not _MCP_CAP_RE.match(name):
+            raise MS.McpServerError(
+                "MCP_BAD_INPUT",
+                "capabilities entries must be tool names matching "
+                "^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,127}$")
+        clean.append(name)
+    return clean
+
+
+def _mcp_fields_from_body(b: Dict[str, Any]) -> Dict[str, Any]:
+    allowed = ("transport", "auth", "auth_type", "command", "args", "url",
+               "env", "enabled")
+    fields = {k: b[k] for k in allowed if k in b}
+    caps = _mcp_capabilities_from_body(b)
+    if caps is not None:
+        fields["capabilities"] = caps
+    return fields
+
+
+def _mcp_current_enabled(cfg: Any, name: str) -> Optional[bool]:
+    """The enabled flag currently stored for ``name`` (None if not registered).
+
+    ``mcp_servers.upsert`` re-validates the merged record through
+    ``_validate``, which never re-emits ``enabled``; reading the stored flag
+    lets an edit preserve it instead of silently disabling the server.
+    """
+    from . import mcp_servers as MS
+    try:
+        for row in MS.list_servers(cfg).get("servers", []):
+            if str(row.get("name")) == name:
+                return bool(row.get("enabled"))
+    except Exception:
+        pass
+    return None
+
+
+def mcp_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/servers -> register an MCP server (confirm-gated).
+
+    B-H1: a real, persisted registry operation on the canonical Qubit store.
+    No server is mounted, spawned, or contacted; credentials are references
+    only.
+    """
+    from . import mcp_servers as MS
+    name = str(b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "server name required"}
+    guard = _compat_confirm(
+        cfg, "mcp_server_create",
+        f"registering MCP server {name!r} requires explicit confirmation: "
+        "re-POST with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    existing_enabled = _mcp_current_enabled(cfg, name)
+    try:
+        fields = _mcp_fields_from_body(b)
+        if "enabled" in fields:
+            desired_enabled = _truthy(fields.pop("enabled"))
+        elif existing_enabled is not None:
+            desired_enabled = existing_enabled
+        else:
+            desired_enabled = False
+        out = MS.upsert(cfg, name, fields, confirmed=True)
+        # ``upsert`` merges then validates; ``_validate`` drops ``enabled``, so
+        # re-apply the intended flag (create-with-enabled must persist and an
+        # edit must preserve an enabled server's state).
+        if bool(out["server"].get("enabled")) != desired_enabled:
+            out = MS.set_enabled(cfg, name, desired_enabled)
+    except Exception as exc:
+        return _mcp_error(exc)
+    _audit("mcp_server_create", "dashboard:user", {"name": name,
+                                                  "enabled": desired_enabled})
+    return _ok(ok=True, server=out["server"],
+               qubit_counterpart="CLI `qubit mcp servers`")
+
+
+def mcp_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/mcp/servers -> upsert a registered server (confirm-gated)."""
+    return mcp_create(cfg, q, b, p)
+
+
+def mcp_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/mcp/servers/{id} -> remove a registered server."""
+    from . import mcp_servers as MS
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "server name required"}
+    guard = _compat_confirm(
+        cfg, "mcp_server_delete",
+        f"removing MCP server {name!r} requires explicit confirmation: "
+        "re-DELETE with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        out = MS.delete(cfg, name)
+    except Exception as exc:
+        return _mcp_error(exc)
+    _audit("mcp_server_delete", "dashboard:user", {"name": name,
+                                                   "removed": out["removed"]})
+    return _ok(ok=True, name=out["name"], removed=out["removed"],
+               qubit_counterpart="CLI `qubit mcp servers`")
+
+
+def mcp_set_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT/POST /api/mcp/servers/{id}/enabled -> persist the enabled flag."""
+    from . import mcp_servers as MS
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "server name required"}
+    enabled = _truthy(b.get("enabled"))
+    guard = _compat_confirm(
+        cfg, "mcp_server_enabled",
+        f"changing MCP server {name!r} enabled state requires explicit "
+        "confirmation: re-send with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        out = MS.set_enabled(cfg, name, enabled)
+    except Exception as exc:
+        return _mcp_error(exc)
+    _audit("mcp_server_enabled", "dashboard:user",
+           {"name": name, "enabled": enabled})
+    return _ok(ok=True, server=out["server"], name=out["server"]["name"],
+               enabled=out["server"]["enabled"],
+               qubit_counterpart="CLI `qubit mcp servers`")
+
+
+def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/servers/{id}/auth -> record a credential reference."""
+    from . import mcp_servers as MS
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MCP_BAD_INPUT",
+                     "detail": "server name required"}
+    ref = str(b.get("reference", b.get("token", b.get("value", ""))) or "")
+    if not ref:
+        return _gate("OAUTH_MANUAL_HANDOFF",
+                     "No live MCP OAuth flow is performed; pass a "
+                     "vault:/env:/file: credential reference instead.",
+                     "CLI `qubit auth login` + `qubit mcp servers`")
+    guard = _compat_confirm(
+        cfg, "mcp_server_auth",
+        f"recording a credential reference for {name!r} requires explicit "
+        "confirmation: re-POST with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        out = MS.set_auth_ref(cfg, name, ref)
+    except Exception as exc:
+        return _mcp_error(exc)
+    _audit("mcp_server_auth", "dashboard:user", {"name": name})
+    return _ok(ok=True, name=out["name"], reference=out["reference"],
+               qubit_counterpart="CLI `qubit auth login` (references only)")
+
+
+def mcp_auth_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/servers/{id}/auth -> reference presence, never a secret."""
+    from . import mcp_servers as MS
+    name = str(p.get("id", "") or "")
+    row = next((s for s in MS.list_servers(cfg)["servers"]
+                if s.get("name") == name), None)
+    if row is None:
+        return 404, {"ok": False, "code": "MCP_NOT_FOUND",
+                     "detail": f"no registered server {name!r}"}
+    ref = (row.get("env") or {}).get("MCP_AUTH", "")
+    return _ok(ok=True, name=name, auth=row.get("auth", "none"),
+               reference_set=bool(ref), reference=ref or None)
+
+
+def webhooks_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/webhooks/enable -> confirmed, audited store-wide toggle."""
+    from . import webhooks as W
+    guard = _compat_confirm(
+        cfg, "webhook_enable",
+        "toggling webhook delivery requires explicit confirmation: "
+        "re-POST with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        res = W.set_enabled(cfg, bool(b.get("enabled", True)),
+                            requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, platform="webhook", enabled=bool(res.get("enabled")),
+               needs_restart=False)
+
+
+def webhooks_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/webhooks/{id}/enabled -> confirmed, audited sub toggle."""
+    from . import webhooks as W
+    sub_id = str(p.get("id", "") or b.get("id", "") or "")
+    guard = _compat_confirm(
+        cfg, "webhook_enabled",
+        f"toggling webhook subscription {_redact(sub_id)!r} requires explicit "
+        "confirmation: re-send with {\"confirm\": true}", q, b,
+        payload={"id": sub_id})
+    if guard is not None:
+        return guard
+    try:
+        res = W.set_sub_enabled(cfg, sub_id,
+                                bool(b.get("enabled", True)),
+                                requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, name=str(res.get("id", "")),
+               enabled=bool(res.get("enabled")))
+
+
+def webhooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/webhooks/{id} -> confirmed, audited subscription removal.
+
+    Uses the shared ``_compat_confirm`` contract: an unconfirmed request stages
+    a typed 409 carrying a REAL single-use ``confirmation_id`` on the shared
+    approvals journal (so the pending-approvals banner can settle it too), and
+    the same request re-issued with ``confirm``/``confirmation_id`` executes
+    the removal. A bodyless DELETE settles via the query form.
+    """
+    from . import webhooks as W
+    sub_id = str(p.get("id", "") or b.get("id", "") or "")
+    guard = _compat_confirm(
+        cfg, "webhook_delete",
+        f"deleting webhook subscription {_redact(sub_id)!r} requires explicit "
+        "confirmation: re-DELETE with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    try:
+        W.remove(cfg, sub_id, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _webhook_error(exc)
+    return _ok(ok=True, name=sub_id)
+
+
+def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/messaging/platforms/{id} -> confirmed account toggle.
+
+    The canonical Qubit channel model is the account registry
+    (``voicebridge.messaging``): a platform is enabled by enabling its account.
+    The id from the SPA is the platform/account id. Without a matching account
+    the toggle is a typed ``MSG_NOT_FOUND`` naming the CLI that registers one —
+    never a fabricated enable.
+    """
+    from . import messaging as M
+    aid = str(p.get("id", "") or "")
+    guard = _compat_confirm(
+        cfg, "messaging_account_update",
+        f"changing messaging channel {aid!r} requires explicit confirmation: "
+        "re-PUT with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    # B-08: the dashboard channel form posts credentials in ``env`` (and
+    # ``clear_env``). The canonical account store never holds credential
+    # material and has no env-write path, so silently dropping them would be a
+    # fake "saved" success. Return a typed refusal instead.
+    if b.get("env") or b.get("clear_env"):
+        return _gate(
+            "CHANNEL_ENV_REFERENCE_ONLY",
+            "Channel credentials are secret references and are not written by "
+            "the dashboard account form; configure the channel's env reference "
+            "through the Qubit credential store.",
+            "CLI `qubit messaging accounts` / `qubit auth login` (reference-only)")
+    try:
+        M.account_update(cfg, aid,
+                         label=str(b.get("label", b.get("name", "")) or ""),
+                         enabled=b.get("enabled") if "enabled" in b else None,
+                         requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        if code == "MSG_NOT_FOUND":
+            return 404, {
+                "ok": False, "code": "MSG_NOT_FOUND",
+                "detail": _redact(str(exc))[:300],
+                "qubit_counterpart": "CLI `qubit messaging accounts` "
+                                     "(register the channel account/credential "
+                                     "reference first; the dashboard toggle "
+                                     "enables a registered account)"}
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True, platform=aid,
+               qubit_counterpart="CLI `qubit messaging accounts`")
+
+
+def h_analytics_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_analytics(cfg, q, b, {**p, "kind": "models"})
+
+
+def h_files_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return h_files(cfg, q, b, {**p, "kind": "read"})
+
+
+def files_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/files -> confined, brokered, REVERSIBLE delete.
+
+    The delete is archived (never destroyed) under the state store and is
+    recoverable with ``file_patch.restore_deleted``. It runs the SAME
+    ``file_patch`` confinement/gate/audit path as the CLI through the canonical
+    broker: a mutation requires the durable ``confirmation_id`` the SPA settles
+    (or a re-issued ``confirmation_id`` query), and an out-of-root/absolute/
+    traversal path is a typed refusal, never a host delete. The absolute path
+    is never accepted from the client — it is resolved against the approved
+    project roots.
+    """
+    from . import file_patch as FP
+    counterpart = ("CLI `qubit files delete` / `qubit patch rollback` + "
+                   "dashboard /files")
+    path = str(b.get("path", q.get("path", "")) or "").strip()
+    if not path:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "path required",
+                     "qubit_counterpart": counterpart}
+    recursive = _truthy(b.get("recursive", q.get("recursive")))
+    try:
+        target = FP.resolve_target(cfg, path, allow_directory=True)
+    except FP.FilePatchError as exc:
+        return _file_patch_refusal(
+            exc.code, exc.detail, counterpart,
+            rollback="nothing deleted; target unchanged")
+    args = {"target_path": path, "requested_by": "dashboard:user",
+            "project_root": "", "recursive": bool(recursive)}
+    resp, receipt = _brokered_file_mutation(
+        cfg, FP.delete_capability_name(), args, q=q, b=b, target=str(target),
+        detail=(f"deleting {path!r} archives it under the Qubit state store "
+                "(reversible) and requires confirmation; re-DELETE with the "
+                "confirmation_id to apply"),
+        counterpart=counterpart)
+    if resp is not None:
+        return resp
+    _audit("files.delete", "dashboard:user", {"path": str(target),
+                                              "recursive": bool(recursive)})
+    return _ok(ok=True, path=str(target), deleted=True,
+               state=receipt.get("state"), receipt=receipt,
+               qubit_counterpart="CLI `qubit files restore` (undo available)")
+
+
+def hooks_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as H
+    name = str(b.get("name", "") or "")
+    if not name and (b.get("event") or b.get("command")):
+        try:
+            recs = H.list_hooks(cfg).get("hooks", [])
+            for r in recs if isinstance(recs, list) else []:
+                if not isinstance(r, dict):
+                    continue
+                if r.get("event") == b.get("event"):
+                    name = str(r.get("name", ""))
+                    break
+        except Exception:
+            name = ""
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "hook name (or matching event) required"}
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; mutation refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    if not _truthy(b.get("confirm")):
+        gate = _compat_confirm(cfg, "hooks.remove", "hook delete",
+                               query=q, body=b, payload={"name": name})
+        if gate is not None:
+            return gate
+    try:
+        H.remove(cfg, name, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    return _ok(ok=True)
+
+
+def h_hooks_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/ops/hooks -> real hook update (re-declare under a new name).
+
+    The canonical hooks registry has no in-place edit: a declaration is
+    immutable once written, so an update is remove-then-declare through the
+    same confirmed, audited ops. The new declaration is validated BEFORE the
+    old one is removed, so a bad payload leaves the registry unchanged.
+    """
+    from . import hooks as H
+    old = str(b.get("name", "") or "")
+    event = str(b.get("event", "") or "")
+    shell = str(b.get("command", b.get("shell", "")) or "")
+    new_name = str(b.get("new_name", "") or "") or old
+    if not old or not event:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "hook update needs 'name' and 'event'"}
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; mutation refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing changed; nothing to roll back"}
+    approved = (_truthy(b.get("confirm")) or _truthy(b.get("approved"))
+                or _truthy(b.get("approve")) or _truthy(q.get("confirm")))
+    if not approved:
+        gate = _compat_confirm(
+            cfg, "hooks.update",
+            "hook update (shell stored disabled, never runs) requires "
+            "explicit confirmation",
+            query=q, body=b,
+            payload={"name": old, "event": event, "command": shell,
+                     "new_name": new_name})
+        if gate is not None:
+            return gate
+    # Validate the replacement under a temporary name first (declare rejects
+    # duplicates), then swap: remove the old name, declare the new one.
+    try:
+        existing = {str(r.get("name", "")) for r in
+                    H.list_hooks(cfg).get("hooks", []) if isinstance(r, dict)}
+    except Exception:
+        existing = set()
+    if old not in existing:
+        return 404, {"ok": False, "code": "HOOK_NOT_FOUND",
+                     "detail": f"no hook {old!r}"}
+    if new_name != old and new_name in existing:
+        return 400, {"ok": False, "code": "HOOK_EXISTS",
+                     "detail": f"hook {new_name!r} already exists"}
+    temp = new_name if new_name != old else f"{old}-tmp"
+    if temp in existing:
+        temp = f"{temp}-upd"
+    try:
+        H.declare(cfg, temp, event, shell, requested_by="dashboard:user",
+                  confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300]}
+    H.remove(cfg, old, requested_by="dashboard:user", confirmed=True)
+    if temp != new_name:
+        H.remove(cfg, temp, requested_by="dashboard:user", confirmed=True)
+        res = H.declare(cfg, new_name, event, shell,
+                        requested_by="dashboard:user", confirmed=True)
+        hook = res.get("hook", {}) if isinstance(res, dict) else {}
+    else:
+        hook = {"name": new_name, "event": event}
+    _audit("hook_update", "dashboard:user", {"from": old, "to": new_name})
+    return _ok(ok=True, event=str(hook.get("event", event)),
+               name=str(hook.get("name", new_name)), command="",
+               approved=False)
+
+
+def _agent_row(skill_id: str, manifest: Dict[str, Any], status: str,
+               hidden: set) -> Dict[str, Any]:
+    return {
+        "name": skill_id,
+        "version": str(manifest.get("version", "0.0.0") or "0.0.0"),
+        "description": str(manifest.get("description", "") or ""),
+        "source": str(manifest.get("source", "qubit-local") or "qubit-local"),
+        "runtime_status": ("enabled" if status == "enabled" else
+                           "disabled" if status in ("staged", "disabled") else
+                           "inactive"),
+        "has_dashboard_manifest": False,
+        "dashboard_manifest": None,
+        "path": "",
+        "can_remove": True,
+        "can_update_git": False,
+        "auth_required": False,
+        "auth_command": "",
+        "user_hidden": skill_id in hidden,
+    }
+
+
+def plugins_hub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Unified plugin hub: vendored agent discovery + Qubit overlays.
+
+    Built on the vendored ``_merged_plugins_hub`` — the same discovery the
+    reference dashboard uses — so the real agent plugin fleet, its activation
+    state, the vendored memory providers, and the vendored dashboard
+    extensions are all surfaced (D-3/D-5/D-6). Qubit's own overlay plugins and
+    permission-store grants are merged additively; the overlay set is reported
+    as dashboard-only extensions. ``user_hidden`` resolves through Qubit's own
+    visibility store so the eye toggle persists.
+    """
+    from .permissions import permissions_store
+    from . import plugin_runtime as PR
+
+    hidden = _hidden_set(cfg)
+    overlay_names = {m["name"] for m in _overlay_manifests()}
+    hub_error = ""
+    try:
+        from qubit_cli.web_server_dashboard import _merged_plugins_hub
+        base = _jsonable(_merged_plugins_hub())
+    except Exception as exc:
+        base = {"plugins": [], "orphan_dashboard_plugins": [],
+                "providers": {}}
+        hub_error = _redact(str(exc))[:200]
+
+    rows = list(base.get("plugins", []) or [])
+    seen = {str(r.get("name", "")) for r in rows}
+    for r in rows:
+        r["user_hidden"] = str(r.get("name", "")) in hidden
+
+    # Additive: Qubit permission-store grants that are not already a discovered
+    # plugin. Overlay extensions are reported under orphan_dashboard_plugins.
+    try:
+        recs = permissions_store(cfg).skills()
+    except Exception:
+        recs = []
+    for rec in recs:
+        d = rec.to_dict() if hasattr(rec, "to_dict") else {}
+        sid = str(d.get("skill_id", "") or "")
+        if not sid or sid in seen or sid in overlay_names:
+            continue
+        man = d.get("manifest", {}) if isinstance(d, dict) else {}
+        if not isinstance(man, dict):
+            man = {}
+        rows.append(_agent_row(sid, man, str(d.get("status", "")), hidden))
+        seen.add(sid)
+
+    orphans = list(base.get("orphan_dashboard_plugins", []) or [])
+    orphan_names = {str(o.get("name", "")) for o in orphans}
+    for m in _overlay_manifests():
+        if m["name"] in orphan_names:
+            continue
+        orphans.append({
+            "name": m["name"], "label": m["label"],
+            "description": m["description"], "icon": m.get("icon", ""),
+            "version": m["version"], "tab": m["tab"], "entry": m["entry"],
+            "css": m.get("css"), "has_api": m.get("has_api", False),
+            "source": m.get("source", "qubit-overlay"),
+        })
+        orphan_names.add(m["name"])
+
+    # The plugin-runtime catalog (canonical installable rows) is the same
+    # registry the CLI/voice install path writes; the dashboard renders its
+    # INSTALL controls from these rows (A27/S9).
+    try:
+        runtime_catalog = PR.plugin_catalog(cfg)
+    except Exception as exc:
+        runtime_catalog = {"state": "UNAVAILABLE",
+                           "code": PR.UNAVAILABLE_CODE,
+                           "detail": _redact(str(exc))[:240], "plugins": []}
+
+    providers = base.get("providers") or {}
+    out = _ok(plugins=rows, orphan_dashboard_plugins=orphans,
+              catalog=runtime_catalog.get("plugins", []),
+              install_capability=runtime_catalog.get(
+                  "install_capability", PR.INSTALL_CAPABILITY),
+              catalog_state=runtime_catalog.get("state", "OK"),
+              catalog_remote=runtime_catalog.get("remote", {}),
+              providers=providers)
+    if hub_error:
+        out[1]["hub_error"] = hub_error
+    return out
+
+
+def plugins_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/dashboard/plugins/catalog -> the real local loadable catalog.
+
+    Every entry has a real manifest + loader + provenance. The upstream remote
+    curated index is exposed only as a typed ``BLOCKED_REMOTE_PLUGIN`` refusal
+    naming the prerequisite; it is never fetched.
+    """
+    from . import plugin_catalog as PC
+    try:
+        out = PC.local_catalog(
+            cfg,
+            query=str(q.get("q", "") or ""),
+            source=str(q.get("source", "") or ""),
+            installed_only=_truthy(q.get("installed", "")),
+            enabled_only=_truthy(q.get("enabled", "")),
+            loadable_only=not _truthy(q.get("all", "")))
+    except Exception as exc:
+        return _fail(exc)
+    return 200, out
+
+
+def plugin_catalog_detail(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/dashboard/plugins/catalog/<id> -> provenance + validation."""
+    from . import plugin_catalog as PC
+    try:
+        out = PC.plugin_detail(cfg, str(p.get("id", "") or ""))
+    except Exception as exc:
+        return _fail(exc)
+    if not out.get("ok"):
+        return 404, out
+    return 200, out
+
+
+def plugins_reload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/dashboard/plugins/reload -> re-read the plugin store/catalog.
+
+    Re-reads the persisted plugin store + reviewed catalog and re-imports every
+    enabled directory plugin, then invalidates the vendored hub cache. A real
+    local counterpart to the reference's ``plugins.reload`` lifecycle op; the
+    e-stop is checked first inside ``plugin_runtime.reload``.
+    """
+    from . import plugin_runtime as PR
+    if not b.get("confirm"):
+        return _need_confirm("plugin reload")
+    try:
+        out = PR.reload(cfg)
+    except PR.PluginRuntimeError as exc:
+        http = 403 if exc.code in (PR.ESTOP_CODE, PR.REFUSED_CODE) else 400
+        _audit("plugin_reload_refused", "dashboard:user",
+               {"code": exc.code})
+        return http, {"ok": False, "code": exc.code,
+                      "detail": _redact(exc.detail)[:300],
+                      "qubit_counterpart": "CLI `qubit plugins reload`"}
+    try:
+        from qubit_cli.web_server_dashboard import _invalidate_plugins_hub_cache
+        _invalidate_plugins_hub_cache()
+    except Exception:
+        pass
+    _audit("plugin_reload", "dashboard:user",
+           {"reloaded": out.get("reloaded_plugins", []),
+            "errors": len(out.get("errors", []) or [])})
+    payload = {k: v for k, v in out.items() if k not in ("state",)}
+    return _ok(**payload)
+
+
+def _plugin_toggle_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    """Map a plugin/permission error to a typed code (never the class name)."""
+    code = getattr(exc, "code", None)
+    text = str(exc)
+    if code is None:
+        if "unknown skill" in text or "no plugin" in text:
+            code = "PLUGIN_NOT_FOUND"
+        elif "not installed or bundled" in text:
+            code = "PLUGIN_NOT_FOUND"
+        else:
+            code = "PLUGIN_REFUSED"
+    http = 404 if code == "PLUGIN_NOT_FOUND" else 400
+    return http, {"ok": False, "code": code,
+                  "detail": _redact(text)[:300],
+                  "qubit_counterpart": "CLI `qubit agent plugins list`"}
+
+
+def _agent_status(name: str, status: str, cfg: Any,
+                  b: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    """Enable/disable a real plugin through its own authority path.
+
+    Resolution order: a vendored agent plugin (bundled/user/entrypoint) toggles
+    the ``plugins.enabled``/``plugins.disabled`` runtime allow/deny lists (the
+    same write the CLI performs); a Qubit plugin-runtime directory plugin
+    loads/unloads through ``plugin_runtime``; a Qubit permission-store grant
+    falls back to the permission toggle. An unknown id is a typed
+    ``PLUGIN_NOT_FOUND``, never a raw Python exception class name (D-4/D-8).
+    """
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "plugin name required"}
+    if not b.get("confirm"):
+        return _need_confirm(f"plugin {status}")
+    want_enabled = status == "active"
+    from . import plugin_runtime as PR
+    if PR.estop_engaged(cfg):
+        return 403, {"ok": False, **PR.refuse_estop(
+            f"plugin {'enable' if want_enabled else 'disable'}")}
+    from . import qubit_plugins as _QP
+    try:
+        _QP._prepare_runtime(cfg)
+    except Exception:
+        pass
+
+    # 1) vendored agent plugin -> config.yaml runtime allow/deny lists.
+    try:
+        from qubit_cli.plugins_cmd import (
+            _resolve_plugin_key, dashboard_set_agent_plugin_enabled)
+        key = _resolve_plugin_key(name)
+    except Exception:
+        key = None
+    if key:
+        try:
+            out = dashboard_set_agent_plugin_enabled(name, enabled=want_enabled)
+        except Exception as exc:
+            return _plugin_toggle_error(exc)
+        if out.get("ok"):
+            _audit("plugin_enable" if want_enabled else "plugin_disable",
+                   "dashboard:user",
+                   {"name": name, "key": key, "runtime": "vendored"})
+            return _ok(ok=True, name=name, key=key, runtime="vendored",
+                       unchanged=bool(out.get("unchanged", False)))
+        return _plugin_toggle_error(RuntimeError(
+            out.get("error") or "plugin toggle failed"))
+
+    # 2) Qubit plugin-runtime directory plugin -> load/unload.
+    from . import plugin_runtime as PR
+    try:
+        rec = PR._find(cfg, name)
+    except Exception:
+        rec = None
+    if rec is not None:
+        try:
+            if want_enabled:
+                out = PR.enable_plugin(cfg, name, confirmed=True,
+                                       requested_by="dashboard:user")
+            else:
+                out = PR.disable_plugin(cfg, name, confirmed=True,
+                                        requested_by="dashboard:user")
+        except PR.PluginRuntimeError as exc:
+            http = 403 if exc.code in (PR.ESTOP_CODE, PR.REFUSED_CODE) else 400
+            return http, {"ok": False, "code": exc.code,
+                          "detail": _redact(exc.detail)[:300],
+                          "qubit_counterpart": "CLI `qubit plugins enable <id>`"}
+        _audit("plugin_enable" if want_enabled else "plugin_disable",
+               "dashboard:user", {"name": name, "runtime": "qubit-runtime"})
+        return _ok(ok=True, name=name, runtime="qubit-runtime",
+                   plugin=out.get("plugin"))
+
+    # 3) Qubit permission-store grant (overlay skill record).
+    from .permissions import permissions_store
+    try:
+        permissions_store(cfg).set_skill_status(
+            name, status, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _plugin_toggle_error(exc)
+    _audit("plugin_enable" if want_enabled else "plugin_disable",
+           "dashboard:user", {"name": name, "runtime": "permission-grant"})
+    return _ok(ok=True, name=name, runtime="permission-grant")
+
+
+def agent_enable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _agent_status(str(p.get("id", "")), "active", cfg, b)
+
+
+def agent_disable(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    return _agent_status(str(p.get("id", "")), "disabled", cfg, b)
+
+
+def agent_remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Remove a real user plugin, a runtime directory plugin, or a grant.
+
+    User plugins under ``QUBIT_HOME/plugins`` are removed on disk through the
+    vendored ``dashboard_remove_user_plugin``; a Qubit plugin-runtime directory
+    plugin is unregistered (files included); a permission-store grant falls back
+    to the permission remove. Bundled plugins stay a typed refusal (D-4).
+    """
+    name = str(p.get("id", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "plugin name required"}
+    if not b.get("confirm"):
+        return _need_confirm("plugin remove")
+    from . import plugin_runtime as PR
+    if PR.estop_engaged(cfg):
+        return 403, {"ok": False, **PR.refuse_estop("plugin remove")}
+    from . import qubit_plugins as _QP
+    try:
+        _QP._prepare_runtime(cfg)
+    except Exception:
+        pass
+
+    # 1) on-disk user plugin (real removal).
+    try:
+        from qubit_cli.plugins_cmd import dashboard_remove_user_plugin
+        out = dashboard_remove_user_plugin(name)
+    except Exception as exc:
+        return _plugin_toggle_error(exc)
+    if out.get("ok"):
+        _audit("plugin_remove", "dashboard:user",
+               {"name": name, "runtime": "vendored"})
+        return _ok(ok=True, name=name, removed=True, runtime="vendored")
+    error = str(out.get("error") or "")
+    if "Bundled" in error or "bundled" in error:
+        return 400, {"ok": False, "code": "PLUGIN_REFUSED",
+                     "detail": _redact(error)[:300],
+                     "qubit_counterpart": "bundled plugins are part of Qubit "
+                                          "and cannot be removed"}
+
+    # 2) Qubit plugin-runtime directory plugin (real removal + unload).
+    from . import plugin_runtime as PR
+    try:
+        rec = PR._find(cfg, name)
+    except Exception:
+        rec = None
+    if rec is not None:
+        try:
+            out = PR.unregister(cfg, name, confirmed=True,
+                                requested_by="dashboard:user")
+        except PR.PluginRuntimeError as exc:
+            http = 403 if exc.code in (PR.ESTOP_CODE, PR.REFUSED_CODE) else 400
+            return http, {"ok": False, "code": exc.code,
+                          "detail": _redact(exc.detail)[:300],
+                          "qubit_counterpart": "CLI `qubit plugins unregister`"}
+        _audit("plugin_remove", "dashboard:user",
+               {"name": name, "runtime": "qubit-runtime"})
+        return _ok(ok=True, name=name, removed=True, runtime="qubit-runtime")
+
+    # 3) permission-store grant.
+    from .permissions import permissions_store
+    try:
+        permissions_store(cfg).remove_skill(
+            name, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _plugin_toggle_error(exc)
+    _audit("plugin_remove", "dashboard:user",
+           {"name": name, "runtime": "permission-grant"})
+    return _ok(ok=True, name=name, removed=True, runtime="permission-grant")
+
+
+def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/dashboard/agent-plugins/install -> ``plugin_runtime.install``.
+
+    The dashboard INSTALL control resolves the SAME canonical install op the
+    CLI/voice use: a reviewed local manifest object, a ``<state_dir>/
+    plugin-catalog`` identifier, or a local ``*.json`` path. Confirmation is
+    the shared durable ``ApprovalJournal`` (``confirmation_id`` or an explicit
+    ``confirm``), the emergency stop is checked first, and a remote identifier
+    is a typed refusal — nothing is fetched, imported, or executed.
+    """
+    from . import plugin_runtime as PR
+    manifest = b.get("manifest")
+    if isinstance(manifest, str):
+        try:
+            manifest = json.loads(manifest)
+        except ValueError:
+            return 400, {"ok": False, "code": PR.INVALID_MANIFEST_CODE,
+                         "detail": "manifest must be a JSON object",
+                         "qubit_counterpart": "CLI `qubit plugin install`"}
+    identifier = str(
+        b.get("identifier", b.get("source", b.get("path", ""))) or "").strip()
+    confirm = bool(b.get("confirm", False))
+    confirmation_id = str(b.get("confirmation_id", "") or "").strip()
+    if manifest is None and not identifier:
+        return 400, {"ok": False, "code": PR.BAD_INPUT_CODE,
+                     "detail": "install needs a manifest, an identifier, or a "
+                               "local manifest path",
+                     "qubit_counterpart": "CLI `qubit plugin install`"}
+    if not confirm and not confirmation_id:
+        return _staged(
+            "installing a reviewed plugin requires confirmation: re-POST with "
+            "{\"confirm\": true} or settle the pending approval",
+            "")
+    try:
+        out = PR.install(cfg, manifest=manifest, identifier=identifier,
+                         confirmed=confirm, confirmation_id=confirmation_id,
+                         requested_by="dashboard:user")
+    except PR.PluginRuntimeError as exc:
+        http = 403 if exc.code in (PR.ESTOP_CODE, PR.BRANDING_CODE,
+                                   PR.REFUSED_CODE) \
+            else 409 if exc.code in (PR.CONFIRM_CODE, PR.EXISTS_CODE) \
+            else 400
+        _audit("plugin_install_refused", "dashboard:user",
+               {"code": exc.code, "identifier": identifier[:120]})
+        return http, {"ok": False, "code": exc.code,
+                      "detail": _redact(exc.detail)[:300],
+                      "qubit_counterpart": "CLI `qubit plugin install` "
+                                           "/ `qubit skills install <manifest>`"}
+    if str(out.get("state")) == "BLOCKED":
+        _audit("plugin_install_refused", "dashboard:user",
+               {"code": out.get("code"), "identifier": identifier[:120]})
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": out.get("code", PR.INSTALL_SOURCE_CODE),
+                     "detail": _redact(str(out.get("explanation", "")))[:300],
+                     "qubit_counterpart": "CLI `qubit plugin install`"}
+    pid = str((out.get("plugin") or {}).get("id", "") or identifier)
+    _audit("plugin_install", "dashboard:user",
+           {"id": str((out.get("plugin") or {}).get("id", "")),
+            "source": str(out.get("source", ""))})
+    # B-08D response-shape parity: the SPA reads ``plugin_name`` / ``warnings``
+    # / ``missing_env``. The manifest carries no env requirements (metadata
+    # only), so those are honest negatives, never fabricated.
+    return _ok(ok=True, installed=bool(out.get("installed")),
+               plugin=out.get("plugin"), plugin_name=pid,
+               warnings=[], missing_env=[],
+               source=out.get("source"),
+               install_capability=out.get("install_capability"),
+               note=out.get("note", ""),
+               qubit_counterpart="CLI `qubit plugin install`")
+
+
+def _memory_provider_path(cfg: Any) -> Path:
+    # Canonical Qubit store (the write target).
+    return _store_path(cfg, "qubit_memory_provider.json")
+
+
+def _memory_provider_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name until the next save.
+    return _migrated_read_path(cfg, "qubit_memory_provider.json",
+                               "hermes_memory_provider.json")
+
+
+def mem_provider_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/memory/provider -> real persisted local-provider selection."""
+    active = str(b.get("active", b.get("provider", "")) or "")
+    if active and active != "qubit-local":
+        return 400, {"ok": False, "code": "MEMORY_LOCAL_ONLY",
+                     "detail": "qubit-local is the only memory provider; "
+                               "cloud sync is refused by policy"}
+    path = _memory_provider_path(cfg)
+    try:
+        store = _load_json_store(_memory_provider_read_path(cfg))
+        store["provider"] = "qubit-local"
+        _save_json_store(path, store)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, active="qubit-local", config=store,
+               qubit_counterpart="CLI `qubit memory` (same local store)")
+
+
+def mem_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET provider config -> real persisted local-store settings."""
+    name = str(p.get("id", "") or "qubit-local")
+    if name != "qubit-local":
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no memory provider {name!r}"}
+    store = _load_json_store(_memory_provider_read_path(cfg))
+    fields = [{"key": k, "value": v}
+              for k, v in sorted(store.items()) if k != "provider"]
+    return _ok(name="qubit-local", label="Qubit local memory", fields=fields,
+               config=store,
+               setup={"required": False,
+                      "detail": "no setup needed; local-only store"},
+               qubit_counterpart="CLI `qubit memory` (same local store)")
+
+
+def mem_config_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT config / POST setup for a memory provider -> real local setup.
+
+    ``qubit-local`` is the only provider. This persists the provider's
+    retrieval options (tier, retention_days) into the same state-dir override
+    store the config console uses, confirm-gated and audited. A request for a
+    non-local provider is a typed refusal (no cloud sync), never a fake 200.
+    """
+    name = str(p.get("id", "") or b.get("name", "") or "qubit-local")
+    if name != "qubit-local":
+        return _gate("MEMORY_LOCAL_ONLY",
+                     f"no memory provider {name!r}; qubit-local is the only "
+                     "store and cloud sync is refused by policy",
+                     "Memory page search + CLI `qubit memory`")
+    if not b.get("confirm"):
+        return _staged(
+            "memory provider setup requires explicit confirmation: re-POST "
+            "with {\"confirm\": true}", "")
+    values = {k: v for k, v in b.items()
+              if k != "confirm" and isinstance(v, (str, int, float, bool))}
+    path = _memory_provider_path(cfg)
+    try:
+        store = _load_json_store(_memory_provider_read_path(cfg))
+        store.update(values)
+        store["provider"] = "qubit-local"
+        _save_json_store(path, store)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(ok=True, name="qubit-local", setup={"required": False},
+               config=store, path=str(path),
+               qubit_counterpart="CLI `qubit memory` (same local store)")
+
+
+def _state_base(cfg: Any) -> Path:
+    try:
+        return Path(cfg.state_dir())
+    except Exception:
+        return Path("/tmp")
+
+
+def _store_path(cfg: Any, name: str) -> Path:
+    return _state_base(cfg) / name
+
+
+def _migrated_read_path(cfg: Any, new_name: str, legacy_name: str) -> Path:
+    """Read path for a Qubit-owned store renamed away from its legacy name.
+
+    The canonical new-name file always wins. When it is absent and the legacy
+    file exists, the legacy path is returned once so no data is lost; the next
+    save writes the canonical name. The legacy file is never moved or deleted.
+    """
+    new = _state_base(cfg) / new_name
+    if new.exists():
+        return new
+    legacy = _state_base(cfg) / legacy_name
+    return legacy if legacy.exists() else new
+
+
+def _config_overrides_path(cfg: Any) -> Path:
+    # Canonical Qubit store (the write target).
+    return _store_path(cfg, "qubit_config_overrides.json")
+
+
+def _config_overrides_read_path(cfg: Any) -> Path:
+    # Reads fall back to the legacy `hermes_*` name when only it exists so a
+    # pre-rename override set survives until the next save writes the new name.
+    return _migrated_read_path(cfg, "qubit_config_overrides.json",
+                               "hermes_config_overrides.json")
+
+
+def _env_refs_path(cfg: Any) -> Path:
+    # PRB-02: the ONE canonical env-reference store (shared with CLI/voice via
+    # voicebridge.env_store). Never a second path or a side store.
+    from . import env_store
+
+    return env_store.store_path(cfg)
+
+
+def _load_json_store(path: Path) -> Dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text())
+        return dict(raw) if isinstance(raw, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_json_store(path: Path, data: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+    try:
+        if path.exists():
+            backup = path.with_suffix(path.suffix + ".bak")
+            backup.write_bytes(path.read_bytes())
+    except OSError:
+        pass
+    tmp.replace(path)
+    _audit("store_write", "dashboard:user",
+           {"path": path.name, "keys": sorted(data)[:20]})
+
+
+def _persist_overrides_to_home(values: Dict[str, Any], cfg: Any = None) -> bool:
+    """Merge non-secret overrides into the Qubit runtime home ``config.yaml``.
+
+    B-03: the display store alone is not a runtime consumer. The vendored
+    runtime, CLI, and voice read ``<QUBIT_HOME>/config.yaml`` through the
+    canonical loader, so writing the validated overrides there makes them
+    actually take effect. Atomic replace; best-effort (the display store
+    remains authoritative for the dashboard round-trip).
+    """
+    try:
+        import os
+
+        from . import qubit_runtime
+
+        home = qubit_runtime.runtime_home_for_cfg(cfg)
+        Path(home).mkdir(parents=True, exist_ok=True)
+        path = Path(home) / "config.yaml"
+        data: Dict[str, Any] = {}
+        if path.is_file():
+            import yaml  # type: ignore
+
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        for dotted, value in values.items():
+            try:
+                _set_dotted(data, dotted, value)
+            except Exception:
+                continue
+        import yaml  # type: ignore
+
+        tmp = path.with_name(path.name + ".qubit-tmp")
+        tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+        os.replace(tmp, path)
+        return True
+    except Exception:
+        return False
+
+
+def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/config -> real confirm-gated Qubit settings override write.
+
+    Accepts both the served client shape (``{"config": {<nested tree>}}``) and
+    legacy flat scalars, flattens them to ``dot.path -> scalar`` overrides,
+    persists to ``<state_dir>/qubit_config_overrides.json`` with an atomic
+    ``.bak`` and an audit line, and reads them back through ``h_config`` on the
+    next request. Secret-shaped keys (``*_key``, ``*_token``, ``*_secret``,
+    ``*_password``) never enter the store: a whole-tree PUT round-trips the
+    secret-shaped leaves the server served, so an unchanged served leaf is
+    skipped while a newly provided or changed one is a typed
+    ``SECRET_WRITE_REFUSED``. A body that carries no applicable scalar is a
+    typed refusal; without ``confirm`` the write stages a typed 409. It never
+    returns ``ok=True`` with a zero count and no change.
+    """
+    if not isinstance(b, dict) or not b:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "config write needs an object body"}
+    payload = b.get("config")
+    if "config" in b and not isinstance(payload, dict):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "config must be an object of settings, not "
+                               f"{type(payload).__name__}"}
+    if not isinstance(payload, dict):
+        payload = b
+    values = _flatten_config(payload)
+    if not values:
+        return _gate("CONFIG_NO_FIELDS",
+                     "config write carried no scalar settings; nothing to apply",
+                     "CLI `qubit config` / dashboard Settings")
+    # An own-export round-trips redacted placeholders; never treat them as a
+    # secret write attempt (and never persist them).
+    values = {k: v for k, v in values.items() if v != "[REDACTED]"}
+    if not values:
+        return _gate("CONFIG_NO_FIELDS",
+                     "config write carried only redacted placeholders; nothing "
+                     "to apply",
+                     "GET /api/config (unredacted) + PUT the changed keys")
+    # B-03: match secret leaves on BOTH underscore and dotted paths. The old
+    # `(_key|_token|_secret|_password)$` missed `dashboard.basic_auth.password`
+    # and `.secret` (a dot separator, not underscore), letting a plaintext
+    # secret into the override store. Shared with the read-side redactor so the
+    # two sides can never diverge.
+    _is_secret_key = _is_secret_config_key
+
+    # The Settings form PUTs the whole tree it read from GET /api/config. On the
+    # served WebUI that read is proxied to the vendored runtime and merged with
+    # Qubit overrides; the direct compat dispatch serves the Qubit live record.
+    # A secret-shaped leaf in the PUT is unchanged when its value matches ANY
+    # record the server could have served (e.g. the vendored
+    # ``browser.camofox.session_key``/``terminal.docker_shared_container_key``/
+    # ``voice.record_key`` or the Qubit ``hotkey.hold_key``). Unchanged served
+    # leaves are not secret *writes*: drop them. A newly provided or actually
+    # changed secret-shaped leaf is still refused.
+    served_records = [_config_live(cfg)]
+    try:
+        from . import qubit_asgi as _HA
+        _code, _, _body = _HA.call("GET", "/api/config")
+        if _code == 200:
+            served_records.append(json.loads(_body.decode("utf-8")))
+    except Exception:
+        pass
+    served_values: Dict[str, list] = {}
+    for record in served_records:
+        try:
+            record = _merge_config_overrides(cfg, record)
+        except Exception:
+            pass
+        for key, value in _flatten_config(record).items():
+            bucket = served_values.setdefault(key, [])
+            if not any(value == existing for existing in bucket):
+                bucket.append(value)
+    # Reject unknown keys and mistyped values against the real schema instead of
+    # persisting an arbitrary key and reporting fabricated success. This runs
+    # BEFORE the secret-shape filter: a bogus key ending in ``_key``/``_token``
+    # was misreported as SECRET_WRITE_REFUSED, hiding a typo behind an unrelated
+    # refusal so the operator could not tell the two apart.
+    from . import config as C
+    known = _config_scalar_paths(C.DEFAULTS)
+    # Accept exactly the keys GET /api/config actually serves -- the served
+    # tree (vendored + overrides) plus the Qubit live record. That includes
+    # env-derived leaves (``VOICE_BRIDGE_MEMORY_DB`` -> ``memory.db``) that are
+    # real runtime settings but absent from DEFAULTS. Without this a whole-tree
+    # Save is refused as UNKNOWN_CONFIG_KEY even after the secret-shaped leaves
+    # are skipped, leaving the control dead for a different reason.
+    for record in served_records:
+        known.update(_config_scalar_paths(record))
+    unknown = sorted(k for k in values if k not in known)
+    if unknown:
+        return _gate("UNKNOWN_CONFIG_KEY",
+                     "unknown settings key(s): " + ", ".join(unknown[:5]) +
+                     "; see GET /api/config/schema",
+                     "GET /api/config/schema")
+    changed_secrets: list = []
+    for key in [k for k in values if _is_secret_key(k)]:
+        if any(values[key] == served for served in served_values.get(key, ())):
+            values.pop(key, None)
+        else:
+            changed_secrets.append(key)
+    if changed_secrets:
+        return _gate("SECRET_WRITE_REFUSED",
+                     "The dashboard never writes secret values; reference "
+                     "names only (" + ", ".join(sorted(changed_secrets)[:5])
+                     + ")",
+                     "CLI `qubit auth login` (vault references, manual handoff)")
+    if not values:
+        return _gate("CONFIG_NO_FIELDS",
+                     "config write carried only unchanged secret-shaped "
+                     "leaves; nothing to apply",
+                     "GET /api/config + PUT the changed keys")
+    mistyped = []
+    for key, value in values.items():
+        default = known[key]
+        if default is None:
+            continue
+        if isinstance(default, bool):
+            good = isinstance(value, bool)
+        elif isinstance(default, (int, float)):
+            good = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif isinstance(default, str):
+            good = isinstance(value, str)
+        elif isinstance(default, list):
+            good = isinstance(value, list)
+        else:
+            good = True
+        if not good:
+            mistyped.append(key)
+    if mistyped:
+        return _gate("BAD_CONFIG_TYPE",
+                     "settings value type mismatch: " +
+                     ", ".join(sorted(mistyped)[:5]),
+                     "GET /api/config/schema")
+    guard = _compat_confirm(
+        cfg, "config.write",
+        "config write stages through the Qubit settings console: re-POST with "
+        "{\"confirm\": true}", q, b, payload=values)
+    if guard is not None:
+        return guard
+    path = _config_overrides_path(cfg)
+    try:
+        previous = _load_json_store(_config_overrides_read_path(cfg))
+        merged = dict(previous)
+        merged.update(values)
+        _save_json_store(path, merged)
+    except Exception as exc:
+        return _fail(exc)
+    # B-03 runtime consumer: also merge into the Qubit runtime home config so
+    # the vendored runtime / CLI / voice actually read the applied settings.
+    applied_to_home = _persist_overrides_to_home(values, cfg)
+    _audit("config_apply", "dashboard:user",
+           {"keys": sorted(values)[:20], "count": len(values),
+            "home_applied": applied_to_home})
+    return _ok(ok=True, config=values, count=len(values),
+               applied_to_home=applied_to_home,
+               path=str(path),
+               rollback=f"restore {path.name}.bak (atomic previous state) or "
+                        f"PUT the prior {len(previous)} overrides back",
+               qubit_counterpart="dashboard Settings (classic) + CLI config "
+                                 "profiles")
+
+
+def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT/DELETE /api/env -> real confirm-gated vault-reference registry.
+
+    Only *references* enter ``<state_dir>/qubit_env_refs.json``: a value must
+    be a vault reference name (``vault:...``/``ref:...``), never a raw secret.
+    DELETE removes a reference. Both are confirm-gated, e-stop-gated, and
+    audited; they never write a secret value or fabricate success.
+    """
+    bad = _unsupported_fields(
+        b, frozenset({"key", "name", "value", "ref", "confirm", "delete"}))
+    if bad[0] != 200:
+        return bad
+    deleting = bool(b.get("delete")) or bool(q.get("delete"))
+    guard = _compat_confirm(
+        cfg, "env_reference_write",
+        "env reference change stages through the Qubit vault: re-POST "
+        "with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    path = _env_refs_path(cfg)
+    name = str(b.get("name", b.get("key", "")) or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "env reference name required"}
+    try:
+        store = _load_json_store(path)
+    except Exception as exc:
+        return _fail(exc)
+    if deleting:
+        existed = name in store
+        store.pop(name, None)
+        _save_json_store(path, store)
+        return _ok(ok=True, name=name, removed=existed, count=len(store),
+                   qubit_counterpart="CLI `qubit auth status` (names only)")
+    value = str(b.get("value", b.get("ref", "")) or "")
+    if not value:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "env reference value required"}
+    if not re.match(r"^(vault|ref):", value):
+        return _gate("SECRET_WRITE_REFUSED",
+                     "Env writes accept vault references only, never secret "
+                     "values; store the secret in the OS keyring/manager.",
+                     "CLI `qubit auth login` (manual-handoff enrollment)")
+    store[name] = value
+    _save_json_store(path, store)
+    return _ok(ok=True, name=name, value=value, count=len(store),
+               qubit_counterpart="CLI `qubit auth status` (names only)")
+
+
+def env_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/env -> remove one vault reference (confirm-gated, audited).
+
+    B-08D: the SPA sends ``DELETE /api/env`` with ``{key, confirm: true}``. The
+    old route forced a PUT-shaped ``delete`` flag, so every real UI delete fell
+    through to the set path and answered ``400 MALFORMED``. The HTTP verb is now
+    the authority; ``key`` (or ``name``) names the reference. E-stop-gated.
+    """
+    bad = _unsupported_fields(
+        b, frozenset({"key", "name", "confirm"}))
+    if bad[0] != 200:
+        return bad
+    guard = _compat_confirm(
+        cfg, "env_reference_delete",
+        "env reference removal stages through the Qubit vault: re-DELETE "
+        "with {\"confirm\": true}", q, b)
+    if guard is not None:
+        return guard
+    name = str(b.get("key", b.get("name", "")) or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "env reference name required"}
+    path = _env_refs_path(cfg)
+    try:
+        store = _load_json_store(path)
+    except Exception as exc:
+        return _fail(exc)
+    existed = name in store
+    if existed:
+        store.pop(name, None)
+        _save_json_store(path, store)
+    return _ok(ok=True, name=name, removed=existed, count=len(store),
+               qubit_counterpart="CLI `qubit auth status` (names only)")
+
+
+_TOOLSET_ENV_FIELDS = frozenset({"env", "profile", "confirm", "name"})
+_PLUGIN_PROVIDER_FIELDS = frozenset(
+    {"context_engine", "memory_provider", "name", "confirm"})
+
+
+def _unsupported_fields(body: Dict[str, Any], allowed: frozenset) -> Tuple[int, Dict[str, Any]]:
+    unknown = sorted(str(k) for k in body if k not in allowed)
+    if not unknown:
+        return 200, {}
+    return 400, {"ok": False, "code": "UNSUPPORTED_FIELD",
+                 "detail": "unsupported field(s): " + ", ".join(unknown),
+                 "supported": sorted(allowed)}
+
+
+def toolset_env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/tools/toolsets/{id}/env -> persist vault references.
+
+    The drawer sends ``{env: {VAR: ref}, profile}``. The value is a vault
+    reference (``vault:...``/``ref:...``), never a raw secret; a raw secret is
+    the typed ``SECRET_WRITE_REFUSED`` gate. An unsupported field is rejected
+    instead of silently dropped, and success reports the reference names that
+    were actually persisted so the UI can confirm a real state change.
+    """
+    name = str(p.get("id", "") or b.get("name", "") or "")
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "toolset name required"}
+    bad = _unsupported_fields(b, _TOOLSET_ENV_FIELDS)
+    if bad[0] != 200:
+        return bad
+    env = b.get("env")
+    if not isinstance(env, dict) or not env:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "env map required "
+                               "({\"env\": {\"VAR\": \"vault:name\"}})"}
+    if not _truthy(b.get("confirm")):
+        return _staged(
+            "toolset env change requires explicit confirmation: re-PUT with "
+            "{\"confirm\": true}", "")
+    path = _env_refs_path(cfg)
+    try:
+        store = _load_json_store(path)
+    except Exception as exc:
+        return _fail(exc)
+    saved: List[str] = []
+    rejected: List[str] = []
+    for key, value in env.items():
+        ref = str(value or "")
+        if re.match(r"^(vault|ref):", ref):
+            store[str(key)] = ref
+            saved.append(str(key))
+        else:
+            rejected.append(str(key))
+    if rejected:
+        return _gate("SECRET_WRITE_REFUSED",
+                     "Toolset env writes accept vault references only, never "
+                     "secret values: " + ", ".join(sorted(rejected)[:5]),
+                     "CLI `qubit auth login` (vault references, manual handoff)")
+    if not saved:
+        return _gate("ENV_NO_FIELDS",
+                     "toolset env carried no reference to persist",
+                     "dashboard Env page + CLI `qubit auth status`")
+    _save_json_store(path, store)
+    return _ok(ok=True, name=name, saved=sorted(saved), count=len(store),
+               profile=str(b.get("profile", "") or ""),
+               qubit_counterpart="CLI `qubit auth status` (names only)")
+
+
+def plugin_providers_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT /api/dashboard/plugin-providers -> persist the context engine choice.
+
+    B-08D: the Plugins page sends ``{context_engine}`` (or
+    ``memory_provider``). It must reach the runtime home ``config.yaml`` that
+    the canonical loader and the vendored hub read — not a generic permission
+    grant that drops the selection. Unsupported fields are rejected.
+    """
+    bad = _unsupported_fields(b, _PLUGIN_PROVIDER_FIELDS)
+    if bad[0] != 200:
+        return bad
+    context_engine = b.get("context_engine")
+    memory_provider = b.get("memory_provider")
+    if context_engine is None and memory_provider is None:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "context_engine or memory_provider required"}
+    for field, value in (("context_engine", context_engine),
+                         ("memory_provider", memory_provider)):
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            return 400, {"ok": False, "code": "MALFORMED",
+                         "detail": f"{field} must be a non-empty name"}
+    if not _truthy(b.get("confirm")):
+        return _staged(
+            "plugin provider change requires explicit confirmation: re-PUT "
+            "with {\"confirm\": true}", "")
+    values: Dict[str, Any] = {}
+    if context_engine is not None:
+        values["context.engine"] = str(context_engine).strip()
+    if memory_provider is not None:
+        values["memory.provider"] = str(memory_provider).strip()
+    applied = _persist_overrides_to_home(values, cfg)
+    if not applied:
+        return _gate("CONFIG_WRITE_FAILED",
+                     "could not persist the plugin provider selection to the "
+                     "runtime home config",
+                     "CLI `qubit config` + dashboard Settings")
+    _audit("plugin_providers_apply", "dashboard:user",
+           {"keys": sorted(values)})
+    return _ok(ok=True,
+               context_engine=str(context_engine).strip()
+               if context_engine is not None else None,
+               memory_provider=str(memory_provider).strip()
+               if memory_provider is not None else None,
+               applied_to_home=True, config=values,
+               qubit_counterpart="CLI `qubit config` + dashboard Plugins page")
+
+
+def toolset_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET toolset config -> real Qubit provider/credential-reference matrix."""
+    from . import proxy_status as PX
+    name = str(p.get("id", "") or "")
+    try:
+        prov = PX.providers(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    rows: List[Dict[str, Any]] = []
+    active: Optional[str] = None
+    for row in prov.get("providers", []) or []:
+        if not isinstance(row, dict):
+            continue
+        pname = str(row.get("provider", ""))
+        is_active = bool(row.get("allowlisted"))
+        if is_active and active is None:
+            active = pname
+        rows.append({
+            "name": pname, "badge": "", "tag": "",
+            "env_vars": [{
+                "key": f"{pname.upper()}_KEY_REF",
+                "prompt": "credential reference (never a value)",
+                "url": None, "default": None,
+                "is_set": str(row.get("key_ref", "")) != "missing"}],
+            "post_setup": None, "requires_nous_auth": False,
+            "is_active": is_active,
+            "status": "ready" if is_active else "needs_setup"})
+    return _ok(name=name, has_category=bool(rows), providers=rows,
+               active_provider=active,
+               qubit_counterpart="CLI `qubit capability` + dashboard Settings "
+                                 "(classic)")
+
+
+def toolset_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET toolset models -> real local model catalog (loopback-only)."""
+    from . import local_models as LM
+    name = str(p.get("id", "") or "")
+    try:
+        cat = LM.catalog(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    rows = [{
+        "id": str(m.get("id", m.get("name", ""))),
+        "display": str(m.get("name", m.get("id", ""))),
+        "speed": "", "strengths": "", "price": ""}
+        for m in (cat.get("models", []) if isinstance(cat, dict) else [])
+        if isinstance(m, dict)]
+    return _ok(name=name, has_models=bool(rows), provider="ollama-local",
+               plugin="ollama-http", models=rows, current=None, default=None,
+               runtime_observed=bool(cat.get("runtime_observed")) if isinstance(cat, dict) else False,
+               qubit_counterpart="CLI `qubit local-models catalog`")
+
+
+# ---------------------------------------------------------------------------
+# Qubit delta Wave 3 surfaces (D3/D4/D20/D21/D24): file transfer, active
+# recall, document extraction, question prompts, and session sharing. Every
+# handler dispatches the SAME module function the CLI/voice call.
+# ---------------------------------------------------------------------------
+_OK_STATES = ("OK", "EMPTY", "COMPLETE", "DEGRADED", "READY")
+_OK_CODES = ("", "OK", "COMPLETE", "EMPTY", "READY")
+
+
+def _surface(out: Any) -> Tuple[int, Dict[str, Any]]:
+    """Adapt a module result to the compat envelope + a typed HTTP status.
+
+    A ``*_CONFIRM_REQUIRED`` result is a 409 staged gate; denied/unavailable
+    typed states are 403; success states are 200. The raw module body (with
+    its typed ``code``/``owner``/``rollback``) is preserved verbatim.
+    """
+    if not isinstance(out, dict):
+        return _fail(Exception("module returned a non-object result"))
+    body = dict(out)
+    state = str(body.get("state", "") or "")
+    code = str(body.get("code", "") or "")
+    if code.upper().endswith("CONFIRM_REQUIRED") or state in (
+            "CONFIRM_REQUIRED", "CONFIRMATION_REQUIRED"):
+        body["ok"] = False
+        return 409, body
+    ok = (state in _OK_STATES and code in _OK_CODES) or state == "EMPTY"
+    body["ok"] = bool(ok)
+    body.setdefault("qubit_counterpart", "")
+    return (200 if ok else 403), body
+
+
+def _ft_default_node(cfg: Any) -> str:
+    """First local (loopback) enrolled node, else first node, else ""."""
+    from . import file_transfer as FT
+    from . import node_host as NH
+
+    try:
+        recs = NH._load(cfg).get("nodes", {})
+    except Exception:
+        return ""
+    for node_id, rec in recs.items():
+        if isinstance(rec, dict) and FT._is_local(rec):
+            return str(node_id)
+    return str(next(iter(recs), "") or "")
+
+
+def _qint(q: Dict[str, str], b: Dict[str, Any], *keys: str, default: int) -> int:
+    raw = _query_text(q, b, *keys)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def h_transfers_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    return _ok(**FT.status(cfg))
+
+
+def h_transfers_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    return _surface(FT.list_directory(
+        cfg, node, _query_text(q, b, "path"),
+        limit=_qint(q, b, "limit", default=FT.MAX_LIST_ENTRIES)))
+
+
+def h_transfers_fetch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    if not b.get("confirm"):
+        return _need_confirm("file transfer fetch")
+    return _surface(FT.fetch(
+        cfg, node, _query_text(q, b, "path"),
+        offset=_qint(q, b, "offset", default=0),
+        max_bytes=_qint(q, b, "max_bytes", "maxBytes",
+                        default=FT.DEFAULT_FETCH_BYTES), confirmed=True))
+
+
+def h_transfers_plan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    if not b.get("confirm"):
+        return _need_confirm("file transfer plan")
+    return _surface(FT.stream_plan(
+        cfg, node, _query_text(q, b, "path"),
+        chunk_size=_qint(q, b, "chunk_size", "chunkSize",
+                         default=FT.DEFAULT_CHUNK_BYTES)))
+
+
+def h_transfers_resume(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import file_transfer as FT
+    node = _query_text(q, b, "node") or _ft_default_node(cfg)
+    return _surface(FT.resume(
+        cfg, node, _query_text(q, b, "transfer_id", "id"),
+        offset=_qint(q, b, "offset", default=0)))
+
+
+def h_recall_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _ok(**AM.status(cfg))
+
+
+def h_recall_policy_get(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _ok(**AM.policy_get(cfg))
+
+
+def h_recall_policy_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    if not b.get("confirm"):
+        return _need_confirm("active-recall policy set")
+    enabled = b.get("enabled")
+    if isinstance(enabled, str):
+        enabled = enabled.strip().lower() in ("on", "true", "yes", "enable")
+    scoped = b.get("session_scoped")
+    if isinstance(scoped, str):
+        scoped = scoped.strip().lower() in ("session", "scoped", "true", "on")
+    return _surface(AM.policy_set(
+        cfg, enabled=enabled, min_score=b.get("min_score"),
+        max_items=b.get("max_items"), session_scoped=scoped, confirmed=True))
+
+
+def h_recall_query(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _surface(AM.recall(
+        cfg, _query_text(q, b, "query", "q"),
+        session=_query_text(q, b, "session"),
+        limit=b.get("limit")))
+
+
+def h_recall_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    return _surface(AM.resolve(
+        cfg, _query_text(q, b, "query", "q"),
+        session=_query_text(q, b, "session")))
+
+
+def h_recall_escalate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import active_memory as AM
+    if not b.get("confirm"):
+        return _need_confirm("memory escalation")
+    return _surface(AM.escalate(
+        cfg, _qint(q, b, "memory_id", "id", default=0),
+        reason=_query_text(q, b, "reason"), confirmed=True))
+
+
+def h_documents_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import doc_extract as DE
+    return _ok(**DE.status(cfg))
+
+
+def h_documents_kinds(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import doc_extract as DE
+    return _ok(**DE.kinds(cfg))
+
+
+def h_documents_extract(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import doc_extract as DE
+    if not b.get("confirm"):
+        return _need_confirm("document extraction")
+    try:
+        out = DE.extract(
+            cfg, _query_text(q, b, "path"),
+            max_chars=_qint(q, b, "max_chars", "maxChars",
+                            default=DE.DEFAULT_MAX_CHARS),
+            page=(_qint(q, b, "page", default=0) or None), confirmed=True)
+    except DE.DocExtractError as exc:
+        return 400, {"ok": False, "state": "FAILED", "code": exc.code,
+                     "detail": _redact(exc.detail)[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "nothing was extracted"}
+    return _surface(out)
+
+
+def h_ask_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    return _ok(**QP.status(cfg))
+
+
+def h_ask_pending(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    return _ok(**QP.pending(cfg))
+
+
+def h_ask_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    if not b.get("confirm"):
+        return _need_confirm("question prompt create")
+    try:
+        out = QP.ask(cfg, [{"text": _query_text(q, b, "question", "text"),
+                            "kind": "text"}],
+                     session=_query_text(q, b, "session"), confirmed=True)
+    except QP.QuestionError as exc:
+        return 400, {"ok": False, "state": "FAILED", "code": exc.code,
+                     "detail": _redact(exc.detail)[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "prompt store untouched"}
+    return _surface(out)
+
+
+def h_ask_answer(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import question_prompt as QP
+    answers = b.get("answers", b.get("responses"))
+    if answers is None:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "answers object/list is required"}
+    try:
+        out = QP.answer(cfg, p.get("prompt_id", b.get("prompt_id", "")), answers)
+    except QP.QuestionError as exc:
+        return 400, {"ok": False, "state": "FAILED", "code": exc.code,
+                     "detail": _redact(exc.detail)[:300],
+                     "owner": "qubit-policy",
+                     "rollback": "prompt store untouched"}
+    return _surface(out)
+
+
+def h_session_share_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    return _surface(SS.status(cfg))
+
+
+def h_session_shares_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    return _surface(SS.list_shares(cfg))
+
+
+def h_session_share_publish(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    sid = p.get("session_id", "") or _query_text(q, b, "session_id")
+    ttl = b.get("ttl_s", q.get("ttl_s"))
+    try:
+        ttl = float(ttl) if ttl not in (None, "") else SS.DEFAULT_TTL_S
+    except (TypeError, ValueError):
+        ttl = SS.DEFAULT_TTL_S
+    return _surface(SS.publish(
+        cfg, sid, ttl_s=ttl, confirmed=bool(b.get("confirm")),
+        requested_by="dashboard:user"))
+
+
+def h_session_share_revoke(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    sid = p.get("share_id", "") or _query_text(q, b, "share_id")
+    return _surface(SS.revoke(cfg, sid, confirmed=bool(b.get("confirm"))))
+
+
+def h_session_shares_purge(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import session_share as SS
+    if not b.get("confirm"):
+        return 409, {
+            "ok": False, "state": "CONFIRMATION_REQUIRED",
+            "code": SS.CONFIRM_CODE,
+            "detail": "session share purge requires explicit confirmation: "
+                      "re-POST with {\"confirm\": true}",
+            "qubit_counterpart": "CLI `qubit shares purge --confirm` + voice "
+                                 "yes",
+        }
+    return _surface(SS.purge_expired(cfg))
+
+
+def h_share_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /share/{share_id}: public token in the query, no dashboard token.
+
+    The share token is the bearer credential (constant-time checked inside the
+    module). A missing/expired/revoked/wrong token returns a typed gate and
+    NEVER another session's transcript.
+    """
+    from . import session_share as SS
+    sid = p.get("share_id", "") or ""
+    token = q.get("token") or b.get("token") or ""
+    out = SS.resolve(cfg, sid, token)
+    state = str(out.get("state", "") or "")
+    body = dict(out)
+    body.setdefault("qubit_counterpart", "open /share/<id> with the share token")
+    if state == "OK":
+        body["ok"] = True
+        return 200, body
+    body["ok"] = False
+    http = {
+        "NOT_FOUND": 404, "EXPIRED": 410, "REVOKED": 403, "DENIED": 403,
+        "ESTOP": 403, "FAILED": 400, "UNAVAILABLE": 503,
+    }.get(state, 403)
+    return http, body
+
+
+# ---------------------------------------------------------------------------
+# Agent 5-10 Qubit-owned front door: GET /api/qubit/*. Each handler is a thin
+# read over the exact module the CLI/voice use; there is no proxy to the fork.
+# ---------------------------------------------------------------------------
+
+def _eval_state_path(cfg: Any, name: str) -> Path:
+    return Path(cfg.state_dir()) / "evaluation" / name
+
+
+def h_qubit_gateway_discovery(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import gateway_peers as GW
+    try:
+        return _ok(**GW.discovery(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_runtime_discovery(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_inventory as RIN
+    try:
+        return _ok(**RIN._discovery(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_runtime_marketplace(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_inventory as RIN
+    try:
+        return _ok(**RIN._marketplace(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_runtime_history(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_images as RI
+    name = str(q.get("name", b.get("name", "")) or "")
+    try:
+        return _ok(**RI.update_history(cfg, name))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Read-only product update check (``UpdateCheckResponse`` wire shape).
+
+    The SPA System page calls ``GET /api/qubit/update/check`` on mount. It is a
+    read, so it answers 200 with a truthful local report
+    (:func:`voicebridge.update_manager.check`) instead of the
+    ``UPDATE_OPERATOR_OWNED`` refusal the blanket update gate used to return
+    (audit A29). A network probe failure yields a typed DEGRADED report with
+    ``behind=null`` — never a fabricated "up to date".
+    """
+    from . import update_manager as UM
+    try:
+        out = UM.check(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**out)
+
+
+def h_qubit_update_apply(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/update -> real non-destructive in-place update.
+
+    Confirmed only (409 CONFIRM_REQUIRED otherwise) and refuses a dirty
+    worktree (409), a latched e-stop (403), a non-git install (403
+    UPDATE_OPERATOR_OWNED with the exact operator command), and the fail-closed
+    test guard (503 UNAVAILABLE). The only command run is ``git pull --ff-only``.
+    """
+    from . import update_manager as UM
+    try:
+        out = UM.apply(cfg, confirm=_truthy(b.get("confirm")))
+    except Exception as exc:
+        return _fail(exc)
+    if out.get("ok"):
+        return 200, out
+    code = str(out.get("code") or "")
+    http = {"CONFIRM_REQUIRED": 409, "WORKTREE_DIRTY": 409,
+            "UPDATE_ESTOP": 403, "UPDATE_UNAVAILABLE": 503,
+            "UPDATE_OPERATOR_OWNED": 403, "UPDATE_FAILED": 500}.get(code, 500)
+    return http, out
+
+
+def h_qubit_runtime_update_report(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any],
+                                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_images as RI
+    try:
+        return _ok(**RI.update_report(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_runtime_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_images as RI
+    try:
+        return _ok(**RI.status(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_runtime_images(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_images as RI
+    try:
+        return _ok(**RI.images())
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_runtime_doctor(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import runtime_images as RI
+    try:
+        return _ok(**RI.doctor(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_egress_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import proxy_status as PX
+    try:
+        return _ok(**PX.egress_status(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_egress_providers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import proxy_status as PX
+    try:
+        return _ok(**PX.providers(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_egress_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import proxy_status as PX
+    host = str(q.get("host", b.get("host", "")) or "").strip()
+    if not host:
+        return 400, {"ok": False, "state": "FAILED",
+                     "code": "EGRESS_HOST_REQUIRED",
+                     "detail": "query parameter 'host' is required",
+                     "qubit_counterpart": "CLI `qubit egress check <host>`"}
+    try:
+        out = PX.check_egress(cfg, host)
+    except Exception as exc:
+        return _fail(exc)
+    allowed = bool(out.get("allowed"))
+    return (200 if allowed else 403), {
+        "ok": allowed, "state": "OK" if allowed else "DENIED",
+        "qubit_counterpart": "CLI `qubit egress check <host>`", **out}
+
+
+def h_qubit_policy_conformance(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import release as REL
+    root = str(q.get("root", b.get("root", "")) or "")
+    if root.strip():
+        path = Path(root)
+        if not path.is_dir():
+            return 400, {"ok": False, "state": "FAILED",
+                         "code": "WORKSPACE_UNREADABLE",
+                         "detail": f"workspace root {path} is not a directory",
+                         "qubit_counterpart":
+                         "CLI `qubit policy conformance`"}
+        try:
+            return _ok(**REL.workspace_conformance(path))
+        except Exception as exc:
+            return _fail(exc)
+    try:
+        return _ok(**REL.workspace_conformance())
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_policy_attest(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import release as REL
+    root = str(q.get("root", b.get("root", "")) or "")
+    if root.strip():
+        path = Path(root)
+        if not path.is_dir():
+            return 400, {"ok": False, "state": "FAILED",
+                         "code": "WORKSPACE_UNREADABLE",
+                         "detail": f"workspace root {path} is not a directory",
+                         "qubit_counterpart": "CLI `qubit policy attest`"}
+        try:
+            return _ok(**REL.workspace_attestation(path))
+        except Exception as exc:
+            return _fail(exc)
+    try:
+        return _ok(**REL.workspace_attestation())
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_hooks_doctor(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import hooks as HK
+    try:
+        return _ok(**HK.doctor(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_qubit_usage(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .evaluation import usage_analytics as UA
+    limit = _qint(q, b, "limit", default=1000)
+    ledger = UA.UsageLedger(_eval_state_path(cfg, "usage.jsonl"))
+    records = ledger.read(limit=limit)
+    out = UA.analyze(records)
+    out.update({"records": len(records), "rejections": ledger.rejections,
+                "path": str(ledger.path),
+                "authority": "append-only local usage ledger; no prompts or "
+                             "secrets are stored",
+                "qubit_counterpart": "CLI `qubit usage analytics`"})
+    return _ok(**out)
+
+
+def h_qubit_receipts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .evaluation import receipts as RC
+    path = _eval_state_path(cfg, "receipts.jsonl")
+    if not path.exists():
+        return 404, {"ok": False, "state": "NOT_FOUND",
+                     "code": "RECEIPTS_NOT_FOUND",
+                     "detail": f"no execution-receipt chain at {path}",
+                     "qubit_counterpart": "CLI `qubit receipts`"}
+    rows, rejected = [], 0
+    for line in path.read_text(errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            rejected += 1
+    verdict = RC.verify_receipts(rows)
+    return _ok(records=len(rows), rejected=rejected, verify=verdict,
+               path=str(path),
+               qubit_counterpart="CLI `qubit receipts`")
+
+
+def h_qubit_logbook(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .evaluation import logbook as LB
+    ledger = LB.Logbook(_eval_state_path(cfg, "logbook.jsonl"))
+    limit = _qint(q, b, "limit", default=100)
+    window = q.get("window_s", b.get("window_s"))
+    try:
+        window = float(window) if window not in (None, "") else None
+    except (TypeError, ValueError):
+        window = None
+    return _ok(entries=ledger.entries(limit=limit, window_s=window),
+               summary=ledger.summary(window_s=window), path=str(ledger.path),
+               qubit_counterpart="CLI `qubit logbook entries`")
+
+
+def h_qubit_browser_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import browser as BR
+    try:
+        return _ok(**BR.profiles(cfg))
+    except Exception as exc:
+        return _fail(exc)
+
+
+# ---------------------------------------------------------------------------
+# S8 — desktop/browser operation routes (A38/A39). Each route is a thin
+# adapter to the canonical operation-catalog id (the same Tier-1 registry entry
+# the CLI and voice run through ``dashboard_ops``), so the shared broker,
+# confirmation journal, emergency stop, and audit apply unchanged. No route
+# re-implements an operation and none returns a fabricated success.
+# ---------------------------------------------------------------------------
+def h_op_computer_ops(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/desktop/ops -> bounded desktop-op catalog (read-only)."""
+    return _run_catalog_op(cfg, "computer_ops")
+
+
+def h_op_computer_presentation_status(cfg: Any, q: Dict[str, str],
+                                      b: Dict[str, Any],
+                                      p: Dict[str, str]
+                                      ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/desktop/presentation -> persisted descriptor (read-only)."""
+    return _run_catalog_op(cfg, "computer_presentation_status")
+
+
+def h_op_computer_launch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/desktop/launch -> allowlisted app launch (confirmed)."""
+    args: Dict[str, Any] = {}
+    if b.get("app"):
+        args["app"] = str(b["app"])
+    if b.get("target"):
+        args["target"] = str(b["target"])
+    return _run_catalog_op(cfg, "computer_launch", args)
+
+
+def h_op_computer_pip(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/desktop/pip -> Document PiP surface (confirmed)."""
+    args: Dict[str, Any] = {}
+    if b.get("target"):
+        args["target"] = str(b["target"])
+    return _run_catalog_op(cfg, "computer_pip", args)
+
+
+def h_op_computer_present(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/desktop/present -> persist presentation (confirmed)."""
+    args: Dict[str, Any] = {}
+    if b.get("mode"):
+        args["mode"] = str(b["mode"])
+    if b.get("panes"):
+        args["panes"] = str(b["panes"])
+    return _run_catalog_op(cfg, "computer_present", args)
+
+
+def h_op_browser_favicon(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/browser/favicon -> same-origin favicon (read-only)."""
+    return _run_catalog_op(cfg, "browser_favicon")
+
+
+def h_op_browser_favicon_cache(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/browser/favicon-cache -> bounded cache (read-only)."""
+    return _run_catalog_op(cfg, "browser_favicon_cache")
+
+
+def h_op_browser_download(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/browser/download -> save page into an approved root."""
+    args: Dict[str, Any] = {}
+    if b.get("dest"):
+        args["dest"] = str(b["dest"])
+    return _run_catalog_op(cfg, "browser_download", args)
+
+
+def h_qubit_local_models_fallback(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any],
+                                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from . import local_models as LM
+    model = str(q.get("model", b.get("model", "")) or "")
+    try:
+        out = (LM.resolve_fallback(cfg, model) if model
+               else LM.fallback_chain(cfg))
+    except Exception as exc:
+        return _fail(exc)
+    ok = str(out.get("state", "")) in ("OK", "EMPTY", "READY", "DEGRADED")
+    return (200 if ok else 403), {
+        "ok": ok, "qubit_counterpart":
+        "CLI `qubit local-models fallback [model]`", **out}
+
+
+# ---------------------------------------------------------------------------
+# Skills hub: the Qubit-reviewed LOCAL catalog. Remote hub fetches are refused
+# by pinned-source policy; every read/mutation runs the same local manifests +
+# PermissionsStore the CLI/voice use (never a network fetch or process spawn).
+# ---------------------------------------------------------------------------
+_REMOTE_IDENTIFIER = re.compile(r"(://|^github:|^gitlab:|^official/|^hub/)")
+
+
+def _is_remote_identifier(text: Any) -> bool:
+    return bool(_REMOTE_IDENTIFIER.search(str(text or "").strip().lower()))
+
+
+def _local_skill_catalog(cfg: Any) -> Dict[str, Dict[str, Any]]:
+    """Local reviewed skill/plugin catalog (installed + Qubit overlay)."""
+    from .permissions import permissions_store
+    rows: Dict[str, Dict[str, Any]] = {}
+    try:
+        for rec in permissions_store(cfg).skills():
+            d = rec.to_dict() if hasattr(rec, "to_dict") else {}
+            man = d.get("manifest", {}) if isinstance(d, dict) else {}
+            if not isinstance(man, dict):
+                man = {}
+            ident = str(d.get("skill_id", "") or "")
+            if not ident:
+                continue
+            rows[ident] = {
+                "identifier": ident,
+                "name": str(man.get("name", ident) or ident),
+                "description": str(man.get("description", "") or ""),
+                "source": str(man.get("source", "qubit-local") or "qubit-local"),
+                "trust_level": "trusted", "category": "installed",
+                "installed": str(d.get("status", "")) == "active",
+                "status": str(d.get("status", "")),
+                "version": str(man.get("version", "") or ""),
+                "tags": [], "repo": None, "_manifest": man,
+                "_origin": "permissions",
+            }
+    except Exception:
+        pass
+    for m in _overlay_manifests():
+        name = str(m.get("name", "") or "")
+        if not name or name in rows:
+            continue
+        # Qubit-authored overlay plugins are installable as skills; they are
+        # original Qubit material, so the project license is their license. Fill
+        # it in when the vendored overlay manifest omits the field, otherwise
+        # the install contract refuses them (LICENSE_REQUIRED) and the hub
+        # control looks dead.
+        man = dict(m)
+        man.setdefault("license", "MIT")
+        man.setdefault("source", "qubit-overlay")
+        man.setdefault(
+            "content_hash",
+            hashlib.sha256(f"qubit-overlay:{name}".encode()).hexdigest())
+        man.setdefault("capabilities", ["overlay.read"])
+        man.setdefault("scopes", ["overlay:read"])
+        rows[name] = {
+            "identifier": name,
+            "name": str(m.get("label", name) or name),
+            "description": str(m.get("description", "") or ""),
+            "source": "qubit-overlay", "trust_level": "builtin",
+            "category": "overlay", "installed": True, "status": "active",
+            "version": str(m.get("version", "") or ""),
+            "tags": [], "repo": None, "_manifest": man, "_origin": "overlay",
+        }
+    return rows
+
+
+def _hub_public(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: v for k, v in row.items() if not k.startswith("_")}
+
+
+def _hub_installed(cfg: Any) -> Dict[str, str]:
+    from .permissions import permissions_store
+    try:
+        return {r.skill_id: r.status for r in permissions_store(cfg).skills()}
+    except Exception:
+        return {}
+
+
+def _manifest_spec(manifest: Dict[str, Any]) -> Any:
+    from .permissions import SkillManifest
+    from .capabilities import Tier
+    tier = manifest.get("tier", "reversible")
+    return SkillManifest(
+        skill_id=str(manifest.get("skill_id", manifest.get("name", "")) or ""),
+        version=str(manifest.get("version", "0.0.0") or "0.0.0"),
+        name=str(manifest.get("name", manifest.get("skill_id", "")) or ""),
+        description=str(manifest.get("description", "") or ""),
+        source=str(manifest.get("source", "qubit-local") or "qubit-local"),
+        revision=str(manifest.get("revision", "1") or "1"),
+        license=str(manifest.get("license", "") or ""),
+        content_hash=str(manifest.get("content_hash", "") or ""),
+        capabilities=tuple(manifest.get("capabilities", []) or []),
+        scopes=tuple(manifest.get("scopes", []) or []),
+        tier=tier if isinstance(tier, Tier) else Tier(str(tier)),
+        sensitivity=str(manifest.get("sensitivity", "internal") or "internal"),
+        approval_policy=str(manifest.get("approval_policy", "confirm")
+                            or "confirm"),
+        timeout_s=float(manifest.get("timeout_s", 30) or 30),
+        resource_limits=dict(manifest.get("resource_limits", {}) or {}),
+        audit_events=tuple(manifest.get("audit_events", ["skill.install"])
+                           or ["skill.install"]),
+        compatibility=str(manifest.get("compatibility", "") or ""),
+        rollback=str(manifest.get("rollback", "remove the skill")
+                     or "remove the skill"))
+
+
+def _hub_resolve_manifest(cfg: Any, identifier: Any) -> Tuple[Any, str]:
+    """(manifest_dict, origin) for a local identifier; (None, reason) else."""
+    ident = str(identifier or "").strip()
+    if not ident or _is_remote_identifier(ident):
+        return None, "remote"
+    path = Path(ident)
+    if path.suffix == ".json" and path.is_file():
+        try:
+            raw = json.loads(path.read_text())
+        except (OSError, ValueError):
+            return None, "malformed"
+        return (raw if isinstance(raw, dict) else None), "path"
+    row = _local_skill_catalog(cfg).get(ident)
+    if row is None:
+        return None, "not_found"
+    return row.get("_manifest") or None, str(row.get("_origin", "catalog"))
+
+
+def _hub_remote_gate(counterpart: str) -> Tuple[int, Dict[str, Any]]:
+    return _gate("BLOCKED_REMOTE_SOURCE",
+                 "Remote skill-hub fetches are refused by pinned-source "
+                 "policy; Qubit serves the reviewed local manifest catalog.",
+                 counterpart)
+
+
+def h_skills_hub_official(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    installed = _hub_installed(cfg)
+    out = []
+    for row in _local_skill_catalog(cfg).values():
+        pub = _hub_public(row)
+        pub["installed"] = (str(pub.get("identifier")) in installed
+                            or bool(row.get("installed")))
+        out.append(pub)
+    return _ok(skills=out, source="qubit-local",
+               qubit_counterpart="CLI `qubit skills list`")
+
+
+def h_skills_hub_sources(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    rows = list(_local_skill_catalog(cfg).values())
+    return _ok(sources=[{
+        "id": "qubit-local", "label": "Qubit reviewed local manifests",
+        "available": True, "searchable": True, "rate_limited": False,
+        "detail": "remote hubs (GitHub/index) are refused by pinned-source "
+                  "policy; local reviewed manifests only"}],
+        index_available=False,
+        featured=[_hub_public(r) for r in rows[:12]],
+        installed=_hub_installed(cfg),
+        qubit_counterpart="CLI `qubit skills list`")
+
+
+def h_skills_hub_search(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    query = str(q.get("query", q.get("q", b.get("q", b.get("query", ""))))
+                or "").strip()
+    if not query:
+        return _ok(results=[], source_counts={}, timed_out=[],
+                   installed={})
+    try:
+        limit = max(1, min(int(q.get("limit", "20") or "20"), 50))
+    except (TypeError, ValueError):
+        limit = 20
+    needle = query.lower()
+    hits = [r for r in _local_skill_catalog(cfg).values()
+            if needle in str(r.get("name", "")).lower()
+            or needle in str(r.get("description", "")).lower()
+            or needle in str(r.get("identifier", "")).lower()]
+    results = [_hub_public(r) for r in hits[:limit]]
+    return _ok(results=results,
+               source_counts={"qubit-local": len(results)},
+               timed_out=[], installed=_hub_installed(cfg),
+               qubit_counterpart="CLI `qubit skills list`")
+
+
+def h_skills_hub_preview(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    ident = str(q.get("identifier", b.get("identifier", "")) or "")
+    if not ident:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "identifier is required",
+                     "qubit_counterpart": "CLI `qubit skills show <id>`"}
+    if _is_remote_identifier(ident):
+        return _hub_remote_gate("CLI `qubit skills show <id>`")
+    man, _why = _hub_resolve_manifest(cfg, ident)
+    if man is None:
+        return 404, {"ok": False, "code": "SKILL_NOT_FOUND",
+                     "detail": f"no local reviewed skill {ident!r}",
+                     "qubit_counterpart": "CLI `qubit skills list`"}
+    return _ok(name=str(man.get("name", ident) or ident),
+               description=str(man.get("description", "") or ""),
+               source=str(man.get("source", "qubit-local") or "qubit-local"),
+               identifier=ident, trust_level="trusted", repo=None, tags=[],
+               skill_md=json.dumps(man, indent=2, sort_keys=True),
+               files=sorted(str(k) for k in man.keys()),
+               qubit_counterpart="CLI `qubit skills show <id>`")
+
+
+def h_skills_hub_scan(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    ident = str(q.get("identifier", b.get("identifier", "")) or "")
+    if not ident:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "identifier is required",
+                     "qubit_counterpart": "CLI `qubit skills validate`"}
+    if _is_remote_identifier(ident):
+        return _hub_remote_gate("CLI `qubit skills validate`")
+    man, _why = _hub_resolve_manifest(cfg, ident)
+    if man is None:
+        return 404, {"ok": False, "code": "SKILL_NOT_FOUND",
+                     "detail": f"no local reviewed skill {ident!r}",
+                     "qubit_counterpart": "CLI `qubit skills list`"}
+    findings: List[Dict[str, Any]] = []
+    verdict, policy = "clean", "allow"
+    reason = "local reviewed manifest passes the Qubit skill contract"
+    try:
+        _manifest_spec(man)
+    except Exception as exc:
+        verdict, policy = "blocked", "block"
+        reason = _redact(str(exc))[:200]
+        findings = [{"severity": "high", "category": "validation",
+                     "file": "manifest", "line": 0, "description": reason}]
+    counts = {sev: 0 for sev in ("critical", "high", "medium", "low")}
+    for f in findings:
+        if f["severity"] in counts:
+            counts[f["severity"]] += 1
+    return _ok(name=str(man.get("name", ident) or ident), identifier=ident,
+               source=str(man.get("source", "qubit-local") or "qubit-local"),
+               trust_level="trusted", verdict=verdict,
+               summary=("no blocking findings" if verdict == "clean"
+                        else "manifest failed validation"),
+               policy=policy, policy_reason=reason, findings=findings,
+               severity_counts=counts, tier1=None,
+               qubit_counterpart="CLI `qubit skills validate`")
+
+
+def h_skills_hub_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import SkillValidationError, permissions_store
+    from .verified_skills import mutations as SM
+    ident = str(b.get("identifier", q.get("identifier", "")) or "")
+    if not ident or _is_remote_identifier(ident):
+        return _hub_remote_gate("CLI `qubit skills install <local-manifest>`")
+    man, why = _hub_resolve_manifest(cfg, ident)
+    if man is None:
+        return 404, {"ok": False, "code": "SKILL_NOT_FOUND",
+                     "detail": f"no local reviewed manifest {ident!r} ({why})",
+                     "qubit_counterpart": "CLI `qubit skills list`"}
+    cid = str(b.get("confirmation_id", "") or q.get("confirmation_id", "")
+              or "").strip()
+    if not _truthy(b.get("confirm")) and not cid:
+        # Canonical journal stage: 409 with a POPULATED, single-use id (the
+        # previous empty id could never be settled by the pending banner).
+        out = SM.handle_skill_mutation(cfg, "install", {"manifest": man},
+                                       actor="dashboard:user",
+                                       session="dashboard")
+        return _mutation_envelope(out)
+    if cid:
+        out = SM.handle_skill_mutation(cfg, "install", {"manifest": man},
+                                       confirmation_id=cid,
+                                       actor="dashboard:user",
+                                       session="dashboard")
+        return _mutation_envelope(out)
+    # Legacy boolean confirm: keep the direct install path (and its honest
+    # duplicate/validation 400s) for callers that already send ``confirm: true``.
+    try:
+        spec = _manifest_spec(man)
+        rec = permissions_store(cfg).install_skill(
+            spec, requested_by="dashboard:user", confirmed=True)
+    except SkillValidationError as exc:
+        return 400, {"ok": False, "code": "SKILL_INVALID",
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit skills install <manifest>`"}
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit skills install <manifest>`"}
+    return _ok(ok=True, skill_id=rec.skill_id, status=rec.status,
+               identifier=ident,
+               qubit_counterpart="CLI `qubit skills install <manifest>`")
+
+
+def h_skills_hub_uninstall(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import permissions_store
+    name = str(b.get("name", b.get("identifier", q.get("identifier", "")))
+               or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "name is required",
+                     "qubit_counterpart": "CLI `qubit skills remove <id>`"}
+    if not b.get("confirm"):
+        return _staged(
+            f"skill uninstall {name!r} requires confirmation: re-POST with "
+            "{\"confirm\": true}", "")
+    try:
+        permissions_store(cfg).remove_skill(
+            name, requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit skills remove <id>`"}
+    return _ok(ok=True, name=name,
+               qubit_counterpart="CLI `qubit skills remove <id>`")
+
+
+def h_skills_hub_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    from .permissions import permissions_store
+    ident = str(b.get("name", b.get("identifier", q.get("identifier", "")))
+                or "").strip()
+    if not ident or _is_remote_identifier(ident):
+        return _hub_remote_gate("CLI `qubit skills install <local-manifest>`")
+    if not b.get("confirm"):
+        return _staged(
+            f"skill update {ident!r} requires confirmation: re-POST with "
+            "{\"confirm\": true}", "")
+    try:
+        store = permissions_store(cfg)
+        if store.skill(ident) is None:
+            return 404, {"ok": False, "code": "SKILL_NOT_FOUND",
+                         "detail": f"no installed skill {ident!r}",
+                         "qubit_counterpart": "CLI `qubit skills list`"}
+        rolled = store.rollback_skill(ident, requested_by="dashboard:user",
+                                      confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or type(exc).__name__
+        if code == "PermissionError" and "rollback state" in str(exc):
+            return _gate("SKILL_VERSIONED",
+                         "Skill versions are immutable; this staged record has "
+                         "no prior active version to roll back. Reinstall the "
+                         "new validated manifest to advance.",
+                         "CLI `qubit skills remove/install <manifest>`")
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "CLI `qubit skills rollback`"}
+    return _ok(ok=True, skill_id=rolled.skill_id, status=rolled.status,
+               detail="rolled back to the prior staged version; reinstall the "
+                      "new validated manifest to advance",
+               qubit_counterpart="CLI `qubit skills rollback/install`")
+
+
+# ---------------------------------------------------------------------------
+# Wave 4: real brokered file / git / blueprint writes (staged -> confirm ->
+# apply through the same Qubit stores and confinement the CLI/voice use).
+# ---------------------------------------------------------------------------
+
+def _full_replace_patch(name: str, before: str, after: str) -> str:
+    """Unified diff that replaces an entire UTF-8 file's contents."""
+    old = before.splitlines()
+    new = after.splitlines()
+    hunk = (f"@@ -1,{len(old)} +1,{len(new)} @@" if old
+            else f"@@ -0,0 +1,{len(new)} @@")
+    lines = [f"--- a/{name}", f"+++ b/{name}", hunk]
+    lines += ["-" + ln for ln in old]
+    lines += ["+" + ln for ln in new]
+    return "\n".join(lines) + "\n"
+
+
+def _file_write_broker(cfg: Any) -> Any:
+    """Build the one host broker with the confined file-write capabilities.
+
+    Same registry/policy/e-stop/confirmation-journal/audit junction the CLI,
+    voice, and planner use; the shared :class:`PowerControl` makes a latched
+    emergency stop / global disable refuse the write BEFORE the executor runs.
+    """
+    from .broker import build_host_broker, register_file_patch
+    from .power import power_control
+
+    broker = build_host_broker(power_control=power_control(cfg), cfg=cfg)
+    register_file_patch(broker, cfg=cfg)
+    return broker
+
+
+def _file_patch_http(code: str) -> int:
+    from . import file_patch as FP
+
+    return {FP.CONFIRM_CODE: 409, FP.ESTOP_CODE: 403,
+            FP.OUTSIDE_ROOT_CODE: 400, FP.BAD_INPUT_CODE: 400,
+            FP.CONFINEMENT_CODE: 503, FP.CONFLICT_CODE: 409,
+            FP.NOT_FOUND_CODE: 400, FP.PARSE_CODE: 400,
+            FP.TOO_LARGE_CODE: 400, FP.TOO_MANY_LINES_CODE: 400,
+            FP.IO_CODE: 400, FP.ROLLBACK_CODE: 400}.get(code, 400)
+
+
+def _file_patch_refusal(code: str, detail: str, counterpart: str,
+                        rollback: str = "nothing written; target unchanged"
+                        ) -> Tuple[int, Dict[str, Any]]:
+    return _file_patch_http(code), {
+        "ok": False, "code": code, "detail": _redact(detail)[:300],
+        "owner": "qubit-policy", "rollback": rollback,
+        "qubit_counterpart": counterpart}
+
+
+def _brokered_file_mutation(cfg: Any, capability: str, args: Dict[str, Any], *,
+                            q: Dict[str, str], b: Dict[str, Any],
+                            target: str, detail: str, counterpart: str
+                            ) -> Tuple[Optional[Tuple[int, Dict[str, Any]]],
+                                       Optional[Dict[str, Any]]]:
+    """Run one confined file mutation through the broker confirmation path.
+
+    Returns ``(response, None)`` to stop (staged or typed refusal) or
+    ``(None, receipt)`` after a real execution. A request that carries no
+    durable ``confirmation_id`` stages a single-use confirmation on the SHARED
+    journal (bound to the capability and the exact arguments) and answers the
+    typed 409 the dashboard settles by re-issuing the same request with that id.
+    A client ``confirm`` boolean is never authority. With an id, the broker
+    checks the shared e-stop/global-disable latch, consumes the confirmation
+    exactly once, audits the decision, and executes.
+    """
+    from . import file_patch as FP
+
+    # E-stop / global-disable fail closed BEFORE anything is staged or written.
+    if _estop(cfg):
+        return _file_patch_refusal(
+            FP.ESTOP_CODE,
+            "emergency stop is latched; reset it before writing files",
+            counterpart, rollback="nothing written; target unchanged"), None
+
+    cid = str(b.get("confirmation_id", "")
+              or q.get("confirmation_id", "") or "").strip()
+    try:
+        broker = _file_write_broker(cfg)
+    except Exception as exc:
+        return _fail(exc), None
+
+    if not cid:
+        confirmation_id = ""
+        try:
+            rec = broker.issue_confirmation(capability, dict(args),
+                                            issued_by="user", ttl_s=120.0)
+            confirmation_id = rec.id
+        except Exception:
+            confirmation_id = ""
+        _audit("needs_confirm", "dashboard:user",
+               {"capability": capability, "target": target,
+                "confirmation_id": confirmation_id})
+        return _staged(detail, confirmation_id), None
+
+    res = broker.execute(capability, dict(args), source="user",
+                         confirmation_id=cid, target=target)
+    if res.ok and str(res.output or "").strip():
+        try:
+            payload = json.loads(res.output)
+        except Exception:
+            payload = {}
+        if isinstance(payload, dict) and payload.get("ok"):
+            receipt = payload.get("receipt")
+            return None, receipt if isinstance(receipt, dict) else {}
+        code = str(payload.get("code") or FP.IO_CODE)
+        detail_msg = str(payload.get("detail") or "file write refused")
+        return _file_patch_refusal(code, detail_msg, counterpart), None
+
+    # Broker-level refusal (e-stop, malformed input, bad confirmation, ...).
+    code = str(res.denied or FP.IO_CODE)
+    http = {"EMERGENCY_STOP": 403, "POWER_DISABLED": 403,
+            "POWER_UNAVAILABLE": 403, "CIRCUIT_OPEN": 403,
+            "DESTRUCTIVE_SCREEN": 403, "CONCURRENCY_LIMIT": 429,
+            "CONFIRMATION_SOURCE_FORBIDDEN": 403,
+            "UNKNOWN_CONFIRMATION_ID": 409, "EXPIRED_CONFIRMATION": 409,
+            "REPLAYED_CONFIRMATION": 409, "CAPABILITY_MISMATCH": 409,
+            "TARGET_MISMATCH": 409, "UNKNOWN_CAPABILITY": 400,
+            "MALFORMED_INPUT": 400, "OUT_OF_SCOPE": 403}.get(code, 400)
+    return (http, {
+        "ok": False, "code": _redact(code)[:80],
+        "detail": _redact(res.error or "file write refused")[:300],
+        "owner": "qubit-policy",
+        "rollback": "nothing written; target unchanged",
+        "qubit_counterpart": counterpart}), None
+
+
+def h_fs_write_text(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/fs/write-text -> confined, brokered, reversible file patch.
+
+    The write runs the SAME ``file_patch`` confinement/backup/rollback/audit
+    path as the CLI, dispatched through the canonical broker so the shared
+    confirmation journal, e-stop/global-disable latch, and audit attribution
+    all apply. A mutation requires a durable ``confirmation_id`` staged on the
+    shared journal; without one it answers a typed 409 (a client ``confirm``
+    boolean is not authority). A path outside the approved project roots is a
+    typed refusal, never a host write.
+    """
+    from . import file_patch as FP
+    counterpart = "CLI `qubit patch apply` / `qubit patch rollback`"
+    path = str(b.get("path", q.get("path", "")) or "").strip()
+    if not path:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "path required",
+                     "qubit_counterpart": "CLI `qubit patch apply`"}
+    content = b.get("content", b.get("text", ""))
+    if not isinstance(content, str):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "content must be text",
+                     "qubit_counterpart": "CLI `qubit patch apply`"}
+    try:
+        target = FP.resolve_target(cfg, path)
+        before = (target.read_text(encoding="utf-8")
+                  if target.exists() else "")
+    except FP.FilePatchError as exc:
+        return _file_patch_refusal(exc.code, exc.detail, counterpart)
+    except (OSError, UnicodeDecodeError) as exc:
+        return _file_patch_refusal(FP.BAD_INPUT_CODE, f"cannot read target ({exc})",
+                                   counterpart)
+    patch = _full_replace_patch(target.name, before, content)
+    args = {"target_path": path, "patch_text": patch,
+            "requested_by": "dashboard:user", "project_root": ""}
+    resp, receipt = _brokered_file_mutation(
+        cfg, FP.capability_name(), args, q=q, b=b, target=str(target),
+        detail=(f"writing {path!r} is a brokered, confirmed, reversible "
+                "confined file patch; re-POST with the confirmation_id to "
+                "apply"),
+        counterpart=counterpart)
+    if resp is not None:
+        return resp
+    return _ok(ok=True, path=str(target), state=receipt.get("state"),
+               receipt=receipt,
+               qubit_counterpart="CLI `qubit patch rollback` (undo available)")
+
+
+def h_files_upload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/files/upload -> real confined UTF-8 text write.
+
+    Accepts plain ``content`` or a base64 ``data_url``/``content_base64``. The
+    bytes must decode as UTF-8; genuinely-binary uploads are a typed
+    ``FILES_BINARY`` gate (Qubit serves bounded text writes, not binary
+    storage). A text upload runs the same brokered confirmation path as
+    ``/api/fs/write-text``.
+    """
+    import base64
+    path = str(b.get("path", q.get("path", "")) or "").strip()
+    if not path:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "path required",
+                     "qubit_counterpart": "POST /api/fs/write-text"}
+    content = b.get("content")
+    if content is None:
+        blob = str(b.get("data_url", b.get("content_base64", "")) or "")
+        if blob:
+            raw = blob.split(",", 1)[1] if blob.startswith("data:") else blob
+            try:
+                data = base64.b64decode(raw, validate=False)
+            except Exception:
+                return 400, {"ok": False, "code": "MALFORMED",
+                             "detail": "content_base64 is not valid base64",
+                             "qubit_counterpart": "POST /api/fs/write-text"}
+            try:
+                content = data.decode("utf-8")
+            except UnicodeDecodeError:
+                return _gate("FILES_BINARY",
+                             "Binary uploads are not stored; Qubit serves "
+                             "bounded UTF-8 text writes through the confined "
+                             "file broker.",
+                             "POST /api/fs/write-text (text only)")
+    if not isinstance(content, str):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "content (text) or content_base64 required",
+                     "qubit_counterpart": "POST /api/fs/write-text"}
+    return h_fs_write_text(cfg, q,
+                           {**b, "path": path, "content": content}, p)
+
+
+def h_files_mkdir(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/files/mkdir -> confined, brokered directory creation.
+
+    Routed through the canonical broker like the file-write path, so the shared
+    e-stop/global-disable latch and confirmation journal apply and a latched
+    e-stop refuses even without a write. The new directory must resolve inside
+    an approved project root. A mutation requires a durable ``confirmation_id``
+    on the shared journal; an existing target or an out-of-root path is a typed
+    refusal, never a host write.
+    """
+    from . import file_patch as FP
+    counterpart = "CLI `qubit project add-folder` / `qubit files inspect`"
+    path = str(b.get("path", q.get("path", "")) or "").strip()
+    if not path:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "path required",
+                     "qubit_counterpart": "CLI `qubit project add-folder`"}
+    try:
+        target = FP.resolve_target(cfg, path)
+    except FP.FilePatchError as exc:
+        return _file_patch_refusal(
+            exc.code, exc.detail, counterpart,
+            rollback="nothing created; target unchanged")
+    args = {"target_path": path, "requested_by": "dashboard:user",
+            "project_root": ""}
+    resp, receipt = _brokered_file_mutation(
+        cfg, FP.mkdir_capability_name(), args, q=q, b=b, target=str(target),
+        detail=(f"creating directory {path!r} is brokered, confirmed, and "
+                "confined; re-POST with the confirmation_id to create"),
+        counterpart=counterpart)
+    if resp is not None:
+        return resp
+    _audit("files.mkdir", "dashboard:user", {"path": str(target)})
+    return _ok(ok=True, path=str(target), created=True,
+               state=receipt.get("state"),
+               qubit_counterpart="CLI `qubit files inspect` / `qubit project`")
+
+
+
+def h_git_write(verb: str) -> Handler:
+    """POST /api/git/... -> real confirm-gated brokered git-write authorization.
+
+    Qubit git stays a scoped read surface: the handler validates the repo with
+    the real ``git_scope`` confinement, then records a capability grant
+    (``git.write.<verb>``) scoped to that repo in the shared PermissionsStore
+    the CLI/voice use. The actual apply runs through the brokered opencode
+    worktree flow, never a raw shell git write from the dashboard.
+    """
+    counterpart = ("CLI `qubit opencode` (brokered worktree apply) + "
+                   "`qubit permissions` grant")
+
+    def _handler(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+        from . import git_scope as GS
+        from .permissions import permissions_store
+        try:
+            root = GS.resolve_root(cfg, _git_query_root(q, b))
+        except Exception as exc:
+            code = getattr(exc, "code", None) or type(exc).__name__
+            return 400, {"ok": False, "code": code,
+                         "detail": _redact(str(exc))[:300],
+                         "qubit_counterpart": "CLI `qubit git status`"}
+        if not b.get("confirm"):
+            return _staged(
+                f"git {verb} is a brokered write on {root}; re-POST with "
+                "{\"confirm\": true} plus a fresh approval", "")
+        try:
+            grant = permissions_store(cfg).grant(
+                f"git.write.{verb}", requested_by="dashboard:user",
+                confirmed=True, scopes=(str(root),),
+                note=f"brokered git {verb}; apply runs through the opencode "
+                     "worktree flow")
+        except Exception as exc:
+            code = getattr(exc, "code", None) or type(exc).__name__
+            return 400, {"ok": False, "code": code,
+                         "detail": _redact(str(exc))[:300],
+                         "qubit_counterpart": counterpart}
+        return _ok(ok=True, verb=verb, root=str(root), grant_id=grant.id,
+                   applied=False,
+                   detail="authorization recorded; apply through the brokered "
+                          "opencode worktree flow",
+                   qubit_counterpart=counterpart)
+
+    return _handler
+
+
+def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/cron/blueprints/instantiate -> real confirm-gated schedule.
+
+    Fills a local blueprint's slots and creates the schedule in the same
+    ``schedules`` store the CLI/voice use. ``values`` (or top-level keys) carry
+    ``name``/``prompt``/``when``. Without ``confirm`` it stages a typed 409; a
+    missing schedule expression is a typed 400, never a fabricated job.
+    """
+    values = b.get("values") if isinstance(b.get("values"), dict) else {}
+    merged = {**{k: v for k, v in b.items() if k != "values"}, **values}
+    if "blueprint" in merged and "name" not in merged:
+        merged["name"] = merged["blueprint"]
+    if not merged.get("name"):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "blueprint name required",
+                     "qubit_counterpart": "CLI `qubit schedules`"}
+    if not merged.get("when") and not merged.get("schedule"):
+        return 400, {"ok": False, "code": "BLUEPRINT_BAD_FILL",
+                     "detail": "a schedule expression (when) is required",
+                     "qubit_counterpart": "CLI `qubit schedules create`"}
+    values = {k: v for k, v in merged.items()
+              if k != "confirm" and isinstance(v, (str, int, float, bool))}
+    return cron_create(cfg, q, {**values, "confirm": bool(b.get("confirm"))}, p)
+
+
+def h_plugin_kanban_attachment_download(
+        cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/plugins/kanban/attachments/{id} -> real attachment bytes.
+
+    Serves the vendored kanban plugin's own attachment store — the same store
+    ``GET /tasks/{id}/attachments`` lists. The compat dispatcher returns JSON,
+    so the blob is base64-encoded alongside the real filename/content-type and
+    the served UI decodes it into a Blob download. A missing row, a tampered
+    path, or a missing blob is the vendored plugin's typed ``PLUGIN_HTTP`` 404 —
+    never a JSON success with no bytes and never the dead compat no-route 404.
+    """
+    from . import qubit_plugins as HP
+    raw = str(p.get("attachment_id") or "").strip()
+    if not raw.isdigit():
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"attachment {raw!r} not found"}
+    att_id = int(raw)
+    try:
+        engine = HP._kanban_engine(cfg)
+        kb = engine.kanban_db
+        with engine._board_conn(q.get("board") or None) as (board, conn):
+            att = kb.get_attachment(conn, att_id)
+            if att is None:
+                return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                             "detail": f"attachment {att_id} not found"}
+            root = Path(kb.attachments_root(board=board)).resolve()
+            stored = Path(att.stored_path).resolve()
+            try:
+                stored.relative_to(root)
+            except (ValueError, OSError):
+                return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                             "detail": "attachment file unavailable"}
+            if not stored.is_file():
+                return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                             "detail": "attachment file missing on disk"}
+            data = stored.read_bytes()
+    except HP.PluginUnavailable as exc:
+        return _gate("ATTACHMENT_STORE_UNAVAILABLE",
+                     "the kanban attachment store is unavailable: "
+                     + _redact(str(exc))[:200],
+                     "CLI `qubit kanban` (attachments live with the task)",
+                     http=503)
+    except Exception as exc:
+        return HP._kanban_http(exc)
+    return _ok(attachment_id=att_id, filename=att.filename,
+               content_type=att.content_type or "application/octet-stream",
+               size=len(data),
+               data_base64=base64.b64encode(data).decode("ascii"))
+
+
+# ---------------------------------------------------------------------------
+# Kanban WRITE surface -> the AUTHORITATIVE Qubit-native store
+# ---------------------------------------------------------------------------
+# The vendored kanban dashboard plugin's read routes synthesize the vendored
+# board/task wire shape from ``voicebridge.kanban`` (the native store the CLI,
+# voice, operations catalog and ``/qubit-boards`` all use). These write handlers
+# back the plugin's own mutation routes with the SAME store, so the dashboard
+# controls mutate exactly what they render — one authoritative board store.
+# Every mutation runs through the shared ``_compat_confirm`` contract (e-stop
+# latch -> stage/settle on the one approvals journal -> execute) and is
+# audited; a mutation with no native-schema equivalent stays a typed refusal
+# naming the CLI/voice/overlay counterpart, never a fabricated success.
+
+_VENDOR_TO_NATIVE_STATUS = {
+    "triage": "open", "todo": "open", "scheduled": "open", "ready": "open",
+    "running": "claimed", "review": "claimed", "blocked": "blocked",
+    "done": "done", "archived": "archived",
+}
+_VENDOR_PRIORITY_TO_NATIVE = {0: "low", 1: "normal", 2: "high"}
+
+
+def _kanban_board_slug(q: Dict[str, str], b: Dict[str, Any]) -> str:
+    raw = str((b or {}).get("board") or (q or {}).get("board") or "").strip()
+    return "main" if raw in ("", "default") else raw
+
+
+def _kanban_priority(value: Any) -> Optional[str]:
+    """Map a vendored priority (int 0/1/2 or a native name) to a native value."""
+    if value is None or value == "":
+        return "normal"
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return _VENDOR_PRIORITY_TO_NATIVE.get(value)
+    text = str(value).strip().lower()
+    return text if text in ("low", "normal", "high") else None
+
+
+def _kanban_native_show(cfg: Any, tid: int) -> Dict[str, Any]:
+    from . import kanban as KB
+
+    return KB.show(cfg, int(tid))["task"]
+
+
+def _kanban_vendor_task(cfg: Any, tid: int) -> Dict[str, Any]:
+    """The vendored task wire shape synthesized from the native task."""
+    task = _kanban_native_show(cfg, tid)
+    comments = task.get("comments") or []
+    return _qubit_plugins._native_task_vendor(task, time.time(), len(comments))
+
+
+def _kanban_confirm(cfg: Any, action: str, detail: str, q: Dict[str, str],
+                    b: Dict[str, Any], payload: Dict[str, Any]
+                    ) -> Optional[Tuple[int, Dict[str, Any]]]:
+    return _compat_confirm(cfg, action, detail, query=q, body=b,
+                           payload=payload)
+
+
+def _kanban_apply_status(cfg: Any, kb: Any, tid: int, status: str) -> None:
+    """Apply a vendored column status through the native transition verbs."""
+    if status == "running":
+        kb.claim(cfg, tid, requested_by="dashboard:user", confirmed=True)
+    elif status == "blocked":
+        kb.block(cfg, tid, requested_by="dashboard:user", confirmed=True)
+    elif status == "done":
+        kb.complete(cfg, tid, requested_by="dashboard:user", confirmed=True)
+    elif status == "archived":
+        kb.archive_task(cfg, tid, requested_by="dashboard:user", confirmed=True)
+    else:  # todo/triage/scheduled/ready -> the native "open" column
+        kb.reclaim(cfg, tid, requested_by="dashboard:user", confirmed=True)
+
+
+def h_plugin_kanban_boards_create(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any],
+                                  p: Dict[str, str]
+                                  ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/plugins/kanban/boards -> create on the native board store."""
+    from . import kanban as KB
+
+    slug = str(b.get("slug", "") or "").strip()
+    if not slug:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "slug required",
+                     "qubit_counterpart": "CLI `qubit kanban boards-create`"}
+    gate = _kanban_confirm(
+        cfg, "kanban.boards_create", f"creating kanban board {slug!r}", q, b,
+        {"slug": slug, "name": str(b.get("name", "") or "")})
+    if gate is not None:
+        return gate
+    try:
+        out = KB.boards_create(cfg, slug, str(b.get("name", "") or ""),
+                               requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    created = str(out.get("board", slug))
+    _audit("kanban.boards.create", "dashboard:user", {"board": created})
+    return 200, {"ok": True,
+                 "board": {"slug": created, "name": out.get("name", created),
+                           "counts": {}, "total": 0,
+                           "is_current": created == "main",
+                           "default_workspace_kind": "scratch",
+                           "default_workdir": None, "project_id": None,
+                           "project_name": None, "archived": False},
+                 "current": "main"}
+
+
+def h_plugin_kanban_tasks_create(cfg: Any, q: Dict[str, str],
+                                 b: Dict[str, Any],
+                                 p: Dict[str, str]
+                                 ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/plugins/kanban/tasks -> create on the native task store."""
+    from . import kanban as KB
+
+    title = str(b.get("title", "") or "").strip()
+    if not title:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "title required",
+                     "qubit_counterpart": "CLI `qubit kanban create`"}
+    board = _kanban_board_slug(q, b)
+    priority = _kanban_priority(b.get("priority"))
+    if priority is None:
+        return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
+                     "detail": "priority must be low, normal, or high",
+                     "qubit_counterpart": "CLI `qubit kanban create`"}
+    gate = _kanban_confirm(
+        cfg, "kanban.create", f"creating kanban task {title!r} on {board!r}",
+        q, b, {"title": title, "board": board})
+    if gate is not None:
+        return gate
+    try:
+        out = KB.create(cfg, title, board=board,
+                        body=str(b.get("body") or ""),
+                        assignee=str(b.get("assignee") or ""),
+                        priority=priority, requested_by="dashboard:user",
+                        confirmed=True)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    tid = int(out["task"]["id"])
+    _audit("kanban.create", "dashboard:user", {"task_id": tid, "board": board})
+    return 200, {"ok": True, "task": _kanban_vendor_task(cfg, tid)}
+
+
+def h_plugin_kanban_tasks_patch(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any],
+                                p: Dict[str, str]
+                                ) -> Tuple[int, Dict[str, Any]]:
+    """PATCH /api/plugins/kanban/tasks/{id} -> native edit/assign/transition."""
+    from . import kanban as KB
+
+    raw = str(p.get("task_id") or "").strip()
+    if not raw.isdigit():
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"task {raw!r} not found"}
+    tid = int(raw)
+    status = str(b.get("status", "") or "").strip().lower()
+    if status and status not in _VENDOR_TO_NATIVE_STATUS:
+        return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
+                     "detail": f"unsupported status {status!r}",
+                     "qubit_counterpart": "CLI `qubit kanban`"}
+    try:
+        _kanban_native_show(cfg, tid)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    gate = _kanban_confirm(cfg, "kanban.update",
+                           f"updating kanban task #{tid}", q, b,
+                           {"task_id": tid, "status": status})
+    if gate is not None:
+        return gate
+    try:
+        if b.get("assignee") is not None:
+            assignee = str(b.get("assignee") or "")
+            if assignee.strip():
+                KB.assign(cfg, tid, assignee, requested_by="dashboard:user",
+                          confirmed=True)
+            else:
+                KB.reclaim(cfg, tid, requested_by="dashboard:user",
+                           confirmed=True)
+        if status:
+            _kanban_apply_status(cfg, KB, tid, status)
+        if b.get("title") is not None or b.get("body") is not None \
+                or b.get("priority") is not None:
+            priority = (_kanban_priority(b.get("priority"))
+                        if b.get("priority") is not None else "")
+            if priority is None:
+                return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
+                             "detail": "priority must be low, normal, or high",
+                             "qubit_counterpart": "CLI `qubit kanban edit`"}
+            KB.edit(cfg, tid,
+                    title=str(b.get("title") or ""),
+                    body=str(b.get("body") or ""),
+                    priority=priority or "",
+                    requested_by="dashboard:user", confirmed=True)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    _audit("kanban.update", "dashboard:user", {"task_id": tid})
+    return 200, {"ok": True, "task": _kanban_vendor_task(cfg, tid)}
+
+
+def h_plugin_kanban_tasks_delete(cfg: Any, q: Dict[str, str],
+                                 b: Dict[str, Any],
+                                 p: Dict[str, str]
+                                 ) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/plugins/kanban/tasks/{id} -> reversible native archive."""
+    from . import kanban as KB
+
+    raw = str(p.get("task_id") or "").strip()
+    if not raw.isdigit():
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"task {raw!r} not found"}
+    tid = int(raw)
+    try:
+        _kanban_native_show(cfg, tid)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    gate = _kanban_confirm(cfg, "kanban.archive",
+                           f"archiving kanban task #{tid}", q, b,
+                           {"task_id": tid})
+    if gate is not None:
+        return gate
+    try:
+        KB.archive_task(cfg, tid, requested_by="dashboard:user",
+                        confirmed=True)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    _audit("kanban.archive", "dashboard:user", {"task_id": tid})
+    return 200, {"ok": True, "deleted": True, "task_id": raw, "archived": True,
+                 "qubit_counterpart": "CLI `qubit kanban restore` "
+                                      "(reversible; undo available)"}
+
+
+def h_plugin_kanban_tasks_bulk(cfg: Any, q: Dict[str, str],
+                               b: Dict[str, Any],
+                               p: Dict[str, str]
+                               ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/plugins/kanban/tasks/bulk -> per-id native patch."""
+    from . import kanban as KB
+
+    ids = b.get("ids")
+    if not isinstance(ids, list) or not ids:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "ids is required",
+                     "qubit_counterpart": "CLI `qubit kanban`"}
+    status = str(b.get("status", "") or "").strip().lower()
+    if status and status not in _VENDOR_TO_NATIVE_STATUS:
+        return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
+                     "detail": f"unsupported status {status!r}",
+                     "qubit_counterpart": "CLI `qubit kanban`"}
+    gate = _kanban_confirm(cfg, "kanban.bulk",
+                           f"bulk-updating {len(ids)} kanban tasks", q, b,
+                           {"ids": ",".join(str(i) for i in ids)[:500],
+                            "status": status})
+    if gate is not None:
+        return gate
+    priority = _kanban_priority(b.get("priority")) \
+        if b.get("priority") is not None else ""
+    if b.get("priority") is not None and priority is None:
+        return 400, {"ok": False, "code": "KANBAN_BAD_INPUT",
+                     "detail": "priority must be low, normal, or high",
+                     "qubit_counterpart": "CLI `qubit kanban`"}
+    results = []
+    for raw in ids:
+        entry: Dict[str, Any] = {"id": str(raw), "ok": True}
+        try:
+            tid = int(str(raw))
+            _kanban_native_show(cfg, tid)
+            if b.get("archive"):
+                KB.archive_task(cfg, tid, requested_by="dashboard:user",
+                                confirmed=True)
+            if status:
+                _kanban_apply_status(cfg, KB, tid, status)
+            if b.get("assignee") is not None and str(b.get("assignee")).strip():
+                KB.assign(cfg, tid, str(b.get("assignee")),
+                          requested_by="dashboard:user", confirmed=True)
+            if b.get("title") is not None or b.get("body") is not None \
+                    or b.get("priority") is not None:
+                KB.edit(cfg, tid, title=str(b.get("title") or ""),
+                        body=str(b.get("body") or ""),
+                        priority=priority or "",
+                        requested_by="dashboard:user", confirmed=True)
+        except Exception as exc:
+            entry.update(ok=False, error=_redact(str(exc))[:160])
+        results.append(entry)
+    _audit("kanban.bulk", "dashboard:user", {"count": len(results)})
+    return 200, {"ok": True, "results": results}
+
+
+def h_plugin_kanban_tasks_comment(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any],
+                                  p: Dict[str, str]
+                                  ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/plugins/kanban/tasks/{id}/comments -> native comment."""
+    from . import kanban as KB
+
+    raw = str(p.get("task_id") or "").strip()
+    if not raw.isdigit():
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"task {raw!r} not found"}
+    tid = int(raw)
+    text = str(b.get("body", "") or "")
+    if not text.strip():
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "body is required",
+                     "qubit_counterpart": "CLI `qubit kanban comment`"}
+    gate = _kanban_confirm(cfg, "kanban.comment",
+                           f"commenting on kanban task #{tid}", q, b,
+                           {"task_id": tid})
+    if gate is not None:
+        return gate
+    try:
+        KB.comment(cfg, tid, text,
+                   requested_by=str(b.get("author") or "dashboard:user"),
+                   confirmed=True)
+    except Exception as exc:
+        return _qubit_plugins._kanban_http(exc)
+    _audit("kanban.comment", "dashboard:user", {"task_id": tid})
+    return 200, {"ok": True}
+
+
+#: Legacy-brand tokens that must never be presented as a *current* Qubit API
+#: path in the served OpenAPI document. A compat alias carrying one of these
+#: still resolves on the wire, but is omitted from the /docs reference so no
+#: legacy-branded literal appears on a user-facing surface (BRAND.md).
+_LEGACY_API_BRAND_RE = re.compile(r"hermes|nous|openclaw", re.IGNORECASE)
+
+
+def h_openapi(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Qubit-branded OpenAPI 3 document generated from the compat route table.
+
+    Serves the /docs browser from the real Qubit API surface — no upstream
+    branding and no fork ``/openapi.json`` proxy. Gated routes are listed as
+    documented capability entries (``deprecated`` + reason), not as executable
+    operations.
+
+    Legacy-named paths (the vendored plugin namespace and the superseded
+    update alias) still resolve on the wire as compat aliases, but they are
+    omitted from this reference so the user-facing /docs browser never renders
+    a legacy-branded literal. The Qubit-owned canonical surfaces are the
+    documented operations.
+    """
+    paths: Dict[str, Dict[str, Any]] = {}
+    for row in ROUTES:
+        pattern = str(row.get("pattern") or "")
+        method = str(row.get("method") or "GET").lower()
+        if not pattern or method not in ("get", "post", "put", "patch",
+                                         "delete"):
+            continue
+        oas_path = re.sub(
+            r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>[^)]*\)", r"{\1}", pattern)
+        if _LEGACY_API_BRAND_RE.search(oas_path):
+            # Legacy-named compat alias (the vendored plugin namespace and the
+            # superseded update alias). The route still RESOLVES on the wire,
+            # but the served /docs document must not present a legacy-branded
+            # path on a user-facing surface (BRAND.md). Omit it from the
+            # OpenAPI reference rather than advertising the legacy literal.
+            continue
+        gate = row.get("gate") or {}
+        entry = {
+            "summary": str(row.get("handler") or ""),
+            "description": (
+                f"Qubit operation {row.get('handler')} "
+                f"[{row.get('disposition')}]"
+                + (f" — gated: {gate.get('code')}" if gate else "")),
+            "deprecated": bool(gate),
+            "responses": {"200": {"description": "OK"}},
+        }
+        paths.setdefault(oas_path, {})[method] = entry
+    return 200, {
+        "openapi": "3.0.3",
+        "info": {
+            "title": "Qubit Agent API",
+            "version": "1.0.0",
+            "description": "Qubit-branded API surface generated from the "
+                           "canonical Qubit compat route table. Operations "
+                           "carrying `x-qubit-compat-alias` are legacy-named "
+                           "compatibility aliases, retained for wire "
+                           "compatibility rather than advertised as current "
+                           "Qubit paths.",
+        },
+        "paths": dict(sorted(paths.items())),
+    }
+
+
+def h_gateway_rpc(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/gateway/rpc -> Qubit-dialect RPC on the one Qubit listener.
+
+    Owner decision 2026-09-18 (D2): Qubit-compatible RPC is served through
+    the existing authenticated Qubit listener, reusing the canonical in-process
+    method registry (``voicebridge.gateway.rpc``) that the CLI already
+    dispatches. No second gateway, server, or authority is started. Each method
+    delegates to the same broker/policy-gated backend the CLI, dashboard, and
+    voice use; the wire envelope follows the Qubit ``req``/``res`` shape:
+
+        {id, method, params} -> {type:"res", id, ok, payload | error}
+
+    The method list is the real registry (``default_registry().names()``), and
+    an unknown method is a typed ``GATEWAY_METHOD_NOT_FOUND`` - never a
+    fabricated success.
+    """
+    from .gateway.rpc import default_registry, handle_request
+    from .gateway.gateway_ws import GatewayError
+
+    body = b if isinstance(b, dict) else {}
+    params = body.get("params")
+    if params is None and isinstance(q.get("params"), str) and q.get("params"):
+        try:
+            params = json.loads(q["params"])
+        except (ValueError, TypeError):
+            params = None
+    msg = {
+        "id": body.get("id") or q.get("id") or "http-rpc",
+        "method": body.get("method") or q.get("method") or "",
+        "params": params if isinstance(params, dict) else {},
+    }
+    registry = default_registry()
+    if not msg["method"]:
+        return 400, {
+            "type": "res", "id": msg["id"], "ok": False,
+            "error": {"code": "GATEWAY_BAD_PARAMS",
+                      "message": "missing method",
+                      "details": {"methods": registry.names()}},
+        }
+    try:
+        res = handle_request(registry, cfg, msg)
+    except GatewayError as exc:
+        return 400, {
+            "type": "res", "id": msg["id"], "ok": False,
+            "error": {"code": exc.code, "message": exc.message,
+                      "details": exc.details},
+        }
+    return (200 if res.get("ok") else 400), res
+
+
+def h_gateway_rpc_methods(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/gateway/rpc -> the advertised Qubit-dialect method list."""
+    from .gateway.rpc import default_registry
+
+    return _ok(methods=default_registry().names(),
+               authority="single in-process registry; no second listener")
+
+
+def h_agents(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/agents -> canonical agent/worker roster (A41).
+
+    Read-only aggregation of the real worker lane, runtime adapters, active
+    agent profile, and recent sessions the same modules serve to the CLI and
+    voice. No second registry and no fabricated agents.
+    """
+    from .integration_status import worker_status
+    from .runtime_inventory import runtime_inventory
+
+    try:
+        inv = runtime_inventory(cfg)
+        worker = worker_status(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    agents: List[Dict[str, Any]] = [{
+        "id": "qubit-worker",
+        "kind": "worker",
+        "route": worker.get("route", "local"),
+        "state": worker.get("state", "OK"),
+        "enabled": bool(worker.get("agent_enabled", True)),
+        "model": str(worker.get("agent_model", "") or ""),
+    }]
+    adapters = inv.get("adapters") if isinstance(inv.get("adapters"), dict) else {}
+    for name in sorted(adapters):
+        row = adapters[name] if isinstance(adapters[name], dict) else {}
+        agents.append({"id": f"adapter:{name}", "kind": "adapter",
+                       "route": str(row.get("route", "") or ""),
+                       "state": str(row.get("state", "OK") or "OK")})
+    return _ok(agents=agents, worker=worker, agent=inv.get("agent"),
+               sessions=inv.get("sessions"),
+               authority="read-only aggregation of the canonical worker lane, "
+                         "runtime adapters, agent profile, and sessions")
+
+
+def h_credentials_pool(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/credentials/pool -> redacted provider/entry inventory.
+
+    Names/labels/status only; no token value or fragment (A32). The upstream
+    ``/api/credentials/pool`` route stays gated; this is the real allowed
+    counterpart for the dashboard Remove control.
+    """
+    from . import credentials as CR
+    try:
+        out = CR.inventory(cfg)
+    except CR.CredentialError as exc:
+        return 503, {"ok": False, "code": exc.code, "detail": exc.detail}
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**out)
+
+
+def h_credentials_pool_add(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/credentials/pool -> add from an env:/file: reference.
+
+    The browser supplies a reference, never a raw key; the value is resolved
+    server-side and written through the canonical credential-pool path.
+    Confirmed, e-stop-aware, audited, and returns no token.
+    """
+    from . import credentials as CR
+    confirm = bool(b.get("confirm")) or \
+        str(q.get("confirm", "")).lower() in ("1", "true", "yes")
+    out = CR.add_reference(
+        cfg, str(b.get("provider", "") or ""),
+        str(b.get("key_ref", b.get("reference", "")) or ""),
+        str(b.get("label", "") or ""), confirmed=confirm,
+        requested_by="dashboard:user")
+    state = str(out.get("state"))
+    status = {"OK": 200, "MISSING": 404, "denied": 409,
+              "ESTOP": 423, "UNAVAILABLE": 503}.get(state, 400)
+    body = {"ok": state == "OK"}
+    body.update(out)
+    return status, body
+
+
+def h_credentials_pool_remove(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/qubit/credentials/pool/{provider}/{index} -> real removal.
+
+    Confirmed + e-stop-aware + audited; delegates to the canonical
+    ``CredentialPool.remove_index`` and returns no secret.
+    """
+    from . import credentials as CR
+    confirm = bool(b.get("confirm")) or \
+        str(q.get("confirm", "")).lower() in ("1", "true", "yes")
+    out = CR.remove(cfg, p.get("provider", ""), p.get("index", ""),
+                    confirmed=confirm, requested_by="dashboard:user")
+    state = str(out.get("state"))
+    status = {"OK": 200, "MISSING": 404, "denied": 409,
+              "ESTOP": 423, "UNAVAILABLE": 503}.get(state, 400)
+    body = {"ok": state == "OK"}
+    body.update(out)
+    return status, body
+
+
+_EXTRA_HANDLERS: Dict[str, Handler] = {
+    "h_openapi": h_openapi,
+    "h_gateway_rpc": h_gateway_rpc,
+    "h_gateway_rpc_methods": h_gateway_rpc_methods,
+    "h_agents": h_agents,
+    "h_credentials_pool": h_credentials_pool,
+    "h_credentials_pool_add": h_credentials_pool_add,
+    "h_credentials_pool_remove": h_credentials_pool_remove,
+    "h_plugin_kanban_attachment_download": h_plugin_kanban_attachment_download,
+    "h_plugin_kanban_boards_create": h_plugin_kanban_boards_create,
+    "h_plugin_kanban_tasks_create": h_plugin_kanban_tasks_create,
+    "h_plugin_kanban_tasks_patch": h_plugin_kanban_tasks_patch,
+    "h_plugin_kanban_tasks_delete": h_plugin_kanban_tasks_delete,
+    "h_plugin_kanban_tasks_bulk": h_plugin_kanban_tasks_bulk,
+    "h_plugin_kanban_tasks_comment": h_plugin_kanban_tasks_comment,
+    "cron_pause": lambda cfg, q, b, p: _cron_mutate("pause", cfg, q, b, p),
+    "cron_resume": lambda cfg, q, b, p: _cron_mutate("resume", cfg, q, b, p),
+    "cron_trigger": lambda cfg, q, b, p: _cron_mutate("run_due", cfg, q, b, p),
+    "pairing_create": lambda cfg, q, b, p: h_pairing_mutate("create", cfg, q, b),
+    "pairing_approve": lambda cfg, q, b, p: h_pairing_mutate("approve", cfg, q, b),
+    "pairing_revoke": lambda cfg, q, b, p: h_pairing_mutate("revoke", cfg, q, b),
+    "webhooks_add": lambda cfg, q, b, p: h_webhooks_mutate("add", cfg, q, b, p),
+    "webhooks_show": lambda cfg, q, b, p: h_webhooks_mutate("show", cfg, q, b, p),
+    "webhooks_mutate": lambda cfg, q, b, p: h_webhooks_mutate("remove", cfg, q, b, p),
+    "blueprints": h_blueprints,
+    "delivery": h_delivery_targets,
+    "h_session_patch": h_session_patch,
+    "h_session_delete": h_session_delete,
+    "h_session_resume": h_session_resume,
+    "sess_empty": lambda cfg, q, b, p: h_sess_empty(cfg, q, b, p),
+    "mem_reset": h_mem_reset,
+    "mem_reset_status": h_mem_reset_status,
+    "mem_prov": h_mem_provider,
+    "toolset_write": h_toolset_write,
+    "h_toolset_toggle": h_toolset_toggle,
+    "h_power": h_power,
+    "power_action": power_action,
+    "plugins_rescan": h_plugins_rescan,
+    "debug_share": h_debug_share,
+    "ckpt": h_ckpt,
+    "h_ckpt": h_ckpt,
+    "actions_read": h_actions_read,
+    "action_status": h_action_status,
+    "font": lambda cfg, q, b, p: h_font(cfg, q, b, p, False),
+    "font_set": lambda cfg, q, b, p: h_font(cfg, q, b, p, True),
+    "h_profiles_active": h_profiles_active,
+    "profiles_active_set": profiles_active_set,
+    "profile_soul_set": profile_soul_set,
+    "profile_desc": profile_desc,
+    "profile_model": profile_model,
+    "profile_describe_auto": profile_describe_auto,
+    "profile_rename": profile_rename,
+    "profile_delete": profile_delete,
+    "cron_create": cron_create,
+    "cron_update": cron_update,
+    "cron_delete": cron_delete,
+    "skill_create": skill_create,
+    "skill_update": skill_update,
+    "skill_delete": skill_delete,
+    "h_terminal_profiles": h_terminal_profiles,
+    "terminal_profile_set": terminal_profile_set,
+    "moa_put": moa_put,
+    "mcp_create": mcp_create,
+    "mcp_update": mcp_update,
+    "mcp_delete": mcp_delete,
+    "mcp_set_enabled": mcp_set_enabled,
+    "mcp_auth": mcp_auth,
+    "mcp_auth_status": mcp_auth_status,
+    "webhooks_enable": webhooks_enable,
+    "webhooks_enabled": webhooks_enabled,
+    "webhooks_delete": webhooks_delete,
+    "msg_update": msg_update,
+    "h_analytics_models": h_analytics_models,
+    "h_files_read": h_files_read,
+    "files_delete": files_delete,
+    "hooks_delete": hooks_delete,
+    "plugins_hub": plugins_hub,
+    "plugins_catalog": plugins_catalog,
+    "plugin_catalog_detail": plugin_catalog_detail,
+    "plugins_reload": plugins_reload,
+    "agent_enable": agent_enable,
+    "agent_disable": agent_disable,
+    "agent_remove": agent_remove,
+    "h_agent_plugin_install": h_agent_plugin_install,
+    "h_chat_session_activity": h_chat_session_activity,
+    "h_chat_session_drafts": h_chat_session_drafts,
+    "h_chat_session_draft_content": h_chat_session_draft_content,
+    "h_chat_session_comments": h_chat_session_comments,
+    "h_chat_vision": h_chat_vision,
+    "h_chat_session_ci": h_chat_session_ci,
+    "env_write": env_write,
+    "env_delete": env_delete,
+    "toolset_env_write": toolset_env_write,
+    "plugin_providers_write": plugin_providers_write,
+    "mem_provider_set": mem_provider_set,
+    "mem_config": mem_config,
+    "mem_config_write": mem_config_write,
+    "h_profile_setup_command": h_profile_setup_command,
+    "h_profile_soul": h_profile_soul,
+    "h_skill_content": h_skill_content,
+    "config_save": config_save,
+    "toolset_config": toolset_config,
+    "toolset_models": toolset_models,
+    "h_local_models_status": h_local_models_status,
+    "h_local_models_hardware": h_local_models_hardware,
+    "h_local_models_catalog": h_local_models_catalog,
+    "h_local_models_jobs": h_local_models_jobs,
+    "h_local_models_job_show": h_local_models_job_show,
+    "h_local_models_runtime_install": h_local_models_runtime_install,
+    "h_local_models_download": h_local_models_download,
+    "h_local_models_delete": h_local_models_delete,
+    "h_local_models_quickstart": h_local_models_quickstart,
+    "h_local_models_server": h_local_models_server,
+    "h_local_models_eject": h_local_models_eject,
+    "h_local_models_activate": h_local_models_activate,
+    "h_local_models_sideload": h_local_models_sideload,
+    "h_local_models_search": h_local_models_search,
+    "h_local_models_search_files": h_local_models_search_files,
+    "h_local_models_download_browsed": h_local_models_download_browsed,
+    "h_custom_endpoints": h_custom_endpoints,
+    "h_profiles_sessions": h_profiles_sessions,
+    "h_profiles_sessions_sidebar": h_profiles_sessions_sidebar,
+    "h_profiles_projects_tree": h_profiles_projects_tree,
+    "h_profile_create": h_profile_create,
+    "h_terminal_backends": h_terminal_backends,
+    "h_computer_use_status": h_computer_use_status,
+    "h_learning_graph": h_learning_graph,
+    "h_learning_node": h_learning_node,
+    "h_learning_node_update": h_learning_node_update,
+    "h_learning_node_delete": h_learning_node_delete,
+    "h_auth_providers": h_auth_providers,
+    "h_transfers_status": h_transfers_status,
+    "h_transfers_list": h_transfers_list,
+    "h_transfers_fetch": h_transfers_fetch,
+    "h_transfers_plan": h_transfers_plan,
+    "h_transfers_resume": h_transfers_resume,
+    "h_recall_status": h_recall_status,
+    "h_recall_policy_get": h_recall_policy_get,
+    "h_recall_policy_set": h_recall_policy_set,
+    "h_recall_query": h_recall_query,
+    "h_recall_resolve": h_recall_resolve,
+    "h_recall_escalate": h_recall_escalate,
+    "h_documents_status": h_documents_status,
+    "h_documents_kinds": h_documents_kinds,
+    "h_documents_extract": h_documents_extract,
+    "h_ask_status": h_ask_status,
+    "h_ask_pending": h_ask_pending,
+    "h_ask_create": h_ask_create,
+    "h_ask_answer": h_ask_answer,
+    "h_session_share_status": h_session_share_status,
+    "h_session_shares_list": h_session_shares_list,
+    "h_session_share_publish": h_session_share_publish,
+    "h_session_share_revoke": h_session_share_revoke,
+    "h_session_shares_purge": h_session_shares_purge,
+    "h_share_resolve": h_share_resolve,
+    "h_qubit_gateway_discovery": h_qubit_gateway_discovery,
+    "h_qubit_runtime_discovery": h_qubit_runtime_discovery,
+    "h_qubit_runtime_marketplace": h_qubit_runtime_marketplace,
+    "h_qubit_runtime_history": h_qubit_runtime_history,
+    "h_qubit_runtime_update_report": h_qubit_runtime_update_report,
+    "h_qubit_update_check": h_qubit_update_check,
+    "h_qubit_update_apply": h_qubit_update_apply,
+    "h_qubit_runtime_status": h_qubit_runtime_status,
+    "h_qubit_runtime_images": h_qubit_runtime_images,
+    "h_qubit_runtime_doctor": h_qubit_runtime_doctor,
+    "h_qubit_egress_status": h_qubit_egress_status,
+    "h_qubit_egress_providers": h_qubit_egress_providers,
+    "h_qubit_egress_check": h_qubit_egress_check,
+    "h_qubit_policy_conformance": h_qubit_policy_conformance,
+    "h_qubit_policy_attest": h_qubit_policy_attest,
+    "h_qubit_hooks_doctor": h_qubit_hooks_doctor,
+    "h_qubit_usage": h_qubit_usage,
+    "h_qubit_receipts": h_qubit_receipts,
+    "h_qubit_logbook": h_qubit_logbook,
+    "h_qubit_browser_profiles": h_qubit_browser_profiles,
+    "h_op_computer_ops": h_op_computer_ops,
+    "h_op_computer_presentation_status": h_op_computer_presentation_status,
+    "h_op_computer_launch": h_op_computer_launch,
+    "h_op_computer_pip": h_op_computer_pip,
+    "h_op_computer_present": h_op_computer_present,
+    "h_op_browser_favicon": h_op_browser_favicon,
+    "h_op_browser_favicon_cache": h_op_browser_favicon_cache,
+    "h_op_browser_download": h_op_browser_download,
+    "h_qubit_local_models_fallback": h_qubit_local_models_fallback,
+    "h_gateway_start": h_gateway_supervision("start"),
+    "h_gateway_stop": h_gateway_supervision("stop"),
+    "h_gateway_restart": h_gateway_restart,
+    "h_custom_endpoints_write": h_custom_endpoints_write,
+    "h_custom_endpoints_activate": h_custom_endpoints_activate,
+    "h_custom_endpoints_delete": h_custom_endpoints_delete,
+    "h_terminal_backend_set": h_terminal_backend_set,
+    "h_computer_use_grant": h_computer_use_grant,
+    "h_profile_export": h_profile_export,
+    "h_portal": h_portal,
+    "h_plugin_asset": h_plugin_asset,
+    "h_skills_hub_official": h_skills_hub_official,
+    "h_skills_hub_sources": h_skills_hub_sources,
+    "h_skills_hub_search": h_skills_hub_search,
+    "h_skills_hub_preview": h_skills_hub_preview,
+    "h_skills_hub_scan": h_skills_hub_scan,
+    "h_skills_hub_install": h_skills_hub_install,
+    "h_skills_hub_uninstall": h_skills_hub_uninstall,
+    "h_skills_hub_update": h_skills_hub_update,
+    "h_fs_write_text": h_fs_write_text,
+    "h_files_upload": h_files_upload,
+    "h_files_mkdir": h_files_mkdir,
+    "h_git_stage": h_git_write("stage"),
+    "h_git_unstage": h_git_write("unstage"),
+    "h_git_revert": h_git_write("revert"),
+    "h_git_commit": h_git_write("commit"),
+    "h_git_worktree_add": h_git_write("worktree-add"),
+    "h_git_worktree_remove": h_git_write("worktree-remove"),
+    "h_git_branch_switch": h_git_write("branch-switch"),
+    "h_blueprint_instantiate": h_blueprint_instantiate,
+    "pairing_clear_pending": h_pairing_clear_pending,
+    "h_mcp_servers": h_mcp_servers,
+    "h_mcp_catalog_live": h_mcp_catalog_live,
+    "h_mcp_test_local": h_mcp_test_local,
+    "h_msg_test_live": h_msg_test_live,
+    "h_pub": h_pub,
+    "h_gateway_drain": h_gateway_drain,
+    "h_plugin_visibility_set": h_plugin_visibility,
+    "h_login_page": h_login_page,
+    "h_auth_login": h_auth_login,
+    "h_auth_native_authorize": h_auth_native_authorize,
+    "h_auth_callback": h_auth_callback,
+    "h_auth_password_login": h_auth_password_login,
+    "h_auth_logout": h_auth_logout,
+    "h_auth_native_token": h_auth_native_token,
+    "h_auth_native_refresh": h_auth_native_refresh,
+    "h_plugin_achievements": _qubit_plugins.h_plugin_achievements,
+    "h_plugin_achievements_scan_status":
+        _qubit_plugins.h_plugin_achievements_scan_status,
+    "h_plugin_achievements_recent_unlocks":
+        _qubit_plugins.h_plugin_achievements_recent_unlocks,
+    "h_plugin_achievements_session_badges":
+        _qubit_plugins.h_plugin_achievements_session_badges,
+    "h_plugin_achievements_rescan":
+        _qubit_plugins.h_plugin_achievements_rescan,
+    "h_plugin_achievements_reset_state":
+        _qubit_plugins.h_plugin_achievements_reset_state,
+    "h_plugin_kanban_board": _qubit_plugins.h_plugin_kanban_board,
+    "h_plugin_kanban_task": _qubit_plugins.h_plugin_kanban_task,
+    "h_plugin_kanban_stats": _qubit_plugins.h_plugin_kanban_stats,
+    "h_plugin_kanban_assignees": _qubit_plugins.h_plugin_kanban_assignees,
+    "h_plugin_kanban_boards": _qubit_plugins.h_plugin_kanban_boards,
+    "h_plugin_kanban_config": _qubit_plugins.h_plugin_kanban_config,
+    "h_plugin_kanban_projects": _qubit_plugins.h_plugin_kanban_projects,
+    "h_plugin_kanban_workers": _qubit_plugins.h_plugin_kanban_workers,
+    "h_plugin_kanban_diagnostics": _qubit_plugins.h_plugin_kanban_diagnostics,
+    "h_plugin_kanban_model_options":
+        _qubit_plugins.h_plugin_kanban_model_options,
+    "h_plugin_kanban_home_channels":
+        _qubit_plugins.h_plugin_kanban_home_channels,
+    "h_plugin_kanban_task_log": _qubit_plugins.h_plugin_kanban_task_log,
+    "h_plugin_kanban_task_attachments":
+        _qubit_plugins.h_plugin_kanban_task_attachments,
+    "h_plugin_kanban_run": _qubit_plugins.h_plugin_kanban_run,
+    "h_plugin_kanban_run_inspect":
+        _qubit_plugins.h_plugin_kanban_run_inspect,
+    "h_plugin_kanban_profiles": _qubit_plugins.h_plugin_kanban_profiles,
+    "h_plugin_kanban_orchestration":
+        _qubit_plugins.h_plugin_kanban_orchestration,
+    "h_plugin_kanban_events": _qubit_plugins.h_plugin_kanban_events,
+    "h_plugin_fleet": _qubit_plugins.h_plugin_fleet,
+}
+
+HANDLERS: Dict[str, Handler] = {
+    "h_status": h_status, "h_runtime": h_runtime, "h_auth_me": h_auth_me, "h_events": h_events,
+    "h_health": h_health, "h_egress_status": h_egress_status,
+    "h_sessions_list": h_sessions_list, "h_sessions_stats": h_sessions_stats,
+    "h_session_show": h_session_show, "h_session_messages": h_session_messages,
+    "h_config": h_config, "h_config_defaults": h_config_defaults,
+    "h_config_schema": h_config_schema, "h_model_info": h_model_info,
+    "h_model_recommended_default": h_model_recommended_default,
+    "h_model_options": h_model_options, "h_model_moa": h_model_moa,
+    "h_model_auxiliary": h_model_auxiliary, "h_model_set": h_model_set,
+    "h_profiles": h_profiles, "h_skills": h_skills,
+    "h_skills_toggle": h_skills_toggle, "h_toolsets": h_toolsets,
+    "h_cron_jobs": h_cron_jobs, "h_cron_job_show": h_cron_job_show,
+    "h_cron_job_runs": h_cron_job_runs,
+    "h_logs": h_logs, "h_system_stats": h_system_stats, "h_mcp": h_mcp,
+    "h_pairing_list": h_pairing_list, "h_webhooks_list": h_webhooks_list,
+    "h_platforms": h_platforms, "h_memory": h_memory,
+    "h_analytics": h_analytics, "h_files": h_files, "h_gateway": h_gateway,
+    "h_gateway_migrate_plan": h_gateway_migrate_plan,
+    "h_host_identity": h_host_identity,
+    "h_providers_oauth": h_providers_oauth,
+    "h_curator": h_curator, "h_curator_paused": h_curator_paused,
+    "h_curator_run": h_curator_run, "h_env": h_env, "h_ops": h_ops,
+    "h_ops_catalog": h_ops_catalog,
+    "h_ops_run": h_ops_run,
+    "h_chat_turn": h_chat_turn,
+    "h_chat_sessions_list": h_chat_sessions_list,
+    "h_chat_session_create": h_chat_session_create,
+    "h_chat_session_show": h_chat_session_show,
+    "h_chat_session_messages": h_chat_session_messages,
+    "h_chat_session_patch": h_chat_session_patch,
+    "h_chat_session_delete": h_chat_session_delete,
+    "h_chat_session_export": h_chat_session_export,
+    "h_chat_session_import": h_chat_session_import,
+    "h_chat_cancel": h_chat_cancel, "h_chat_pty": h_chat_pty,
+    "h_chat_retry": h_chat_retry, "h_chat_stream": h_chat_stream,
+    "h_plugins": h_plugins, "h_themes": h_themes, "h_theme_get": h_theme_get,
+    "h_theme_set": h_theme_set,
+    "h_hooks": h_hooks, "h_hooks_create": h_hooks_create,
+    "h_hooks_update": h_hooks_update,
+    "h_approvals_list": h_approvals_list,
+    "h_ops_confirm": h_ops_confirm, "h_ops_cancel": h_ops_cancel,
+    "h_git_status": h_git_status, "h_git_log": h_git_log,
+    "h_git_diff": h_git_diff, "h_git_show": h_git_show,
+    "h_git_file_diff": h_git_file_diff,
+    "h_git_worktrees": h_git_worktrees, "h_git_branches": h_git_branches,
+    "h_git_base_branches": h_git_base_branches,
+    "h_git_review_list": h_git_review_list,
+    "h_git_review_commit_context": h_git_review_commit_context,
+    "h_git_review_rev_parse": h_git_review_rev_parse,
+    "h_fs_list": h_fs_list, "h_fs_tree": h_fs_tree, "h_fs_stat": h_fs_stat,
+    "h_fs_read_text": h_fs_read_text,
+    "h_fs_read_data_url": h_fs_read_data_url,
+    "h_fs_git_root": h_fs_git_root, "h_fs_default_cwd": h_fs_default_cwd,
+    "h_audio_status": h_audio_status, "h_audio_devices": h_audio_devices,
+    "h_audio_voice_config": h_audio_voice_config,
+    "h_audio_transcribe": h_audio_transcribe,
+    "h_audio_speak": h_audio_speak,
+}
+HANDLERS.update(_EXTRA_HANDLERS)
+
+
+def _overlay_manifests() -> List[Dict[str, Any]]:
+    manifests: List[Dict[str, Any]] = []
+    plugdir = OVERLAY_DIR / "plugins"
+    if plugdir.exists():
+        for mf in sorted(plugdir.glob("*/manifest.json")):
+            try:
+                manifests.append(json.loads(mf.read_text()))
+            except (OSError, ValueError):
+                continue
+    return manifests
+
+
+def plugins_response() -> Dict[str, Any]:
+    return {"plugins": _overlay_manifests()}
+
+
+def themes_response(cfg: Any) -> Dict[str, Any]:
+    theme_path = OVERLAY_DIR / "qubit-theme.json"
+    try:
+        definition = json.loads(theme_path.read_text())
+    except (OSError, ValueError):
+        definition = {}
+    active = "qubit" if definition else "default"
+    themes = [{"name": "qubit", "label": "Qubit Command",
+               "description": "Qubit graphite/navy with signal-lime accents",
+               "definition": definition}] if definition else []
+    return {"active": active, "themes": themes}
+
+
+def match(method: str, path: str) -> Tuple[Optional[Dict[str, Any]], Dict[str, str]]:
+    for route in ROUTES:
+        if route["method"] != method:
+            continue
+        m = re.fullmatch(route["pattern"], path)
+        if m:
+            return route, {k: v for k, v in m.groupdict().items()}
+    return None, {}
+
+
+def dispatch(cfg: Any, method: str, path: str,
+             query: Optional[Dict[str, str]] = None,
+             body: Optional[Dict[str, Any]] = None,
+             actor: str = "dashboard:user") -> Tuple[int, Any]:
+    clean = path.split("?")[0]
+    if len(clean) > 1:
+        clean = clean.rstrip("/")
+    route, params = match(method, clean)
+    if route is None and str(method).upper() == "HEAD":
+        # HEAD mirrors its GET route (status/headers only, no body), so a
+        # gated or implemented GET never answers a bare 404 to a HEAD preload.
+        route, params = match("GET", clean)
+    if route is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": f"no compat route for {method} {path}"}
+    if route["disposition"] == "gated":
+        gate = route["gate"]
+        _audit("gated", actor, {"route": f"{method} {path}",
+                                "code": gate.get("code", "")})
+        return gate.get("http", 403), {"ok": False, "state": "UNAVAILABLE",
+                                       "code": gate.get("code"),
+                                       "detail": gate.get("detail"),
+                                       "qubit_counterpart": gate.get("counterpart"),
+                                       "owner": gate.get("owner"),
+                                       "rollback": gate.get("rollback")}
+    if route["disposition"] == "stream":
+        # A streaming route cannot be expressed as a JSON ``(status, dict)``.
+        # The SSE front door (webui) consumes this disposition and iterates the
+        # route handler; a generic JSON dispatch is a typed refusal, never a
+        # fabricated success.
+        _audit("stream_requires_sse", actor, {"route": f"{method} {path}"})
+        return 400, {"ok": False, "code": "STREAM_REQUIRES_SSE",
+                     "detail": "this route streams Server-Sent Events; call it "
+                               "over the SSE front door, not the JSON dispatcher",
+                     "content_type": "text/event-stream",
+                     "qubit_counterpart": f"POST {path} (Accept: text/event-stream)"}
+    handler = HANDLERS.get(route["handler"])
+    if handler is None:
+        return 500, {"ok": False, "code": "NO_HANDLER",
+                     "detail": f"handler {route['handler']!r} missing"}
+    try:
+        code, out = handler(cfg, query or {}, body or {}, params)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("served", actor, {"route": f"{method} {path}", "code": str(code)})
+    return code, out

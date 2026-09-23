@@ -46,7 +46,7 @@ def test_no_stub_commands_for_blocked_rows():
             f"{absent!r} must not exist as a CLI command (no stubs)"
     # The fork-backed families are real routes to the vendored CLI, never a
     # fabricated stub: each resolves to a forward/needs-confirm route.
-    from voicebridge import cli_hermes_forward as HF
+    from voicebridge import cli_qubit_forward as HF
 
     for routed in ROUTED_FORK_COMMANDS:
         assert routed in names, routed

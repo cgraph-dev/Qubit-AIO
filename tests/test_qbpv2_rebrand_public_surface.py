@@ -4,7 +4,7 @@ The owner gate: the normal Qubit product must never expose Hermes or OpenClaw
 as a product/assistant name, route prefix, URL, title, nav label, or dashboard
 path. This scan fails on every upstream-name occurrence on the served/rendered
 public surface that is not on the explicit allowlist recorded in
-``docs/QUBIT_REBRAND_ALLOWLIST.md``.
+``docs/archive/2026-09-21/QUBIT_REBRAND_ALLOWLIST.md``.
 
 Hermetic HTTP checks against a real local WebUI server; no browser needed.
 No skips / xfail except when the dashboard build is absent from the checkout.
@@ -21,10 +21,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 
 # Internal compatibility / wire-protocol identifiers (not product names) —
-# keep in sync with docs/QUBIT_REBRAND_ALLOWLIST.md.
+# keep in sync with docs/archive/2026-09-21/QUBIT_REBRAND_ALLOWLIST.md.
 ALLOWED_PUBLIC_TOKENS = (
     "__HERMES_BASE_PATH__",
     "__HERMES_SESSION_TOKEN__",
@@ -53,6 +53,8 @@ _BANNED_BUNDLE_PHRASES = (
     "Hermes Agent", "Hermes Console", "Hermes Teal", "Update Hermes",
     "Hermes gateway", "Hermes plugins", "Hermes RPC", "Hermes Desktop",
     "OpenClaw",
+    # Company/portal product branding must read Qubit Labs, never Nous.
+    "Nous Portal", "Nous Research", "NousResearch", "Nous Blue",
 )
 
 
@@ -70,7 +72,7 @@ def _start(tmp_path):
     state.mkdir(exist_ok=True)
     p = tmp_path / "voice.yaml"
     p.write_text(f"logging:\n  jsonl_path: '{state}'\n"
-                 f"webui:\n  token: test-token\n  hermes_backend: false\n")
+                 f"webui:\n  token: test-token\n  qubit_backend: false\n")
     cfg = Config.load(p)
 
     class _FakeOrch:
@@ -111,8 +113,8 @@ def server(tmp_path):
 
 def test_public_route_table_has_no_upstream_names():
     from voicebridge.webui import (
-        HERMES_ROUTE_ALIASES,
-        HERMES_WS_GATE_CODES,
+        QUBIT_ROUTE_ALIASES,
+        QUBIT_WS_GATE_CODES,
         SPA_ROUTE_PATHS,
     )
 
@@ -120,10 +122,10 @@ def test_public_route_table_has_no_upstream_names():
     for route in SPA_ROUTE_PATHS:
         if _UPSTREAM.search(route):
             offenders.append(route)
-    for src, tgt in HERMES_ROUTE_ALIASES.items():
+    for src, tgt in QUBIT_ROUTE_ALIASES.items():
         if _UPSTREAM.search(src) or _UPSTREAM.search(tgt):
             offenders.append(f"{src}->{tgt}")
-    for api_path in HERMES_WS_GATE_CODES:
+    for api_path in QUBIT_WS_GATE_CODES:
         if _UPSTREAM.search(api_path):
             offenders.append(api_path)
     assert not offenders, f"upstream names in public route table: {offenders}"
@@ -180,7 +182,7 @@ def test_upstream_paths_are_404_and_clean(server, path):
 def test_built_spa_bundle_has_no_product_facing_upstream_names():
     index = DIST / "index.html"
     if not index.is_file():
-        pytest.skip("frontend/hermes-dist not built in this checkout")
+        pytest.skip("frontend/qubit-dist not built in this checkout")
     hits = []
     for path in sorted((DIST / "assets").glob("*.js")):
         text = path.read_text(encoding="utf-8", errors="replace")

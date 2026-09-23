@@ -71,7 +71,7 @@ SAFE_PATH = "/usr/bin:/bin"
 # Directories that can never be a project root or workdir.
 _SECRET_DIR_NAMES = frozenset({
     ".ssh", ".gnupg", ".opencode", ".config", ".local", ".password-store",
-    ".aws", ".openclaw",
+    ".aws", ".qubit",
 })
 _SECRET_FILE_HINTS = (".env", "credentials", "secret", "token", ".pem",
                       ".key", "id_rsa", "id_ed25519")

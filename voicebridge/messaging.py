@@ -5,7 +5,7 @@ live messaging transports. Qubit implements the complete code-side
 adapter; the live network is the last mile and stays credential-gated:
 
 * ``account-add`` — provider records (``whatsapp`` | ``whatsapp-cloud``
-  | ``slack`` plus the OpenClaw-breadth channels ``discord`` | ``telegram``
+  | ``slack`` plus the Qubit-breadth channels ``discord`` | ``telegram``
   | ``signal`` | ``matrix`` | ``msteams`` | ``imessage``) with label,
   endpoint (provider allowlist enforced, lookalike hosts refused), origin
   binding, and a vault-only key reference (never a value). Explicit
@@ -1119,7 +1119,7 @@ def refuse_estop(operation: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # OC-D12/D13/D17: channel feature adapters (voice / rich media / E2EE / agents)
 #
-# The code-side half of the named OpenClaw channel features. Qubit performs no
+# The code-side half of the named Qubit channel features. Qubit performs no
 # network or crypto I/O itself: the caller injects the transport (the live
 # bot/crypto boundary). Without one every call is a typed UNAVAILABLE, never a
 # fabricated success; each call is estop + confirmation + credential-reference

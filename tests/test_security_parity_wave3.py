@@ -82,7 +82,7 @@ def _wait_active(b: CapabilityBroker, timeout: float = 5.0) -> str:
 
 
 def test_unclassified_fork_subcommand_is_typed_refusal():
-    from voicebridge import cli_hermes_forward as FW
+    from voicebridge import cli_qubit_forward as FW
 
     # An unknown mutating-looking subcommand can never forward raw.
     r = FW.route_family(["bundles", "purge-everything"])
@@ -327,12 +327,12 @@ def test_estop_probe_error_on_shared_control_fails_closed(tmp_path):
     assert r.denied == "POWER_UNAVAILABLE" and not r.ok
 
 
-def test_hermes_chat_turn_refused_under_estop(tmp_path, monkeypatch):
-    """Regression for the broker.estop_engaged import hermes_compat expects:
+def test_qubit_chat_turn_refused_under_estop(tmp_path, monkeypatch):
+    """Regression for the broker.estop_engaged import qubit_compat expects:
     before the fix the probe returned False and the agent turn ran latched."""
     cfg = _cfg(tmp_path)
     from voicebridge import power as PW
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     PW.power_control_store(cfg).set(emergency_stop=True, global_disable=False,
                                     issued_by="cli:user")

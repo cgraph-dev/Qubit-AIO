@@ -1,6 +1,6 @@
-"""Qubit local-models surface (Hermes ``web_routers/local_models.py`` parity).
+"""Qubit local-models surface (Qubit ``web_routers/local_models.py`` parity).
 
-Upstream Hermes exposed a dashboard window into a managed llama.cpp
+Upstream Qubit exposed a dashboard window into a managed llama.cpp
 runtime: status/hardware/catalog/jobs reads plus install/download/sideload/
 server/eject/activate/quickstart writes that pulled binaries and GGUF files
 from the network.
@@ -535,7 +535,7 @@ def structured_task(cfg: Any, *, prompt: Any, schema: Any = None,
                     runner: Any = None) -> Dict[str, Any]:
     """JSON-only structured task over the local model boundary.
 
-    Qubit-owned equivalent of the OpenClaw ``llm-task`` tool. The prompt is
+    Qubit-owned equivalent of the Qubit ``llm-task`` tool. The prompt is
     bounded and validated locally; the model call is only ever made through a
     caller-supplied ``runner`` (an injected boundary). With no runner the
     result is a typed ``LOCAL_MODEL_TASK_UNAVAILABLE`` and a non-JSON reply

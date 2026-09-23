@@ -16,11 +16,12 @@ redacted, and marked as such — it can never widen a permission.
 Qubit implements tab supervision over loopback CDP only
 endpoints (``tools/browser_tool*.py``, ``browser_camofox*.py``); Qubit
 implements only loopback tab operations natively. Provenance and the
-deliberate divergence are recorded in ``docs/UPSTREAM_REUSE.md``.
+deliberate divergence are recorded in ``docs/archive/2026-09-21/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import math
 import os
@@ -1174,3 +1175,497 @@ def extension_attach(cfg: Any, extension_id: str, *,
                       "enroll a node with browser.cdp (`qubit node enroll`)",
             "extension_id": ext, "owner": "qubit-policy",
             "rollback": "nothing started; nothing to roll back"}
+
+
+# ------------------------------------------- Bounded metadata ops (A38)
+# Two bounded browser-metadata operations close the Qubit delta rows
+# ``browser_favicon_script``, ``browser_panel_download`` and the link-favicon
+# cache. Both run over the existing loopback CDP session on an already
+# attached tab and are confined to that tab's own approved http(s) origin:
+# the page itself performs a same-origin fetch (``credentials: same-origin``),
+# so there is never a host-side network egress to an arbitrary URL and no
+# personal profile is touched. ``favicon`` is read-only (like ``read``) and is
+# e-stop-gated; ``download`` writes bytes and therefore additionally requires
+# ``--confirm`` and resolves the destination through ``files.py`` so bytes can
+# only land inside an approved project root.
+METADATA_SCHEMA = "qubit-browser-metadata/1"
+FAVICON_BAD_INPUT_CODE = "BROWSER_FAVICON_BAD_INPUT"
+FAVICON_NOT_FOUND_CODE = "BROWSER_FAVICON_NOT_FOUND"
+FAVICON_ORIGIN_CODE = "BROWSER_FAVICON_ORIGIN_DENIED"
+FAVICON_ESTOP_CODE = "BROWSER_FAVICON_ESTOP"
+DOWNLOAD_CONFIRM_CODE = "BROWSER_DOWNLOAD_CONFIRM_REQUIRED"
+DOWNLOAD_BAD_INPUT_CODE = "BROWSER_DOWNLOAD_BAD_INPUT"
+DOWNLOAD_ORIGIN_CODE = "BROWSER_DOWNLOAD_ORIGIN_DENIED"
+DOWNLOAD_OUTSIDE_ROOT_CODE = "BROWSER_DOWNLOAD_OUTSIDE_ROOT"
+DOWNLOAD_ESTOP_CODE = "BROWSER_DOWNLOAD_ESTOP"
+DOWNLOAD_UNAVAILABLE_CODE = "BROWSER_DOWNLOAD_UNAVAILABLE"
+DOWNLOAD_TOO_LARGE_CODE = "BROWSER_DOWNLOAD_TOO_LARGE"
+DOWNLOAD_FAILED_CODE = "BROWSER_DOWNLOAD_FAILED"
+MAX_FAVICON_BYTES = 256 * 1024
+MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024
+FAVICON_CACHE_MAX_ENTRIES = 64
+FAVICON_CACHE_FILE = "favicon-cache.json"
+
+
+def _origin_of(url: str, code: str) -> str:
+    """Canonicalize an attached tab's origin, refusing non-http(s)/hostless."""
+    text = str(url or "").strip()
+    try:
+        parts = urllib.parse.urlsplit(text)
+        port = parts.port
+    except ValueError:
+        raise BrowserTabsError(code, "the attached tab has an invalid URL")
+    scheme = (parts.scheme or "").lower()
+    host = (parts.hostname or "").lower().strip(".")
+    if scheme not in ("http", "https") or not host:
+        raise BrowserTabsError(
+            code, "the attached tab is not an http(s) origin")
+    default_port = (scheme == "http" and port == 80) or (
+        scheme == "https" and port == 443)
+    suffix = "" if port is None or default_port else f":{port}"
+    return f"{scheme}://{host}{suffix}"
+
+
+def _check_origin_allowed(url: str, origins: Any, code: str) -> str:
+    """Return the tab origin, refusing it when it is not in ``origins``.
+
+    ``origins`` is ``None`` (the tab's own origin is the only allowed origin,
+    enforced again inside the page) or an explicit iterable of approved
+    origins. Any non-http(s) tab is always refused.
+    """
+    origin = _origin_of(url, code)
+    if origins is None:
+        return origin
+    try:
+        allowed = {_origin_of(str(entry), code) for entry in origins}
+    except TypeError:
+        raise BrowserTabsError(code, "approved origins must be a sequence")
+    if origin not in allowed:
+        raise BrowserTabsError(
+            code, f"origin {origin} is not in the approved origin list")
+    return origin
+
+
+def _favicon_expr(max_bytes: int) -> str:
+    """Same-origin favicon probe: candidate order matches the upstream script.
+
+    Every candidate is rejected unless its URL origin equals the page origin,
+    so a page cannot steer the fetch at a third-party or loopback host.
+    """
+    return (
+        "(async (maxBytes) => {"
+        " const abs = (u) => { try { return new URL(u, location.href).href; }"
+        " catch (e) { return ''; } };"
+        " const same = (u) => { try { return new URL(u, location.href).origin"
+        " === location.origin; } catch (e) { return false; } };"
+        " const links = Array.from(document.querySelectorAll("
+        " 'link[rel~=\"icon\"],link[rel=\"apple-touch-icon\"],"
+        "link[rel=\"shortcut icon\"]'));"
+        " const preferred = links.find((l) =>"
+        " /(?:^|\\s)32x32(?:\\s|$)/i.test(l.getAttribute('sizes') || ''));"
+        " const ordered = [...(preferred ? [preferred] : []),"
+        " ...links.filter((l) => l !== preferred), {href: '/favicon.ico'}];"
+        " const seen = new Set();"
+        " for (const link of ordered) {"
+        "  const raw = link.getAttribute ? (link.getAttribute('href') || '')"
+        " : (link.href || '');"
+        "  const href = abs(raw);"
+        "  if (!href || seen.has(href) || !same(href)) { continue; }"
+        "  seen.add(href);"
+        "  try {"
+        "   const resp = await fetch(href, {credentials: 'same-origin',"
+        " mode: 'cors'});"
+        "   if (!resp.ok) { continue; }"
+        "   const blob = await resp.blob();"
+        "   const mime = (blob.type || '').split(';')[0].trim().toLowerCase();"
+        "   if (!/^image\\/[a-z0-9.+-]+$/.test(mime) || blob.size === 0"
+        " || blob.size > maxBytes) { continue; }"
+        "   const dataUrl = await new Promise((resolve) => {"
+        "    const reader = new FileReader();"
+        "    reader.onload = () => resolve(typeof reader.result === 'string'"
+        " ? reader.result : null);"
+        "    reader.onerror = reader.onabort = () => resolve(null);"
+        "    reader.readAsDataURL(blob); });"
+        "   if (dataUrl) { return {found: true, origin: location.origin,"
+        " icon: href, mime: mime, data_url: dataUrl}; }"
+        "  } catch (e) { }"
+        " }"
+        " return {found: false, origin: location.origin};"
+        "})(" + json.dumps(int(max_bytes)) + ")"
+    )
+
+
+def _download_expr(max_bytes: int) -> str:
+    """Same-origin document snapshot: fetch the displayed document's bytes."""
+    return (
+        "(async (maxBytes) => {"
+        " try {"
+        "  const resp = await fetch(location.href,"
+        " {credentials: 'same-origin'});"
+        "  if (!resp.ok) { return {found: false,"
+        " reason: 'status ' + resp.status}; }"
+        "  const blob = await resp.blob();"
+        "  if (blob.size === 0 || blob.size > maxBytes) {"
+        " return {found: false, reason: 'size ' + blob.size}; }"
+        "  const buf = await blob.arrayBuffer();"
+        "  const bytes = new Uint8Array(buf); let bin = '';"
+        "  for (let i = 0; i < bytes.length; i++) {"
+        " bin += String.fromCharCode(bytes[i]); }"
+        "  return {found: true, url: location.href, origin: location.origin,"
+        " mime: (blob.type || 'application/octet-stream'),"
+        " size: blob.size, data_base64: btoa(bin)};"
+        " } catch (e) {"
+        "  return {found: false, reason: String(e && e.message || e)};"
+        " }"
+        "})(" + json.dumps(int(max_bytes)) + ")"
+    )
+
+
+def _bounded_favicon_cap(max_bytes: Any) -> int:
+    try:
+        cap = int(max_bytes)
+    except (TypeError, ValueError):
+        cap = MAX_FAVICON_BYTES
+    if cap <= 0:
+        cap = MAX_FAVICON_BYTES
+    return min(cap, MAX_FAVICON_BYTES)
+
+
+def _bounded_download_cap(max_bytes: Any) -> int:
+    try:
+        cap = int(max_bytes)
+    except (TypeError, ValueError):
+        cap = MAX_DOWNLOAD_BYTES
+    if cap <= 0:
+        cap = MAX_DOWNLOAD_BYTES
+    return min(cap, MAX_DOWNLOAD_BYTES)
+
+
+# ------------------------------------------------------- favicon cache
+def _cache_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) / FAVICON_CACHE_FILE
+
+
+def _load_cache(cfg: Any) -> Dict[str, Any]:
+    try:
+        raw = _cache_path(cfg).read_text(encoding="utf-8")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_cache(cfg: Any, data: Dict[str, Any]) -> None:
+    entries = data.get("entries", {})
+    if isinstance(entries, dict) and len(entries) > FAVICON_CACHE_MAX_ENTRIES:
+        ordered = sorted(entries.items(),
+                         key=lambda kv: float(kv[1].get("updated_at", 0) or 0),
+                         reverse=True)
+        data = dict(data)
+        data["entries"] = dict(ordered[:FAVICON_CACHE_MAX_ENTRIES])
+    try:
+        path = _cache_path(cfg)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, sort_keys=True), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _cache_get(cfg: Any, origin: str) -> Optional[Dict[str, Any]]:
+    entry = _load_cache(cfg).get("entries", {}).get(origin)
+    return entry if isinstance(entry, dict) else None
+
+
+def _cache_put(cfg: Any, origin: str, entry: Dict[str, Any]) -> None:
+    data = _load_cache(cfg)
+    entries = data.get("entries")
+    if not isinstance(entries, dict):
+        entries = {}
+    entries[origin] = entry
+    data["entries"] = entries
+    data["schema"] = METADATA_SCHEMA
+    _save_cache(cfg, data)
+
+
+def favicon_cache(cfg: Any, *, limit: int = 32) -> Dict[str, Any]:
+    """Read the bounded favicon cache (read-only; no network, no CDP)."""
+    try:
+        cap = max(1, min(int(limit), FAVICON_CACHE_MAX_ENTRIES))
+    except (TypeError, ValueError):
+        cap = 32
+    entries = _load_cache(cfg).get("entries", {})
+    rows = [dict(entry, origin=origin)
+            for origin, entry in sorted(entries.items())
+            if isinstance(entry, dict)][:cap]
+    return {"state": "OK", "schema": METADATA_SCHEMA, "entries": rows,
+            "count": len(rows), "max_entries": FAVICON_CACHE_MAX_ENTRIES,
+            "authority": "read-only cache; favicon bytes are untrusted page "
+                         "images and never a permission grant"}
+
+
+def favicon(cfg: Any, target: str = "", *, max_bytes: int = MAX_FAVICON_BYTES,
+            origins: Any = None, refresh: bool = False,
+            requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Capture the attached tab's favicon as a bounded ``data:`` URL (A38).
+
+    The page performs the fetch so the request is inherently same-origin; the
+    returned icon must be an ``image/*`` blob within ``max_bytes``. The tab's
+    origin must be http(s) and, when ``origins`` is given, explicitly approved.
+    Read-only (no confirmation), e-stop-gated, audited, and cached by origin.
+    """
+    if estop_engaged(cfg):
+        return {"state": "denied", "code": FAVICON_ESTOP_CODE,
+                "detail": "emergency stop latched; favicon capture refused",
+                "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing to roll back"}
+    cap = _bounded_favicon_cap(max_bytes)
+    try:
+        page = _resolve_target(cfg, target)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    origin = _check_origin_allowed(str(page.get("url", "")), origins,
+                                   FAVICON_ORIGIN_CODE)
+    if not refresh:
+        cached = _cache_get(cfg, origin)
+        if cached and str(cached.get("data_url", "")).startswith("data:image/"):
+            body = dict(cached)
+            body.update({"state": "OK", "schema": METADATA_SCHEMA,
+                         "cached": True, "target": str(page.get("id", "")),
+                         "origin": origin})
+            return body
+    tid = str(page.get("id", ""))
+    try:
+        session = _target_session(page)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    try:
+        try:
+            result = session.call("Runtime.evaluate",
+                                  {"expression": _favicon_expr(cap),
+                                   "returnByValue": True, "awaitPromise": True})
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            raise BrowserTabsError(exc.code, exc.detail)
+        value = result.get("result", {}).get("value", {})
+        if not isinstance(value, dict):
+            raise BrowserTabsError(cdp.PROTOCOL_CODE,
+                                   "CDP Runtime.evaluate: no value")
+        if not value.get("found"):
+            return {"state": "NOT_FOUND", "code": FAVICON_NOT_FOUND_CODE,
+                    "detail": "no readable same-origin favicon on this tab",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "browser untouched; nothing to roll back"}
+        data_url = str(value.get("data_url", ""))
+        mime = str(value.get("mime", "")).split(";")[0].strip().lower()
+        if (not data_url.startswith("data:image/") or "," not in data_url
+                or not re.match(r"^image/[a-z0-9.+-]+$", mime)):
+            return {"state": "FAILED", "code": FAVICON_BAD_INPUT_CODE,
+                    "detail": "the page returned a non-image favicon",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "browser untouched; nothing to roll back"}
+        try:
+            raw = base64.b64decode(data_url.split(",", 1)[1], validate=True)
+        except Exception:
+            raw = b""
+        if not raw or len(raw) > cap:
+            return {"state": "denied", "code": FAVICON_BAD_INPUT_CODE,
+                    "detail": f"favicon exceeds the {cap} byte cap",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "browser untouched; nothing to roll back"}
+        _remember(cfg, tid)
+        _cache_put(cfg, origin, {"origin": origin, "icon": value.get("icon", ""),
+                                 "mime": mime, "bytes": len(raw),
+                                 "data_url": data_url, "updated_at": time.time()})
+        _audit("favicon", requested_by,
+               {"target": tid, "origin": origin, "bytes": str(len(raw))})
+        return {"state": "OK", "schema": METADATA_SCHEMA, "target": tid,
+                "origin": origin, "icon": redact_spec(value.get("icon", ""))[:300],
+                "mime": mime, "bytes": len(raw), "data_url": data_url,
+                "cache_key": origin, "cached": False,
+                "trust": "untrusted-page-image",
+                "authority": "loopback CDP same-origin fetch; personal "
+                             "profiles untouched"}
+    finally:
+        session.close()
+
+
+# ------------------------------------------------- document download
+def _download_filename(page_url: str) -> str:
+    try:
+        path = urllib.parse.urlsplit(str(page_url or "")).path
+    except ValueError:
+        path = ""
+    name = os.path.basename(path.rstrip("/")) or "document.html"
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)[:120] or "document.html"
+    if "." not in name:
+        name += ".html"
+    return name
+
+
+def _resolve_download_dest(cfg: Any, dest: Any,
+                           page_url: str = "") -> Path:
+    """Resolve ``dest`` strictly inside an approved root via ``files.py``.
+
+    The shared :func:`voicebridge.files._resolve_inside` root gate is the only
+    path resolver used here; an existing directory destination derives a
+    bounded filename from the tab URL. Symlinks and non-regular files are
+    refused so a download can never escape the approved root.
+    """
+    text = str(dest or "").strip()
+    if not text or len(text) > 4096 or "\x00" in text:
+        raise BrowserTabsError(DOWNLOAD_BAD_INPUT_CODE,
+                               "a destination path is required")
+    try:
+        from . import files as FL
+    except Exception as exc:  # pragma: no cover - defensive
+        raise BrowserTabsError(
+            DOWNLOAD_BAD_INPUT_CODE,
+            f"approved-root gate unavailable ({redact_spec(exc)[:120]})")
+    try:
+        resolved = FL._resolve_inside(cfg, text)
+    except FL.FilesError as exc:
+        code = (DOWNLOAD_OUTSIDE_ROOT_CODE if exc.code == FL.OUTSIDE_ROOT_CODE
+                else DOWNLOAD_BAD_INPUT_CODE)
+        raise BrowserTabsError(code, exc.detail)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise BrowserTabsError(DOWNLOAD_BAD_INPUT_CODE,
+                               redact_spec(str(exc))[:200])
+    if resolved.exists() and resolved.is_dir():
+        resolved = resolved / _download_filename(page_url)
+    if resolved.is_symlink():
+        raise BrowserTabsError(DOWNLOAD_OUTSIDE_ROOT_CODE,
+                               "destination is a symlink; refusing to follow")
+    if resolved.exists() and not resolved.is_file():
+        raise BrowserTabsError(DOWNLOAD_BAD_INPUT_CODE,
+                               "destination is not a regular file")
+    return resolved
+
+
+def _write_bytes_atomic(path: Path, raw: bytes) -> None:
+    tmp = path.with_name(path.name + ".qubit-download")
+    fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(raw)
+        os.replace(str(tmp), str(path))
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+
+def download(cfg: Any, dest: str, target: str = "", *, origins: Any = None,
+             max_bytes: int = MAX_DOWNLOAD_BYTES, confirmed: bool = False,
+             requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Save the displayed document into an approved root (A38).
+
+    Confirmation-gated and e-stop-gated. The bytes come from a same-origin
+    fetch performed by the attached page; the destination is resolved by the
+    shared ``files.py`` root gate so nothing can be written outside an
+    approved project folder. Returns a hash-linked receipt.
+    """
+    if estop_engaged(cfg):
+        return {"state": "denied", "code": DOWNLOAD_ESTOP_CODE,
+                "detail": "emergency stop latched; document download refused",
+                "owner": "qubit-policy",
+                "rollback": "browser untouched; nothing written"}
+    cap = _bounded_download_cap(max_bytes)
+    _require_confirmed(confirmed, "download")
+    try:
+        page = _resolve_target(cfg, target)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    tid = str(page.get("id", ""))
+    page_url = str(page.get("url", ""))
+    origin = _check_origin_allowed(page_url, origins, DOWNLOAD_ORIGIN_CODE)
+    dest_path = _resolve_download_dest(cfg, dest, page_url)
+    try:
+        session = _target_session(page)
+    except BrowserTabsError as exc:
+        if exc.code == cdp.UNAVAILABLE_CODE:
+            return _screenshot_unavailable(exc.detail)
+        raise
+    try:
+        try:
+            result = session.call("Runtime.evaluate",
+                                  {"expression": _download_expr(cap),
+                                   "returnByValue": True, "awaitPromise": True})
+        except cdp.CdpError as exc:
+            if exc.code == cdp.UNAVAILABLE_CODE:
+                return _screenshot_unavailable(exc.detail)
+            raise BrowserTabsError(exc.code, exc.detail)
+        value = result.get("result", {}).get("value", {})
+        if not isinstance(value, dict):
+            raise BrowserTabsError(cdp.PROTOCOL_CODE,
+                                   "CDP Runtime.evaluate: no value")
+        if not value.get("found"):
+            return {"state": "UNAVAILABLE", "code": DOWNLOAD_UNAVAILABLE_CODE,
+                    "detail": ("the displayed document could not be fetched "
+                               "same-origin"),
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "nothing written; nothing to roll back"}
+        payload = value.get("data_base64", "")
+        try:
+            size = int(value.get("size", 0) or 0)
+        except (TypeError, ValueError):
+            size = 0
+        if not isinstance(payload, str) or not payload:
+            return {"state": "UNAVAILABLE", "code": DOWNLOAD_UNAVAILABLE_CODE,
+                    "detail": "the displayed document had no readable bytes",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "nothing written; nothing to roll back"}
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except Exception:
+            return {"state": "FAILED", "code": DOWNLOAD_FAILED_CODE,
+                    "detail": "the document payload was not valid base64",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "nothing written; nothing to roll back"}
+        if not raw:
+            return {"state": "UNAVAILABLE", "code": DOWNLOAD_UNAVAILABLE_CODE,
+                    "detail": "the displayed document was empty",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "nothing written; nothing to roll back"}
+        if len(raw) > cap or size > cap:
+            return {"state": "denied", "code": DOWNLOAD_TOO_LARGE_CODE,
+                    "detail": f"document {max(len(raw), size)} bytes exceeds "
+                              f"cap {cap}", "max_bytes": cap,
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "nothing written; nothing to roll back"}
+        try:
+            _write_bytes_atomic(dest_path, raw)
+        except OSError as exc:
+            return {"state": "FAILED", "code": DOWNLOAD_FAILED_CODE,
+                    "detail": f"could not write the download ({exc})",
+                    "target": tid, "origin": origin, "owner": "qubit-policy",
+                    "rollback": "nothing written; nothing to roll back"}
+        digest = hashlib.sha256(raw).hexdigest()
+        _remember(cfg, tid)
+        _audit("download", requested_by,
+               {"target": tid, "origin": origin, "bytes": str(len(raw)),
+                "dest": redact_spec(dest_path.name)[:120]})
+        return {"state": "OK", "schema": METADATA_SCHEMA, "target": tid,
+                "origin": origin, "dest": redact_spec(str(dest_path))[:400],
+                "bytes": len(raw), "max_bytes": cap,
+                "mime": redact_spec(value.get("mime", ""))[:80],
+                "url": redact_spec(page_url)[:300],
+                "receipt": {"kind": "browser.document.download",
+                            "target": tid, "origin": origin,
+                            "bytes": len(raw), "sha256": digest},
+                "trust": "untrusted-page-bytes",
+                "authority": "loopback CDP same-origin fetch; approved root "
+                             "write via files.py; personal profiles untouched",
+                "rollback": "delete the downloaded file to reverse"}
+    finally:
+        session.close()

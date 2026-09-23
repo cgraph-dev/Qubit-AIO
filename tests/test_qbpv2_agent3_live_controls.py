@@ -19,7 +19,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 pytestmark = pytest.mark.skipif(
     not (DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")
@@ -121,7 +121,11 @@ def test_boards_claim_and_comment_controls_work(tmp_path):
         ui.stop()
 
 
-def test_achievements_reset_control_is_confirm_gated(tmp_path):
+def test_achievements_reset_control_is_confirm_gated(tmp_path, monkeypatch):
+    # Isolate the runtime home: the achievements engine scans QUBIT_HOME, so
+    # without this the real runtime's provider history leaks into the test and
+    # a reset cannot yield a zero-unlock state.
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "state"))
     ui, port = _start(tmp_path)
     try:
         with pw.sync_playwright() as p:

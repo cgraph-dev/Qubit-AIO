@@ -93,11 +93,11 @@ def test_installer_qubit_owned_no_foreign_runtime():
     # before asserting the installer never references a foreign assistant
     # runtime (no external install, command, service, or dependency).
     scrubbed = install_sh.lower()
-    for vendored in ("frontend/hermes-dist", "qubit_hermes"):
+    for vendored in ("frontend/qubit-dist", "qubit_runtime"):
         scrubbed = scrubbed.replace(vendored, "<qubit-vendored>")
     assert "hermes" not in scrubbed, \
         "installer must not reference a foreign assistant"
-    assert not (REPO_ROOT / "scripts" / "install_hermes_runtime.sh").exists()
+    assert not (REPO_ROOT / "scripts" / "install_qubit_runtime.sh").exists()
     assert not (REPO_ROOT / "voicebridge" / "runtime").exists()
     assert not (REPO_ROOT / "voicebridge" / "hermes").exists()
 

@@ -71,7 +71,9 @@ def test_voice_backend_skill_lifecycle_and_persistence(tmp_path, monkeypatch):
     assert shown["skill"]["manifest"]["version"] == "1.0.0"
 
     enabled = VC._b_skills(ctx, {"action": "enable", "skill_id": man.skill_id})
-    assert enabled["status"] == "active"
+    # _b_skills reports the canonical enabled/disabled boolean; the permissioned
+    # record's own status (active) is the persisted truth asserted below.
+    assert enabled["status"] == "enabled"
     reopened = PERM.permissions_store(cfg)
     assert reopened.skill(man.skill_id).status == "active"
     reopened.close()
@@ -95,7 +97,9 @@ def test_voice_backend_skill_lifecycle_and_persistence(tmp_path, monkeypatch):
 def test_voice_backend_skill_negatives(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     ctx = _Ctx(cfg)
-    with pytest.raises(PERM.PermissionError):
+    # _b_skills maps the authority's typed SkillAuthorityError to ValueError; an
+    # unknown skill fails closed instead of silently writing a disabled-set entry.
+    with pytest.raises(ValueError):
         VC._b_skills(ctx, {"action": "enable", "skill_id": "missing.skill"})
     with pytest.raises(ValueError):
         VC._b_skills(ctx, {"action": "bogus"})

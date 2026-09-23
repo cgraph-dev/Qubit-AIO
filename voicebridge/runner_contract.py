@@ -4,7 +4,7 @@ ONE source for every call to the resident generative model:
 model alias, context size, keep-alive, placement/parallelism policy.
 Per rule 6.3-27, no caller may set its own num_ctx/keep_alive/placement.
 
-The reload key under pinned Ollama semantics (docs/UPSTREAM_REUSE.md R5) is
+The reload key under pinned Ollama semantics (docs/archive/2026-09-21/UPSTREAM_REUSE.md R5) is
 the full runner options struct — here, num_ctx — plus model identity.
 keep_alive is expiry policy only and is pinned to -1 (always resident).
 Placement/parallelism are recorded as policy fields; the bridge deliberately
@@ -22,7 +22,7 @@ from .logging_setup import log_event
 
 DEFAULT_ALIAS = "qubit-brain4"
 DEFAULT_URL = "http://127.0.0.1:11434"
-# Measured choice (Packet 4B, docs/BENCHMARKS.md): smallest context that fits
+# Measured choice (Packet 4B, docs/archive/2026-09-21/BENCHMARKS.md): smallest context that fits
 # the compiled-context budget plus output reserve with >=25% headroom.
 DEFAULT_NUM_CTX = 4096
 KEEP_ALIVE = -1

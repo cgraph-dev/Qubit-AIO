@@ -39,7 +39,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LEDGER = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.openclaw.json"
+LEDGER = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
 GEN = REPO_ROOT / "scripts" / "rebuild_ledger_openclaw.py"
 
 

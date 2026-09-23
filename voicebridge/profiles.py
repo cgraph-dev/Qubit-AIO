@@ -156,12 +156,12 @@ def default_manifests() -> List[ProviderManifest]:
     return [
         ProviderManifest(
             id="qubit-brain4", kind=BRAIN, default=True,
-            source="ollama://qubit-brain4 (docs/UPSTREAM_REUSE.md R7)",
+            source="ollama://qubit-brain4 (docs/archive/2026-09-21/UPSTREAM_REUSE.md R7)",
             revision="resolved-at-runtime (Ollama digest)",
             license="Apache-2.0 (Qwen3-4B-Instruct-2507-derived)",
             hardware="gpu", languages=["en"], vram_mib=3300, ram_mib=0,
-            latency_ms=644.0, quality_evidence="docs/BAKEOFF_4D.md",
-            safety_evidence="docs/EVALUATION_6B.md", rollback_to="qubit-brain4",
+            latency_ms=644.0, quality_evidence="docs/archive/2026-09-21/BAKEOFF_4D.md",
+            safety_evidence="docs/archive/2026-09-21/EVALUATION_6B.md", rollback_to="qubit-brain4",
             config_path=("intent", "local_llm", "model"),
             config_value="qubit-brain4"),
         ProviderManifest(
@@ -169,24 +169,24 @@ def default_manifests() -> List[ProviderManifest]:
             source="sherpa-onnx (CPU; declared dep)",
             revision=">=1.13", license="Apache-2.0",
             hardware="cpu", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=70.0, quality_evidence="docs/AUDIO_SETUP.md",
-            safety_evidence="docs/OPERATIONS_7A.md", rollback_to="sherpa",
+            latency_ms=70.0, quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
+            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md", rollback_to="sherpa",
             config_path=("asr", "provider"), config_value="sherpa"),
         ProviderManifest(
             id="piper", kind=TTS, default=True,
             source="piper-tts (declared dep)",
             revision=">=1.2", license="MIT",
             hardware="cpu", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=250.0, quality_evidence="docs/AUDIO_SETUP.md",
-            safety_evidence="docs/OPERATIONS_7A.md", rollback_to="piper",
+            latency_ms=250.0, quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
+            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md", rollback_to="piper",
             config_path=("tts", "provider"), config_value="piper"),
         ProviderManifest(
             id="en_US-amy-medium", kind=VOICE, default=True,
             source="rhasspy/piper-voices v1.0.0 (en_US amy medium)",
             revision="v1.0.0", license="MIT",
             hardware="cpu", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=250.0, quality_evidence="docs/AUDIO_SETUP.md",
-            safety_evidence="docs/OPERATIONS_7A.md",
+            latency_ms=250.0, quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
+            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md",
             rollback_to="en_US-amy-medium",
             config_path=("tts", "voice"), config_value="en_US-amy-medium"),
         ProviderManifest(
@@ -194,8 +194,8 @@ def default_manifests() -> List[ProviderManifest]:
             source="system OS defaults (HyperX rules)",
             revision="n/a", license="none",
             hardware="any", languages=["en"], vram_mib=0, ram_mib=0,
-            latency_ms=0.0, quality_evidence="docs/AUDIO_SETUP.md",
-            safety_evidence="docs/OPERATIONS_7C.md", rollback_to="os-default",
+            latency_ms=0.0, quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
+            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7C.md", rollback_to="os-default",
             config_path=None, config_value=None),
     ]
 
@@ -436,7 +436,7 @@ def _measure_latency(cfg: Any, manifest: ProviderManifest) -> Dict[str, str]:
         rec = D.model_artifact_record(cfg)
         if rec.get("state") == "OK":
             return {"state": OK,
-                    "detail": "latency from held-out bake-off (docs/BAKEOFF_4D.md)"}
+                    "detail": "latency from held-out bake-off (docs/archive/2026-09-21/BAKEOFF_4D.md)"}
         return {"state": PARTIAL, "detail": "latency unmeasured (brain offline)"}
     return {"state": PARTIAL, "detail": "latency unmeasured for this kind"}
 
@@ -839,10 +839,10 @@ BRANDING_FILE_EDITS = [
         ("OpenClaw Voice Bridge", "Qubit VoiceBridge"),
         ("Qubit Voice Agent", "Qubit VoiceBridge"),
     ]),
-    ("docs/AGENT_PROMPT_PACK.md", [
+    ("docs/archive/2026-09-21/AGENT_PROMPT_PACK.md", [
         ("openclaw-voice-bridge", "qubit-voicebridge"),
     ]),
-    ("docs/VOICE_BRIDGE_SYSTEM.md", [
+    ("docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md", [
         ("openclaw-voice-bridge", "qubit-voicebridge"),
         ("qubit-voice-agent", "qubit-voicebridge"),
         ("OpenClaw Voice Bridge", "Qubit VoiceBridge"),
@@ -882,7 +882,7 @@ BRANDING_PATH_PAIRS_8S = [
 # launcher references (everything else in BRANDING_FILE_EDITS) remain strictly
 # checked and migrated.
 BRANDING_HISTORICAL_REFERENCE_FILES = (
-    "docs/AGENT_PROMPT_PACK.md",
+    "docs/archive/2026-09-21/AGENT_PROMPT_PACK.md",
 )
 
 

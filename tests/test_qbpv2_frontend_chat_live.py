@@ -16,7 +16,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-DIST = REPO_ROOT / "frontend" / "hermes-dist"
+DIST = REPO_ROOT / "frontend" / "qubit-dist"
 pytestmark = pytest.mark.skipif(
     not (DIST / "index.html").is_file(),
     reason="hermes-dist not built (npm build step)")
@@ -48,7 +48,8 @@ def _start(tmp_path):
     return ui, ui._server.server_address[1]
 
 
-def test_chat_page_uses_native_turn_and_no_pty(tmp_path):
+def test_native_chat_page_uses_native_turn_and_no_pty(tmp_path):
+    """/qubit-chat is the native Qubit chat: native agent turn, no PTY."""
     ui, port = _start(tmp_path)
     pty_requests: list[str] = []
     try:
@@ -59,7 +60,7 @@ def test_chat_page_uses_native_turn_and_no_pty(tmp_path):
                 "request",
                 lambda r: pty_requests.append(r.url) if "/api/pty" in r.url else None,
             )
-            page.goto(f"http://127.0.0.1:{port}/chat", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat", timeout=30000)
             page.wait_for_selector('[aria-label="Message Qubit"]', timeout=30000)
             box = page.get_by_label("Message Qubit")
             assert box.count() == 1
@@ -78,9 +79,8 @@ def test_chat_page_uses_native_turn_and_no_pty(tmp_path):
     assert pty_requests == [], pty_requests
 
 
-def test_chat_page_has_no_websocket_pty(tmp_path):
-    """The page must not even attempt a WebSocket — no /api/pty, /api/ws,
-    /api/events upgrades from the chat surface."""
+def test_native_chat_page_has_no_websocket_pty(tmp_path):
+    """The native /qubit-chat surface must not attempt a WebSocket PTY."""
     ui, port = _start(tmp_path)
     ws_urls: list[str] = []
     try:
@@ -88,7 +88,7 @@ def test_chat_page_has_no_websocket_pty(tmp_path):
             browser = p.chromium.launch()
             page = browser.new_page()
             page.on("websocket", lambda w: ws_urls.append(w.url))
-            page.goto(f"http://127.0.0.1:{port}/chat", timeout=30000)
+            page.goto(f"http://127.0.0.1:{port}/qubit-chat", timeout=30000)
             page.wait_for_timeout(4000)
             browser.close()
     finally:

@@ -1,4 +1,4 @@
-"""Active-recall memory layer (OpenClaw v2026.9.4 delta D4).
+"""Active-recall memory layer (Qubit v2026.9.4 delta D4).
 
 Adds the missing active-recall resolution/selection surface over the existing
 Packet 5B :class:`voicebridge.memory.store.MemoryStore` (and, when configured,

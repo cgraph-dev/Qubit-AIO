@@ -9,7 +9,7 @@ Invariants locked here:
   production backend;
 * op evidence is *linked* to a production dispatch, so a textual mention
   (docstring, comment, unrelated assertion) can never close a row;
-* the direct ``docs/QUBIT_SOURCE_INVENTORY.json`` is ingested when present:
+* the direct ``docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json`` is ingested when present:
   unmatched surface items become explicit open rows and the omissions summary
   is recorded; a missing or malformed inventory is tolerated and recorded;
 * ``gap_ledger.py --require-inventory-complete`` fails on unexplained
@@ -43,7 +43,7 @@ def _load_module(name: str, filename: str):
 rebuild = _load_module("rebuild_ledger_qubit_wave3", "rebuild_ledger_qubit.py")
 gap_ledger = _load_module("gap_ledger_wave3", "gap_ledger.py")
 
-SECTION_PATH = REPO_ROOT / "docs" / "QUBIT_GAP_LEDGER.qubit.json"
+SECTION_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.qubit.json"
 
 
 def _section() -> dict:
@@ -67,8 +67,8 @@ def test_generator_deterministic_across_hash_seeds(tmp_path) -> None:
     """
     inv_path = _write_inventory(tmp_path / "stable_inv.json", [
         {"id": "wave3:seed-open", "source": "hermes",
-         "category": "hermes_cli_subcommand", "name": "Seed open",
-         "path": "hermes_cli/seed.py", "ledger_match": None},
+         "category": "qubit_cli_subcommand", "name": "Seed open",
+         "path": "qubit_cli/seed.py", "ledger_match": None},
     ])
     outputs = []
     for seed in ("0", "1"):
@@ -248,11 +248,11 @@ def test_malformed_inventory_is_tolerated_and_recorded(tmp_path) -> None:
 def test_unmatched_inventory_items_become_explicit_open_rows(tmp_path) -> None:
     inv_path = _write_inventory(tmp_path / "inv.json", [
         {"id": "wave3:novel-op", "source": "hermes",
-         "category": "hermes_cli_subcommand", "name": "Novel op",
-         "path": "hermes_cli/novel.py", "ledger_match": None},
+         "category": "qubit_cli_subcommand", "name": "Novel op",
+         "path": "qubit_cli/novel.py", "ledger_match": None},
         {"id": "api:GET /api/backup", "source": "hermes",
-         "category": "hermes_backend_route", "name": "GET /api/backup",
-         "path": "hermes_cli/backup.py", "ledger_match": "backup_info"},
+         "category": "qubit_backend_route", "name": "GET /api/backup",
+         "path": "qubit_cli/backup.py", "ledger_match": "backup_info"},
     ])
     data = rebuild.build_ledger(inventory_path=inv_path)
     inv = data["inventory"]
@@ -314,7 +314,7 @@ def test_parented_surface_covered_by_implemented_parent(tmp_path) -> None:
     inv_path = _write_inventory(tmp_path / "inv.json", [
         {"id": "synthetic:model-entry", "source": "hermes",
          "category": "hermes_model", "name": "gpt-5",
-         "path": "hermes_cli/models_catalog_static.py",
+         "path": "qubit_cli/models_catalog_static.py",
          "parent_id": "model", "coverage": "model-entry"},
     ])
     data = rebuild.build_ledger(inventory_path=inv_path)
@@ -397,7 +397,7 @@ def test_inventory_summary_is_internally_consistent() -> None:
 
 
 def _read_inventory() -> dict:
-    path = REPO_ROOT / "docs" / "QUBIT_SOURCE_INVENTORY.json"
+    path = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
     assert path.is_file(), path
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -463,7 +463,7 @@ def _write_sections(docs: Path, inventory: dict,
 def test_require_inventory_complete_fails_on_omissions(tmp_path) -> None:
     docs = tmp_path / "docs"
     _write_sections(docs, {
-        "present": True, "path": "docs/QUBIT_SOURCE_INVENTORY.json",
+        "present": True, "path": "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json",
         "items_total": 3, "surface_items": 3, "matched": 2, "unmatched": 1,
         "unexplained_omissions": 1, "omitted_ids": ["wave3:missing"],
         "error": "",
@@ -481,7 +481,7 @@ def test_require_inventory_complete_fails_on_omissions(tmp_path) -> None:
 def test_require_inventory_complete_passes_when_complete(tmp_path) -> None:
     docs = tmp_path / "docs"
     _write_sections(docs, {
-        "present": True, "path": "docs/QUBIT_SOURCE_INVENTORY.json",
+        "present": True, "path": "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json",
         "items_total": 2, "surface_items": 2, "matched": 2, "unmatched": 0,
         "unexplained_omissions": 0, "omitted_ids": [], "error": "",
     })
@@ -510,7 +510,8 @@ DOCUMENTED_OPEN_ROW = None
 
 def test_committed_ledgers_have_no_open_rows() -> None:
     """The committed sections are code-complete: zero open rows."""
-    sections, missing, _ = gap_ledger.load_sections(REPO_ROOT / "docs")
+    sections, missing, _ = gap_ledger.load_sections(
+        REPO_ROOT / "docs" / "archive" / "2026-09-21")
     assert missing == [], missing
     summary = gap_ledger.build_summary(sections, missing)
     assert summary["open_rows"] == 0, summary["by_status"]
@@ -522,7 +523,7 @@ def test_committed_ledgers_have_no_open_rows() -> None:
 
 def test_require_code_ready_passes_on_committed_ledgers(tmp_path) -> None:
     rc = gap_ledger.main([
-        "--docs-dir", str(REPO_ROOT / "docs"),
+        "--docs-dir", str(REPO_ROOT / "docs" / "archive" / "2026-09-21"),
         "--out", str(tmp_path / "LEDGER.md"),
         "--require-code-ready"])
     assert rc == 0

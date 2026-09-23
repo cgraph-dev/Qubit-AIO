@@ -31,10 +31,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-PLUGINS = REPO_ROOT / "frontend/hermes-qubit/plugins"
+PLUGINS = REPO_ROOT / "frontend/qubit-app/plugins"
 BRAND = PLUGINS / "qubit-brand/qubit-brand.js"
 REPORTS = PLUGINS / "qubit-reports/qubit-reports.js"
-SRC = REPO_ROOT / "frontend/hermes-web/src"
+SRC = REPO_ROOT / "frontend/qubit-web/src"
 RESOLVE = SRC / "lib/resolve-page-title.ts"
 APP = SRC / "App.tsx"
 POLICY_REFUSAL = SRC / "lib/policy-refusal.ts"
@@ -135,7 +135,7 @@ def test_d15_update_controls_use_the_refusal_helper():
     assert system.count("policyRefusalMessage") >= 2
     # refused state renders a reason and hides the actionable controls
     assert 'data-state="unavailable"' in system
-    assert "canUpdateHermes && !updateRefusal" in system
+    assert "canUpdateQubit && !updateRefusal" in system
     # process supervision is discovered from GET /api/gateway and disabled
     assert "getGatewayStatus" in system
     assert "GATEWAY_NO_SUPERVISION" in system
@@ -243,7 +243,7 @@ def test_d7_reports_hides_tokens_when_disabled_and_shows_when_enabled():
 # Production wiring: the served plugin set still includes the owned bundles
 # ---------------------------------------------------------------------------
 def test_owned_plugins_are_served_by_the_real_backend():
-    from voicebridge import hermes_compat as HC
+    from voicebridge import qubit_compat as HC
 
     served = {m["name"] for m in HC.plugins_response()["plugins"]}
     assert {"qubit-brand", "qubit-reports"} <= served

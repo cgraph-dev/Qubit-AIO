@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-LEDGER = REPO / "docs" / "QUBIT_GAP_LEDGER.qubit.json"
+LEDGER = REPO / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.qubit.json"
 
 GUIDANCE_ROWS = {
     "commands_list": "qubit, what can you do",

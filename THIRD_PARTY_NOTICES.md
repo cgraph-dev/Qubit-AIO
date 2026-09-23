@@ -421,15 +421,18 @@ MIT License text requirement (retained provenance record):
 
 ## Hermes agent dashboard — vendored baseline (owner amendment 2026-09-11)
 
-`frontend/hermes-web/` (191 files from upstream `web/`) plus
-`frontend/hermes-shared/` (18 files from upstream `apps/shared`) is a
-byte-identical vendor of NousResearch/hermes-agent (MIT © 2025 Nous Research)
-at pinned commit `2237be355906fbe6065ce1815711eee52b2d646e` (tag `v2026.9.7`),
-authorized by `docs/QUBIT_OWNER_AMENDMENT_2026-09-11.md` and recorded in
-`docs/UPSTREAM_REUSE.md` (R35) with per-file hashes in
-`docs/HERMES_SOURCE_COMPARISON.json`. Qubit integration, branding, and OpenClaw
-additions live ONLY in `frontend/hermes-qubit/` (overlay) and
-`voicebridge/hermes_compat.py`; vendored files are never edited in place.
+`frontend/qubit-web/` (191 files from upstream `web/`) plus
+`frontend/qubit-shared/` (18 files from upstream `qubit-shared`) is a
+source-level Qubit rebrand of NousResearch/hermes-agent (MIT © 2025 Nous
+Research) at pinned commit `2237be355906fbe6065ce1815711eee52b2d646e` (tag
+`v2026.9.7`), authorized by `docs/archive/2026-09-21/QUBIT_OWNER_AMENDMENT_2026-09-11.md` and
+recorded in `docs/UPSTREAM_REUSE.md` (R35) with per-file upstream/local hashes,
+patch reasons, and affected regression tests in
+`docs/HERMES_SOURCE_COMPARISON.json` (unchanged files remain byte-identical;
+rebranded files carry an explicit patch record). Qubit integration, branding,
+and OpenClaw additions live in `frontend/qubit-app/` (overlay) and
+`voicebridge/qubit_compat.py`; no vendored file is edited without a recorded
+patch entry.
 `LICENSE` (Qubit school-project terms) does not apply to these paths.
 
 MIT License text requirement (vendored dashboard provenance record):

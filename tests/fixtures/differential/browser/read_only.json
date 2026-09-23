@@ -2,13 +2,17 @@
   "schema_version": 1,
   "fixture_id": "browser.status.read_only",
   "family": "browser",
+  "read_only": true,
   "command": null,
   "request": {
     "kind": null,
-    "method": "GET",
-    "path": "/agent/api/qubit/browser/status",
+    "method": "POST",
+    "path": "/agent/api/ops/run",
     "headers": {},
-    "body": null,
+    "body": {
+      "id": "browser_status",
+      "args": {}
+    },
     "event": null,
     "argv": []
   },
@@ -27,10 +31,7 @@
   "expected": {
     "http_status": 200,
     "json_schema": {
-      "state": "OK"
-    },
-    "backend_operation": {
-      "op": "browser.status"
+      "ok": true
     }
   },
   "qubit": {
@@ -39,7 +40,7 @@
     "approval": null
   },
   "hermes": {
-    "path": "hermes_cli/subcommands/browser.py:8",
+    "path": "qubit_cli/subcommands/browser.py:8",
     "symbol": "build_browser_parser",
     "mapping_status": "VERIFIED"
   },
@@ -48,16 +49,20 @@
     "symbol": "getBrowserControlState",
     "mapping_status": "VERIFIED"
   },
-  "notes": "Browser loopback control contract. Browser is a VISUAL family: the fixture requires a real canonical backend_operation, so a rendered control cannot pass on markup alone. Profiles are untouched by read-only status. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: hermes_cli/subcommands/browser.py:8 (build_browser_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: extensions/browser/src/browser-control-state.ts:44 (getBrowserControlState).",
+  "notes": "Browser loopback control contract. Browser is a VISUAL family: the control must reach the real canonical dashboard_ops op browser_status (run_registry_op -> voice_commands browser_status), not the invented /agent/api/qubit/browser/status path. Read-only alternative: GET /agent/api/qubit/browser/profiles (qubit_compat.py:4687). Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/subcommands/browser.py:8 (build_browser_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: extensions/browser/src/browser-control-state.ts:44 (getBrowserControlState). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
   "evidence": {
     "voice_utterance": null,
-    "dashboard_route": "/agent/api/qubit/browser/status",
-    "dashboard_control": "browser.status",
+    "dashboard_route": "/agent/api/ops/run",
+    "dashboard_control": "browser_status",
     "request_schema": {
-      "method": "GET",
-      "path": "/agent/api/qubit/browser/status"
+      "method": "POST",
+      "path": "/agent/api/ops/run",
+      "body": {
+        "id": "browser_status",
+        "args": "object"
+      }
     },
-    "broker_policy_decision": null,
+    "broker_policy_decision": "run_op dispatch through dashboard_ops registry",
     "runtime_provider": "loopback CDP",
     "store_state_assertion": null,
     "output_event_assertion": null,
@@ -71,7 +76,6 @@
     },
     "evidence_notes": {
       "voice_utterance": "not exposed by this fixture's surface",
-      "broker_policy_decision": "not exposed by this fixture's surface",
       "store_state_assertion": "not exposed by this fixture's surface",
       "output_event_assertion": "not exposed by this fixture's surface",
       "error_codes": "not exposed by this fixture's surface",
@@ -92,5 +96,7 @@
       "kind": "a11y",
       "ref": "evidence:browser.status.read_only/a11y.json"
     }
-  }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN (X-Api-Token) and a live operator instance. The real canonical op is browser_status via POST /agent/api/ops/run (qubit_compat.py:4474 h_ops_run -> dashboard_ops.py:609 run_op)."
 }

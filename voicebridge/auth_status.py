@@ -26,13 +26,16 @@ AUDIT_CAP = 1000
 DETAIL_LIMIT = 160
 NAME_LIMIT = 120
 
-#: Explicit store boundary: one writable authority per domain. The chat
-#: transcript store (``voicebridge.chat_transport.ChatSessionStore``) owns
-#: conversation sessions + turns in ``chat_sessions.json``; this module's
-#: :class:`SessionStore` owns action-receipt lifecycle metadata in
-#: ``sessions.json``. They never share a file, a schema, or a record id
-#: namespace, and neither writes the other's records.
-CHAT_TRANSCRIPT_STORE = "chat_sessions.json"
+#: Explicit store boundary: one writable authority per domain. Chat
+#: transcripts (C7) live in the ONE vendored ``qubit_state.SessionDB``
+#: (``state.db`` under the Qubit runtime home), reached through the strict
+#: adapter ``voicebridge.qubit_session_store.QubitSessionStore``; the
+#: terminal/TUI/agent and every native surface read/write that same database.
+#: This module's :class:`SessionStore` owns action-receipt lifecycle metadata
+#: in ``sessions.json`` — a separate domain that never shares a file, schema,
+#: or record-id namespace with the chat transcripts.
+CHAT_TRANSCRIPT_STORE = "state.db"
+CHAT_TRANSCRIPT_ADAPTER = "voicebridge.qubit_session_store.QubitSessionStore"
 CHAT_TRANSCRIPT_SCHEMA = "qubit-chat-session/1"
 RECEIPT_SESSION_STORE = "sessions.json"
 STORE_BOUNDARY = {
@@ -48,13 +51,28 @@ STORE_BOUNDARY = {
         "not_owner_of": [CHAT_TRANSCRIPT_STORE, "chat conversation turns"],
     },
     "chat": {
-        "authority": "voicebridge.chat_transport.ChatSessionStore",
+        "authority": CHAT_TRANSCRIPT_ADAPTER,
         "domain": "chat transcript",
         "file": CHAT_TRANSCRIPT_STORE,
         "schema_id": CHAT_TRANSCRIPT_SCHEMA,
-        "owns": ["chat sessions", "conversation messages"],
+        "backing_store": "qubit-runtime (qubit_state.SessionDB)",
+        "owns": ["chat sessions", "conversation messages", "tool/system rows",
+                 "session ids/timestamps/order"],
         "not_owner_of": [RECEIPT_SESSION_STORE, "action receipts",
                          "receipt lifecycle metadata"],
+    },
+    # The vendored fork's ``state.db`` is the SAME canonical chat store the
+    # native adapter fronts (C7): one database, one writer path per surface, no
+    # copy-sync. It lives under the single Qubit-owned runtime home.
+    "fork_agent_sessions": {
+        "authority": "qubit-runtime (qubit_state.SessionDB)",
+        "domain": "canonical chat/agent session history (shared, C7)",
+        "file": "state.db",
+        "read_only_adapter": False,
+        "writable": True,
+        "home_authority": "voicebridge.qubit_runtime.default_home",
+        "owns": ["agent loops/turns/messages", "native chat sessions/messages"],
+        "not_owner_of": [RECEIPT_SESSION_STORE, "action receipts"],
     },
 }
 
@@ -62,6 +80,31 @@ STORE_BOUNDARY = {
 def store_boundary() -> Dict[str, Any]:
     """Return the explicit, non-overlapping store ownership contract."""
     return dict(STORE_BOUNDARY)
+
+
+def session_authority() -> Dict[str, Any]:
+    """The single session-authority contract across every session surface.
+
+    Exactly one authority is writable per concern: action-receipt lifecycle
+    metadata (:class:`SessionStore`, ``sessions.json``) and chat transcripts
+    (:class:`voicebridge.qubit_session_store.QubitSessionStore`, a strict
+    adapter over the vendored ``qubit_state.SessionDB``). The terminal/TUI/agent
+    and every native surface read/write that ONE ``state.db``; no second
+    writable chat store exists. Cross-module readers (compat handlers, CLI, the
+    dashboard) must read through the named authority.
+    """
+    return {
+        "schema": "qubit-session-authority/1",
+        "writable_authorities": {
+            "receipt_lifecycle": "voicebridge.auth_status.SessionStore",
+            "chat_transcript": CHAT_TRANSCRIPT_ADAPTER,
+        },
+        "backing_stores": {
+            "chat_transcript": "qubit-runtime (qubit_state.SessionDB)",
+        },
+        "read_only_adapters": {},
+        "store_boundary": dict(STORE_BOUNDARY),
+    }
 
 
 def auth_status(cfg: Any) -> Dict[str, Any]:
@@ -92,8 +135,17 @@ def auth_status(cfg: Any) -> Dict[str, Any]:
         providers.append({"provider": name, "key_ref": kind,
                           "configured": configured,
                           "allowlisted": name in allowed})
+    # PRB-02: project the canonical env-reference registry so CLI `qubit auth
+    # status` and voice `auth_status` report the SAME store the dashboard
+    # GET/PUT/DELETE /api/env reads and writes. Names only, never values.
+    try:
+        from . import env_store
+
+        env_references = env_store.names(cfg)
+    except Exception:  # noqa: BLE001 - never fail the status read
+        env_references = []
     return {"schema": "qubit-auth-status/1", "frontier_enabled": policy.enabled,
-            "providers": providers}
+            "providers": providers, "env_references": env_references}
 
 
 class SessionStore:
@@ -106,9 +158,10 @@ class SessionStore:
     deletes a receipt, so a deleted session stays recoverable via ``resume``.
 
     Store boundary: this authority owns receipt lifecycle metadata only. Chat
-    conversation sessions + turns are owned by
-    ``voicebridge.chat_transport.ChatSessionStore`` (`chat_sessions.json`);
-    this store never reads or writes that file. See :data:`STORE_BOUNDARY`.
+    conversation sessions + turns live in the ONE canonical ``state.db``
+    (``voicebridge.qubit_session_store.QubitSessionStore`` over the vendored
+    ``qubit_state.SessionDB``); this store never reads or writes it.
+    See :data:`STORE_BOUNDARY`.
     """
 
     STORE_FILE = RECEIPT_SESSION_STORE

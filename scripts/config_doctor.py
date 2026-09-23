@@ -38,17 +38,23 @@ ACTIVE, RESIDENT, AVAILABLE = "ACTIVE", "RESIDENT", "AVAILABLE"
 MISSING, DEGRADED, WARN, FAIL = "MISSING", "DEGRADED", "WARN", "FAIL"
 
 # Modules imported through guarded optional paths (try/except ImportError) as
-# inventoried in docs/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
+# inventoried in docs/archive/2026-09-21/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
 # gracefully, so their absence is a warning, not a fresh-install failure.
 OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
                     "pystray"}
 LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
-             # Qubit-owned vendored Hermes fork (qubit_hermes/): local source,
+             # Qubit-owned vendored upstream fork (qubit_runtime/): local source,
              # not a PyPI distribution. The fork's modules are top-level once
-             # ``hermes_runtime.ensure_path()`` puts the fork root on sys.path;
+             # ``qubit_runtime.ensure_path()`` puts the fork root on sys.path;
              # ``toolsets`` is the toolset registry imported by the Qubit
-             # config overlay in voicebridge/hermes_asgi.py.
-             "hermes_cli", "toolsets"}
+             # config overlay in voicebridge/qubit_asgi.py, and ``providers``
+             # is the fork's provider-profile registry imported (lazily, after
+             # ensure_path) by voicebridge/pty_ws.py.
+             "qubit_cli", "toolsets", "providers",
+             # Other vendored fork top-level modules imported lazily after
+             # ``qubit_runtime.ensure_path()``: ``agent`` (credential pool /
+             # runtime), ``tools`` (skills), and ``qubit_state`` (SessionDB).
+             "agent", "tools", "qubit_state"}
 
 
 # Distribution-name -> import-name corrections (pip name differs from module).
@@ -282,8 +288,8 @@ def check_reconcile(cfg, results) -> None:
 
     # 2. model alias: docs claim (example), config, and runner contract agree
     doc_alias = None
-    for doc in (REPO / "docs" / "AUDIO_SETUP.md",
-                REPO / "docs" / "VOICE_BRIDGE_SYSTEM.md",
+    for doc in (REPO / "docs/archive/2026-09-21" / "AUDIO_SETUP.md",
+                REPO / "docs/archive/2026-09-21" / "VOICE_BRIDGE_SYSTEM.md",
                 REPO / "README.md"):
         try:
             for line in doc.read_text().splitlines():
@@ -345,7 +351,7 @@ def check_reconcile(cfg, results) -> None:
 
     # 5. MIGRATIONS coverage: the feature-flag change has an entry
     try:
-        mig = (REPO / "docs" / "MIGRATIONS.md").read_text()
+        mig = (REPO / "docs/archive/2026-09-21" / "MIGRATIONS.md").read_text()
         if "## MIG-016" not in mig:
             results.append(("reconcile.migrations", FAIL,
                             "missing MIG-016 (feature-flag registry) entry"))

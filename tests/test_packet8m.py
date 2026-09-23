@@ -1,6 +1,6 @@
 """Packet 8M tests: optional GENOME-compatible semantic memory adapter.
 
-Covers the pinned GENOME contract (docs/UPSTREAM_REUSE.md R23) as adapted over
+Covers the pinned GENOME contract (docs/archive/2026-09-21/UPSTREAM_REUSE.md R23) as adapted over
 the existing 5B MemoryStore: disabled-by-default + provider selection, LLM-free
 ingest, semantic recall with typed unavailable/degraded states, bi-temporal
 belief facts (valid_from/valid_until boundaries, believer-aware invalidation,
@@ -800,7 +800,7 @@ def test_no_unauthorized_runtime_surface(tmp_path):
     # Owner amendment 2026-09-11 (runtime): the Qubit-owned vendored Hermes
     # backend is authorized, so its ASGI stack (fastapi/uvicorn/starlette) may
     # be loaded. Genuinely unauthorized runtime surfaces stay forbidden. This
-    # migration is recorded in docs/QUBIT_HERMES_CUTOVER_MIGRATION.md.
+    # migration is recorded in docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md.
     assert not any(m.startswith(("mcp", "flask", "torch",
                                  "sentence_transformers")) for m in sys.modules)
     s = SemanticMemory(tmp_path / "m.db", enabled=True, provider="hash")
