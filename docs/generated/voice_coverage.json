@@ -5,10 +5,10 @@
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
-    "bound_backends": 626,
+    "bound_backends": 627,
     "dead_backend_ids": [],
     "dead_backends": 0,
-    "total_entries": 626
+    "total_entries": 627
   },
   "rows": [
     {
@@ -6740,6 +6740,14 @@
       "voice_intent": "qubit recall status"
     },
     {
+      "entry": "memory_search",
+      "id": "op recall_update",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "controls",
+      "voice_intent": "qubit recall update"
+    },
+    {
       "entry": "cli_receipts",
       "id": "op receipts_ledger",
       "kind": "match",
@@ -11032,11 +11040,11 @@
   "source": "docs/generated/parity_inventory.json",
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
-    "distinct_intents": 865,
+    "distinct_intents": 866,
     "guard": 0,
-    "real": 593,
-    "real_pct": 43.06,
-    "rows": 1377,
+    "real": 594,
+    "real_pct": 43.11,
+    "rows": 1378,
     "unresolved": 784
   },
   "surfaces": {
@@ -11049,9 +11057,9 @@
     },
     "controls": {
       "guard": 0,
-      "real": 236,
-      "real_pct": 39.4,
-      "total": 599,
+      "real": 237,
+      "real_pct": 39.5,
+      "total": 600,
       "unresolved": 363
     },
     "other": {

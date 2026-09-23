@@ -77,7 +77,7 @@ def resolve_qubit_bin() -> Optional[str]:
         abs_path = os.path.abspath(argv0)
         if os.access(abs_path, os.X_OK) and not (_is_windows and _is_python_script(abs_path)):
             return abs_path
-    return shutil.which("hermes") or None
+    return shutil.which("qubit") or None
 
 
 def build_relaunch_argv(

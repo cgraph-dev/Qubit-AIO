@@ -133,8 +133,8 @@ def _get_profiles_root() -> Path:
 
 
 def _get_default_qubit_home() -> Path:
-    """Default (pre-profile) QUBIT_HOME: ``~/.hermes``, or QUBIT_HOME itself in
-    Docker/custom deployments (e.g. ``/opt/data``)."""
+    """Default (pre-profile) QUBIT_HOME: the Qubit-owned default home, or QUBIT_HOME
+    itself in Docker/custom deployments (e.g. ``/opt/data``)."""
     from qubit_constants import get_default_qubit_root
     return get_default_qubit_root()
 
@@ -197,7 +197,7 @@ def validate_profile_name(name: str) -> None:
     directory name must look like, while ingress-point normalization handles UX flexibility (see #18498).
     """
     if name == "default":
-        return  # special alias for ~/.hermes
+        return  # special alias for the default QUBIT_HOME
     if not _PROFILE_ID_RE.match(name):
         raise ValueError(f"Invalid profile name {name!r}. Must match [a-z0-9][a-z0-9_-]{{0,63}}")
     if name in _RESERVED_NAMES:
@@ -335,9 +335,9 @@ def create_wrapper_script(name: str, target: Optional[str] = None) -> Optional[P
     wrapper_path = _wrapper_path(canon)
     try:
         if sys.platform == "win32":
-            wrapper_path.write_text(f"@echo off\r\nhermes -p {profile} %*\r\n", encoding="utf-8")
+            wrapper_path.write_text(f"@echo off\r\nqubit -p {profile} %*\r\n", encoding="utf-8")
         else:
-            qubit_exe = shutil.which("hermes") or "hermes"
+            qubit_exe = shutil.which("qubit") or "qubit"
             wrapper_path.write_text(f'#!/bin/sh\nexec {shlex.quote(qubit_exe)} -p {profile} "$@"\n', encoding="utf-8")
             wrapper_path.chmod(wrapper_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         return wrapper_path
@@ -725,7 +725,7 @@ def list_profiles() -> List[ProfileInfo]:
 
 
 def profiles_to_serve(multiplex: bool, profile_allowlist: Optional[List[str]] = None) -> List[Tuple[str, Path]]:
-    """``(profile_name, hermes_home)`` pairs a gateway should serve — the single chokepoint
+    """``(profile_name, qubit_home)`` pairs a gateway should serve — the single chokepoint
     for "which profiles does the inbound gateway handle".
 
     ``multiplex=False``: exactly one entry for the *active* profile (byte-for-byte the
@@ -851,7 +851,7 @@ def create_profile(
         )
     canon = _canon_valid(name)
     if canon == "default":
-        raise ValueError("Cannot create a profile named 'default' — it is the built-in profile (~/.hermes).")
+        raise ValueError("Cannot create a profile named 'default' — it is the built-in profile (the default QUBIT_HOME).")
     profile_dir = get_profile_dir(canon)
     if profile_dir.exists() and named_profile_is_deleted(profile_dir):
         # Empty shells left by post-delete mkdir may be replaced. Identity files mean the
@@ -970,16 +970,16 @@ def backfill_profile_envs(quiet: bool = False) -> List[str]:
 
 
 _BACKEND_TOKENS = frozenset({"serve", "dashboard", "gateway"})
-_QUBIT_ARGV_MARKERS = ("qubit_cli.main", "qubit-gateway", "hermes-gateway", "tui_gateway")
+_QUBIT_ARGV_MARKERS = ("qubit_cli.main", "qubit-gateway", "tui_gateway")
 # python / python3 / python3.12 / pythonw(.exe): the interpreter basenames a
 # `#!/…/python3` console-script shim is exec'd through when something (e.g. Electron's
-# `findOnPath('hermes')`) spawns the shim by handing the interpreter its path — then the
-# OS-reported argv[0] is the interpreter, not "hermes".
+# `findOnPath('qubit')`) spawns the shim by handing the interpreter its path — then the
+# OS-reported argv[0] is the interpreter, not "qubit".
 _PYTHON_INTERPRETER_RE = re.compile(r"^python[\d.]*w?(\.exe)?$")
 # Console-script entry points this project ships (pyproject.toml [project.scripts]).
-# argv[1] is matched against exact names, not ``startswith("hermes")``: with a bare
-# interpreter argv[0], argv[1] can be ANY user script ("hermes-notes.py").
-_QUBIT_CONSOLE_SCRIPT_NAMES = frozenset({"hermes", "hermes-agent", "hermes-acp"})
+# argv[1] is matched against exact names, not ``startswith("qubit")``: with a bare
+# interpreter argv[0], argv[1] can be ANY user script ("qubit-notes.py").
+_QUBIT_CONSOLE_SCRIPT_NAMES = frozenset({"qubit", "qubit-agent", "qubit-acp"})
 
 
 def _is_qubit_argv(argv: list) -> bool:
@@ -987,7 +987,7 @@ def _is_qubit_argv(argv: list) -> bool:
     or a python interpreter directly exec'ing a known ``qubit`` console-script shim."""
     joined = " ".join(argv)
     exe_name = os.path.basename(argv[0]).lower()
-    if any(marker in joined for marker in _QUBIT_ARGV_MARKERS) or exe_name.startswith("hermes"):
+    if any(marker in joined for marker in _QUBIT_ARGV_MARKERS) or exe_name.startswith("qubit"):
         return True
     if len(argv) >= 2 and _PYTHON_INTERPRETER_RE.match(exe_name):
         script_name = os.path.basename(str(argv[1])).lower()
@@ -1160,7 +1160,7 @@ def delete_profile(name: str, yes: bool = False) -> Path:
     to prevent auto-restart, gateway stopped if running)."""
     canon = normalize_profile_name(name)
     if canon == "default":
-        raise ValueError("Cannot delete the default profile (~/.hermes).\nTo remove everything, use: qubit uninstall")
+        raise ValueError("Cannot delete the default profile (the default QUBIT_HOME).\nTo remove everything, use: qubit uninstall")
     canon, profile_dir = _existing_profile_dir(canon)
     gw_running = _check_gateway_running(profile_dir)
     wrapper_path = _get_wrapper_dir() / canon
@@ -1315,7 +1315,8 @@ def _stop_gateway_process(profile_dir: Path) -> None:
         raw = pid_file.read_text(encoding="utf-8").strip()
         data = json.loads(raw) if raw.startswith("{") else {"pid": int(raw)}
         pid = int(data["pid"])
-        # Cross-profile kill refusal: the record's hermes_home stamp names the gateway's TRUE
+        # Cross-profile kill refusal: the record's qubit_home stamp (legacy ``hermes_home``
+        # still read as a fallback) names the gateway's TRUE
         # owner. A poisoned gateway.pid in this dir can point at another profile's live
         # gateway — killing it starts a mutual SIGTERM restart loop.
         from gateway.status import get_process_start_time, recorded_gateway_home_conflicts, terminate_pid
@@ -1377,8 +1378,8 @@ def _retarget_active_profile(old: str, new: str, message: str) -> None:
 
 
 def get_active_profile_name() -> str:
-    """Profile name inferred from QUBIT_HOME: ``"default"`` when unset or ``~/.hermes``, the
-    name under ``~/.hermes/profiles/<name>``, ``"custom"`` for any other path."""
+    """Profile name inferred from QUBIT_HOME: ``"default"`` when unset or the default home,
+    the name under ``<QUBIT_HOME>/profiles/<name>``, ``"custom"`` for any other path."""
     from qubit_constants import get_qubit_home
     resolved = get_qubit_home().resolve()
     if resolved == _get_default_qubit_home().resolve():
@@ -1415,11 +1416,11 @@ def _profile_export_directory() -> Path:
 
     # A custom deployment may point QUBIT_HOME at its source checkout: use a sibling store,
     # falling back to the OS temp dir only when the user's home itself is a checkout (dotfiles
-    # repo). Per-uid temp name: a fixed /tmp/hermes-profile-exports is a predictable shared
+    # repo). Per-uid temp name: a fixed /tmp/qubit-profile-exports is a predictable shared
     # path another local user could pre-create (or symlink) first.
     uid_suffix = f"-{os.getuid()}" if hasattr(os, "getuid") else ""
     candidates = (
-        Path.home() / ".hermes-profile-exports", Path(tempfile.gettempdir()) / f"hermes-profile-exports{uid_suffix}"
+        Path.home() / ".qubit-profile-exports", Path(tempfile.gettempdir()) / f"qubit-profile-exports{uid_suffix}"
     )
     for candidate in candidates:
         if not _inside_git_checkout(candidate):
@@ -1538,7 +1539,7 @@ def export_profile(name: str, output_path: str, extra_files: Optional[Dict[str, 
     # Archive base name without extension (.tar.gz appended by the writer).
     base = str(Path(output_path)).removesuffix(".tar.gz").removesuffix(".tgz")
 
-    # The default profile IS ~/.hermes (dir name ".hermes"), so both paths stage a filtered
+    # The default profile IS the default QUBIT_HOME, so both paths stage a filtered
     # copy under a temp dir named after the canonical id: root allow-list for default,
     # credential exclusion for named profiles.
     def _ignore_credentials(directory: str, contents: list) -> set:
@@ -1574,18 +1575,18 @@ def import_profile(archive_path: str, name: Optional[str] = None) -> Path:
         raise ValueError("Profile archive must contain exactly one top-level directory.")
 
     # Default-profile archives have "default/" at top level; importing as "default" would
-    # target ~/.hermes itself.
+    # target the default QUBIT_HOME itself.
     canon = _canon_valid(inferred_name)
     if canon == "default":
         raise ValueError(
-            "Cannot import as 'default' — that is the built-in root profile (~/.hermes). "
+            "Cannot import as 'default' — that is the built-in root profile (the default QUBIT_HOME). "
             "Specify a different name: qubit profile import <archive> --name <name>"
         )
     profile_dir = get_profile_dir(canon)
     if profile_dir.exists():
         raise FileExistsError(f"Profile '{canon}' already exists at {profile_dir}")
     _get_profiles_root().mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="hermes_profile_import_") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="qubit_profile_import_") as tmpdir:
         staging_root = Path(tmpdir)
         safe_extract_targz(archive, staging_root)
         extracted = staging_root / archive_root
@@ -1615,10 +1616,15 @@ def _atomic_write_json(path: Path, data: dict) -> bool:
 
 
 def _migrate_honcho_profile_host(old_name: str, new_name: str, new_dir: Path) -> None:
-    """Rename Honcho host blocks for a renamed profile without changing peers."""
-    old_host = f"hermes_{old_name}"
-    legacy_old_host = f"qubit.{old_name}"
-    new_host = f"hermes_{new_name}"
+    """Rename Honcho host blocks for a renamed profile without changing peers.
+
+    Qubit-owned host keys use the ``qubit_<profile>`` prefix. ``hermes_<profile>``
+    (the pre-rebrand key) and the dot-form ``qubit.<profile>`` are still accepted as
+    legacy sources so a host block written before the rename is migrated, not orphaned."""
+    legacy_hermes_old_host = f"hermes_{old_name}"
+    old_host = f"qubit_{old_name}"
+    legacy_dot_old_host = f"qubit.{old_name}"
+    new_host = f"qubit_{new_name}"
     candidates = [
         new_dir / "honcho.json", _get_default_qubit_home() / "honcho.json", Path.home() / ".honcho" / "config.json"
     ]
@@ -1638,15 +1644,17 @@ def _migrate_honcho_profile_host(old_name: str, new_name: str, new_dir: Path) ->
         hosts = raw.get("hosts")
         if not isinstance(hosts, dict):
             continue
-        source_host = old_host if old_host in hosts else legacy_old_host
-        if source_host not in hosts:
+        source_host = next(
+            (h for h in (old_host, legacy_hermes_old_host, legacy_dot_old_host) if h in hosts), None
+        )
+        if source_host is None:
             continue
         if new_host in hosts:
             print(f"⚠ Honcho host block not migrated: {new_host} already exists in {path}")
             continue
         block = hosts[source_host]
         if isinstance(block, dict) and "aiPeer" not in block:
-            block["aiPeer"] = old_name  # source_host is ``hermes_<old>`` or legacy ``qubit.<old>``
+            block["aiPeer"] = old_name  # legacy source: ``hermes_<old>`` or dot-form ``qubit.<old>``
         hosts[new_host] = hosts.pop(source_host)
         if _atomic_write_json(path, raw):
             print(f"✓ Honcho host updated: {source_host} → {new_host}")

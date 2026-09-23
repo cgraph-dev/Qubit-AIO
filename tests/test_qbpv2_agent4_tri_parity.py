@@ -39,7 +39,12 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LEDGER = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
+# Canonical generated location (finding N3): the deterministic generator writes
+# docs/generated/, never the frozen archive. Prefer canonical, fall back to the
+# frozen record read-only only if the generated artifact is absent.
+LEDGER = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.openclaw.json"
+if not LEDGER.exists():
+    LEDGER = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
 GEN = REPO_ROOT / "scripts" / "rebuild_ledger_openclaw.py"
 
 

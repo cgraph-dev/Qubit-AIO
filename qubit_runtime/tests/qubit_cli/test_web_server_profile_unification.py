@@ -227,6 +227,85 @@ class TestProfileScopedMcp:
         assert resp.status_code == 200
         assert resp.json()["tools"] == [{"name": "tool-a", "description": "desc"}]
 
+    def test_mcp_resources_and_prompts_routes_are_wired(
+        self, client, isolated_profiles, monkeypatch
+    ):
+        """The resources/prompts list routes resolve the requested profile's server
+        and dispatch to the vendored transport with the right capability."""
+        import qubit_cli.web_routers.mcp as mcp_router
+
+        (isolated_profiles["worker_beta"] / "config.yaml").write_text(
+            "mcp_servers:\n  res-srv:\n    url: http://x/mcp\n",
+            encoding="utf-8",
+        )
+        calls = []
+
+        def fake_list(name, config, capability):
+            calls.append((name, capability))
+            return (
+                {"resources": [{"uri": "file:///a"}]}
+                if capability == "resources"
+                else {"prompts": [{"name": "p"}]}
+            )
+
+        monkeypatch.setattr(mcp_router, "_list_server_capability", fake_list)
+
+        resp = client.get(
+            "/api/mcp/servers/res-srv/resources", params={"profile": "worker_beta"}
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"resources": [{"uri": "file:///a"}]}
+
+        resp = client.get(
+            "/api/mcp/servers/res-srv/prompts", params={"profile": "worker_beta"}
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"prompts": [{"name": "p"}]}
+
+        assert calls == [("res-srv", "resources"), ("res-srv", "prompts")]
+
+    def test_mcp_capability_routes_404_unknown_server(self, client, isolated_profiles):
+        assert client.get("/api/mcp/servers/ghost/resources").status_code == 404
+        assert client.get("/api/mcp/servers/ghost/prompts").status_code == 404
+        assert client.get("/api/mcp/servers/ghost/resource-templates").status_code == 404
+
+    def test_mcp_resource_templates_route_is_wired(
+        self, client, isolated_profiles, monkeypatch
+    ):
+        """The resource-templates route rides the SDK session's
+        ``list_resource_templates`` (drained via the vendored paginator)."""
+        import qubit_cli.web_routers.mcp as mcp_router
+
+        (isolated_profiles["worker_beta"] / "config.yaml").write_text(
+            "mcp_servers:\n  tpl-srv:\n    url: http://x/mcp\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(
+            mcp_router,
+            "_list_server_templates",
+            lambda name, config: {"resource_templates": [{"uriTemplate": "file:///{path}"}]},
+        )
+
+        resp = client.get(
+            "/api/mcp/servers/tpl-srv/resource-templates",
+            params={"profile": "worker_beta"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"resource_templates": [{"uriTemplate": "file:///{path}"}]}
+
+    def test_vendored_handler_capability_boundary(self):
+        """The vendored tool-handler wrappers cover list/read resources and
+        list/get prompts; resource templates ride the SDK session method
+        directly (no handler wrapper), which is why the template route drains
+        ``session.list_resource_templates`` itself."""
+        from tools import mcp_tool_handlers as handlers
+
+        assert hasattr(handlers, "_make_list_resources_handler")
+        assert hasattr(handlers, "_make_read_resource_handler")
+        assert hasattr(handlers, "_make_list_prompts_handler")
+        assert hasattr(handlers, "_make_get_prompt_handler")
+        assert not hasattr(handlers, "_make_list_resource_templates_handler")
+
 
 class TestProfileScopedModel:
     def test_model_set_main_scoped(self, client, isolated_profiles):

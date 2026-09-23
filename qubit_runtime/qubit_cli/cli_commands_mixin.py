@@ -1,4 +1,4 @@
-"""Slash-command handlers for the interactive CLI (``HermesCLI`` inherits ``CLICommandsMixin``).
+"""Slash-command handlers for the interactive CLI (``QubitCLI`` inherits ``CLICommandsMixin``).
 
 cli.py-internal symbols (``_cprint``/``_ACCENT``/``save_config_value``…) are imported LAZILY inside
 the helpers/handlers via ``from cli import ...`` — cli.py imports this module (cycle otherwise).
@@ -190,7 +190,7 @@ _REASONING_TOGGLES = {
     **dict.fromkeys(("clamp", "collapse", "short"), ("reasoning_full", False, "CLAMPED to 10 lines", "")),
 }
 
-# /bg AIAgent provider-routing kwargs -> HermesCLI attribute carrying the value.
+# /bg AIAgent provider-routing kwargs -> QubitCLI attribute carrying the value.
 _BG_PROVIDER_KWARGS = {
     "providers_allowed": "_providers_only", "providers_ignored": "_providers_ignore",
     "providers_order": "_providers_order", "provider_sort": "_provider_sort",
@@ -1882,7 +1882,8 @@ class CLICommandsMixin:
 
     def _handle_plan_command(self, cmd: str):
         """Handle /plan — write a markdown implementation plan, no execution. The live agent
-        inspects the workspace read-only and saves the plan under ``.hermes/plans/``."""
+        inspects the workspace read-only and saves the plan under the Qubit home plans
+        directory (``<QUBIT_HOME>/plans/``)."""
         from agent.plan_prompt import build_plan_prompt
         task = _command_arg(cmd)  # optional — empty infers the task from conversation context
         print(f"\n📋 Planning: {_ellipsize(task, 80)}" if task
@@ -2303,7 +2304,7 @@ class CLICommandsMixin:
         Factored out so the read-back/strip logic is unit-testable."""
         editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR")
                   or ("notepad" if os.name == "nt" else "nano"))
-        fd, path = tempfile.mkstemp(suffix=".md", prefix="hermes_prompt_")
+        fd, path = tempfile.mkstemp(suffix=".md", prefix="qubit_prompt_")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write("#! Compose your prompt below. Lines starting with '#!' are ignored.\n"
@@ -2577,8 +2578,9 @@ class CLICommandsMixin:
         from types import SimpleNamespace
         words = {w.lower() for w in cmd_original.split()[1:]}
         local = "local" in words
-        # ``nous`` is the pre-rebrand word for the same private destination and
-        # stays accepted so existing muscle memory / scripts keep working.
+        # ``nous`` is the pre-rebrand word for the same private destination; it is a
+        # load-bearing legacy usage identifier, accepted so existing muscle memory /
+        # scripts keep working. The canonical word is ``qubit``.
         private = ("qubit" in words or "nous" in words) and not local
         # Typing /debug is the upload consent (yes=True); input() would hang in prompt_toolkit anyway.
         run_debug_share(SimpleNamespace(

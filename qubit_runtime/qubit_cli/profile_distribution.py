@@ -406,7 +406,7 @@ def install_distribution(
     """Install a distribution from *source* into a new profile; returns the resolved plan.
     Use :func:`plan_install` first to preview + prompt."""
     from qubit_cli.profiles import check_alias_collision, create_wrapper_script
-    with tempfile.TemporaryDirectory(prefix="hermes_dist_install_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="qubit_dist_install_") as tmp:
         plan = plan_install(source, Path(tmp), override_name=name)
         if plan.existing and not force:
             raise DistributionError(
@@ -447,7 +447,7 @@ def update_distribution(profile_name: str, force_config: bool = False) -> Instal
             f"Profile '{canon}' has no recorded source.  Re-install with "
             "`qubit profile install <source> --name {canon} --force`."
         )
-    with tempfile.TemporaryDirectory(prefix="hermes_dist_update_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="qubit_dist_update_") as tmp:
         plan = plan_install(existing_manifest.source, Path(tmp), override_name=canon)
         plan.preserves_config = not force_config
         _copy_dist_payload(plan.staged_dir, plan.target_dir, plan.manifest, preserve_config=plan.preserves_config)

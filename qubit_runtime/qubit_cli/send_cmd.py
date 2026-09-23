@@ -111,7 +111,7 @@ def _list_targets(platform_filter: Optional[str], *, json_mode: bool) -> int:
     if not platforms:
         print("No messaging platforms configured or no channels discovered yet.")
         print("Set one up with `qubit gateway setup`, or run the gateway once so")
-        print("channel discovery can populate ~/.hermes/channel_directory.json.")
+        print("channel discovery can populate $QUBIT_HOME/channel_directory.json.")
         return _SUCCESS_EXIT
 
     # Unfiltered: the shared formatter over the merged view. Filtered: a minimal view of our own.

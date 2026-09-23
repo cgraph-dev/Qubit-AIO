@@ -69,14 +69,16 @@ METHOD_CODE = "MCP_METHOD_UNSUPPORTED"
 DISCOVERY_METHOD = "tools/list"
 RESOURCE_LIST_METHOD = "resources/list"
 RESOURCE_READ_METHOD = "resources/read"
+RESOURCE_TEMPLATES_METHOD = "resources/templates/list"
 PROMPT_LIST_METHOD = "prompts/list"
 PROMPT_GET_METHOD = "prompts/get"
 SUPPORTED_METHODS = (DISCOVERY_METHOD, RESOURCE_LIST_METHOD,
-                     RESOURCE_READ_METHOD, PROMPT_LIST_METHOD,
-                     PROMPT_GET_METHOD)
+                     RESOURCE_READ_METHOD, RESOURCE_TEMPLATES_METHOD,
+                     PROMPT_LIST_METHOD, PROMPT_GET_METHOD)
 #: Methods whose result carries a named list under this key.
 _LIST_KEYS = {DISCOVERY_METHOD: "tools",
               RESOURCE_LIST_METHOD: "resources",
+              RESOURCE_TEMPLATES_METHOD: "resourceTemplates",
               PROMPT_LIST_METHOD: "prompts"}
 MAX_ITEMS = 256
 
@@ -437,6 +439,14 @@ def list_prompts(cfg: Any, record: Dict[str, Any], *,
                  requested_by: str = "cli:user") -> Dict[str, Any]:
     """Real ``prompts/list`` through the brokered transport."""
     return call_method(cfg, record, PROMPT_LIST_METHOD, params={},
+                       timeout_s=timeout_s, requested_by=requested_by)
+
+
+def list_resource_templates(cfg: Any, record: Dict[str, Any], *,
+                            timeout_s: Optional[float] = None,
+                            requested_by: str = "cli:user") -> Dict[str, Any]:
+    """Real ``resources/templates/list`` through the brokered transport."""
+    return call_method(cfg, record, RESOURCE_TEMPLATES_METHOD, params={},
                        timeout_s=timeout_s, requested_by=requested_by)
 
 

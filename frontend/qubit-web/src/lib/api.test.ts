@@ -1080,4 +1080,41 @@ describe("api.uploadFile", () => {
       /FILES_BINARY/,
     );
   });
+
+  it("settles a broker 409 by re-issuing the multipart with confirmation_id", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            state: "NEEDS_CONFIRMATION",
+            code: "CONFIRM_REQUIRED",
+            detail: "writing 'probe.txt' is a brokered, confirmed, reversible confined file patch",
+            confirmation_id: "cid-upload-1",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const file = new File(["hello"], "probe.txt", { type: "text/plain" });
+    await runMutationWithConfirm(
+      () => api.uploadFile("/tmp/project/probe.txt", file, true),
+      () => true,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [firstUrl] = fetchMock.mock.calls[0] as [string];
+    const [secondUrl, secondInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(firstUrl).toBe("/agent/api/files/upload-stream");
+    expect(secondUrl).toContain("confirmation_id=cid-upload-1");
+    expect(secondInit.body).toBeInstanceOf(FormData);
+  });
 });

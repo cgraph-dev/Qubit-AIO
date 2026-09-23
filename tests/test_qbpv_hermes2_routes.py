@@ -144,8 +144,9 @@ def test_put_kanban_orchestration_never_mutates_config(tmp_path, monkeypatch):
 def test_delete_sessions_empty_is_bulk_gate_not_single_session(tmp_path,
                                                                monkeypatch):
     """DELETE /api/sessions/empty is the bulk empty-session sweep, not a delete
-    of a session named ``empty``. It must be the typed receipt-store gate, and
-    a real session id must still reach the confirm-gated single-session delete.
+    of a session named ``empty``. It is now a real confirm-gated handler over
+    the canonical ``QubitSessionStore`` (was a typed receipt-store gate), and a
+    real session id must still reach the confirm-gated single-session delete.
     """
     from voicebridge import qubit_compat as HC
 
@@ -153,17 +154,17 @@ def test_delete_sessions_empty_is_bulk_gate_not_single_session(tmp_path,
 
     route, _ = HC.match("DELETE", "/api/sessions/empty")
     assert route is not None, "bulk empty-session route must be registered"
-    assert route["disposition"] == "gated", route
-    assert route["gate"]["code"] == _RECEIPT_GATE, route
+    assert route["disposition"] == "implemented", route
+    assert route["handler"] == "sessions_empty_delete", route
 
     code, out = HC.dispatch(cfg, "DELETE", "/api/sessions/empty", {}, {})
-    assert code == 501, (code, out)
-    assert out["ok"] is False and out["code"] == _RECEIPT_GATE, out
-    assert out["qubit_counterpart"], out
-    # confirm cannot turn the bulk sweep into a fabricated success
+    assert code == 409 and out["code"] == "CONFIRM_REQUIRED", (code, out)
+    assert out["confirmation_id"], out
+    # confirm settles the real bulk sweep exactly once
     code2, out2 = HC.dispatch(cfg, "DELETE", "/api/sessions/empty", {},
                               {"confirm": True})
-    assert code2 == 501 and out2["code"] == _RECEIPT_GATE, (code2, out2)
+    assert code2 == 200 and out2["ok"] is True, (code2, out2)
+    assert isinstance(out2.get("deleted"), int), out2
 
     # A normal session id is still the confirm-gated single-session handler.
     route, params = HC.match("DELETE", "/api/sessions/rec-abc")

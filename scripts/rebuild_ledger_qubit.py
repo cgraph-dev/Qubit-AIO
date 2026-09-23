@@ -969,7 +969,7 @@ def build_fork_rows() -> List[Dict[str, str]]:
             "id": "fork_tool_runtime",
             "area": "tools",
             "capability": ("In-process fork agent tool registry "
-                           "(pinned Hermes tools + toolsets)"),
+                           "(pinned upstream tools + toolsets)"),
             "upstream_ref": "qubit_runtime/toolsets.py",
             "qubit_backend": "qubit_runtime.tools.registry:registry",
             "cli": "",
@@ -1107,7 +1107,7 @@ def build_page_rows(index: TestIndex,
         rows.append({
             "id": row_id,
             "area": "hermes_web_page",
-            "capability": f"Hermes web page {name}",
+            "capability": f"Qubit web page {name}",
             "upstream_ref": "hermes-agent@2237be3",
             "qubit_backend": "voicebridge.qubit_compat",
             "cli": "",
@@ -1115,7 +1115,7 @@ def build_page_rows(index: TestIndex,
             "voice": "",
             "status": status,
             "proving_test": proof,
-            "note": ("vendored Hermes baseline page served by the Qubit compat "
+            "note": ("vendored upstream baseline page served by the Qubit compat "
                      "backend"),
             "needs": "none",
         })

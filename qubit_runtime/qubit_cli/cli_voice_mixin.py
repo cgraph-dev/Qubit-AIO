@@ -329,7 +329,7 @@ class CLIVoiceMixin:
             self._voice_last_tts_text = tts_text
             # MP3 for CLI playback (afplay doesn't handle OGG well); the TTS tool may
             # auto-convert MP3->OGG but the original MP3 remains.
-            out_dir = os.path.join(tempfile.gettempdir(), "hermes_voice")
+            out_dir = os.path.join(tempfile.gettempdir(), "qubit_voice")
             os.makedirs(out_dir, exist_ok=True)
             mp3_path = os.path.join(out_dir, f"tts_{time.strftime('%Y%m%d_%H%M%S')}.mp3")
 

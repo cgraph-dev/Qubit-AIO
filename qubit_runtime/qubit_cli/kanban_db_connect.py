@@ -1164,7 +1164,7 @@ def write_txn(conn: sqlite3.Connection, *, allow_nested: bool = False):
                 "(savepoint semantics; the inner RELEASE is not durable until "
                 "the outer transaction commits)."
             )
-        savepoint = f"hermes_nested_{secrets.token_hex(8)}"
+        savepoint = f"qubit_nested_{secrets.token_hex(8)}"
         conn.execute(f"SAVEPOINT {savepoint}")
         try:
             yield conn

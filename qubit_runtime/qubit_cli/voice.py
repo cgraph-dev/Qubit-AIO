@@ -609,8 +609,8 @@ def _speak_whole_file(text: str) -> None:
 
     # Pre-chosen MP3 path so we can play MP3 even when text_to_speech_tool auto-converts to OGG
     # for messaging platforms (afplay's OGG is flaky).
-    os.makedirs(os.path.join(tempfile.gettempdir(), "hermes_voice"), exist_ok=True)
-    mp3_path = os.path.join(tempfile.gettempdir(), "hermes_voice", f"tts_{time.strftime('%Y%m%d_%H%M%S')}.mp3")
+    os.makedirs(os.path.join(tempfile.gettempdir(), "qubit_voice"), exist_ok=True)
+    mp3_path = os.path.join(tempfile.gettempdir(), "qubit_voice", f"tts_{time.strftime('%Y%m%d_%H%M%S')}.mp3")
     _debug(f"speak_text: synthesizing {len(tts_text)} chars -> {mp3_path}")
     raw_result = text_to_speech_tool(text=tts_text, output_path=mp3_path)
     try:

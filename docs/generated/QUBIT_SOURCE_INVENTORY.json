@@ -9,9 +9,9 @@
   },
   "openclaw": {
    "repo": "https://github.com/openclaw/openclaw",
-   "revision": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
-   "tag": "v2026.9.4",
-   "path": "/tmp/opencode/pinned/openclaw-3928bad"
+   "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
+   "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
+   "path": "/home/trick/Projects/Repos/Qubit Agent/srcodes/openclaw"
   }
  },
  "counts_by_category": {
@@ -34,7 +34,7 @@
   "hermes_tool": 99,
   "hermes_upstream_test": 4827,
   "hermes_workflow": 130,
-  "openclaw_extension": 154,
+  "openclaw_extension": 138,
   "qubit_backend_route": 286,
   "qubit_cli_command": 75,
   "qubit_cli_option": 393,
@@ -43,21 +43,10 @@
  },
  "counts_by_source": {
   "hermes": 7688,
-  "openclaw": 154
+  "openclaw": 138
  },
  "openclaw_extension_categories": {
-  "(uncategorized)": 2,
-  "channels": 27,
-  "context": 2,
-  "gateway": 5,
-  "media": 23,
-  "memory": 14,
-  "models": 59,
-  "runtime": 12,
-  "security": 5,
-  "tools": 40,
-  "voice": 24,
-  "web": 13
+  "(uncategorized)": 138
  },
  "hermes_byte_diff": {
   "upstream_repo": "https://github.com/NousResearch/hermes-agent",
@@ -66,11 +55,11 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 14733,
-   "local_files": 12265,
-   "identical": 4858,
-   "missing": 3311,
+   "local_files": 12319,
+   "identical": 4883,
+   "missing": 3257,
    "extra": 843,
-   "changed": 6564
+   "changed": 6593
   },
   "missing": [
    {
@@ -99,134 +88,14 @@
     "upstream_blob": "6531171054c569c0fb95be05ea1207a9f860d615"
    },
    {
-    "path": "agent/auxiliary_async_rebuild.py",
-    "expected_local": "agent/auxiliary_async_rebuild.py",
-    "upstream_blob": "a9dec33ebb77610c9a730f294ec5174f8bd6d6f3"
-   },
-   {
-    "path": "agent/auxiliary_fallback_recovery.py",
-    "expected_local": "agent/auxiliary_fallback_recovery.py",
-    "upstream_blob": "5875348a7cbcac16f30d23258fdb5fd165b421cc"
-   },
-   {
-    "path": "agent/auxiliary_reasoning_floor.py",
-    "expected_local": "agent/auxiliary_reasoning_floor.py",
-    "upstream_blob": "61aaa63751a31bf21fefb23f83c8a11d721831dc"
-   },
-   {
-    "path": "agent/auxiliary_structured_output.py",
-    "expected_local": "agent/auxiliary_structured_output.py",
-    "upstream_blob": "d67057efb401bd3637581d9e063e899ffdc91341"
-   },
-   {
-    "path": "agent/auxiliary_unavailable.py",
-    "expected_local": "agent/auxiliary_unavailable.py",
-    "upstream_blob": "81b5759e47c340662af7769cba91c7c3568c0aee"
-   },
-   {
-    "path": "agent/chat_completion_wait_notice.py",
-    "expected_local": "agent/chat_completion_wait_notice.py",
-    "upstream_blob": "20b47b1f2904a18031c1c52eb4f37fd6321f9660"
-   },
-   {
-    "path": "agent/codex_runtime_history_seed.py",
-    "expected_local": "agent/codex_runtime_history_seed.py",
-    "upstream_blob": "54a817bb49ea25fd19ab02947fd03d238fd11ccf"
-   },
-   {
-    "path": "agent/context_file_sources.py",
-    "expected_local": "agent/context_file_sources.py",
-    "upstream_blob": "b4deb7b4101a4211b51674e3c6357f054a174490"
-   },
-   {
-    "path": "agent/context_pin.py",
-    "expected_local": "agent/context_pin.py",
-    "upstream_blob": "f402dcd752a89bb41e2f515944dc9b8c1a111b22"
-   },
-   {
-    "path": "agent/conversation_compression_manual.py",
-    "expected_local": "agent/conversation_compression_manual.py",
-    "upstream_blob": "d8fdbfa6b691009edd5ecd1b5a1913987a291289"
-   },
-   {
-    "path": "agent/credential_pool_model_cooldowns.py",
-    "expected_local": "agent/credential_pool_model_cooldowns.py",
-    "upstream_blob": "d74d1ded1bf49b0d73e9f87b317bdf227b1a45d8"
-   },
-   {
-    "path": "agent/credential_pool_plugin.py",
-    "expected_local": "agent/credential_pool_plugin.py",
-    "upstream_blob": "58b593886a0ce68820c89cdd8082d4697655e31d"
-   },
-   {
-    "path": "agent/image_eviction_policy.py",
-    "expected_local": "agent/image_eviction_policy.py",
-    "upstream_blob": "cde689d3d19a421c76bb5eb219ef9f74fd0ffcfd"
-   },
-   {
-    "path": "agent/interrupt_scope.py",
-    "expected_local": "agent/interrupt_scope.py",
-    "upstream_blob": "26f664c81aa841029e739947c5ea2ee2547cbfbf"
-   },
-   {
-    "path": "agent/moa_alternation.py",
-    "expected_local": "agent/moa_alternation.py",
-    "upstream_blob": "4e94608b8c2d3d871d5b0a61841658ab0e988df0"
-   },
-   {
-    "path": "agent/notification_presentation.py",
-    "expected_local": "agent/notification_presentation.py",
-    "upstream_blob": "e99fd28e7e5b60d5ac05a81a42f06e6a4e51b1cf"
-   },
-   {
-    "path": "agent/oneshot_footprint.py",
-    "expected_local": "agent/oneshot_footprint.py",
-    "upstream_blob": "61e7545f5da280531e4e50b773b65a9a63675c93"
-   },
-   {
-    "path": "agent/proxy_bypass.py",
-    "expected_local": "agent/proxy_bypass.py",
-    "upstream_blob": "d073410413e64da9eb9c5929f715df47d61e3abe"
-   },
-   {
-    "path": "agent/sdk_transform_bypass.py",
-    "expected_local": "agent/sdk_transform_bypass.py",
-    "upstream_blob": "10788195345500bcf32b3e47a41a3def4119226c"
-   },
-   {
-    "path": "agent/served_model.py",
-    "expected_local": "agent/served_model.py",
-    "upstream_blob": "4f68150729f41e0781e615bc8dc1f8fe5eede889"
-   },
-   {
     "path": "agent/surface_switch.py",
     "expected_local": "agent/surface_switch.py",
     "upstream_blob": "5b642ecd0b3eef7931be585a450080494e86915a"
    },
    {
-    "path": "agent/terminal_approval_batch.py",
-    "expected_local": "agent/terminal_approval_batch.py",
-    "upstream_blob": "a21b310c9e4dff8993912accbdf3fe5f10ea449a"
-   },
-   {
-    "path": "agent/turn_author.py",
-    "expected_local": "agent/turn_author.py",
-    "upstream_blob": "c837f9b266088482d91ccb87567f57371a14f164"
-   },
-   {
     "path": "agent/turn_failure_copy.py",
     "expected_local": "agent/turn_failure_copy.py",
     "upstream_blob": "41f3c808fe357e081cd5d2d7ef6c2e232c02f501"
-   },
-   {
-    "path": "agent/turn_recovery_autorecover.py",
-    "expected_local": "agent/turn_recovery_autorecover.py",
-    "upstream_blob": "0dfa2bc10d0e28ab798ae6e835d47ee10be634ad"
-   },
-   {
-    "path": "agent/vault_login_classifier.py",
-    "expected_local": "agent/vault_login_classifier.py",
-    "upstream_blob": "684f113b45fd2a864b97383f92c03a37cc17302c"
    },
    {
     "path": "apps/desktop/e2e/archived-hidden-session-recoverable.spec.ts",
@@ -5432,56 +5301,6 @@
     "path": "contributors/emails/zsulthan9@gmail.com",
     "expected_local": "contributors/emails/zsulthan9@gmail.com",
     "upstream_blob": "62ff4037269e68ef0e54c6edfdaf3d40c39c9564"
-   },
-   {
-    "path": "cron/bot_chat_delivery.py",
-    "expected_local": "cron/bot_chat_delivery.py",
-    "upstream_blob": "e9a17612b01b358b7eb1add4b84bd40c7bffdd0e"
-   },
-   {
-    "path": "cron/constants.py",
-    "expected_local": "cron/constants.py",
-    "upstream_blob": "0e4649f08172a4431c630433eb0f3ea6790924dc"
-   },
-   {
-    "path": "cron/env_settings.py",
-    "expected_local": "cron/env_settings.py",
-    "upstream_blob": "6f713d6fd5c33f76f3a3eb60eee7f9807cabc33d"
-   },
-   {
-    "path": "cron/quota_hold.py",
-    "expected_local": "cron/quota_hold.py",
-    "upstream_blob": "0d031a4e761a5683dba4d2fb9b2739f2fb9441ce"
-   },
-   {
-    "path": "cron/scheduler_failure_copy.py",
-    "expected_local": "cron/scheduler_failure_copy.py",
-    "upstream_blob": "eb5952b5a865d16cace8bed0d7f895e56ac4a1fd"
-   },
-   {
-    "path": "cron/scheduler_ownership.py",
-    "expected_local": "cron/scheduler_ownership.py",
-    "upstream_blob": "3ace2a790f72b51f1d1297b8bc5557da41ff5869"
-   },
-   {
-    "path": "cron/scheduler_thread.py",
-    "expected_local": "cron/scheduler_thread.py",
-    "upstream_blob": "85f54e5bb77db3e67b4ac5137b8e31bc85c2f7bb"
-   },
-   {
-    "path": "cron/scheduler_tick.py",
-    "expected_local": "cron/scheduler_tick.py",
-    "upstream_blob": "3afd054d671ae3c60dda6fcb8e350042cb0c8550"
-   },
-   {
-    "path": "cron/scheduler_worker_env.py",
-    "expected_local": "cron/scheduler_worker_env.py",
-    "upstream_blob": "ef13355fcac42ec4c5418a9f2971f96105f1386c"
-   },
-   {
-    "path": "cron/unreachable_retry.py",
-    "expected_local": "cron/unreachable_retry.py",
-    "upstream_blob": "924a826a5217a4b6f2f844a93d01e1088f4e540d"
    },
    {
     "path": "evals/api_delegation_http_probe.py",
@@ -16289,106 +16108,6 @@
     "upstream_blob": "e9c0478346c28fccc165a80076241d1490851fec"
    },
    {
-    "path": "web/src/components/LoadErrorNotice.tsx",
-    "expected_local": "web/src/components/LoadErrorNotice.tsx",
-    "upstream_blob": "3e17c52fcdee9624a93151a142fb81783af17f17"
-   },
-   {
-    "path": "web/src/lib/api-error.test.ts",
-    "expected_local": "web/src/lib/api-error.test.ts",
-    "upstream_blob": "99965319e7bed9f0b923af84ddd86e617ed2d6e3"
-   },
-   {
-    "path": "web/src/lib/api-error.ts",
-    "expected_local": "web/src/lib/api-error.ts",
-    "upstream_blob": "13ea59c5a6dadacba7ac906f14e4a6507f61797f"
-   },
-   {
-    "path": "web/src/lib/api-plugins-catalog.test.ts",
-    "expected_local": "web/src/lib/api-plugins-catalog.test.ts",
-    "upstream_blob": "d2cc219f9086a5c52796d1abd19b9ee2dfbf8b29"
-   },
-   {
-    "path": "web/src/lib/chat-sidebar-banner.test.ts",
-    "expected_local": "web/src/lib/chat-sidebar-banner.test.ts",
-    "upstream_blob": "317e42f8ac6d5142ef4bfb97bc0bb123352a00e8"
-   },
-   {
-    "path": "web/src/lib/chat-sidebar-banner.ts",
-    "expected_local": "web/src/lib/chat-sidebar-banner.ts",
-    "upstream_blob": "5b532b500078bc7b4a438b90ba124fd87af00523"
-   },
-   {
-    "path": "web/src/lib/eventsFeedClient.ts",
-    "expected_local": "web/src/lib/eventsFeedClient.ts",
-    "upstream_blob": "22a1be3ba6eb1402d3bfd7cb27ffd24cb7132f14"
-   },
-   {
-    "path": "web/src/lib/load-error-copy.test.ts",
-    "expected_local": "web/src/lib/load-error-copy.test.ts",
-    "upstream_blob": "052fdf15fb7f6e02b73cb2bd696aba034f6fdfa8"
-   },
-   {
-    "path": "web/src/lib/load-error-copy.ts",
-    "expected_local": "web/src/lib/load-error-copy.ts",
-    "upstream_blob": "a00938a480112cb01732da2ad2815e72c867d8fa"
-   },
-   {
-    "path": "web/src/lib/profile-bootstrap.test.ts",
-    "expected_local": "web/src/lib/profile-bootstrap.test.ts",
-    "upstream_blob": "90d46e95db697f310d16cad958f1458454e8598c"
-   },
-   {
-    "path": "web/src/lib/profile-bootstrap.ts",
-    "expected_local": "web/src/lib/profile-bootstrap.ts",
-    "upstream_blob": "51402fb1c8b1e2a8e65355e28b15d78aa4776be0"
-   },
-   {
-    "path": "web/src/lib/pty-attach-token.test.ts",
-    "expected_local": "web/src/lib/pty-attach-token.test.ts",
-    "upstream_blob": "2f2c7e91fe77f18f703035a1760037f894baf519"
-   },
-   {
-    "path": "web/src/lib/pty-attach-token.ts",
-    "expected_local": "web/src/lib/pty-attach-token.ts",
-    "upstream_blob": "e52db967457c11fb8e8be44e39c29d74ddf8d82f"
-   },
-   {
-    "path": "web/src/lib/pty-close-copy.test.ts",
-    "expected_local": "web/src/lib/pty-close-copy.test.ts",
-    "upstream_blob": "9f8786d63e6afc1e66bc0b5fc97571db327e14cc"
-   },
-   {
-    "path": "web/src/lib/pty-close-copy.ts",
-    "expected_local": "web/src/lib/pty-close-copy.ts",
-    "upstream_blob": "0ad3913e506a7cb890999eeb32455b6e979a7220"
-   },
-   {
-    "path": "web/src/lib/shared-gateway.test.ts",
-    "expected_local": "web/src/lib/shared-gateway.test.ts",
-    "upstream_blob": "8dc8abfcef51b4e36d8812013d62df9cb8ffd615"
-   },
-   {
-    "path": "web/src/lib/shared-gateway.ts",
-    "expected_local": "web/src/lib/shared-gateway.ts",
-    "upstream_blob": "9619a67a30a7a3319b881769769feaa9fe9c7d01"
-   },
-   {
-    "path": "web/src/lib/xterm-webgl-release.test.ts",
-    "expected_local": "web/src/lib/xterm-webgl-release.test.ts",
-    "upstream_blob": "9d0ddc3379c7da0e17aba318c2f1edf964a877b3"
-   },
-   {
-    "path": "web/src/lib/xterm-webgl-release.ts",
-    "expected_local": "web/src/lib/xterm-webgl-release.ts",
-    "upstream_blob": "6a357f427f8e7ff033a13acca3ba7ba8f5c2e391"
-   },
-   {
-    "path": "web/src/themes/presets.test.ts",
-    "expected_local": "web/src/themes/presets.test.ts",
-    "upstream_blob": "f941819841c83a29b896fc5738b2ec5419c28189"
-   },
-   {
     "path": "website/docs/developer-guide/billing-lifecycle.md",
     "expected_local": "website/docs/developer-guide/billing-lifecycle.md",
     "upstream_blob": "4ac7e406fe986e69632e9c073a3e2da52df2c7ee"
@@ -20460,6 +20179,27 @@
     "local_sha256": "1318c00bf0bc031021118e039963d5a03ffa2127028cf772ed0863bd1c5eff29"
    },
    {
+    "path": "agent/auxiliary_reasoning_floor.py",
+    "upstream_path": "agent/auxiliary_reasoning_floor.py",
+    "upstream_blob": "61aaa63751a31bf21fefb23f83c8a11d721831dc",
+    "upstream_sha256": "46595ca1856bb72d7dcd2cae7f923679eb91a8b63f621a44a7f8d90d43ad6cc5",
+    "local_sha256": "46e7782e1f1df35fa2f760a6c6d2d387017cf60ffad4dc50726988e204ae1765"
+   },
+   {
+    "path": "agent/auxiliary_structured_output.py",
+    "upstream_path": "agent/auxiliary_structured_output.py",
+    "upstream_blob": "d67057efb401bd3637581d9e063e899ffdc91341",
+    "upstream_sha256": "78df064498598df0fb71c0d8742793e688df852a72b318a111c9c279d5252282",
+    "local_sha256": "8aeda9f49e38904913658f16057e0d1765e59303d27f357155a6d4bb47ce89f2"
+   },
+   {
+    "path": "agent/auxiliary_unavailable.py",
+    "upstream_path": "agent/auxiliary_unavailable.py",
+    "upstream_blob": "81b5759e47c340662af7769cba91c7c3568c0aee",
+    "upstream_sha256": "ae33ba5c2fb6ddc94dba61fde656e0111b565fbc4c8b3b7a7dfd9fe7d901b2a0",
+    "local_sha256": "11c40683610009c0a72898efb417d47debd8cdb38b40ef8f79d0159fcb6d8e5b"
+   },
+   {
     "path": "agent/auxiliary_wire.py",
     "upstream_path": "agent/auxiliary_wire.py",
     "upstream_blob": "a865f135be200e313b3ba2a66a3f9debeb461b85",
@@ -20593,6 +20333,13 @@
     "local_sha256": "de1930aab92e2687c582e4ac76ed7d8662081fc850eca4ee6c195e146898b05c"
    },
    {
+    "path": "agent/codex_runtime_history_seed.py",
+    "upstream_path": "agent/codex_runtime_history_seed.py",
+    "upstream_blob": "54a817bb49ea25fd19ab02947fd03d238fd11ccf",
+    "upstream_sha256": "7ec54e70f0f580814708e25fe18385a080a0adb02ac6c5a821fbec413ca0178e",
+    "local_sha256": "1d17ea8d864ae4d355a4d86fd1420854d63aaed164833e616419fea0c4276a6e"
+   },
+   {
     "path": "agent/coding_context.py",
     "upstream_path": "agent/coding_context.py",
     "upstream_blob": "178d71eeb9dde33d5ec37dffc85ffa668b5bc174",
@@ -20642,6 +20389,13 @@
     "local_sha256": "45ca98bbeaab3dbbcb8b9b009275d287b5c2d552d96a4a2fc56ec8616b290cbe"
    },
    {
+    "path": "agent/context_file_sources.py",
+    "upstream_path": "agent/context_file_sources.py",
+    "upstream_blob": "b4deb7b4101a4211b51674e3c6357f054a174490",
+    "upstream_sha256": "a222be2b17cd2f5df4cbda2ae751e428e116989775da8b504b3e4b0860f079eb",
+    "local_sha256": "1f421072c37f9fef2bada06236697d47f2764a19f510a3438c020d57ce435914"
+   },
+   {
     "path": "agent/context_references.py",
     "upstream_path": "agent/context_references.py",
     "upstream_blob": "2920522d973b85cce78567a8b677c865861d3319",
@@ -20654,6 +20408,13 @@
     "upstream_blob": "0fdc014fba631ec8dd227c7862ecf5e8b11b4c6f",
     "upstream_sha256": "04461a37d2742d305d2bb6efa1a61d9043208de1014aef37e44bb6a6c1fb1535",
     "local_sha256": "64f9b78ba9d12a0e2c3d5e76668aa8fd3c2c249c695f4237e5258d24377bbf8e"
+   },
+   {
+    "path": "agent/conversation_compression_manual.py",
+    "upstream_path": "agent/conversation_compression_manual.py",
+    "upstream_blob": "d8fdbfa6b691009edd5ecd1b5a1913987a291289",
+    "upstream_sha256": "87555f1ab8c193c57cb72f19c29a5960998f1f88f969242f0c157f243bab40f2",
+    "local_sha256": "c971eaba157ca2b2bcd21ea5116419f348230d21c7535f39c1a02176bd29df6b"
    },
    {
     "path": "agent/conversation_loop.py",
@@ -20689,6 +20450,20 @@
     "upstream_blob": "f5b89f7e08924701f56d97b1f4c7b2d94526e5f1",
     "upstream_sha256": "e8618c83ba85501fc4d0613625b5209f93f0dc55bf9642546aee5c7fa990bdfe",
     "local_sha256": "69f5a2c40dabd0f54eedc25fb86c6ec34cbb782c5899509fdd55e44ad33c7f7a"
+   },
+   {
+    "path": "agent/credential_pool_model_cooldowns.py",
+    "upstream_path": "agent/credential_pool_model_cooldowns.py",
+    "upstream_blob": "d74d1ded1bf49b0d73e9f87b317bdf227b1a45d8",
+    "upstream_sha256": "309f0aa56f0e43912c76dc030bbfb64d2d0df82505bd5d5114b87317c14fca9c",
+    "local_sha256": "4179b3e0f8e42f63e37bf7ba52c4e0cfe38847ffafd8d61997c3d3315bb3873b"
+   },
+   {
+    "path": "agent/credential_pool_plugin.py",
+    "upstream_path": "agent/credential_pool_plugin.py",
+    "upstream_blob": "58b593886a0ce68820c89cdd8082d4697655e31d",
+    "upstream_sha256": "0daa307228ff1a463f8a9afc9130adfc8be4d901b92460c4b8b132bf97e38340",
+    "local_sha256": "bdf02c440beae4d2a9311990e7cb59ab71bbb7dd911b34fc48cc9a5652c4f33a"
    },
    {
     "path": "agent/credential_sources.py",
@@ -20850,6 +20625,13 @@
     "upstream_blob": "561be6173231384d84bf21a3ede311d1de9a3663",
     "upstream_sha256": "a00650b85d32cf968b70823f726c68f5547d5eadabf8d918adb23b167c5465a7",
     "local_sha256": "572c6abeb287cbb8728297cf357a7011537f4cfbf0f1e26db80401c0afe790e4"
+   },
+   {
+    "path": "agent/interrupt_scope.py",
+    "upstream_path": "agent/interrupt_scope.py",
+    "upstream_blob": "26f664c81aa841029e739947c5ea2ee2547cbfbf",
+    "upstream_sha256": "12e81677c0c329e6104cc53ef53440c3529812712f0a4e0f890c5f25f33e6cd4",
+    "local_sha256": "5f9e2bd5e0db8c9499b5c316ed682fde35c48b5fc64adde9fbd92f45fba06f4a"
    },
    {
     "path": "agent/kanban_stop.py",
@@ -21097,6 +20879,13 @@
     "local_sha256": "f8214c3b8e550e220429b68754bb34a1b719bf4e2cd5d2788b0730d6187539c5"
    },
    {
+    "path": "agent/oneshot_footprint.py",
+    "upstream_path": "agent/oneshot_footprint.py",
+    "upstream_blob": "61e7545f5da280531e4e50b773b65a9a63675c93",
+    "upstream_sha256": "9942e90d4dea7fc8f80d456d3e079d618dda06ddedee62a3a3f40820c717ff8a",
+    "local_sha256": "bec0d7c725a3ab89e5195e142c57638a61837bff62f30a6535d50b473aa63a1e"
+   },
+   {
     "path": "agent/opencode_affinity.py",
     "upstream_path": "agent/opencode_affinity.py",
     "upstream_blob": "d61ff46c5dd1677a6ce17fd82a9a8c3e4e159213",
@@ -21171,7 +20960,7 @@
     "upstream_path": "agent/plan_prompt.py",
     "upstream_blob": "c9fdfa99968c27d13386cae76b80a81230524d12",
     "upstream_sha256": "81a4ce937a78eb5b766c6ecdc414a7d0570e8875845b46f1a63b5fe70ec1b45b",
-    "local_sha256": "952488833c484602c8e58800b3b558bf0153ce8c1e250a6a81b99497c6390b45"
+    "local_sha256": "903c3b003c65221347e5bf3cd571ac2a359210aa987654263a7c3804fe524181"
    },
    {
     "path": "agent/plugin_llm.py",
@@ -21370,6 +21159,13 @@
     "local_sha256": "6383a8922b9dfe784b636f76101328ffc9fc12401f0b24beac519c5187273468"
    },
    {
+    "path": "agent/sdk_transform_bypass.py",
+    "upstream_path": "agent/sdk_transform_bypass.py",
+    "upstream_blob": "10788195345500bcf32b3e47a41a3def4119226c",
+    "upstream_sha256": "6887046105bd5e666631aa9a0d0a81488392ba8978ede650ae4e31abc36ccbd6",
+    "local_sha256": "d9445dbae0ff397e741bfdf3d0a1876d10150ff4b98d02d0a9876b8ab0f020ea"
+   },
+   {
     "path": "agent/secret_scope.py",
     "upstream_path": "agent/secret_scope.py",
     "upstream_blob": "634f30e9f15789c9201bc426bd124ae7f298d821",
@@ -21417,6 +21213,13 @@
     "upstream_blob": "0bd36ba991b158c3efae6867e063cb5d394261af",
     "upstream_sha256": "391c06dd42fd128b88024355bba80475d0076f2717fc56169c66f81d8bb7555c",
     "local_sha256": "da0087da693352590c458b3e18746f63dcdbee38a142ef55a8806ee7287579c9"
+   },
+   {
+    "path": "agent/served_model.py",
+    "upstream_path": "agent/served_model.py",
+    "upstream_blob": "4f68150729f41e0781e615bc8dc1f8fe5eede889",
+    "upstream_sha256": "2e20c4630108b1b5b9bd7dd6f266334bd0994d1498d6b7a3dc99d72c1223ebd7",
+    "local_sha256": "9a2b1ef07823ba54b1b4a3295a9a3fb07531ebc8dcdcec8e12949292fef10b1b"
    },
    {
     "path": "agent/session_persistence.py",
@@ -21508,6 +21311,13 @@
     "upstream_blob": "9d5c5e1ecccd74100335bc5a8fde8674aa039ef1",
     "upstream_sha256": "04b09acc16045149bbf267c0d7829edddf6a4fbde3822b17987ac32175687100",
     "local_sha256": "e7d6e1ab3541be5b526ac2a1f7436b7a0e0268f99bb522968abf6a54569feaac"
+   },
+   {
+    "path": "agent/terminal_approval_batch.py",
+    "upstream_path": "agent/terminal_approval_batch.py",
+    "upstream_blob": "a21b310c9e4dff8993912accbdf3fe5f10ea449a",
+    "upstream_sha256": "8c7c5be7f6650946f98cdee2705959bcc567c77927d24dfa04fd2c6187c09e38",
+    "local_sha256": "1fe51d917a608ebf22a0e6af9b3b728c2a3901834346323202e3d66fa64b915c"
    },
    {
     "path": "agent/terminal_env_provider.py",
@@ -30197,11 +30007,25 @@
     "local_sha256": "be2849d5da3b2fb7e07a76f32d52bdd5876056b56d28ec2379a8db58ea10d10c"
    },
    {
+    "path": "cron/bot_chat_delivery.py",
+    "upstream_path": "cron/bot_chat_delivery.py",
+    "upstream_blob": "e9a17612b01b358b7eb1add4b84bd40c7bffdd0e",
+    "upstream_sha256": "f167c98f7170acc395de349731f39c9493db4327a9bf8b2cd6901cce3e66d90a",
+    "local_sha256": "c722660471816f8de11c8d1fcb3d0a503daf667faf91f6833cebedfd9aa655a5"
+   },
+   {
     "path": "cron/delivery_queue.py",
     "upstream_path": "cron/delivery_queue.py",
     "upstream_blob": "4569b1b726a2cc06e8c57828294a2992a251427e",
     "upstream_sha256": "556e81530df3c90ffbd33acf22c8e840631e7c1852d61dd031cd50e7c6a30e93",
     "local_sha256": "fa3767581514410dcdece515a9d91455bb9a1fb0f5a5a3911eca58c2d7dc3295"
+   },
+   {
+    "path": "cron/env_settings.py",
+    "upstream_path": "cron/env_settings.py",
+    "upstream_blob": "6f713d6fd5c33f76f3a3eb60eee7f9807cabc33d",
+    "upstream_sha256": "ac9e78792160cd0541d0979e53259ddfc48cb6c40bf7a23599e783abcd7a2574",
+    "local_sha256": "5987e074bd704e10caa30ac7390f86f7713328d03f41d03a96cd0456832b4438"
    },
    {
     "path": "cron/executions.py",
@@ -30253,6 +30077,13 @@
     "local_sha256": "0ed9fa18814e5aff1a144b66d20cb4705737395bf6357580fa6bd5cef347e431"
    },
    {
+    "path": "cron/quota_hold.py",
+    "upstream_path": "cron/quota_hold.py",
+    "upstream_blob": "0d031a4e761a5683dba4d2fb9b2739f2fb9441ce",
+    "upstream_sha256": "5a4dd0b0197f9e211dc1bd4dfdf4e79fc02fb2347c034e6313fefb8e62c70dfe",
+    "local_sha256": "d4d1e81f8c2efaa6c4b08bd400162ec36f53600227faf6b4a82a310e30cb3016"
+   },
+   {
     "path": "cron/scheduler.py",
     "upstream_path": "cron/scheduler.py",
     "upstream_blob": "f2d2f9db0dcdb9f7cd41aaeffe013a281a1b0710",
@@ -30279,6 +30110,20 @@
     "upstream_blob": "c1dad47274672345755cd681acba38db4ab80495",
     "upstream_sha256": "b9fee31af3d54a7429d4a096bbb91cc5eefccfc84cc17be8909fe9e5852a6359",
     "local_sha256": "f84fb06a2846ea0fe30b65a152b9fcdbcb74bc10fdaddf3a03703be1ff772c21"
+   },
+   {
+    "path": "cron/scheduler_failure_copy.py",
+    "upstream_path": "cron/scheduler_failure_copy.py",
+    "upstream_blob": "eb5952b5a865d16cace8bed0d7f895e56ac4a1fd",
+    "upstream_sha256": "136d0bd69a3be939024c901c6efaaf1e708201b5e2534e4be5c49663cea88f2d",
+    "local_sha256": "ccd2ec14ff27e4e38126e8deddbefcdebf8432b0d3322187c16904be6c8095c1"
+   },
+   {
+    "path": "cron/scheduler_ownership.py",
+    "upstream_path": "cron/scheduler_ownership.py",
+    "upstream_blob": "3ace2a790f72b51f1d1297b8bc5557da41ff5869",
+    "upstream_sha256": "5077dc78790b95fec515cf51c4b332195a56658f025ae8b306e6d197a2dacba5",
+    "local_sha256": "dee54b7579809f6f1c3354d7cf2cc98ee322cf6e4d7985b09ca025b960860c3f"
    },
    {
     "path": "cron/scheduler_preflight.py",
@@ -30309,6 +30154,20 @@
     "local_sha256": "0bfb7acd6c46ef32f6a59bb97cd6d24174e38a0c33a504aab4faddfc0c239ede"
    },
    {
+    "path": "cron/scheduler_tick.py",
+    "upstream_path": "cron/scheduler_tick.py",
+    "upstream_blob": "3afd054d671ae3c60dda6fcb8e350042cb0c8550",
+    "upstream_sha256": "a1f908f141d6d3d14abd132d8f247ed76e87fb04b1a62059c129442099e620cd",
+    "local_sha256": "a1e558cb85bef60471016e8d541409fd61e70547c1b12c882c85581ad9246900"
+   },
+   {
+    "path": "cron/scheduler_worker_env.py",
+    "upstream_path": "cron/scheduler_worker_env.py",
+    "upstream_blob": "ef13355fcac42ec4c5418a9f2971f96105f1386c",
+    "upstream_sha256": "474fa6f72414fb8109fb26f26d919a74f09792de8762892f9fa243b6f16fb318",
+    "local_sha256": "617f0cb385c4bbb486af8458f773cdad39cb533840008f26992202e07917bf3f"
+   },
+   {
     "path": "cron/suggestion_catalog.py",
     "upstream_path": "cron/suggestion_catalog.py",
     "upstream_blob": "da1fbdc22bc93edcd4d1cfa84bc59828e40fa801",
@@ -30321,6 +30180,13 @@
     "upstream_blob": "57c82e86b8fae19a68abfe7456b5e4555f7dee30",
     "upstream_sha256": "d99acef99ed0d58585f8131faacf071b66ec317de4a925970235d054911aea81",
     "local_sha256": "9e04a08e3d854b2569f3313365a5f3636944320e5b233e328e0fbaafaae28c67"
+   },
+   {
+    "path": "cron/unreachable_retry.py",
+    "upstream_path": "cron/unreachable_retry.py",
+    "upstream_blob": "924a826a5217a4b6f2f844a93d01e1088f4e540d",
+    "upstream_sha256": "ae75a7e3371e7b601f1265e5e87dfcecfa93e93ada257f45879246256ea21378",
+    "local_sha256": "edfcf8eb1633814207271cdc52d1097f6ddf179ba0ef9f2d01027d3ed6f1772a"
    },
    {
     "path": "docker-compose.windows.yml",
@@ -36270,7 +36136,7 @@
     "upstream_path": "hermes_cli/_startup_fast.py",
     "upstream_blob": "74491fbf0068c2a187e737e4005cd4be9f367ac9",
     "upstream_sha256": "bda48b4a484b32b6800b260f09ac3718d16766408332da568e7a5e09d589a70d",
-    "local_sha256": "d186c586e21251f2395bad169eed9ecb4a1ebca93c51268addfe946af91d612e"
+    "local_sha256": "8fc6384e1428de10969e6bfe804f8144b0013a062b4409a26a14e998f10aad7c"
    },
    {
     "path": "qubit_cli/_subprocess_compat.py",
@@ -36291,7 +36157,7 @@
     "upstream_path": "hermes_cli/agent_import.py",
     "upstream_blob": "2d6902a0d4cb9fe3c350805a2871d96ae9ac3542",
     "upstream_sha256": "54768deb1d365bdbaa9115ec983862bb928b9442430a0a2d33d8e0c4503949f4",
-    "local_sha256": "3d21187fee0b229d34d095c1d3d09dd2d9d1fce3cc365c0f728bdf6e651c12cf"
+    "local_sha256": "61f7565a1f31957763bb99c4d532d7b91dc9e6abafdf514a3b49e421e00d7b55"
    },
    {
     "path": "qubit_cli/agent_plugins.py",
@@ -36515,7 +36381,7 @@
     "upstream_path": "hermes_cli/cli_commands_mixin.py",
     "upstream_blob": "68ff0ff25461f6dd2bca9791bdf127e18e11794c",
     "upstream_sha256": "0ae92f7275fdac27c618a20149b309c718508a56fcc052fb459fd09c667e9c74",
-    "local_sha256": "e7a81c2ea27b516fa1139463f3c1b4c7d91ed1ace6a5373bb0bc742beb637fbf"
+    "local_sha256": "28bf79a3e2ac07f5b0ce042fbd25ab868a89ee99da826ce05055a5ff92d19fa3"
    },
    {
     "path": "qubit_cli/cli_info_mixin.py",
@@ -36599,7 +36465,7 @@
     "upstream_path": "hermes_cli/cli_voice_mixin.py",
     "upstream_blob": "8f2b0ebfb9ae64f650974ecbd3aea7130f964a04",
     "upstream_sha256": "504fadec077e6d2da5d801cc654febfb8cf9bb768ee9cac1eec52c0283a9191b",
-    "local_sha256": "994abc7058b91c7d737ac506cb2b12770f88bb9c062381e2d84b46039cb42fad"
+    "local_sha256": "d3960a92cecfa0141b87ebf7af1e5b720e00f32bc681a7385bfb39b66c610108"
    },
    {
     "path": "qubit_cli/clipboard.py",
@@ -36641,7 +36507,7 @@
     "upstream_path": "hermes_cli/commands.py",
     "upstream_blob": "cfe1d07566ef2bbb1f7a5b59ddc3983c61bdc525",
     "upstream_sha256": "4b00ecf404fce59a049c8e8898c731e442ba6dede57b34b6740bf8b8a23b2446",
-    "local_sha256": "8d5e2eb72ca7e0ad888d26f5383a30c1c0bd414165217e6e490153a03849552e"
+    "local_sha256": "5632aec2409fc763e0f47022a862ab3c22cbbdfcec9696fcf24ac9a274926484"
    },
    {
     "path": "qubit_cli/commands_completion.py",
@@ -36655,7 +36521,7 @@
     "upstream_path": "hermes_cli/commands_platforms.py",
     "upstream_blob": "203b24b994086c21bba7216c86f540c6c6ede1ff",
     "upstream_sha256": "e1d32ddc2ef5cdd5e1b62f93c35a3165c9f5b09a8c3c06bfbc01981a2d8f2869",
-    "local_sha256": "e059c177aa02757d910fd01286fa777d87efe57ba738cf8ee7ea785235a457f3"
+    "local_sha256": "8df6bdb60f3b986c17ad840d9344449f1e1eb206a27782519111b8829b8a706c"
    },
    {
     "path": "qubit_cli/completion.py",
@@ -36704,7 +36570,7 @@
     "upstream_path": "hermes_cli/console_engine.py",
     "upstream_blob": "866876d70fb87512b650693417cd51b88d49f61d",
     "upstream_sha256": "57609671a19546fb292de70bb5a3861a6f96ff47ffb32b8dee5f20a57d05d719",
-    "local_sha256": "24799c74f37624ebb64f2f428217f0f32ced5f15f8df17189cee72fdb904aaf7"
+    "local_sha256": "071bc0fa45f690f63325b9a4599140ab3454207621c80755afae54816887857c"
    },
    {
     "path": "qubit_cli/container_boot.py",
@@ -36746,14 +36612,14 @@
     "upstream_path": "hermes_cli/curator.py",
     "upstream_blob": "e7b43aaf6702c86a64abf724868eadc79c44269b",
     "upstream_sha256": "c670b5d389c918e209e6c9eae2c96407ef8581f4f23918486916068ec8f8e0af",
-    "local_sha256": "5e7d47879798b6b3dd96d493756b49461b65fed6c9042af073ca741020d98d3d"
+    "local_sha256": "41b6e2079780595918d68d396d9b03c17d7b82a64da261d04bbbba97bd6049f4"
    },
    {
     "path": "qubit_cli/curses_ui.py",
     "upstream_path": "hermes_cli/curses_ui.py",
     "upstream_blob": "e8d0e1bd6d4c1125cf82b1f4b336b376157ee86f",
     "upstream_sha256": "860efdad69a7aca86d969fb2b90e80752baff7e2b527f3d3a885bcdb82c8f221",
-    "local_sha256": "4b25bfeeb3ca39664cd1d4851f8544bfaaad385262f9fee6635ddd977082ea37"
+    "local_sha256": "03dcb321658b01f8c4e02c7de40b34e680a37d4efba4717685f44f1e34ca5706"
    },
    {
     "path": "qubit_cli/dashboard_auth/__init__.py",
@@ -36858,7 +36724,7 @@
     "upstream_path": "hermes_cli/debug.py",
     "upstream_blob": "c783168e95d0210c426ca1a85bb73a886d4958ad",
     "upstream_sha256": "23cb78f56cd8b80df28be0ff4a551698a2785c89cebaae30c253a1d322d5aa60",
-    "local_sha256": "7afe4e6b3a1549d05d77cbe8dfcdb9c3e27c80f501f03118ec2551f29dbeb5ba"
+    "local_sha256": "67adbd47bf66c8259e5d25be3057bc3a570f413b1b0aa2cd6d181f64c3321d32"
    },
    {
     "path": "qubit_cli/default_soul.py",
@@ -37082,7 +36948,7 @@
     "upstream_path": "hermes_cli/hooks.py",
     "upstream_blob": "7228017ddb8a8dd5641631f83378e1844b936c54",
     "upstream_sha256": "2eaaecd3a95d1c9e6d1d60892e1f3b0d8ee1df8961b7d99eda8bb8f646db5eee",
-    "local_sha256": "dab8ed2f7e86438c6f72eb86a7d456e9c0e1cf6bc5a30de14ecc35931485114a"
+    "local_sha256": "b41f46187fd6c8cacda565e60590d0b062097f99e18400432123057b55c663ac"
    },
    {
     "path": "qubit_cli/image_provenance.py",
@@ -37110,7 +36976,7 @@
     "upstream_path": "hermes_cli/inventory.py",
     "upstream_blob": "c0cc8126a4d9dc5bfd8f001c419555724a7da9ba",
     "upstream_sha256": "5a381bddc1cc12e3ef515d636f60af3045b806b6b8ed56c03d68be80bdb0b52a",
-    "local_sha256": "90874c31cb1e4f7d8df0c48041b0993ab3c02b15e59eb67f393c811feafcd061"
+    "local_sha256": "6272cd1b6785655d54f03e9ac177b7c14a815a4dc4a9c210466164d65dbc0be7"
    },
    {
     "path": "qubit_cli/journey.py",
@@ -37138,14 +37004,14 @@
     "upstream_path": "hermes_cli/kanban_db.py",
     "upstream_blob": "5520ded607368f477a0cce650731ec738cb93128",
     "upstream_sha256": "9ae980cf224a5bb5ecbc3adf074c64a4ae20cf46b17d6e7824b45d549b73a7bc",
-    "local_sha256": "941b26f781f3180810c25edb94f9936b01548a173e5090a2fb170ee958f4ccf3"
+    "local_sha256": "cea6e555069036272336a40d6d27af28d038f34f2634d22f88e932bec2f49fc6"
    },
    {
     "path": "qubit_cli/kanban_db_connect.py",
     "upstream_path": "hermes_cli/kanban_db_connect.py",
     "upstream_blob": "0886ef472558eecbaccea49464168f90df991980",
     "upstream_sha256": "e275e08d03b8af82213452e33db4bd246f485f6cba4db52434c6cdc5944e319f",
-    "local_sha256": "e0f9bdbb7607660341b8fe1ff0f9a48ee16c42b376101e30391fd47e16eeb3a0"
+    "local_sha256": "288bc01b2920a2465a5427014fb584fb55422affe4401fdf2fec074c64cd1734"
    },
    {
     "path": "qubit_cli/kanban_db_dispatch.py",
@@ -37376,7 +37242,7 @@
     "upstream_path": "hermes_cli/main.py",
     "upstream_blob": "4026861eb2e9b51be5de84eb631fce55f5c2cd4b",
     "upstream_sha256": "648fdd918ae0f86d768561442a993193278692c1fe12d56eab63e276a6d732bf",
-    "local_sha256": "a98252756bc180c4cc67e2531f995ac2369a4b31458983ce5ab280266df0c757"
+    "local_sha256": "adda892cea9858d4776ebde07d08fc840eee8e8e01b73a7a6d79857fc1d1fff2"
    },
    {
     "path": "qubit_cli/main_agent_cmds.py",
@@ -37390,14 +37256,14 @@
     "upstream_path": "hermes_cli/main_dashboard.py",
     "upstream_blob": "fcc927dd8870304cbbbe1e0e94cdb12a449b9628",
     "upstream_sha256": "4bbb9b1989a8a9b131d5e4e00bc11c0d5a1cf115c4b59f1728585202fe4f2f85",
-    "local_sha256": "c2331ad734d4eb834df7e6cef326fc2acb41244bff593f17a2c93df09cf7cb21"
+    "local_sha256": "683f0d64c4574fd5624737037e796d5f721b49cda460738aac126e4de00326a6"
    },
    {
     "path": "qubit_cli/main_desktop.py",
     "upstream_path": "hermes_cli/main_desktop.py",
     "upstream_blob": "f02cc2956ed9253a09881f1b91f34b3448824ee7",
     "upstream_sha256": "9c69d789535ffecf35ea54cd0b683aad94e7201d63dde6ca0ca6c6e861122884",
-    "local_sha256": "0728f53150c1f0bc774f137ad40dbb62e19b17b0c0aa23acbb28a095df2cf66c"
+    "local_sha256": "0f4570f67541f209f52c034ba6dad3367f8f449f92f0460ea9c4e63b29848789"
    },
    {
     "path": "qubit_cli/main_install_repair.py",
@@ -37495,7 +37361,7 @@
     "upstream_path": "hermes_cli/memory_setup.py",
     "upstream_blob": "a7aab868c48806250c6ab13ffe57afd3b2036f2e",
     "upstream_sha256": "f00af719fcc0d93bae3525fbec26f363f9c9cc32d50299c9e22c18bb1f248cba",
-    "local_sha256": "272a6ede78b3194175465d65ee04a5e48d953e890382cfa48d9b474f854145de"
+    "local_sha256": "4902f6696fd2a75f299ff77ab52eb49460567fdc87460f0e12263e16906f450f"
    },
    {
     "path": "qubit_cli/middleware.py",
@@ -37677,7 +37543,7 @@
     "upstream_path": "hermes_cli/npm_engine.py",
     "upstream_blob": "2c7e71b0a5d16e26716b5995e501d5c4bb7133f0",
     "upstream_sha256": "4c06b2e72cd308bd70d1e31f7b601dc3733df6cda953137aaaefe6b65591e876",
-    "local_sha256": "632af8ff741366416cb9b7eca1dffd29c4bf9b363c744f189e5ffedb28877d01"
+    "local_sha256": "d41f2f4d3acb4380c08b040340a52d9c79b071fd8283db6be004ab60b3347955"
    },
    {
     "path": "qubit_cli/observability/__init__.py",
@@ -37817,7 +37683,7 @@
     "upstream_path": "hermes_cli/plugin_dev.py",
     "upstream_blob": "ed03cea55dc669d73c89bb30150219424857af9f",
     "upstream_sha256": "b39f595e1f8bdc810fd72266c21bca5042cc55cc6d193d6d756c8b45db620e66",
-    "local_sha256": "5f287cfc2229ad5a2063429eafbc9653e8bdafa2d7260835ba7f06b35ea4e720"
+    "local_sha256": "c20ac78987256db8af9ab3927b4a05bb973c2ef8ece7033a6db1a84265cf566b"
    },
    {
     "path": "qubit_cli/plugin_packs.py",
@@ -37845,7 +37711,7 @@
     "upstream_path": "hermes_cli/plugins.py",
     "upstream_blob": "15fa39d715479b4a71144e843a107ab3b3b2bdf2",
     "upstream_sha256": "0e2d82b1abcbda95d4c96c40daef0887d728bfd12a1e0c9bc155d0ebd335fc70",
-    "local_sha256": "4d5732a001c42bd9920b4a1e555befac8e6a405daa423ed144e30464635c5078"
+    "local_sha256": "04a293f736b0d89e28111547a053599c2e17ec2e59fa64803af4eeae9a064422"
    },
    {
     "path": "qubit_cli/plugins_cmd.py",
@@ -37915,7 +37781,7 @@
     "upstream_path": "hermes_cli/profile_cmd.py",
     "upstream_blob": "6e6058031e6c26caf83c487032a00a9706b390ae",
     "upstream_sha256": "154f41b1d4b700b79e63f6c58dfbec3bacf53d781ee6aee2943b72a07e21fb7c",
-    "local_sha256": "1a879ce80dce02d1aae164b791fe30ebe75c44bc46f68f07c2f3d96ba90270c0"
+    "local_sha256": "0f686b372499c24a8ff6a81f1e3617262ce774a5e6504f62d3135d54c77ff800"
    },
    {
     "path": "qubit_cli/profile_describer.py",
@@ -37929,7 +37795,7 @@
     "upstream_path": "hermes_cli/profile_distribution.py",
     "upstream_blob": "9e458af6c0bbc42156707ed9dabcb329e7d2b933",
     "upstream_sha256": "1966862510ee71cd45f0c8cda2e8039ec8d8aebd77b532bec548d32ed373e4db",
-    "local_sha256": "38a0eb4313500c327f4c9ecac884f7cbbd36d60f71e6ef97060d503f5bba2e37"
+    "local_sha256": "8b0d32a6b6154b91bf95a5d535a8660f8c5a6b7424f7cc4e3fccbea69471b401"
    },
    {
     "path": "qubit_cli/profile_identity.py",
@@ -37943,7 +37809,7 @@
     "upstream_path": "hermes_cli/profiles.py",
     "upstream_blob": "5b7e1f5bbe96a598fd9568315193d21270f4b708",
     "upstream_sha256": "060ee8e9528a56350f9ec6c5fdb614c66937bd443a292f4ac42ccecb2f43cfee",
-    "local_sha256": "683b55b32a5dd8e104d9caa0d5550e167a47c09b18665811ab88e1f8d0ea2562"
+    "local_sha256": "89e035f9b44ccdc1cc1903518a836e03d6e170753563f4535c9e1be0961d7e87"
    },
    {
     "path": "qubit_cli/projects_cmd.py",
@@ -38062,7 +37928,7 @@
     "upstream_path": "hermes_cli/relaunch.py",
     "upstream_blob": "790ca1026eee33e74dd131b431f2652852b376ad",
     "upstream_sha256": "97b5834d33909b175310748a952ba81447f3faef16c7df947a26c1bb6858bd42",
-    "local_sha256": "c9a639e9b1723e7ed8ec0eedb6182bc24ce3ed483b6c5a59ac9ac252bdd4cf85"
+    "local_sha256": "d9318216fc6afa56a257f046c71a4a7eeddd29d5a47a36d827c90951f15792a3"
    },
    {
     "path": "qubit_cli/relay_plugin_cutover.py",
@@ -38104,7 +37970,7 @@
     "upstream_path": "hermes_cli/runtime_provider_backends.py",
     "upstream_blob": "9e94ad6f243a86d60ea3d5f6fa54ca8346b77a33",
     "upstream_sha256": "659c9049385446bf791a87477375855817a7662a6cb44c76f3a120979feffc23",
-    "local_sha256": "47084be33c67e3929bb4582d9ac90f3cc4ee45c80239a41c14d3de4c2965c548"
+    "local_sha256": "9644f54daece492aced6592be2f630aaf2613ba847a64c7d54bd6e691ed98795"
    },
    {
     "path": "qubit_cli/runtime_provider_custom.py",
@@ -38125,7 +37991,7 @@
     "upstream_path": "hermes_cli/security_advisories.py",
     "upstream_blob": "7ffcbedb9c5ac4fb7411bbddd3beabd9b5dd11b1",
     "upstream_sha256": "bac168189319dac5ffe047170e2a33a863e42ab0241b572ba6bea78e6efcfd31",
-    "local_sha256": "4ff232289d519448eeb97fc3479784c098b1c5e97acbf78b3b1228164c3e4a51"
+    "local_sha256": "1e183101839665404fec7dcca2ed2fa55f155d3a52b826339bbd31b286a05403"
    },
    {
     "path": "qubit_cli/security_audit.py",
@@ -38139,14 +38005,14 @@
     "upstream_path": "hermes_cli/security_audit_startup.py",
     "upstream_blob": "5f91aef8e6ad4790cf3207c78fe93752fd9accca",
     "upstream_sha256": "327df9b16e24fbffe11ff529a3069624e0bce54ea7a5f4c0c418ed761f58f3c9",
-    "local_sha256": "07f4b8d8d9bfe2d92ffe87e033e142bfc46f0cc8ce4ba0f13d06e7a3254ce430"
+    "local_sha256": "2d083b3a178495a6b41a9d3ca0355ce50bbcfc4f58c175dd4f1656df4f84ca92"
    },
    {
     "path": "qubit_cli/send_cmd.py",
     "upstream_path": "hermes_cli/send_cmd.py",
     "upstream_blob": "efb9ba62dd0284bf6c0680de7ed0a0030a079ebb",
     "upstream_sha256": "945a8cf85be519ff20265f0d9b57e5b277008e6b1f8076d0a959a0f6ab1a2590",
-    "local_sha256": "e3b5758f69284d36e20e66c472c507f9d45ec66a07d308cbb77adcfca3648738"
+    "local_sha256": "c755ad92d78276a36155c99c3e688edd7f7ee984881df24ae8d59a8c64739647"
    },
    {
     "path": "qubit_cli/service_manager.py",
@@ -38188,14 +38054,14 @@
     "upstream_path": "hermes_cli/session_lost_and_found.py",
     "upstream_blob": "bdf4b18c73e89c9e855d4cd2d8514a0a494585f8",
     "upstream_sha256": "42d64bafde7de4e2cd1cb88fccb63bf4940f9224b0c958186326e58b9ed8887c",
-    "local_sha256": "1024f4bf22bfa3a854808af2bc545b2d7328696fe755131a94c381efa62c4e5a"
+    "local_sha256": "c1e78c014bd417fe6e9a7f6a3e649d4eed49c57bf0a7bda902e28ba0ba0da879"
    },
    {
     "path": "qubit_cli/session_recovery.py",
     "upstream_path": "hermes_cli/session_recovery.py",
     "upstream_blob": "467be84113166d5989e171d90395b40d56b4c85f",
     "upstream_sha256": "688467570c01aebc3150c334c464ef3db5f472278f739371219d7554b497fb69",
-    "local_sha256": "ce60c815d0c74d7f01869cc7400f21d715fb97f183c2e07482806f43990908ea"
+    "local_sha256": "188b39d72c6cc602a2ef62f16021cec31fdc528e344f8f3903702f24d365a743"
    },
    {
     "path": "qubit_cli/sessions_cmd.py",
@@ -38237,7 +38103,7 @@
     "upstream_path": "hermes_cli/setup.py",
     "upstream_blob": "f2fcf3c8a72a381db10855627d4144f1bbc3fd56",
     "upstream_sha256": "d4b3a87f75df37010f51053e4d3e563d1ab5d89f073714cf1bc10abb49f3c57b",
-    "local_sha256": "52bdc8d974d463f607875ce19ced56b35265719c2948e4e625ff40572cce14de"
+    "local_sha256": "8c7374b6fce2b70fb1bfd0734009e85b8ad758e770b1be8f6ed1ce0d3e1fdb7e"
    },
    {
     "path": "qubit_cli/setup_hidden_env.py",
@@ -38272,7 +38138,7 @@
     "upstream_path": "hermes_cli/setup_summary.py",
     "upstream_blob": "9ca7a0b82e4cc772f57fb7f81bdd5f7d7afe6996",
     "upstream_sha256": "41e6fa2dd7676259ac771fd32151578b40a720081cadbd0ae357c9ace4cac515",
-    "local_sha256": "c021cb521096064082b03964b5d90560749f4ae592ea161f45a1b188a3afdc8c"
+    "local_sha256": "5e84baa6ec88822b588557ddeb1ffe810489cd20b02461edb435961f20117018"
    },
    {
     "path": "qubit_cli/setup_terminal.py",
@@ -38286,7 +38152,7 @@
     "upstream_path": "hermes_cli/setup_tts.py",
     "upstream_blob": "199897d946241dde63f310ef71150758362f8bbf",
     "upstream_sha256": "8b2ef3455deaab269d9e0e860bceb5e924d94010942732841bbee10330bbee83",
-    "local_sha256": "d0177f43e1e18d75c3b4df94221b8c6c7439e123b5eee4cf5de51621674610b7"
+    "local_sha256": "e6342e3c10be4c82dc29c7400995128f7678e5d0d87b95ca9aa3400303782c4c"
    },
    {
     "path": "qubit_cli/setup_whatsapp_cloud.py",
@@ -38881,7 +38747,7 @@
     "upstream_path": "hermes_cli/tips.py",
     "upstream_blob": "0fb8b5f2483bddc573c362a3dbedd4648a0f0e4e",
     "upstream_sha256": "96ed0a3ecd7e07283e8c64c36d39dd79402b182eec81c975d2f5197ee5aaaf1e",
-    "local_sha256": "a34ebb73796264de4e800d174fc904be2ed1a11025e6c64e06c9514ba2ffdb0d"
+    "local_sha256": "c39b89a22fcfc2c6674a5fadfb4aad1a1058f7eacc8b4622b687bfd4f93d8653"
    },
    {
     "path": "qubit_cli/tools_config.py",
@@ -38944,7 +38810,7 @@
     "upstream_path": "hermes_cli/update_cmd.py",
     "upstream_blob": "be34f5bf20771b5e89e8a5a1a90673ae7c7ed09c",
     "upstream_sha256": "8f0a83cd4838689a498046989c2c4b7df806a019b9229c2d9fc5a866576f515c",
-    "local_sha256": "f1960e5fb55c13ebec5ea6b1e2906af8d142db22a0fe1d3c5a8403a19cd7b70a"
+    "local_sha256": "33bc2de6b76638a00f5534f8235762d3962259df53efcf3fe06a058bb71cd394"
    },
    {
     "path": "qubit_cli/update_cmd_common.py",
@@ -39007,7 +38873,7 @@
     "upstream_path": "hermes_cli/update_cmd_zip.py",
     "upstream_blob": "efb8b99948a1baa1c7002875588e518241ecc78e",
     "upstream_sha256": "e3becdd3203837f791dc19b328904a1ee1d3d9f98b64b90e060b0e138f29b6ff",
-    "local_sha256": "aec69c3ec20aef16ce0d0287e679dc617f8ab17b17030f9ce66aa0d0e8886dcf"
+    "local_sha256": "339f9a7785cc0383bb2ed259ea8e9ca6eb4fb0aa86bd8d57beed4ce5de72cec2"
    },
    {
     "path": "qubit_cli/update_contract.py",
@@ -39070,7 +38936,7 @@
     "upstream_path": "hermes_cli/voice.py",
     "upstream_blob": "cd2cb2320356f9f0eacf6435a258fb382aa1f7df",
     "upstream_sha256": "8882e357925e6559ed86cb8055dd2d0c1c56f9f15e8dae9ca68038e766ac368d",
-    "local_sha256": "d3c1f97db52e1ea7b4ec2a361f0fd27e3003cd15d2d7fb37cc4ba946d9517637"
+    "local_sha256": "be0def19002b4e8f5fffca649e9c55c267ff759ad379a576b8becb36627b99e9"
    },
    {
     "path": "qubit_cli/web_deps.py",
@@ -39182,7 +39048,7 @@
     "upstream_path": "hermes_cli/web_routers/mcp.py",
     "upstream_blob": "4eab73b1dd36f985b95487b839920b249e27945e",
     "upstream_sha256": "83b383a47ed959ae1b21c95446315f0996905f37af977af08cedca62658aef99",
-    "local_sha256": "5c4c14713cc16790c49f705de941c42b3fed51b979d4a1d51afd5bdcf98ef7bd"
+    "local_sha256": "eea8b5aba3efb72a04a8729aecd960a944c020f3494579b1731f3af9c5f66ddd"
    },
    {
     "path": "qubit_cli/web_routers/memory_providers.py",
@@ -39245,7 +39111,7 @@
     "upstream_path": "hermes_cli/web_routers/status.py",
     "upstream_blob": "0b1b75cd0fc12cd0631c6b2edea389c4157dede5",
     "upstream_sha256": "a4465ef1f8ea7bea15ade57cfe1fd70915815ce0854bfad519a1410577d56da1",
-    "local_sha256": "10416ce0c822f95f4000e04c364e450293dbf10d946ec413269addc93ed7dc25"
+    "local_sha256": "30282b7432b662cd59f5d6fb4fc001f219c8c9ce22f6132bd487e8d151e51aa5"
    },
    {
     "path": "qubit_cli/web_routers/tools.py",
@@ -39259,14 +39125,14 @@
     "upstream_path": "hermes_cli/web_server.py",
     "upstream_blob": "e6d7c8fe70057cb7acb5370ccec4aea8a8c45264",
     "upstream_sha256": "ada3f574463c0ef59d844f176aa16af668b71406bf326f42efd8dbf706f3e58f",
-    "local_sha256": "dd0e7c2796ce0e14764473bf21a2f81bb59cddb3ff876663ea088950bda32564"
+    "local_sha256": "b90109351f13511d1cb1504490f33bf7c950fec603fe5a628b8eeb37605e21b7"
    },
    {
     "path": "qubit_cli/web_server_chat.py",
     "upstream_path": "hermes_cli/web_server_chat.py",
     "upstream_blob": "047bc867afb9ab066c3430957db0f8efe6a532bd",
     "upstream_sha256": "c510283bf6d84f35f5ec3722a6750cceecf493ab8b742263a13663f4408662fc",
-    "local_sha256": "fcb92d1852a122406d813b53b82a6b8f1fdc770ba2771610d5c3f8f95daec068"
+    "local_sha256": "ba6484a349a08024379d7c56cac6f62d6a5f6fb2162d8fd157651e2b731c0b5e"
    },
    {
     "path": "qubit_cli/web_server_config.py",
@@ -39399,14 +39265,14 @@
     "upstream_path": "hermes_cli/worktree_gc.py",
     "upstream_blob": "e8c3c0cf627a234ca76285099234ee8d607ac84f",
     "upstream_sha256": "48cf3d40c2c8d92f81af524a2a19f63019eef4b1ae36359c22b7b6b8386dd6d9",
-    "local_sha256": "abee3c14d6c57a1061fb7effac2699227bc4619c94622938b021929980b2920d"
+    "local_sha256": "3f20e97d0eccbcaf4d5830577da05793b9d73513c9b063442f05989ca3916a9c"
    },
    {
     "path": "qubit_cli/worktree_ops.py",
     "upstream_path": "hermes_cli/worktree_ops.py",
     "upstream_blob": "d9216a9e395bf1a020af8094e0f0586ae97859cd",
     "upstream_sha256": "9b4797ff6ef387eb12fad6dcf14301246bb4cdd462c153b9a615aa6859969e32",
-    "local_sha256": "e4746169b0b7b09579fe1aea5483fb26515fbb4084f1fadc4268aba466c52abd"
+    "local_sha256": "57fcc71d3bb6a48d4decf6a3aec0ad5d2dd34858b4a48327fe6e21e041ac18d1"
    },
    {
     "path": "qubit_cli/write_approval_commands.py",
@@ -42353,7 +42219,7 @@
     "upstream_path": "tests/agent/test_plan_prompt.py",
     "upstream_blob": "87abbe0f269d6bc87df3a2326297be086b240744",
     "upstream_sha256": "ded13279ca7bd2fe2ce056962ab3589603e296eeb7f6b77e15686cfa5c2a89dc",
-    "local_sha256": "ab54b973e7472532c09fc0fb5dba9c31163bd0a44be8f4657350b946c339fd4a"
+    "local_sha256": "6bf922002ba3505c0eb6fffb8885e87149fe6fe4a7875a54e72f034cf663b1a7"
    },
    {
     "path": "tests/agent/test_plugin_llm.py",
@@ -44264,14 +44130,14 @@
     "upstream_path": "tests/gateway/test_control_socket.py",
     "upstream_blob": "825f73b4f3885812ef295fe1b186fa7b9703db24",
     "upstream_sha256": "8e4ab7e64ce0f3487ccdc15e94b2be2adcbf0c411d2c7fc05723bb7b1d9adfff",
-    "local_sha256": "e8ff1cebaf8603f5687b6d203495c38b6f663ae82cd978618103452097cd7c68"
+    "local_sha256": "b658f32acb559dbcafbdce8c22d491702d56095c1654267549152aaec8106ab2"
    },
    {
     "path": "tests/gateway/test_control_socket_windows_live.py",
     "upstream_path": "tests/gateway/test_control_socket_windows_live.py",
     "upstream_blob": "6a5a25ffa0175ca374157904058498eef89a0c1a",
     "upstream_sha256": "5b73faceb08c1cc9550bf1dbb80b5c66c377d6518c7963c72b52a437ccf4d5c8",
-    "local_sha256": "7ee9e2ac15009325df524eb25bd7e23fc325c7b19c44e337f04d599bb3c40ac3"
+    "local_sha256": "2560de94273ace0b03db03d80d817d6d61deb3093450fd0d62f5cbf307286c37"
    },
    {
     "path": "tests/gateway/test_cron_active_work_drain.py",
@@ -50935,7 +50801,7 @@
     "upstream_path": "tests/hermes_cli/test_profiles.py",
     "upstream_blob": "59342694454bf63addb88936086a5d6f8819f4ae",
     "upstream_sha256": "3ac1156b5490facd8b350d6e3d78716b1c34bb381c2d7437f85a2d5a2199ba31",
-    "local_sha256": "b5976ced47e1a31ae311e5a7ed4294591a37fbbbce7494dc9bfa4eda794b046b"
+    "local_sha256": "c70e56c19de60f4111935edf54e6424fc9ec644638d37686b5a64c67c6fd412e"
    },
    {
     "path": "tests/qubit_cli/test_profiles_s6_hooks.py",
@@ -51145,7 +51011,7 @@
     "upstream_path": "tests/hermes_cli/test_relaunch.py",
     "upstream_blob": "f57f30c5a86443c4a6cfc7e842f3b483ec0aeae9",
     "upstream_sha256": "99ea11a245c07ef98b6d64ccc15f74336d095c8a9d34717b3a9931fcffa6a95e",
-    "local_sha256": "711bd1c8e85a0ca587e89a7da65f2479280059c7bfb2e9536ddeb5d9c5e9dfe1"
+    "local_sha256": "d0e291faf6cf9b36a8eb2dada66bf776d69706be5273c9a9c551a3001687e258"
    },
    {
     "path": "tests/qubit_cli/test_relay_plugin_cutover.py",
@@ -52881,7 +52747,7 @@
     "upstream_path": "tests/hermes_cli/test_web_server_profile_unification.py",
     "upstream_blob": "42e7d36b22aabf5ebee1000d9b0119116ca79573",
     "upstream_sha256": "76f761791086f602ac48ac41abca8e5066d88470901ee7341960aa671621ac64",
-    "local_sha256": "6244e9465acf8d752ca8fd5997d49c89149c4d1f93fd125244cb8bfef6b7f925"
+    "local_sha256": "bca81d8996e04e78552537429047dff280be9a0a35579ddca4f4de30204d9526"
    },
    {
     "path": "tests/qubit_cli/test_web_server_pty_idle_backoff.py",
@@ -60521,6 +60387,20 @@
     "local_sha256": "12114287978928c5cabf750cffef6632e0a3307f23a1a8b30715495842ab406e"
    },
    {
+    "path": "web/src/lib/api-error.test.ts",
+    "upstream_path": "web/src/lib/api-error.test.ts",
+    "upstream_blob": "99965319e7bed9f0b923af84ddd86e617ed2d6e3",
+    "upstream_sha256": "f9a0da48ce04c89ee05c74c07426090ccc96b511472d8a3d499d76ced1ab85c1",
+    "local_sha256": "74d93c938acfe49732006059e5524ca199a99927837e035feecbf903937657f2"
+   },
+   {
+    "path": "web/src/lib/api-error.ts",
+    "upstream_path": "web/src/lib/api-error.ts",
+    "upstream_blob": "13ea59c5a6dadacba7ac906f14e4a6507f61797f",
+    "upstream_sha256": "275742acbd0110ff2271e0d32980f06515aa5dff593faffe864648defee43444",
+    "local_sha256": "aee971a77e24b4635d6b48bb91b98a2e4bab7a3d57c4943f867ed920ceb9cfa7"
+   },
+   {
     "path": "web/src/lib/api.test.ts",
     "upstream_path": "web/src/lib/api.test.ts",
     "upstream_blob": "3a97b6131bc6406aaba48992340aee94d67995a1",
@@ -60533,6 +60413,13 @@
     "upstream_blob": "16fb2f049309378a33ff15217abc88440c169e04",
     "upstream_sha256": "fd019205925a6eadb9518902d0ae0e0d88a7cab41454b6e80dcfdb442e515a52",
     "local_sha256": "ad366ab97a13f724b1cdec3613ab4e7096f6ac2c4c2cdb8bfe97e23498926790"
+   },
+   {
+    "path": "web/src/lib/chat-sidebar-banner.test.ts",
+    "upstream_path": "web/src/lib/chat-sidebar-banner.test.ts",
+    "upstream_blob": "317e42f8ac6d5142ef4bfb97bc0bb123352a00e8",
+    "upstream_sha256": "9459a5a8ab56d070776ab06b03b1bb7324554db05e6478ab0d714d9e79dabd4c",
+    "local_sha256": "443a8ab47e64bb75f57608bb1e01d045634a2011c1eab90b7e026198359a331b"
    },
    {
     "path": "web/src/lib/chatImagePaste.ts",
@@ -60591,6 +60478,13 @@
     "local_sha256": "d8242d3a6e28a5748a0311841f3df5350ec92050cdbbff42e2e7fa399ff9e6e0"
    },
    {
+    "path": "web/src/lib/load-error-copy.test.ts",
+    "upstream_path": "web/src/lib/load-error-copy.test.ts",
+    "upstream_blob": "052fdf15fb7f6e02b73cb2bd696aba034f6fdfa8",
+    "upstream_sha256": "78ce7f8641bbc1dedb85a31f9417533805ece2a7a7a9ddc6cb37581939a09d45",
+    "local_sha256": "140f77f2daf03626c3f97209cb9210721ec4538f6c494ac1d9fcfec156e285d4"
+   },
+   {
     "path": "web/src/lib/log-classify.test.ts",
     "upstream_path": "web/src/lib/log-classify.test.ts",
     "upstream_blob": "ea9178390e65419d41347d0176dc75fc777d3c40",
@@ -60610,6 +60504,27 @@
     "upstream_blob": "7a11c629f3d3720af82618556b38fa9fff644d72",
     "upstream_sha256": "0f60a8ac4bb690795692463752afd6f75b5e462aeab02878431e2235f99f401c",
     "local_sha256": "bb9ffa1035c352a296b364b3f3d10f87978622d11c79c8b847fc2cceacbd5d97"
+   },
+   {
+    "path": "web/src/lib/profile-bootstrap.ts",
+    "upstream_path": "web/src/lib/profile-bootstrap.ts",
+    "upstream_blob": "51402fb1c8b1e2a8e65355e28b15d78aa4776be0",
+    "upstream_sha256": "dbc3445e56235ccc0f16a76c2a5731d13ca5f31cf2e980ee5f3d49acd65f5fa2",
+    "local_sha256": "970c55f9034ec57c4750b84c3b40c76f1621e8e77b11d94b14f2149bdb6d909c"
+   },
+   {
+    "path": "web/src/lib/pty-close-copy.test.ts",
+    "upstream_path": "web/src/lib/pty-close-copy.test.ts",
+    "upstream_blob": "9f8786d63e6afc1e66bc0b5fc97571db327e14cc",
+    "upstream_sha256": "f21f8f4c922f0a7707ce4e2852fd900dca03ccf92d3900cdf2c791e98c8549ee",
+    "local_sha256": "a2d4e6f1fc743f377ec8d51e238fc64c7b79336514e6a8560a8dd70eb81fe8c2"
+   },
+   {
+    "path": "web/src/lib/pty-close-copy.ts",
+    "upstream_path": "web/src/lib/pty-close-copy.ts",
+    "upstream_blob": "0ad3913e506a7cb890999eeb32455b6e979a7220",
+    "upstream_sha256": "018502dc61f9fd0db401e22f244dc33f2121cefde64a35bfc319ed792caa1803",
+    "local_sha256": "c1f3a1f7b4d745ee11836b3a0382ff0efbd2ef0e9e29a5db7d5b501c1655778d"
    },
    {
     "path": "web/src/lib/pty-composition.test.ts",
@@ -60673,6 +60588,13 @@
     "upstream_blob": "55bc303baa782a8a95d3debadcc9faa9ae904e73",
     "upstream_sha256": "d382b4db2121aee1ff1296df9a9682657b2117cef3a6cce19bec82d0b11392e7",
     "local_sha256": "41d45a2c50bf896790e3dd3c53bc5b143bc71fa3225e2eaa8bd6ef38363f710c"
+   },
+   {
+    "path": "web/src/lib/shared-gateway.test.ts",
+    "upstream_path": "web/src/lib/shared-gateway.test.ts",
+    "upstream_blob": "8dc8abfcef51b4e36d8812013d62df9cb8ffd615",
+    "upstream_sha256": "7a72a8fae36deb455888b1d3adb9a3e81664efb171f88fd54ccc77832c34c859",
+    "local_sha256": "54f67f2d41b0dd5fe26079eb262011797f7377e535200edead4957ece9034bc7"
    },
    {
     "path": "web/src/main.tsx",
@@ -65971,9 +65893,9 @@
   },
   "openclaw": {
    "ledger_rows": 104,
-   "extensions": 154,
-   "matched": 65,
-   "unmatched": 89
+   "extensions": 138,
+   "matched": 54,
+   "unmatched": 84
   },
   "qubit": {
    "ledger_rows": 746
@@ -67407,12 +67329,12 @@
  },
  "parent_mapping": {
   "method": "Mechanical parent mapping: a CLI option/positional belongs to its command family (nearest existing cli: row); a CLI alias to its target; a model/provider entry to model/proxy_providers; a plugin asset/API/test/manifest to its plugin; an OpenClaw extension to the audited OC-* capability of its name or first mapped manifest category; a workflow source file to its area capability; a dashboard component/dialog/form/nav to webui_status.  A surface is covered when it matches its own ledger row or its resolved parent row is IMPLEMENTED in the live ledger, so it must not create a standalone MISSING row.  Parented and distinct uncovered items are counted and listed separately.",
-  "parented_surfaces": 1140,
-  "parented_covered": 1136,
+  "parented_surfaces": 1006,
+  "parented_covered": 1002,
   "parented_uncovered": 4,
-  "distinct_surfaces": 766,
-  "distinct_covered": 744,
-  "distinct_uncovered": 22,
+  "distinct_surfaces": 884,
+  "distinct_covered": 766,
+  "distinct_uncovered": 118,
   "by_coverage": {
    "(distinct)": 754,
    "cli-alias": 32,
@@ -67421,33 +67343,21 @@
    "evidence-i18n": 1109,
    "evidence-test": 4827,
    "model-entry": 222,
-   "openclaw-capability": 154,
+   "openclaw-capability": 138,
    "plugin-surface": 9,
    "provider-entry": 39,
    "static-asset": 1,
    "workflow-surface": 130
   },
   "by_parent_covered": {
-   "OC-02": 5,
-   "OC-16": 1,
-   "OC-19": 24,
    "OC-30": 1,
    "OC-34": 1,
    "OC-35": 1,
-   "OC-46": 5,
-   "OC-53": 10,
-   "OC-63": 10,
-   "OC-64": 4,
-   "OC-66": 10,
    "OC-67": 1,
-   "OC-D01": 1,
    "OC-D03": 1,
-   "OC-D08": 5,
    "OC-D12": 1,
    "OC-D15": 1,
    "OC-D16": 1,
-   "OC-D20": 1,
-   "OC-D28": 58,
    "browser_status": 25,
    "channels_status": 8,
    "cli:acp": 6,
@@ -67636,6 +67546,7 @@
   },
   "uncovered_by_category": {
    "distinct": {
+    "openclaw_extension": 96,
     "qubit_backend_route": 10,
     "qubit_cli_command": 3,
     "qubit_cli_subcommand": 9
@@ -67646,17 +67557,19 @@
   }
  },
  "omissions": {
-  "total": 26,
-  "distinct_total": 22,
+  "total": 122,
+  "distinct_total": 118,
   "parented_uncovered": 4,
-  "parented_covered": 1136,
+  "parented_covered": 1002,
   "by_category": {
+   "openclaw_extension": 96,
    "qubit_backend_route": 10,
    "qubit_cli_command": 3,
    "qubit_cli_option": 4,
    "qubit_cli_subcommand": 9
   },
   "distinct_by_category": {
+   "openclaw_extension": 96,
    "qubit_backend_route": 10,
    "qubit_cli_command": 3,
    "qubit_cli_subcommand": 9
@@ -191588,63 +191501,26 @@
    "parent_covered": false
   },
   {
-   "id": "openclaw-ext:a2a",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "a2a",
-   "path": "extensions/a2a/",
-   "extension_id": "a2a",
-   "categories": [
-    "channels"
-   ],
-   "manifest": "extensions/a2a/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [
-    "a2a"
-   ],
-   "enabled_by_default": null,
-   "file_count": 32,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-19",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension a2a",
-    "backend": "voicebridge/channels_inbound.py normalize_event",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'a2a' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
-    "needs": "creds"
-   }
-  },
-  {
    "id": "openclaw-ext:acpx",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "acpx",
    "path": "extensions/acpx/",
    "extension_id": "acpx",
-   "categories": [
-    "runtime",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/acpx/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 66,
+   "file_count": 40,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:active-memory",
@@ -191653,23 +191529,21 @@
    "name": "active-memory",
    "path": "extensions/active-memory/",
    "extension_id": "active-memory",
-   "categories": [
-    "memory"
-   ],
+   "categories": [],
    "manifest": "extensions/active-memory/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 26,
+   "file_count": 6,
    "in_audit_docs": true,
    "ledger_match": "api:GET /api/memory",
    "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-46",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-46",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:admin-http-rpc",
@@ -191678,22 +191552,20 @@
    "name": "admin-http-rpc",
    "path": "extensions/admin-http-rpc/",
    "extension_id": "admin-http-rpc",
-   "categories": [
-    "gateway"
-   ],
+   "categories": [],
    "manifest": "extensions/admin-http-rpc/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 9,
+   "file_count": 8,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-02",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-02",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:alibaba",
@@ -191702,22 +191574,20 @@
    "name": "alibaba",
    "path": "extensions/alibaba/",
    "extension_id": "alibaba",
-   "categories": [
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/alibaba/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 7,
+   "file_count": 6,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-64",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-64",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:amazon-bedrock",
@@ -191726,23 +191596,20 @@
    "name": "amazon-bedrock",
    "path": "extensions/amazon-bedrock/",
    "extension_id": "amazon-bedrock",
-   "categories": [
-    "models",
-    "memory"
-   ],
+   "categories": [],
    "manifest": "extensions/amazon-bedrock/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 33,
+   "file_count": 28,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:amazon-bedrock-mantle",
@@ -191751,9 +191618,7 @@
    "name": "amazon-bedrock-mantle",
    "path": "extensions/amazon-bedrock-mantle/",
    "extension_id": "amazon-bedrock-mantle",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/amazon-bedrock-mantle/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -191762,11 +191627,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:anthropic",
@@ -191775,23 +191640,20 @@
    "name": "anthropic",
    "path": "extensions/anthropic/",
    "extension_id": "anthropic",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/anthropic/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 88,
+   "file_count": 30,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:anthropic-vertex",
@@ -191800,22 +191662,20 @@
    "name": "anthropic-vertex",
    "path": "extensions/anthropic-vertex/",
    "extension_id": "anthropic-vertex",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/anthropic-vertex/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 22,
+   "file_count": 20,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:arcee",
@@ -191824,22 +191684,20 @@
    "name": "arcee",
    "path": "extensions/arcee/",
    "extension_id": "arcee",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/arcee/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 12,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:azure-speech",
@@ -191848,70 +191706,20 @@
    "name": "azure-speech",
    "path": "extensions/azure-speech/",
    "extension_id": "azure-speech",
-   "categories": [
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/azure-speech/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 13,
+   "file_count": 9,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:baseten",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "baseten",
-   "path": "extensions/baseten/",
-   "extension_id": "baseten",
-   "categories": [
-    "models"
-   ],
-   "manifest": "extensions/baseten/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 15,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:beam",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "beam",
-   "path": "extensions/beam/",
-   "extension_id": "beam",
-   "categories": [
-    "runtime"
-   ],
-   "manifest": "extensions/beam/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": null,
-   "file_count": 13,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-53",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:bonjour",
@@ -191920,22 +191728,20 @@
    "name": "bonjour",
    "path": "extensions/bonjour/",
    "extension_id": "bonjour",
-   "categories": [
-    "gateway"
-   ],
+   "categories": [],
    "manifest": "extensions/bonjour/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 12,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-02",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-02",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:brave",
@@ -191944,9 +191750,7 @@
    "name": "brave",
    "path": "extensions/brave/",
    "extension_id": "brave",
-   "categories": [
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/brave/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -191955,11 +191759,11 @@
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:browser",
@@ -191968,16 +191772,12 @@
    "name": "browser",
    "path": "extensions/browser/",
    "extension_id": "browser",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/browser/openclaw.plugin.json",
-   "cli_commands": [
-    "browser"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 617,
+   "file_count": 338,
    "in_audit_docs": true,
    "ledger_match": "cli:browser",
    "ledger_source": "hermes",
@@ -191989,63 +191789,26 @@
    "parent_covered": false
   },
   {
-   "id": "openclaw-ext:buzz",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "buzz",
-   "path": "extensions/buzz/",
-   "extension_id": "buzz",
-   "categories": [
-    "channels"
-   ],
-   "manifest": "extensions/buzz/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [
-    "buzz"
-   ],
-   "enabled_by_default": null,
-   "file_count": 88,
-   "in_audit_docs": true,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-19",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension buzz",
-    "backend": "voicebridge/channels_inbound.py normalize_event",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'buzz' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
-    "needs": "creds"
-   }
-  },
-  {
    "id": "openclaw-ext:byteplus",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "byteplus",
    "path": "extensions/byteplus/",
    "extension_id": "byteplus",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/byteplus/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 13,
+   "file_count": 12,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:canvas",
@@ -192054,14 +191817,12 @@
    "name": "canvas",
    "path": "extensions/canvas/",
    "extension_id": "canvas",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/canvas/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 45,
+   "file_count": 47,
    "in_audit_docs": true,
    "ledger_match": "OC-35",
    "ledger_source": "openclaw",
@@ -192079,22 +191840,20 @@
    "name": "cerebras",
    "path": "extensions/cerebras/",
    "extension_id": "cerebras",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/cerebras/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 12,
+   "file_count": 10,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:chutes",
@@ -192103,46 +191862,20 @@
    "name": "chutes",
    "path": "extensions/chutes/",
    "extension_id": "chutes",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/chutes/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 16,
+   "file_count": 15,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:clawrouter",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "clawrouter",
-   "path": "extensions/clawrouter/",
-   "extension_id": "clawrouter",
-   "categories": [
-    "models"
-   ],
-   "manifest": "extensions/clawrouter/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 14,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:clickclack",
@@ -192151,25 +191884,22 @@
    "name": "clickclack",
    "path": "extensions/clickclack/",
    "extension_id": "clickclack",
-   "categories": [
-    "channels",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/clickclack/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "clickclack"
    ],
    "enabled_by_default": null,
-   "file_count": 93,
+   "file_count": 24,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension clickclack",
@@ -192186,9 +191916,7 @@
    "name": "cloudflare-ai-gateway",
    "path": "extensions/cloudflare-ai-gateway/",
    "extension_id": "cloudflare-ai-gateway",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/cloudflare-ai-gateway/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -192197,11 +191925,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:codex",
@@ -192210,26 +191938,42 @@
    "name": "codex",
    "path": "extensions/codex/",
    "extension_id": "codex",
-   "categories": [
-    "runtime",
-    "tools",
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/codex/openclaw.plugin.json",
-   "cli_commands": [
-    "codex"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 645,
+   "file_count": 219,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
+  },
+  {
+   "id": "openclaw-ext:codex-supervisor",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "codex-supervisor",
+   "path": "extensions/codex-supervisor/",
+   "extension_id": "codex-supervisor",
+   "categories": [],
+   "manifest": "extensions/codex-supervisor/openclaw.plugin.json",
+   "cli_commands": [],
+   "channels": [],
+   "enabled_by_default": null,
+   "file_count": 17,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:cohere",
@@ -192238,9 +191982,7 @@
    "name": "cohere",
    "path": "extensions/cohere/",
    "extension_id": "cohere",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/cohere/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -192249,11 +191991,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:comfy",
@@ -192262,23 +192004,20 @@
    "name": "comfy",
    "path": "extensions/comfy/",
    "extension_id": "comfy",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/comfy/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 17,
+   "file_count": 14,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:copilot",
@@ -192287,22 +192026,20 @@
    "name": "copilot",
    "path": "extensions/copilot/",
    "extension_id": "copilot",
-   "categories": [
-    "runtime"
-   ],
+   "categories": [],
    "manifest": "extensions/copilot/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 66,
+   "file_count": 40,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:copilot-proxy",
@@ -192311,82 +192048,20 @@
    "name": "copilot-proxy",
    "path": "extensions/copilot-proxy/",
    "extension_id": "copilot-proxy",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/copilot-proxy/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 7,
+   "file_count": 6,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:crabbox",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "crabbox",
-   "path": "extensions/crabbox/",
-   "extension_id": "crabbox",
-   "categories": [
-    "runtime",
-    "tools"
-   ],
-   "manifest": "extensions/crabbox/openclaw.plugin.json",
-   "cli_commands": [
-    "crabbox"
-   ],
-   "channels": [],
-   "enabled_by_default": null,
-   "file_count": 60,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-53",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:cua-computer",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "cua-computer",
-   "path": "extensions/cua-computer/",
-   "extension_id": "cua-computer",
-   "categories": [
-    "tools"
-   ],
-   "manifest": "extensions/cua-computer/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 39,
-   "in_audit_docs": true,
-   "ledger_match": "inv:openclaw-ext:cua-computer",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension cua-computer",
-    "backend": "voicebridge/computer_use.py status/refuse_install",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'cua-computer' -> gate (parent=OC-13, gate=COMPUTER_USE_NO_DRIVER) via voicebridge/computer_use.py status/refuse_install.",
-    "needs": "hardware"
-   }
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:deepgram",
@@ -192395,24 +192070,20 @@
    "name": "deepgram",
    "path": "extensions/deepgram/",
    "extension_id": "deepgram",
-   "categories": [
-    "models",
-    "voice",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/deepgram/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 15,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:deepinfra",
@@ -192421,24 +192092,20 @@
    "name": "deepinfra",
    "path": "extensions/deepinfra/",
    "extension_id": "deepinfra",
-   "categories": [
-    "models",
-    "memory",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/deepinfra/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 43,
+   "file_count": 33,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:deepseek",
@@ -192447,22 +192114,20 @@
    "name": "deepseek",
    "path": "extensions/deepseek/",
    "extension_id": "deepseek",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/deepseek/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 18,
+   "file_count": 17,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:device-pair",
@@ -192471,14 +192136,12 @@
    "name": "device-pair",
    "path": "extensions/device-pair/",
    "extension_id": "device-pair",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/device-pair/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 15,
+   "file_count": 13,
    "in_audit_docs": true,
    "ledger_match": "inv:openclaw-ext:device-pair",
    "ledger_source": "qubit",
@@ -192504,22 +192167,20 @@
    "name": "diagnostics-otel",
    "path": "extensions/diagnostics-otel/",
    "extension_id": "diagnostics-otel",
-   "categories": [
-    "gateway"
-   ],
+   "categories": [],
    "manifest": "extensions/diagnostics-otel/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 41,
+   "file_count": 9,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-02",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-02",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:diagnostics-prometheus",
@@ -192528,22 +192189,20 @@
    "name": "diagnostics-prometheus",
    "path": "extensions/diagnostics-prometheus/",
    "extension_id": "diagnostics-prometheus",
-   "categories": [
-    "gateway"
-   ],
+   "categories": [],
    "manifest": "extensions/diagnostics-prometheus/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 14,
+   "file_count": 9,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-02",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-02",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:diffs",
@@ -192552,14 +192211,12 @@
    "name": "diffs",
    "path": "extensions/diffs/",
    "extension_id": "diffs",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/diffs/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 39,
+   "file_count": 36,
    "in_audit_docs": true,
    "ledger_match": "inv:openclaw-ext:diffs",
    "ledger_source": "qubit",
@@ -192585,22 +192242,20 @@
    "name": "diffs-language-pack",
    "path": "extensions/diffs-language-pack/",
    "extension_id": "diffs-language-pack",
-   "categories": [
-    "runtime"
-   ],
+   "categories": [],
    "manifest": "extensions/diffs-language-pack/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 9,
+   "file_count": 8,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:discord",
@@ -192609,17 +192264,14 @@
    "name": "discord",
    "path": "extensions/discord/",
    "extension_id": "discord",
-   "categories": [
-    "channels",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/discord/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "discord"
    ],
    "enabled_by_default": null,
-   "file_count": 725,
+   "file_count": 541,
    "in_audit_docs": true,
    "ledger_match": "OC-D12",
    "ledger_source": "openclaw",
@@ -192637,23 +192289,20 @@
    "name": "document-extract",
    "path": "extensions/document-extract/",
    "extension_id": "document-extract",
-   "categories": [
-    "context",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/document-extract/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 6,
+   "file_count": 5,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D20",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D20",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:duckduckgo",
@@ -192662,22 +192311,20 @@
    "name": "duckduckgo",
    "path": "extensions/duckduckgo/",
    "extension_id": "duckduckgo",
-   "categories": [
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/duckduckgo/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 14,
+   "file_count": 11,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:elevenlabs",
@@ -192686,25 +192333,21 @@
    "name": "elevenlabs",
    "path": "extensions/elevenlabs/",
    "extension_id": "elevenlabs",
-   "categories": [
-    "models",
-    "voice",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/elevenlabs/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 23,
+   "file_count": 21,
    "in_audit_docs": false,
    "ledger_match": "api:GET /api/audio/elevenlabs/voices",
    "ledger_source": "hermes",
    "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:exa",
@@ -192713,22 +192356,20 @@
    "name": "exa",
    "path": "extensions/exa/",
    "extension_id": "exa",
-   "categories": [
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/exa/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 12,
+   "file_count": 13,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:fal",
@@ -192737,47 +192378,20 @@
    "name": "fal",
    "path": "extensions/fal/",
    "extension_id": "fal",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/fal/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 17,
+   "file_count": 15,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:featherless",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "featherless",
-   "path": "extensions/featherless/",
-   "extension_id": "featherless",
-   "categories": [
-    "models"
-   ],
-   "manifest": "extensions/featherless/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 12,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:feishu",
@@ -192786,17 +192400,14 @@
    "name": "feishu",
    "path": "extensions/feishu/",
    "extension_id": "feishu",
-   "categories": [
-    "channels",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/feishu/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "feishu"
    ],
    "enabled_by_default": null,
-   "file_count": 282,
+   "file_count": 213,
    "in_audit_docs": true,
    "ledger_match": "OC-D16",
    "ledger_source": "openclaw",
@@ -192814,16 +192425,12 @@
    "name": "file-transfer",
    "path": "extensions/file-transfer/",
    "extension_id": "file-transfer",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/file-transfer/openclaw.plugin.json",
-   "cli_commands": [
-    "file-transfer"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 62,
+   "file_count": 37,
    "in_audit_docs": true,
    "ledger_match": "OC-D03",
    "ledger_source": "openclaw",
@@ -192841,23 +192448,20 @@
    "name": "firecrawl",
    "path": "extensions/firecrawl/",
    "extension_id": "firecrawl",
-   "categories": [
-    "web",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/firecrawl/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 21,
+   "file_count": 20,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:fireworks",
@@ -192866,79 +192470,20 @@
    "name": "fireworks",
    "path": "extensions/fireworks/",
    "extension_id": "fireworks",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/fireworks/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 15,
+   "file_count": 12,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:fish-audio-speech",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "fish-audio-speech",
-   "path": "extensions/fish-audio-speech/",
-   "extension_id": "fish-audio-speech",
-   "categories": [
-    "voice"
-   ],
-   "manifest": "extensions/fish-audio-speech/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": null,
-   "file_count": 9,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-66",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:geolocation",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "geolocation",
-   "path": "extensions/geolocation/",
-   "extension_id": "geolocation",
-   "categories": [
-    "tools"
-   ],
-   "manifest": "extensions/geolocation/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 13,
-   "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:geolocation",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false,
-   "fork_disposition": {
-    "status": "IMPLEMENTED",
-    "capability": "openclaw extension geolocation",
-    "backend": "voicebridge/node_host.py geolocate",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'geolocation' -> distinct (parent=OC-56, gate=none) via voicebridge/node_host.py geolocate.",
-    "needs": "none"
-   }
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:github-copilot",
@@ -192947,23 +192492,20 @@
    "name": "github-copilot",
    "path": "extensions/github-copilot/",
    "extension_id": "github-copilot",
-   "categories": [
-    "models",
-    "memory"
-   ],
+   "categories": [],
    "manifest": "extensions/github-copilot/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 40,
+   "file_count": 28,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:gmi",
@@ -192972,22 +192514,20 @@
    "name": "gmi",
    "path": "extensions/gmi/",
    "extension_id": "gmi",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/gmi/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 7,
+   "file_count": 9,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:google",
@@ -192996,24 +192536,20 @@
    "name": "google",
    "path": "extensions/google/",
    "extension_id": "google",
-   "categories": [
-    "models",
-    "memory",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/google/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 86,
+   "file_count": 81,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:google-meet",
@@ -193022,25 +192558,20 @@
    "name": "google-meet",
    "path": "extensions/google-meet/",
    "extension_id": "google-meet",
-   "categories": [
-    "voice",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/google-meet/openclaw.plugin.json",
-   "cli_commands": [
-    "googlemeet"
-   ],
+   "cli_commands": [],
    "channels": [],
-   "enabled_by_default": true,
-   "file_count": 81,
+   "enabled_by_default": false,
+   "file_count": 42,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:googlechat",
@@ -193049,24 +192580,22 @@
    "name": "googlechat",
    "path": "extensions/googlechat/",
    "extension_id": "googlechat",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/googlechat/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "googlechat"
    ],
    "enabled_by_default": null,
-   "file_count": 94,
+   "file_count": 72,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension googlechat",
@@ -193083,22 +192612,20 @@
    "name": "gradium",
    "path": "extensions/gradium/",
    "extension_id": "gradium",
-   "categories": [
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/gradium/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 13,
+   "file_count": 12,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:groq",
@@ -193107,23 +192634,20 @@
    "name": "groq",
    "path": "extensions/groq/",
    "extension_id": "groq",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/groq/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 9,
+   "file_count": 10,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:huggingface",
@@ -193132,22 +192656,20 @@
    "name": "huggingface",
    "path": "extensions/huggingface/",
    "extension_id": "huggingface",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/huggingface/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 12,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:image-generation-core",
@@ -193161,7 +192683,7 @@
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 3,
+   "file_count": 6,
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:image-generation-core",
    "ledger_source": "qubit",
@@ -193181,55 +192703,20 @@
    }
   },
   {
-   "id": "openclaw-ext:imap",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "imap",
-   "path": "extensions/imap/",
-   "extension_id": "imap",
-   "categories": [
-    "tools"
-   ],
-   "manifest": "extensions/imap/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": false,
-   "file_count": 15,
-   "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:imap",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": null,
-   "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension imap",
-    "backend": "voicebridge/channels_inbound.py normalize_event",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'imap' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
-    "needs": "creds"
-   }
-  },
-  {
    "id": "openclaw-ext:imessage",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "imessage",
    "path": "extensions/imessage/",
    "extension_id": "imessage",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/imessage/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "imessage"
    ],
    "enabled_by_default": null,
-   "file_count": 197,
+   "file_count": 149,
    "in_audit_docs": true,
    "ledger_match": "OC-D15",
    "ledger_source": "openclaw",
@@ -193247,22 +192734,20 @@
    "name": "inworld",
    "path": "extensions/inworld/",
    "extension_id": "inworld",
-   "categories": [
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/inworld/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 13,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:irc",
@@ -193271,24 +192756,22 @@
    "name": "irc",
    "path": "extensions/irc/",
    "extension_id": "irc",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/irc/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "irc"
    ],
    "enabled_by_default": null,
-   "file_count": 62,
+   "file_count": 53,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension irc",
@@ -193305,9 +192788,7 @@
    "name": "kilocode",
    "path": "extensions/kilocode/",
    "extension_id": "kilocode",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/kilocode/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -193316,11 +192797,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:kimi-coding",
@@ -193329,22 +192810,20 @@
    "name": "kimi-coding",
    "path": "extensions/kimi-coding/",
    "extension_id": "kimi",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/kimi-coding/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 20,
+   "file_count": 17,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:line",
@@ -193353,24 +192832,22 @@
    "name": "line",
    "path": "extensions/line/",
    "extension_id": "line",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/line/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "line"
    ],
    "enabled_by_default": null,
-   "file_count": 133,
+   "file_count": 92,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension line",
@@ -193381,53 +192858,26 @@
    }
   },
   {
-   "id": "openclaw-ext:linux-node",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "linux-node",
-   "path": "extensions/linux-node/",
-   "extension_id": "linux-node",
-   "categories": [
-    "runtime"
-   ],
-   "manifest": "extensions/linux-node/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 14,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-53",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
    "id": "openclaw-ext:litellm",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "litellm",
    "path": "extensions/litellm/",
    "extension_id": "litellm",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/litellm/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 12,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:llama-cpp",
@@ -193436,23 +192886,20 @@
    "name": "llama-cpp",
    "path": "extensions/llama-cpp/",
    "extension_id": "llama-cpp",
-   "categories": [
-    "models",
-    "memory"
-   ],
+   "categories": [],
    "manifest": "extensions/llama-cpp/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 43,
+   "file_count": 7,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:llm-task",
@@ -193461,14 +192908,12 @@
    "name": "llm-task",
    "path": "extensions/llm-task/",
    "extension_id": "llm-task",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/llm-task/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 11,
+   "file_count": 9,
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:llm-task",
    "ledger_source": "qubit",
@@ -193494,23 +192939,20 @@
    "name": "lmstudio",
    "path": "extensions/lmstudio/",
    "extension_id": "lmstudio",
-   "categories": [
-    "models",
-    "memory"
-   ],
+   "categories": [],
    "manifest": "extensions/lmstudio/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 30,
+   "file_count": 21,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:lobster",
@@ -193519,14 +192961,12 @@
    "name": "lobster",
    "path": "extensions/lobster/",
    "extension_id": "lobster",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/lobster/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 15,
+   "file_count": 17,
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:lobster",
    "ledger_source": "qubit",
@@ -193546,83 +192986,29 @@
    }
   },
   {
-   "id": "openclaw-ext:logbook",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "logbook",
-   "path": "extensions/logbook/",
-   "extension_id": "logbook",
-   "categories": [
-    "tools"
-   ],
-   "manifest": "extensions/logbook/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": false,
-   "file_count": 19,
-   "in_audit_docs": true,
-   "ledger_match": "OC-16",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-16",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-16",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:longcat",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "longcat",
-   "path": "extensions/longcat/",
-   "extension_id": "longcat",
-   "categories": [
-    "models"
-   ],
-   "manifest": "extensions/longcat/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 14,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
    "id": "openclaw-ext:matrix",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "matrix",
    "path": "extensions/matrix/",
    "extension_id": "matrix",
-   "categories": [
-    "channels",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/matrix/openclaw.plugin.json",
-   "cli_commands": [
-    "matrix"
-   ],
+   "cli_commands": [],
    "channels": [
     "matrix"
    ],
    "enabled_by_default": null,
-   "file_count": 394,
+   "file_count": 341,
    "in_audit_docs": true,
    "ledger_match": "api:GET /api/tools/toolsets/{name}/config",
    "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:mattermost",
@@ -193631,24 +193017,22 @@
    "name": "mattermost",
    "path": "extensions/mattermost/",
    "extension_id": "mattermost",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/mattermost/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "mattermost"
    ],
    "enabled_by_default": null,
-   "file_count": 145,
+   "file_count": 105,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension mattermost",
@@ -193659,31 +193043,48 @@
    }
   },
   {
+   "id": "openclaw-ext:media-understanding-core",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "media-understanding-core",
+   "path": "extensions/media-understanding-core/",
+   "extension_id": "media-understanding-core",
+   "categories": [],
+   "manifest": null,
+   "cli_commands": [],
+   "channels": [],
+   "enabled_by_default": null,
+   "file_count": 4,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
+  },
+  {
    "id": "openclaw-ext:memory-core",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "memory-core",
    "path": "extensions/memory-core/",
    "extension_id": "memory-core",
-   "categories": [
-    "memory",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/memory-core/openclaw.plugin.json",
-   "cli_commands": [
-    "memory"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 277,
+   "file_count": 148,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-46",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-46",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:memory-lancedb",
@@ -193692,25 +193093,20 @@
    "name": "memory-lancedb",
    "path": "extensions/memory-lancedb/",
    "extension_id": "memory-lancedb",
-   "categories": [
-    "memory",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/memory-lancedb/openclaw.plugin.json",
-   "cli_commands": [
-    "ltm"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 35,
+   "file_count": 14,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-46",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-46",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:memory-wiki",
@@ -193719,49 +193115,20 @@
    "name": "memory-wiki",
    "path": "extensions/memory-wiki/",
    "extension_id": "memory-wiki",
-   "categories": [
-    "memory",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/memory-wiki/openclaw.plugin.json",
-   "cli_commands": [
-    "wiki"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 97,
+   "file_count": 72,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-46",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-46",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:meta",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "meta",
-   "path": "extensions/meta/",
-   "extension_id": "meta",
-   "categories": [
-    "models"
-   ],
-   "manifest": "extensions/meta/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 14,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:microsoft",
@@ -193770,22 +193137,20 @@
    "name": "microsoft",
    "path": "extensions/microsoft/",
    "extension_id": "microsoft",
-   "categories": [
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/microsoft/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 11,
+   "file_count": 10,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:microsoft-foundry",
@@ -193794,23 +193159,20 @@
    "name": "microsoft-foundry",
    "path": "extensions/microsoft-foundry/",
    "extension_id": "microsoft-foundry",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/microsoft-foundry/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 16,
+   "file_count": 14,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:migrate-claude",
@@ -193819,22 +193181,20 @@
    "name": "migrate-claude",
    "path": "extensions/migrate-claude/",
    "extension_id": "migrate-claude",
-   "categories": [
-    "runtime"
-   ],
+   "categories": [],
    "manifest": "extensions/migrate-claude/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 15,
+   "file_count": 14,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:migrate-hermes",
@@ -193843,22 +193203,20 @@
    "name": "migrate-hermes",
    "path": "extensions/migrate-hermes/",
    "extension_id": "migrate-hermes",
-   "categories": [
-    "runtime"
-   ],
+   "categories": [],
    "manifest": "extensions/migrate-hermes/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 36,
+   "file_count": 24,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:minimax",
@@ -193867,24 +193225,20 @@
    "name": "minimax",
    "path": "extensions/minimax/",
    "extension_id": "minimax",
-   "categories": [
-    "models",
-    "voice",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/minimax/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 44,
+   "file_count": 41,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:mistral",
@@ -193893,24 +193247,20 @@
    "name": "mistral",
    "path": "extensions/mistral/",
    "extension_id": "mistral",
-   "categories": [
-    "models",
-    "memory",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/mistral/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 23,
+   "file_count": 19,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:moonshot",
@@ -193919,24 +193269,20 @@
    "name": "moonshot",
    "path": "extensions/moonshot/",
    "extension_id": "moonshot",
-   "categories": [
-    "models",
-    "media",
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/moonshot/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 25,
+   "file_count": 21,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:msteams",
@@ -193945,24 +193291,22 @@
    "name": "msteams",
    "path": "extensions/msteams/",
    "extension_id": "msteams",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/msteams/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "msteams"
    ],
    "enabled_by_default": null,
-   "file_count": 247,
+   "file_count": 189,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension msteams",
@@ -193973,55 +193317,28 @@
    }
   },
   {
-   "id": "openclaw-ext:mxc",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "mxc",
-   "path": "extensions/mxc/",
-   "extension_id": "mxc",
-   "categories": [
-    "security",
-    "runtime"
-   ],
-   "manifest": "extensions/mxc/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": null,
-   "file_count": 34,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-D08",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D08",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
    "id": "openclaw-ext:nextcloud-talk",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "nextcloud-talk",
    "path": "extensions/nextcloud-talk/",
    "extension_id": "nextcloud-talk",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/nextcloud-talk/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "nextcloud-talk"
    ],
    "enabled_by_default": null,
-   "file_count": 76,
+   "file_count": 59,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension nextcloud-talk",
@@ -194038,24 +193355,22 @@
    "name": "nostr",
    "path": "extensions/nostr/",
    "extension_id": "nostr",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/nostr/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "nostr"
    ],
    "enabled_by_default": null,
-   "file_count": 64,
+   "file_count": 53,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension nostr",
@@ -194072,9 +193387,7 @@
    "name": "novita",
    "path": "extensions/novita/",
    "extension_id": "novita",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/novita/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -194083,11 +193396,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:nvidia",
@@ -194096,22 +193409,20 @@
    "name": "nvidia",
    "path": "extensions/nvidia/",
    "extension_id": "nvidia",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/nvidia/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 12,
+   "file_count": 10,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:oc-path",
@@ -194120,16 +193431,12 @@
    "name": "oc-path",
    "path": "extensions/oc-path/",
    "extension_id": "oc-path",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/oc-path/openclaw.plugin.json",
-   "cli_commands": [
-    "path"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 86,
+   "file_count": 83,
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:oc-path",
    "ledger_source": "qubit",
@@ -194155,52 +193462,42 @@
    "name": "ollama",
    "path": "extensions/ollama/",
    "extension_id": "ollama",
-   "categories": [
-    "models",
-    "memory",
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/ollama/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 78,
+   "file_count": 46,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
-   "id": "openclaw-ext:onepassword",
+   "id": "openclaw-ext:open-prose",
    "source": "openclaw",
    "category": "openclaw_extension",
-   "name": "onepassword",
-   "path": "extensions/onepassword/",
-   "extension_id": "onepassword",
-   "categories": [
-    "security",
-    "tools"
-   ],
-   "manifest": "extensions/onepassword/openclaw.plugin.json",
-   "cli_commands": [
-    "onepassword"
-   ],
+   "name": "open-prose",
+   "path": "extensions/open-prose/",
+   "extension_id": "open-prose",
+   "categories": [],
+   "manifest": "extensions/open-prose/openclaw.plugin.json",
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 28,
+   "file_count": 93,
    "in_audit_docs": false,
-   "ledger_match": "cli:secrets onepassword",
-   "ledger_source": "hermes",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D08",
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D08",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:openai",
@@ -194209,24 +193506,20 @@
    "name": "openai",
    "path": "extensions/openai/",
    "extension_id": "openai",
-   "categories": [
-    "models",
-    "memory",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/openai/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 145,
+   "file_count": 73,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:opencode",
@@ -194235,15 +193528,12 @@
    "name": "opencode",
    "path": "extensions/opencode/",
    "extension_id": "opencode",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/opencode/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 24,
+   "file_count": 13,
    "in_audit_docs": true,
    "ledger_match": "OC-30",
    "ledger_source": "openclaw",
@@ -194261,23 +193551,20 @@
    "name": "opencode-go",
    "path": "extensions/opencode-go/",
    "extension_id": "opencode-go",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/opencode-go/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 18,
+   "file_count": 15,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:openrouter",
@@ -194286,24 +193573,20 @@
    "name": "openrouter",
    "path": "extensions/openrouter/",
    "extension_id": "openrouter",
-   "categories": [
-    "models",
-    "voice",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/openrouter/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 43,
+   "file_count": 32,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:openshell",
@@ -194312,23 +193595,20 @@
    "name": "openshell",
    "path": "extensions/openshell/",
    "extension_id": "openshell",
-   "categories": [
-    "security",
-    "runtime"
-   ],
+   "categories": [],
    "manifest": "extensions/openshell/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 24,
+   "file_count": 17,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D08",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D08",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:parallel",
@@ -194337,23 +193617,21 @@
    "name": "parallel",
    "path": "extensions/parallel/",
    "extension_id": "parallel",
-   "categories": [
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/parallel/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 18,
+   "file_count": 21,
    "in_audit_docs": false,
    "ledger_match": "kanban_swarm",
    "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:perplexity",
@@ -194362,22 +193640,42 @@
    "name": "perplexity",
    "path": "extensions/perplexity/",
    "extension_id": "perplexity",
-   "categories": [
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/perplexity/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 12,
+   "file_count": 13,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
+  },
+  {
+   "id": "openclaw-ext:phone-control",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "phone-control",
+   "path": "extensions/phone-control/",
+   "extension_id": "phone-control",
+   "categories": [],
+   "manifest": "extensions/phone-control/openclaw.plugin.json",
+   "cli_commands": [],
+   "channels": [],
+   "enabled_by_default": true,
+   "file_count": 6,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:pixverse",
@@ -194386,9 +193684,7 @@
    "name": "pixverse",
    "path": "extensions/pixverse/",
    "extension_id": "pixverse",
-   "categories": [
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/pixverse/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -194397,11 +193693,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-64",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-64",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:policy",
@@ -194410,26 +193706,21 @@
    "name": "policy",
    "path": "extensions/policy/",
    "extension_id": "policy",
-   "categories": [
-    "security",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/policy/openclaw.plugin.json",
-   "cli_commands": [
-    "policy"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 88,
+   "file_count": 27,
    "in_audit_docs": true,
    "ledger_match": "api:POST /api/auth/ws-ticket",
    "ledger_source": "hermes",
    "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": "OC-D08",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D08",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:qa-channel",
@@ -194438,24 +193729,22 @@
    "name": "qa-channel",
    "path": "extensions/qa-channel/",
    "extension_id": "qa-channel",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/qa-channel/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "qa-channel"
    ],
    "enabled_by_default": null,
-   "file_count": 38,
+   "file_count": 31,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension qa-channel",
@@ -194472,25 +193761,42 @@
    "name": "qa-lab",
    "path": "extensions/qa-lab/",
    "extension_id": "qa-lab",
-   "categories": [
-    "tools",
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/qa-lab/openclaw.plugin.json",
-   "cli_commands": [
-    "qa"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 630,
+   "file_count": 267,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
+  },
+  {
+   "id": "openclaw-ext:qa-matrix",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "qa-matrix",
+   "path": "extensions/qa-matrix/",
+   "extension_id": "qa-matrix",
+   "categories": [],
+   "manifest": "extensions/qa-matrix/openclaw.plugin.json",
+   "cli_commands": [],
+   "channels": [],
+   "enabled_by_default": null,
+   "file_count": 65,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:qianfan",
@@ -194499,9 +193805,7 @@
    "name": "qianfan",
    "path": "extensions/qianfan/",
    "extension_id": "qianfan",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/qianfan/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -194510,11 +193814,35 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
+  },
+  {
+   "id": "openclaw-ext:qqbot",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "qqbot",
+   "path": "extensions/qqbot/",
+   "extension_id": "qqbot",
+   "categories": [],
+   "manifest": "extensions/qqbot/openclaw.plugin.json",
+   "cli_commands": [],
+   "channels": [
+    "qqbot"
+   ],
+   "enabled_by_default": true,
+   "file_count": 230,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:qwen",
@@ -194523,10 +193851,7 @@
    "name": "qwen",
    "path": "extensions/qwen/",
    "extension_id": "qwen",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/qwen/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -194535,82 +193860,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:raft",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "raft",
-   "path": "extensions/raft/",
-   "extension_id": "raft",
-   "categories": [
-    "channels"
-   ],
-   "manifest": "extensions/raft/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [
-    "raft"
-   ],
-   "enabled_by_default": null,
-   "file_count": 18,
-   "in_audit_docs": true,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-19",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension raft",
-    "backend": "voicebridge/channels_inbound.py normalize_event",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'raft' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
-    "needs": "creds"
-   }
-  },
-  {
-   "id": "openclaw-ext:reef",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "reef",
-   "path": "extensions/reef/",
-   "extension_id": "reef",
-   "categories": [
-    "channels",
-    "tools"
-   ],
-   "manifest": "extensions/reef/openclaw.plugin.json",
-   "cli_commands": [
-    "reef"
-   ],
-   "channels": [
-    "reef"
-   ],
-   "enabled_by_default": null,
-   "file_count": 79,
-   "in_audit_docs": true,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-19",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension reef",
-    "backend": "voicebridge/channels_inbound.py normalize_event",
-    "proving_test": "tests/test_openclaw_extensions_wave5.py",
-    "reason": "OpenClaw extension 'reef' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
-    "needs": "creds"
-   }
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:runway",
@@ -194619,22 +193873,20 @@
    "name": "runway",
    "path": "extensions/runway/",
    "extension_id": "runway",
-   "categories": [
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/runway/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 7,
+   "file_count": 6,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-64",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-64",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:searxng",
@@ -194643,22 +193895,20 @@
    "name": "searxng",
    "path": "extensions/searxng/",
    "extension_id": "searxng",
-   "categories": [
-    "web"
-   ],
+   "categories": [],
    "manifest": "extensions/searxng/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 13,
+   "file_count": 10,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:senseaudio",
@@ -194667,22 +193917,20 @@
    "name": "senseaudio",
    "path": "extensions/senseaudio/",
    "extension_id": "senseaudio",
-   "categories": [
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/senseaudio/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 7,
+   "file_count": 6,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-64",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-64",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:sglang",
@@ -194691,9 +193939,7 @@
    "name": "sglang",
    "path": "extensions/sglang/",
    "extension_id": "sglang",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/sglang/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -194702,11 +193948,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:signal",
@@ -194715,25 +193961,23 @@
    "name": "signal",
    "path": "extensions/signal/",
    "extension_id": "signal",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/signal/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "signal"
    ],
    "enabled_by_default": null,
-   "file_count": 130,
+   "file_count": 84,
    "in_audit_docs": true,
    "ledger_match": "experiments_signal",
    "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:slack",
@@ -194742,25 +193986,23 @@
    "name": "slack",
    "path": "extensions/slack/",
    "extension_id": "slack",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/slack/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "slack"
    ],
    "enabled_by_default": null,
-   "file_count": 399,
+   "file_count": 282,
    "in_audit_docs": true,
    "ledger_match": "cli:slack",
    "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:sms",
@@ -194769,24 +194011,22 @@
    "name": "sms",
    "path": "extensions/sms/",
    "extension_id": "sms",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/sms/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "sms"
    ],
    "enabled_by_default": null,
-   "file_count": 47,
+   "file_count": 30,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension sms",
@@ -194803,22 +194043,20 @@
    "name": "stepfun",
    "path": "extensions/stepfun/",
    "extension_id": "stepfun",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/stepfun/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 10,
+   "file_count": 9,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:synology-chat",
@@ -194827,24 +194065,22 @@
    "name": "synology-chat",
    "path": "extensions/synology-chat/",
    "extension_id": "synology-chat",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/synology-chat/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "synology-chat"
    ],
    "enabled_by_default": null,
-   "file_count": 44,
+   "file_count": 35,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension synology-chat",
@@ -194861,22 +194097,20 @@
    "name": "synthetic",
    "path": "extensions/synthetic/",
    "extension_id": "synthetic",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/synthetic/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 13,
+   "file_count": 9,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:talk-voice",
@@ -194885,23 +194119,20 @@
    "name": "talk-voice",
    "path": "extensions/talk-voice/",
    "extension_id": "talk-voice",
-   "categories": [
-    "voice",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/talk-voice/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 5,
+   "file_count": 4,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:tavily",
@@ -194910,77 +194141,20 @@
    "name": "tavily",
    "path": "extensions/tavily/",
    "extension_id": "tavily",
-   "categories": [
-    "web",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/tavily/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 21,
+   "file_count": 17,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:team-reports",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "team-reports",
-   "path": "extensions/team-reports/",
-   "extension_id": "team-reports",
-   "categories": [
-    "tools"
-   ],
-   "manifest": "extensions/team-reports/openclaw.plugin.json",
-   "cli_commands": [
-    "team-reports"
-   ],
-   "channels": [],
-   "enabled_by_default": false,
-   "file_count": 56,
-   "in_audit_docs": true,
-   "ledger_match": "OC-D01",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D01",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D01",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:teams-meetings",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "teams-meetings",
-   "path": "extensions/teams-meetings/",
-   "extension_id": "teams-meetings",
-   "categories": [
-    "voice",
-    "tools"
-   ],
-   "manifest": "extensions/teams-meetings/openclaw.plugin.json",
-   "cli_commands": [
-    "teamsmeetings"
-   ],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 42,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-66",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:telegram",
@@ -194989,25 +194163,23 @@
    "name": "telegram",
    "path": "extensions/telegram/",
    "extension_id": "telegram",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/telegram/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "telegram"
    ],
    "enabled_by_default": null,
-   "file_count": 550,
+   "file_count": 349,
    "in_audit_docs": true,
    "ledger_match": "api:POST /api/messaging/telegram/onboarding/start",
    "ledger_source": "hermes",
    "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:tencent",
@@ -195016,22 +194188,20 @@
    "name": "tencent",
    "path": "extensions/tencent/",
    "extension_id": "tencent",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/tencent/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 17,
+   "file_count": 9,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:test-support",
@@ -195045,7 +194215,7 @@
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 5,
+   "file_count": 4,
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:test-support",
    "ledger_source": "qubit",
@@ -195065,30 +194235,50 @@
    }
   },
   {
+   "id": "openclaw-ext:thread-ownership",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "thread-ownership",
+   "path": "extensions/thread-ownership/",
+   "extension_id": "thread-ownership",
+   "categories": [],
+   "manifest": "extensions/thread-ownership/openclaw.plugin.json",
+   "cli_commands": [],
+   "channels": [],
+   "enabled_by_default": null,
+   "file_count": 4,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
+  },
+  {
    "id": "openclaw-ext:tlon",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "tlon",
    "path": "extensions/tlon/",
    "extension_id": "tlon",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/tlon/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "tlon"
    ],
    "enabled_by_default": null,
-   "file_count": 87,
+   "file_count": 65,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension tlon",
@@ -195105,23 +194295,20 @@
    "name": "together",
    "path": "extensions/together/",
    "extension_id": "together",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/together/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 13,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:tokenjuice",
@@ -195130,9 +194317,7 @@
    "name": "tokenjuice",
    "path": "extensions/tokenjuice/",
    "extension_id": "tokenjuice",
-   "categories": [
-    "runtime"
-   ],
+   "categories": [],
    "manifest": "extensions/tokenjuice/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
@@ -195141,11 +194326,11 @@
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-53",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-53",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:tts-local-cli",
@@ -195154,22 +194339,20 @@
    "name": "tts-local-cli",
    "path": "extensions/tts-local-cli/",
    "extension_id": "tts-local-cli",
-   "categories": [
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/tts-local-cli/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 9,
+   "file_count": 5,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-66",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:twitch",
@@ -195178,24 +194361,22 @@
    "name": "twitch",
    "path": "extensions/twitch/",
    "extension_id": "twitch",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/twitch/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "twitch"
    ],
    "enabled_by_default": null,
-   "file_count": 53,
+   "file_count": 48,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension twitch",
@@ -195206,56 +194387,26 @@
    }
   },
   {
-   "id": "openclaw-ext:vault",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "vault",
-   "path": "extensions/vault/",
-   "extension_id": "vault",
-   "categories": [
-    "security",
-    "tools"
-   ],
-   "manifest": "extensions/vault/openclaw.plugin.json",
-   "cli_commands": [
-    "vault"
-   ],
-   "channels": [],
-   "enabled_by_default": null,
-   "file_count": 10,
-   "in_audit_docs": false,
-   "ledger_match": "cli:secrets",
-   "ledger_source": "hermes",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D08",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D08",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
    "id": "openclaw-ext:venice",
    "source": "openclaw",
    "category": "openclaw_extension",
    "name": "venice",
    "path": "extensions/venice/",
    "extension_id": "venice",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/venice/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 18,
+   "file_count": 12,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:vercel-ai-gateway",
@@ -195264,55 +194415,42 @@
    "name": "vercel-ai-gateway",
    "path": "extensions/vercel-ai-gateway/",
    "extension_id": "vercel-ai-gateway",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/vercel-ai-gateway/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 14,
+   "file_count": 11,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
-  },
-  {
-   "id": "openclaw-ext:visitor-access",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "visitor-access",
-   "path": "extensions/visitor-access/",
-   "extension_id": "visitor-access",
-   "categories": [
-    "tools"
-   ],
-   "manifest": "extensions/visitor-access/openclaw.plugin.json",
-   "cli_commands": [],
-   "channels": [],
-   "enabled_by_default": null,
-   "file_count": 15,
-   "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:visitor-access",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "openclaw extension visitor-access",
-    "backend": "voicebridge/device.py token_issue (expiring grant)",
-    "proving_test": "tests/test_openclaw_parity_wave1.py",
-    "reason": "OpenClaw extension 'visitor-access' -> gate (parent=OC-05, gate=DEVICE_TOKEN_PENDING_APPROVAL) via voicebridge/device.py token_issue (expiring grant).",
-    "needs": "creds"
-   }
+   "parent_covered": false
+  },
+  {
+   "id": "openclaw-ext:video-generation-core",
+   "source": "openclaw",
+   "category": "openclaw_extension",
+   "name": "video-generation-core",
+   "path": "extensions/video-generation-core/",
+   "extension_id": "video-generation-core",
+   "categories": [],
+   "manifest": null,
+   "cli_commands": [],
+   "channels": [],
+   "enabled_by_default": null,
+   "file_count": 6,
+   "in_audit_docs": false,
+   "ledger_match": null,
+   "ledger_source": null,
+   "parent_id": null,
+   "coverage": "openclaw-capability",
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:vllm",
@@ -195321,22 +194459,20 @@
    "name": "vllm",
    "path": "extensions/vllm/",
    "extension_id": "vllm",
-   "categories": [
-    "models"
-   ],
+   "categories": [],
    "manifest": "extensions/vllm/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 14,
+   "file_count": 15,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:voice-call",
@@ -195345,17 +194481,12 @@
    "name": "voice-call",
    "path": "extensions/voice-call/",
    "extension_id": "voice-call",
-   "categories": [
-    "voice",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/voice-call/openclaw.plugin.json",
-   "cli_commands": [
-    "voicecall"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 158,
+   "file_count": 124,
    "in_audit_docs": true,
    "ledger_match": "OC-67",
    "ledger_source": "openclaw",
@@ -195373,23 +194504,20 @@
    "name": "volcengine",
    "path": "extensions/volcengine/",
    "extension_id": "volcengine",
-   "categories": [
-    "models",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/volcengine/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 15,
+   "file_count": 13,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:voyage",
@@ -195398,22 +194526,20 @@
    "name": "voyage",
    "path": "extensions/voyage/",
    "extension_id": "voyage",
-   "categories": [
-    "memory"
-   ],
+   "categories": [],
    "manifest": "extensions/voyage/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 9,
+   "file_count": 6,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-46",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-46",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:vydra",
@@ -195422,24 +194548,20 @@
    "name": "vydra",
    "path": "extensions/vydra/",
    "extension_id": "vydra",
-   "categories": [
-    "models",
-    "voice",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/vydra/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 19,
+   "file_count": 14,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:web-readability",
@@ -195448,23 +194570,20 @@
    "name": "web-readability",
    "path": "extensions/web-readability/",
    "extension_id": "web-readability",
-   "categories": [
-    "web",
-    "context"
-   ],
+   "categories": [],
    "manifest": "extensions/web-readability/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 6,
+   "file_count": 5,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-63",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-63",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:webhooks",
@@ -195473,24 +194592,21 @@
    "name": "webhooks",
    "path": "extensions/webhooks/",
    "extension_id": "webhooks",
-   "categories": [
-    "gateway",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/webhooks/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": null,
-   "file_count": 13,
+   "file_count": 11,
    "in_audit_docs": true,
    "ledger_match": "api:GET /api/webhooks",
    "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-02",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-02",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:whatsapp",
@@ -195499,26 +194615,23 @@
    "name": "whatsapp",
    "path": "extensions/whatsapp/",
    "extension_id": "whatsapp",
-   "categories": [
-    "channels",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/whatsapp/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "whatsapp"
    ],
    "enabled_by_default": null,
-   "file_count": 292,
+   "file_count": 270,
    "in_audit_docs": true,
    "ledger_match": "api:POST /api/messaging/whatsapp/onboarding/start",
    "ledger_source": "hermes",
    "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:workboard",
@@ -195527,16 +194640,12 @@
    "name": "workboard",
    "path": "extensions/workboard/",
    "extension_id": "workboard",
-   "categories": [
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/workboard/openclaw.plugin.json",
-   "cli_commands": [
-    "workboard"
-   ],
+   "cli_commands": [],
    "channels": [],
    "enabled_by_default": false,
-   "file_count": 144,
+   "file_count": 24,
    "in_audit_docs": true,
    "ledger_match": "OC-34",
    "ledger_source": "openclaw",
@@ -195554,25 +194663,21 @@
    "name": "xai",
    "path": "extensions/xai/",
    "extension_id": "xai",
-   "categories": [
-    "models",
-    "voice",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/xai/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 107,
+   "file_count": 72,
    "in_audit_docs": false,
    "ledger_match": "cli:migrate xai",
    "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:xiaomi",
@@ -195581,23 +194686,20 @@
    "name": "xiaomi",
    "path": "extensions/xiaomi/",
    "extension_id": "xiaomi",
-   "categories": [
-    "models",
-    "voice"
-   ],
+   "categories": [],
    "manifest": "extensions/xiaomi/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 17,
+   "file_count": 14,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:zai",
@@ -195606,23 +194708,20 @@
    "name": "zai",
    "path": "extensions/zai/",
    "extension_id": "zai",
-   "categories": [
-    "models",
-    "media"
-   ],
+   "categories": [],
    "manifest": "extensions/zai/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [],
    "enabled_by_default": true,
-   "file_count": 20,
+   "file_count": 17,
    "in_audit_docs": false,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-D28",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D28",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:zalo",
@@ -195631,24 +194730,22 @@
    "name": "zalo",
    "path": "extensions/zalo/",
    "extension_id": "zalo",
-   "categories": [
-    "channels"
-   ],
+   "categories": [],
    "manifest": "extensions/zalo/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "zalo"
    ],
    "enabled_by_default": null,
-   "file_count": 79,
+   "file_count": 69,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension zalo",
@@ -195665,25 +194762,22 @@
    "name": "zalouser",
    "path": "extensions/zalouser/",
    "extension_id": "zalouser",
-   "categories": [
-    "channels",
-    "tools"
-   ],
+   "categories": [],
    "manifest": "extensions/zalouser/openclaw.plugin.json",
    "cli_commands": [],
    "channels": [
     "zalouser"
    ],
    "enabled_by_default": null,
-   "file_count": 90,
+   "file_count": 74,
    "in_audit_docs": true,
    "ledger_match": null,
    "ledger_source": null,
-   "parent_id": "OC-19",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-19",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension zalouser",
@@ -195692,33 +194786,6 @@
     "reason": "OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.",
     "needs": "creds"
    }
-  },
-  {
-   "id": "openclaw-ext:zoom-meetings",
-   "source": "openclaw",
-   "category": "openclaw_extension",
-   "name": "zoom-meetings",
-   "path": "extensions/zoom-meetings/",
-   "extension_id": "zoom-meetings",
-   "categories": [
-    "voice",
-    "tools"
-   ],
-   "manifest": "extensions/zoom-meetings/openclaw.plugin.json",
-   "cli_commands": [
-    "zoommeetings"
-   ],
-   "channels": [],
-   "enabled_by_default": true,
-   "file_count": 40,
-   "in_audit_docs": false,
-   "ledger_match": null,
-   "ledger_source": null,
-   "parent_id": "OC-66",
-   "coverage": "openclaw-capability",
-   "parent_resolved": "OC-66",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
   }
  ]
 }

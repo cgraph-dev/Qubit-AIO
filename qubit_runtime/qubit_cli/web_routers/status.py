@@ -701,14 +701,31 @@ async def run_debug_share_endpoint(body: DebugShareRequest | None = None):
 @logs_router.get("/api/logs")
 async def get_logs(
     file: str = "agent", lines: int = 100, level: Optional[str] = None,
-    component: Optional[str] = None, search: Optional[str] = None):
+    component: Optional[str] = None, search: Optional[str] = None,
+    offset: int = 0):
+    """Tail a log file, newest-first, with an additive ``offset`` page contract.
+
+    The upstream 0.21.4 handler (``hermes_cli/web_routers/status.py:794``) accepts
+    only ``file/lines/level/component/search`` and returns ``{file, lines}``; it
+    has neither offset/cursor pagination nor a per-line detail route. ``offset``
+    is therefore Qubit-added and backwards-compatible: ``offset=0`` (the default)
+    returns exactly the same ``lines`` as before, and the extra pagination fields
+    are additive. ``offset`` counts matching lines to skip from the newest end, so
+    ``offset += returned`` walks backwards through the log.
+    """
     from qubit_cli.logs import _read_tail, LOG_FILES
     log_name = LOG_FILES.get(file)
     if not log_name:
         raise HTTPException(status_code=400, detail=f"Unknown log file: {file}")
     log_path = get_qubit_home() / "logs" / log_name
+    cap = min(lines, 500)
+    if cap < 0:
+        cap = 0
+    offset = max(0, offset)
+    empty = {"file": file, "lines": [], "offset": offset, "limit": cap,
+             "returned": 0, "has_more": False, "next_offset": None}
     if not log_path.exists():
-        return {"file": file, "lines": []}
+        return empty
 
     try:
         from qubit_logging import COMPONENT_PREFIXES
@@ -723,13 +740,28 @@ async def get_logs(
         if comp_prefixes is None:
             raise HTTPException(status_code=400, detail=f"Unknown component: {component}. "
                                 f"Available: {', '.join(sorted(COMPONENT_PREFIXES))}")
+    # Read one matching line past the requested page so ``has_more`` is proven
+    # (an older line exists), never guessed. Search keeps the upstream 2000-line
+    # over-read; without search we read exactly offset+cap+1 matching lines.
+    read_n = 2000 if search else max(1, offset + cap + 1)
     result = _read_tail(
-        log_path, min(lines, 500) if not search else 2000,
+        log_path, read_n,
         has_filters=bool(min_level or comp_prefixes or search),
         min_level=min_level, component_prefixes=comp_prefixes)
     # _read_tail doesn't support free-text search, so post-filter (case-insensitive
-    # substring) here and trim to the requested line count afterward.
+    # substring) here before paginating.
     if search:
         needle = search.lower()
-        result = [l for l in result if needle in l.lower()][-min(lines, 500):]
-    return {"file": file, "lines": result}
+        result = [l for l in result if needle in l.lower()]
+    # result is oldest→newest. Skip the newest ``offset`` matching lines, then
+    # take the next ``cap`` (the page); anything before that is older => has_more.
+    end = len(result) - offset
+    if end <= 0:
+        page = []
+    else:
+        start = max(0, end - cap)
+        page = result[start:end]
+    has_more = cap > 0 and (len(result) - offset - cap) > 0
+    return {"file": file, "lines": page, "offset": offset, "limit": cap,
+            "returned": len(page), "has_more": has_more,
+            "next_offset": (offset + len(page)) if has_more else None}

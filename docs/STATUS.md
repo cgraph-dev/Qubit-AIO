@@ -3,24 +3,26 @@
 **Living document. Evidence-backed. Reviewed every session.** No claim below is
 `VERIFIED`, `M1`, `M2`, `CODE_READY`, or `COMPLETE` unless its evidence says so.
 
-> **CONTINUE HERE (handoff pointer, 2026-09-23 wave 15).** The full orchestrator
-> session log is **§10–§27** below — read §10–§27 before doing anything. In
-> short: **Phase 0 PASS**; **all 13 M1 items now PASS** — items 2/12 via the
+> **CONTINUE HERE (handoff pointer, 2026-09-23 wave 16).** The full orchestrator
+> session log is **§10–§28** below — read §10–§28 before doing anything. In
+> short: **Phase 0 PASS**; **all 13 M1 items PASS** — items 2/12 via the
 > operator-installed gateway daemon (§25), items 3/4 via direct browser evidence
-> (§27); **no `M1` milestone claimed until owner ratification**. Owner Decisions
-> #10–#13 and **#15–#18** implemented. W9 pin `d337b736` + worktree **frozen at
-> `42d64b84`**; W9 slices ported: `qubit_state*`, `tools/` (+28), `gateway/`
-> (+23) — `missing_from_local` 3362→3311. `~/.hermes/.env` fallback removed;
-> `.hermes_history` sanitized importer implemented (review only, not applied).
-> **Wave 14/15:** route parity **MISSING = 0** (1248 PORTED / 129 GATED); voice
-> real 428→593; service-name de-brand (N26); N29 ctx-authority fixed.
-> **Open owner/operator gates:** (1) ratify `M1`; (2) the 2 branding
-> manifest-hash tests (need the frontend/OpenClaw pins); (3) the
-> `.hermes_history` apply (approve the review); (4) deep `qubit_runtime/`
-> identifier rename + final M4 verification.
+> (§27); **no `M1` claimed until owner ratification**. Owner Decisions #10–#18
+> implemented. W9 pin `d337b736` + worktree **frozen at `42d64b84`** then
+> **checkpoint `32fd917a`**; W9 slices ported: `qubit_state*`, `tools/` (+28),
+> `gateway/` (+23), `agent/` (+24), `cron/`+`web/` (+30) —
+> `missing_from_local` 3362→3257. OpenClaw re-pinned to
+> `da03996ab7` (v2026.6.8); route parity **MISSING = 0** (1249 PORTED / 129
+> GATED); voice real 594; N17 `.env` fallback removed; `.hermes_history`
+> sanitizer implemented (review only); N26/N29/N32/N33 fixed; branding
+> manifest-hash tests now pass.
+> **Open owner/operator gates:** (1) ratify `M1`; (2) the `.hermes_history`
+> apply (approve the review); (3) deep `qubit_runtime/` rename of the remaining
+> modules; (4) final M4 verification.
 > Handoff artifacts: backups `/tmp/opencode/qubit-phase1-backups/`; the Hermes
-> pin is recreatable read-only from the reference git DB (`d337b736`); freeze
-> commit `42d64b84`.
+> pin is recreatable read-only from the reference git DB (`d337b736`); OpenClaw
+> source `/home/trick/Projects/Repos/Qubit Agent/srcodes/openclaw`; commits
+> `42d64b84` (freeze) / `32fd917a` (checkpoint).
 > **Critical fix to not regress:** `write_file`/`patch` were broken by the N4
 > rename (`file_tools_write_guards.py` KeyError) and are now fixed (§21).
 
@@ -1061,6 +1063,56 @@ profile lock is transient).
 (next slices); the `.hermes_history` apply (owner approves the review); the final
 M4 gate + independent verifier.
 
+## 28. Wave 16 — OpenClaw re-pin, W9 agent/cron/web slices, deep-rename slice — 2026-09-23
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed.**
+
+- **OpenClaw re-pinned to the latest commit.** `OPENCLAW_PIN =
+  da03996ab7203fe6b9b4d8edb2b54726e4394c9c` — the `main` HEAD of
+  `/home/trick/Projects/Repos/Qubit Agent/srcodes/openclaw` (version 2026.6.8).
+  The tag field is the accurate `git describe` value
+  `v2026.4.19-beta.2-28254-gda03996ab7` (the commit is untagged; the old
+  `v2026.6.8` tag pointed at a different SHA — finding N32, fixed). OpenClaw
+  source count: **138** extension dirs (134 with `openclaw.plugin.json`); the
+  v2026.6.8 manifests carry no top-level `categories`, so the aggregate records
+  `(uncategorized)` — `tests/test_source_inventory.py` updated accordingly.
+  Both `scripts/hermes_vendor_manifest.py` and `scripts/source_inventory.py`
+  regenerated; `HERMES_SOURCE_COMPARISON.json` regenerated with the new pin
+  (the frontend-comparison abort was fixed: an absent mapped local file is now
+  recorded as missing, not a hard failure).
+- **W9 slices.** `agent/` **+24** (2 held back — absent 0.21.4 deps),
+  `cron/` + `web/` **+30** (0 held back). `missing_from_local` **3311 → 3257**.
+  Qubit overlays preserved (N26 `record_home`; `HERMES_CRON_*`/wire names kept).
+- **Deep rename slice (`qubit_runtime/qubit_cli/`, existing files).** 38 files:
+  local identifiers, temp/dir prefixes, and user-facing strings de-branded;
+  wire/contract names preserved (`HERMES_HOME`, `X-Hermes-Session-Token`,
+  `HERMES_SUPERVISED_CHILD`, `hermes-gateway*` foreign-service detection,
+  toolset names); 3 contract renames reverted (the receipt-pinned
+  `hermes-update` action). Counts in `qubit_cli/*.py`: `Hermes` 42→38,
+  `hermes_` 124→106, `HERMES_` 701→673, `hermes` 828→761.
+- **Ledger de-brand (N33).** `scripts/rebuild_ledger_qubit.py` no longer emits
+  `Hermes` strings into the ledger (**43 → 0** occurrences).
+- **Artifacts regenerated** (vendor manifest, source inventory, ledgers, page
+  coverage, parity inventory, voice coverage). Parity: **1378 rows — 1249
+  PORTED / 129 GATED / 0 MISSING**; voice real **594 (43.11%)**.
+  **The 2 branding manifest-hash tests now pass** with the new OpenClaw pin.
+- **Focused sweep: 455 passed / 2 skipped / 0 failed across 28 files**; graft
+  build refreshed.
+- **Independent verification (read-only) results:** M1 items 3/4/6 **PASS**
+  (process tree + `agent.log` reproduced), N29 **PASS**, gateway daemon
+  **PASS**, frozen records **PASS**, git checkpoint **PASS**.
+- **N15 correction:** `docs/archive/2026-09-21/` **is** tracked in git (163
+  files) — the earlier "entirely untracked" claim (§22) was wrong.
+
+**New findings:** N32 (OpenClaw tag/commit mismatch — **FIXED**); N33
+(ledger generator emitted `Hermes` strings — **FIXED**); N34 (concurrent
+opencode sessions actively edit the worktree; evidence artifacts drift until a
+freeze — the dominant risk).
+
+**Still open:** owner ratification of `M1`; the deep rename of the remaining
+`qubit_runtime/` modules; the `.hermes_history` apply (owner approves the
+review); the final M4 gate + independent verifier.
+
 ## 24. Live dashboard E2E audit + fix — 2026-09-23 (10-agent wave)
 
 **No M1/M2/CODE_READY/VERIFIED claimed. Not committed.** Real browser + live
@@ -1123,3 +1175,99 @@ raw reports `/tmp/opencode/qubit-dashboard-audit-2026-09-23/`.
   verified; gateway restart action status honest `completed/exit 0`. Cron
   timezone/retries, memory update/pagination, boards pagination implemented in
   the stores (cross-file route wiring pending). 294 focused tests pass.
+
+- **Wave 5 (5 agents, disjoint files).** Cron timezone/retry fields wired to the
+  wire shape; memory recall `offset` + `POST /api/recall/update` + voice update
+  action; boards/kanban pagination wired; dead `_persona_*` handlers removed;
+  binary upload wired through the brokered `local.files_upload` capability
+  (path-confined, confirm+audit+e-stop; live returns typed
+  `FILE_PATCH_OUTSIDE_ROOT` until an approved project root exists); logs offset
+  pagination added (backend additive + `LogsPage` UI); `profiles.py`
+  `create_wrapper_script` now writes `qubit -p` (was `hermes -p`, and
+  `_is_our_wrapper` never matched); `plan_prompt` + plan skill point at the
+  QUBIT_HOME plans path; `uploadFile` sends real multipart bytes (was lossy
+  `file.text()`). MCP resources/prompts/resource-templates routes were added to
+  the vendored router but remain **shadowed by the compat `/api/mcp/servers`
+  prefix** (canonical vs vendored registry) — recorded OPEN. 72 focused tests
+  pass; service active.
+
+## 25. W9 deep-rebrand slice — product-surface brand + stale reference paths (2026-09-23)
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Not committed. Files backed
+up to `/tmp/opencode/qubit-dashboard-audit-2026-09-23/backups/`.**
+
+Owner-scoped slice over six `qubit_runtime/qubit_cli/` files (port/adapt of the
+reference 0.21.4 with the hermes→qubit rename map; no invention):
+
+- **`profiles.py` — done.**
+  - `_get_default_qubit_home` docstrings (`~/.hermes`, "dir name `.hermes`") →
+    "the Qubit-owned default home"; `validate_profile_name` alias comment, the
+    `create/delete/import` ValueErrors, `get_active_profile_name`,
+    `export/import_profile` comments reconciled (no hardcoded `~/.hermes` prose).
+  - Qubit-owned console-script identity: `_QUBIT_CONSOLE_SCRIPT_NAMES`
+    `{hermes,hermes-agent,hermes-acp}` → `{qubit,qubit-agent,qubit-acp}`;
+    `_QUBIT_ARGV_MARKERS` dropped the dead `hermes-gateway`; the `exe_name`
+    gate `startswith("hermes")` → `startswith("qubit")`. These match the shipped
+    `[project.scripts]` (`qubit`, `qubit-agent`, `qubit-acp`); the actual
+    Electron spawn is `findOnPath('qubit')` (`apps/desktop/electron/main.ts`).
+  - Honcho host prefix (Qubit-owned key): `hermes_<profile>` → `qubit_<profile>`
+    with **read-old/write-new fallback** — `_migrate_honcho_profile_host` now
+    migrates a legacy `hermes_<old>` (and dot-form `qubit.<old>`) host block onto
+    `qubit_<new>`, preserving `aiPeer`. Genuine upstream attribution kept
+    (`.hermes` platform seam, the reserved name `hermes`, `hermes-agent`).
+  - Pre-existing session edit carried: wrapper writes `qubit -p`.
+- **`tips.py` — done.** `/plan` tip `.hermes/plans/` → the Qubit home plans
+  directory (`$QUBIT_HOME/plans`), consistent with `plan_prompt.py` (already
+  `display_qubit_home()/plans`).
+- **`commands.py` — done.** `plan` desc `.qubit/plans/` → "the Qubit home plans
+  directory"; `reload-skills` desc `~/.qubit/skills/` → "the Qubit home skills
+  directory". (Both were fiction: neither `.qubit` nor `.hermes` is the home.)
+- **`cli_commands_mixin.py` — done.** `HermesCLI` → `QubitCLI` (the real class in
+  `cli.py:2530`); `_handle_plan_command` docstring path; `prefix="hermes_prompt_"`
+  → `qubit_prompt_` (pre-existing session edit); the `nous` legacy usage word
+  documented as a load-bearing accepted identifier.
+- **`main_dashboard.py` — done.** `hermes-serve.service` docstring example →
+  `qubit-serve.service`; the OAuth help block no longer prints the upstream docs
+  URL (`hermes-agent.nousresearch.com/docs/...`) or `~/.hermes/.env` — points at
+  `qubit dashboard register --help` and the Qubit home `.env`; desktop-ssh token
+  comment reconciled. **Deliberately kept:** the frozen reference-read handling
+  (`HEMES_*`/`HERMES_WEB_DIST`/`HERMES_DESKTOP` env names, the
+  `shutil.which("hermes")`-style reference paths) — load-bearing wire/reference
+  identifiers, not product copy.
+- **`relaunch.py` — done.** `resolve_qubit_bin` PATH fallback
+  `shutil.which("hermes")` → `shutil.which("qubit")`.
+
+**Tests reconciled for the renames (test files only, changes product code
+requires):** `test_relaunch.py` (pretest-failing: it patched the nonexistent
+`resolve_hermes_bin`; now patches `resolve_qubit_bin` + pins argv),
+`test_profiles.py` (honcho `hermes_` → `qubit_`; console-script shim cases →
+`qubit*`; stale `_get_default_hermes_home` prose), `test_control_socket.py` +
+`test_control_socket_windows_live.py` (patched the renamed helper), and
+`test_plan_prompt.py` (+1 contract test for the de-branded `/plan` description).
+
+**Evidence:** `python -m py_compile` clean; imports + `resolve_qubit_bin` /
+`_is_qubit_argv` / registry descs verified live; focused pytest
+**37 branding tests pass** and **158 vendored CLI/gateway tests pass (6 skipped)**;
+real `qubit agent -z "Reply with exactly: QUBIT_OK"` → `QUBIT_OK`; branding scan
+on the six changed files shows only load-bearing identifiers / `.hermes` platform
+seam. No git writes; service not restarted. **Left open with reason:** `tips.py`
+and `main_dashboard.py` still contain `~/.hermes/...` path names and `HERMES_*`
+env names — the env vars are real wire/config identifiers used across
+`qubit_runtime/`, and the tips' path names describe persisted homes (a coordinated
+runtime-path rename is out of this slice's six-file scope).
+
+- **Wave 5b (5 agents + direct fixes).** MCP `resources/prompts/resource-templates`
+  now have a compat passthrough over `voicebridge.mcp_servers` (live 200, honest
+  typed `MCP_PROTOCOL_ERROR` for a tools-only server; unknown server 404; was "no
+  compat route"). `qubit_cli` identity de-brand slice (console-script/argv
+  identity, honcho `qubit_` prefix with read-old, plan paths, relaunch/PATH,
+  OAuth help) with wire/env names preserved. **Two real product bugs fixed:**
+  `_rebrand_chat_message` copied top-level `tool_name`/`tool_calls`/`reasoning`
+  from the **raw** `meta` instead of the rebranded one (brand leak on the
+  CLI/dashboard wire shape); `skills_create` was staged but `_compat_runner` had
+  no branch (id-only confirm → 400 `CONFIRM_UNSUPPORTED`) — payload now carries
+  the manifest and the runner re-enters `skill_create`. 9 stale tests reconciled
+  (Ruling 3 / sessions / e-stop code / profiles registry). Generated artifacts
+  regenerated (completions, openclaw ledger, route ownership); tri-parity test
+  now reads the canonical `docs/generated/` ledger. Frontend: SystemPage cancel
+  honesty + sidebar no-double-confirm. 78 focused tests pass; service active.

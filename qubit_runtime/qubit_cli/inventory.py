@@ -721,7 +721,7 @@ def _prewarm_pricing_async(
                         _pricing_prewarm_threads.pop(prewarm_key, None)
 
         thread = Thread(target=copy_context().run, args=(_worker,),
-                        name="hermes-picker-pricing-prewarm", daemon=True)
+                        name="qubit-picker-pricing-prewarm", daemon=True)
         _pricing_prewarm_threads[prewarm_key] = thread
         thread.start()
         return thread

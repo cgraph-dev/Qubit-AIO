@@ -74,7 +74,9 @@ def _start_ui(tmp_path, monkeypatch):
 
 
 # ------------------------------------------------------------------- A25
-def test_root_redirects_to_sessions_not_chat(tmp_path, monkeypatch):
+def test_root_redirects_to_chat(tmp_path, monkeypatch):
+    # Ruling 3 -> Option A: ``/`` lands on the Qubit chat workspace (``/chat``),
+    # not the sessions list.
     import http.client
 
     ui, _state = _start_ui(tmp_path, monkeypatch)
@@ -88,7 +90,7 @@ def test_root_redirects_to_sessions_not_chat(tmp_path, monkeypatch):
         resp.read()
         conn.close()
         assert resp.status == 302, resp.status
-        assert loc == "/sessions", loc
+        assert loc == "/chat", loc
     finally:
         ui.stop()
 

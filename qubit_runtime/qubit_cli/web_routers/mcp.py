@@ -191,6 +191,163 @@ async def test_mcp_server(name: str, profile: Optional[str] = None):
     }
 
 
+def _list_server_capability(name: str, config: dict, capability: str) -> Dict[str, Any]:
+    """Connect to one MCP server, drain its ``resources``/``prompts`` list, disconnect.
+
+    Read-only, adapted from ``qubit_cli/mcp_config.py::_probe_single_server``
+    (the same vendored transport path the ``/test`` probe uses); the drain and
+    rendering reuse the agent's own list utility handlers
+    (``tools/mcp_tool_handlers.py::_render_resource_list`` / ``_render_prompt_list``).
+    Resource templates ride the SDK session's ``list_resource_templates`` via the
+    separate ``/resource-templates`` route below.
+    """
+    from qubit_cli.mcp_config import _resolve_mcp_server_config
+    from tools.mcp_tool import _paginate_full_list
+    from tools.mcp_tool_discovery import _connect_server
+    from tools.mcp_tool_handlers import _render_prompt_list, _render_resource_list
+    from tools.mcp_tool_lifecycle import _stop_mcp_loop_if_idle
+    from tools.mcp_tool_loop import _ensure_mcp_loop, _run_on_mcp_loop
+
+    resolved = _resolve_mcp_server_config(config)
+    try:
+        connect_timeout = max(1.0, float(resolved.get("connect_timeout", 30)))
+    except (TypeError, ValueError):
+        connect_timeout = 30.0
+
+    _ensure_mcp_loop()
+    payload: Dict[str, Any] = {}
+
+    async def _list():
+        server = await asyncio.wait_for(_connect_server(name, resolved), timeout=connect_timeout)
+        try:
+            if capability == "resources":
+                items = await _paginate_full_list(server.session.list_resources, "resources", name)
+                payload.update(_render_resource_list(items, name))
+            else:
+                items = await _paginate_full_list(server.session.list_prompts, "prompts", name)
+                payload.update(_render_prompt_list(items, name))
+        finally:
+            await server.shutdown()
+
+    try:
+        _run_on_mcp_loop(_list(), timeout=connect_timeout + 10)
+    finally:
+        _stop_mcp_loop_if_idle()
+    return payload
+
+
+async def _list_mcp_capability(name: str, profile: Optional[str], capability: str) -> Dict[str, Any]:
+    from qubit_cli.mcp_config import _get_mcp_servers
+
+    servers = await scoped_to_thread(profile, _get_mcp_servers)
+    if name not in servers:
+        raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
+
+    def _scoped():
+        with _config_profile_scope(profile):
+            return _list_server_capability(name, servers[name], capability)
+
+    try:  # connecting blocks on the dedicated MCP loop — keep it off the FastAPI loop
+        return await asyncio.to_thread(_scoped)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/api/mcp/servers/{name}/resources")
+async def list_mcp_server_resources(name: str, profile: Optional[str] = None):
+    """List an MCP server's resources (read-only: connect, list, disconnect)."""
+    return await _list_mcp_capability(name, profile, "resources")
+
+
+@router.get("/api/mcp/servers/{name}/prompts")
+async def list_mcp_server_prompts(name: str, profile: Optional[str] = None):
+    """List an MCP server's prompts (read-only: connect, list, disconnect)."""
+    return await _list_mcp_capability(name, profile, "prompts")
+
+
+def _render_resource_templates(templates: Any, server_name: str) -> Dict[str, Any]:
+    """Resource-template entries in the same camelCase wire shape the resource
+    list uses (``tools/mcp_tool_handlers.py::_render_resource_list``)."""
+    from tools.mcp_tool_common import mcp_field
+
+    out = []
+    for t in templates:
+        entry: Dict[str, Any] = {}
+        uri = mcp_field(t, "uri_template", "uriTemplate")
+        if uri is not None:
+            entry["uriTemplate"] = str(uri)
+        name = getattr(t, "name", None)
+        if name:
+            entry["name"] = name
+        description = getattr(t, "description", None)
+        if description:
+            entry["description"] = description
+        mime = mcp_field(t, "mime_type", "mimeType")
+        if mime:
+            entry["mimeType"] = mime
+        out.append(entry)
+    return {"resource_templates": out}
+
+
+def _list_server_templates(name: str, config: dict) -> Dict[str, Any]:
+    """Drain an MCP server's ``resources/templates/list``, disconnect.
+
+    The vendored tool handlers wrap only ``list_resources``/``list_prompts``
+    (``tools/mcp_tool_handlers.py:534-542``); the SDK session method
+    ``list_resource_templates`` rides the same transport, so this reuses the
+    vendored ``_paginate_full_list`` drain (``tools/mcp_tool.py:255``) instead of
+    a second MCP client.
+    """
+    from qubit_cli.mcp_config import _resolve_mcp_server_config
+    from tools.mcp_tool import _paginate_full_list
+    from tools.mcp_tool_discovery import _connect_server
+    from tools.mcp_tool_lifecycle import _stop_mcp_loop_if_idle
+    from tools.mcp_tool_loop import _ensure_mcp_loop, _run_on_mcp_loop
+
+    resolved = _resolve_mcp_server_config(config)
+    try:
+        connect_timeout = max(1.0, float(resolved.get("connect_timeout", 30)))
+    except (TypeError, ValueError):
+        connect_timeout = 30.0
+
+    _ensure_mcp_loop()
+    payload: Dict[str, Any] = {}
+
+    async def _list():
+        server = await asyncio.wait_for(_connect_server(name, resolved), timeout=connect_timeout)
+        try:
+            items = await _paginate_full_list(
+                server.session.list_resource_templates, "resource_templates", name)
+            payload.update(_render_resource_templates(items, name))
+        finally:
+            await server.shutdown()
+
+    try:
+        _run_on_mcp_loop(_list(), timeout=connect_timeout + 10)
+    finally:
+        _stop_mcp_loop_if_idle()
+    return payload
+
+
+@router.get("/api/mcp/servers/{name}/resource-templates")
+async def list_mcp_server_resource_templates(name: str, profile: Optional[str] = None):
+    """List an MCP server's resource templates (read-only: connect, list, disconnect)."""
+    from qubit_cli.mcp_config import _get_mcp_servers
+
+    servers = await scoped_to_thread(profile, _get_mcp_servers)
+    if name not in servers:
+        raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
+
+    def _scoped():
+        with _config_profile_scope(profile):
+            return _list_server_templates(name, servers[name])
+
+    try:
+        return await asyncio.to_thread(_scoped)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.post("/api/mcp/servers/{name}/auth")
 async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = None):
     """Start MCP OAuth and hand the authorization URL to the dashboard browser."""

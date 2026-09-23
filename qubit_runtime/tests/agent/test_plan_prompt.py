@@ -31,8 +31,11 @@ class TestBuildPlanPrompt:
             assert "read-only" in prompt
 
     def test_save_location_contract(self):
+        from qubit_constants import display_qubit_home
+
         prompt = build_plan_prompt("anything")
-        assert ".hermes/plans/" in prompt
+        assert f"{display_qubit_home()}/plans/" in prompt
+        assert ".hermes/plans/" not in prompt
         assert "YYYY-MM-DD_HHMMSS-<slug>.md" in prompt
 
     def test_authoring_craft_travels_with_every_prompt(self):
@@ -72,6 +75,17 @@ class TestPlanRegistryWiring:
 
         names = {n for n, _ in telegram_bot_commands()}
         assert "plan" in names
+
+    def test_plan_command_description_names_qubit_home(self):
+        # The user-facing /plan description must point at the Qubit home plans
+        # directory, never a legacy reference path (either the upstream
+        # .hermes/plans or the old pre-rebrand .qubit/plans spelling).
+        from qubit_cli.commands import resolve_command
+
+        desc = resolve_command("plan").description
+        assert "Qubit home plans" in desc
+        assert ".hermes/plans" not in desc
+        assert ".qubit/plans" not in desc
 
     def test_no_bundled_plan_skill_remains(self):
         # The bundled skill was removed with the builtin conversion; a

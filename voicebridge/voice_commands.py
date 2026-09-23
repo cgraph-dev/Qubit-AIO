@@ -4342,7 +4342,18 @@ def _b_active_memory(ctx, args):
         return {"active_memory": AM.recall(
             cfg, str(args.get("query", "") or ""),
             session=str(args.get("session", "") or ""),
-            limit=_as_optional_int(args.get("limit")))}
+            limit=_as_optional_int(args.get("limit")),
+            offset=_as_int(args.get("offset"), 0))}
+    if action == "update":
+        return {"active_memory": AM.update(
+            cfg, _as_int(args.get("memory_id"), 0),
+            text=(str(args.get("text")) if args.get("text") is not None
+                  else None),
+            tier=(str(args.get("tier")) if args.get("tier") is not None
+                  else None),
+            confidence=_as_optional_float(args.get("confidence")),
+            reason=str(args.get("reason", "") or ""),
+            session=str(args.get("session", "") or ""), confirmed=True)}
     if action == "resolve":
         return {"active_memory": AM.resolve(
             cfg, str(args.get("query", "") or ""),
@@ -8171,6 +8182,14 @@ _E("recall_query", "Active recall",
    args=(_R("query"),), fixed=(("action", "recall"),),
    examples=("qubit, recall memories invoices",),
    help="Policy-scoped, bounded, redacted recall results.")
+_E("recall_update", "Update active memory",
+   ("update active memory", "edit active memory", "correct active memory"),
+   "active_memory", (),
+   args=(_I("memory_id"), _R("text")),
+   fixed=(("action", "update"), ("reason", "voice update")),
+   confirm=True, split="int-rest",
+   examples=("qubit, update active memory 3 the corrected fact",),
+   help="Confirmed in-place update of one active memory's text.")
 _E("recall_resolve", "Resolve recall context",
    ("resolve recall context", "active recall context",
     "resolve active memory"),
@@ -8916,6 +8935,7 @@ CLI_COVERAGE = {
         "recall_policy_get",
         "recall_policy_set",
         "recall_query",
+        "recall_update",
         "recall_resolve",
         "recall_escalate",
     ),

@@ -400,13 +400,17 @@ def test_live_agent_ingress_serves_fork_reads_and_stays_confined(tmp_path):
     ui.start()
     port = ui._server.server_address[1]
     try:
-        # Status is the fork's real status document, not the empty Qubit stub.
+        # Status is the Qubit canonical status document, not the empty stub:
+        # ``/api/status`` is on the QUBIT_READ_AUTHORITY exempt list so the SPA
+        # sidebar reads the real Qubit gateway supervision (systemd + port
+        # probe) rather than the fork's unsupervised null gateway fields.
         status, body = _get(port, "/agent/api/status")
         assert status == 200, (status, body[:200])
         out = json.loads(body)
-        assert out.get("schema") is None, out
+        assert out.get("schema") == "qubit-runtime-status/1", out
         assert out.get("version") and out.get("release_date"), out
-        assert "overall" in out and "components" in out, out
+        assert out.get("model"), out
+        assert "gateway_running" in out and "gateway_state" in out, out
 
         # Env is the fork's real environment document: a non-empty dict.
         status, body = _get(port, "/agent/api/env")

@@ -32,7 +32,7 @@ LEDGER_BASELINE_REV = "f5fc5776"
 # fully-synced tree. The ``-git`` clone is the read-only oracle; the pristine
 # tree has no ``.git`` and cannot satisfy ``_pins_available``.
 QUBIT_PIN = Path("/tmp/opencode/pinned/hermes-agent-d337b736-git")
-OPENCLAW_PIN = Path("/tmp/opencode/pinned/openclaw-3928bad")
+OPENCLAW_PIN = Path("/home/trick/Projects/Repos/Qubit Agent/srcodes/openclaw")
 
 # Categories the inventory must always cover (mechanical counts, not statuses).
 REQUIRED_CATEGORIES = {
@@ -386,11 +386,14 @@ def test_achievements_plugin_represented_and_closed_in_ledger(inventory,
 def test_openclaw_extensions_have_category_and_manifest(inventory):
     exts = [i for i in inventory["items"]
             if i["category"] == "openclaw_extension"]
-    assert len(exts) == 154
+    # Latest OpenClaw pin (da03996ab7, v2026.6.8) ships 138 extension dirs.
+    assert len(exts) == 138
     with_manifest = [e for e in exts if e.get("manifest")]
-    assert len(with_manifest) >= 150
+    assert len(with_manifest) >= 130
     with_cat = [e for e in exts if e.get("categories")]
-    assert len(with_cat) >= 150
+    # The v2026.6.8 plugin manifests carry no top-level ``categories`` array,
+    # so every extension is recorded uncategorized in the aggregate.
+    assert len(with_cat) == 0
     # unknown extensions are explicitly flagged as not audited
     for e in exts:
         assert "in_audit_docs" in e

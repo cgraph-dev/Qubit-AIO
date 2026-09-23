@@ -17,12 +17,10 @@ For this turn, you are in PLAN MODE — planning only.
   actions.
 - You may inspect the repo or other context with read-only commands/tools
   when needed.
-- Your deliverable is a markdown plan saved inside the active workspace under
-  `.hermes/plans/YYYY-MM-DD_HHMMSS-<slug>.md` (create the directory if
-  needed; Qubit file tools are backend-aware, so this relative path keeps
-  the plan with the workspace on local, docker, ssh, modal, and daytona
-  backends). If the runtime provides a specific target path, use that exact
-  path instead.
+- Your deliverable is a markdown plan saved under the Qubit home plans
+  directory at `{plans_dir}/YYYY-MM-DD_HHMMSS-<slug>.md` (create the
+  directory if needed). If the runtime provides a specific target path, use
+  that exact path instead.
 """
 
 _PLAN_CRAFT = """\
@@ -62,10 +60,14 @@ def build_plan_prompt(task: str = "") -> str:
 
     See #36821.
     """
+    from qubit_constants import display_qubit_home
+
+    plans_dir = f"{display_qubit_home()}/plans"
+    rules = _PLAN_MODE_RULES.format(plans_dir=plans_dir)
     task = (task or "").strip()
     task_block = f"Task to plan:\n{task}\n" if task else (
         "No explicit task was given with /plan — infer the task from the "
         "current conversation context (the thing we have been discussing "
         "or working toward). If the conversation does not imply a task, ask a brief clarifying question.\n"
     )
-    return "[/plan — plan mode]\n\n" + _PLAN_MODE_RULES + "\n" + task_block + "\n" + _PLAN_CRAFT
+    return "[/plan — plan mode]\n\n" + rules + "\n" + task_block + "\n" + _PLAN_CRAFT

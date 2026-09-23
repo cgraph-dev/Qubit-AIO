@@ -467,7 +467,7 @@ def _active_session_file_for_channel(app: "FastAPI", channel: str) -> Path:
     from qubit_cli.web_server import _get_pty_active_session_files
     files = _get_pty_active_session_files(app)
     if files.get(channel) is None:
-        fd, raw_path = tempfile.mkstemp(prefix="hermes-pty-active-", suffix=".json")
+        fd, raw_path = tempfile.mkstemp(prefix="qubit-pty-active-", suffix=".json")
         os.close(fd)
         files[channel] = Path(raw_path)
     return files[channel]
@@ -487,7 +487,7 @@ def _get_console_executor() -> concurrent.futures.ThreadPoolExecutor:
         with _console_executor_lock:
             if _console_executor is None:
                 _console_executor = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=_CONSOLE_EXECUTOR_MAX_WORKERS, thread_name_prefix="hermes-console")
+                    max_workers=_CONSOLE_EXECUTOR_MAX_WORKERS, thread_name_prefix="qubit-console")
                 # Tear down on interpreter exit without waiting on in-flight
                 # workers: a stuck 60s console command must not block shutdown.
                 atexit.register(

@@ -59,7 +59,7 @@ ADVISORIES: tuple[Advisory, ...] = (
         compromised=(("mistralai", frozenset({"2.4.6"})),),
         remediation=(
             "Run: pip uninstall -y mistralai  (or: uv pip uninstall mistralai)",
-            "Rotate API keys in ~/.hermes/.env (OpenRouter, Anthropic, OpenAI, "
+            "Rotate API keys in ~/.config/qubit-voicebridge/.env (OpenRouter, Anthropic, OpenAI, "
             "Qubit, GitHub, AWS, Google, Mistral, etc.).",
             "Audit ~/.npmrc, ~/.pypirc, ~/.aws/credentials, ~/.config/gh/hosts.yml, "
             "and any other credential files for tokens that may have been read.",
@@ -191,7 +191,7 @@ def full_remediation_text(hit: AdvisoryHit) -> list[str]:
 
 
 # ─── Startup-banner gating ────────────────────────────────────────────────────
-# Once the banner is seen we cache that in ``~/.hermes/cache/advisory_banner_seen`` (one
+# Once the banner is seen we cache that in ``$QUBIT_HOME/cache/advisory_banner_seen`` (one
 # ``<id> <timestamp>`` line per advisory). Acked advisories never re-banner; cached-but-not-acked
 # ones re-banner after 24h so the user doesn't fully forget.
 

@@ -79,6 +79,14 @@ PROBE_TIMEOUT_S = 8.0
 #: Server-level methods the registry will broker. Mirrors the client's
 #: sanctioned set so a caller cannot smuggle an arbitrary JSON-RPC method.
 OPERATION_METHODS = MC.SUPPORTED_METHODS
+#: Read-only dashboard capability reads mapped to their sanctioned client
+#: method. These are list operations, so they carry the lighter method gate
+#: (enabled + runnable), not the tool allowlist.
+CAPABILITY_METHODS = {
+    "resources": MC.RESOURCE_LIST_METHOD,
+    "prompts": MC.PROMPT_LIST_METHOD,
+    "resource-templates": MC.RESOURCE_TEMPLATES_METHOD,
+}
 DISCOVER_PREREQUISITE = ("enable the server and record a stdio command or http "
                          "url so Qubit can open a brokered client connection")
 
@@ -410,6 +418,9 @@ def _client_method(cfg: Any, rec: Dict[str, Any], op: str, params: Any, *,
     if op == MC.PROMPT_LIST_METHOD:
         return MC.list_prompts(cfg, rec, timeout_s=timeout_s,
                                requested_by=requested_by)
+    if op == MC.RESOURCE_TEMPLATES_METHOD:
+        return MC.list_resource_templates(cfg, rec, timeout_s=timeout_s,
+                                          requested_by=requested_by)
     if op == MC.PROMPT_GET_METHOD:
         args = payload.get("arguments")
         return MC.get_prompt(cfg, rec, str(payload.get("name") or ""),
@@ -743,6 +754,98 @@ def invocation_status(cfg: Any, name: str) -> Dict[str, Any]:
 def _stored_record(cfg: Any, name: str) -> Optional[Dict[str, Any]]:
     rec = _load(cfg).get("servers", {}).get(name)
     return rec if isinstance(rec, dict) else None
+
+
+def _capability_disposition(name: str, method: str, code: str,
+                            detail: str) -> Dict[str, Any]:
+    """Honest typed disposition for a capability read that cannot connect."""
+    return {
+        "state": "OPERATOR_ONLY",
+        "schema": INVOKE_SCHEMA,
+        "name": name,
+        "operation": method,
+        "connected": False,
+        "invocable": False,
+        "code": code,
+        "result": None,
+        "names": [],
+        "count": 0,
+        "operator_prerequisite": DISCOVER_PREREQUISITE,
+        "qubit_counterpart": INVOKE_COUNTERPART,
+        "authority": "voicebridge.mcp_servers.list_servers",
+        "detail": detail,
+    }
+
+
+def list_capability(cfg: Any, name: str, capability: str, *,
+                    timeout_s: Optional[float] = None,
+                    requested_by: str = "dashboard:user") -> Dict[str, Any]:
+    """Read-only drain of one server-level list method (resources/prompts/templates).
+
+    Resolves the server through the ONE registry authority, then drains the
+    real list through the brokered :mod:`voicebridge.mcp_client` transport.
+    This is a read, so it needs no confirmation; the shared e-stop and the
+    method gate (supported transport + enabled + runnable) still apply. A
+    server that is inventory-only returns the honest typed OPERATOR_ONLY
+    disposition naming the prerequisite — never a fabricated empty list.
+    Unknown servers raise ``MCP_NOT_FOUND``; a transport failure raises the
+    client's typed code.
+    """
+    clean = _check_name(name)
+    method = CAPABILITY_METHODS.get(str(capability))
+    if method is None:
+        raise McpServerError("MCP_BAD_INPUT",
+                             f"capability {capability!r} is not a supported read")
+    rec = _stored_record(cfg, clean)
+    if not isinstance(rec, dict):
+        # A server declared only in the operator config is real inventory but
+        # records no runnable transport, so it cannot be drained.
+        if clean not in set(config_server_names(cfg)):
+            raise McpServerError(INVOKE_NOT_FOUND_CODE,
+                                 f"no registered server {clean!r}")
+        return _capability_disposition(
+            clean, method, "MCP_NOT_CONNECTED",
+            "config-declared server records no runnable transport; Qubit opens "
+            "no MCP connection for it")
+    if _estop(cfg):
+        return _capability_disposition(
+            clean, method, INVOKE_ESTOP_CODE, "emergency stop is latched")
+    try:
+        MC.check_method(rec, method)
+    except MC.McpClientError as exc:
+        return _capability_disposition(clean, method, exc.code, exc.detail)
+    if timeout_s is None:
+        timeout_s = _cfg_timeout(cfg, "timeout_s", MC.DEFAULT_TIMEOUT_S)
+    try:
+        out = _client_method(cfg, rec, method, {}, timeout_s=timeout_s,
+                             requested_by=requested_by)
+    except MC.McpClientError as exc:
+        _audit("list.denied", requested_by,
+               {"name": clean, "method": method, "code": exc.code})
+        raise McpServerError(exc.code, exc.detail) from exc
+    result: Dict[str, Any] = {
+        "state": "OK",
+        "schema": INVOKE_SCHEMA,
+        "name": clean,
+        "operation": method,
+        "transport": str(rec.get("transport") or ""),
+        "connected": True,
+        "invocable": True,
+        "result": out.get("result"),
+        "text": out.get("text"),
+        "names": out.get("names"),
+        "count": out.get("count"),
+        "duration_ms": out.get("duration_ms"),
+        "requested_by": _bounded(requested_by, 64),
+        "redacted": True,
+        "authority": ("voicebridge.mcp_client.call_method (brokered MCP client; "
+                      "read-only list)"),
+        "detail": "real MCP client list; output redacted",
+    }
+    _audit("list", requested_by,
+           {"name": clean, "method": method,
+            "transport": result["transport"], "state": "OK"})
+    return result
 
 
 def invoke(cfg: Any, name: str, *, tool: str = "",

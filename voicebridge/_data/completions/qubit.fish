@@ -22,10 +22,13 @@ complete -c qubit -n '__fish_use_subcommand' -f -a checkpoints
 complete -c qubit -n '__fish_use_subcommand' -f -a claw
 complete -c qubit -n '__fish_use_subcommand' -f -a completion
 complete -c qubit -n '__fish_use_subcommand' -f -a computer-use
+complete -c qubit -n '__fish_use_subcommand' -f -a config
 complete -c qubit -n '__fish_use_subcommand' -f -a console
+complete -c qubit -n '__fish_use_subcommand' -f -a cron
 complete -c qubit -n '__fish_use_subcommand' -f -a debug
 complete -c qubit -n '__fish_use_subcommand' -f -a desktop
 complete -c qubit -n '__fish_use_subcommand' -f -a device
+complete -c qubit -n '__fish_use_subcommand' -f -a doctor
 complete -c qubit -n '__fish_use_subcommand' -f -a documents
 complete -c qubit -n '__fish_use_subcommand' -f -a dump
 complete -c qubit -n '__fish_use_subcommand' -f -a egress
@@ -57,6 +60,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a memory
 complete -c qubit -n '__fish_use_subcommand' -f -a memory-graph
 complete -c qubit -n '__fish_use_subcommand' -f -a mic-test
 complete -c qubit -n '__fish_use_subcommand' -f -a moa
+complete -c qubit -n '__fish_use_subcommand' -f -a model
 complete -c qubit -n '__fish_use_subcommand' -f -a monitor
 complete -c qubit -n '__fish_use_subcommand' -f -a msg
 complete -c qubit -n '__fish_use_subcommand' -f -a node
@@ -98,6 +102,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a tools
 complete -c qubit -n '__fish_use_subcommand' -f -a transfers
 complete -c qubit -n '__fish_use_subcommand' -f -a tts-test
 complete -c qubit -n '__fish_use_subcommand' -f -a tui
+complete -c qubit -n '__fish_use_subcommand' -f -a update
 complete -c qubit -n '__fish_use_subcommand' -f -a usage
 complete -c qubit -n '__fish_use_subcommand' -f -a verified-skills
 complete -c qubit -n '__fish_use_subcommand' -f -a verify

@@ -745,7 +745,7 @@ def write_bytes(cfg: Any, target_path: str, data: bytes, *,
     else:
         before = b""
 
-    if payload == before:
+    if existed and payload == before:
         receipt = _upload_receipt("NO_CHANGE", target, actor, before, payload,
                                   backup=None, confinement=confinement_reason)
         _audit("upload_noop", actor, {"target": str(target),
@@ -1100,3 +1100,8 @@ def mkdir_capability_name() -> str:
 def delete_capability_name() -> str:
     """Broker capability id for confined, reversible file/folder deletion."""
     return "local.files_delete"
+
+
+def write_bytes_capability_name() -> str:
+    """Broker capability id for the confined, reversible binary upload."""
+    return "local.files_upload"

@@ -321,7 +321,7 @@ def _snapshot_and_inspect(
     source: Path, work_root: Path,
 ) -> tuple[tempfile.TemporaryDirectory[str], Path, dict[str, Any]]:
     before = _source_fingerprint(source)
-    temp_dir = tempfile.TemporaryDirectory(prefix="hermes-session-recovery-", dir=str(work_root))
+    temp_dir = tempfile.TemporaryDirectory(prefix="qubit-session-recovery-", dir=str(work_root))
     try:
         snapshot_source, copied = _copy_source_bundle(source, Path(temp_dir.name))
         if _source_fingerprint(source) != before:

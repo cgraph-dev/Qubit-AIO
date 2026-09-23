@@ -34,14 +34,14 @@ def _cmd_list(_args) -> None:
     outbound = outbound_webhooks.iter_configured_targets(cfg)
 
     if not specs and not outbound:
-        print("No shell hooks or outbound webhooks configured in ~/.hermes/config.yaml.")
+        print("No shell hooks or outbound webhooks configured in $QUBIT_HOME/config.yaml.")
         print("See `qubit hooks --help` or")
         print("    website/docs/user-guide/features/hooks.md")
         print("for the config schema and worked examples.")
         return
 
     if not specs:
-        print("No shell hooks configured in ~/.hermes/config.yaml.")
+        print("No shell hooks configured in $QUBIT_HOME/config.yaml.")
     else:
         by_event: Dict[str, List] = {}
         for spec in specs:

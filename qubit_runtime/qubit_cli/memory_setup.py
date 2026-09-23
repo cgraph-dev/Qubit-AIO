@@ -298,7 +298,7 @@ def cmd_setup(args) -> None:
     providers = _get_available_providers()
     if not providers:
         print("\n  No memory provider plugins detected.")
-        print("  Install a plugin to ~/.hermes/plugins/ and try again.\n")
+        print("  Install a plugin to $QUBIT_HOME/plugins/ and try again.\n")
         return
 
     items = [(name, f"— {desc}") for name, desc, _ in providers]
@@ -359,7 +359,7 @@ def _write_env_vars(
 
     ``save_env_value`` applies the shared gate (name regex, ``LD_PRELOAD``/``PYTHONPATH``/``QUBIT_HOME``
     denylist, CR/LF stripping, atomic 0o600 writes). ``ValueError`` is reported and skipped so one
-    bad key doesn't sink the batch; filesystem errors propagate. ``hermes_home`` is applied via the
+    bad key doesn't sink the batch; filesystem errors propagate. ``qubit_home`` is applied via the
     context-local override, not ``os.environ``.
     """
     from qubit_cli.config import save_env_value
@@ -440,11 +440,11 @@ def cmd_status(args) -> None:
                         if url and not is_set:
                             line += f"  → {url}"
                         print(line)
-                print("  Note: systemd/gateway services do not inherit ~/.hermes/.env —")
+                print("  Note: systemd/gateway services do not inherit $QUBIT_HOME/.env —")
                 print("        set any variables above in the service environment.")
         else:
             print("\n  Plugin:    NOT installed ✗")
-            print(f"  Install the '{provider_name}' memory plugin to ~/.hermes/plugins/")
+            print(f"  Install the '{provider_name}' memory plugin to $QUBIT_HOME/plugins/")
 
     if providers:
         print("\n  Installed plugins:")

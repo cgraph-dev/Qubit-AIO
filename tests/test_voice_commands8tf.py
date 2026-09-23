@@ -629,6 +629,7 @@ COMPLETE_EXAMPLES = {
     "recall_policy_get": "qubit, show recall policy",
     "recall_policy_set": "qubit, turn active recall on",
     "recall_query": "qubit, recall memories invoices",
+    "recall_update": "qubit, update active memory 3 the corrected fact",
     "recall_resolve": "qubit, resolve recall context invoices",
     "recall_escalate": "qubit, escalate memory 3 reason important",
     "documents_status": "qubit, document status",

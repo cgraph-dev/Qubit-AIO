@@ -25,6 +25,7 @@ Fail-closed guarantees (enforced here + tests):
 """
 from __future__ import annotations
 
+import base64
 import json
 import multiprocessing
 import os
@@ -973,11 +974,24 @@ _FILE_PATCH_OUTPUT_CAP = 32_768
 _FILE_PATCH_MAX_TEXT = 512 * 1024
 
 
+def _file_upload_max_b64() -> int:
+    """Base64 ceiling for the binary-upload capability.
+
+    Derived from ``file_patch.MAX_UPLOAD_BYTES`` (the raw-bytes cap mirroring
+    the upstream ``_MANAGED_FILE_MAX_BYTES``) plus base64's 4/3 inflation and
+    one padding quantum. Base64 is ASCII, so character count is byte count.
+    """
+    from . import file_patch as _fp
+
+    return ((int(_fp.MAX_UPLOAD_BYTES) + 2) // 3) * 4
+
+
 def _file_patch_validator(allowed: frozenset):
     """Typed input schema for the confined file-write capabilities.
 
     Unlike the generic scalar validator this permits the bounded-but-large
-    unified-diff ``patch_text`` (up to ``_FILE_PATCH_MAX_TEXT``) while still
+    unified-diff ``patch_text`` (up to ``_FILE_PATCH_MAX_TEXT``) and the
+    bounded base64 ``content_base64`` (up to the upload cap) while still
     rejecting undeclared keys and non-string values.
     """
     def _check(args: Dict[str, Any]) -> None:
@@ -992,24 +1006,36 @@ def _file_patch_validator(allowed: frozenset):
                 raise ValueError(f"arg {key} must be a string")
         if "recursive" in args and not isinstance(args.get("recursive"), bool):
             raise ValueError("arg recursive must be a boolean")
+        if "overwrite" in args and not isinstance(args.get("overwrite"), bool):
+            raise ValueError("arg overwrite must be a boolean")
         if "patch_text" in args:
             text = args.get("patch_text")
             if not isinstance(text, str):
                 raise ValueError("patch_text must be a string")
             if len(text.encode("utf-8", "surrogatepass")) > _FILE_PATCH_MAX_TEXT:
                 raise ValueError("patch_text exceeds the bounded patch size")
+        if "content_base64" in args:
+            blob = args.get("content_base64")
+            if not isinstance(blob, str):
+                raise ValueError("content_base64 must be a string")
+            if len(blob) > _file_upload_max_b64():
+                raise ValueError("content_base64 exceeds the bounded upload size")
     return _check
 
 
 def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
     """Register the confined, reversible file-write capabilities on ``broker``.
 
-    ``local.apply_patch`` and ``local.files_mkdir`` are MUTATING (a real on-disk
-    write that must be confirmed and is reversible from a durable backup). The
-    dashboard file routes, the planner/model ``apply_patch`` path, the CLI, and
-    voice now reach ONE decision point through the same registry, shared
-    e-stop/global-disable latch, shared confirmation journal, and audit the
-    ``local.*`` actions use. The executors invoke the existing
+    ``local.apply_patch``, ``local.files_mkdir``, ``local.files_delete``, and
+    ``local.files_upload`` are MUTATING (a real on-disk write that must be
+    confirmed and is reversible from a durable backup). The dashboard file
+    routes, the planner/model ``apply_patch`` path, the CLI, and voice now reach
+    ONE decision point through the same registry, shared e-stop/global-disable
+    latch, shared confirmation journal, and audit the ``local.*`` actions use.
+    ``local.files_upload`` carries the binary payload as a bounded base64
+    string (``content_base64``) because broker arguments are JSON scalars; the
+    executor decodes it and calls ``file_patch.write_bytes``, which never text-
+    decodes the payload. The executors invoke the existing
     :mod:`voicebridge.file_patch` confinement/backup/rollback implementation
     with ``confirmed=True`` because the broker decision — a durable, single-use
     user confirmation — IS the confirmation; a client-supplied boolean never is.
@@ -1060,6 +1086,26 @@ def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
             return json.dumps({"ok": False, "code": exc.code,
                                "detail": exc.detail}, default=str)
 
+    def _upload(args: Dict[str, Any]) -> str:
+        try:
+            blob = str(args.get("content_base64", "") or "")
+            try:
+                data = base64.b64decode(blob, validate=True)
+            except Exception:
+                return json.dumps({"ok": False, "code": _fp.BAD_INPUT_CODE,
+                                   "detail": "content_base64 is not valid "
+                                             "base64"}, default=str)
+            receipt = _fp.write_bytes(
+                cfg, str(args.get("target_path", "")), data,
+                requested_by=str(args.get("requested_by", "cli:user")),
+                confirmed=True,
+                overwrite=bool(args.get("overwrite", True)),
+                project_root=str(args.get("project_root", "") or ""))
+            return json.dumps({"ok": True, "receipt": receipt}, default=str)
+        except _fp.FilePatchError as exc:
+            return json.dumps({"ok": False, "code": exc.code,
+                               "detail": exc.detail}, default=str)
+
     specs = (
         (_fp.capability_name(), _apply,
          frozenset({"target_path", "patch_text", "requested_by",
@@ -1073,6 +1119,11 @@ def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
                     "recursive"}),
          "confined reversible file/folder delete archived to the Qubit "
          "state store"),
+        (_fp.write_bytes_capability_name(), _upload,
+         frozenset({"target_path", "content_base64", "overwrite",
+                    "requested_by", "project_root"}),
+         "confined reversible binary file upload; bounded, backed up, and "
+         "atomic"),
     )
     registered = []
     for name, fn, allowed, effects in specs:

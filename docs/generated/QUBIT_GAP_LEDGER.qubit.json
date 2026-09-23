@@ -17,11 +17,11 @@
   "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)"
  ],
  "generated_from": {
-  "voice_commands.REGISTRY": 510,
-  "dashboard_ops.catalog": 562,
+  "voice_commands.REGISTRY": 511,
+  "dashboard_ops.catalog": 563,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
-  "qubit_compat.ROUTES": 444,
+  "qubit_compat.ROUTES": 448,
   "qubit_compat.GATED": 95,
   "cli_families": 114,
   "source_inventory.items": 6775,
@@ -34,7 +34,7 @@
   "source_inventory.dispositioned_gated": 4
  },
  "counts_by_status": {
-  "IMPLEMENTED": 708,
+  "IMPLEMENTED": 709,
   "OPERATOR_ONLY": 3,
   "SAFE_EQUIVALENT": 36
  },
@@ -42,7 +42,7 @@
   "acp": 3,
   "acp_client": 7,
   "actions": 11,
-  "active_memory": 6,
+  "active_memory": 7,
   "agent": 1,
   "approvals": 1,
   "audio": 1,
@@ -182,11 +182,11 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 747
+  "qubit-surface": 748
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
-  "has-cli has-dashboard has-voice": 506,
+  "has-cli has-dashboard has-voice": 507,
   "has-dashboard": 65,
   "has-dashboard has-voice": 4,
   "no-surface": 124
@@ -6702,6 +6702,20 @@
    "needs": "none"
   },
   {
+   "id": "recall_update",
+   "area": "active_memory",
+   "capability": "Update active memory",
+   "upstream_ref": "",
+   "qubit_backend": "voicebridge.voice_commands._b_active_memory -> voicebridge.active_memory.update",
+   "cli": "qubit recall",
+   "dashboard": "qubit-memory:/memory",
+   "voice": "recall_update",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_audit_wave_ai10_schedules_memory_boards.py::test_active_memory_update_and_recall_pagination",
+   "note": "Confirmed in-place update of one active memory's text.",
+   "needs": "none"
+  },
+  {
    "id": "receipts_ledger",
    "area": "receipts_ledger",
    "capability": "Execution receipts",
@@ -8846,7 +8860,7 @@
   {
    "id": "fork_tool_runtime",
    "area": "tools",
-   "capability": "In-process fork agent tool registry (pinned Hermes tools + toolsets)",
+   "capability": "In-process fork agent tool registry (pinned upstream tools + toolsets)",
    "upstream_ref": "qubit_runtime/toolsets.py",
    "qubit_backend": "qubit_runtime.tools.registry:registry",
    "cli": "",
@@ -9028,7 +9042,7 @@
   {
    "id": "page_agentspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page AgentsPage",
+   "capability": "Qubit web page AgentsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9036,13 +9050,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_analyticspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page AnalyticsPage",
+   "capability": "Qubit web page AnalyticsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9050,13 +9064,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_channelspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page ChannelsPage",
+   "capability": "Qubit web page ChannelsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9064,13 +9078,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_chatpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page ChatPage",
+   "capability": "Qubit web page ChatPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9078,13 +9092,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_configpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page ConfigPage",
+   "capability": "Qubit web page ConfigPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9092,13 +9106,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_cronpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page CronPage",
+   "capability": "Qubit web page CronPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9106,13 +9120,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_docspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page DocsPage",
+   "capability": "Qubit web page DocsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9120,13 +9134,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_envpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page EnvPage",
+   "capability": "Qubit web page EnvPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9134,13 +9148,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_filespage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page FilesPage",
+   "capability": "Qubit web page FilesPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9148,13 +9162,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_logspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page LogsPage",
+   "capability": "Qubit web page LogsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9162,13 +9176,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_mcppage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page McpPage",
+   "capability": "Qubit web page McpPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9176,13 +9190,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_modelspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page ModelsPage",
+   "capability": "Qubit web page ModelsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9190,13 +9204,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_pairingpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page PairingPage",
+   "capability": "Qubit web page PairingPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9204,13 +9218,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_pluginspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page PluginsPage",
+   "capability": "Qubit web page PluginsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9218,13 +9232,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_profilebuilderpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page ProfileBuilderPage",
+   "capability": "Qubit web page ProfileBuilderPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9232,13 +9246,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_profilespage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page ProfilesPage",
+   "capability": "Qubit web page ProfilesPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9246,13 +9260,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_sessionspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page SessionsPage",
+   "capability": "Qubit web page SessionsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9260,13 +9274,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_skillspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page SkillsPage",
+   "capability": "Qubit web page SkillsPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9274,13 +9288,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_systempage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page SystemPage",
+   "capability": "Qubit web page SystemPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9288,13 +9302,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_terminalchatpage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page TerminalChatPage",
+   "capability": "Qubit web page TerminalChatPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9302,13 +9316,13 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {
    "id": "page_webhookspage",
    "area": "hermes_web_page",
-   "capability": "Hermes web page WebhooksPage",
+   "capability": "Qubit web page WebhooksPage",
    "upstream_ref": "hermes-agent@2237be3",
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
@@ -9316,7 +9330,7 @@
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
-   "note": "vendored Hermes baseline page served by the Qubit compat backend",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
    "needs": "none"
   },
   {

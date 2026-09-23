@@ -280,7 +280,6 @@ def test_qubit_usage_receipts_logbook_surface_real_records(tmp_path, monkeypatch
 
 # ------------------------------------------------- real confirm-gated mutations
 def test_profile_create_is_real_confirm_gated(tmp_path, monkeypatch):
-    from voicebridge import brain as B
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -292,12 +291,15 @@ def test_profile_create_is_real_confirm_gated(tmp_path, monkeypatch):
     code, out = HC.dispatch(cfg, "POST", "/api/profiles", {},
                             {"name": "work", "confirm": True})
     assert code == 200 and out["ok"] is True, (code, out)
-    assert out["principal"]["id"] == "work", out
-    assert B.principal_list(cfg)["principals"][0]["id"] == "work"
+    # One registry: the real reference profile (``qubit_cli.profiles``), not
+    # the retired brain-principal store.
+    P = HC._profiles_module(cfg)
+    assert out["name"] == "work" and out["path"] == "work", out
+    assert P.profile_exists("work"), out
 
     code, out = HC.dispatch(cfg, "POST", "/api/profiles", {},
                             {"name": "work", "confirm": True})
-    assert code == 400 and out["code"] == B.EXISTS_CODE, (code, out)
+    assert code == 400 and out["code"] == "PROFILE_EXISTS", (code, out)
 
     code, out = HC.dispatch(cfg, "POST", "/api/profiles", {}, {"confirm": True})
     assert (code, out["code"]) == (400, "MALFORMED"), (code, out)
@@ -774,12 +776,12 @@ def test_toolset_reads_are_real(tmp_path, monkeypatch):
 
 
 def test_profile_setup_command_is_real(tmp_path, monkeypatch):
-    from voicebridge import brain as B
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    B.principal_add(cfg, "work", "person", "Work", requested_by="t",
-                    confirmed=True)
+    # Registration is the real reference profile registry, not the retired
+    # brain-principal store.
+    HC._profiles_module(cfg).create_profile("work", no_skills=True)
 
     code, out = HC.dispatch(cfg, "GET", "/api/profiles/work/setup-command",
                             {}, {})
@@ -956,14 +958,23 @@ def test_files_upload_is_real_text_broker_with_binary_gate(tmp_path,
     assert code == 200 and out["ok"] is True, (code, out)
     assert target.read_text() == "uploaded text", target.read_text()
 
-    # Genuinely-binary content is a typed gate and is never stored.
-    blob = base64.b64encode(b"\x00\x01\x02\xff").decode()
+    # Genuinely-binary content is written byte-for-byte through the brokered,
+    # reversible ``local.files_upload`` capability (confirmation-staged).
+    raw = b"\x00\x01\x02\xff"
+    blob = base64.b64encode(raw).decode()
+    bin_target = root / "bin.dat"
     code, out = HC.dispatch(cfg, "POST", "/api/files/upload", {},
-                            {"path": str(root / "bin.dat"),
-                             "content_base64": blob, "confirm": True})
-    assert (code, out["code"]) == (403, "FILES_BINARY"), (code, out)
+                            {"path": str(bin_target), "content_base64": blob,
+                             "confirm": True})
+    assert (code, out["code"]) == (409, "CONFIRM_REQUIRED"), (code, out)
     assert out["qubit_counterpart"], out
-    assert not (root / "bin.dat").exists()
+    assert not bin_target.exists(), "unconfirmed binary must not write"
+    cid = out["confirmation_id"]
+    code, out = HC.dispatch(cfg, "POST", "/api/files/upload", {},
+                            {"path": str(bin_target), "content_base64": blob,
+                             "confirmation_id": cid})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert bin_target.read_bytes() == raw
 
     code, out = HC.dispatch(cfg, "POST", "/api/files/upload", {},
                             {"confirm": True})
@@ -1042,13 +1053,22 @@ def test_files_upload_stream_is_real_text_broker(tmp_path, monkeypatch):
     assert code == 200 and out["ok"] is True, (code, out)
     assert target.read_text() == "streamed text", target.read_text()
 
-    # A genuinely-binary stream stays a typed gate and is never stored.
-    blob = base64.b64encode(b"\x00\xff\x00").decode()
+    # A genuinely-binary stream is written byte-for-byte through the same
+    # brokered, reversible capability (confirmation-staged, never a silent gate).
+    raw = b"\x00\xff\x00"
+    blob = base64.b64encode(raw).decode()
+    bin_target = root / "b.bin"
     code, out = HC.dispatch(cfg, "POST", "/api/files/upload-stream", {},
-                            {"path": str(root / "b.bin"),
-                             "content_base64": blob, "confirm": True})
-    assert (code, out["code"]) == (403, "FILES_BINARY"), (code, out)
-    assert not (root / "b.bin").exists()
+                            {"path": str(bin_target), "content_base64": blob,
+                             "confirm": True})
+    assert (code, out["code"]) == (409, "CONFIRM_REQUIRED"), (code, out)
+    assert not bin_target.exists(), "unconfirmed binary must not write"
+    cid = out["confirmation_id"]
+    code, out = HC.dispatch(cfg, "POST", "/api/files/upload-stream", {},
+                            {"path": str(bin_target), "content_base64": blob,
+                             "confirmation_id": cid})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert bin_target.read_bytes() == raw
 
     code, out = HC.dispatch(cfg, "POST", "/api/files/upload-stream", {},
                             {"confirm": True})

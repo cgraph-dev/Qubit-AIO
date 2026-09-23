@@ -184,7 +184,7 @@ def _upload_paste_rs(content: str) -> str:
 
 
 def _upload_dpaste_com(content: str, expiry_days: int = 7) -> str:
-    boundary = "----HermesDebugBoundary9f3c"
+    boundary = "----QubitDebugBoundary9f3c"
     fields = (("content", content), ("syntax", "text"), ("expiry_days", str(expiry_days)))
     body = ("".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{n}"\r\n\r\n{v}\r\n'
                     for n, v in fields) + f"--{boundary}--\r\n").encode("utf-8")

@@ -435,7 +435,7 @@ def _profile_install(args):
     try:
         # Preview: stage into a scratch dir, show the manifest, then do the real install.
         # The double-stage avoids any side-effects if the user declines.
-        with tempfile.TemporaryDirectory(prefix="hermes_dist_preview_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="qubit_dist_preview_") as tmp:
             plan = plan_install(args.source, Path(tmp), override_name=getattr(args, "install_name", None))
             _render_distribution_plan(plan)
             if not getattr(args, "yes", False) and not _confirm("\nProceed with install? [y/N] "):

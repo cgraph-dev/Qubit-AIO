@@ -36,8 +36,8 @@ PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
 UPSTREAM_TAG = "v0.21.4"
 UPSTREAM_REPO = "https://github.com/NousResearch/hermes-agent"
 UPSTREAM_LICENSE = "MIT License, Copyright (c) 2025 Nous Research"
-OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
-OPENCLAW_TAG = "v2026.9.2"
+OPENCLAW_PIN = "da03996ab7203fe6b9b4d8edb2b54726e4394c9c"
+OPENCLAW_TAG = "v2026.4.19-beta.2-28254-gda03996ab7"
 OPENCLAW_REPO = "https://github.com/openclaw/openclaw"
 OPENCLAW_LICENSE = "MIT (Copyright (c) 2026 OpenClaw Foundation)"
 
@@ -1577,7 +1577,23 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
             qubit = _LOCAL_PATH_RENAMES.get(qubit, qubit)
             qpath = REPO / qubit
             if not qpath.is_file():
-                raise SystemExit(f"vendored comparison file missing: {qubit}")
+                # The pinned upstream revision carries files the vendored tree
+                # does not yet (W9 is a slice-by-slice vendor sync). Record the
+                # absent counterpart honestly -- no hash, no patch, explicit
+                # reason -- instead of aborting the whole comparison artifact.
+                row.update({
+                    "qubit": None,
+                    "qubit_sha256": None,
+                    "patch": None,
+                    "reason": "not vendored locally: pinned upstream file "
+                              f"{upstream_field} has no shipped Qubit "
+                              f"counterpart at {qubit} (recorded missing, not "
+                              "drift).",
+                    "upstream_blob_sha256": upstream_sha,
+                    "affected_regression_test": None,
+                })
+                rows.append(row)
+                continue
             patch = _PATCH_SPEC.get(qubit)
             # Deep source rebrand: any content change in a vendored frontend
             # file is a documented, owned Qubit patch (never silent drift).
@@ -1660,10 +1676,9 @@ def main(argv=None) -> int:
     ap.add_argument("--upstream", default="/tmp/opencode/pinned/hermes-agent")
     ap.add_argument("--local", default="qubit_runtime")
     ap.add_argument("--out", default="docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json")
-    # Default to the contractual OpenClaw baseline clone that matches
-    # OPENCLAW_PIN (v2026.9.2); the newer v2026.9.4 clone lives at
-    # /tmp/opencode/pinned/openclaw and must be passed explicitly because the
-    # recorded comparison baseline is the owner-approved v2026.9.2 revision.
+    # Default to the owner-pinned OpenClaw clone that matches OPENCLAW_PIN
+    # (tag OPENCLAW_TAG). The live pinned checkout is passed explicitly with
+    # --openclaw; the default path is only a convenience fallback.
     ap.add_argument("--openclaw",
                     default=f"/tmp/opencode/pinned/openclaw-{OPENCLAW_TAG}")
     ap.add_argument("--comparison-out",

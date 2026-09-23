@@ -379,8 +379,15 @@ def test_mcp_inventory_reads_are_real_and_never_connect(tmp_path, monkeypatch):
 
     code, out = HC.dispatch(cfg, "GET", "/api/mcp/catalog", {}, {})
     assert code == 200
-    assert [e["name"] for e in out["entries"]] == ["wave1-mcp"], out
-    assert out["diagnostics"], out
+    # The catalog is the reviewed manifest inventory (the "available" set) with
+    # each entry's installed/enabled state reconciled against the canonical
+    # Qubit registry, so the locally-registered server appears installed
+    # alongside the reviewed entries -- it is not the only row.
+    names = [e["name"] for e in out["entries"]]
+    assert "wave1-mcp" in names, out
+    installed = {e["name"]: e["installed"] for e in out["entries"]}
+    assert installed["wave1-mcp"] is True, out
+    assert isinstance(out["diagnostics"], list), out
 
     code, out = HC.dispatch(cfg, "POST", "/api/mcp/servers/wave1-mcp/test",
                             {}, {})

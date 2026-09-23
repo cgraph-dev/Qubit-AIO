@@ -1,9 +1,9 @@
 """Qubit Plugin System — discovers, loads, and manages plugins.
 
 Sources, later overriding earlier on key collision: bundled ``<repo>/plugins/<name>/`` (``memory/``
-and ``context_engine/`` have their own discovery), user ``~/.hermes/plugins/<name>/``, project
-``./.hermes/plugins/<name>/`` (opt-in via ``HERMES_ENABLE_PROJECT_PLUGINS``), and pip packages in
-the ``hermes_agent.plugins`` entry-point group. A directory plugin needs a ``plugin.yaml`` manifest
+and ``context_engine/`` have their own discovery), user ``$QUBIT_HOME/plugins/<name>/``, project
+``./.qubit/plugins/<name>/`` (opt-in via ``QUBIT_ENABLE_PROJECT_PLUGINS``), and pip packages in
+the ``qubit_agent.plugins`` entry-point group. A directory plugin needs a ``plugin.yaml`` manifest
 and an ``__init__.py`` exposing ``register(ctx)``. Plugins register callbacks for ``VALID_HOOKS``
 (core fires ``invoke_hook(name, **kwargs)``) and tools via ``PluginContext.register_tool()``.
 """
@@ -390,7 +390,7 @@ class PluginContext:
 
     @property
     def profile_name(self) -> str:
-        """Active profile name (``"default"``, the ``~/.hermes/profiles/<name>`` id, or ``"custom"``),
+        """Active profile name (``"default"``, the ``$QUBIT_HOME/profiles/<name>`` id, or ``"custom"``),
         derived from ``QUBIT_HOME`` — not ``_cli_ref``, which is None outside the interactive CLI —
         so gateway and kanban workers get it too."""
         try:
@@ -976,7 +976,7 @@ class PluginContext:
         frontmatter: Optional[Mapping[str, Any]] = None,
     ) -> PluginRegistration:
         """Register a read-only skill resolvable as ``'<plugin_name>:<name>'`` via ``skill_view()``.
-        Not in ``~/.hermes/skills/`` nor ``<available_skills>`` — explicit loads only. Raises
+        Not in ``$QUBIT_HOME/skills/`` nor ``<available_skills>`` — explicit loads only. Raises
         ``ValueError`` (``':'``/invalid chars) or ``FileNotFoundError``."""
         from agent.skill_utils import _NAMESPACE_RE
         if ":" in name:
@@ -1033,7 +1033,7 @@ _SCOPED_PROVIDER_REGISTRARS: Tuple[Tuple[str, str, str, str, str, str, Dict[str,
     ("register_secret_source", "secret_source", "agent.secret_sources.registry",
      "agent.secret_sources.base:SecretSource", "secret source",
      "Register a :class:`agent.secret_sources.base.SecretSource`, run by ``load_qubit_dotenv()`` "
-     "(after ``~/.hermes/.env``, before credentials are read) when ``secrets.<name>`` is enabled. The "
+     "(after ``~/.config/qubit-voicebridge/.env``, before credentials are read) when ``secrets.<name>`` is enabled. The "
      "orchestrator owns ordering/precedence/provenance; the source only fetches. Since dotenv usually "
      "loads before discovery, the manager re-pulls enabled plugin sources afterwards.",
      {"normalize": None, "register": "register_source", "param": "source"}),
@@ -2002,7 +2002,7 @@ def resolve_plugin_command_result(result: Any) -> Any:
         finally:
             done.set()
 
-    threading.Thread(target=_runner, name="hermes-plugin-command-await", daemon=True).start()
+    threading.Thread(target=_runner, name="qubit-plugin-command-await", daemon=True).start()
     if not done.wait(timeout=_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS):
         raise TimeoutError("Plugin command async handler did not complete within "
                            f"{_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS:.0f}s")

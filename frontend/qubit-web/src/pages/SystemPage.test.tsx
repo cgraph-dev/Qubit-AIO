@@ -31,8 +31,26 @@ const apiMocks = vi.hoisted(() => ({
   getActionStatus: vi.fn(),
 }));
 
+const ConfirmRequiredError = vi.hoisted(
+  () =>
+    class ConfirmRequiredError extends Error {
+      readonly detail: string;
+      readonly confirmationId: string;
+      constructor(detail: string, confirmationId = "cid") {
+        super(`CONFIRM_REQUIRED: ${detail}`);
+        this.name = "ConfirmRequiredError";
+        this.detail = detail;
+        this.confirmationId = confirmationId;
+      }
+      settle() {
+        return Promise.resolve({});
+      }
+    },
+);
+
 vi.mock("@/lib/api", () => ({
   api: apiMocks,
+  ConfirmRequiredError,
   parsePolicyRefusal: () => null,
   policyRefusalMessage: () => "",
 }));
@@ -192,6 +210,58 @@ describe("SystemPage gateway control confirmation", () => {
 
     await waitFor(() => decision !== null);
     expect(decision).toBe(false);
+  });
+
+  it("reports a declined confirmation as cancelled, not failed", async () => {
+    apiMocks.restartGateway.mockImplementation(
+      async (confirm?: (detail: string) => boolean | Promise<boolean>) => {
+        await confirm!("gateway restart changes a service");
+        throw new ConfirmRequiredError("gateway restart changes a service");
+      },
+    );
+    await renderSystem();
+
+    await act(async () => buttonByText("Restart")!.click());
+    await waitFor(() => Boolean(buttonByText("Restart gateway")));
+    await act(async () => buttonByText("Restart gateway")!.click());
+
+    await waitFor(() =>
+      (document.body.textContent ?? "").includes("cancelled"),
+    );
+    expect(document.body.textContent).not.toContain("Gateway restart failed");
+  });
+});
+
+describe("SystemPage gateway control honesty", () => {
+  it("disables Start (and enables Stop/Restart) while the gateway runs", async () => {
+    apiMocks.getStatus.mockResolvedValue({
+      can_update_qubit: false,
+      active_sessions: 0,
+      gateway_running: true,
+      gateway_state: "OK",
+      gateway_pid: 4242,
+    });
+    await renderSystem();
+
+    await waitFor(() => buttonByText("Start") !== null);
+    expect(buttonByText("Start")!.disabled).toBe(true);
+    expect(buttonByText("Restart")!.disabled).toBe(false);
+    expect(buttonByText("Stop")!.disabled).toBe(false);
+  });
+
+  it("disables Stop (and enables Start) while the gateway is stopped", async () => {
+    apiMocks.getStatus.mockResolvedValue({
+      can_update_qubit: false,
+      active_sessions: 0,
+      gateway_running: false,
+      gateway_state: "inactive",
+      gateway_pid: null,
+    });
+    await renderSystem();
+
+    await waitFor(() => buttonByText("Start") !== null);
+    expect(buttonByText("Start")!.disabled).toBe(false);
+    expect(buttonByText("Stop")!.disabled).toBe(true);
   });
 });
 

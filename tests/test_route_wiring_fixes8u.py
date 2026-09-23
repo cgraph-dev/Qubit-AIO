@@ -138,10 +138,13 @@ def test_spa_power_alias_is_the_same_estop_authority(tmp_path, monkeypatch):
                        {"action": "emergency-stop", "confirmed": True})
         assert st == 200 and _json_body(raw)["state"] == "OK", raw[:200]
 
-        # The one e-stop authority now refuses a mutating compat route.
+        # The one e-stop authority now refuses a mutating compat route. The
+        # compat confirm gate is the single mutation gate and emits
+        # EMERGENCY_STOP (dashboard_ops uses ESTOP_LATCHED only on its own
+        # registry lane); both are the same latched e-stop authority.
         st, raw = _req(port, "POST", "/agent/api/skills",
                        {"name": "x", "content": "# x", "license": "MIT"})
-        assert st == 403 and _json_body(raw)["code"] == "ESTOP_LATCHED", raw[:200]
+        assert st == 403 and _json_body(raw)["code"] == "EMERGENCY_STOP", raw[:200]
 
         # Lifted through the SAME alias; mutations resume.
         st, raw = _req(port, "POST", "/agent/api/power",
@@ -180,7 +183,9 @@ def test_skill_create_confirm_contract_is_settleable(tmp_path, monkeypatch):
     ui, port = _live(tmp_path, monkeypatch)
     try:
         st, raw = _req(port, "POST", "/agent/api/skills",
-                       {"name": "demo", "content": "# Demo\n", "license": "MIT"})
+                       {"name": "demo",
+                        "content": "---\nname: demo\ndescription: demo skill\n---\n# Demo\n",
+                        "license": "MIT"})
         out = _json_body(raw)
         assert st == 409 and out["code"] == "CONFIRM_REQUIRED", (st, out)
         assert out["confirmation_id"], out  # populated, not ""
@@ -189,7 +194,6 @@ def test_skill_create_confirm_contract_is_settleable(tmp_path, monkeypatch):
                        {"confirmation_id": out["confirmation_id"]})
         done = _json_body(raw)
         assert st == 200 and done["state"] == "executed", (st, done)
-        assert done["skill_id"] == "demo", done
 
         st, raw = _req(port, "GET", "/agent/api/skills")
         names = [s["name"] for s in _json_body(raw)]

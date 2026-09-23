@@ -277,7 +277,7 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
     import tempfile
     from urllib.request import urlretrieve
     print("→ Downloading latest version...")
-    tmp_dir = tempfile.mkdtemp(prefix="hermes-update-")
+    tmp_dir = tempfile.mkdtemp(prefix="qubit-update-")
     try:
         zip_path = os.path.join(tmp_dir, f"hermes-agent-{branch}.zip")
         urlretrieve(zip_url, zip_path)

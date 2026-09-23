@@ -53,7 +53,7 @@ def _azure_foundry_api_key(rp, explicit_api_key: str) -> str:
     if not api_key:
         raise rp.AuthError(
             "Azure Foundry requires an API key. Set AZURE_FOUNDRY_API_KEY in "
-            "~/.hermes/.env or run 'qubit model' to configure. To use "
+            "$QUBIT_HOME/.env or run 'qubit model' to configure. To use "
             "keyless Microsoft Entra ID auth instead, set "
             "model.auth_mode: entra_id in config.yaml (or pick "
             "'Microsoft Entra ID' in 'qubit model')."

@@ -366,9 +366,9 @@ class TestDeleteProfile:
         assert pids == [101]
 
     def test_backend_scan_matches_shebang_exec_of_qubit_shim(self, profile_env, monkeypatch):
-        """A `hermes` console-script shim spawned directly (e.g. Electron's
-        findOnPath('hermes') resolution) reports argv[0] as the interpreter
-        (python3) and argv[1] as the shim's path -- not "hermes" -- because
+        """A `qubit` console-script shim spawned directly (e.g. Electron's
+        findOnPath('qubit') resolution) reports argv[0] as the interpreter
+        (python3) and argv[1] as the shim's path -- not "qubit" -- because
         the OS execs the shebang. The scanner must still recognize it so
         profile delete doesn't leave a zombie Desktop-spawned backend behind
         (issue: deleting a Desktop profile kept reappearing after relaunch).
@@ -393,12 +393,12 @@ class TestDeleteProfile:
         self_pid = os.getpid()
         procs = [
             # Shebang-exec'd shim bound to coder → matched despite argv[0]
-            # being the python interpreter, not "hermes".
-            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "coder", "serve",
+            # being the python interpreter, not "qubit".
+            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/qubit", "--profile", "coder", "serve",
                             "--host", "127.0.0.1", "--port", "0"]),
             # Same shape but a different profile → skipped.
-            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "other", "serve"]),
-            # Non-hermes script run by python3 → skipped.
+            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/qubit", "--profile", "other", "serve"]),
+            # Non-qubit script run by python3 → skipped.
             FakeProc(203, ["/usr/bin/python3", "/Users/x/some_script.py", "--profile", "coder", "serve"]),
         ]
 
@@ -415,11 +415,11 @@ class TestDeleteProfile:
         assert pids == [201]
 
     def test_backend_scan_rejects_unrelated_qubit_prefixed_script(self, profile_env, monkeypatch):
-        """A user's own script that happens to start with "hermes" (e.g.
-        hermes-notes.py, hermes-unrelated-tool) must NOT be misidentified as
+        """A user's own script that happens to start with "qubit" (e.g.
+        qubit-notes.py, qubit-unrelated-tool) must NOT be misidentified as
         the console-script shim just because argv[0] is a python interpreter
-        and argv[1]'s basename starts with "hermes" -- only the actual known
-        console-script entry points (hermes, hermes-agent, hermes-acp) count.
+        and argv[1]'s basename starts with "qubit" -- only the actual known
+        console-script entry points (qubit, qubit-agent, qubit-acp) count.
         """
         create_profile("coder", no_alias=True)
         profile_dir = get_profile_dir("coder")
@@ -442,9 +442,9 @@ class TestDeleteProfile:
         procs = [
             # Looks like the shim by prefix alone, but is the user's own
             # unrelated tool -- must be rejected, not killed by profile delete.
-            FakeProc(301, ["/usr/bin/python3", "/Users/x/scripts/hermes-notes.py",
+            FakeProc(301, ["/usr/bin/python3", "/Users/x/scripts/qubit-notes.py",
                             "--profile", "coder", "serve"]),
-            FakeProc(302, ["/usr/bin/python3", "/Users/x/scripts/hermes-unrelated-tool",
+            FakeProc(302, ["/usr/bin/python3", "/Users/x/scripts/qubit-unrelated-tool",
                             "--profile", "coder", "serve"]),
         ]
 
@@ -461,9 +461,9 @@ class TestDeleteProfile:
         assert pids == []
 
     def test_backend_scan_matches_all_known_console_script_shims(self, profile_env, monkeypatch):
-        """The other two real console-script entry points (hermes-agent,
-        hermes-acp -- see pyproject.toml [project.scripts]) must also be
-        recognized via the shebang-exec path, not just the primary "hermes"
+        """The other two real console-script entry points (qubit-agent,
+        qubit-acp -- see pyproject.toml [project.scripts]) must also be
+        recognized via the shebang-exec path, not just the primary "qubit"
         shim.
         """
         create_profile("coder", no_alias=True)
@@ -485,9 +485,9 @@ class TestDeleteProfile:
 
         self_pid = os.getpid()
         procs = [
-            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/hermes-agent",
+            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/qubit-agent",
                             "--profile", "coder", "serve"]),
-            FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/hermes-acp",
+            FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/qubit-acp",
                             "--profile", "coder", "serve"]),
         ]
 
@@ -593,7 +593,7 @@ class TestAliasCollision:
         wrapper_dir = profile_env / ".local" / "bin"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         bat_path = wrapper_dir / "mybot.bat"
-        bat_path.write_text("@echo off\r\nhermes -p mybot %*\r\n")
+        bat_path.write_text("@echo off\r\nqubit -p mybot %*\r\n")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=str(bat_path),
@@ -618,14 +618,25 @@ class TestWrapperScript:
     """Tests for create_wrapper_script() and remove_wrapper_script()."""
 
     def test_creates_sh_on_posix(self, profile_env, monkeypatch):
-        monkeypatch.setattr("qubit_cli.profiles.shutil.which", lambda name: "/opt/hermes/bin/hermes")
+        monkeypatch.setattr("qubit_cli.profiles.shutil.which", lambda name: "/opt/qubit/bin/qubit")
         from qubit_cli.profiles import create_wrapper_script
         wrapper = create_wrapper_script("mybot")
         assert wrapper is not None
         assert wrapper.name == "mybot"
         content = wrapper.read_text()
         assert content.startswith("#!/bin/sh")
-        assert "exec /opt/hermes/bin/hermes -p mybot" in content
+        assert "exec /opt/qubit/bin/qubit -p mybot" in content
+
+    def test_created_wrapper_is_recognized_and_removed(self, profile_env, monkeypatch):
+        """The wrapper create path and the recognition/cleanup path must agree on
+        the ``qubit -p`` needle — a brand mismatch leaves orphans behind."""
+        monkeypatch.setattr("qubit_cli.profiles.shutil.which", lambda name: "/opt/qubit/bin/qubit")
+        from qubit_cli.profiles import create_wrapper_script, remove_wrapper_script, _is_our_wrapper
+        wrapper = create_wrapper_script("mybot")
+        assert wrapper is not None and wrapper.exists()
+        assert _is_our_wrapper(wrapper) is True
+        assert remove_wrapper_script("mybot") is True
+        assert not wrapper.exists()
 
 
     @pytest.mark.windows_only
@@ -727,19 +738,21 @@ class TestRenameProfile:
         assert new_dir == tmp_path / ".hermes" / "profiles" / "newname"
 
     def test_renames_root_honcho_host_without_changing_ai_peer(self, profile_env):
+        """A pre-rebrand ``hermes_<profile>`` host block is migrated onto the
+        Qubit-owned ``qubit_<profile>`` key, preserving peer identity."""
         tmp_path = profile_env
         create_profile("ssi_health", no_alias=True)
         honcho_path = tmp_path / ".hermes" / "honcho.json"
         honcho_path.write_text(json.dumps({
             "hosts": {
-                "hermes.ssi_health": {
+                "hermes_ssi_health": {
                     "recallMode": "hybrid",
                     "writeFrequency": "async",
                     "sessionStrategy": "per-session",
                     "saveMessages": True,
                     "peerName": "user-peer",
                     "aiPeer": "ssi_health",
-                    "workspace": "hermes",
+                    "workspace": "qubit",
                     "enabled": True,
                 }
             }
@@ -749,9 +762,9 @@ class TestRenameProfile:
             rename_profile("ssi_health", "heimdall")
 
         cfg = json.loads(honcho_path.read_text())
-        assert "hermes.ssi_health" not in cfg["hosts"]
-        assert cfg["hosts"]["hermes_heimdall"]["aiPeer"] == "ssi_health"
-        assert cfg["hosts"]["hermes_heimdall"]["peerName"] == "user-peer"
+        assert "hermes_ssi_health" not in cfg["hosts"]
+        assert cfg["hosts"]["qubit_heimdall"]["aiPeer"] == "ssi_health"
+        assert cfg["hosts"]["qubit_heimdall"]["peerName"] == "user-peer"
 
 
 # ===================================================================
@@ -858,16 +871,16 @@ class TestProfileIsolation:
 
 
 # ===================================================================
-# TestGetProfilesRoot / TestGetDefaultHermesHome (internal helpers)
+# TestGetProfilesRoot / TestGetDefaultQubitHome (internal helpers)
 # ===================================================================
 
 class TestInternalHelpers:
-    """Tests for _get_profiles_root() and _get_default_hermes_home()."""
+    """Tests for _get_profiles_root() and _get_default_qubit_home()."""
 
 
 
     def test_default_qubit_home_docker(self, tmp_path, monkeypatch):
-        """In Docker, _get_default_hermes_home() returns QUBIT_HOME itself."""
+        """In Docker, _get_default_qubit_home() returns QUBIT_HOME itself."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)

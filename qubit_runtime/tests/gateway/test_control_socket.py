@@ -280,7 +280,7 @@ def test_collect_fleet_versions_prefers_socket(tmp_path: Path, monkeypatch):
         lambda refresh=False: {"sha": "HEADSHA", "version": "1.0"},
     )
     monkeypatch.setattr(
-        "qubit_cli.profiles._get_default_hermes_home", lambda: home
+        "qubit_cli.profiles._get_default_qubit_home", lambda: home
     )
     monkeypatch.setattr(
         "qubit_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
@@ -315,7 +315,7 @@ def test_collect_fleet_versions_falls_back_to_state_file(tmp_path: Path, monkeyp
         lambda refresh=False: {"sha": "HEADSHA", "version": "1.0"},
     )
     monkeypatch.setattr(
-        "qubit_cli.profiles._get_default_hermes_home", lambda: home
+        "qubit_cli.profiles._get_default_qubit_home", lambda: home
     )
     monkeypatch.setattr(
         "qubit_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
@@ -351,7 +351,7 @@ def test_runtime_inventory_dedupes_same_pid_across_homes(tmp_path: Path, monkeyp
     (profiles_root / "coder").mkdir(parents=True)
 
     monkeypatch.setattr(
-        "qubit_cli.profiles._get_default_hermes_home", lambda: home
+        "qubit_cli.profiles._get_default_qubit_home", lambda: home
     )
     monkeypatch.setattr(
         "qubit_cli.profiles._get_profiles_root", lambda: profiles_root
@@ -380,7 +380,7 @@ def test_runtime_inventory_prefers_socket_supervisor(tmp_path: Path, monkeypatch
     home.mkdir()
 
     monkeypatch.setattr(
-        "qubit_cli.profiles._get_default_hermes_home", lambda: home
+        "qubit_cli.profiles._get_default_qubit_home", lambda: home
     )
     monkeypatch.setattr(
         "qubit_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"

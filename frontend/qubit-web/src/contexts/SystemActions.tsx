@@ -71,7 +71,11 @@ export function SystemActionsProvider({
       setActionStatus(null);
       try {
         if (action === "restart") {
-          await api.restartGateway();
+          // The sidebar's own ConfirmDialog (App.tsx `confirmRestart`) already
+          // collected the human decision before calling runAction, so the
+          // confirm-gated API round-trip must carry that consent explicitly —
+          // otherwise the default window.confirm prompt fires a second time.
+          await api.restartGateway(() => true);
           setActiveAction(action);
         } else {
           const resp = await api.updateQubit();

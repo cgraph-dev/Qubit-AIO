@@ -1900,8 +1900,40 @@ def _cron_next_run(j: Dict[str, Any]) -> Optional[float]:
     return None
 
 
-def _cron_shape(j: Dict[str, Any]) -> Dict[str, Any]:
+def _cron_timezone(cfg: Any) -> str:
+    """Configured IANA zone name for the cron surface (``""`` = server-local).
+
+    The store's :func:`schedules.list_jobs` already returns the resolved name;
+    this helper gives the single-job (``h_cron_job_show``/create) path the same
+    truthful value without reaching into the module's private resolver.
+    """
+    from . import schedules as S
+    try:
+        return str(S.list_jobs(cfg, limit=1).get("timezone", "") or "")
+    except Exception:  # noqa: BLE001 — a read must never break the page
+        return ""
+
+
+def _cron_shape(j: Dict[str, Any], *, cfg: Any = None,
+                tz_name: str = "") -> Dict[str, Any]:
     # CronJob wire shape (web/src/lib/api.ts); Qubit schedules are the store.
+    # ``next_run_at`` prefers the store's own projection (``schedules.next_run_at``
+    # folds the configured timezone + a pending retry ladder) and only falls back
+    # to the local UTC-day arithmetic when the caller passed a raw row.
+    next_run = j.get("next_run_at")
+    if next_run is None:
+        next_run = _cron_next_run(j)
+    try:
+        retry_at = float(j.get("retry_at") or 0.0)
+    except (TypeError, ValueError):
+        retry_at = 0.0
+    retry_enabled = None
+    if cfg is not None:
+        from . import schedules as S
+        try:
+            retry_enabled = bool(S.retry_enabled(cfg))
+        except Exception:  # noqa: BLE001
+            retry_enabled = None
     return {
         "id": str(j.get("id", "")), "profile": None, "profile_name": None,
         "hermes_home": None, "is_default_profile": True,
@@ -1918,9 +1950,17 @@ def _cron_shape(j: Dict[str, Any]) -> Dict[str, Any]:
         "no_agent": None, "context_from": None, "enabled_toolsets": None,
         "workdir": None,
         "last_run_at": _epoch_to_iso(j.get("last_run_at")),
-        "next_run_at": _epoch_to_iso(_cron_next_run(j)),
-        "last_status": j.get("last_state"), "last_error": None,
+        "next_run_at": _epoch_to_iso(next_run),
+        "last_status": j.get("last_state"),
+        "last_error": (str(j.get("last_error") or "") or None),
         "last_delivery_error": j.get("last_delivery_error"),
+        # Timezone + retry posture the store already computes (never nulled):
+        # the configured zone, the pending retry instant/attempt, and whether
+        # the retry ladder is armed at all.
+        "timezone": tz_name or None,
+        "retry_at": _epoch_to_iso(retry_at) if retry_at > 0 else None,
+        "retry_attempt": int(j.get("retry_attempt") or 0),
+        "retry_enabled": retry_enabled,
     }
 
 
@@ -1932,7 +1972,9 @@ def h_cron_jobs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception as exc:
         return _fail(exc)
     jobs = res.get("jobs", res) if isinstance(res, dict) else res
-    return 200, [_cron_shape(j) for j in (jobs or [])]
+    tz_name = str(res.get("timezone", "") or "") if isinstance(res, dict) else ""
+    return 200, [_cron_shape(j, cfg=cfg, tz_name=tz_name)
+                 for j in (jobs or [])]
 
 
 def h_cron_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1950,7 +1992,8 @@ def h_cron_job_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 404, {"ok": False, "code": res.get("code", "NOT_FOUND"),
                      "detail": _redact(res.get("error", ""))[:200]}
     job = res.get("job", res) if isinstance(res, dict) else {}
-    return 200, _cron_shape(job if isinstance(job, dict) else {})
+    return 200, _cron_shape(job if isinstance(job, dict) else {},
+                            cfg=cfg, tz_name=_cron_timezone(cfg))
 
 
 def h_cron_job_runs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2374,6 +2417,91 @@ def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                probe=str(out.get("probe", "local-validation")),
                network_probe=bool(out.get("network_probe", False)),
                detail=out["detail"])
+
+
+#: Read-only MCP capability reads (resources / prompts / resource templates).
+#: The vendored router exposes the same three reads over the fork's MCP config
+#: registry (``qubit_runtime/qubit_cli/web_routers/mcp.py``); the dashboard
+#: ``/agent/api/mcp/servers`` prefix is quarantined to this compat table, so
+#: they are served here against the canonical ``voicebridge.mcp_servers``
+#: registry and the ONE brokered client transport (never a second MCP client).
+_MCP_CAPABILITY_KEYS = {
+    "resources": "resources",
+    "prompts": "prompts",
+    "resource-templates": "resource_templates",
+}
+_MCP_CAPABILITY_RESULT_KEYS = {
+    "resources": "resources",
+    "prompts": "prompts",
+    "resource-templates": "resourceTemplates",
+}
+
+
+def _mcp_capability_read(cfg: Any, p: Dict[str, str],
+                         capability: str) -> Tuple[int, Dict[str, Any]]:
+    """Resolve a server from the canonical registry and drain one list.
+
+    Read-only: no confirmation. The canonical ``list_capability`` still honors
+    the shared e-stop and the method gate (enabled + runnable). A real drained
+    list is returned verbatim; an inventory-only server returns its honest typed
+    OPERATOR_ONLY disposition; an unknown server is a typed 404. A transport
+    failure is surfaced as a typed error, never a fabricated empty list.
+    """
+    from . import mcp_servers as MS
+
+    name = str(p.get("name", p.get("id", "")) or "")
+    key = _MCP_CAPABILITY_KEYS[capability]
+    try:
+        out = MS.list_capability(cfg, name, capability,
+                                 requested_by="dashboard:user")
+    except Exception as exc:
+        code = str(getattr(exc, "code", "") or "")
+        if code in ("MCP_NOT_FOUND", "MCP_BAD_INPUT", "MCP_STORE_CORRUPT",
+                    "SECRET_WRITE_REFUSED"):
+            return _mcp_error(exc)
+        return 200, {
+            "ok": False, "state": "ERROR", "server": name,
+            "capability": capability, "connected": False,
+            "code": code or "MCP_READ_FAILED",
+            "detail": _redact(str(getattr(exc, "detail", exc)))[:300],
+            "qubit_counterpart": ("CLI `qubit mcp invoke` / the agent MCP "
+                                  "resource tools"),
+        }
+    if out.get("state") != "OK":
+        return _ok(server=name, capability=capability, state=out.get("state"),
+                   connected=False, invocable=False, code=out.get("code"),
+                   detail=out.get("detail"),
+                   operator_prerequisite=out.get("operator_prerequisite"),
+                   qubit_counterpart=out.get("qubit_counterpart"),
+                   authority=out.get("authority"), **{key: []})
+    result = out.get("result") if isinstance(out.get("result"), dict) else {}
+    items = result.get(_MCP_CAPABILITY_RESULT_KEYS[capability])
+    if not isinstance(items, list):
+        items = []
+    return _ok(server=name, capability=capability, state="OK",
+               connected=True, code="MCP_READ_OK", count=len(items),
+               names=out.get("names"), result=result,
+               authority=out.get("authority"), detail=out.get("detail"),
+               **{key: items})
+
+
+def h_mcp_server_resources(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/servers/{name}/resources -> real resources/list (read-only)."""
+    return _mcp_capability_read(cfg, p, "resources")
+
+
+def h_mcp_server_prompts(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/servers/{name}/prompts -> real prompts/list (read-only)."""
+    return _mcp_capability_read(cfg, p, "prompts")
+
+
+def h_mcp_server_resource_templates(cfg: Any, q: Dict[str, str],
+                                    b: Dict[str, Any], p: Dict[str, str]
+                                    ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/mcp/servers/{name}/resource-templates -> real templates list."""
+    return _mcp_capability_read(cfg, p, "resource-templates")
 
 
 def mcp_invoke(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -3956,10 +4084,11 @@ def _rebrand_chat_message(message: Any) -> Any:
         # tool_call_id), so a nested-only message rendered the tool-result
         # bubble but never the assistant's ``write_file`` invocation or its
         # reasoning. Surface the same values top-level; ``meta`` is preserved.
+        rebranded_meta = out["meta"]
         for key in ("tool_calls", "tool_name", "tool_call_id",
                     "reasoning", "reasoning_content"):
-            if key in meta and key not in out:
-                out[key] = meta[key]
+            if key in rebranded_meta and key not in out:
+                out[key] = rebranded_meta[key]
     return out
 
 
@@ -7006,6 +7135,14 @@ _r("PUT", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
 _r("GET", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth_status")
 _r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth")
 _r("GET", r"/api/mcp/catalog", "h_mcp_catalog_live")
+# Read-only capability reads (resources/prompts/resource-templates). The
+# vendored router serves them over the fork's MCP config registry; the
+# dashboard ``/agent/api/mcp/servers`` prefix is quarantined to this table, so
+# the canonical Qubit registry + brokered client must own them here.
+_r("GET", r"/api/mcp/servers/(?P<name>[^/]+)/resources", "h_mcp_server_resources")
+_r("GET", r"/api/mcp/servers/(?P<name>[^/]+)/prompts", "h_mcp_server_prompts")
+_r("GET", r"/api/mcp/servers/(?P<name>[^/]+)/resource-templates",
+   "h_mcp_server_resource_templates")
 # Real, confirm-gated tool invocation from the dashboard (the same canonical
 # entry point the CLI/voice use). Placed with the other MCP sub-routes so it is
 # never shadowed by a generic server pattern.
@@ -7287,6 +7424,7 @@ _r("GET", r"/api/recall/policy", "h_recall_policy_get")
 _r("POST", r"/api/recall/policy", "h_recall_policy_set")
 _r("GET", r"/api/recall/resolve", "h_recall_resolve")
 _r("GET", r"/api/recall", "h_recall_query")
+_r("POST", r"/api/recall/update", "h_recall_update")
 _r("POST", r"/api/recall/escalate", "h_recall_escalate")
 _r("GET", r"/api/documents/status", "h_documents_status")
 _r("GET", r"/api/documents/kinds", "h_documents_kinds")
@@ -8624,29 +8762,6 @@ def _need_confirm(action: str) -> Tuple[int, Dict[str, Any]]:
                    "with {\"confirm\": true}", "")
 
 
-def _persona_path(cfg: Any) -> Path:
-    # Canonical Qubit persona store (the write target).
-    return _store_path(cfg, "qubit_persona.json")
-
-
-def _persona_read_path(cfg: Any) -> Path:
-    # Reads fall back to the legacy `hermes_*` name until the next save.
-    return _migrated_read_path(cfg, "qubit_persona.json",
-                               "hermes_persona.json")
-
-
-def _persona_active(cfg: Any) -> str:
-    try:
-        raw = json.loads(_persona_read_path(cfg).read_text())
-        return str(raw.get("active", "") or "")
-    except (OSError, ValueError):
-        return ""
-
-
-def _persona_save(cfg: Any, name: str) -> None:
-    _persona_path(cfg).write_text(json.dumps({"active": name}))
-
-
 def _hidden_path(cfg: Any) -> Path:
     # Canonical Qubit store (the write target).
     return _store_path(cfg, "qubit_hidden.json")
@@ -9015,7 +9130,17 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
     job = res.get("job", {}) if isinstance(res, dict) else {}
-    return 200, _cron_shape(job if isinstance(job, dict) else {})
+    if isinstance(job, dict) and job.get("id") and "next_run_at" not in job:
+        # ``create_job`` returns the raw row; re-read through the store view so
+        # the returned projection honors the configured timezone/retry posture.
+        try:
+            viewed = S.get_job(cfg, int(job["id"]))
+            if isinstance(viewed, dict) and isinstance(viewed.get("job"), dict):
+                job = viewed["job"]
+        except Exception:  # noqa: BLE001 — a read must never break the create
+            pass
+    return 200, _cron_shape(job if isinstance(job, dict) else {},
+                            cfg=cfg, tz_name=_cron_timezone(cfg))
 
 
 def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -9113,7 +9238,8 @@ def skill_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "skills_create",
         f"creating skill {name!r} requires explicit confirmation: "
         "re-POST with {\"confirm\": true}", q, b,
-        payload={"skill_id": name})
+        payload={"skill_id": name, "instructions": content,
+                 "category": category or ""})
     if guard is not None:
         return guard
     try:
@@ -10953,11 +11079,22 @@ def _ft_default_node(cfg: Any) -> str:
 
 
 def _qint(q: Dict[str, str], b: Dict[str, Any], *keys: str, default: int) -> int:
-    raw = _query_text(q, b, *keys)
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return default
+    """Integer query/body param, accepting a JSON int or a numeric string."""
+    for src in (q, b):
+        if not isinstance(src, dict):
+            continue
+        for key in keys:
+            value = src.get(key)
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value:
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    continue
+    return default
 
 
 def h_transfers_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -11037,13 +11174,50 @@ def h_recall_policy_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         max_items=b.get("max_items"), session_scoped=scoped, confirmed=True))
 
 
+def _recall_limit(q: Dict[str, str], b: Dict[str, Any]) -> Optional[int]:
+    """Bounded page size for the recall surface (``None`` = store default)."""
+    raw = b.get("limit") if isinstance(b, dict) else None
+    if isinstance(raw, int) and not isinstance(raw, bool):
+        return raw if raw > 0 else None
+    value = _qint(q, b, "limit", default=0)
+    return value if value > 0 else None
+
+
 def h_recall_query(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import active_memory as AM
     return _surface(AM.recall(
         cfg, _query_text(q, b, "query", "q"),
         session=_query_text(q, b, "session"),
-        limit=b.get("limit")))
+        limit=_recall_limit(q, b),
+        offset=_qint(q, b, "offset", default=0)))
+
+
+def h_recall_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/recall/update -> confirmation-gated in-place memory update.
+
+    Ports the reference memory update path (holographic
+    ``store.py:161 update_fact`` / Mem0 ``_backend.py:32 update``) that the
+    active-recall surface was missing. The mutation is e-stop / disabled gated
+    inside :func:`active_memory.update`; a client ``confirm`` boolean alone is
+    not authority for the write, so without it the request stages the typed
+    confirmation the dashboard settles by re-issuing with the id.
+    """
+    from . import active_memory as AM
+    if not _truthy(b.get("confirm", q.get("confirm", ""))):
+        return _need_confirm("active-recall memory update")
+    confidence = b.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        confidence = None
+    text = b.get("text") if isinstance(b.get("text"), str) else None
+    tier = b.get("tier") if isinstance(b.get("tier"), str) else None
+    return _surface(AM.update(
+        cfg, _qint(q, b, "memory_id", "id", default=0),
+        text=text, tier=tier, confidence=confidence,
+        reason=_query_text(q, b, "reason"),
+        session=_query_text(q, b, "session"),
+        confirmed=True))
 
 
 def h_recall_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -12112,45 +12286,72 @@ def h_fs_write_text(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_files_upload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/files/upload -> real confined UTF-8 text write.
+    """POST /api/files/upload[/-stream] -> real confined, brokered upload.
 
-    Accepts plain ``content`` or a base64 ``data_url``/``content_base64``. The
-    bytes must decode as UTF-8; genuinely-binary uploads are a typed
-    ``FILES_BINARY`` gate (Qubit serves bounded text writes, not binary
-    storage). A text upload runs the same brokered confirmation path as
-    ``/api/fs/write-text``.
+    Ports the reference managed-files upload (``POST /api/files/upload`` JSON
+    ``data_url`` and ``POST /api/files/upload-stream`` multipart ``file`` —
+    ``hermes_cli/web_routers/files.py:493-565``) onto Qubit's ONE confined-write
+    path. An explicit text ``content`` keeps the confined text-patch path
+    (``/api/fs/write-text``); a raw ``content_binary`` or a base64
+    ``data_url``/``content_base64`` payload is written byte-for-byte through the
+    ``local.files_upload`` broker capability, so a genuinely-binary upload is
+    stored (reversibly, from a durable backup) instead of refused. The
+    multipart parser (``voicebridge/webui.py parse_multipart_form``) supplies
+    ``content_binary``/``content_base64`` for the upload field and ``content``
+    only when the bytes decode as UTF-8.
     """
     import base64
+    from . import file_patch as FP
     path = str(b.get("path", q.get("path", "")) or "").strip()
     if not path:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "path required",
                      "qubit_counterpart": "POST /api/fs/write-text"}
     content = b.get("content")
-    if content is None:
-        blob = str(b.get("data_url", b.get("content_base64", "")) or "")
-        if blob:
-            raw = blob.split(",", 1)[1] if blob.startswith("data:") else blob
-            try:
-                data = base64.b64decode(raw, validate=False)
-            except Exception:
-                return 400, {"ok": False, "code": "MALFORMED",
-                             "detail": "content_base64 is not valid base64",
-                             "qubit_counterpart": "POST /api/fs/write-text"}
-            try:
-                content = data.decode("utf-8")
-            except UnicodeDecodeError:
-                return _gate("FILES_BINARY",
-                             "Binary uploads are not stored; Qubit serves "
-                             "bounded UTF-8 text writes through the confined "
-                             "file broker.",
-                             "POST /api/fs/write-text (text only)")
-    if not isinstance(content, str):
+    if isinstance(content, str):
+        # UTF-8 text (JSON ``content`` or a text multipart field) keeps the
+        # confined text-patch path.
+        return h_fs_write_text(cfg, q,
+                               {**b, "path": path, "content": content}, p)
+
+    raw_binary = b.get("content_binary")
+    blob = b.get("content_base64")
+    if blob in (None, ""):
+        blob = b.get("data_url")
+    has_binary = isinstance(raw_binary, (bytes, bytearray)) or bool(blob)
+    if not has_binary:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "content (text) or content_base64 required",
                      "qubit_counterpart": "POST /api/fs/write-text"}
-    return h_fs_write_text(cfg, q,
-                           {**b, "path": path, "content": content}, p)
+    if isinstance(raw_binary, (bytes, bytearray)):
+        payload_b64 = base64.b64encode(bytes(raw_binary)).decode("ascii")
+    else:
+        raw = str(blob)
+        raw = raw.split(",", 1)[1] if raw.startswith("data:") else raw
+        try:
+            base64.b64decode(raw, validate=False)
+        except Exception:
+            return 400, {"ok": False, "code": "MALFORMED",
+                         "detail": "content_base64 is not valid base64",
+                         "qubit_counterpart": "POST /api/fs/write-text"}
+        payload_b64 = raw
+    overwrite = (_truthy(b.get("overwrite"))
+                 if "overwrite" in b else True)
+    counterpart = "CLI `qubit patch rollback` (undo available)"
+    args = {"target_path": path, "content_base64": payload_b64,
+            "overwrite": overwrite, "requested_by": "dashboard:user",
+            "project_root": ""}
+    resp, receipt = _brokered_file_mutation(
+        cfg, FP.write_bytes_capability_name(), args, q=q, b=b, target=path,
+        detail=(f"uploading {path!r} is a brokered, confirmed, reversible "
+                "confined write; re-POST with the confirmation_id to apply"),
+        counterpart=counterpart)
+    if resp is not None:
+        return resp
+    return _ok(ok=True, path=path, state=receipt.get("state"),
+               bytes=receipt.get("bytes_after"),
+               sha256=receipt.get("after_sha256"), receipt=receipt,
+               qubit_counterpart=counterpart)
 
 
 def h_files_mkdir(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -13140,6 +13341,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_recall_policy_get": h_recall_policy_get,
     "h_recall_policy_set": h_recall_policy_set,
     "h_recall_query": h_recall_query,
+    "h_recall_update": h_recall_update,
     "h_recall_resolve": h_recall_resolve,
     "h_recall_escalate": h_recall_escalate,
     "h_documents_status": h_documents_status,
@@ -13218,6 +13420,9 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_mcp_servers": h_mcp_servers,
     "h_mcp_catalog_live": h_mcp_catalog_live,
     "h_mcp_test_local": h_mcp_test_local,
+    "h_mcp_server_resources": h_mcp_server_resources,
+    "h_mcp_server_prompts": h_mcp_server_prompts,
+    "h_mcp_server_resource_templates": h_mcp_server_resource_templates,
     "h_msg_test_live": h_msg_test_live,
     "h_pub": h_pub,
     "h_gateway_drain": h_gateway_drain,

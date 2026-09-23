@@ -380,7 +380,7 @@ def slack_native_slashes() -> list[tuple[str, str, str]]:
     """(slash_name, description, usage_hint) triples for Slack: every gateway-available command
     (canonical names first so they win slots at the cap, then aliases, then plugins) becomes a
     standalone slash, deduped and clamped to the 50-command cap; Slack built-ins and
-    _SLACK_VIA_HERMES_ONLY are skipped. ``/qubit`` is always first for anything dropped."""
+    _SLACK_VIA_QUBIT_ONLY are skipped. ``/qubit`` is always first for anything dropped."""
     available = _gateway_available_commands()
     wanted = [(cmd.name, cmd.description, cmd.args_hint or "") for cmd in available]
     wanted += [(alias, f"Alias for /{cmd.name} — {cmd.description}", cmd.args_hint or "")

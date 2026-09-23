@@ -5,9 +5,33 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { Download, FileText, RefreshCw, Search, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { useSearchParams } from "react-router";
-import { api } from "@/lib/api";
+// `fetchJSON` is the exported request seam from `@/lib/api`. The Logs page
+// needs the additive `offset` page param, which `api.getLogs` does not yet
+// thread through (lib/api.ts is owned by another agent) — calling the same
+// exported function keeps one auth/prefix path instead of a hand-rolled fetch.
+import { fetchJSON, type LogsResponse } from "@/lib/api";
+
+// The vendored status router's additive page fields (see
+// `qubit_cli/web_routers/status.py` get_logs). Declared here because
+// `LogsResponse` in lib/api.ts (owned by another agent) only carries
+// `{file, lines}`; the base shape is unchanged and fully backwards-compatible.
+type LogsPageResponse = LogsResponse & {
+  offset?: number;
+  limit?: number;
+  returned?: number;
+  has_more?: boolean;
+  next_offset?: number | null;
+};
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { FilterGroup, Segmented } from "@nous-research/ui/ui/components/segmented";
@@ -36,6 +60,14 @@ const LINE_COLORS: Record<string, string> = {
   info: "text-foreground",
   debug: "text-text-tertiary",
 };
+
+// Timestamp prefix as emitted by qubit_logging; the detail view shows it
+// separately from the message body. No timestamp => null (traceback lines).
+const LINE_TS_RE = /^(\d{4}-\d{2}-\d{2}[ T][\d:,.]{8,})/;
+
+function lineTimestamp(line: string): string | null {
+  return LINE_TS_RE.exec(line)?.[1] ?? null;
+}
 
 const formatFilterLabel = (value: string) => value.toUpperCase();
 
@@ -74,6 +106,14 @@ export default function LogsPage() {
   const [lines, setLines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Additive page contract (vendored status router `?offset=`): `offset` counts
+  // matching lines skipped from the newest end; `hasMore`/`nextOffset` come from
+  // the server so "Load older" can never invent a page that does not exist.
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  // Row detail view: the index of the expanded line (null = collapsed).
+  const [detailIndex, setDetailIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { t } = useI18n();
   const { setAfterTitle, setEnd } = usePageHeader();
@@ -83,22 +123,42 @@ export default function LogsPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // A filter/file/page-size change starts a fresh newest-first page.
+  useEffect(() => {
+    setOffset(0);
+  }, [file, lineCount, level, component, search]);
+
   const fetchLogs = useCallback(() => {
     setLoading(true);
     setError(null);
-    api
-      .getLogs({ file, lines: lineCount, level, component, search })
+    const qs = new URLSearchParams();
+    qs.set("file", file);
+    qs.set("lines", String(lineCount));
+    if (level && level !== "ALL") qs.set("level", level);
+    if (component && component !== "all") qs.set("component", component);
+    if (search.trim()) qs.set("search", search.trim());
+    if (offset > 0) qs.set("offset", String(offset));
+    fetchJSON<LogsPageResponse>(`/api/logs?${qs.toString()}`)
       .then((resp) => {
         setLines(resp.lines);
-        setTimeout(() => {
-          if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-          }
-        }, 50);
+        setHasMore(Boolean(resp.has_more));
+        setNextOffset(
+          typeof resp.next_offset === "number" ? resp.next_offset : null,
+        );
+        setDetailIndex(null);
+        // Only follow the tail on the newest page; an older page must not yank
+        // the viewport to the bottom.
+        if (offset === 0) {
+          setTimeout(() => {
+            if (scrollRef.current) {
+              scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+          }, 50);
+        }
       })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
-  }, [file, lineCount, level, component, search]);
+  }, [file, lineCount, level, component, search, offset]);
 
   // Download the exact lines currently shown (the server tail + filters are the
   // source of truth; no second backend fetch is invented).
@@ -275,10 +335,45 @@ export default function LogsPage() {
 
       <Card className="min-w-0 max-w-full overflow-hidden">
         <CardHeader className="py-3 px-4">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            {file}.log
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              {file}.log
+              {offset > 0 && (
+                <span className="text-xs font-normal text-text-tertiary">
+                  (older page · offset {offset})
+                </span>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                ghost
+                size="sm"
+                disabled={offset === 0 || loading}
+                onClick={() => setOffset(Math.max(0, offset - lineCount))}
+                aria-label="Load newer lines"
+                title="Newer lines"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Newer
+              </Button>
+              <Button
+                type="button"
+                ghost
+                size="sm"
+                disabled={!hasMore || loading}
+                onClick={() => {
+                  if (nextOffset !== null) setOffset(nextOffset);
+                }}
+                aria-label="Load older lines"
+                title="Older lines"
+              >
+                Older
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {error && (
@@ -298,12 +393,32 @@ export default function LogsPage() {
             )}
             {lines.map((line, i) => {
               const cls = classifyLine(line);
+              const ts = lineTimestamp(line);
+              const expanded = detailIndex === i;
               return (
-                <div
-                  key={i}
-                  className={`${LINE_COLORS[cls]} hover:bg-secondary/20 px-1 -mx-1`}
-                >
-                  {rebrand(line)}
+                <div key={i}>
+                  <button
+                    type="button"
+                    onClick={() => setDetailIndex(expanded ? null : i)}
+                    aria-expanded={expanded}
+                    aria-label={`Log line ${offset + i + 1} detail`}
+                    className={`${LINE_COLORS[cls]} block w-full cursor-pointer text-left hover:bg-secondary/20 px-1 -mx-1`}
+                  >
+                    {rebrand(line)}
+                  </button>
+                  {expanded && (
+                    <div className="my-1 border-l-2 border-secondary bg-secondary/20 px-3 py-2">
+                      <div className="mb-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] uppercase text-text-tertiary">
+                        <span>Line {offset + i + 1}</span>
+                        <span>{cls}</span>
+                        {ts && <span>{ts}</span>}
+                        <span>{line.length} chars</span>
+                      </div>
+                      <pre className="whitespace-pre-wrap break-words text-foreground">
+                        {rebrand(line)}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               );
             })}

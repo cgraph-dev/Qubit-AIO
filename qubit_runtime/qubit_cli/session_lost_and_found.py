@@ -146,7 +146,7 @@ def find_sqlite3_cli() -> Optional[str]:
 
 def _cli_supports_recover(binary: str) -> bool:
     """True when ``binary`` can run ``.recover`` (has sqlite_dbpage)."""
-    scratch_dir = tempfile.mkdtemp(prefix="hermes-recover-probe-")
+    scratch_dir = tempfile.mkdtemp(prefix="qubit-recover-probe-")
     scratch = Path(scratch_dir) / "probe.db"
     try:
         conn = sqlite3.connect(str(scratch))

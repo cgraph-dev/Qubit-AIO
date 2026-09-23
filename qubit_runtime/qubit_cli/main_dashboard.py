@@ -166,7 +166,7 @@ def _pid_unified_cgroup_entries(pid: int):
 
 
 def _get_systemd_service_for_pid(pid: int) -> str | None:
-    """The systemd service unit name *pid* belongs to (``hermes-serve.service``), or None.
+    """The systemd service unit name *pid* belongs to (e.g. ``qubit-serve.service``), or None.
 
     None when the PID isn't part of a service, the file is unreadable, or off Linux.
     """
@@ -471,9 +471,9 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
             "the dashboard again:\n"
             "    qubit dashboard register\n"
             "  It provisions a Qubit Labs OAuth client and writes "
-            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
-            "  Docs: https://hermes-agent.nousresearch.com/docs/"
-            "user-guide/features/web-dashboard#authentication-gated-mode"
+            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into the Qubit home .env for you.\n"
+            "  Docs: run `qubit dashboard register --help` for the authentication-gated "
+            "setup steps."
         )
         sys.exit(0)
 
@@ -548,8 +548,8 @@ def _read_ssh_session_token_file(path: str) -> str:
     if not os.path.isabs(path):
         raise SystemExit("--ssh-session-token-file must be absolute")
 
-    # The Desktop client writes the token under the account's $HOME/.hermes/
-    # desktop-ssh, independent of QUBIT_HOME and the active profile. Anchor
+    # The Desktop client writes the token under the account's default QUBIT_HOME
+    # desktop-ssh, independent of the active profile. Anchor
     # validation there, NOT get_qubit_home(): a non-default profile or a Docker
     # /opt/data root re-homes get_qubit_home() and would reject every token.
     # See #69551.

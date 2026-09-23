@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger("hermes.security_audit")
+logger = logging.getLogger("qubit.security_audit")
 
 # The audit runs once per process even if both the CLI and gateway startup paths call it.
 _AUDIT_RAN = False

@@ -908,7 +908,7 @@ def _macos_codesigning_identity_valid(security: str, identity: str) -> bool:
 def _macos_create_signing_identity(
     openssl: str, security: str, codesign: str, keychain: str, identity: str) -> bool:
     """Create a self-signed code-signing cert (10 years), import it with codesign access, trust it for codeSign."""
-    tmp_dir = Path(tempfile.mkdtemp(prefix="hermes-tcc-"))
+    tmp_dir = Path(tempfile.mkdtemp(prefix="qubit-tcc-"))
     try:
         key = tmp_dir / "sign.key"
         crt = tmp_dir / "sign.crt"

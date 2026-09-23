@@ -46,8 +46,8 @@ REPO = Path(__file__).resolve().parents[1]
 HERMES_PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
 HERMES_TAG = "v0.21.4"
 HERMES_REPO = "https://github.com/NousResearch/hermes-agent"
-OPENCLAW_PIN = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
-OPENCLAW_TAG = "v2026.9.4"
+OPENCLAW_PIN = "da03996ab7203fe6b9b4d8edb2b54726e4394c9c"
+OPENCLAW_TAG = "v2026.4.19-beta.2-28254-gda03996ab7"
 OPENCLAW_REPO = "https://github.com/openclaw/openclaw"
 
 # Ledger revision the inventory reconciles against. The default is the live

@@ -22,10 +22,13 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a checkpoints
 complete -c voicebridge -n '__fish_use_subcommand' -f -a claw
 complete -c voicebridge -n '__fish_use_subcommand' -f -a completion
 complete -c voicebridge -n '__fish_use_subcommand' -f -a computer-use
+complete -c voicebridge -n '__fish_use_subcommand' -f -a config
 complete -c voicebridge -n '__fish_use_subcommand' -f -a console
+complete -c voicebridge -n '__fish_use_subcommand' -f -a cron
 complete -c voicebridge -n '__fish_use_subcommand' -f -a debug
 complete -c voicebridge -n '__fish_use_subcommand' -f -a desktop
 complete -c voicebridge -n '__fish_use_subcommand' -f -a device
+complete -c voicebridge -n '__fish_use_subcommand' -f -a doctor
 complete -c voicebridge -n '__fish_use_subcommand' -f -a documents
 complete -c voicebridge -n '__fish_use_subcommand' -f -a dump
 complete -c voicebridge -n '__fish_use_subcommand' -f -a egress
@@ -57,6 +60,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a memory
 complete -c voicebridge -n '__fish_use_subcommand' -f -a memory-graph
 complete -c voicebridge -n '__fish_use_subcommand' -f -a mic-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a moa
+complete -c voicebridge -n '__fish_use_subcommand' -f -a model
 complete -c voicebridge -n '__fish_use_subcommand' -f -a monitor
 complete -c voicebridge -n '__fish_use_subcommand' -f -a msg
 complete -c voicebridge -n '__fish_use_subcommand' -f -a node
@@ -98,6 +102,7 @@ complete -c voicebridge -n '__fish_use_subcommand' -f -a tools
 complete -c voicebridge -n '__fish_use_subcommand' -f -a transfers
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tts-test
 complete -c voicebridge -n '__fish_use_subcommand' -f -a tui
+complete -c voicebridge -n '__fish_use_subcommand' -f -a update
 complete -c voicebridge -n '__fish_use_subcommand' -f -a usage
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verified-skills
 complete -c voicebridge -n '__fish_use_subcommand' -f -a verify

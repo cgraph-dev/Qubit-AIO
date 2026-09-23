@@ -151,7 +151,7 @@ def upgrade_managed_npm(npm: str, npm_range: str, *, prefix: Path, quiet: bool =
         return False
     try:
         # A temp cwd keeps the checkout's .npmrc (engine-strict, min-release-age) out of scope.
-        with tempfile.TemporaryDirectory(prefix="hermes-npm-upgrade-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="qubit-npm-upgrade-") as tmp:
             result = subprocess.run(
                 [
                     npm, "install", "--global", "--prefix", str(prefix), f"npm@{npm_range}",

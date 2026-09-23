@@ -280,7 +280,7 @@ def audit_branches(repo_root: str) -> List[BranchRecord]:
     workers = max(1, min(8, (os.cpu_count() or 4), len(branches)))
     if workers > 1:
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="hermes-branch-gc") as pool:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="qubit-branch-gc") as pool:
                 return list(pool.map(_classify_branch, branches))
         except Exception:
             pass

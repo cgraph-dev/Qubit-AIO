@@ -10,8 +10,8 @@
       "qubit": {
         "gated": 51,
         "missing": 0,
-        "ported": 511,
-        "total": 562
+        "ported": 512,
+        "total": 563
       },
       "reference": {
         "gated": 78,
@@ -30,8 +30,8 @@
       "control": {
         "gated": 51,
         "missing": 0,
-        "ported": 548,
-        "total": 599
+        "ported": 549,
+        "total": 600
       },
       "route": {
         "gated": 58,
@@ -48,8 +48,8 @@
     },
     "gated": 129,
     "missing": 0,
-    "ported": 1248,
-    "total": 1377
+    "ported": 1249,
+    "total": 1378
   },
   "e2e_verified": false,
   "generated_from": {
@@ -117,11 +117,11 @@
   "qubit_surface_summary": {
     "dashboard_ops.EXTRA_OPS": 35,
     "dashboard_ops.MODEL_PROFILE_OPS": 17,
-    "dashboard_ops.catalog": 562,
+    "dashboard_ops.catalog": 563,
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
     "qubit_compat.GATED": 69,
-    "qubit_compat.ROUTES": 444,
+    "qubit_compat.ROUTES": 448,
     "qubit_voice_top": 113,
     "reference_cli_sub": 313,
     "reference_cli_top": 71,
@@ -129,7 +129,7 @@
     "reference_routes": 272,
     "reference_skills": 30,
     "reference_toolsets": 27,
-    "voice_commands.REGISTRY": 510,
+    "voice_commands.REGISTRY": 511,
     "voice_commands.VOICE_GUARDS": 18
   },
   "rows": [
@@ -14244,6 +14244,26 @@
       "side": "qubit",
       "surface": "control",
       "voice_intent": "qubit recall status",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "PORTED",
+      "evidence": {
+        "qubit": "interfaces=['cli', 'dashboard', 'voice'] backend=REGISTRY/EXTRA_OPS",
+        "reference": "voicebridge/dashboard_ops.py catalog()"
+      },
+      "id": "op recall_update",
+      "interface_reason": null,
+      "interfaces": [
+        "cli",
+        "dashboard",
+        "voice"
+      ],
+      "method": null,
+      "qubit_counterpart": "dashboard_ops.catalog[recall_update] backend=?",
+      "side": "qubit",
+      "surface": "control",
+      "voice_intent": "qubit recall update",
       "voice_intent_verified": false
     },
     {

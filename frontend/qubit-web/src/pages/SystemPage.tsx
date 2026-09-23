@@ -44,7 +44,7 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { QubitConsoleModal } from "@/components/QubitConsoleModal";
 import { cn, themedBody } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { api, ConfirmRequiredError } from "@/lib/api";
 import { parsePolicyRefusal, policyRefusalMessage, refusalOrError } from "@/lib/policy-refusal";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import type {
@@ -374,6 +374,12 @@ export default function SystemPage() {
       showToast(`Gateway ${verb} started`, "success");
       setTimeout(loadAll, 3000);
     } catch (e) {
+      // A declined in-app confirmation rethrows the typed ConfirmRequiredError;
+      // nothing was executed, so report it as cancelled — never as a failure.
+      if (e instanceof ConfirmRequiredError) {
+        showToast(`Gateway ${verb} cancelled — confirmation declined`, "error");
+        return;
+      }
       const refusal = parsePolicyRefusal(e);
       if (refusal) {
         const message = policyRefusalMessage(refusal);

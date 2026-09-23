@@ -184,12 +184,12 @@ def try_fast_version(argv: list[str] | None = None) -> bool:
 
     Only ``--version``/``-V`` (``--version`` carries the full output incl. update status), and never
     when container mode may need to route the command into the container. Termux keeps the
-    HERMES_TERMUX_DISABLE_FAST_CLI escape hatch.
+    QUBIT_TERMUX_DISABLE_FAST_CLI escape hatch.
     """
     if argv is None:
         argv = sys.argv[1:]
     is_termux = is_termux_env()
-    if is_termux and os.environ.get("HERMES_TERMUX_DISABLE_FAST_CLI") == "1":
+    if is_termux and os.environ.get("QUBIT_TERMUX_DISABLE_FAST_CLI") == "1":
         return False
     if is_termux:
         if not is_termux_fast_version_argv(argv):

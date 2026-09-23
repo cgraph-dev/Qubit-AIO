@@ -987,10 +987,13 @@ def parse_multipart_form(raw: bytes,
     ``400 bad json body`` before any handler ran (audit 2026-09-23 D-3 for
     /files). This parses the body into the same dict the JSON path produces:
     text fields decode to ``str``; file fields are delivered as ``bytes``
-    under their field name with metadata under ``_files``. When a file field
-    is present its bytes are also exposed as ``content_base64`` (and as
-    ``content`` when they decode as UTF-8) so the confined text-upload handler
-    can consume it without a second parser. Returns ``None`` when the boundary
+    under their field name with metadata under ``_files``. The first file
+    field is the upload payload: its raw bytes are exposed as
+    ``content_binary`` and, for the broker capability contract, base64-encoded
+    as ``content_base64``; ``content`` is set only when those bytes decode as
+    UTF-8 so the confined text-upload handler keeps its text path while a
+    genuinely-binary upload reaches ``local.files_upload`` unmodified (audit
+    2026-09-23 /files binary upload). Returns ``None`` when the boundary
     is missing or the body is unparseable, so the caller can answer 400.
     """
     boundary = ""
@@ -1035,11 +1038,24 @@ def parse_multipart_form(raw: bytes,
         blob = out.get(first)
         if isinstance(blob, bytes):
             import base64 as _b64
+            # The binary-upload contract: ``content_binary`` is the exact
+            # bytes; ``content_base64`` is the bounded JSON-scalar form the
+            # ``local.files_upload`` broker capability consumes. Both are set
+            # unconditionally for the upload payload so a non-UTF-8 file is
+            # never dropped; ``content`` (text) stays UTF-8-only.
+            out.setdefault("content_binary", blob)
             out.setdefault("content_base64", _b64.b64encode(blob).decode())
             try:
                 out.setdefault("content", blob.decode("utf-8"))
             except UnicodeDecodeError:
                 pass
+        meta = files.get(first) or {}
+        out.setdefault("_upload", {
+            "field": first,
+            "filename": meta.get("filename", ""),
+            "content_type": meta.get("content_type", ""),
+            "size": meta.get("size", 0),
+        })
     return out
 
 

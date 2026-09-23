@@ -719,7 +719,7 @@ def _classify_prune_candidates(repo_root: str, candidates: list) -> list:
     try:
         if workers > 1:
             with concurrent.futures.ThreadPoolExecutor(
-                max_workers=workers, thread_name_prefix="hermes-wt-prune"
+                max_workers=workers, thread_name_prefix="qubit-wt-prune"
             ) as pool:
                 verdicts = list(pool.map(_classify, candidates))
         else:

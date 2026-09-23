@@ -90,7 +90,7 @@ Qubit facts: `qubit_compat.ROUTES` 415 (94 `GATED`) · `dashboard_ops` 562+35
       on product surfaces or Qubit-owned paths (re-baselined: 1,621 strict /
       5,381 case-insensitive files; `qubit_runtime/` = the W9 deep part).
 - [ ] Legal attribution intact (`LICENSE`, `THIRD_PARTY_NOTICES.md`).
-- [~] `frontend/qubit-dist` regenerated; branding scans green. *(wave 12: rebuilt, tsc rc 0, bundle scan green; 2 manifest-hash tests stale until the worktree freeze regenerates the vendor manifest)*
+- [x] `frontend/qubit-dist` regenerated; branding scans green. *(wave 16: rebuilt, tsc rc 0, bundle scan green; the 2 manifest-hash tests now pass with the OpenClaw re-pin `da03996ab7` + regenerated `HERMES_SOURCE_COMPARISON.json` — STATUS §28)*
 
 ## 9. Release — M4
 

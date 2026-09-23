@@ -38,7 +38,7 @@ def _doctor_runtime(plugin_path: Path):
     try:
         # The temp dir enters the stack FIRST so any failure below (ENOSPC / KeyboardInterrupt in
         # copytree) removes it instead of stranding a hermes-plugin-doctor-* directory.
-        home = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="hermes-plugin-doctor-")))
+        home = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="qubit-plugin-doctor-")))
         bundled = home / "bundled-plugins"
         plugins_root = home / "plugins"
         bundled.mkdir(parents=True)

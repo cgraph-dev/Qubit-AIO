@@ -2028,7 +2028,7 @@ _FROZEN_UPDATER_SURFACE: dict[str, tuple[str, ...]] = {
         "_ledger_reapable_backend_pids", "_leftover_pausable_gateway_pids", "_npm_lockfile_changed",
         "_orphaned_desktop_backend_pids", "_park_stashed_changes",
         "_pause_windows_gateways_for_update", "_print_parked_branch_kept_notice",
-        "_print_parked_branch_skip_warning", "_purge_stale_hermes_modules",
+        "_print_parked_branch_skip_warning", "_purge_stale_qubit_modules",
         "_refresh_active_lazy_features", "_refresh_active_memory_provider_dependencies",
         "_refresh_bootstrap_cache_scripts", "_refresh_windows_gateway_launchers",
         "_relaunch_stopped_serves", "_reload_updated_runtime_modules",
@@ -2040,7 +2040,7 @@ _FROZEN_UPDATER_SURFACE: dict[str, tuple[str, ...]] = {
         "_write_update_incomplete_marker",
     ),
     "qubit_cli.dashboard_procs": (
-        "_detect_concurrent_hermes_instances", "_kill_stale_dashboard_processes",
+        "_detect_concurrent_qubit_instances", "_kill_stale_dashboard_processes",
     ),
 }
 _FROZEN_ATTR_SOURCES: dict[str, str] = {
@@ -3003,7 +3003,7 @@ def _try_termux_fast_cli_launch() -> bool:
     """Run obvious Termux non-TUI chat/oneshot/version paths on a light parser."""
     if not _is_termux_startup_environment():
         return False
-    if os.environ.get("HERMES_TERMUX_DISABLE_FAST_CLI") == "1":
+    if os.environ.get("QUBIT_TERMUX_DISABLE_FAST_CLI") == "1":
         return False
 
     argv = sys.argv[1:]

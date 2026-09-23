@@ -55,9 +55,15 @@ def test_voice_unsupported_is_typed(tmp_path):
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page()
+            # The product falls back to local MediaRecorder STT when the
+            # browser speech API is absent, so the true "no speech input
+            # engine" condition is BOTH absent: no SpeechRecognition and no
+            # microphone capture.
             page.add_init_script(
                 "delete window.SpeechRecognition; "
-                "delete window.webkitSpeechRecognition;")
+                "delete window.webkitSpeechRecognition; "
+                "Object.defineProperty(window.navigator, 'mediaDevices', "
+                "{ configurable: true, value: undefined });")
             page.goto(f"http://127.0.0.1:{port}/qubit-chat",
                       timeout=30000)
             page.wait_for_timeout(2000)

@@ -150,8 +150,9 @@ def test_every_normal_route_redirects_into_the_shell(tmp_path):
     from voicebridge.webui import qubit_alias_target
     ui, port = _start(tmp_path)
     try:
+        # Ruling 3 -> Option A: the root lands on the Qubit chat workspace.
         status, loc = _raw(port, "/")
-        assert (status, loc) == (302, "/sessions")
+        assert (status, loc) == (302, "/chat")
         for route in REQUIRED_ROUTES:
             if route == "/":
                 continue

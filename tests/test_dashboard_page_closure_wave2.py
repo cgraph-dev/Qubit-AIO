@@ -279,8 +279,15 @@ def test_chat_routes_are_two_surfaces_one_backend():
     text = OVERLAY_APP.read_text(encoding="utf-8")
     assert '"/chat": TerminalChatPage' in text
     assert '"/qubit-chat": ChatRouteSink' in text
+    # Ruling 3 -> Option A: the root ``/`` lands on ``/chat`` (RootRedirect).
+    # The two chat surfaces themselves must not redirect; scope the ban to
+    # everything except the root redirect so the Ruling-3 root redirect is
+    # allowed while a chat-route redirect is still forbidden.
+    root_redirect = re.search(r"function RootRedirect\(\).*?\n\}", text, re.S)
+    assert root_redirect and 'to="/chat"' in root_redirect.group(0), text
+    without_root = text.replace(root_redirect.group(0), "")
     for bad in ('<Navigate to="/chat"', '<Navigate to="/qubit-chat"'):
-        assert bad not in text, bad
+        assert bad not in without_root, bad
     assert 'from "@/lib/chat-routes"' in text
     assert "isNativeChatPath(pathname)" in text
     # The terminal surface is a real xterm host, not the native transcript.

@@ -438,6 +438,16 @@ def _qbool(q: Dict[str, str], key: str, default: bool = False) -> bool:
     return str(raw).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _qint(q: Dict[str, str], key: str, default: int = 0) -> int:
+    raw = q.get(key)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
 def _kanban_read(cfg: Any, fn_name: str, **kwargs: Any) -> Tuple[int, Any]:
     try:
         module = _kanban_engine(cfg)
@@ -629,22 +639,39 @@ def h_plugin_kanban_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 def h_plugin_kanban_assignees(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                               p: Dict[str, str]) -> Tuple[int, Any]:
     from . import kanban as N
+    # ``offset``/``limit`` page the underlying task scan (the additive Qubit
+    # extension ``kanban.list_tasks`` documents); the default keeps the
+    # reference's full-board assignee union. The paging envelope is reported
+    # honestly so a paging caller never has to guess.
+    limit = _qint(q, "limit", N.LIST_MAX)
+    offset = _qint(q, "offset", 0)
+    if limit <= 0:
+        limit = N.LIST_MAX
     try:
-        out = N.list_tasks(cfg, board=_native_board(q), limit=N.LIST_MAX)
+        out = N.list_tasks(cfg, board=_native_board(q), limit=limit,
+                           offset=max(0, offset))
     except Exception as exc:
         return _kanban_http(exc)
     names = sorted({t["assignee"] for t in out.get("tasks", [])
                     if t.get("assignee")})
     return 200, {"ok": True,
                  "assignees": [{"name": n, "on_disk": False, "counts": {}}
-                               for n in names]}
+                               for n in names],
+                 "offset": int(out.get("offset", 0)),
+                 "limit": int(out.get("limit", limit)),
+                 "total": int(out.get("total", len(names))),
+                 "has_more": bool(out.get("has_more", False))}
 
 
 def h_plugin_kanban_boards(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            p: Dict[str, str]) -> Tuple[int, Any]:
     from . import kanban as N
+    # ``limit=0`` keeps the reference's full-board listing; a positive limit +
+    # offset is the additive Qubit paging extension (kanban.boards_list).
+    limit = _qint(q, "limit", 0)
+    offset = max(0, _qint(q, "offset", 0))
     try:
-        out = N.boards_list(cfg)
+        out = N.boards_list(cfg, limit=max(0, limit), offset=offset)
     except Exception as exc:
         return _kanban_http(exc)
     boards = []
@@ -669,7 +696,10 @@ def h_plugin_kanban_boards(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    "is_current": True, "default_workspace_kind": "scratch",
                    "default_workdir": None, "project_id": None,
                    "project_name": None, "archived": False}]
-    return 200, {"ok": True, "boards": boards, "current": "main"}
+    return 200, {"ok": True, "boards": boards, "current": "main",
+                 "offset": int(out.get("offset", offset)),
+                 "total": int(out.get("total", len(boards))),
+                 "has_more": bool(out.get("has_more", False))}
 
 
 def h_plugin_kanban_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],

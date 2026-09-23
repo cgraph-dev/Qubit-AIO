@@ -75,25 +75,28 @@ fix waves, so they are not defects:
 
 - **Remote plugin index** (reference 240-entry) not ported; Qubit policy refuses
   remote fetch. The local 70-entry catalog is real.
-- **Binary file upload** is text-only; needs a brokered binary store.
-- **Cross-file wiring** for cron timezone/retries, memory update/pagination, and
-  boards pagination: implemented in the stores, not yet reachable from the
-  dashboard/voice routes.
-- `qubit_cli/profiles.py::create_wrapper_script` writes `hermes -p` while
-  `_is_our_wrapper` checks `qubit -p` (legacy brand + wrapper never cleaned up).
-- `agent/plan_prompt.py` + the `plan` skill reference a stale `.hermes/plans/` path.
+- **Binary upload** is brokered + wired; live exercise needs an approved project
+  root (`qubit project add-folder`) — operator prerequisite.
 - The retired `openclaw-migration` script is newer than the canonical
-  `qubit-migration` copy — needs an owner ruling on which is canonical.
-- MCP resources/prompts/templates list routes absent; logs pagination/detail
-  backend contract absent (reference has neither either).
+  `qubit-migration` copy — needs an owner ruling.
+- Deep `qubit_runtime/` identifier rebrand continues (wire/env names preserved) —
+  W9 backlog.
+- 2 differential-parity tests need the pinned byte manifest (owner gate) and 1
+  reachability test reads a frozen archive — not code defects.
 
-### Resolved in the retry wave
+### Resolved in the retry + wave-5 agents
 Skills de-brand finished (0 rewritable prose brand; 146 strict-identifier files
-remain = preserved wire/provenance ids; live 197 skills resolve) · `/chat` slash
-`/toolsets /whoami /version /context` confirmed working · profiles reconciled
-onto the real reference `qubit_cli/profiles.py` registry · env
-`env:/vault:/file:` refs round-trip with `is_set` · channel secret-scope verified
-· gateway restart action status honest `completed/exit 0` · cron/memory/boards
-store support added.
+remain = preserved ids; live 197 skills resolve) · `/chat` slash
+`/toolsets /whoami /version /context` working · profiles reconciled onto the
+real reference `qubit_cli/profiles.py` registry · env `env:/vault:/file:` refs
+round-trip with `is_set` · channel secret-scope verified · gateway restart
+action status honest `completed/exit 0` · cron timezone/retry fields wired ·
+memory recall offset + `/api/recall/update` · boards pagination · binary upload
+brokered · logs offset pagination · `profiles.py` wrapper brand/cleanup bug ·
+`plan_prompt` QUBIT_HOME plans path · `uploadFile` real multipart bytes ·
+**MCP resources/prompts/resource-templates compat passthrough** (live 200) ·
+`qubit_cli` identity de-brand slice · **2 real product bugs fixed** (raw-meta
+brand leak in `_rebrand_chat_message`; `skills_create` id-only settle) · 9 stale
+tests reconciled · generated artifacts regenerated.
 
 No claim of `1:1`, `100%`, `CODE_READY`, `VERIFIED`, `M1`, or `COMPLETE`.

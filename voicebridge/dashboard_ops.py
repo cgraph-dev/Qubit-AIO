@@ -821,6 +821,17 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             return HC.msg_update(cfg, {}, body,
                                  {"id": str(staged.get("id", "") or "")})
         return _run
+    if action == "skills_create":
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            body: Dict[str, Any] = {"confirm": True,
+                                    "skill_id": str(staged.get("skill_id", "") or ""),
+                                    "instructions": staged.get("instructions", ""),
+                                    "category": staged.get("category", "")}
+            return HC.skill_create(cfg, {}, body, {})
+        return _run
     return None
 
 

@@ -150,7 +150,7 @@ class _SetupNavigationState:
         self.replay_choices: list[object] = copy.deepcopy(replay or [])
 
 
-_SETUP_NAVIGATION: ContextVar[_SetupNavigationState | None] = ContextVar("hermes_setup_navigation", default=None)
+_SETUP_NAVIGATION: ContextVar[_SetupNavigationState | None] = ContextVar("qubit_setup_navigation", default=None)
 
 
 def _handle_setup_menu_navigation(event: MenuNavigationEvent, value: object = None) -> MenuNavigationStart | None:

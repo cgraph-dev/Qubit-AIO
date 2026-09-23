@@ -162,46 +162,28 @@
       "status": "OPEN-OPERATOR"
     },
     {
-      "id": "R-files-binary",
+      "id": "R-files-binary-root",
       "severity": "med",
-      "title": "Files upload is text-only; binary upload needs a brokered binary store",
-      "status": "OPEN"
-    },
-    {
-      "id": "R-wiring-cron-memory-boards",
-      "severity": "med",
-      "title": "Cron timezone/retries + memory update/pagination + boards pagination are implemented in the stores but not yet wired to the dashboard/voice routes (qubit_compat h_recall_query/h_plugin_kanban_*; voice_commands _b_active_memory)",
-      "status": "OPEN"
-    },
-    {
-      "id": "R-profiles-wrapper",
-      "severity": "low",
-      "title": "qubit_runtime/qubit_cli/profiles.py create_wrapper_script writes `hermes -p` while _is_our_wrapper checks `qubit -p` (legacy brand + wrapper never cleaned up)",
-      "status": "OPEN"
-    },
-    {
-      "id": "R-plan-prompt-hermes-path",
-      "severity": "low",
-      "title": "agent/plan_prompt.py + plan skill reference stale `.hermes/plans/` path",
-      "status": "OPEN"
+      "title": "Binary upload is brokered + wired; live exercise needs an approved project root (`qubit project add-folder`) \u2014 operator",
+      "status": "OPEN-OPERATOR"
     },
     {
       "id": "R-migration-script-divergence",
       "severity": "low",
-      "title": "Retired openclaw-migration script newer than canonical qubit-migration copy; needs owner ruling on canonical",
+      "title": "Retired openclaw-migration script newer than canonical qubit-migration copy; owner ruling on canonical",
       "status": "OPEN-OPERATOR"
     },
     {
-      "id": "R-mcp-resources",
+      "id": "R-deep-rebrand-identifiers",
       "severity": "low",
-      "title": "MCP resources/prompts/templates list routes absent (vendored transport exposes none)",
+      "title": "Deep qubit_runtime identifier rebrand continues (wire/env names preserved); W9 backlog",
       "status": "OPEN"
     },
     {
-      "id": "R-logs-pagination",
+      "id": "R-frozen-artifact-tests",
       "severity": "low",
-      "title": "Logs pagination/detail backend contract absent (reference has none either)",
-      "status": "OPEN"
+      "title": "2 differential-parity tests need the pinned byte manifest (owner gate) and 1 reachability test reads a frozen archive \u2014 not code defects",
+      "status": "OPEN-OPERATOR"
     }
   ],
   "defects": [
@@ -7519,6 +7501,8 @@
   },
   "verification_corrections": {
     "2026-09-23": "Post-fix live re-verification found several audit FAIL/OPEN rows already real: sessions import/prune/delete-empty/bulk-delete are real confirm-gated handlers (not 501); webhook rotate/test/deliveries/retry are real id-scoped routes (audit searched the wrong path); MCP /api/mcp/catalog returns real entries; pairing GET returns request_id; logs backend supports search. Dispositions in the per-control rows reflect the pre-fix audit; see fixes[] for what landed.",
-    "retry-wave": "2026-09-23 retry wave: skills de-brand finished (0 rewritable prose brand in skills; 146 strict-identifier files remain = preserved wire/provenance ids; live 197 skills resolve, legacy names read-old fallback via skill_view); /chat slash /toolsets /whoami /version /context confirmed working (D-5 was a downstream symptom of the slash-worker PYTHONPATH fix); profiles reconciled from the invented brain-principal store onto the real reference qubit_cli/profiles.py registry (live create/model/desc/SOUL/rename/active/delete round-trips); env env:/vault:/file: refs round-trip with is_set; channel secret-scope verified (allowlists configurable, tokens refused); gateway restart action status returns honest completed/exit 0. New cross-file items added to remaining."
+    "retry-wave": "2026-09-23 retry wave: skills de-brand finished (0 rewritable prose brand in skills; 146 strict-identifier files remain = preserved wire/provenance ids; live 197 skills resolve, legacy names read-old fallback via skill_view); /chat slash /toolsets /whoami /version /context confirmed working (D-5 was a downstream symptom of the slash-worker PYTHONPATH fix); profiles reconciled from the invented brain-principal store onto the real reference qubit_cli/profiles.py registry (live create/model/desc/SOUL/rename/active/delete round-trips); env env:/vault:/file: refs round-trip with is_set; channel secret-scope verified (allowlists configurable, tokens refused); gateway restart action status returns honest completed/exit 0. New cross-file items added to remaining.",
+    "wave-5": "2026-09-23 wave 5 (5 agents): cron timezone/retry fields wired to the wire shape; memory recall offset + /api/recall/update route + voice update action; boards/kanban pagination wired; dead _persona_* handlers removed; binary upload wired through the brokered local.files_upload capability (path-confined, confirm+audit+e-stop; live returns typed FILE_PATCH_OUTSIDE_ROOT until a project root exists); logs offset pagination added (backend additive + LogsPage UI); MCP resources/prompts/resource-templates routes added to the vendored router (not yet reachable via the compat prefix); profiles.py wrapper now writes `qubit -p` and matches _is_our_wrapper (was `hermes -p`); plan_prompt + plan skill point at the QUBIT_HOME plans path; uploadFile now sends real multipart bytes (was lossy file.text()).",
+    "wave-5b": "2026-09-23 wave 5 (second batch): MCP resources/prompts/resource-templates now have a compat passthrough over voicebridge.mcp_servers (live 200, honest typed MCP_PROTOCOL_ERROR for a tools-only server; unknown server 404 MCP_NOT_FOUND); qubit_cli identity de-brand slice (_get_default_qubit_home, console-script/argv identity, honcho qubit_ prefix with read-old, plan paths, relaunch/PATH, main_dashboard OAuth help) with wire/env names preserved; 9 stale tests reconciled across Ruling 3 / sessions / e-stop code / profiles registry; TWO REAL PRODUCT BUGS found and fixed: (1) qubit_compat _rebrand_chat_message copied top-level tool_name/tool_calls/reasoning from the RAW meta instead of the rebranded meta (brand leak on the CLI/dashboard wire shape); (2) skills_create was staged by _compat_confirm but _compat_runner had no branch (id-only confirm returned 400 CONFIRM_UNSUPPORTED) \u2014 payload now carries the manifest and the runner re-enters skill_create; generated artifacts regenerated (completions 114 commands, openclaw gap ledger, route ownership); tri-parity test now reads the canonical docs/generated ledger (not the frozen archive); frontend SystemPage cancel honesty + sidebar no-double-confirm; achievements Reset confirmed confirmation-gated; analytics export + docs examples confirmed absent upstream; gateway independence sweep clean + regression test added."
   }
 }
