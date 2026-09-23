@@ -716,7 +716,7 @@ class LocalEnvironment(BaseEnvironment):
         so always the QUBIT_HOME cache dir with forward slashes (bash- and Python-valid)."""
         if _IS_WINDOWS:
             cache_dir = (_default_terminal_temp_dir()
-                         or Path(tempfile.gettempdir()) / "hermes_terminal")
+                         or Path(tempfile.gettempdir()) / "qubit_terminal")
             cache_dir.mkdir(parents=True, exist_ok=True)
             _prune_terminal_temp_once()
             return str(cache_dir).replace("\\", "/")

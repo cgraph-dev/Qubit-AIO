@@ -3,8 +3,8 @@
 Sandboxes (Docker/Modal/SSH) hold only opaque proxy tokens; iron-proxy — a TLS-intercepting,
 default-deny egress firewall — swaps them for real credentials on the way out, so a leaked
 token is useless outside the trusted proxy boundary.  The pinned binary is auto-installed
-into ``<hermes_home>/bin``; CA, ``proxy.yaml``, ``mappings.json``, pidfile and logs live in
-``<hermes_home>/proxy``.  Failures warn and never block agent startup.
+into ``<qubit_home>/bin``; CA, ``proxy.yaml``, ``mappings.json``, pidfile and logs live in
+``<qubit_home>/proxy``.  Failures warn and never block agent startup.
 """
 
 from __future__ import annotations
@@ -188,7 +188,7 @@ def _platform_asset_name() -> str:
 
 
 def find_iron_proxy(*, install_if_missing: bool = False) -> Optional[Path]:
-    """Managed ``<hermes_home>/bin`` copy first, then PATH; optionally auto-install."""
+    """Managed ``<qubit_home>/bin`` copy first, then PATH; optionally auto-install."""
     managed = _qubit_bin_dir() / _platform_binary_name()
     if managed.exists() and os.access(managed, os.X_OK):
         return managed
@@ -210,7 +210,7 @@ def install_iron_proxy(*, force: bool = False) -> Path:
     if target.exists() and not force:
         return target
     asset_name = _platform_asset_name()
-    with tempfile.TemporaryDirectory(prefix="hermes-iron-proxy-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="qubit-iron-proxy-") as tmpdir:
         archive_path, checksum_path = (tmp := Path(tmpdir)) / asset_name, tmp / _IRON_PROXY_CHECKSUM_NAME
         logger.info("Downloading %s", f"{_IRON_PROXY_RELEASE_BASE}/{asset_name}")
         _release_asset(asset_name, archive_path)
@@ -355,7 +355,7 @@ def ensure_ca_cert(*, force: bool = False) -> Tuple[Path, Path]:
         return ca_crt, ca_key
     if shutil.which("openssl") is None:
         raise RuntimeError("openssl not found on PATH. Install OpenSSL (apt: `openssl`, brew: `openssl`) to generate the iron-proxy CA cert.")
-    with tempfile.TemporaryDirectory(prefix="hermes-proxy-ca-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="qubit-proxy-ca-") as tmpdir:
         tmp_key, tmp_crt = Path(tmpdir) / "ca.key", Path(tmpdir) / "ca.crt"
         _run(["openssl", "genrsa", "-out", str(tmp_key), "4096"], timeout=60, check=True)
         _run(["openssl", "req", "-x509", "-new", "-nodes", "-key", str(tmp_key), "-sha256", "-days", "3650", "-subj", "/CN=qubit iron-proxy CA",
@@ -588,7 +588,7 @@ def _write_state_file_atomic(state: Path, name: str, dump) -> Path:
 
 
 def write_proxy_config(config: Dict) -> Path:
-    """Serialize the config dict to ``<hermes_home>/proxy/proxy.yaml`` (safe_dump, no Python tags)."""
+    """Serialize the config dict to ``<qubit_home>/proxy/proxy.yaml`` (safe_dump, no Python tags)."""
     if (yaml := _yaml()) is None:
         raise RuntimeError("PyYAML is required to write the iron-proxy config but is not installed.")
     return _write_state_file_atomic(_proxy_state_dir(), "proxy.yaml", lambda f: yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False))

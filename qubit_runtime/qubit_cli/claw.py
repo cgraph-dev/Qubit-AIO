@@ -13,19 +13,27 @@ from typing import Callable, Optional
 from qubit_cli.config import get_qubit_home, get_config_path, load_config, save_config
 from qubit_constants import get_optional_skills_dir
 from qubit_cli.setup import (Colors, color, print_header, print_info, print_success, print_error,
-                              prompt_yes_no)
+                              print_warning, prompt_yes_no)
 
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-_SCRIPT_REL = Path("migration", "openclaw-migration", "scripts", "openclaw_to_hermes.py")
-_OPENCLAW_SCRIPT = get_optional_skills_dir(PROJECT_ROOT / "optional-skills") / _SCRIPT_REL
+# Owner decision #3 (2026-09-23): `qubit-migration` is the canonical migration
+# skill. The retired `openclaw-migration` frame is retained as a read-old
+# compatibility alias only — it is never deleted — and is used only when the
+# canonical skill is absent (read-old/write-new; no user data is lost).
+_CANONICAL_SCRIPT_REL = Path("migration", "qubit-migration", "scripts", "openclaw_to_hermes.py")
+_LEGACY_SCRIPT_REL = Path("migration", "openclaw-migration", "scripts", "openclaw_to_hermes.py")
+_OPENCLAW_SCRIPT = get_optional_skills_dir(PROJECT_ROOT / "optional-skills") / _CANONICAL_SCRIPT_REL
 # Fallback: user may have installed the skill from the Hub
-_OPENCLAW_SCRIPT_INSTALLED = get_qubit_home() / "skills" / _SCRIPT_REL
+_OPENCLAW_SCRIPT_INSTALLED = get_qubit_home() / "skills" / _CANONICAL_SCRIPT_REL
+_LEGACY_OPENCLAW_SCRIPT = get_optional_skills_dir(PROJECT_ROOT / "optional-skills") / _LEGACY_SCRIPT_REL
+_LEGACY_OPENCLAW_SCRIPT_INSTALLED = get_qubit_home() / "skills" / _LEGACY_SCRIPT_REL
 
-# Known Qubit directory names (current + legacy)
-_OPENCLAW_DIR_NAMES = (".qubit", ".clawdbot", ".moltbot")
+# Known Qubit directory names (current + legacy). `.openclaw` is the upstream
+# legacy home, kept for read-old source detection.
+_OPENCLAW_DIR_NAMES = (".qubit", ".openclaw", ".clawdbot", ".moltbot")
 
 # `qubit claw migrate` flags/defaults. Secrets are never included implicitly: --migrate-secrets
 # is required even under --preset full (Qubit's two-phase posture); no silent API-key import.
@@ -170,9 +178,37 @@ def _warn_if_gateway_running(auto_yes: bool) -> None:
         sys.exit(0)
 
 
+def _migration_script_candidates() -> tuple[Path, ...]:
+    """Migration script locations, canonical `qubit-migration` first.
+
+    The retired `openclaw-migration` frame is a read-old compatibility alias:
+    it is consulted only when no canonical copy exists, and it is never
+    removed.
+    """
+    return (_OPENCLAW_SCRIPT, _OPENCLAW_SCRIPT_INSTALLED,
+            _LEGACY_OPENCLAW_SCRIPT, _LEGACY_OPENCLAW_SCRIPT_INSTALLED)
+
+
+def _is_legacy_migration_script(script: Path) -> bool:
+    """True when *script* is the retired `openclaw-migration` frame."""
+    return script in (_LEGACY_OPENCLAW_SCRIPT, _LEGACY_OPENCLAW_SCRIPT_INSTALLED)
+
+
 def _find_migration_script() -> Path | None:
-    """Find the openclaw_to_hermes.py script in known locations."""
-    return next((c for c in (_OPENCLAW_SCRIPT, _OPENCLAW_SCRIPT_INSTALLED) if c.exists()), None)
+    """Find the migration script, preferring the canonical `qubit-migration`."""
+    return next((c for c in _migration_script_candidates() if c.exists()), None)
+
+
+def _warn_legacy_migration_script(script: Path) -> None:
+    """Loud deprecation note when only the retired frame is available."""
+    if not _is_legacy_migration_script(script):
+        return
+    print_warning(
+        f"Deprecated: using the retired 'openclaw-migration' skill at {script}.")
+    print_info(
+        "The canonical migration skill is 'qubit-migration'. Install or enable "
+        "it to use the supported path. The legacy frame is preserved (never "
+        "deleted), so no user data is lost.")
 
 
 def _load_migration_module(script_path: Path):
@@ -249,9 +285,10 @@ def _cmd_migrate(args):
     script_path = _find_migration_script()
     if not script_path:
         return _error_block(
-            "Migration script not found.", "Expected at one of:", f"  {_OPENCLAW_SCRIPT}",
-            f"  {_OPENCLAW_SCRIPT_INSTALLED}",
-            "Make sure the openclaw-migration skill is installed.")
+            "Migration script not found.", "Expected at one of:",
+            *(f"  {candidate}" for candidate in _migration_script_candidates()),
+            "Make sure the qubit-migration skill is installed.")
+    _warn_legacy_migration_script(script_path)
     opts.qubit_home = get_qubit_home()
     print()
     print_header("Migration Settings")

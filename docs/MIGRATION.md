@@ -33,8 +33,23 @@ Qubit's home = `~/.local/state/qubit-voicebridge/runtime/` (resolved by
 
 ## Existing tooling (reuse, do not reinvent)
 
+- **Canonical migration skill: `qubit-migration`** (owner decision #3,
+  2026-09-23). Skill dir `qubit_runtime/optional-skills/migration/qubit-migration/`;
+  entry script `scripts/openclaw_to_hermes.py`; reached through the
+  `qubit claw migrate` command and the `qubit setup` first-run flow. The
+  `qubit-migration` script is the canonical implementation (it carries the
+  upstream data-safety fixes: refuse-to-overwrite an unreadable `config.yaml`,
+  atomic YAML writes).
+- **Compatibility alias: `openclaw-migration`** (retired frame). It is a
+  read-old alias only: the skill name resolves to `qubit-migration`
+  (`agent.skill_utils.resolve_legacy_skill_name`), the entry points fall back to
+  the legacy frame **only when no canonical copy exists** (with a loud
+  deprecation note naming `qubit-migration`), and the frame is archived by
+  `migrate_legacy_skill_dirs` — **never deleted** (read-old/write-new; no user
+  data is lost).
 - `voicebridge/qubit_migration.py` — the real user-data migration
-  (read-only source, backed up, idempotent, reversible).
+  (read-only source, backed up, idempotent, reversible), surfaced as
+  `qubit product legacy-migrate` (aliases `hermes-migrate`).
 - `voicebridge/qubit_runtime.py::migrate_legacy_homes`.
 - CLI: `qubit product migrate` (branding) and the separate user-data migration.
 - `claw` — legacy-assistant migration tools (confirm-gated).

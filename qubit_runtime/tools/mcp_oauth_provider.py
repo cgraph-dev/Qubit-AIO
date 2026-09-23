@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class QubitProviderMixin:
     """Token-endpoint fixes layered over the SDK's ``OAuthClientProvider`` (must precede it in
-    the MRO; subclasses set ``_hermes_logger`` to keep their own logger name).
+    the MRO; subclasses set ``_qubit_logger`` to keep their own logger name).
 
     - Supabase-style dynamic registration returns a ``client_secret`` but omits
       ``token_endpoint_auth_method``; the SDK then treats the client as public and the token
@@ -55,7 +55,7 @@ class QubitProviderMixin:
         return request
 
     def _coerce_client_secret_post(self) -> None:
-        """Same rule as ``HermesTokenStorage._coerce_secret_auth_method``, applied to the
+        """Same rule as ``QubitTokenStorage._coerce_secret_auth_method``, applied to the
         in-memory client info BEFORE the SDK builds a token-endpoint request from it."""
         info = self.context.client_info
         if not info:
@@ -111,7 +111,7 @@ class QubitProviderMixin:
         return True
 
 
-def prepare_oauth_config(server_name: str, server_url: str, oauth_config: dict | None) -> tuple[dict, "HermesTokenStorage"]:
+def prepare_oauth_config(server_name: str, server_url: str, oauth_config: dict | None) -> tuple[dict, "QubitTokenStorage"]:
     """Copy the ``oauth:`` block, apply provider defaults, open its token storage. The copy
     matters: later steps record ``_resolved_port`` / ``_cimd_url`` in the dict, which must
     never leak back into the caller's config."""
@@ -121,7 +121,7 @@ def prepare_oauth_config(server_name: str, server_url: str, oauth_config: dict |
     return cfg, mo.QubitTokenStorage(server_name)
 
 
-def build_provider_kwargs(cfg: dict, storage: "HermesTokenStorage", *, ssh_proxy_hint: bool) -> dict[str, Any]:
+def build_provider_kwargs(cfg: dict, storage: "QubitTokenStorage", *, ssh_proxy_hint: bool) -> dict[str, Any]:
     """Resolve the callback port and return the shared provider constructor kwargs. Order
     matters: metadata needs the resolved port, pre-registration needs the metadata.
     ``ssh_proxy_hint`` lets the redirect handler tailor its remote-session hint to a configured

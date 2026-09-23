@@ -50,14 +50,14 @@ def _remember_room_retention(request: "web.Request", claims: dict[str, Any]) -> 
     try:
         request[_ROOM_RETENTION_REQUEST_KEY] = value
     except (AttributeError, TypeError):
-        setattr(request, "_hermes_room_run_retention_until", value)
+        setattr(request, "_qubit_room_run_retention_until", value)
 
 
 def _room_retention_until(request: "web.Request") -> float:
     try:
         value = request.get(_ROOM_RETENTION_REQUEST_KEY, 0)
     except AttributeError:
-        value = getattr(request, "_hermes_room_run_retention_until", 0)
+        value = getattr(request, "_qubit_room_run_retention_until", 0)
     return max(0.0, float(value or 0))
 
 

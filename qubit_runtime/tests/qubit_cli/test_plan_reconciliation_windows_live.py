@@ -49,7 +49,7 @@ def test_plan_reconciliation_live_windows(tmp_path, monkeypatch):
         }), encoding="utf-8")
 
         import qubit_cli.profiles as profiles_mod
-        monkeypatch.setattr(profiles_mod, "_get_default_hermes_home", lambda: home)
+        monkeypatch.setattr(profiles_mod, "_get_default_qubit_home", lambda: home)
         monkeypatch.setattr(profiles_mod, "_get_profiles_root", lambda: tmp_path / "none")
 
         from qubit_cli.update_inventory import (

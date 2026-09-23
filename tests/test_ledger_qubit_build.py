@@ -40,7 +40,7 @@ def _load_module(name: str, filename: str):
 rebuild = _load_module("rebuild_ledger_qubit", "rebuild_ledger_qubit.py")
 gap_ledger = _load_module("gap_ledger", "gap_ledger.py")
 
-SECTION_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.qubit.json"
+SECTION_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.qubit.json"
 
 
 def _section() -> dict:
@@ -341,7 +341,7 @@ def test_missing_registry_entry_is_flagged_not_fatal() -> None:
 
 
 def test_all_sections_merge_without_schema_violation() -> None:
-    docs = REPO_ROOT / "docs" / "archive" / "2026-09-21"
+    docs = REPO_ROOT / "docs" / "generated"
     sections, missing, warnings = gap_ledger.load_sections(docs)
     assert missing == [], f"missing required ledger sections: {missing}"
     assert {s["file_section"] for s in sections} == set(gap_ledger.SECTIONS)

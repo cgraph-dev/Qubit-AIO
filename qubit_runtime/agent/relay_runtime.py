@@ -705,7 +705,7 @@ class RelayRuntime:
             return
         thread = threading.Thread(
             target=lambda: (self._operations_idle.wait(), self._finish_shutdown()),
-            name=f"hermes-nemo-relay-shutdown-{self.runtime_id[:8]}", daemon=True,
+            name=f"qubit-nemo-relay-shutdown-{self.runtime_id[:8]}", daemon=True,
         )
         try:
             thread.start()
@@ -824,7 +824,7 @@ class RelayTurnContext:
 
 
 _CURRENT_TURN: contextvars.ContextVar[RelayTurnContext | None] = contextvars.ContextVar(
-    "hermes_relay_turn", default=None
+    "qubit_relay_turn", default=None
 )
 
 # >0 while the native pipeline is mid-dispatch of a Qubit tool/LLM callback. Nested managed
@@ -832,7 +832,7 @@ _CURRENT_TURN: contextvars.ContextVar[RelayTurnContext | None] = contextvars.Con
 # loop, blocked inside the synchronous callback), so resolve_execution_context() bypasses Relay.
 # A ContextVar so the marker follows copy_context() into worker threads / per-thread loops.
 _MANAGED_CALLBACK_DEPTH: contextvars.ContextVar[int] = contextvars.ContextVar(
-    "hermes_relay_managed_callback_depth", default=0
+    "qubit_relay_managed_callback_depth", default=0
 )
 
 
@@ -1234,7 +1234,7 @@ def _resolve_plugin_awaitable(value: Any) -> Any:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(value)
-    return _run_on_daemon_thread(lambda: asyncio.run(value), name="hermes-nemo-relay-plugin-lifecycle")
+    return _run_on_daemon_thread(lambda: asyncio.run(value), name="qubit-nemo-relay-plugin-lifecycle")
 
 
 def _session_id(event: dict[str, Any]) -> str:

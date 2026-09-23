@@ -18,7 +18,7 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 SERVED_MODEL_HEADERS: tuple[str, ...] = ("x-litellm-model-id", "x-litellm-model-api-base")
-_HOOK_MARK = "_hermes_served_model_hook"
+_HOOK_MARK = "_qubit_served_model_hook"
 
 
 def served_model_from_headers(headers: Any) -> Optional[str]:

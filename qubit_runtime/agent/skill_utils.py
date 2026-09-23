@@ -394,7 +394,7 @@ def display_skill_create_dir() -> str:
 
 
 def get_all_skills_dirs() -> List[Path]:
-    """Skill dirs: local ``~/.hermes/skills/`` first, then create_dir, then external.
+    """Skill dirs: the Qubit home ``skills/`` first, then create_dir, then external.
     Trusted project dirs are NOT included (higher precedence; see get_project_skills_dirs)."""
     dirs = [get_skills_dir()]
     create_dir = get_skill_create_dir()
@@ -589,7 +589,7 @@ def normalize_skill_lookup_name(identifier: str) -> str:
         except Exception:
             pass
     # Prefer the lexical path under a trusted root before resolving symlinks:
-    # ~/.hermes/skills/<name> may be a symlink to a checkout elsewhere, and
+    # a Qubit home ``skills/<name>`` may be a symlink to a checkout elsewhere, and
     # resolving first would turn that trusted path into one skill_view rejects.
     for root in trusted_roots:
         if identifier_path.is_relative_to(root):
@@ -860,7 +860,7 @@ _DEBRAND_DOCS_HOST = re.compile(
 _DEBRAND_DOCS_ENDPOINT = "/agent/openapi.json"
 #: Doc-only home rewrites (user-facing paths -> the canonical QUBIT_HOME).
 _DEBRAND_HOME_DOC = re.compile(r"(?:~|\$\{HOME\}|\$HOME)/\.hermes")
-_DEBRAND_HERMES_HOME_DOC = re.compile(r"\bHERMES_HOME\b")
+_DEBRAND_QUBIT_HOME_DOC = re.compile(r"\bHERMES_HOME\b")
 #: Collapse a QUBIT_HOME parameter expansion whose fallback is the legacy home
 #: (``${QUBIT_HOME:-~/.hermes}`` / ``${HERMES_HOME:-$HOME/.hermes}``) to the
 #: canonical ``$QUBIT_HOME`` instead of leaving a degenerate ``${X:-$QUBIT_HOME}``.
@@ -911,7 +911,7 @@ def debrand_skill_text(
     if is_doc:
         out = _DEBRAND_HOME_FALLBACK_DOC.sub("$QUBIT_HOME", out)
         out = _DEBRAND_HOME_SELF_DOC.sub("$QUBIT_HOME", out)
-        out = _DEBRAND_HERMES_HOME_DOC.sub("QUBIT_HOME", out)
+        out = _DEBRAND_QUBIT_HOME_DOC.sub("QUBIT_HOME", out)
         out = _DEBRAND_HOME_DOC.sub("$QUBIT_HOME", out)
     # Collapse the upstream docs host to the Qubit-owned endpoint before the
     # general URL mask hides it (see _DEBRAND_DOCS_HOST).

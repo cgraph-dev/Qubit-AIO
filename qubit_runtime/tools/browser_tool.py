@@ -326,7 +326,7 @@ def _last_session_key(task_id: str) -> str:
 
 
 def _socket_safe_tmpdir() -> str:
-    """Short temp dir for Unix sockets: macOS ``TMPDIR`` + ``agent-browser-hermes_…``
+    """Short temp dir for Unix sockets: macOS ``TMPDIR`` + ``agent-browser-<session>…``
     exceeds the 104-byte AF_UNIX limit (silent screenshot failures), so use /tmp there."""
     return "/tmp" if sys.platform == "darwin" else tempfile.gettempdir()
 

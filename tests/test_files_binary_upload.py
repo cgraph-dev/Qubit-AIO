@@ -76,6 +76,39 @@ def test_binary_write_requires_confirmation(tmp_path, monkeypatch):
     assert target.read_bytes() == BLOB
 
 
+# ------------------------------------------------------- registry -> root bridge
+def test_registered_project_folder_is_approved_root(tmp_path, monkeypatch):
+    """A folder added through the canonical project registry is exactly the
+    approved root the confined upload path resolves against.
+
+    Owner Decision #2 (2026-09-23) approved a real repo folder as the
+    binary-upload project root. This pins the bridge the live proof exercises:
+    ``projects.create``/``add_folder`` -> ``files.approved_roots`` ->
+    ``file_patch.resolve_target`` accepts an in-root file and refuses an
+    out-of-root one.
+    """
+    from voicebridge import files as FS
+    from voicebridge import projects as PJ
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    root = tmp_path / "approved-repo"
+    root.mkdir()
+    other = tmp_path / "not-approved"
+    other.mkdir()
+    PJ.create(cfg, "Approved", [str(root)], requested_by="t",
+              confirmed=True, use=True)
+
+    approved = FS.approved_roots(cfg)
+    assert root.resolve() in approved, approved
+
+    inside = root / "probe.bin"
+    assert FP.resolve_target(cfg, str(inside)) == inside.resolve()
+
+    with pytest.raises(FP.FilePatchError) as exc:
+        FP.resolve_target(cfg, str(other / "probe.bin"))
+    assert exc.value.code == FP.OUTSIDE_ROOT_CODE
+
+
 # --------------------------------------------------------------- confinement
 def test_binary_write_rejects_traversal(tmp_path, monkeypatch):
     if not _confinement_ok():

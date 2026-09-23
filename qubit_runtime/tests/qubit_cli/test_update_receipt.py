@@ -279,7 +279,7 @@ class TestFleetClassification:
                                    "version": "1.0", "source": "git"},
         )
         monkeypatch.setattr(
-            "qubit_cli.profiles._get_default_hermes_home", lambda: home
+            "qubit_cli.profiles._get_default_qubit_home", lambda: home
         )
         monkeypatch.setattr(
             "qubit_cli.profiles._get_profiles_root",
@@ -321,7 +321,7 @@ class TestFleetClassification:
             json.dumps({"pid": 999999, "code_sha": "a" * 40}), encoding="utf-8"
         )
         monkeypatch.setattr(
-            "qubit_cli.profiles._get_default_hermes_home", lambda: home
+            "qubit_cli.profiles._get_default_qubit_home", lambda: home
         )
         monkeypatch.setattr(
             "qubit_cli.profiles._get_profiles_root",

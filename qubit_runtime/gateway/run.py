@@ -1525,7 +1525,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from qubit_constants import get_qubit_home, get_qubit_home_override
 _qubit_home = get_qubit_home()
 
-# Load ~/.hermes/.env first: user-managed env files must override stale shell exports on restart.
+# Load the Qubit home .env first: user-managed env files must override stale shell exports on restart.
 from qubit_cli.env_loader import load_qubit_dotenv
 _env_path = _qubit_home / '.env'
 load_qubit_dotenv(qubit_home=_qubit_home, project_env=Path(__file__).resolve().parents[1] / '.env')
@@ -1774,7 +1774,7 @@ def _platform_has_bot_credential(platform: "Platform", platform_config: "Platfor
     # transient failure — after which it stays down until the gateway is restarted by hand. Mirror the
     # adapter's own gate: homeserver + user_id + password. Read ONLY from extra, never os.getenv:
     # build_config() already copies all three env vars onto extra, and importing this module loads
-    # ~/.hermes/.env, so an env fallback would report "has credential" for every Matrix config on the box —
+    # the Qubit home .env, so an env fallback would report "has credential" for every Matrix config on the box —
     # including the empty-primary multiplex case (#64674) this check exists to evict.
     if platform is not Platform.MATRIX:
         return False
@@ -3642,7 +3642,7 @@ class GatewayRunner(
             if borrowed is not None:
                 wrapper = AsyncSessionDB(borrowed)
                 # close_all_session_db_handles() must not close what the store owns (its sweep runs first).
-                wrapper.__dict__["_hermes_borrowed_handle"] = True
+                wrapper.__dict__["_qubit_borrowed_handle"] = True
                 return wrapper
             if store is not None:
                 # Store handle unavailable: opening our own would resurrect the duplicate borrowed away.
@@ -3680,7 +3680,7 @@ class GatewayRunner(
         See #98573.
         """
         def _close(db) -> None:
-            if getattr(db, "__dict__", {}).get("_hermes_borrowed_handle"):
+            if getattr(db, "__dict__", {}).get("_qubit_borrowed_handle"):
                 return
             inner = getattr(db, "_db", db)
             if inner is None or not hasattr(inner, "close"):

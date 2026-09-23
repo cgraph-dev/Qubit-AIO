@@ -142,3 +142,28 @@ archived contract is preserved, not edited.
   each a Qubit status + voice path ([PARITY.md](PARITY.md)).
 - Brand: build the deny-list/allow-list split, then de-brand the 1,638 live files
   ([BRAND.md](BRAND.md)).
+
+## Owner decisions in force (2026-09-23, session 2)
+
+19. **Curated, pinned remote plugin index APPROVED.** The blanket "remote index
+    refused" stance is superseded. A curated, pinned remote plugin index is
+    approved and served on the Plugins page; every entry is pinned (source repo +
+    40-hex ref), curated, and installs are pin-verified and routed through the
+    canonical confirm/audit/e-stop path. Raw unvetted remote fetch stays refused.
+20. **Binary-upload project root APPROVED:** `/home/trick/Projects/Repos/qubit-voicebridge`
+    is registered as an approved project folder (`qubit project create/add-folder`),
+    enabling the brokered, confined binary-upload path. Proven live byte-identical.
+21. **`qubit-migration` is the canonical migration system.** The retired
+    `openclaw-migration` command/frame is retained only as a read-old/write-new
+    compatibility alias (never deleted; loud deprecation naming `qubit-migration`).
+22. **Deep internal identifier rebrand AUTHORIZED in controlled W9 slices.**
+    Proceed slice-by-slice in `qubit_runtime/`, preserving legal attribution,
+    frozen records, and load-bearing wire/env/provenance identifiers.
+23. **Pinned byte manifest must be regenerated, never fabricated.** The exact
+    manifest is produced deterministically from the real pinned source; absence of
+    the pinned source yields `BLOCKED — PINNED SOURCE REQUIRED`, never hand-written
+    hashes.
+24. **`docs/archive/` is historical-only.** Active tests and generators target
+    `docs/generated/` (or `docs/differential/` for the frozen contract) and never
+    read or write the archive; the reachability proof and route-ownership matrix
+    now read canonical `docs/generated/` artifacts.

@@ -25,7 +25,7 @@ DEFAULT_IMAGE_TOKEN_COST = 1500
 _MIN_PLAUSIBLE, _MAX_PLAUSIBLE = 64, 32_768
 _EMA_ALPHA = 0.5
 
-_image_cost_var: ContextVar[Optional[int]] = ContextVar("hermes_image_token_cost", default=None)
+_image_cost_var: ContextVar[Optional[int]] = ContextVar("qubit_image_token_cost", default=None)
 _LEARNED: Dict[str, int] = {}
 _LOADED = False
 

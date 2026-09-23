@@ -24,7 +24,7 @@ _LOCAL_MCP_ACTIONS = ("install", "enable", "authorize", "reconnect")
 # Actions that require the external connector gateway.
 _MANAGED_ACTIONS = ("connect",)
 _GATEWAY_PREREQUISITE = (
-    "external Qubit/Hermes connector tool gateway (gateway.sock + portal "
+    "external Qubit connector tool gateway (gateway.sock + portal "
     "account authorization); Qubit runs no managed-connector gateway"
 )
 _LOCAL_SURFACE = "`qubit mcp` in the terminal, or the dashboard Connections page"

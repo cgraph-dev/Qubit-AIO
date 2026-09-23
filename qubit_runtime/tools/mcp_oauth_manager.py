@@ -44,7 +44,7 @@ class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
     """OAuthClientProvider with pre-flow disk-mtime reload (external refreshes become visible to
     a running session), expiry seeding on cold load, pre-flight metadata discovery, dead-client
     registration detection and the bidirectional ``async_auth_flow`` bridge. Token-endpoint
-    fixes come from ``HermesProviderMixin``. Only usable when the SDK's OAuth module imported.
+    fixes come from ``QubitProviderMixin``. Only usable when the SDK's OAuth module imported.
 
     Reference: Claude Code's ``invalidateOAuthCacheIfDiskChanged`` (``src/utils/auth.ts:1320``, CC-1096 /
     GH#24317).
@@ -64,7 +64,7 @@ class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
         self._qubit_preregistered = preregistered
 
     def _qubit_storage(self):
-        """The context storage when it is a ``HermesTokenStorage``, else None."""
+        """The context storage when it is a ``QubitTokenStorage``, else None."""
         from tools.mcp_oauth import QubitTokenStorage
         return self.context.storage if isinstance(self.context.storage, QubitTokenStorage) else None
 
@@ -74,7 +74,7 @@ class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
     async def _initialize(self) -> None:
         """Load stored state, seed ``token_expiry_time``, restore/prefetch metadata. The SDK's
         ``_initialize`` never calls ``update_token_expiry``, so a restarted process would ship stale
-        Bearer tokens as "valid"; seeding the expiry (``HermesTokenStorage`` persists absolute
+        Bearer tokens as "valid"; seeding the expiry (``QubitTokenStorage`` persists absolute
         ``expires_at``) makes the SDK refresh first. Metadata is restored from disk, else discovered
         pre-flight when we hold tokens but no metadata: otherwise ``_refresh_token`` guesses
         ``{server_url}/token`` (wrong for split-origin providers), 404s, and we fall to browser reauth."""
@@ -299,7 +299,7 @@ class MCPOAuthManager:
         return (str(home.expanduser().resolve(strict=False)), server_name)
 
     def _build_provider(self, server_name: str, entry: _ProviderEntry) -> Optional[Any]:
-        """Build a ``HermesMCPOAuthProvider``; None if the SDK's OAuth support is unavailable."""
+        """Build a ``QubitMCPOAuthProvider``; None if the SDK's OAuth support is unavailable."""
         if _QUBIT_PROVIDER_CLS is None:
             logger.warning("MCP OAuth '%s': SDK auth module unavailable", server_name)
             return None

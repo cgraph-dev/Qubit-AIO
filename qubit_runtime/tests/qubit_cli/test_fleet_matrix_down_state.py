@@ -22,7 +22,7 @@ def _setup(monkeypatch, tmp_path, record: dict):
         "qubit_cli.build_info.get_code_identity",
         lambda refresh=False: {"sha": "HEADSHA", "version": "1.0"},
     )
-    monkeypatch.setattr("qubit_cli.profiles._get_default_hermes_home", lambda: home)
+    monkeypatch.setattr("qubit_cli.profiles._get_default_qubit_home", lambda: home)
     monkeypatch.setattr(
         "qubit_cli.profiles._get_profiles_root", lambda: tmp_path / "no-profiles"
     )

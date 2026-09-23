@@ -19,7 +19,7 @@ def _get_qubit_version() -> str:
 
 
 def build_user_agent() -> str:
-    """``QQBotAdapter/<qqbot_version> (Python/<py_version>; <os>; Qubit/<hermes_version>)``."""
+    """``QQBotAdapter/<qqbot_version> (Python/<py_version>; <os>; Qubit/<qubit_version>)``."""
     v = sys.version_info
     return (f"QQBotAdapter/{QQBOT_VERSION} (Python/{v.major}.{v.minor}.{v.micro}; "
             f"{platform.system().lower()}; Qubit/{_get_qubit_version()})")

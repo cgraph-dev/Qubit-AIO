@@ -1,5 +1,5 @@
 """Real-profile local browsing: snapshot the user's default Chromium profile into a
-hermes-owned copy, launch the real browser binary on it, and attach agent-browser.
+Qubit-owned copy, launch the real browser binary on it, and attach agent-browser.
 
 State (``_REAL_PROFILE_SESSION``, ``_real_profile_cdp_lock``, ``_real_profile_cdp_cache``,
 ``_real_profile_chrome_procs``) lives in ``tools.browser_tool``; it is read

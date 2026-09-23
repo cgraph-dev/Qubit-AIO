@@ -2,7 +2,7 @@
 """MCP OAuth 2.1 client support: browser authorization-code flow with PKCE.
 
 The SDK's ``OAuthClientProvider`` does discovery, client identification, PKCE, exchange and
-refresh; this module supplies ``HermesTokenStorage`` (on-disk persistence), the localhost callback
+refresh; this module supplies ``QubitTokenStorage`` (on-disk persistence), the localhost callback
 listener and ``build_oauth_auth()`` (legacy entry point). client_id is Qubit' Client ID Metadata
 Document URL (CIMD) when the server supports it, else RFC 7591 DCR. ``mcp_servers.<name>.oauth`` keys
 (all optional): client_id, client_secret, scope, redirect_port, redirect_uri (proxy callback),
@@ -91,7 +91,7 @@ _oauth_interactive_forced = contextvars.ContextVar("_oauth_interactive_forced", 
 # Paste-prompt tokens that exit OAuth without auth; the waiter maps the sentinel to
 # OAuthNonInteractiveError("user_skipped") so MCP setup continues without this server.
 _SKIP_TOKENS = frozenset({"skip", "cancel", "s", "n", "no", "q", "quit"})
-_USER_SKIPPED_SENTINEL = "__hermes_user_skipped__"
+_USER_SKIPPED_SENTINEL = "__qubit_user_skipped__"
 
 
 def _get_token_dir(qubit_home: str | Path | None = None) -> Path:
@@ -143,7 +143,7 @@ def _reserve_callback_port() -> int:
     return _bind_reserved(0)  # type: ignore[return-value]  # port 0 never returns None
 
 
-def _cached_client_info(storage: "HermesTokenStorage | None") -> dict | None:
+def _cached_client_info(storage: "QubitTokenStorage | None") -> dict | None:
     """The on-disk client registration for *storage*, or None."""
     try:
         return _read_json(storage._client_info_path()) if storage is not None else None
@@ -151,7 +151,7 @@ def _cached_client_info(storage: "HermesTokenStorage | None") -> dict | None:
         return None
 
 
-def _cached_redirect(storage: "HermesTokenStorage | None") -> "tuple[str | None, int | None]":
+def _cached_redirect(storage: "QubitTokenStorage | None") -> "tuple[str | None, int | None]":
     """``(https proxy URI, loopback callback port)`` from the cached client registration (None when
     absent): a DCR ``client_id`` is bound to its registered redirect URI, so a new random port under
     it gets ``redirect_uri does not match any registered URIs``."""
@@ -743,7 +743,7 @@ def _pick_cimd_port() -> int | None:
     return _assigned_cimd_ports[0] if _assigned_cimd_ports else None
 
 
-def _server_declined_cimd(storage: "HermesTokenStorage | None") -> bool:
+def _server_declined_cimd(storage: "QubitTokenStorage | None") -> bool:
     """True when cached metadata shows this server doesn't advertise CIMD. The SDK decides CIMD vs DCR
     in its 401 branch — after Qubit must fix the redirect URI — so cached metadata closes the gap;
     only a genuinely unknown server pays the optimistic pin."""
@@ -754,7 +754,7 @@ def _server_declined_cimd(storage: "HermesTokenStorage | None") -> bool:
     return metadata is not None and getattr(metadata, "client_id_metadata_document_supported", None) is not True
 
 
-def _maybe_use_cimd(cfg: dict, storage: "HermesTokenStorage | None" = None) -> "tuple[str, int] | None":
+def _maybe_use_cimd(cfg: dict, storage: "QubitTokenStorage | None" = None) -> "tuple[str, int] | None":
     """``(client_id URL, pinned callback port)``, or None to use DCR. Each ineligibility case means the
     redirect URI is not one the document declares, the client identity is already settled, or the
     server is known not to want a document — a metadata URL would be rejected."""
@@ -793,7 +793,7 @@ def token_request_user_agent(cfg: dict) -> str | None:
     return ua.strip() if isinstance(ua, str) and ua.strip() else None
 
 
-def _configure_callback_port(cfg: dict, storage: "HermesTokenStorage | None" = None) -> int:
+def _configure_callback_port(cfg: dict, storage: "QubitTokenStorage | None" = None) -> int:
     """Resolve the callback port into ``cfg['_resolved_port']`` (0 = non-loopback URI). Precedence:
     dashboard flow / cached https redirect URI → CIMD pinned port (sets ``cfg['_cimd_url']``) →
     ``oauth.redirect_port`` → cached registration port → fresh ephemeral port (the only parked one).
@@ -900,7 +900,7 @@ def _build_client_metadata(cfg: dict) -> "OAuthClientMetadata":
 
 
 def _invalidate_tokens_on_client_change(
-    storage: "HermesTokenStorage", new_client_id: str, new_client_secret: str | None) -> None:
+    storage: "QubitTokenStorage", new_client_id: str, new_client_secret: str | None) -> None:
     """Drop cached tokens when the configured client identity changes: tokens minted under the old
     ``client_id`` fail refresh with ``invalid_client``, and pre-registered clients are exempt from
     auto-poison, so stale tokens would wedge every request until a manual wipe. Compares on-disk
@@ -929,7 +929,7 @@ def _invalidate_tokens_on_client_change(
             storage._server_name, old_client_id, new_client_id, storage._server_name)
 
 
-def _maybe_preregister_client(storage: "HermesTokenStorage", cfg: dict, client_metadata: "OAuthClientMetadata") -> None:
+def _maybe_preregister_client(storage: "QubitTokenStorage", cfg: dict, client_metadata: "OAuthClientMetadata") -> None:
     """If cfg has a pre-registered client_id, persist it to storage."""
     client_id = cfg.get("client_id")
     if not client_id:
@@ -992,9 +992,9 @@ def build_oauth_auth(server_name: str, server_url: str, oauth_config: dict | Non
     if QubitOAuthClientProvider is None:
         from tools.mcp_oauth_provider import QubitProviderMixin
 
-        QubitOAuthClientProvider = type("HermesOAuthClientProvider", (QubitProviderMixin, _sdk_class("OAuthClientProvider")), {
-            "__doc__": "SDK provider plus Qubit' token-endpoint fixes (see ``HermesProviderMixin``).",
-            "__module__": __name__, "_hermes_logger": logger})
+        QubitOAuthClientProvider = type("QubitOAuthClientProvider", (QubitProviderMixin, _sdk_class("OAuthClientProvider")), {
+            "__doc__": "SDK provider plus Qubit' token-endpoint fixes (see ``QubitProviderMixin``).",
+            "__module__": __name__, "_qubit_logger": logger})
     return QubitOAuthClientProvider(server_url=server_url, **kwargs)
 
 

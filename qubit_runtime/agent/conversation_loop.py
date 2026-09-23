@@ -758,7 +758,7 @@ def _stored_prompt_matches_runtime(agent, prompt: str) -> bool:
 
     # Additive identity check (REBUILD_ON_RESUME): the current renderer always emits
     # the Qubit runtime-identity heading. A stored prompt without it predates the
-    # rebrand (a Hermes-era assistant identity/persona) and would replay the upstream
+    # rebrand (a legacy assistant identity/persona) and would replay the upstream
     # identity to the model verbatim, so it must be treated as stale and rebuilt by
     # the caller's ``stale_runtime`` branch. The Model/Provider/cwd/Platform checks
     # below stay exactly as they were.

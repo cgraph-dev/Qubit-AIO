@@ -397,7 +397,7 @@ def test_inventory_summary_is_internally_consistent() -> None:
 
 
 def _read_inventory() -> dict:
-    path = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
+    path = REPO_ROOT / "docs/generated" / "QUBIT_SOURCE_INVENTORY.json"
     assert path.is_file(), path
     return json.loads(path.read_text(encoding="utf-8"))
 

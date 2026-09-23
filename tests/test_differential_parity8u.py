@@ -34,7 +34,7 @@ MANIFEST_PATH = FIXTURES_DIR / "MANIFEST.json"
 ROW_RESULT_SCHEMA_PATH = FIXTURES_DIR / "schema" / "row_result.schema.json"
 
 # Contractual upstream pins mirrored from the frozen pins in OWNERSHIP.md.
-PIN_QUBIT = "2237be355906fbe6065ce1815711eee52b2d646e"
+PIN_QUBIT = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
 PIN_OPENCLAW = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
 VISUAL_REF_FIELDS = ("screenshot_ref", "dom_snapshot_ref", "a11y_snapshot_ref")
 

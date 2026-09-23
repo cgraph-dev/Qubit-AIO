@@ -12,6 +12,8 @@ import type {
   MemoryProviderSetupResult,
   PluginCatalogDetail,
   PluginCatalogEntry,
+  PluginPinnedIndex,
+  PluginPinnedIndexEntry,
   PluginsHubResponse,
 } from "@/lib/api";
 import { Button } from "@nous-research/ui/ui/components/button";
@@ -321,6 +323,9 @@ export default function PluginsPage() {
   const [catalogError, setCatalogError] = useState("");
   const [catalogBusy, setCatalogBusy] = useState<string | null>(null);
   const [reloadBusy, setReloadBusy] = useState(false);
+  const [pinnedIndex, setPinnedIndex] = useState<PluginPinnedIndex | null>(null);
+  const [indexQuery, setIndexQuery] = useState("");
+  const [indexBusy, setIndexBusy] = useState<string | null>(null);
 
   const { toast, showToast } = useToast();
   const { t } = useI18n();
@@ -354,6 +359,7 @@ export default function PluginsPage() {
       })
       .then((res) => {
         setCatalog(res.entries ?? []);
+        setPinnedIndex(res.pinned_index ?? null);
       })
       .catch((e) => {
         setCatalog([]);
@@ -397,6 +403,30 @@ export default function PluginsPage() {
       showToast(refusalOrError(e, e instanceof Error ? e.message : "Install failed"), "error");
     } finally {
       setCatalogBusy(null);
+    }
+  };
+
+  const onIndexInstall = async (entry: PluginPinnedIndexEntry) => {
+    setIndexBusy(entry.name);
+    try {
+      // The backend verifies the curated pin, runs the canonical
+      // e-stop -> confirmation -> audit gate, and then honestly reports the
+      // operator gate: the pinned remote source is not fetched.
+      await api.installAgentPluginFromIndex(entry.name, entry.pinned_ref);
+      showToast(`${entry.label || entry.name} installed`, "success");
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(
+        refusalOrError(
+          e,
+          e instanceof Error
+            ? e.message
+            : `Install refused: pinned source not fetched (operator gate, ref ${entry.pinned_ref.slice(0, 8)})`,
+        ),
+        "error",
+      );
+    } finally {
+      setIndexBusy(null);
     }
   };
 
@@ -623,6 +653,23 @@ export default function PluginsPage() {
     : null;
   const visibleMemoryFields =
     memoryConfig?.fields.filter((field) => fieldIsVisible(field, memoryValues)) ?? [];
+
+  const indexNeedle = indexQuery.trim().toLowerCase();
+  const indexEntries = (pinnedIndex?.entries ?? []).filter(
+    (entry) =>
+      !indexNeedle ||
+      [
+        entry.name,
+        entry.label,
+        entry.description,
+        entry.repo,
+        entry.maintainer,
+        entry.category,
+        entry.tier,
+        ...entry.tags,
+        ...entry.capabilities,
+      ].some((value) => String(value).toLowerCase().includes(indexNeedle)),
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -1017,9 +1064,10 @@ export default function PluginsPage() {
               data-testid="plugin-catalog-remote-refusal"
               className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
             >
-              {t.pluginsPage.catalogRemoteRefused ?? "Remote catalog refused by policy"}: typed{" "}
-              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span> — no remote repository is
-              fetched, cloned, or executed. Only reviewed local directories / manifests install.
+              {t.pluginsPage.catalogRemoteRefused ?? "Raw remote fetch refused by policy"}: typed{" "}
+              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span> — no arbitrary remote
+              repository is fetched, cloned, or executed. The curated, pinned index is served
+              separately below; only reviewed local directories / manifests install.
             </p>
 
             {catalogError ? (
@@ -1050,6 +1098,71 @@ export default function PluginsPage() {
                 ))}
               </ul>
             )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="plugin-pinned-index-section">
+          <CardHeader>
+            <div className="min-w-0">
+              <CardTitle>{"Curated pinned plugin index"}</CardTitle>
+              <p className="text-xs tracking-[0.08em] text-text-tertiary">
+                {
+                  "Curated remote plugin sources, each pinned to a full commit SHA. Install is operator-gated and verified at the pinned ref; raw unvetted remote fetch stays refused."
+                }
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                className="max-w-sm"
+                placeholder={"Search the pinned index by name, source, or capability…"}
+                spellCheck={false}
+                value={indexQuery}
+                onChange={(e) => setIndexQuery(e.target.value)}
+              />
+              {pinnedIndex ? (
+                <span className="text-xs tracking-[0.06em] text-text-tertiary">
+                  {pinnedIndex.count} {"curated · pinned"} ·{" "}
+                  <span className="font-mono">{pinnedIndex.source}</span>
+                </span>
+              ) : null}
+            </div>
+
+            {!pinnedIndex ? (
+              <p className="text-xs text-text-tertiary">
+                {"Pinned index unavailable; the local catalog above is unaffected."}
+              </p>
+            ) : indexEntries.length === 0 ? (
+              <p className="text-xs text-text-tertiary">
+                {"No pinned-index entries match your search."}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {indexEntries.map((entry) => (
+                  <PinnedIndexRow
+                    key={entry.id}
+                    entry={entry}
+                    busy={indexBusy === entry.name}
+                    onInstall={onIndexInstall}
+                    t={t}
+                  />
+                ))}
+              </ul>
+            )}
+
+            <p
+              data-testid="plugin-pinned-index-install-gate"
+              className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
+            >
+              {"Install is operator-gated"}: typed{" "}
+              <span className="font-mono">
+                {pinnedIndex?.install?.code ?? "PLUGIN_INDEX_OPERATOR_GATED"}
+              </span>{" "}
+              — the entry is verified against its pinned ref and routed through the canonical
+              confirm / audit / e-stop path, but the pinned remote source is not fetched until an
+              operator verifies the repository and license.
+            </p>
           </CardContent>
         </Card>
 
@@ -1340,6 +1453,91 @@ function PluginRowCard(props: PluginRowCardProps) {
         confirmLabel={t.common.delete}
       />
     </Card>
+  );
+}
+
+interface PinnedIndexRowProps {
+  entry: PluginPinnedIndexEntry;
+  busy: boolean;
+  onInstall: (entry: PluginPinnedIndexEntry) => Promise<void>;
+  t: Translations;
+}
+
+/** One curated, pinned remote-index row. Shows the real source, the full
+ *  pinned commit SHA, the license state, and provenance. Install is an honest
+ *  operator-gated affordance: the backend verifies the pin and runs the
+ *  canonical gate, but the remote source is never fetched here. */
+function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="border border-border bg-background/20 px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-semibold">{entry.label || entry.name}</span>
+          <Badge tone="secondary">curated</Badge>
+          <Badge tone="outline">pinned</Badge>
+          <Badge tone="outline">{entry.tier}</Badge>
+          <Badge tone="outline">{entry.category}</Badge>
+          <span className="font-mono text-[0.6875rem] text-text-tertiary">
+            {entry.pinned_ref_short}
+          </span>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button size="sm" disabled={busy} onClick={() => void onInstall(entry)}>
+            {busy ? <Spinner /> : null}
+            {t.pluginsPage.catalogInstall ?? "Install"}
+          </Button>
+          <Button ghost size="sm" onClick={() => setOpen((v) => !v)}>
+            {open ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+            {open
+              ? (t.pluginsPage.catalogHideDetails ?? "Hide details")
+              : (t.pluginsPage.catalogDetails ?? "Details")}
+          </Button>
+        </div>
+      </div>
+      {entry.description ? (
+        <p className="mt-2 text-xs text-text-secondary">{entry.description}</p>
+      ) : null}
+      <p className="mt-1 text-xs text-text-tertiary">
+        {"Pinned ref"}: <span className="font-mono">{entry.pinned_ref}</span>
+      </p>
+      {open ? (
+        <div className="mt-3 grid gap-1 border-t border-border pt-3 text-xs text-text-secondary">
+          <div>
+            {"Source"}:{" "}
+            <a className="underline" href={entry.repo} target="_blank" rel="noreferrer">
+              {entry.repo}
+              {entry.subdir ? `#${entry.subdir}` : ""}
+            </a>
+          </div>
+          <div>
+            {"Maintainer"}: {entry.maintainer || "—"}
+          </div>
+          <div>
+            {"License"}: {entry.license}
+          </div>
+          {entry.capabilities.length ? (
+            <div>
+              {"Capabilities"}: {entry.capabilities.join(", ")}
+            </div>
+          ) : null}
+          {Object.keys(entry.provenance).length ? (
+            <div>
+              {"Provenance"}:{" "}
+              <span className="font-mono">
+                {Object.entries(entry.provenance)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(" · ")}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
   );
 }
 

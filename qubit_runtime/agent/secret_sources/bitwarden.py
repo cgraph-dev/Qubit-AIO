@@ -1,7 +1,7 @@
 """Bitwarden Secrets Manager (`bws` CLI) integration.
 
 Pulls API keys from BSM at startup so they need not live in ``~/.hermes/.env``.
-``bws`` is auto-installed into ``<hermes_home>/bin/bws`` (one pinned version,
+``bws`` is auto-installed into ``<qubit_home>/bin/bws`` (one pinned version,
 SHA-256-verified against the published checksum). The one bootstrap secret is
 the access token in ``.env``; every other key can live in BSM. One
 ``bws secret list <project_id>`` call per fetch, cached in-process and on disk
@@ -47,7 +47,7 @@ _BWS_CHECKSUM_NAME = f"bws-sha256-checksums-{_BWS_VERSION}.txt"
 _BWS_DOWNLOAD_TIMEOUT = 60
 _BWS_RUN_TIMEOUT = 30
 
-# <hermes_home>/cache/bws_cache.json holds only secret VALUES (never the access
+# <qubit_home>/cache/bws_cache.json holds only secret VALUES (never the access
 # token); kept out of .env so users editing .env don't commit BSM-sourced secrets.
 _CacheKey = Tuple[str, str, str]  # (access_token_fingerprint, project_id, server_url)
 _DISK_CACHE_BASENAME = "bws_cache.json"
@@ -98,7 +98,7 @@ def _qubit_bin_dir() -> Path:
 
 
 def find_bws(*, install_if_missing: bool = False) -> Optional[Path]:
-    """Managed ``<hermes_home>/bin/bws`` first, then PATH, then optional auto-install."""
+    """Managed ``<qubit_home>/bin/bws`` first, then PATH, then optional auto-install."""
     managed = _qubit_bin_dir() / _platform_binary_name()
     if managed.exists() and os.access(managed, os.X_OK):
         return managed
@@ -152,7 +152,7 @@ def install_bws(*, force: bool = False) -> Path:
         return target
 
     asset_name = _platform_asset_name()
-    with tempfile.TemporaryDirectory(prefix="hermes-bws-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="qubit-bws-") as tmpdir:
         tmp = Path(tmpdir)
         zip_path = tmp / asset_name
         checksum_path = tmp / _BWS_CHECKSUM_NAME

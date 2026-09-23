@@ -27,7 +27,7 @@ _conversation_id: ContextVar[Optional[str]] = ContextVar("nous_portal_conversati
 # chat (``prompt_cache_scope.declared_conversation_scope``). Only that declared value
 # is published; unset means consumers fall back to the conversation id, so delegate
 # trees keep sharing their parent's sticky key.
-_affinity_scope: ContextVar[Optional[str]] = ContextVar("hermes_affinity_scope", default=None)
+_affinity_scope: ContextVar[Optional[str]] = ContextVar("qubit_affinity_scope", default=None)
 
 
 def _reset_var(var: ContextVar, token) -> None:

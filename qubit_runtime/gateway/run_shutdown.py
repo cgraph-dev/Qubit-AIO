@@ -269,7 +269,7 @@ class GatewayShutdownMixin:
     def _scale_to_zero_has_live_background_work(self) -> bool:
         """Live background work (delegations, processes, pending watchers) that must block a suspend.
 
-        PERMANENT supervised watchers (_hermes_supervised_watcher, incl. the scale-to-zero watcher
+        PERMANENT supervised watchers (_qubit_supervised_watcher, incl. the scale-to-zero watcher
         itself) are excluded, else this would be True forever and the gateway could never go dormant.
         """
         if any(

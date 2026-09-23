@@ -1113,6 +1113,41 @@ freeze — the dominant risk).
 `qubit_runtime/` modules; the `.hermes_history` apply (owner approves the
 review); the final M4 gate + independent verifier.
 
+## 29. Wave 17 — W9 qubit_cli/tui_gateway/plugins slices + deep rename — 2026-09-23
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed.**
+
+- **W9 slices.** `qubit_cli/` **+57** (4 held back — `anon_auth`,
+  `auth_openrouter`, `auth_codex_browser`, `shared_session_attach`: absent
+  0.21.4 symbols in `auth_constants`/`auth_device_flow`/`active_sessions`);
+  `tui_gateway/` **+31** (0 held back; contracts registry 219 methods / 69
+  events); `plugins/` + `scripts/` + `optional-mcps/` **+18** (1 held back —
+  `dump_desktop_slash_registry`: absent `desktop_surface_registry`).
+  `missing_from_local` **3257 → 3151**.
+- **Deep rename slices (existing files only).** `agent/`: strict occurrences
+  **317 → 286** (88 → 72 files); a real rename the vendored tests already
+  expected was completed (`provider_projection` → 5 failing tests now pass).
+  `gateway/` + `tools/`: `Hermes` 23 → 4, `hermes_` 108 → 81 (`HERMES_` wire
+  names unchanged); the `url_safety` SSRF-guard idempotency bug
+  (`_hermes_ssrf_guarded` vs `_qubit_ssrf_guarded`) was fixed. Service de-brand
+  (N26) preserved.
+- **Artifacts regenerated** (vendor manifest, source inventory, ledgers, page
+  coverage, parity, voice). Parity: **1378 rows — 1249 PORTED / 129 GATED /
+  0 MISSING**; voice real **594**.
+- **Vendored test sync:** `openai-native` added to the web-provider plugin
+  registry expectation (0.21.4).
+- **Focused sweep: 489 passed / 2 skipped / 0 failed across 29 files**; graft
+  build refreshed; `parity_inventory.py --check` OK. One transient failure
+  (`test_committed_inventory_in_sync`) was a concurrent-edit race — regenerated
+  and green.
+- **New finding N35:** concurrent opencode sessions edit the worktree faster
+  than regenerable artifacts can be frozen; the artifact-consistency tests are
+  inherently racy until a single-writer freeze (N34 confirmed).
+
+**Still open:** owner ratification of `M1`; the deep rename of the remaining
+modules (`cron`/`web`/`tools` remainder, `qubit_cli`, `tui_gateway`, top-level);
+the `.hermes_history` apply; the final M4 gate + independent verifier.
+
 ## 24. Live dashboard E2E audit + fix — 2026-09-23 (10-agent wave)
 
 **No M1/M2/CODE_READY/VERIFIED claimed. Not committed.** Real browser + live
@@ -1271,3 +1306,22 @@ runtime-path rename is out of this slice's six-file scope).
   regenerated (completions, openclaw ledger, route ownership); tri-parity test
   now reads the canonical `docs/generated/` ledger. Frontend: SystemPage cancel
   honesty + sidebar no-double-confirm. 78 focused tests pass; service active.
+
+- **Owner decisions #19–#24 implemented (2026-09-23).** (1) Curated **pinned
+  remote plugin index** approved and served (`voicebridge/data/plugin_index_pinned.json`,
+  5 pinned entries; live `pinned_index count=5 curated=true pinned=true`; install
+  pin-verified + operator-gated). (2) `/home/trick/Projects/Repos/qubit-voicebridge`
+  registered as an approved **binary-upload project root** (`qubit project`
+  active); live multipart upload proven **byte-identical** (sha256 `c6742d03…`,
+  409→confirm→200, bwrap confinement, traversal/absolute/replay refused). (3)
+  **`qubit-migration` canonical**; `openclaw-migration` retained as a
+  read-old/write-new compatibility alias with a loud deprecation note; fixed a
+  real independence bug where `qubit claw migrate` fell back to `~/.hermes`.
+  (4) **Deep identifier rebrand** authorized in W9 slices — slice landed
+  (`profiles.py`, `skill_utils.py`, `main_dashboard.py`) with wire/env names
+  preserved. (5) **Pinned byte manifest regenerated** from the real pin
+  `d337b736…` (`HERMES_BYTE_MANIFEST.json` sha256 `9d8ca061…`, 14,733 rows,
+  determinism ×2); differential selftest **96/96**. (6) **`docs/archive/`
+  historical-only** — reachability test + generator repointed to
+  `docs/generated/` (artifact sha256 `63fe29b4…`, determinism ×2); dead
+  `h_logs_*` handlers removed. 227 focused tests pass; services active.

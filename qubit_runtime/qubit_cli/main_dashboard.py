@@ -693,8 +693,9 @@ def _route_named_profile_dashboard(
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=False)
     # Pin the child to the machine ROOT, resolved explicitly rather than by
     # dropping QUBIT_HOME: in the Docker layout the root is /opt/data, and an
-    # unset QUBIT_HOME would fall back to $HOME/.hermes = /opt/data/.hermes — an
-    # empty auto-seeded home with only the default profile and no install stamp.
+    # unset QUBIT_HOME would fall back to the platform-default home nested under
+    # /opt/data — an empty auto-seeded home with only the default profile and no
+    # install stamp.
     # get_default_qubit_root() strips a trailing profiles/<name> for both layouts.
     try:
         from qubit_constants import get_default_qubit_root

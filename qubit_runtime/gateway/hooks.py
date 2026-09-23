@@ -42,7 +42,7 @@ def _load_hook_dir(hook_dir: Path) -> Optional[tuple]:
     # Register in sys.modules BEFORE exec_module so Pydantic/dataclass forward references
     # (``from __future__ import annotations``) resolve; otherwise a handler declaring a
     # BaseModel fails at first dispatch with "TypeAdapter ... is not fully defined".
-    module_name = f"hermes_hook_{hook_name}"
+    module_name = f"qubit_hook_{hook_name}"
     spec = importlib.util.spec_from_file_location(module_name, handler_path)
     if spec is None or spec.loader is None:
         return _skip(hook_name, "could not load handler.py")

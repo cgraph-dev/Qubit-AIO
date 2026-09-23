@@ -49,7 +49,7 @@ class _BackgroundLoop:
     def start(self) -> None:
         if self._thread is not None:
             return
-        self._thread = threading.Thread(target=self._run_forever, name="hermes-lsp-loop", daemon=True)
+        self._thread = threading.Thread(target=self._run_forever, name="qubit-lsp-loop", daemon=True)
         self._thread.start()
         self._ready.wait(timeout=5.0)
 

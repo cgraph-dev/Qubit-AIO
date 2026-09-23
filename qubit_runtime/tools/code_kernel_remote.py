@@ -199,7 +199,7 @@ def _spawn_remote_kernel(env, env_type: str, owner: str, task_env_id: str,
     from tools.code_execution_tool import (
         MAX_STDOUT_BYTES, _ship_file_to_remote, _env_temp_dir, generate_qubit_tools_module,
     )
-    kernel_dir = f"{_env_temp_dir(env)}/hermes_rkernel_{uuid.uuid4().hex[:12]}"
+    kernel_dir = f"{_env_temp_dir(env)}/qubit_rkernel_{uuid.uuid4().hex[:12]}"
     q_dir = shlex.quote(kernel_dir)
     kernel = None
     try:

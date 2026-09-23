@@ -57,7 +57,7 @@ def _skills_scan_signature(dirs_to_scan, disabled) -> tuple:
     return (tuple(sig), frozenset(disabled), platform)
 
 
-QUBIT_HOME = get_qubit_home()  # all skills live in ~/.hermes/skills/ (seeded from bundled)
+QUBIT_HOME = get_qubit_home()  # all skills live in the Qubit home skills dir (seeded from bundled)
 SKILLS_DIR = QUBIT_HOME / "skills"
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
 

@@ -5,7 +5,7 @@ Users map env-var names to ``op://vault/item/field`` references in
 call using whatever auth the user's ``op`` already has (``OP_SERVICE_ACCOUNT_TOKEN``
 headless, ``OP_SESSION_*`` interactive) — Qubit never authenticates on the
 user's behalf, and failures never block startup. Complete pulls are cached
-in-process and under ``<hermes_home>/cache/op_cache.json`` (values only; auth
+in-process and under ``<qubit_home>/cache/op_cache.json`` (values only; auth
 material is fingerprinted, never stored).
 """
 

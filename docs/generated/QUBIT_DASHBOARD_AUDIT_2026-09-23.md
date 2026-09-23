@@ -71,32 +71,24 @@ fix waves, so they are not defects:
   `request_id`; the logs backend honors `?search=`; webhook URLs are allowlisted
   and secrets must be `env:`/`file:` refs.
 
+## Owner decisions 2026-09-23 (#19–#24) — implemented
+
+| # | Decision | Status | Evidence |
+|---|---|---|---|
+| 1 | Curated, pinned remote plugin index APPROVED | IMPLEMENTED | 5 pinned entries; live `pinned_index count=5 curated=true pinned=true`; install pin-verified + operator-gated |
+| 2 | Repo APPROVED as binary-upload root | IMPLEMENTED | project `qubit-voicebridge` active; live upload byte-identical `c6742d03…`; confinement refusals |
+| 3 | `qubit-migration` canonical, old command an alias | IMPLEMENTED | canonical-first resolution + deprecation note; 12 tests |
+| 4 | Deep identifier rebrand authorized in W9 slices | IN PROGRESS | slice landed (profiles/skill_utils/main_dashboard); wire names preserved |
+| 5 | Pinned byte manifest regenerated, never fabricated | IMPLEMENTED | `HERMES_BYTE_MANIFEST.json` sha256 `9d8ca061…`, 14,733 rows, determinism ×2; selftest 96/96 |
+| 6 | `docs/archive/` historical-only; reachability → active docs | IMPLEMENTED | test+generator repointed to `docs/generated/`; artifact sha256 `63fe29b4…` |
+
 ## Remaining (not done — not claimed)
 
-- **Remote plugin index** (reference 240-entry) not ported; Qubit policy refuses
-  remote fetch. The local 70-entry catalog is real.
-- **Binary upload** is brokered + wired; live exercise needs an approved project
-  root (`qubit project add-folder`) — operator prerequisite.
-- The retired `openclaw-migration` script is newer than the canonical
-  `qubit-migration` copy — needs an owner ruling.
-- Deep `qubit_runtime/` identifier rebrand continues (wire/env names preserved) —
-  W9 backlog.
-- 2 differential-parity tests need the pinned byte manifest (owner gate) and 1
-  reachability test reads a frozen archive — not code defects.
-
-### Resolved in the retry + wave-5 agents
-Skills de-brand finished (0 rewritable prose brand; 146 strict-identifier files
-remain = preserved ids; live 197 skills resolve) · `/chat` slash
-`/toolsets /whoami /version /context` working · profiles reconciled onto the
-real reference `qubit_cli/profiles.py` registry · env `env:/vault:/file:` refs
-round-trip with `is_set` · channel secret-scope verified · gateway restart
-action status honest `completed/exit 0` · cron timezone/retry fields wired ·
-memory recall offset + `/api/recall/update` · boards pagination · binary upload
-brokered · logs offset pagination · `profiles.py` wrapper brand/cleanup bug ·
-`plan_prompt` QUBIT_HOME plans path · `uploadFile` real multipart bytes ·
-**MCP resources/prompts/resource-templates compat passthrough** (live 200) ·
-`qubit_cli` identity de-brand slice · **2 real product bugs fixed** (raw-meta
-brand leak in `_rebrand_chat_message`; `skills_create` id-only settle) · 9 stale
-tests reconciled · generated artifacts regenerated.
+- Deep `qubit_runtime/` identifier rebrand continues in controlled W9 slices.
+- Follow-up to #6: some active scripts still default to `docs/archive/` paths
+  (`rebuild_ledger_qubit/openclaw` read the archive source-inventory;
+  `hermes_vendor_manifest`/`config_binding_manifest` default `--out`;
+  `differential_parity` gap-ledger path) — needs a targeted reconciliation wave.
+- Curated pinned index install remains operator-gated by design.
 
 No claim of `1:1`, `100%`, `CODE_READY`, `VERIFIED`, `M1`, or `COMPLETE`.

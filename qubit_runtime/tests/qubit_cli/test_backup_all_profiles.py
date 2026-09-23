@@ -27,7 +27,7 @@ def profiles(monkeypatch, tmp_path):
     work = _mk_profile(tmp_path / "home" / "profiles" / "work", jobs=5)
     sparks = _mk_profile(tmp_path / "home" / "profiles" / "sparks", jobs=0)
     monkeypatch.setattr(
-        "qubit_cli.profiles._get_default_hermes_home", lambda: default_home
+        "qubit_cli.profiles._get_default_qubit_home", lambda: default_home
     )
     monkeypatch.setattr(
         "qubit_cli.profiles._get_profiles_root", lambda: tmp_path / "home" / "profiles"
@@ -53,7 +53,7 @@ class TestSiblingEnumeration:
         def _boom():
             raise RuntimeError("no profiles module")
 
-        monkeypatch.setattr("qubit_cli.profiles._get_default_hermes_home", _boom)
+        monkeypatch.setattr("qubit_cli.profiles._get_default_qubit_home", _boom)
         assert backup._sibling_profile_homes(tmp_path) == []
 
 

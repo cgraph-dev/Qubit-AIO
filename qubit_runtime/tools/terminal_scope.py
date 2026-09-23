@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterator, Optional
 logger = logging.getLogger(__name__)
 
 # None = no scope bound (process-env behavior); dict = complete policy; Refusal = resolution failed.
-_terminal_scope_var: ContextVar = ContextVar("hermes_terminal_scope", default=None)
+_terminal_scope_var: ContextVar = ContextVar("qubit_terminal_scope", default=None)
 
 # Keys whose default lives in terminal_tool.py, not DEFAULT_CONFIG (which wins on overlap);
 # without them the projection is not total.

@@ -27,7 +27,7 @@ def fleet(monkeypatch, tmp_path):
     _write_state(work_home, 200)  # pre-stamp gateway: no code identity
 
     import re
-    monkeypatch.setattr("qubit_cli.profiles._get_default_hermes_home", lambda: default_home)
+    monkeypatch.setattr("qubit_cli.profiles._get_default_qubit_home", lambda: default_home)
     monkeypatch.setattr("qubit_cli.profiles._get_profiles_root", lambda: default_home / "profiles")
     monkeypatch.setattr("qubit_cli.profiles._PROFILE_ID_RE", re.compile(r"^[a-z0-9][a-z0-9_-]*$"), raising=False)
     monkeypatch.setattr("gateway.status._pid_exists", lambda pid: pid in (100, 200))
@@ -106,7 +106,7 @@ class TestCollectInventory:
         for target in (
             "qubit_cli.config.detect_install_method",
             "qubit_cli.build_info.get_code_identity",
-            "qubit_cli.profiles._get_default_hermes_home",
+            "qubit_cli.profiles._get_default_qubit_home",
             "qubit_cli.gateway._get_service_pids",
             "qubit_cli.gateway.find_profile_gateway_processes",
         ):

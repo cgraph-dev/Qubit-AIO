@@ -40,12 +40,13 @@ _CLONE_SUBDIR_FILES = ["memories/MEMORY.md", "memories/USER.md"]
 _CLONE_ALL_STRIP: list[str] = ["gateway.pid", "gateway_state.json", "processes.json"]
 
 # Infrastructure excluded from --clone-all ONLY when the source is the default profile
-# (``~/.hermes``): git checkout (+ ~3 GB venv), worktrees, sibling profiles, shared bins,
-# npm packages. Named profiles never hold these at root, so the gate avoids silently
-# dropping user data from a named-profile source. Export uses a root allow-list instead
-# (``_DEFAULT_EXPORT_INCLUDE_ROOT``): an archive is a portable snapshot, a clone must run.
+# (the default QUBIT_HOME root): git checkout (+ ~3 GB venv), worktrees, sibling profiles,
+# shared bins, npm packages. Named profiles never hold these at root, so the gate avoids
+# silently dropping user data from a named-profile source. Export uses a root allow-list
+# instead (``_DEFAULT_EXPORT_INCLUDE_ROOT``): an archive is a portable snapshot, a clone
+# must run.
 _CLONE_ALL_DEFAULT_EXCLUDE_ROOT: frozenset[str] = frozenset({
-    "hermes-agent", ".worktrees", "profiles", "bin", "node_modules",
+    "qubit-agent", ".worktrees", "profiles", "bin", "node_modules",
 })
 
 # Per-profile history excluded from --clone-all for ANY source: SQLite session store
@@ -114,7 +115,7 @@ _DEFAULT_EXPORT_INCLUDE_ROOT = frozenset({
 })
 
 # Names that cannot be used as profile aliases
-_RESERVED_NAMES = frozenset({"hermes", "default", "test", "tmp", "root", "sudo"})
+_RESERVED_NAMES = frozenset({"qubit", "default", "test", "tmp", "root", "sudo"})
 
 # Qubit subcommands that cannot be used as profile names/aliases
 _QUBIT_SUBCOMMANDS = frozenset({

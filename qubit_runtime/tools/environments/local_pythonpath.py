@@ -35,7 +35,7 @@ def _build_qubit_repo_root_aliases(
     resolved_root: Path, lexical_root: Path, configured_home: Path,
 ) -> tuple[Path, ...]:
     """Exact repo-root spellings emitted by Qubit launchers. Mirrors
-    ``gateway_windows._preserve_hermes_home_path`` (physical path under the resolved
+    ``gateway_windows._preserve_qubit_home_path`` (physical path under the resolved
     QUBIT_HOME -> configured spelling) so a junction-backed install matches without
     treating arbitrary QUBIT_HOME descendants as Qubit-owned. A repo-level junction
     (possibly cross-drive) is accepted only when a strict resolve proves

@@ -350,7 +350,7 @@ def test_achievements_plugin_represented_and_closed_in_ledger(inventory,
     # carries a real plugin:hermes-achievements row with a backend and an
     # on-disk proving test, and the inventory surfaces reconcile to it.
     qubit_rows = json.loads(
-        (REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.hermes.json").read_text(
+        (GENERATED / "QUBIT_GAP_LEDGER.hermes.json").read_text(
             encoding="utf-8"))["rows"]
     row = next((r for r in qubit_rows
                 if r["id"] == "plugin:hermes-achievements"), None)

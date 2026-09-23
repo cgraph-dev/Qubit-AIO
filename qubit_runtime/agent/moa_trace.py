@@ -2,7 +2,7 @@
 
 Every MoA turn that runs the reference fan-out (a cache MISS in
 ``MoAChatCompletions.create``) appends one JSON line to
-``<hermes_home>/moa-traces/<session_id>.jsonl``: what every model saw, said, and
+``<qubit_home>/moa-traces/<session_id>.jsonl``: what every model saw, said, and
 cost. Side-channel only: never enters the ``messages`` table, history or replay
 (references are advisory side-calls whose rows would corrupt role alternation).
 Off by default; when off the only overhead is the config read.

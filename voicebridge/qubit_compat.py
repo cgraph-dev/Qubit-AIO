@@ -2114,139 +2114,6 @@ def h_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(file=fname, lines=lines)
 
 
-def _log_paths(cfg: Any) -> Dict[str, Path]:
-    """Canonical log-file map (name -> path), ported from the reference logs
-    router (``hermes_cli/web_routers/status.py:794`` -> ``qubit_cli.logs.LOG_FILES``)."""
-    from . import qubit_runtime as HR
-    HR.ensure_path()
-    from qubit_cli.logs import LOG_FILES  # type: ignore
-
-    base = Path(cfg.state_dir()) / "logs"
-    return {name: base / fname for name, fname in LOG_FILES.items()}
-
-
-def _read_log_lines(cfg: Any, log_file: str, *, lines: int = 100,
-                    level: str = "", component: str = "",
-                    search: str = "") -> Tuple[Optional[str], Optional[str],
-                                              List[str]]:
-    """Read the tail of one log file with the reference filter surface.
-
-    Returns ``(err_code, err_detail, lines)``. Ported from the reference
-    ``get_logs`` (``hermes_cli/web_routers/status.py:794``): ``level`` maps to
-    ``_read_tail``'s ``min_level``, ``component`` to ``COMPONENT_PREFIXES``, and
-    ``search`` is a case-insensitive post-filter. Unknown file/component are
-    typed errors, never an app-level 500.
-    """
-    from . import qubit_runtime as HR
-    HR.ensure_path()
-    from qubit_cli.logs import _read_tail  # type: ignore
-
-    paths = _log_paths(cfg)
-    if log_file not in paths:
-        return ("LOGS_UNKNOWN_FILE",
-                f"Unknown log file: {log_file}. Available: "
-                f"{', '.join(sorted(paths))}", [])
-    path = paths[log_file]
-    if not path.exists():
-        return (None, None, [])
-    try:
-        from qubit_logging import COMPONENT_PREFIXES  # type: ignore
-    except Exception:
-        COMPONENT_PREFIXES = {}
-    min_level = level if level and level.upper() != "ALL" else None
-    comp_prefixes = None
-    if component and component.lower() != "all":
-        comp_prefixes = COMPONENT_PREFIXES.get(component)
-        if comp_prefixes is None:
-            return ("LOGS_UNKNOWN_COMPONENT",
-                    f"Unknown component: {component}. Available: "
-                    f"{', '.join(sorted(COMPONENT_PREFIXES))}", [])
-    try:
-        want = max(1, min(int(lines), 2000))
-    except (TypeError, ValueError):
-        want = 100
-    out = _read_tail(
-        path, want if not search else 2000,
-        has_filters=bool(min_level or comp_prefixes or search),
-        min_level=min_level, component_prefixes=comp_prefixes)
-    if search:
-        needle = str(search).lower()
-        out = [l for l in out if needle in l.lower()][-min(want, 500):]
-    return (None, None, [_redact(l) for l in out])
-
-
-def h_logs_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/logs/files -> the available log files (name/size/existence)."""
-    try:
-        paths = _log_paths(cfg)
-    except Exception as exc:
-        return _fail(exc)
-    files = []
-    for name, path in paths.items():
-        try:
-            exists = path.exists()
-            size = path.stat().st_size if exists else 0
-        except OSError:
-            exists, size = False, 0
-        files.append({"name": name, "file": path.name, "exists": exists,
-                      "size": size})
-    return _ok(files=files)
-
-
-def h_logs_export(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/logs/export -> redacted log lines for download.
-
-    The reference ``get_logs`` returns the tail; a "detail/export" need was
-    unmet by the SPA. This serves the same filtered tail plus a joined text
-    body so the page can offer a redacted download. Secret material is stripped
-    by the shared redactor, always.
-    """
-    log_file = str(q.get("file", "agent") or "agent")
-    try:
-        lines_arg = int(q.get("lines", "500") or "500")
-    except ValueError:
-        lines_arg = 500
-    err, detail, rows = _read_log_lines(
-        cfg, log_file, lines=lines_arg, level=q.get("level", ""),
-        component=q.get("component", ""), search=q.get("search", ""))
-    if err:
-        return (400 if err.startswith("LOGS_") else 500), {
-            "ok": False, "code": err, "detail": detail}
-    content = "".join(rows)
-    return _ok(ok=True, file=log_file, redacted=True, count=len(rows),
-               content=content, lines=rows)
-
-
-def h_logs_detail(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """GET /api/logs/detail -> one line with its severity classification."""
-    log_file = str(q.get("file", "agent") or "agent")
-    try:
-        index = int(q.get("index", "0") or "0")
-    except ValueError:
-        index = 0
-    err, detail, rows = _read_log_lines(
-        cfg, log_file, lines=max(index + 1, 1), level=q.get("level", ""),
-        component=q.get("component", ""), search=q.get("search", ""))
-    if err:
-        return 400, {"ok": False, "code": err, "detail": detail}
-    if index < 0 or index >= len(rows):
-        return 404, {"ok": False, "code": "LOGS_NOT_FOUND",
-                     "detail": f"no line {index} in {log_file}.log"}
-    line = rows[index]
-    severity = "INFO"
-    upper = line.upper()
-    for token, label in (("ERROR", "ERROR"), ("WARN", "WARNING"),
-                         ("DEBUG", "DEBUG")):
-        if token in upper:
-            severity = label
-            break
-    return _ok(ok=True, file=log_file, index=index, line=line,
-               severity=severity, total=len(rows))
-
-
 def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     import os
@@ -10082,12 +9949,19 @@ def plugins_hub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            "detail": _redact(str(exc))[:240], "plugins": []}
 
     providers = base.get("providers") or {}
+    try:
+        from . import plugin_catalog as PC
+        catalog_index = PC.pinned_index_block()
+    except Exception as exc:
+        catalog_index = {"ok": False, "state": "UNAVAILABLE",
+                         "detail": _redact(str(exc))[:240], "entries": []}
     out = _ok(plugins=rows, orphan_dashboard_plugins=orphans,
               catalog=runtime_catalog.get("plugins", []),
               install_capability=runtime_catalog.get(
                   "install_capability", PR.INSTALL_CAPABILITY),
               catalog_state=runtime_catalog.get("state", "OK"),
               catalog_remote=runtime_catalog.get("remote", {}),
+              catalog_index=catalog_index,
               providers=providers)
     if hub_error:
         out[1]["hub_error"] = hub_error
@@ -10098,9 +9972,11 @@ def plugins_catalog(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/dashboard/plugins/catalog -> the real local loadable catalog.
 
-    Every entry has a real manifest + loader + provenance. The upstream remote
-    curated index is exposed only as a typed ``BLOCKED_REMOTE_PLUGIN`` refusal
-    naming the prerequisite; it is never fetched.
+    Every local entry has a real manifest + loader + provenance. The response
+    also carries ``pinned_index``: the curated, pinned remote index (Owner
+    Decision #1). Raw unvetted remote fetch stays a typed
+    ``BLOCKED_REMOTE_PLUGIN`` refusal; an index install is pinned/verified and
+    routed through the canonical e-stop -> confirmation -> audit gate.
     """
     from . import plugin_catalog as PC
     try:
@@ -10351,10 +10227,14 @@ def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
     The dashboard INSTALL control resolves the SAME canonical install op the
     CLI/voice use: a reviewed local manifest object, a ``<state_dir>/
-    plugin-catalog`` identifier, or a local ``*.json`` path. Confirmation is
-    the shared durable ``ApprovalJournal`` (``confirmation_id`` or an explicit
-    ``confirm``), the emergency stop is checked first, and a remote identifier
-    is a typed refusal — nothing is fetched, imported, or executed.
+    plugin-catalog`` identifier, or a local ``*.json`` path. A ``catalog_name``
+    (+ optional ``ref``) selects a curated, pinned index entry: it is verified
+    against the curated pin and routed through the canonical e-stop ->
+    confirmation -> audit path, then honestly operator-gated (the pinned remote
+    source is not fetched). Confirmation is the shared durable
+    ``ApprovalJournal`` (``confirmation_id`` or an explicit ``confirm``), the
+    emergency stop is checked first, and a raw remote identifier is a typed
+    refusal — nothing is fetched, imported, or executed.
     """
     from . import plugin_runtime as PR
     manifest = b.get("manifest")
@@ -10369,10 +10249,34 @@ def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         b.get("identifier", b.get("source", b.get("path", ""))) or "").strip()
     confirm = bool(b.get("confirm", False))
     confirmation_id = str(b.get("confirmation_id", "") or "").strip()
+    catalog_name = str(b.get("catalog_name", "") or "").strip()
+    ref = str(b.get("ref", "") or "").strip()
+    if catalog_name and manifest is None and not identifier:
+        from . import plugin_catalog as PC
+        try:
+            out = PC.install_from_index(
+                cfg, catalog_name, ref=ref, confirmed=confirm,
+                confirmation_id=confirmation_id, requested_by="dashboard:user")
+        except PR.PluginRuntimeError as exc:
+            http = 403 if exc.code in (PR.ESTOP_CODE, PR.REFUSED_CODE,
+                                       PC.INDEX_REF_MISMATCH_CODE) \
+                else 409 if exc.code == PR.CONFIRM_CODE \
+                else 404 if exc.code == PC.INDEX_NOT_FOUND_CODE \
+                else 400
+            _audit("plugin_index_install_refused", "dashboard:user",
+                   {"code": exc.code, "catalog_name": catalog_name[:120]})
+            return http, {"ok": False, "code": exc.code,
+                          "detail": _redact(exc.detail)[:300],
+                          "qubit_counterpart": "CLI `qubit agent plugins install "
+                                               "<operator-verified-dir>`"}
+        _audit("plugin_index_install_refused", "dashboard:user",
+               {"code": out.get("code"), "catalog_name": catalog_name[:120],
+                "pinned_ref": str(out.get("pinned_ref", ""))[:40]})
+        return 403, out
     if manifest is None and not identifier:
         return 400, {"ok": False, "code": PR.BAD_INPUT_CODE,
-                     "detail": "install needs a manifest, an identifier, or a "
-                               "local manifest path",
+                     "detail": "install needs a manifest, an identifier, a "
+                               "catalog name, or a local manifest path",
                      "qubit_counterpart": "CLI `qubit plugin install`"}
     if not confirm and not confirmation_id:
         return _staged(

@@ -8,6 +8,10 @@ records and the differential interface were **not touched**:
 Nothing here is `VERIFIED`, `M1`, `M2`, `CODE_READY`, or `COMPLETE`. This set is
 a working truth + plan, meant to be reviewed and corrected repeatedly.
 
+**`docs/archive/` is historical-only (Owner Decision #6, 2026-09-23): active
+tests and generators must target `docs/generated/` (or `docs/differential/` for
+the frozen contract), and must never read or write the archive.**
+
 ## The set
 
 | Doc | Purpose |

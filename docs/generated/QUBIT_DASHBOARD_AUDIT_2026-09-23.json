@@ -156,33 +156,21 @@
   ],
   "remaining": [
     {
-      "id": "R-plugins-remote",
-      "severity": "med",
-      "title": "Reference 240-entry remote plugin index not ported (Qubit policy refuses remote fetch); local 70-entry catalog is real",
-      "status": "OPEN-OPERATOR"
-    },
-    {
-      "id": "R-files-binary-root",
-      "severity": "med",
-      "title": "Binary upload is brokered + wired; live exercise needs an approved project root (`qubit project add-folder`) \u2014 operator",
-      "status": "OPEN-OPERATOR"
-    },
-    {
-      "id": "R-migration-script-divergence",
-      "severity": "low",
-      "title": "Retired openclaw-migration script newer than canonical qubit-migration copy; owner ruling on canonical",
-      "status": "OPEN-OPERATOR"
-    },
-    {
       "id": "R-deep-rebrand-identifiers",
       "severity": "low",
-      "title": "Deep qubit_runtime identifier rebrand continues (wire/env names preserved); W9 backlog",
+      "title": "Deep qubit_runtime identifier rebrand continues in controlled W9 slices (wire/env names preserved)",
       "status": "OPEN"
     },
     {
-      "id": "R-frozen-artifact-tests",
+      "id": "R-archive-readers",
       "severity": "low",
-      "title": "2 differential-parity tests need the pinned byte manifest (owner gate) and 1 reachability test reads a frozen archive \u2014 not code defects",
+      "title": "Follow-up to decision #24: some active scripts still default to docs/archive paths (rebuild_ledger_qubit/openclaw read archive SOURCE_INVENTORY; hermes_vendor_manifest/config_binding_manifest default --out; differential_parity gap-ledger path) \u2014 needs a targeted reconciliation wave",
+      "status": "OPEN"
+    },
+    {
+      "id": "R-plugin-index-install",
+      "severity": "low",
+      "title": "Curated pinned index is served and pin-verified; the actual install remains operator-gated (PLUGIN_INDEX_OPERATOR_GATED) by design",
       "status": "OPEN-OPERATOR"
     }
   ],
@@ -7504,5 +7492,43 @@
     "retry-wave": "2026-09-23 retry wave: skills de-brand finished (0 rewritable prose brand in skills; 146 strict-identifier files remain = preserved wire/provenance ids; live 197 skills resolve, legacy names read-old fallback via skill_view); /chat slash /toolsets /whoami /version /context confirmed working (D-5 was a downstream symptom of the slash-worker PYTHONPATH fix); profiles reconciled from the invented brain-principal store onto the real reference qubit_cli/profiles.py registry (live create/model/desc/SOUL/rename/active/delete round-trips); env env:/vault:/file: refs round-trip with is_set; channel secret-scope verified (allowlists configurable, tokens refused); gateway restart action status returns honest completed/exit 0. New cross-file items added to remaining.",
     "wave-5": "2026-09-23 wave 5 (5 agents): cron timezone/retry fields wired to the wire shape; memory recall offset + /api/recall/update route + voice update action; boards/kanban pagination wired; dead _persona_* handlers removed; binary upload wired through the brokered local.files_upload capability (path-confined, confirm+audit+e-stop; live returns typed FILE_PATCH_OUTSIDE_ROOT until a project root exists); logs offset pagination added (backend additive + LogsPage UI); MCP resources/prompts/resource-templates routes added to the vendored router (not yet reachable via the compat prefix); profiles.py wrapper now writes `qubit -p` and matches _is_our_wrapper (was `hermes -p`); plan_prompt + plan skill point at the QUBIT_HOME plans path; uploadFile now sends real multipart bytes (was lossy file.text()).",
     "wave-5b": "2026-09-23 wave 5 (second batch): MCP resources/prompts/resource-templates now have a compat passthrough over voicebridge.mcp_servers (live 200, honest typed MCP_PROTOCOL_ERROR for a tools-only server; unknown server 404 MCP_NOT_FOUND); qubit_cli identity de-brand slice (_get_default_qubit_home, console-script/argv identity, honcho qubit_ prefix with read-old, plan paths, relaunch/PATH, main_dashboard OAuth help) with wire/env names preserved; 9 stale tests reconciled across Ruling 3 / sessions / e-stop code / profiles registry; TWO REAL PRODUCT BUGS found and fixed: (1) qubit_compat _rebrand_chat_message copied top-level tool_name/tool_calls/reasoning from the RAW meta instead of the rebranded meta (brand leak on the CLI/dashboard wire shape); (2) skills_create was staged by _compat_confirm but _compat_runner had no branch (id-only confirm returned 400 CONFIRM_UNSUPPORTED) \u2014 payload now carries the manifest and the runner re-enters skill_create; generated artifacts regenerated (completions 114 commands, openclaw gap ledger, route ownership); tri-parity test now reads the canonical docs/generated ledger (not the frozen archive); frontend SystemPage cancel honesty + sidebar no-double-confirm; achievements Reset confirmed confirmation-gated; analytics export + docs examples confirmed absent upstream; gateway independence sweep clean + regression test added."
-  }
+  },
+  "owner_decisions_2026_09_23": [
+    {
+      "n": 1,
+      "decision": "Curated, pinned remote plugin index APPROVED",
+      "status": "IMPLEMENTED",
+      "evidence": "voicebridge/data/plugin_index_pinned.json (5 pinned entries); live catalog pinned_index count=5 curated=true pinned=true; install pin-verified + operator-gated"
+    },
+    {
+      "n": 2,
+      "decision": "/home/trick/Projects/Repos/qubit-voicebridge APPROVED as binary-upload root",
+      "status": "IMPLEMENTED",
+      "evidence": "project qubit-voicebridge registered+active; live multipart upload 409->200 byte-identical sha256 c6742d03\u2026; confinement refusals proven"
+    },
+    {
+      "n": 3,
+      "decision": "qubit-migration canonical; old command retained as compatibility alias",
+      "status": "IMPLEMENTED",
+      "evidence": "claw.py/setup_migration.py canonical-first resolution; deprecation note; 12 tests"
+    },
+    {
+      "n": 4,
+      "decision": "Deep internal identifier rebrand authorized in W9 slices",
+      "status": "IN_PROGRESS",
+      "evidence": "slice: profiles.py/skill_utils.py/main_dashboard.py; 107 focused tests; wire/env names preserved"
+    },
+    {
+      "n": 5,
+      "decision": "Pinned byte manifest regenerated, never fabricated",
+      "status": "IMPLEMENTED",
+      "evidence": "HERMES_BYTE_MANIFEST.json sha256 9d8ca061\u2026 14,733 rows; determinism x2; differential selftest 96/96"
+    },
+    {
+      "n": 6,
+      "decision": "docs/archive historical-only; reachability test targets active docs",
+      "status": "IMPLEMENTED",
+      "evidence": "test_compat_handler_reachability + generator repointed to docs/generated/; artifact sha256 63fe29b4\u2026 determinism x2"
+    }
+  ]
 }

@@ -12,9 +12,10 @@ non-authoritative. This analyzer classifies every such handler as:
   registration in ``qubit_compat.py``; it is reachable only through the compat
   fallback and is a delete candidate.
 
-It writes ``docs/archive/2026-09-21/QUBIT_COMPAT_HANDLER_REACHABILITY.json``; the guard test
+It writes ``docs/generated/QUBIT_COMPAT_HANDLER_REACHABILITY.json``; the guard test
 ``tests/test_compat_handler_reachability.py`` keeps it current and checked
-against the route-ownership matrix.
+against the route-ownership matrix. ``docs/archive/2026-09-21/`` is
+historical-only and is never a generator input or output (owner decision #6).
 """
 from __future__ import annotations
 
@@ -33,8 +34,8 @@ for extra in (str(REPO), str(REPO / "scripts")):
 import source_inventory as SI  # noqa: E402
 from voicebridge import qubit_compat as HC  # noqa: E402
 
-MATRIX = REPO / "docs/archive/2026-09-21/QUBIT_ROUTE_OWNERSHIP.json"
-OUT = REPO / "docs/archive/2026-09-21/QUBIT_COMPAT_HANDLER_REACHABILITY.json"
+MATRIX = REPO / "docs/generated/QUBIT_ROUTE_OWNERSHIP.json"
+OUT = REPO / "docs/generated/QUBIT_COMPAT_HANDLER_REACHABILITY.json"
 COMPAT = REPO / "voicebridge/qubit_compat.py"
 
 _SCAN_DIRS = ("voicebridge", "tests", "scripts")
@@ -271,7 +272,7 @@ def build() -> Dict[str, Any]:
     return {
         "schema": "qubit-compat-handler-reachability/1",
         "decision": "owner architecture decision 2026-09-17",
-        "matrix": "docs/archive/2026-09-21/QUBIT_ROUTE_OWNERSHIP.json",
+        "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
         "counts": counts,
         "registered_untested": [r["handler"] for r in rows
                                 if r["classification"] == "registration_only"],

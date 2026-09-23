@@ -133,17 +133,27 @@ def _skip_configured_section(config: dict, section_key: str, label: str) -> bool
 
 # ── Qubit Migration ──
 
-_OPENCLAW_SCRIPT = (
-    get_optional_skills_dir(PROJECT_ROOT / "optional-skills")
-    / "migration" / "openclaw-migration" / "scripts" / "openclaw_to_hermes.py"
+# Owner decision #3 (2026-09-23): `qubit-migration` is the canonical migration
+# skill; the retired `openclaw-migration` frame is a read-old compatibility
+# alias only (never deleted), consulted only when no canonical copy exists.
+_OPTIONAL_SKILLS = get_optional_skills_dir(PROJECT_ROOT / "optional-skills")
+_OPENCLAW_SCRIPT = _OPTIONAL_SKILLS / "migration" / "qubit-migration" / "scripts" / "openclaw_to_hermes.py"
+_LEGACY_OPENCLAW_SCRIPT = (
+    _OPTIONAL_SKILLS / "migration" / "openclaw-migration" / "scripts" / "openclaw_to_hermes.py"
 )
+
+
+def _migration_script_path() -> Optional[Path]:
+    """Canonical `qubit-migration` script, else the retired frame; None if absent."""
+    return next((p for p in (_OPENCLAW_SCRIPT, _LEGACY_OPENCLAW_SCRIPT) if p.exists()), None)
 
 
 def _load_openclaw_migration_module():
     """Load the openclaw_to_hermes migration script as a module; None if it can't be loaded."""
-    if not _OPENCLAW_SCRIPT.exists():
+    script = _migration_script_path()
+    if script is None:
         return None
-    spec = importlib.util.spec_from_file_location("openclaw_to_hermes", _OPENCLAW_SCRIPT)
+    spec = importlib.util.spec_from_file_location("openclaw_to_hermes", script)
     if spec is None or spec.loader is None:
         return None
     mod = importlib.util.module_from_spec(spec)
@@ -258,8 +268,12 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
         get_config_path, _info, load_config, print_header, print_info, print_success, print_warning, prompt_yes_no,
         save_config
     )
-    openclaw_dir = Path.home() / ".qubit"
-    if not openclaw_dir.is_dir() or not _OPENCLAW_SCRIPT.exists():
+    # Read-old source detection: the Qubit-fork home first, then the upstream
+    # legacy `.openclaw` home.
+    openclaw_dir = next(
+        (d for d in (Path.home() / ".qubit", Path.home() / ".openclaw") if d.is_dir()),
+        Path.home() / ".qubit")
+    if not openclaw_dir.is_dir() or _migration_script_path() is None:
         return False
     print_header("Qubit Installation Detected", gap=True)
     _info(f"Found Qubit data at {openclaw_dir}",

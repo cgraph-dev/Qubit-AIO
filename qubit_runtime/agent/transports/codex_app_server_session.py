@@ -696,6 +696,6 @@ def _get_qubit_version() -> str:
     try:
         from importlib.metadata import version
 
-        return version("hermes-agent")
+        return version("qubit-voicebridge")
     except Exception:  # pragma: no cover
         return "0.0.0"

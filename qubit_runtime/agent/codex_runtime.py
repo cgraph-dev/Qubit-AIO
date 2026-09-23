@@ -87,7 +87,7 @@ def _record_codex_app_server_usage(agent, turn, messages=None) -> dict[str, Any]
     input (the protocol exposes no cache-write tokens); a turn with no usage still counts as one API call.
     ``messages`` (the transcript mirror) lets real usage anchor the next preflight: this runtime bypasses
     the main loop's capture, and the mirror is never compacted natively, so without an anchor the rough
-    estimate grows monotonically and hermes-mode fires thread compaction on tiny threads (#100381)."""
+    estimate grows monotonically and legacy-mode fires thread compaction on tiny threads (#100381)."""
     agent.session_api_calls += 1
     usage = getattr(turn, "token_usage_last", None)
     compressor = getattr(agent, "context_compressor", None)

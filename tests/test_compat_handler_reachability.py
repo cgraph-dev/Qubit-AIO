@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-COMMITTED = REPO / "docs/archive/2026-09-21/QUBIT_COMPAT_HANDLER_REACHABILITY.json"
+COMMITTED = REPO / "docs/generated/QUBIT_COMPAT_HANDLER_REACHABILITY.json"
 GENERATOR = REPO / "scripts/compat_handler_reachability.py"
-MATRIX = REPO / "docs/archive/2026-09-21/QUBIT_ROUTE_OWNERSHIP.json"
+MATRIX = REPO / "docs/generated/QUBIT_ROUTE_OWNERSHIP.json"
 
 CLASSES = {"production_referenced", "test_referenced", "route_test_reachable",
            "script_referenced", "registration_only"}
@@ -36,7 +36,7 @@ def _committed() -> dict:
 def test_committed_proof_is_current():
     assert COMMITTED.is_file(), COMMITTED
     assert _committed() == _build(), (
-        "docs/archive/2026-09-21/QUBIT_COMPAT_HANDLER_REACHABILITY.json is stale; regenerate with "
+        "docs/generated/QUBIT_COMPAT_HANDLER_REACHABILITY.json is stale; regenerate with "
         "`python scripts/compat_handler_reachability.py`")
 
 

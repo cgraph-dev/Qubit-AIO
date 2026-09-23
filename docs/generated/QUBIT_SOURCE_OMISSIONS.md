@@ -18,7 +18,7 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - Distinct capabilities total: **884**; parented surfaces total: **1006**
 - Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 152, GATED 22)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
-- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=12319 identical=4883 missing=3257 extra=843 changed=6593
+- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=12425 identical=4896 missing=3151 extra=843 changed=6686
 
 ### Omission counts by category (all uncovered)
 

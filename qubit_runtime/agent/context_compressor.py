@@ -62,7 +62,7 @@ def _safe_int(value: Any) -> int | None:
 # deliberate main-model retry that must NOT re-issue the pin). The summary call is the ONLY auxiliary LLM
 # call a lean compaction attempt makes (#96603) — there are no sibling digest calls.
 _SUMMARY_ROUTE_PIN: contextvars.ContextVar[Optional[Dict[str, Any]]] = (
-    contextvars.ContextVar("hermes_summary_route_pin", default=None)
+    contextvars.ContextVar("qubit_summary_route_pin", default=None)
 )
 
 # ``timeout`` is included so a fallback entry keeps its own deadline.

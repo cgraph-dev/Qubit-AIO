@@ -82,6 +82,7 @@ class TestBundledPluginsRegister:
             "exa",
             "firecrawl",
             "keenable",
+            "openai-native",
             "parallel",
             "perplexity",
             "searxng",

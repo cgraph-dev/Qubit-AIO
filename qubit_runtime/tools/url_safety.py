@@ -435,7 +435,7 @@ def _install_ssrf_guard_on_transport(transport: Any, schemes_by_origin_var: Any,
     """Swap the transport's pool network backend for the SSRF-guarded one (idempotent). Only the
     direct transport is guarded; proxy mounts delegate final-target resolution to the trusted proxy."""
     state = getattr(transport, "__dict__", {}) if transport is not None else {}
-    if transport is None or state.get("_hermes_ssrf_guarded", False):
+    if transport is None or state.get("_qubit_ssrf_guarded", False):
         return
     label = "async httpx transport" if is_async else "httpx transport"
     pool = state.get("_pool")
@@ -462,7 +462,7 @@ def _install_ssrf_guard_on_transport(transport: Any, schemes_by_origin_var: Any,
 def _install_ssrf_guard_on_client(client: Any, *, is_async: bool = False) -> None:
     """Guard ``client._transport`` only; ``_mounts`` (env/explicit proxies) stay untouched."""
     import contextvars
-    var_name = "hermes_ssrf_async_origin_schemes" if is_async else "hermes_ssrf_origin_schemes"
+    var_name = "qubit_ssrf_async_origin_schemes" if is_async else "qubit_ssrf_origin_schemes"
     _install_ssrf_guard_on_transport(
         getattr(client, "__dict__", {}).get("_transport"), contextvars.ContextVar(var_name), is_async=is_async)
 
@@ -512,7 +512,7 @@ def ssrf_safe_async_http_transport(**kwargs: Any) -> Any:
     import contextvars
     import httpx
 
-    schemes_by_origin_var = contextvars.ContextVar("hermes_ssrf_async_origin_schemes")
+    schemes_by_origin_var = contextvars.ContextVar("qubit_ssrf_async_origin_schemes")
 
     class _Transport(httpx.AsyncHTTPTransport):
         def __init__(self, **transport_kwargs: Any):
@@ -535,7 +535,7 @@ def ssrf_safe_http_transport(**kwargs: Any) -> Any:
     import contextvars
     import httpx
 
-    schemes_by_origin_var = contextvars.ContextVar("hermes_ssrf_origin_schemes")
+    schemes_by_origin_var = contextvars.ContextVar("qubit_ssrf_origin_schemes")
 
     class _Transport(httpx.HTTPTransport):
         def __init__(self, **transport_kwargs: Any):

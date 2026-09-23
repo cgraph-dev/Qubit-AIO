@@ -4,7 +4,7 @@ The registry's ordinary availability cache is profile-wide, while a gateway
 can build schemas for several platforms in the same profile concurrently.
 Carry only the explicit selection through a ContextVar, never process env.
 
-Ported from the Hermes foundation (tools/kanban_toolset_context.py) so the
+Ported from the upstream foundation (tools/kanban_toolset_context.py) so the
 Qubit kanban detector can distinguish "named explicitly for this schema build"
 from "enabled by a saved profile opt-in".
 """

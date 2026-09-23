@@ -57,7 +57,7 @@ def test_unknown_method_is_typed_not_found_not_fabricated_success():
 
 def test_route_ownership_matrix_records_the_routes_with_no_violation():
     doc = json.loads(
-        (REPO_ROOT / "docs/archive/2026-09-21/QUBIT_ROUTE_OWNERSHIP.json").read_text())
+        (REPO_ROOT / "docs/generated/QUBIT_ROUTE_OWNERSHIP.json").read_text())
     assert doc["violations"] == []
     paths = {(r["method"], r["path"]) for r in doc["rows"]}
     assert ("GET", "/api/gateway/rpc") in paths

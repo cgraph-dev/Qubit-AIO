@@ -541,7 +541,7 @@ def _bind_rpc_socket(kernel: SessionKernel) -> str:
         rpc_endpoint = f"tcp://{host}:{port}"
     else:
         sock_tmpdir = "/tmp" if sys.platform == "darwin" else tempfile.gettempdir()
-        rpc_endpoint = kernel.sock_path = os.path.join(sock_tmpdir, f"hermes_rpc_{uuid.uuid4().hex}.sock")
+        rpc_endpoint = kernel.sock_path = os.path.join(sock_tmpdir, f"qubit_rpc_{uuid.uuid4().hex}.sock")
         server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         server_sock.bind(kernel.sock_path)
         os.chmod(kernel.sock_path, 0o600)

@@ -35,7 +35,7 @@ _SHARED_TRANSPORTS_MAX = 32
 # ``request.extensions`` key stamped by ``_SharedTransport.handle_request``;
 # the socket-abort walker in agent_runtime_helpers uses it to find only the
 # owning client's in-flight connections on a shared pool.
-QUBIT_TRANSPORT_OWNER_EXT = "hermes_transport_owner"
+QUBIT_TRANSPORT_OWNER_EXT = "qubit_transport_owner"
 
 
 def _interleave_addrinfos(addrinfos: list[tuple]) -> list[tuple]:

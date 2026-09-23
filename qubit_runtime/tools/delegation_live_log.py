@@ -1,6 +1,6 @@
 """Live, tail-able transcripts for delegated subagents.
 
-One append-only log per child under ``<hermes_home>/cache/delegation/live/
+One append-only log per child under ``<qubit_home>/cache/delegation/live/
 <delegation_id>/task-<n>.log``, pre-created with a header at dispatch (so
 ``tail -f`` attaches immediately); paths are returned from ``delegate_task``.
 ``cache/delegation`` is mounted read-only into remote terminal backends, so

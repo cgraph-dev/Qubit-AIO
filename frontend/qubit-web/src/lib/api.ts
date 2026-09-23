@@ -1950,6 +1950,17 @@ export const api = {
       body: JSON.stringify({ confirm: true, ...body }),
     }),
 
+  // Curated, pinned index install. Sends the entry's curated `pinned_ref` so
+  // the backend verifies the pin; a pinned/verified request still goes through
+  // the canonical e-stop -> confirmation -> audit path, and the remote source
+  // is never fetched (raw remote fetch stays refused).
+  installAgentPluginFromIndex: (catalogName: string, ref: string) =>
+    fetchJSON<AgentPluginInstallResponse>("/api/dashboard/agent-plugins/install", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true, catalog_name: catalogName, ref }),
+    }),
+
   enableAgentPlugin: (name: string) =>
     fetchJSON<{ ok: boolean; name: string; unchanged?: boolean }>(
       `/api/dashboard/agent-plugins/${pluginPath(name)}/enable`,
@@ -4272,6 +4283,7 @@ export interface PluginsHubResponse {
   plugins: HubAgentPluginRow[];
   orphan_dashboard_plugins: PluginManifestResponse[];
   providers: PluginsHubProviders;
+  catalog_index?: PluginPinnedIndex;
 }
 
 // ── Real local plugin catalog ──────────────────────────────────────────
@@ -4337,6 +4349,59 @@ export interface PluginCatalogRemote {
   prerequisite: string;
 }
 
+// ── Curated, pinned remote plugin index (Owner Decision #1) ────────────
+
+export interface PluginPinnedIndexEntry {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  repo: string;
+  subdir: string;
+  pinned_ref: string;
+  pinned_ref_short: string;
+  homepage: string;
+  maintainer: string;
+  license: string;
+  tier: string;
+  category: string;
+  capabilities: string[];
+  api_version?: number | null;
+  tags: string[];
+  curated: boolean;
+  pinned: boolean;
+  install_state: string;
+  install_code: string;
+  install_capability: string;
+  provenance: Record<string, string>;
+}
+
+export interface PluginPinnedIndexInstall {
+  state: string;
+  code: string;
+  detail: string;
+  prerequisite: string;
+  endpoint: string;
+}
+
+export interface PluginPinnedIndex {
+  ok: boolean;
+  state: string;
+  schema: string;
+  curated: boolean;
+  pinned: boolean;
+  source: string;
+  curation: string;
+  license_note: string;
+  install_policy: string;
+  query: string;
+  count: number;
+  install_capability: string;
+  entries: PluginPinnedIndexEntry[];
+  install: PluginPinnedIndexInstall;
+  raw_remote_fetch: PluginCatalogRemote;
+}
+
 export interface PluginCatalogResponse {
   ok: boolean;
   state: string;
@@ -4348,6 +4413,7 @@ export interface PluginCatalogResponse {
   counts: Record<string, number>;
   estop: boolean;
   remote: PluginCatalogRemote;
+  pinned_index?: PluginPinnedIndex;
   install_capability: string;
   entries: PluginCatalogEntry[];
 }
@@ -4404,7 +4470,9 @@ export interface PluginReloadResponse {
 }
 
 export interface AgentPluginInstallRequest {
-  identifier: string;
+  identifier?: string;
+  catalog_name?: string;
+  ref?: string;
   force?: boolean;
   enable?: boolean;
 }

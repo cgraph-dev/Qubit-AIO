@@ -232,7 +232,7 @@ class MCPServerTransportMixin:
         # thread: the reaper blocks up to 2s (SIGTERM → wait → SIGKILL) when orphans exist, which would
         # otherwise stall the shared MCP event loop.
         new_pids: set = set()
-        # Subprocess stderr goes to ~/.hermes/logs/mcp-stderr.log so banners can't corrupt the TUI.
+        # Subprocess stderr goes to the Qubit home logs/mcp-stderr.log so banners can't corrupt the TUI.
         _config._write_stderr_log_header(self.name)
         try:
             errlog = _config._get_mcp_stderr_log()
