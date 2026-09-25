@@ -48,21 +48,47 @@ def _expand_qubit_home(path: str) -> Path:
     return Path(os.path.expanduser(os.path.expandvars(path)))
 
 
-def _get_platform_default_qubit_home() -> Path:
-    """Return the platform default with the literal data-directory suffix."""
+# The Qubit-owned platform-default home directory names. ``.hermes`` is the
+# pre-rebrand (upstream) name and is accepted read-old so existing installs
+# still resolve instead of being orphaned by the rename.
+_QUBIT_HOME_DIR = ".qubit"
+_LEGACY_HOME_DIR = ".hermes"
+
+
+def _default_home_dir_names() -> tuple[str, ...]:
+    """Platform-default home dir names, canonical first then legacy (read-old)."""
+    if sys.platform == "win32":
+        return (_QUBIT_HOME_DIR.lstrip("."), _LEGACY_HOME_DIR.lstrip("."))
+    return (_QUBIT_HOME_DIR, _LEGACY_HOME_DIR)
+
+
+def _platform_default_home_for(dir_name: str) -> Path:
+    """Platform default for *dir_name* with the literal data-directory suffix."""
     suffix = os.environ.get("HERMES_DATA_DIR_SUFFIX", "")
     if sys.platform == "win32":
         local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
-        return base / ("hermes" + suffix)
-    return Path.home() / (".hermes" + suffix)
+        return base / (dir_name.lstrip(".") + suffix)
+    return Path.home() / (dir_name + suffix)
+
+
+def _get_platform_default_qubit_home() -> Path:
+    """Return the Qubit-owned platform default with the literal data-directory suffix."""
+    return _platform_default_home_for(_QUBIT_HOME_DIR)
+
+
+def _legacy_platform_default_qubit_home() -> Path:
+    """Pre-rebrand platform default (``~/.hermes``), accepted read-old."""
+    return _platform_default_home_for(_LEGACY_HOME_DIR)
 
 
 def sudo_invoker_default_home() -> Path | None:
-    """The invoking user's native ``~/.hermes`` when this process is root under ``sudo``, else None.
+    """The invoking user's native Qubit home when this process is root under ``sudo``, else None.
 
-    sudo strips QUBIT_HOME and sets HOME=/root, so the process's own default is root's; the profile
-    store and the system service being operated on belong to SUDO_USER.
+    Prefers the Qubit-owned ``~/.qubit``, falling back to a populated legacy
+    ``~/.hermes`` (read-old) so an existing install still resolves. sudo strips
+    QUBIT_HOME and sets HOME=/root, so the process's own default is root's; the
+    profile store and the system service being operated on belong to SUDO_USER.
     """
     if not hasattr(os, "geteuid") or os.geteuid() != 0:
         return None
@@ -72,9 +98,15 @@ def sudo_invoker_default_home() -> Path | None:
     import pwd
 
     try:
-        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".hermes"
+        user_home = Path(pwd.getpwnam(sudo_user).pw_dir)
     except KeyError:  # SUDO_USER not in passwd (chroot/container)
         return None
+    names = _default_home_dir_names()
+    for name in names:
+        candidate = user_home / name
+        if candidate.exists():
+            return candidate
+    return user_home / names[0]
 
 
 def _warn_profile_fallback_once() -> None:
@@ -225,9 +257,14 @@ def get_default_qubit_root(*, home: str | Path | None = None) -> Path:
         return memo[2]
     result = native_home
     if env_path is not None:
-        try:
-            env_path.resolve().relative_to(native_home.resolve())  # under ~/.hermes (normal or profile mode)
-        except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else QUBIT_HOME itself
+        for native in (native_home, _legacy_platform_default_qubit_home()):
+            try:
+                env_path.resolve().relative_to(native.resolve())  # under the native root (normal or profile mode)
+            except ValueError:  # not under this native root; try the next
+                continue
+            result = native
+            break
+        else:  # Docker/custom root: <root>/profiles/<name> -> <root>, else QUBIT_HOME itself
             result = env_path.parent.parent if env_path.parent.name == "profiles" else env_path
     _default_qubit_root_memo = (*memo_key, result)
     return result
@@ -240,13 +277,14 @@ _QUBIT_HOME_MARKERS = ("config.yaml", ".env", "state.db")
 
 
 def _is_qubit_profiles_root(profiles_dir: Path) -> bool:
-    """True when *profiles_dir* is provably ``<hermes-home>/profiles``.
+    """True when *profiles_dir* is provably ``<qubit-home>/profiles``.
 
-    Accepts the classic ``~/.hermes`` layout, a root carrying Qubit-home marker files, a
-    ``profiles/.deleted`` tombstone dir (only ``profile delete`` creates it), or the default root.
+    Accepts the Qubit-owned ``~/.qubit`` layout (and the pre-rebrand ``~/.hermes``
+    read-old), a root carrying Qubit-home marker files, a ``profiles/.deleted``
+    tombstone dir (only ``profile delete`` creates it), or the default root.
     """
     root = profiles_dir.parent
-    if root.name == ".hermes":
+    if root.name in _default_home_dir_names():
         return True
     try:
         if (profiles_dir / _DELETED_PROFILES_DIR).is_dir() or any(
@@ -272,7 +310,7 @@ def named_profile_home(path: str | Path) -> Path | None:
         if (candidate.parent.name == "profiles" and not candidate.name.startswith(".")
                 and _is_qubit_profiles_root(candidate.parent)):
             return candidate
-        if candidate.name == ".hermes":  # default home: a coincidental profiles/ ancestor is not a root
+        if candidate.name in _default_home_dir_names():  # default home: a coincidental profiles/ ancestor is not a root
             return None
     return None
 
@@ -280,8 +318,9 @@ def named_profile_home(path: str | Path) -> Path | None:
 def profile_name_for_home(path: str | Path | None) -> str | None:
     """Return the canonical profile id owning *path*, or ``None`` when it is not a profile home.
 
-    The default home is the Qubit root itself, so its basename is an installation detail (``.hermes``
-    on POSIX and commonly ``qubit`` on Windows), not the profile id ``default``.
+    The default home is the Qubit root itself, so its basename is an installation detail (``.qubit``
+    on POSIX and commonly ``qubit`` on Windows; the pre-rebrand ``.hermes`` is accepted read-old),
+    not the profile id ``default``.
     """
     if path is None or not str(path).strip():
         return None
@@ -573,7 +612,7 @@ def _legacy_path_has_content(path: Path) -> bool:
 
 
 def display_qubit_home(home: Path | None = None) -> str:
-    """User-facing ``~/`` display string for QUBIT_HOME (``~/.hermes/profiles/coder``).
+    """User-facing ``~/`` display string for QUBIT_HOME (``~/.qubit/profiles/coder``).
 
     ``home`` overrides the lookup for callers that run before the CLI has applied the sticky
     ``active_profile`` (``get_qubit_home()`` would emit the wrong-profile fallback warning there).

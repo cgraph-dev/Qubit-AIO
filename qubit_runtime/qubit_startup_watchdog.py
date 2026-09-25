@@ -103,11 +103,12 @@ def _process_qubit_home() -> Path:
     val = os.environ.get("QUBIT_HOME", "").strip()
     if val:
         return Path(val)
+    suffix = os.environ.get("HERMES_DATA_DIR_SUFFIX", "")
     if sys.platform == "win32":
         local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
-        return base / "qubit"
-    return Path.home() / ".qubit"
+        return base / ("qubit" + suffix)
+    return Path.home() / (".qubit" + suffix)
 
 
 def get_startup_watchdog_dump_path(home: Optional[Path] = None) -> Path:

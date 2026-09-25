@@ -49,7 +49,7 @@ print(json.dumps(result))
         text=True, capture_output=True,
     )
     assert result.returncode == 0, result.stderr
-    base = tmp_path / "AppData" / "Local" / "hermes" if sys.platform == "win32" else tmp_path / ".hermes"
+    base = tmp_path / "AppData" / "Local" / "qubit" if sys.platform == "win32" else tmp_path / ".qubit"
     root = Path(str(base) + suffix)
     profile = root / "profiles" / "coder"
     assert json.loads(result.stdout) == list(map(str, [

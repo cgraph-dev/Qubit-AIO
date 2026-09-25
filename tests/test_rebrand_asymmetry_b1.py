@@ -140,12 +140,6 @@ def test_resolve_qubit_bin_prefers_qubit(monkeypatch, tmp_path):
 
 
 # ---------------------------------------------------------------- default home
-@pytest.mark.xfail(
-    strict=True,
-    reason="A3a platform default home lives in the excluded "
-    "qubit_runtime/qubit_constants.py; report as an excluded-file need "
-    "instead of editing it (Task 9 brief).",
-)
 def test_platform_default_home_is_qubit_owned():
     from qubit_constants import _get_platform_default_qubit_home
 

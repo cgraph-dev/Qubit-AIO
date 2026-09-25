@@ -28,11 +28,11 @@ class TestGetDefaultHermesRoot:
 
     @pytest.mark.platforms("linux")
     def test_no_qubit_home_returns_native(self, tmp_path, monkeypatch):
-        """When QUBIT_HOME is not set, returns ~/.hermes."""
+        """When QUBIT_HOME is not set, returns ~/.qubit."""
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
-        assert get_default_qubit_root() == tmp_path / ".hermes"
+        assert get_default_qubit_root() == tmp_path / ".qubit"
 
 
 
@@ -61,13 +61,13 @@ class TestGetDefaultHermesRoot:
 
     @pytest.mark.platforms("windows")
     def test_no_qubit_home_returns_localappdata_root_on_windows(self, tmp_path, monkeypatch):
-        """Native Windows falls back to %LOCALAPPDATA%\\hermes, not ~/.hermes."""
+        """Native Windows falls back to %LOCALAPPDATA%/qubit, not ~/.qubit."""
         local_appdata = tmp_path / "LocalAppData"
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
 
-        assert get_default_qubit_root() == local_appdata / "hermes"
+        assert get_default_qubit_root() == local_appdata / "qubit"
 
 
 
@@ -89,14 +89,14 @@ class TestGetHermesHome:
 
     @pytest.mark.platforms("windows")
     def test_windows_fallback_uses_localappdata(self, tmp_path, monkeypatch):
-        """When QUBIT_HOME is unset on Windows, use %LOCALAPPDATA%\\hermes."""
+        """When QUBIT_HOME is unset on Windows, use %LOCALAPPDATA%/qubit."""
         local_appdata = tmp_path / "LocalAppData"
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "Home")
         monkeypatch.setattr(qubit_constants, "_profile_fallback_warned", False)
 
-        assert get_qubit_home() == local_appdata / "hermes"
+        assert get_qubit_home() == local_appdata / "qubit"
 
 
 class TestGetProcessHermesHome:
