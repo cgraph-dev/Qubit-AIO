@@ -134,7 +134,7 @@ def test_transform_tool_result_runs_after_post_tool_call(monkeypatch):
 
 def test_transform_tool_result_integration_with_real_plugin(monkeypatch, tmp_path):
     """End-to-end: load a real plugin from QUBIT_HOME and verify it rewrites results."""
-    import yaml
+    import qubit_yaml as yaml
 
     hermes_home = Path(os.environ["QUBIT_HOME"])
     plugins_dir = hermes_home / "plugins"

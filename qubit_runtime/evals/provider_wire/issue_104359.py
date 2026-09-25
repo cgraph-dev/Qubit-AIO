@@ -121,7 +121,7 @@ config = {
     },
     "prompt_caching": {"enabled": False},
 }
-import yaml
+import qubit_yaml as yaml
 
 Path(os.environ["QUBIT_HOME"], "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
 from qubit_state import SessionDB

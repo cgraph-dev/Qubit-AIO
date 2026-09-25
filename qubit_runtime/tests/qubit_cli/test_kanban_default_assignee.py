@@ -7,27 +7,20 @@ the task is skipped (existing behavior preserved).
 from __future__ import annotations
 
 import json
-import os
-import sys
-import tempfile
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture()
-def isolated_kanban_home(monkeypatch):
-    """Spin up a fresh QUBIT_HOME with a clean kanban DB."""
-    test_home = tempfile.mkdtemp(prefix="kanban_default_assignee_test_")
-    monkeypatch.setenv("QUBIT_HOME", test_home)
-    # Force-reimport so the fresh QUBIT_HOME is picked up.
-    for mod in list(sys.modules.keys()):
-        if mod.startswith("qubit_cli") or mod.startswith("qubit_state") or mod == "qubit_constants":
-            del sys.modules[mod]
+def isolated_kanban_home(tmp_path, monkeypatch):
+    """Fresh QUBIT_HOME with a clean kanban DB."""
+    test_home = tmp_path / ".hermes"
+    test_home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(test_home))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     from qubit_cli import kanban_db
     yield kanban_db, test_home
-    # Cleanup is best-effort; tempfile dir survives but pytest isolation
-    # gives each test its own monkeypatched QUBIT_HOME so no cross-test
-    # contamination.
 
 
 def _fake_spawn(*args, **kwargs):
