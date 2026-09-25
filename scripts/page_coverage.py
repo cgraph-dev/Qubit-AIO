@@ -13,11 +13,18 @@ discovery uses `sorted(...)`; output is `json.dump(..., indent=2)` plus one
 trailing newline. Identical worktrees at the same revision produce a
 byte-identical file, so the artifact can be reproduced and `--check`ed.
 
+The artifact embeds the revision it was generated at. ``--check`` therefore
+compares the *revision-independent* content: it normalizes the recorded
+generation revision (the top-level fields, every row's
+``last_verification_revision``, and the ``method`` prose) before diffing, so it
+passes on a moved HEAD while still catching real content drift.
+
 Usage:
     python scripts/page_coverage.py                 # write the artifact
     python scripts/page_coverage.py --out <path>    # write elsewhere
     python scripts/page_coverage.py --check         # render in memory, diff
-                                                    # vs the on-disk artifact,
+                                                    # vs the on-disk artifact
+                                                    # (revision-independent),
                                                     # exit 2 on drift
 
 Exit codes: 0 ok; 2 usage/drift/generator error.
@@ -956,13 +963,46 @@ def _render(artifact):
     return json.dumps(artifact, indent=2, ensure_ascii=False) + "\n"
 
 
+#: Fields that record the generation revision, plus the ``method`` prose that
+#: embeds it. Normalized before a ``--check`` diff so a moved HEAD never fails.
+_REV_FIELDS = ("generated_from_revision", "last_verification_revision")
+_METHOD_REV_RE = re.compile(r"at revision [0-9a-f]{7,40}")
+REV_TOKEN = "<REVISION>"
+
+
+def _revision_independent(doc):
+    """Return *doc* with its embedded generation revision normalized away.
+
+    ``--check`` must be portable across a moved HEAD: the artifact records the
+    revision it was generated at, so a byte diff would fail after every commit
+    even when the extracted content is unchanged. Normalizing only the
+    revision-bearing fields (and the ``method`` prose) keeps real content drift
+    detectable while ignoring revision-only drift. Non-revision 40-hex values
+    (upstream pins, method-inventory commits) are deliberately left intact.
+    """
+    def scrub(node):
+        if isinstance(node, dict):
+            return {
+                key: (REV_TOKEN if key in _REV_FIELDS else scrub(value))
+                for key, value in node.items()
+            }
+        if isinstance(node, list):
+            return [scrub(item) for item in node]
+        if isinstance(node, str):
+            return _METHOD_REV_RE.sub("at revision " + REV_TOKEN, node)
+        return node
+
+    return scrub(doc)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", default=OUT,
                     help="output path (default: %(default)s)")
     ap.add_argument("--check", action="store_true",
                     help="render in memory and fail (exit 2) if the on-disk "
-                         "artifact differs; writes nothing")
+                         "artifact differs (revision-independent compare); "
+                         "writes nothing")
     args = ap.parse_args(argv)
 
     artifact = build_artifact()
@@ -974,12 +1014,19 @@ def main(argv=None):
             print("check FAILED: %s is absent" % target, file=sys.stderr)
             return 2
         with open(target, encoding="utf-8") as fh:
-            on_disk = fh.read()
-        if on_disk != rendered:
+            on_disk_text = fh.read()
+        try:
+            on_disk = json.loads(on_disk_text)
+            fresh = json.loads(rendered)
+        except ValueError as exc:
+            print("check FAILED: %s is not valid JSON: %s" % (target, exc),
+                  file=sys.stderr)
+            return 2
+        if _revision_independent(on_disk) != _revision_independent(fresh):
             print("check FAILED: %s differs from regenerated output"
                   % target, file=sys.stderr)
             return 2
-        print("check OK: %s is current at revision %s"
+        print("check OK: %s is current (revision-independent) at revision %s"
               % (target, artifact["generated_from_revision"]))
         return 0
 

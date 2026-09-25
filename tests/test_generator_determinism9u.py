@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import json
 import sys
 import warnings
 from pathlib import Path
@@ -89,6 +90,52 @@ def test_page_coverage_check_matches_on_disk_artifact():
     assert rc == 0, (
         "docs/generated/QUBIT_PAGE_COVERAGE_2026-09-21.json is stale; regenerate with "
         "`python scripts/page_coverage.py`")
+
+
+def test_page_coverage_check_ignores_a_moved_revision(tmp_path):
+    """``--check`` passes when only the embedded generation revision moved.
+
+    The canonical artifact records the HEAD it was generated at; after a commit
+    that revision is stale by construction. ``--check`` must compare the
+    revision-independent content so a moved HEAD is not reported as drift.
+    """
+    mod = _load("page_coverage_gen9u_rev", "page_coverage.py")
+    with _ignore_leaked_handle_warning():
+        art = mod.build_artifact()
+    current = art["generated_from_revision"]
+    stale = "0" * 40
+    assert current != stale
+    # Simulate the same content generated at a different revision: every
+    # revision-bearing field and the ``method`` prose name the stale SHA.
+    art["generated_from_revision"] = stale
+    art["last_verification_revision"] = stale
+    art["method"] = art["method"].replace(current, stale)
+    for row in art["rows"]:
+        if "last_verification_revision" in row:
+            row["last_verification_revision"] = stale
+    path = tmp_path / "coverage_moved_rev.json"
+    path.write_text(mod._render(art), encoding="utf-8")
+
+    with _ignore_leaked_handle_warning():
+        assert mod.main(["--check", "--out", str(path)]) == 0
+
+
+def test_page_coverage_check_still_catches_real_drift(tmp_path):
+    """A revision-independent compare must still reject real content drift."""
+    mod = _load("page_coverage_gen9u_drift", "page_coverage.py")
+    with _ignore_leaked_handle_warning():
+        art = mod.build_artifact()
+    path = tmp_path / "coverage_drift.json"
+    path.write_text(mod._render(art), encoding="utf-8")
+
+    drifted = json.loads(path.read_text(encoding="utf-8"))
+    drifted["summary"]["total_rows"] += 1
+    path.write_text(
+        json.dumps(drifted, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8")
+
+    with _ignore_leaked_handle_warning():
+        assert mod.main(["--check", "--out", str(path)]) == 2
 
 
 def test_identifier_rename_two_renders_are_byte_identical():
