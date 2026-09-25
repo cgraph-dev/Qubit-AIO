@@ -576,7 +576,7 @@ def _scan_gateway_pids(
         looks_like_gateway_command_line,
         looks_like_gateway_runtime_command_line,
         profile_flag_value,
-        hermes_home_assignments,
+        qubit_home_assignments,
         command_line_names_qubit_home,
     )
     current_home = str(get_qubit_home().resolve())
@@ -602,7 +602,7 @@ def _scan_gateway_pids(
         # wmic/CIM), so only a non-matching explicit QUBIT_HOME= disqualifies.
         if profile_flag_value(command_lc) is not None:
             return False
-        return (not hermes_home_assignments(command_lc)
+        return (not qubit_home_assignments(command_lc)
                 or command_line_names_qubit_home(command_lc, current_home_lc))
 
     def _consider(pid: int, command: str) -> None:

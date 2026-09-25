@@ -2,7 +2,7 @@
 versioned JSON verbs (``identify``, ``status``). A connectable socket with a well-formed ``identify``
 answer IS liveness — no PID-reuse heuristics. Never a TCP port: filesystem/pipe ACLs are the auth
 boundary. POSIX: ``$QUBIT_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
-file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
+file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\qubit-gateway-<hash>``.
 Wire contract: ONE request per connection — one JSON line in, one out, then the server closes.
 Consumers PREFER the socket and fall back to the state-file/scan layer when it doesn't answer.
 """
@@ -26,6 +26,11 @@ from typing import Any, Callable, Optional
 logger = logging.getLogger(__name__)
 
 CONTROL_PROTOCOL_VERSION = 1
+# N26: the Qubit-owned Windows pipe prefix. ``_LEGACY_PIPE_PREFIX`` is the
+# pre-de-brand name; clients still try it so a daemon started before the rename
+# remains reachable (read-old/write-new).
+_PIPE_PREFIX = "qubit-gateway"
+_LEGACY_PIPE_PREFIX = "hermes-gateway"
 _SOCKET_FILENAME = "gateway.sock"
 _POINTER_FILENAME = "gateway.sock.path"
 _IS_WINDOWS = sys.platform == "win32"
@@ -42,7 +47,12 @@ def _home_hash(home: Path) -> str:
 
 def windows_pipe_name(home: Path) -> str:
     """Per-QUBIT_HOME named pipe path (Windows transport)."""
-    return rf"\\.\pipe\hermes-gateway-{_home_hash(home)}"
+    return rf"\\.\pipe\{_PIPE_PREFIX}-{_home_hash(home)}"
+
+
+def _legacy_windows_pipe_name(home: Path) -> str:
+    """Pre-de-brand pipe name, tried only as a fallback for an older daemon."""
+    return rf"\\.\pipe\{_LEGACY_PIPE_PREFIX}-{_home_hash(home)}"
 
 
 def _fits_sun_path(path: Path) -> bool:
@@ -97,12 +107,16 @@ def _detect_supervisor() -> str:
 
 def build_identify_payload() -> dict[str, Any]:
     """Default ``identify`` answer, built from gateway.status primitives."""
-    from gateway.status import _build_pid_record, _get_code_identity_fields, _profile_label_for_home, read_runtime_status
+    from gateway.status import (_build_pid_record, _get_code_identity_fields,
+                                _profile_label_for_home, read_runtime_status,
+                                record_home)
     record = _build_pid_record()
+    home = record_home(record)
     payload: dict[str, Any] = {
         "protocol": CONTROL_PROTOCOL_VERSION,
-        **{k: record.get(k) for k in ("kind", "pid", "start_time", "hermes_home")},
-        "profile": _profile_label_for_home(record.get("hermes_home") or ""),
+        **{k: record.get(k) for k in ("kind", "pid", "start_time")},
+        "qubit_home": home,
+        "profile": _profile_label_for_home(home or ""),
         "supervisor": _detect_supervisor(), **_get_code_identity_fields()}
     with contextlib.suppress(Exception):
         # served_profiles (multiplex mode) is stamped into runtime status by the runner.
@@ -316,8 +330,18 @@ def _query_unix_socket(home: Path, request: bytes, timeout: float) -> Optional[b
 
 
 def _query_windows_pipe(home: Path, request: bytes, timeout: float) -> Optional[bytes]:  # pragma: no cover - wine2e lane
-    pipe_name = windows_pipe_name(home)
+    # New pipe name first; fall back to the pre-de-brand prefix so a client can
+    # still reach a daemon started before the rename.
     deadline = time.monotonic() + timeout
+    for pipe_name in (windows_pipe_name(home), _legacy_windows_pipe_name(home)):
+        raw = _query_windows_pipe_named(pipe_name, request, deadline)
+        if raw is not None:
+            return raw
+    return None
+
+
+def _query_windows_pipe_named(pipe_name: str, request: bytes,
+                              deadline: float) -> Optional[bytes]:  # pragma: no cover - wine2e lane
     handle = None
     while handle is None:
         try:

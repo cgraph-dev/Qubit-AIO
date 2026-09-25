@@ -1,4 +1,4 @@
-"""Qubit Achievements dashboard plugin backend, mounted at /api/plugins/hermes-achievements/.
+"""Qubit Achievements dashboard plugin backend, mounted at /api/plugins/qubit-achievements/.
 
 Scans the session history into per-session stats (checkpointed by fingerprint so warm
 scans are cheap), aggregates them, and evaluates the tiered / multi-condition catalog.
@@ -144,32 +144,57 @@ CHECKPOINT_FILE = "scan_checkpoint.json"
 _CHECKPOINT_SCHEMA_VERSION = 2
 
 
+def _migrate_legacy_data_dir(root: Path) -> None:
+    """Read-old migration for the pre-rename ``plugin-data/hermes-achievements/``.
+
+    Preserves existing unlock/checkpoint state when the plugin identity moved to
+    ``qubit-achievements``; a file already present under the new root wins (never
+    destructive)."""
+    legacy = get_qubit_home() / "plugin-data" / "hermes-achievements"
+    try:
+        if not legacy.is_dir() or legacy.resolve() == root.resolve():
+            return
+        for child in legacy.iterdir():
+            target = root / child.name
+            if target.exists():
+                continue
+            try:
+                child.replace(target)
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
 def _data_dir() -> Path:
-    """Durable data root (``<qubit home>/plugin-data/hermes-achievements/``). State used to
+    """Durable data root (``<qubit home>/plugin-data/qubit-achievements/``). State used to
     live in the install tree and died on ``qubit plugins remove``/``update``; legacy files
     migrate on first read (see ``_data_file``)."""
     try:
         from plugins.plugin_storage import plugin_data_dir
-        return plugin_data_dir("hermes-achievements")
+        root = plugin_data_dir("qubit-achievements")
     except Exception:
         # Standalone dashboard import (no plugins package on sys.path): same layout, computed locally.
-        root = get_qubit_home() / "plugin-data" / "hermes-achievements"
+        root = get_qubit_home() / "plugin-data" / "qubit-achievements"
         root.mkdir(parents=True, exist_ok=True)
-        return root
+    _migrate_legacy_data_dir(root)
+    return root
 
 
 def _data_file(name: str) -> Path:
     path = _data_dir() / name
     if not path.exists():
-        legacy = get_qubit_home() / "plugins" / "hermes-achievements" / name
-        if legacy.exists():
-            try:
-                # Two statements so the read (utf-8-sig, tolerates a BOM)
-                # and the write (utf-8, never emits one) stay distinct.
-                legacy_text = legacy.read_text(encoding="utf-8-sig")
-                path.write_text(legacy_text, encoding="utf-8")
-            except Exception:
-                pass
+        for legacy_name in ("qubit-achievements", "hermes-achievements"):
+            legacy = get_qubit_home() / "plugins" / legacy_name / name
+            if legacy.exists():
+                try:
+                    # Two statements so the read (utf-8-sig, tolerates a BOM)
+                    # and the write (utf-8, never emits one) stay distinct.
+                    legacy_text = legacy.read_text(encoding="utf-8-sig")
+                    path.write_text(legacy_text, encoding="utf-8")
+                except Exception:
+                    pass
+                break
     return path
 
 
@@ -810,7 +835,7 @@ def _start_background_scan() -> None:
         existing = _BACKGROUND_SCAN_THREAD
         if existing is not None and existing.is_alive():
             return
-        thread = threading.Thread(target=_run_scan_and_update_cache, kwargs={"publish_partial_snapshots": True}, name="hermes-achievements-scan", daemon=True)
+        thread = threading.Thread(target=_run_scan_and_update_cache, kwargs={"publish_partial_snapshots": True}, name="qubit-achievements-scan", daemon=True)
         _BACKGROUND_SCAN_THREAD = thread
         thread.start()
 
