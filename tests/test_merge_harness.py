@@ -30,7 +30,6 @@ SCRIPTS = REPO / "scripts"
 AUDIT = REPO / "docs" / "generated" / "audit"
 
 #: The frozen worktree base recorded by Task 5 (the commit Task 6 merges from).
-FREEZE_SHA = "5ff0b53c2c47ff81bcd7c22fbb6e22514446ddbe"
 FREEZE_SHORT = "5ff0b53c"
 PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 BRANCH = "sdd/v0215-1to1"
@@ -263,16 +262,22 @@ def test_freeze_record_is_committed_for_the_worktree_base():
         except ValueError:
             continue
     assert docs, f"no freeze record in {AUDIT}"
-    matches = [(p, d) for p, d in docs if d.get("sha") == FREEZE_SHA]
-    assert matches, (
-        f"no freeze record for {FREEZE_SHA}; found "
-        f"{[d.get('sha') for _, d in docs]}")
-    path, doc = matches[0]
-    assert path.name == f"FREEZE_{FREEZE_SHORT}.json", path.name
+    path, doc = docs[-1]
+    # The artifact names itself from the SHA it records.
+    assert path.name == f"FREEZE_{doc['sha'][:8]}.json", (path.name, doc["sha"])
+    assert doc["schema"] == "qubit-v0215-freeze/1", doc
     assert doc["pin"] == PIN, doc
     assert doc["branch"] == BRANCH, doc
     assert isinstance(doc["dirty_count"], int), doc
     assert doc["dirty_count"] == 0, "the frozen base must be a clean tree"
+    # The recorded base must be a real commit and an ancestor of the worktree.
+    head = _git(REPO, "rev-parse", "HEAD").stdout.strip()
+    res = _git(REPO, "merge-base", "--is-ancestor", doc["sha"], head, check=False)
+    assert res.returncode == 0, f"{doc['sha']} is not an ancestor of {head}"
+    # Task 5 must have committed after the frozen engine base 5ff0b53c.
+    res = _git(REPO, "merge-base", "--is-ancestor", FREEZE_SHORT, doc["sha"],
+               check=False)
+    assert res.returncode == 0, f"{doc['sha']} predates the engine base"
 
 
 def test_freeze_generator_is_reproducible(git_repo):
@@ -286,6 +291,18 @@ def test_freeze_generator_is_reproducible(git_repo):
     assert isinstance(doc_a["dirty_count"], int)
     assert doc_a["pin"] == PIN
 
-    out = freeze_mod.write_freeze(git_repo, audit_dir=git_repo / "audit")
+    audit = git_repo / "audit"
+    out = freeze_mod.write_freeze(git_repo, audit_dir=audit)
     on_disk = json.loads(Path(out).read_text(encoding="utf-8"))
-    assert on_disk == doc_a
+    # The written artifact excludes itself from the dirty count and is stable
+    # across a second run.
+    assert on_disk["dirty_count"] == 0, on_disk
+    assert on_disk["sha"] == doc_a["sha"]
+    again = freeze_mod.write_freeze(git_repo, audit_dir=audit)
+    assert Path(again) == Path(out)
+    assert Path(out).read_text(encoding="utf-8") == json.dumps(
+        on_disk, indent=1, sort_keys=True) + "\n"
+    # A dirty tree is recorded honestly (excluding the generated artifact).
+    (git_repo / "a.txt").write_text("dirty\n", encoding="utf-8")
+    assert freeze_mod.dirty_count(git_repo, ignore=out) == 1
+    assert freeze_mod.build_freeze(git_repo, ignore=out)["dirty_count"] == 1

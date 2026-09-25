@@ -36,13 +36,33 @@ def _git(repo: Path, *args: str) -> str:
     return res.stdout
 
 
-def dirty_count(repo: Path) -> int:
-    """Modified tracked files + untracked files in *repo* (excluding ignored)."""
+def dirty_count(repo: Path, ignore: Optional[Path] = None) -> int:
+    """Modified tracked files + untracked files in *repo* (excluding ignored).
+
+    *ignore*, when given, is a path (typically the freeze output) that is not
+    counted.  The freeze writer writes its own artifact into the worktree, so
+    without this the record would never describe a clean tree.
+    """
     out = _git(repo, "status", "--porcelain", "--untracked-files=all")
-    return sum(1 for line in out.splitlines() if line.strip())
+    skip = None
+    if ignore is not None:
+        try:
+            skip = str(Path(ignore).resolve().relative_to(Path(repo).resolve()))
+        except ValueError:
+            skip = None
+    count = 0
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        if skip is not None:
+            rel = line[3:].strip()
+            if rel == skip or rel.startswith(skip + "/"):
+                continue
+        count += 1
+    return count
 
 
-def build_freeze(repo: Path) -> dict:
+def build_freeze(repo: Path, ignore: Optional[Path] = None) -> dict:
     """Build the freeze record for *repo* without writing anything."""
     repo = Path(repo)
     sha = _git(repo, "rev-parse", "HEAD").strip()
@@ -52,7 +72,7 @@ def build_freeze(repo: Path) -> dict:
     return {
         "schema": "qubit-v0215-freeze/1",
         "sha": sha,
-        "dirty_count": dirty_count(repo),
+        "dirty_count": dirty_count(repo, ignore=ignore),
         "pin": PIN,
         "branch": branch,
     }
@@ -62,12 +82,14 @@ def write_freeze(repo: Path, audit_dir: Optional[Path] = None) -> Path:
     """Build the record for *repo* and write ``FREEZE_<short>.json``.
 
     Returns the written path.  *audit_dir* defaults to
-    ``docs/generated/audit/``.
+    ``docs/generated/audit/``.  The output is idempotent: the artifact is
+    named from the recorded HEAD and does not count itself as dirty.
     """
     repo = Path(repo)
-    doc = build_freeze(repo)
+    sha = _git(repo, "rev-parse", "HEAD").strip()
     out_dir = Path(audit_dir) if audit_dir is not None else AUDIT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"FREEZE_{doc['sha'][:8]}.json"
+    out = out_dir / f"FREEZE_{sha[:8]}.json"
+    doc = build_freeze(repo, ignore=out)
     out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return out
