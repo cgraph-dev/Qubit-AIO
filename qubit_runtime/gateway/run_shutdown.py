@@ -1388,7 +1388,7 @@ class GatewayShutdownMixin:
         return watcher_env
 
     @staticmethod
-    def _spawn_windows_restart_watcher(hermes_cmd: list, current_pid: int, restart_after_s: float) -> None:
+    def _spawn_windows_restart_watcher(qubit_cmd: list, current_pid: int, restart_after_s: float) -> None:
         """Spawn the detached Windows watcher (``python -c``), retrying once without job breakaway."""
         import subprocess
         from qubit_cli._subprocess_compat import (
@@ -1403,7 +1403,7 @@ class GatewayShutdownMixin:
         # See #54220, #56747.
         from qubit_cli._launchers import runtime_command
         watcher_argv = runtime_command(project_root,
-            [str(current_pid), str(restart_after_s), *hermes_cmd, "gateway", "restart"],
+            [str(current_pid), str(restart_after_s), *qubit_cmd, "gateway", "restart"],
             code=_WINDOWS_RESTART_WATCHER)
         watcher_python = watcher_argv[0]
         popen_kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=watcher_env)
@@ -1432,8 +1432,8 @@ class GatewayShutdownMixin:
         from gateway.run import _resolve_qubit_bin
         import shutil
         import subprocess
-        hermes_cmd = _resolve_qubit_bin()
-        if not hermes_cmd:
+        qubit_cmd = _resolve_qubit_bin()
+        if not qubit_cmd:
             logger.error("Could not locate qubit binary for detached /restart")
             return
         if self._detached_restart_helper_started:
@@ -1442,9 +1442,9 @@ class GatewayShutdownMixin:
         current_pid = os.getpid()
         restart_after_s = max(float(getattr(self, "_restart_drain_timeout", 0.0) or 0.0) + 5.0, 5.0)
         if sys.platform == "win32":
-            GatewayShutdownMixin._spawn_windows_restart_watcher(hermes_cmd, current_pid, restart_after_s)
+            GatewayShutdownMixin._spawn_windows_restart_watcher(qubit_cmd, current_pid, restart_after_s)
             return
-        cmd = " ".join(shlex.quote(part) for part in hermes_cmd)
+        cmd = " ".join(shlex.quote(part) for part in qubit_cmd)
         shell_cmd = (
             f"deadline=$(( $(date +%s) + {int(restart_after_s)} )); "
             f"while kill -0 {current_pid} 2>/dev/null && [ $(date +%s) -lt $deadline ]; do sleep 0.2; done; "

@@ -48,14 +48,14 @@ logger = logging.getLogger(__name__)
 _DEFAULT_BASE_URL = "https://api.perplexity.ai"
 _KEY_URL = "https://www.perplexity.ai/account/api"
 
-# Identify Qubit to Perplexity: the same static harness identity Qubit sends Kimi and
-# OpenCode, plus Perplexity's integration header. No per-user identifier and no separate
+# Identify Qubit to Perplexity: a static Qubit-owned harness identity plus
+# Perplexity's integration header. No per-user identifier and no separate
 # request; the call already carries the user's own API key.
 _HEADERS = {
-    "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+    "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge",
     "X-Title": "Qubit Agent",
-    "User-Agent": f"HermesAgent/{get_version_info().base_version}",
-    "X-Pplx-Integration": "hermes-agent",
+    "User-Agent": f"Qubit-Agent/{get_version_info().base_version}",
+    "X-Pplx-Integration": "qubit-agent",
 }
 
 
