@@ -16,6 +16,7 @@ from rich.table import Table
 from agent.proxy_sources import iron_proxy as ip
 from agent.redact import mask_secret
 from qubit_cli.config import load_config, load_env, save_config
+from qubit_constants import display_qubit_home
 
 
 def register_cli(parent_parser: argparse.ArgumentParser) -> None:
@@ -154,11 +155,13 @@ def _setup_mint_tokens(console: Console, args: argparse.Namespace):
         if available_env_names is None:
             return None
     else:
-        # Operators commonly keep provider keys only in ~/.hermes/.env (loaded when the agent
-        # runs, NOT exported into an interactive shell); backfill so discovery sees them.
+        # Operators commonly keep provider keys only in the Qubit home ``.env`` (loaded when the
+        # agent runs, NOT exported into an interactive shell); backfill so discovery sees them.
         loaded = _load_env_file_into_environ()
         if loaded:
-            console.print(f"  [dim]Loaded {loaded} provider key name(s) from ~/.hermes/.env for discovery.[/dim]")
+            console.print(
+                f"  [dim]Loaded {loaded} provider key name(s) from "
+                f"{display_qubit_home()}/.env for discovery.[/dim]")
     discovered = ip.discover_provider_mappings(available_env_names=available_env_names or None)
     # Preserve existing tokens unless rotation was requested — re-running setup must not
     # invalidate tokens baked into already-running sandboxes.
@@ -571,7 +574,7 @@ def _bitwarden_env_names(console: Console) -> Optional[List[str]]:
 
 
 def _load_env_file_into_environ() -> int:
-    """Backfill known provider keys from ``~/.hermes/.env`` into ``os.environ``; returns the count.
+    """Backfill known provider keys from the Qubit home ``.env`` into ``os.environ``; returns the count.
     Never overrides an exported value; only known provider names, so unrelated secrets stay out."""
     try:
         file_env = load_env()

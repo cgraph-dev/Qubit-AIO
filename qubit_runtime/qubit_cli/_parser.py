@@ -120,7 +120,7 @@ Examples:
     qubit gateway status         Show gateway status
     qubit -p <profile> <cmd>     Run any command against a named profile's
                                   home (also --profile) — e.g. qubit -p coder gateway stop
-    qubit -s hermes-agent-dev,github-auth
+    qubit -s qubit-agent-dev,github-auth
     qubit -w                     Start in isolated git worktree
     qubit sessions list          List past sessions
     qubit sessions browse        Interactive session picker
@@ -345,7 +345,7 @@ def build_top_level_parser():
     ``subparsers.add_parser(...)``.
     """
     parser = HermesArgumentParser(
-        prog="hermes", description="Qubit Agent - AI assistant with tool-calling capabilities",
+        prog="qubit", description="Qubit Agent - AI assistant with tool-calling capabilities",
         formatter_class=argparse.RawDescriptionHelpFormatter, epilog=_EPILOGUE)
     _add_top_level_flags(parser)
     # metavar keeps the usage line to ``qubit [...] <command>`` instead of the brace list of

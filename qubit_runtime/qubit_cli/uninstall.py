@@ -653,7 +653,7 @@ def run_gui_uninstall(args):
     print()
     _print_box("│            ✓ Chat GUI Uninstalled!                      │", Colors.GREEN)
     print()
-    print("The Qubit agent is still installed. Run 'hermes' to use the CLI,")
+    print("The Qubit agent is still installed. Run 'qubit' to use the CLI,")
     print("or 'qubit uninstall' to remove the agent too.")
     print()
 

@@ -61,6 +61,28 @@ PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
 
 SCHEMA = "qubit-public-surface-scan/1"
 
+#: Help invocations scanned by the ``cli`` surface. ``qubit agent|uninstall|auth|
+#: gateway|proxy --help`` were added in Task 14: the original scan only rendered
+#: ``--help`` / ``update --help``, which is exactly what let the remaining CLI
+#: prose leaks (S2–S6) report as zero.
+CLI_HELP_ARGS: Tuple[Tuple[str, ...], ...] = (
+    ("--help",),
+    ("agent", "--help"),
+    ("auth", "--help"),
+    ("gateway", "--help"),
+    ("proxy", "--help"),
+    ("uninstall", "--help"),
+    ("update", "--help"),
+)
+#: Wire/contract identifiers that legitimately render in help text (env vars,
+#: session-token header, IPC channels, module specifiers). Preserved as-is per
+#: BRAND.md, so a rendered occurrence is allowlisted, never counted as a leak.
+CLI_WIRE_IDENTIFIER_RE = re.compile(
+    r"\bHERMES_[A-Z0-9_]*\b"
+    r"|\bX-Hermes-Session-Token\b"
+    r"|\bhermes:[A-Za-z0-9_.:-]+\b"
+    r"|@hermes/[A-Za-z0-9_./-]+")
+
 #: The legacy public-brand tokens (case-insensitive).
 LEGACY_RE = re.compile(
     r"hermes|openclaw|nousresearch|nousportal|nous\s+research", re.IGNORECASE)
@@ -219,12 +241,26 @@ def _hits(text: str) -> List[str]:
 # ---------------------------------------------------------------------------
 # a. CLI help output
 # ---------------------------------------------------------------------------
+def _cli_launcher() -> List[str]:
+    """Command that renders the Qubit CLI, independent of a repo-local ``.venv``.
+
+    Production layout uses ``.venv/bin/qubit``; a source checkout without a
+    virtualenv falls back to the running interpreter importing ``voicebridge.cli``
+    from ``REPO_ROOT`` (which is the subprocess cwd). Both are read-only.
+    """
+    if QUBIT.exists():
+        return [str(QUBIT)]
+    return [sys.executable, "-c",
+            "import sys; from voicebridge.cli import main; sys.exit(main())"]
+
+
 def scan_cli() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     findings: List[Dict[str, Any]] = []
     allow: Dict[str, int] = {}
-    for argv in (["update", "--help"], ["--help"]):
+    launcher = _cli_launcher()
+    for argv in CLI_HELP_ARGS:
         try:
-            proc = subprocess.run([str(QUBIT), *argv], capture_output=True,
+            proc = subprocess.run([*launcher, *argv], capture_output=True,
                                   text=True, timeout=90,
                                   cwd=str(REPO_ROOT))
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -232,9 +268,24 @@ def scan_cli() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
                                   text=f"{exc}", classification="error"))
             continue
         text = proc.stdout + proc.stderr
-        for token in _hits(text):
-            findings.append(_leak("cli", token, file="qubit " + " ".join(argv),
-                                  text=text[:400], classification="help_text"))
+        label = "qubit " + " ".join(argv)
+        for line in text.splitlines():
+            if not (LEGACY_RE.search(line) or UPSTREAM_URL_RE.search(line)
+                    or HANDLE_RE.search(line)):
+                continue
+            # Mask preserved wire/contract identifiers, then flag only what
+            # remains — this keeps HERMES_* env vars allowlisted while catching
+            # product copy like a bare ``hermes`` command or a ``~/.hermes`` path.
+            masked = CLI_WIRE_IDENTIFIER_RE.sub(
+                lambda m: " " * len(m.group(0)), line)
+            remaining = _hits(masked)
+            if remaining:
+                for token in remaining:
+                    findings.append(_leak("cli", token, file=label, text=line,
+                                          classification="help_text"))
+            else:
+                for token in _hits(line):
+                    _allow(allow, "cli", "wire_identifier", token)
     return findings, allow
 
 
