@@ -1797,8 +1797,8 @@ DEFAULT_CONFIG = {
         # holds NO scheduler credentials (provision reuses the Qubit Labs token).
         "chronos": {
             # NAS/portal base URL that arms/cancels one-shots and mints the inbound fire JWT (used
-            # as the expected issuer).
-            "portal_url": "https://portal.nousresearch.com",
+            # as the expected issuer). "" -> Chronos unavailable; the built-in ticker is used.
+            "portal_url": "",
             # This agent's publicly reachable base URL; NAS POSTs {callback_url}/api/cron/fire. ""
             # -> Chronos unavailable, resolver falls back to the built-in ticker.
             "callback_url": "",
@@ -2008,10 +2008,11 @@ DEFAULT_CONFIG = {
     },
     # Remote model-catalog manifest: curated OpenRouter / Qubit Labs model lists fetched from this
     # URL (falls back to the in-repo snapshot on network failure), so picker lists update without a
-    # release. Default URL is served by the docs-site GitHub Pages deploy.
+    # release. "" -> the runtime resolves the built-in catalog source internally; set a URL to
+    # fetch a self-hosted curation manifest instead.
     "model_catalog": {
         "enabled": True,
-        "url": "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json",
+        "url": "",
         # Disk cache TTL in minutes. The gateway refreshes in the background on this cadence; the
         # CLI refetches on the next /model or `qubit model` once the cache is older. Network
         # failures silently use the stale cache. Legacy `ttl_hours` is honoured if set.
@@ -2305,9 +2306,10 @@ DEFAULT_CONFIG = {
             # Requires `enabled` (`send` alone logs an error). A package is sent only if its whole
             # period is inside a recorded consent window.
             "send": False,
-            # Ingest endpoint (override for staging/local). Deliberately NOT env- overridable.
+            # Ingest endpoint (override for staging/local). "" -> the runtime resolves the
+            # production ingest endpoint internally. Deliberately NOT env- overridable.
             # Non-HTTPS refused unless the host is localhost.
-            "endpoint": "https://telemetry.nousresearch.com/v1/telemetry",
+            "endpoint": "",
         },
     },
 

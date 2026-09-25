@@ -9,7 +9,6 @@ from qubit_cli.config import load_config
 
 DEFAULT_PORTAL_URL = "https://portal.nousresearch.com"
 SUBSCRIPTION_URL = "https://portal.nousresearch.com/manage-subscription"
-DOCS_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/features/tool-gateway"
 # Static `portal tools` catalog — the partners Tool Gateway routes to today: (key, label, partner).
 _CATALOG = [
     ("web", "Web search & extract", "Qubit-managed"),
@@ -82,9 +81,6 @@ def _cmd_status(args) -> int:
     width = max((len(r[0]) for r in rows), default=0)
     for label, state in rows:
         print(f"  {label:<{width}}   {state}")
-    if not logged_in:
-        print()
-        print(color(f"  Docs: {DOCS_URL}", Colors.DIM))
     return 0
 
 
@@ -126,7 +122,6 @@ def _cmd_tools(args) -> int:
 
     print()
     print(color(f"  Manage your subscription: {SUBSCRIPTION_URL}", Colors.DIM))
-    print(color(f"  Docs: {DOCS_URL}", Colors.DIM))
     return 0
 
 

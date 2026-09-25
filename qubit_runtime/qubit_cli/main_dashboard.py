@@ -78,7 +78,7 @@ def _dashboard_probe_host(host: str | None) -> str:
     return normalized
 
 
-_DASHBOARD_SYSTEMD_UNIT = "hermes-dashboard.service"
+_DASHBOARD_SYSTEMD_UNIT = "qubit-voicebridge.service"
 
 _SYSTEMCTL_ERRORS = (FileNotFoundError, subprocess.TimeoutExpired, OSError)
 
@@ -184,7 +184,7 @@ def _pid_unified_cgroup_entries(pid: int):
 
 
 def _get_systemd_service_for_pid(pid: int) -> str | None:
-    """The systemd service unit name *pid* belongs to (``hermes-serve.service``), or None.
+    """The systemd service unit name *pid* belongs to (e.g. ``qubit-serve.service``), or None.
 
     None when the PID isn't part of a service, the file is unreadable, or off Linux.
     """
@@ -591,9 +591,9 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
             "the dashboard again:\n"
             "    qubit dashboard register\n"
             "  It provisions a Qubit Labs OAuth client and writes "
-            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
-            "  Docs: https://hermes-agent.nousresearch.com/docs/"
-            "user-guide/features/web-dashboard#authentication-gated-mode"
+            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into the Qubit home .env for you.\n"
+            "  Docs: run `qubit dashboard register --help` for the authentication-gated "
+            "setup steps."
         )
         sys.exit(0)
 
@@ -668,8 +668,8 @@ def _read_ssh_session_token_file(path: str) -> str:
     if not os.path.isabs(path):
         raise SystemExit("--ssh-session-token-file must be absolute")
 
-    # The Desktop client writes the token under the account's $HOME/.hermes/
-    # desktop-ssh, independent of QUBIT_HOME and the active profile. Anchor
+    # The Desktop client writes the token under the account's default QUBIT_HOME
+    # desktop-ssh, independent of the active profile. Anchor
     # validation there, NOT get_qubit_home(): a non-default profile or a Docker
     # /opt/data root re-homes get_qubit_home() and would reject every token.
     # See #69551.
@@ -928,8 +928,9 @@ def _route_named_profile_dashboard(
     env = build_subprocess_env(scrub_secrets=False, inherit_profile_home=False)
     # Pin the child to the machine ROOT, resolved explicitly rather than by
     # dropping QUBIT_HOME: in the Docker layout the root is /opt/data, and an
-    # unset QUBIT_HOME would fall back to $HOME/.hermes = /opt/data/.hermes — an
-    # empty auto-seeded home with only the default profile and no install stamp.
+    # unset QUBIT_HOME would fall back to the platform-default home nested under
+    # /opt/data — an empty auto-seeded home with only the default profile and no
+    # install stamp.
     # get_default_qubit_root() strips a trailing profiles/<name> for both layouts.
     try:
         from qubit_constants import get_default_qubit_root

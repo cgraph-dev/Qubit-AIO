@@ -1929,7 +1929,8 @@ class CLICommandsMixin:
 
     def _handle_plan_command(self, cmd: str):
         """Handle /plan — write a markdown implementation plan, no execution. The live agent
-        inspects the workspace read-only and saves the plan under ``.hermes/plans/``."""
+        inspects the workspace read-only and saves the plan under the Qubit home plans
+        directory (``<QUBIT_HOME>/plans/``)."""
         from agent.plan_prompt import build_plan_prompt
         task = _command_arg(cmd)  # optional — empty infers the task from conversation context
         print(f"\n📋 Planning: {_ellipsize(task, 80)}" if task
@@ -2682,9 +2683,13 @@ class CLICommandsMixin:
         from types import SimpleNamespace
         words = {w.lower() for w in cmd_original.split()[1:]}
         local = "local" in words
+        # ``nous`` is the pre-rebrand word for the same private destination; it is a
+        # load-bearing legacy usage identifier, accepted so existing muscle memory /
+        # scripts keep working. The canonical word is ``qubit``.
+        private = ("qubit" in words or "nous" in words) and not local
         # Typing /debug is the upload consent (yes=True); input() would hang in prompt_toolkit anyway.
         run_debug_share(SimpleNamespace(
-            lines=200, expire=7, local=local, qubit="nous" in words and not local, yes=True))
+            lines=200, expire=7, local=local, qubit=private, yes=True))
 
     def _handle_update_command(self) -> bool:
         """Handle /update — exit the session and relaunch as ``qubit update``. Returns True when

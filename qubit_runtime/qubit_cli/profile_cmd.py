@@ -153,7 +153,7 @@ def _profile_use(args):
     name = args.profile_name
     try:
         set_active_profile(name)
-        print("Switched to: default (~/.hermes)" if name == "default" else f"Switched to: {name}")
+        print("Switched to: default" if name == "default" else f"Switched to: {name}")
     except (ValueError, FileNotFoundError) as e:
         _die(f"Error: {e}")
 

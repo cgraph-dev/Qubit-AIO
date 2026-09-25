@@ -46,7 +46,7 @@ _EDIT_CONFIG_ROWS = (
     ("qubit config", "         View current settings"), ("qubit config edit", "    Open config in your editor"),
     ("qubit config set <key> <value>", ""))
 _READY_ROWS = (
-    ("hermes", "              Start chatting"), ("qubit gateway", "      Start messaging gateway"),
+    ("qubit", "                 Start chatting"), ("qubit gateway", "      Start messaging gateway"),
     ("qubit doctor", "       Check for issues"))
 
 
