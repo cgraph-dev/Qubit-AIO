@@ -56,6 +56,7 @@ MODULE_TOKENS = {
     "hermes_state_fts": "qubit_state_fts",
     "hermes_state_gateway": "qubit_state_gateway",
     "hermes_state_guard": "qubit_state_guard",
+    "hermes_state_health": "qubit_state_health",
     "hermes_state_holders": "qubit_state_holders",
     "hermes_state_ids": "qubit_state_ids",
     "hermes_state_lockguard": "qubit_state_lockguard",
@@ -85,6 +86,7 @@ MODULE_TOKENS = {
     "hermes_client_tag": "qubit_client_tag",
     "hermes_xai_user_agent": "qubit_xai_user_agent",
     "hermes_xai_default_headers": "qubit_xai_default_headers",
+    "hermes_yaml": "qubit_yaml",
     "hermes_undo": "qubit_undo",
     # Qubit-owned modules.
     "hermes_asgi": "qubit_asgi",
