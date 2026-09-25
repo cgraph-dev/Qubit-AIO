@@ -100,8 +100,10 @@ qubit = "voicebridge.cli:main"
 voicebridge = "voicebridge.cli:main"
 qubit-dev = "voicebridge.terminal:main"
 # Direct launcher for the vendored Qubit-owned runtime (same backend the
-# `qubit agent …` subcommand and the dashboard dispatch to).
-qubit-agent = "voicebridge.qubit_runtime:entry"
+# `qubit agent …` subcommand and the dashboard dispatch to). The legacy
+# single-query runner (upstream `hermes-agent`) honors argv
+# (`--help`/`--version`/`--query`); `qubit` remains the full CLI.
+qubit-agent = "voicebridge.qubit_runtime:legacy_entry"
 
 [build-system]
 requires = ["hatchling"]

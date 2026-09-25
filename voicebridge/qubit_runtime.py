@@ -608,6 +608,35 @@ def entry() -> None:
     raise SystemExit(run(sys.argv[1:]))
 
 
+def legacy_entry() -> None:
+    """Console-script entry point for the legacy ``qubit-agent`` runner.
+
+    Mirrors :func:`run`'s Qubit-home/``sys.path`` pinning, then hands argv to the
+    vendored legacy single-query runner (``agent.legacy_cli:main``) instead of
+    the full ``qubit`` CLI. Upstream routes ``hermes-agent`` here so
+    ``--help``/``--version``/``--query`` are honored; passing argv explicitly
+    (and replacing ``sys.argv``) keeps a bare invocation on the help path rather
+    than the vendored runner's built-in demo turn.
+    """
+    args = list(sys.argv[1:])
+    prog = _launcher_prog()
+    saved_path = list(sys.path)
+    saved_env = dict(os.environ)
+    saved = sys.argv
+    sys.argv = [prog, *args]
+    try:
+        use_qubit_home()
+        ensure_path()
+        from agent.legacy_cli import main as _legacy_main
+        result = _legacy_main(args)
+    finally:
+        sys.argv = saved
+        sys.path[:] = saved_path
+        os.environ.clear()
+        os.environ.update(saved_env)
+    raise SystemExit(result if isinstance(result, int) else 0)
+
+
 __all__ = ["runtime_root", "manifest_path", "default_home", "use_qubit_home",
            "migrate_legacy_homes", "ensure_path", "run", "status", "entry",
-           "serve"]
+           "legacy_entry", "serve"]
