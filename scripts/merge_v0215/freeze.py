@@ -74,6 +74,7 @@ def build_freeze(repo: Path, ignore: Optional[Path] = None) -> dict:
     return {
         "schema": "qubit-v0215-freeze/1",
         "sha": sha,
+        "artifact_commit": sha,
         "dirty_count": dirty_count(repo, ignore=ignore),
         "pin": PIN,
         "branch": branch,
@@ -85,8 +86,15 @@ def write_freeze(repo: Path, audit_dir: Optional[Path] = None) -> Path:
 
     Returns the written path.  *audit_dir* defaults to
     ``docs/generated/audit/``.  The output is idempotent: the artifact is
-    named from the recorded HEAD and the audit directory is excluded from the
-    dirty count (so the record itself never makes the tree look dirty).
+    named from the recorded ``sha`` and the audit directory is excluded from
+    the dirty count (so the record itself never makes the tree look dirty).
+
+    ``sha`` is the *freeze base*: the clean commit the artifact was generated
+    against.  ``artifact_commit`` records the same value at generation time;
+    when the artifact is committed it becomes the **parent** of the commit
+    that introduces it, because a committed file cannot name its own commit
+    without ``--amend``.  Task 6 must therefore verify ``sha`` is an ancestor
+    of its start HEAD, not that ``sha == HEAD``.
     """
     repo = Path(repo)
     sha = _git(repo, "rev-parse", "HEAD").strip()

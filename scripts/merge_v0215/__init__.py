@@ -13,7 +13,7 @@ caller owns the destination and the live-tree guard.
 """
 from __future__ import annotations
 
-from .checkpoint import Checkpoint, CheckpointError
+from .checkpoint import Checkpoint, CheckpointError, DirtyWorktreeError
 from .freeze import PIN, build_freeze, dirty_count, write_freeze
 from .merge import MergeConflict, merge_file
 from .rules import BUCKET_ACTIONS, WRITE_ORDER, action_for_path
@@ -23,6 +23,7 @@ __all__ = [
     "WRITE_ORDER",
     "Checkpoint",
     "CheckpointError",
+    "DirtyWorktreeError",
     "MergeConflict",
     "PIN",
     "action_for_path",

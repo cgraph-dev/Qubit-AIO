@@ -35,6 +35,11 @@ def _parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="restore a checkpoint (default: the most recent)",
     )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="allow rollback to discard uncommitted/untracked work",
+    )
     p.add_argument("--list", action="store_true", help="list checkpoints")
     p.add_argument(
         "--freeze", action="store_true", help="write the freeze record"
@@ -64,7 +69,7 @@ def main(argv=None) -> int:
         return 0
     if args.rollback is not None:
         name = args.rollback or None
-        sha = cp.rollback(name)
+        sha = cp.rollback(name, force=args.force)
         print(f"rollback {name or '(latest)'}: {sha}")
         return 0
     if args.list:
