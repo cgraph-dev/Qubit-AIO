@@ -91,7 +91,15 @@ dependencies = [
 hotkey = ["pynput>=1.7"]
 edge = ["edge-tts>=6"]
 kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model download only
-test = ["pytest>=8"]
+# The v0.21.5 vendored runtime eagerly constructs a native Anthropic client in
+# `agent.agent_init._init_anthropic_client`, and the vendored test suite asserts
+# on real SDK client shape. The SDK is an optional *runtime* extra upstream
+# (`qubit_runtime/pyproject.toml` -> `anthropic = [anthropic==0.87.0]`), but the
+# test environment must carry it at the same reviewed pin or every
+# `AIAgent(provider="anthropic", ...)` test dies at
+# `agent/anthropic_adapter.py:63` (PM cannot lazy-install: `pm-runtime` is not in
+# the product venv). Keep the pin identical to the vendored extra/test group.
+test = ["pytest>=8", "anthropic==0.87.0"]
 
 [project.scripts]
 # Canonical public launcher: `qubit` (all user docs reference this name).
