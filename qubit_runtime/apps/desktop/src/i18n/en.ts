@@ -142,9 +142,7 @@ export const en: Translations = {
       cloudDownDescription:
         'The Qubit-managed cloud agent this gateway connects to is returning a server error. It cannot be restarted from here — check its status, switch to the local gateway, or get support.',
       cloudDownHint:
-        'The buttons below open the Qubit Portal (instance status and controls) or switch to the local gateway.',
-      cloudDownCheckPortal: 'Check Portal status',
-      cloudDownDiscord: 'Get help on Discord',
+        'The buttons below switch to the local gateway, retry, or open Gateway settings.',
       hideRecentLogs: 'Hide recent logs',
       showRecentLogs: 'Show recent logs',
       signedInTitle: 'Signed in',
@@ -265,9 +263,7 @@ export const en: Translations = {
       'You can also run `qubit debug share --nous` from a terminal, or `qubit debug share --local` to print the report without uploading.',
     handoffLead: 'Pick up the discussion in:',
     links: {
-      github: 'GitHub Issues',
-      portal: 'Qubit Portal Support',
-      discord: 'Discord'
+      github: 'GitHub Issues'
     }
   },
 
@@ -1017,7 +1013,7 @@ export const en: Translations = {
       sshErrHostKey:
         'The host key has CHANGED since you last connected. Verify this is expected, then run ssh-keygen -R <host> and reconnect.',
       sshErrNotInstalled:
-        'Qubit is not installed on the remote host. Install it there (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) or set the Qubit path.',
+        'Qubit is not installed on the remote host. Install it there (see https://github.com/cgraph-dev/qubit-voicebridge) or set the Qubit path.',
       sshErrPlatform:
         'Unsupported remote platform. Qubit Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
       sshErrTimeout: 'SSH connection timed out. The host may be unreachable or asleep.',
@@ -1927,7 +1923,7 @@ export const en: Translations = {
       },
       MATRIX_HOMESERVER: { label: 'Homeserver URL', placeholder: 'https://matrix.org' },
       MATRIX_ACCESS_TOKEN: { label: 'Access token' },
-      MATRIX_USER_ID: { label: 'Bot user ID', placeholder: '@hermes:example.org' },
+      MATRIX_USER_ID: { label: 'Bot user ID', placeholder: '@qubit:example.org' },
       MATRIX_ALLOWED_USERS: {
         label: 'Allowed Matrix user IDs',
         help: 'Recommended. Comma-separated user IDs in @user:server format.'
@@ -2053,7 +2049,7 @@ export const en: Translations = {
       title: (profile: string) => `Connect ${profile} to a remote host`,
       description: 'Sessions in this profile will run on the remote Qubit you point it at, instead of this computer.',
       urlLabel: 'Remote address',
-      urlPlaceholder: 'https://hermes.example.com',
+      urlPlaceholder: 'https://gateway.example.com',
       urlInvalid: 'Enter a full address starting with http:// or https://',
       tokenLabel: 'Access token',
       tokenPlaceholder: 'Paste the remote session token',

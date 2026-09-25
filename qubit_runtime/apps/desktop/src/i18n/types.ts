@@ -184,8 +184,6 @@ export interface Translations {
       cloudDownTitle: string
       cloudDownDescription: string
       cloudDownHint: string
-      cloudDownCheckPortal: string
-      cloudDownDiscord: string
       hideRecentLogs: string
       showRecentLogs: string
       signedInTitle: string
@@ -302,9 +300,7 @@ export interface Translations {
     failedHint: string
     handoffLead: string
     links: {
-      discord: string
       github: string
-      portal: string
     }
   }
 

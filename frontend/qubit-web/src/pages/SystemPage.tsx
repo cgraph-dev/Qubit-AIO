@@ -43,6 +43,7 @@ import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { QubitConsoleModal } from "@/components/QubitConsoleModal";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { cn, themedBody } from "@/lib/utils";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import { parsePolicyRefusal, policyRefusalMessage, refusalOrError } from "@/lib/policy-refusal";
@@ -210,6 +211,10 @@ export default function SystemPage() {
   const [power, setPower] = useState<PowerStatusResponse | null>(null);
   const [powerBusy, setPowerBusy] = useState(false);
   const [confirmEStop, setConfirmEStop] = useState(false);
+  // The global-disable latch is the same class of shared, cross-surface
+  // control as the emergency stop, so it goes through the same confirm gate
+  // (and audit). `enable` is the de-escalation and needs no confirmation.
+  const [confirmGlobalDisable, setConfirmGlobalDisable] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [activeAction, setActiveAction] = useState<string | null>(null);
@@ -800,6 +805,7 @@ export default function SystemPage() {
     : HOOK_EVENTS_FALLBACK;
 
   return (
+    <PageErrorBoundary label="System">
     <div className="flex flex-col gap-8">
       <Toast toast={toast} />
       <input
@@ -879,6 +885,18 @@ export default function SystemPage() {
         title="Latch the emergency stop?"
         description="This immediately refuses new agent turns, sessions, and brokered actions across every surface until it is reset. It does not kill the backend process."
         confirmLabel="Latch emergency stop"
+        destructive
+      />
+      <ConfirmDialog
+        open={confirmGlobalDisable}
+        onCancel={() => setConfirmGlobalDisable(false)}
+        onConfirm={() => {
+          setConfirmGlobalDisable(false);
+          void runPowerAction("disable", "Global disable");
+        }}
+        title="Globally disable the agent?"
+        description="This latches the shared global-disable control the CLI, voice gateway, and this dashboard read; new agent work is refused everywhere until it is re-enabled. It is recorded on the audit journal."
+        confirmLabel="Globally disable"
         destructive
       />
       <DeleteConfirmDialog
@@ -1351,15 +1369,15 @@ export default function SystemPage() {
                   Global enable
                 </Button>
               ) : (
-                <Button
-                  size="sm"
-                  ghost
-                  className="text-warning"
-                  disabled={powerBusy || estopLatched}
-                  onClick={() => void runPowerAction("disable", "Global disable")}
-                >
-                  Global disable
-                </Button>
+                  <Button
+                    size="sm"
+                    ghost
+                    className="text-warning"
+                    disabled={powerBusy || estopLatched}
+                    onClick={() => setConfirmGlobalDisable(true)}
+                  >
+                    Global disable
+                  </Button>
               )}
             </div>
           </CardContent>
@@ -1829,5 +1847,6 @@ export default function SystemPage() {
         ))}
       </section>
     </div>
+    </PageErrorBoundary>
   );
 }

@@ -849,7 +849,7 @@ describe('ToolsetConfigPanel', () => {
         flow: 'device_code',
         session_id: 'sess-1',
         user_code: 'NOUS-1234',
-        verification_url: 'https://portal.nousresearch.com/device?user_code=NOUS-1234',
+        verification_url: 'https://portal.qubit.test/device?user_code=NOUS-1234',
         poll_interval: 5,
         expires_in: 600
       })
@@ -877,7 +877,7 @@ describe('ToolsetConfigPanel', () => {
 
         await waitFor(() => expect(startOAuthLogin).toHaveBeenCalledWith('nous'))
         expect(openSpy).toHaveBeenCalledWith(
-          'https://portal.nousresearch.com/device?user_code=NOUS-1234',
+          'https://portal.qubit.test/device?user_code=NOUS-1234',
           '_blank',
           'noopener,noreferrer'
         )

@@ -93,6 +93,18 @@ FORWARD_TABLE = {
 # Subcommand sentinel meaning "every value of this axis".
 ANY = "*"
 
+# MCP read subcommands the Qubit CLI now owns natively on the ONE canonical
+# registry (``voicebridge.mcp_servers``, ``<state_dir>/mcp_servers.json``).
+# The ``FORWARD_TABLE`` rows below map them to the vendored fork, whose
+# ``cmd_mcp_list`` reads the fork's ``config.yaml mcp_servers`` — a second store
+# a dashboard-created server never reaches. ``route`` therefore declines these
+# pairs so the native parser serves them from the canonical registry, the same
+# authority ``qubit mcp status``/``invoke`` use. The table rows are retained
+# because the generated ledger/source-inventory classify the surface from them.
+NATIVE_MCP_READS = frozenset({
+    ("mcp", "list"), ("mcp", "config"), ("mcp", "ls"), ("mcp", "picker"),
+})
+
 # Whole Qubit families backed by the vendored fork:
 #   family -> (fork_family, readonly, confirm)
 # ``readonly`` subcommands forward verbatim (the empty string is the bare
@@ -688,6 +700,11 @@ def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
 
     Returns ``None`` when the Qubit parser owns the call.
     """
+    raw = list(argv or [])
+    if len(raw) >= 2 and (raw[0], raw[1]) in NATIVE_MCP_READS:
+        # Native canonical MCP read (``voicebridge.mcp_servers``); never the
+        # fork's second ``config.yaml mcp_servers`` store.
+        return None
     resolved = route_family(argv, cfg=cfg)
     if resolved is not None:
         return resolved
@@ -709,6 +726,6 @@ def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
 __all__ = ["FORWARD_TABLE", "FAMILY_FORWARD", "FAMILY_FORWARD_WAVE6",
            "CONFIRM_TABLE", "NATIVE_REFUSALS", "OPENCLAW_FAMILIES",
            "OPENCLAW_NATIVE_EQUIVALENT", "OPENCLAW_OPERATOR_ONLY",
-           "OPENCLAW_MISSING", "FamilyRoute", "translate", "maybe_forward",
-           "route", "route_family", "confirm_pair", "chat_route",
-           "family_refusal"]
+           "OPENCLAW_MISSING", "NATIVE_MCP_READS", "FamilyRoute", "translate",
+           "maybe_forward", "route", "route_family", "confirm_pair",
+           "chat_route", "family_refusal"]

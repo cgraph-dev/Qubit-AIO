@@ -17,12 +17,12 @@
   "docs/generated/QUBIT_SOURCE_INVENTORY.json (direct source inventory, agent A)"
  ],
  "generated_from": {
-  "voice_commands.REGISTRY": 511,
-  "dashboard_ops.catalog": 563,
+  "voice_commands.REGISTRY": 514,
+  "dashboard_ops.catalog": 566,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
   "qubit_compat.ROUTES": 448,
-  "qubit_compat.GATED": 95,
+  "qubit_compat.GATED": 94,
   "cli_families": 114,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
@@ -34,7 +34,7 @@
   "source_inventory.dispositioned_gated": 4
  },
  "counts_by_status": {
-  "IMPLEMENTED": 709,
+  "IMPLEMENTED": 712,
   "OPERATOR_ONLY": 3,
   "SAFE_EQUIVALENT": 36
  },
@@ -165,6 +165,9 @@
   "themes": 7,
   "tools": 2,
   "tui_guidance": 1,
+  "update_apply": 1,
+  "update_check": 1,
+  "update_rollback": 1,
   "update_status": 1,
   "usage": 1,
   "verified": 7,
@@ -182,11 +185,11 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 748
+  "qubit-surface": 751
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
-  "has-cli has-dashboard has-voice": 507,
+  "has-cli has-dashboard has-voice": 510,
   "has-dashboard": 65,
   "has-dashboard has-voice": 4,
   "no-surface": 124
@@ -8060,6 +8063,48 @@
    "needs": "none"
   },
   {
+   "id": "update_apply",
+   "area": "update_apply",
+   "capability": "Apply update",
+   "upstream_ref": "update/apply",
+   "qubit_backend": "voicebridge.voice_commands._b_update_apply",
+   "cli": "qubit update",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "update_apply",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_update_surfaces_wave21.py::test_update_ops_dispatch_through_the_shared_dashboard_dispatcher",
+   "note": "Apply a confirmed update (snapshot then fast-forward).",
+   "needs": "none"
+  },
+  {
+   "id": "update_check",
+   "area": "update_check",
+   "capability": "Check for updates",
+   "upstream_ref": "update/check",
+   "qubit_backend": "voicebridge.voice_commands._b_update_check",
+   "cli": "qubit update",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "update_check",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_update_surfaces_wave21.py::test_update_ops_dispatch_through_the_shared_dashboard_dispatcher",
+   "note": "Read-only update check: version, install method, revision.",
+   "needs": "none"
+  },
+  {
+   "id": "update_rollback",
+   "area": "update_rollback",
+   "capability": "Roll back update",
+   "upstream_ref": "update/rollback",
+   "qubit_backend": "voicebridge.voice_commands._b_update_rollback",
+   "cli": "qubit update",
+   "dashboard": "qubit-ops:/operations",
+   "voice": "update_rollback",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_update_surfaces_wave21.py::test_update_ops_dispatch_through_the_shared_dashboard_dispatcher",
+   "note": "Restore the recorded pre-apply revision (confirmed).",
+   "needs": "none"
+  },
+  {
    "id": "update_status",
    "area": "update_status",
    "capability": "Update status",
@@ -8826,7 +8871,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "In-place self-update from the dashboard is refused; upgrades are versioned, staged, and reversible. routes=3",
+   "note": "In-place self-update from the dashboard is refused; upgrades are versioned, staged, and reversible. routes=2",
    "needs": "owner"
   },
   {

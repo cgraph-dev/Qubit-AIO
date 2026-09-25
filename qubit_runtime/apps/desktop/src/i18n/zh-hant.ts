@@ -138,9 +138,7 @@ export const zhHant = defineLocale({
       cloudDownTitle: 'Qubit Cloud 代理已停機',
       cloudDownDescription:
         '此閘道連線的 Qubit 託管雲端代理正在回傳伺服器錯誤。無法在此處重新啟動——請檢查其狀態、切換至本機閘道，或取得支援。',
-      cloudDownHint: '使用下方按鈕開啟 Qubit Portal（檢視執行個體狀態與操作）或加入 Discord 取得支援。',
-      cloudDownCheckPortal: '查看 Portal 狀態',
-      cloudDownDiscord: '在 Discord 取得協助',
+      cloudDownHint: '使用下方按鈕切換至本地閘道、重試或開啟閘道設定。',
       hideRecentLogs: '隱藏最近記錄',
       showRecentLogs: '顯示最近記錄',
       signedInTitle: '已登入',
@@ -257,9 +255,7 @@ export const zhHant = defineLocale({
       '您也可以在終端機執行 `qubit debug share --nous`，或執行 `qubit debug share --local` 在不上傳的情況下檢視報告。',
     handoffLead: '在以下位置繼續討論:',
     links: {
-      github: 'GitHub Issues',
-      portal: 'Qubit Portal 支援',
-      discord: 'Discord'
+      github: 'GitHub Issues'
     }
   },
 
@@ -917,7 +913,7 @@ export const zhHant = defineLocale({
         'SSH 驗證失敗。請將金鑰載入 ssh-agent（ssh-add），或在 ~/.ssh/config 中設定 IdentityFile——Qubit 以非互動方式執行 ssh。',
       sshErrHostKey: '自上次連線以來主機金鑰已變更。請確認這是預期的，然後執行 ssh-keygen -R <host> 並重新連線。',
       sshErrNotInstalled:
-        '遠端主機上未安裝 Qubit。請在遠端安裝（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）或設定 Qubit 路徑。',
+        '遠端主機上未安裝 Qubit。請在遠端安裝（參見 https://github.com/cgraph-dev/qubit-voicebridge）或設定 Qubit 路徑。',
       sshErrPlatform: '不支援的遠端平台。Qubit Desktop 的 SSH 模式支援 Linux、macOS 和 Windows 遠端主機。',
       sshErrTimeout: 'SSH 連線逾時。主機可能無法存取或處於睡眠狀態。',
       sshErrUpdateRequired: '使用 Desktop SSH 連線前，請更新遠端主機上的 Qubit。',
@@ -1607,7 +1603,7 @@ export const zhHant = defineLocale({
       MATTERMOST_ALLOWED_USERS: { label: '允許的使用者 ID', help: '建議設定。逗號分隔的 Mattermost 使用者 ID。' },
       MATRIX_HOMESERVER: { label: 'Homeserver URL', placeholder: 'https://matrix.org' },
       MATRIX_ACCESS_TOKEN: { label: '存取 Token' },
-      MATRIX_USER_ID: { label: 'Bot 使用者 ID', placeholder: '@hermes:example.org' },
+      MATRIX_USER_ID: { label: 'Bot 使用者 ID', placeholder: '@qubit:example.org' },
       MATRIX_ALLOWED_USERS: {
         label: '允許的 Matrix 使用者 ID',
         help: '建議設定。@user:server 格式的逗號分隔使用者 ID。'
@@ -1658,7 +1654,7 @@ export const zhHant = defineLocale({
       title: (profile: string) => `將 ${profile} 連線至遠端主機`,
       description: '此設定檔中的工作階段將在你指定的遠端 Qubit 上執行，而不是這台電腦。',
       urlLabel: '遠端位址',
-      urlPlaceholder: 'https://hermes.example.com',
+      urlPlaceholder: 'https://gateway.example.com',
       urlInvalid: '請輸入以 http:// 或 https:// 開頭的完整位址',
       tokenLabel: '存取權杖',
       tokenPlaceholder: '貼上遠端工作階段權杖',

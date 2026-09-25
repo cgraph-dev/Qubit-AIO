@@ -1,6 +1,6 @@
 """Vendored Hermes dashboard plugin fleet — real backend routes + state.
 
-Proves that the pinned ``plugins/hermes-achievements`` and ``plugins/kanban``
+Proves that the pinned ``plugins/qubit-achievements`` and ``plugins/kanban``
 dashboard APIs are served by Qubit's real compat backend
 (``voicebridge/qubit_plugins.py``), compute from REAL local session history /
 the real kanban DB, persist state under the Qubit state dir, and never
@@ -97,15 +97,15 @@ def _seed_kanban(cfg, monkeypatch):
 # Route registration evidence
 # ---------------------------------------------------------------------------
 PLUGIN_ROUTES = [
-    ("GET", "/api/plugins/hermes-achievements/achievements",
+    ("GET", "/api/plugins/qubit-achievements/achievements",
      "h_plugin_achievements"),
-    ("GET", "/api/plugins/hermes-achievements/scan-status",
+    ("GET", "/api/plugins/qubit-achievements/scan-status",
      "h_plugin_achievements_scan_status"),
-    ("GET", "/api/plugins/hermes-achievements/recent-unlocks",
+    ("GET", "/api/plugins/qubit-achievements/recent-unlocks",
      "h_plugin_achievements_recent_unlocks"),
-    ("POST", "/api/plugins/hermes-achievements/rescan",
+    ("POST", "/api/plugins/qubit-achievements/rescan",
      "h_plugin_achievements_rescan"),
-    ("POST", "/api/plugins/hermes-achievements/reset-state",
+    ("POST", "/api/plugins/qubit-achievements/reset-state",
      "h_plugin_achievements_reset_state"),
     ("GET", "/api/plugins/kanban/board", "h_plugin_kanban_board"),
     ("GET", "/api/plugins/kanban/stats", "h_plugin_kanban_stats"),
@@ -136,7 +136,7 @@ def test_plugin_routes_resolve_to_registered_handlers():
 
 
 # ---------------------------------------------------------------------------
-# hermes-achievements: real computed state from real session history
+# qubit-achievements: real computed state from real session history
 # ---------------------------------------------------------------------------
 def test_achievements_routes_compute_real_state(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
@@ -147,12 +147,12 @@ def test_achievements_routes_compute_real_state(tmp_path, monkeypatch):
     HP.reset_plugin_caches()
 
     code, rescan = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert code == 200 and rescan["ok"] is True, (code, str(rescan)[:300])
     assert rescan["unlocked_count"] >= 1, rescan["unlocked_count"]
 
     code, out = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert code == 200, (code, str(out)[:300])
     assert out["unlocked_count"] >= 1, out
     assert out["discovered_count"] + out["secret_count"] >= 1, out
@@ -169,20 +169,20 @@ def test_achievements_routes_compute_real_state(tmp_path, monkeypatch):
 
     # scan-status reflects the real scan bookkeeping.
     code, status = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/scan-status", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/scan-status", {}, {})
     assert code == 200 and status["run_count"] >= 1, status
     assert status["state"] in ("idle", "running"), status
 
     # recent-unlocks returns the persisted unlock with its timestamp.
     code, recent = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/recent-unlocks", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/recent-unlocks", {}, {})
     assert code == 200 and isinstance(recent, list), (code, recent)
     assert any(a["id"] == "open_weights_pilgrim" for a in recent), recent
 
     # per-session badges evaluate against the real session stats.
     code, badges = HC.dispatch(
         cfg, "GET",
-        f"/api/plugins/hermes-achievements/sessions/{sid}/badges", {}, {})
+        f"/api/plugins/qubit-achievements/sessions/{sid}/badges", {}, {})
     assert code == 200 and badges["session_id"] == sid, (code, badges)
     assert any(b["id"] == "open_weights_pilgrim" for b in badges["badges"]), \
         badges
@@ -197,10 +197,10 @@ def test_achievements_state_persists_across_reload(tmp_path, monkeypatch):
     HP.reset_plugin_caches()
 
     code, _out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert code == 200
 
-    state_root = _qubit_home(cfg) / "plugin-data" / "hermes-achievements"
+    state_root = _qubit_home(cfg) / "plugin-data" / "qubit-achievements"
     snapshot = state_root / "scan_snapshot.json"
     unlock_state = state_root / "state.json"
     checkpoint = state_root / "scan_checkpoint.json"
@@ -219,7 +219,7 @@ def test_achievements_state_persists_across_reload(tmp_path, monkeypatch):
     # Simulate a process restart: drop in-memory caches, keep disk state.
     HP.reset_plugin_caches()
     code, out = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert code == 200, (code, str(out)[:300])
     by_id = {a["id"]: a for a in out["achievements"]}
     assert by_id["open_weights_pilgrim"]["unlocked"] is True, \
@@ -235,17 +235,17 @@ def test_achievements_reset_requires_confirmation(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     _seed_history(cfg, monkeypatch)
     HP.reset_plugin_caches()
-    HC.dispatch(cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+    HC.dispatch(cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
 
     code, out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/reset-state", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/reset-state", {}, {})
     assert code == 409 and out["code"] == "CONFIRM_REQUIRED", (code, out)
 
     code, out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/reset-state", {},
+        cfg, "POST", "/api/plugins/qubit-achievements/reset-state", {},
         {"confirm": True})
     assert code == 200 and out["ok"] is True, (code, out)
-    state_root = _qubit_home(cfg) / "plugin-data" / "hermes-achievements"
+    state_root = _qubit_home(cfg) / "plugin-data" / "qubit-achievements"
     assert not (state_root / "scan_snapshot.json").exists()
 
 
@@ -409,16 +409,16 @@ def test_plugin_fleet_discovery_lists_vendored_plugins(tmp_path, monkeypatch):
     code, out = HC.dispatch(cfg, "GET", "/api/dashboard/plugins/fleet", {}, {})
     assert code == 200 and isinstance(out, dict), (code, out)
     names = {m["name"] for m in out["plugins"]}
-    assert {"hermes-achievements", "kanban"} <= names, names
+    assert {"qubit-achievements", "kanban"} <= names, names
     achievements = next(m for m in out["plugins"]
-                        if m["name"] == "hermes-achievements")
+                        if m["name"] == "qubit-achievements")
     assert achievements["entry"] == "dist/index.js", achievements
     assert achievements["tab"]["path"] == "/achievements", achievements
     # The vendored fleet view is additive: the overlay list is unchanged.
     code, overlays = HC.dispatch(cfg, "GET", "/api/dashboard/plugins", {}, {})
     assert code == 200 and isinstance(overlays, list)
     assert {m["name"] for m in overlays}.isdisjoint(
-        {"hermes-achievements", "kanban"}), overlays
+        {"qubit-achievements", "kanban"}), overlays
 
 
 # ---------------------------------------------------------------------------
@@ -440,10 +440,10 @@ def test_achievements_wire_shape_states_and_tier_progression(
     sid = _seed_history(cfg, monkeypatch)
     HP.reset_plugin_caches()
     code, _out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert code == 200
     code, out = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert code == 200, (code, str(out)[:300])
 
     states = {"unlocked": 0, "discovered": 0, "secret": 0}
@@ -485,16 +485,16 @@ def test_achievements_scan_status_lifecycle(tmp_path, monkeypatch):
     HP.reset_plugin_caches()
 
     code, before = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/scan-status", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/scan-status", {}, {})
     assert code == 200 and before["state"] == "idle", before
     assert before["ttl_seconds"] == 120, before
     run0 = before["run_count"]
 
     code, _out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert code == 200
     code, after = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/scan-status", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/scan-status", {}, {})
     assert code == 200, (code, after)
     assert after["run_count"] == run0 + 1, after
     assert after["state"] == "idle", after
@@ -512,10 +512,10 @@ def test_achievements_recent_unlocks_sorted_and_capped(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     _seed_history(cfg, monkeypatch)
     HP.reset_plugin_caches()
-    HC.dispatch(cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+    HC.dispatch(cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
 
     code, recent = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/recent-unlocks", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/recent-unlocks", {}, {})
     assert code == 200 and isinstance(recent, list), (code, recent)
     assert 0 < len(recent) <= 20, recent
     assert all(a["unlocked"] for a in recent), recent
@@ -530,18 +530,18 @@ def test_achievements_session_badges_real_and_unknown(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     sid = _seed_history(cfg, monkeypatch)
     HP.reset_plugin_caches()
-    HC.dispatch(cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+    HC.dispatch(cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
 
     code, badges = HC.dispatch(
         cfg, "GET",
-        f"/api/plugins/hermes-achievements/sessions/{sid}/badges", {}, {})
+        f"/api/plugins/qubit-achievements/sessions/{sid}/badges", {}, {})
     assert code == 200 and badges["session_id"] == sid, (code, badges)
     assert any(b["id"] == "open_weights_pilgrim" for b in badges["badges"]), \
         badges
 
     code, empty = HC.dispatch(
         cfg, "GET",
-        "/api/plugins/hermes-achievements/sessions/nope/badges", {}, {})
+        "/api/plugins/qubit-achievements/sessions/nope/badges", {}, {})
     assert code == 200 and empty == {"session_id": "nope", "badges": []}, empty
 
 
@@ -556,7 +556,7 @@ def test_achievements_scan_is_bounded(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_ACHIEVEMENTS_SCAN_LIMIT", "2")
     HP.reset_plugin_caches()
     code, out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert code == 200, (code, str(out)[:300])
     assert out["scan_meta"]["sessions_total"] == 2, out["scan_meta"]
 
@@ -571,10 +571,10 @@ def test_achievements_mutations_refuse_under_estop(tmp_path, monkeypatch):
     monkeypatch.setattr(HP, "_estop", lambda _cfg: True)
 
     code, out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert code == 403 and out["code"] == "ESTOP_ENGAGED", (code, out)
     code, out = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/reset-state", {},
+        cfg, "POST", "/api/plugins/qubit-achievements/reset-state", {},
         {"confirm": True})
     assert code == 403 and out["code"] == "ESTOP_ENGAGED", (code, out)
 
@@ -591,7 +591,7 @@ def test_plugin_engine_unavailable_is_typed(tmp_path, monkeypatch):
 
     monkeypatch.setattr(HP, "_load_engine", _boom)
     code, out = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert code == 503 and out["code"] == "PLUGIN_ENGINE_UNAVAILABLE", \
         (code, out)
     # Kanban now reads the authoritative Qubit-native store and does not need
@@ -682,7 +682,7 @@ def test_vendored_fleet_audit_covers_every_plugin():
     from voicebridge import qubit_plugins as HP
 
     expected = (
-        "hermes-achievements", "kanban", "browser", "context_engine",
+        "qubit-achievements", "kanban", "browser", "context_engine",
         "cron_providers", "dashboard_auth", "disk-cleanup", "google_meet",
         "image_gen", "memory", "model-providers", "observability", "platforms",
         "security-guidance", "spotify", "teams_pipeline", "video_gen", "web",
@@ -691,7 +691,7 @@ def test_vendored_fleet_audit_covers_every_plugin():
     audit = HP.plugin_fleet_audit()
     assert [r["name"] for r in audit] == list(expected)
     dashboard = [r["name"] for r in audit if r["has_dashboard"]]
-    assert dashboard == ["hermes-achievements", "kanban"], dashboard
+    assert dashboard == ["qubit-achievements", "kanban"], dashboard
     for row in audit:
         if row["has_dashboard"]:
             assert row["manifest"].endswith("dashboard/manifest.json"), row

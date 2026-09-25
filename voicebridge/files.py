@@ -185,6 +185,38 @@ def list_dir(cfg: Any, path: str, *, depth: int = 1) -> Dict[str, Any]:
             "entries": entries, "truncated": truncated}
 
 
+def list_children(cfg: Any, path: str) -> Dict[str, Any]:
+    """List the immediate children of one folder inside the approved roots.
+
+    Mirrors the reference dashboard ``list_managed_files`` (a single
+    ``os.scandir`` level, directories first). The dashboard navigates one
+    folder at a time by entry path, so a recursive walk is unnecessary and
+    harmful there: it consumes :data:`MAX_LIST_ENTRIES` with descendants and
+    can hide the sibling directories entirely.
+    """
+    target = _resolve_inside(cfg, path)
+    _refuse_special(target)
+    if not target.is_dir():
+        raise FilesError(BAD_INPUT_CODE, "not a folder; use `files read`")
+    try:
+        with os.scandir(target) as scan:
+            children = sorted(scan,
+                              key=lambda e: (not e.is_dir(), e.name.lower()))
+    except OSError as exc:
+        raise FilesError(IO_CODE, f"cannot list folder ({exc})")
+    entries: List[Dict[str, Any]] = []
+    truncated = False
+    for child in children:
+        entries.append(_public_dir(Path(child.path), target))
+        if len(entries) >= MAX_LIST_ENTRIES:
+            truncated = True
+            break
+    _audit("list", "qubit", {"path": redact_spec(str(target))[:120],
+                             "count": str(len(entries))})
+    return {"state": "OK", "folder": redact_spec(str(target))[:300],
+            "entries": entries, "truncated": truncated}
+
+
 def read_file(cfg: Any, path: str, *, max_chars: int = MAX_READ_CHARS
               ) -> Dict[str, Any]:
     """Read a text file inside the approved roots (bounded, redacted)."""

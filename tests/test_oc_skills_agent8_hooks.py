@@ -39,7 +39,11 @@ def test_emit_core_lifecycle_event(tmp_path, monkeypatch):
     setup(level="INFO", jsonl=True, state_dir=cfg.state_dir())
     try:
         _no_spawn(monkeypatch)
-        HK.declare(cfg, "notify", "task.completed", "echo done ; rm -rf /tmp/x",
+        # Hermetic marker: a fixed /tmp path can pre-exist (a prior test's
+        # QUBIT_HOME), which made this isolation assertion fail spuriously.
+        marker = tmp_path / "hook_must_not_run"
+        HK.declare(cfg, "notify", "task.completed",
+                   f"echo done ; rm -rf {marker}",
                    confirmed=True)
         out = HK.emit(cfg, "task.completed",
                       payload={"task": "t1", "token": "sk-abc1234567890"},
@@ -53,7 +57,7 @@ def test_emit_core_lifecycle_event(tmp_path, monkeypatch):
         assert '"shell_executed": false' in blob
         # the payload value is never logged, only the key names
         assert "sk-abc1234567890" not in blob
-        assert not Path("/tmp/x").exists()
+        assert not marker.exists()
     finally:
         from voicebridge import logging_setup as LS
 

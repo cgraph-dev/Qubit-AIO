@@ -1,14 +1,14 @@
 {
  "blockers": [],
- "byte_identical_to_blob": 6097,
+ "byte_identical_to_blob": 6078,
  "classification_counts": {
   "EOL_NORMALIZED": 6,
   "INTENTIONALLY_OMITTED": 1122,
   "MISSING": 0,
   "OPENCLAW_OVERLAY": 0,
-  "QUBIT_ADDED": 828,
-  "QUBIT_PATCHED": 7508,
-  "UNCHANGED": 6097,
+  "QUBIT_ADDED": 829,
+  "QUBIT_PATCHED": 7527,
+  "UNCHANGED": 6078,
   "UNEXPLAINED": 0
  },
  "eol_normalized": [
@@ -90,6 +90,7 @@
   "apps/desktop/src/lib/format.ts",
   "apps/desktop/src/lib/mcp-directory.ts",
   "apps/desktop/src/lib/model-search-text.ts",
+  "apps/desktop/src/lib/qubit-links.ts",
   "apps/desktop/src/lib/reconnect-backoff.test.ts",
   "apps/desktop/src/lib/reconnect-backoff.ts",
   "apps/desktop/src/plugins/accent/picker.tsx",
@@ -904,7 +905,7 @@
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/skills/bundled/research/research-research-paper-writing.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/skills/bundled/smart-home/smart-home-openhue.md"
  ],
- "file_count": 14439,
+ "file_count": 14440,
  "files": {
   ".coderabbit.yaml": {
    "classification": "UNCHANGED",
@@ -6593,7 +6594,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "4c1b5da8e03b29a1cb76cb33dcfcec83623bc60768b3dce5aa6df9418e1ee1f6",
+   "sha256": "11fa3f219023ae2e527240ee46e2216ed9b85239137380da7a855faf87ff3034",
    "symlink": false,
    "upstream_blob": "09a0aa98ed964cf35455bac44f3ba94f3d037729",
    "upstream_blob_sha256": "1e01eebf627d3390f8a1dd96fc0d8406d5c3c3f12d15510827a7ab3ab077d1a9",
@@ -7789,7 +7790,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "7d788a121015f1ec6880e872d664f07f762bc1b6652de5502077a089900ba3b9",
+   "sha256": "9ce22ec1e6e01343ff1fc8c3774c898a20c48487a9fbfba16f2e56c49fda85c2",
    "symlink": false,
    "upstream_blob": "b80de96248247d02d8ca1508fc9b1fd7cd009917",
    "upstream_blob_sha256": "3a239091fda49487e044a36062e9da00a3066b2872930a2a0aafbe8d4dc4bae8",
@@ -7906,7 +7907,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "42abd67375dd1d8716bc47e622be53d5037edf15ff3f2692e5d6a6563b57a310",
+   "sha256": "6f223de6fdce3d9924e8261e590b676d9b4d169e617a5b45c7b186d035bea4a2",
    "symlink": false,
    "upstream_blob": "144cdd9b61c2d5189aaca86ecd1cec687111089c",
    "upstream_blob_sha256": "e68cddb2e4e67506503b7a09ae7c0eff602221d7c9de74094f67652892d1422c",
@@ -7919,7 +7920,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "d8cedef4d34302925f2c7d9a44a0541b7eb1f4a0ed81a30cfae9c85a6cd604f7",
+   "sha256": "597d6fcb30f9b1759c27756600df07739742f360bd509a479fbb237d6a774bb3",
    "symlink": false,
    "upstream_blob": "86c30543f31e835873f1fc9ea03655d16069e022",
    "upstream_blob_sha256": "92bd120428fc83e9a330eddefdbbc1d883ea3ae1198cc5a6daa97a93ad4c3ede",
@@ -8270,7 +8271,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "2c0bd89da4f1fd66110070164a017353fdcbe0c51c440d1576798ce33a0cd4d5",
+   "sha256": "edfe19012b75b27acc30bf9dce4b3c104f45f4353443b83b9828b5516467ce4c",
    "symlink": false,
    "upstream_blob": "a8d818e855cc766c2f343d32d76b0fdbacbfdb7e",
    "upstream_blob_sha256": "09e67a7ea084b3a61143d22902bf731116e499c64c01f5845e38fbb1c6d73b92",
@@ -8772,12 +8773,12 @@
    "upstream_sha256": "21afc123dd0d8182516ccdc056c0cbab00628261a0155632b7f8fba3112d11ed"
   },
   "apps/desktop/electron/desktop-plugin-install.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "1506a5c0e7c44dd4121b5878ea660aa19893046dda813ce696ea2fdb2b4bb425",
+   "patched": true,
+   "sha256": "b278c1c9860588fb139905a38b2f02eddc486e9da776370541a192ccd606746c",
    "symlink": false,
    "upstream_blob": "e7bb67e9b000273efdff3a7746d47d330cfe268f",
    "upstream_blob_sha256": "1506a5c0e7c44dd4121b5878ea660aa19893046dda813ce696ea2fdb2b4bb425",
@@ -9539,12 +9540,12 @@
    "upstream_sha256": "99e072cfbdc3fea7924e473ff7e73ba4fbc2f56cde496cc8f88f4d63a9ab467f"
   },
   "apps/desktop/electron/github-api-auth.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "1181e95d3091d6785069fdfcea08337d78f2a66f39b7ca84744c1405e452198e",
+   "patched": true,
+   "sha256": "2052cea96bdfc3010cd286ecf8d96c15b009721a0cd25fa873b4523f034b9aac",
    "symlink": false,
    "upstream_blob": "509877217547ad6f6be0eae45014b21085c4db5f",
    "upstream_blob_sha256": "1181e95d3091d6785069fdfcea08337d78f2a66f39b7ca84744c1405e452198e",
@@ -10233,7 +10234,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "a9b7919f7e7211cf367bb654dd2b04206bbaee0c97f46443496635798510a788",
+   "sha256": "e02b9387d7e5c402eeb47d77ede86882cb3ad4effd644eefe426e48052797689",
    "symlink": false,
    "upstream_blob": "38dd6293d9f86df5738f1aef016b2b4142d8f022",
    "upstream_blob_sha256": "643765a6a89f7a908cbb5bb70851b1aa7f9b013610ccf9f30290a1dd1231fc27",
@@ -11650,7 +11651,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "a7b092e7ab1a1fa9f93c603e76e88bcd7c218aec2a289e865300d833d59f8e4e",
+   "sha256": "5ea503a63ed3fdf3354b7825662a273508ab82e17f4b9c324bffde761d4cb759",
    "symlink": false,
    "upstream_blob": "e6c77f8fe68e3808f0672fe99b16a9489b2e22d8",
    "upstream_blob_sha256": "768623c33d6f06259f41a4669af50c751c88fa69a0dadc8fb78a1828dc322d7f",
@@ -12295,12 +12296,12 @@
    "upstream_sha256": "03353cfdd87d6442450ecaea938c6f8144dd04f341dacef00f58ada3f90855c3"
   },
   "apps/desktop/electron/update-api-check.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "f5d526ee0cc38a1b006072d9db8e6b37d13fd447e995934a41c0a2ab0028308d",
+   "patched": true,
+   "sha256": "5b1220fcb45e3107de0a6c56b0d206f2fbee2567c866c9566359be4f56efe90e",
    "symlink": false,
    "upstream_blob": "ec7edeee9c2de0fd37698a9f38ba22d079196586",
    "upstream_blob_sha256": "f5d526ee0cc38a1b006072d9db8e6b37d13fd447e995934a41c0a2ab0028308d",
@@ -12321,12 +12322,12 @@
    "upstream_sha256": "30c1267f9837c974a4b2c6a05dfaedd8097f77af7e3bc26b5cf2425d4a01fcfa"
   },
   "apps/desktop/electron/update-api-proxy.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "53cf8bb7b5fc6cdb520069bfba2aed1f73172caf906944536dcd6359751e4c0e",
+   "patched": true,
+   "sha256": "dcaed6c1014b09f5c0cd982a90173e7820ef2b10db9875d4e6046bc342198f00",
    "symlink": false,
    "upstream_blob": "dbfdbb6655d197e3162406e2f70ec72da945a2ff",
    "upstream_blob_sha256": "53cf8bb7b5fc6cdb520069bfba2aed1f73172caf906944536dcd6359751e4c0e",
@@ -12352,7 +12353,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": false,
-   "sha256": "494af9192e82fdcecdc34881eb167d4f43da1cdc4fb5ec700955671912b02b33",
+   "sha256": "c087a827aeea8150d00e273e3b7dd68b56ee3d3624b956aef02fbc97e04986a8",
    "symlink": false,
    "upstream_blob": null,
    "upstream_blob_sha256": null,
@@ -12464,12 +12465,12 @@
    "upstream_sha256": "00e87b588605982bffb4a15f8d1d51a56c4b53b9245660b5e29ad21b1f3fb344"
   },
   "apps/desktop/electron/update-remote.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "0d495aae2c9534f42760d56524c7cf378aadc7f6e43fc4ddac2276cb6cdd7719",
+   "patched": true,
+   "sha256": "b7940d2eb37f26db0bfff63044e7944c18b15532d970fe6e2f648e75596e3e31",
    "symlink": false,
    "upstream_blob": "80dc8b1dd0b51dae50542f3bab0174238c33d3e8",
    "upstream_blob_sha256": "0d495aae2c9534f42760d56524c7cf378aadc7f6e43fc4ddac2276cb6cdd7719",
@@ -12477,12 +12478,12 @@
    "upstream_sha256": "0d495aae2c9534f42760d56524c7cf378aadc7f6e43fc4ddac2276cb6cdd7719"
   },
   "apps/desktop/electron/update-remote.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "46ccf9c5de6bac2f87b9d20016d605cd5271fde6cc83c45f7c54e01040ffdcc4",
+   "patched": true,
+   "sha256": "72a5b087635536355cd0732c10115df0ca43190b7c0b4dbe7f6160f23adb413a",
    "symlink": false,
    "upstream_blob": "1c5a6d57c74c84d8910eed0811673a5e00f42e1b",
    "upstream_blob_sha256": "46ccf9c5de6bac2f87b9d20016d605cd5271fde6cc83c45f7c54e01040ffdcc4",
@@ -13223,7 +13224,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "9f401485c83b0eb6ea211e76e48acc4ad7097d1968f1d2c35eac64283dd510d1",
+   "sha256": "78a171d8b4bc628583d216006848533de87fe3010fbd51af99b5272c62d61154",
    "symlink": false,
    "upstream_blob": "34f0acba1b903b0456f9a3ae390ee433cfcc3771",
    "upstream_blob_sha256": "b26b8d191eeb599888f176f60051ae375d12a95f0c879b086af73af0a089a4dd",
@@ -14063,12 +14064,12 @@
    "upstream_sha256": "b4adf493c0048e4f3c7773a1d303f44b80c982c4901f4a72a4c92f3dbdfb198e"
   },
   "apps/desktop/scripts/local-pack-publish.test.mjs": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "e4c6aad4b3e2e58a1e31fa644769d99d7b14e79045eb18185d9545ad2050c3ea",
+   "patched": true,
+   "sha256": "70df4d0295c1ad0d06858069784f5d4e81951043ae95b055db88799fe54e2850",
    "symlink": false,
    "upstream_blob": "0dd1dc042e3cdc699d0f4601deba1de5868e7c7a",
    "upstream_blob_sha256": "e4c6aad4b3e2e58a1e31fa644769d99d7b14e79045eb18185d9545ad2050c3ea",
@@ -14588,7 +14589,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "df59e5b5bc36e1282eac139833cbaf9be992d7b97762b64c9f68c5302387396a",
+   "sha256": "3356ca9c79dc6c13f9db0a9fae6b9f6c464a3e1aedd5247422f8e32f71bfe27d",
    "symlink": false,
    "upstream_blob": "8a97acaef2c1e76d085c7f6a79722217385d60ac",
    "upstream_blob_sha256": "394d9c82f6e8359b66c402d75117f64613467ea14f2399157df39645e8aa025e",
@@ -14939,7 +14940,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "d18310fd284a936c680d32b51c4cf801e7821dbfb16ca2232771039acd72e0b4",
+   "sha256": "8e72e4880e73a089648c5f33edd7de82dda24c1be20b7fe35c58d910feb5cdff",
    "symlink": false,
    "upstream_blob": "47d2636f2bcd4c7eedff58174531c733bf498575",
    "upstream_blob_sha256": "a760001d2fb9285df6b1b6d7501504ef2006a661638bb9ca44db7b2f041e6022",
@@ -15030,7 +15031,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "f209d83d9bc336a726f8eb2b356d1d74f43fa2674ae0bbe02b97990e1c31572b",
+   "sha256": "98c9254b7f4125be6572a91e1bad4416dbe9a60b5fc535778d149feb90100c8d",
    "symlink": false,
    "upstream_blob": "e397d1e849f67253dc31d94b012df73ad0a1f183",
    "upstream_blob_sha256": "160778ae0b09ce77e6f079b9e1952d651bdaed9058c852cf4bd9ae99411760f8",
@@ -15090,12 +15091,12 @@
    "upstream_sha256": "bcaa68b1336c45dcfc601b4e04d58d4b2beed2c4be9ff93abe575f39daa02b61"
   },
   "apps/desktop/src/app/capabilities/plugins/plugins-tab.test.tsx": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "a2e4a740c2b285620c83fb5e5d2b2ef62127b8743e7f47a3623457065ee35e1b",
+   "patched": true,
+   "sha256": "da9810558bb78d62126ae535dc8f76e7191853a10b73a0b9c92b07579c90114d",
    "symlink": false,
    "upstream_blob": "0682891ec52411a305cb60f5bc179c3e1563ccc7",
    "upstream_blob_sha256": "a2e4a740c2b285620c83fb5e5d2b2ef62127b8743e7f47a3623457065ee35e1b",
@@ -15142,12 +15143,12 @@
    "upstream_sha256": "54a5d94f1fdd1bb8adfd20099f8b8e7e630fd9b5805ab8ba46446b910ef8743e"
   },
   "apps/desktop/src/app/capabilities/skills/embedded-hub-picker.tsx": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "ac19bea897bb84ea6a286125f276796a12779c10893d215dfc49524cc1440f49",
+   "patched": true,
+   "sha256": "e93e99ae7665af423db211e84f8a675b2575e3c941c6a6a9e0a6b6200bb45708",
    "symlink": false,
    "upstream_blob": "7d9fdbe53511da4f27fe1935835e46d450467b69",
    "upstream_blob_sha256": "ac19bea897bb84ea6a286125f276796a12779c10893d215dfc49524cc1440f49",
@@ -15563,7 +15564,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "19067f152d0f83ab954ee663922673587dba6f19978c8b35e0ed0992058238fe",
+   "sha256": "834f827c52a1c781592cf16c33c62a03087475f0c65e286819b555b679d5c2ff",
    "symlink": false,
    "upstream_blob": "411269b8a53ba41ef7954c85ab2c1423e3c2d936",
    "upstream_blob_sha256": "eeee798a7a0265694b2ae73416412e84c0aa709d8475365145c9995c00598cdb",
@@ -15571,12 +15572,12 @@
    "upstream_sha256": "eeee798a7a0265694b2ae73416412e84c0aa709d8475365145c9995c00598cdb"
   },
   "apps/desktop/src/app/chat/composer/directive-scope.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "2faa9adc3c38e004ae43b9254f107044b71a4c2b3b71b6b668ed5efe822fc2b5",
+   "patched": true,
+   "sha256": "9e3e8e2adf1d088df927b7f0db66a5ef6e36738e14e4428538c5342ec6a77fc6",
    "symlink": false,
    "upstream_blob": "08d1804dfbab62f2dd3705dd9f22670070a9a089",
    "upstream_blob_sha256": "2faa9adc3c38e004ae43b9254f107044b71a4c2b3b71b6b668ed5efe822fc2b5",
@@ -21075,7 +21076,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "db983313bd6cd8f0c53e04cbfd8f14dbbd4aae53da89c77c17833be066fa5836",
+   "sha256": "a5168d47e1f4d8e539e491e05b479af10c26a93daff531375f47033a0fd1e1cd",
    "symlink": false,
    "upstream_blob": "d60fed80fd52ad54720ec8cb8fbc6fb0c0d92a53",
    "upstream_blob_sha256": "b4da16264456c4629bcd7c9a7632460f7680b1339a1c4e17e57a0deece082b55",
@@ -21309,7 +21310,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "91e7e3c8412a5db854daa93b15ce409c6e9ea882ff9dd723e16ac8f36da34ccd",
+   "sha256": "3cc3de4ee4757b1d2560818958469db9f9c5b57473ce8274fe9594b604353c09",
    "symlink": false,
    "upstream_blob": "465dbc667149439437e05bac94e9a509a3a13da0",
    "upstream_blob_sha256": "a1478a9e949479149337c59853ffc4beb59c131d979dc9fa8d4f08ee8df14974",
@@ -23714,7 +23715,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "7850d815fcbb532dba4c450c1bf1278b9f6fb80b28b46a221bcb85a3d6d2b92d",
+   "sha256": "bbba155a78d41114c5eb4c64111a90dc67526f3f656bb20a159c16c5d58ed315",
    "symlink": false,
    "upstream_blob": "fda946eaa211118be718daf1ce2293e19e094c44",
    "upstream_blob_sha256": "115986a16f8132314f3b3de406bac141ab2cb4242de292902c31fc8bcdfb1d87",
@@ -23766,7 +23767,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "2638382da8241d7f546b73af68af253cf8c0f839cba4c998fb0208211a8ed500",
+   "sha256": "c3f02f6add1ff518bfc7b6aee9f64d1239d1d928fc5c086bafff81017fbcb385",
    "symlink": false,
    "upstream_blob": "aa5f9c384952062f3541c4fd8495d556985dceca",
    "upstream_blob_sha256": "c6e5b30e3a6434b4138dc270e4b19d858005c9438a3a5d1a5d6c34c647ba01c8",
@@ -23826,12 +23827,12 @@
    "upstream_sha256": "dfbc0ced5b79343b814a54c6e8ea2fc1c354eacc29e91d2e6fecda5f7f373f47"
   },
   "apps/desktop/src/app/settings/billing/dev-fixtures.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "e03e120955039bd3afb0457b5d5a6f2124c6e01be4360f3fada56bec2731052b",
+   "patched": true,
+   "sha256": "d57eb7020b5c1e190224e893f4c72c8b8a7e23cde34a06ea4a04f8f32f308548",
    "symlink": false,
    "upstream_blob": "91e3f9f953d560190a0f61794a3af9d6b019841e",
    "upstream_blob_sha256": "e03e120955039bd3afb0457b5d5a6f2124c6e01be4360f3fada56bec2731052b",
@@ -23839,12 +23840,12 @@
    "upstream_sha256": "e03e120955039bd3afb0457b5d5a6f2124c6e01be4360f3fada56bec2731052b"
   },
   "apps/desktop/src/app/settings/billing/errors.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "1475617a92865fa54079d2dc28c4fe28abadac12cf537e8fcae2fb1065e85022",
+   "patched": true,
+   "sha256": "b473cdb1a71c74db1654d992ac9fa0aad68beaa49a6a44ef7d7c677a58802e2f",
    "symlink": false,
    "upstream_blob": "82ed48091d7d4497a1044318861d18dc00088d96",
    "upstream_blob_sha256": "1475617a92865fa54079d2dc28c4fe28abadac12cf537e8fcae2fb1065e85022",
@@ -23995,12 +23996,12 @@
    "upstream_sha256": "e2f0ccd0f7a73d14b6b992956df98425911194c4d7eca8615184d0fcad8ffb60"
   },
   "apps/desktop/src/app/settings/billing/types.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "e14c60b7e95f3c0da462b28ede1c90226eec2017c6d9ed1dcafe3e209b88697a",
+   "patched": true,
+   "sha256": "4e658c139ae43653659c50096d0f7c997ed76401d6315200cb78c23be849e2c1",
    "symlink": false,
    "upstream_blob": "320cc9248310d9621c0da0b55011eaf39ca459cd",
    "upstream_blob_sha256": "e14c60b7e95f3c0da462b28ede1c90226eec2017c6d9ed1dcafe3e209b88697a",
@@ -24026,7 +24027,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "12acb02ff226faa7fee431225623ef7f17177c4511588f70caf2f83c88563ac1",
+   "sha256": "c74f40f709940dd4247eeb43a18abb0ed965873e7c381816f7f118996ebf5803",
    "symlink": false,
    "upstream_blob": "6a9c2349cbba4ab716bbfec52204241716225dca",
    "upstream_blob_sha256": "68f03800a9be9814248e021bd61a703905e98ca25bea5e00b15e5b6cac1ef690",
@@ -24039,7 +24040,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "b833853dc25b405713eb554279960983ff325980d03febfb4b21e9e68117d96d",
+   "sha256": "fed9d050a70021318dbba66a24a1ebed7dd85678015462ccad456baecf75500f",
    "symlink": false,
    "upstream_blob": "288c31ecf7a02212872b0c9c51fff2aa04e104ba",
    "upstream_blob_sha256": "637c5cbc8283b2a0385d27e0de6730a62d309383d3771bb41839237e9328dab2",
@@ -24047,12 +24048,12 @@
    "upstream_sha256": "637c5cbc8283b2a0385d27e0de6730a62d309383d3771bb41839237e9328dab2"
   },
   "apps/desktop/src/app/settings/billing/use-charge-poller.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "bbf157a97fb3d2c8c3b791ca1b6fcc58c0a823948d548a4109e758dddbfd51cd",
+   "patched": true,
+   "sha256": "8c109bfad23cd33c9d74912cf9b1e140187405c3b2b56620f24a8bb0c5e544eb",
    "symlink": false,
    "upstream_blob": "82f6df182fee6b5d5160e363f3c88b6ebeee1ecc",
    "upstream_blob_sha256": "bbf157a97fb3d2c8c3b791ca1b6fcc58c0a823948d548a4109e758dddbfd51cd",
@@ -24078,7 +24079,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "362f482309d8516eb3f181fc1955ae91ed9e4de1728a1076e72a3775315ba569",
+   "sha256": "ceb42c23ca4c4bdbed06d3748caa084c6af097c97d7c4b0b891e90403494bab2",
    "symlink": false,
    "upstream_blob": "ee90129e5b8124fc084b253f2ef5d3db6fb22151",
    "upstream_blob_sha256": "44388938fda99bc34e551531139dcd06159b58a161df9087d2a34c6b106fd6ee",
@@ -24286,7 +24287,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "38a84a2af46a2ef905f174db33c65728c807b844da81349a4931d9e7e6c404ec",
+   "sha256": "e09af08887091952b9c5c7548c277f4cf396e75953ab7544ef2a591d5b098072",
    "symlink": false,
    "upstream_blob": "29660a02f5d678bee310d793b8dd77d32cc0dc93",
    "upstream_blob_sha256": "66836d91e7f242e37ddb274a0198f637fdf926f895cd9fe349a673993e93003c",
@@ -24299,7 +24300,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "f3a5d8dd82849dd2d8bb7635241db32fed8c27a1aae987a503f1d1b74436b1bf",
+   "sha256": "ab686efc11ba61e27550a2d5a9f1b3ce86469c0ab8ba66b66691f9032dcec530",
    "symlink": false,
    "upstream_blob": "28930d893d6047e3f587821c9699276f68d0b2e5",
    "upstream_blob_sha256": "022ae74417c0dcaea45f23015d81309422702876d91989deb78a66b8b3b95055",
@@ -24442,7 +24443,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "585864d3a138857b29c208a8e21bf56f51126b0a1faaab2edb2e555024cf9b90",
+   "sha256": "0147a9570aae6a9d1e8527b399f6393e7e907dd439dd6af98c806c254b6c6e37",
    "symlink": false,
    "upstream_blob": "c555b5f118c9949bb4b7168fdc545e9678a85564",
    "upstream_blob_sha256": "503250fa8fe9db5c0e4a2de355fee638f80ecbed16719e7478463a642e5077ca",
@@ -25144,7 +25145,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "bba70cd441fa376552f16f3b3c139687b4475acb9031cf3275d00205613dd9c0",
+   "sha256": "dd819d2773b7fa03b36e6578506e614c633d8cfa6a328f858e6907b850493318",
    "symlink": false,
    "upstream_blob": "735dbfe016514ec88b26acc4b7c6b364eaac837b",
    "upstream_blob_sha256": "3048984875d4d867c105942cb03837ea21ad5020d10c939a0a9de4eb8aa56ee9",
@@ -25157,7 +25158,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "81df3c598ed60cced17428d1fe2f35bec21272e951f5d7bdfa6678aa247a41fa",
+   "sha256": "020c8e2e80d00fa8b20799350be09f31b4a32ebd575448d0c58362f32bf8f399",
    "symlink": false,
    "upstream_blob": "176342cdcb176e558de3ffd2889cf066eba25bdd",
    "upstream_blob_sha256": "ecdf186d8233e7d3e7c6022ae34c7cefb6b72ea2a133783f2bca448751c50eed",
@@ -25768,7 +25769,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": false,
-   "sha256": "9e318ef4a395781e594f0a36d68d73d243e1abe2e753be0dcae37fe15aa06c0d",
+   "sha256": "d3bc277db7a0702a41cb3de77f17e5e81430d792087de953b277f9681c1fb380",
    "symlink": false,
    "upstream_blob": null,
    "upstream_blob_sha256": null,
@@ -25781,7 +25782,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": false,
-   "sha256": "2ed8d044272586cf8a283735507f92536bd6faccb8210f0c1e846c3253da291e",
+   "sha256": "697562ecc295c39c6d182105ca8295a82b6d59ded0d8f9a1969be6f2ed375a2e",
    "symlink": false,
    "upstream_blob": null,
    "upstream_blob_sha256": null,
@@ -26366,7 +26367,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "39c1700a64269592ec73b1ffea4408bcb3d2696abb16f6af8a00ab2ad55adb7c",
+   "sha256": "0beb616ace6add152aa6470bcc575ddc9a0c892e3943f7f8a10c51c5e6453d0b",
    "symlink": false,
    "upstream_blob": "7031253862387c20d1269035d3255201f4e1e2bb",
    "upstream_blob_sha256": "fa1f83e2f0b92972417ba6d481085bd4097aa3cea1909363c87dcbebcb2cd550",
@@ -26530,12 +26531,12 @@
    "upstream_sha256": "7c33e0ae718f23e9f466fb65171c64332fb30dc71cef611252837f718daf8acf"
   },
   "apps/desktop/src/components/assistant-ui/embeds/providers/detect.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "002de1fe645b2bd0eebfb9eb32625dac175ed6661d80492545ae5344de830e24",
+   "patched": true,
+   "sha256": "a3111ae8be53b6b48e474c3878a6238eca3d720d9c04ef710ac60088a7e6da28",
    "symlink": false,
    "upstream_blob": "74be1caa14d33b8624e12a17ad64233f73429c0b",
    "upstream_blob_sha256": "002de1fe645b2bd0eebfb9eb32625dac175ed6661d80492545ae5344de830e24",
@@ -26938,7 +26939,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "0a18377fe09520132b54bbb4ad76bea825e0baad4ebdcc2780daa037a7bdf6a1",
+   "sha256": "80f5666b32597763333179fdfc308771d19fbf6adb77ca8c74d7a94d466ab8cc",
    "symlink": false,
    "upstream_blob": "2773d6ccbd18e501f46e6fc67b975f38d28054cb",
    "upstream_blob_sha256": "44d1928295521712cb46fc7bc316181d6986c680ad524e99ba200399c1b72eaa",
@@ -28038,12 +28039,12 @@
    "upstream_sha256": "6381c86515759877cad8bc0c84030fb94303ff2a5941a6e5baaec96f348e6110"
   },
   "apps/desktop/src/components/assistant-ui/thread/user-message-text.test.tsx": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "9eb56f2984785b5c35eec63a0fb9ed139b65fc5149966fe538766671168df8a0",
+   "patched": true,
+   "sha256": "d59b35a1d18bdca39357fc2f52221713ae4a7062223f9ddf9f30dfcd7d40be71",
    "symlink": false,
    "upstream_blob": "e8c76f2d9049248e9833e4065d1490146f2c901b",
    "upstream_blob_sha256": "9eb56f2984785b5c35eec63a0fb9ed139b65fc5149966fe538766671168df8a0",
@@ -28160,7 +28161,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "16cebc423db024acf10ba005b4716defcd6d6ff1f0f5e8a8f3957b9650ce06bd",
+   "sha256": "0c45225b8a4fa75b699a92b2171d1e4b69058cd45bb70ebdfc65363c56ca88f8",
    "symlink": false,
    "upstream_blob": "64e8c3a0df6f4f453ff975365dcd6362f20acf38",
    "upstream_blob_sha256": "204d050f48073df23cf3b41226f2f51457948995512d8acdee0a7f669821d794",
@@ -28446,7 +28447,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "8cff07e68ada50068f62148d41df2fe5640806914e06bb6767dc0e5400127e1d",
+   "sha256": "837cc05e28d0c7a92633224267691ded75f18e8593be101c72d895b6afb9fd57",
    "symlink": false,
    "upstream_blob": "e9148c99e0359d5c84ebfb4d9975dc86cd5186ed",
    "upstream_blob_sha256": "a6fe575ed16573cecc512f1c5fec8a53d5c8b92823744055c5e295afe3960600",
@@ -28459,7 +28460,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "af912b087819119e8f6d55245c8b16a4ebb7056b30a5148e934e12836e28e9c5",
+   "sha256": "81382334b9fec0c0f3793f145aeceafe6c75cfcda8cda0be81105700519678c8",
    "symlink": false,
    "upstream_blob": "7f9fa3d4104179317acd18498a4ac203d002bc23",
    "upstream_blob_sha256": "43d0c90ed67d36fd54bf61df9f1182539d0754db045b968c25d9e4a793350078",
@@ -29811,7 +29812,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "5db21f1438af7d138297721b7aa1b79ee29f3b66e62f224af7d015d0cb1cd403",
+   "sha256": "18950ff77471e50bde8625a0fe526429cba173e4eb89875928accdb772fe10d6",
    "symlink": false,
    "upstream_blob": "ef1587a959f4921a0296c6c63684d7967eeb9f4c",
    "upstream_blob_sha256": "a64d8a9c714dc2c38f0c13fc05f84ff119b86e4c04dc27db5b5f72b3b17d4ae1",
@@ -29941,7 +29942,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "3b658bda31b503ea5820ae5924afd4d23ac24ac6451a0a842c89c97b144d1f94",
+   "sha256": "49bb99373e9a76ac8c658edbf0f344282c43792795c227e707300b37749d72e0",
    "symlink": false,
    "upstream_blob": "42482347a0619fa902cd9db32195387646bafef8",
    "upstream_blob_sha256": "4916a514f8155c6af88e45fd8376ef0c7b732658c60bc0a5bd0a07e4b104a5a7",
@@ -31215,7 +31216,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "b7ff89e7e1b958b6d50a2be015c4d96f32290b7117850c2baceeb68f14914efa",
+   "sha256": "7db05e1466f645b28956a32aba01aa924fcba6fa1c01831dd85e699c718ddcf5",
    "symlink": false,
    "upstream_blob": "e0f3ef1a848bf9dd7b1d6f241853ff6a709af3d3",
    "upstream_blob_sha256": "42a499d1ac2b8f39b3b89081f4bc3890fefcd740b1b032045c2920581690d899",
@@ -33074,7 +33075,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "311f06e6247c3a19e62e2c1e4c891cb30ae758f8fdbd1f8e7a56749e1ae37416",
+   "sha256": "886a158556cc301de4cca00e24bec8be7d37d365be69c4294b108e5def689686",
    "symlink": false,
    "upstream_blob": "53716ba2cb6983e8d68a21f0ddb26da090bb6634",
    "upstream_blob_sha256": "4e36c74dfaaa2479eca51b78f1c2768da0404e7796bd27fc157685b8ee9e8520",
@@ -33295,7 +33296,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "e36aa491273a5ae1b495451132521c771c539087f9d15bb9b63c604ef9c1fce6",
+   "sha256": "d6f942193128e15b80cb76d2e5737c4073051feef5987817aa16901825c7f38f",
    "symlink": false,
    "upstream_blob": "3187d4cd011f459408af77f1c99ed265028cfd46",
    "upstream_blob_sha256": "1b5986c5cd0f6c21baa1ad9f2f2b49409ccb8ba31ab6a5712895d83f580ff7c6",
@@ -33360,7 +33361,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "ebfc446af3ae9f9eaec9bf0e1017c7fc476a8c8aa9d0a372013390c7daf5d4ec",
+   "sha256": "bcc2ef91b62eccf221cddcb81ddd810392c4d8e22bf4e71c2e4d8733c5c823e7",
    "symlink": false,
    "upstream_blob": "3221852be727ead344bf6c6815f3c81e75d00db2",
    "upstream_blob_sha256": "86c0c448c77eb037da618dcf3f7b3dce65478751b516f59c8d7ace781ec409f9",
@@ -33386,7 +33387,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "120d97554f733d8cbc9835d474ca144953c6f5a4da0bd02cff3b0d30a5260932",
+   "sha256": "e2e3148cb7723b62d47659713acb08991df98d3da4070c5004990a0bb43e328b",
    "symlink": false,
    "upstream_blob": "0e51f012c39619732dd138138a8dbebfef0721bf",
    "upstream_blob_sha256": "7494a3e840c587d4d947055c547990d8b22dd80b56e1fa7f6081f09b2848e229",
@@ -33464,7 +33465,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "aa23c961e9f19ddcdd2158c34de2180fd091135938d22a6a5bb6d2d3429e044c",
+   "sha256": "c479c4950a6740c197e8d68331093e99246d010f16f21595316c93d093546e0d",
    "symlink": false,
    "upstream_blob": "d72e2dca58ef4db1a829b37791e9b109b55dfa92",
    "upstream_blob_sha256": "089561ef266d6da555f811561422d2d0c836a8c8aa083c44437260a0aa56a08d",
@@ -33503,7 +33504,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "ccb77432020f338bb6f461e5f4c5aaa3041be3a6ad04b5aaf8749700c1a8a809",
+   "sha256": "6fcfbdac9345d37544d21d5bfa95bc55ecb613277e2b3b2fa162ef32f2a717ad",
    "symlink": false,
    "upstream_blob": "798229d1a1156d2fac255690be19689ff5f85d48",
    "upstream_blob_sha256": "1b6f3a4950b6852069753a615e559da02ee1e959d9fb7f138feabb5e2186c5fd",
@@ -33516,7 +33517,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "901efa9a457ea8032e38e96acd95045c845be22459403aa8878d8d53dc768026",
+   "sha256": "01301727c80405749bc9e26ccffbe930b6555e8e026994c73da1047f5212f6e9",
    "symlink": false,
    "upstream_blob": "5a8c53d41d6139f01720f833d4f95cbd13f15409",
    "upstream_blob_sha256": "8fca6d254f23ef1368334941db5dfbf1cd140201745636d26dc4b915c505505c",
@@ -33529,7 +33530,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "464480887ee77fc8deb6f3539752348bffce5cf67260449b2bf618d16ff2699e",
+   "sha256": "3657317dbf15eb80d864220c96e4a100df043b630c795cb3c312a4774ead70b7",
    "symlink": false,
    "upstream_blob": "5316dec4bbf0349661da142e3f1be81250f95c52",
    "upstream_blob_sha256": "152cb935d5d1cdaf49a22ba9dd6ebed17a91993e7cafb8fc67bd940d6e7e981a",
@@ -34426,7 +34427,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "4454a2886b2485abb11bc8e388d0cc472fcc055df4e934a74445d49c2ba51477",
+   "sha256": "14d2eef7bd26c7e4342e6e8b3a2b1977a18e8883c9f7ee97982aaca581f31182",
    "symlink": false,
    "upstream_blob": "4b4eb25e18dc37429705615f0538a051d4ba7563",
    "upstream_blob_sha256": "908e285788ba295fe02dc445c1acc29190fe1d33bec1a6020dd6313bf1379212",
@@ -35856,7 +35857,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "b537fe96c8cf28ac2c5854799d12647879f0d387da4b809bb3d01092b754e3a0",
+   "sha256": "57e4cb34e5a2963aa17510d352253d61bf2ceb5208f4e2a534a0266a042f0257",
    "symlink": false,
    "upstream_blob": "5ebcbfcb7deb4bce38deb8d42f203377244cd78b",
    "upstream_blob_sha256": "79986731cbc590ce121ca643b997139cf1e4dd7743341d48de58435e7b20a39c",
@@ -35864,12 +35865,12 @@
    "upstream_sha256": "79986731cbc590ce121ca643b997139cf1e4dd7743341d48de58435e7b20a39c"
   },
   "apps/desktop/src/lib/plugin-source-urls.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "16292041fa4d5b036dcec1c94c1c12bafb522488d25d1eeae2fdfffedb739224",
+   "patched": true,
+   "sha256": "ba0e0ed305a745a4513a5102ac0326bbd4f2d8dc6c9240e241aee2bb1a1b05a5",
    "symlink": false,
    "upstream_blob": "5a3d8986e6e27c7e0449847f3eeeb32c084e2360",
    "upstream_blob_sha256": "16292041fa4d5b036dcec1c94c1c12bafb522488d25d1eeae2fdfffedb739224",
@@ -36330,6 +36331,19 @@
    "upstream_blob_sha256": "0abe5b92bbaf5e51656578ffc986228a0c9ddb66c38ea74f1b513a6e691a008b",
    "upstream_mode": "100644",
    "upstream_sha256": "0abe5b92bbaf5e51656578ffc986228a0c9ddb66c38ea74f1b513a6e691a008b"
+  },
+  "apps/desktop/src/lib/qubit-links.ts": {
+   "classification": "QUBIT_ADDED",
+   "git_tracked": false,
+   "local_fs_mode": "100644",
+   "local_git_mode": null,
+   "patched": false,
+   "sha256": "eaa8ca18860f00ed7e4271fbf88941d0b147ec39d9cc481c9d681c4045a22093",
+   "symlink": false,
+   "upstream_blob": null,
+   "upstream_blob_sha256": null,
+   "upstream_mode": null,
+   "upstream_sha256": null
   },
   "apps/desktop/src/lib/query-client.test.ts": {
    "classification": "UNCHANGED",
@@ -37897,7 +37911,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "7e9265ced1134de50f2f9818707ab92848ba2876b98aab04efbcb66fead85f05",
+   "sha256": "eac68551933ff54592e76ee3aa972b836d49e8475e99980beae59d6f62d05777",
    "symlink": false,
    "upstream_blob": "674ded703d23acdeed697370c27d87879adcb260",
    "upstream_blob_sha256": "6e3f0b0bc2b9333745828413d20cb9ff31564affa8c07a153f53b5a6e6ebbf6c",
@@ -39691,7 +39705,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "58ff3ad923f664566926e0ae71664c1198f14372c687fff7a6952717b66b7277",
+   "sha256": "e6de2605e59394c33c434a84790c4ad0cbd2d9c3aabae1b42cc3ed0756dfdd17",
    "symlink": false,
    "upstream_blob": "088ae42cd26fc0f59f5aae5e4465d2ce8ceb9cdb",
    "upstream_blob_sha256": "67c430646655ce4b97aa6860438dfd79f6bb0641db7cf4e0377dd18e938b81b8",
@@ -39704,7 +39718,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "08f058261ae527c5ac3c77b83459c1c2f862db8fdd82cc6db0361c7bebcc08a4",
+   "sha256": "d0813915c9b43121c960a21d3c5bd9392c6d9ac777968f5b6a5461382f36278a",
    "symlink": false,
    "upstream_blob": "8039e3ebd6abf59b5e72fa823c4e568e5e5d3457",
    "upstream_blob_sha256": "8e8555b1648e13c54e73b0d8a6525820a945abda793c5312abca8428fa641504",
@@ -40055,7 +40069,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "a6629eb8d6fd52dae1f00388c0e5debe35211ada6e71ee4c6cf61d05be67b43b",
+   "sha256": "94c0309d82dd135f49cb6419b1f67408cf1505c0ec9a96b365607dc978a63b40",
    "symlink": false,
    "upstream_blob": "383f3b1db5e1bf3bae81eee5a441c904c2e70cee",
    "upstream_blob_sha256": "b99c1a28ad7f8f0a729f85843ded557c229b5fbb1f5d52f3fe9fb7f69a97ab8f",
@@ -43560,12 +43574,12 @@
    "upstream_sha256": "6a0c34bb2ed7ba4cdbabab08e7d681b78e1b3d7877b37ceb85a32eeab853c624"
   },
   "apps/desktop/src/store/suggestion-providers/github.test.ts": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "f9dcf3e05a2d8b68a8ba5f139c8da481d068fda46aee2a96de9a17deceef81a1",
+   "patched": true,
+   "sha256": "db5ac50a2bdd048d3d0bfadfb154b9b1ba6cb3e5f9bb4dc59a81dea864055846",
    "symlink": false,
    "upstream_blob": "654db5d1390323fc96e0d26b0b2099e1cc3c4213",
    "upstream_blob_sha256": "f9dcf3e05a2d8b68a8ba5f139c8da481d068fda46aee2a96de9a17deceef81a1",
@@ -44046,7 +44060,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "82b5db96ccb1add613790f32e7c475cc6772fe0c080d49cdd2ba01eb50a81d0c",
+   "sha256": "2ddf04f9cbfd057e0b25313a45c9c8668c8a43d31679c395e6f99aae9b2e1d85",
    "symlink": false,
    "upstream_blob": "92d172367763df644e5dc1f8b7f7e65651b77b7c",
    "upstream_blob_sha256": "a151b4bde5f016c996bdafe62c795f155427397e02b6f7952fe528074b5013ef",
@@ -44059,7 +44073,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "17ad359c70a00659013847d0d8d7f86e92e737958d0e12940595a011a6a17913",
+   "sha256": "2075d873033f7035a904cc13af179597521f8c5c5cb3465ec1936117b4b17927",
    "symlink": false,
    "upstream_blob": "06fedccfe7d7e51d6af43524a1ced5b5dc2ca592",
    "upstream_blob_sha256": "18952a06a08ecf63a0c858f2e62c4248ca55969b32b55bcb40ad4bc840c819ef",
@@ -44696,7 +44710,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "02be158c4e55c40d3fdbbddedd30fad1fc7cbd3c700c0f5da14419903163942b",
+   "sha256": "8dad64069e33da5a35c709875c8a40bc8127876d4bbbf72aa2ef9d28d27c6f26",
    "symlink": false,
    "upstream_blob": "cf58230dc431ebb6a1f724a6f1dff07c5af76561",
    "upstream_blob_sha256": "55a62bbc87baae7fc1793600e79ce2ed1dc6c21bc4c9e6b6e5747acece037c86",
@@ -86459,123 +86473,6 @@
    "upstream_mode": "100644",
    "upstream_sha256": "e687b56557582b0cc68027268312448f1aa612ef919862f4297e8112de12ba43"
   },
-  "plugins/hermes-achievements/LICENSE": {
-   "classification": "UNCHANGED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "5c6bbd852eeff017e73830408977d26e4379c5f9bb6edb03fce171f81db5fe43",
-   "symlink": false,
-   "upstream_blob": "2312b9235214767563d8618156d68ca78e23b766",
-   "upstream_blob_sha256": "5c6bbd852eeff017e73830408977d26e4379c5f9bb6edb03fce171f81db5fe43",
-   "upstream_mode": "100644",
-   "upstream_sha256": "5c6bbd852eeff017e73830408977d26e4379c5f9bb6edb03fce171f81db5fe43"
-  },
-  "plugins/hermes-achievements/README.md": {
-   "classification": "QUBIT_PATCHED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": true,
-   "sha256": "43fdac4e022792843fa65488caf23f581d07062d405582acd2913c33422f6ffe",
-   "symlink": false,
-   "upstream_blob": "2c1ed638281bf3992d3565364e275ccd24caf72e",
-   "upstream_blob_sha256": "1a42b081800f145b1a4fe7004c78b5060b2174ae2e6d0bc6afae8a1e26501b0c",
-   "upstream_mode": "100644",
-   "upstream_sha256": "1a42b081800f145b1a4fe7004c78b5060b2174ae2e6d0bc6afae8a1e26501b0c"
-  },
-  "plugins/hermes-achievements/dashboard/dist/index.js": {
-   "classification": "QUBIT_PATCHED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": true,
-   "sha256": "1e04c17dfed2476185e132720c3a48769329f5b2a70b99b4a917b3e02da88c8e",
-   "symlink": false,
-   "upstream_blob": "5be8a3f1dd1d9ebb66d7ae1f36472c531bf68a49",
-   "upstream_blob_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010",
-   "upstream_mode": "100644",
-   "upstream_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010"
-  },
-  "plugins/hermes-achievements/dashboard/dist/style.css": {
-   "classification": "UNCHANGED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
-   "symlink": false,
-   "upstream_blob": "4353a1cb2f9e70cb604d4fbdfebfd138398cf0e9",
-   "upstream_blob_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
-   "upstream_mode": "100644",
-   "upstream_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b"
-  },
-  "plugins/hermes-achievements/dashboard/manifest.json": {
-   "classification": "QUBIT_PATCHED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": true,
-   "sha256": "fdfdb1d28ce8d4dd3109d34220c9f787dc5bc688e2a67161d31418fac9f126eb",
-   "symlink": false,
-   "upstream_blob": "5fcc39313bbf04586efa7e033ab0be900a49007b",
-   "upstream_blob_sha256": "9043f31295a45493a20ff7f4ef60616d7df2636d02057993497fb72d1b2ce789",
-   "upstream_mode": "100644",
-   "upstream_sha256": "9043f31295a45493a20ff7f4ef60616d7df2636d02057993497fb72d1b2ce789"
-  },
-  "plugins/hermes-achievements/dashboard/plugin_api.py": {
-   "classification": "QUBIT_PATCHED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": true,
-   "sha256": "6e317fd5afeda88ff96c816890c2148c18332bc1e1ca8489ebfadc91e3d2b3f1",
-   "symlink": false,
-   "upstream_blob": "92e0d7decdd7ffba07a41a1e6e35e040c24cd99e",
-   "upstream_blob_sha256": "eab67f053976398093a66be7d6fc2f88d1f75f48d212b546f4b551d0b7f98e7d",
-   "upstream_mode": "100644",
-   "upstream_sha256": "eab67f053976398093a66be7d6fc2f88d1f75f48d212b546f4b551d0b7f98e7d"
-  },
-  "plugins/hermes-achievements/docs/assets/achievements-dashboard-hd.png": {
-   "classification": "UNCHANGED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "e90792f68eaab77cc379b242aac07012728718dbfb1a5769a578772a173244d7",
-   "symlink": false,
-   "upstream_blob": "2342f548e31e80c72daac54fee5966fc18a21e6d",
-   "upstream_blob_sha256": "e90792f68eaab77cc379b242aac07012728718dbfb1a5769a578772a173244d7",
-   "upstream_mode": "100644",
-   "upstream_sha256": "e90792f68eaab77cc379b242aac07012728718dbfb1a5769a578772a173244d7"
-  },
-  "plugins/hermes-achievements/docs/assets/achievements-tier-showcase-hd.png": {
-   "classification": "UNCHANGED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "0d54eb06565f9fa5b971bb354a8793ac56d814029a38376363e25db51bbbefca",
-   "symlink": false,
-   "upstream_blob": "64dfc85c602934807b05435af885e73ffca8ddf6",
-   "upstream_blob_sha256": "0d54eb06565f9fa5b971bb354a8793ac56d814029a38376363e25db51bbbefca",
-   "upstream_mode": "100644",
-   "upstream_sha256": "0d54eb06565f9fa5b971bb354a8793ac56d814029a38376363e25db51bbbefca"
-  },
-  "plugins/hermes-achievements/tests/test_achievement_engine.py": {
-   "classification": "QUBIT_PATCHED",
-   "git_tracked": true,
-   "local_fs_mode": "100644",
-   "local_git_mode": "100644",
-   "patched": true,
-   "sha256": "e5a9b0489689fc864891759a9f7b03e31a60c04878a2002436f0c20f5d240947",
-   "symlink": false,
-   "upstream_blob": "fa20eda0c106a6e5a99b7ab54611f160b660870d",
-   "upstream_blob_sha256": "3137ec19b1d653d6875ccd93049c619e121b113d28994fb0d6ba591e5aa6ea13",
-   "upstream_mode": "100644",
-   "upstream_sha256": "3137ec19b1d653d6875ccd93049c619e121b113d28994fb0d6ba591e5aa6ea13"
-  },
   "plugins/image_gen/_common.py": {
    "classification": "QUBIT_PATCHED",
    "git_tracked": true,
@@ -90072,6 +89969,123 @@
    "upstream_blob_sha256": "e8a7595f6e9eb696670a91019f81213551ed66096c119035d1788c44a1fc9456",
    "upstream_mode": "100644",
    "upstream_sha256": "e8a7595f6e9eb696670a91019f81213551ed66096c119035d1788c44a1fc9456"
+  },
+  "plugins/qubit-achievements/LICENSE": {
+   "classification": "UNCHANGED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": false,
+   "sha256": "5c6bbd852eeff017e73830408977d26e4379c5f9bb6edb03fce171f81db5fe43",
+   "symlink": false,
+   "upstream_blob": "2312b9235214767563d8618156d68ca78e23b766",
+   "upstream_blob_sha256": "5c6bbd852eeff017e73830408977d26e4379c5f9bb6edb03fce171f81db5fe43",
+   "upstream_mode": "100644",
+   "upstream_sha256": "5c6bbd852eeff017e73830408977d26e4379c5f9bb6edb03fce171f81db5fe43"
+  },
+  "plugins/qubit-achievements/README.md": {
+   "classification": "QUBIT_PATCHED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": true,
+   "sha256": "43fdac4e022792843fa65488caf23f581d07062d405582acd2913c33422f6ffe",
+   "symlink": false,
+   "upstream_blob": "2c1ed638281bf3992d3565364e275ccd24caf72e",
+   "upstream_blob_sha256": "1a42b081800f145b1a4fe7004c78b5060b2174ae2e6d0bc6afae8a1e26501b0c",
+   "upstream_mode": "100644",
+   "upstream_sha256": "1a42b081800f145b1a4fe7004c78b5060b2174ae2e6d0bc6afae8a1e26501b0c"
+  },
+  "plugins/qubit-achievements/dashboard/dist/index.js": {
+   "classification": "QUBIT_PATCHED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": true,
+   "sha256": "01b84deadcb4f92d9ebf05c7e18ff8eb6458cc845c77c9d8049aaa41f83d203f",
+   "symlink": false,
+   "upstream_blob": "5be8a3f1dd1d9ebb66d7ae1f36472c531bf68a49",
+   "upstream_blob_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010",
+   "upstream_mode": "100644",
+   "upstream_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010"
+  },
+  "plugins/qubit-achievements/dashboard/dist/style.css": {
+   "classification": "QUBIT_PATCHED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": true,
+   "sha256": "e51d11a79387fed158331d45a476820638bb2be75271f4bddac166d50f002fba",
+   "symlink": false,
+   "upstream_blob": "4353a1cb2f9e70cb604d4fbdfebfd138398cf0e9",
+   "upstream_blob_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
+   "upstream_mode": "100644",
+   "upstream_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b"
+  },
+  "plugins/qubit-achievements/dashboard/manifest.json": {
+   "classification": "QUBIT_PATCHED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": true,
+   "sha256": "b81bf143be156a66c018c3efdf3fdc503c6533c8bd0268c8849f435d84a78115",
+   "symlink": false,
+   "upstream_blob": "5fcc39313bbf04586efa7e033ab0be900a49007b",
+   "upstream_blob_sha256": "9043f31295a45493a20ff7f4ef60616d7df2636d02057993497fb72d1b2ce789",
+   "upstream_mode": "100644",
+   "upstream_sha256": "9043f31295a45493a20ff7f4ef60616d7df2636d02057993497fb72d1b2ce789"
+  },
+  "plugins/qubit-achievements/dashboard/plugin_api.py": {
+   "classification": "QUBIT_PATCHED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": true,
+   "sha256": "936ac36636141ae00f077f089711ad34269dbf561e197cb0107d906b30740cd1",
+   "symlink": false,
+   "upstream_blob": "92e0d7decdd7ffba07a41a1e6e35e040c24cd99e",
+   "upstream_blob_sha256": "eab67f053976398093a66be7d6fc2f88d1f75f48d212b546f4b551d0b7f98e7d",
+   "upstream_mode": "100644",
+   "upstream_sha256": "eab67f053976398093a66be7d6fc2f88d1f75f48d212b546f4b551d0b7f98e7d"
+  },
+  "plugins/qubit-achievements/docs/assets/achievements-dashboard-hd.png": {
+   "classification": "UNCHANGED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": false,
+   "sha256": "e90792f68eaab77cc379b242aac07012728718dbfb1a5769a578772a173244d7",
+   "symlink": false,
+   "upstream_blob": "2342f548e31e80c72daac54fee5966fc18a21e6d",
+   "upstream_blob_sha256": "e90792f68eaab77cc379b242aac07012728718dbfb1a5769a578772a173244d7",
+   "upstream_mode": "100644",
+   "upstream_sha256": "e90792f68eaab77cc379b242aac07012728718dbfb1a5769a578772a173244d7"
+  },
+  "plugins/qubit-achievements/docs/assets/achievements-tier-showcase-hd.png": {
+   "classification": "UNCHANGED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": false,
+   "sha256": "0d54eb06565f9fa5b971bb354a8793ac56d814029a38376363e25db51bbbefca",
+   "symlink": false,
+   "upstream_blob": "64dfc85c602934807b05435af885e73ffca8ddf6",
+   "upstream_blob_sha256": "0d54eb06565f9fa5b971bb354a8793ac56d814029a38376363e25db51bbbefca",
+   "upstream_mode": "100644",
+   "upstream_sha256": "0d54eb06565f9fa5b971bb354a8793ac56d814029a38376363e25db51bbbefca"
+  },
+  "plugins/qubit-achievements/tests/test_achievement_engine.py": {
+   "classification": "QUBIT_PATCHED",
+   "git_tracked": true,
+   "local_fs_mode": "100644",
+   "local_git_mode": "100644",
+   "patched": true,
+   "sha256": "e5a9b0489689fc864891759a9f7b03e31a60c04878a2002436f0c20f5d240947",
+   "symlink": false,
+   "upstream_blob": "fa20eda0c106a6e5a99b7ab54611f160b660870d",
+   "upstream_blob_sha256": "3137ec19b1d653d6875ccd93049c619e121b113d28994fb0d6ba591e5aa6ea13",
+   "upstream_mode": "100644",
+   "upstream_sha256": "3137ec19b1d653d6875ccd93049c619e121b113d28994fb0d6ba591e5aa6ea13"
   },
   "plugins/security-guidance/LICENSE": {
    "classification": "UNCHANGED",
@@ -94889,7 +94903,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "d8934ec5b7fe4efc34391ae05ef57f886e142842634a28157133ba6c3c39de9d",
+   "sha256": "cad40c2ef374291374dbd32625f47824688bfca2cae15d72fc84b7ca47f9b90a",
    "symlink": false,
    "upstream_blob": "92b36904b3c395a027663dd75285a914cfb52e7a",
    "upstream_blob_sha256": "30554b9054c9bf3b97f9cd706aa2abb17d8c3edc8bc22dbe5940d6299b170170",
@@ -130925,7 +130939,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "794b047b80c28d907c1a3a870b4f7b7a1fe8a1675912dfbdb09be00b7d575b46",
+   "sha256": "7ac66dd965d0ccd23590fb9ffa4da26038c82867fa5b974ec745db2f9541d9e2",
    "symlink": false,
    "upstream_blob": "df2a3101ba4197bebcbc6783a7587a2ee58c6939",
    "upstream_blob_sha256": "87c536f9e437a95cd074c23304a865f64a0184acf9137fe0153b91ae913e3849",
@@ -131250,7 +131264,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "f8cb69fb5b4a4d3f82a0a9526883b61996e2f74a80cd03c0ebacd91a9424d1a2",
+   "sha256": "6ddbd42910542dfbf6bb7f9d1357f72a4403d4839d70e93dabc830ff3f778579",
    "symlink": false,
    "upstream_blob": "1d8ad035ae6ad5890b7414dde1fcbde950a71228",
    "upstream_blob_sha256": "d2d9ed5cbbc7e935f2b9615eb294d3cef98d12170f89a6a0d854cd17a6acb9d6",
@@ -143288,7 +143302,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "e818eed8d99d78fd3014d9254386b3e28362aabd903691a1f291482c705c65d9",
+   "sha256": "f98c46eb25700c741650849fb152b63a3ed2a4918b2b4b6910677911481b2d1b",
    "symlink": false,
    "upstream_blob": "0256d3da65967d705df81e6da795ae8ce476ad34",
    "upstream_blob_sha256": "2abc5b4955403af61c497ed2ad79cb11d79b25f4647161e4b66d7f86660a5186",
@@ -188615,7 +188629,7 @@
   }
  },
  "git_index_gaps": [],
- "identical": 6103,
+ "identical": 6084,
  "intentionally_omitted": [
   "optional-skills/devops/hermes-s6-container-supervision/SKILL.md",
   "optional-skills/migration/openclaw-migration/SKILL.md",
@@ -189741,10 +189755,10 @@
   "ui-tui/src/__tests__/userMessages.test.ts"
  ],
  "local_fs_mode_counts": {
-  "100644": 14368,
+  "100644": 14369,
   "100755": 71
  },
- "local_git_file_count": 14453,
+ "local_git_file_count": 14447,
  "local_git_mode_counts": {
   "100644": 14367,
   "100755": 71
@@ -192002,6 +192016,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/electron/desktop-plugin-install.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/electron/desktop-plugin-install.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -192143,6 +192162,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/electron/git-worktree-ops.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/electron/github-api-auth.test.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -192652,7 +192676,17 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/electron/update-api-check.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/electron/update-api-check.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/electron/update-api-proxy.test.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -192673,6 +192707,16 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/electron/update-marker.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/electron/update-remote.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/electron/update-remote.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -192872,6 +192916,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/scripts/local-pack-publish.test.mjs": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/scripts/perf/README.md": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -193062,12 +193111,22 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/src/app/capabilities/plugins/plugins-tab.test.tsx": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/src/app/capabilities/plugins/plugins-tab.tsx": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/src/app/capabilities/scope-selector.tsx": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/app/capabilities/skills/embedded-hub-picker.tsx": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -193118,6 +193177,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/src/app/chat/composer/directive-label.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/app/chat/composer/directive-scope.test.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -194662,6 +194726,16 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/src/app/settings/billing/dev-fixtures.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/app/settings/billing/errors.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/src/app/settings/billing/errors.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -194682,6 +194756,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/src/app/settings/billing/types.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/src/app/settings/billing/types.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -194693,6 +194772,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/src/app/settings/billing/use-billing-state.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/app/settings/billing/use-charge-poller.test.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -195192,6 +195276,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "apps/desktop/src/components/assistant-ui/embeds/providers/detect.test.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "apps/desktop/src/components/assistant-ui/markdown-text.media.test.tsx": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -195383,6 +195472,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/src/components/assistant-ui/thread/user-message-edit.test.tsx": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/components/assistant-ui/thread/user-message-text.test.tsx": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -196488,6 +196582,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/src/lib/plugin-catalog.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/lib/plugin-source-urls.test.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -197998,6 +198097,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "apps/desktop/src/store/subagents.ts": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "apps/desktop/src/store/suggestion-providers/github.test.ts": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -202382,31 +202486,6 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
-  "plugins/hermes-achievements/README.md": {
-   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
-   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
-   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
-  },
-  "plugins/hermes-achievements/dashboard/dist/index.js": {
-   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
-   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
-   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
-  },
-  "plugins/hermes-achievements/dashboard/manifest.json": {
-   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
-   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
-   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
-  },
-  "plugins/hermes-achievements/dashboard/plugin_api.py": {
-   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
-   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
-   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
-  },
-  "plugins/hermes-achievements/tests/test_achievement_engine.py": {
-   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
-   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
-   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
-  },
   "plugins/image_gen/_common.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -203378,6 +203457,36 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "plugins/plugin_storage.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/qubit-achievements/README.md": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/qubit-achievements/dashboard/dist/index.js": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/qubit-achievements/dashboard/dist/style.css": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/qubit-achievements/dashboard/manifest.json": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/qubit-achievements/dashboard/plugin_api.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/qubit-achievements/tests/test_achievement_engine.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -227816,6 +227925,7 @@
   "apps/desktop/electron/dashboard-token.ts",
   "apps/desktop/electron/desktop-log-line.test.ts",
   "apps/desktop/electron/desktop-log-line.ts",
+  "apps/desktop/electron/desktop-plugin-install.test.ts",
   "apps/desktop/electron/desktop-plugin-install.ts",
   "apps/desktop/electron/desktop-plugin-remove.ts",
   "apps/desktop/electron/desktop-plugins-root.ts",
@@ -227845,6 +227955,7 @@
   "apps/desktop/electron/git-review-ops.ts",
   "apps/desktop/electron/git-worktree-ops.test.ts",
   "apps/desktop/electron/git-worktree-ops.ts",
+  "apps/desktop/electron/github-api-auth.test.ts",
   "apps/desktop/electron/github-api-auth.ts",
   "apps/desktop/electron/gitlock.ts",
   "apps/desktop/electron/guest-onboarding-flag.test.ts",
@@ -227946,11 +228057,15 @@
   "apps/desktop/electron/titlebar-overlay-width.test.ts",
   "apps/desktop/electron/titlebar-overlay-width.ts",
   "apps/desktop/electron/translucency.test.ts",
+  "apps/desktop/electron/update-api-check.test.ts",
   "apps/desktop/electron/update-api-check.ts",
+  "apps/desktop/electron/update-api-proxy.test.ts",
   "apps/desktop/electron/update-gate.test.ts",
   "apps/desktop/electron/update-gate.ts",
   "apps/desktop/electron/update-handoff-marker.test.ts",
   "apps/desktop/electron/update-marker.ts",
+  "apps/desktop/electron/update-remote.test.ts",
+  "apps/desktop/electron/update-remote.ts",
   "apps/desktop/electron/updater-process.test.ts",
   "apps/desktop/electron/updater-process.ts",
   "apps/desktop/electron/venv-blocker-scan.test.ts",
@@ -227990,6 +228105,7 @@
   "apps/desktop/scripts/dev-no-hmr.mjs",
   "apps/desktop/scripts/eval.mjs",
   "apps/desktop/scripts/fixtures/tasks-scroll.md",
+  "apps/desktop/scripts/local-pack-publish.test.mjs",
   "apps/desktop/scripts/perf/README.md",
   "apps/desktop/scripts/perf/gateway_attach_bench.py",
   "apps/desktop/scripts/perf/lib/launch.mjs",
@@ -228028,8 +228144,10 @@
   "apps/desktop/src/app/artifacts/index.tsx",
   "apps/desktop/src/app/capabilities/index.test.tsx",
   "apps/desktop/src/app/capabilities/mcp/mcp-tab.tsx",
+  "apps/desktop/src/app/capabilities/plugins/plugins-tab.test.tsx",
   "apps/desktop/src/app/capabilities/plugins/plugins-tab.tsx",
   "apps/desktop/src/app/capabilities/scope-selector.tsx",
+  "apps/desktop/src/app/capabilities/skills/embedded-hub-picker.tsx",
   "apps/desktop/src/app/chat/chat-swap-overlay.tsx",
   "apps/desktop/src/app/chat/composer/attachments.tsx",
   "apps/desktop/src/app/chat/composer/composer-utils.test.ts",
@@ -228040,6 +228158,7 @@
   "apps/desktop/src/app/chat/composer/directive-actions.test.tsx",
   "apps/desktop/src/app/chat/composer/directive-actions.tsx",
   "apps/desktop/src/app/chat/composer/directive-label.test.ts",
+  "apps/desktop/src/app/chat/composer/directive-scope.test.ts",
   "apps/desktop/src/app/chat/composer/focus.ts",
   "apps/desktop/src/app/chat/composer/hooks/use-at-completions.ts",
   "apps/desktop/src/app/chat/composer/hooks/use-auto-speak-replies.owner.test.tsx",
@@ -228348,13 +228467,17 @@
   "apps/desktop/src/app/settings/appearance-settings.tsx",
   "apps/desktop/src/app/settings/billing/api.test.ts",
   "apps/desktop/src/app/settings/billing/current-plan-card.tsx",
+  "apps/desktop/src/app/settings/billing/dev-fixtures.ts",
+  "apps/desktop/src/app/settings/billing/errors.test.ts",
   "apps/desktop/src/app/settings/billing/errors.ts",
   "apps/desktop/src/app/settings/billing/index.test.tsx",
   "apps/desktop/src/app/settings/billing/index.tsx",
   "apps/desktop/src/app/settings/billing/tier-art.tsx",
+  "apps/desktop/src/app/settings/billing/types.test.ts",
   "apps/desktop/src/app/settings/billing/types.ts",
   "apps/desktop/src/app/settings/billing/use-billing-state.test.ts",
   "apps/desktop/src/app/settings/billing/use-billing-state.ts",
+  "apps/desktop/src/app/settings/billing/use-charge-poller.test.ts",
   "apps/desktop/src/app/settings/billing/use-step-up.test.tsx",
   "apps/desktop/src/app/settings/billing/use-step-up.ts",
   "apps/desktop/src/app/settings/browser-real-profile-panel.test.tsx",
@@ -228454,6 +228577,7 @@
   "apps/desktop/src/components/assistant-ui/directive-chip-links.test.tsx",
   "apps/desktop/src/components/assistant-ui/directive-text.test.ts",
   "apps/desktop/src/components/assistant-ui/directive-text.tsx",
+  "apps/desktop/src/components/assistant-ui/embeds/providers/detect.test.ts",
   "apps/desktop/src/components/assistant-ui/markdown-text.media.test.tsx",
   "apps/desktop/src/components/assistant-ui/markdown-text.test.ts",
   "apps/desktop/src/components/assistant-ui/markdown-text.tsx",
@@ -228493,6 +228617,7 @@
   "apps/desktop/src/components/assistant-ui/thread/use-timeline-history.test.tsx",
   "apps/desktop/src/components/assistant-ui/thread/user-edit-composer.tsx",
   "apps/desktop/src/components/assistant-ui/thread/user-message-edit.test.tsx",
+  "apps/desktop/src/components/assistant-ui/thread/user-message-text.test.tsx",
   "apps/desktop/src/components/assistant-ui/thread/user-message.tsx",
   "apps/desktop/src/components/assistant-ui/tool/approval.test.tsx",
   "apps/desktop/src/components/assistant-ui/tool/approval.tsx",
@@ -228714,6 +228839,7 @@
   "apps/desktop/src/lib/oneshot.ts",
   "apps/desktop/src/lib/personalities.ts",
   "apps/desktop/src/lib/plugin-catalog.ts",
+  "apps/desktop/src/lib/plugin-source-urls.test.ts",
   "apps/desktop/src/lib/preview-act/watch-in-page.test.ts",
   "apps/desktop/src/lib/preview-act/watch-in-page.ts",
   "apps/desktop/src/lib/preview-reach.test.ts",
@@ -229016,6 +229142,7 @@
   "apps/desktop/src/store/sidebar-collapse-persistence.test.ts",
   "apps/desktop/src/store/subagents.test.ts",
   "apps/desktop/src/store/subagents.ts",
+  "apps/desktop/src/store/suggestion-providers/github.test.ts",
   "apps/desktop/src/store/suggestion-providers/mcp.test.ts",
   "apps/desktop/src/store/suggestion-providers/mcp.ts",
   "apps/desktop/src/store/system-actions.ts",
@@ -229892,11 +230019,6 @@
   "plugins/google_meet/node/server.py",
   "plugins/google_meet/process_manager.py",
   "plugins/google_meet/tools.py",
-  "plugins/hermes-achievements/README.md",
-  "plugins/hermes-achievements/dashboard/dist/index.js",
-  "plugins/hermes-achievements/dashboard/manifest.json",
-  "plugins/hermes-achievements/dashboard/plugin_api.py",
-  "plugins/hermes-achievements/tests/test_achievement_engine.py",
   "plugins/image_gen/_common.py",
   "plugins/image_gen/deepinfra/__init__.py",
   "plugins/image_gen/fal/__init__.py",
@@ -230092,6 +230214,12 @@
   "plugins/platforms/whatsapp/plugin.yaml",
   "plugins/plugin_loader.py",
   "plugins/plugin_storage.py",
+  "plugins/qubit-achievements/README.md",
+  "plugins/qubit-achievements/dashboard/dist/index.js",
+  "plugins/qubit-achievements/dashboard/dist/style.css",
+  "plugins/qubit-achievements/dashboard/manifest.json",
+  "plugins/qubit-achievements/dashboard/plugin_api.py",
+  "plugins/qubit-achievements/tests/test_achievement_engine.py",
   "plugins/security-guidance/README.md",
   "plugins/security-guidance/patterns.py",
   "plugins/security-guidance/plugin.yaml",
@@ -237219,6 +237347,42 @@
    "to": "nix/qubit-runtime.nix"
   },
   {
+   "from": "plugins/hermes-achievements/LICENSE",
+   "to": "plugins/qubit-achievements/LICENSE"
+  },
+  {
+   "from": "plugins/hermes-achievements/README.md",
+   "to": "plugins/qubit-achievements/README.md"
+  },
+  {
+   "from": "plugins/hermes-achievements/dashboard/dist/index.js",
+   "to": "plugins/qubit-achievements/dashboard/dist/index.js"
+  },
+  {
+   "from": "plugins/hermes-achievements/dashboard/dist/style.css",
+   "to": "plugins/qubit-achievements/dashboard/dist/style.css"
+  },
+  {
+   "from": "plugins/hermes-achievements/dashboard/manifest.json",
+   "to": "plugins/qubit-achievements/dashboard/manifest.json"
+  },
+  {
+   "from": "plugins/hermes-achievements/dashboard/plugin_api.py",
+   "to": "plugins/qubit-achievements/dashboard/plugin_api.py"
+  },
+  {
+   "from": "plugins/hermes-achievements/docs/assets/achievements-dashboard-hd.png",
+   "to": "plugins/qubit-achievements/docs/assets/achievements-dashboard-hd.png"
+  },
+  {
+   "from": "plugins/hermes-achievements/docs/assets/achievements-tier-showcase-hd.png",
+   "to": "plugins/qubit-achievements/docs/assets/achievements-tier-showcase-hd.png"
+  },
+  {
+   "from": "plugins/hermes-achievements/tests/test_achievement_engine.py",
+   "to": "plugins/qubit-achievements/tests/test_achievement_engine.py"
+  },
+  {
    "from": "setup-hermes.sh",
    "to": "setup-qubit.sh"
   },
@@ -242155,7 +242319,7 @@
    "to": "web/src/components/QubitConsoleModal.tsx"
   }
  ],
- "renamed_count": 1815,
+ "renamed_count": 1824,
  "symlink_count_local": 0,
  "symlink_count_upstream": 0,
  "symlink_divergences": [],

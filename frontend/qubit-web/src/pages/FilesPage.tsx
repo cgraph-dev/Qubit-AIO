@@ -301,8 +301,18 @@ export default function FilesPage() {
 
   const downloadFile = async (entry: ManagedFileEntry) => {
     if (entry.is_directory) return;
+    // The listing carries only `name` for the active folder's entries — the
+    // backend's managed-files adapter maps the helper's `rel` field onto
+    // `path`, so a top-level file arrives with an empty `path`. Sending that
+    // verbatim produced `path=` and a 400 FILES_BAD_INPUT, leaving every
+    // root-level Download unusable. Resolve the real target from the listing
+    // directory + name (the read route accepts an absolute path inside the
+    // approved root).
+    const base = listing?.path ?? currentPath ?? "";
+    const target =
+      entry.path?.trim() || (base ? joinPath(base, entry.name) : entry.name);
     try {
-      const file = await api.readFile(entry.path);
+      const file = await api.readFile(target);
       downloadDataUrl(file.data_url, file.name);
     } catch (e) {
       showToast(`Download failed: ${e}`, "error");

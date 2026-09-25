@@ -1400,18 +1400,29 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
 # ---------------------------------------------------------------------------
 
 def _load_ledger(repo: Path, name: str, rev: str | None = None) -> dict:
-    """Load a ledger section from a git revision (default: working tree)."""
+    """Load a ledger section from a git revision (default: working tree).
+
+    Owner Decision #24: an explicit ``rev`` reads the historical ledger from
+    git (lineage); the working-tree case reads the *canonical generated*
+    ledger under ``docs/generated/`` first, with the frozen
+    ``docs/archive/2026-09-21/`` copy as a read-only fallback for a legacy
+    checkout. The archive is never written.
+    """
     if rev:
         try:
-            raw = _git(repo, "show", f"{rev}:docs/archive/2026-09-21/QUBIT_GAP_LEDGER.{name}.json")
+            raw = _git(repo, "show",
+                       f"{rev}:docs/archive/2026-09-21/QUBIT_GAP_LEDGER.{name}.json")
             return json.loads(raw)
         except (subprocess.CalledProcessError, ValueError):
             return {"rows": []}
-    path = repo / "docs" / "archive" / "2026-09-21" / f"QUBIT_GAP_LEDGER.{name}.json"
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"rows": []}
+    for path in (repo / "docs" / "generated" / f"QUBIT_GAP_LEDGER.{name}.json",
+                 repo / "docs" / "archive" / "2026-09-21"
+                 / f"QUBIT_GAP_LEDGER.{name}.json"):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+    return {"rows": []}
 
 
 def _test_ref_reproducible(repo: Path, proving: str) -> tuple[bool, str]:
@@ -1496,6 +1507,13 @@ def _match_hermes_item(item: dict, all_ids: set, find_by_name):
         rid = f"dashboard:{item['route']}"
         if rid in all_ids:
             return rid
+    elif cat == "hermes_dashboard_component":
+        # Parented dashboard surface: coverage comes from its parent row
+        # (``webui_status``), never from a same-name capability. A generic
+        # component name is collision-prone -- e.g. the ``Markdown`` component
+        # matching OC-48 purely because that row's capability text begins with
+        # "Markdown workspace memory" -- so components are not name-matched.
+        return None
     name = item["name"].split(":")[-1]
     if cat == "hermes_plugin_asset":
         return None  # generic filenames (index.js/style.css) cause noise

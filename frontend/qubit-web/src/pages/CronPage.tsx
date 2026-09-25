@@ -51,6 +51,7 @@ import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
 import { Segmented } from "@nous-research/ui/ui/components/segmented";
 import { AutomationBlueprints } from "@/components/AutomationBlueprints";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { cn, themedBody } from "@/lib/utils";
 
 /** Human-readable error for a failed confirm-gated schedule write. */
@@ -891,6 +892,7 @@ export default function CronPage() {
     : null;
 
   return (
+    <PageErrorBoundary label="Cron">
     <div className="flex flex-col gap-6">
       <PluginSlot name="cron:top" />
       <Toast toast={toast} />
@@ -1265,5 +1267,6 @@ export default function CronPage() {
 
       <PluginSlot name="cron:bottom" />
     </div>
+    </PageErrorBoundary>
   );
 }

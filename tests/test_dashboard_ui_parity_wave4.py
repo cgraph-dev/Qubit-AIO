@@ -195,10 +195,10 @@ def test_brand_notice_has_no_self_referential_dead_link():
 # Pinned Achievements + Kanban tabs: real backend, Qubit-branded, localized
 # ---------------------------------------------------------------------------
 def test_achievements_tab_is_qubit_branded_and_calls_real_backend():
-    bundle = PUBLIC_PLUGINS / "hermes-achievements" / "dist" / "index.js"
+    bundle = PUBLIC_PLUGINS / "qubit-achievements" / "dist" / "index.js"
     text = bundle.read_text(encoding="utf-8")
-    assert 'register("hermes-achievements"' in text
-    assert "/api/plugins/hermes-achievements" in text
+    assert 'register("qubit-achievements"' in text
+    assert "/api/plugins/qubit-achievements" in text
     assert "Qubit Achievements" in text
     assert "tx(" in text, "achievements must resolve host translations"
     clean = text.replace("X-Hermes-Session-Token", "")

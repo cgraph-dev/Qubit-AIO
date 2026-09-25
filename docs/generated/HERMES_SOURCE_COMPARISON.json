@@ -55,7 +55,7 @@
    },
    {
     "qubit": "frontend/qubit-web/public/plugins/fleet.json",
-    "qubit_sha256": "1d92e5557a8ed3dd3e1e8be594a103eb3f7c504571346579831944727642ba02",
+    "qubit_sha256": "6a27785204041e27308af1401a5d2000b534643ef086ccb46db2244514366c7a",
     "role": "Qubit-authored static fleet manifest aggregate: mirrors the two pinned dashboard manifests (tab paths/positions, entry, css) with a Qubit-neutral description; verified by tests/test_dashboard_plugin_fleet.py::test_static_fleet_manifest_mirrors_pinned_plugins.",
     "affected_regression_test": "tests/test_dashboard_plugin_fleet.py"
    },
@@ -67,7 +67,7 @@
    },
    {
     "qubit": "frontend/qubit-web/src/pages/SystemPage.test.tsx",
-    "qubit_sha256": "370ee90ede302c07d5204fe93ef2c61373fed16df530cca953951f0441457850",
+    "qubit_sha256": "e21c6ae42d15368b814074d881235c9ac13f6c73a941c6b23c791206db19371b",
     "role": "Qubit-added contract test for the System page power/e-stop control (live latch badge, confirm-dialog latch -> powerAction('emergency-stop'), latched reset state); no upstream counterpart.",
     "affected_regression_test": "tests/test_branding_parity_wave3.py"
    },
@@ -103,7 +103,7 @@
    },
    {
     "qubit": "frontend/qubit-web/src/pages/DocsPage.test.tsx",
-    "qubit_sha256": "8ee89fd2850538a335a0e5d5235c40fb6b14b861c81acb77a4b57a4617f4f9a3",
+    "qubit_sha256": "0fc2fcc7800500716e9bd5b87e2fa066da6ebdd982122d64b68ed3f9400c7bad",
     "role": "Qubit-added contract test for the /docs OpenAPI reference (drift A23): renders the served OAS operations grouped by namespace and narrowed by the header search input.",
     "affected_regression_test": "frontend/qubit-web/src/pages/DocsPage.test.tsx"
    },
@@ -151,7 +151,7 @@
    },
    {
     "qubit": "frontend/qubit-web/src/pages/TerminalChatPage.tsx",
-    "qubit_sha256": "af57d678c45e22a6858665a32e056a94f078b219e83ccb35a9c7a12c834675eb",
+    "qubit_sha256": "3ded44511a611c621804d99ff947291fbb47a683df0176066ce86bbcb258e39a",
     "role": "Qubit-added `/chat` terminal frontend: mounts the vendored xterm terminal and streams the real vendor PTY over the single Qubit WebSocket upgrade path (`/agent/api/pty`) with a short-lived single-use scoped ticket. `/qubit-chat` keeps the Qubit-native ChatPage (owner decision 2026-09-17).",
     "affected_regression_test": "tests/test_pty_ws8u.py"
    }
@@ -538,7 +538,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "cee9bc190de2a4c9577fda6bae58e69d7c70b48d58772f60bf90401fceb4c896",
    "qubit": "frontend/qubit-web/src/components/AutomationBlueprints.tsx",
-   "qubit_sha256": "adaabe68e88020e918b804067b3fda155d95c74ab8a3362f3c662580c959df18",
+   "qubit_sha256": "91537221ac7bfdfb33fc1f5724ecb583397091eb6597d8de1c0e37b36cbacb8d",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "cee9bc190de2a4c9577fda6bae58e69d7c70b48d58772f60bf90401fceb4c896",
@@ -2501,7 +2501,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "4db6394f5a3882723bfbd22d560de1b8e070b4ae2d2d4bf46ee51347c63acb24",
    "qubit": "frontend/qubit-web/src/pages/CronPage.tsx",
-   "qubit_sha256": "3705e0726f29c466b2d192eb0a4dd91bd5287b6e8d6207874d800f760d7807d3",
+   "qubit_sha256": "6c0c00955386e5e2d3741edb3ea974d8053ca0b5d27449f042a0bb7628c59491",
    "patch": "Qubit fix: null-safe cron delivery-target handling (`available ?? []`, `selected ?? []`, `deliveryTargets ?? []`)",
    "reason": "Qubit runtime fix so the vendored cron page does not crash when a partially loaded cron response omits a list; behavior is unchanged when the fields are present.",
    "upstream_blob_sha256": "4db6394f5a3882723bfbd22d560de1b8e070b4ae2d2d4bf46ee51347c63acb24",
@@ -2540,7 +2540,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "4a0d8774ef45df7c28d5b9aa0f7a46413a78da0729575b05d2fa1968e3a5ed9b",
    "qubit": "frontend/qubit-web/src/pages/FilesPage.tsx",
-   "qubit_sha256": "2bfbc1fb5ec7b9c68525c5c0245ef7e18d9fde75cba4d4ecd6f75a4a8b7f8f50",
+   "qubit_sha256": "30a1d62539b43f71bb7722e37618f902452b582015b4b3c99963c85f5c6716ba",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "4a0d8774ef45df7c28d5b9aa0f7a46413a78da0729575b05d2fa1968e3a5ed9b",
@@ -2553,7 +2553,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "59ced0caf58814aff23dae2713d24b484419a87996ab3fa9070d26e0a8027025",
    "qubit": "frontend/qubit-web/src/pages/LogsPage.tsx",
-   "qubit_sha256": "115a5e3f1560dace01321f88a8d036243522ed706c4dab821b895b2bf0539ad2",
+   "qubit_sha256": "244604707457329199f812dbe38d4cd12ee284202afd0f5b0e81905a170bf97d",
    "patch": "wave2/frontend-rebrand-normalizer",
    "reason": "Apply the Qubit product-identity normalizer (`rebrand`) to rendered log lines at the render boundary so backend/upstream free-text never exposes an upstream product name. Presentation-only; no logic or backend-route change. Regression: tests/test_qubit_frontend_inventory8u.py.",
    "upstream_blob_sha256": "59ced0caf58814aff23dae2713d24b484419a87996ab3fa9070d26e0a8027025",
@@ -2605,7 +2605,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "9366f90ef997ede48fb38361735cda694a1f0dc230911f6972c1f30c75120d24",
    "qubit": "frontend/qubit-web/src/pages/PluginsPage.tsx",
-   "qubit_sha256": "318077a447f6d4c6f8160a9857273afc2c858fe558b1765ec791001b18f7ea04",
+   "qubit_sha256": "2a36f4e3515c085f38527076dd5603f63c5eb8a3f3a78b48c5fc7bfe76c09988",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "9366f90ef997ede48fb38361735cda694a1f0dc230911f6972c1f30c75120d24",
@@ -2644,7 +2644,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "fa49ea24d79442464be4c0794096d3f7daa9c4c7032538e6acc9300e1140b705",
    "qubit": "frontend/qubit-web/src/pages/SessionsPage.test.tsx",
-   "qubit_sha256": "15da48bbab7258d5f3e3ed9cdeef7f34b3c7a1d8409ac760c2e2bbb4cb42cca5",
+   "qubit_sha256": "d377a30ff6909bb4f4145ab04f05c351c22d50c6299e3836e18af592bb317833",
    "patch": "wave17/sessions-tests: pin the Chats/Automation/All and Overview/History tab families and the Escape-dismissal of the 'Session source' popover",
    "reason": "Dashboard parity A19 + the live2 a11y finding: the vendored sessions test is extended to exercise the real Overview panel and the source-popover dismissal contract. Test-only; no runtime dependency or backend-route change.",
    "upstream_blob_sha256": "fa49ea24d79442464be4c0794096d3f7daa9c4c7032538e6acc9300e1140b705",
@@ -2657,7 +2657,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "bba893a19a462198548549b62a1156d343baa4402b22311286ab73673c00e804",
    "qubit": "frontend/qubit-web/src/pages/SessionsPage.tsx",
-   "qubit_sha256": "0217b65d437a282138ab8206b19140f3633d67aff717c2dfe1d43bba97689d13",
+   "qubit_sha256": "e20b09ea65c7e7c2f05326981a6c0d0633f61615e3585733a88d6b6aafad9954",
    "patch": "hermes_flow source label 'Hermes Flow' -> 'Qubit Flow' (owner rebrand; no logic change)",
    "reason": "Qubit rebrand of a product-facing session source label; the source id hermes_flow is unchanged for compatibility.",
    "upstream_blob_sha256": "bba893a19a462198548549b62a1156d343baa4402b22311286ab73673c00e804",
@@ -2683,7 +2683,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "8427f2ca749e15de1d0f9354a614588d490b621bcf6c62d24d0a4ecae89a613e",
    "qubit": "frontend/qubit-web/src/pages/SystemPage.tsx",
-   "qubit_sha256": "5295c8b55987b11725608d629b7c556460f15b1221973f9cbb0191213e8d1343",
+   "qubit_sha256": "c01fabdfd1efd336d444791f8c1c1ffe5ee0295364646ef345735341a769f5f2",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "8427f2ca749e15de1d0f9354a614588d490b621bcf6c62d24d0a4ecae89a613e",
@@ -2696,7 +2696,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "2dc36100b027bf5966039bc52f5426863b4d5683b125a577f1c6730acce947d8",
    "qubit": "frontend/qubit-web/src/pages/WebhooksPage.tsx",
-   "qubit_sha256": "56c51b2c44f77a1e38a88a760d250f1143f264c87e48cc593e0d1b68c4bba2b2",
+   "qubit_sha256": "63d2ab8540903dba2d8b53b43d045b9a74ef8afd26c21db35c332e1e66bf5cdb",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "2dc36100b027bf5966039bc52f5426863b4d5683b125a577f1c6730acce947d8",
@@ -2800,11 +2800,11 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "453b4631586c474a5598706eb7d5f6fa4c029bd5239bd1838d8c04217ac01950",
    "qubit": "frontend/qubit-web/src/plugins/usePlugins.test.ts",
-   "qubit_sha256": "453b4631586c474a5598706eb7d5f6fa4c029bd5239bd1838d8c04217ac01950",
-   "patch": null,
-   "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline.",
+   "qubit_sha256": "8254f88729786e6fa8a06831afc616995df6f7b57254c22ba673c31ecac4b16f",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "453b4631586c474a5598706eb7d5f6fa4c029bd5239bd1838d8c04217ac01950",
-   "affected_regression_test": "tests/test_qubit_vendor8tf.py"
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -2813,7 +2813,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "9e5eb67012f67a2e21b5684160c86c504dbbf91c90753b0aff2611420c0f0f52",
    "qubit": "frontend/qubit-web/src/plugins/usePlugins.ts",
-   "qubit_sha256": "99d0112a8b782328f25c90a2541e60746edabb0e203abc3bfc2c888bbdafb1d0",
+   "qubit_sha256": "a2026c4e0d62e52fe39bd949f0009d0b24c54dcb1365a76cd5c4625ee96e3937",
    "patch": "wave3/usePlugins-static-fleet",
    "reason": "Merge the SPA-shipped static plugin fleet (pinned achievements + kanban manifests) with the compat overlay manifests the Qubit backend advertises, and resolve each manifest's entry/css bundles against its assetBase (fleet bundles ship under <base>/plugins/<name>; overlay bundles keep <base>/dashboard-plugins/<name>). Backend + auth behaviour unchanged (SDK fetch/ws helpers still apply the base path and session token). Regression: tests/test_dashboard_plugin_fleet.py.",
    "upstream_blob_sha256": "9e5eb67012f67a2e21b5684160c86c504dbbf91c90753b0aff2611420c0f0f52",
@@ -56701,12 +56701,12 @@
    "upstream": "plugins/hermes-achievements/dashboard/dist/index.js",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010",
-   "qubit": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js",
-   "qubit_sha256": "1e04c17dfed2476185e132720c3a48769329f5b2a70b99b4a917b3e02da88c8e",
-   "patch": "wave3/QUBIT_ADDED:byte-identical [wave3 rebrand] Qubit product naming applied; [A28] share trigger shown on all non-secret cards and typed SHARE_UNAVAILABLE refusals added.",
-   "reason": "Owner-approved Qubit rebrand of the vendored achievements dashboard bundle: product-facing copy relabelled Qubit (Qubit Achievements / Qubit Agent / Qubit session history); protocol identifiers (X-Hermes-Session-Token, HERMES_PLUGINS, ~/.hermes) and module ids preserved. A28: restored the Hermes Share actions (trigger, dialog, Share on X / Copy image / Download PNG) with typed refusals when canvas/toBlob are unavailable.",
+   "qubit": "frontend/qubit-web/public/plugins/qubit-achievements/dist/index.js",
+   "qubit_sha256": "01b84deadcb4f92d9ebf05c7e18ff8eb6458cc845c77c9d8049aaa41f83d203f",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010",
-   "affected_regression_test": "tests/test_dashboard_plugin_fleet.py"
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/plugins",
@@ -56714,12 +56714,12 @@
    "upstream": "plugins/hermes-achievements/dashboard/dist/style.css",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
-   "qubit": "frontend/qubit-web/public/plugins/hermes-achievements/dist/style.css",
-   "qubit_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
-   "patch": "wave3/QUBIT_ADDED:byte-identical",
-   "reason": "Vendored pinned achievements stylesheet copied byte-identical into the SPA static root.",
+   "qubit": "frontend/qubit-web/public/plugins/qubit-achievements/dist/style.css",
+   "qubit_sha256": "e51d11a79387fed158331d45a476820638bb2be75271f4bddac166d50f002fba",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
-   "affected_regression_test": "tests/test_dashboard_plugin_fleet.py"
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/plugins",

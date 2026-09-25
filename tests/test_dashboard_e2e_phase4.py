@@ -1289,7 +1289,7 @@ def test_achievements_rescan_and_scan_status(browser, ui_server):
     """Achievements: Rescan runs the canonical scan and the status advances."""
     base, token = ui_server
     before = _api(base, token, "GET",
-                  "/agent/api/plugins/hermes-achievements/scan-status")[1]
+                  "/agent/api/plugins/qubit-achievements/scan-status")[1]
     before_runs = int(before.get("run_count", 0))
 
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
@@ -1300,7 +1300,7 @@ def test_achievements_rescan_and_scan_status(browser, ui_server):
         rescan = page.get_by_role("button", name="Rescan")
         rescan.wait_for(timeout=20000)
         with page.expect_response(
-                lambda r: r.url.endswith("/plugins/hermes-achievements/rescan")
+                lambda r: r.url.endswith("/plugins/qubit-achievements/rescan")
                 and r.request.method == "POST") as info:
             rescan.click()
         assert info.value.status == 200, info.value.status
@@ -1311,7 +1311,7 @@ def test_achievements_rescan_and_scan_status(browser, ui_server):
             lambda c, d: d if c == 200 and int(d.get("run_count", 0)) > before_runs
             else None
         )(*_api(base, token, "GET",
-                "/agent/api/plugins/hermes-achievements/scan-status")))
+                "/agent/api/plugins/qubit-achievements/scan-status")))
         assert after, (before_runs, after)
     finally:
         ctx.close()

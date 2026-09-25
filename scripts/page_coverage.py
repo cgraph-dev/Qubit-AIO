@@ -70,6 +70,20 @@ def _canonical_artifact(name):
 
 sys.path.insert(0, ROOT)
 
+
+def _bundled_plugin_page(preferred, *legacy):
+    """Resolve a bundled dashboard-plugin entry file, tolerating a rebrand
+    rename of the plugin directory (e.g. ``hermes-achievements`` ->
+    ``qubit-achievements``). The on-disk frontend plugin dir is the source of
+    truth for the served bundle, so return whichever candidate exists."""
+    base = "frontend/qubit-web/public/plugins"
+    for name in (preferred, *legacy):
+        rel = "%s/%s/dist/index.js" % (base, name)
+        if os.path.exists(os.path.join(ROOT, rel)):
+            return rel
+    return "%s/%s/dist/index.js" % (base, preferred)
+
+
 # ---------------------------------------------------------------------------
 # Area definitions: plan section -> page area
 # ---------------------------------------------------------------------------
@@ -241,8 +255,8 @@ AREAS = [
                      "/qubit-approvals is a hidden header-banner plugin on the shared journal."]),
     dict(id="achievements", plan=27, name="Achievements",
          routes=["/achievements"], sidebar=["Achievements"],
-         pages=["frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js"],
-         plugins=[], upstream=["qubit_runtime/plugins/hermes-achievements"],
+         pages=[_bundled_plugin_page("qubit-achievements", "hermes-achievements")],
+         plugins=[], upstream=["qubit_runtime/plugins/qubit-achievements"],
          cli=[], voice_prefixes=[],
          known_gaps=["Vendored plugin bundle; dashboard page present, share/export via canvas PNG."]),
     dict(id="devices", plan=28, name="Devices",
@@ -270,7 +284,7 @@ PREFIX_MAP = [
     ("/api/qubit/logbook", "operations"),
     ("/api/qubit/update", "system"),
     ("/api/qubit", "operations"),
-    ("/api/plugins/hermes-achievements", "achievements"),
+    ("/api/plugins/qubit-achievements", "achievements"),
     ("/api/plugins/kanban", "kanban"),
     ("/api/sessions", "sessions"),
     ("/api/files", "files"),
@@ -573,7 +587,7 @@ def build_artifact():
         ("/operations", "qubit-ops plugin", "operations"),
         ("/reports", "qubit-reports plugin", "logs_reports"),
         ("/qubit-runtime", "qubit-runtime plugin", "runtime"),
-        ("/achievements", "hermes-achievements bundled plugin", "achievements"),
+        ("/achievements", "qubit-achievements bundled plugin", "achievements"),
         ("/kanban", "kanban bundled plugin", "kanban"),
     ]
     assert len(client_routes) == 34, len(client_routes)

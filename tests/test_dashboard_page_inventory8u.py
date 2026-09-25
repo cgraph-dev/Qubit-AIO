@@ -130,7 +130,7 @@ def test_served_fleet_and_plugin_bundles_are_qubit_branded(tmp_path):
         status, _ctype, body = _get(port, "/plugins/fleet.json")
         assert status == 200
         fleet = {m["name"] for m in json.loads(body)}
-        assert fleet == {"hermes-achievements", "kanban"}
+        assert fleet == {"qubit-achievements", "kanban"}
         for name in sorted(fleet):
             status, ctype, body = _get(
                 port, f"/plugins/{name}/dist/index.js")

@@ -3,7 +3,7 @@
 The source ``~/.hermes/plugins/hermes-achievements/`` directory holds only
 legacy durable-state JSON (``state.json`` / ``scan_checkpoint.json`` /
 ``scan_snapshot.json``) — no manifest and no code. The real plugin is the
-vendored *dashboard* plugin (``qubit_runtime/plugins/hermes-achievements/``)
+vendored *dashboard* plugin (``qubit_runtime/plugins/qubit-achievements/``)
 whose one canonical Qubit execution path is
 :mod:`voicebridge.qubit_plugins` (the vendored engine over the real
 ``qubit_state.SessionDB``).
@@ -204,7 +204,7 @@ def test_host_adapter_invokes_the_real_achievements_engine(tmp_path,
     assert status["result"]["run_count"] >= 1, status["result"]
 
     # The canonical engine persisted its durable state under QUBIT_HOME.
-    state_root = _qubit_home(cfg) / "plugin-data" / "hermes-achievements"
+    state_root = _qubit_home(cfg) / "plugin-data" / "qubit-achievements"
     assert (state_root / "scan_snapshot.json").is_file(), sorted(
         p.name for p in state_root.iterdir())
     assert (state_root / "state.json").is_file()

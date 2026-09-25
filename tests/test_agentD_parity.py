@@ -77,11 +77,11 @@ def test_achievements_full_real_catalog(tmp_path, monkeypatch):
     # workflow (same as test_qubit_plugins.test_achievements_routes_compute_real_state)
     # so this test deterministically observes the real computed catalog.
     rcode, rout = HC.dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan", {}, {})
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan", {}, {})
     assert rcode == 200, (rcode, str(rout)[:300])
 
     code, out = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert code == 200, (code, str(out)[:300])
 
     achs = out["achievements"]

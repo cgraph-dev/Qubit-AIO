@@ -5,10 +5,10 @@
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
-    "bound_backends": 1137,
+    "bound_backends": 1140,
     "dead_backend_ids": [],
     "dead_backends": 0,
-    "total_entries": 1137
+    "total_entries": 1140
   },
   "rows": [
     {
@@ -338,6 +338,14 @@
       "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit computer-use permissions"
+    },
+    {
+      "entry": null,
+      "id": "hermes computer-use screen",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "cli",
+      "voice_intent": ""
     },
     {
       "entry": "status",
@@ -1924,6 +1932,14 @@
       "voice_intent": "qubit plugins"
     },
     {
+      "entry": null,
+      "id": "hermes plugins adopt",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "cli",
+      "voice_intent": ""
+    },
+    {
       "entry": "cli_plugins_browse",
       "id": "hermes plugins browse",
       "kind": "match",
@@ -1938,6 +1954,14 @@
       "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit plugins capabilities"
+    },
+    {
+      "entry": null,
+      "id": "hermes plugins check-updates",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "cli",
+      "voice_intent": ""
     },
     {
       "entry": "cli_guard_plugins_compat",
@@ -2018,6 +2042,14 @@
       "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit plugins show"
+    },
+    {
+      "entry": null,
+      "id": "hermes plugins trust-update-url",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "cli",
+      "voice_intent": ""
     },
     {
       "entry": "cli_guard_plugins_update",
@@ -7516,6 +7548,30 @@
       "voice_intent": "qubit tui help"
     },
     {
+      "entry": null,
+      "id": "op update_apply",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "controls",
+      "voice_intent": "qubit update apply"
+    },
+    {
+      "entry": "update_check",
+      "id": "op update_check",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "controls",
+      "voice_intent": "qubit update check"
+    },
+    {
+      "entry": null,
+      "id": "op update_rollback",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "controls",
+      "voice_intent": "qubit update rollback"
+    },
+    {
       "entry": "update_status",
       "id": "op update_status",
       "kind": "match",
@@ -8082,6 +8138,14 @@
       "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit audio"
+    },
+    {
+      "entry": null,
+      "id": "GET /api/chat/workspaces",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "routes",
+      "voice_intent": "qubit chat"
     },
     {
       "entry": "cli_config",
@@ -9116,6 +9180,14 @@
       "voice_intent": "qubit autonomy status"
     },
     {
+      "entry": null,
+      "id": "POST /api/dashboard/agent-plugins/activate",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "routes",
+      "voice_intent": "qubit dashboard"
+    },
+    {
       "entry": "cli_plugins_install",
       "id": "POST /api/dashboard/agent-plugins/install",
       "kind": "clarify",
@@ -9354,6 +9426,22 @@
       "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit local models jobs"
+    },
+    {
+      "entry": "local_models_catalog",
+      "id": "POST /api/local-models/download/pause",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "routes",
+      "voice_intent": "qubit local models"
+    },
+    {
+      "entry": "local_models_catalog",
+      "id": "POST /api/local-models/download/resume",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "routes",
+      "voice_intent": "qubit local models"
     },
     {
       "entry": "local_models_catalog",
@@ -10026,6 +10114,14 @@
       "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit console help"
+    },
+    {
+      "entry": null,
+      "id": "WEBSOCKET /api/display/ws",
+      "kind": "unknown",
+      "resolution": "unresolved",
+      "surface": "routes",
+      "voice_intent": "qubit display"
     },
     {
       "entry": "cli_guard_events",
@@ -11040,27 +11136,27 @@
   "source": "docs/generated/parity_inventory.json",
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
-    "distinct_intents": 866,
+    "distinct_intents": 874,
     "guard": 193,
-    "real": 1185,
-    "real_pct": 85.99,
-    "rows": 1378,
-    "unresolved": 0
+    "real": 1188,
+    "real_pct": 85.47,
+    "rows": 1390,
+    "unresolved": 9
   },
   "surfaces": {
     "cli": {
       "guard": 135,
       "real": 249,
-      "real_pct": 64.84,
-      "total": 384,
-      "unresolved": 0
+      "real_pct": 64.18,
+      "total": 388,
+      "unresolved": 4
     },
     "controls": {
       "guard": 36,
-      "real": 564,
-      "real_pct": 94.0,
-      "total": 600,
-      "unresolved": 0
+      "real": 565,
+      "real_pct": 93.7,
+      "total": 603,
+      "unresolved": 2
     },
     "other": {
       "guard": 0,
@@ -11071,10 +11167,10 @@
     },
     "routes": {
       "guard": 21,
-      "real": 251,
-      "real_pct": 92.28,
-      "total": 272,
-      "unresolved": 0
+      "real": 253,
+      "real_pct": 91.34,
+      "total": 277,
+      "unresolved": 3
     },
     "tools": {
       "guard": 1,

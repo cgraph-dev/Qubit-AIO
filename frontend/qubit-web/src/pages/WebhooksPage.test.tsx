@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiMocks = vi.hoisted(() => ({
   getWebhooks: vi.fn(),
+  createWebhook: vi.fn(),
   rotateWebhookSecret: vi.fn(),
   testWebhook: vi.fn(),
   retryWebhook: vi.fn(),
@@ -23,9 +24,6 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return { ...actual, api: apiMocks };
 });
 vi.mock("@/plugins", () => ({ PluginSlot: () => null }));
-vi.mock("@/contexts/usePageHeader", () => ({
-  usePageHeader: () => ({ setAfterTitle: vi.fn(), setEnd: vi.fn() }),
-}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -45,17 +43,21 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 }
 
 async function renderPage() {
-  const [{ default: WebhooksPage }, { I18nProvider }] = await Promise.all([
-    import("./WebhooksPage"),
-    import("@/i18n"),
-  ]);
+  const [{ default: WebhooksPage }, { I18nProvider }, { PageHeaderProvider }] =
+    await Promise.all([
+      import("./WebhooksPage"),
+      import("@/i18n"),
+      import("@/contexts/PageHeaderProvider"),
+    ]);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   const ui: ReactNode = (
     <I18nProvider>
       <MemoryRouter initialEntries={["/webhooks"]}>
-        <WebhooksPage />
+        <PageHeaderProvider pluginTabs={[]}>
+          <WebhooksPage />
+        </PageHeaderProvider>
       </MemoryRouter>
     </I18nProvider>
   );
@@ -152,5 +154,36 @@ describe("WebhooksPage per-subscription operations", () => {
     await waitFor(() => apiMocks.getWebhookDeliveries.mock.calls.length > 0);
     expect(apiMocks.getWebhookDeliveries).toHaveBeenCalledWith("hook");
     await waitFor(() => container.textContent?.includes("FAILED") ?? false);
+  });
+});
+
+describe("WebhooksPage create validation", () => {
+  it("renders actionable inline errors in the dialog, focuses the first invalid field, and sends no request", async () => {
+    await renderPage();
+    await waitFor(() => apiMocks.getWebhooks.mock.calls.length > 0);
+
+    const newBtn = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((b) => /New subscription/.test(b.textContent ?? ""));
+    expect(newBtn).not.toBeUndefined();
+    await act(async () => newBtn?.click());
+    await waitFor(() => document.getElementById("webhook-name") !== null);
+
+    const create = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+    ).find((b) => (b.textContent ?? "").trim() === "Create");
+    expect(create).not.toBeUndefined();
+    await act(async () => create?.click());
+
+    expect(apiMocks.createWebhook).not.toHaveBeenCalled();
+    const dialog = document.querySelector('[role="dialog"]');
+    const dialogText = dialog?.textContent ?? "";
+    expect(dialogText).toContain("Name required");
+    expect(dialogText).toContain("Delivery URL required");
+    expect(dialogText).toContain("At least one event is required");
+    expect(dialogText).toContain("env:VAR or file:PATH");
+    expect(document.activeElement?.id).toBe("webhook-name");
+    // Dialog stays open for correction.
+    expect(document.getElementById("webhook-name")).not.toBeNull();
   });
 });

@@ -9193,7 +9193,7 @@ def selftest() -> int:
     # bundle, an absent symbol or no reading test stays OPEN (never fabricated).
     bundle_linked = _plugin_bundle_linkage({
         "qubit_path": (
-            "frontend/qubit-web/public/plugins/hermes-achievements"
+            "frontend/qubit-web/public/plugins/qubit-achievements"
             "/dist/index.js:1"),
         "qubit_symbol": "card.share_title",
     })
@@ -9214,7 +9214,7 @@ def selftest() -> int:
         }) is None
         and _plugin_bundle_linkage({
             "qubit_path": (
-                "frontend/qubit-web/public/plugins/hermes-achievements"
+                "frontend/qubit-web/public/plugins/qubit-achievements"
                 "/dist/index.js:1"),
             "qubit_symbol": "no.such.control.label",
         }) is None
@@ -9229,7 +9229,7 @@ def selftest() -> int:
         "capability_id": "selftest.plugin_bundle.linked",
         "interface_disposition": "SAFE_EQUIVALENT",
         "qubit_path": (
-            "frontend/qubit-web/public/plugins/hermes-achievements"
+            "frontend/qubit-web/public/plugins/qubit-achievements"
             "/dist/index.js:1"),
         "qubit_symbol": "card.share_title",
         "test_ids": [],

@@ -194,9 +194,45 @@ describe("SessionsPage archived rows", () => {
 });
 
 /**
- * Drift A19 (/sessions Overview + History tabs) and the live2 a11y finding:
- * the "Session source" popover must dismiss on Escape.
+ * The Overview "Recent Sessions" card used to be inert metadata that looked
+ * like an expandable History row (a dead affordance). It must open the
+ * transcript on click.
  */
+describe("SessionsPage overview recent-session cards", () => {
+  const overviewRow = () => [
+    {
+      id: "sid-recent",
+      profile: null,
+      source: "cli",
+      model: "prov/model",
+      title: "Recent one",
+      started_at: 1,
+      ended_at: null,
+      last_active: 1,
+      is_active: false,
+      message_count: 2,
+      tool_call_count: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      preview: "hello",
+    },
+  ];
+
+  it("opens the transcript when a recent-session card is clicked", async () => {
+    await renderSessionsPage([], overviewRow());
+    const card = document.querySelector(
+      '[data-testid="recent-session-sid-recent"]',
+    );
+    expect(card).not.toBeNull();
+    const trigger = card?.querySelector<HTMLElement>('[role="button"]');
+    expect(trigger).not.toBeNull();
+
+    await act(async () => click(trigger ?? null));
+    await waitFor(() => apiMocks.getSessionMessages.mock.calls.length > 0);
+    expect(apiMocks.getSessionMessages).toHaveBeenCalledWith("sid-recent", null);
+    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+  });
+});
 describe("SessionsPage tab families + source popover dismissal", () => {
   const oneRow = () => [
     { id: "sid-1", profile: null, source: "cli", model: null, title: "One", started_at: 1,

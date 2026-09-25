@@ -22,7 +22,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from voicebridge.cli_qubit_forward import FORWARD_TABLE  # noqa: E402
+from voicebridge.cli_qubit_forward import (  # noqa: E402
+    FORWARD_TABLE, NATIVE_MCP_READS)
 
 
 def _qubit_subcommands() -> dict:
@@ -47,15 +48,26 @@ def test_forward_table_is_real_and_does_not_shadow_native_commands():
     shadowed = []
     for (fam, sub) in FORWARD_TABLE:
         assert fam in families, f"unknown Qubit family {fam!r}"
+        # MCP read spellings are deliberately native now (canonical registry);
+        # ``route`` declines them before ``translate`` so the fork never wins.
+        if (fam, sub) in NATIVE_MCP_READS:
+            continue
         if sub in families.get(fam, set()):
             shadowed.append((fam, sub))
     assert shadowed == [], (
         "forwarding would shadow native Qubit subcommands: " + repr(shadowed))
 
 
-def test_mcp_list_is_forwarded_because_qubit_has_only_status():
-    assert ("mcp", "list") in FORWARD_TABLE
-    assert _qubit_subcommands()["mcp"] == {"status"}
+def test_mcp_reads_are_native_on_the_canonical_registry():
+    # ``qubit mcp list/config/ls/picker`` no longer forward to the fork's
+    # second ``config.yaml mcp_servers`` store; they are native canonical reads
+    # on ``voicebridge.mcp_servers`` (same authority as ``status``/``invoke``).
+    for sub in ("list", "config", "ls", "picker"):
+        assert sub in _qubit_subcommands()["mcp"], sub
+        assert ("mcp", sub) in FORWARD_TABLE, sub  # ledger classification
+        assert ("mcp", sub) in NATIVE_MCP_READS, sub
+    assert _qubit_subcommands()["mcp"] == {
+        "status", "list", "ls", "config", "picker", "invoke"}
 
 
 @pytest.mark.parametrize("pair", sorted(FORWARD_TABLE))
@@ -65,6 +77,10 @@ def test_every_forward_pair_dispatches_to_fork(monkeypatch, pair):
     from voicebridge import qubit_runtime
 
     fam, sub = pair
+    if pair in NATIVE_MCP_READS:
+        # Superseded by the native canonical read path; the table row stays for
+        # ledger classification only.
+        pytest.skip("native canonical MCP read (not fork-forwarded)")
     calls = []
 
     def _fake_run(argv=None):

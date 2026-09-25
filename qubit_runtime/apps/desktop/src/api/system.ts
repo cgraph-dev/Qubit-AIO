@@ -146,7 +146,7 @@ export function restartGateway(): Promise<ActionResponse> {
 export function updateQubit(): Promise<ActionResponse> {
   return qubitApi<ActionResponse>({
     ...profileScoped(),
-    path: '/api/hermes/update',
+    path: '/api/qubit/update',
     method: 'POST'
   })
 }
@@ -157,7 +157,7 @@ export function updateQubit(): Promise<ActionResponse> {
 export function checkQubitUpdate(force = false): Promise<BackendUpdateCheckResponse> {
   return qubitApi<BackendUpdateCheckResponse>({
     ...profileScoped(),
-    path: `/api/hermes/update/check${force ? '?force=true' : ''}`
+    path: `/api/qubit/update/check${force ? '?force=true' : ''}`
   })
 }
 

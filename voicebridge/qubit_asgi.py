@@ -66,7 +66,7 @@ QUBIT_OWNED_PREFIXES = (
     "/api/dashboard",
     "/api/qubit",
     "/api/ops",
-    "/api/plugins/hermes-achievements",
+    "/api/plugins/qubit-achievements",
     "/api/plugins/kanban",
 )
 

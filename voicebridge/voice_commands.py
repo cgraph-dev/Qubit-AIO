@@ -1134,7 +1134,8 @@ def _b_skills(ctx, args):
         try:
             rec = skill_catalog.set_skill_enabled(
                 ctx.cfg, str(args.get("skill_id", "")),
-                action == "enable", requested_by="voice:user")
+                action == "enable", requested_by="voice:user",
+                confirmed=True)
         except skill_catalog.SkillAuthorityError as exc:
             raise ValueError(f"{exc.code}: {exc.detail}")
         return {"status": "enabled" if rec["enabled"] else "disabled",
@@ -2666,6 +2667,129 @@ def _b_update_status(ctx, args):
                        "version": diag.get("version"),
                        "migration": migration.get("state"),
                        "platform": (diag.get("platform", {}) or {}).get("state")}}
+
+
+def _voice_update_resolver():
+    """The canonical update backend, or ``None`` when it is not importable.
+
+    Deferred/optional so this module loads even when ``update_manager`` (or a
+    dependency it grows) is unavailable. Returning ``None`` lets the backends
+    raise the same typed failure the CLI/dashboard would, rather than leak an
+    import error to the voice pipeline.
+    """
+    try:
+        from . import update_manager as UM
+    except Exception:  # noqa: BLE001
+        return None
+    return UM
+
+
+def _voice_update_channel(ctx, args):
+    """Best-effort channel/tag -> source resolution through the canonical seam.
+
+    The manager's ``source`` argument is a git remote **name**; the canonical
+    ``update_channel.resolve_source`` returns a policy dict, so ``.remote`` is
+    extracted. When that optional backend is absent a supplied channel/tag is
+    ignored (the configured source still applies) rather than failing the whole
+    update — the voice surface stays usable.
+    """
+    channel = str(args.get("channel", "") or "").strip()
+    tag = str(args.get("tag", "") or "").strip()
+    src = str(args.get("source", "") or "").strip() or None
+    if not channel and not tag:
+        return src
+    import importlib.util as _ilu
+    if _ilu.find_spec("voicebridge.update_channel") is not None:
+        try:
+            from . import update_channel as UC  # type: ignore
+            resolved = UC.resolve_source(ctx.cfg, src)
+            if resolved.get("ok", True):
+                return str(resolved.get("remote") or src or "").strip() or src
+        except Exception:  # noqa: BLE001
+            pass
+    return src
+
+
+def _raise_for_update(out):
+    """Raise the typed update error so the voice policy layer sees a refusal.
+
+    The voice executor maps a raised exception to a REFUSED/FAILED outcome; the
+    receipt of a successful or confirmation-required response is returned to the
+    caller unchanged. A confirm-required code is surfaced with its typed code so
+    the spoken summary names the required confirmation.
+    """
+    if not isinstance(out, dict):
+        raise ValueError("the update backend returned no receipt")
+    if out.get("ok"):
+        return out
+    code = str(out.get("code") or "UPDATE_FAILED")
+    detail = str(out.get("detail") or out.get("message") or "").strip()
+    raise ValueError(f"{code}: {detail}" if detail else code)
+
+
+def _b_update_check(ctx, args):
+    """Voice read-only update check — the SAME backend the CLI/dashboard call."""
+    UM = _voice_update_resolver()
+    if UM is None:
+        raise ValueError("UPDATE_UNAVAILABLE: the update backend is not "
+                         "available")
+    source = _voice_update_channel(ctx, args)
+    return UM.check(ctx.cfg, source=source)
+
+
+def _b_update_apply(ctx, args):
+    """Voice update apply — canonical full lifecycle, confirmation-gated.
+
+    This backend runs only after the voice confirmation is approved
+    (``confirmed=True``), so it calls the same full lifecycle the CLI and
+    dashboard use. Without a pending confirmation the caller never reaches here;
+    the canonical confirm/e-stop policy still runs inside the manager.
+    """
+    UM = _voice_update_resolver()
+    if UM is None:
+        raise ValueError("UPDATE_UNAVAILABLE: the update backend is not "
+                         "available")
+    source = _voice_update_channel(ctx, args)
+    channel = str(args.get("channel", "") or "").strip() or None
+    tag = str(args.get("tag", "") or "").strip() or None
+    full = getattr(UM, "full_apply", None)
+    if full is not None:
+        kwargs = {"confirm": True, "source": source, "channel": channel,
+                  "actor": "voice:user"}
+        import inspect as _inspect
+        try:
+            params = _inspect.signature(full).parameters
+            # A variadic callee (**kwargs) accepts every argument; never drop
+            # ``confirm`` from it. Only filter a fixed signature.
+            variadic = any(p.kind == _inspect.Parameter.VAR_KEYWORD
+                           for p in params.values())
+            accepted = set(params)
+        except (TypeError, ValueError):
+            variadic, accepted = True, set(kwargs)
+        forwarded = (kwargs if variadic else
+                     {k: v for k, v in kwargs.items() if k in accepted})
+        out = full(ctx.cfg, **forwarded)
+    else:
+        snap = UM.snapshot(ctx.cfg, reason="pre-apply", source=source,
+                           actor="voice:user")
+        if not snap.get("ok"):
+            return _raise_for_update(snap)
+        out = UM.apply(ctx.cfg, confirm=True, source=source, actor="voice:user")
+        if isinstance(out, dict):
+            out.setdefault("backup_dir", snap.get("backup_dir"))
+            out.setdefault("backup_bundle", snap.get("bundle"))
+    return _raise_for_update(out)
+
+
+def _b_update_rollback(ctx, args):
+    """Voice update rollback — the SAME canonical rollback the CLI calls."""
+    UM = _voice_update_resolver()
+    if UM is None:
+        raise ValueError("UPDATE_UNAVAILABLE: the update backend is not "
+                         "available")
+    backup_dir = args.get("backup_dir") or None
+    out = UM.rollback(ctx.cfg, backup_dir=backup_dir, actor="voice:user")
+    return _raise_for_update(out)
 
 
 def _b_config_profiles(ctx, args):
@@ -5030,6 +5154,9 @@ _BACKENDS: Dict[str, Callable] = {
     "mic_guidance": _b_mic_guidance,
     "curator": _b_curator,
     "update_status": _b_update_status,
+    "update_check": _b_update_check,
+    "update_apply": _b_update_apply,
+    "update_rollback": _b_update_rollback,
     "config_profiles": _b_config_profiles,
     "config": _b_config,
     "profile_admin": _b_profile_admin,
@@ -6494,6 +6621,31 @@ _E("update_status", "Update status",
    "update_status", ("update/uninstall",),
    examples=("qubit, update status",),
    help="Installed version and migration state.")
+# SURFACES unification: the same canonical update backend the CLI
+# (`qubit update`) and dashboard routes call. The read is a direct backend call;
+# both mutations mint a single-use confirmation (confirm=True) and honor the
+# shared e-stop before the backend runs.
+_E("update_check", "Check for updates",
+   ("update check", "is there an update", "check the update",
+    "check the update status"),
+   "update_check", ("update/check",), summary="status",
+   args=(_S("source"), _S("channel"), _S("tag")),
+   examples=("qubit, update check",),
+   help="Read-only update check: version, install method, revision.")
+_E("update_apply", "Apply update",
+   ("apply update", "install update", "update now", "run the update",
+    "apply the update"),
+   "update_apply", ("update/apply",), confirm=True,
+   args=(_S("source"), _S("channel"), _S("tag")),
+   examples=("qubit, apply update",),
+   help="Apply a confirmed update (snapshot then fast-forward).")
+_E("update_rollback", "Roll back update",
+   ("roll back update", "rollback update", "undo the update",
+    "restore previous version"),
+   "update_rollback", ("update/rollback",), confirm=True,
+   args=(_S("backup_dir"),),
+   examples=("qubit, roll back update",),
+   help="Restore the recorded pre-apply revision (confirmed).")
 _E("config_profiles", "Config profiles",
    ("list config profiles", "show config", "configuration profiles",
     "config status", "show config profile"),
@@ -11679,7 +11831,7 @@ for _lit, (_guide, _code) in _CLI_GUARDS.items():
 
 
 # ------------------------------------------------- wave 4: plugin fleet
-# The pinned Qubit dashboard plugin fleet (``hermes-achievements`` + the full
+# The pinned Qubit dashboard plugin fleet (``qubit-achievements`` + the full
 # kanban plugin API) has a real in-process Qubit backend since wave 3
 # (``voicebridge/qubit_plugins.py``). Those routes are dashboard/compat
 # surfaces, so they are NOT part of the frozen CLI-parity ``REGISTRY`` whose
@@ -11695,19 +11847,19 @@ PLUGIN_FLEET_REGISTRY: Dict[str, VoiceCommand] = {}
 
 PLUGIN_FLEET_OPS: Dict[str, Tuple[str, str, Optional[Dict[str, Any]]]] = {
     "achievements_list":
-        ("GET", "/api/plugins/hermes-achievements/achievements", None),
+        ("GET", "/api/plugins/qubit-achievements/achievements", None),
     "achievements_scan_status":
-        ("GET", "/api/plugins/hermes-achievements/scan-status", None),
+        ("GET", "/api/plugins/qubit-achievements/scan-status", None),
     "achievements_recent":
-        ("GET", "/api/plugins/hermes-achievements/recent-unlocks", None),
+        ("GET", "/api/plugins/qubit-achievements/recent-unlocks", None),
     "achievements_session_badges":
         ("GET",
-         "/api/plugins/hermes-achievements/sessions/{session_id}/badges",
+         "/api/plugins/qubit-achievements/sessions/{session_id}/badges",
          None),
     "achievements_rescan":
-        ("POST", "/api/plugins/hermes-achievements/rescan", {}),
+        ("POST", "/api/plugins/qubit-achievements/rescan", {}),
     "achievements_reset":
-        ("POST", "/api/plugins/hermes-achievements/reset-state",
+        ("POST", "/api/plugins/qubit-achievements/reset-state",
          {"confirm": True}),
     "plugin_fleet_list":
         ("GET", "/api/dashboard/plugins/fleet", None),

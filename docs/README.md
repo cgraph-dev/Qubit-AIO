@@ -26,6 +26,9 @@ the frozen contract), and must never read or write the archive.**
 | [CHECKLIST.md](CHECKLIST.md) | The master checklist: every capability + visual parity, tickable. |
 | [DECISIONS.md](DECISIONS.md) | Owner rulings in force; pointers to the preserved contracts. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | What Qubit is: one unified agent, layered. |
+| [QUBIT_1TO1_ROOT_CAUSES.md](QUBIT_1TO1_ROOT_CAUSES.md) | Why Qubit is not 1:1 with Hermes: version, rebrand asymmetry, overlay, config. |
+| [QUBIT_OWNER_AMENDMENT_2026-09-25_PIN_AND_1TO1.md](QUBIT_OWNER_AMENDMENT_2026-09-25_PIN_AND_1TO1.md) | Owner amendment: pin `69948c0057`, deterministic 1:1 rebase, frozen-contract handling. |
+| [QubitVSupstream.md](QubitVSupstream.md) | Generated living audit (ledger-driven): status, diffs, regressions. Do not hand-edit. |
 | This file | Index, review checklist, provenance. |
 
 ## Session sources (kept)

@@ -17,7 +17,7 @@ describe('formatRefValue', () => {
   })
 })
 
-describe('hermesDirectiveFormatter.parse', () => {
+describe('qubitDirectiveFormatter.parse', () => {
   it('keeps quoted file paths whole when parsing', () => {
     const segments = qubitDirectiveFormatter.parse('see @image:`apple-touch-icon (1).png` for the icon')
 

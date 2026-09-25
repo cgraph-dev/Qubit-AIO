@@ -13,7 +13,7 @@ import type * as QubitSdk from '@hermes/plugin-sdk'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const HUB_ORIGIN = 'https://hermes-agent.nousresearch.com'
+import { QUBIT_DOCS_ORIGIN as HUB_ORIGIN } from '@/lib/qubit-links'
 
 const mocks = vi.hoisted(() => ({
   notify: vi.fn(),

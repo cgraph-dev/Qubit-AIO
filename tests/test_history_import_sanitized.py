@@ -150,6 +150,59 @@ def test_apply_redacts_secret_backs_up_and_rolls_back(tmp_path):
     assert dest.read_bytes() == original
 
 
+def test_import_does_not_duplicate_a_secret_shared_by_source_and_dest(tmp_path):
+    """A secret already in the destination must not be re-added by the source.
+
+    Regression: the merge de-duplicated incoming lines against the *raw*
+    destination, but kept the *sanitized* destination lines, so a line whose
+    secret was redacted in both source and destination was written twice.
+    """
+    from voicebridge import qubit_migration as HM
+
+    src = _source(tmp_path, f"export KEY={SK_KEY}\nsafe command\n")
+    dest = tmp_path / "dest" / ".hermes_history"
+    dest.parent.mkdir(parents=True)
+    dest.write_text(f"export KEY={SK_KEY}\n", encoding="utf-8")
+    bdir = tmp_path / "backup"
+
+    out = HM.import_cli_history_sanitized(
+        home=src, dest=dest, confirm=True, backup_dir=bdir)
+    assert out["state"] == "OK", out
+    # Only the one genuinely new line is added; the shared secret line is not.
+    assert out["added_lines"] == 1, out
+
+    written = dest.read_text(encoding="utf-8").splitlines()
+    placeholder_lines = [ln for ln in written if HM.HISTORY_PLACEHOLDER in ln]
+    assert len(placeholder_lines) == 1, written
+    assert SK_KEY not in "\n".join(written)
+    assert "safe command" in written
+
+    # The sanitized output is idempotent: a second apply adds nothing.
+    again = HM.import_cli_history_sanitized(
+        home=src, dest=dest, confirm=True, backup_dir=bdir)
+    assert again["state"] == "NOOP", again
+
+
+def test_apply_writes_review_out_file_without_secrets(tmp_path):
+    """``--review-out`` must write the report on apply, not only dry-run."""
+    from voicebridge import qubit_migration as HM
+
+    src = _source(tmp_path, f"export KEY={SK_KEY}\nqubit doctor\n")
+    dest = tmp_path / "dest" / ".hermes_history"
+    bdir = tmp_path / "backup"
+    review_file = tmp_path / "review.json"
+
+    out = HM.import_cli_history_sanitized(
+        home=src, dest=dest, confirm=True, backup_dir=bdir,
+        review_path=review_file)
+    assert out["state"] == "OK", out
+    assert review_file.is_file(), "review report must be written on apply"
+    assert out["review_path"] == str(review_file)
+    report = review_file.read_text(encoding="utf-8")
+    assert SK_KEY not in report
+    assert json.loads(report)["state"] == "OK"
+
+
 def test_rollback_removes_destination_the_import_created(tmp_path):
     from voicebridge import qubit_migration as HM
 

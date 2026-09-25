@@ -600,15 +600,18 @@ def delete_skill_file(cfg: Any, name: str,
 
 
 def set_skill_enabled(cfg: Any, name: str, enabled: bool,
-                      *, requested_by: str) -> Dict[str, Any]:
+                      *, requested_by: str,
+                      confirmed: bool = False) -> Dict[str, Any]:
     """Enable/disable one skill on every surface (live ``toggle_skill``).
 
     Resolution goes through :func:`resolve_skill`. Every on-disk skill flips
     the vendored disabled set (``<QUBIT_HOME>/config.yaml`` ``skills.disabled``)
     keyed by its frontmatter name — the same set the catalog annotates and the
     runtime loader enforces. A permissioned-manifest-only record (no on-disk
-    file) keeps the permissioned store as its state owner. Caller owns
-    confirmation/e-stop.
+    file) keeps the permissioned store as its state owner and requires its own
+    ``confirmed`` bit (enabling a staged plugin grants authority; the CLI
+    passes ``--confirm``, the dashboard/voice paths have already settled the
+    shared journal confirmation). Caller owns confirmation/e-stop.
     """
     clean = str(name or "").strip()
     if not clean:
@@ -626,16 +629,18 @@ def set_skill_enabled(cfg: Any, name: str, enabled: bool,
             rec = None
         if rec is not None and store is not None:
             if enabled:
-                store.enable_skill(clean, requested_by=requested_by,
-                                   confirmed=True)
+                changed = store.enable_skill(clean, requested_by=requested_by,
+                                             confirmed=confirmed)
             else:
-                store.disable_skill(clean, requested_by=requested_by,
-                                    confirmed=True)
+                changed = store.disable_skill(clean, requested_by=requested_by,
+                                              confirmed=confirmed)
+            status = str(getattr(changed, "status", "")
+                         or ("active" if enabled else "disabled"))
             _audit("toggle", requested_by,
                    {"skill_id": clean, "enabled": bool(enabled),
                     "origin": "permissioned"})
             return {"skill_id": clean, "enabled": bool(enabled),
-                    "origin": "permissioned"}
+                    "origin": "permissioned", "status": status}
         # Fail closed: enabling/disabling a skill that exists in neither the
         # on-disk catalog nor the permissioned store is not a real skill. The
         # old fall-through silently wrote a disabled-set entry for any name.
@@ -673,7 +678,8 @@ def set_skill_enabled(cfg: Any, name: str, enabled: bool,
     clear_skills_prompt_cache()
     _audit("toggle", requested_by,
            {"skill_id": target, "enabled": bool(enabled), "origin": "catalog"})
-    return {"skill_id": target, "enabled": bool(enabled), "origin": "catalog"}
+    return {"skill_id": target, "enabled": bool(enabled), "origin": "catalog",
+            "status": "active" if enabled else "disabled"}
 
 
 __all__ = ["SkillAuthorityError", "catalog_entries", "merged_store_view",

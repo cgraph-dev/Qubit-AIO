@@ -52,13 +52,15 @@ BANNED_REGEXES = (
 )
 
 #: Identifiers that are compatibility/provenance contract and must survive.
+#: `NousResearch` is deliberately NOT here: the desktop public surfaces were
+#: de-branded (owner directive 2026-09-25) and no longer name the upstream owner.
+#: The canonical repository replaces every user-facing GitHub/release/docs link.
 ALLOWED_IDENTIFIERS = (
     "X-Hermes-Session-Token",
     "HERMES_DESKTOP_REMOTE_URL",
     "hermes:backend-exit",
     "hermes-agent",
     "~/.hermes",
-    "NousResearch",
     "__HERMES_",
 )
 
@@ -155,12 +157,20 @@ def test_runtime_marker_and_process_title_rebranded():
 
 
 def test_provenance_urls_are_not_falsified():
-    """Genuine upstream endpoints are provenance, never rewritten."""
+    """Desktop public links point at the canonical repo; runtime provenance stays.
+
+    Owner directive 2026-09-25: every user-facing desktop URL is the canonical
+    Qubit repository — the upstream owner/repo must not appear on the desktop
+    surfaces. The runtime's own provenance/attribution records (outside the
+    desktop scope) are not rewritten.
+    """
     electron = _read(sorted(
         p for p in ELECTRON.glob("*.ts") if ".test." not in p.name))
-    assert "github.com/NousResearch/hermes-agent" in electron
+    assert "github.com/cgraph-dev/qubit-voicebridge" in electron
+    assert "github.com/NousResearch/hermes-agent" not in electron
     pkg = (DESKTOP / "package.json").read_text(encoding="utf-8")
-    assert "git+https://github.com/NousResearch/hermes-agent.git" in pkg
+    assert "git+https://github.com/cgraph-dev/qubit-voicebridge.git" in pkg
+    assert "git+https://github.com/NousResearch/hermes-agent.git" not in pkg
     legacy = (REPO / "qubit_runtime" / "qubit_cli" / "debug.py").read_text(
         encoding="utf-8")
     assert "https://github.com/NousResearch/hermes-agent/issues" in legacy

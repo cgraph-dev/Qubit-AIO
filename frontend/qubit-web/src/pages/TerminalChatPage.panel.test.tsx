@@ -383,4 +383,41 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     );
     expect(FakeWebSocket.instances[0].url).not.toContain("resume=");
   });
+
+  it("closes the prior PTY socket on Reconnect (no leaked terminal)", async () => {
+    // Regression: connect() used to open a NEW WebSocket without closing the
+    // previous one, so every Reconnect / profile switch / New chat leaked a
+    // live PTY. The server caps concurrent PTYs and enforces one live owner
+    // per session, so the next turn hit PTY_LIMIT or "session already has a
+    // live owner".
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+    const first = FakeWebSocket.instances[0];
+    const closeSpy = vi.spyOn(first, "close");
+
+    const reconnect = container.querySelector(
+      'button[aria-label="Reconnect terminal"]',
+    )!;
+    await act(async () => {
+      reconnect.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
+
+    // The prior socket is closed AND its handlers detached, so its onclose
+    // cannot schedule a second reconnect behind the fresh terminal.
+    expect(closeSpy).toHaveBeenCalled();
+    expect(first.onclose).toBeNull();
+    expect(first.onopen).toBeNull();
+    expect(first.onmessage).toBeNull();
+  });
 });

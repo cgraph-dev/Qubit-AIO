@@ -54,7 +54,7 @@ def test_built_shell_has_no_upstream_identity():
 @pytest.mark.skipif(not (DIST / "index.html").is_file(),
                     reason="hermes-dist not built")
 def test_served_plugin_bundles_carry_no_visible_upstream_name():
-    for name in ("hermes-achievements", "kanban"):
+    for name in ("qubit-achievements", "kanban"):
         bundle = (DIST / "plugins" / name / "dist" / "index.js")
         src = bundle.read_text(encoding="utf-8")
         # The only allowed upstream token is the compat auth header name.
@@ -107,7 +107,7 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
                 checked += 1
         assert checked >= 50, checked
         # Plugin bundles the SPA loads are the tracked public copies.
-        for name in ("hermes-achievements", "kanban"):
+        for name in ("qubit-achievements", "kanban"):
             for sub in ("dist/index.js", "dist/style.css"):
                 served = urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/plugins/{name}/{sub}",
@@ -117,6 +117,6 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
                     hashlib.sha256(tracked).hexdigest(), (name, sub)
         fleet = json.loads(urllib.request.urlopen(
             f"http://127.0.0.1:{port}/plugins/fleet.json", timeout=15).read())
-        assert {m["name"] for m in fleet} == {"hermes-achievements", "kanban"}
+        assert {m["name"] for m in fleet} == {"qubit-achievements", "kanban"}
     finally:
         ui.stop()

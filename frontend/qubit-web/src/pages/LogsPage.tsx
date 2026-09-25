@@ -191,7 +191,11 @@ export default function LogsPage() {
           onClick={exportLogs}
           disabled={lines.length === 0}
           aria-label="Export log lines"
-          title="Download the lines currently shown"
+          title={
+            lines.length === 0
+              ? "Nothing to export — no log lines are loaded"
+              : "Download the lines currently shown"
+          }
         >
           <Download />
         </Button>

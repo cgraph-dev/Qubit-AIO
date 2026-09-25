@@ -57,9 +57,6 @@ def test_wave5_readonly_routes_forward_fork_argv(monkeypatch):
         (["approvals", "suggest"], ["approvals", "suggest"]),
         (["auth", "list"], ["auth", "list"]),
         (["schedules", "notepad"], ["cron", "notepad"]),
-        (["mcp", "config"], ["mcp", "config"]),
-        (["mcp", "ls"], ["mcp", "ls"]),
-        (["mcp", "picker"], ["mcp", "picker"]),
         (["plugins", "search"], ["plugins", "search"]),
         (["profile", "alias"], ["profile", "alias"]),
         (["profile", "describe"], ["profile", "describe"]),
@@ -280,8 +277,7 @@ def test_wave5_forward_pairs_do_not_shadow_native_subcommands():
                 parser_fams[fam] = subs
     for pair in (
         ("approvals", "suggest"), ("auth", "list"), ("schedules", "notepad"),
-        ("mcp", "config"), ("mcp", "ls"),
-        ("mcp", "picker"), ("plugins", "search"), ("profile", "alias"),
+        ("plugins", "search"), ("profile", "alias"),
         ("profile", "describe"), ("profile", "info"), ("sessions", "browse"),
         ("skills", "browse"), ("skills", "diff"), ("skills", "inspect"),
         ("skills", "search"), ("sync", "device"), ("sync", "status"),

@@ -3,7 +3,10 @@ import {
   getCachedManifests,
   cacheManifests,
   canSeedLoadedFromCache,
+  isLegacyBrandedManifest,
+  sanitizeManifests,
   MANIFEST_CACHE_KEY,
+  LEGACY_MANIFEST_CACHE_KEYS,
 } from "./usePlugins";
 import type { PluginManifest } from "./types";
 
@@ -99,6 +102,74 @@ describe("plugin manifest cache helpers", () => {
     };
     vi.stubGlobal("sessionStorage", badStorage);
     expect(() => cacheManifests([exampleManifest])).not.toThrow();
+  });
+
+  it("drops a legacy-branded cached manifest (the 404 /plugins/hermes-achievements entry)", () => {
+    const legacy: PluginManifest = {
+      ...exampleManifest,
+      name: "hermes-achievements",
+      assetBase: "/plugins/hermes-achievements",
+    };
+    storage.setItem(MANIFEST_CACHE_KEY, JSON.stringify([legacy, exampleManifest]));
+    const got = getCachedManifests();
+    expect(got).toEqual([exampleManifest]);
+    expect(got?.some((m) => m.name === "hermes-achievements")).toBe(false);
+  });
+
+  it("purges the pre-rename cache key on read so the stale entry cannot survive", () => {
+    const legacy: PluginManifest = {
+      ...exampleManifest,
+      name: "hermes-achievements",
+      assetBase: "/plugins/hermes-achievements",
+    };
+    storage.setItem(
+      LEGACY_MANIFEST_CACHE_KEYS[0],
+      JSON.stringify([legacy]),
+    );
+    getCachedManifests();
+    expect(storage.getItem(LEGACY_MANIFEST_CACHE_KEYS[0])).toBeNull();
+  });
+
+  it("cacheManifests never persists a legacy-branded manifest", () => {
+    const legacy: PluginManifest = {
+      ...exampleManifest,
+      name: "hermes-achievements",
+      assetBase: "/plugins/hermes-achievements",
+    };
+    cacheManifests([legacy, exampleManifest]);
+    const raw = storage.getItem(MANIFEST_CACHE_KEY);
+    expect(raw).not.toContain("hermes");
+    expect(getCachedManifests()).toEqual([exampleManifest]);
+  });
+});
+
+describe("manifest sanitizer", () => {
+  it("flags legacy names or asset roots, never a canonical qubit manifest", () => {
+    expect(
+      isLegacyBrandedManifest({
+        ...exampleManifest,
+        assetBase: "/plugins/hermes-achievements",
+      }),
+    ).toBe(true);
+    expect(
+      isLegacyBrandedManifest({ ...exampleManifest, name: "openclaw-x" }),
+    ).toBe(true);
+    expect(
+      isLegacyBrandedManifest({
+        ...exampleManifest,
+        name: "qubit-achievements",
+        assetBase: "/plugins/qubit-achievements",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps only canonical manifests and tolerates malformed entries", () => {
+    const list = sanitizeManifests([
+      exampleManifest,
+      { ...exampleManifest, name: "hermes-achievements" },
+      null as unknown as PluginManifest,
+    ]);
+    expect(list).toEqual([exampleManifest]);
   });
 });
 

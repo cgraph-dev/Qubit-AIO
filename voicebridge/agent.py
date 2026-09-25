@@ -343,6 +343,17 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     # Canonical session id: an empty/voice-default alias maps to the one
     # canonical conversation; an explicit id is preserved exactly.
     sid = resolve_session_id(cfg, session)
+    # Honor the session's persisted reasoning preference (the /qubit-chat
+    # selector): a voice/PTT/worker turn must apply the same output budget the
+    # text turn does. Unreadable/invalid preference degrades to None so a
+    # corrupt value can never brick a voice turn (per-request callers still win
+    # on agent.turn).
+    try:
+        from .chat_transport import session_reasoning
+
+        reasoning = session_reasoning(cfg, sid)
+    except Exception:  # noqa: BLE001 - preference is advisory
+        reasoning = None
     if not clean:
         return {"state": "FAILED", "code": "MALFORMED",
                 "detail": "session needs non-empty task text",
@@ -408,7 +419,7 @@ def run_session(cfg: Any, task_text: str, *, session: str,
         res = _gateway.run_role(
             prompt, cfg, role="chat", model=_model(cfg),
             max_tokens=1024, timeout_s=min(budget, 300.0),
-            local_mode="chat", should_stop=check)
+            local_mode="chat", should_stop=check, reasoning=reasoning)
     except Exception as exc:  # noqa: BLE001 - typed, redacted
         return {"state": "FAILED", "code": "MODEL_ERROR",
                 "detail": _redact(str(exc))[:300], "session": sid,

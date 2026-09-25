@@ -507,7 +507,7 @@
     },
     {
       "path": "tests/fixtures/differential/dashboard/drift_achievements_share.json",
-      "sha256": "53945b29ad1925c063052e798c4c690c02a94183a7464678d321b870d89601a7",
+      "sha256": "9825126cc86ad0186fea91bd66d86c667bf8129609af560b0a99ecb99ffb15f1",
       "family": "dashboard",
       "fixture_id": "drift.achievements.share"
     },

@@ -215,9 +215,11 @@ _CLI_COVERAGE = {
     # SAME voice-registry ids its `profile model` / `flags` / `package` /
     # `schedules` counterpart already uses, so the single-clear invariant holds
     # without a second store or a fabricated voice surface.
-    # Owner Decision #11: the sanctioned native update surface maps to the same
-    # `update_status` voice intent the dashboard update card uses.
-    "update": ("update_status",),
+    # Owner Decision #11: the sanctioned native update surface maps to the
+    # canonical update voice intents backing the dashboard update card. All four
+    # route to the SAME `update_manager` backend the CLI/dashboard use.
+    "update": ("update_status", "update_check", "update_apply",
+               "update_rollback"),
     "model": ("config_profiles",),
     "config": ("config_profiles", "auth_status"),
     "doctor": ("doctor", "diagnostics"),
@@ -445,6 +447,14 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_sub = mcp_p.add_subparsers(dest="mcp_command")
     mcp_sub.add_parser("status", parents=[common],
                        help="list configured MCP servers without mounting anything")
+    # Read spellings the vendored parser used to own. They read the ONE
+    # canonical Qubit MCP registry (``voicebridge.mcp_servers``), never the
+    # fork's second ``config.yaml mcp_servers`` store, so a dashboard-created
+    # server is visible here exactly as it is in ``status``.
+    mcp_sub.add_parser("list", parents=[common],
+                       aliases=["ls", "config", "picker"],
+                       help="list configured MCP servers from the canonical "
+                            "Qubit registry (read-only)")
     mcp_inv = mcp_sub.add_parser(
         "invoke", parents=[common],
         help="call a tool on a configured MCP server (brokered; confirmed)")
@@ -1327,6 +1337,23 @@ def build_parser() -> argparse.ArgumentParser:
     up.add_argument("--source", default="",
                     help="override the update source: a git remote name or a "
                          "local repository/bundle path")
+    # SURFACES unification: the release channel/tag are resolved through the
+    # canonical update-channel resolver (same backend the other surfaces use).
+    # Additive and optional; when the resolver is absent a supplied
+    # channel/tag is a typed refusal rather than a silent no-op.
+    up.add_argument("--channel", default="",
+                    help="release channel to update from (resolved by the "
+                         "canonical update-channel backend)")
+    up.add_argument("--tag", default="",
+                    help="specific release tag to update from (resolved by the "
+                         "canonical update-channel backend)")
+    # Explicit operator confirmation for the mutating verbs. Owner Decision #11
+    # treats choosing the verb as intent, so this stays optional/backward
+    # compatible; when supplied it is honored as the one canonical confirm so
+    # CLI, dashboard, and voice share the same confirm input.
+    up.add_argument("--confirm", action="store_true",
+                    help="explicitly confirm a mutating --apply/--rollback "
+                         "(the verb alone is already explicit intent)")
     up.add_argument("--backup-dir", default=None,
                     help="explicit update backup directory (default: the Qubit "
                          "backup dir under <state>/backups/update/)")
@@ -5971,13 +5998,15 @@ def _cmd_skills(cfg, args) -> int:
 
                 try:
                     rec = _SC.set_skill_enabled(
-                        cfg, args.skill_id, True, requested_by="cli:user")
+                        cfg, args.skill_id, True, requested_by="cli:user",
+                        confirmed=bool(getattr(args, "confirm", False)))
                 except _SC.SkillAuthorityError as exc:
                     print(_json.dumps({"state": "failed", "code": exc.code,
                                        "detail": exc.detail}, indent=2))
                     return 2
                 out = {"state": "OK", "enabled": rec["enabled"],
-                       "origin": rec["origin"], "skill_id": rec["skill_id"]}
+                       "origin": rec["origin"], "skill_id": rec["skill_id"],
+                       "status": rec.get("status")}
         elif cmd == "disable":
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_disable": args.skill_id}
@@ -5986,13 +6015,15 @@ def _cmd_skills(cfg, args) -> int:
 
                 try:
                     rec = _SC.set_skill_enabled(
-                        cfg, args.skill_id, False, requested_by="cli:user")
+                        cfg, args.skill_id, False, requested_by="cli:user",
+                        confirmed=bool(getattr(args, "confirm", False)))
                 except _SC.SkillAuthorityError as exc:
                     print(_json.dumps({"state": "failed", "code": exc.code,
                                        "detail": exc.detail}, indent=2))
                     return 2
                 out = {"state": "OK", "enabled": rec["enabled"],
-                       "origin": rec["origin"], "skill_id": rec["skill_id"]}
+                       "origin": rec["origin"], "skill_id": rec["skill_id"],
+                       "status": rec.get("status")}
         elif cmd == "remove":
             if getattr(args, "dry_run", False):
                 out = {"state": "preview", "would_remove": args.skill_id}
@@ -6410,6 +6441,40 @@ def _print_update_check(out) -> None:
               f"(daemon: {rt.get('daemon')})")
 
 
+def _update_resolve_channel(cfg, source, channel, tag):
+    """Resolve a channel/tag (or bare source) to the git remote string.
+
+    ``voicebridge.update_channel`` is the canonical resolver; it is optional and
+    may be absent, in which case a supplied channel/tag is a typed refusal
+    (never a silent no-op) while a bare ``source`` passes through unchanged.
+    ``resolve_source`` returns a policy dict; the manager's ``source`` argument
+    is the git remote **name**, so ``.remote`` is extracted. A refused URL
+    (``ok=False``) is surfaced as a typed error before any verb runs.
+    """
+    channel = str(channel or "").strip()
+    tag = str(tag or "").strip()
+    src = str(source or "").strip() or None
+    if not channel and not tag:
+        return src
+    import importlib.util as _ilu
+
+    if _ilu.find_spec("voicebridge.update_channel") is None:
+        raise ValueError(
+            "update channels/tags require the Qubit update-channel support; "
+            "update from a release source instead (--source)")
+    from . import update_channel as UC
+
+    resolved = UC.resolve_source(cfg, src)
+    if channel:
+        resolved["channel"] = channel
+    if tag:
+        resolved["tag"] = tag
+    if not resolved.get("ok", True):
+        raise ValueError(str(resolved.get("detail")
+                             or resolved.get("code") or "update source refused"))
+    return str(resolved.get("remote") or src or "").strip() or src
+
+
 def _cmd_update(cfg, args) -> int:
     """qubit update --check|--apply|--rollback (Owner Decision #11).
 
@@ -6421,6 +6486,11 @@ def _cmd_update(cfg, args) -> int:
     runs the non-destructive fast-forward. `--rollback` restores the recorded
     pre-apply revision from the most recent update backup and writes a
     pre-rollback snapshot first, so the rollback is itself reversible.
+
+    All surfaces route through the ONE canonical backend: ``--apply`` prefers
+    ``update_manager.full_apply`` (the full lifecycle) and otherwise reproduces
+    the identical snapshot -> apply(confirm=True) sequence on the same manager
+    primitives, so this command and the dashboard/voice handlers never diverge.
     """
     import json as _json
     from . import update_manager as UM
@@ -6438,11 +6508,30 @@ def _cmd_update(cfg, args) -> int:
         return 2
     verb = verbs[0] if verbs else "check"
     source = str(getattr(args, "source", "") or "").strip() or None
+    channel = str(getattr(args, "channel", "") or "").strip() or None
+    tag = str(getattr(args, "tag", "") or "").strip() or None
     backup_dir = getattr(args, "backup_dir", None) or None
     as_json = bool(getattr(args, "json", False))
 
+    # Resolve a channel/tag through the canonical update-channel backend before
+    # any verb runs (check included). An absent resolver is a typed refusal.
+    try:
+        source = _update_resolve_channel(cfg, source, channel, tag)
+    except Exception as exc:  # noqa: BLE001
+        out = {"ok": False, "state": "FAILED", "code": "UPDATE_CHANNEL_UNKNOWN",
+               "detail": str(exc)}
+        if as_json:
+            print(_json.dumps(out, indent=2, sort_keys=True))
+        else:
+            _print_update_receipt(out, False)
+        return 2
+
     if verb == "check":
         out = UM.check(cfg, source=source)
+        for key in ("channel", "tag"):
+            value = locals().get(key)
+            if value:
+                out[key] = value
         rt = _update_runtime_state(cfg)
         if rt is not None:
             out["runtime_image"] = rt
@@ -6471,14 +6560,40 @@ def _cmd_update(cfg, args) -> int:
         return 3
 
     if verb == "apply":
-        snap = UM.snapshot(cfg, reason="pre-apply", source=source,
-                           backup_dir=backup_dir, actor="cli:update")
-        if not snap.get("ok"):
-            _print_update_receipt(snap, as_json)
-            return _update_rc(snap)
-        out = UM.apply(cfg, confirm=True, source=source, actor="cli:update")
-        out["backup_dir"] = snap.get("backup_dir")
-        out["backup_bundle"] = snap.get("bundle")
+        # Prefer the canonical full lifecycle when it lands; otherwise run the
+        # identical snapshot -> apply(confirm=True) sequence on the same
+        # manager. Both go through one backend/policy/e-stop/audit path. The
+        # full lifecycle's exact keyword surface may evolve, so only the
+        # arguments it actually accepts are forwarded (never a TypeError).
+        full = getattr(UM, "full_apply", None)
+        if full is not None:
+            kwargs = {"confirm": True, "source": source, "actor": "cli:update"}
+            if channel:
+                kwargs["channel"] = channel
+            import inspect as _inspect
+            try:
+                params = _inspect.signature(full).parameters
+                # A variadic callee (**kwargs) can take every argument, so
+                # never silently drop ``confirm``/``channel`` from it; only
+                # filter when the signature is fixed and would TypeError.
+                variadic = any(p.kind == _inspect.Parameter.VAR_KEYWORD
+                               for p in params.values())
+                accepted = set(params)
+            except (TypeError, ValueError):
+                variadic, accepted = True, set(kwargs)
+            forwarded = (kwargs if variadic else
+                         {k: v for k, v in kwargs.items() if k in accepted})
+            out = full(cfg, **forwarded)
+        else:
+            snap = UM.snapshot(cfg, reason="pre-apply", source=source,
+                               backup_dir=backup_dir, actor="cli:update")
+            if not snap.get("ok"):
+                _print_update_receipt(snap, as_json)
+                return _update_rc(snap)
+            out = UM.apply(cfg, confirm=True, source=source,
+                           actor="cli:update")
+            out["backup_dir"] = snap.get("backup_dir")
+            out["backup_bundle"] = snap.get("bundle")
         _print_update_receipt(out, as_json)
         return _update_rc(out)
 

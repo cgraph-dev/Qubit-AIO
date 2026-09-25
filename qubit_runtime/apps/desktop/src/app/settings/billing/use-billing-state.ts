@@ -8,8 +8,19 @@ import { resolveRefusal } from './errors'
 import type { BillingStateResponse, SubscriptionStateResponse, SubscriptionTierOption, UsageModelData } from './types'
 
 export const EMPTY_BILLING_VALUE = '—'
-export const FALLBACK_PORTAL_BILLING_URL = 'https://portal.nousresearch.com/billing'
-export const FALLBACK_PORTAL_URL = 'https://portal.nousresearch.com'
+/**
+ * Last-resort portal origin for signed-in account actions. Qubit does not ship
+ * a hard-coded portal: set `VITE_QUBIT_PORTAL_URL` at build time to the Qubit
+ * account portal. When unset, portal-only affordances are omitted rather than
+ * pointing at a foreign service.
+ */
+const CONFIGURED_PORTAL_URL = String(import.meta.env.VITE_QUBIT_PORTAL_URL || '').replace(/\/+$/, '')
+export const FALLBACK_PORTAL_URL = CONFIGURED_PORTAL_URL
+export const FALLBACK_PORTAL_BILLING_URL = CONFIGURED_PORTAL_URL ? `${CONFIGURED_PORTAL_URL}/billing` : ''
+
+function portalAction(label: string, url?: null | string): { label: string; url: string } | undefined {
+  return url ? { label, url } : undefined
+}
 
 // The billing endpoint is the authoritative source of truth for balance / cap /
 // plan — the inference `x-nous-credits-*` headers are best-effort and can drift
@@ -96,7 +107,11 @@ export type BillingPlanCardView = {
   pending?: PendingPlanTransition
   price?: string
   tierName: string
-} & ({ action: { label: string }; link?: undefined } | { action?: undefined; link: { label: string; url: string } })
+} & (
+  | { action: { label: string }; link?: undefined }
+  | { action?: undefined; link: { label: string; url: string } }
+  | { action?: undefined; link?: undefined }
+)
 
 interface BillingPlanTierBase {
   creditsDisplay?: string
@@ -199,7 +214,10 @@ export function deriveBillingView(
   if (!billing.logged_in || subscription?.logged_in === false) {
     return {
       notice: {
-        action: { label: 'Open portal ↗', url: billing.portal_url ?? subscription?.portal_url ?? FALLBACK_PORTAL_URL },
+        action: portalAction(
+          'Open portal ↗',
+          billing.portal_url ?? subscription?.portal_url ?? FALLBACK_PORTAL_URL
+        ),
         message: 'Run /portal in the TUI or open the Qubit portal to connect your account.',
         title: 'Connect your Qubit account'
       },
@@ -247,7 +265,7 @@ export function buildManageSubscriptionUrl(
   // (validated server-side by the NAS reader, draft #748).
   tierId?: null | string
 ): string {
-  // The hard-coded portal is the LAST-RESORT origin, not a bare early return:
+  // The configured portal is the LAST-RESORT origin, not a bare early return:
   // org_id / plan must still be applied to it so a null portal_url never silently
   // strips the params that route the user to the right org + pre-selected tier.
   const portalUrls = [subscription?.portal_url, fallbackPortalUrl, FALLBACK_PORTAL_BILLING_URL].filter(
@@ -318,7 +336,7 @@ function noCardNotice(billing: BillingStateResponse): BillingNoticeView | undefi
   }
 
   return {
-    action: { label: 'Add card ↗', url: billing.portal_url ?? FALLBACK_PORTAL_BILLING_URL },
+    action: portalAction('Add card ↗', billing.portal_url ?? FALLBACK_PORTAL_BILLING_URL),
     message: 'Buying top-up credits and auto-refill stay disabled until a card is on file. Add one on the portal.',
     title: 'No payment method on file',
     tone: 'warn'
@@ -413,17 +431,19 @@ function derivePlanCard(
     return { action: { label: current ? 'Change plan' : 'View plans' }, caption, pending, price, tierName }
   }
 
-  return {
-    caption,
-    // No in-app action → always hand off to the portal so the user isn't stranded.
-    link: {
-      label: 'Adjust plan ↗',
-      url: buildManageSubscriptionUrl(subscription, subscription?.portal_url ?? billing.portal_url)
-    },
-    pending,
-    price,
-    tierName
+  const portalUrl = buildManageSubscriptionUrl(subscription, subscription?.portal_url ?? billing.portal_url)
+
+  if (portalUrl) {
+    return {
+      caption,
+      link: { label: 'Adjust plan ↗', url: portalUrl },
+      pending,
+      price,
+      tierName
+    }
   }
+
+  return { caption, pending, price, tierName }
 }
 
 // The change scheduled at period end (undoable via subscription.resume). NAS may
@@ -501,7 +521,7 @@ function derivePlanTiers(
   // Only a downgrade has a target tier to mark; a cancellation has none.
   const pendingName = pending?.kind === 'downgrade' ? pending.tierName : null
 
-  return gridTiers.map((tier): BillingPlanTierView => {
+  return gridTiers.flatMap((tier): BillingPlanTierView[] => {
     const base: BillingPlanTierBase = {
       creditsDisplay: creditsPerMonthDisplay(tier.monthly_credits),
       name: tier.name,
@@ -510,7 +530,7 @@ function derivePlanTiers(
     }
 
     if (currentTier && tier.tier_id === currentTier.tier_id) {
-      return { ...base, state: 'current' }
+      return [{ ...base, state: 'current' }]
     }
 
     // A scheduled downgrade target is inert (matched by name — NAS sends no id for
@@ -518,20 +538,25 @@ function derivePlanTiers(
     // NAS, so two tiers can't collide. Checked before the downgrade branch since the
     // target IS a lower tier.
     if (pendingName && tier.name === pendingName) {
-      return { ...base, state: 'scheduled' }
+      return [{ ...base, state: 'scheduled' }]
     }
 
     // Downgrade = strictly below the current tier's order → an in-app chargeless
     // change (the PlanCard wires the confirm flow by tierId).
     if (currentOrder != null && tier.tier_order < currentOrder) {
-      return { ...base, state: 'downgrade' }
+      return [{ ...base, state: 'downgrade' }]
     }
 
-    return {
-      ...base,
-      action: { label: 'Choose ↗', url: buildManageSubscriptionUrl(subscription, manageBase, tier.tier_id) },
-      state: 'upgrade'
+    const url = buildManageSubscriptionUrl(subscription, manageBase, tier.tier_id)
+
+    // An upgrade needs a portal to open; with no portal origin resolvable
+    // (no backend portal_url and no configured Qubit portal) omit the tile
+    // rather than render a dead "Choose" click.
+    if (!url) {
+      return []
     }
+
+    return [{ ...base, action: { label: 'Choose ↗', url }, state: 'upgrade' }]
   })
 }
 
@@ -544,7 +569,7 @@ function paymentMethodRow(billing: BillingStateResponse): BillingAccountRowView 
     // it. The reason (buys/auto-refill are blocked) already leads the page as a
     // notice, so the row stays a bare call-to-action with no redundant status text.
     return {
-      action: { label: 'Add payment method', url: portalUrl },
+      action: portalAction('Add payment method', portalUrl),
       description: '',
       id: 'payment_method',
       title: 'Payment method'
@@ -552,7 +577,7 @@ function paymentMethodRow(billing: BillingStateResponse): BillingAccountRowView 
   }
 
   return {
-    action: { label: 'Update', url: portalUrl },
+    action: portalAction('Update', portalUrl),
     description: 'Manage the card used for top-ups and subscription renewals.',
     id: 'payment_method',
     title: 'Payment method',
@@ -630,7 +655,7 @@ function autoReloadRow(billing: BillingStateResponse): BillingAccountRowView {
     const portalUrl = billing.portal_url ?? FALLBACK_PORTAL_BILLING_URL
 
     return {
-      action: { label: 'Reconcile ↗', url: portalUrl },
+      action: portalAction('Reconcile ↗', portalUrl),
       caption: `Auto-refill charges ${cardLabel} — reconcile on the portal`,
       description: AUTO_REFILL_GENERIC,
       id: 'auto_reload',

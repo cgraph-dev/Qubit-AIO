@@ -129,7 +129,7 @@ export function makeNousCloudBackendDownError(baseUrl: string, error: unknown): 
   const err = new Error(
     `Qubit Cloud agent ${hostname} is down ` +
       `(HTTP ${serverError.statusCode}: server-side fault). ` +
-      'Check https://portal.nousresearch.com for backend status, ' +
+      'Check your Qubit Cloud dashboard for backend status, ' +
       'or switch to Local mode in Settings → Gateway. ' +
       `Original detail: ${detail}`
   ) as any

@@ -6,7 +6,7 @@ state file, localization namespace, and workflow is inventoried in
 ``docs/archive/2026-09-21/HERMES_FRONTEND_MAP.json`` and checked against the real Qubit rendering
 paths (``frontend/qubit-web/**`` overlay + ``frontend/qubit-app/**``).
 
-The audit explicitly covers ``qubit_runtime/plugins/hermes-achievements/`` so a
+The audit explicitly covers ``qubit_runtime/plugins/qubit-achievements/`` so a
 generic badge/status-card imitation cannot pass: the 60+ catalog, the six REST
 routes, the durable state files, the served dashboard page, and the
 product-identity normalization are all asserted from real artifacts.
@@ -29,12 +29,21 @@ MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
 FW = REPO_ROOT / "frontend" / "qubit-web"
 QH = REPO_ROOT / "frontend" / "qubit-app"
 PINNED = REPO_ROOT / "qubit_runtime" / "plugins"
-ACH_API = PINNED / "hermes-achievements" / "dashboard" / "plugin_api.py"
-ACH_BUNDLE = (FW / "public" / "plugins" / "hermes-achievements" / "dist"
+ACH_API = PINNED / "qubit-achievements" / "dashboard" / "plugin_api.py"
+ACH_BUNDLE = (FW / "public" / "plugins" / "qubit-achievements" / "dist"
               / "index.js")
 APP_TSX = FW / "src" / "App.tsx"
 
 UPSTREAM_RE = re.compile(r"\bHermes\b|\bOpenClaw\b")
+
+# The frozen upstream map records the pre-rename local identity and paths
+# (``hermes-achievements``); translate to the Qubit-owned local identity
+# (``qubit-achievements``) when checking on-disk artifacts.
+_LOCAL_NAME = {"hermes-achievements": "qubit-achievements"}
+
+
+def _local_path(value: str) -> str:
+    return str(value).replace("hermes-achievements", "qubit-achievements")
 
 
 def _doc():
@@ -123,12 +132,13 @@ def test_pinned_and_overlay_plugin_inventory_matches_disk():
     pinned = {r["name"]: r for r in inv["plugins"]["pinned"]}
     assert set(pinned) == {"hermes-achievements", "kanban"}
     for name, row in pinned.items():
-        man = REPO_ROOT / row["manifest"]
+        local = _LOCAL_NAME.get(name, name)
+        man = REPO_ROOT / _local_path(row["manifest"])
         assert man.is_file(), man
         disk = json.loads(man.read_text(encoding="utf-8"))
-        assert disk["name"] == name
+        assert disk["name"] == local
         assert disk["tab"]["path"] == row["tab"]["path"]
-        assert REPO_ROOT.joinpath(row["bundle_served"]).is_file()
+        assert REPO_ROOT.joinpath(_local_path(row["bundle_served"])).is_file()
 
     overlay = {r["name"] for r in inv["plugins"]["overlay"]}
     disk_overlay = {p.parent.name for p in (QH / "plugins").glob(
@@ -140,7 +150,7 @@ def test_pinned_and_overlay_plugin_inventory_matches_disk():
 
     fleet = {e["name"] for e in json.loads(
         (FW / "public" / "plugins" / "fleet.json").read_text())}
-    assert fleet == {"hermes-achievements", "kanban"}
+    assert fleet == {"qubit-achievements", "kanban"}
 
 
 def test_plugin_apis_are_real_routes():
@@ -174,15 +184,15 @@ def test_achievements_state_assets_and_page_are_real():
     audit = _doc()["achievements_audit"]
     assert audit["backend_present"] and audit["api_present"]
     assert audit["persistence_present"] and audit["dashboard_page_present"]
-    assert (REPO_ROOT / audit["dashboard_page_file"]).is_file()
+    assert (REPO_ROOT / _local_path(audit["dashboard_page_file"])).is_file()
     api_text = ACH_API.read_text(encoding="utf-8")
     for name in ("state.json", "scan_snapshot.json", "scan_checkpoint.json"):
         assert name in api_text, name
     for asset in audit["assets_present"]:
-        assert (PINNED / "hermes-achievements" / asset).is_file(), asset
+        assert (PINNED / "qubit-achievements" / asset).is_file(), asset
     for state in audit["states"]:
         assert state in api_text, state
-    assert (PINNED / "hermes-achievements" / "tests"
+    assert (PINNED / "qubit-achievements" / "tests"
             / "test_achievement_engine.py").is_file()
 
 
@@ -230,7 +240,7 @@ def test_achievements_payload_is_normalized_at_the_render_boundary(
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert status == 200 and isinstance(payload, dict), (status, payload)
 
     # Apply the exact contract the bundle implements to the real payload.
@@ -251,7 +261,7 @@ def test_shipped_normalizer_rebrands_the_real_backend_payload(
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements", {}, {})
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements", {}, {})
     assert status == 200
 
     bundle = ACH_BUNDLE.read_text(encoding="utf-8")

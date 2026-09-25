@@ -623,7 +623,7 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
           kind: 'warning',
           title: copy.nousAuthNeededTitle,
           message: copy.nousAuthNeededMessage(provider.name),
-          action: { label: copy.nousAuthSignIn, onClick: () => void signInToNousPortal() }
+          action: { label: copy.nousAuthSignIn, onClick: () => void signInToLabsPortal() }
         })
 
         return
@@ -641,7 +641,7 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
   // Drive the existing Qubit Labs OAuth device-code flow (the same session
   // machinery onboarding uses: start → open verification URL → poll), then
   // refetch the toolset config so is_active / status flip once entitled.
-  async function signInToNousPortal() {
+  async function signInToLabsPortal() {
     try {
       const start = await startOAuthLogin('nous', profile)
 

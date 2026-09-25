@@ -304,6 +304,7 @@ export default function PluginsPage() {
   const [installForce, setInstallForce] = useState(false);
   const [installEnable, setInstallEnable] = useState(true);
   const [installBusy, setInstallBusy] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
   const [rescanBusy, setRescanBusy] = useState(false);
   const [memorySel, setMemorySel] = useState(MEMORY_PROVIDER_BUILTIN);
   const [memoryConfig, setMemoryConfig] = useState<MemoryProviderConfig | null>(null);
@@ -493,8 +494,9 @@ export default function PluginsPage() {
 
   const onInstall = async () => {
     const id = installId.trim();
+    setInstallError(null);
     if (!id) {
-      showToast(t.pluginsPage.installHint, "error");
+      setInstallError(t.pluginsPage.installHint);
       return;
     }
     setInstallBusy(true);
@@ -511,19 +513,20 @@ export default function PluginsPage() {
       setInstallId("");
       await loadHub();
     } catch (e) {
-      // Surface the typed refusal honestly. A staged confirmation owns the
-      // shared settle round-trip (installAgentPlugin sends confirm: true), so
-      // anything reaching here is a real policy refusal — remote Git installs
-      // answer BLOCKED_REMOTE_PLUGIN. Name the prerequisite rather than a raw
-      // "403: {…}" string, and never claim success.
+      // Surface the typed refusal honestly and persistently. A staged
+      // confirmation owns the shared settle round-trip (installAgentPlugin
+      // sends confirm: true), so anything reaching here is a real policy
+      // refusal — remote Git installs answer BLOCKED_REMOTE_PLUGIN, an
+      // unreviewed/absent path answers PLUGIN_INSTALL_SOURCE. Name the
+      // prerequisite rather than a raw "400: {…}" string, never claim success,
+      // and keep the reason visible (the transient toast can be missed).
       const detail = e instanceof Error ? e.message : String(e);
       const remote = detail.includes("BLOCKED_REMOTE_PLUGIN");
-      showToast(
-        remote
-          ? "Remote Git install refused by policy (BLOCKED_REMOTE_PLUGIN). Use a reviewed local directory or *.json manifest, or the operator-gated `qubit agent plugins install`."
-          : detail || "Install failed",
-        "error",
-      );
+      const message = remote
+        ? "Remote Git install refused by policy (BLOCKED_REMOTE_PLUGIN). Use a reviewed local directory or *.json manifest, or the operator-gated `qubit agent plugins install`."
+        : refusalOrError(e, detail || "Install failed");
+      setInstallError(message);
+      showToast(message, "error");
     } finally {
       setInstallBusy(false);
     }
@@ -960,8 +963,13 @@ export default function PluginsPage() {
                 id="install-url"
                 placeholder="/path/to/reviewed-plugin or /path/to/plugin.json"
                 spellCheck={false}
+                aria-invalid={installError ? true : undefined}
+                aria-describedby={installError ? "plugin-install-error" : undefined}
                 value={installId}
-                onChange={(e) => setInstallId(e.target.value)}
+                onChange={(e) => {
+                  setInstallId(e.target.value);
+                  if (installError) setInstallError(null);
+                }}
               />
             </div>
 
@@ -1004,6 +1012,16 @@ export default function PluginsPage() {
             >
               {t.pluginsPage.installBtn}
             </Button>
+
+            {installError ? (
+              <p
+                data-testid="plugin-install-error"
+                role="alert"
+                className="border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive [overflow-wrap:anywhere]"
+              >
+                {installError}
+              </p>
+            ) : null}
 
             <p className="text-xs tracking-[0.06em] text-text-tertiary">
               {t.pluginsPage.rescanHint}

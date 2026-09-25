@@ -1,0 +1,147 @@
+{
+  "agent": "A5",
+  "artifact": "REBRAND_LEAKS",
+  "scanned_head": "badbb2756dd7b24a2acb30ccc50725d82f2cda37",
+  "method": "rg -F over named roots with excludes: .git, node_modules, .venv, graft, __pycache__, dist; docs/archive/ excluded per brief; LICENSE and THIRD_PARTY_NOTICES excluded from leak judgment (legal). frontend/qubit-dist included on purpose (served bundle).",
+  "tokens": ["Hermes", "HERMES", "hermes", "NousResearch", "Nous Research", "NousPortal", "OpenClaw", "openclaw"],
+  "classification_enum": [
+    "Required compatibility identifier (wire/db/env name)",
+    "Legal/provenance attribution",
+    "Migration-only alias",
+    "Test fixture/history data",
+    "Unapproved public leak"
+  ],
+  "excluded_from_leak_judgment": [
+    "docs/archive/** (historical-only per Owner Decision #24)",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/differential/INTERFACE.md (frozen contract)"
+  ],
+  "live_file_counts_by_token": {
+    "Hermes": 864,
+    "HERMES": 1511,
+    "hermes": 4311,
+    "NousResearch": 403,
+    "Nous Research": 28,
+    "NousPortal": 33,
+    "OpenClaw": 74,
+    "openclaw": 136
+  },
+  "live_file_counts_by_area_any_token": {
+    "qubit_runtime/apps": 1171,
+    "qubit_runtime/website": 565,
+    "tests": 441,
+    "qubit_runtime/qubit_cli": 255,
+    "docs": 207,
+    "qubit_runtime/tools": 129,
+    "qubit_runtime/agent": 112,
+    "voicebridge": 68,
+    "scripts": 40,
+    "qubit_runtime/web": 34,
+    "frontend/qubit-web/src": 25,
+    "frontend/qubit-app": 12
+  },
+  "summaries": {
+    "legal_provenance": "LICENSE/THIRD_PARTY_NOTICES and the generated manifests' upstream_repo/upstream_license fields. Must not be changed.",
+    "required_compat_identifiers": "Wire/protocol, env, DB, and registry ids. Renaming them without an adapter breaks the served SPA, existing installs, or persisted state.",
+    "migration_only_aliases": "Read-old/write-new fallbacks and legacy home/name adoption. Safe to retire after a migration window.",
+    "test_fixture_history": "tests/**, docs/generated ledgers, parity artifacts, sample sessions. Not shipped product surfaces.",
+    "unapproved_public_leaks": "Actionable: user-visible/served/repo-advertised legacy strings that are Qubit-owned and safe (or adapter-backed) to de-brand."
+  },
+  "safe_to_rename_now": [
+    {
+      "item": "qubit_dist bundled plugin id/path 'hermes-achievements'",
+      "files": [
+        "frontend/qubit-dist/plugins/fleet.json:2 (name)",
+        "frontend/qubit-dist/plugins/hermes-achievements/dist/index.js",
+        "frontend/qubit-web/src/pages/DocsPage.test.tsx:37",
+        "voicebridge/voice_commands.py:11844",
+        "voicebridge/qubit_compat.py:7141,7145",
+        "voicebridge/qubit_asgi.py:69"
+      ],
+      "classification": "Unapproved public leak",
+      "why_safe": "Qubit-owned bundled plugin (source: 'bundled'). Its route literal /api/plugins/hermes-achievements/* is a compat alias that can be served alongside a Qubit-canonical /api/plugins/achievements/* until the plugin and its state are migrated.",
+      "requires_adapter": true
+    },
+    {
+      "item": "User-facing help/error strings naming legacy command/home",
+      "files": [
+        "qubit_runtime/qubit_cli/auth.py:1465-1466 ('... in ~/.hermes/.env.')",
+        "qubit_runtime/qubit_cli/uninstall.py:459 (\"Run 'hermes' to use the CLI,\")",
+        "qubit_runtime/qubit_cli/auth_commands.py:798 ('Reference behavior: `hermes auth upgrade` ...')",
+        "qubit_runtime/qubit_cli/_parser.py:87 (example 'qubit -s hermes-agent-dev,github-auth')",
+        "qubit_runtime/qubit_cli/gateway.py:5078,5388 ('~/.hermes/.env')",
+        "qubit_runtime/qubit_cli/proxy_cli.py:160 ('from ~/.hermes/.env')"
+      ],
+      "classification": "Unapproved public leak",
+      "why_safe": "These are literal prose/errors; functional credential resolution already routes through get_qubit_home()/get_env_path(). Fixing the text needs no adapter. The auth.py error path is also functionally wrong for Qubit (points users at the external reference home).",
+      "requires_adapter": false
+    },
+    {
+      "item": "Qubit-home persisted CLI history filename '.hermes_history'",
+      "files": [
+        "qubit_runtime/qubit_cli/cli_init_mixin.py:303",
+        "voicebridge/qubit_migration.py:58,130,1583,1589"
+      ],
+      "classification": "Migration-only alias",
+      "why_safe": "Stored inside QUBIT_HOME. Rename to a Qubit name with read-old fallback; the importer already treats it as a read-only source.",
+      "requires_adapter": true
+    },
+    {
+      "item": "localStorage read-old keys in the served bundle",
+      "files": [
+        "frontend/qubit-dist/assets/api-C8CGGVn4.js ('hermes.tokenReloadAttempted')",
+        "frontend/qubit-dist/assets/index-CSirZ4gZ.js ('hermes-sidebar-collapsed')",
+        "frontend/qubit-web/src/i18n/context.tsx:78 ('hermes-locale')",
+        "frontend/qubit-web/src/App.tsx:395 ('hermes-sidebar-collapsed')",
+        "frontend/qubit-web/src/themes/context.tsx:38,46 ('hermes-dashboard-*')"
+      ],
+      "classification": "Migration-only alias",
+      "why_safe": "Browser-local preference migration already implemented (read legacy once, write Qubit key, remove legacy). No wire impact.",
+      "requires_adapter": true
+    }
+  ],
+  "required_compatibility_identifiers_do_not_rename_without_adapter": [
+    {"item": "X-Hermes-Session-Token", "files": ["frontend/qubit-dist/assets/api-C8CGGVn4.js", "frontend/qubit-web/src/lib/api.ts:79", "voicebridge/webui.py"], "why": "HTTP header contract between SPA and backend."},
+    {"item": "__HERMES_SESSION_TOKEN__ / __HERMES_BASE_PATH__ / __HERMES_AUTH_REQUIRED__ / __HERMES_PLUGINS__ / __HERMES_PLUGIN_SDK__", "files": ["voicebridge/webui.py:1374-1376", "frontend/qubit-web/src/lib/api.ts:67-79", "frontend/qubit-web/src/plugins/slots.ts:6", "frontend/qubit-app/plugins/*/*.js"], "why": "Server-injected globals and the plugin SDK contract; rename requires a coordinated server+SPA+plugin change."},
+    {"item": "HERMES_HOME (and HERMES_QWEN_, HERMES_INFERENCE_MODEL, HERMES_ACCEPT_HOOKS, HERMES_UID/GID, HERMES_HOME_MODE)", "files": ["qubit_runtime/qubit_cli/config.py:577,587", "qubit_runtime/qubit_cli/main_tui_launch.py:739,828,837", "qubit_runtime/qubit_cli/_parser.py:128,156", "frontend/qubit-web/src/pages/EnvPage.tsx:54,56"], "why": "Environment/wire identifiers; QUBIT_* aliases exist for some (main_tui_launch maps HERMES_INFERENCE_MODEL->QUBIT_INFERENCE_MODEL) but the legacy names are still advertised and read."},
+    {"item": "NOUS_ env prefix -> display 'Qubit Labs'", "files": ["frontend/qubit-web/src/pages/EnvPage.tsx:47-48", "frontend/qubit-dist/assets/EnvPage-D3EJ8wDh.js"], "why": "Provider credential grouping prefix; display name already Qubit. Env keys render as text, so change only with a provider-catalog adapter."},
+    {"item": "hermes-index skill-hub source id", "files": ["qubit_runtime/tools/skills_hub_official.py:283", "qubit_runtime/qubit_cli/web_routers/skills.py:33 ('hermes-index': 'Qubit Index')", "frontend/qubit-web/src/pages/SkillsPage.tsx:1233,1243", "frontend/qubit-dist/assets/SkillsPage-D16lvzua.js"], "why": "Data id in skill-hub API responses; display already maps to 'Qubit Index'. Rename needs a backend id migration + SPA + client adapter."},
+    {"item": "Plugin namespace /api/plugins/hermes-achievements/* and /api/hermes/update* (migration alias)", "files": ["voicebridge/qubit_compat.py:7145", "voicebridge/qubit_compat.py (GATED /api/hermes/update.*)"], "why": "Explicitly documented as migration/compat aliases; omitted from served /docs (h_openapi _LEGACY_API_BRAND_RE)."}
+  ],
+  "migration_only_aliases": [
+    {"item": "openclaw-migration skill resolves to canonical qubit-migration", "files": ["qubit_runtime/agent/skill_utils.py", "qubit_runtime/optional-skills/migration/qubit-migration"]},
+    {"item": "HERMES_HOME -> QUBIT_HOME adoption shim", "files": ["voicebridge/qubit_legacy.py:4,34,43,92"]},
+    {"item": "Legacy home names qubit/hermes-runtime/hermes migrated read-only", "files": ["voicebridge/qubit_runtime.py:326,_LEGACY_HOME_NAMES"]},
+    {"item": "Qubit CLI history '.hermes_history' in QUBIT_HOME", "files": ["qubit_runtime/qubit_cli/cli_init_mixin.py:303"]}
+  ],
+  "legal_provenance_attribution": [
+    {"item": "LICENSE + THIRD_PARTY_NOTICES.md upstream copyright", "files": ["LICENSE", "THIRD_PARTY_NOTICES.md"], "why": "Required by license; must remain."},
+    {"item": "Generated manifest provenance fields", "files": ["docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json (upstream_repo=https://github.com/NousResearch/hermes-agent, upstream_license='MIT License, Copyright (c) 2025 Nous Research')", "docs/generated/HERMES_SOURCE_COMPARISON.json"], "why": "Vendored-code provenance record; keep."},
+    {"item": "Third-party dependencies", "files": ["frontend/qubit-web/package.json:19 '@nous-research/ui': '0.18.2'", "frontend/qubit-web/package-lock.json"], "why": "Published npm package identity; cannot rename without forking. Absent from the built bundle (tree-shaken), so not a rendered surface."}
+  ],
+  "test_fixture_history_data": [
+    {"item": "Legacy tokens in test sources and fixtures", "files": ["frontend/qubit-web/src/pages/DocsPage.test.tsx:30,145,149 ('/api/hermes/update')", "tests/** 441 files", "qubit_runtime/tests/**"], "why": "Not shipped; test expectations must track real behavior."},
+    {"item": "Historical ledgers/manifests/audits", "files": ["docs/generated/QUBIT_GAP_LEDGER.hermes.json", "docs/generated/QUBIT_DASHBOARD_AUDIT_2026-09-23.json", "docs/QUBIT_HERMES_RUNTIME_CATALOG_2026-09-22.json"], "why": "Evidence artifacts; excluded from leak judgment."}
+  ],
+  "unapproved_public_leaks": [
+    {"id": "R-01", "severity": "HIGH", "item": "Runtime error tells users to put credentials in ~/.hermes/.env (also the forbidden external home)", "file": "qubit_runtime/qubit_cli/auth.py:1465-1466", "repro": "HOME=<iso> QUBIT_HOME=<iso> .venv/bin/qubit agent -z 'x' -m 2", "observed": "qubit -z: agent failed: No inference provider configured. ... set an API key (... ) in ~/.hermes/.env."},
+    {"id": "R-02", "severity": "MEDIUM", "item": "Uninstall help advertises the wrong command name 'hermes'", "file": "qubit_runtime/qubit_cli/uninstall.py:459", "repro": "rg -n \"Run 'hermes'\" qubit_runtime/qubit_cli/uninstall.py", "observed": "The Qubit agent is still installed. Run 'hermes' to use the CLI,"},
+    {"id": "R-03", "severity": "MEDIUM", "item": "Help example uses legacy-named bundled skill", "file": "qubit_runtime/qubit_cli/_parser.py:87", "repro": "qubit agent --help | rg hermes-agent-dev", "observed": "qubit -s hermes-agent-dev,github-auth  (rendered in `qubit agent --help`)"},
+    {"id": "R-04", "severity": "MEDIUM", "item": "Auth upgrade help prints 'Reference behavior: hermes auth upgrade ...'", "file": "qubit_runtime/qubit_cli/auth_commands.py:798", "repro": "rg -n 'hermes auth upgrade' qubit_runtime/qubit_cli", "observed": "Reference behavior: `hermes auth upgrade` signs the free tier into a Nous account and"},
+    {"id": "R-05", "severity": "MEDIUM", "item": "Served bundle ships a legacy-named bundled plugin id/path", "file": "frontend/qubit-dist/plugins/fleet.json:2 (and .../plugins/hermes-achievements/)", "repro": "rg -n 'hermes-achievements' frontend/qubit-dist/plugins/fleet.json", "observed": "name='hermes-achievements', assetBase='/plugins/hermes-achievements'"},
+    {"id": "R-06", "severity": "MEDIUM", "item": "Gateway setup prints '~/.hermes/.env' as the credential store", "file": "qubit_runtime/qubit_cli/gateway.py:5078,5388", "repro": "rg -n '\\.hermes/\\.env' qubit_runtime/qubit_cli/gateway.py", "observed": "'Qubit will store the returned account_id/token in ~/.hermes/.env.' / 'Set these env vars in ~/.hermes/.env: ...'"},
+    {"id": "R-07", "severity": "LOW", "item": "Env value disclosure text references the external home", "file": "qubit_runtime/qubit_cli/proxy_cli.py:160", "repro": "rg -n '\\.hermes/\\.env' qubit_runtime/qubit_cli/proxy_cli.py", "observed": "Loaded N provider key name(s) from ~/.hermes/.env for discovery."}
+  ],
+  "in_progress_deep_rebrand_targets": {
+    "qubit_runtime/apps": "1,171 files (desktop + bootstrap-installer); top-level package is qubit-desktop/productName Qubit but 879 src files still match lowercase 'hermes'. Not built by the installer.",
+    "qubit_runtime/website": "565 files (upstream docusaurus site).",
+    "qubit_runtime/web": "34 files (vendored web source; the served bundle is built from frontend/qubit-web instead).",
+    "qubit_runtime/qubit_cli": "255 files (identified for deep-rename slices per Owner Decision #22)."
+  },
+  "notes": [
+    "Do NOT rename the persisted wire/db/env identifiers (R-required list) without a compatibility adapter and read-old/write-new migration.",
+    "Do NOT touch LICENSE / THIRD_PARTY_NOTICES / docs/differential/INTERFACE.md / docs/archive/**.",
+    "The deep rebrand is a very large in-progress effort (thousands of files); the actionable, low-risk wins are R-01..R-07 plus the persistence aliases."
+  ]
+}

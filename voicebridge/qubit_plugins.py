@@ -1,6 +1,6 @@
 """Qubit-owned backend for the vendored Qubit dashboard plugin fleet.
 
-The pinned Qubit tree vendors ``plugins/hermes-achievements`` and
+The pinned Qubit tree vendors ``plugins/qubit-achievements`` and
 ``plugins/kanban`` with their real dashboard APIs and tests, but before this
 module they had no Qubit backend route or ledger row. This adapter exposes
 those plugin APIs through :mod:`voicebridge.qubit_compat` while keeping the
@@ -44,11 +44,11 @@ _BOUND_INSTALLED = False
 # The complete vendored Qubit plugin fleet, in the order the direct source
 # inventory records it. Exposed as the single authority for the fleet audit so
 # ``scripts/rebuild_ledger_hermes.py`` cannot drift from the tree it scans.
-# Only ``hermes-achievements`` and ``kanban`` declare a dashboard surface
+# Only ``qubit-achievements`` and ``kanban`` declare a dashboard surface
 # (``dashboard/manifest.json``); every other entry is an agent/provider plugin
 # with no dashboard route of its own, tracked under its own capability area.
 VENDORED_PLUGIN_FLEET: Tuple[str, ...] = (
-    "hermes-achievements", "kanban", "browser", "context_engine",
+    "qubit-achievements", "kanban", "browser", "context_engine",
     "cron_providers", "dashboard_auth", "disk-cleanup", "google_meet",
     "image_gen", "memory", "model-providers", "observability", "platforms",
     "security-guidance", "spotify", "teams_pipeline", "video_gen", "web",
@@ -274,7 +274,7 @@ def _install_scan_bound(engine: Any) -> None:
 
 def _achievements_engine(cfg: Any) -> Any:
     _prepare_runtime(cfg)
-    engine = _load_engine("hermes-achievements")
+    engine = _load_engine("qubit-achievements")
     _install_scan_bound(engine)
     return engine
 
@@ -289,7 +289,7 @@ def reset_plugin_caches() -> None:
     """
     global _ACTIVE_BOUND
     _ACTIVE_BOUND = _scan_limit()
-    engine = _ENGINES.get("hermes-achievements")
+    engine = _ENGINES.get("qubit-achievements")
     if engine is None:
         return
     engine._SNAPSHOT_CACHE = None
@@ -304,7 +304,7 @@ def reset_plugin_caches() -> None:
 
 
 # ---------------------------------------------------------------------------
-# hermes-achievements handlers
+# qubit-achievements handlers
 # ---------------------------------------------------------------------------
 
 def _achievements_payload(engine: Any) -> Dict[str, Any]:
@@ -326,10 +326,10 @@ def h_plugin_achievements(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         engine = _achievements_engine(cfg)
         globals()["_ACTIVE_BOUND"] = _scan_limit()
         payload = _achievements_payload(engine)
-        _harden_state(cfg, "hermes-achievements")
+        _harden_state(cfg, "qubit-achievements")
         return 200, payload
     except Exception as exc:
-        return _fail(exc, "hermes-achievements")
+        return _fail(exc, "qubit-achievements")
 
 
 def h_plugin_achievements_scan_status(
@@ -339,7 +339,7 @@ def h_plugin_achievements_scan_status(
         engine = _achievements_engine(cfg)
         return 200, engine._scan_status_payload()
     except Exception as exc:
-        return _fail(exc, "hermes-achievements")
+        return _fail(exc, "qubit-achievements")
 
 
 def h_plugin_achievements_recent_unlocks(
@@ -352,7 +352,7 @@ def h_plugin_achievements_recent_unlocks(
         return 200, sorted(unlocked, key=lambda a: a.get("unlocked_at") or 0,
                            reverse=True)[:20]
     except Exception as exc:
-        return _fail(exc, "hermes-achievements")
+        return _fail(exc, "qubit-achievements")
 
 
 def h_plugin_achievements_session_badges(
@@ -373,7 +373,7 @@ def h_plugin_achievements_session_badges(
                   for d, r in results if r["unlocked"]]
         return 200, {"session_id": session_id, "badges": badges}
     except Exception as exc:
-        return _fail(exc, "hermes-achievements")
+        return _fail(exc, "qubit-achievements")
 
 
 def h_plugin_achievements_rescan(
@@ -386,11 +386,11 @@ def h_plugin_achievements_rescan(
         engine = _achievements_engine(cfg)
         globals()["_ACTIVE_BOUND"] = _scan_limit()
         data = engine.evaluate_all(force=True)
-        _harden_state(cfg, "hermes-achievements")
+        _harden_state(cfg, "qubit-achievements")
         _audit("achievements_rescan", {"unlocked": data.get("unlocked_count")})
         return 200, {"ok": True, **data}
     except Exception as exc:
-        return _fail(exc, "hermes-achievements")
+        return _fail(exc, "qubit-achievements")
 
 
 def h_plugin_achievements_reset_state(
@@ -419,7 +419,7 @@ def h_plugin_achievements_reset_state(
         _audit("achievements_reset", {"ok": True})
         return 200, {"ok": True}
     except Exception as exc:
-        return _fail(exc, "hermes-achievements")
+        return _fail(exc, "qubit-achievements")
 
 
 # ---------------------------------------------------------------------------

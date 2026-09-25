@@ -10,34 +10,34 @@
       "qubit": {
         "gated": 51,
         "missing": 0,
-        "ported": 512,
-        "total": 563
+        "ported": 515,
+        "total": 566
       },
       "reference": {
-        "gated": 78,
-        "missing": 0,
+        "gated": 76,
+        "missing": 11,
         "ported": 737,
-        "total": 815
+        "total": 824
       }
     },
     "by_surface": {
       "cli": {
         "gated": 10,
-        "missing": 0,
+        "missing": 4,
         "ported": 374,
-        "total": 384
+        "total": 388
       },
       "control": {
         "gated": 51,
         "missing": 0,
-        "ported": 549,
-        "total": 600
+        "ported": 552,
+        "total": 603
       },
       "route": {
-        "gated": 58,
-        "missing": 0,
+        "gated": 56,
+        "missing": 7,
         "ported": 214,
-        "total": 272
+        "total": 277
       },
       "tool": {
         "gated": 10,
@@ -46,10 +46,10 @@
         "total": 122
       }
     },
-    "gated": 129,
-    "missing": 0,
-    "ported": 1249,
-    "total": 1378
+    "gated": 127,
+    "missing": 11,
+    "ported": 1252,
+    "total": 1390
   },
   "e2e_verified": false,
   "generated_from": {
@@ -77,7 +77,7 @@
       "`qubit --help` (native top-level families)",
       "frontend/qubit-web/src/App.tsx + pages/"
     ],
-    "reference": "hermes-agent 0.21.4 @ 400f11bd35fae0da91c396a1424315da81729982 @ /home/trick/.hermes/hermes-agent (read-only); live dashboard http://127.0.0.1:9119/?profile=default",
+    "reference": "hermes-agent 0.0.0 @ 69948c005791d4d0e51670ca015238c2c7663749 @ /home/trick/.hermes/hermes-agent (read-only); live dashboard http://127.0.0.1:9119/?profile=default",
     "reference_cli": "`hermes --help` + per-command `--help` (recursive)",
     "reference_route_sources": [
       "__init__.py",
@@ -85,11 +85,13 @@
       "actions.py",
       "analytics.py",
       "audio.py",
+      "chat_workspaces.py",
       "chat_ws.py",
       "chat_ws_errors.py",
       "config_env.py",
       "cron.py",
       "dashboard_ui.py",
+      "display.py",
       "files.py",
       "git.py",
       "local_models.py",
@@ -108,8 +110,8 @@
     ]
   },
   "known_gaps": [
-    "routes: 0 reference routes have no qubit_compat counterpart (see MISSING rows).",
-    "cli: 0 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
+    "routes: 7 reference routes have no qubit_compat counterpart (see MISSING rows).",
+    "cli: 4 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
     "controls: Qubit dashboard_ops catalog rows lacking a voice interface are GATED under voice-for-everything.",
     "tools: 0 reference tool(s) absent; 10 toolset(s) present but disabled in the Qubit cli scope.",
     "e2e_verified is false for every row: registration/dispatch is not behavioral proof."
@@ -117,19 +119,19 @@
   "qubit_surface_summary": {
     "dashboard_ops.EXTRA_OPS": 35,
     "dashboard_ops.MODEL_PROFILE_OPS": 17,
-    "dashboard_ops.catalog": 563,
+    "dashboard_ops.catalog": 566,
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
-    "qubit_compat.GATED": 69,
+    "qubit_compat.GATED": 68,
     "qubit_compat.ROUTES": 448,
     "qubit_voice_top": 113,
-    "reference_cli_sub": 313,
+    "reference_cli_sub": 317,
     "reference_cli_top": 71,
     "reference_optional_mcps": 65,
-    "reference_routes": 272,
+    "reference_routes": 277,
     "reference_skills": 30,
     "reference_toolsets": 27,
-    "voice_commands.REGISTRY": 511,
+    "voice_commands.REGISTRY": 514,
     "voice_commands.VOICE_GUARDS": 18
   },
   "rows": [
@@ -705,6 +707,20 @@
       "side": "reference",
       "surface": "cli",
       "voice_intent": "qubit computer-use permissions",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "no counterpart",
+        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use screen --help`"
+      },
+      "id": "hermes computer-use screen",
+      "method": null,
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "cli",
+      "voice_intent": "",
       "voice_intent_verified": false
     },
     {
@@ -3480,6 +3496,20 @@
       "voice_intent_verified": false
     },
     {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "no counterpart",
+        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins adopt --help`"
+      },
+      "id": "hermes plugins adopt",
+      "method": null,
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "cli",
+      "voice_intent": "",
+      "voice_intent_verified": false
+    },
+    {
       "classification": "PORTED",
       "evidence": {
         "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins browse --help`",
@@ -3505,6 +3535,20 @@
       "side": "reference",
       "surface": "cli",
       "voice_intent": "qubit plugins capabilities",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "no counterpart",
+        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins check-updates --help`"
+      },
+      "id": "hermes plugins check-updates",
+      "method": null,
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "cli",
+      "voice_intent": "",
       "voice_intent_verified": false
     },
     {
@@ -3645,6 +3689,20 @@
       "side": "reference",
       "surface": "cli",
       "voice_intent": "qubit plugins show",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "no counterpart",
+        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins trust-update-url --help`"
+      },
+      "id": "hermes plugins trust-update-url",
+      "method": null,
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "cli",
+      "voice_intent": "",
       "voice_intent_verified": false
     },
     {
@@ -16178,6 +16236,66 @@
         "qubit": "interfaces=['cli', 'dashboard', 'voice'] backend=REGISTRY/EXTRA_OPS",
         "reference": "voicebridge/dashboard_ops.py catalog()"
       },
+      "id": "op update_apply",
+      "interface_reason": null,
+      "interfaces": [
+        "cli",
+        "dashboard",
+        "voice"
+      ],
+      "method": null,
+      "qubit_counterpart": "dashboard_ops.catalog[update_apply] backend=?",
+      "side": "qubit",
+      "surface": "control",
+      "voice_intent": "qubit update apply",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "PORTED",
+      "evidence": {
+        "qubit": "interfaces=['cli', 'dashboard', 'voice'] backend=REGISTRY/EXTRA_OPS",
+        "reference": "voicebridge/dashboard_ops.py catalog()"
+      },
+      "id": "op update_check",
+      "interface_reason": null,
+      "interfaces": [
+        "cli",
+        "dashboard",
+        "voice"
+      ],
+      "method": null,
+      "qubit_counterpart": "dashboard_ops.catalog[update_check] backend=?",
+      "side": "qubit",
+      "surface": "control",
+      "voice_intent": "qubit update check",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "PORTED",
+      "evidence": {
+        "qubit": "interfaces=['cli', 'dashboard', 'voice'] backend=REGISTRY/EXTRA_OPS",
+        "reference": "voicebridge/dashboard_ops.py catalog()"
+      },
+      "id": "op update_rollback",
+      "interface_reason": null,
+      "interfaces": [
+        "cli",
+        "dashboard",
+        "voice"
+      ],
+      "method": null,
+      "qubit_counterpart": "dashboard_ops.catalog[update_rollback] backend=?",
+      "side": "qubit",
+      "surface": "control",
+      "voice_intent": "qubit update rollback",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "PORTED",
+      "evidence": {
+        "qubit": "interfaces=['cli', 'dashboard', 'voice'] backend=REGISTRY/EXTRA_OPS",
+        "reference": "voicebridge/dashboard_ops.py catalog()"
+      },
       "id": "op update_status",
       "interface_reason": null,
       "interfaces": [
@@ -17247,7 +17365,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=cron_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:287"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:297"
       },
       "id": "DELETE /api/cron/jobs/{job_id}",
       "method": "DELETE",
@@ -17275,7 +17393,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=env_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:944"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:957"
       },
       "id": "DELETE /api/env",
       "method": "DELETE",
@@ -17289,7 +17407,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=files_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:578"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:586"
       },
       "id": "DELETE /api/files",
       "method": "DELETE",
@@ -17303,7 +17421,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_learning_node_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:688"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:701"
       },
       "id": "DELETE /api/learning/node",
       "method": "DELETE",
@@ -17317,7 +17435,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:717"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:730"
       },
       "id": "DELETE /api/local-models/models/{model_id}",
       "method": "DELETE",
@@ -17359,7 +17477,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:782"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:799"
       },
       "id": "DELETE /api/messaging/telegram/onboarding/{pairing_id}",
       "method": "DELETE",
@@ -17373,7 +17491,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:623"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:640"
       },
       "id": "DELETE /api/messaging/whatsapp/onboarding/{pairing_id}",
       "method": "DELETE",
@@ -17401,7 +17519,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profile_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:855"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:869"
       },
       "id": "DELETE /api/profiles/{name}",
       "method": "DELETE",
@@ -17415,7 +17533,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_custom_endpoints_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:733"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:746"
       },
       "id": "DELETE /api/providers/custom-endpoints/{endpoint_id}",
       "method": "DELETE",
@@ -17457,7 +17575,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_empty_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:449"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:473"
       },
       "id": "DELETE /api/sessions/empty",
       "method": "DELETE",
@@ -17471,7 +17589,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:663"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:706"
       },
       "id": "DELETE /api/sessions/{session_id}",
       "method": "DELETE",
@@ -17499,7 +17617,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=action_status",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:331"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:345"
       },
       "id": "GET /api/actions/{name}/status",
       "method": "GET",
@@ -17580,10 +17698,24 @@
       "voice_intent_verified": false
     },
     {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_workspaces.py:64"
+      },
+      "id": "GET /api/chat/workspaces",
+      "method": "GET",
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "route",
+      "voice_intent": "qubit chat",
+      "voice_intent_verified": false
+    },
+    {
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_config",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:78"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:81"
       },
       "id": "GET /api/config",
       "method": "GET",
@@ -17597,7 +17729,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_config_defaults",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:92"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:95"
       },
       "id": "GET /api/config/defaults",
       "method": "GET",
@@ -17625,7 +17757,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_config_schema",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:97"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:100"
       },
       "id": "GET /api/config/schema",
       "method": "GET",
@@ -17653,7 +17785,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=blueprints",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:383"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:393"
       },
       "id": "GET /api/cron/blueprints",
       "method": "GET",
@@ -17667,7 +17799,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=delivery",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:252"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:253"
       },
       "id": "GET /api/cron/delivery-targets",
       "method": "GET",
@@ -17681,7 +17813,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_cron_jobs",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:232"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:233"
       },
       "id": "GET /api/cron/jobs",
       "method": "GET",
@@ -17695,7 +17827,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_cron_job_show",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:237"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:238"
       },
       "id": "GET /api/cron/jobs/{job_id}",
       "method": "GET",
@@ -17709,7 +17841,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_cron_job_runs",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:242"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:243"
       },
       "id": "GET /api/cron/jobs/{job_id}/runs",
       "method": "GET",
@@ -17723,7 +17855,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_curator",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:608"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:621"
       },
       "id": "GET /api/curator",
       "method": "GET",
@@ -17821,7 +17953,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_egress_status",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:107"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:110"
       },
       "id": "GET /api/egress/status",
       "method": "GET",
@@ -17835,7 +17967,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_env",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:227"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:232"
       },
       "id": "GET /api/env",
       "method": "GET",
@@ -17849,7 +17981,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_files",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:359"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:367"
       },
       "id": "GET /api/files",
       "method": "GET",
@@ -17863,7 +17995,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:445"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:453"
       },
       "id": "GET /api/files/download",
       "method": "GET",
@@ -17877,7 +18009,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_files_read",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:408"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:416"
       },
       "id": "GET /api/files/read",
       "method": "GET",
@@ -17891,7 +18023,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:465"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:473"
       },
       "id": "GET /api/files/stream",
       "method": "GET",
@@ -17905,7 +18037,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_fs_default_cwd",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:745"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:757"
       },
       "id": "GET /api/fs/default-cwd",
       "method": "GET",
@@ -17919,7 +18051,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:721"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:733"
       },
       "id": "GET /api/fs/download",
       "method": "GET",
@@ -17933,7 +18065,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_fs_git_root",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:734"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:746"
       },
       "id": "GET /api/fs/git-root",
       "method": "GET",
@@ -17947,7 +18079,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_fs_list",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:609"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:617"
       },
       "id": "GET /api/fs/list",
       "method": "GET",
@@ -17961,7 +18093,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_fs_read_data_url",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:709"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:719"
       },
       "id": "GET /api/fs/read-data-url",
       "method": "GET",
@@ -17975,7 +18107,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_fs_read_text",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:632"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:640"
       },
       "id": "GET /api/fs/read-text",
       "method": "GET",
@@ -17989,7 +18121,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_gateway_migrate_plan",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:147"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:148"
       },
       "id": "GET /api/gateway/migrate/plan",
       "method": "GET",
@@ -18157,7 +18289,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_health",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:115"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:116"
       },
       "id": "GET /api/health",
       "method": "GET",
@@ -18171,7 +18303,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_health_idle",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:139"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:143"
       },
       "id": "GET /api/health/idle",
       "method": "GET",
@@ -18182,28 +18314,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "MISSING",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:258"
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:262"
       },
       "id": "GET /api/hermes/update/check",
       "method": "GET",
-      "qubit_counterpart": "GET /api/hermes/update.* -> __gate__",
+      "qubit_counterpart": null,
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit update status",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "MISSING",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:413"
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:427"
       },
       "id": "GET /api/hermes/update/receipt",
       "method": "GET",
-      "qubit_counterpart": "GET /api/hermes/update.* -> __gate__",
+      "qubit_counterpart": null,
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",
@@ -18213,7 +18345,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_host_identity",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:122"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:124"
       },
       "id": "GET /api/host/identity",
       "method": "GET",
@@ -18227,7 +18359,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_learning_graph",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:656"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:669"
       },
       "id": "GET /api/learning/graph",
       "method": "GET",
@@ -18241,7 +18373,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_learning_node",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:681"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:694"
       },
       "id": "GET /api/learning/node",
       "method": "GET",
@@ -18255,7 +18387,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_catalog",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:595"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:611"
       },
       "id": "GET /api/local-models/catalog",
       "method": "GET",
@@ -18269,7 +18401,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_hardware",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:523"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:538"
       },
       "id": "GET /api/local-models/hardware",
       "method": "GET",
@@ -18283,7 +18415,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_jobs",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:887"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:900"
       },
       "id": "GET /api/local-models/jobs",
       "method": "GET",
@@ -18297,7 +18429,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_job_show",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:895"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:910"
       },
       "id": "GET /api/local-models/jobs/{job_id}",
       "method": "GET",
@@ -18311,7 +18443,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_search",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:905"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:920"
       },
       "id": "GET /api/local-models/search",
       "method": "GET",
@@ -18325,7 +18457,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_search_files",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:914"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:929"
       },
       "id": "GET /api/local-models/search/files",
       "method": "GET",
@@ -18339,7 +18471,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_status",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:476"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:491"
       },
       "id": "GET /api/local-models/status",
       "method": "GET",
@@ -18353,7 +18485,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_logs",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:794"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:807"
       },
       "id": "GET /api/logs",
       "method": "GET",
@@ -18423,7 +18555,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:243"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:251"
       },
       "id": "GET /api/media",
       "method": "GET",
@@ -18451,7 +18583,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=mem_config",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/memory_providers.py:516"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/memory_providers.py:508"
       },
       "id": "GET /api/memory/providers/{name}/config",
       "method": "GET",
@@ -18465,7 +18597,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_platforms",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:792"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:809"
       },
       "id": "GET /api/messaging/platforms",
       "method": "GET",
@@ -18479,7 +18611,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:703"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:720"
       },
       "id": "GET /api/messaging/telegram/onboarding/{pairing_id}",
       "method": "GET",
@@ -18493,7 +18625,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:583"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:600"
       },
       "id": "GET /api/messaging/whatsapp/onboarding/{pairing_id}",
       "method": "GET",
@@ -18633,7 +18765,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_portal",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:707"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:720"
       },
       "id": "GET /api/portal",
       "method": "GET",
@@ -18647,7 +18779,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profiles",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:685"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:699"
       },
       "id": "GET /api/profiles",
       "method": "GET",
@@ -18661,7 +18793,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profiles_active",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:763"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:777"
       },
       "id": "GET /api/profiles/active",
       "method": "GET",
@@ -18675,7 +18807,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profiles_projects_tree",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:597"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:611"
       },
       "id": "GET /api/profiles/projects/tree",
       "method": "GET",
@@ -18689,7 +18821,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profiles_sessions",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:400"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:411"
       },
       "id": "GET /api/profiles/sessions",
       "method": "GET",
@@ -18703,7 +18835,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profiles_sessions_sidebar",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:453"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:465"
       },
       "id": "GET /api/profiles/sessions/sidebar",
       "method": "GET",
@@ -18717,7 +18849,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:1020"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:1034"
       },
       "id": "GET /api/profiles/{name}/desktop-overlay",
       "method": "GET",
@@ -18731,7 +18863,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profile_setup_command",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:793"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:807"
       },
       "id": "GET /api/profiles/{name}/setup-command",
       "method": "GET",
@@ -18745,7 +18877,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profile_soul",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:876"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:890"
       },
       "id": "GET /api/profiles/{name}/soul",
       "method": "GET",
@@ -18759,7 +18891,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_custom_endpoints",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:651"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:664"
       },
       "id": "GET /api/providers/custom-endpoints",
       "method": "GET",
@@ -18801,7 +18933,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_sessions_list",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:165"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:173"
       },
       "id": "GET /api/sessions",
       "method": "GET",
@@ -18815,7 +18947,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sess_empty",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:441"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:465"
       },
       "id": "GET /api/sessions/empty/count",
       "method": "GET",
@@ -18829,7 +18961,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_sessions_list",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:254"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:278"
       },
       "id": "GET /api/sessions/search",
       "method": "GET",
@@ -18843,7 +18975,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_sessions_stats",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:467"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:491"
       },
       "id": "GET /api/sessions/stats",
       "method": "GET",
@@ -18857,7 +18989,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_show",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:486"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:510"
       },
       "id": "GET /api/sessions/{session_id}",
       "method": "GET",
@@ -18871,7 +19003,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_show",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:754"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:797"
       },
       "id": "GET /api/sessions/{session_id}/export",
       "method": "GET",
@@ -18885,7 +19017,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_show",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:502"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:526"
       },
       "id": "GET /api/sessions/{session_id}/latest-descendant",
       "method": "GET",
@@ -18899,7 +19031,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_messages",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:565"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:606"
       },
       "id": "GET /api/sessions/{session_id}/messages",
       "method": "GET",
@@ -18913,7 +19045,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_messages_around",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:641"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:683"
       },
       "id": "GET /api/sessions/{session_id}/messages/around",
       "method": "GET",
@@ -18927,7 +19059,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_timeline",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:619"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:661"
       },
       "id": "GET /api/sessions/{session_id}/timeline",
       "method": "GET",
@@ -19039,7 +19171,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:105"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:106"
       },
       "id": "GET /api/ssh/ownership",
       "method": "GET",
@@ -19053,7 +19185,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_status",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:451"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:458"
       },
       "id": "GET /api/status",
       "method": "GET",
@@ -19067,7 +19199,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_system_stats",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:548"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:561"
       },
       "id": "GET /api/system/stats",
       "method": "GET",
@@ -19165,7 +19297,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_plugin_asset",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:356"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:383"
       },
       "id": "GET /dashboard-plugins/{plugin_name}/{file_path:path}",
       "method": "GET",
@@ -19179,7 +19311,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profile_rename",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:836"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:850"
       },
       "id": "PATCH /api/profiles/{name}",
       "method": "PATCH",
@@ -19193,7 +19325,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_session_patch",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:717"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:760"
       },
       "id": "PATCH /api/sessions/{session_id}",
       "method": "PATCH",
@@ -19207,7 +19339,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_audio_speak",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:283"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:284"
       },
       "id": "POST /api/audio/speak",
       "method": "POST",
@@ -19235,7 +19367,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:340"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:341"
       },
       "id": "POST /api/audio/tts-lease",
       "method": "POST",
@@ -19263,7 +19395,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:322"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:330"
       },
       "id": "POST /api/chat/image-upload",
       "method": "POST",
@@ -19291,7 +19423,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_blueprint_instantiate",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:413"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:424"
       },
       "id": "POST /api/cron/blueprints/instantiate",
       "method": "POST",
@@ -19305,7 +19437,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:292"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:302"
       },
       "id": "POST /api/cron/fire",
       "method": "POST",
@@ -19319,7 +19451,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=cron_create",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:247"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:248"
       },
       "id": "POST /api/cron/jobs",
       "method": "POST",
@@ -19333,7 +19465,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=cron_pause",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:272"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:282"
       },
       "id": "POST /api/cron/jobs/{job_id}/pause",
       "method": "POST",
@@ -19347,7 +19479,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=cron_resume",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:277"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:287"
       },
       "id": "POST /api/cron/jobs/{job_id}/resume",
       "method": "POST",
@@ -19361,7 +19493,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=cron_trigger",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:282"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:292"
       },
       "id": "POST /api/cron/jobs/{job_id}/trigger",
       "method": "POST",
@@ -19375,7 +19507,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_curator_run",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:647"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:660"
       },
       "id": "POST /api/curator/run",
       "method": "POST",
@@ -19383,6 +19515,20 @@
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit autonomy status",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "GATED",
+      "evidence": {
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:290"
+      },
+      "id": "POST /api/dashboard/agent-plugins/activate",
+      "method": "POST",
+      "qubit_counterpart": "POST /api/dashboard/agent-plugins/.* -> __gate__",
+      "side": "reference",
+      "surface": "route",
+      "voice_intent": "qubit dashboard",
       "voice_intent_verified": false
     },
     {
@@ -19445,7 +19591,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_plugin_visibility_set",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:318"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:345"
       },
       "id": "POST /api/dashboard/plugins/{name:path}/visibility",
       "method": "POST",
@@ -19459,7 +19605,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:962"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:975"
       },
       "id": "POST /api/env/reveal",
       "method": "POST",
@@ -19473,7 +19619,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_files_mkdir",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:568"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:576"
       },
       "id": "POST /api/files/mkdir",
       "method": "POST",
@@ -19487,7 +19633,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_files_upload",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:493"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:501"
       },
       "id": "POST /api/files/upload",
       "method": "POST",
@@ -19501,7 +19647,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_files_upload",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:547"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:555"
       },
       "id": "POST /api/files/upload-stream",
       "method": "POST",
@@ -19515,7 +19661,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_fs_write_text",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:649"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/files.py:659"
       },
       "id": "POST /api/fs/write-text",
       "method": "POST",
@@ -19529,7 +19675,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_gateway_drain",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:165"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:166"
       },
       "id": "POST /api/gateway/drain",
       "method": "POST",
@@ -19543,7 +19689,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:155"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:156"
       },
       "id": "POST /api/gateway/migrate",
       "method": "POST",
@@ -19557,7 +19703,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_gateway_restart",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:139"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:140"
       },
       "id": "POST /api/gateway/restart",
       "method": "POST",
@@ -19739,7 +19885,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:147"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:151"
       },
       "id": "POST /api/health/retirement",
       "method": "POST",
@@ -19750,14 +19896,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "MISSING",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:219"
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:220"
       },
       "id": "POST /api/hermes/update",
       "method": "POST",
-      "qubit_counterpart": "POST /api/hermes/update.* -> __gate__",
+      "qubit_counterpart": null,
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit update status",
@@ -19767,7 +19913,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_activate",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:860"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:873"
       },
       "id": "POST /api/local-models/activate",
       "method": "POST",
@@ -19781,7 +19927,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_download",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:703"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:691"
       },
       "id": "POST /api/local-models/download",
       "method": "POST",
@@ -19795,7 +19941,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_download_browsed",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:923"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:938"
       },
       "id": "POST /api/local-models/download-browsed",
       "method": "POST",
@@ -19806,10 +19952,38 @@
       "voice_intent_verified": false
     },
     {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:708"
+      },
+      "id": "POST /api/local-models/download/pause",
+      "method": "POST",
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "route",
+      "voice_intent": "qubit local models",
+      "voice_intent_verified": false
+    },
+    {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:721"
+      },
+      "id": "POST /api/local-models/download/resume",
+      "method": "POST",
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "route",
+      "voice_intent": "qubit local models",
+      "voice_intent_verified": false
+    },
+    {
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_eject",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:842"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:855"
       },
       "id": "POST /api/local-models/eject",
       "method": "POST",
@@ -19823,7 +19997,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_quickstart",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:757"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:772"
       },
       "id": "POST /api/local-models/quickstart",
       "method": "POST",
@@ -19837,7 +20011,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_runtime_install",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:662"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:656"
       },
       "id": "POST /api/local-models/runtime/install",
       "method": "POST",
@@ -19851,7 +20025,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_server",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:825"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:838"
       },
       "id": "POST /api/local-models/server",
       "method": "POST",
@@ -19865,7 +20039,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_sideload",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:950"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:961"
       },
       "id": "POST /api/local-models/sideload",
       "method": "POST",
@@ -19935,7 +20109,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=mem_config_write",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/memory_providers.py:536"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/memory_providers.py:528"
       },
       "id": "POST /api/memory/providers/{name}/setup",
       "method": "POST",
@@ -19963,7 +20137,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_msg_test_live",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:916"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:942"
       },
       "id": "POST /api/messaging/platforms/{platform_id}/test",
       "method": "POST",
@@ -19977,7 +20151,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:680"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:697"
       },
       "id": "POST /api/messaging/telegram/onboarding/start",
       "method": "POST",
@@ -19991,7 +20165,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:742"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:759"
       },
       "id": "POST /api/messaging/telegram/onboarding/{pairing_id}/apply",
       "method": "POST",
@@ -20005,7 +20179,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:549"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:566"
       },
       "id": "POST /api/messaging/whatsapp/onboarding/start",
       "method": "POST",
@@ -20019,7 +20193,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:592"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:609"
       },
       "id": "POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply",
       "method": "POST",
@@ -20075,7 +20249,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_ops",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:767"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:780"
       },
       "id": "POST /api/ops/config-migrate",
       "method": "POST",
@@ -20089,7 +20263,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=debug_share",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:772"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:785"
       },
       "id": "POST /api/ops/debug-share",
       "method": "POST",
@@ -20117,7 +20291,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_ops",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:762"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:775"
       },
       "id": "POST /api/ops/dump",
       "method": "POST",
@@ -20173,7 +20347,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_ops",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:757"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:770"
       },
       "id": "POST /api/ops/prompt-size",
       "method": "POST",
@@ -20243,7 +20417,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profile_create",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:690"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:704"
       },
       "id": "POST /api/profiles",
       "method": "POST",
@@ -20257,7 +20431,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profiles_active_set",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:782"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:796"
       },
       "id": "POST /api/profiles/active",
       "method": "POST",
@@ -20271,7 +20445,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:992"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:1005"
       },
       "id": "POST /api/profiles/import",
       "method": "POST",
@@ -20285,7 +20459,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:647"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:661"
       },
       "id": "POST /api/profiles/sessions/pull-requests",
       "method": "POST",
@@ -20299,7 +20473,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profile_describe_auto",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:943"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:956"
       },
       "id": "POST /api/profiles/{name}/describe-auto",
       "method": "POST",
@@ -20313,7 +20487,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_profile_export",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:974"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:987"
       },
       "id": "POST /api/profiles/{name}/export",
       "method": "POST",
@@ -20327,7 +20501,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:814"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:828"
       },
       "id": "POST /api/profiles/{name}/open-terminal",
       "method": "POST",
@@ -20341,7 +20515,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_custom_endpoints_write",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:664"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:677"
       },
       "id": "POST /api/providers/custom-endpoints",
       "method": "POST",
@@ -20355,7 +20529,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:761"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:774"
       },
       "id": "POST /api/providers/custom-endpoints/validate",
       "method": "POST",
@@ -20369,7 +20543,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_custom_endpoints_activate",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:681"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:694"
       },
       "id": "POST /api/providers/custom-endpoints/{endpoint_id}/activate",
       "method": "POST",
@@ -20411,7 +20585,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:874"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:887"
       },
       "id": "POST /api/providers/validate",
       "method": "POST",
@@ -20425,7 +20599,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_bulk_delete",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:400"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:424"
       },
       "id": "POST /api/sessions/bulk-delete",
       "method": "POST",
@@ -20439,7 +20613,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_import",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:418"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:442"
       },
       "id": "POST /api/sessions/import",
       "method": "POST",
@@ -20453,7 +20627,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:678"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:721"
       },
       "id": "POST /api/sessions/owner-backfill",
       "method": "POST",
@@ -20467,7 +20641,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=sessions_prune",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:789"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/sessions.py:832"
       },
       "id": "POST /api/sessions/prune",
       "method": "POST",
@@ -20593,7 +20767,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=config_save",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:115"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:118"
       },
       "id": "PUT /api/config",
       "method": "PUT",
@@ -20621,7 +20795,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=cron_update",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:267"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/cron.py:277"
       },
       "id": "PUT /api/cron/jobs/{job_id}",
       "method": "PUT",
@@ -20635,7 +20809,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_curator_paused",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:628"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:641"
       },
       "id": "PUT /api/curator/paused",
       "method": "PUT",
@@ -20663,7 +20837,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=plugin_providers_write",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:290"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/dashboard_ui.py:317"
       },
       "id": "PUT /api/dashboard/plugin-providers",
       "method": "PUT",
@@ -20691,7 +20865,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=env_write",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:287"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/config_env.py:292"
       },
       "id": "PUT /api/env",
       "method": "PUT",
@@ -20705,7 +20879,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_learning_node_update",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:696"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/status.py:709"
       },
       "id": "PUT /api/learning/node",
       "method": "PUT",
@@ -20761,7 +20935,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=mem_config_write",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/memory_providers.py:559"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/memory_providers.py:551"
       },
       "id": "PUT /api/memory/providers/{name}/config",
       "method": "PUT",
@@ -20775,7 +20949,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=msg_update",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:851"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:868"
       },
       "id": "PUT /api/messaging/platforms/{platform_id}",
       "method": "PUT",
@@ -20803,7 +20977,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profile_desc",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:914"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:927"
       },
       "id": "PUT /api/profiles/{name}/description",
       "method": "PUT",
@@ -20817,7 +20991,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profile_model",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:928"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:941"
       },
       "id": "PUT /api/profiles/{name}/model",
       "method": "PUT",
@@ -20831,7 +21005,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=profile_soul_set",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:892"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/profiles.py:905"
       },
       "id": "PUT /api/profiles/{name}/soul",
       "method": "PUT",
@@ -20957,7 +21131,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:372"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/audio.py:473"
       },
       "id": "WEBSOCKET /api/audio/speak-stream",
       "method": "WEBSOCKET",
@@ -20971,7 +21145,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:271"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:277"
       },
       "id": "WEBSOCKET /api/console",
       "method": "WEBSOCKET",
@@ -20982,10 +21156,24 @@
       "voice_intent_verified": false
     },
     {
+      "classification": "MISSING",
+      "evidence": {
+        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/display.py:74"
+      },
+      "id": "WEBSOCKET /api/display/ws",
+      "method": "WEBSOCKET",
+      "qubit_counterpart": null,
+      "side": "reference",
+      "surface": "route",
+      "voice_intent": "qubit display",
+      "voice_intent_verified": false
+    },
+    {
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_events",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:624"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:644"
       },
       "id": "WEBSOCKET /api/events",
       "method": "WEBSOCKET",
@@ -20999,7 +21187,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:432"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:438"
       },
       "id": "WEBSOCKET /api/pty",
       "method": "WEBSOCKET",
@@ -21013,7 +21201,7 @@
       "classification": "PORTED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_pub",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:612"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:632"
       },
       "id": "WEBSOCKET /api/pub",
       "method": "WEBSOCKET",
@@ -21027,7 +21215,7 @@
       "classification": "GATED",
       "evidence": {
         "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
-        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:573"
+        "reference": "/home/trick/.hermes/hermes-agent/hermes_cli/web_routers/chat_ws.py:593"
       },
       "id": "WEBSOCKET /api/ws",
       "method": "WEBSOCKET",

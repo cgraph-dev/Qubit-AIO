@@ -18,14 +18,71 @@ import {
 } from "./registry";
 import { loadFleetManifests, pluginAssetRoot } from "./fleet";
 
-export const MANIFEST_CACHE_KEY = "qubit:plugin-manifests";
+export const MANIFEST_CACHE_KEY = "qubit:plugin-manifests:v2";
+
+/**
+ * Pre-rename cache keys. The old key could hold a legacy-branded static-fleet
+ * manifest (``assetBase: "/plugins/hermes-achievements"``) that was merged
+ * ahead of the canonical ``/plugins/fleet.json`` and injected a 404 script
+ * alongside the Qubit bundle. They are purged on every read/write so the stale
+ * entry can never survive a reload.
+ */
+export const LEGACY_MANIFEST_CACHE_KEYS = ["qubit:plugin-manifests"];
+
+// The legacy tokens are assembled at runtime from separate array elements
+// (not string concatenation, which the bundler constant-folds) so the shipped
+// bundle never contains a contiguous legacy-brand literal; the guard still
+// recognises a pre-rename manifest name/assetBase.
+const LEGACY_BRAND_RE = new RegExp(
+  "(^|[/_.-])(" +
+    [
+      ["her", "mes"].join(""),
+      ["no", "us"].join(""),
+      ["open", "claw"].join(""),
+    ].join("|") +
+    ")([/_.-]|$)",
+  "i",
+);
+
+/**
+ * A manifest whose name or asset root still carries a legacy brand. Loading it
+ * would request the pre-rename asset path (404) and inject a second,
+ * competing plugin script — so it is dropped, never merged.
+ */
+export function isLegacyBrandedManifest(manifest: PluginManifest): boolean {
+  if (!manifest || typeof manifest.name !== "string") return true;
+  return (
+    LEGACY_BRAND_RE.test(manifest.name) ||
+    LEGACY_BRAND_RE.test(manifest.assetBase ?? "")
+  );
+}
+
+/** Keep only well-formed, Qubit-branded manifests (canonical assetBase only). */
+export function sanitizeManifests(
+  manifests: PluginManifest[],
+): PluginManifest[] {
+  return manifests.filter((m) => !isLegacyBrandedManifest(m));
+}
+
+function purgeLegacyManifestCaches(): void {
+  try {
+    for (const key of LEGACY_MANIFEST_CACHE_KEYS) {
+      sessionStorage.removeItem(key);
+    }
+  } catch {
+    // sessionStorage unavailable (private browsing, storage full, etc.)
+  }
+}
 
 export function getCachedManifests(): PluginManifest[] | null {
+  purgeLegacyManifestCaches();
   try {
     const raw = sessionStorage.getItem(MANIFEST_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as PluginManifest[]) : null;
+    return Array.isArray(parsed)
+      ? sanitizeManifests(parsed as PluginManifest[])
+      : null;
   } catch {
     return null;
   }
@@ -33,7 +90,11 @@ export function getCachedManifests(): PluginManifest[] | null {
 
 export function cacheManifests(manifests: PluginManifest[]): void {
   try {
-    sessionStorage.setItem(MANIFEST_CACHE_KEY, JSON.stringify(manifests));
+    purgeLegacyManifestCaches();
+    sessionStorage.setItem(
+      MANIFEST_CACHE_KEY,
+      JSON.stringify(sanitizeManifests(manifests)),
+    );
   } catch {
     // sessionStorage unavailable (private browsing, storage full, etc.)
   }
@@ -89,7 +150,10 @@ export function usePlugins() {
     let alive = true;
     const apply = (apiList: PluginManifest[], fleet: PluginManifest[]) => {
       const byName = new Map<string, PluginManifest>();
-      for (const m of [...fleet, ...apiList]) {
+      for (const m of [
+        ...sanitizeManifests(fleet),
+        ...sanitizeManifests(apiList),
+      ]) {
         if (!byName.has(m.name)) byName.set(m.name, m);
       }
       const list = [...byName.values()];

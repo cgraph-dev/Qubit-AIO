@@ -1280,75 +1280,108 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    r = _resolved_model(cfg)
-    groups: Dict[str, Dict[str, Any]] = {}
-    try:
-        from .providers import resolver as R
+    """GET /api/model/options -> the real vendored provider/model catalogue.
 
-        for pr in R.list_profiles(cfg).get("profiles", []):
-            prov = str(pr.get("provider") or "")
-            mid = str(pr.get("model") or "")
-            if not prov:
-                continue
-            g = groups.setdefault(prov, {
-                "name": prov, "slug": prov, "models": [],
-                "is_current": False,
-                "is_user_defined": pr.get("kind") != "local",
-                "source": "qubit-model-profiles",
-                "authenticated": (pr.get("locality") == "local")
-                or bool(pr.get("has_secret_ref")),
-            })
-            if mid and mid not in g["models"]:
-                g["models"].append(mid)
-            if pr.get("id") == r["profile_id"]:
-                g["is_current"] = True
-    except Exception:
-        groups = {}
-    if not groups:
-        groups["ollama"] = {
-            "name": "ollama", "slug": "ollama", "models": [r["model"]],
-            "is_current": True, "is_user_defined": False,
-            "source": "qubit-brain4", "authenticated": True}
-    providers = []
-    for g in groups.values():
-        if not g["models"]:
-            g["models"] = [r["model"]]
-        g["total_models"] = len(g["models"])
-        providers.append(g)
-    if not any(x["is_current"] for x in providers):
-        providers[0]["is_current"] = True
-    # ModelOptionsResponse wire shape.
-    return _ok(model=r["model"], provider=r["provider"], providers=providers)
+    Owner decision #5: the picker delegates to the vendored Hermes foundation
+    (``qubit_cli.inventory.build_model_options_payload`` + ``load_picker_context``)
+    — the SAME builder the reference dashboard serves — never a hand-rolled
+    3-profile stub. Query params mirror the reference route
+    (``web_routers/models.py:get_model_options``): ``refresh``,
+    ``include_unconfigured``, ``explicit_only``.
+
+    Qubit policy: the payload is passed through ``_strip_provider_secret_fields``
+    so credential values AND credential references (``key_env`` etc.) never leave
+    the backend. The response wire shape (``providers[]`` with
+    ``name``/``slug``/``models``/``is_current``/``authenticated``/``total_models``
+    plus top-level ``model``/``provider``) is what ``ModelPickerDialog`` expects.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.inventory import build_model_options_payload, load_picker_context  # type: ignore
+
+        def _truthy(value: Any) -> bool:
+            return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+        payload = build_model_options_payload(
+            load_picker_context(),
+            explicit_only=_truthy(q.get("explicit_only")),
+            include_unconfigured=_truthy(q.get("include_unconfigured")),
+            refresh=_truthy(q.get("refresh")),
+        )
+    except Exception as exc:
+        return _fail(exc)
+    return _ok(**_strip_provider_secret_fields(payload or {}))
 
 
 def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Recommended default model (RecommendedDefaultResponse wire shape).
 
-    Resolved through the same Qubit model info path as ``h_model_info`` /
-    ``h_model_options`` (``agent._model`` + the config profiles brain). Qubit
-    ships a single local brain, so the recommendation is that resolved model; a
-    requested cloud provider slug is echoed honestly with an empty model since
-    no cloud curation exists — never a silently-picked paid default.
+    Delegates to the vendored foundation (owner decision #5): the real picker
+    payload + ``qubit_cli.models.pick_silent_default_model``, the same curation
+    the reference route (``web_routers/models.py:get_recommended_default_model``)
+    uses. Qubit policy: an absent/unknown provider slug gets an honest empty
+    model — never a silently-picked paid default. No credentials are served.
     """
-    m = _qubit_model(cfg)
-    requested = str(q.get("provider", "") or "").strip().lower()
-    local_slugs = {"", "local", "ollama", "ollama-local", "qubit-local"}
-    if requested not in local_slugs:
-        return _ok(provider=requested, model="", free_tier=None,
-                   detail="Qubit routes through the local configured brain; "
-                          "no cloud provider curation is performed")
-    provider = "ollama-local"
-    return _ok(provider=provider, model=m["name"], free_tier=None,
-               detail="recommended default = configured Qubit brain profile")
+    slug = str(q.get("provider", "") or "").strip().lower()
+    if not slug:
+        return _ok(provider="", model="", free_tier=None,
+                   detail="no provider requested")
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.inventory import build_models_payload, load_picker_context  # type: ignore
+        from qubit_cli.models import pick_silent_default_model  # type: ignore
+
+        payload = build_models_payload(load_picker_context())
+        for row in payload.get("providers", []):
+            if str(row.get("slug", "")).lower() == slug:
+                models = [str(m) for m in (row.get("models") or [])]
+                return _ok(provider=slug,
+                           model=pick_silent_default_model(models, provider=slug),
+                           free_tier=None)
+        return _ok(provider=slug, model="", free_tier=None)
+    except Exception as exc:
+        return _fail(exc)
 
 
 def h_model_auxiliary(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    m = _qubit_model(cfg)
-    # AuxiliaryModelsResponse wire shape; no aux pins exist.
-    return _ok(tasks=[], main={"provider": "ollama-local",
-                               "model": m["name"]})
+    """GET /api/model/auxiliary -> real auxiliary-task assignments.
+
+    Ported from the reference route (``web_routers/models.py:get_auxiliary_models``)
+    over the vendored ``_AUX_TASK_SLOTS``; reads the Qubit runtime config's
+    ``auxiliary`` section. Never serves credentials.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.config import load_config  # type: ignore
+        from qubit_cli.web_server_config import _AUX_TASK_SLOTS  # type: ignore
+
+        cfg_data = load_config()
+        aux_cfg = cfg_data.get("auxiliary", {})
+        if not isinstance(aux_cfg, dict):
+            aux_cfg = {}
+        tasks = []
+        for slot in _AUX_TASK_SLOTS:
+            slot_cfg = aux_cfg.get(slot, {}) if isinstance(aux_cfg.get(slot), dict) else {}
+            base_url = str(slot_cfg.get("base_url", "") or "")
+            tasks.append({
+                "task": slot,
+                "provider": str(slot_cfg.get("provider", "auto") or "auto"),
+                "model": str(slot_cfg.get("model", "") or ""),
+                "base_url": base_url,
+                "reasoning_effort": str(slot_cfg.get("reasoning_effort") or "") or None,
+            })
+        model_cfg = cfg_data.get("model", "")
+        if isinstance(model_cfg, dict):
+            main_model = model_cfg.get("default", model_cfg.get("name", ""))
+            main_provider = model_cfg.get("provider", "")
+        else:
+            main_model, main_provider = (str(model_cfg) if model_cfg else ""), ""
+        return _ok(tasks=tasks,
+                   main={"provider": main_provider, "model": main_model})
+    except Exception as exc:
+        return _fail(exc)
 
 
 def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2393,7 +2426,16 @@ def mcp_invoke(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not tool:
         return 400, {"ok": False, "code": "MCP_BAD_INPUT",
                      "detail": "tool name required"}
+    # Accept every real wire spelling: the SPA sends ``args``, the MCP client
+    # spec sends ``arguments``, and the voice/gateway path sends ``tool_args``.
+    # All three resolve to the SAME canonical ``voicebridge.mcp_servers.invoke``
+    # args dict; an absent/ill-typed value is an honest empty call, never a
+    # silently dropped argument list.
     raw_args = b.get("args")
+    if not isinstance(raw_args, dict):
+        raw_args = b.get("arguments")
+    if not isinstance(raw_args, dict):
+        raw_args = b.get("tool_args")
     args = raw_args if isinstance(raw_args, dict) else {}
     confirmed = _truthy(b.get("confirm"))
     cid = str(b.get("confirmation_id") or q.get("confirmation_id") or "").strip()
@@ -3254,7 +3296,12 @@ def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import files as FI
     import base64
-    if q.get("path") or p.get("kind") == "read":
+    # The read route is ``/api/files/read`` and the list route is ``/api/files``
+    # (``h_files_read`` forwards with ``kind="read"``). Deciding by the *route*
+    # — never by the mere presence of ``?path=`` — is what makes subdirectory
+    # listing/navigation work; the earlier ``if q.get("path")`` test treated
+    # every ``/api/files?path=<dir>`` as a file read.
+    if p.get("kind") == "read":
         path = str(q.get("path", b.get("path", "")) or "")
         try:
             res = FI.read_file(cfg, path)
@@ -3279,26 +3326,60 @@ def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    detail="no active project folder; register one with "
                           "`qubit project add-folder`")
     try:
-        res = FI.list_dir(cfg, folder)
+        # Immediate children only: the reference ``list_managed_files`` does a
+        # single ``os.scandir`` level and the SPA navigates folder-by-folder, so
+        # a recursive walk would spend the entry cap on descendants and hide
+        # the sibling directories.
+        res = FI.list_children(cfg, folder)
     except Exception as exc:
         code = getattr(exc, "code", "FILES_ERROR")
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
     raw_entries = res.get("entries", []) if isinstance(res, dict) else []
+    # ``files._public_dir`` emits ``dir`` (and a root-relative ``rel``); the
+    # dashboard wire shape (reference ``web_server_files._managed_file_entry``)
+    # needs ``is_directory`` and an addressable absolute ``path``. Read the
+    # ``dir`` key directly — the previous ``is_dir``/``is_directory`` lookup
+    # missed it, so every folder rendered as a file and the /files page could
+    # not navigate. Join ``rel`` back onto the resolved listing root so both a
+    # root-level file and a nested entry carry a usable path.
+    listed_root = str(res.get("folder", folder) if isinstance(res, dict)
+                      else folder)
     entries = []
     for en in raw_entries if isinstance(raw_entries, list) else []:
         if not isinstance(en, dict):
             continue
+        rel = str(en.get("rel", en.get("path", "")) or "")
+        entry_path = os.path.join(listed_root, rel) if rel and listed_root else ""
+        is_dir = bool(en.get("dir", en.get("is_dir",
+                                           en.get("is_directory", False))))
         entries.append({
             "name": str(en.get("name", "")),
-            "path": str(en.get("path", "")),
-            "is_directory": bool(en.get("is_dir", en.get("is_directory", False))),
-            "size": en.get("size"), "mtime": en.get("mtime", 0),
+            "path": entry_path,
+            "is_directory": is_dir,
+            "size": None if is_dir else en.get("size"),
+            "mtime": en.get("mtime", 0),
             "mime_type": en.get("mime_type"),
         })
+    # Reference ``list_managed_files`` sorts directories first, then by name.
+    entries.sort(key=lambda e: (not e["is_directory"], e["name"].lower()))
+    # The "up" control needs the parent folder; it exists whenever the listing
+    # root is itself inside an approved project root (never above all roots).
+    parent = None
+    if listed_root:
+        parent_path = Path(listed_root).parent
+        if parent_path != Path(listed_root):
+            for root in FI.approved_roots(cfg):
+                try:
+                    parent_path.relative_to(root)
+                    parent = str(parent_path)
+                except ValueError:
+                    continue
+                break
     # ManagedFilesResponse wire shape.
-    return _ok(root=folder, path=folder, parent=None, locked_root=folder,
-               can_change_path=False, entries=entries)
+    return _ok(root=listed_root, path=listed_root, parent=parent,
+               locked_root=listed_root, can_change_path=False,
+               entries=entries)
 
 
 def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -7096,21 +7177,21 @@ _r("GET", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("POST", r"/api/ops/(?P<name>[a-z-]+)", "h_ops")
 _r("DELETE", r"/api/ops/hooks", "hooks_delete")
 _r("GET", r"/api/plugins/kanban/events", "h_plugin_kanban_events")
-# Vendored dashboard plugin fleet (hermes-achievements + kanban). Real
+# Vendored dashboard plugin fleet (qubit-achievements + kanban). Real
 # backends live in voicebridge/qubit_plugins.py and read the same local
 # session history / kanban DB the Qubit-owned Qubit runtime uses. Read routes
 # precede the GATED kanban write wildcard below so they are never shadowed.
-_r("GET", r"/api/plugins/hermes-achievements/achievements",
+_r("GET", r"/api/plugins/qubit-achievements/achievements",
    "h_plugin_achievements")
-_r("GET", r"/api/plugins/hermes-achievements/scan-status",
+_r("GET", r"/api/plugins/qubit-achievements/scan-status",
    "h_plugin_achievements_scan_status")
-_r("GET", r"/api/plugins/hermes-achievements/recent-unlocks",
+_r("GET", r"/api/plugins/qubit-achievements/recent-unlocks",
    "h_plugin_achievements_recent_unlocks")
-_r("GET", r"/api/plugins/hermes-achievements/sessions/(?P<session_id>[^/]+)/badges",
+_r("GET", r"/api/plugins/qubit-achievements/sessions/(?P<session_id>[^/]+)/badges",
    "h_plugin_achievements_session_badges")
-_r("POST", r"/api/plugins/hermes-achievements/rescan",
+_r("POST", r"/api/plugins/qubit-achievements/rescan",
    "h_plugin_achievements_rescan")
-_r("POST", r"/api/plugins/hermes-achievements/reset-state",
+_r("POST", r"/api/plugins/qubit-achievements/reset-state",
    "h_plugin_achievements_reset_state")
 _r("GET", r"/api/plugins/kanban/board", "h_plugin_kanban_board")
 _r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)", "h_plugin_kanban_task")
@@ -7360,6 +7441,7 @@ _r("GET", r"/api/qubit/local-models/fallback", "h_qubit_local_models_fallback")
 # precede the remaining GATED `GET /api/qubit/update.*` alias so the specific
 # rows win (audit A29 + objective C).
 _r("GET", r"/api/qubit/update/check", "h_qubit_update_check")
+_r("POST", r"/api/qubit/update/rollback", "h_qubit_update_rollback")
 _r("POST", r"/api/qubit/update", "h_qubit_update_apply")
 
 # Wave 2 conversions: previously-blanket mutating refusals now run the real
@@ -7463,16 +7545,17 @@ GATED: List[Dict[str, Any]] = [
                                            "Built-in xterm chat image paste is superseded by "
                                            "Qubit Chat attachments (vision_describe backend).",
                                             "overlay Qubit Chat tab + `qubit vision describe`")),
-    # Public Qubit path + migration-only upstream-compat alias (allowed:
-    # migration/compatibility record; the public frontend uses /api/qubit/*).
-    # `POST /api/qubit/update` is a real handler (registered above); only the
-    # unknown `GET /api/qubit/update.*` subpaths fall through to this gate.
+    # Public Qubit update surface. The specific canonical routes
+    # (``GET /api/qubit/update/check``, ``POST /api/qubit/update``,
+    # ``POST /api/qubit/update/rollback``) are real handlers registered above;
+    # only unknown GET/POST subpaths fall through to this typed gate, so an
+    # unrecognized update subpath is never a bare 404. The legacy
+    # ``/api/hermes/update.*`` alias was removed entirely (owner directive:
+    # no publicly reachable Hermes-named route). The vendored runtime no
+    # longer declares it either, so an old client path is an explicit 404 on
+    # the Qubit compat path and can never be fork-proxied.
     ("GET", r"/api/qubit/update.*", _NO_UPDATE),
-    # Upstream-compatible wire alias (migration/compatibility): old clients
-    # that call /api/hermes/update keep the typed operator-owned refusal; the
-    # product advertises only the Qubit path.
-    ("GET", r"/api/hermes/update.*", _NO_UPDATE),
-    ("POST", r"/api/hermes/update.*", _NO_UPDATE),
+    ("POST", r"/api/qubit/update.*", _NO_UPDATE),
 
     ("GET", r"/api/ssh/ownership", _g("SSH_OWNERSHIP_OPERATOR",
         "Qubit owns the host shell surface; no remote SSH ownership nonce is "
@@ -7627,15 +7710,48 @@ for _m, _p, _ginfo in GATED:
 
 def h_blueprints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import schedules as S
+    """GET /api/cron/blueprints -> the REAL vendored blueprint catalog.
+
+    Ported from the vendored ``qubit_cli/web_routers/cron.py::list_cron_blueprints``
+    (pinned 0.21.4): each entry is the full form schema
+    ``{key,title,description,category,tags,fields,schedule,scheduleHuman,
+    command,appUrl}`` from ``cron.blueprint_catalog``, with the ``deliver``
+    slot's options rewritten from the actually configured gateway platforms.
+
+    The previous compat stub returned only ``{name,kind,instantiate}`` for the
+    names of already-existing jobs and shadowed the real catalog, so the
+    dashboard's blueprint form rendered field-less cards. Qubit policy: the
+    catalog is a pure read (never a mutation); instantiation remains the
+    confirm-gated ``h_blueprint_instantiate`` on the same ``schedules`` store.
+    """
+    from . import qubit_runtime
     try:
-        jobs = S.list_jobs(cfg)
+        qubit_runtime.ensure_path()
+        try:
+            qubit_runtime.use_qubit_home(cfg)
+        except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
+            pass
+        from cron.blueprint_catalog import (  # type: ignore
+            CATALOG, blueprint_catalog_entry,
+        )
+        deliver_options = None
+        try:
+            from cron.scheduler_delivery import cron_delivery_targets  # type: ignore
+            platforms = [t["id"] for t in cron_delivery_targets() if t.get("id")]
+            deliver_options = ["origin", "local", *platforms]
+        except Exception:  # noqa: BLE001 - keep the static options, like upstream
+            deliver_options = None
+        entries = []
+        for r in CATALOG:
+            entry = blueprint_catalog_entry(r)
+            if deliver_options:
+                for f in entry.get("fields", []):
+                    if f.get("name") == "deliver":
+                        f["options"] = deliver_options
+            entries.append(entry)
+        return _ok(blueprints=entries)
     except Exception as exc:
         return _fail(exc)
-    names = sorted({str(j.get("name", "")) for j in jobs.get("jobs", [])} if isinstance(jobs, dict) else [])
-    return _ok(blueprints=[{"name": n, "kind": "schedule-template",
-                            "instantiate": "POST /api/cron/blueprints/instantiate (staged, confirmed)"}
-                           for n in names])
 
 
 def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -8109,6 +8225,39 @@ def _strip_secret_fields(obj: Any) -> Any:
                 if str(k).lower() not in _PROVIDER_SECRET_KEYS}
     if isinstance(obj, list):
         return [_strip_secret_fields(x) for x in obj]
+    return obj
+
+
+# Even a credential *name* (`key_env: FIREWORKS_API_KEY`) is inventory the
+# served model picker does not need; Qubit never exposes credential references
+# on product surfaces. Substring match here is deliberate (the opposite of the
+# exact-name ``_PROVIDER_SECRET_KEYS`` denylist): a provider row's hidden
+# ``key_env``/``key_ref``/``api_key_env`` sibling keys are all dropped, while
+# public fields (`slug`, `models`, `pricing`, `capabilities`) survive intact.
+def _strip_provider_secret_fields(obj: Any) -> Any:
+    """Drop credential references/values from a provider payload, recursively.
+
+    The vendored picker payload carries provider rows with hidden metadata;
+    credential-shaped keys and key-reference keys (``key_env`` etc.) never leave
+    the backend. Response-facing facts (slug, models, totals, capabilities,
+    pricing, warnings) are preserved, so the SPA picker renders identically.
+    """
+    if isinstance(obj, dict):
+        out: Dict[str, Any] = {}
+        for k, v in obj.items():
+            kl = str(k).lower()
+            if kl in _PROVIDER_SECRET_KEYS:
+                continue
+            if any(part in kl for part in ("key_env", "key_ref", "apikey", "api_key")):
+                continue
+            if kl in {"token", "access_token", "refresh_token", "id_token",
+                      "secret", "client_secret", "password", "private_key",
+                      "credential", "credentials"}:
+                continue
+            out[k] = _strip_provider_secret_fields(v)
+        return out
+    if isinstance(obj, list):
+        return [_strip_provider_secret_fields(x) for x in obj]
     return obj
 
 
@@ -9145,7 +9294,7 @@ def skill_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "skills_update",
         f"rewriting skill {name!r} requires explicit confirmation: "
         "re-POST with {\"confirm\": true}", q, b,
-        payload={"skill_id": name})
+        payload={"skill_id": name, "content": content})
     if guard is not None:
         return guard
     try:
@@ -9179,7 +9328,7 @@ def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "skills_delete",
         f"deleting skill {name!r} requires explicit confirmation: "
         "re-DELETE with {\"confirm\": true}", q, b,
-        payload={"skill_id": name})
+        payload={"skill_id": name, "name": name})
     if guard is not None:
         return guard
     try:
@@ -9299,10 +9448,15 @@ def mcp_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not name:
         return 400, {"ok": False, "code": "MCP_BAD_INPUT",
                      "detail": "server name required"}
+    try:
+        staged_fields = _jsonable(_mcp_fields_from_body(b))
+    except Exception:  # noqa: BLE001 - invalid fields are validated post-confirm
+        staged_fields = {}
     guard = _compat_confirm(
         cfg, "mcp_server_create",
         f"registering MCP server {name!r} requires explicit confirmation: "
-        "re-POST with {\"confirm\": true}", q, b)
+        "re-POST with {\"confirm\": true}", q, b,
+        payload={"name": name, "fields": staged_fields})
     if guard is not None:
         return guard
     existing_enabled = _mcp_current_enabled(cfg, name)
@@ -9345,7 +9499,8 @@ def mcp_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     guard = _compat_confirm(
         cfg, "mcp_server_delete",
         f"removing MCP server {name!r} requires explicit confirmation: "
-        "re-DELETE with {\"confirm\": true}", q, b)
+        "re-DELETE with {\"confirm\": true}", q, b,
+        payload={"name": name})
     if guard is not None:
         return guard
     try:
@@ -9370,7 +9525,8 @@ def mcp_set_enabled(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     guard = _compat_confirm(
         cfg, "mcp_server_enabled",
         f"changing MCP server {name!r} enabled state requires explicit "
-        "confirmation: re-send with {\"confirm\": true}", q, b)
+        "confirmation: re-send with {\"confirm\": true}", q, b,
+        payload={"name": name, "enabled": enabled})
     if guard is not None:
         return guard
     try:
@@ -9430,7 +9586,8 @@ def mcp_auth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     guard = _compat_confirm(
         cfg, "mcp_server_auth",
         f"recording a credential reference for {name!r} requires explicit "
-        "confirmation: re-POST with {\"confirm\": true}", q, b)
+        "confirmation: re-POST with {\"confirm\": true}", q, b,
+        payload={"name": name, "reference": ref})
     if guard is not None:
         return guard
     try:
@@ -11347,6 +11504,106 @@ def h_qubit_runtime_history(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _fail(exc)
 
 
+# One canonical backend for every update surface. All of these are module-level
+# (testable, monkeypatchable) seams that resolve the manager read defensively so
+# this module works before AND after the canonical full lifecycle lands.
+def _update_full_apply() -> Any:
+    """The canonical apply entry point, or ``None`` when not yet present.
+
+    ``update_manager.full_apply`` is the one-call lifecycle (snapshot -> apply ->
+    receipt). Read via ``getattr`` so this module keeps working while the core is
+    still being extended: an absent symbol is a normal, expected state, never an
+    AttributeError at import.
+    """
+    from . import update_manager as UM
+    return getattr(UM, "full_apply", None)
+
+
+def _update_resolve_source(cfg: Any, source: Any, channel: Any,
+                           tag: Any) -> Any:
+    """Resolve a channel/tag to a git remote via the canonical resolver.
+
+    Optional: ``voicebridge.update_channel`` may not exist yet. Read via the
+    module registry (``util.find_spec``) so the missing-module case is caught
+    locally. ``resolve_source`` returns a policy dict; the manager's ``source``
+    argument is the git remote **name**, so ``.remote`` is extracted. A refused
+    URL (``ok=False``) raises so the handler answers with the typed code.
+    """
+    ch = str(channel or "").strip()
+    tg = str(tag or "").strip()
+    src = str(source or "").strip() or None
+    if not ch and not tg:
+        return src
+    import importlib.util as _ilu
+    if _ilu.find_spec("voicebridge.update_channel") is None:
+        raise ValueError(
+            "update channels/tags require the Qubit update-channel support; "
+            "update it from a release source instead")
+    from . import update_channel as UC  # type: ignore
+    resolved = UC.resolve_source(cfg, src)
+    if ch:
+        resolved["channel"] = ch
+    if tg:
+        resolved["tag"] = tg
+    if not resolved.get("ok", True):
+        raise ValueError(str(resolved.get("detail")
+                             or resolved.get("code") or "update source refused"))
+    return str(resolved.get("remote") or src or "").strip() or src
+
+
+def _update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str], source: Any = None) -> Dict[str, Any]:
+    """Read-only update check — the shared seam GET uses and voice calls."""
+    from . import update_manager as UM
+    return UM.check(cfg, source=source)
+
+
+def _update_apply(cfg: Any, b: Dict[str, Any], *, actor: str,
+                  source: Any = None, channel: Any = None,
+                  tag: Any = None) -> Dict[str, Any]:
+    """Run the canonical update lifecycle for one confirmed apply.
+
+    Prefers ``update_manager.full_apply`` (the one-call snapshot -> apply ->
+    receipt). Until that lands it reproduces the exact CLI lifecycle on the
+    existing primitives: ``snapshot`` (timestamped, non-destructive backup) then
+    ``apply(confirm=True)``, merging the backup path onto the receipt. Either way
+    the same manager policy/confirmation/e-stop/audit path runs — there is no
+    second backend.
+    """
+    from . import update_manager as UM
+    resolved = _update_resolve_source(cfg, source, channel, tag)
+    full = _update_full_apply()
+    if full is not None:
+        # Forward only the keywords the canonical lifecycle accepts, so a
+        # signature change never becomes a TypeError at the compat boundary.
+        kwargs = {"confirm": _truthy(b.get("confirm")), "source": resolved,
+                  "channel": (channel or None), "tag": (tag or None),
+                  "actor": actor}
+        import inspect as _inspect
+        try:
+            accepted = set(_inspect.signature(full).parameters)
+        except (TypeError, ValueError):
+            accepted = set(kwargs)
+        return full(cfg, **{k: v for k, v in kwargs.items() if k in accepted})
+    if not _truthy(b.get("confirm")):
+        return UM.apply(cfg, confirm=False, source=resolved, actor=actor)
+    snap = UM.snapshot(cfg, reason="pre-apply", source=resolved,
+                       actor=actor)
+    if not snap.get("ok"):
+        return snap
+    out = UM.apply(cfg, confirm=True, source=resolved, actor=actor)
+    if isinstance(out, dict):
+        out.setdefault("backup_dir", snap.get("backup_dir"))
+        out.setdefault("backup_bundle", snap.get("bundle"))
+    return out
+
+
+def _update_rollback(cfg: Any, backup_dir: Any = None, *, actor: str) -> Dict[str, Any]:
+    """Run the canonical rollback — the shared seam POST rollback/voice call."""
+    from . import update_manager as UM
+    return UM.rollback(cfg, backup_dir=backup_dir, actor=actor)
+
+
 def h_qubit_update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Read-only product update check (``UpdateCheckResponse`` wire shape).
@@ -11356,14 +11613,46 @@ def h_qubit_update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     (:func:`voicebridge.update_manager.check`) instead of the
     ``UPDATE_OPERATOR_OWNED`` refusal the blanket update gate used to return
     (audit A29). A network probe failure yields a typed DEGRADED report with
-    ``behind=null`` — never a fabricated "up to date".
+    ``behind=null`` — never a fabricated "up to date". ``?source=`` / ``?channel=``
+    / ``?tag=`` select the update source without changing the checkout.
     """
-    from . import update_manager as UM
     try:
-        out = UM.check(cfg)
+        source = _update_resolve_source(cfg, q.get("source"),
+                                        q.get("channel"), q.get("tag"))
+        out = _update_check(cfg, q, b, p, source=source)
     except Exception as exc:
         return _fail(exc)
     return _ok(**out)
+
+
+def _update_failure_http(code: str) -> int:
+    """Map a typed update refusal code to its HTTP status.
+
+    Busy lock 409 (CONFIRM_REQUIRED / WORKTREE_DIRTY / the lock-busy code read
+    from the manager when present), e-stop and operator-owned 403, unavailable
+    503, and every dependency/migration/validation/service/health failure 500.
+    An unknown code falls back to 500 — never a fabricated success.
+    """
+    code = str(code or "")
+    from . import update_manager as UM
+    busy = {str(getattr(UM, "LOCK_BUSY_CODE", "UPDATE_LOCK_BUSY")),
+            "UPDATE_BUSY", "CONFIRM_REQUIRED", "WORKTREE_DIRTY"}
+    if code in busy:
+        return 409
+    if code in ("UPDATE_ESTOP", "UPDATE_OPERATOR_OWNED"):
+        return 403
+    if code in ("UPDATE_UNAVAILABLE",):
+        return 503
+    return 500
+
+
+def _update_response(out: Any) -> Tuple[int, Dict[str, Any]]:
+    if not isinstance(out, dict):
+        return 500, {"ok": False, "state": "FAILED", "code": "UPDATE_FAILED",
+                     "detail": "the update backend returned no receipt"}
+    if out.get("ok"):
+        return 200, out
+    return _update_failure_http(str(out.get("code") or "")), out
 
 
 def h_qubit_update_apply(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -11371,22 +11660,39 @@ def h_qubit_update_apply(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """POST /api/qubit/update -> real non-destructive in-place update.
 
     Confirmed only (409 CONFIRM_REQUIRED otherwise) and refuses a dirty
-    worktree (409), a latched e-stop (403), a non-git install (403
-    UPDATE_OPERATOR_OWNED with the exact operator command), and the fail-closed
-    test guard (503 UNAVAILABLE). The only command run is ``git pull --ff-only``.
+    worktree (409), a busy lock (409), a latched e-stop (403), a non-git install
+    (403 UPDATE_OPERATOR_OWNED with the exact operator command), and the
+    fail-closed test guard (503 UNAVAILABLE). The only command run is
+    ``git pull --ff-only`` — the canonical :func:`update_manager.full_apply`
+    lifecycle when present. ``confirm``/``source``/``channel``/``tag`` come from
+    the request body.
     """
-    from . import update_manager as UM
     try:
-        out = UM.apply(cfg, confirm=_truthy(b.get("confirm")))
+        out = _update_apply(cfg, b, actor="dashboard:user")
     except Exception as exc:
         return _fail(exc)
-    if out.get("ok"):
-        return 200, out
-    code = str(out.get("code") or "")
-    http = {"CONFIRM_REQUIRED": 409, "WORKTREE_DIRTY": 409,
-            "UPDATE_ESTOP": 403, "UPDATE_UNAVAILABLE": 503,
-            "UPDATE_OPERATOR_OWNED": 403, "UPDATE_FAILED": 500}.get(code, 500)
-    return http, out
+    return _update_response(out)
+
+
+def h_qubit_update_rollback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/qubit/update/rollback -> restore the pre-apply revision.
+
+    The same canonical :func:`update_manager.rollback` the CLI and voice call:
+    confirm-gated (409 CONFIRM_REQUIRED without ``confirm``), e-stop 403, no
+    backup 409 UPDATE_NO_BACKUP, invalid backup 500. ``backup_dir`` may be
+    provided in the body to restore a specific snapshot.
+    """
+    try:
+        out = _update_rollback(cfg, backup_dir=(b.get("backup_dir") or None),
+                               actor="dashboard:user")
+    except Exception as exc:
+        return _fail(exc)
+    if isinstance(out, dict) and not out.get("ok"):
+        code = str(out.get("code") or "")
+        if code == "UPDATE_NO_BACKUP":
+            return 409, out
+    return _update_response(out)
 
 
 def h_qubit_runtime_update_report(cfg: Any, q: Dict[str, str],
@@ -12764,11 +13070,10 @@ def h_openapi(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     documented capability entries (``deprecated`` + reason), not as executable
     operations.
 
-    Legacy-named paths (the vendored plugin namespace and the superseded
-    update alias) still resolve on the wire as compat aliases, but they are
-    omitted from this reference so the user-facing /docs browser never renders
-    a legacy-branded literal. The Qubit-owned canonical surfaces are the
-    documented operations.
+    Legacy-named vendored plugin paths still resolve on the wire as compat
+    aliases, but they are omitted from this reference so the user-facing /docs
+    browser never renders a legacy-branded literal. The Qubit-owned canonical
+    surfaces are the documented operations.
     """
     paths: Dict[str, Dict[str, Any]] = {}
     for row in ROUTES:
@@ -12780,11 +13085,11 @@ def h_openapi(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         oas_path = re.sub(
             r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>[^)]*\)", r"{\1}", pattern)
         if _LEGACY_API_BRAND_RE.search(oas_path):
-            # Legacy-named compat alias (the vendored plugin namespace and the
-            # superseded update alias). The route still RESOLVES on the wire,
-            # but the served /docs document must not present a legacy-branded
-            # path on a user-facing surface (BRAND.md). Omit it from the
-            # OpenAPI reference rather than advertising the legacy literal.
+            # Legacy-named vendored plugin alias. The route still RESOLVES on
+            # the wire, but the served /docs document must not present a
+            # legacy-branded path on a user-facing surface (BRAND.md). Omit it
+            # from the OpenAPI reference rather than advertising the legacy
+            # literal.
             continue
         gate = row.get("gate") or {}
         entry = {
@@ -13274,8 +13579,9 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_qubit_runtime_marketplace": h_qubit_runtime_marketplace,
     "h_qubit_runtime_history": h_qubit_runtime_history,
     "h_qubit_runtime_update_report": h_qubit_runtime_update_report,
-    "h_qubit_update_check": h_qubit_update_check,
-    "h_qubit_update_apply": h_qubit_update_apply,
+     "h_qubit_update_check": h_qubit_update_check,
+     "h_qubit_update_apply": h_qubit_update_apply,
+     "h_qubit_update_rollback": h_qubit_update_rollback,
     "h_qubit_runtime_status": h_qubit_runtime_status,
     "h_qubit_runtime_images": h_qubit_runtime_images,
     "h_qubit_runtime_doctor": h_qubit_runtime_doctor,

@@ -433,8 +433,7 @@ test('waitForHermesReady surfaces actionable error for cloud agent 503', async (
   } catch (error: any) {
     assert.ok(error.message.includes('Qubit Cloud agent'), `unexpected message: ${error.message}`)
     assert.ok(error.message.includes('503'), `should mention status code: ${error.message}`)
-    assert.ok(error.message.includes('portal.nousresearch.com'), `should mention portal: ${error.message}`)
-    assert.ok(error.message.includes('discord.gg/NousResearch'), `should mention Discord: ${error.message}`)
+    assert.ok(error.message.includes('Qubit Cloud dashboard'), `should mention status destination: ${error.message}`)
     assert.equal(error.isCloudBackendDown, true)
     assert.equal(error.statusCode, 503)
     assert.ok(attempts > 1, 'should have retried before failing')

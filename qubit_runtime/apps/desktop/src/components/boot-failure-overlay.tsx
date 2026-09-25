@@ -7,8 +7,7 @@ import { Loader } from '@/components/ui/loader'
 import { LogView } from '@/components/ui/log-view'
 import type { DesktopConnectionConfig } from '@/global'
 import { useI18n } from '@/i18n'
-import { openExternalLink } from '@/lib/external-link'
-import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench } from '@/lib/icons'
+import { ChevronLeft, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench } from '@/lib/icons'
 import { $desktopBoot } from '@/store/boot'
 import { notify, notifyError } from '@/store/notifications'
 import { $desktopOnboarding } from '@/store/onboarding'
@@ -297,16 +296,10 @@ export function BootFailureOverlay() {
   } else if (cloudDown) {
     // A Qubit Cloud agent is down — the user cannot restart the managed
     // instance and Repair is local-only. Lead with the paths that actually
-    // resolve it: check the portal (status/instance controls), switch to the
-    // local gateway, retry, or adjust settings. The portal is a button (not a
-    // URL buried in the hint prose) so localized hints can't drift the link.
+    // resolve it: switch to the local gateway, retry, or adjust settings.
+    // (The hosted portal status page has no Qubit equivalent, so no external
+    // link is offered here.)
     actions = [
-      {
-        key: 'portal',
-        label: copy.cloudDownCheckPortal,
-        onClick: () => openExternalLink('https://portal.nousresearch.com'),
-        icon: <ExternalLink />
-      },
       localAction,
       { ...retryAction, variant: 'secondary' },
       { ...settingsAction, variant: 'ghost' }

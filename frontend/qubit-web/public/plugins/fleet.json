@@ -1,6 +1,6 @@
 [
   {
-    "name": "hermes-achievements",
+    "name": "qubit-achievements",
     "label": "Achievements",
     "description": "Steam-style achievements for vibe coding and agentic Qubit workflows.",
     "icon": "Star",
@@ -10,7 +10,7 @@
     "css": "dist/style.css",
     "has_api": true,
     "source": "bundled",
-    "assetBase": "/plugins/hermes-achievements"
+    "assetBase": "/plugins/qubit-achievements"
   },
   {
     "name": "kanban",

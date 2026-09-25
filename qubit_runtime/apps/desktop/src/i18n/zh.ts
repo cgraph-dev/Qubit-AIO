@@ -138,9 +138,7 @@ export const zh: Translations = {
       cloudDownTitle: 'Qubit Cloud 代理已宕机',
       cloudDownDescription:
         '此网关连接的 Qubit 托管云代理正在返回服务器错误。无法在此处重启——请检查其状态、切换到本地网关或获取支持。',
-      cloudDownHint: '使用下方按钮打开 Qubit Portal（查看实例状态与操作）或加入 Discord 获取支持。',
-      cloudDownCheckPortal: '查看 Portal 状态',
-      cloudDownDiscord: '在 Discord 获取帮助',
+      cloudDownHint: '使用下方按钮切换至本地网关、重试或打开网关设置。',
       hideRecentLogs: '隐藏最近日志',
       showRecentLogs: '显示最近日志',
       signedInTitle: '已登录',
@@ -257,9 +255,7 @@ export const zh: Translations = {
       '您也可以在终端运行 `qubit debug share --nous`，或运行 `qubit debug share --local` 在不上传的情况下查看报告。',
     handoffLead: '在以下位置继续讨论:',
     links: {
-      github: 'GitHub Issues',
-      portal: 'Qubit Portal 支持',
-      discord: 'Discord'
+      github: 'GitHub Issues'
     }
   },
 
@@ -1210,7 +1206,7 @@ export const zh: Translations = {
         'SSH 认证失败。请将密钥加载到 ssh-agent（ssh-add），或在 ~/.ssh/config 中设置 IdentityFile——Qubit 以非交互方式运行 ssh。',
       sshErrHostKey: '自上次连接以来主机密钥已更改。请确认这是预期的，然后运行 ssh-keygen -R <host> 并重新连接。',
       sshErrNotInstalled:
-        '远程主机上未安装 Qubit。请在远程安装（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）或设置 Qubit 路径。',
+        '远程主机上未安装 Qubit。请在远程安装（参见 https://github.com/cgraph-dev/qubit-voicebridge）或设置 Qubit 路径。',
       sshErrPlatform: '不支持的远程平台。Qubit Desktop 的 SSH 模式支持 Linux、macOS 和 Windows 远程主机。',
       sshErrTimeout: 'SSH 连接超时。主机可能无法访问或处于休眠状态。',
       sshErrUpdateRequired: '使用 Desktop SSH 连接前，请更新远程主机上的 Qubit。',
@@ -2080,7 +2076,7 @@ export const zh: Translations = {
       MATTERMOST_ALLOWED_USERS: { label: '允许的用户 ID', help: '推荐。逗号分隔的 Mattermost 用户 ID。' },
       MATRIX_HOMESERVER: { label: 'Homeserver URL', placeholder: 'https://matrix.org' },
       MATRIX_ACCESS_TOKEN: { label: '访问令牌' },
-      MATRIX_USER_ID: { label: 'Bot 用户 ID', placeholder: '@hermes:example.org' },
+      MATRIX_USER_ID: { label: 'Bot 用户 ID', placeholder: '@qubit:example.org' },
       MATRIX_ALLOWED_USERS: { label: '允许的 Matrix 用户 ID', help: '推荐。@user:server 格式的逗号分隔用户 ID。' },
       SIGNAL_HTTP_URL: {
         label: 'Signal 桥接 URL',
@@ -2222,7 +2218,7 @@ export const zh: Translations = {
       title: (profile: string) => `将 ${profile} 连接到远程主机`,
       description: '此配置档案中的会话将在你指定的远程 Qubit 上运行，而不是这台电脑。',
       urlLabel: '远程地址',
-      urlPlaceholder: 'https://hermes.example.com',
+      urlPlaceholder: 'https://gateway.example.com',
       urlInvalid: '请输入以 http:// 或 https:// 开头的完整地址',
       tokenLabel: '访问令牌',
       tokenPlaceholder: '粘贴远程会话令牌',

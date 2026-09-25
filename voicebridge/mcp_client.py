@@ -44,8 +44,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 SCHEMA = "qubit-mcp-client/1"
 
-DEFAULT_TIMEOUT_S = 30.0
-MAX_TIMEOUT_S = 120.0
+# Ported from the vendored tool-call budget (``tools/mcp_tool_common.py:41
+# _DEFAULT_TOOL_TIMEOUT = 300``): the reference allows a single MCP tool call up
+# to 300s. Qubit previously defaulted to 30s and hard-capped at 120s, so a
+# legitimately heavy tool (e.g. graft's full-repo ``graft_check_freshness``,
+# ~30s on a 4k-file graph) was killed by the client before its real result
+# arrived. The timeout stays bounded (300s ceiling, still killable) and config
+# ``mcp.timeout_s`` / an explicit per-call ``timeout_s`` can lower it.
+DEFAULT_TIMEOUT_S = 300.0
+MAX_TIMEOUT_S = 300.0
 MAX_OUTPUT_CHARS = 200_000
 MAX_CAPABILITIES = 64
 MAX_CAP_CHARS = 128

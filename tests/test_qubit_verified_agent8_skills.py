@@ -64,8 +64,12 @@ def test_voice_backend_skill_lifecycle_and_persistence(tmp_path, monkeypatch):
     perms.close()
 
     listed = VC._b_skills(ctx, {"action": "list"})
-    assert [s["skill_id"] for s in listed["skills"]] == [man.skill_id]
-    assert listed["skills"][0]["status"] == "staged"
+    # N14 (owner-approved, in force): a permissioned record with no on-disk
+    # SKILL.md is a capability grant, not a model skill — the agent and
+    # dashboard cannot resolve it, so the unified ``skills list`` must not
+    # display it. It stays manageable by id through show/enable/disable/
+    # rollback/remove (asserted below) via the permissioned store.
+    assert [s["skill_id"] for s in listed["skills"]] == []
 
     shown = VC._b_skills(ctx, {"action": "show", "skill_id": man.skill_id})
     assert shown["skill"]["manifest"]["version"] == "1.0.0"

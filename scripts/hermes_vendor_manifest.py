@@ -228,6 +228,8 @@ _EXTRA_PATH_RENAMES: dict[str, str] = {
 #: Directory-prefix renames (upstream prefix -> shipped prefix).
 _EXTRA_PREFIX_RENAMES: tuple[tuple[str, str], ...] = (
     ("ui-tui/packages/hermes-ink/", "ui-tui/packages/qubit-ink/"),
+    # Deep-rebrand slice: the bundled achievements dashboard plugin directory.
+    ("plugins/hermes-achievements/", "plugins/qubit-achievements/"),
 )
 #: Generic segment map mirroring ``scripts/qubit_identifier_rename.py`` so the
 #: RR2 module-graph file renames (fork tests, skill shims, TS components) are
@@ -847,6 +849,12 @@ _PATCH_SPEC.update({
 _LOCAL_PATH_RENAMES: dict[str, str] = {
     "frontend/qubit-web/src/components/HermesConsoleModal.tsx":
         "frontend/qubit-web/src/components/QubitConsoleModal.tsx",
+    # Public plugin namespace rename (hermes-achievements -> qubit-achievements):
+    # the pinned upstream bundle is vendored under the Qubit product namespace.
+    "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js":
+        "frontend/qubit-web/public/plugins/qubit-achievements/dist/index.js",
+    "frontend/qubit-web/public/plugins/hermes-achievements/dist/style.css":
+        "frontend/qubit-web/public/plugins/qubit-achievements/dist/style.css",
 }
 
 _COMPARISON_SCOPES = [

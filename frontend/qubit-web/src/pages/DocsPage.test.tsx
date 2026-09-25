@@ -34,7 +34,7 @@ const OAS = {
         responses: { "200": { description: "ok" } },
       },
     },
-    "/api/plugins/hermes-achievements/achievements": {
+    "/api/plugins/qubit-achievements/achievements": {
       get: {
         summary: "achievements alias",
         "x-qubit-compat-alias": true,

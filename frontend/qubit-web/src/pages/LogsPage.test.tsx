@@ -20,9 +20,6 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return { ...actual, fetchJSON: apiMocks.fetchJSON };
 });
 vi.mock("@/plugins", () => ({ PluginSlot: () => null }));
-vi.mock("@/contexts/usePageHeader", () => ({
-  usePageHeader: () => ({ setAfterTitle: vi.fn(), setEnd: vi.fn() }),
-}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -42,17 +39,21 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 }
 
 async function renderLogs() {
-  const [{ default: LogsPage }, { I18nProvider }] = await Promise.all([
-    import("./LogsPage"),
-    import("@/i18n"),
-  ]);
+  const [{ default: LogsPage }, { I18nProvider }, { PageHeaderProvider }] =
+    await Promise.all([
+      import("./LogsPage"),
+      import("@/i18n"),
+      import("@/contexts/PageHeaderProvider"),
+    ]);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   const ui: ReactNode = (
     <I18nProvider>
       <MemoryRouter initialEntries={["/logs"]}>
-        <LogsPage />
+        <PageHeaderProvider pluginTabs={[]}>
+          <LogsPage />
+        </PageHeaderProvider>
       </MemoryRouter>
     </I18nProvider>
   );
@@ -144,6 +145,27 @@ describe("LogsPage pagination", () => {
     expect(container.textContent).toContain("line-older");
     // The newest page is replaced by the older page (offset is server-driven).
     expect(container.textContent).not.toContain("line-newest");
+  });
+});
+
+describe("LogsPage export disabled reason", () => {
+  it("disables Export and names the truthful reason when no lines are loaded", async () => {
+    apiMocks.fetchJSON.mockResolvedValue({
+      file: "agent",
+      lines: [],
+      has_more: false,
+      next_offset: null,
+    });
+
+    await renderLogs();
+    await waitFor(() => apiMocks.fetchJSON.mock.calls.length > 0);
+
+    const exportBtn = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Export log lines"]',
+    );
+    expect(exportBtn).not.toBeNull();
+    expect(exportBtn?.disabled).toBe(true);
+    expect(exportBtn?.getAttribute("title")).toContain("Nothing to export");
   });
 });
 

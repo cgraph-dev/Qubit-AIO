@@ -1665,9 +1665,6 @@ def import_cli_history_sanitized(
                        f"nothing written")
             return review
     review["existing_lines"] = len(existing)
-    seen = set(existing)
-    incoming = [ln for ln in sanitized["text"].splitlines() if ln not in seen]
-    review["added_lines"] = len(incoming)
 
     # The pre-existing destination is sanitized too: a secret already present
     # in Qubit's own history must never be preserved by the import. Then the
@@ -1677,6 +1674,14 @@ def import_cli_history_sanitized(
     review["destination_redacted_lines"] = existing_sanitized["redacted_lines"]
     review["destination_redactions"] = existing_sanitized["redactions"]
     review["destination_patterns"] = existing_sanitized["patterns"]
+
+    # De-duplicate incoming lines against the *sanitized* existing lines (the
+    # exact lines that will be kept). Comparing against the raw destination
+    # would re-add a line whose secret was already redacted there, duplicating
+    # it whenever the same secret appears in both source and destination.
+    seen = set(existing_sanitized["text"].splitlines())
+    incoming = [ln for ln in sanitized["text"].splitlines() if ln not in seen]
+    review["added_lines"] = len(incoming)
     review["redactions"] = (sanitized["redactions"]
                             + existing_sanitized["redactions"])
     final_lines = existing_sanitized["text"].splitlines() + incoming
@@ -1706,6 +1711,9 @@ def import_cli_history_sanitized(
         review.update(state="NOOP",
                       detail="destination already contains every history line; "
                              "nothing written")
+        if review_path is not None:
+            _write_history_review(review, Path(review_path))
+            review["review_path"] = str(review_path)
         return review
 
     bdir = _history_backup_dir(cfg, backup_dir)
@@ -1725,6 +1733,9 @@ def import_cli_history_sanitized(
     (bdir / "journal.json").write_text(
         json.dumps(journal, indent=2, sort_keys=True), encoding="utf-8")
     _write_history_review(journal, bdir / "review.json")
+    if review_path is not None:
+        _write_history_review(journal, Path(review_path))
+        review["review_path"] = str(review_path)
     log_event("migration.history.import", added_lines=len(incoming),
               redactions=review["redactions"])
     return {"schema": HISTORY_SCHEMA, "state": "OK", "dry_run": False, **review}

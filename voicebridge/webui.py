@@ -954,6 +954,14 @@ QUBIT_READ_AUTHORITY: tuple = (
     # never appeared on reload — a write/read split-brain found by the route E2E
     # audit. Serve GET from the same compat store the writes use.
     "/api/providers/custom-endpoints",
+    # Update surface (SURFACES unification): the SPA System page's
+    # ``GET /api/qubit/update/check`` must be served by the canonical Qubit
+    # update handler (``h_qubit_update_check`` -> ``update_manager.check``), the
+    # SAME backend the CLI `qubit update`, the dashboard POST, and the voice
+    # intents call. Without this the read is proxied to the fork's own updater
+    # while the Qubit POST/CLI/voice drive the Qubit manager — the read/write
+    # split-brain this workstream exists to remove.
+    "/api/qubit/update",
 )
 
 

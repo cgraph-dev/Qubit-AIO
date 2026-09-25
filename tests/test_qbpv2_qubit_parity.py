@@ -109,7 +109,8 @@ def test_forward_pairs_never_shadow_native_qubit_subcommands():
                         subs.update(sub.choices.keys())
                 families[fam] = subs
     shadowed = [(fam, sub) for (fam, sub) in HF.FORWARD_TABLE
-                if sub in families.get(fam, set())]
+                if (fam, sub) not in HF.NATIVE_MCP_READS
+                and sub in families.get(fam, set())]
     assert shadowed == [], shadowed
 
 

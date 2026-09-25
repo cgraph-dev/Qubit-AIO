@@ -210,3 +210,40 @@ describe("PluginsPage curated pinned index", () => {
     );
   });
 });
+
+describe("PluginsPage install error surfacing", () => {
+  it("renders the typed install error inline with aria-invalid, not a silent dead control", async () => {
+    apiMocks.installAgentPlugin.mockRejectedValue(
+      new Error(
+        '400: {"ok": false, "code": "PLUGIN_INSTALL_SOURCE", "detail": "no reviewed local plugin manifest for \'/nonexistent/path\'", "qubit_counterpart": "CLI `qubit plugin install`"}',
+      ),
+    );
+    await renderPage();
+    await waitFor(() => container.querySelector("#install-url") !== null);
+
+    const input = container.querySelector<HTMLInputElement>("#install-url")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "/nonexistent/path");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const installBtn = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((b) => (b.textContent ?? "").trim() === "Install");
+    expect(installBtn).not.toBeUndefined();
+    await act(async () => installBtn?.click());
+
+    await waitFor(
+      () =>
+        container.querySelector('[data-testid="plugin-install-error"]') !== null,
+    );
+    const err = container.querySelector('[data-testid="plugin-install-error"]');
+    expect(err?.textContent).toContain("no reviewed local plugin manifest");
+    expect(err?.getAttribute("role")).toBe("alert");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+  });
+});

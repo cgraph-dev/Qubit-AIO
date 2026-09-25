@@ -21,11 +21,11 @@
  ],
  "plugin_fleet": [
   {
-   "name": "hermes-achievements",
+   "name": "qubit-achievements",
    "has_dashboard": true,
    "source": "vendored",
-   "manifest": "plugins/hermes-achievements/dashboard/manifest.json",
-   "api": "plugins/hermes-achievements/dashboard/plugin_api.py"
+   "manifest": "plugins/qubit-achievements/dashboard/manifest.json",
+   "api": "plugins/qubit-achievements/dashboard/plugin_api.py"
   },
   {
    "name": "kanban",
@@ -6531,7 +6531,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_agent1_forward.py::test_upstream_parser_error_is_preserved",
+   "proving_test": "tests/test_cross_surface_wiring_agenth.py::test_mcp_list_and_status_agree_on_a_dashboard_created_server",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "none"
   },
@@ -6559,7 +6559,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_agent1_forward.py::test_forwarded_mcp_catalog_runs_in_fork",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "none"
   },
@@ -6573,7 +6573,7 @@
    "dashboard": "",
    "voice": "",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_cli_closure_wave5.py::test_wave5_readonly_routes_forward_fork_argv",
+   "proving_test": "tests/test_cli_agent1_forward.py::test_forwarded_mcp_catalog_runs_in_fork",
    "note": "Subcommand-surface gap inside the mcp family.",
    "needs": "none"
   },

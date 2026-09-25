@@ -73,6 +73,15 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
+  );
+}
+
 export default function WebhooksPage() {
   const [data, setData] = useState<WebhooksResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +102,17 @@ export default function WebhooksPage() {
   const [secretRef, setSecretRef] = useState("");
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<CreatedWebhook | null>(null);
+  // Inline validation for the create dialog. A validation failure must be
+  // actionable where the operator is looking — the shared toast renders at
+  // z-50, beneath the modal backdrop (z-[100]), so feedback routed only to it
+  // is invisible and the dialog looks dead. Field-level errors render inside
+  // the dialog and focus the first invalid field.
+  const [formErrors, setFormErrors] = useState<{
+    name?: string;
+    url?: string;
+    events?: string;
+    secretRef?: string;
+  }>({});
 
   // Per-subscription operations (rotate/test/deliveries/retry). ``actionBusy``
   // keys the in-flight action as ``<name>:<action>`` so only that button spins.
@@ -207,6 +227,7 @@ export default function WebhooksPage() {
     setUrl("");
     setEvents("");
     setSecretRef("");
+    setFormErrors({});
   }, []);
 
   const handleCreate = async () => {
@@ -217,20 +238,37 @@ export default function WebhooksPage() {
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean);
     const secretReference = secretRef.trim();
+    const errors: {
+      name?: string;
+      url?: string;
+      events?: string;
+      secretRef?: string;
+    } = {};
     if (!subId) {
-      showToast("Name required (lowercase id)", "error");
-      return;
+      errors.name = "Name required — use a lowercase id (e.g. github-push).";
     }
     if (!deliveryUrl) {
-      showToast("Delivery URL required", "error");
-      return;
+      errors.url = "Delivery URL required.";
     }
     if (!eventsList.length) {
-      showToast("At least one event is required", "error");
-      return;
+      errors.events = "At least one event is required (comma-separated).";
     }
     if (!/^(env|file):/.test(secretReference)) {
-      showToast("Secret must be an env:VAR or file:PATH reference", "error");
+      errors.secretRef =
+        "Secret must be an env:VAR or file:PATH reference.";
+    }
+    setFormErrors(errors);
+    const firstInvalid = (
+      ["name", "url", "events", "secretRef"] as const
+    ).find((key) => errors[key]);
+    if (firstInvalid) {
+      const inputIds = {
+        name: "webhook-name",
+        url: "webhook-url",
+        events: "webhook-events",
+        secretRef: "webhook-secret-ref",
+      };
+      document.getElementById(inputIds[firstInvalid])?.focus();
       return;
     }
     setCreating(true);
@@ -497,8 +535,17 @@ export default function WebhooksPage() {
                     autoFocus
                     placeholder="e.g. github-push"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    aria-invalid={formErrors.name ? true : undefined}
+                    aria-describedby={
+                      formErrors.name ? "webhook-name-error" : undefined
+                    }
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (formErrors.name)
+                        setFormErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
                   />
+                  <FieldError id="webhook-name-error" message={formErrors.name} />
                 </div>
 
                 <div className="grid gap-2">
@@ -507,8 +554,17 @@ export default function WebhooksPage() {
                     id="webhook-url"
                     placeholder="https://hooks.example.com/agent"
                     value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    aria-invalid={formErrors.url ? true : undefined}
+                    aria-describedby={
+                      formErrors.url ? "webhook-url-error" : undefined
+                    }
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      if (formErrors.url)
+                        setFormErrors((prev) => ({ ...prev, url: undefined }));
+                    }}
                   />
+                  <FieldError id="webhook-url-error" message={formErrors.url} />
                 </div>
 
                 <div className="grid gap-2">
@@ -517,7 +573,19 @@ export default function WebhooksPage() {
                     id="webhook-events"
                     placeholder="comma-separated, e.g. task.completed"
                     value={events}
-                    onChange={(e) => setEvents(e.target.value)}
+                    aria-invalid={formErrors.events ? true : undefined}
+                    aria-describedby={
+                      formErrors.events ? "webhook-events-error" : undefined
+                    }
+                    onChange={(e) => {
+                      setEvents(e.target.value);
+                      if (formErrors.events)
+                        setFormErrors((prev) => ({ ...prev, events: undefined }));
+                    }}
+                  />
+                  <FieldError
+                    id="webhook-events-error"
+                    message={formErrors.events}
                   />
                 </div>
 
@@ -527,7 +595,22 @@ export default function WebhooksPage() {
                     id="webhook-secret-ref"
                     placeholder="env:WEBHOOK_SIGNING_SECRET or file:/run/secrets/hook"
                     value={secretRef}
-                    onChange={(e) => setSecretRef(e.target.value)}
+                    aria-invalid={formErrors.secretRef ? true : undefined}
+                    aria-describedby={
+                      formErrors.secretRef ? "webhook-secret-ref-error" : undefined
+                    }
+                    onChange={(e) => {
+                      setSecretRef(e.target.value);
+                      if (formErrors.secretRef)
+                        setFormErrors((prev) => ({
+                          ...prev,
+                          secretRef: undefined,
+                        }));
+                    }}
+                  />
+                  <FieldError
+                    id="webhook-secret-ref-error"
+                    message={formErrors.secretRef}
                   />
                 </div>
 

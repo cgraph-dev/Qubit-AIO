@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from '@/lib/icons'
+import { QUBIT_RELEASES_URL, QUBIT_REPO_URL } from '@/lib/qubit-links'
 import { cn } from '@/lib/utils'
 import {
   $desktopVersion,
@@ -21,8 +22,8 @@ import {
 import { ListRow, SectionHeading, SettingsContent } from './primitives'
 import { UninstallSection } from './uninstall-section'
 
-const RELEASE_NOTES_URL = 'https://github.com/NousResearch/hermes-agent/releases'
-const INSTALLER_URL = 'https://hermes-agent.nousresearch.com/'
+const RELEASE_NOTES_URL = QUBIT_RELEASES_URL
+const INSTALLER_URL = QUBIT_REPO_URL
 
 function relativeTime(ms: number | undefined, a: Translations['settings']['about']) {
   if (!ms) {

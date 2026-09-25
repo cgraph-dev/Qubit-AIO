@@ -1320,7 +1320,7 @@ app.setName(APP_NAME)
 // Windows toast notifications silently no-op unless an AppUserModelID is set:
 // `new Notification().show()` returns without error and nothing appears. The
 // AUMID must match the installed Start Menu shortcut's AUMID, which
-// electron-builder derives from the build `appId` (com.nousresearch.hermes) —
+// electron-builder derives from the build `appId` (com.qubitlabs.qubit) —
 // keep this string in sync with package.json `build.appId`. macOS/Linux don't
 // need this, so gate it on Windows. (Fixes: desktop approval/turn notifications
 // never firing on Windows.)
@@ -3307,7 +3307,7 @@ async function fetchCompareBehindCount({ currentSha, originUrl, targetSha }) {
           headers: {
             Accept: 'application/vnd.github+json',
             // GitHub requires a UA on api.github.com; requests without one 403.
-            'User-Agent': 'hermes-desktop-update-check'
+            'User-Agent': 'qubit-desktop-update-check'
           },
           timeout: 10_000
         },
@@ -8368,13 +8368,13 @@ async function freshGatewayWsUrl(profile) {
 //     with that agent's session cookie — no prompt. Each agent still completes
 //     its own PKCE exchange; SSO removes the human click, not a security check.
 
-// Canonical Qubit portal base URL, overridable for staging/dev. Mirrors the CLI
-// convention (qubit_cli/auth.py DEFAULT_NOUS_PORTAL_URL + the same env names)
-// so a single override flips every Qubit surface to the same portal.
-const DEFAULT_NOUS_PORTAL_URL = 'https://portal.nousresearch.com'
-
+// Canonical Qubit portal base URL, configured by the operator. Qubit does not
+// hard-code a portal origin: set QUBIT_PORTAL_BASE_URL (or the legacy
+// NOUS_PORTAL_BASE_URL alias) to the Qubit account portal. When unset, cloud
+// portal features report "not configured" instead of silently dialing a legacy
+// upstream service.
 function resolvePortalBaseUrl() {
-  const raw = process.env.QUBIT_PORTAL_BASE_URL || process.env.NOUS_PORTAL_BASE_URL || DEFAULT_NOUS_PORTAL_URL
+  const raw = process.env.QUBIT_PORTAL_BASE_URL || process.env.NOUS_PORTAL_BASE_URL || ''
 
   return String(raw).trim().replace(/\/+$/, '')
 }
@@ -8401,6 +8401,11 @@ async function hasLivePortalSession() {
   }
 
   const portalBaseUrl = resolvePortalBaseUrl()
+
+  if (!portalBaseUrl) {
+    return false
+  }
+
   const parsed = new URL(portalBaseUrl)
 
   const readPortal = async () => {
@@ -8447,6 +8452,11 @@ async function hasPortalAccessToken() {
   }
 
   const portalBaseUrl = resolvePortalBaseUrl()
+
+  if (!portalBaseUrl) {
+    return false
+  }
+
   const parsed = new URL(portalBaseUrl)
 
   try {
@@ -8601,6 +8611,12 @@ function renewPortalAccessSilently() {
 function openPortalLoginWindow() {
   const portalBaseUrl = resolvePortalBaseUrl()
 
+  if (!portalBaseUrl) {
+    return Promise.reject(
+      new Error('Qubit Cloud is not configured. Set QUBIT_PORTAL_BASE_URL to your Qubit portal.')
+    )
+  }
+
   return new Promise((resolve, reject) => {
     if (!app.isReady()) {
       reject(new Error('Desktop is not ready to start a Qubit Cloud sign-in.'))
@@ -8711,6 +8727,10 @@ function openPortalLoginWindow() {
 // portal session is present.
 async function discoverCloudAgents(org?: string) {
   const portalBaseUrl = resolvePortalBaseUrl()
+
+  if (!portalBaseUrl) {
+    throw new Error('Qubit Cloud is not configured. Set QUBIT_PORTAL_BASE_URL to your Qubit portal.')
+  }
 
   if (!(await hasLivePortalSession())) {
     const err = new Error(
@@ -15919,7 +15939,7 @@ ipcMain.handle('hermes:connections:update-all', async (_event, payload) => {
             ensureRegistryBackend(connection.id, null)
           )
 
-          const body: any = await postJsonForBackend(descriptor, '/api/hermes/update', {}, { timeoutMs: 15_000 })
+          const body: any = await postJsonForBackend(descriptor, '/api/qubit/update', {}, { timeoutMs: 15_000 })
 
           if (body?.ok === false) {
             // The backend refused (docker/nix/externally-managed installs) —

@@ -23,12 +23,10 @@ import {
 import { useI18n } from '@/i18n'
 import { ExternalLink as ExternalLinkAnchor, openExternalLink } from '@/lib/external-link'
 import { ExternalLink, Loader2Icon, Lock } from '@/lib/icons'
+import { QUBIT_ISSUES_URL } from '@/lib/qubit-links'
 import { $sendDiagnostics, confirmSendDiagnostics, dismissSendDiagnostics } from '@/store/send-diagnostics'
 
-const SUPPORT_LINKS = [
-  { key: 'github', url: 'https://github.com/NousResearch/hermes-agent/issues' },
-  { key: 'portal', url: 'https://portal.nousresearch.com/help' }
-] as const
+const SUPPORT_LINKS = [{ key: 'github', url: QUBIT_ISSUES_URL }] as const
 
 export function SendDiagnosticsHost() {
   const { t } = useI18n()

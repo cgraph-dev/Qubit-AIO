@@ -150,11 +150,11 @@ describe('BootFailureOverlay', () => {
     const gatewayUrl = 'https://agent-1.agents.nousresearch.com'
     const logout = vi.fn().mockResolvedValue({ ok: true, connected: false })
     const nativeLogin = vi.fn().mockResolvedValue({ ok: true, connected: false })
-    const cloudStatus = vi.fn().mockResolvedValue({ portalBaseUrl: 'https://portal.nousresearch.com', signedIn: false })
+    const cloudStatus = vi.fn().mockResolvedValue({ portalBaseUrl: 'https://portal.qubit.test', signedIn: false })
 
     const cloudLogin = vi.fn().mockResolvedValue({
       ok: true,
-      portalBaseUrl: 'https://portal.nousresearch.com',
+      portalBaseUrl: 'https://portal.qubit.test',
       signedIn: true
     })
 
@@ -211,16 +211,15 @@ describe('BootFailureOverlay', () => {
       // Cloud-specific title + actionable recovery instead of the generic
       // remote-failure copy.
       expect(await screen.findByText(/Nous Cloud agent is down/i)).toBeTruthy()
-      // Portal and Discord are dedicated action buttons (localized labels
-      // can't drift the URLs, which live in code).
-      expect(screen.getByRole('button', { name: /check portal status/i })).toBeTruthy()
-      expect(screen.getByRole('button', { name: /get help on discord/i })).toBeTruthy()
       // Cloud-down is a remote failure: local-only Repair is dropped; the
-      // actionable paths are Gateway settings + Use local gateway.
+      // actionable paths are the local gateway, Retry, and Gateway settings.
+      // (There is no Qubit-hosted portal status page to link to, so no
+      // external "check portal" action is offered.)
+      expect(screen.queryByRole('button', { name: /check portal status/i })).toBeNull()
       expect(screen.queryByRole('button', { name: /repair/i })).toBeNull()
       expect(screen.getByRole('button', { name: /gateway settings/i })).toBeTruthy()
       expect(screen.getByRole('button', { name: /use local gateway/i })).toBeTruthy()
-      // The electron-built error message (portal / local mode / Discord) is
+      // The electron-built error message (agent host / local mode) is
       // still surfaced in the error box.
       expect(screen.getByText(/ares-3009\.agents\.nousresearch\.com/i)).toBeTruthy()
     } finally {

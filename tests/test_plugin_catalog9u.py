@@ -145,7 +145,7 @@ def test_hub_surfaces_the_real_fleet_and_providers(tmp_path, monkeypatch):
     assert "browser-browser-use" in names
     assert len(names) >= 50, len(names)
     orphans = {o["name"] for o in out["orphan_dashboard_plugins"]}
-    assert {"kanban", "hermes-achievements"} <= orphans
+    assert {"kanban", "qubit-achievements"} <= orphans
     assert {"qubit-boards", "qubit-ops"} <= orphans
     # Real vendored memory providers (not a hardcoded single option).
     assert len(out["providers"]["memory_options"]) >= 5

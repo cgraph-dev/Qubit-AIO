@@ -48,7 +48,9 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
     prefix: 'NOUS_',
     name: 'Qubit Labs',
     description: 'Hosted Qubit & Nous-trained models',
-    docsUrl: 'https://portal.nousresearch.com',
+    // No public signup/console URL is shipped for this group (the legacy
+    // upstream portal is not a Qubit surface); the card header renders without
+    // an external link until a Qubit-hosted one exists.
     priority: 0
   },
   {

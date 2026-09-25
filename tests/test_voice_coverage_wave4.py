@@ -9,7 +9,7 @@ wave-1/2/3 example tables:
    registry entry or an explicit, tested ``VOICE_IMPOSSIBLE`` reason — the
    union the ledger derives is asserted equal to the parser tree (no drift);
 2. every wave-3 vendored dashboard-plugin compat route (the
-   ``hermes-achievements`` + kanban plugin fleet, ``qubit_plugins.py``) has a
+   ``qubit-achievements`` + kanban plugin fleet, ``qubit_plugins.py``) has a
    real voice entry that dispatches the *same* ``qubit_compat`` route the
    dashboard SPA calls — no unspoken plugin route, and the one dashboard-only
    control is explicitly declared;

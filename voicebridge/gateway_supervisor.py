@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -809,10 +810,13 @@ def _control_impl(cfg: Any, action: str, *, confirmed: bool = False,
 
     # restart / stop replace (or end) this process: dispatch detached so the
     # HTTP response is sent first, and report the transition as in-progress.
+    # The unit name is config-controlled and this argv is executed by ``sh -c``
+    # (the sleep must precede the transition so the response is flushed first),
+    # so it is shell-quoted — never interpolated raw.
     detached = ["sh", "-c",
                 f"sleep {DETACH_DELAY_S}; systemctl"
                 + (" --user" if system_scope(cfg) == "user" else "")
-                + f" {clean} {unit}"]
+                + f" {clean} {shlex.quote(unit)}"]
     try:
         spawn(detached)
     except Exception as exc:  # noqa: BLE001

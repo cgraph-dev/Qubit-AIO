@@ -19,10 +19,75 @@ interface AutomationBlueprintsProps {
   onCreated?: () => void;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+const FIELD_TYPES = new Set<AutomationBlueprintField["type"]>([
+  "time",
+  "enum",
+  "text",
+  "weekdays",
+]);
+
+function normalizeField(
+  raw: unknown,
+  index: number,
+): AutomationBlueprintField | null {
+  if (!isRecord(raw)) return null;
+  const name = asString(raw.name) || asString(raw.key);
+  if (!name) return null;
+  const rawType = asString(raw.type) as AutomationBlueprintField["type"];
+  return {
+    name,
+    type: FIELD_TYPES.has(rawType) ? rawType : "text",
+    label: asString(raw.label) || name || `Field ${index + 1}`,
+    default: typeof raw.default === "string" ? raw.default : null,
+    options: Array.isArray(raw.options) ? raw.options.map((o) => String(o)) : [],
+    optional: raw.optional === true,
+    strict: raw.strict !== false,
+    help: asString(raw.help),
+  };
+}
+
+/**
+ * Normalize one catalog entry into the blueprint shape the form renders.
+ *
+ * The canonical backend returns ``{key,title,…,fields:[…]}``; the Qubit compat
+ * catalog returns a lighter ``{name,kind,instantiate}`` shape with no
+ * ``fields``. The dashboard must render either without the ``fields is not
+ * iterable`` crash the unguarded form produced, so every entry is normalized
+ * here and field-less entries render read-only rather than exploding.
+ */
+export function normalizeBlueprint(raw: unknown): AutomationBlueprint | null {
+  if (!isRecord(raw)) return null;
+  const key = asString(raw.key) || asString(raw.name) || asString(raw.id);
+  if (!key) return null;
+  const fields = Array.isArray(raw.fields) ? raw.fields : [];
+  const tags = Array.isArray(raw.tags) ? raw.tags : [];
+  return {
+    key,
+    title:
+      asString(raw.title) || asString(raw.label) || asString(raw.name) || key,
+    description: asString(raw.description) || asString(raw.kind),
+    category: asString(raw.category),
+    tags: tags.map((tag) => (typeof tag === "string" ? tag : String(tag))),
+    fields: fields
+      .map(normalizeField)
+      .filter((field): field is AutomationBlueprintField => field !== null),
+    command: asString(raw.command) || asString(raw.instantiate),
+    appUrl: asString(raw.appUrl),
+  };
+}
+
 /** Initial form values for a blueprint = each field's default (or ""). */
 function initialValues(blueprint: AutomationBlueprint): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const f of blueprint.fields) out[f.name] = f.default ?? "";
+  for (const f of blueprint.fields ?? []) out[f.name] = f.default ?? "";
   return out;
 }
 
@@ -81,6 +146,8 @@ function BlueprintCard({
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(blueprint));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fields = blueprint.fields ?? [];
+  const tags = blueprint.tags ?? [];
 
   const submit = useCallback(async () => {
     setSubmitting(true);
@@ -112,25 +179,31 @@ function BlueprintCard({
             </div>
             <p className="mt-1 text-sm opacity-70">{blueprint.description}</p>
             <div className="mt-2 flex flex-wrap gap-1">
-              {blueprint.tags.map((t) => (
+              {tags.map((t) => (
                 <Badge key={t} tone="secondary">
                   {t}
                 </Badge>
               ))}
             </div>
           </div>
-          <Button
-            ghost={open}
-            size="sm"
-            onClick={() => setOpen((o) => !o)}
-          >
-            {open ? "Cancel" : "Set up"}
-          </Button>
+          {fields.length > 0 ? (
+            <Button
+              ghost={open}
+              size="sm"
+              onClick={() => setOpen((o) => !o)}
+            >
+              {open ? "Cancel" : "Set up"}
+            </Button>
+          ) : (
+            <span className="shrink-0 text-xs opacity-60">
+              No configurable fields
+            </span>
+          )}
         </div>
 
-        {open && (
+        {open && fields.length > 0 && (
           <div className="space-y-3 border-t pt-3">
-            {blueprint.fields.map((f) => (
+            {fields.map((f) => (
               <div key={f.name} className="space-y-1">
                 <Label htmlFor={`${blueprint.key}-${f.name}`}>{f.label}</Label>
                 <FieldInput
@@ -180,7 +253,13 @@ export function AutomationBlueprints({ profile, onCreated }: AutomationBlueprint
     api
       .getAutomationBlueprints()
       .then((r) => {
-        if (!cancelled) setBlueprints(r.blueprints);
+        if (cancelled) return;
+        const raw = Array.isArray(r?.blueprints) ? r.blueprints : [];
+        setBlueprints(
+          raw
+            .map(normalizeBlueprint)
+            .filter((b): b is AutomationBlueprint => b !== null),
+        );
       })
       .catch((e) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));

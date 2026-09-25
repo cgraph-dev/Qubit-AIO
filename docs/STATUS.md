@@ -1458,3 +1458,94 @@ runtime-path rename is out of this slice's six-file scope).
   `_compat_runner` has the webhook family (live: 409 → confirm 200 → created).
   150 focused tests pass; services active. One MCP-invoke row is environment-only
   (`graft` not on the service `PATH`).
+
+## 32. Update/install lifecycle port — 2026-09-25 (waves 1–2, 10 agents)
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Not committed.**
+
+Ported the proven Hermes update lifecycle onto the Qubit-owned backend. The one
+canonical manager is `voicebridge/update_manager.py`; every surface (CLI,
+dashboard API, voice, gateway action) now routes through it.
+
+- **Core lifecycle (new modules).** `update_manager.full_apply()` orchestrates:
+  confirm → e-stop → fail-closed guard → install-method detection → update lock
+  → dirty refusal → snapshot → `git pull --ff-only` → hand-off re-exec → deps →
+  config/schema migration → compile/import + critical-module + frontend
+  validation → owned-service restart → health/listener/version → receipt.
+  Post-pull failures auto-restore the pre-apply revision and record
+  `rolled_back`. New: `update_lock.py` (pid+timestamp marker, 20-min ceiling,
+  hand-off pid/ancestor adoption, `transfer_to`), `update_receipt.py` (schema 1,
+  kind `qubit-update`, redacted), `update_validation.py`, 
+  `update_config_migration.py` (idempotent, backed-up), `update_handoff.py`.
+- **Distribution policy.** `update_channel.py` + `docs/UPDATE.md`: default repo
+  identity `cgraph-dev/qubit-voicebridge`, remote `origin`, branch `main`,
+  channel `stable` (stable→SemVer tags, beta→rc/beta, canary→branch head),
+  anonymous public fetch, explicit-auth private, legacy-URL guard
+  (`hermes`/`nousresearch`/`nous` refused as a configured source URL). Container
+  → `docker pull`, package/immutable → the exact operator command.
+- **Surfaces.** `cli.py` `--check|--apply|--rollback|--channel|--tag|--confirm`
+  (canonical resolver; variadic-safe kwargs); `qubit_compat.py`
+  GET `/api/qubit/update/check`, POST `/api/qubit/update`,
+  POST `/api/qubit/update/rollback` (typed code→HTTP map); `voice_commands.py`
+  `update_check`/`update_apply`/`update_rollback` (confirmation + e-stop).
+- **Defects fixed.** Resume child re-pulled/re-snapshotted (now skips pre-pull
+  steps); lock hand-off race (parent now transfers the marker to the child pid);
+  kwargs signature-filter silently dropped `confirm` when the callee was
+  variadic (CLI + voice).
+- **Fresh-install E2E (hermetic PASS).** Disposable bare remote + clone under
+  isolated `HOME`/`QUBIT_HOME`/XDG: install-from-zero check, safe ff-only
+  apply→v2, deps+config migration, sentinel preserved, rollback restores the
+  exact pre-apply revision with a pre-rollback snapshot, strace shows **0**
+  accesses to `/home/trick/.hermes`. Host service restart/health are
+  explicitly skipped under the fail-closed guard (no fabricated success).
+  Evidence: `/tmp/opencode/qubit-update/fresh_install_report.md`.
+- **Tests.** 159 update tests pass (15 files) + 80 route/CLI/voice regression +
+  frontend `tsc -b` clean + 53 frontend api tests. Packaging/release 51 pass.
+- **Remaining limitations:** live `--apply`/`--rollback` against the host were
+  not run (would restart the live service); the hand-off child and service
+  restart are unit-proven but only exercised in production outside the guard;
+  the compat alias `/api/hermes/update.*` and the vendored desktop updater still
+  use the legacy path (W9 deep-rename debt). No secrets copied; `~/.hermes`
+  read-only.
+
+## 33. Public-branding closure (owner clarification) — 2026-09-25
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Not committed.**
+
+- **Canonical update source (owner ruling).** `QUBIT_UPDATE_URL =
+  https://github.com/cgraph-dev/qubit-voicebridge.git`; `resolve_source` prefers
+  the canonical URL, overrides a legacy-branded `origin`/`update.remote`, and
+  refuses explicit `hermes`/`nousresearch`/`nous`/`openclaw` source URLs
+  (`UPDATE_LEGACY_SOURCE_URL`). Default branch `main`, channel `stable`.
+  `qubit update --check --json` now reports the canonical URL as the update
+  source.
+- **Public Hermes routes removed.** `/api/hermes/update.*` deleted; unknown
+  canonical `GET/POST /api/qubit/update/*` subpaths answer the typed
+  `UPDATE_OPERATOR_OWNED` gate. Public plugin namespace renamed
+  `hermes-achievements` → `qubit-achievements` (six routes + fleet.json + engine
+  dir + plugin bundle); legacy path 404s with no alias. Route table: 448
+  entries, **0** legacy-branded paths.
+- **Desktop updater de-branded.** Vendored desktop update API paths →
+  `/api/qubit/update*`; about/diagnostics/onboarding/billing/portal/skills-hub
+  URLs → canonical repo or removed (no fabricated Qubit service); `package.json`
+  repository → canonical. Desktop typecheck/build **BLOCKED** (no
+  `node_modules`/Electron toolchain on this host); TS syntax-checked instead.
+- **Bundle guard fix.** A frontend de-brand regex shipped contiguous legacy
+  tokens into `frontend/qubit-dist`; rebuilt with a non-foldable array-join
+  assembly and regenerated the bundle.
+- **Public-surface scan: 0 leaks** across cli/routes/voice/bundles/
+  source_strings/update_receipt (`scripts/qubit_public_surface_scan.py`,
+  deterministic x2). Allowlisted internal wire/provenance identifiers remain
+  (classified, never public).
+- **Regenerated:** vendor manifest (`missing_from_local=[]`,
+  `git_index_gaps=[]`, 14440 files), source inventory, ledgers, route
+  ownership, handler reachability, parity/voice/page coverage. Differential
+  selftest 96/96; drift fixture repointed.
+- **Tests:** 202 update/branding/route tests pass; 237 route/parity/manifest/
+  ledger tests pass (5 pinned-source skips). One pre-existing failure unrelated
+  to this work: `test_qbpv2_agent3_inventory` (W9 web-sync overlay, fails at
+  HEAD).
+- **Remaining blocker:** desktop artifact rebuild needs the Electron toolchain
+  (`apps/desktop/node_modules`); frontend rebuilt. Generated parity artifacts
+  legitimately reference the upstream route names they compare against
+  (internal/provenance, not public).

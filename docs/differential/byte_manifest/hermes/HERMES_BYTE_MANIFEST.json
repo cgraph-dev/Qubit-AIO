@@ -9,7 +9,7 @@
   "license": "MIT License, Copyright (c) 2025 Nous Research"
  },
  "source": {
-  "path": "/tmp/opencode/pinned/hermes-agent-d337b736-git",
+  "path": "/tmp/opencode/pinned/hermes-agent",
   "head": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
   "checkout_matches_pin": true,
   "generator": "scripts/hermes_byte_manifest.py"

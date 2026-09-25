@@ -832,6 +832,53 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                                     "category": staged.get("category", "")}
             return HC.skill_create(cfg, {}, body, {})
         return _run
+    if action in ("skills_update", "skills_delete"):
+        # The skills editor's rewrite/delete stage through ``_compat_confirm``
+        # with the validated scalar set (``skills_update`` carries the new
+        # content; ``skills_delete`` the name). The pending-approvals banner's
+        # id-only Confirm must re-enter the SAME handler so the edit applies
+        # exactly once instead of failing ``CONFIRM_UNSUPPORTED``.
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            sid = str(staged.get("skill_id") or staged.get("name") or "")
+            if action == "skills_update":
+                return HC.skill_update(
+                    cfg, {}, {"confirm": True, "skill_id": sid,
+                              "content": str(staged.get("content", ""))},
+                    {"id": sid})
+            return HC.skill_delete(
+                cfg, {}, {"confirm": True, "skill_id": sid, "name": sid}, {})
+        return _run
+    if action in ("mcp_server_create", "mcp_server_delete",
+                  "mcp_server_enabled", "mcp_server_auth"):
+        # MCP registry mutations staged by ``_compat_confirm`` (the create
+        # payload is the validated, reference-only server fields). The banner's
+        # id-only Confirm re-enters the canonical ``voicebridge.mcp_servers``
+        # handler so the pending MCP change applies exactly once.
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            name = str(staged.get("name", "") or "")
+            if action == "mcp_server_create":
+                fields = staged.get("fields")
+                body: Dict[str, Any] = {"confirm": True, "name": name}
+                if isinstance(fields, dict):
+                    body.update(fields)
+                return HC.mcp_create(cfg, {}, body, {})
+            if action == "mcp_server_delete":
+                return HC.mcp_delete(cfg, {}, {"confirm": True, "name": name},
+                                     {})
+            if action == "mcp_server_enabled":
+                return HC.mcp_set_enabled(
+                    cfg, {}, {"confirm": True, "name": name,
+                              "enabled": bool(staged.get("enabled"))}, {})
+            return HC.mcp_auth(
+                cfg, {}, {"confirm": True, "name": name,
+                          "reference": str(staged.get("reference", ""))}, {})
+        return _run
     if action in ("cron.pause", "cron.resume", "cron.run_due"):
         # The cron row actions (pause/resume/trigger) stage via
         # ``_cron_mutate`` with ``payload={"id": job_id}``. Re-enter the same

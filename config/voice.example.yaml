@@ -188,3 +188,22 @@ logging:
 terminal:
   min_context_tokens: 65536
   # profile: ""            # optional: model-profile id used for /chat
+
+# ---------------------------------------------------------------------------
+# Update source/channel policy (all optional; see docs/UPDATE.md).
+# The canonical resolver is voicebridge/update_channel.py; the git mechanism is
+# voicebridge/update_manager.py. Leave these unset to use the defaults below.
+#
+# update:
+#   # Canonical Qubit repository (default destination; channel `stable`,
+#   # branch `main`). With no explicit source configured, the updater prefers
+#   # this URL; a legacy-branded clone `origin` is overridden by it, and an
+#   # `origin` that already points at Qubit is used as-is.
+#   remote_url: "https://github.com/cgraph-dev/qubit-voicebridge.git"
+#   remote: origin                      # git remote NAME to update from (default)
+#   branch: main                        # branch to track when following a branch
+#   tag: ""                             # optional version tag (e.g. v1.2.3);
+#                                       # stable/beta follow tags, canary branch
+#   channel: stable                     # stable | beta | canary
+#   # repo_root: ""                     # checkout to inspect (defaults to repo)
+#   # backup_dir: ""                    # default: <XDG state>/qubit-voicebridge/backups/update

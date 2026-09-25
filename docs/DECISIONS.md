@@ -167,3 +167,18 @@ archived contract is preserved, not edited.
     `docs/generated/` (or `docs/differential/` for the frozen contract) and never
     read or write the archive; the reachability proof and route-ownership matrix
     now read canonical `docs/generated/` artifacts.
+
+## Owner decisions in force (2026-09-25)
+
+25. **Pin move to `69948c0057` + 1:1 rebase AUTHORIZED.** Move the vendored pin
+    from `d337b736` (v0.21.4) to `69948c005791d4d0e51670ca015238c2c7663749`
+    (v2026.9.24-2096, v0.21.5+2053-class), the newest source available on this
+    host (GitHub unreachable at pin time; the read-only reference install is the
+    source of record). Rebrand the exact pinned source with the deterministic
+    engine rather than manual porting; the engine token map is extended for
+    `hermes_state_health`/`hermes_yaml` (their absence caused an `ImportError`).
+    The frozen-contract surface is re-baselined to this pin **by amendment** —
+    archived frozen records are preserved, never rewritten, and the machine
+    interface contract is regenerated at the merge freeze. No `VERIFIED` /
+    `CODE_READY` / parity claim; the merge is a tracked workstream. Full text:
+    `docs/QUBIT_OWNER_AMENDMENT_2026-09-25_PIN_AND_1TO1.md`.

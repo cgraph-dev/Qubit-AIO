@@ -89,3 +89,44 @@ describe("FilesPage empty-root reason", () => {
     expect(container.textContent).not.toContain("Loading");
   });
 });
+
+describe("FilesPage root-level download path resolution", () => {
+  it("resolves an entry with an empty path from the listing directory + name", async () => {
+    apiMocks.listFiles.mockResolvedValue({
+      ok: true,
+      root: "/repo",
+      path: "/repo",
+      locked_root: "/repo",
+      can_change_path: false,
+      entries: [
+        {
+          name: "AGENTS.md",
+          path: "",
+          is_directory: false,
+          size: 10,
+          mtime: 0,
+          mime_type: null,
+        },
+      ],
+    });
+    apiMocks.readFile.mockResolvedValue({
+      name: "AGENTS.md",
+      data_url: "data:text/plain;base64,QQ==",
+    });
+
+    await renderFiles();
+    await waitFor(() => container.textContent?.includes("AGENTS.md") === true);
+
+    const download = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Download AGENTS.md"]',
+    );
+    expect(download).not.toBeNull();
+    await act(async () => {
+      download?.click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    await waitFor(() => apiMocks.readFile.mock.calls.length > 0);
+    expect(apiMocks.readFile).toHaveBeenCalledWith("/repo/AGENTS.md");
+  });
+});

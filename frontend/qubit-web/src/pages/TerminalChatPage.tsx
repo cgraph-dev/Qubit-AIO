@@ -120,6 +120,29 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const connect = useCallback((profileId?: string) => {
     const term = termRef.current;
     if (!term || disposedRef.current) return;
+    // Tear down any previous terminal BEFORE opening a new one. Without this
+    // a Reconnect / profile switch / New chat opened a SECOND PTY while the
+    // first stayed alive: the server caps concurrent PTYs and enforces one
+    // live owner per session, so the operator hit PTY_LIMIT or "session
+    // already has a live owner" on the next turn. Detaching the handlers
+    // first stops the old socket's onclose from scheduling its own reconnect.
+    const prev = wsRef.current;
+    if (prev) {
+      prev.onopen = null;
+      prev.onmessage = null;
+      prev.onerror = null;
+      prev.onclose = null;
+      try {
+        prev.close();
+      } catch {
+        /* already closed */
+      }
+      wsRef.current = null;
+    }
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     const picked = profileId ?? selectedRef.current ?? undefined;
     setState("connecting");
     setNotice(null);

@@ -492,6 +492,117 @@ function MessageList({
   );
 }
 
+/**
+ * A row in the Overview tab's "Recent Sessions" card. The reference renders
+ * these as inert metadata, which reads as a dead affordance — they look like
+ * the expandable History rows but no gesture opens them. Make the row a real
+ * disclosure: clicking/Enter expands the transcript inline, on the same
+ * per-row profile route the History list uses.
+ */
+function RecentSessionCard({ session }: { session: SessionInfo }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<SessionMessage[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || messages !== null) return;
+    let cancelled = false;
+    api
+      .getSessionMessages(session.id, session.profile)
+      .then((resp) => {
+        if (!cancelled) setMessages(resp.messages);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, messages, session.id, session.profile]);
+
+  return (
+    <div
+      className="flex min-w-0 max-w-full flex-col border border-border"
+      data-testid={`recent-session-${session.id}`}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${t.common.expand} ${session.title ?? t.common.untitled}`}
+        onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen((prev) => !prev);
+          }
+        }}
+        className="flex min-w-0 max-w-full cursor-pointer flex-col gap-2 p-3 transition-colors hover:bg-secondary/30 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span
+            className={`font-mondwest normal-case min-w-0 truncate text-sm ${session.title ? "font-medium" : "text-muted-foreground italic"}`}
+          >
+            {session.title ??
+              (session.preview
+                ? session.preview.slice(0, 60)
+                : t.common.untitled)}
+          </span>
+
+          <span className="min-w-0 break-words text-xs text-muted-foreground">
+            {session.model && (
+              <>
+                <span className="font-mono-ui">
+                  {session.model.split("/").pop()}
+                </span>{" "}
+                ·{" "}
+              </>
+            )}
+            {session.message_count} {t.common.msgs} ·{" "}
+            {timeAgo(session.last_active)}
+          </span>
+
+          {session.preview && session.title && (
+            <p className="font-mondwest normal-case min-w-0 max-w-full text-xs leading-snug text-text-tertiary [overflow-wrap:anywhere]">
+              {session.preview}
+            </p>
+          )}
+        </div>
+
+        <Badge
+          tone="outline"
+          className="shrink-0 self-start text-xs sm:self-center"
+        >
+          <Database className="mr-1 h-3 w-3" />
+          {session.source ? sourceLabel(session.source) : "local"}
+        </Badge>
+      </div>
+
+      {open && (
+        <div className="min-w-0 border-t border-border bg-background/50 p-4">
+          {messages === null && !error && (
+            <div className="flex items-center justify-center py-8">
+              <Spinner className="text-xl text-primary" />
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-destructive py-4 text-center">{error}</p>
+          )}
+          {messages && messages.length === 0 && (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              {t.sessions.noMessages}
+            </p>
+          )}
+          {messages && messages.length > 0 && (
+            <MessageList messages={messages} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SessionRow({
   session,
   snippet,
@@ -505,8 +616,7 @@ function SessionRow({
   onExport,
   onRestore,
   resumeInChatEnabled,
-}: SessionRowProps) {
-  const [messages, setMessages] = useState<SessionMessage[] | null>(null);
+}: SessionRowProps) {  const [messages, setMessages] = useState<SessionMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(session.title ?? "");
@@ -2279,48 +2389,7 @@ export default function SessionsPage() {
 
               <CardContent className="grid min-w-0 gap-3">
                 {recentSessions.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex min-w-0 max-w-full flex-col gap-2 border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span
-                        className={`font-mondwest normal-case min-w-0 truncate text-sm ${s.title ? "font-medium" : "text-muted-foreground italic"}`}
-                      >
-                        {s.title ??
-                          (s.preview
-                            ? s.preview.slice(0, 60)
-                            : t.common.untitled)}
-                      </span>
-
-                      <span className="min-w-0 break-words text-xs text-muted-foreground">
-                        {s.model && (
-                          <>
-                            <span className="font-mono-ui">
-                              {s.model.split("/").pop()}
-                            </span>{" "}
-                            ·{" "}
-                          </>
-                        )}
-                        {s.message_count} {t.common.msgs} ·{" "}
-                        {timeAgo(s.last_active)}
-                      </span>
-
-                      {s.preview && s.title && (
-                        <p className="font-mondwest normal-case min-w-0 max-w-full text-xs leading-snug text-text-tertiary [overflow-wrap:anywhere]">
-                          {s.preview}
-                        </p>
-                      )}
-                    </div>
-
-                    <Badge
-                      tone="outline"
-                      className="shrink-0 self-start text-xs sm:self-center"
-                    >
-                      <Database className="mr-1 h-3 w-3" />
-                      {s.source ? sourceLabel(s.source) : "local"}
-                    </Badge>
-                  </div>
+                  <RecentSessionCard key={s.id} session={s} />
                 ))}
               </CardContent>
             </Card>

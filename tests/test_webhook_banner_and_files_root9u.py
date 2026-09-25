@@ -87,3 +87,59 @@ def test_files_root_empty_without_active_project(tmp_path, monkeypatch):
 
     monkeypatch.setattr(PJ, "active_project", lambda cfg: {"state": "EMPTY"})
     assert HC._files_root(cfg) == ""
+
+
+def _files_project(tmp_path, monkeypatch):
+    """Register a temp project root so ``files.approved_roots`` admits it."""
+    from voicebridge import projects as PJ
+
+    root = tmp_path / "proj"
+    (root / "sub").mkdir(parents=True)
+    (root / "a.txt").write_text("alpha")
+    (root / "sub" / "b.txt").write_text("beta")
+    rec = {"slug": "probe", "folders": [str(root)], "archived": False}
+    monkeypatch.setattr(
+        PJ, "list_projects",
+        lambda cfg, include_archived=False: {"state": "OK", "projects": [rec]})
+    monkeypatch.setattr(
+        PJ, "active_project",
+        lambda cfg: {"state": "OK", "project": rec})
+    return root
+
+
+def test_files_list_exposes_absolute_paths_and_directory_flag(
+        tmp_path, monkeypatch):
+    """Regression: ``files._public_dir`` emits ``dir``/``rel``; the compat
+    adapter must surface ``is_directory`` + an absolute ``path`` (a folder read
+    as a file could not be navigated) and return ``parent`` for the up control.
+    """
+    cfg = _cfg(tmp_path, monkeypatch)
+    from voicebridge import qubit_compat as HC
+
+    root = _files_project(tmp_path, monkeypatch)
+    code, body = HC.h_files(cfg, {"path": str(root)}, {}, {})
+    assert code == 200, body
+    entries = {e["name"]: e for e in body["entries"]}
+    assert entries["sub"]["is_directory"] is True, entries["sub"]
+    assert entries["sub"]["path"] == str(root / "sub"), entries["sub"]
+    assert entries["a.txt"]["is_directory"] is False, entries["a.txt"]
+    assert entries["a.txt"]["path"] == str(root / "a.txt"), entries["a.txt"]
+    # Directories sort before files (reference ``list_managed_files``).
+    assert body["entries"][0]["name"] == "sub", body["entries"]
+    # Immediate children only: a recursive walk would surface ``sub/b.txt`` and
+    # spend the entry cap on descendants instead of sibling directories.
+    assert all("/" not in e["name"] for e in body["entries"]), body["entries"]
+    assert not any(e["path"].endswith("sub/b.txt") for e in body["entries"])
+
+    # Nested listing works and points back at the parent for "up".
+    code, nested = HC.h_files(cfg, {"path": str(root / "sub")}, {}, {})
+    assert code == 200, nested
+    assert nested["parent"] == str(root), nested
+    assert {e["name"] for e in nested["entries"]} == {"b.txt"}, nested
+
+    # A nested file still downloads by its absolute ``path``.
+    code, read = HC.h_files_read(cfg, {"path": str(root / "sub" / "b.txt")},
+                                 {}, {})
+    assert code == 200, read
+    assert read["name"] == "b.txt", read
+    assert read["data_url"].startswith("data:text/plain;base64,"), read

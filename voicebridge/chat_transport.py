@@ -839,7 +839,9 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
         model=str(routed.get("model") or ""),
         idempotency_key=f"{sid}:{time.monotonic_ns()}")
     try:
-        res = GW.run(req, cfg, cancel=_stopped, reasoning=reasoning)
+        res = GW.run(req, cfg, cancel=_stopped, reasoning=reasoning,
+                     profile_id=str(routed.get("profile_id") or ""),
+                     session_id=sid)
     except Exception as exc:  # noqa: BLE001 - typed, redacted
         _release_cancel(sid, ev)
         _audit("turn_remote_error", session=sid, error=str(exc))

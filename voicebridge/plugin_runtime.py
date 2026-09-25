@@ -447,7 +447,7 @@ def _echo_handler(args: Dict[str, Any]) -> Dict[str, Any]:
 def _achievements_adapter(cfg: Any, args: Dict[str, Any]) -> Any:
     """Host adapter over the ONE canonical achievements backend.
 
-    ``hermes-achievements`` ships as a *dashboard* plugin (a FastAPI router +
+    ``qubit-achievements`` ships as a *dashboard* plugin (a FastAPI router +
     a frontend bundle), not as a native ``tool``/``channel``/``provider``/
     ``hook`` plugin. Qubit already owns its real local execution path in
     :mod:`voicebridge.qubit_plugins` (the vendored engine over the real

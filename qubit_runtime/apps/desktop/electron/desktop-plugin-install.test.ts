@@ -22,8 +22,8 @@ function mkdtemp(prefix: string) {
 
 describe('resolvePluginGitUrl', () => {
   it('maps owner/repo shorthand to github git url', () => {
-    expect(resolvePluginGitUrl('NousResearch/hermes-example-plugins')).toEqual({
-      gitUrl: 'https://github.com/NousResearch/hermes-example-plugins.git',
+    expect(resolvePluginGitUrl('example/qubit-example-plugins')).toEqual({
+      gitUrl: 'https://github.com/example/qubit-example-plugins.git',
       subdir: null
     })
   })

@@ -1382,9 +1382,9 @@ export interface ActionStatusResponse {
   name: string
   pid: number | null
   running: boolean
-  /** hermes-update only: durable completion identity recovered from update.log. */
+  /** The updater action only: durable completion identity recovered from update.log. */
   action_id?: string
-  /** hermes-update only: summary of the durable update receipt (#91277 bullet 3) —
+  /** The updater action only: summary of the durable update receipt (#91277 bullet 3) —
    *  the authoritative outcome record, present even when the dashboard
    *  restarted itself mid-action and lost its in-memory registries. */
   receipt?: UpdateReceiptSummary
@@ -1397,7 +1397,7 @@ export interface BackendUpdateCommit {
   at: number
 }
 
-/** Shape of `GET /api/hermes/update/check` — the backend's own update state.
+/** Shape of `GET /api/qubit/update/check` — the backend's own update state.
  *  Used by the desktop's remote update overlay so the backend version (not the
  *  Electron client clone) drives "what's changed + Install" in remote mode. */
 export interface BackendUpdateCheckResponse {

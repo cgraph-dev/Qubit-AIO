@@ -11,19 +11,19 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
 - Inventory items (all categories): **7826**
-- Candidate omissions (uncovered surface items): **122**
-- Distinct capability gaps (no parent row): **118**
+- Candidate omissions (uncovered surface items): **119**
+- Distinct capability gaps (no parent row): **115**
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **4**
 - Parented surfaces covered by an IMPLEMENTED parent: **1002**
 - Distinct capabilities total: **884**; parented surfaces total: **1006**
-- Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 158, GATED 16)
+- Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 157, GATED 17)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
-- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=14439 identical=6103 missing=1122 extra=828 changed=7508
+- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=14440 identical=6084 missing=1122 extra=829 changed=7527
 
 ### Omission counts by category (all uncovered)
 
 - `openclaw_extension`: 96
-- `qubit_backend_route`: 10
+- `qubit_backend_route`: 7
 - `qubit_cli_command`: 3
 - `qubit_cli_option`: 4
 - `qubit_cli_subcommand`: 9
@@ -34,7 +34,7 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - `hermes_locale_key`: 370
 - `hermes_upstream_test`: 4827
 
-## Distinct capability gaps (118)
+## Distinct capability gaps (115)
 
 No parent capability row exists; these remain explicit open rows.
 
@@ -137,12 +137,9 @@ No parent capability row exists; these remain explicit open rows.
 - `openclaw-ext:xiaomi` — source `extensions/xiaomi/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/xiaomi/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/xiaomi/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
 - `openclaw-ext:zai` — source `extensions/zai/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/zai/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/zai/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
 
-### qubit_backend_route (10)
+### qubit_backend_route (7)
 
-- `api:GET /api/audio/voice-live/status` — source `hermes_cli/web_routers/audio.py:167`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:167`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 - `api:GET /api/dashboard/plugins/catalog` — source `hermes_cli/web_routers/dashboard_ui.py:178`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:178`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/gateway/migrate/plan` — source `hermes_cli/web_routers/actions.py:147`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:147`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/health/idle` — source `hermes_cli/web_routers/status.py:139`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:139`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 - `api:GET /api/host/identity` — source `hermes_cli/web_routers/status.py:122`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:122`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 - `api:GET /api/sessions/{session_id}/messages/around` — source `hermes_cli/web_routers/sessions.py:614`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:614`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 - `api:GET /api/sessions/{session_id}/timeline` — source `hermes_cli/web_routers/sessions.py:592`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:592`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
@@ -380,7 +377,7 @@ These are coverage evidence for their parent, not separate gaps.
 
 Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
 
-### `fork_plugin_runtime` (18; IMPLEMENTED 18, GATED 0)
+### `fork_plugin_runtime` (18; IMPLEMENTED 17, GATED 1)
 
 - `plugin:browser` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:context_engine` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
@@ -388,7 +385,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `plugin:dashboard_auth` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:disk-cleanup` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:google_meet` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
-- `plugin:hermes-achievements` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
+- `plugin:hermes-achievements` — **GATED**; backend `—`; plugin 'hermes-achievements' is not present in the vendored fork plugin fleet; no Qubit wrapper.
 - `plugin:image_gen` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:kanban` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:memory` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`

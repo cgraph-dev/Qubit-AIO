@@ -116,7 +116,7 @@ def test_built_bundle_has_chat_route_and_api_prefix():
 def test_built_plugin_manifests_live_at_root():
     fleet = json.loads(
         (DIST / "plugins" / "fleet.json").read_text(encoding="utf-8"))
-    assert {m["name"] for m in fleet} == {"hermes-achievements", "kanban"}
+    assert {m["name"] for m in fleet} == {"qubit-achievements", "kanban"}
     for entry in fleet:
         base = entry["assetBase"]
         assert base.startswith("/") and "/hermes/" not in base, base

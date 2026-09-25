@@ -51,9 +51,7 @@ export const ar = defineLocale({
       'يمكنك أيضاً تشغيل `qubit debug share --nous` من الطرفية، أو `qubit debug share --local` لعرض التقرير دون رفعه.',
     handoffLead: 'تابع النقاش في:',
     links: {
-      github: 'GitHub Issues',
-      portal: 'دعم بوابة Qubit',
-      discord: 'Discord'
+      github: 'GitHub Issues'
     }
   },
   common: {
@@ -145,9 +143,7 @@ export const ar = defineLocale({
       cloudDownTitle: 'عامل Qubit Cloud معطّل',
       cloudDownDescription:
         'يعيد عامل السحابة المُدار من Qubit الذي يتصل به هذا البوابة خطأً من الخادم. لا يمكن إعادة تشغيله من هنا — تحقق من حالته، أو بدّل إلى البوابة المحلية، أو احصل على الدعم.',
-      cloudDownHint: 'تفتح الأزرار أدناه بوابة Qubit (حالة المثيل وعناصر التحكم) أو Discord للحصول على الدعم.',
-      cloudDownCheckPortal: 'التحقق من حالة البوابة',
-      cloudDownDiscord: 'الحصول على مساعدة عبر Discord',
+      cloudDownHint: 'تفتح الأزرار أدناه التبديل إلى البوابة المحلية أو إعادة المحاولة أو إعدادات البوابة.',
       openLogs: 'فتح السجلات',
       repairHint: 'يعيد الإصلاح تشغيل المثبت وقد يستغرق بضع دقائق على جهاز جديد.',
       remoteSignInHint: signInLabel =>
@@ -1400,7 +1396,7 @@ export const ar = defineLocale({
       },
       MATRIX_USER_ID: {
         label: 'معرّف مستخدم البوت',
-        placeholder: '@hermes:example.org'
+        placeholder: '@qubit:example.org'
       },
       MATRIX_ALLOWED_USERS: {
         label: 'معرّفات مستخدمي Matrix المسموح بهم',
@@ -1459,7 +1455,7 @@ export const ar = defineLocale({
       title: (profile: string) => `ربط ${profile} بمضيف بعيد`,
       description: 'ستعمل جلسات هذا الملف الشخصي على خادم Qubit البعيد الذي تحدده، بدلاً من هذا الجهاز.',
       urlLabel: 'العنوان البعيد',
-      urlPlaceholder: 'https://hermes.example.com',
+      urlPlaceholder: 'https://gateway.example.com',
       urlInvalid: 'أدخل عنواناً كاملاً يبدأ بـ http:// أو https://',
       tokenLabel: 'رمز الوصول',
       tokenPlaceholder: 'الصق رمز الجلسة البعيد',

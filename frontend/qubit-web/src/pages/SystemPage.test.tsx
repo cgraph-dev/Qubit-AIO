@@ -302,3 +302,40 @@ describe("SystemPage emergency stop", () => {
     expect(apiMocks.powerAction).toHaveBeenCalledWith("reset");
   });
 });
+
+describe("SystemPage global disable confirmation", () => {
+  it("routes Global disable through the same confirm gate as the emergency stop", async () => {
+    apiMocks.getPowerStatus
+      .mockResolvedValueOnce(powerStatus(false, false))
+      .mockResolvedValueOnce(powerStatus(false, true));
+    await renderSystem();
+
+    const disable = buttonByText("Global disable");
+    expect(disable).not.toBeNull();
+    await act(async () => disable!.click());
+
+    // Nothing executes until the human confirms in the dialog.
+    expect(apiMocks.powerAction).not.toHaveBeenCalled();
+    await waitFor(() => Boolean(buttonByText("Globally disable")));
+    await act(async () => buttonByText("Globally disable")!.click());
+
+    await waitFor(() =>
+      apiMocks.powerAction.mock.calls.some((c) => c[0] === "disable"),
+    );
+    expect(apiMocks.powerAction).toHaveBeenCalledWith("disable");
+  });
+
+  it("cancelling applies nothing (net-zero)", async () => {
+    await renderSystem();
+
+    await act(async () => buttonByText("Global disable")!.click());
+    await waitFor(() => Boolean(buttonByText("Globally disable")));
+    const cancel = [...document.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === "Cancel",
+    );
+    await act(async () => cancel!.click());
+
+    await waitFor(() => buttonByText("Globally disable") === null);
+    expect(apiMocks.powerAction).not.toHaveBeenCalled();
+  });
+});

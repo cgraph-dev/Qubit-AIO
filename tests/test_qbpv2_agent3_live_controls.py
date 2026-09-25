@@ -150,7 +150,7 @@ def test_achievements_reset_control_is_confirm_gated(tmp_path, monkeypatch):
             assert page.get_by_text("Qubit Achievements").count() >= 1
             browser.close()
 
-        payload = _req(port, "/agent/api/plugins/hermes-achievements/achievements")
+        payload = _req(port, "/agent/api/plugins/qubit-achievements/achievements")
         assert payload["unlocked_count"] == 0
     finally:
         ui.stop()

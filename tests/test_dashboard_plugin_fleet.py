@@ -5,7 +5,7 @@ production compat dispatcher:
 
 * every baseline page route is present in the SPA route map and the served
   shell answers it (the full Hermes information architecture is preserved);
-* the pinned ``hermes-achievements`` manifest declares a ``/achievements`` tab
+* the pinned ``qubit-achievements`` manifest declares a ``/achievements`` tab
   positioned after ``analytics`` and the ``kanban`` manifest a ``/kanban`` tab
   after ``skills``;
 * the static fleet manifest shipped inside the SPA mirrors those pinned
@@ -43,7 +43,7 @@ BASELINE_ROUTES = {
 }
 # Pinned plugin fleet: name -> (tab path, position, entry, css).
 FLEET_PLUGINS = {
-    "hermes-achievements": ("/achievements", "after:analytics",
+    "qubit-achievements": ("/achievements", "after:analytics",
                             "dist/index.js", "dist/style.css"),
     "kanban": ("/kanban", "after:skills",
                "dist/index.js", "dist/style.css"),
@@ -186,14 +186,14 @@ def test_pinned_manifests_declare_the_fleet_tabs():
 
 
 def test_achievements_tab_is_registered_from_its_manifest():
-    manifest = (PINNED / "hermes-achievements" / "dashboard"
+    manifest = (PINNED / "qubit-achievements" / "dashboard"
                 / "manifest.json")
     data = json.loads(manifest.read_text(encoding="utf-8"))
     assert data["tab"]["path"] == "/achievements"
     assert data["tab"]["position"] == "after:analytics"
-    bundle = (PINNED / "hermes-achievements" / "dashboard"
+    bundle = (PINNED / "qubit-achievements" / "dashboard"
               / data["entry"]).read_text(encoding="utf-8")
-    assert 'register("hermes-achievements"' in bundle
+    assert 'register("qubit-achievements"' in bundle
     # App.tsx wires addon manifests into both the sidebar and the routes.
     app = APP_TSX.read_text(encoding="utf-8")
     assert "usePlugins" in app and "PluginPage" in app
@@ -262,7 +262,7 @@ def test_served_spa_and_fleet_assets(tmp_path):
         assert status == 200, (status, body[:200])
         assert "application/json" in ctype
         fleet = {m["name"]: m for m in json.loads(body)}
-        assert fleet["hermes-achievements"]["tab"]["path"] == "/achievements"
+        assert fleet["qubit-achievements"]["tab"]["path"] == "/achievements"
         assert fleet["kanban"]["tab"]["path"] == "/kanban"
 
         for name, (tab, _pos, entry, css) in FLEET_PLUGINS.items():
@@ -326,7 +326,7 @@ def test_unknown_plugin_route_is_typed_not_fabricated(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, body = HC.dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/no-such-endpoint", {},
+        cfg, "GET", "/api/plugins/qubit-achievements/no-such-endpoint", {},
         {})
     assert status == 404, (status, body)
     assert body.get("code") == "NOT_FOUND", body
@@ -348,11 +348,11 @@ def test_fleet_plugins_carry_no_unrebranded_product_name():
 # on-disk proof the generator's ``find_page_plugin_proof`` looks for.
 # ---------------------------------------------------------------------------
 PLUGIN_FLEET_ROW_IDS = {
-    "hermes-achievements": "plugin_hermes-achievements",
+    "qubit-achievements": "plugin_qubit-achievements",
     "kanban": "plugin_kanban",
 }
 PLUGIN_FLEET_READ_ROUTE = {
-    "hermes-achievements": "/api/plugins/hermes-achievements/achievements",
+    "qubit-achievements": "/api/plugins/qubit-achievements/achievements",
     "kanban": "/api/plugins/kanban/board",
 }
 

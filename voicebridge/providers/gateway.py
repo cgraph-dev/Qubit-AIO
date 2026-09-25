@@ -40,6 +40,55 @@ def _default_local_model(cfg: Any) -> str:
         return DEFAULT_ALIAS
 
 
+def _opencode_session_transport(base: Any, provider: str, base_url: str,
+                                session_id: str, fallback_key: str,
+                                profile_id: str = "") -> Any:
+    """Wrap a frontier transport to send OpenCode's required affinity header.
+
+    The vendored runtime adds ``x-opencode-session`` to every OpenCode request
+    (``agent.opencode_affinity``); the generic frontier transport did not, so an
+    otherwise-authorized opencode-go/zen turn was rejected by the relay with
+    ``MissingSessionID``. The value only has to be opaque and consistent per
+    conversation: the resolved session id first, then the request idempotency
+    key, then the profile id. Non-OpenCode targets are returned untouched.
+    """
+    extra: dict = {}
+    try:
+        from .. import qubit_runtime
+        qubit_runtime.ensure_path()
+        from agent.opencode_affinity import (
+            is_opencode_target, opencode_session_headers)
+        if not is_opencode_target(provider, base_url):
+            return base
+        sid = (str(session_id or "").strip()
+               or str(fallback_key or "").strip()
+               or str(profile_id or "").strip())
+        if not sid:
+            import uuid as _uuid
+            sid = _uuid.uuid4().hex
+        extra = opencode_session_headers(provider, base_url, sid)
+    except Exception:  # noqa: BLE001 - dependency-free fallback below
+        low = f"{provider} {base_url}".lower()
+        if "opencode" not in low:
+            return base
+        import uuid as _uuid
+        sid = (str(session_id or "").strip()
+               or str(fallback_key or "").strip()
+               or str(profile_id or "").strip() or _uuid.uuid4().hex)
+        extra = {"x-opencode-session": sid}
+    if not extra:
+        return base
+
+    def _wrapped(url: str, headers: Any, payload: Any,
+                 timeout_s: float) -> Any:
+        merged = dict(headers or {})
+        for key, value in extra.items():
+            merged.setdefault(key, value)
+        return base(url, merged, payload, timeout_s)
+
+    return _wrapped
+
+
 def _estimate_cost(entry: Optional[ModelEntry], pcfg: dict,
                    prompt_chars: int, max_tokens: int) -> float:
     """Cost estimate honoring catalog prices, else operator price overrides.
@@ -386,7 +435,8 @@ def run_role(prompt: str, cfg: Any, *, role: str = "chat",
               context=context, timeout_s=timeout_s,
               system_prompt=system_prompt, messages=messages, options=options,
               keep_alive=keep_alive, on_sentence=on_sentence,
-              should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx)
+              should_stop=should_stop, reasoning=reasoning, num_ctx=num_ctx,
+              profile_id=eff.profile_id, session_id=session or "")
     # PV-04: carry the resolved provider/model/role identity so CLI/dashboard/
     # voice receipts report the same authority that actually executed.
     res.details.update(_resolved_identity(eff, role, route))
@@ -452,7 +502,9 @@ def run(req: ProviderRequest, cfg: Any,
         on_sentence: Optional[Callable[[str], None]] = None,
         should_stop: Optional[Callable[[], bool]] = None,
         reasoning: Optional[str] = None,
-        num_ctx: Optional[int] = None) -> ProviderResult:
+        num_ctx: Optional[int] = None,
+        profile_id: str = "",
+        session_id: str = "") -> ProviderResult:
     """Run one request through the 8Q policy. Never raises; typed results.
 
     The local route uses one of the shared local adapters: ``chat`` (default,
@@ -460,6 +512,17 @@ def run(req: ProviderRequest, cfg: Any,
     or ``chat_raw`` (raw ``/api/chat`` with explicit messages/format/images).
     All three honor the canonical runner contract; none is a caller-owned
     Ollama request.
+
+    ``profile_id`` names the resolved model profile this request executes. The
+    one resolver may enable/allowlist that specific profile through
+    ``intent.frontier.profile_overrides`` while the global frontier switch stays
+    off; threading it here keeps a ``run_role``/remote-chat call consistent with
+    the profile the resolver already reported executable (and supplies the
+    profile's own ``base_url``/``key_ref`` when no explicit override is given).
+    It does not widen policy: a profile whose override is absent/denied still
+    fails closed on the global switch/allowlist. ``session_id`` names the
+    conversation so an OpenCode relay gets its required ``x-opencode-session``
+    affinity header; it is otherwise unused.
     """
     policy = FrontierPolicy.from_config(cfg)
     requested = (req.route or policy.route or "local").lower()
@@ -474,6 +537,30 @@ def run(req: ProviderRequest, cfg: Any,
             if "/" in first:
                 provider, model = first.split("/", 1)
     ident = f"{provider}/{model}" if provider and model else "frontier/unknown"
+
+    # Honor the resolved profile's effective policy/profile overrides. Without
+    # this, a profile the resolver enabled via ``profile_overrides`` would be
+    # reported executable and then denied here with CLOUD_DISABLED — the exact
+    # split-brain the resolver exists to prevent.
+    profile = None
+    pid = str(profile_id or "").strip()
+    if pid:
+        try:
+            from . import resolver as _resolver
+            profile = _resolver.get_profile(cfg, pid)
+        except Exception:  # noqa: BLE001 - a missing profile is fail-closed
+            profile = None
+        try:
+            from ..config import model_profile_overrides as _overrides
+            ov = _overrides(cfg, pid)
+        except Exception:  # noqa: BLE001 - absent override keeps global policy
+            ov = {}
+        if "policy_enabled" in ov:
+            policy.enabled = bool(ov["policy_enabled"])
+        if ov.get("allowlisted") and provider and model:
+            pair = f"{provider}/{model}"
+            if pair not in policy.allowlist:
+                policy.allowlist = [*policy.allowlist, pair]
 
     def _fallback(reason: str, msg: str) -> ProviderResult:
         fb = _local_complete(req.prompt, cfg,
@@ -584,7 +671,8 @@ def run(req: ProviderRequest, cfg: Any,
     # A resolved model profile may declare its own credential reference;
     # prefer it over the policy provider default so two profiles of one
     # provider never share a credential by accident. Values are never logged.
-    raw_ref = key_ref or pcfg.get("key_ref", "")
+    raw_ref = (key_ref or (profile.key_ref if profile else "")
+               or pcfg.get("key_ref", ""))
     if isinstance(raw_ref, SecretRef):
         ref = f"{raw_ref.source}:{raw_ref.name}"
     elif isinstance(raw_ref, Mapping):
@@ -620,6 +708,7 @@ def run(req: ProviderRequest, cfg: Any,
                                   identity=f"{provider}/{model}")
 
     base_url = (str(base_url or "").strip()
+                or str((profile.base_url if profile else "") or "")
                 or str(pcfg.get("base_url", "") or
                        _frontier.WELL_KNOWN_BASES.get(provider, "") or ""))
     if looks_like_opencode_private_db(base_url):
@@ -673,6 +762,13 @@ def run(req: ProviderRequest, cfg: Any,
         import dataclasses as _dc
 
         req = _dc.replace(req, max_tokens=int(reasoning_applied["max_tokens"]))
+    # OpenCode relays reject a request with no session-affinity header
+    # (``MissingSessionID``); wrap the transport only for OpenCode targets and
+    # only when the caller did not already supply a transport.
+    if transport is None:
+        transport = _opencode_session_transport(
+            _frontier.urllib_transport, provider, base_url, session_id,
+            str(req.idempotency_key or ""), profile_id)
     client = _frontier.FrontierClient(base_url, key, provider, model,
                                      timeout_s=min(req.timeout_s, policy.timeout_s),
                                      max_retries=policy.max_retries,

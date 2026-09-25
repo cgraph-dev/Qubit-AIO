@@ -223,6 +223,13 @@ def test_all_inventory_skills_vendored_and_loadable(inventory, fork_path):
 # ---------------------------------------------------------------------------
 # 4. Vendored plugins covered by the Qubit wrapper fleet
 # ---------------------------------------------------------------------------
+# Public namespace rename: the upstream capability/inventory is
+# ``hermes-achievements``; the Qubit-owned identity + on-disk dir is
+# ``qubit-achievements``. Inventory rows keep the upstream name, so map to the
+# local identity before checking the wrapper fleet + plugin dir.
+LOCAL_PLUGIN_NAME = {"hermes-achievements": "qubit-achievements"}
+
+
 def test_all_vendored_plugin_items_have_a_wrapper(inventory, fork_path):
     """The cited plugin proof: every plugin item is in the wrapper fleet."""
     from voicebridge import qubit_plugins as HP
@@ -235,11 +242,12 @@ def test_all_vendored_plugin_items_have_a_wrapper(inventory, fork_path):
     offenders = []
     for it in plugin_items:
         name = str(it.get("name") or "")
-        directory = REPO_ROOT / "qubit_runtime" / "plugins" / name
+        local_name = LOCAL_PLUGIN_NAME.get(name, name)
+        directory = REPO_ROOT / "qubit_runtime" / "plugins" / local_name
         disposition = it.get("fork_disposition") or {}
-        if name not in fleet:
+        if local_name not in fleet:
             offenders.append((it["id"], "not in VENDORED_PLUGIN_FLEET"))
-        if name not in audited:
+        if local_name not in audited:
             offenders.append((it["id"], "not covered by plugin_fleet_audit"))
         if not directory.is_dir():
             offenders.append((it["id"], "plugin dir missing"))

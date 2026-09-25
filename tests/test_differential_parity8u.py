@@ -5037,7 +5037,7 @@ def test_frontend_linkage_never_fabricates(runner, tmp_path):
 # sha256. Every absence (no bundle, symbol absent, no reading test) fails closed.
 # ---------------------------------------------------------------------------
 _ACHIEVEMENTS_BUNDLE = (
-    "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js")
+    "frontend/qubit-web/public/plugins/qubit-achievements/dist/index.js")
 _ACHIEVEMENTS_BUNDLE_TEST = (
     "tests/test_qbpv2_agent3_achievements.py"
     "::test_served_bundle_wires_the_real_workflow_controls")
@@ -5085,7 +5085,7 @@ def test_plugin_bundle_linkage_disposes_bundle_row(runner, tmp_path):
         encoding="utf-8")
     assert "card.share_title" in test_text, (
         "the cited test does not reference the mapped control")
-    assert _ACHIEVEMENTS_BUNDLE in test_text or "hermes-achievements" in test_text, (
+    assert _ACHIEVEMENTS_BUNDLE in test_text or "qubit-achievements" in test_text, (
         "the cited test does not reference the served bundle")
 
     gates = _proof_gates(runner, [resolved], [resolved])
@@ -5119,7 +5119,7 @@ def test_plugin_bundle_linkage_never_fabricates(runner, tmp_path, monkeypatch):
     # A non-JS asset under the plugin root is not a bundle.
     assert runner._plugin_bundle_linkage({
         "qubit_path": "frontend/qubit-web/public/plugins/fleet.json:1",
-        "qubit_symbol": "hermes-achievements",
+        "qubit_symbol": "qubit-achievements",
     }) is None, "a non-JS plugin asset was linked as a bundle"
 
     # The bundle exists but the row's symbol is absent from it.
@@ -5159,7 +5159,7 @@ def test_plugin_bundle_function_reads_requires_a_real_read(runner):
         "strings": frozenset({bundle}),
     }
     assert not runner._plugin_bundle_function_reads(
-        prose, bundle, "hermes-achievements", "index.js"), (
+        prose, bundle, "qubit-achievements", "index.js"), (
         "a bare string mention (no file read) was accepted as a bundle read")
 
     real = {
@@ -5169,7 +5169,7 @@ def test_plugin_bundle_function_reads_requires_a_real_read(runner):
         "strings": frozenset(),
     }
     assert runner._plugin_bundle_function_reads(
-        real, bundle, "hermes-achievements", "index.js"), (
+        real, bundle, "qubit-achievements", "index.js"), (
         "a real bundle read through a resolved path constant was rejected")
 
 

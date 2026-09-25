@@ -10,7 +10,7 @@
   "expected": {},
   "interface_disposition": "SAFE_EQUIVALENT",
   "qubit": {
-    "path": "frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js:1",
+    "path": "frontend/qubit-web/public/plugins/qubit-achievements/dist/index.js:1",
     "caller": "card.share_title",
     "approval": null,
     "mapping_status": "VERIFIED"
@@ -25,7 +25,7 @@
     "symbol": null,
     "mapping_status": "N/A"
   },
-  "notes": "Visual-drift A28: Hermes /achievements renders per-achievement Share actions; the Qubit /achievements page is a COMPILED plugin bundle (frontend/qubit-web/public/plugins/hermes-achievements/dist/index.js) with no AchievementsPage.tsx, so a vitest component linkage cannot see it. The proof type is plugin_bundle_linkage: the served bundle contains the share surface (card.share_title / share.* labels) and the real Python test tests/test_qbpv2_agent3_achievements.py::test_served_bundle_wires_the_real_workflow_controls reads the served bundle and asserts card.share_title. The bundle sha256 is recorded; nothing is fabricated. This fixture declares only a Qubit mapping (no command/request), so its disposition is resolved from the linkage, never from an invented execution.",
+  "notes": "Visual-drift A28: Hermes /achievements renders per-achievement Share actions; the Qubit /achievements page is a COMPILED plugin bundle (frontend/qubit-web/public/plugins/qubit-achievements/dist/index.js) with no AchievementsPage.tsx, so a vitest component linkage cannot see it. The proof type is plugin_bundle_linkage: the served bundle contains the share surface (card.share_title / share.* labels) and the real Python test tests/test_qbpv2_agent3_achievements.py::test_served_bundle_wires_the_real_workflow_controls reads the served bundle and asserts card.share_title. The bundle sha256 is recorded; nothing is fabricated. This fixture declares only a Qubit mapping (no command/request), so its disposition is resolved from the linkage, never from an invented execution.",
   "evidence": {
     "dashboard_route": "/achievements",
     "dashboard_control": "card.share_title",

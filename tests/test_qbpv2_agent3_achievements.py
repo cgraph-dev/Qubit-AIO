@@ -1,6 +1,6 @@
 """Agent 3 (wave 2) — Achievements real workflow audit.
 
-Verifies the vendored hermes-achievements plugin is a REAL workflow: a 60+
+Verifies the vendored qubit-achievements plugin is a REAL workflow: a 60+
 catalog with categories/tiers/states, progress, persistence across reload,
 rescan, and a confirmation-gated reset, all served by the production compat
 backend. Also audits the served dashboard bundle for the real controls and the
@@ -18,8 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 BUNDLE = (REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
-          / "hermes-achievements" / "dist" / "index.js")
-ENGINE_API = (REPO_ROOT / "qubit_runtime" / "plugins" / "hermes-achievements"
+          / "qubit-achievements" / "dist" / "index.js")
+ENGINE_API = (REPO_ROOT / "qubit_runtime" / "plugins" / "qubit-achievements"
               / "dashboard" / "plugin_api.py")
 
 
@@ -53,7 +53,7 @@ def test_backend_engine_is_the_vendored_source():
 def test_catalog_has_60_badges_categories_tiers_and_states(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements")
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements")
     assert status == 200, payload
     achievements = payload["achievements"]
     assert len(achievements) >= 60, len(achievements)
@@ -85,7 +85,7 @@ def test_catalog_has_60_badges_categories_tiers_and_states(tmp_path, monkeypatch
 def test_rescan_persists_real_state_across_reload(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = _dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/rescan")
+        cfg, "POST", "/api/plugins/qubit-achievements/rescan")
     assert status == 200, payload
     assert payload.get("ok") is True
     assert payload.get("scan_meta", {}).get("mode") in (
@@ -94,7 +94,7 @@ def test_rescan_persists_real_state_across_reload(tmp_path, monkeypatch):
     # A brand-new dispatch (fresh process image of the same state dir) still
     # reports the same catalog and discovered/unlocked counts.
     status2, payload2 = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements")
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements")
     assert status2 == 200
     assert payload2["total_count"] == payload["total_count"]
     assert payload2["discovered_count"] == payload["discovered_count"]
@@ -102,7 +102,7 @@ def test_rescan_persists_real_state_across_reload(tmp_path, monkeypatch):
     import os
 
     state_root = Path(os.environ["QUBIT_HOME"]) / "plugin-data" / \
-        "hermes-achievements"
+        "qubit-achievements"
     assert state_root.is_dir(), state_root
     assert (state_root / "state.json").exists() or \
         (state_root / "scan_snapshot.json").exists(), list(state_root.iterdir())
@@ -111,22 +111,22 @@ def test_rescan_persists_real_state_across_reload(tmp_path, monkeypatch):
 def test_reset_requires_confirmation_and_then_clears_unlocks(tmp_path,
                                                              monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
-    _dispatch(cfg, "POST", "/api/plugins/hermes-achievements/rescan")
+    _dispatch(cfg, "POST", "/api/plugins/qubit-achievements/rescan")
     before = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements")[1]
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements")[1]
 
     status, payload = _dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/reset-state")
+        cfg, "POST", "/api/plugins/qubit-achievements/reset-state")
     assert status == 409, (status, payload)
     assert payload.get("code") == "CONFIRM_REQUIRED"
 
     status, payload = _dispatch(
-        cfg, "POST", "/api/plugins/hermes-achievements/reset-state",
+        cfg, "POST", "/api/plugins/qubit-achievements/reset-state",
         body={"confirm": True})
     assert status == 200 and payload.get("ok") is True, payload
 
     after = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements")[1]
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements")[1]
     assert after["unlocked_count"] == 0
     assert before["total_count"] == after["total_count"]
 
@@ -134,11 +134,11 @@ def test_reset_requires_confirmation_and_then_clears_unlocks(tmp_path,
 def test_scan_status_and_recent_unlocks_are_real_routes(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     status, scan = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/scan-status")
+        cfg, "GET", "/api/plugins/qubit-achievements/scan-status")
     assert status == 200
     assert scan.get("state") in ("idle", "pending", "running", "done", "error")
     status, recent = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/recent-unlocks")
+        cfg, "GET", "/api/plugins/qubit-achievements/recent-unlocks")
     assert status == 200
     assert isinstance(recent, (list, dict))
 
@@ -147,7 +147,7 @@ def test_served_bundle_wires_the_real_workflow_controls():
     assert BUNDLE.is_file()
     src = BUNDLE.read_text(encoding="utf-8")
     # Real API seam + all read/write plugin routes.
-    assert "/api/plugins/hermes-achievements" in src
+    assert "/api/plugins/qubit-achievements" in src
     for route in ('"/achievements"', '"/rescan"', '"/reset-state"'):
         assert route in src, route
     # Real controls, not a static badge.
@@ -195,7 +195,7 @@ def test_catalog_payload_is_rebranded_on_render_boundary(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     status, payload = _dispatch(
-        cfg, "GET", "/api/plugins/hermes-achievements/achievements")
+        cfg, "GET", "/api/plugins/qubit-achievements/achievements")
     assert status == 200
     # The backend rebrands at the served boundary: the raw JSON API must already
     # be Qubit-only; the shipped SPA normalizer remains a second guard.
