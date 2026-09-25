@@ -15,10 +15,10 @@ python scripts/hermes_byte_manifest.py          # write the manifest + sha256
 python scripts/hermes_byte_manifest.py --check  # verify it is up to date
 ```
 
-- Pin: `d337b736aa1e8ebecfab043842d13e4a2d2f48a3` (Hermes `v0.21.4`).
-- Source: the read-only pinned clone (default
-  `/tmp/opencode/pinned/hermes-agent-d337b736-git`; override with
-  `--upstream`/`QUBIT_PINNED_HERMES`).
+- Pin: `69948c005791d4d0e51670ca015238c2c7663749` (Hermes `v0.21.5`,
+  owner amendment 2026-09-25 / DECISIONS #25).
+- Source: the read-only reference install (default
+  `~/.hermes/hermes-agent`; override with `--upstream`/`QUBIT_PINNED_HERMES`).
 - Each tracked file records its pinned git blob, SHA-256 (canonical blob
   content), and a classification. Every actionable entry is `IDENTICAL`;
   untracked generated/runtime artifacts are `NOT_APPLICABLE` (gate-exempt).

@@ -5,10 +5,10 @@
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
-    "bound_backends": 1140,
+    "bound_backends": 1151,
     "dead_backend_ids": [],
     "dead_backends": 0,
-    "total_entries": 1140
+    "total_entries": 1151
   },
   "rows": [
     {
@@ -10914,233 +10914,17 @@
       "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit skills install yuanbao"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset a2a",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable a2a"
-    },
-    {
-      "entry": "browser_status",
-      "id": "toolset browser",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit browser status"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset clarify",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable clarify"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset code_execution",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable code_execution"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset computer_use",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable computer_use"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset connections",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable connections"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset context_engine",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable context_engine"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset cronjob",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable cronjob"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset delegation",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable delegation"
-    },
-    {
-      "entry": "cli_plugins_install",
-      "id": "toolset file",
-      "kind": "clarify",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit plugins install"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset homeassistant",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable homeassistant"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset image_gen",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable image_gen"
-    },
-    {
-      "entry": "cli_kanban_boards",
-      "id": "toolset kanban",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit kanban boards"
-    },
-    {
-      "entry": "cli_memory_search",
-      "id": "toolset memory",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit memory search"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset session_search",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable session_search"
-    },
-    {
-      "entry": "cli_skills",
-      "id": "toolset skills",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit skills list"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset spotify",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable spotify"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset stt",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable stt"
-    },
-    {
-      "entry": "cli_console_help",
-      "id": "toolset terminal",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit console help"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset todo",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable todo"
-    },
-    {
-      "entry": "cli_tts_test",
-      "id": "toolset tts",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tts test"
-    },
-    {
-      "entry": "cli_media_generate",
-      "id": "toolset video",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit media gen generate"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset video_gen",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable video_gen"
-    },
-    {
-      "entry": "vision_status",
-      "id": "toolset vision",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit vision status"
-    },
-    {
-      "entry": "cli_web_fetch",
-      "id": "toolset web",
-      "kind": "clarify",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit web fetch"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset x_search",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable x_search"
-    },
-    {
-      "entry": "cli_tools_enable",
-      "id": "toolset yuanbao",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit tools enable yuanbao"
     }
   ],
   "schema": "qubit-voice-coverage/1",
   "source": "docs/generated/parity_inventory.json",
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
-    "distinct_intents": 874,
+    "distinct_intents": 857,
     "guard": 193,
-    "real": 1188,
-    "real_pct": 85.47,
-    "rows": 1390,
+    "real": 1161,
+    "real_pct": 85.18,
+    "rows": 1363,
     "unresolved": 9
   },
   "surfaces": {
@@ -11174,9 +10958,9 @@
     },
     "tools": {
       "guard": 1,
-      "real": 121,
-      "real_pct": 99.18,
-      "total": 122,
+      "real": 94,
+      "real_pct": 98.95,
+      "total": 95,
       "unresolved": 0
     }
   }

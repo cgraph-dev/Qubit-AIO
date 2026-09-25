@@ -57,7 +57,7 @@ from voicebridge import cli_qubit_forward as _fwd  # noqa: E402
 from voicebridge import qubit_compat as _hc  # noqa: E402
 from voicebridge import qubit_plugins as _hp  # noqa: E402
 
-PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 QH = "qubit_runtime/"
 GENERATED = "2026-09-12"
 OUT_PATH = ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.hermes.json"

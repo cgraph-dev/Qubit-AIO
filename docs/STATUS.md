@@ -1549,3 +1549,73 @@ dashboard API, voice, gateway action) now routes through it.
   (`apps/desktop/node_modules`); frontend rebuilt. Generated parity artifacts
   legitimately reference the upstream route names they compare against
   (internal/provenance, not public).
+
+## 34. v0.21.5 rebase — interface contract + generated artifacts regenerated — 2026-09-25
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Not pushed.** Work is on
+the isolated SDD branch (`sdd/t15`); the live repo and `~/.hermes` are untouched
+(the reference home is read-only source of record).
+
+- **Pin re-baselined.** The vendored pin is now
+  `69948c005791d4d0e51670ca015238c2c7663749` (Hermes `v0.21.5`,
+  v2026.9.24-2096) per owner amendment 2026-09-25 / `docs/DECISIONS.md` #25. The
+  generator pin constants were updated in `scripts/hermes_byte_manifest.py`,
+  `scripts/hermes_vendor_manifest.py`, `scripts/source_inventory.py`,
+  `scripts/differential_parity.py` (`CONTRACTUAL_PINS["hermes"]`), and
+  `scripts/rebuild_ledger_hermes.py`.
+- **Machine interface contract regenerated** (Task 15). The frozen human-readable
+  `docs/differential/INTERFACE.md` and `docs/archive/**` were **not** edited;
+  the machine-readable contract was regenerated in place:
+  `docs/differential/byte_manifest/hermes/HERMES_BYTE_MANIFEST.json` — **16,078
+  tracked rows, 100% `IDENTICAL`, 30 `eol_normalized`**, contract pin
+  `69948c0057`, sha256 `d275beab…`; `manifest.sha256` re-pinned;
+  `--check` passes.
+- **`docs/generated/*` regenerated (Task 18), each byte-identical ×2:**
+  - `QUBIT_HERMES_VENDOR_MANIFEST.json`: revision `69948c0057`, tag `v0.21.5`,
+    16,079 files, UNCHANGED 9,941 / QUBIT_PATCHED 6,089 / QUBIT_ADDED 28 /
+    EOL_NORMALIZED 21 / INTENTIONALLY_OMITTED 22 / MISSING 5 (the 5 are
+    upstream-brand paths intentionally not renamed: `hermes`, `setup-hermes.sh`,
+    `apps/desktop/public/hermes.png`, two `_hermes_home.py` scripts);
+    `git_index_gaps=[]`, `UNEXPLAINED=0`. `HERMES_SOURCE_COMPARISON.json`
+    regenerated.
+  - `QUBIT_SOURCE_INVENTORY.json` + `QUBIT_SOURCE_OMISSIONS.md`: 8,058 Hermes /
+    138 OpenClaw items; Hermes byte diff identical 9,963 / changed 6,088 /
+    missing 27 / extra 28.
+  - Ledgers: `hermes` 591 (482 IMPLEMENTED / 105 SAFE_EQUIVALENT / 4 MISSING),
+    `openclaw` 104 (unchanged), `qubit` 757 (713 / 36 / 3 OPERATOR_ONLY /
+    5 MISSING); merged `QUBIT_GAP_LEDGER.md` 1,452 rows, **code-side open 10,
+    code-ready False**.
+  - `parity_inventory.json`: **1,363 rows — 1,238 PORTED / 117 GATED /
+    8 MISSING**; the 8 MISSING are 7 routes (`GET /api/chat/workspaces`,
+    `/api/hermes/update{/check,/receipt,}`, `POST /api/local-models/download/
+    {pause,resume}`, `WS /api/display/ws`) + `optional-mcp n8n-official`.
+  - `voice_coverage.json`: 1,363 rows — real 1,161 / guard 193 / unresolved 9 /
+    dead backends 0.
+  - `QUBIT_PAGE_COVERAGE_2026-09-21.json` (3,433 rows, checked at revision
+    `737759ad`); `QUBIT_COMPAT_HANDLER_REACHABILITY.json` (68 handlers: 32
+    production-referenced / 32 route-test / 2 registration-only / 2
+    test-referenced — already current, unchanged).
+  - **Determinism env:** throwaway `HOME`/`QUBIT_HOME` with
+    `QUBIT_PARITY_REF_HOME` and the product skill set staged; the reference
+    working tree is not deterministic (untracked build/i18n noise), so the
+    pinned source is read from a pristine checkout of the exact reference
+    commit for the vendor/comparison/source-inventory artifacts.
+  - **Freeze record** `docs/generated/audit/FREEZE_<sha>.json` regenerated from
+    the clean artifact commit (see below).
+- **Living docs.** `docs/QUBIT_1TO1_ROOT_CAUSES.md` updated for the
+  `69948c0057` pin and the closed Cause-1/B3-R2 items; `docs/QubitVSupstream.md`
+  regenerated via `scripts/forensic_audit/run_audit.py` (ledger run 6:
+  CRITICAL 1 / HIGH 42 / MEDIUM 133 / LOW 61 / INFO 8; status NEW 7 / OPEN 227 /
+  FIXED 11). The open CRITICAL is the known rebase engine gap
+  (`hermes_state_health.py` kept its legacy filename while references were
+  rewritten to `qubit_state_health`).
+- **`--check` status:** byte manifest, parity inventory, voice coverage, page
+  coverage, compat reachability, and all three ledger sections pass `--check`;
+  vendor manifest / source inventory / comparison were proven byte-identical on
+  two independent renders (no `--check` mode).
+- **Remaining drift / blockers:** the open CRITICAL + 42 HIGH audit findings
+  (rebrand-asymmetry and overlay regressions carried into the rebase); the 8
+  MISSING parity rows; the pinned-source checkout lives under `/tmp` (the
+  reference tree itself is not byte-deterministic due to untracked files); the
+  product `~/.config`/`~/.hermes` independence and the full gate + independent
+  verifier remain open.

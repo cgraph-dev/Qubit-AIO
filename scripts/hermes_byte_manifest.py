@@ -29,7 +29,7 @@ Usage:
     scripts/hermes_byte_manifest.py
     scripts/hermes_byte_manifest.py --check
     scripts/hermes_byte_manifest.py --upstream /tmp/opencode/pinned/hermes-agent \\
-        --pin d337b736aa1e8ebecfab043842d13e4a2d2f48a3 \\
+        --pin 69948c005791d4d0e51670ca015238c2c7663749 \\
         --out docs/differential/byte_manifest/hermes/HERMES_BYTE_MANIFEST.json
 """
 from __future__ import annotations
@@ -44,10 +44,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 
-# The W9 vendored pin (owner decision 2026-09-23 #14/#15). The pristine
-# read-only baseline clone carries this revision's exact blobs.
-PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
-UPSTREAM_TAG = "v0.21.4"
+# The vendored pin (owner amendment 2026-09-25, DECISIONS #25). The read-only
+# reference install is the source of record for this revision's exact blobs.
+PIN = "69948c005791d4d0e51670ca015238c2c7663749"
+UPSTREAM_TAG = "v0.21.5"
 UPSTREAM_REPO = "https://github.com/NousResearch/hermes-agent"
 UPSTREAM_LICENSE = "MIT License, Copyright (c) 2025 Nous Research"
 
@@ -56,9 +56,8 @@ DEFAULT_OUT = (
     / "HERMES_BYTE_MANIFEST.json"
 )
 DEFAULT_UPSTREAM_CANDIDATES = (
-    Path("/tmp/opencode/pinned/hermes-agent-d337b736-git"),
-    Path("/tmp/opencode/pinned/hermes-agent-0.21.4"),
-    Path("/tmp/opencode/pinned/hermes-agent"),
+    Path.home() / ".hermes" / "hermes-agent",
+    Path("/tmp/qubit-pin-69948c0057"),
 )
 
 ARTIFACT = "HERMES_BYTE_MANIFEST"

@@ -14,17 +14,17 @@
         "total": 566
       },
       "reference": {
-        "gated": 76,
-        "missing": 11,
-        "ported": 737,
-        "total": 824
+        "gated": 66,
+        "missing": 8,
+        "ported": 723,
+        "total": 797
       }
     },
     "by_surface": {
       "cli": {
         "gated": 10,
-        "missing": 4,
-        "ported": 374,
+        "missing": 0,
+        "ported": 378,
         "total": 388
       },
       "control": {
@@ -40,16 +40,16 @@
         "total": 277
       },
       "tool": {
-        "gated": 10,
-        "missing": 0,
-        "ported": 112,
-        "total": 122
+        "gated": 0,
+        "missing": 1,
+        "ported": 94,
+        "total": 95
       }
     },
-    "gated": 127,
-    "missing": 11,
-    "ported": 1252,
-    "total": 1390
+    "gated": 117,
+    "missing": 8,
+    "ported": 1238,
+    "total": 1363
   },
   "e2e_verified": false,
   "generated_from": {
@@ -60,8 +60,8 @@
       "/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list",
       "ls /home/trick/.hermes/skills/",
       "ls /home/trick/.hermes/hermes-agent/optional-mcps/",
-      "/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit --help ; /home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent --help",
-      "/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list",
+      "/tmp/qubit-w4/.venv/bin/qubit --help ; /tmp/qubit-w4/.venv/bin/qubit agent --help",
+      "/tmp/qubit-w4/.venv/bin/qubit agent tools list",
       "python -c 'from voicebridge import qubit_compat as qc; qc.match(method,path)'  # route classification"
     ],
     "generated_inputs": [
@@ -111,9 +111,9 @@
   },
   "known_gaps": [
     "routes: 7 reference routes have no qubit_compat counterpart (see MISSING rows).",
-    "cli: 4 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
+    "cli: 0 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
     "controls: Qubit dashboard_ops catalog rows lacking a voice interface are GATED under voice-for-everything.",
-    "tools: 0 reference tool(s) absent; 10 toolset(s) present but disabled in the Qubit cli scope.",
+    "tools: 1 reference tool(s) absent; 0 toolset(s) present but disabled in the Qubit cli scope.",
     "e2e_verified is false for every row: registration/dispatch is not behavioral proof."
   ],
   "qubit_surface_summary": {
@@ -130,7 +130,7 @@
     "reference_optional_mcps": 65,
     "reference_routes": 277,
     "reference_skills": 30,
-    "reference_toolsets": 27,
+    "reference_toolsets": 0,
     "voice_commands.REGISTRY": 514,
     "voice_commands.VOICE_GUARDS": 18
   },
@@ -138,7 +138,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent acp --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent acp --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes acp --help`"
       },
       "id": "hermes acp",
@@ -152,7 +152,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent approvals --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent approvals --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes approvals --help`"
       },
       "id": "hermes approvals",
@@ -166,7 +166,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent approvals suggest --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent approvals suggest --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes approvals suggest --help`"
       },
       "id": "hermes approvals suggest",
@@ -180,7 +180,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent approvals test --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent approvals test --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes approvals test --help`"
       },
       "id": "hermes approvals test",
@@ -194,7 +194,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth --help`"
       },
       "id": "hermes auth",
@@ -208,7 +208,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth add --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth add --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth add --help`"
       },
       "id": "hermes auth add",
@@ -222,7 +222,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth list --help`"
       },
       "id": "hermes auth list",
@@ -236,7 +236,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth logout --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth logout --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth logout --help`"
       },
       "id": "hermes auth logout",
@@ -250,7 +250,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth priority --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth priority --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth priority --help`"
       },
       "id": "hermes auth priority",
@@ -264,7 +264,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth refresh --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth refresh --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth refresh --help`"
       },
       "id": "hermes auth refresh",
@@ -278,7 +278,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth remove --help`"
       },
       "id": "hermes auth remove",
@@ -292,7 +292,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth reset --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth reset --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth reset --help`"
       },
       "id": "hermes auth reset",
@@ -306,7 +306,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth spotify --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth spotify --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth spotify --help`"
       },
       "id": "hermes auth spotify",
@@ -320,7 +320,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth status --help`"
       },
       "id": "hermes auth status",
@@ -334,7 +334,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent auth upgrade --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent auth upgrade --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes auth upgrade --help`"
       },
       "id": "hermes auth upgrade",
@@ -348,7 +348,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent backup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent backup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes backup --help`"
       },
       "id": "hermes backup",
@@ -362,7 +362,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent browser --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent browser --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes browser --help`"
       },
       "id": "hermes browser",
@@ -376,7 +376,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent browser close-profile --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent browser close-profile --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes browser close-profile --help`"
       },
       "id": "hermes browser close-profile",
@@ -390,7 +390,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent bundles --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent bundles --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes bundles --help`"
       },
       "id": "hermes bundles",
@@ -404,7 +404,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent bundles create --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent bundles create --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes bundles create --help`"
       },
       "id": "hermes bundles create",
@@ -418,7 +418,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent bundles delete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent bundles delete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes bundles delete --help`"
       },
       "id": "hermes bundles delete",
@@ -432,7 +432,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent bundles list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent bundles list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes bundles list --help`"
       },
       "id": "hermes bundles list",
@@ -446,7 +446,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent bundles reload --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent bundles reload --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes bundles reload --help`"
       },
       "id": "hermes bundles reload",
@@ -460,7 +460,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent bundles show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent bundles show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes bundles show --help`"
       },
       "id": "hermes bundles show",
@@ -474,7 +474,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent chat --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent chat --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes chat --help`"
       },
       "id": "hermes chat",
@@ -488,7 +488,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent checkpoints --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent checkpoints --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes checkpoints --help`"
       },
       "id": "hermes checkpoints",
@@ -502,7 +502,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent checkpoints clear --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent checkpoints clear --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes checkpoints clear --help`"
       },
       "id": "hermes checkpoints clear",
@@ -516,7 +516,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent checkpoints clear-legacy --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent checkpoints clear-legacy --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes checkpoints clear-legacy --help`"
       },
       "id": "hermes checkpoints clear-legacy",
@@ -530,7 +530,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent checkpoints list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent checkpoints list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes checkpoints list --help`"
       },
       "id": "hermes checkpoints list",
@@ -544,7 +544,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent checkpoints prune --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent checkpoints prune --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes checkpoints prune --help`"
       },
       "id": "hermes checkpoints prune",
@@ -558,7 +558,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent checkpoints status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent checkpoints status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes checkpoints status --help`"
       },
       "id": "hermes checkpoints status",
@@ -572,7 +572,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent claw --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent claw --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes claw --help`"
       },
       "id": "hermes claw",
@@ -586,7 +586,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent claw cleanup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent claw cleanup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes claw cleanup --help`"
       },
       "id": "hermes claw cleanup",
@@ -600,7 +600,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent claw migrate --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent claw migrate --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes claw migrate --help`"
       },
       "id": "hermes claw migrate",
@@ -614,7 +614,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent codex-runtime --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent codex-runtime --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes codex-runtime --help`"
       },
       "id": "hermes codex-runtime",
@@ -628,7 +628,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent codex-runtime migrate --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent codex-runtime migrate --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes codex-runtime migrate --help`"
       },
       "id": "hermes codex-runtime migrate",
@@ -642,7 +642,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent completion --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent completion --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes completion --help`"
       },
       "id": "hermes completion",
@@ -656,7 +656,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent computer-use --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent computer-use --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use --help`"
       },
       "id": "hermes computer-use",
@@ -670,7 +670,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent computer-use doctor --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent computer-use doctor --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use doctor --help`"
       },
       "id": "hermes computer-use doctor",
@@ -684,7 +684,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent computer-use install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent computer-use install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use install --help`"
       },
       "id": "hermes computer-use install",
@@ -698,7 +698,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent computer-use permissions --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent computer-use permissions --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use permissions --help`"
       },
       "id": "hermes computer-use permissions",
@@ -710,14 +710,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent computer-use screen --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use screen --help`"
       },
       "id": "hermes computer-use screen",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent computer-use screen",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -726,7 +726,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent computer-use status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent computer-use status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes computer-use status --help`"
       },
       "id": "hermes computer-use status",
@@ -740,7 +740,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config --help`"
       },
       "id": "hermes config",
@@ -754,7 +754,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config check --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config check --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config check --help`"
       },
       "id": "hermes config check",
@@ -768,7 +768,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config edit --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config edit --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config edit --help`"
       },
       "id": "hermes config edit",
@@ -782,7 +782,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config env-path --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config env-path --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config env-path --help`"
       },
       "id": "hermes config env-path",
@@ -796,7 +796,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config get --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config get --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config get --help`"
       },
       "id": "hermes config get",
@@ -810,7 +810,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config migrate --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config migrate --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config migrate --help`"
       },
       "id": "hermes config migrate",
@@ -824,7 +824,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config path --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config path --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config path --help`"
       },
       "id": "hermes config path",
@@ -838,7 +838,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config set --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config set --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config set --help`"
       },
       "id": "hermes config set",
@@ -852,7 +852,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config show --help`"
       },
       "id": "hermes config show",
@@ -866,7 +866,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent config unset --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent config unset --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes config unset --help`"
       },
       "id": "hermes config unset",
@@ -880,7 +880,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent console --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent console --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes console --help`"
       },
       "id": "hermes console",
@@ -894,7 +894,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron --help`"
       },
       "id": "hermes cron",
@@ -908,7 +908,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron create --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron create --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron create --help`"
       },
       "id": "hermes cron create",
@@ -922,7 +922,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron doctor --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron doctor --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron doctor --help`"
       },
       "id": "hermes cron doctor",
@@ -936,7 +936,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron edit --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron edit --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron edit --help`"
       },
       "id": "hermes cron edit",
@@ -950,7 +950,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron incidents --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron incidents --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron incidents --help`"
       },
       "id": "hermes cron incidents",
@@ -964,7 +964,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron list --help`"
       },
       "id": "hermes cron list",
@@ -978,7 +978,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron notepad --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron notepad --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron notepad --help`"
       },
       "id": "hermes cron notepad",
@@ -992,7 +992,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron pause --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron pause --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron pause --help`"
       },
       "id": "hermes cron pause",
@@ -1006,7 +1006,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron remove --help`"
       },
       "id": "hermes cron remove",
@@ -1020,7 +1020,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron resume --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron resume --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron resume --help`"
       },
       "id": "hermes cron resume",
@@ -1034,7 +1034,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron run --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron run --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron run --help`"
       },
       "id": "hermes cron run",
@@ -1048,7 +1048,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron runs --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron runs --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron runs --help`"
       },
       "id": "hermes cron runs",
@@ -1062,7 +1062,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron status --help`"
       },
       "id": "hermes cron status",
@@ -1076,7 +1076,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent cron tick --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent cron tick --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes cron tick --help`"
       },
       "id": "hermes cron tick",
@@ -1090,7 +1090,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator --help`"
       },
       "id": "hermes curator",
@@ -1104,7 +1104,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator adopt --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator adopt --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator adopt --help`"
       },
       "id": "hermes curator adopt",
@@ -1118,7 +1118,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator archive --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator archive --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator archive --help`"
       },
       "id": "hermes curator archive",
@@ -1132,7 +1132,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator backup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator backup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator backup --help`"
       },
       "id": "hermes curator backup",
@@ -1146,7 +1146,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator ledger --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator ledger --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator ledger --help`"
       },
       "id": "hermes curator ledger",
@@ -1160,7 +1160,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator list-archived --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator list-archived --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator list-archived --help`"
       },
       "id": "hermes curator list-archived",
@@ -1174,7 +1174,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator list-unmanaged --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator list-unmanaged --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator list-unmanaged --help`"
       },
       "id": "hermes curator list-unmanaged",
@@ -1188,7 +1188,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator pause --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator pause --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator pause --help`"
       },
       "id": "hermes curator pause",
@@ -1202,7 +1202,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator pin --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator pin --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator pin --help`"
       },
       "id": "hermes curator pin",
@@ -1216,7 +1216,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator prune --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator prune --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator prune --help`"
       },
       "id": "hermes curator prune",
@@ -1230,7 +1230,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator purge --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator purge --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator purge --help`"
       },
       "id": "hermes curator purge",
@@ -1244,7 +1244,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator restore --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator restore --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator restore --help`"
       },
       "id": "hermes curator restore",
@@ -1258,7 +1258,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator resume --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator resume --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator resume --help`"
       },
       "id": "hermes curator resume",
@@ -1272,7 +1272,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator rollback --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator rollback --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator rollback --help`"
       },
       "id": "hermes curator rollback",
@@ -1286,7 +1286,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator run --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator run --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator run --help`"
       },
       "id": "hermes curator run",
@@ -1300,7 +1300,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator status --help`"
       },
       "id": "hermes curator status",
@@ -1314,7 +1314,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator unpin --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator unpin --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator unpin --help`"
       },
       "id": "hermes curator unpin",
@@ -1328,7 +1328,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent curator usage --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent curator usage --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes curator usage --help`"
       },
       "id": "hermes curator usage",
@@ -1342,7 +1342,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent dashboard --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent dashboard --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes dashboard --help`"
       },
       "id": "hermes dashboard",
@@ -1356,7 +1356,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent dashboard register --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent dashboard register --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes dashboard register --help`"
       },
       "id": "hermes dashboard register",
@@ -1370,7 +1370,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent debug --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent debug --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes debug --help`"
       },
       "id": "hermes debug",
@@ -1384,7 +1384,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent debug delete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent debug delete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes debug delete --help`"
       },
       "id": "hermes debug delete",
@@ -1398,7 +1398,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent debug share --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent debug share --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes debug share --help`"
       },
       "id": "hermes debug share",
@@ -1412,7 +1412,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent desktop --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent desktop --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes desktop --help`"
       },
       "id": "hermes desktop",
@@ -1426,7 +1426,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent doctor --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent doctor --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes doctor --help`"
       },
       "id": "hermes doctor",
@@ -1440,7 +1440,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent dump --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent dump --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes dump --help`"
       },
       "id": "hermes dump",
@@ -1454,7 +1454,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress --help`"
       },
       "id": "hermes egress",
@@ -1468,7 +1468,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress config --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress config --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress config --help`"
       },
       "id": "hermes egress config",
@@ -1482,7 +1482,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress disable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress disable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress disable --help`"
       },
       "id": "hermes egress disable",
@@ -1496,7 +1496,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress install --help`"
       },
       "id": "hermes egress install",
@@ -1510,7 +1510,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress reload --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress reload --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress reload --help`"
       },
       "id": "hermes egress reload",
@@ -1524,7 +1524,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress restart --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress restart --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress restart --help`"
       },
       "id": "hermes egress restart",
@@ -1538,7 +1538,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress setup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress setup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress setup --help`"
       },
       "id": "hermes egress setup",
@@ -1552,7 +1552,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress start --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress start --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress start --help`"
       },
       "id": "hermes egress start",
@@ -1566,7 +1566,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress status --help`"
       },
       "id": "hermes egress status",
@@ -1580,7 +1580,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent egress stop --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent egress stop --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes egress stop --help`"
       },
       "id": "hermes egress stop",
@@ -1594,7 +1594,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent fallback --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent fallback --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes fallback --help`"
       },
       "id": "hermes fallback",
@@ -1608,7 +1608,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent fallback add --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent fallback add --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes fallback add --help`"
       },
       "id": "hermes fallback add",
@@ -1622,7 +1622,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent fallback clear --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent fallback clear --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes fallback clear --help`"
       },
       "id": "hermes fallback clear",
@@ -1636,7 +1636,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent fallback list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent fallback list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes fallback list --help`"
       },
       "id": "hermes fallback list",
@@ -1650,7 +1650,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent fallback remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent fallback remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes fallback remove --help`"
       },
       "id": "hermes fallback remove",
@@ -1664,7 +1664,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway --help`"
       },
       "id": "hermes gateway",
@@ -1678,7 +1678,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway enroll --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway enroll --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway enroll --help`"
       },
       "id": "hermes gateway enroll",
@@ -1692,7 +1692,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway install --help`"
       },
       "id": "hermes gateway install",
@@ -1706,7 +1706,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway list --help`"
       },
       "id": "hermes gateway list",
@@ -1720,7 +1720,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway migrate --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway migrate --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway migrate --help`"
       },
       "id": "hermes gateway migrate",
@@ -1734,7 +1734,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway migrate-legacy --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway migrate-legacy --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway migrate-legacy --help`"
       },
       "id": "hermes gateway migrate-legacy",
@@ -1748,7 +1748,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway restart --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway restart --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway restart --help`"
       },
       "id": "hermes gateway restart",
@@ -1762,7 +1762,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway run --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway run --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway run --help`"
       },
       "id": "hermes gateway run",
@@ -1776,7 +1776,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway setup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway setup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway setup --help`"
       },
       "id": "hermes gateway setup",
@@ -1790,7 +1790,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway start --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway start --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway start --help`"
       },
       "id": "hermes gateway start",
@@ -1804,7 +1804,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway status --help`"
       },
       "id": "hermes gateway status",
@@ -1818,7 +1818,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway stop --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway stop --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway stop --help`"
       },
       "id": "hermes gateway stop",
@@ -1832,7 +1832,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent gateway uninstall --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent gateway uninstall --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes gateway uninstall --help`"
       },
       "id": "hermes gateway uninstall",
@@ -1846,7 +1846,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent hooks --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent hooks --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes hooks --help`"
       },
       "id": "hermes hooks",
@@ -1860,7 +1860,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent hooks doctor --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent hooks doctor --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes hooks doctor --help`"
       },
       "id": "hermes hooks doctor",
@@ -1874,7 +1874,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent hooks list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent hooks list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes hooks list --help`"
       },
       "id": "hermes hooks list",
@@ -1888,7 +1888,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent hooks revoke --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent hooks revoke --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes hooks revoke --help`"
       },
       "id": "hermes hooks revoke",
@@ -1902,7 +1902,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent hooks test --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent hooks test --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes hooks test --help`"
       },
       "id": "hermes hooks test",
@@ -1916,7 +1916,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent import --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent import --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes import --help`"
       },
       "id": "hermes import",
@@ -1930,7 +1930,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent import-agent --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent import-agent --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes import-agent --help`"
       },
       "id": "hermes import-agent",
@@ -1944,7 +1944,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent insights --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent insights --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes insights --help`"
       },
       "id": "hermes insights",
@@ -1958,7 +1958,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent journey --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent journey --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes journey --help`"
       },
       "id": "hermes journey",
@@ -1972,7 +1972,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent journey delete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent journey delete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes journey delete --help`"
       },
       "id": "hermes journey delete",
@@ -1986,7 +1986,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent journey edit --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent journey edit --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes journey edit --help`"
       },
       "id": "hermes journey edit",
@@ -2000,7 +2000,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent journey list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent journey list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes journey list --help`"
       },
       "id": "hermes journey list",
@@ -2014,7 +2014,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban --help`"
       },
       "id": "hermes kanban",
@@ -2028,7 +2028,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban archive --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban archive --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban archive --help`"
       },
       "id": "hermes kanban archive",
@@ -2042,7 +2042,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban assign --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban assign --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban assign --help`"
       },
       "id": "hermes kanban assign",
@@ -2056,7 +2056,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban assignees --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban assignees --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban assignees --help`"
       },
       "id": "hermes kanban assignees",
@@ -2070,7 +2070,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban attach --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban attach --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban attach --help`"
       },
       "id": "hermes kanban attach",
@@ -2084,7 +2084,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban attach-rm --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban attach-rm --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban attach-rm --help`"
       },
       "id": "hermes kanban attach-rm",
@@ -2098,7 +2098,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban attachments --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban attachments --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban attachments --help`"
       },
       "id": "hermes kanban attachments",
@@ -2112,7 +2112,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban block --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban block --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban block --help`"
       },
       "id": "hermes kanban block",
@@ -2126,7 +2126,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban boards --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban boards --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban boards --help`"
       },
       "id": "hermes kanban boards",
@@ -2140,7 +2140,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban claim --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban claim --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban claim --help`"
       },
       "id": "hermes kanban claim",
@@ -2154,7 +2154,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban comment --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban comment --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban comment --help`"
       },
       "id": "hermes kanban comment",
@@ -2168,7 +2168,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban complete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban complete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban complete --help`"
       },
       "id": "hermes kanban complete",
@@ -2182,7 +2182,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban context --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban context --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban context --help`"
       },
       "id": "hermes kanban context",
@@ -2196,7 +2196,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban create --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban create --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban create --help`"
       },
       "id": "hermes kanban create",
@@ -2210,7 +2210,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban daemon --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban daemon --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban daemon --help`"
       },
       "id": "hermes kanban daemon",
@@ -2224,7 +2224,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban decompose --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban decompose --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban decompose --help`"
       },
       "id": "hermes kanban decompose",
@@ -2238,7 +2238,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban diagnostics --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban diagnostics --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban diagnostics --help`"
       },
       "id": "hermes kanban diagnostics",
@@ -2252,7 +2252,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban dispatch --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban dispatch --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban dispatch --help`"
       },
       "id": "hermes kanban dispatch",
@@ -2266,7 +2266,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban edit --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban edit --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban edit --help`"
       },
       "id": "hermes kanban edit",
@@ -2280,7 +2280,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban gc --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban gc --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban gc --help`"
       },
       "id": "hermes kanban gc",
@@ -2294,7 +2294,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban heartbeat --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban heartbeat --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban heartbeat --help`"
       },
       "id": "hermes kanban heartbeat",
@@ -2308,7 +2308,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban init --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban init --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban init --help`"
       },
       "id": "hermes kanban init",
@@ -2322,7 +2322,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban link --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban link --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban link --help`"
       },
       "id": "hermes kanban link",
@@ -2336,7 +2336,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban list --help`"
       },
       "id": "hermes kanban list",
@@ -2350,7 +2350,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban log --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban log --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban log --help`"
       },
       "id": "hermes kanban log",
@@ -2364,7 +2364,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban notify-list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban notify-list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban notify-list --help`"
       },
       "id": "hermes kanban notify-list",
@@ -2378,7 +2378,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban notify-subscribe --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban notify-subscribe --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban notify-subscribe --help`"
       },
       "id": "hermes kanban notify-subscribe",
@@ -2392,7 +2392,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban notify-unsubscribe --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban notify-unsubscribe --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban notify-unsubscribe --help`"
       },
       "id": "hermes kanban notify-unsubscribe",
@@ -2406,7 +2406,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban promote --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban promote --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban promote --help`"
       },
       "id": "hermes kanban promote",
@@ -2420,7 +2420,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban reassign --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban reassign --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban reassign --help`"
       },
       "id": "hermes kanban reassign",
@@ -2434,7 +2434,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban reclaim --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban reclaim --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban reclaim --help`"
       },
       "id": "hermes kanban reclaim",
@@ -2448,7 +2448,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban reopen-review --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban reopen-review --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban reopen-review --help`"
       },
       "id": "hermes kanban reopen-review",
@@ -2462,7 +2462,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban repair --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban repair --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban repair --help`"
       },
       "id": "hermes kanban repair",
@@ -2476,7 +2476,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban request-changes --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban request-changes --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban request-changes --help`"
       },
       "id": "hermes kanban request-changes",
@@ -2490,7 +2490,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban request-review --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban request-review --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban request-review --help`"
       },
       "id": "hermes kanban request-review",
@@ -2504,7 +2504,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban runs --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban runs --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban runs --help`"
       },
       "id": "hermes kanban runs",
@@ -2518,7 +2518,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban schedule --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban schedule --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban schedule --help`"
       },
       "id": "hermes kanban schedule",
@@ -2532,7 +2532,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban set-model --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban set-model --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban set-model --help`"
       },
       "id": "hermes kanban set-model",
@@ -2546,7 +2546,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban show --help`"
       },
       "id": "hermes kanban show",
@@ -2560,7 +2560,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban specify --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban specify --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban specify --help`"
       },
       "id": "hermes kanban specify",
@@ -2574,7 +2574,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban stats --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban stats --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban stats --help`"
       },
       "id": "hermes kanban stats",
@@ -2588,7 +2588,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban swarm --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban swarm --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban swarm --help`"
       },
       "id": "hermes kanban swarm",
@@ -2602,7 +2602,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban tail --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban tail --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban tail --help`"
       },
       "id": "hermes kanban tail",
@@ -2616,7 +2616,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban unblock --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban unblock --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban unblock --help`"
       },
       "id": "hermes kanban unblock",
@@ -2630,7 +2630,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban unlink --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban unlink --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban unlink --help`"
       },
       "id": "hermes kanban unlink",
@@ -2644,7 +2644,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent kanban watch --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent kanban watch --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes kanban watch --help`"
       },
       "id": "hermes kanban watch",
@@ -2658,7 +2658,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent logout --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent logout --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes logout --help`"
       },
       "id": "hermes logout",
@@ -2672,7 +2672,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent logs --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent logs --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes logs --help`"
       },
       "id": "hermes logs",
@@ -2686,7 +2686,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp --help`"
       },
       "id": "hermes lsp",
@@ -2700,7 +2700,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp install --help`"
       },
       "id": "hermes lsp install",
@@ -2714,7 +2714,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp install-all --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp install-all --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp install-all --help`"
       },
       "id": "hermes lsp install-all",
@@ -2728,7 +2728,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp list --help`"
       },
       "id": "hermes lsp list",
@@ -2742,7 +2742,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp restart --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp restart --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp restart --help`"
       },
       "id": "hermes lsp restart",
@@ -2756,7 +2756,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp status --help`"
       },
       "id": "hermes lsp status",
@@ -2770,7 +2770,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent lsp which --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent lsp which --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes lsp which --help`"
       },
       "id": "hermes lsp which",
@@ -2784,7 +2784,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp --help`"
       },
       "id": "hermes mcp",
@@ -2798,7 +2798,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp add --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp add --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp add --help`"
       },
       "id": "hermes mcp add",
@@ -2812,7 +2812,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp catalog --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp catalog --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp catalog --help`"
       },
       "id": "hermes mcp catalog",
@@ -2826,7 +2826,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp configure --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp configure --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp configure --help`"
       },
       "id": "hermes mcp configure",
@@ -2840,7 +2840,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp install --help`"
       },
       "id": "hermes mcp install",
@@ -2854,7 +2854,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp list --help`"
       },
       "id": "hermes mcp list",
@@ -2868,7 +2868,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp login --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp login --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp login --help`"
       },
       "id": "hermes mcp login",
@@ -2882,7 +2882,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp picker --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp picker --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp picker --help`"
       },
       "id": "hermes mcp picker",
@@ -2896,7 +2896,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp reauth --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp reauth --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp reauth --help`"
       },
       "id": "hermes mcp reauth",
@@ -2910,7 +2910,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp remove --help`"
       },
       "id": "hermes mcp remove",
@@ -2924,7 +2924,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp serve --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp serve --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp serve --help`"
       },
       "id": "hermes mcp serve",
@@ -2938,7 +2938,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent mcp test --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent mcp test --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes mcp test --help`"
       },
       "id": "hermes mcp test",
@@ -2952,7 +2952,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent memory --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent memory --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes memory --help`"
       },
       "id": "hermes memory",
@@ -2966,7 +2966,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent memory off --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent memory off --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes memory off --help`"
       },
       "id": "hermes memory off",
@@ -2980,7 +2980,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent memory reset --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent memory reset --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes memory reset --help`"
       },
       "id": "hermes memory reset",
@@ -2994,7 +2994,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent memory setup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent memory setup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes memory setup --help`"
       },
       "id": "hermes memory setup",
@@ -3008,7 +3008,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent memory status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent memory status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes memory status --help`"
       },
       "id": "hermes memory status",
@@ -3022,7 +3022,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent migrate --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent migrate --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes migrate --help`"
       },
       "id": "hermes migrate",
@@ -3036,7 +3036,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent migrate relay --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent migrate relay --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes migrate relay --help`"
       },
       "id": "hermes migrate relay",
@@ -3050,7 +3050,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent migrate xai --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent migrate xai --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes migrate xai --help`"
       },
       "id": "hermes migrate xai",
@@ -3064,7 +3064,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent moa --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent moa --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes moa --help`"
       },
       "id": "hermes moa",
@@ -3078,7 +3078,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent moa configure --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent moa configure --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes moa configure --help`"
       },
       "id": "hermes moa configure",
@@ -3092,7 +3092,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent moa delete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent moa delete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes moa delete --help`"
       },
       "id": "hermes moa delete",
@@ -3106,7 +3106,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent moa list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent moa list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes moa list --help`"
       },
       "id": "hermes moa list",
@@ -3120,7 +3120,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent model --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent model --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes model --help`"
       },
       "id": "hermes model",
@@ -3134,7 +3134,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent monitoring --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent monitoring --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes monitoring --help`"
       },
       "id": "hermes monitoring",
@@ -3148,7 +3148,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent monitoring status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent monitoring status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes monitoring status --help`"
       },
       "id": "hermes monitoring status",
@@ -3162,7 +3162,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pairing --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pairing --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pairing --help`"
       },
       "id": "hermes pairing",
@@ -3176,7 +3176,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pairing approve --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pairing approve --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pairing approve --help`"
       },
       "id": "hermes pairing approve",
@@ -3190,7 +3190,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pairing clear-pending --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pairing clear-pending --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pairing clear-pending --help`"
       },
       "id": "hermes pairing clear-pending",
@@ -3204,7 +3204,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pairing list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pairing list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pairing list --help`"
       },
       "id": "hermes pairing list",
@@ -3218,7 +3218,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pairing revoke --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pairing revoke --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pairing revoke --help`"
       },
       "id": "hermes pairing revoke",
@@ -3232,7 +3232,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pause --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pause --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pause --help`"
       },
       "id": "hermes pause",
@@ -3246,7 +3246,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer --help`"
       },
       "id": "hermes peer",
@@ -3260,7 +3260,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer add --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer add --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer add --help`"
       },
       "id": "hermes peer add",
@@ -3274,7 +3274,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer dm --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer dm --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer dm --help`"
       },
       "id": "hermes peer dm",
@@ -3288,7 +3288,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer list --help`"
       },
       "id": "hermes peer list",
@@ -3302,7 +3302,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer remove --help`"
       },
       "id": "hermes peer remove",
@@ -3316,7 +3316,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer run --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer run --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer run --help`"
       },
       "id": "hermes peer run",
@@ -3330,7 +3330,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer status --help`"
       },
       "id": "hermes peer status",
@@ -3344,7 +3344,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent peer stop --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent peer stop --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes peer stop --help`"
       },
       "id": "hermes peer stop",
@@ -3358,7 +3358,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets --help`"
       },
       "id": "hermes pets",
@@ -3372,7 +3372,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets doctor --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets doctor --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets doctor --help`"
       },
       "id": "hermes pets doctor",
@@ -3386,7 +3386,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets install --help`"
       },
       "id": "hermes pets install",
@@ -3400,7 +3400,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets list --help`"
       },
       "id": "hermes pets list",
@@ -3414,7 +3414,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets off --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets off --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets off --help`"
       },
       "id": "hermes pets off",
@@ -3428,7 +3428,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets remove --help`"
       },
       "id": "hermes pets remove",
@@ -3442,7 +3442,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets scale --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets scale --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets scale --help`"
       },
       "id": "hermes pets scale",
@@ -3456,7 +3456,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets select --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets select --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets select --help`"
       },
       "id": "hermes pets select",
@@ -3470,7 +3470,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent pets show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent pets show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes pets show --help`"
       },
       "id": "hermes pets show",
@@ -3484,7 +3484,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins --help`"
       },
       "id": "hermes plugins",
@@ -3496,14 +3496,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins adopt --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins adopt --help`"
       },
       "id": "hermes plugins adopt",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent plugins adopt",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -3512,7 +3512,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins browse --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins browse --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins browse --help`"
       },
       "id": "hermes plugins browse",
@@ -3526,7 +3526,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins capabilities --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins capabilities --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins capabilities --help`"
       },
       "id": "hermes plugins capabilities",
@@ -3538,14 +3538,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins check-updates --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins check-updates --help`"
       },
       "id": "hermes plugins check-updates",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent plugins check-updates",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -3554,7 +3554,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins compat --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins compat --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins compat --help`"
       },
       "id": "hermes plugins compat",
@@ -3568,7 +3568,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins disable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins disable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins disable --help`"
       },
       "id": "hermes plugins disable",
@@ -3582,7 +3582,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins doctor --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins doctor --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins doctor --help`"
       },
       "id": "hermes plugins doctor",
@@ -3596,7 +3596,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins enable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins enable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins enable --help`"
       },
       "id": "hermes plugins enable",
@@ -3610,7 +3610,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins install --help`"
       },
       "id": "hermes plugins install",
@@ -3624,7 +3624,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins list --help`"
       },
       "id": "hermes plugins list",
@@ -3638,7 +3638,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins pack --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins pack --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins pack --help`"
       },
       "id": "hermes plugins pack",
@@ -3652,7 +3652,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins remove --help`"
       },
       "id": "hermes plugins remove",
@@ -3666,7 +3666,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins search --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins search --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins search --help`"
       },
       "id": "hermes plugins search",
@@ -3680,7 +3680,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins show --help`"
       },
       "id": "hermes plugins show",
@@ -3692,14 +3692,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins trust-update-url --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins trust-update-url --help`"
       },
       "id": "hermes plugins trust-update-url",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent plugins trust-update-url",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -3708,7 +3708,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins update --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins update --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins update --help`"
       },
       "id": "hermes plugins update",
@@ -3722,7 +3722,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent plugins validate --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent plugins validate --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes plugins validate --help`"
       },
       "id": "hermes plugins validate",
@@ -3736,7 +3736,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent portal --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent portal --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes portal --help`"
       },
       "id": "hermes portal",
@@ -3750,7 +3750,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent portal info --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent portal info --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes portal info --help`"
       },
       "id": "hermes portal info",
@@ -3764,7 +3764,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent portal login --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent portal login --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes portal login --help`"
       },
       "id": "hermes portal login",
@@ -3778,7 +3778,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent portal open --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent portal open --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes portal open --help`"
       },
       "id": "hermes portal open",
@@ -3792,7 +3792,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent portal tools --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent portal tools --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes portal tools --help`"
       },
       "id": "hermes portal tools",
@@ -3806,7 +3806,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile --help`"
       },
       "id": "hermes profile",
@@ -3820,7 +3820,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile alias --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile alias --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile alias --help`"
       },
       "id": "hermes profile alias",
@@ -3834,7 +3834,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile create --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile create --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile create --help`"
       },
       "id": "hermes profile create",
@@ -3848,7 +3848,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile delete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile delete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile delete --help`"
       },
       "id": "hermes profile delete",
@@ -3862,7 +3862,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile describe --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile describe --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile describe --help`"
       },
       "id": "hermes profile describe",
@@ -3876,7 +3876,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile export --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile export --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile export --help`"
       },
       "id": "hermes profile export",
@@ -3890,7 +3890,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile import --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile import --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile import --help`"
       },
       "id": "hermes profile import",
@@ -3904,7 +3904,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile info --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile info --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile info --help`"
       },
       "id": "hermes profile info",
@@ -3918,7 +3918,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile install --help`"
       },
       "id": "hermes profile install",
@@ -3932,7 +3932,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile list --help`"
       },
       "id": "hermes profile list",
@@ -3946,7 +3946,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile migrate-identity --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile migrate-identity --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile migrate-identity --help`"
       },
       "id": "hermes profile migrate-identity",
@@ -3960,7 +3960,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile purge-identity --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile purge-identity --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile purge-identity --help`"
       },
       "id": "hermes profile purge-identity",
@@ -3974,7 +3974,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile rename --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile rename --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile rename --help`"
       },
       "id": "hermes profile rename",
@@ -3988,7 +3988,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile show --help`"
       },
       "id": "hermes profile show",
@@ -4002,7 +4002,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile update --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile update --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile update --help`"
       },
       "id": "hermes profile update",
@@ -4016,7 +4016,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent profile use --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent profile use --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes profile use --help`"
       },
       "id": "hermes profile use",
@@ -4030,7 +4030,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project --help`"
       },
       "id": "hermes project",
@@ -4044,7 +4044,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project add-folder --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project add-folder --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project add-folder --help`"
       },
       "id": "hermes project add-folder",
@@ -4058,7 +4058,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project archive --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project archive --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project archive --help`"
       },
       "id": "hermes project archive",
@@ -4072,7 +4072,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project bind-board --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project bind-board --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project bind-board --help`"
       },
       "id": "hermes project bind-board",
@@ -4086,7 +4086,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project create --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project create --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project create --help`"
       },
       "id": "hermes project create",
@@ -4100,7 +4100,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project list --help`"
       },
       "id": "hermes project list",
@@ -4114,7 +4114,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project remove-folder --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project remove-folder --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project remove-folder --help`"
       },
       "id": "hermes project remove-folder",
@@ -4128,7 +4128,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project rename --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project rename --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project rename --help`"
       },
       "id": "hermes project rename",
@@ -4142,7 +4142,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project restore --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project restore --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project restore --help`"
       },
       "id": "hermes project restore",
@@ -4156,7 +4156,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project set-primary --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project set-primary --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project set-primary --help`"
       },
       "id": "hermes project set-primary",
@@ -4170,7 +4170,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project show --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project show --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project show --help`"
       },
       "id": "hermes project show",
@@ -4184,7 +4184,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent project use --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent project use --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes project use --help`"
       },
       "id": "hermes project use",
@@ -4198,7 +4198,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent prompt-size --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent prompt-size --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes prompt-size --help`"
       },
       "id": "hermes prompt-size",
@@ -4212,7 +4212,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent proxy --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent proxy --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes proxy --help`"
       },
       "id": "hermes proxy",
@@ -4226,7 +4226,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent proxy providers --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent proxy providers --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes proxy providers --help`"
       },
       "id": "hermes proxy providers",
@@ -4240,7 +4240,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent proxy start --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent proxy start --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes proxy start --help`"
       },
       "id": "hermes proxy start",
@@ -4254,7 +4254,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent proxy status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent proxy status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes proxy status --help`"
       },
       "id": "hermes proxy status",
@@ -4268,7 +4268,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent resume --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent resume --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes resume --help`"
       },
       "id": "hermes resume",
@@ -4282,7 +4282,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent secrets --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent secrets --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes secrets --help`"
       },
       "id": "hermes secrets",
@@ -4296,7 +4296,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent secrets bitwarden --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent secrets bitwarden --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes secrets bitwarden --help`"
       },
       "id": "hermes secrets bitwarden",
@@ -4310,7 +4310,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent secrets onepassword --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent secrets onepassword --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes secrets onepassword --help`"
       },
       "id": "hermes secrets onepassword",
@@ -4324,7 +4324,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent security --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent security --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes security --help`"
       },
       "id": "hermes security",
@@ -4338,7 +4338,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent security audit --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent security audit --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes security audit --help`"
       },
       "id": "hermes security audit",
@@ -4352,7 +4352,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent send --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent send --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes send --help`"
       },
       "id": "hermes send",
@@ -4366,7 +4366,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent serve --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent serve --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes serve --help`"
       },
       "id": "hermes serve",
@@ -4380,7 +4380,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions --help`"
       },
       "id": "hermes sessions",
@@ -4394,7 +4394,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions archive --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions archive --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions archive --help`"
       },
       "id": "hermes sessions archive",
@@ -4408,7 +4408,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions browse --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions browse --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions browse --help`"
       },
       "id": "hermes sessions browse",
@@ -4422,7 +4422,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions clean-markers --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions clean-markers --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions clean-markers --help`"
       },
       "id": "hermes sessions clean-markers",
@@ -4436,7 +4436,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions delete --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions delete --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions delete --help`"
       },
       "id": "hermes sessions delete",
@@ -4450,7 +4450,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions export --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions export --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions export --help`"
       },
       "id": "hermes sessions export",
@@ -4464,7 +4464,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions import --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions import --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions import --help`"
       },
       "id": "hermes sessions import",
@@ -4478,7 +4478,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions list --help`"
       },
       "id": "hermes sessions list",
@@ -4492,7 +4492,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions optimize --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions optimize --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions optimize --help`"
       },
       "id": "hermes sessions optimize",
@@ -4506,7 +4506,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions optimize-storage --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions optimize-storage --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions optimize-storage --help`"
       },
       "id": "hermes sessions optimize-storage",
@@ -4520,7 +4520,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions pin --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions pin --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions pin --help`"
       },
       "id": "hermes sessions pin",
@@ -4534,7 +4534,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions pinned --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions pinned --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions pinned --help`"
       },
       "id": "hermes sessions pinned",
@@ -4548,7 +4548,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions prune --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions prune --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions prune --help`"
       },
       "id": "hermes sessions prune",
@@ -4562,7 +4562,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions recover --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions recover --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions recover --help`"
       },
       "id": "hermes sessions recover",
@@ -4576,7 +4576,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions rename --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions rename --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions rename --help`"
       },
       "id": "hermes sessions rename",
@@ -4590,7 +4590,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions repair --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions repair --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions repair --help`"
       },
       "id": "hermes sessions repair",
@@ -4604,7 +4604,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions repair-profiles --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions repair-profiles --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions repair-profiles --help`"
       },
       "id": "hermes sessions repair-profiles",
@@ -4618,7 +4618,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions repair-routing --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions repair-routing --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions repair-routing --help`"
       },
       "id": "hermes sessions repair-routing",
@@ -4632,7 +4632,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions retitle-skills --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions retitle-skills --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions retitle-skills --help`"
       },
       "id": "hermes sessions retitle-skills",
@@ -4646,7 +4646,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions set-journal-mode --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions set-journal-mode --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions set-journal-mode --help`"
       },
       "id": "hermes sessions set-journal-mode",
@@ -4660,7 +4660,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions stats --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions stats --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions stats --help`"
       },
       "id": "hermes sessions stats",
@@ -4674,7 +4674,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sessions unpin --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sessions unpin --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sessions unpin --help`"
       },
       "id": "hermes sessions unpin",
@@ -4688,7 +4688,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent setup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent setup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes setup --help`"
       },
       "id": "hermes setup",
@@ -4702,7 +4702,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills --help`"
       },
       "id": "hermes skills",
@@ -4716,7 +4716,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills audit --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills audit --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills audit --help`"
       },
       "id": "hermes skills audit",
@@ -4730,7 +4730,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills browse --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills browse --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills browse --help`"
       },
       "id": "hermes skills browse",
@@ -4744,7 +4744,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills check --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills check --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills check --help`"
       },
       "id": "hermes skills check",
@@ -4758,7 +4758,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills config --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills config --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills config --help`"
       },
       "id": "hermes skills config",
@@ -4772,7 +4772,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills diff --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills diff --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills diff --help`"
       },
       "id": "hermes skills diff",
@@ -4786,7 +4786,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills inspect --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills inspect --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills inspect --help`"
       },
       "id": "hermes skills inspect",
@@ -4800,7 +4800,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills install --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills install --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills install --help`"
       },
       "id": "hermes skills install",
@@ -4814,7 +4814,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills list --help`"
       },
       "id": "hermes skills list",
@@ -4828,7 +4828,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills list-modified --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills list-modified --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills list-modified --help`"
       },
       "id": "hermes skills list-modified",
@@ -4842,7 +4842,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills opt-in --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills opt-in --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills opt-in --help`"
       },
       "id": "hermes skills opt-in",
@@ -4856,7 +4856,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills opt-out --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills opt-out --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills opt-out --help`"
       },
       "id": "hermes skills opt-out",
@@ -4870,7 +4870,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills publish --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills publish --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills publish --help`"
       },
       "id": "hermes skills publish",
@@ -4884,7 +4884,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills repair-official --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills repair-official --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills repair-official --help`"
       },
       "id": "hermes skills repair-official",
@@ -4898,7 +4898,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills reset --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills reset --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills reset --help`"
       },
       "id": "hermes skills reset",
@@ -4912,7 +4912,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills search --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills search --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills search --help`"
       },
       "id": "hermes skills search",
@@ -4926,7 +4926,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills snapshot --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills snapshot --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills snapshot --help`"
       },
       "id": "hermes skills snapshot",
@@ -4940,7 +4940,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills tap --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills tap --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills tap --help`"
       },
       "id": "hermes skills tap",
@@ -4954,7 +4954,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills trust --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills trust --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills trust --help`"
       },
       "id": "hermes skills trust",
@@ -4968,7 +4968,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills uninstall --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills uninstall --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills uninstall --help`"
       },
       "id": "hermes skills uninstall",
@@ -4982,7 +4982,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills untrust --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills untrust --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills untrust --help`"
       },
       "id": "hermes skills untrust",
@@ -4996,7 +4996,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skills update --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skills update --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skills update --help`"
       },
       "id": "hermes skills update",
@@ -5010,7 +5010,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skin --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skin --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skin --help`"
       },
       "id": "hermes skin",
@@ -5024,7 +5024,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skin list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skin list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skin list --help`"
       },
       "id": "hermes skin list",
@@ -5038,7 +5038,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skin set --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skin set --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skin set --help`"
       },
       "id": "hermes skin set",
@@ -5052,7 +5052,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent skin use --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent skin use --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes skin use --help`"
       },
       "id": "hermes skin use",
@@ -5066,7 +5066,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent slack --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent slack --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes slack --help`"
       },
       "id": "hermes slack",
@@ -5080,7 +5080,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent slack manifest --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent slack manifest --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes slack manifest --help`"
       },
       "id": "hermes slack manifest",
@@ -5094,7 +5094,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes status --help`"
       },
       "id": "hermes status",
@@ -5108,7 +5108,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync --help`"
       },
       "id": "hermes sync",
@@ -5122,7 +5122,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync device --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync device --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync device --help`"
       },
       "id": "hermes sync device",
@@ -5136,7 +5136,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync disable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync disable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync disable --help`"
       },
       "id": "hermes sync disable",
@@ -5150,7 +5150,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync enable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync enable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync enable --help`"
       },
       "id": "hermes sync enable",
@@ -5164,7 +5164,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync now --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync now --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync now --help`"
       },
       "id": "hermes sync now",
@@ -5178,7 +5178,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync propose --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync propose --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync propose --help`"
       },
       "id": "hermes sync propose",
@@ -5192,7 +5192,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync pull --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync pull --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync pull --help`"
       },
       "id": "hermes sync pull",
@@ -5206,7 +5206,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync push --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync push --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync push --help`"
       },
       "id": "hermes sync push",
@@ -5220,7 +5220,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent sync status --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent sync status --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes sync status --help`"
       },
       "id": "hermes sync status",
@@ -5234,7 +5234,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent tools --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools --help`"
       },
       "id": "hermes tools",
@@ -5248,7 +5248,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools disable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent tools disable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools disable --help`"
       },
       "id": "hermes tools disable",
@@ -5262,7 +5262,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools enable --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent tools enable --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools enable --help`"
       },
       "id": "hermes tools enable",
@@ -5276,7 +5276,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent tools list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list --help`"
       },
       "id": "hermes tools list",
@@ -5290,7 +5290,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools post-setup --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent tools post-setup --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools post-setup --help`"
       },
       "id": "hermes tools post-setup",
@@ -5304,7 +5304,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent uninstall --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent uninstall --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes uninstall --help`"
       },
       "id": "hermes uninstall",
@@ -5318,7 +5318,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent update --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent update --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes update --help`"
       },
       "id": "hermes update",
@@ -5332,7 +5332,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent usage --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent usage --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes usage --help`"
       },
       "id": "hermes usage",
@@ -5346,7 +5346,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent vault --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent vault --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes vault --help`"
       },
       "id": "hermes vault",
@@ -5360,7 +5360,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent vault add --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent vault add --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes vault add --help`"
       },
       "id": "hermes vault add",
@@ -5374,7 +5374,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent vault list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent vault list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes vault list --help`"
       },
       "id": "hermes vault list",
@@ -5388,7 +5388,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent vault rm --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent vault rm --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes vault rm --help`"
       },
       "id": "hermes vault rm",
@@ -5402,7 +5402,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent vault sources --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent vault sources --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes vault sources --help`"
       },
       "id": "hermes vault sources",
@@ -5416,7 +5416,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent verify --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent verify --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes verify --help`"
       },
       "id": "hermes verify",
@@ -5430,7 +5430,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent webhook --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent webhook --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes webhook --help`"
       },
       "id": "hermes webhook",
@@ -5444,7 +5444,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent webhook list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent webhook list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes webhook list --help`"
       },
       "id": "hermes webhook list",
@@ -5458,7 +5458,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent webhook remove --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent webhook remove --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes webhook remove --help`"
       },
       "id": "hermes webhook remove",
@@ -5472,7 +5472,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent webhook subscribe --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent webhook subscribe --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes webhook subscribe --help`"
       },
       "id": "hermes webhook subscribe",
@@ -5486,7 +5486,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent webhook test --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent webhook test --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes webhook test --help`"
       },
       "id": "hermes webhook test",
@@ -5500,7 +5500,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent whatsapp --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent whatsapp --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes whatsapp --help`"
       },
       "id": "hermes whatsapp",
@@ -5514,7 +5514,7 @@
     {
       "classification": "GATED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent whatsapp-cloud --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent whatsapp-cloud --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes whatsapp-cloud --help`"
       },
       "id": "hermes whatsapp-cloud",
@@ -5528,7 +5528,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent worktree --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent worktree --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes worktree --help`"
       },
       "id": "hermes worktree",
@@ -5542,7 +5542,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent worktree list --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent worktree list --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes worktree list --help`"
       },
       "id": "hermes worktree list",
@@ -5556,7 +5556,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent worktree prune --help`",
+        "qubit": "`/tmp/qubit-w4/.venv/bin/qubit agent worktree prune --help`",
         "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes worktree prune --help`"
       },
       "id": "hermes worktree prune",
@@ -21786,14 +21786,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "PORTED",
+      "classification": "MISSING",
       "evidence": {
-        "qubit": "qubit_runtime/optional-mcps/",
+        "qubit": "no counterpart",
         "reference": "/home/trick/.hermes/hermes-agent/optional-mcps/n8n-official"
       },
       "id": "optional-mcp n8n-official",
       "method": null,
-      "qubit_counterpart": "qubit_runtime/optional-mcps/n8n",
+      "qubit_counterpart": null,
       "side": "reference",
       "surface": "tool",
       "voice_intent": "qubit mcp install n8n-official",
@@ -22138,7 +22138,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/apple",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/apple",
         "reference": "/home/trick/.hermes/skills/apple"
       },
       "id": "skill apple",
@@ -22152,7 +22152,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/autonomous-ai-agents",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/autonomous-ai-agents",
         "reference": "/home/trick/.hermes/skills/autonomous-ai-agents"
       },
       "id": "skill autonomous-ai-agents",
@@ -22166,7 +22166,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/blockchain",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/blockchain",
         "reference": "/home/trick/.hermes/skills/blockchain"
       },
       "id": "skill blockchain",
@@ -22180,7 +22180,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/brain-upgrade",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/brain-upgrade",
         "reference": "/home/trick/.hermes/skills/brain-upgrade"
       },
       "id": "skill brain-upgrade",
@@ -22194,7 +22194,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/communication",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/communication",
         "reference": "/home/trick/.hermes/skills/communication"
       },
       "id": "skill communication",
@@ -22208,7 +22208,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/creative",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/creative",
         "reference": "/home/trick/.hermes/skills/creative"
       },
       "id": "skill creative",
@@ -22222,7 +22222,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/data-science",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/data-science",
         "reference": "/home/trick/.hermes/skills/data-science"
       },
       "id": "skill data-science",
@@ -22236,7 +22236,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/devops",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/devops",
         "reference": "/home/trick/.hermes/skills/devops"
       },
       "id": "skill devops",
@@ -22250,7 +22250,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/email",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/email",
         "reference": "/home/trick/.hermes/skills/email"
       },
       "id": "skill email",
@@ -22264,7 +22264,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/finance",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/finance",
         "reference": "/home/trick/.hermes/skills/finance"
       },
       "id": "skill finance",
@@ -22278,7 +22278,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/gaming",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/gaming",
         "reference": "/home/trick/.hermes/skills/gaming"
       },
       "id": "skill gaming",
@@ -22292,7 +22292,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/github",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/github",
         "reference": "/home/trick/.hermes/skills/github"
       },
       "id": "skill github",
@@ -22306,7 +22306,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/health",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/health",
         "reference": "/home/trick/.hermes/skills/health"
       },
       "id": "skill health",
@@ -22320,7 +22320,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/qubit-voice-mode",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/qubit-voice-mode",
         "reference": "/home/trick/.hermes/skills/hermes-voice-mode"
       },
       "id": "skill hermes-voice-mode",
@@ -22334,7 +22334,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/mcp",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/mcp",
         "reference": "/home/trick/.hermes/skills/mcp"
       },
       "id": "skill mcp",
@@ -22348,7 +22348,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/media",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/media",
         "reference": "/home/trick/.hermes/skills/media"
       },
       "id": "skill media",
@@ -22362,7 +22362,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/migration",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/migration",
         "reference": "/home/trick/.hermes/skills/migration"
       },
       "id": "skill migration",
@@ -22376,7 +22376,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/mlops",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/mlops",
         "reference": "/home/trick/.hermes/skills/mlops"
       },
       "id": "skill mlops",
@@ -22390,7 +22390,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/payments",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/payments",
         "reference": "/home/trick/.hermes/skills/payments"
       },
       "id": "skill payments",
@@ -22404,7 +22404,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/productivity",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/productivity",
         "reference": "/home/trick/.hermes/skills/productivity"
       },
       "id": "skill productivity",
@@ -22418,7 +22418,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/professional-reporting",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/professional-reporting",
         "reference": "/home/trick/.hermes/skills/professional-reporting"
       },
       "id": "skill professional-reporting",
@@ -22432,7 +22432,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/research",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/research",
         "reference": "/home/trick/.hermes/skills/research"
       },
       "id": "skill research",
@@ -22446,7 +22446,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/security",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/security",
         "reference": "/home/trick/.hermes/skills/security"
       },
       "id": "skill security",
@@ -22460,7 +22460,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/smart-home",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/smart-home",
         "reference": "/home/trick/.hermes/skills/smart-home"
       },
       "id": "skill smart-home",
@@ -22474,7 +22474,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/software-development",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/software-development",
         "reference": "/home/trick/.hermes/skills/software-development"
       },
       "id": "skill software-development",
@@ -22488,7 +22488,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/voice-routing",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/voice-routing",
         "reference": "/home/trick/.hermes/skills/voice-routing"
       },
       "id": "skill voice-routing",
@@ -22502,7 +22502,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/vscode-memory",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/vscode-memory",
         "reference": "/home/trick/.hermes/skills/vscode-memory"
       },
       "id": "skill vscode-memory",
@@ -22516,7 +22516,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/web",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/web",
         "reference": "/home/trick/.hermes/skills/web"
       },
       "id": "skill web",
@@ -22530,7 +22530,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/web-development",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/web-development",
         "reference": "/home/trick/.hermes/skills/web-development"
       },
       "id": "skill web-development",
@@ -22544,7 +22544,7 @@
     {
       "classification": "PORTED",
       "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/yuanbao",
+        "qubit": "/tmp/qubit-t15-home/.local/state/qubit-voicebridge/runtime/skills/yuanbao",
         "reference": "/home/trick/.hermes/skills/yuanbao"
       },
       "id": "skill yuanbao",
@@ -22553,384 +22553,6 @@
       "side": "reference",
       "surface": "tool",
       "voice_intent": "qubit skills install yuanbao",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset a2a",
-      "method": null,
-      "qubit_counterpart": "toolset a2a (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable a2a",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset browser",
-      "method": null,
-      "qubit_counterpart": "toolset browser",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit browser status",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset clarify",
-      "method": null,
-      "qubit_counterpart": "toolset clarify",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable clarify",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset code_execution",
-      "method": null,
-      "qubit_counterpart": "toolset code_execution",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable code_execution",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset computer_use",
-      "method": null,
-      "qubit_counterpart": "toolset computer_use",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable computer_use",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset connections",
-      "method": null,
-      "qubit_counterpart": "toolset connections (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable connections",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset context_engine",
-      "method": null,
-      "qubit_counterpart": "toolset context_engine (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable context_engine",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset cronjob",
-      "method": null,
-      "qubit_counterpart": "toolset cronjob",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable cronjob",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset delegation",
-      "method": null,
-      "qubit_counterpart": "toolset delegation",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable delegation",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset file",
-      "method": null,
-      "qubit_counterpart": "toolset file",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit plugins install",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset homeassistant",
-      "method": null,
-      "qubit_counterpart": "toolset homeassistant (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable homeassistant",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset image_gen",
-      "method": null,
-      "qubit_counterpart": "toolset image_gen",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable image_gen",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset kanban",
-      "method": null,
-      "qubit_counterpart": "toolset kanban",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit kanban boards",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset memory",
-      "method": null,
-      "qubit_counterpart": "toolset memory",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit memory search",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset session_search",
-      "method": null,
-      "qubit_counterpart": "toolset session_search",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable session_search",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset skills",
-      "method": null,
-      "qubit_counterpart": "toolset skills",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit skills list",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset spotify",
-      "method": null,
-      "qubit_counterpart": "toolset spotify (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable spotify",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset stt",
-      "method": null,
-      "qubit_counterpart": "toolset stt (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable stt",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset terminal",
-      "method": null,
-      "qubit_counterpart": "toolset terminal",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit console help",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset todo",
-      "method": null,
-      "qubit_counterpart": "toolset todo",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable todo",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset tts",
-      "method": null,
-      "qubit_counterpart": "toolset tts",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tts test",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset video",
-      "method": null,
-      "qubit_counterpart": "toolset video (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit media gen generate",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset video_gen",
-      "method": null,
-      "qubit_counterpart": "toolset video_gen (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable video_gen",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset vision",
-      "method": null,
-      "qubit_counterpart": "toolset vision",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit vision status",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=True",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset web",
-      "method": null,
-      "qubit_counterpart": "toolset web",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit web fetch",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset x_search",
-      "method": null,
-      "qubit_counterpart": "toolset x_search (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable x_search",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "GATED",
-      "evidence": {
-        "qubit": "`/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/qubit agent tools list` enabled=False",
-        "reference": "`/home/trick/.hermes/hermes-agent/venv/bin/hermes tools list`"
-      },
-      "id": "toolset yuanbao",
-      "method": null,
-      "qubit_counterpart": "toolset yuanbao (present, disabled in cli scope)",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit tools enable yuanbao",
       "voice_intent_verified": false
     }
   ],
