@@ -190,6 +190,37 @@ terminal:
   # profile: ""            # optional: model-profile id used for /chat
 
 # ---------------------------------------------------------------------------
+# Agent-runtime alignment (Qubit-owned; mirrors <QUBIT_HOME>/config.yaml).
+# This template is copied to ~/.config/qubit-voicebridge/voice.yaml, which the
+# voice bridge reads. The vendored agent runtime reads a SEPARATE file,
+# <QUBIT_HOME>/config.yaml; the values below are the portable Qubit baseline for
+# that runtime (mirror them there, e.g. with `qubit config set`, on a fresh
+# host). They are recorded here so a rebrand or a hand-edit cannot reintroduce
+# an unregistered toolset name or a journal mode that disagrees with the
+# accepted single-writer decision.
+agent_runtime:
+  # Qubit CLI bundle + the real coordination toolset. Validated against
+  # qubit_runtime/toolsets.py: the Qubit-owned `qubit-cli` id shares the
+  # canonical CLI bundle, and `kanban` is a real registered toolset (dispatcher
+  # guarded). Do NOT use the capital-Q `Qubit-cli` spelling — it is not a
+  # registry key.
+  toolsets:
+    - qubit-cli
+    - kanban
+  # Accepted SQLite journal mode. The canonical state.db is opened by two
+  # Qubit-owned processes (voicebridge + the gateway daemon); on this host the
+  # linked SQLite cannot apply WAL safely, so the accepted working choice is
+  # DELETE (see STATUS §11). Keeping this in agreement with the on-disk mode
+  # removes the config-vs-reality drift the forensic audit flagged.
+  database:
+    journal_mode: delete
+  # platform_toolsets parity is NOT required: the vendored runtime derives each
+  # platform's default toolset from the static qubit-<platform> bundles, so the
+  # reference's explicit maps only restated those defaults. Add entries here
+  # only to override a platform on purpose (every name must be a valid toolset).
+  platform_toolsets: {}
+
+# ---------------------------------------------------------------------------
 # Update source/channel policy (all optional; see docs/UPDATE.md).
 # The canonical resolver is voicebridge/update_channel.py; the git mechanism is
 # voicebridge/update_manager.py. Leave these unset to use the defaults below.

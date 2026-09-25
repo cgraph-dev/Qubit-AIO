@@ -25,6 +25,11 @@ RestartSec=3
 # Environment=DISPLAY=:0
 # Environment=XAUTHORITY=/run/user/1000/gdm/Xauthority
 Environment=VOICE_BRIDGE_CONFIG=%h/.config/qubit-voicebridge/voice.yaml
+# Explicit Qubit-owned runtime home. The bridge and the gateway daemon each
+# resolve QUBIT_HOME themselves, but systemd is the authority for the process
+# environment: pinning it here keeps both services on the SAME one state.db
+# (the single-authority rule) and never lets a launch inherit an external home.
+Environment=QUBIT_HOME=%h/.local/state/qubit-voicebridge/runtime
 # Only needed if you use the whisper fallback ASR on CUDA with a non-standard
 # CUDA install (sherpa/moonshine run on CPU by default):
 # Environment=LD_LIBRARY_PATH=/usr/local/lib/ollama/cuda_v12
