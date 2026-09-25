@@ -42,6 +42,11 @@ import os  # noqa: E402
 
 BASE = Path(os.environ.get("QUBIT_T6_BASE", "/tmp/qubit-task6-base/qubit_runtime"))
 OURS = Path(os.environ.get("QUBIT_T6_OURS", "/tmp/qubit-v0215-candidate/qubit_runtime"))
+#: The immutable fork snapshot the triage classified against.  Never the target:
+#: once the merge mutates the target, using it as ``theirs`` would reclassify
+#: every already-merged file (the snapshot is the frozen R8 input).
+THEIRS = Path(os.environ.get(
+    "QUBIT_T6_THEIRS", "/tmp/qubit-task6-theirs-snapshot/qubit_runtime"))
 TARGET = Path(os.environ.get("QUBIT_T6_TARGET", str(REPO / "qubit_runtime")))
 TRIAGE = Path(os.environ.get(
     "QUBIT_T6_TRIAGE",
@@ -105,7 +110,7 @@ def main(argv=None) -> int:
     if args.check:
         recs: list[dict] = []
         for bucket in BUCKET_ORDER:
-            recs.extend(run_bucket(TARGET, BASE, OURS, TARGET, bucket, apply=False))
+            recs.extend(run_bucket(TARGET, BASE, OURS, THEIRS, bucket, apply=False))
         problems = cross_check(recs)
         print(json.dumps({
             "buckets": {b: sum(1 for r in recs if r["bucket"] == b) for b in BUCKET_ORDER},
@@ -124,8 +129,8 @@ def main(argv=None) -> int:
         if not args.all:
             records = [r for r in records if r["bucket"] != bucket]
         print(f"merging bucket {bucket} ...", flush=True)
-        records.extend(run_bucket(TARGET, BASE, OURS, TARGET, bucket, apply=True))
-        audit = build_audit(records, BASE, OURS, TARGET)
+        records.extend(run_bucket(TARGET, BASE, OURS, THEIRS, bucket, apply=True))
+        audit = build_audit(records, BASE, OURS, THEIRS)
         write_audit(audit, AUDIT_OUT)
         print(f"  changed={audit['totals']['changed']} "
               f"written={audit['totals']['written']} "

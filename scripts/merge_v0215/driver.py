@@ -148,7 +148,8 @@ def resolve(base: Path, ours: Path, theirs: Path, rel: str,
     rec = {"path": rel, "class": cls, "conflict": False}
 
     if cls in ("IDENTICAL", "ADDED_IDENTICAL", "SAME_CHANGE", "BOTH_DELETED"):
-        rec.update(resolution=RES_SKIP, action="noop", data=None)
+        rec.update(resolution=RES_SKIP, action="noop", data=None,
+                   merge_markers=False)
         return rec
 
     if cls == "TAKE_OURS":
@@ -157,6 +158,7 @@ def resolve(base: Path, ours: Path, theirs: Path, rel: str,
         else:
             resolution = RES_ADDED if _read(base, rel) is None else RES_AUTO_OURS
             rec.update(resolution=resolution, action="write", data=ob)
+        rec["merge_markers"] = False
         return rec
 
     if cls == "REAPPLY_THEIRS":
@@ -165,15 +167,16 @@ def resolve(base: Path, ours: Path, theirs: Path, rel: str,
         except MergeConflict:
             merged = tb
             rec.update(resolution=RES_KEEP_CONFLICT, action=_keep_action(tb),
-                       data=tb, conflict=True)
+                       data=tb, conflict=True, merge_markers=True)
             return rec
         rec.update(resolution=RES_MERGE_FILE,
-                   action=_content_action(merged, tb), data=merged)
+                   action=_content_action(merged, tb), data=merged,
+                   merge_markers=False)
         return rec
 
-    # CONFLICT -> keep theirs by default.
+    # CONFLICT -> keep theirs by default (no merge attempted).
     rec.update(resolution=RES_KEEP_CONFLICT, action=_keep_action(tb), data=tb,
-               conflict=True)
+               conflict=True, merge_markers=False)
     return rec
 
 
@@ -277,7 +280,7 @@ def build_audit(records: list[dict], base: Path, ours: Path,
         by_bucket_res.setdefault(r["bucket"], Counter())[r["resolution"]] += 1
     conflicts = [
         {"path": r["path"], "bucket": r["bucket"],
-         "kind": "MERGE_MARKERS" if r["class"] == "CONFLICT"
+         "kind": "MERGE_MARKERS" if r.get("merge_markers")
                  else "TRIAGE_CONFLICT",
          "action": r["action"]}
         for r in records if r["resolution"] == RES_KEEP_CONFLICT
