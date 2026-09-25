@@ -24,6 +24,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -76,7 +78,11 @@ def test_catalog_serves_curated_pinned_index(tmp_path, monkeypatch):
     assert idx["install"]["code"] == "PLUGIN_INDEX_OPERATOR_GATED"
     for entry in idx["entries"]:
         assert entry["name"]
-        assert entry["repo"].startswith("https://")
+        # B4-06: the served display row is de-branded; the real upstream source
+        # lives only in the internal ``provenance`` sub-field.
+        assert "nousresearch" not in json.dumps(
+            {k: v for k, v in entry.items() if k != "provenance"}).lower()
+        assert entry["provenance"]["upstream_repo"].startswith("https://")
         assert _SHA40.match(entry["pinned_ref"]), entry
         assert entry["license"] == "unverified"
         assert entry["curated"] is True and entry["pinned"] is True
@@ -89,8 +95,16 @@ def test_pinned_refs_match_the_vendored_source_index(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = _catalog(cfg)
     assert code == 200
-    served = {e["name"]: e["pinned_ref"] for e in out["pinned_index"]["entries"]}
+    # B4-06: served ids are de-branded; the provenance source_name is the link
+    # back to the vendored source index.
+    served = {e["provenance"]["source_name"]: e["pinned_ref"]
+              for e in out["pinned_index"]["entries"]}
     assert served, "pinned index must not be empty"
+    source_path = (REPO_ROOT / "qubit_runtime" / "qubit_cli" / "data"
+                   / "plugin_index.json")
+    if not source_path.exists():
+        pytest.skip("vendored plugin_index.json absent (vendored .gitignore "
+                    "excludes data/; packaging owns restoring it)")
     source = {p["name"]: p["ref"] for p in _source_index()["plugins"]}
     for name, ref in served.items():
         assert name in source, f"{name!r} is not in the vendored source index"
@@ -124,7 +138,7 @@ def test_pinned_index_search_filters_real_entries(tmp_path, monkeypatch):
     code, out = _catalog(cfg, {"q": "telegram"})
     assert code == 200
     names = {e["name"] for e in out["pinned_index"]["entries"]}
-    assert names == {"hermes-telegram-business"}, names
+    assert names == {"qubit-telegram-business"}, names
     code, out = _catalog(cfg, {"q": "zzz-no-match"})
     assert code == 200
     assert out["pinned_index"]["entries"] == []
@@ -137,13 +151,13 @@ def test_install_requires_confirmation_then_is_operator_gated(tmp_path, monkeypa
     # No confirm -> canonical 409.
     code, out = HC.dispatch(
         cfg, "POST", "/api/dashboard/agent-plugins/install", {},
-        {"catalog_name": "hermes-media-studio"})
+        {"catalog_name": "qubit-media-studio"})
     assert code == 409
     assert out["code"] == "PLUGIN_CONFIRM_REQUIRED"
     # Confirmed pinned install -> honest operator-gated refusal naming the pin.
     code, out = HC.dispatch(
         cfg, "POST", "/api/dashboard/agent-plugins/install", {},
-        {"catalog_name": "hermes-media-studio",
+        {"catalog_name": "qubit-media-studio",
          "ref": "e8d59971d2b7901405b39dac7b03bdd616272d0d", "confirm": True})
     assert code == 403
     assert out["code"] == "PLUGIN_INDEX_OPERATOR_GATED"
@@ -158,7 +172,7 @@ def test_install_off_pin_ref_is_a_typed_mismatch(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = HC.dispatch(
         cfg, "POST", "/api/dashboard/agent-plugins/install", {},
-        {"catalog_name": "hermes-media-studio", "ref": "0" * 40, "confirm": True})
+        {"catalog_name": "qubit-media-studio", "ref": "0" * 40, "confirm": True})
     assert code == 403
     assert out["code"] == "PLUGIN_INDEX_REF_MISMATCH"
 
@@ -184,7 +198,7 @@ def test_install_from_index_refuses_while_estop_latched(tmp_path, monkeypatch):
     try:
         code, out = HC.dispatch(
             cfg, "POST", "/api/dashboard/agent-plugins/install", {},
-            {"catalog_name": "hermes-media-studio", "confirm": True})
+            {"catalog_name": "qubit-media-studio", "confirm": True})
         assert code == 403
         assert out["code"] == "PLUGIN_ESTOP"
     finally:
@@ -196,7 +210,7 @@ def test_install_from_index_module_audits_and_never_fetches(tmp_path, monkeypatc
     from voicebridge import plugin_catalog as PC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    out = PC.install_from_index(cfg, "hermes-telegram-business", confirmed=True,
+    out = PC.install_from_index(cfg, "qubit-telegram-business", confirmed=True,
                                 requested_by="test")
     assert out["ok"] is False
     assert out["code"] == PC.INDEX_CODE

@@ -79,9 +79,13 @@ def _rebrand_epilogue(text: Optional[str], prog: str) -> Optional[str]:
     lines = []
     for line in text.splitlines(True):
         stripped = line.lstrip(" \t")
-        if stripped == "hermes" or stripped.startswith(("qubit ", "qubit\t")):
-            indent = line[: len(line) - len(stripped)]
-            line = indent + prog + stripped[len("hermes"):]
+        indent = line[: len(line) - len(stripped)]
+        if stripped == "hermes":
+            line = indent + prog
+        elif stripped.startswith(("qubit ", "qubit\t")):
+            # B3-R1: strip the 5-char ``qubit`` token, NOT the 6-char upstream
+            # one, so the separating space/tab survives (``qubit chat``).
+            line = indent + prog + stripped[len("qubit"):]
         lines.append(line)
     return _qubit_text("".join(lines))
 

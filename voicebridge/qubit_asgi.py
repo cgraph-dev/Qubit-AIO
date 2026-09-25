@@ -103,8 +103,15 @@ def _apply_qubit_config_overlay() -> None:
             _CD.DEFAULT_CONFIG["toolsets"] = ["qubit-cli"]
         try:
             import toolsets as _ts
-            if "qubit-cli" not in _ts.TOOLSETS and "hermes-cli" in _ts.TOOLSETS:
-                _ts.TOOLSETS["qubit-cli"] = _ts.TOOLSETS["hermes-cli"]
+            # B4-07: the string rebrand produced a capital-Q name ("Qubit-cli")
+            # in live configs while the overlay only aliased lowercase
+            # "qubit-cli", so the id silently resolved to 0 tools. Register
+            # every spelling (the resolver is exact-name, not case-folded) and
+            # keep ``hermes-cli`` itself as the read-old source.
+            bundle = _ts.TOOLSETS.get("hermes-cli")
+            if bundle is not None:
+                for _alias in ("qubit-cli", "Qubit-cli", "QUBIT-cli"):
+                    _ts.TOOLSETS.setdefault(_alias, bundle)
         except Exception:
             pass
     except Exception:

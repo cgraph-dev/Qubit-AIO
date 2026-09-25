@@ -365,6 +365,35 @@ def set_enabled(cfg: Any, name: str, enabled: bool) -> Dict[str, Any]:
     return {"state": "OK", "server": _public(rec)}
 
 
+def _redact_probe(text: object) -> str:
+    """Redact a probe/error string before it can reach a served response.
+
+    B4-05: the dashboard MCP test body echoes probe failures verbatim, and a
+    connection error can embed an ``Authorization`` header value. Delegate to
+    the vendored ``redact_mcp_probe_text`` (the reference's own redactor, which
+    masks recognized credential header fields + bare auth schemes and then runs
+    the generic secret redactor); fall back to the overlay redactor if the fork
+    is unavailable. Never raises — an unexpected failure fails closed.
+    """
+    raw = "" if text is None else str(text)
+    if not raw:
+        return raw
+    try:
+        from . import qubit_runtime as QR
+
+        QR.ensure_path()
+        from qubit_cli.mcp_config import redact_mcp_probe_text  # type: ignore
+
+        return str(redact_mcp_probe_text(raw))
+    except Exception:  # noqa: BLE001 - fail closed, never raise
+        try:
+            from .redaction import redact_text
+
+            return str(redact_text(raw))
+        except Exception:  # noqa: BLE001
+            return "«redacted»"
+
+
 def _probe(cfg: Any, rec: Dict[str, Any], *, timeout_s: Optional[float] = None,
            requested_by: str = "cli:user") -> Dict[str, Any]:
     """Real ``tools/list`` probe through the brokered client.
@@ -381,8 +410,9 @@ def _probe(cfg: Any, rec: Dict[str, Any], *, timeout_s: Optional[float] = None,
                                 requested_by=requested_by)
     except MC.McpClientError as exc:
         return {"connected": False, "tools": [], "code": exc.code,
-                "state": "ERROR", "errors": [f"{exc.code}: {exc.detail}"],
-                "detail": exc.detail}
+                "state": "ERROR",
+                "errors": [_redact_probe(f"{exc.code}: {exc.detail}")],
+                "detail": _redact_probe(exc.detail)}
     tools = list(out.get("names") or [])
     return {"connected": True, "tools": tools, "code": DISCOVER_PROBE_CODE,
             "state": "OK", "errors": [],
@@ -463,7 +493,7 @@ def test(cfg: Any, name: str, *, probe: bool = True,
     try:
         _validate(rec)
     except McpServerError as exc:
-        errors.append(exc.detail)
+        errors.append(_redact_probe(exc.detail))
     out: Dict[str, Any] = {
         "state": "OK" if not errors else "INVALID",
         "code": "MCP_NOT_CONNECTED",

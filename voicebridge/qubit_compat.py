@@ -374,6 +374,103 @@ def power_action(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 # Readers (shared Qubit modules — same functions CLI/voice call)
 # ---------------------------------------------------------------------------
 
+def _status_pressure(cfg: Any, home: Optional[Path]
+                     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Memory/disk pressure rollups for ``/api/status`` (B4-03). Never raises.
+
+    The reference payload carries advisory ``memory``/``disk`` blocks that
+    ``MemoryPressureBanner`` reads; the overlay route dropped them, leaving the
+    banner permanently empty. Reuse the vendored collectors (same modules the
+    reference route imports), failing to an honest ``pressure: unknown``.
+    """
+    memory: Dict[str, Any] = {"pressure": "unknown"}
+    disk: Dict[str, Any] = {"pressure": "unknown"}
+    try:
+        _vendored_runtime(cfg)
+        from gateway.memory_status import collect_memory_status  # type: ignore
+
+        memory = collect_memory_status(home)
+    except Exception:  # noqa: BLE001
+        memory = {"pressure": "unknown"}
+    try:
+        _vendored_runtime(cfg)
+        from gateway.disk_status import collect_disk_status  # type: ignore
+
+        disk = collect_disk_status(home)
+    except Exception:  # noqa: BLE001
+        disk = {"pressure": "unknown"}
+    if not isinstance(memory, dict):
+        memory = {"pressure": "unknown"}
+    if not isinstance(disk, dict):
+        disk = {"pressure": "unknown"}
+    return memory, disk
+
+
+def _status_auth_gate(cfg: Any) -> Dict[str, Any]:
+    """Dashboard auth-gate readout (reference ``_auth_gate_status`` shape)."""
+    auth_required = bool(str(getattr(cfg, "api_token", "") or ""))
+    auth_providers: List[str] = []
+    auth_flows: List[str] = []
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.dashboard_auth import (  # type: ignore
+            list_providers, list_session_providers)
+
+        auth_providers = [str(getattr(p, "name", p)) for p in list_providers()]
+        if auth_required:
+            auth_flows.append("cookie")
+            if list_session_providers():
+                auth_flows.append("native_pkce")
+    except Exception:  # noqa: BLE001 - module optional/early startup
+        pass
+    return {"auth_required": auth_required, "auth_providers": auth_providers,
+            "auth_flows": auth_flows}
+
+
+def _status_components(gw: Dict[str, Any], platforms: Dict[str, Any],
+                       home: Optional[Path]) -> Dict[str, Any]:
+    """Component health rollup (counts/enums only) matching the reference."""
+    running = bool(gw.get("running"))
+    state = str(gw.get("state") or ("running" if running else "stopped"))
+    components: Dict[str, Any] = {
+        "gateway": {
+            "status": ("ok" if running and state in
+                       ("OK", "running", "RESTARTING") else "degraded"),
+            "state": state or ("running" if running else "stopped")},
+        "dashboard": {"status": "ok"},
+    }
+    storage_ok = False
+    try:
+        storage_ok = home is not None and (Path(home) / "state.db").exists()
+    except Exception:  # noqa: BLE001
+        storage_ok = False
+    components["storage"] = {"status": "ok" if storage_ok else "degraded"}
+    states = []
+    for value in (platforms or {}).values():
+        if not isinstance(value, dict):
+            continue
+        name = str(value.get("state") or value.get("status") or "").lower()
+        if name and name != "disabled":
+            states.append(name)
+    connected = sum(1 for s in states if s in ("connected", "running", "ok"))
+    components["platforms"] = {
+        "status": "ok" if connected == len(states) else "degraded",
+        "configured": len(states), "connected": connected}
+    return components
+
+
+def _status_profile_names(cfg: Any) -> List[str]:
+    """Profile names for the status payload (low-sensitivity product surface)."""
+    try:
+        P = _profiles_module(cfg)
+        infos = P.list_profiles()
+        names = [str(getattr(info, "name", "") or "") for info in infos]
+        names = [n for n in names if n]
+        return names
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import runtime_inventory as RI
@@ -416,20 +513,51 @@ def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         gw = GS.status(cfg)
     except Exception:  # noqa: BLE001 - status must never crash the route
         gw = {}
+    # B4-03: the reference payload also carries advisory pressure, the platform
+    # map, the auth gate, and the component rollup. Port them so the SPA's
+    # MemoryPressureBanner / SessionsPage platforms surfaces stop being dead.
+    home: Optional[Path] = Path(state_dir) if state_dir else None
+    daemon = gw.get("daemon") if isinstance(gw.get("daemon"), dict) else {}
+    platforms = daemon.get("platforms_map") if isinstance(daemon, dict) else {}
+    if not isinstance(platforms, dict):
+        platforms = {}
+    memory, disk = _status_pressure(cfg, home)
+    auth = _status_auth_gate(cfg)
+    try:
+        active_agents = int((daemon or {}).get("active_agents") or 0)
+    except Exception:  # noqa: BLE001
+        active_agents = 0
+    components = _status_components(gw, platforms, home)
+    overall = ("ok" if all(item.get("status") == "ok"
+                           for item in components.values()) else "degraded")
+    install_id: Optional[str] = None
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.install_identity import get_install_id  # type: ignore
+
+        install_id = get_install_id()
+    except Exception:  # noqa: BLE001
+        install_id = None
     return _ok(schema="qubit-runtime-status/1",
                model=model, qubit=core,
-               active_sessions=sessions_count,
-               auth_required=False, auth_providers=[], auth_flows=[],
+               active_sessions=sessions_count, active_agents=active_agents,
+               auth_required=auth["auth_required"],
+               auth_providers=auth["auth_providers"],
+               auth_flows=auth["auth_flows"],
                can_update_qubit=False,
                config_path=state_dir, config_version=1, env_path=state_dir,
                gateway_exit_reason=None, gateway_health_url=None,
-               gateway_pid=gw.get("pid"), gateway_platforms={},
+               gateway_pid=gw.get("pid"), gateway_platforms=platforms,
                gateway_running=bool(gw.get("running")),
                gateway_state=(gw.get("state") if gw.get("running")
                               else (gw.get("active_state") or "unknown")),
                gateway_updated_at=None,
                gateway_service_unit=gw.get("service_unit"),
                gateway_detail=gw.get("detail", ""),
+               gateway_mode="standalone",
+               memory=memory, disk=disk,
+               components=components, overall=overall,
+               profiles=_status_profile_names(cfg), install_id=install_id,
                qubit_home=state_dir, latest_config_version=1,
                release_date="2026-09-11", version="qubit-" + version,
                detail="Qubit single-authority backend; gateway process "
@@ -1256,26 +1384,97 @@ def _resolved_model(cfg: Any) -> Dict[str, Any]:
                 "ctx": ctx,
                 "profile_id": str(eff.get("profile_id") or ""),
                 "kind": str(eff.get("kind") or ""),
-                "locality": str(eff.get("locality") or "")}
+                "locality": str(eff.get("locality") or ""),
+                "base_url": _resolved_base_url(cfg)}
     return {"model": m["name"], "provider": "ollama", "ctx": m["ctx"],
-            "profile_id": m["name"], "kind": "local", "locality": "local"}
+            "profile_id": m["name"], "kind": "local", "locality": "local",
+            "base_url": _resolved_base_url(cfg)}
+
+
+def _resolved_base_url(cfg: Any) -> str:
+    """The effective profile's ``base_url`` (for auto model metadata); ""."""
+    try:
+        from .providers import resolver as R
+
+        eff = R.resolve(cfg)
+        return str(getattr(eff, "base_url", "") or "")
+    except Exception:  # noqa: BLE001 - metadata derivation is best-effort
+        return ""
+
+
+#: Fields mirrored from the vendored ``agent.models_dev.ModelCapabilities``
+#: (the reference ``web_routers/models.py`` serves the same set).
+_CAPABILITY_FIELDS = ("supports_tools", "supports_vision",
+                      "supports_reasoning", "context_window",
+                      "max_output_tokens", "model_family")
+
+
+def _auto_context_length(model: str, base_url: str, provider: str) -> int:
+    """B4-02: the auto-detected context window, independent of the override.
+
+    Cache first (cheap), then the same hard time-bounded vendored probe the
+    ``/chat`` guard uses. Zero when nothing can be resolved — never fabricated.
+    """
+    if not model:
+        return 0
+    try:
+        from agent import model_metadata as _mm  # type: ignore
+
+        cached = _mm.get_cached_context_length(model, base_url)
+        if isinstance(cached, int) and cached > 0:
+            return cached
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from .providers import resolver as R
+
+        value, _src = R._probe_real_context_window(model, base_url, provider)
+        if isinstance(value, int) and value > 0:
+            return value
+    except Exception:  # noqa: BLE001
+        pass
+    return 0
 
 
 def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     r = _resolved_model(cfg)
-    ctx = r["ctx"]
+    ctx = int(r["ctx"] or 0)
+    model = str(r["model"])
+    provider = str(r["provider"])
+    # B4-01/B4-02: derive capabilities and the auto-detected window from the
+    # vendored metadata resolver — the exact source the reference
+    # ``web_routers/models.py`` uses — instead of baking in placeholder values
+    # (which permanently disabled the ``/chat`` reasoning selector). The
+    # hardcoded dict survives only as a last-resort fallback.
+    auto_ctx = 0
+    caps: Optional[Dict[str, Any]] = None
+    try:
+        _vendored_runtime(cfg)
+        auto_ctx = _auto_context_length(model, str(r.get("base_url") or ""),
+                                        provider)
+        try:
+            from agent import models_dev as _md  # type: ignore
+
+            mc = _md.get_model_capabilities(provider=provider, model=model)
+            if mc is not None:
+                caps = {name: getattr(mc, name, None)
+                        for name in _CAPABILITY_FIELDS}
+        except Exception:  # noqa: BLE001 - fall back below
+            caps = None
+    except Exception:  # noqa: BLE001 - never 500 the read
+        auto_ctx = 0
+    if not isinstance(caps, dict):
+        caps = {"supports_tools": True, "supports_vision": False,
+                "supports_reasoning": False, "context_window": ctx,
+                "max_output_tokens": 1024,
+                "model_family": ("qwen3-4b" if r.get("kind") == "local"
+                                 else provider)}
+    effective = ctx or auto_ctx
     # ModelInfoResponse wire shape.
-    return _ok(model=r["model"], provider=r["provider"],
-               auto_context_length=ctx, config_context_length=ctx,
-               effective_context_length=ctx,
-               capabilities={"supports_tools": True, "supports_vision": False,
-                             "supports_reasoning": False,
-                             "context_window": ctx,
-                             "max_output_tokens": 1024,
-                             "model_family": ("qwen3-4b"
-                                              if r["kind"] == "local"
-                                              else r["provider"])})
+    return _ok(model=model, provider=provider,
+               auto_context_length=auto_ctx, config_context_length=ctx,
+               effective_context_length=effective, capabilities=caps)
 
 
 def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
