@@ -35,7 +35,6 @@ AUDIT = REPO / "docs" / "generated" / "audit"
 #: ``--amend``), so this is the ancestor-lower-bound the record must satisfy.
 FREEZE_SHORT = "5ff0b53c"
 PIN = "69948c005791d4d0e51670ca015238c2c7663749"
-BRANCH = "sdd/v0215-1to1"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -365,7 +364,11 @@ def test_freeze_record_is_committed_for_the_worktree_base():
     assert path.name == f"FREEZE_{doc['sha'][:8]}.json", (path.name, doc["sha"])
     assert doc["schema"] == "qubit-v0215-freeze/1", doc
     assert doc["pin"] == PIN, doc
-    assert doc["branch"] == BRANCH, doc
+    # Branch-agnostic: the freeze names whichever branch it was generated on;
+    # the harness tests must pass on any branch, so assert it names *a* real
+    # branch (not "detached"), never equality to one hardcoded branch.
+    assert isinstance(doc["branch"], str) and doc["branch"], doc
+    assert doc["branch"] != "detached", doc
     assert isinstance(doc["dirty_count"], int), doc
     assert doc["dirty_count"] == 0, "the frozen base must be a clean tree"
     # Finding 4: the record carries the commit that will introduce the
@@ -398,7 +401,20 @@ def test_committed_freeze_matches_a_fresh_generation(tmp_path):
     assert fresh["artifact_commit"] == head
     assert fresh["dirty_count"] == 0, fresh
     assert fresh["pin"] == PIN
-    assert fresh["branch"] == BRANCH
+    # The fresh record names the branch actually checked out here (any branch),
+    # not a hardcoded integration branch.
+    here = _git(REPO, "symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+    assert fresh["branch"] == here, fresh
+
+
+def test_freeze_records_the_checked_out_branch(git_repo):
+    """The freeze names the checked-out branch — no coupling to a branch name."""
+    from merge_v0215 import freeze as freeze_mod
+
+    _git(git_repo, "checkout", "-q", "-b", "sdd/not-the-harness-branch")
+    doc = freeze_mod.build_freeze(git_repo)
+    assert doc["branch"] == "sdd/not-the-harness-branch", doc
+    assert doc["sha"] == _git(git_repo, "rev-parse", "HEAD").stdout.strip()
 
 
 def test_freeze_generator_is_reproducible(git_repo):
