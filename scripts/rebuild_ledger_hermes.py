@@ -2078,8 +2078,8 @@ def build_dashboard_rows() -> List[Dict[str, str]]:
 # from ``voicebridge.qubit_plugins.plugin_fleet_audit`` and embedded in the
 # section's ``plugin_fleet`` metadata so no fleet plugin is silently dropped.
 PLUGINS = [
-    ("hermes-achievements", "dashboard_plugin",
-     "hermes dashboard plugin hermes-achievements (API + state)",
+    ("qubit-achievements", "dashboard_plugin",
+     "qubit dashboard plugin qubit-achievements (API + state)",
      "voicebridge/qubit_compat.py:h_plugin_achievements", "IMPLEMENTED",
      "tests/test_qubit_plugins.py::test_achievements_wire_shape_states_and_tier_progression",
      "none", "hermes-dist Achievements tab (/achievements)", "", "",
@@ -2092,7 +2092,7 @@ PLUGINS = [
      "and a confirm-gated /reset-state. Dashboard-only by design: the vendored "
      "plugin ships no CLI/voice surface and Qubit invents none. The plugin JS "
      "bundle is served by the webui overlay path, not this compat backend.",
-     "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py:57"),
+     "qubit_runtime/plugins/qubit-achievements/dashboard/plugin_api.py:57"),
     ("kanban", "dashboard_plugin",
      "hermes dashboard plugin kanban (read API)",
      "voicebridge/qubit_compat.py:h_plugin_kanban_board", "IMPLEMENTED",
@@ -2266,7 +2266,7 @@ def build_ledger() -> Dict[str, object]:
             "qubit_runtime/qubit_cli/web_server*.py",
             "qubit_runtime/qubit_cli/memory_oauth.py",
             "qubit_runtime/qubit_cli/dashboard_auth/routes.py",
-            "qubit_runtime/plugins/hermes-achievements/dashboard/plugin_api.py",
+            "qubit_runtime/plugins/qubit-achievements/dashboard/plugin_api.py",
             "qubit_runtime/plugins/kanban/dashboard/plugin_api.py",
             "qubit_runtime/web/src/App.tsx",
         ],

@@ -4298,13 +4298,14 @@ def _guard_existing_gateway_process_conflict(replace: bool = False) -> None:
         # get_running_pid() filters by the current profile's QUBIT_HOME; warn if the PID file
         # belongs to another profile (user switched profiles while the old gateway still runs).
         try:
-            from gateway.status import _read_pid_record, _pid_record_belongs_to_current_profile
+            from gateway.status import (
+                _read_pid_record, _pid_record_belongs_to_current_profile, record_home)
             stale = _read_pid_record()
             if stale is not None and not _pid_record_belongs_to_current_profile(stale):
                 logger.warning(
                     "PID file belongs to another profile (qubit_home=%s). "
                     "The old gateway may still be running under that profile.",
-                    stale.get("hermes_home", "<unknown>"),
+                    record_home(stale) or "<unknown>",
                 )
         except Exception:
             pass

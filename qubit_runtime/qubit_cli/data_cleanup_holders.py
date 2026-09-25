@@ -16,14 +16,16 @@ _OWNER_STOP_HINTS = {
 
 def _drain_manual_gateway(home: Path) -> None:
     from gateway.control_socket import identify_gateway, pause_gateway_for_update
-    from gateway.status import get_process_start_time, get_running_pid_identity_strict, _pid_exists
+    from gateway.status import (
+        get_process_start_time, get_running_pid_identity_strict, _pid_exists, record_home)
 
     identity = identify_gateway(home)
     if identity is None:
         if get_running_pid_identity_strict(home / "gateway.pid") is not None:
             raise RuntimeError(f"gateway has no usable control socket for {home}; stop it through its owner and retry")
         return
-    if not identity.get("hermes_home") or Path(identity["hermes_home"]).resolve() != home:
+    identity_home = record_home(identity)
+    if not identity_home or Path(identity_home).resolve() != home:
         raise RuntimeError(f"gateway control identity does not match {home}")
     owner = identity.get("supervisor")
     if owner != "manual":

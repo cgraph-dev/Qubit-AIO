@@ -91,11 +91,12 @@ def record_serves_profile(record: Any, home: Optional[Union[Path, str]] = None) 
     if not isinstance(record, dict):
         return False
     from gateway.status import (
-        _get_process_qubit_home, _profile_label_for_home, _same_qubit_home)
+        _get_process_qubit_home, _profile_label_for_home, _same_qubit_home,
+        record_home as _record_home)
 
     try:
         target = Path(home) if home is not None else get_qubit_home()
-        record_home = record.get("hermes_home")
+        record_home = _record_home(record)
         if not isinstance(record_home, str) or not record_home.strip():
             record_home = _get_process_qubit_home()
         if _same_qubit_home(record_home, target):

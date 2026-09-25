@@ -42,10 +42,10 @@ def profile_env(tmp_path, monkeypatch):
 def _record(pid=424242, start=111222333, home=None, argv=None):
     return {
         "pid": pid,
-        "kind": "hermes-gateway",
+        "kind": "qubit-gateway",
         "argv": argv or ["python", "-m", "qubit_cli.main", "gateway", "run"],
         "start_time": start,
-        "hermes_home": home,
+        "qubit_home": home,
     }
 
 
@@ -124,7 +124,7 @@ class TestRecordAuthority:
         from gateway.run import _replace_target_belongs_to_other_profile
 
         legacy = _record(home=None)
-        legacy.pop("hermes_home")
+        legacy.pop("qubit_home")
 
         with (
             patch(
@@ -381,7 +381,14 @@ class TestSignalBoundary:
 def asyncio_run(coro):
     import asyncio
 
-    return asyncio.new_event_loop().run_until_complete(_swallow(coro))
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_swallow(coro))
+    finally:
+        # Close the loop (and any gateway control-socket resources it owns) so a
+        # leaked AF_UNIX socket cannot surface as an unraisable resource warning
+        # in a later test when this module runs after another test file.
+        loop.close()
 
 
 async def _swallow(coro):

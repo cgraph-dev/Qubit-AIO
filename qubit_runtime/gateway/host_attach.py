@@ -140,7 +140,12 @@ def _identity_matches(identity, record, home: Path) -> bool:
     """
     if not isinstance(identity, dict) or identity.get("pid") != record.pid:
         return False
-    reported = identity.get("hermes_home")
+    try:
+        from gateway.status import record_home
+
+        reported = record_home(identity)
+    except Exception:
+        reported = None
     if not reported:
         return True  # older gateway: PID + a socket keyed by this home is all it can prove
     try:
