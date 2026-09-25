@@ -52,6 +52,15 @@ def test_missing_modules_are_mapped():
     assert mt.get("hermes_yaml") == "qubit_yaml"
 
 
+def test_private_underscore_module_basename_is_renamed():
+    """``_hermes_home.py`` must rename: the module-basename regex only matches
+    ``^hermes_``, so a leading-underscore private helper needs the curated map.
+    Otherwise the content pass rewrites its import to ``_qubit_home`` while the
+    file stays ``_hermes_home.py`` (``No module named '_qubit_home'``)."""
+    curated = _engine().CURATED_BASENAME_RENAMES
+    assert curated.get("_hermes_home.py") == "_qubit_home.py"
+
+
 # ---------------------------------------------------------------------------
 # Step A -- home/const identifier map
 # ---------------------------------------------------------------------------

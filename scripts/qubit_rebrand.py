@@ -203,6 +203,12 @@ CURATED_BASENAME_RENAMES = {
     "hermes-web": "qubit-web",
     "hermes-dist": "qubit-dist",
     "HermesConsoleModal.tsx": "QubitConsoleModal.tsx",
+    # private home-helper module imported by standalone skill scripts.  The
+    # content pass rewrites ``from _hermes_home import`` -> ``from _qubit_home
+    # import`` (the leading-underscore private prefix), but the module-basename
+    # regex only matches ``^hermes_``; without this entry the import dangles
+    # (``No module named '_qubit_home'``).
+    "_hermes_home.py": "_qubit_home.py",
     # generators / packaging / tui
     "rebuild_ledger_hermes.py": "rebuild_ledger_qubit.py",
     "test_ledger_hermes_build.py": "test_ledger_qubit_build.py",
