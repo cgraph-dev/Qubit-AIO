@@ -32,6 +32,7 @@ import faulthandler
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -98,10 +99,15 @@ _handle: Optional["StartupWatchdogHandle"] = None
 
 
 def _process_qubit_home() -> Path:
-    """Use the stdlib-only process resolver before application startup."""
-    from qubit_constants import get_process_qubit_home
-
-    return get_process_qubit_home()
+    """QUBIT_HOME for diagnostic files — stdlib-only replica of the qubit_constants default."""
+    val = os.environ.get("QUBIT_HOME", "").strip()
+    if val:
+        return Path(val)
+    if sys.platform == "win32":
+        local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
+        base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
+        return base / "qubit"
+    return Path.home() / ".qubit"
 
 
 def get_startup_watchdog_dump_path(home: Optional[Path] = None) -> Path:

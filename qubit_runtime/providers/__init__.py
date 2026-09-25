@@ -481,14 +481,23 @@ def _discover_entry_point_providers() -> None:
     if not enabled:
         return
 
-    group = "hermes_agent.plugins"
+    groups = ("qubit_agent.plugins", "hermes_agent.plugins")
     try:
         eps = _md.entry_points()
+        group_eps = []
+        seen = set()
         # Python 3.10+ exposes .select(); older returns a dict-like mapping.
-        if hasattr(eps, "select"):
-            group_eps = list(eps.select(group=group))
-        else:  # pragma: no cover — legacy interpreters
-            group_eps = list(eps.get(group, []))  # type: ignore[attr-defined]
+        for group in groups:
+            if hasattr(eps, "select"):
+                selected = list(eps.select(group=group))
+            else:  # pragma: no cover — legacy interpreters
+                selected = list(eps.get(group, []))  # type: ignore[attr-defined]
+            for ep in selected:
+                key = (getattr(ep, "name", ""), getattr(ep, "value", ""))
+                if key in seen:
+                    continue
+                seen.add(key)
+                group_eps.append(ep)
     except Exception as exc:
         logger.debug("entry-point provider scan skipped: %s", exc)
         return

@@ -24,8 +24,15 @@ from qubit_cli.relay_plugin_cutover import LEGACY_RELAY_PLUGIN_KEYS, RELAY_PLUGI
 
 logger = logging.getLogger("qubit_cli.plugins")
 
+#: Qubit-owned entry-point group. ``hermes_agent.plugins`` is kept as a
+#: read-old fallback for upstream distributions that still advertise it.
+QUBIT_ENTRY_POINTS_GROUP = "qubit_agent.plugins"
 ENTRY_POINTS_GROUP = "hermes_agent.plugins"
+ENTRY_POINTS_GROUPS = (QUBIT_ENTRY_POINTS_GROUP, ENTRY_POINTS_GROUP)
+QUBIT_ENTRY_POINT_CAPABILITIES_GROUP = "qubit_agent.plugin_capabilities"
 ENTRY_POINT_CAPABILITIES_GROUP = "hermes_agent.plugin_capabilities"
+ENTRY_POINT_CAPABILITIES_GROUPS = (
+    QUBIT_ENTRY_POINT_CAPABILITIES_GROUP, ENTRY_POINT_CAPABILITIES_GROUP)
 
 # Per-harness manifest directories plugin repos ship for OTHER agent harnesses (e.g. obra/superpowers keeps one
 # plugin.json per harness). Their plugin.json is not an Agent Plugins v1 manifest and can never validate, so
@@ -44,6 +51,20 @@ def _select_entry_point_group(entry_points: Any, group: str) -> list:
     return [ep for ep in entry_points if ep.group == group]
 
 
+def _select_entry_point_groups(entry_points: Any, groups: tuple) -> list:
+    """Union of the Qubit-owned and legacy upstream entry-point groups, deduped."""
+    seen = set()
+    out = []
+    for group in groups:
+        for ep in _select_entry_point_group(entry_points, group):
+            key = (getattr(ep, "name", ""), getattr(ep, "value", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(ep)
+    return out
+
+
 def discover_entrypoint_manifests() -> List["PluginManifest"]:
     """Return metadata-only manifests for installed entry-point plugins. Kind comes from an import-free source
     scan (memory/model providers route to their own discovery). Capabilities come from the companion
@@ -52,8 +73,9 @@ def discover_entrypoint_manifests() -> List["PluginManifest"]:
     manifests: List[PluginManifest] = []
     try:
         eps = importlib.metadata.entry_points()
-        group_eps = _select_entry_point_group(eps, ENTRY_POINTS_GROUP)
-        capability_eps = _select_entry_point_group(eps, ENTRY_POINT_CAPABILITIES_GROUP)
+        group_eps = _select_entry_point_groups(eps, ENTRY_POINTS_GROUPS)
+        capability_eps = _select_entry_point_groups(
+            eps, ENTRY_POINT_CAPABILITIES_GROUPS)
     except Exception as exc:
         logger.debug("Entry-point scan failed: %s", exc)
         return manifests
@@ -185,11 +207,15 @@ def collect_directory_manifests() -> List[PluginManifest]:
     logger.debug("Scanning user plugins: %s", user_dir)
     _scan("user", user_dir, "user")
     if _origin._env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
-        project_dir = Path.cwd() / ".hermes" / "plugins"
+        # Qubit-owned ``./.qubit/plugins/`` wins; ``./.hermes/plugins/`` is the
+        # read-old fallback for repos laid out before the rebrand.
+        project_dir = Path.cwd() / ".qubit" / "plugins"
+        if not project_dir.is_dir():
+            project_dir = Path.cwd() / ".hermes" / "plugins"
         logger.debug("Scanning project plugins: %s", project_dir)
         _scan("project", project_dir, "project")
     else:
-        logger.debug("Project plugins disabled (set HERMES_ENABLE_PROJECT_PLUGINS=1 to enable)")
+        logger.debug("Project plugins disabled (set QUBIT_ENABLE_PROJECT_PLUGINS=1 to enable)")
     return manifests
 
 

@@ -186,9 +186,13 @@ def _parse_frontmatter(content: str) -> dict:
 
 
 def _qubit_tags(fm: dict) -> Any:
-    """``metadata.hermes.tags`` from parsed frontmatter, or ``[]`` (unvalidated type)."""
+    """``metadata.qubit.tags`` (read-old ``metadata.hermes.tags``) from parsed frontmatter,
+    or ``[]`` (unvalidated type)."""
     metadata = fm.get("metadata", {})
-    qubit_meta = metadata.get("hermes", {}) if isinstance(metadata, dict) else None
+    qubit_meta = (
+        (metadata.get("qubit") or metadata.get("hermes") or {})
+        if isinstance(metadata, dict) else None
+    )
     return qubit_meta.get("tags", []) if isinstance(qubit_meta, dict) else []
 
 

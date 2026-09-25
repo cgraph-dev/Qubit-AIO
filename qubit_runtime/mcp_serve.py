@@ -42,7 +42,7 @@ def _qubit_home() -> Path:
         from qubit_constants import get_qubit_home
         return get_qubit_home()
     except ImportError:
-        return Path(os.environ.get("QUBIT_HOME", Path.home() / ".hermes"))
+        return Path(os.environ.get("QUBIT_HOME", Path.home() / ".qubit"))
 
 
 def _get_sessions_dir() -> Path:

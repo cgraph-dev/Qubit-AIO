@@ -93,6 +93,18 @@ def _requires_qubit_spec_valid(spec: str) -> bool:
     return True
 
 
+def _manifest_requires_spec(manifest: dict) -> str:
+    """The declared Qubit-version spec.
+
+    Accepts the Qubit-owned spelling first (``requires_qubit`` / ``qubit``),
+    then the read-old upstream spelling (``requires_hermes`` / ``hermes``).
+    """
+    return str(
+        manifest.get("requires_qubit") or manifest.get("qubit")
+        or manifest.get("requires_hermes") or manifest.get("hermes") or ""
+    ).strip()
+
+
 def _check_manifest_fields(report: ValidationReport, manifest: dict) -> None:
     missing = [
         f for f in ("name", "version", "description") if not manifest.get(f)
@@ -107,8 +119,8 @@ def _check_manifest_fields(report: ValidationReport, manifest: dict) -> None:
         report.add("manifest fields", True, "name, version, description present")
 
 
-def _check_requires_hermes(report: ValidationReport, manifest: dict) -> None:
-    spec = str(manifest.get("requires_hermes") or "").strip()
+def _check_requires_qubit(report: ValidationReport, manifest: dict) -> None:
+    spec = _manifest_requires_spec(manifest)
     if not spec:
         report.add("requires_hermes", True, "not declared")
         return
@@ -507,7 +519,7 @@ def validate_plugin_dir(plugin_dir: Path) -> ValidationReport:
     report.add("manifest", True, "plugin.yaml parses")
 
     _check_manifest_fields(report, manifest)
-    _check_requires_hermes(report, manifest)
+    _check_requires_qubit(report, manifest)
     _check_config_spec(report, manifest)
     _check_requires_env(report, manifest)
     _check_loadable(report, plugin_dir)

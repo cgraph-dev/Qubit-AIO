@@ -589,7 +589,8 @@ def _gateway_command_subcommand(command: str | None) -> str | None:
         return "run"
     joined = " ".join(tokens)
     if "qubit_cli.main" not in joined and "qubit_cli/main.py" not in joined and not any(
-        b in ("hermes", "hermes.exe") for b in basenames
+        b in ("qubit", "qubit.exe", "qubit-dev", "qubit-dev.exe", "voicebridge",
+              "hermes", "hermes.exe") for b in basenames
     ):
         return None
     # Drop --profile X / -p X / --profile=X / -p=X (consumes a VALUE of "gateway" too).

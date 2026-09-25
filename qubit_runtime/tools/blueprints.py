@@ -59,7 +59,8 @@ def _split_frontmatter(text: str) -> Optional[Dict[str, Any]]:
 def parse_blueprint(skill_md_text: str) -> Optional[BlueprintSpec]:
     """Extract a BlueprintSpec from a SKILL.md string, or None if not a blueprint.
 
-    A skill is a blueprint iff ``metadata.hermes.blueprint`` is a mapping with a
+    A skill is a blueprint iff ``metadata.qubit.blueprint`` (read-old
+    ``metadata.hermes.blueprint``) is a mapping with a
     non-empty ``schedule``. Raises BlueprintError if the block exists but is
     structurally invalid (so a typo surfaces instead of silently no-op'ing).
     """
@@ -68,12 +69,12 @@ def parse_blueprint(skill_md_text: str) -> Optional[BlueprintSpec]:
         return None
 
     meta = fm.get("metadata")
-    qubit = meta.get("hermes") if isinstance(meta, dict) else None
-    blueprint = hermes.get("blueprint") if isinstance(qubit, dict) else None
+    qubit = ((meta.get("qubit") or meta.get("hermes")) if isinstance(meta, dict) else None)
+    blueprint = qubit.get("blueprint") if isinstance(qubit, dict) else None
     if blueprint is None:
         return None
     if not isinstance(blueprint, dict):
-        raise BlueprintError("metadata.hermes.blueprint must be a mapping")
+        raise BlueprintError("metadata.qubit.blueprint must be a mapping")
 
     schedule = str(blueprint.get("schedule", "")).strip()
     if not schedule:
@@ -159,7 +160,7 @@ def register_blueprint_suggestion(spec: BlueprintSpec) -> Optional[Dict[str, Any
 
 def export_blueprint(job: Dict[str, Any], body: str, *, blueprint_name: Optional[str] = None) -> str:
     """Inverse of ``create_blueprint_job``: render a cron job as a SKILL.md (with a
-    ``metadata.hermes.blueprint`` block) ready for ``qubit skills publish``.
+    ``metadata.qubit.blueprint`` block) ready for ``qubit skills publish``.
     ``body`` becomes the SKILL.md body; its first line is the description."""
     import qubit_yaml as yaml
 
@@ -180,7 +181,7 @@ def export_blueprint(job: Dict[str, Any], body: str, *, blueprint_name: Optional
     frontmatter = {
         "name": name, "description": body.splitlines()[0][:200] if body else "Shared automation blueprint.",
         "version": "1.0.0", "license": "MIT",
-        "metadata": {"hermes": {"tags": ["blueprint", "automation"], "blueprint": block}},
+        "metadata": {"qubit": {"tags": ["blueprint", "automation"], "blueprint": block}},
     }
     fm_yaml = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True).strip()
     body_text = body or f"# {name}\n\nShared automation blueprint."

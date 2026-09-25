@@ -99,7 +99,7 @@ class DistributionManifest:
     name: str
     version: str = "0.1.0"
     description: str = ""
-    hermes_requires: str = ""
+    qubit_requires: str = ""
     author: str = ""
     license: str = ""
     env_requires: List[EnvRequirement] = field(default_factory=list)
@@ -124,7 +124,8 @@ class DistributionManifest:
             raise DistributionError("distribution_owned must be a list")
         return cls(
             name=name, version=_str(data, "version", "0.1.0"), description=_str(data, "description"),
-            hermes_requires=_str(data, "hermes_requires"), author=_str(data, "author"),
+            qubit_requires=_str(data, "qubit_requires") or _str(data, "hermes_requires"),
+            author=_str(data, "author"),
             license=_str(data, "license"), env_requires=[EnvRequirement.from_dict(e) for e in env_raw],
             distribution_owned=[str(p).strip().strip("/") for p in dist_owned_raw if str(p).strip()],
             source=_str(data, "source"), installed_at=_str(data, "installed_at"),
@@ -134,7 +135,7 @@ class DistributionManifest:
         out: Dict[str, Any] = {"name": self.name, "version": self.version}
         # Key order is the on-disk YAML order (write_manifest uses sort_keys=False).
         optional = (
-            ("description", self.description), ("hermes_requires", self.hermes_requires),
+            ("description", self.description), ("qubit_requires", self.qubit_requires),
             ("author", self.author), ("license", self.license),
             ("env_requires", [e.to_dict() for e in self.env_requires]),
             ("distribution_owned", self.distribution_owned), ("source", self.source),
@@ -316,7 +317,7 @@ def plan_install(source: str, workdir: Path, override_name: Optional[str] = None
         raise DistributionError(
             f"No {MANIFEST_FILENAME} found at the distribution root — this source is not a Qubit distribution."
         )
-    check_qubit_requires(manifest.hermes_requires, get_version_info().base_version)  # fail fast
+    check_qubit_requires(manifest.qubit_requires, get_version_info().base_version)  # fail fast
     canon = _canon_valid(override_name or manifest.name)
     if canon == "default":
         raise DistributionError(
