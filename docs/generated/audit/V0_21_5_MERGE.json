@@ -1,0 +1,282 @@
+{
+ "schema": "qubit-v0215-task6-merge/1",
+ "base_root": "/tmp/qubit-task6-base/qubit_runtime",
+ "ours_root": "/tmp/qubit-v0215-candidate/qubit_runtime",
+ "theirs_root": "/tmp/qubit-sdd/qubit_runtime",
+ "merge_rule": "TAKE_OURS->ours; REAPPLY_THEIRS->merge_file; CONFLICT->keep theirs; add candidate-only",
+ "totals": {
+  "changed": 17,
+  "written": 10,
+  "deleted": 0,
+  "conflicts": 6,
+  "by_resolution": {
+   "AUTO_OURS": 9,
+   "ADDED": 1,
+   "MERGE_FILE": 1,
+   "KEEP_THEIRS_CONFLICT": 6,
+   "KEEP_THEIRS": 0,
+   "DELETED": 0,
+   "SKIP_IDENTICAL": 0
+  },
+  "by_class": {
+   "CONFLICT": 6,
+   "REAPPLY_THEIRS": 1,
+   "TAKE_OURS": 10
+  },
+  "by_bucket": {
+   "qubit_state*": 17
+  },
+  "by_bucket_resolution": {
+   "qubit_state*": {
+    "ADDED": 1,
+    "AUTO_OURS": 9,
+    "KEEP_THEIRS_CONFLICT": 6,
+    "MERGE_FILE": 1
+   }
+  }
+ },
+ "conflicts": [
+  {
+   "path": "qubit_state.py",
+   "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "qubit_state_common.py",
+   "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "qubit_state_fts.py",
+   "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "qubit_state_holders.py",
+   "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "qubit_state_schema.py",
+   "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "qubit_state_sessions.py",
+   "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  }
+ ],
+ "files": [
+  {
+   "path": "qubit_state.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "4cb02c85b345573ca73d02d2da30f5824234fa1299c3a83c89ad4ed713ab6568",
+   "ours_sha256": "635a16c26d2a90af559a66c29e4cb37b99b9d6daaae81bda30e4bdc1930df4ff",
+   "theirs_sha256": "d297152ab9746f39839671cee04f21475fab46de082341763736448e99b55e7b",
+   "result_sha256": "d297152ab9746f39839671cee04f21475fab46de082341763736448e99b55e7b"
+  },
+  {
+   "path": "qubit_state_common.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "c932848df79fc3eaf33f69cb5e8e3719846219c47142569d4073a9086569ae5d",
+   "ours_sha256": "baf18c882140f6c8b0b80fa560b73c49286e277ba9e0abf3e909b63a5e1c21de",
+   "theirs_sha256": "c517a8c2f639effd98284a67205323a0eb20303abb5846654b7b0014d7090f37",
+   "result_sha256": "c517a8c2f639effd98284a67205323a0eb20303abb5846654b7b0014d7090f37"
+  },
+  {
+   "path": "qubit_state_compression.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "f01bd72f9fdc5e74a8c850a78266a21e7eee736a7d05e6d6e7b6a0b4dc407dcc",
+   "ours_sha256": "adf72e79f9dd7acfc5df00724fed51b478c9a6f2a7fa589a417d5e28093f46f7",
+   "theirs_sha256": "adf72e79f9dd7acfc5df00724fed51b478c9a6f2a7fa589a417d5e28093f46f7",
+   "result_sha256": "adf72e79f9dd7acfc5df00724fed51b478c9a6f2a7fa589a417d5e28093f46f7"
+  },
+  {
+   "path": "qubit_state_errors.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "7b71e09a163214943a32700914f40bdb67e418e0bfcb9f7a3936279d04d3d99c",
+   "ours_sha256": "0f8223914d49957b45284b3626865f9f61f1fa9e9acf72b5bcb9367ecb2d43db",
+   "theirs_sha256": "0f8223914d49957b45284b3626865f9f61f1fa9e9acf72b5bcb9367ecb2d43db",
+   "result_sha256": "0f8223914d49957b45284b3626865f9f61f1fa9e9acf72b5bcb9367ecb2d43db"
+  },
+  {
+   "path": "qubit_state_fts.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "491e15d41c283fd40ddc44372aadae4083fbde88620f3b25c08d044268f9df41",
+   "ours_sha256": "e02af524986ebc0533e165eb2be691a29074f7faf898fff9ce5a2ec0438334ff",
+   "theirs_sha256": "f34a55d2a35954f1564079858410227a8a62ce866076eb66627a515a4f8012ef",
+   "result_sha256": "f34a55d2a35954f1564079858410227a8a62ce866076eb66627a515a4f8012ef"
+  },
+  {
+   "path": "qubit_state_gateway.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "a82260ce70fcc23b98fcd27c9926024c2c542480161d749c6aab8218260f102a",
+   "ours_sha256": "51a707fcb03308c7ea308d1c4f289b301c928c7561796e137dd2ff4dd18bde5c",
+   "theirs_sha256": "51a707fcb03308c7ea308d1c4f289b301c928c7561796e137dd2ff4dd18bde5c",
+   "result_sha256": "51a707fcb03308c7ea308d1c4f289b301c928c7561796e137dd2ff4dd18bde5c"
+  },
+  {
+   "path": "qubit_state_health.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": null,
+   "ours_sha256": "4fc7f227e700413b8cbb7d50167638716212c430744f435634c56b140cb4ca1e",
+   "theirs_sha256": "4fc7f227e700413b8cbb7d50167638716212c430744f435634c56b140cb4ca1e",
+   "result_sha256": "4fc7f227e700413b8cbb7d50167638716212c430744f435634c56b140cb4ca1e"
+  },
+  {
+   "path": "qubit_state_holders.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "fd7efdd54d3e4860b2490ffe8df971a21806c4bf818b428dbff66709e49463a5",
+   "ours_sha256": "904383955df5e29af81544a94442d40a83edeefbb11a49dadcca6fd5c2c07c15",
+   "theirs_sha256": "c1905c9fd17eb945a1c707a66b3b5a1592babda8039b255dfabcacdb7867a2c7",
+   "result_sha256": "c1905c9fd17eb945a1c707a66b3b5a1592babda8039b255dfabcacdb7867a2c7"
+  },
+  {
+   "path": "qubit_state_lockguard.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "7b9b8650c90a9eb89b168fe975b30246ba6b6ba0f4e3fb55aaa4d1637a962554",
+   "ours_sha256": "b1260bad45712c4db5f35b1bb5ea36446ffbfc8da6531a3cef94308c25010a7b",
+   "theirs_sha256": "b1260bad45712c4db5f35b1bb5ea36446ffbfc8da6531a3cef94308c25010a7b",
+   "result_sha256": "b1260bad45712c4db5f35b1bb5ea36446ffbfc8da6531a3cef94308c25010a7b"
+  },
+  {
+   "path": "qubit_state_messages.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "86212a47eca2d1d57e3e18f113094b1d7ee1602ea7c0a036886d7bc07b70293e",
+   "ours_sha256": "4e9284900fe3aa195eb44556bc39644f86505dba70bfd365e14a832732519ee5",
+   "theirs_sha256": "4e9284900fe3aa195eb44556bc39644f86505dba70bfd365e14a832732519ee5",
+   "result_sha256": "4e9284900fe3aa195eb44556bc39644f86505dba70bfd365e14a832732519ee5"
+  },
+  {
+   "path": "qubit_state_portability.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "33296f0273ff1cb7daa7e16a3830bcacd51c7e622a1fb918b4b6da864b86c73f",
+   "ours_sha256": "faaa0c776676ce78afd2ff6d6c511ae5bc19988ea64e904ce23d3cdb7577b879",
+   "theirs_sha256": "faaa0c776676ce78afd2ff6d6c511ae5bc19988ea64e904ce23d3cdb7577b879",
+   "result_sha256": "faaa0c776676ce78afd2ff6d6c511ae5bc19988ea64e904ce23d3cdb7577b879"
+  },
+  {
+   "path": "qubit_state_profile_repair.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "8cf1292d64ff4d86d82f42670b7004e144f8a1b6a7c15fd234f985450072d8fc",
+   "ours_sha256": "49ccc602c19f28f052e2ec9aaee345271b5d865ed74b943cf6175749ee42c25e",
+   "theirs_sha256": "49ccc602c19f28f052e2ec9aaee345271b5d865ed74b943cf6175749ee42c25e",
+   "result_sha256": "49ccc602c19f28f052e2ec9aaee345271b5d865ed74b943cf6175749ee42c25e"
+  },
+  {
+   "path": "qubit_state_repair.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "a8c0710b9c62987dc752459819d346caf153d3743ef15d1a916230b4e04e1aea",
+   "ours_sha256": "a8c0710b9c62987dc752459819d346caf153d3743ef15d1a916230b4e04e1aea",
+   "theirs_sha256": "170338d934ed104abb49d653b9248c089c4618d9eb812c3d3ad0351336de139c",
+   "result_sha256": "170338d934ed104abb49d653b9248c089c4618d9eb812c3d3ad0351336de139c"
+  },
+  {
+   "path": "qubit_state_schema.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "3900076ff792fe8a8897d26f5f284a3a517dc1908640c357b907ef15179ed342",
+   "ours_sha256": "3b008cb35f41984d202e273a147819eef80ffb14d200ab57f903be91224e8b05",
+   "theirs_sha256": "a302a8a229857638d3e874da55c11a948be991208d40ea41291040c088791efe",
+   "result_sha256": "a302a8a229857638d3e874da55c11a948be991208d40ea41291040c088791efe"
+  },
+  {
+   "path": "qubit_state_sessions.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "qubit_state*",
+   "base_sha256": "1c83557e5262b284bc9ef3b4967f5d4ba74a7e36eb52d147e92c1e08d7077e72",
+   "ours_sha256": "5c3a9f4aef23eb2992f60a166ed10fb08cb55936191c8f03a11fbb1700c5b771",
+   "theirs_sha256": "ed8e6ed4dce717faf3a0010c074c3eda621447383d8ff06d7349ce3e0903ab0c",
+   "result_sha256": "ed8e6ed4dce717faf3a0010c074c3eda621447383d8ff06d7349ce3e0903ab0c"
+  },
+  {
+   "path": "qubit_state_timeline.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "275e5836095f2f7c8ce590b6cf849f245310fe7cd3ab8bad95325c546effc82d",
+   "ours_sha256": "493b925c221e8fbebff8b5c3630e63d4f13f5fd6634c8611ef3e6d2c4f632a42",
+   "theirs_sha256": "493b925c221e8fbebff8b5c3630e63d4f13f5fd6634c8611ef3e6d2c4f632a42",
+   "result_sha256": "493b925c221e8fbebff8b5c3630e63d4f13f5fd6634c8611ef3e6d2c4f632a42"
+  },
+  {
+   "path": "qubit_state_wal.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "qubit_state*",
+   "base_sha256": "2d09fc8814906fcd64471869de259791b72c57612684a5272829904308722cca",
+   "ours_sha256": "a5be6a4bc7bd0ac8aa719e90f18c8474741bd33fb1857ab79df5dc4ac84cda04",
+   "theirs_sha256": "a5be6a4bc7bd0ac8aa719e90f18c8474741bd33fb1857ab79df5dc4ac84cda04",
+   "result_sha256": "a5be6a4bc7bd0ac8aa719e90f18c8474741bd33fb1857ab79df5dc4ac84cda04"
+  }
+ ]
+}
