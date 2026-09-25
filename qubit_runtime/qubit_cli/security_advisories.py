@@ -195,7 +195,7 @@ def full_remediation_text(hit: AdvisoryHit) -> list[str]:
 
 
 # ─── Startup-banner gating ────────────────────────────────────────────────────
-# Once the banner is seen we cache that in ``~/.hermes/cache/advisory_banner_seen`` (one
+# Once the banner is seen we cache that in ``$QUBIT_HOME/cache/advisory_banner_seen`` (one
 # ``<id> <timestamp>`` line per advisory). Acked advisories never re-banner; cached-but-not-acked
 # ones re-banner after 24h so the user doesn't fully forget.
 

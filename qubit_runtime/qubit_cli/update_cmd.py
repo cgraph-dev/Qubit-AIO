@@ -277,7 +277,7 @@ def _validate_python_files_syntax(
     import tempfile
 
     root = Path(root)
-    with tempfile.TemporaryDirectory(prefix="hermes-syntax-check-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="qubit-syntax-check-") as tmpdir:
         for relpath in relpaths:
             path = root / relpath
             if not path.exists():
@@ -490,7 +490,7 @@ def _filter_non_gateway_concurrent_instances(
 
 
 def _log_only_write(text: str) -> None:
-    """Write ``text`` to ``~/.hermes/logs/update.log`` only, never the terminal.
+    """Write ``text`` to ``$QUBIT_HOME/logs/update.log`` only, never the terminal.
 
     During ``qubit update`` ``sys.stdout`` is an ``_UpdateOutputStream`` that
     mirrors to both the terminal and ``update.log``. Loud, low-signal
