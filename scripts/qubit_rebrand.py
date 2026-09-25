@@ -112,6 +112,37 @@ ENV_TOKENS = {
     "HERMES_HOME": "QUBIT_HOME",
 }
 
+# Curated basename renames from the frozen rebrand manifest
+# (``docs/archive/2026-09-21/QUBIT_REBRAND_MANIFEST.json``, ``path_renames``).
+# The module-token pass above only expresses ``^hermes_<module>``; these are the
+# camel / hyphen / product basenames it cannot encode. Matched on exact
+# basename, for both files and directories. Preserved wire/service ids
+# (``hermes-kanban-*``, ``@hermes/ink`` package aliases, ...) are deliberately
+# absent — they are never renamed.
+CURATED_BASENAME_RENAMES = {
+    # desktop product assets
+    "hermes.desktop": "qubit.desktop",
+    "hermes.png": "qubit.png",
+    "Hermes.app": "Qubit.app",
+    "Hermes.exe": "Qubit.exe",
+    # differential fixtures
+    "vendor_hermes_constants.json": "vendor_qubit_constants.json",
+    "vendor_hermes_state_common.json": "vendor_qubit_state_common.json",
+    # frontend packages / dirs
+    "hermes-qubit": "qubit-app",
+    "hermes-shared": "qubit-shared",
+    "hermes-web": "qubit-web",
+    "hermes-dist": "qubit-dist",
+    "HermesConsoleModal.tsx": "QubitConsoleModal.tsx",
+    # generators / packaging / tui
+    "rebuild_ledger_hermes.py": "rebuild_ledger_qubit.py",
+    "test_ledger_hermes_build.py": "test_ledger_qubit_build.py",
+    "hermes-exec-shim.sh": "qubit-exec-shim.sh",
+    "hermes-agent.nix": "qubit-runtime.nix",
+    "hermes-ink.d.ts": "qubit-ink.d.ts",
+    "hermes-ink": "qubit-ink",
+}
+
 # Filesystem basenames (module files/dirs) to rename, derived from MODULE_TOKENS.
 # Only Python modules/packages and the launcher are renamed here; data assets,
 # contributor records, and provenance trees are left untouched.
@@ -249,6 +280,13 @@ def _path_renames():
         for dirpath, dirs, files in os.walk(base, topdown=False):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
             for name in dirs + files:
+                curated = CURATED_BASENAME_RENAMES.get(name)
+                if curated is not None and curated != name:
+                    old = Path(dirpath) / name
+                    new = Path(dirpath) / curated
+                    renames.append((old.relative_to(REPO).as_posix(),
+                                    new.relative_to(REPO).as_posix()))
+                    continue
                 m = token_re.match(name)
                 if not m:
                     continue
