@@ -39,9 +39,11 @@ def _git(repo: Path, *args: str) -> str:
 def dirty_count(repo: Path, ignore: Optional[Path] = None) -> int:
     """Modified tracked files + untracked files in *repo* (excluding ignored).
 
-    *ignore*, when given, is a path (typically the freeze output) that is not
-    counted.  The freeze writer writes its own artifact into the worktree, so
-    without this the record would never describe a clean tree.
+    *ignore*, when given, is a path or directory (typically the freeze output
+    or the whole audit directory) that is not counted.  The freeze writer
+    writes its artifact into the worktree, so without this the record would
+    never describe a clean tree; excluding the audit directory keeps the
+    record stable across a delete-and-regenerate cycle.
     """
     out = _git(repo, "status", "--porcelain", "--untracked-files=all")
     skip = None
@@ -56,7 +58,7 @@ def dirty_count(repo: Path, ignore: Optional[Path] = None) -> int:
             continue
         if skip is not None:
             rel = line[3:].strip()
-            if rel == skip or rel.startswith(skip + "/"):
+            if rel == skip or rel.startswith(skip.rstrip("/") + "/"):
                 continue
         count += 1
     return count
@@ -83,13 +85,14 @@ def write_freeze(repo: Path, audit_dir: Optional[Path] = None) -> Path:
 
     Returns the written path.  *audit_dir* defaults to
     ``docs/generated/audit/``.  The output is idempotent: the artifact is
-    named from the recorded HEAD and does not count itself as dirty.
+    named from the recorded HEAD and the audit directory is excluded from the
+    dirty count (so the record itself never makes the tree look dirty).
     """
     repo = Path(repo)
     sha = _git(repo, "rev-parse", "HEAD").strip()
     out_dir = Path(audit_dir) if audit_dir is not None else AUDIT_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"FREEZE_{sha[:8]}.json"
-    doc = build_freeze(repo, ignore=out)
+    doc = build_freeze(repo, ignore=out_dir)
     out.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return out

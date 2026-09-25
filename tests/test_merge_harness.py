@@ -255,6 +255,7 @@ def test_checkpoint_cli(git_repo):
 # freeze record
 # ---------------------------------------------------------------------------
 def test_freeze_record_is_committed_for_the_worktree_base():
+    """A committed freeze record exists for the current worktree base."""
     docs = []
     for path in sorted(AUDIT.glob("FREEZE_*.json")):
         try:
@@ -280,6 +281,24 @@ def test_freeze_record_is_committed_for_the_worktree_base():
     assert res.returncode == 0, f"{doc['sha']} predates the engine base"
 
 
+def test_committed_freeze_matches_a_fresh_generation(tmp_path):
+    """A freshly generated record for the frozen base reports a clean tree.
+
+    The committed artifact records the base commit that existed *before* the
+    artifact itself was committed, so a fresh generation names an ancestor of
+    HEAD (the artifact commit) rather than HEAD itself.
+    """
+    from merge_v0215 import freeze as freeze_mod
+
+    base = _git(REPO, "rev-parse", "HEAD~1").stdout.strip()
+    out = freeze_mod.write_freeze(REPO, audit_dir=tmp_path)
+    fresh = json.loads(Path(out).read_text(encoding="utf-8"))
+    assert fresh["sha"] == base, fresh
+    assert fresh["dirty_count"] == 0, fresh
+    assert fresh["pin"] == PIN
+    assert fresh["branch"] == BRANCH
+
+
 def test_freeze_generator_is_reproducible(git_repo):
     from merge_v0215 import freeze as freeze_mod
 
@@ -294,15 +313,15 @@ def test_freeze_generator_is_reproducible(git_repo):
     audit = git_repo / "audit"
     out = freeze_mod.write_freeze(git_repo, audit_dir=audit)
     on_disk = json.loads(Path(out).read_text(encoding="utf-8"))
-    # The written artifact excludes itself from the dirty count and is stable
-    # across a second run.
+    # The written artifact excludes the audit dir from the dirty count and is
+    # stable across a second run.
     assert on_disk["dirty_count"] == 0, on_disk
     assert on_disk["sha"] == doc_a["sha"]
     again = freeze_mod.write_freeze(git_repo, audit_dir=audit)
     assert Path(again) == Path(out)
     assert Path(out).read_text(encoding="utf-8") == json.dumps(
         on_disk, indent=1, sort_keys=True) + "\n"
-    # A dirty tree is recorded honestly (excluding the generated artifact).
+    # A dirty tracked tree is recorded honestly (excluding the audit dir).
     (git_repo / "a.txt").write_text("dirty\n", encoding="utf-8")
-    assert freeze_mod.dirty_count(git_repo, ignore=out) == 1
-    assert freeze_mod.build_freeze(git_repo, ignore=out)["dirty_count"] == 1
+    assert freeze_mod.dirty_count(git_repo, ignore=audit) == 1
+    assert freeze_mod.build_freeze(git_repo, ignore=audit)["dirty_count"] == 1
