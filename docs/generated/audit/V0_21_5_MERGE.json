@@ -5,29 +5,30 @@
  "theirs_root": "/tmp/qubit-sdd/qubit_runtime",
  "merge_rule": "TAKE_OURS->ours; REAPPLY_THEIRS->merge_file; CONFLICT->keep theirs; add candidate-only",
  "totals": {
-  "changed": 366,
-  "written": 53,
-  "deleted": 1,
-  "conflicts": 177,
+  "changed": 646,
+  "written": 113,
+  "deleted": 2,
+  "conflicts": 303,
   "by_resolution": {
-   "AUTO_OURS": 42,
-   "ADDED": 11,
-   "MERGE_FILE": 135,
-   "KEEP_THEIRS_CONFLICT": 177,
+   "AUTO_OURS": 78,
+   "ADDED": 35,
+   "MERGE_FILE": 228,
+   "KEEP_THEIRS_CONFLICT": 303,
    "KEEP_THEIRS": 0,
-   "DELETED": 1,
+   "DELETED": 2,
    "SKIP_IDENTICAL": 0
   },
   "by_class": {
-   "CONFLICT": 177,
-   "REAPPLY_THEIRS": 135,
-   "TAKE_OURS": 54
+   "CONFLICT": 303,
+   "REAPPLY_THEIRS": 228,
+   "TAKE_OURS": 115
   },
   "by_bucket": {
    "agent": 220,
    "gateway": 127,
    "providers": 2,
-   "qubit_state*": 17
+   "qubit_state*": 17,
+   "tools": 280
   },
   "by_bucket_resolution": {
    "agent": {
@@ -51,6 +52,13 @@
     "AUTO_OURS": 9,
     "KEEP_THEIRS_CONFLICT": 6,
     "MERGE_FILE": 1
+   },
+   "tools": {
+    "ADDED": 24,
+    "AUTO_OURS": 36,
+    "DELETED": 1,
+    "KEEP_THEIRS_CONFLICT": 126,
+    "MERGE_FILE": 93
    }
   }
  },
@@ -1114,6 +1122,762 @@
   {
    "path": "providers/base.py",
    "bucket": "providers",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/AGENTS.md",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/approval.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/approval_context.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/approval_floors.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/async_delegation.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/blueprints.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/bot_mode_dm.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/bot_mode_probe.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/bot_relay.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_cdp_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_lightpanda.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_tool_install.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_tool_lifecycle.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_tool_real_profile.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_tool_session.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/browser_use_cli.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/checkpoint_manager.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/code_execution_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/computer_use/cua_backend.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/computer_use/cua_backend_daemon.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/computer_use/doctor.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/computer_use/schema.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/computer_use/tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/connectors/live.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/connectors/mcp.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/connectors/mcp_oauth.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/credential_files.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/cronjob_tools.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/daemon_pool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/delegate_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/delegate_tool_config.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/delegation_live_log.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/discord_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/base.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/base_output.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/daytona.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/docker.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/file_sync.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/local.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/local_env_policy.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/local_gitbash_probe.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/local_pythonpath.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/modal.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/remote_common.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/environments/vercel_sandbox.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/fal_common.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/file_operations.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/file_operations_common.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/file_operations_lint.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/file_operations_search.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/file_tools.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/file_tools_read_tracking.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/fuzzy_match.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/kanban_tools.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/lazy_deps.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/managed_tool_gateway.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_oauth.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_oauth_provider.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_schema_cache.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_agent.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_common.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_config.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_discovery.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_handlers.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_lifecycle.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_registration.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_schema.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_server_run.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/mcp_tool_transport.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/memory_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/memory_tool_store.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/osv_check.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/patch_parser.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/plugin_guard.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/process_registry.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/process_registry_checkpoint.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/process_registry_notifications.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/process_registry_results.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/read_extract.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/registry.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/self_repo_guard.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/send_message_senders.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/session_search_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skill_ledger.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skill_linter.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skill_manager_batch.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skill_manager_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skill_usage.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_guard.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_hub.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_hub_clawhub.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_hub_github.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_hub_models.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_hub_official.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_hub_search.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_sync.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_sync_client.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/skills_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/terminal_scope.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/terminal_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/terminal_tool_backends.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/terminal_tool_background.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/terminal_tool_result.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/tirith_security.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/tool_search.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/tool_search_catalog.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/transcription_audio.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/transcription_cloud.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/transcription_command.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/transcription_common.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/transcription_local.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/transcription_tools.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/tts_tool.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/tts_tool_providers.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/vision_tools.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/vision_tools_image_prep.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/voice_mode.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/wake_word.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/wake_word_engines.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/web_result_cache.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/web_tools.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/web_tools_rescue.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/website_policy.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/write_approval.py",
+   "bucket": "tools",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tools/xai_http.py",
+   "bucket": "tools",
    "kind": "MERGE_MARKERS",
    "action": "noop"
   }
@@ -5510,6 +6274,3366 @@
    "ours_sha256": "3ff31fff36830ca500d9c98905c431c72f8df46c43b48368a4a57bc7dd8b8605",
    "theirs_sha256": "5765ab03cc784ff4e231b7d028bb57f1aed2661641e4eea65cc5cbdd7c951186",
    "result_sha256": "5765ab03cc784ff4e231b7d028bb57f1aed2661641e4eea65cc5cbdd7c951186"
+  },
+  {
+   "path": "tools/AGENTS.md",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d1866804ea92694718f8535ac8c69991eb87824dfc92f9e94dc7b831d746caa5",
+   "ours_sha256": "2406d644f5e0668432106456673e2bab400ed4f074f78ae453462873ff00538d",
+   "theirs_sha256": "a7738b5252ed4620fd2551ffc932fa93f7510810df897fb9d9b5baeb4ec84721",
+   "result_sha256": "a7738b5252ed4620fd2551ffc932fa93f7510810df897fb9d9b5baeb4ec84721"
+  },
+  {
+   "path": "tools/approval.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5ba911277fe8b0ef353612e0f9b0109f5cc7034fb5efbd5e53f2587aad777027",
+   "ours_sha256": "1ba4cef6297540a545608198c1750157d91a6343b3f070ee753e4d08c203a020",
+   "theirs_sha256": "bbcef9b050a794933d0e99f9fb8645e97dd1516438c0cf309c839d2502fbb3fc",
+   "result_sha256": "bbcef9b050a794933d0e99f9fb8645e97dd1516438c0cf309c839d2502fbb3fc"
+  },
+  {
+   "path": "tools/approval_context.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5f2e312713b16ab270ca7ba01978f24ac75353a3c47276c9859e2d24769ef238",
+   "ours_sha256": "bd75eb7a2701fb7fc06f61fc610f9054929799bd201c8e1376878567832074ba",
+   "theirs_sha256": "52169a55b4e9b957d7a32cea8d32cc95f49214375aff34a6edc8fffd0f3011c7",
+   "result_sha256": "52169a55b4e9b957d7a32cea8d32cc95f49214375aff34a6edc8fffd0f3011c7"
+  },
+  {
+   "path": "tools/approval_detection.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b490b16d51998528b1117f0e011e385686bea47856a1b76594e43ea100b7c158",
+   "ours_sha256": "b490b16d51998528b1117f0e011e385686bea47856a1b76594e43ea100b7c158",
+   "theirs_sha256": "2bf4459ef7808155df33f7bd03b89a27a95458b2ebb40795ab7ea2b017a0d383",
+   "result_sha256": "2bf4459ef7808155df33f7bd03b89a27a95458b2ebb40795ab7ea2b017a0d383"
+  },
+  {
+   "path": "tools/approval_floors.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "db56f0448caf1a0ddbbf512bfa7f881dc196f0ecf186b550683513acf6b42299",
+   "ours_sha256": "ed2df59ea9c893526c7c52399100eb20d56a9782e48841ed1ea8dc97a627bea6",
+   "theirs_sha256": "58d01cc125ac5eb0b2ee1c8a6ad2649d990dd319f44ae7105a18ea284b9e6deb",
+   "result_sha256": "58d01cc125ac5eb0b2ee1c8a6ad2649d990dd319f44ae7105a18ea284b9e6deb"
+  },
+  {
+   "path": "tools/approval_gateway_wait.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5b4233b2d0aff4ff70857e29a391978914937bf8ef294e4b1bfb4000997ed056",
+   "ours_sha256": "5b4233b2d0aff4ff70857e29a391978914937bf8ef294e4b1bfb4000997ed056",
+   "theirs_sha256": "8f96a1307e8e38204f92eb52e67d682937d217e6a4a472f52c9cae6655af606e",
+   "result_sha256": "8f96a1307e8e38204f92eb52e67d682937d217e6a4a472f52c9cae6655af606e"
+  },
+  {
+   "path": "tools/approval_human_wait.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "36a54842802456364fbe9b68cb3598b21bf295d7b0fd9bdb42b63350864cad6f",
+   "ours_sha256": "7db1d6cf183ae7617409b853fd7027dfc50d02a2aaa638f1a84ba50dc8b1886b",
+   "theirs_sha256": "7db1d6cf183ae7617409b853fd7027dfc50d02a2aaa638f1a84ba50dc8b1886b",
+   "result_sha256": "7db1d6cf183ae7617409b853fd7027dfc50d02a2aaa638f1a84ba50dc8b1886b"
+  },
+  {
+   "path": "tools/approval_prompt.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "fdc043a53f03bcfd82e83d5aab17136ca6fe409852b5fa988e7fb389f536b15f",
+   "ours_sha256": "fdc043a53f03bcfd82e83d5aab17136ca6fe409852b5fa988e7fb389f536b15f",
+   "theirs_sha256": "f03f41b22fe188dbf73d0d4f06172b795d20771e8ed12f8003de398f18c5866a",
+   "result_sha256": "f03f41b22fe188dbf73d0d4f06172b795d20771e8ed12f8003de398f18c5866a"
+  },
+  {
+   "path": "tools/approval_smart.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e1b236bcb7ff8c1b72429a26a1b9724f08bee8901cf89d79dc2e008cb2999e7d",
+   "ours_sha256": "e1b236bcb7ff8c1b72429a26a1b9724f08bee8901cf89d79dc2e008cb2999e7d",
+   "theirs_sha256": "86ce2f7c27bc1b350f715a0d9a5d9ed39befd5295193c02d3765aa47e6efa3e8",
+   "result_sha256": "86ce2f7c27bc1b350f715a0d9a5d9ed39befd5295193c02d3765aa47e6efa3e8"
+  },
+  {
+   "path": "tools/arg_coercion.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a5ccb2c8fdac36e8d49dd61421144ca1e07d6d84288e9164a7fc222fcecce106",
+   "ours_sha256": "a5ccb2c8fdac36e8d49dd61421144ca1e07d6d84288e9164a7fc222fcecce106",
+   "theirs_sha256": "b0e1fa04652911fb157ed966c5641a2a5ba4d297a820a75cea5d95f9e440390c",
+   "result_sha256": "b0e1fa04652911fb157ed966c5641a2a5ba4d297a820a75cea5d95f9e440390c"
+  },
+  {
+   "path": "tools/async_delegation.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "df0d0990fde87f6758f3554c6e6633c8a6835c36652ba5c7aabdfaf834df1968",
+   "ours_sha256": "8cc198e9af964c24f4796e17bb394cec7d618f8bc67f986b76e05909b0e98476",
+   "theirs_sha256": "6cc86f01be3b4cc9ab4aafa1e22c8c20a9fe30551e5990417195a5ac9e48d84e",
+   "result_sha256": "6cc86f01be3b4cc9ab4aafa1e22c8c20a9fe30551e5990417195a5ac9e48d84e"
+  },
+  {
+   "path": "tools/binary_extensions.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a2d59139f7bffa274738074f4d11ccd5b299a6ef7ad6542a65738e0760cd38da",
+   "ours_sha256": "a2d59139f7bffa274738074f4d11ccd5b299a6ef7ad6542a65738e0760cd38da",
+   "theirs_sha256": "9dc721f746754753ea71ba898360325bc0eae13ab501dad4381ecb09c9e6cb79",
+   "result_sha256": "9dc721f746754753ea71ba898360325bc0eae13ab501dad4381ecb09c9e6cb79"
+  },
+  {
+   "path": "tools/blueprints.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2fa725ca5bbe249ebdf09c91e06b53f93512a3a26c22389383cf40d49259c8d2",
+   "ours_sha256": "8458314e849a51a3260a3dfd711bbb9fc5f3e44807944d71638be85eb95fa429",
+   "theirs_sha256": "dcb0273d204e3b4b34f4668633819a196ce0b68a164dce7b1382716b537144e8",
+   "result_sha256": "dcb0273d204e3b4b34f4668633819a196ce0b68a164dce7b1382716b537144e8"
+  },
+  {
+   "path": "tools/bot_desktop/__init__.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "851f2cf648610574cfb74f8c99ff0261d30913360bba20a470a1931785ff4bef",
+   "theirs_sha256": "851f2cf648610574cfb74f8c99ff0261d30913360bba20a470a1931785ff4bef",
+   "result_sha256": "851f2cf648610574cfb74f8c99ff0261d30913360bba20a470a1931785ff4bef"
+  },
+  {
+   "path": "tools/bot_desktop/browser.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "c9e3014675a3bffe8ae26c01dceef975d0803c4d25e16b678f1ccf86f6c05dfd",
+   "theirs_sha256": "c9e3014675a3bffe8ae26c01dceef975d0803c4d25e16b678f1ccf86f6c05dfd",
+   "result_sha256": "c9e3014675a3bffe8ae26c01dceef975d0803c4d25e16b678f1ccf86f6c05dfd"
+  },
+  {
+   "path": "tools/bot_desktop/install.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "a8cfc039f5595333ca1f9c59fde95842fd50f2ddb622360159e622b4705702b1",
+   "theirs_sha256": "a8cfc039f5595333ca1f9c59fde95842fd50f2ddb622360159e622b4705702b1",
+   "result_sha256": "a8cfc039f5595333ca1f9c59fde95842fd50f2ddb622360159e622b4705702b1"
+  },
+  {
+   "path": "tools/bot_desktop/launcher.sh",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "69d64a58d8d71078230d7f19ae75962e1bbb6bcc4518ed84ff34c88a5c4816a4",
+   "theirs_sha256": "69d64a58d8d71078230d7f19ae75962e1bbb6bcc4518ed84ff34c88a5c4816a4",
+   "result_sha256": "69d64a58d8d71078230d7f19ae75962e1bbb6bcc4518ed84ff34c88a5c4816a4"
+  },
+  {
+   "path": "tools/bot_desktop/lease.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "efbd5533f50371b02ac4c70ff38779f71aa7779c2be31f4e85d8673d1346d7ff",
+   "theirs_sha256": "efbd5533f50371b02ac4c70ff38779f71aa7779c2be31f4e85d8673d1346d7ff",
+   "result_sha256": "efbd5533f50371b02ac4c70ff38779f71aa7779c2be31f4e85d8673d1346d7ff"
+  },
+  {
+   "path": "tools/bot_desktop/resources.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "cfca7aa9c0baf83a6ef0922becf1dfb50c28ed89f0db2dc1b867df22ede7f3ba",
+   "theirs_sha256": "cfca7aa9c0baf83a6ef0922becf1dfb50c28ed89f0db2dc1b867df22ede7f3ba",
+   "result_sha256": "cfca7aa9c0baf83a6ef0922becf1dfb50c28ed89f0db2dc1b867df22ede7f3ba"
+  },
+  {
+   "path": "tools/bot_desktop/rfb_filter.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "3e7b31584072f82b0a003f7bcc50b30f42cfab3080301e2c4766de384753f1da",
+   "theirs_sha256": "3e7b31584072f82b0a003f7bcc50b30f42cfab3080301e2c4766de384753f1da",
+   "result_sha256": "3e7b31584072f82b0a003f7bcc50b30f42cfab3080301e2c4766de384753f1da"
+  },
+  {
+   "path": "tools/bot_desktop/runtime.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "212b46ef2734d09f985bd3a969203a4a5562b8e5b3f062a0367dbd3e5d05db5e",
+   "theirs_sha256": "212b46ef2734d09f985bd3a969203a4a5562b8e5b3f062a0367dbd3e5d05db5e",
+   "result_sha256": "212b46ef2734d09f985bd3a969203a4a5562b8e5b3f062a0367dbd3e5d05db5e"
+  },
+  {
+   "path": "tools/bot_desktop/thumbnail.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "56e6cc44e4c6acfa752d682c23d7b30e9b75bc3805d2a175f2ac6a5887a0bf32",
+   "theirs_sha256": "56e6cc44e4c6acfa752d682c23d7b30e9b75bc3805d2a175f2ac6a5887a0bf32",
+   "result_sha256": "56e6cc44e4c6acfa752d682c23d7b30e9b75bc3805d2a175f2ac6a5887a0bf32"
+  },
+  {
+   "path": "tools/bot_desktop/wallpaper.png",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2",
+   "theirs_sha256": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2",
+   "result_sha256": "57f8bda750c95bf4804ae73cf4e203b4c200d48b66f6f46da2118b5324276aa2"
+  },
+  {
+   "path": "tools/bot_failure_reasons.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0fcb7dd009ccb28ef6d14d46bc620958fe6ecf8221569e59731008100210a340",
+   "ours_sha256": "0fcb7dd009ccb28ef6d14d46bc620958fe6ecf8221569e59731008100210a340",
+   "theirs_sha256": "0157aab61051b7833d1214829a2c6308094f10d65b0049ba8ec9c3f308a0eccd",
+   "result_sha256": "0157aab61051b7833d1214829a2c6308094f10d65b0049ba8ec9c3f308a0eccd"
+  },
+  {
+   "path": "tools/bot_live_delivery.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "8c326cff0cbd823d5e8b310263cb5ef362ba69220efec0fbb86d23f6c8e3f172",
+   "ours_sha256": "93da6feb4aea5926404b7d55e83013fcca1a0fcc68a10f8b12c5ee07be9959ba",
+   "theirs_sha256": "93da6feb4aea5926404b7d55e83013fcca1a0fcc68a10f8b12c5ee07be9959ba",
+   "result_sha256": "93da6feb4aea5926404b7d55e83013fcca1a0fcc68a10f8b12c5ee07be9959ba"
+  },
+  {
+   "path": "tools/bot_mode_dm.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ae560d07b74f39623aba93fd74e0cc8b64af3549538f68c70882349299edefd0",
+   "ours_sha256": "fc8601ec465cc8f45594c8c048ab18ce8af6c9c93d9ae37feb3073a851dac084",
+   "theirs_sha256": "4851668219c923fc98ed9c6c52d49f18e22021e00c27a6d0880d2c6afa80e738",
+   "result_sha256": "4851668219c923fc98ed9c6c52d49f18e22021e00c27a6d0880d2c6afa80e738"
+  },
+  {
+   "path": "tools/bot_mode_probe.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4921b114a203714485fe6eaeb4665d945a492750bc4988bffd95fba89a45f321",
+   "ours_sha256": "a84197143cbecab2ca4de6c11276c9b1f51a03aa3426501355ad0a1431c5a712",
+   "theirs_sha256": "dff0b118bfb9e2575fd26288aa65c294c2952677c3171bab2640e28301bdd88b",
+   "result_sha256": "dff0b118bfb9e2575fd26288aa65c294c2952677c3171bab2640e28301bdd88b"
+  },
+  {
+   "path": "tools/bot_relay.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "28280a4d3f19f2421d84904f1a6d6fa11f479435da9403f2fd9fa0dacb47df44",
+   "ours_sha256": "c1e9c6b99d0318e55c3151d6bde87fe8f1e0eb26a796045d718389d2c139bd6a",
+   "theirs_sha256": "b640be5823a407850d217d8c634755b811fe87a4cd6def64892c846f0c65f1ba",
+   "result_sha256": "b640be5823a407850d217d8c634755b811fe87a4cd6def64892c846f0c65f1ba"
+  },
+  {
+   "path": "tools/browser_camofox.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c8d29f5781c05b43bfc38b27d4a84b6c166e7541a520175edbe91ccc7f04f424",
+   "ours_sha256": "c8d29f5781c05b43bfc38b27d4a84b6c166e7541a520175edbe91ccc7f04f424",
+   "theirs_sha256": "c94ec1c60b25457fd8eba80fb6fbcbf70322b0baf56953c7e092b62152137d50",
+   "result_sha256": "c94ec1c60b25457fd8eba80fb6fbcbf70322b0baf56953c7e092b62152137d50"
+  },
+  {
+   "path": "tools/browser_camofox_state.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7d35ec7d1ad6dae6cb62762352051613ca7244d31580334653b88abf0a587bd9",
+   "ours_sha256": "7d35ec7d1ad6dae6cb62762352051613ca7244d31580334653b88abf0a587bd9",
+   "theirs_sha256": "c647dd89cb55cebebcdafed86d83daf26b2a15e88cadd6488988abb3332f97d4",
+   "result_sha256": "c647dd89cb55cebebcdafed86d83daf26b2a15e88cadd6488988abb3332f97d4"
+  },
+  {
+   "path": "tools/browser_cdp_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "00c3c6f0645c4e55de8b9268cf3d2ebee4e37b42d1850f84fa26be2c2d5c989a",
+   "ours_sha256": "59487f899990b21e5536e405df4a0fcf9dde5d3b6dce8bfb90046ca5976bfbc0",
+   "theirs_sha256": "8c3cfe32d0c3880c3fa6fa3050faf3e2abb9d6ae8d07e443bdf3678858a158b5",
+   "result_sha256": "8c3cfe32d0c3880c3fa6fa3050faf3e2abb9d6ae8d07e443bdf3678858a158b5"
+  },
+  {
+   "path": "tools/browser_lightpanda.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "1bd0051032a0f82e91a110c43332fd050987aa9f5077318db12be39c5084cb2b",
+   "ours_sha256": "a60c2eae002440f4d182e8fbf047d5c566c891e5848b02d6def54ae9b90d81e2",
+   "theirs_sha256": "62670bf791c7c4c0c1dfc244cc9646ef3a0aa3c14b0cbad3dca54adfc1b417e5",
+   "result_sha256": "62670bf791c7c4c0c1dfc244cc9646ef3a0aa3c14b0cbad3dca54adfc1b417e5"
+  },
+  {
+   "path": "tools/browser_supervisor.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7865152eaff3cb6d0e06311071e9d21d5770e0d82df7f2e3cc1ae5a9867c9470",
+   "ours_sha256": "7865152eaff3cb6d0e06311071e9d21d5770e0d82df7f2e3cc1ae5a9867c9470",
+   "theirs_sha256": "8c3e06ee9e583eb433e1a5a03b5840e104c224aed242499c145a54650d42875a",
+   "result_sha256": "8c3e06ee9e583eb433e1a5a03b5840e104c224aed242499c145a54650d42875a"
+  },
+  {
+   "path": "tools/browser_supervisor_dialogs.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5885ec92a5acf04df0b8b05197741b00e1aac5112180ae7185a8238cb07cdeb9",
+   "ours_sha256": "5885ec92a5acf04df0b8b05197741b00e1aac5112180ae7185a8238cb07cdeb9",
+   "theirs_sha256": "d6235dff295e2ff25a114b574f21181f98a1d93f0f2ccc7bd2689b61bd2adbea",
+   "result_sha256": "d6235dff295e2ff25a114b574f21181f98a1d93f0f2ccc7bd2689b61bd2adbea"
+  },
+  {
+   "path": "tools/browser_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7546da220f302f9ec116f8788b7e90c0d8538504c91480670ec5d25e4c177abb",
+   "ours_sha256": "7b4cd59be185d0094c740f6ab2bd1f6beace596aeb8f52cb4b30a7106d5b0511",
+   "theirs_sha256": "9e12abb933cdb728c14d34b614257f60b92d32adf1639c23618f81044dd996f0",
+   "result_sha256": "9e12abb933cdb728c14d34b614257f60b92d32adf1639c23618f81044dd996f0"
+  },
+  {
+   "path": "tools/browser_tool_cdp.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0052d2a5b0fad0a4487e27f81bdab6496802b14cf3126289958f99ebb449ae6f",
+   "ours_sha256": "0052d2a5b0fad0a4487e27f81bdab6496802b14cf3126289958f99ebb449ae6f",
+   "theirs_sha256": "1c6994ff1e563eb6347e764f9259ef7d641a3ee0b637806766938c1e4e033870",
+   "result_sha256": "1c6994ff1e563eb6347e764f9259ef7d641a3ee0b637806766938c1e4e033870"
+  },
+  {
+   "path": "tools/browser_tool_cloud.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ff8e20183d7922f5cf32926ee1bdea4d918b6012003a2006fe987c589f872eb9",
+   "ours_sha256": "ff8e20183d7922f5cf32926ee1bdea4d918b6012003a2006fe987c589f872eb9",
+   "theirs_sha256": "19ef086fc2223c73acc983be69edb43fc24ff02b7e0fffd81e550ecea1006937",
+   "result_sha256": "19ef086fc2223c73acc983be69edb43fc24ff02b7e0fffd81e550ecea1006937"
+  },
+  {
+   "path": "tools/browser_tool_install.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ce2007b62abd11eba4766734bb4b0e621192870c0581fc88958a8c6e36e89ded",
+   "ours_sha256": "eeaa6a189cfd9e4a14b4f6c698e5d77786c6c81d51a5f0b91076d9e31a8732f8",
+   "theirs_sha256": "8672ea0738b8ed319af0bf8e45af70e0e25415c7c690c24c38ed3f164c56bd15",
+   "result_sha256": "8672ea0738b8ed319af0bf8e45af70e0e25415c7c690c24c38ed3f164c56bd15"
+  },
+  {
+   "path": "tools/browser_tool_lifecycle.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "df6ab560691f4d280b22e6bcafc7290501a2cbf945b46da916960c10b02af1fc",
+   "ours_sha256": "b133716d9bf0aacac4378c4b9fd0bae22650d9c15e8188a507f98ddf5b6e2aa6",
+   "theirs_sha256": "dabf30a2c551ea2cb4b2ce074db056ac640fef41651a33d77066120b5ac2e2bb",
+   "result_sha256": "dabf30a2c551ea2cb4b2ce074db056ac640fef41651a33d77066120b5ac2e2bb"
+  },
+  {
+   "path": "tools/browser_tool_lightpanda_fallback.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "88f1cfb68b291202ecdf908b0dac09d393ef3ad9f40fbaad74ba807563c408fe",
+   "ours_sha256": "97989930557087f249cfe3b1ecd1b6af6e07ad43f20a7410138a250a55f5b838",
+   "theirs_sha256": "97989930557087f249cfe3b1ecd1b6af6e07ad43f20a7410138a250a55f5b838",
+   "result_sha256": "97989930557087f249cfe3b1ecd1b6af6e07ad43f20a7410138a250a55f5b838"
+  },
+  {
+   "path": "tools/browser_tool_real_profile.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7fa9bb5d48c25d74f2b67ff6f16eeff88a9d9d46d6e5df45beb997af0b4e356a",
+   "ours_sha256": "b98cf55f34ea3b44cfe2de051d904ebe973d04336eaad92f039e88ee7784d27c",
+   "theirs_sha256": "3775b67b23ea2e83fa72a08579c6b4b141ba8cf85e3804b12b91e3cb298dcede",
+   "result_sha256": "3775b67b23ea2e83fa72a08579c6b4b141ba8cf85e3804b12b91e3cb298dcede"
+  },
+  {
+   "path": "tools/browser_tool_session.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "8103d3dd72819171f2d28d18382fba0c86569daf7b40c92ca3f2dc6e790305d5",
+   "ours_sha256": "b93f45a8b3841e0ddbeb0769390b817b64a9f511b2894918c470d47ffc5fb958",
+   "theirs_sha256": "529d28474ff5906db91869058d05db937b36b3370fdedaac3e2a3c0de51a1c6b",
+   "result_sha256": "529d28474ff5906db91869058d05db937b36b3370fdedaac3e2a3c0de51a1c6b"
+  },
+  {
+   "path": "tools/browser_tool_snapshot.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a79957dea3e0467912a72cb436c79826fbe8191f01301a49d552445f9418f5ba",
+   "ours_sha256": "a79957dea3e0467912a72cb436c79826fbe8191f01301a49d552445f9418f5ba",
+   "theirs_sha256": "ec486939b515d6e57a5a1850f337f6a07f218f34758531d5ce97c718819d9831",
+   "result_sha256": "ec486939b515d6e57a5a1850f337f6a07f218f34758531d5ce97c718819d9831"
+  },
+  {
+   "path": "tools/browser_tool_vision.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ec7f0c3d0f476f59c7aa63c91ee5839ca08c9a60bbd08cf99036d95aeb053c8d",
+   "ours_sha256": "ec7f0c3d0f476f59c7aa63c91ee5839ca08c9a60bbd08cf99036d95aeb053c8d",
+   "theirs_sha256": "82fe32f8970e1d27c6f6d85c94504deaa5d97715c7608bf050727a08d52276ad",
+   "result_sha256": "82fe32f8970e1d27c6f6d85c94504deaa5d97715c7608bf050727a08d52276ad"
+  },
+  {
+   "path": "tools/browser_use_cli.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d33cbd7d89f9cacb84dbb00a75004043ad40389e7e4259675de103a192aa8c99",
+   "ours_sha256": "7e0f368600c947b72a9e4dbf66cf3bad4ba94266967dfb6ff9db2e5350c7570e",
+   "theirs_sha256": "e18e0325a139b8b4196b3dc8194af21fcceb57fafbe29ab59dd0eb7f50904acb",
+   "result_sha256": "e18e0325a139b8b4196b3dc8194af21fcceb57fafbe29ab59dd0eb7f50904acb"
+  },
+  {
+   "path": "tools/browser_vault_tool.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "cc35774c5be1595b3f73243818eb2741280afd689e2409e6c313a8e6e33459f4",
+   "ours_sha256": "20736b49f9ee91cdcf0410ad2917da55657a2ed89b22013db6c7de9e1070f8ca",
+   "theirs_sha256": "20736b49f9ee91cdcf0410ad2917da55657a2ed89b22013db6c7de9e1070f8ca",
+   "result_sha256": "20736b49f9ee91cdcf0410ad2917da55657a2ed89b22013db6c7de9e1070f8ca"
+  },
+  {
+   "path": "tools/budget_config.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a688903c8e833f7bcf1398d86ac47372c9f40412b2273cd799253c2b374a099f",
+   "ours_sha256": "a688903c8e833f7bcf1398d86ac47372c9f40412b2273cd799253c2b374a099f",
+   "theirs_sha256": "d197a0f88a7dff474bc99498adcb6cdbf8c798577a1e958bcf08053b52da37ea",
+   "result_sha256": "d197a0f88a7dff474bc99498adcb6cdbf8c798577a1e958bcf08053b52da37ea"
+  },
+  {
+   "path": "tools/checkpoint_maintenance.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "52cb8d2c78a2456fa67089b8c78c5f3f8d014bf5ba249e727a1592892776735e",
+   "theirs_sha256": "52cb8d2c78a2456fa67089b8c78c5f3f8d014bf5ba249e727a1592892776735e",
+   "result_sha256": "52cb8d2c78a2456fa67089b8c78c5f3f8d014bf5ba249e727a1592892776735e"
+  },
+  {
+   "path": "tools/checkpoint_manager.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "36a50ec00b3426cc77ebe835d340f582e70ee7ac3f3ea97de6608575906d21e9",
+   "ours_sha256": "e0f057b16f52a678a77ff4c359a6172674f5ebee545c13829709bbf2f359a6ae",
+   "theirs_sha256": "ad6d9fd2a2e21eed112024648f83eaaa7dc30e1320de446f0a9fd53440d53ff4",
+   "result_sha256": "ad6d9fd2a2e21eed112024648f83eaaa7dc30e1320de446f0a9fd53440d53ff4"
+  },
+  {
+   "path": "tools/checkpoint_manager_profile_rename.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "9fcae0cd9b64168def6e619405579e4c539c651aa9899d1ffb46c6cdbc1fc90a",
+   "ours_sha256": "9a21b617eb82bc586c6a6e401814706432925cc475d8f58f2934a659ee8287a2",
+   "theirs_sha256": "9a21b617eb82bc586c6a6e401814706432925cc475d8f58f2934a659ee8287a2",
+   "result_sha256": "9a21b617eb82bc586c6a6e401814706432925cc475d8f58f2934a659ee8287a2"
+  },
+  {
+   "path": "tools/checkpoint_pruning.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "07bd71d0e243e30ca6d7fe68b98a6dd75ef2366b99aae796079513b646fd9658",
+   "theirs_sha256": "07bd71d0e243e30ca6d7fe68b98a6dd75ef2366b99aae796079513b646fd9658",
+   "result_sha256": "07bd71d0e243e30ca6d7fe68b98a6dd75ef2366b99aae796079513b646fd9658"
+  },
+  {
+   "path": "tools/clarify_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "3c55327461b28fa36905f12660122bd131fa84a09a44e481efb230edbf411ab3",
+   "ours_sha256": "3c55327461b28fa36905f12660122bd131fa84a09a44e481efb230edbf411ab3",
+   "theirs_sha256": "d0e3bb6e00541940166be2af87ad13b4bdf59c1a8fdb45dbd93c61fd094b998f",
+   "result_sha256": "d0e3bb6e00541940166be2af87ad13b4bdf59c1a8fdb45dbd93c61fd094b998f"
+  },
+  {
+   "path": "tools/code_execution_env.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "df068034dd0a2e2563adb2343de7b4a4a2d5a4feba1a2e5107115c69e3b7c7c5",
+   "ours_sha256": "df068034dd0a2e2563adb2343de7b4a4a2d5a4feba1a2e5107115c69e3b7c7c5",
+   "theirs_sha256": "840a32611ed32d786ce36f4b9758f4958843b318f65995933adb632a649cd2ef",
+   "result_sha256": "840a32611ed32d786ce36f4b9758f4958843b318f65995933adb632a649cd2ef"
+  },
+  {
+   "path": "tools/code_execution_rpc.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "6a2468d9d15e083195b668fc4c996d418361918141f8705a0a39e6693940f965",
+   "ours_sha256": "3a9aeb59434342fb1935410af241f6a3c8d6d55781bcdf2aa01bf9f3d2d24b6d",
+   "theirs_sha256": "3a9aeb59434342fb1935410af241f6a3c8d6d55781bcdf2aa01bf9f3d2d24b6d",
+   "result_sha256": "3a9aeb59434342fb1935410af241f6a3c8d6d55781bcdf2aa01bf9f3d2d24b6d"
+  },
+  {
+   "path": "tools/code_execution_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c29c9d0fd3acd8dc8872a6b7e5924ec795fabd84b46ec1a2d64feb9d621910f0",
+   "ours_sha256": "e761de3ba503fadd081a7a4536ce268106eed1fcb6013670f1660dcf9e5ba560",
+   "theirs_sha256": "74d3d10907e9cda2ac8885790529a7e3751672b7ef923682e2d12c30e20dc209",
+   "result_sha256": "74d3d10907e9cda2ac8885790529a7e3751672b7ef923682e2d12c30e20dc209"
+  },
+  {
+   "path": "tools/code_kernel.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "32d1711b22f79a36c3a04723018544635444104974ea574d0250c2242369ed1f",
+   "ours_sha256": "32d1711b22f79a36c3a04723018544635444104974ea574d0250c2242369ed1f",
+   "theirs_sha256": "902daf0f1633f69c682fd6004b0d2055325a8aaa63f07e5769af34aacc7fceef",
+   "result_sha256": "902daf0f1633f69c682fd6004b0d2055325a8aaa63f07e5769af34aacc7fceef"
+  },
+  {
+   "path": "tools/code_kernel_remote.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "48f7248704c180cc3a084d2fa88daabddaf0aeea84ea0898ad069e1d6f0bfed8",
+   "ours_sha256": "48f7248704c180cc3a084d2fa88daabddaf0aeea84ea0898ad069e1d6f0bfed8",
+   "theirs_sha256": "7217f941897e6dde651d71252d7b76c0fea9c23125d143e126678e9d0e5eebba",
+   "result_sha256": "7217f941897e6dde651d71252d7b76c0fea9c23125d143e126678e9d0e5eebba"
+  },
+  {
+   "path": "tools/computer_use/backend.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "f1c8179142139946b40378366a22060ca92a7d7688341867096773be73e93d7d",
+   "ours_sha256": "7d3dc902eede3795cc3d03535565ef4b0d48915583cedea9738c436aa7702434",
+   "theirs_sha256": "7d3dc902eede3795cc3d03535565ef4b0d48915583cedea9738c436aa7702434",
+   "result_sha256": "7d3dc902eede3795cc3d03535565ef4b0d48915583cedea9738c436aa7702434"
+  },
+  {
+   "path": "tools/computer_use/cua_backend.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e6014d8433c3428bef25e39c8c151e328abce422ba6d834af16501a8a22b793a",
+   "ours_sha256": "a43548f46eaa96be8e0f5b4f6513510b3d0019e757ada991f31795eebede189b",
+   "theirs_sha256": "c28ec17da999566e0e6f3b597a531a708a731feef10c83140830acdd4e3892f3",
+   "result_sha256": "c28ec17da999566e0e6f3b597a531a708a731feef10c83140830acdd4e3892f3"
+  },
+  {
+   "path": "tools/computer_use/cua_backend_capture.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "e837503d394a93c4db999e4f3286bd66cb09a4589839da7164bfde3d2cba8e32",
+   "ours_sha256": "731a29517596d9ea26a42696bea4daa41957d728282eb124c81f2d88f7b3e935",
+   "theirs_sha256": "731a29517596d9ea26a42696bea4daa41957d728282eb124c81f2d88f7b3e935",
+   "result_sha256": "731a29517596d9ea26a42696bea4daa41957d728282eb124c81f2d88f7b3e935"
+  },
+  {
+   "path": "tools/computer_use/cua_backend_daemon.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4b6f87aac8838608ea3a79a9d789710afcb87de1ce5bfeacfa84a1ce759543c5",
+   "ours_sha256": "0abcc037ef76424880673270ba3fe6e4a617f9e896c63a575cb7cf580a1d4f70",
+   "theirs_sha256": "132f79ac890634ef0f14a8b47e987e6cdadf0cea8edb22bdd4d2261181545653",
+   "result_sha256": "132f79ac890634ef0f14a8b47e987e6cdadf0cea8edb22bdd4d2261181545653"
+  },
+  {
+   "path": "tools/computer_use/cua_backend_driver.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "f6faf36cd87826e0380452e84aa6e1d0c29f1fb5385722349607c8ac11bed643",
+   "ours_sha256": "8054b4188fb89486a5f2aac1a51194b7e22047fe20f3542ceea8254fcfdf90af",
+   "theirs_sha256": "8054b4188fb89486a5f2aac1a51194b7e22047fe20f3542ceea8254fcfdf90af",
+   "result_sha256": "8054b4188fb89486a5f2aac1a51194b7e22047fe20f3542ceea8254fcfdf90af"
+  },
+  {
+   "path": "tools/computer_use/cua_backend_session.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "6d9807349f5977c626d40a32d541a6e4d5e51977a3e9cfe5a9d5b3e9860c88b9",
+   "ours_sha256": "6d9807349f5977c626d40a32d541a6e4d5e51977a3e9cfe5a9d5b3e9860c88b9",
+   "theirs_sha256": "646e2b5feb60fda78322ff599d155a610b459f746f336c41b21e8b9e3d0e1bcd",
+   "result_sha256": "646e2b5feb60fda78322ff599d155a610b459f746f336c41b21e8b9e3d0e1bcd"
+  },
+  {
+   "path": "tools/computer_use/doctor.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "aa025a4d5d14fcd7cfc8e5cdbd8e0b49c2b516f1d0cf9045647a603783cb452f",
+   "ours_sha256": "a4d9384407c706263898dbb4c13b069fbc693dc2346a00ee99f3760c6cc880e3",
+   "theirs_sha256": "e9497295963d530271f9056e5ad49f094427955eefaf0ed649a91a56ea2e7468",
+   "result_sha256": "e9497295963d530271f9056e5ad49f094427955eefaf0ed649a91a56ea2e7468"
+  },
+  {
+   "path": "tools/computer_use/permissions.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7e2e8678c93b51c4f01a5473a835a9a72ad957bbdc7808112ca668e1af699dc2",
+   "ours_sha256": "7e2e8678c93b51c4f01a5473a835a9a72ad957bbdc7808112ca668e1af699dc2",
+   "theirs_sha256": "470ccadfa0e60f2b32c059cc76f6b3321b7ced27f36c1b45e04e35c2e77372f7",
+   "result_sha256": "470ccadfa0e60f2b32c059cc76f6b3321b7ced27f36c1b45e04e35c2e77372f7"
+  },
+  {
+   "path": "tools/computer_use/schema.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e587dcd762a1f437dbd2047ca479a741899e0bead6987f89342079d4be559b22",
+   "ours_sha256": "75c9b90ab07923f7034ef4a961334ce1fede47eade3099d7b206a7cf50fd641d",
+   "theirs_sha256": "13ab168df394f11c1ddf4b57498ac848c17b72012e1a291aeb024e4d3c75385b",
+   "result_sha256": "13ab168df394f11c1ddf4b57498ac848c17b72012e1a291aeb024e4d3c75385b"
+  },
+  {
+   "path": "tools/computer_use/tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b77152317f2fbdc9fe9869ab201253d2327657f2f9c41c94eea801ab9ad1b4f3",
+   "ours_sha256": "4c993109a3044f01a96238aeaaf930e4e55c7503060c338e25d895fe3fd6ef59",
+   "theirs_sha256": "0bd6cb357e809275c828abb8ad6a3125823b741c485c009744314f01db8fa374",
+   "result_sha256": "0bd6cb357e809275c828abb8ad6a3125823b741c485c009744314f01db8fa374"
+  },
+  {
+   "path": "tools/computer_use/vision_routing.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "85d4cee506de104a4c502828a6539d11a93b000e218e3aa6441ee0671826be0e",
+   "ours_sha256": "85d4cee506de104a4c502828a6539d11a93b000e218e3aa6441ee0671826be0e",
+   "theirs_sha256": "037f7c205c853c9c3fe5f75bc65ad398da259d4599e9703b78e950ec72bdbe60",
+   "result_sha256": "037f7c205c853c9c3fe5f75bc65ad398da259d4599e9703b78e950ec72bdbe60"
+  },
+  {
+   "path": "tools/connections_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": null,
+   "theirs_sha256": "fd677e81aca7d1528e32880ae487a09bc740710dd8a5b5ae336a758e00085b7e",
+   "result_sha256": "fd677e81aca7d1528e32880ae487a09bc740710dd8a5b5ae336a758e00085b7e"
+  },
+  {
+   "path": "tools/connectors/account.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "1d5025d0ee5eabcf97ef33732610e481bd90df1e385596d5950d5e6386ad4a0e",
+   "theirs_sha256": "1d5025d0ee5eabcf97ef33732610e481bd90df1e385596d5950d5e6386ad4a0e",
+   "result_sha256": "1d5025d0ee5eabcf97ef33732610e481bd90df1e385596d5950d5e6386ad4a0e"
+  },
+  {
+   "path": "tools/connectors/catalog.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "1ab077f3731f7b71fa2cbc4af028e314f0e69719da1c6478ccf8be6194613f3b",
+   "theirs_sha256": "1ab077f3731f7b71fa2cbc4af028e314f0e69719da1c6478ccf8be6194613f3b",
+   "result_sha256": "1ab077f3731f7b71fa2cbc4af028e314f0e69719da1c6478ccf8be6194613f3b"
+  },
+  {
+   "path": "tools/connectors/catalog_tool.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "57df673d5fccd8704d8e5af20c6d9577d3cfa68f5cdf8ea722b2eaa42a7f5db2",
+   "theirs_sha256": "57df673d5fccd8704d8e5af20c6d9577d3cfa68f5cdf8ea722b2eaa42a7f5db2",
+   "result_sha256": "57df673d5fccd8704d8e5af20c6d9577d3cfa68f5cdf8ea722b2eaa42a7f5db2"
+  },
+  {
+   "path": "tools/connectors/contract.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "4bcb269ffc7c9a54a18735f5b19e63a95786b4b1f1345503b53aaf906e05fca7",
+   "ours_sha256": "057f4e89aab3ff9bc4f3baf76f69bb795d9f19af1d7d6f67f6f46dc54532665f",
+   "theirs_sha256": "057f4e89aab3ff9bc4f3baf76f69bb795d9f19af1d7d6f67f6f46dc54532665f",
+   "result_sha256": "057f4e89aab3ff9bc4f3baf76f69bb795d9f19af1d7d6f67f6f46dc54532665f"
+  },
+  {
+   "path": "tools/connectors/gateway/bridge.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "8d9d102590924c0103454a47099563fdad69caaca37cb250417f5f63f7bb464d",
+   "ours_sha256": "6bcf5887e204c6e285218643eac008e2fdb0d4960f3c223c3285c7d3bd5c2c99",
+   "theirs_sha256": "6bcf5887e204c6e285218643eac008e2fdb0d4960f3c223c3285c7d3bd5c2c99",
+   "result_sha256": "6bcf5887e204c6e285218643eac008e2fdb0d4960f3c223c3285c7d3bd5c2c99"
+  },
+  {
+   "path": "tools/connectors/gateway/client.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "d207e445f577ff7f3fd171b57f683def908baa919e75301d3383662d1bb135e2",
+   "ours_sha256": "74b902676be74960deb8ecfb3d7291c738079cbd271c22217f2390851c28c97c",
+   "theirs_sha256": "74b902676be74960deb8ecfb3d7291c738079cbd271c22217f2390851c28c97c",
+   "result_sha256": "74b902676be74960deb8ecfb3d7291c738079cbd271c22217f2390851c28c97c"
+  },
+  {
+   "path": "tools/connectors/gateway/config.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "ab888e5cfb7c4370f782bacca5fe77e9c561664184be882307a523fd67395753",
+   "ours_sha256": "b84212dc012ff6945d2d8e23f4a449c7d67c7b0e13f57a92b3e64586f025bc17",
+   "theirs_sha256": "b84212dc012ff6945d2d8e23f4a449c7d67c7b0e13f57a92b3e64586f025bc17",
+   "result_sha256": "b84212dc012ff6945d2d8e23f4a449c7d67c7b0e13f57a92b3e64586f025bc17"
+  },
+  {
+   "path": "tools/connectors/gateway/errors.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "7afd9ec757dd72556ca8af0fdd1a4729444b185d3d1f64e45bcbc7e6a181965b",
+   "ours_sha256": "81e5926517c63fa8852b2de50b90f457029d33a223011f1d62da80a246861397",
+   "theirs_sha256": "81e5926517c63fa8852b2de50b90f457029d33a223011f1d62da80a246861397",
+   "result_sha256": "81e5926517c63fa8852b2de50b90f457029d33a223011f1d62da80a246861397"
+  },
+  {
+   "path": "tools/connectors/gateway/merge.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "8de1d8b944fb33418a7a527d31989ca8e0f4d28c17bb9fd667a76acbac71801f",
+   "ours_sha256": "0b91c55fba7083e6249e1467545fa8e70406bc7fabcc11d6b9c2258098316f39",
+   "theirs_sha256": "0b91c55fba7083e6249e1467545fa8e70406bc7fabcc11d6b9c2258098316f39",
+   "result_sha256": "0b91c55fba7083e6249e1467545fa8e70406bc7fabcc11d6b9c2258098316f39"
+  },
+  {
+   "path": "tools/connectors/gateway/wire.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "fe30e2711e0c371a3f8d988cb53440cd5a76726261a1321ba6d11dc89dd8a7af",
+   "ours_sha256": "1b1bd362d7a8fe7aa14380484d35e455fa2a31c8a3a7e4fd2adfcbeeb2878112",
+   "theirs_sha256": "1b1bd362d7a8fe7aa14380484d35e455fa2a31c8a3a7e4fd2adfcbeeb2878112",
+   "result_sha256": "1b1bd362d7a8fe7aa14380484d35e455fa2a31c8a3a7e4fd2adfcbeeb2878112"
+  },
+  {
+   "path": "tools/connectors/live.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "3ce1266c392f975dfc32b91ba0decb0c2802dea6ee6c157d0a2893c492af58ea",
+   "ours_sha256": "29f4dd02477915ef0e317d97efec2e8ab91bb39917f1d4158a2f1dab5e543e1b",
+   "theirs_sha256": "76f95ef8aea05de61d5c379af8ba3fcf6cc5fa300998c9c71ad282b314a7ab40",
+   "result_sha256": "76f95ef8aea05de61d5c379af8ba3fcf6cc5fa300998c9c71ad282b314a7ab40"
+  },
+  {
+   "path": "tools/connectors/managed.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "aeffe55149075a5426d680b4402c013766a53bbc8612f70b8d1be329e6ab516f",
+   "ours_sha256": "8c99c62b2922f84ae037b46bb081bca8f15afc97adec810e0b72ecce5e0da1f2",
+   "theirs_sha256": "8c99c62b2922f84ae037b46bb081bca8f15afc97adec810e0b72ecce5e0da1f2",
+   "result_sha256": "8c99c62b2922f84ae037b46bb081bca8f15afc97adec810e0b72ecce5e0da1f2"
+  },
+  {
+   "path": "tools/connectors/mcp.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7635674bc772695e9bc4baf79c503409ce85656ecca54853ae1a3a628e69ff60",
+   "ours_sha256": "f2e6d2de9586e7e558819d35358b2d755994348e5f17db0e21cf3b22dac7d364",
+   "theirs_sha256": "9b03620e24185a96de312332f69e51257ccb7d06af381ff2b4d62f241b592500",
+   "result_sha256": "9b03620e24185a96de312332f69e51257ccb7d06af381ff2b4d62f241b592500"
+  },
+  {
+   "path": "tools/connectors/mcp_oauth.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e3622cafb1f162e776e639a49f7647cad6144af0653c348455dbd8bc8f150df0",
+   "ours_sha256": "92576493b0c65e67a1fddce63f9a8a8d7916a2710aed85666a6f6355043c1d0e",
+   "theirs_sha256": "83146290028bef21a612234078ce38971539a9568dc707cc49c74f4804b6a5b1",
+   "result_sha256": "83146290028bef21a612234078ce38971539a9568dc707cc49c74f4804b6a5b1"
+  },
+  {
+   "path": "tools/connectors/operation.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "972d39a8e574e222214d8c3cd764affed8f5483e0e90ebe73e4f3b30a948bf6b",
+   "ours_sha256": "4bb7b27ee537c7dfafe648109a2a5fbd571f72f7039a89f56eade72d1289f7af",
+   "theirs_sha256": "4bb7b27ee537c7dfafe648109a2a5fbd571f72f7039a89f56eade72d1289f7af",
+   "result_sha256": "4bb7b27ee537c7dfafe648109a2a5fbd571f72f7039a89f56eade72d1289f7af"
+  },
+  {
+   "path": "tools/connectors/portal/__init__.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "9f56e761d79bfdb34304a012586cb04d16b435ef6130091a97702e559260a2f2",
+   "theirs_sha256": "9f56e761d79bfdb34304a012586cb04d16b435ef6130091a97702e559260a2f2",
+   "result_sha256": "9f56e761d79bfdb34304a012586cb04d16b435ef6130091a97702e559260a2f2"
+  },
+  {
+   "path": "tools/connectors/portal/client.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "8aaccbcf0a99bd1d9f7d71900130fb583f6694ea2de8ca0183fc41ec0aae7a30",
+   "theirs_sha256": "8aaccbcf0a99bd1d9f7d71900130fb583f6694ea2de8ca0183fc41ec0aae7a30",
+   "result_sha256": "8aaccbcf0a99bd1d9f7d71900130fb583f6694ea2de8ca0183fc41ec0aae7a30"
+  },
+  {
+   "path": "tools/connectors/portal/errors.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "5ab2c930f99c554cd743e9cdf9462aa1f04f72f0008ca10aa80a95544480d873",
+   "theirs_sha256": "5ab2c930f99c554cd743e9cdf9462aa1f04f72f0008ca10aa80a95544480d873",
+   "result_sha256": "5ab2c930f99c554cd743e9cdf9462aa1f04f72f0008ca10aa80a95544480d873"
+  },
+  {
+   "path": "tools/connectors/portal/policy.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "7307ef2fda671272f16f6ddef8ed59683f8079aa2a7aaed9d958f52fec441088",
+   "theirs_sha256": "7307ef2fda671272f16f6ddef8ed59683f8079aa2a7aaed9d958f52fec441088",
+   "result_sha256": "7307ef2fda671272f16f6ddef8ed59683f8079aa2a7aaed9d958f52fec441088"
+  },
+  {
+   "path": "tools/connectors/portal/tools_cache.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "2cd1a7a32607d12fd2c5a93f894aceae7f3a169e885119ff845a61ce56f18513",
+   "theirs_sha256": "2cd1a7a32607d12fd2c5a93f894aceae7f3a169e885119ff845a61ce56f18513",
+   "result_sha256": "2cd1a7a32607d12fd2c5a93f894aceae7f3a169e885119ff845a61ce56f18513"
+  },
+  {
+   "path": "tools/connectors/portal/wire.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "648461ead30c2bc9c1e6fa2b933edd0b54dd38b6bed61558e6eddbf444114801",
+   "theirs_sha256": "648461ead30c2bc9c1e6fa2b933edd0b54dd38b6bed61558e6eddbf444114801",
+   "result_sha256": "648461ead30c2bc9c1e6fa2b933edd0b54dd38b6bed61558e6eddbf444114801"
+  },
+  {
+   "path": "tools/connectors/run.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "8476b922a3ae0b791b54c015569a0ab2b83a9301107bffd4d4229f4de9c89a6f",
+   "ours_sha256": "2024211204d89c24aac6b55778db012a3ed3160d1d17fb56a6b2997876834c5f",
+   "theirs_sha256": "2024211204d89c24aac6b55778db012a3ed3160d1d17fb56a6b2997876834c5f",
+   "result_sha256": "2024211204d89c24aac6b55778db012a3ed3160d1d17fb56a6b2997876834c5f"
+  },
+  {
+   "path": "tools/connectors/search.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "29e365ceab1db51ee5961f74032352313f4e72f79932df00f3e07414549ee288",
+   "ours_sha256": "1610e0f24c00b558827ade7d16f997d282fd2344502f22347d5e518892bb678c",
+   "theirs_sha256": "1610e0f24c00b558827ade7d16f997d282fd2344502f22347d5e518892bb678c",
+   "result_sha256": "1610e0f24c00b558827ade7d16f997d282fd2344502f22347d5e518892bb678c"
+  },
+  {
+   "path": "tools/connectors/targets.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "628b9e12e8bbc4a031329c33a6a9a724346887cd6f12d5dce3ce821f115e452d",
+   "ours_sha256": "1d016e03a0898b5bb4f319c1c0b0a74ad3107b38c5e334554bcb8722d6b5ad21",
+   "theirs_sha256": "1d016e03a0898b5bb4f319c1c0b0a74ad3107b38c5e334554bcb8722d6b5ad21",
+   "result_sha256": "1d016e03a0898b5bb4f319c1c0b0a74ad3107b38c5e334554bcb8722d6b5ad21"
+  },
+  {
+   "path": "tools/connectors/tool.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "e9a9284f28a531e7ea56edc5ec812971f5dd9352c60205abf1c608e49270d156",
+   "ours_sha256": "1b3bd6552f5291ffaffa63a511c812b0e46498f2b14711a964fc667b74304ffa",
+   "theirs_sha256": "1b3bd6552f5291ffaffa63a511c812b0e46498f2b14711a964fc667b74304ffa",
+   "result_sha256": "1b3bd6552f5291ffaffa63a511c812b0e46498f2b14711a964fc667b74304ffa"
+  },
+  {
+   "path": "tools/connectors/turn.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "7e1aee61ba9f61d09fef2b74b8cc0b1fe927557b83da9d54bd236d8b2eb0bce7",
+   "theirs_sha256": "7e1aee61ba9f61d09fef2b74b8cc0b1fe927557b83da9d54bd236d8b2eb0bce7",
+   "result_sha256": "7e1aee61ba9f61d09fef2b74b8cc0b1fe927557b83da9d54bd236d8b2eb0bce7"
+  },
+  {
+   "path": "tools/credential_files.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7316ee203d2c1af0df9660f2a7b6511c7aa1de9139403229eacc8823c05f0827",
+   "ours_sha256": "0cc39f4da32639dcd6564f97ab65ea639e0152a305ebbdc4a764faf1544ad1a4",
+   "theirs_sha256": "53cb6fadb7b7f86feb28a4f8213427f4dc799862d0a57d38ad1c189ad1865d68",
+   "result_sha256": "53cb6fadb7b7f86feb28a4f8213427f4dc799862d0a57d38ad1c189ad1865d68"
+  },
+  {
+   "path": "tools/cronjob_job_args.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b2b72e028d2f7fe32a4471ea1104c4f7eca4e3e59c72289c8ffe92acc98d51a5",
+   "ours_sha256": "b2b72e028d2f7fe32a4471ea1104c4f7eca4e3e59c72289c8ffe92acc98d51a5",
+   "theirs_sha256": "14b37756d3529109367bfded72dc287e4cc0a9fde8922fde14c69feede064f30",
+   "result_sha256": "14b37756d3529109367bfded72dc287e4cc0a9fde8922fde14c69feede064f30"
+  },
+  {
+   "path": "tools/cronjob_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "dbd6160d56475410e784e403e484d8215b1ab98fe5f4bcc266b045d8852f9b5d",
+   "ours_sha256": "335b3ab7024a7852baa1f7ca512d984c33b174232523fdbdd926247e2f3d5f90",
+   "theirs_sha256": "162f440a9f91fff22ff65fb31a3391ce71bde08d70e52741ebe7abeb18f97539",
+   "result_sha256": "162f440a9f91fff22ff65fb31a3391ce71bde08d70e52741ebe7abeb18f97539"
+  },
+  {
+   "path": "tools/daemon_pool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "48f2de4ef2927d4eeee86755b691727586056bad65f5de4edb9f01dd0c72ae3a",
+   "ours_sha256": "e4342132b48d1840d9be69a20677b329b652c87a7644e4be7557e862d050e072",
+   "theirs_sha256": "a5af8cba52f4e42fba7db725e173043b36171657b0c0b21339a5366cc9bbd503",
+   "result_sha256": "a5af8cba52f4e42fba7db725e173043b36171657b0c0b21339a5366cc9bbd503"
+  },
+  {
+   "path": "tools/debug_helpers.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0d04b1f6d5c798148ab1379c3e820dac4b171250f739b2bc7464f0e09c67b7bc",
+   "ours_sha256": "0d04b1f6d5c798148ab1379c3e820dac4b171250f739b2bc7464f0e09c67b7bc",
+   "theirs_sha256": "14560431845df5ff194a4ca2fd27e8b92bd5aa378f1f5fdb72b0d9ae9ccf6b47",
+   "result_sha256": "14560431845df5ff194a4ca2fd27e8b92bd5aa378f1f5fdb72b0d9ae9ccf6b47"
+  },
+  {
+   "path": "tools/delegate_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2006d34eaf08f15311e37a3802822071b8956a21a7701b89172edf49287cfc39",
+   "ours_sha256": "3ce8e7c35c9f31cf6afdd6becfb3290d0444731e0509f130f2969b62ec685b08",
+   "theirs_sha256": "d79345e165fd529250cfc8a814b20f1a5984543728e8115807b64cbab52f89c2",
+   "result_sha256": "d79345e165fd529250cfc8a814b20f1a5984543728e8115807b64cbab52f89c2"
+  },
+  {
+   "path": "tools/delegate_tool_child_run.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "78a9b16f4ca19447a03cadc78026f789da46452e068d1c1946cbfef68e1d5b1a",
+   "ours_sha256": "78a9b16f4ca19447a03cadc78026f789da46452e068d1c1946cbfef68e1d5b1a",
+   "theirs_sha256": "fcadd6d0e937052b7058c2b8b617869391982c57a5fe52eebe09513c7fe02e69",
+   "result_sha256": "fcadd6d0e937052b7058c2b8b617869391982c57a5fe52eebe09513c7fe02e69"
+  },
+  {
+   "path": "tools/delegate_tool_config.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a5420ed914ed1830e5d4e435d08669dab87f8c87d7314e180a0075d69aea1322",
+   "ours_sha256": "b53562d24e51f90d5a1ff272e5d969581ec76f63a830b1c1205931f318b235f4",
+   "theirs_sha256": "ffcab4d45fed4543c57ca4d34834655a1eabe459527eda9948c5603d323d3332",
+   "result_sha256": "ffcab4d45fed4543c57ca4d34834655a1eabe459527eda9948c5603d323d3332"
+  },
+  {
+   "path": "tools/delegate_tool_dispatch.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "1fecceaf1f77272e224e46bb8f7b7206b77f09f716066060be15ab219c234473",
+   "ours_sha256": "1fecceaf1f77272e224e46bb8f7b7206b77f09f716066060be15ab219c234473",
+   "theirs_sha256": "b4dd54770cff96e41d936b6a08f05c12779be4cbbf343353cbc3c99f6d5895c4",
+   "result_sha256": "b4dd54770cff96e41d936b6a08f05c12779be4cbbf343353cbc3c99f6d5895c4"
+  },
+  {
+   "path": "tools/delegate_tool_progress.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "db905f2ca871e7bc298decd131f63e287ff2f1194309e9cbc266d81d355ca35f",
+   "ours_sha256": "db905f2ca871e7bc298decd131f63e287ff2f1194309e9cbc266d81d355ca35f",
+   "theirs_sha256": "f09d34be8a265743489bb3ee66f2cc9231c7d1da73116ae49f44ebb054e98057",
+   "result_sha256": "f09d34be8a265743489bb3ee66f2cc9231c7d1da73116ae49f44ebb054e98057"
+  },
+  {
+   "path": "tools/delegate_tool_registry.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ca0cf0fc762538a93c40379bcf7a558846992548815b4f91fe3ad834fdb80854",
+   "ours_sha256": "ca0cf0fc762538a93c40379bcf7a558846992548815b4f91fe3ad834fdb80854",
+   "theirs_sha256": "6b21c74096cb3e9fbddb59eb331a196b1f6b4d1790a31b5abffb4a98e0bfb6de",
+   "result_sha256": "6b21c74096cb3e9fbddb59eb331a196b1f6b4d1790a31b5abffb4a98e0bfb6de"
+  },
+  {
+   "path": "tools/delegate_tool_results.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4ccdae0d3f962390c21f36ad93b2a156a336360d5727d77ae13cdd8ea8427b6d",
+   "ours_sha256": "4ccdae0d3f962390c21f36ad93b2a156a336360d5727d77ae13cdd8ea8427b6d",
+   "theirs_sha256": "4f83b09acdcbe8899dd646a9e16f865cf0faae06c019e3477f6830d897e1e055",
+   "result_sha256": "4f83b09acdcbe8899dd646a9e16f865cf0faae06c019e3477f6830d897e1e055"
+  },
+  {
+   "path": "tools/delegate_tool_tasks.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d6029b03eee89c8261f3e64becc1c2aa900916eec3ab56bed4fae1811c24e886",
+   "ours_sha256": "d6029b03eee89c8261f3e64becc1c2aa900916eec3ab56bed4fae1811c24e886",
+   "theirs_sha256": "7e552ee2aab647447930f5379c96308b755dae7ed8dce152214b6c0de395e2a9",
+   "result_sha256": "7e552ee2aab647447930f5379c96308b755dae7ed8dce152214b6c0de395e2a9"
+  },
+  {
+   "path": "tools/delegate_tool_toolsets.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e540eb4418467c3483ebad4f34d89f6acf6c29892dfa2d0418958491bb5fdd74",
+   "ours_sha256": "e540eb4418467c3483ebad4f34d89f6acf6c29892dfa2d0418958491bb5fdd74",
+   "theirs_sha256": "a1967a15c535dbbd100a812bfa5d43dd26459f1775ded775d59716faa1acfbe2",
+   "result_sha256": "a1967a15c535dbbd100a812bfa5d43dd26459f1775ded775d59716faa1acfbe2"
+  },
+  {
+   "path": "tools/delegation_live_log.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "69aaee0c3f9f75dc9a9e313a436efbd36ce44808cad68f6863b4cb8e514e4996",
+   "ours_sha256": "6aa7ebca1c9ce1e34f34467884bf03fe17419eff634d201764f83c546def33fc",
+   "theirs_sha256": "fcc819eb1c22df4ce7a3af0960dc806d24b7305ddf299645b435d59963adba9f",
+   "result_sha256": "fcc819eb1c22df4ce7a3af0960dc806d24b7305ddf299645b435d59963adba9f"
+  },
+  {
+   "path": "tools/delegation_output_schema.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "314424a7edf1a2e0d4dbebbd50a5237a5d164db4f868ecfff7692895d42984ca",
+   "ours_sha256": "314424a7edf1a2e0d4dbebbd50a5237a5d164db4f868ecfff7692895d42984ca",
+   "theirs_sha256": "bd7874c2bf0c6b9208a9472e5ceba8c4cdff8226d73d5b600fcf18147876c9f7",
+   "result_sha256": "bd7874c2bf0c6b9208a9472e5ceba8c4cdff8226d73d5b600fcf18147876c9f7"
+  },
+  {
+   "path": "tools/discord_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d971945a06b4b7ab2ab770fe2fae95810ba32ac48ac064751e956eeb0f900aa2",
+   "ours_sha256": "31cfd5fb541d0e3131b5b0b2e6b8ce913c5d5402a1820ea065fd32d56bf94368",
+   "theirs_sha256": "b960bf7ea4acb09cd57522a7b5d4f67dc66e2fca93cc5e91996d33d8af3a4c5f",
+   "result_sha256": "b960bf7ea4acb09cd57522a7b5d4f67dc66e2fca93cc5e91996d33d8af3a4c5f"
+  },
+  {
+   "path": "tools/env_passthrough.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "fad5b371f60268a9cbe27b1857ef56ce068f79c93fa0b662518d3093279cb8a6",
+   "ours_sha256": "fad5b371f60268a9cbe27b1857ef56ce068f79c93fa0b662518d3093279cb8a6",
+   "theirs_sha256": "d983d06bfb271b04cefac75bb50d9d52ab47194b2349d24b847a0c5293f817eb",
+   "result_sha256": "d983d06bfb271b04cefac75bb50d9d52ab47194b2349d24b847a0c5293f817eb"
+  },
+  {
+   "path": "tools/environments/base.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7d6643d28b3fea8ecf2f3752165ec9239fc70450373d94acee9b1f2d16b8e6a8",
+   "ours_sha256": "bdaedeb0567d73077eced991e9a705db01d9411842b4d26eb3a43a22424566d3",
+   "theirs_sha256": "cdfdb358ebf7d90e5655f6ca1fa9c8dc79e8cb848185692414e330c8c0223aaa",
+   "result_sha256": "cdfdb358ebf7d90e5655f6ca1fa9c8dc79e8cb848185692414e330c8c0223aaa"
+  },
+  {
+   "path": "tools/environments/base_output.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "36e1bc6b136f715e30b7a609ea73b21c6402a2b9d29a5ff0b22f1a689100ba66",
+   "ours_sha256": "fb59cd7c103e70b33dae4113fba6d38092971972f66cbdd08d1963eb047781f1",
+   "theirs_sha256": "24677e26a969c72a7ef821915d99686d4c8a09ce2ac1b4b969d4b235d7e85a88",
+   "result_sha256": "24677e26a969c72a7ef821915d99686d4c8a09ce2ac1b4b969d4b235d7e85a88"
+  },
+  {
+   "path": "tools/environments/base_session_env.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4b66e50beb268ebf18e5e3e74be57e9429b0a31d58c40d843007b2ebc7f64004",
+   "ours_sha256": "4b66e50beb268ebf18e5e3e74be57e9429b0a31d58c40d843007b2ebc7f64004",
+   "theirs_sha256": "4d70a1a777ddbdc8221a889df8d934e66c5921bf44f1fb3328cd4b383c23383a",
+   "result_sha256": "4d70a1a777ddbdc8221a889df8d934e66c5921bf44f1fb3328cd4b383c23383a"
+  },
+  {
+   "path": "tools/environments/daytona.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "224204584404914ef83ee1038db8d585af9d590c41f17c6195e5d33f4dbe43ac",
+   "ours_sha256": "673ee0dab726b406c089705a4fb1813635339112e9fe87327587d35d3ef205c5",
+   "theirs_sha256": "4b4053d8ee3d11a4f7a302f4b1a02816c692fdb3ee6f5c57a5856acf6ff2754b",
+   "result_sha256": "4b4053d8ee3d11a4f7a302f4b1a02816c692fdb3ee6f5c57a5856acf6ff2754b"
+  },
+  {
+   "path": "tools/environments/docker.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "1042b968e121debe2c8d91faab356319ac1b5c897d7f8fc279874a6b00e72d6c",
+   "ours_sha256": "c57cbcb1f96bdfc42f18291b1f3cc97dfd6d8f939ad3e3ece4857515efc4ffc7",
+   "theirs_sha256": "87b7c6ec3b778c208af001ae6042645d0b39e3d3e409f0c7c6b21b74555ef4e6",
+   "result_sha256": "87b7c6ec3b778c208af001ae6042645d0b39e3d3e409f0c7c6b21b74555ef4e6"
+  },
+  {
+   "path": "tools/environments/docker_egress.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b34a168e9fb4a3e11b1f90351efc0d0f868ee786ad02fe45e831409b4f6a9daf",
+   "ours_sha256": "b34a168e9fb4a3e11b1f90351efc0d0f868ee786ad02fe45e831409b4f6a9daf",
+   "theirs_sha256": "0894cb2fcb6c3a07748c201541764e9d8b7550f44e72935d1234c1191d60b68b",
+   "result_sha256": "0894cb2fcb6c3a07748c201541764e9d8b7550f44e72935d1234c1191d60b68b"
+  },
+  {
+   "path": "tools/environments/file_sync.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c17bd27d23a98a1c19d2cface38c0e69c3e6572fdf5ed4a5e10a8e04d44fdd4c",
+   "ours_sha256": "c010bbda4e0860ab9657b1b6c825eafb5a62dd726621eaa3b41a3be8b5908b00",
+   "theirs_sha256": "c5f1fa13d33fba386752b2ae2fdbffb6c4577101bed8a1ae56c1fe8385b8b46b",
+   "result_sha256": "c5f1fa13d33fba386752b2ae2fdbffb6c4577101bed8a1ae56c1fe8385b8b46b"
+  },
+  {
+   "path": "tools/environments/local.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2590d914c172ff55855abd4f19c24c4ff03ced7c77bed1d60c9c2009356d7d4b",
+   "ours_sha256": "15fa75ec566e9b1ab4d7b232b0a475006abf57bffc5769f3145a322c8f8a9e2d",
+   "theirs_sha256": "6c56558c8c9e418c4bbccf2428ced1eebbe10aaa18581a527e5e4dc9add6d219",
+   "result_sha256": "6c56558c8c9e418c4bbccf2428ced1eebbe10aaa18581a527e5e4dc9add6d219"
+  },
+  {
+   "path": "tools/environments/local_env_policy.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "13cb9686a39670d51bd368f35d16535de398410fcdb340aacf7380400b115505",
+   "ours_sha256": "aacc36ded20e2bde2171b5eaae8e6d635993479a0e83335f51ff8be2fecacf2d",
+   "theirs_sha256": "5c948fdf54567189703e7a94c3aeaf1174361a695608a9d3154a1c1d6f18b917",
+   "result_sha256": "5c948fdf54567189703e7a94c3aeaf1174361a695608a9d3154a1c1d6f18b917"
+  },
+  {
+   "path": "tools/environments/local_gitbash_probe.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "6d772fcae2c485e924c433edf34e7f15c6daaf41fadd613184df0118a98536cc",
+   "ours_sha256": null,
+   "theirs_sha256": "81037b03bfa7449712e212078b5cb331d9aaf6cdbdfc73d3bb91a691bed01631",
+   "result_sha256": "81037b03bfa7449712e212078b5cb331d9aaf6cdbdfc73d3bb91a691bed01631"
+  },
+  {
+   "path": "tools/environments/local_pythonpath.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "bc39b9ffdf40aa836a348109d2ae7bcb9667e56709f1b17ab68ac0da9eb94b16",
+   "ours_sha256": "10ea420ab628422409d1040d34cc7dfbcc409eb5fcb9aebaeda725f252db085b",
+   "theirs_sha256": "cd570ab7bd03a9aa460502643feea33fe50c6ecb466432e2e6e3bc8aec83d3fd",
+   "result_sha256": "cd570ab7bd03a9aa460502643feea33fe50c6ecb466432e2e6e3bc8aec83d3fd"
+  },
+  {
+   "path": "tools/environments/modal.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ce8bb0cdeafae3ddbd5c7b6bcba49cad4e6e9900159a14bc717250ab6d9759cc",
+   "ours_sha256": "71083a0f4fd96f46edb83c32cc38a0af9600ca91cfe3597d2c696d370c4930f5",
+   "theirs_sha256": "53b52daf512d9565e78e61e6c9f1fcb12336fb6fb63d5cb53a71e2f0a6d46d3b",
+   "result_sha256": "53b52daf512d9565e78e61e6c9f1fcb12336fb6fb63d5cb53a71e2f0a6d46d3b"
+  },
+  {
+   "path": "tools/environments/remote_common.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "f5ca2184a4041c08616eac4e315af9fdbd0453bdcee126b04ae84437ce12f54c",
+   "ours_sha256": "fd5e4b55597cc600c914b950649b68795ed9231334066e9b99cdd2b1cca1a4d1",
+   "theirs_sha256": "156ac13a9073ea97233d1ac1354d3bdcc06a6a14852d78a6b08b55c44755a425",
+   "result_sha256": "156ac13a9073ea97233d1ac1354d3bdcc06a6a14852d78a6b08b55c44755a425"
+  },
+  {
+   "path": "tools/environments/singularity.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b69b21a206703256ea9a78aeaaf5e93c854897c478485cbe170301559921c5bc",
+   "ours_sha256": "b69b21a206703256ea9a78aeaaf5e93c854897c478485cbe170301559921c5bc",
+   "theirs_sha256": "39767226b3568e3ec9357a255f6fce035a677a7e71f6a3ef7d5609d2bee69075",
+   "result_sha256": "39767226b3568e3ec9357a255f6fce035a677a7e71f6a3ef7d5609d2bee69075"
+  },
+  {
+   "path": "tools/environments/ssh.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "636c9095ce9bef7898f920f4cd507f32c7e88caa84016be05b130d896456a14c",
+   "ours_sha256": "636c9095ce9bef7898f920f4cd507f32c7e88caa84016be05b130d896456a14c",
+   "theirs_sha256": "a7712ce8ae4ffbbff0fe81360c6c58e8deef66ac24e0583bead650b168d2d6e9",
+   "result_sha256": "a7712ce8ae4ffbbff0fe81360c6c58e8deef66ac24e0583bead650b168d2d6e9"
+  },
+  {
+   "path": "tools/environments/vercel_sandbox.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "238fc13d412810af2eb92f153b93bdfaa70331d0b1fb8946bc28e71d01dba342",
+   "ours_sha256": "a585ae54d45a252347288df5376bd7c62a6c6a9a6c6a84c690da978c369c2804",
+   "theirs_sha256": "589c5dba9d6fcaeea087518eb0630e62958bc7da172027a47d6a2ce7a3a0c646",
+   "result_sha256": "589c5dba9d6fcaeea087518eb0630e62958bc7da172027a47d6a2ce7a3a0c646"
+  },
+  {
+   "path": "tools/fal_common.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2bf9577c1462399df663d64091df1303daf59d243117e1187240aa268401d962",
+   "ours_sha256": "579974ffca5a058815a9626452ee7371b9e161dff6892c850a2f54eda2320479",
+   "theirs_sha256": "485564448777fd7bb90173865561d6f279ce651e534550b7f29ab91180950671",
+   "result_sha256": "485564448777fd7bb90173865561d6f279ce651e534550b7f29ab91180950671"
+  },
+  {
+   "path": "tools/file_operations.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "15c539d6de209d791a26f54cc48f6ed187414f8ff47f56ef2c0a48e250fe6064",
+   "ours_sha256": "cdb88cacb2c196a8bba4275b96a3146e40567194657f8ba49bf3da3ab4bdd558",
+   "theirs_sha256": "13c1a60eec2cf58876aae35f5d1e783577110240cdf238eca146714b31632909",
+   "result_sha256": "13c1a60eec2cf58876aae35f5d1e783577110240cdf238eca146714b31632909"
+  },
+  {
+   "path": "tools/file_operations_common.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "829cb92348e10b440e3f3f4c8102afbacbe7c875adaf095edfed23451d38b0fc",
+   "ours_sha256": "dc0a3d7c46376694eaa918a2c9239dbbc0d77234ffe6010582c8c112e835cae8",
+   "theirs_sha256": "d346c6d2e710a0fbf74bb25151b3864adba0e716db0ec9e8fa87fdbc180c6a7d",
+   "result_sha256": "d346c6d2e710a0fbf74bb25151b3864adba0e716db0ec9e8fa87fdbc180c6a7d"
+  },
+  {
+   "path": "tools/file_operations_lint.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e48df7f59d642ca7668412b128255530c8318be2f6c2de646c0111db3f0786d5",
+   "ours_sha256": "cd5c8728d547d2e03db8b8e8eccd309e9bc9fc41e654699bf700427050d63795",
+   "theirs_sha256": "8bb10170f92b5108f87195421a08c03dc0ea27eca0aaff344476cf7f44497e0c",
+   "result_sha256": "8bb10170f92b5108f87195421a08c03dc0ea27eca0aaff344476cf7f44497e0c"
+  },
+  {
+   "path": "tools/file_operations_search.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7a29f9f1344c30813910d9ff06d8e45b2f8928ecc79dfff21ad40fea52588a9c",
+   "ours_sha256": "d766e9b8af4aba8e2639e9dd9006c20f323964276bc43f918a5676da2a1f37bb",
+   "theirs_sha256": "0dd5c95cb0d3fae9f4699707880e88871d6455623a2bd8d8d3b1158805c7a959",
+   "result_sha256": "0dd5c95cb0d3fae9f4699707880e88871d6455623a2bd8d8d3b1158805c7a959"
+  },
+  {
+   "path": "tools/file_state.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c1e379e13aea173b3a23d074793d07614c2c6e944fcd6e72ff87652701e3ad25",
+   "ours_sha256": "c1e379e13aea173b3a23d074793d07614c2c6e944fcd6e72ff87652701e3ad25",
+   "theirs_sha256": "917242c95faed18436bacf9429f242496bb76497c2514b083d6d0df62487ba2a",
+   "result_sha256": "917242c95faed18436bacf9429f242496bb76497c2514b083d6d0df62487ba2a"
+  },
+  {
+   "path": "tools/file_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "bbe4ee1f33156797a9c5dcfd064b7e902140ed2fa831c2f1fb46fdd0a0e835e9",
+   "ours_sha256": "1cd5258897f63011ab7531f125fb42ae703557acc07c154d721b07fbb9f63705",
+   "theirs_sha256": "eeab251ce4dada556240e4bfd8f457361458ba88acdb83017a2fca1111bde1a9",
+   "result_sha256": "eeab251ce4dada556240e4bfd8f457361458ba88acdb83017a2fca1111bde1a9"
+  },
+  {
+   "path": "tools/file_tools_paths.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "6f523d180defcb5b774c31bc0074798f20c325ff8f49b234ef8a9730ec032512",
+   "ours_sha256": "6f523d180defcb5b774c31bc0074798f20c325ff8f49b234ef8a9730ec032512",
+   "theirs_sha256": "44b1ffd2fd314ccedb0faf92856ce62cf9dcd2b40609546271ce22c853ade434",
+   "result_sha256": "44b1ffd2fd314ccedb0faf92856ce62cf9dcd2b40609546271ce22c853ade434"
+  },
+  {
+   "path": "tools/file_tools_read_tracking.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "80161da12c514011a51fdc563db4db76e872e72a2e180d1ea30b313f3f87af7c",
+   "ours_sha256": "76057d71c98dbe27fa8c7e8112fac319b1cfd299072e91c6da019bc92f71552b",
+   "theirs_sha256": "bf9ab81e2be04938a49d4bc4d44863ef740699d0b01f4db13ef5a54bc3be150d",
+   "result_sha256": "bf9ab81e2be04938a49d4bc4d44863ef740699d0b01f4db13ef5a54bc3be150d"
+  },
+  {
+   "path": "tools/file_tools_write_guards.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "fc49a5799f04b2cd4f9c0b66e2314256ddefbbbbedc52a97a1e06c1938dc68f4",
+   "ours_sha256": "fc49a5799f04b2cd4f9c0b66e2314256ddefbbbbedc52a97a1e06c1938dc68f4",
+   "theirs_sha256": "fd77f2948347617da3b43866c496879c05d9a61c510177178eddaddd04d638f5",
+   "result_sha256": "fd77f2948347617da3b43866c496879c05d9a61c510177178eddaddd04d638f5"
+  },
+  {
+   "path": "tools/fuzzy_match.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "f20a367ce8cf0fa41ee918c8d83921d6978d461d46b2ae8e77efb19b0bbce1ec",
+   "ours_sha256": "fd66dc9008ca5eb059bbdb2ddc3f164cf77e96f620ae805abd3f97c8017a0987",
+   "theirs_sha256": "151d7de4ec9af37cf79e6d7885f4ae5ff309194acfc316e2b75d1a3362eb253f",
+   "result_sha256": "151d7de4ec9af37cf79e6d7885f4ae5ff309194acfc316e2b75d1a3362eb253f"
+  },
+  {
+   "path": "tools/homeassistant_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c1d12f6ece9792ddce3c99909b4d867e31aadc616100e0eecd92b6d08c34e990",
+   "ours_sha256": "c1d12f6ece9792ddce3c99909b4d867e31aadc616100e0eecd92b6d08c34e990",
+   "theirs_sha256": "5f7c9fefef2372119ebc8cde78cb8e5c6d7ee4a1a0bd3a5f100436267ce83ae9",
+   "result_sha256": "5f7c9fefef2372119ebc8cde78cb8e5c6d7ee4a1a0bd3a5f100436267ce83ae9"
+  },
+  {
+   "path": "tools/hook_output_spill.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2b2f91b63c5df70e4cfd1a2be867e8072d10e96d217adebce9d505e9b5a41139",
+   "ours_sha256": "2b2f91b63c5df70e4cfd1a2be867e8072d10e96d217adebce9d505e9b5a41139",
+   "theirs_sha256": "9adaf5b2d6a45582599d73889ab293983d7d2db1617461b74e3e83c62fbe70eb",
+   "result_sha256": "9adaf5b2d6a45582599d73889ab293983d7d2db1617461b74e3e83c62fbe70eb"
+  },
+  {
+   "path": "tools/image_generation_catalog.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e844236257b6bf7f0c3d5c824aca3d414286726c1e544f4a8f7f74c3057c260d",
+   "ours_sha256": "e844236257b6bf7f0c3d5c824aca3d414286726c1e544f4a8f7f74c3057c260d",
+   "theirs_sha256": "6669ee2cec41a716d9b33e108a0575fdcc073523a6d4d20a3747e7854246efcc",
+   "result_sha256": "6669ee2cec41a716d9b33e108a0575fdcc073523a6d4d20a3747e7854246efcc"
+  },
+  {
+   "path": "tools/image_generation_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2ea0a1a6b59db7b6be7ecab20619d921c4301c47d3f4271d123fa4ae56827c90",
+   "ours_sha256": "2ea0a1a6b59db7b6be7ecab20619d921c4301c47d3f4271d123fa4ae56827c90",
+   "theirs_sha256": "97731d02f4357790bd191ab6fd5929289cd305cd5605d186a568f8b9f6711b5e",
+   "result_sha256": "97731d02f4357790bd191ab6fd5929289cd305cd5605d186a568f8b9f6711b5e"
+  },
+  {
+   "path": "tools/image_source.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "548e1e27d1c4adfbc17dbbb99089e86390ad9f3179a423159852de595a4d116f",
+   "ours_sha256": "548e1e27d1c4adfbc17dbbb99089e86390ad9f3179a423159852de595a4d116f",
+   "theirs_sha256": "95f568acb3f41dcc243f1567cd0da1c12e36c6bd0224a5afe6c3998bbb87cd93",
+   "result_sha256": "95f568acb3f41dcc243f1567cd0da1c12e36c6bd0224a5afe6c3998bbb87cd93"
+  },
+  {
+   "path": "tools/interrupt.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "3127f53b4ca1431df828015a3eb06d29ffd43ea9b6a51954d3a45bc69483917b",
+   "ours_sha256": "3127f53b4ca1431df828015a3eb06d29ffd43ea9b6a51954d3a45bc69483917b",
+   "theirs_sha256": "513945569eb46a6a253afc851a81e1157b66d7dbdff52a73c676c4fbce17247b",
+   "result_sha256": "513945569eb46a6a253afc851a81e1157b66d7dbdff52a73c676c4fbce17247b"
+  },
+  {
+   "path": "tools/kanban_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "1d344cd572e228f8fb348cafb98d76764f4cfc9288258850ce0681fa96b094e8",
+   "ours_sha256": "abfbbcaac2be3c1da23b9996a618daab81ec57645c094bed268b4e8c4330904b",
+   "theirs_sha256": "433b783feb6bd67812399b552b8039c6f9954a055dbb8e29e17a06e146e5a451",
+   "result_sha256": "433b783feb6bd67812399b552b8039c6f9954a055dbb8e29e17a06e146e5a451"
+  },
+  {
+   "path": "tools/kanban_tools_schemas.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "cd37a42db381d418a9fcdcd04c8d27636ada47a647bba8c4cf8ceb13631dcbf4",
+   "ours_sha256": "cd37a42db381d418a9fcdcd04c8d27636ada47a647bba8c4cf8ceb13631dcbf4",
+   "theirs_sha256": "d356d43e5c71e8aa23ba7a9f9db62125e6660153d01b3e03b929c926c28b23fd",
+   "result_sha256": "d356d43e5c71e8aa23ba7a9f9db62125e6660153d01b3e03b929c926c28b23fd"
+  },
+  {
+   "path": "tools/kanban_toolset_context.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "73c473524ce149a1421cb0745df02f6518a231bdc1344a3f4f8024aed6e16f72",
+   "ours_sha256": "73c473524ce149a1421cb0745df02f6518a231bdc1344a3f4f8024aed6e16f72",
+   "theirs_sha256": "347213b6eb6f2797dd3ee4e4fab04405c71fba768d1d81b7d839d34b188b9d90",
+   "result_sha256": "347213b6eb6f2797dd3ee4e4fab04405c71fba768d1d81b7d839d34b188b9d90"
+  },
+  {
+   "path": "tools/lazy_deps.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c1d3ad95e16b4f4a7a65c2c7f7a3d918cf9269d0dec40efc8e83092bbe053332",
+   "ours_sha256": "863586e43528c793e610319f4b80f56f7c719f5d4b5a137dacc6de1bb8bf2319",
+   "theirs_sha256": "e7d55bd8be3981d25ed442bf18f18c250c0b6e47f20c18390c70a94bf56e0e02",
+   "result_sha256": "e7d55bd8be3981d25ed442bf18f18c250c0b6e47f20c18390c70a94bf56e0e02"
+  },
+  {
+   "path": "tools/managed_tool_gateway.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2b0ca9a6836b2d4ced4a26cf4e095d9f00aff38f4578b12d7cc9e5e57c047e62",
+   "ours_sha256": "fe13abdce0dbac37760ebca0a2f0dc9ccf8df55b3e8078d9a1054749b0e0759a",
+   "theirs_sha256": "98df6bf5a139fb4ef752a265e68a98005c65223fbb160d83e9d22b5555c1d36e",
+   "result_sha256": "98df6bf5a139fb4ef752a265e68a98005c65223fbb160d83e9d22b5555c1d36e"
+  },
+  {
+   "path": "tools/mcp_dashboard_oauth.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a654ca7ff8e739fdcc3d524b60e5e6d01b3a5fa140cc930b39bf72f43b87905f",
+   "ours_sha256": "a654ca7ff8e739fdcc3d524b60e5e6d01b3a5fa140cc930b39bf72f43b87905f",
+   "theirs_sha256": "c84fe9b886294f07e43ec2a88bec62bc84b61422122adf20b5eb19b1bf60d5f4",
+   "result_sha256": "c84fe9b886294f07e43ec2a88bec62bc84b61422122adf20b5eb19b1bf60d5f4"
+  },
+  {
+   "path": "tools/mcp_liveness.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "08f641996ec6596904f02dcfef1f71391f29d5b196bca3598cdef1cae076cca1",
+   "theirs_sha256": "08f641996ec6596904f02dcfef1f71391f29d5b196bca3598cdef1cae076cca1",
+   "result_sha256": "08f641996ec6596904f02dcfef1f71391f29d5b196bca3598cdef1cae076cca1"
+  },
+  {
+   "path": "tools/mcp_oauth.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "092106203761631faa0c83fd84807baecfa6ec6d137354badb3cff336d716ac1",
+   "ours_sha256": "e25f71bf2d178c6cb2928a34e182b6fe308b5dfc25c9f7c72c7447db51cab24e",
+   "theirs_sha256": "f224ace108896a0102d0b27f145fd814b087b63924ee846cf712726aa7ebe3f5",
+   "result_sha256": "f224ace108896a0102d0b27f145fd814b087b63924ee846cf712726aa7ebe3f5"
+  },
+  {
+   "path": "tools/mcp_oauth_device.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "db2bd1abb56d9dcdbb2fcbbcd058f2af92077843a7356f3e45fac0c2a789dfbe",
+   "ours_sha256": "db2bd1abb56d9dcdbb2fcbbcd058f2af92077843a7356f3e45fac0c2a789dfbe",
+   "theirs_sha256": "2eecd1d9f1f9b36bba9307c1f4e745920ecad1c57f7cb86cae030a2ef1ade111",
+   "result_sha256": "2eecd1d9f1f9b36bba9307c1f4e745920ecad1c57f7cb86cae030a2ef1ade111"
+  },
+  {
+   "path": "tools/mcp_oauth_manager.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7fc698201ca852852707a01bee5cb1ad0a460873e9efa74669162ed7a0c8226d",
+   "ours_sha256": "7fc698201ca852852707a01bee5cb1ad0a460873e9efa74669162ed7a0c8226d",
+   "theirs_sha256": "83c1535f21b13fe2620e36e2a463a10eefd03f8162d37c17b241e08768b0989a",
+   "result_sha256": "83c1535f21b13fe2620e36e2a463a10eefd03f8162d37c17b241e08768b0989a"
+  },
+  {
+   "path": "tools/mcp_oauth_provider.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e076dbacbd9f01ccb9861738d990312caecd559860b069aea67f67606db7be90",
+   "ours_sha256": "3c13f6e1155540e1323bd4cd4fb623e126a70b510b90ddad5ad5c0de53d89ab3",
+   "theirs_sha256": "97e49e575f8a7b2becbe1b640b3303716dadf7271f9bb3b001464a33ecd094ff",
+   "result_sha256": "97e49e575f8a7b2becbe1b640b3303716dadf7271f9bb3b001464a33ecd094ff"
+  },
+  {
+   "path": "tools/mcp_schema_cache.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2004ccf911f11ec5d4c806a091b06e7502d44f97f83c1b8a57a6dd5ef6127fff",
+   "ours_sha256": "058ad8fba9722d9a5b0a19e8635e96437f079d84589793c4292579bc1e128fbf",
+   "theirs_sha256": "a5cd2b38b494e9018a565a7f67d3ade084ca9a9c12e43d3edd5323291e35bfd2",
+   "result_sha256": "a5cd2b38b494e9018a565a7f67d3ade084ca9a9c12e43d3edd5323291e35bfd2"
+  },
+  {
+   "path": "tools/mcp_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4cb74b5dd36425e807786733b19d7aba0e507c10deb51fb594e333509ac75fb2",
+   "ours_sha256": "4cb74b5dd36425e807786733b19d7aba0e507c10deb51fb594e333509ac75fb2",
+   "theirs_sha256": "d5faf770728a040116e9216c4a56e26860a92016c803862d267ba4429071beb8",
+   "result_sha256": "d5faf770728a040116e9216c4a56e26860a92016c803862d267ba4429071beb8"
+  },
+  {
+   "path": "tools/mcp_tool_agent.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "05a96e1dc3051339404d058c75d586bc0f6b67df09bf9cf48bae825b51f80963",
+   "ours_sha256": "7b8df82ad6c62bc6a669b17c637712602a8830d08764c3150822da3f88ba6d7d",
+   "theirs_sha256": "8ad851254f38354bc3f8eb678bf9135836270999e5be3efc968f052ff1c5069c",
+   "result_sha256": "8ad851254f38354bc3f8eb678bf9135836270999e5be3efc968f052ff1c5069c"
+  },
+  {
+   "path": "tools/mcp_tool_common.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c986535ab6f9fe910c78e83a59e8fb03bdc4cafd33810e6d626f6f8c52e2c112",
+   "ours_sha256": "accf82818f7893d9041e43d6746050ff5e75e7c702125d9c2a63450a19f3c086",
+   "theirs_sha256": "ad1432cfc0d6ede806b64fab5f77945dbc2694786890b893169e56823c67d61e",
+   "result_sha256": "ad1432cfc0d6ede806b64fab5f77945dbc2694786890b893169e56823c67d61e"
+  },
+  {
+   "path": "tools/mcp_tool_config.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b03aa3b8d1d0d02918bad6f98affa324c90ea4f56fe7d2e71d0d79b68bcfdde9",
+   "ours_sha256": "7970a8b153564bfd1c5a2fe798a3948da431e102c263d06db8f601cd993c915d",
+   "theirs_sha256": "0c65aabfaa6a83eb553cd97b27c379e1760b4acc4885fb8d2b34eb4ae75ee58e",
+   "result_sha256": "0c65aabfaa6a83eb553cd97b27c379e1760b4acc4885fb8d2b34eb4ae75ee58e"
+  },
+  {
+   "path": "tools/mcp_tool_content.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "980a73c4d045e029b39e690fd2cf24dfc7df59a233a5fe6f99862cb88a686810",
+   "ours_sha256": "980a73c4d045e029b39e690fd2cf24dfc7df59a233a5fe6f99862cb88a686810",
+   "theirs_sha256": "94b5a186aa3ac8a25c8f4d6632903cb5da150bc0820964cb7cc2bb7d8ddb5a26",
+   "result_sha256": "94b5a186aa3ac8a25c8f4d6632903cb5da150bc0820964cb7cc2bb7d8ddb5a26"
+  },
+  {
+   "path": "tools/mcp_tool_discovery.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a7b467ce149efb7dfc4322547a489e677613a12d05f98016d1608514082c3e56",
+   "ours_sha256": "94fe509d4b569cb7d77b01e506bd7ae1b0037d5ee645ebd76899011d15af30a1",
+   "theirs_sha256": "52b3490a9e614fdf579de5a0b227e2e4e4c0535cc80312ba727416b3b9afd0dc",
+   "result_sha256": "52b3490a9e614fdf579de5a0b227e2e4e4c0535cc80312ba727416b3b9afd0dc"
+  },
+  {
+   "path": "tools/mcp_tool_errors.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "9db6214150e9c304f68420ab05520f38867bf1e7251a18b691d0faf92e266b1e",
+   "ours_sha256": "9db6214150e9c304f68420ab05520f38867bf1e7251a18b691d0faf92e266b1e",
+   "theirs_sha256": "14de7e6be7c91e86b51c5cd8992f4f1974db05de26032ad23bbf75247f7f597f",
+   "result_sha256": "14de7e6be7c91e86b51c5cd8992f4f1974db05de26032ad23bbf75247f7f597f"
+  },
+  {
+   "path": "tools/mcp_tool_handlers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "70d805b2fe6d9b28c39708d2941a5b9033e274f428135c6bc8ba5ea9799ba7a2",
+   "ours_sha256": "9eb01546185003c5130673bfd4d6a555023e72d05bb8d57e4432e39d6e617d60",
+   "theirs_sha256": "ea2a588cf88c185fe36ed95c28278ab43aa68d8826f2eab247c692dda8d22316",
+   "result_sha256": "ea2a588cf88c185fe36ed95c28278ab43aa68d8826f2eab247c692dda8d22316"
+  },
+  {
+   "path": "tools/mcp_tool_health.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "50dd2c4daa258691d2c01a78d7b56d5a5dcddad61c65a2ea73b8aee0f51041e7",
+   "ours_sha256": "50dd2c4daa258691d2c01a78d7b56d5a5dcddad61c65a2ea73b8aee0f51041e7",
+   "theirs_sha256": "d8f3b080761ab04c8132866d9f75727d5c2ca53e5c40d00e21417e9f6d1bbfa6",
+   "result_sha256": "d8f3b080761ab04c8132866d9f75727d5c2ca53e5c40d00e21417e9f6d1bbfa6"
+  },
+  {
+   "path": "tools/mcp_tool_lifecycle.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a1717278476427d3805b968bf83dc86bd6e3d085299cb87c78fdf58da3c3c5f3",
+   "ours_sha256": "4cffb56132b5c657633a84e4c95d56e234e53803fa8ff463b19623e959d1be25",
+   "theirs_sha256": "ce0152b0798e0e19e5fda3fc9f9c66de886ebb40963964f4f24de5ec63a01f74",
+   "result_sha256": "ce0152b0798e0e19e5fda3fc9f9c66de886ebb40963964f4f24de5ec63a01f74"
+  },
+  {
+   "path": "tools/mcp_tool_loop.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "177c9c77842cb6b2be41874361dfe5532a5a890c4ca561dc7c659af184921c06",
+   "ours_sha256": "177c9c77842cb6b2be41874361dfe5532a5a890c4ca561dc7c659af184921c06",
+   "theirs_sha256": "1f4852bd8d660fa333c5361171e062f4113a90ee2bbcb31f3a2aed1c9896fa86",
+   "result_sha256": "1f4852bd8d660fa333c5361171e062f4113a90ee2bbcb31f3a2aed1c9896fa86"
+  },
+  {
+   "path": "tools/mcp_tool_registration.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4a35f71f174e1dd22ed1fa2f4ad48a73794c80be29cb4f0908974fed2a066448",
+   "ours_sha256": "10a33536058523140beb8b6e224ef88c30925bea1d4807f7a822096c736b9117",
+   "theirs_sha256": "ee16ac368063ed46c00727ee549870f4e75cf56399320ff15410811373fce9dd",
+   "result_sha256": "ee16ac368063ed46c00727ee549870f4e75cf56399320ff15410811373fce9dd"
+  },
+  {
+   "path": "tools/mcp_tool_sampling.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "8827014bd5ce77d8357b7bb75dd80cdb784aac7c25bb362be3f9e4a53fc9948f",
+   "ours_sha256": "b379865a33c707533dc4ac97598e16d2a0fed40007f3c20212577e6b7d5d14f4",
+   "theirs_sha256": "b379865a33c707533dc4ac97598e16d2a0fed40007f3c20212577e6b7d5d14f4",
+   "result_sha256": "b379865a33c707533dc4ac97598e16d2a0fed40007f3c20212577e6b7d5d14f4"
+  },
+  {
+   "path": "tools/mcp_tool_schema.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b0dd360817086f9b60b800828cb8117434b2b59dd42eb77284feaa0e37de91f3",
+   "ours_sha256": "c36757d09134c7b8bb82f25676c790b611a4f8d1f4340a7e774a163d473eb4b0",
+   "theirs_sha256": "72702dc0c88825552a74b1fc6ef6a5d18a748eb80623c94fcf884c8c633b9429",
+   "result_sha256": "72702dc0c88825552a74b1fc6ef6a5d18a748eb80623c94fcf884c8c633b9429"
+  },
+  {
+   "path": "tools/mcp_tool_server_run.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c584db83cf012795d39890de89bee0ffee4dde53d6611dbcb9dfdc60a9774c60",
+   "ours_sha256": "feca7a832afca9add0b9ba6343bea2d62ddbe4c4bc194af1fb20f822dc76d1e9",
+   "theirs_sha256": "f5d6ed185bfda988a3993944c27f34dc9b7e3f7ce80a675c8b5e8b46cf349328",
+   "result_sha256": "f5d6ed185bfda988a3993944c27f34dc9b7e3f7ce80a675c8b5e8b46cf349328"
+  },
+  {
+   "path": "tools/mcp_tool_transport.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a4e7b2eeadaa59115289a516b8957d188fccdb94c85f156bbfa80d422e651138",
+   "ours_sha256": "348f09cc2da84001d071f214fc110c4a448f68db2274818f459b10d4db01ca56",
+   "theirs_sha256": "c930c0247366126764f5028b41152a73a100f54c9ecf9184804c60803669bd5f",
+   "result_sha256": "c930c0247366126764f5028b41152a73a100f54c9ecf9184804c60803669bd5f"
+  },
+  {
+   "path": "tools/memory_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ef3780d142eecd2f9227f7a0449eb03744a626e5c8eb4667613ec3a3e96ad526",
+   "ours_sha256": "832ed2f91db4fcec3b2eed4790e6d540eb6e77cb65b1f6857f9d3d22330d8a8a",
+   "theirs_sha256": "4833de0790a3ea23b3f589a3bee0a179e91f46cbf8cf8f3601305c705a6e6ce0",
+   "result_sha256": "4833de0790a3ea23b3f589a3bee0a179e91f46cbf8cf8f3601305c705a6e6ce0"
+  },
+  {
+   "path": "tools/memory_tool_store.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "6d78f56c138fe87f7c42fd248b685860b2642020ced0457a2a9ad5565d6e60d2",
+   "ours_sha256": "6f6551b6d48da95876faa4de84df2da23aad4131503cbea355cfc8bf3a70f34b",
+   "theirs_sha256": "5d25c0604de0c4bf4b4f07402b0582b20c33377330a0c7354e059a7e7cf52293",
+   "result_sha256": "5d25c0604de0c4bf4b4f07402b0582b20c33377330a0c7354e059a7e7cf52293"
+  },
+  {
+   "path": "tools/neutts_synth.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "112dc07f7b6174e0ba8cfe0d1aa0a88704327bd45a27e8c1042c29e72e4f6546",
+   "ours_sha256": "31d96b8191426445864d19de59ff7882ac221fe32a81362caea9aa838267ad7b",
+   "theirs_sha256": "31d96b8191426445864d19de59ff7882ac221fe32a81362caea9aa838267ad7b",
+   "result_sha256": "31d96b8191426445864d19de59ff7882ac221fe32a81362caea9aa838267ad7b"
+  },
+  {
+   "path": "tools/openrouter_client.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "2f139930d5ef438d91ca418bf5f9faef137d405c20bb3330f3766df1d29fd354",
+   "ours_sha256": "ae6fb56d9969a8fca68ae06d2f61daf6b0afded55bd94b599f25e1fc0beb1780",
+   "theirs_sha256": "ae6fb56d9969a8fca68ae06d2f61daf6b0afded55bd94b599f25e1fc0beb1780",
+   "result_sha256": "ae6fb56d9969a8fca68ae06d2f61daf6b0afded55bd94b599f25e1fc0beb1780"
+  },
+  {
+   "path": "tools/osv_check.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "772277c369692f819205f92a9361ce69c12a1b20a7e13fcec67a9d1ac2dab645",
+   "ours_sha256": "e1296ff54cb219ff7ce43c2d5a724c199c03c5c0b5549b4a2e2e7ec14839c9d4",
+   "theirs_sha256": "d22d1b4c65ad5d6a70379221fc11c24bb6d30affde91bab0981a3f28b869401d",
+   "result_sha256": "d22d1b4c65ad5d6a70379221fc11c24bb6d30affde91bab0981a3f28b869401d"
+  },
+  {
+   "path": "tools/patch_parser.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "34ed655302c884180910cb8aa88394c62ab5fbcb9de5830d338e942ffc8ac8c5",
+   "ours_sha256": "36429567e87ff4d7407513894b12c05578679b38894df08bba2d2e9c8b052edf",
+   "theirs_sha256": "1d54eb40111b1512d09952143fd71322bc7bf8124c364e2404d76c046a08253b",
+   "result_sha256": "1d54eb40111b1512d09952143fd71322bc7bf8124c364e2404d76c046a08253b"
+  },
+  {
+   "path": "tools/path_security.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0f6abe03b0786357a87365368ef39a6a77c1d49408a1c958403cded4691e2812",
+   "ours_sha256": "0f6abe03b0786357a87365368ef39a6a77c1d49408a1c958403cded4691e2812",
+   "theirs_sha256": "143664207af920016274a73711fc7042bcc35e6f1613665953eaafb202a77d07",
+   "result_sha256": "143664207af920016274a73711fc7042bcc35e6f1613665953eaafb202a77d07"
+  },
+  {
+   "path": "tools/plugin_guard.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "16dc94936358141472d82ac85e82b1b142dac3f56e2550531b1cd3003a1d57e8",
+   "ours_sha256": "f54c869607d649d32b65486b5e7f7e3502bb598ae30bbc7e2817827244d8515d",
+   "theirs_sha256": "658afb27d1f37bbfa53e1152c87d72ff9030ae789966616bec13518cf7e8da63",
+   "result_sha256": "658afb27d1f37bbfa53e1152c87d72ff9030ae789966616bec13518cf7e8da63"
+  },
+  {
+   "path": "tools/process_registry.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d22f75f5cb638f18eaf8a757438892d5d5ed98b5ccda3c797e55b8f987567065",
+   "ours_sha256": "f16f37d0afe27e1caddaf84239daf48eb5ff8caa349c76133e424410e23d343c",
+   "theirs_sha256": "087f589e56ca1465465bf103fa9bd9a9abea421b914c749d0381c603d312e795",
+   "result_sha256": "087f589e56ca1465465bf103fa9bd9a9abea421b914c749d0381c603d312e795"
+  },
+  {
+   "path": "tools/process_registry_checkpoint.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "77d6e98c34c06a909abb2fad9001065108581c36e8ba844f9c8119c0efa74b51",
+   "ours_sha256": "349e885d8e3a241ed1981df390e894aa74271e2a1d404a93b6905c6d109e4b7a",
+   "theirs_sha256": "750d48803dc5b66576457c47d4662ec00de518fe1d72947e5366c1f4f3a2bca7",
+   "result_sha256": "750d48803dc5b66576457c47d4662ec00de518fe1d72947e5366c1f4f3a2bca7"
+  },
+  {
+   "path": "tools/process_registry_notifications.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c7734b1b34274ce4e062aa7da1bfc0f2c533c93026a2df0dea0323cd50aa4d5e",
+   "ours_sha256": "04e6f9479ed14b307546c5285e244be8bf601d7bd904627abfcbe706f62d41a3",
+   "theirs_sha256": "f64d02765683f0b788fdff8d7349c04c2f2e9476e1d63ad89cbab25f04816e80",
+   "result_sha256": "f64d02765683f0b788fdff8d7349c04c2f2e9476e1d63ad89cbab25f04816e80"
+  },
+  {
+   "path": "tools/process_registry_results.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "bd7bbb1ee68852e4d9634701df0ff4a29420470d19fb5902272ad389ca8dfba7",
+   "ours_sha256": "2a30543fe1779de35f41c86a83671b69fa93b7a8350e19efe697071cb8146aa6",
+   "theirs_sha256": "d9d090b8510043acf801fe61c2eaeaf553dd44a64376158707c4012f96754744",
+   "result_sha256": "d9d090b8510043acf801fe61c2eaeaf553dd44a64376158707c4012f96754744"
+  },
+  {
+   "path": "tools/project_tools.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "355a03f67666668d1233d15cdbc7916a5bd7c2905a9911e8e823e81b96f8bf2c",
+   "ours_sha256": "77b00a138dceb454d54c314a989f372add674063432f2a74fc8a21bd1ea33e41",
+   "theirs_sha256": "77b00a138dceb454d54c314a989f372add674063432f2a74fc8a21bd1ea33e41",
+   "result_sha256": "77b00a138dceb454d54c314a989f372add674063432f2a74fc8a21bd1ea33e41"
+  },
+  {
+   "path": "tools/read_extract.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c655f4e58368baa4203a9c743fdac5fff8ffbeddaa5acbe9d79fc5298e0c1125",
+   "ours_sha256": "768302cdc1e9d1c200eac1bc5256605dcbd482f931d13e60094f6a0a370fefe8",
+   "theirs_sha256": "a89224e3f3db13f9c5eca8740dbcd513f327773005560d2c662705da0ce50a92",
+   "result_sha256": "a89224e3f3db13f9c5eca8740dbcd513f327773005560d2c662705da0ce50a92"
+  },
+  {
+   "path": "tools/registry.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7f517554a0bcbce1351a90bb3c0a88ba89e8c89850bb50a42948114e96dfdf8e",
+   "ours_sha256": "a3aa5fb8648d303ff3d65e0a1455ce876e26b768cb35e090df34fb0611354c07",
+   "theirs_sha256": "55a73f3a233aff6676b5ba4fa7d4188da86530222ade471977803811b97530a7",
+   "result_sha256": "55a73f3a233aff6676b5ba4fa7d4188da86530222ade471977803811b97530a7"
+  },
+  {
+   "path": "tools/schema_sanitizer.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "8f58baf2faf47fe95b47d3372fc8a29ed13854ca0b192980fbb6041981c507cf",
+   "ours_sha256": "8f58baf2faf47fe95b47d3372fc8a29ed13854ca0b192980fbb6041981c507cf",
+   "theirs_sha256": "5486af2d93aa3c43e2f14576eabc8c9f2eb4cb2ca8cbef8c044a96641b0dcaa2",
+   "result_sha256": "5486af2d93aa3c43e2f14576eabc8c9f2eb4cb2ca8cbef8c044a96641b0dcaa2"
+  },
+  {
+   "path": "tools/self_repo_guard.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "93d3f06217d88802108e0ce91f5a0c8f82f8493f27c8a62ea51c3b161f6e8e9b",
+   "ours_sha256": "eba003817d56dc0fbebbe797df2a9d70db6c97456e8b0862bc1fef520cf491a0",
+   "theirs_sha256": "191fb049401cff51eccb527ac5f3914a22c1013ef8134e5cb522f9b0146cd379",
+   "result_sha256": "191fb049401cff51eccb527ac5f3914a22c1013ef8134e5cb522f9b0146cd379"
+  },
+  {
+   "path": "tools/send_message_senders.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "9618bb5e43e9fc5209d945c217799cd975d8500010e6e58160f3056aff975f11",
+   "ours_sha256": "10bbebf4954e83b9ff1b90e232ae2a6835eccb7eaf923a45dc4a84317a767d30",
+   "theirs_sha256": "79f023a47282d7c20a2c779705d7533dab2f02a6a8b2feb027ec36a66034e6d0",
+   "result_sha256": "79f023a47282d7c20a2c779705d7533dab2f02a6a8b2feb027ec36a66034e6d0"
+  },
+  {
+   "path": "tools/send_message_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c1e06a0bdef10c92cf02d6c9ec1c32d1f2a5c99bafe17a15130e4b5b6e9b86dd",
+   "ours_sha256": "c1e06a0bdef10c92cf02d6c9ec1c32d1f2a5c99bafe17a15130e4b5b6e9b86dd",
+   "theirs_sha256": "731058276893094868d916c8977ba2bdb1bf6539a3c13db1babe66858989ce38",
+   "result_sha256": "731058276893094868d916c8977ba2bdb1bf6539a3c13db1babe66858989ce38"
+  },
+  {
+   "path": "tools/session_search_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "829acd4f46eaff15a7ab80aefa94575fdf55615c258ea017144066445edbdae7",
+   "ours_sha256": "6a41d82ade10fb8ffed24cb043a41fd1a75df6d0bd8ff2920cf7828ef9364925",
+   "theirs_sha256": "ab25236edfeb91a7553e5faffeac6d0a99dac5823e33aebae2ea68283e9ee406",
+   "result_sha256": "ab25236edfeb91a7553e5faffeac6d0a99dac5823e33aebae2ea68283e9ee406"
+  },
+  {
+   "path": "tools/setup_mcp_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": null,
+   "theirs_sha256": "cc5a8860ec375c9e898be372d94d6919b456eb01130a4873f8b717e8017d9c44",
+   "result_sha256": "cc5a8860ec375c9e898be372d94d6919b456eb01130a4873f8b717e8017d9c44"
+  },
+  {
+   "path": "tools/shell_heredoc.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "12f9b8e2218cc4feda13b06d1ffe1fd5cdb3b6c227380a3a02965d13b7de1c8a",
+   "ours_sha256": "12f9b8e2218cc4feda13b06d1ffe1fd5cdb3b6c227380a3a02965d13b7de1c8a",
+   "theirs_sha256": "b8c5f3341936517e55d0dd262653b86035851deaa70c41a5c5a0232a5d5ebb8c",
+   "result_sha256": "b8c5f3341936517e55d0dd262653b86035851deaa70c41a5c5a0232a5d5ebb8c"
+  },
+  {
+   "path": "tools/skill_ledger.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e7557f5e3cca280255bd8cd4564a3a7e7e26b6c97021d87b934f1646a1d12095",
+   "ours_sha256": "24e421f549e63df41c3bed6ea6a3d1a96b7679ada7b35827a37e874ab6c80f21",
+   "theirs_sha256": "2a918580ed3c3527614b185da984a339623eaa94f64f7c93d97a6f6816777c99",
+   "result_sha256": "2a918580ed3c3527614b185da984a339623eaa94f64f7c93d97a6f6816777c99"
+  },
+  {
+   "path": "tools/skill_linter.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "1a51926b442ae199c05ca8e35faf27534ece5162082f5c3f3e892635375860a8",
+   "ours_sha256": "82b91e0f84f6807d59b2757582c95ddf567372de4ec3a9ecfe0d0e4aece30306",
+   "theirs_sha256": "46c1e1e582ff4e76b900d18653b7bb437a2973391d6acf063bc0e41372ddc53f",
+   "result_sha256": "46c1e1e582ff4e76b900d18653b7bb437a2973391d6acf063bc0e41372ddc53f"
+  },
+  {
+   "path": "tools/skill_manager_batch.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a0283a4858c6f40bd54b2fcdde25a4697bd640e0e01f1d3acfbdda9c06f6ba90",
+   "ours_sha256": "84364237869aa610431c5cf4ce5c67bdcc915ddf1d0e2fc633876c76fc00ac19",
+   "theirs_sha256": "2cefa015de4db1122ea59834f9a38debb2643c0b035592e941f853aab995bd52",
+   "result_sha256": "2cefa015de4db1122ea59834f9a38debb2643c0b035592e941f853aab995bd52"
+  },
+  {
+   "path": "tools/skill_manager_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c236a29b24e773cabeba8cf8b49f1f0b6cb134683a7ec99219da22f820f93b7c",
+   "ours_sha256": "984bd603d2de2c894b6167e368940f54ba9e04cda3a8bc9fb5f6d6e393aae739",
+   "theirs_sha256": "99ffd36c42e4c8f1f0001f32b31b96e0830f0727fd22c3076d7cb8780f386ccc",
+   "result_sha256": "99ffd36c42e4c8f1f0001f32b31b96e0830f0727fd22c3076d7cb8780f386ccc"
+  },
+  {
+   "path": "tools/skill_provenance.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5c492a925cdde61c3257eb5db76568822d26be3d9a2c40d364a9997a3a7cb576",
+   "ours_sha256": "5c492a925cdde61c3257eb5db76568822d26be3d9a2c40d364a9997a3a7cb576",
+   "theirs_sha256": "58a064c44aec13925c724a8bb377bea90fbf6b2a817c8d8bcf4823e6c5436713",
+   "result_sha256": "58a064c44aec13925c724a8bb377bea90fbf6b2a817c8d8bcf4823e6c5436713"
+  },
+  {
+   "path": "tools/skill_usage.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5813707a99e9f8a670e421e533b9fe64d4ee9f4ae340687d839c491998455e64",
+   "ours_sha256": "32fd23661eec859c406c7b4646c385f5cdaa9e84ce6451eb8228a5ebacb5d3a8",
+   "theirs_sha256": "a1d03195d95ba792b3c2ea9f84efd90cbdbcf464cdc59d84a101f3529dc73cef",
+   "result_sha256": "a1d03195d95ba792b3c2ea9f84efd90cbdbcf464cdc59d84a101f3529dc73cef"
+  },
+  {
+   "path": "tools/skillevaluator_scan.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "38100b3fc2667ed12cc0cce0990ec98dd9ebc23efccd185cdf56716552a221b1",
+   "ours_sha256": "fae8358f2033b2cf29608c049c5e491ad81be1cb5a22ae4f21dce9235424ac50",
+   "theirs_sha256": "fae8358f2033b2cf29608c049c5e491ad81be1cb5a22ae4f21dce9235424ac50",
+   "result_sha256": "fae8358f2033b2cf29608c049c5e491ad81be1cb5a22ae4f21dce9235424ac50"
+  },
+  {
+   "path": "tools/skills_ast_audit.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "aba2ec07cba04ffd7d90e6d6fcbc2873127edb766bcfd717e6d51c408101d794",
+   "ours_sha256": "ff65aab26f5fac243780f0bf4e286aa3511208ca85a3e2cbddf1769012b58123",
+   "theirs_sha256": "ff65aab26f5fac243780f0bf4e286aa3511208ca85a3e2cbddf1769012b58123",
+   "result_sha256": "ff65aab26f5fac243780f0bf4e286aa3511208ca85a3e2cbddf1769012b58123"
+  },
+  {
+   "path": "tools/skills_guard.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e9acdea743bb9dfdeb5caec6210f6f154bfecefe32055351c2ddd18eaa70a15d",
+   "ours_sha256": "ee8c207ec8e5c3599246e6d6f1beb0895ff5854eb8b91d3c7d6b72ec274c0c0b",
+   "theirs_sha256": "f0a5975ea3880ce7fbfb3a854c7f8035be2f4da1327b9bca12a0dca69aaad000",
+   "result_sha256": "f0a5975ea3880ce7fbfb3a854c7f8035be2f4da1327b9bca12a0dca69aaad000"
+  },
+  {
+   "path": "tools/skills_hub.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d0112535fe4a877912f7fbf510080e848c0c6ac8a84ac33f72ec4f2d8235493b",
+   "ours_sha256": "67e01a037788af90a80af5e08aee2975b81675a841d4f639bd76fc398e0aa37b",
+   "theirs_sha256": "0d1872b90ad03615b9e520e39a1f8f6904ece994197aef1469206f34fc962de3",
+   "result_sha256": "0d1872b90ad03615b9e520e39a1f8f6904ece994197aef1469206f34fc962de3"
+  },
+  {
+   "path": "tools/skills_hub_clawhub.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "067395cc0864b03bcf242f2759eb36b95b271a89986e5d1e396890c4602fe558",
+   "ours_sha256": "55fa5bac9698cae6b41f00796afd3ff089ee253295b8dac8bb6cddada2bb3f5f",
+   "theirs_sha256": "0a1a4cf820edd4d92ff51d48b377876f0ea0371872f38fa39bc725b1221c401d",
+   "result_sha256": "0a1a4cf820edd4d92ff51d48b377876f0ea0371872f38fa39bc725b1221c401d"
+  },
+  {
+   "path": "tools/skills_hub_github.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5aec638437b4877e529172aab4ab4083443ea2af357e4f802b402f3fc37f34f3",
+   "ours_sha256": "5dc723cce9f4d1a7226bec3b15634548e12db490f532580d21ad3bd15d99d74c",
+   "theirs_sha256": "4fa845f55ff7b54e9f0cd35b5d12b3057a9cacbc2dbbb911e73f2df34a34d8b2",
+   "result_sha256": "4fa845f55ff7b54e9f0cd35b5d12b3057a9cacbc2dbbb911e73f2df34a34d8b2"
+  },
+  {
+   "path": "tools/skills_hub_install.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "825269c7915b3f46cac6e0eb0a5db07f5b418fa255d267317c407e5a03cb72e5",
+   "ours_sha256": "825269c7915b3f46cac6e0eb0a5db07f5b418fa255d267317c407e5a03cb72e5",
+   "theirs_sha256": "ed071eda82116594c5334981727e540714fe6f91244a4bdfa6c9b438cb3edf35",
+   "result_sha256": "ed071eda82116594c5334981727e540714fe6f91244a4bdfa6c9b438cb3edf35"
+  },
+  {
+   "path": "tools/skills_hub_models.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "404cb689136866155583f4765b8cada922c650e06bac96f60c7d0f709f282c3b",
+   "ours_sha256": "91dff54550cecd7a9468fa7a5045fac7c28c3cd61355eeae507ee34c78921017",
+   "theirs_sha256": "33554186b4439d5bbdc3622e02a53dd799ba596ea352079fad32f6f5de98545d",
+   "result_sha256": "33554186b4439d5bbdc3622e02a53dd799ba596ea352079fad32f6f5de98545d"
+  },
+  {
+   "path": "tools/skills_hub_official.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "074d048eb2d6f6369b12a91cc3b87f7e47ef20512f8bddae360e9f9d93c4333d",
+   "ours_sha256": "420fb79f69ebaf2ea3fae33deca96db86c30906209d4ffab92696ef1115ee9a7",
+   "theirs_sha256": "7e6a8156706284565d744fc4547e158a3493032ea522b95f28205a8e917ed4f6",
+   "result_sha256": "7e6a8156706284565d744fc4547e158a3493032ea522b95f28205a8e917ed4f6"
+  },
+  {
+   "path": "tools/skills_hub_search.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c134bd4c9cc653abb7315f33eeb5aecc37ff282621a76d17dd775db839332bea",
+   "ours_sha256": "7ab761da13188916e7ff5482105e778d2556f2383350c5ceae48f33c03a5925e",
+   "theirs_sha256": "38464804298169eab436a695ef5195fc3fb860f9b1b0726e25698e19d9bb5f5f",
+   "result_sha256": "38464804298169eab436a695ef5195fc3fb860f9b1b0726e25698e19d9bb5f5f"
+  },
+  {
+   "path": "tools/skills_hub_skillssh.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "39cb22a45e607c12ed17699850e440c5fff676695e4f153eb3f1768e4732a423",
+   "ours_sha256": "39cb22a45e607c12ed17699850e440c5fff676695e4f153eb3f1768e4732a423",
+   "theirs_sha256": "1d729887671767247695f84a02b76f710d2285ebf0268af16c6bf11d3e83142d",
+   "result_sha256": "1d729887671767247695f84a02b76f710d2285ebf0268af16c6bf11d3e83142d"
+  },
+  {
+   "path": "tools/skills_hub_sources.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "66feb92897a32eb91193349f7df502e9598da9b2c12f8677d91791b042fbe42a",
+   "ours_sha256": "66feb92897a32eb91193349f7df502e9598da9b2c12f8677d91791b042fbe42a",
+   "theirs_sha256": "8ac3e6eea1b52963b71bce3dfda9b189e22d71e8caaf625812ee373515afcb54",
+   "result_sha256": "8ac3e6eea1b52963b71bce3dfda9b189e22d71e8caaf625812ee373515afcb54"
+  },
+  {
+   "path": "tools/skills_sync.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e275e38126c0a7ab90b910b3b14547873b40df5551cc97a23b8567053aa962b6",
+   "ours_sha256": "fb6277fe07437056f5a70033964696a54376f268b88ab23fd1ab67b7e68ec6e2",
+   "theirs_sha256": "a11c509a997544084ffca05d92b8621b0bbfbfbb4ec2456577bc08f87e215bf8",
+   "result_sha256": "a11c509a997544084ffca05d92b8621b0bbfbfbb4ec2456577bc08f87e215bf8"
+  },
+  {
+   "path": "tools/skills_sync_bundled_ops.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4826fcf25f71b0282284c3de24b4b4364a46c2476fbee6c5c6fe392d7fbb23e8",
+   "ours_sha256": "4826fcf25f71b0282284c3de24b4b4364a46c2476fbee6c5c6fe392d7fbb23e8",
+   "theirs_sha256": "c4577f1669b955b7b6b9c7ab3e28b4c347cec24257191f2709cf32e5070ba9da",
+   "result_sha256": "c4577f1669b955b7b6b9c7ab3e28b4c347cec24257191f2709cf32e5070ba9da"
+  },
+  {
+   "path": "tools/skills_sync_client.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "7f7e1a56ca0a542d05dfbb27d6f02b238948eca2c32d4da8dee945dd3aa4bdb3",
+   "ours_sha256": "a8c11ff94cb7f695e6a02ae460f71538cb12c0295bacde9a1970841a160fd5c2",
+   "theirs_sha256": "e7c103d1185b1666b7b94807472f1d0de28a9b5ac8ff924155dfa6050e65bf9a",
+   "result_sha256": "e7c103d1185b1666b7b94807472f1d0de28a9b5ac8ff924155dfa6050e65bf9a"
+  },
+  {
+   "path": "tools/skills_sync_client_org.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "5e7e38e01ab22b5b2244bc07c96c917bac7bf749472b89d8746e27b3742a0a1c",
+   "ours_sha256": "e888296a8cca71200071ae51c82c20da29a53602da626c3ca0642ba47b2e6e2a",
+   "theirs_sha256": "e888296a8cca71200071ae51c82c20da29a53602da626c3ca0642ba47b2e6e2a",
+   "result_sha256": "e888296a8cca71200071ae51c82c20da29a53602da626c3ca0642ba47b2e6e2a"
+  },
+  {
+   "path": "tools/skills_sync_optional.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "542df409717c2fe1c883a32798ab0d4603ba813d88b300529f23c2b86a8391e9",
+   "ours_sha256": "e55b1498725ac1b5f5169b6bd03a047b8b7658ba993b0012a3dcd6b9988d1482",
+   "theirs_sha256": "e55b1498725ac1b5f5169b6bd03a047b8b7658ba993b0012a3dcd6b9988d1482",
+   "result_sha256": "e55b1498725ac1b5f5169b6bd03a047b8b7658ba993b0012a3dcd6b9988d1482"
+  },
+  {
+   "path": "tools/skills_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "954cc89527301d58d822ccfc72021a4d10f72b99f0393b71d44cbc518aefad87",
+   "ours_sha256": "775257f4aa6f3f0541901bf50b88133d7bb55bb1fddb1eead729e461d0b442ca",
+   "theirs_sha256": "95f4ab4d143a138fc542f0d8ed29268bf08168c160d057c3f5093e4a07ea95a6",
+   "result_sha256": "95f4ab4d143a138fc542f0d8ed29268bf08168c160d057c3f5093e4a07ea95a6"
+  },
+  {
+   "path": "tools/skills_tool_dedup.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "205e324ceb338a908616adda7698eeb0c5c89ebbd25a1bbef62d3b6e53124b3a",
+   "ours_sha256": "205e324ceb338a908616adda7698eeb0c5c89ebbd25a1bbef62d3b6e53124b3a",
+   "theirs_sha256": "8c94b54378807b373e3e8c8b685522a1d2cf5e9aa77e8acbc1ffa29d67da0a10",
+   "result_sha256": "8c94b54378807b373e3e8c8b685522a1d2cf5e9aa77e8acbc1ffa29d67da0a10"
+  },
+  {
+   "path": "tools/skills_tool_plugin.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "d9c9b46edf5fbdd98c5e4e38abfaa2e69464913e11a392987b5b156d414f0ac7",
+   "ours_sha256": "0e2d55430039be40f8d7ec58328f0c9bd3ecdffb981a96eec508246881a98cc2",
+   "theirs_sha256": "0e2d55430039be40f8d7ec58328f0c9bd3ecdffb981a96eec508246881a98cc2",
+   "result_sha256": "0e2d55430039be40f8d7ec58328f0c9bd3ecdffb981a96eec508246881a98cc2"
+  },
+  {
+   "path": "tools/skills_tool_setup.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "de266c8bc6441637a4f6d44f885823d58affaa8ea4ec61e4d39e6e7d8b268fbc",
+   "ours_sha256": "de266c8bc6441637a4f6d44f885823d58affaa8ea4ec61e4d39e6e7d8b268fbc",
+   "theirs_sha256": "f90ac16467078d44d68f6bce9d004e4bc848ca19fcbea6c347757c703a0020e6",
+   "result_sha256": "f90ac16467078d44d68f6bce9d004e4bc848ca19fcbea6c347757c703a0020e6"
+  },
+  {
+   "path": "tools/subagent_worktree.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "c723eaf9890eb49a8c227e00b4c0503135e9ffcd59efdc6c1666857fb18fe6d2",
+   "ours_sha256": "c723eaf9890eb49a8c227e00b4c0503135e9ffcd59efdc6c1666857fb18fe6d2",
+   "theirs_sha256": "fe02bda6508982fc747ac88c3150c8916c823ab5d1f5b6c831d25a62f17dd0c0",
+   "result_sha256": "fe02bda6508982fc747ac88c3150c8916c823ab5d1f5b6c831d25a62f17dd0c0"
+  },
+  {
+   "path": "tools/terminal_scope.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e50d0964f715abf9211a066baf4eb90f52921e0299ab095ebbc87b68cbc69079",
+   "ours_sha256": "24ac268c40d9923f3d6f2653a95e2c64e0f6a7c4c3fe431c980af0a31e3b717e",
+   "theirs_sha256": "42a8bc628ed669330c63cc3150903de65c677f15c1b1f1d71aa5a3caf1dee022",
+   "result_sha256": "42a8bc628ed669330c63cc3150903de65c677f15c1b1f1d71aa5a3caf1dee022"
+  },
+  {
+   "path": "tools/terminal_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5ab5c3c91fac7a86b77b89f6aa5d132ad09e1f6b0ce921cc2e43dda7e2794df6",
+   "ours_sha256": "f4e88cb1c03ca1b8d31ab9dc1087cf57286501d11f35ff4e57693b96a126beae",
+   "theirs_sha256": "ab08ed899fd04b84defeb858296b76a145485e81149919e379381e18c86bfcc8",
+   "result_sha256": "ab08ed899fd04b84defeb858296b76a145485e81149919e379381e18c86bfcc8"
+  },
+  {
+   "path": "tools/terminal_tool_backends.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "51a489b95e333ad325bbc6ca7c3b421e959cbcfe09cb1e8a824b4653200e5105",
+   "ours_sha256": "317f2457259340b1e63fff1d842986c8e2797cb83da06b6aa5abc1a0a993ecdf",
+   "theirs_sha256": "3314e5e5b1e19f7f3fb99f14284b0e35e977b1e1253ee1ea17e45815785746e1",
+   "result_sha256": "3314e5e5b1e19f7f3fb99f14284b0e35e977b1e1253ee1ea17e45815785746e1"
+  },
+  {
+   "path": "tools/terminal_tool_background.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "05b68026734a5bb12820bcf09ef60468f157f03ed365c94c3cd477b885d8e893",
+   "ours_sha256": "2063dc4965375e86dc2e8421004d69456dc72d38944bf8d055194567cc2f3652",
+   "theirs_sha256": "f861e269b9fc3e44cb0d3f8acc6663eecb1106bc5b8fb29e8080fbd946c9d412",
+   "result_sha256": "f861e269b9fc3e44cb0d3f8acc6663eecb1106bc5b8fb29e8080fbd946c9d412"
+  },
+  {
+   "path": "tools/terminal_tool_guards.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "cd948bda6b5392358dea8c5a388478634098d5aabbcfa4423d37b07ca3ded6c8",
+   "ours_sha256": "cd948bda6b5392358dea8c5a388478634098d5aabbcfa4423d37b07ca3ded6c8",
+   "theirs_sha256": "c183f0b4416c199f8f1db17a626d655ecdc45393dabfedc7de7222999a649b6c",
+   "result_sha256": "c183f0b4416c199f8f1db17a626d655ecdc45393dabfedc7de7222999a649b6c"
+  },
+  {
+   "path": "tools/terminal_tool_lifecycle.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "f4bcf7022015fc1328cf539202f3abed09092b219bd57be4a4a7846bddca095e",
+   "ours_sha256": "10243e369cf4e8cb7a6c6b114892f175e1054f1db68fef3d26a40516582dd251",
+   "theirs_sha256": "10243e369cf4e8cb7a6c6b114892f175e1054f1db68fef3d26a40516582dd251",
+   "result_sha256": "10243e369cf4e8cb7a6c6b114892f175e1054f1db68fef3d26a40516582dd251"
+  },
+  {
+   "path": "tools/terminal_tool_result.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ac212fb9a82ea591a1b0ffc46611ec7a7c6179ab2e8bc9cad7dc6e608bba7d06",
+   "ours_sha256": "96743e780ad297fd5edabbf38402e874d697647e3e1f8ddf0a3b6a562e4bc9df",
+   "theirs_sha256": "0cf996a32f803c7a7e082dc334e67c25107484ed6e75af144f2489f7d442fca1",
+   "result_sha256": "0cf996a32f803c7a7e082dc334e67c25107484ed6e75af144f2489f7d442fca1"
+  },
+  {
+   "path": "tools/terminal_tool_sudo.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "f86dc27b9f19bb1bcf2fb5ae54d34c31eaed03422055f9c762417f1b8197afaa",
+   "ours_sha256": "f86dc27b9f19bb1bcf2fb5ae54d34c31eaed03422055f9c762417f1b8197afaa",
+   "theirs_sha256": "94f49bfbafcab96e331aeab5341209434f48b09df9d448811d88e1d3179516df",
+   "result_sha256": "94f49bfbafcab96e331aeab5341209434f48b09df9d448811d88e1d3179516df"
+  },
+  {
+   "path": "tools/thread_context.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "eba2aff2044160b709cf5f14e86403749bb1367bd3ea9ab3e5dd068280f8a009",
+   "ours_sha256": "eba2aff2044160b709cf5f14e86403749bb1367bd3ea9ab3e5dd068280f8a009",
+   "theirs_sha256": "d0833b1987439067b733d6a1809116226034962e6680ca4da3938125da78d783",
+   "result_sha256": "d0833b1987439067b733d6a1809116226034962e6680ca4da3938125da78d783"
+  },
+  {
+   "path": "tools/threat_patterns.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "905e90c3245412f5429b041fec042aa4b8045aec9dada8b5e987c04dfb4fb509",
+   "ours_sha256": "905e90c3245412f5429b041fec042aa4b8045aec9dada8b5e987c04dfb4fb509",
+   "theirs_sha256": "49b986dbeed5d416e579ca6bd03c82e2a6858701ad1553e8a97ba780db9d3b9b",
+   "result_sha256": "49b986dbeed5d416e579ca6bd03c82e2a6858701ad1553e8a97ba780db9d3b9b"
+  },
+  {
+   "path": "tools/tirith_security.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "dec7abe5c28c6bc57abbac19358b0f656b2434fd520b5ad66beecb41f0adaf02",
+   "ours_sha256": "183124c0a1baf30a286892ffc4efb02c56f9bfe620302e02003ddb2bb7be8465",
+   "theirs_sha256": "c9c5fa19245253c2741fbbfbd388d70b40570ffe8687c5ec18e527570fe1784b",
+   "result_sha256": "c9c5fa19245253c2741fbbfbd388d70b40570ffe8687c5ec18e527570fe1784b"
+  },
+  {
+   "path": "tools/tool_backend_helpers.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "9398c91cb0b31aabc8b03c08f0f4f5aeaa375626ecc2e3b3c178cd1dd403bc87",
+   "ours_sha256": "9398c91cb0b31aabc8b03c08f0f4f5aeaa375626ecc2e3b3c178cd1dd403bc87",
+   "theirs_sha256": "cc57c5f3c27bb2211859b9fc6e57f402c2524cf3c1eab13aab7e4c5d50343d88",
+   "result_sha256": "cc57c5f3c27bb2211859b9fc6e57f402c2524cf3c1eab13aab7e4c5d50343d88"
+  },
+  {
+   "path": "tools/tool_labels.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": null,
+   "ours_sha256": "29f66b72ee9ebebe8e2f71b8303ef6dba82b96904aa1779219ac727545df7d8d",
+   "theirs_sha256": "29f66b72ee9ebebe8e2f71b8303ef6dba82b96904aa1779219ac727545df7d8d",
+   "result_sha256": "29f66b72ee9ebebe8e2f71b8303ef6dba82b96904aa1779219ac727545df7d8d"
+  },
+  {
+   "path": "tools/tool_output_limits.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0062c69a99c1488ce96f34f83f4058b38b4bd9412ae191261f66ee3f0b45a4f0",
+   "ours_sha256": "0062c69a99c1488ce96f34f83f4058b38b4bd9412ae191261f66ee3f0b45a4f0",
+   "theirs_sha256": "6d544bd7dae8969628d74af88e2ec46801c3937354375c4d3448e0664573af18",
+   "result_sha256": "6d544bd7dae8969628d74af88e2ec46801c3937354375c4d3448e0664573af18"
+  },
+  {
+   "path": "tools/tool_result_storage.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2ededba6e033af62cf07d6b99603cdc9d4512a2b7bc0a47b51e07b5bf2442ba3",
+   "ours_sha256": "2ededba6e033af62cf07d6b99603cdc9d4512a2b7bc0a47b51e07b5bf2442ba3",
+   "theirs_sha256": "5ab21ad1790dd893b8bb1765fb15b38b23ace2fc1764afafa4eb00434d2b662e",
+   "result_sha256": "5ab21ad1790dd893b8bb1765fb15b38b23ace2fc1764afafa4eb00434d2b662e"
+  },
+  {
+   "path": "tools/tool_search.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "2138cea5cb1c00ca3b560a66f69e257892efc29108c2bb059a864292da2c9a6e",
+   "ours_sha256": "c1093d8a9a0b96749032d6c5ac39ba4c711eba68de79cf07d8a2128c63cd8b9e",
+   "theirs_sha256": "80f7af15c5c3d71561c07fb0be2049554d5224221625e0e169302a5bf82fe891",
+   "result_sha256": "80f7af15c5c3d71561c07fb0be2049554d5224221625e0e169302a5bf82fe891"
+  },
+  {
+   "path": "tools/tool_search_catalog.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "279eca7ab54d25275579339a83a534258b90039a5e66b3a94e077328ca0d55b5",
+   "ours_sha256": "0538182c735afad9cac48fd023174dd7cd6386d977a9c74c1b71d6c5cdfc250b",
+   "theirs_sha256": "6ff187afbc32b8bbdf74f6760bb7cdc470eae945fbc0a44596df0d2cbef7c1fa",
+   "result_sha256": "6ff187afbc32b8bbdf74f6760bb7cdc470eae945fbc0a44596df0d2cbef7c1fa"
+  },
+  {
+   "path": "tools/tool_search_validation.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "495d75b44fcaa1f694ac9dc3cae86d5d22d1d964f76c46df022b345fe818dbc0",
+   "ours_sha256": "495d75b44fcaa1f694ac9dc3cae86d5d22d1d964f76c46df022b345fe818dbc0",
+   "theirs_sha256": "2b87a2b3c8459fbe1d938873053e958623d5972d2fcadc4332e74d39dcf6df24",
+   "result_sha256": "2b87a2b3c8459fbe1d938873053e958623d5972d2fcadc4332e74d39dcf6df24"
+  },
+  {
+   "path": "tools/tour_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "bb63dc7a728d53dc29697bf7275a2e150bc335dd320b10911007f99f9f6f9c8f",
+   "ours_sha256": "bb63dc7a728d53dc29697bf7275a2e150bc335dd320b10911007f99f9f6f9c8f",
+   "theirs_sha256": "0836d322a8cd6af933770dbe5fb6bd3c6f7750d9caed8eda7dc24bcccd470585",
+   "result_sha256": "0836d322a8cd6af933770dbe5fb6bd3c6f7750d9caed8eda7dc24bcccd470585"
+  },
+  {
+   "path": "tools/transcription_audio.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "5748857e4c2c2419092b4dee884140efff06e81c265e8cb37dc20a4ea7519568",
+   "ours_sha256": "753b97f31d23096968061bf1badaccce6fd67961dcd6264a8914c65ed82dd5f0",
+   "theirs_sha256": "01de602eba24ecbee41eecc7b698df96cc9ced07f53eb32a123bc9d49b396850",
+   "result_sha256": "01de602eba24ecbee41eecc7b698df96cc9ced07f53eb32a123bc9d49b396850"
+  },
+  {
+   "path": "tools/transcription_cloud.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "bfd4ff59f7202e7452b2a5f4132bd7f05cf7ddbbd3bffdcf23f0a7cdb8c86e91",
+   "ours_sha256": "0f6162ec9edc2640d1ffd89898864122ccc419c0d02b307573f10450a545f58a",
+   "theirs_sha256": "3143cd9c299f9b54f9e3a667271fd0ec39849836f93330a1b625b617188ae6ef",
+   "result_sha256": "3143cd9c299f9b54f9e3a667271fd0ec39849836f93330a1b625b617188ae6ef"
+  },
+  {
+   "path": "tools/transcription_command.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "b97e4029e2989151df379c8540ccdd5eb80d65b9d1c44c9abfb7df00a3e87bee",
+   "ours_sha256": "ec781a7af81fc28ce30a3266061e32c80a620906c72b7c772aec1d2f170851f3",
+   "theirs_sha256": "f2ff11c6a1ac7b76f7fc14ed877a8c1fe926528e4dae9093f752f317cce8f8f7",
+   "result_sha256": "f2ff11c6a1ac7b76f7fc14ed877a8c1fe926528e4dae9093f752f317cce8f8f7"
+  },
+  {
+   "path": "tools/transcription_common.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0d9d04a7ea16bbaf79728871c5683123c3fc791fbea991b2e773f1a388db37ba",
+   "ours_sha256": "7fd335c610290c1c3628aefa6e2629763b757a2eaea74ec5f3033c6d03b10c98",
+   "theirs_sha256": "765ed70b632e3d31c1b64070a716373d0583e5b1cf5a8ef11b29cb6f5261de6f",
+   "result_sha256": "765ed70b632e3d31c1b64070a716373d0583e5b1cf5a8ef11b29cb6f5261de6f"
+  },
+  {
+   "path": "tools/transcription_local.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "3ec0d9c8960165ff592faf2c5b0d065260a7da3ccd2f52dcd9d90b7ca9fb9821",
+   "ours_sha256": "c8450b092de04e91fe62c503c90dfca30179e80d230b5ff156fb157449573ecc",
+   "theirs_sha256": "44a26805cce6840d18e2f316ff24cedbf0bd74b0e47ca352dff9d6da82be75cf",
+   "result_sha256": "44a26805cce6840d18e2f316ff24cedbf0bd74b0e47ca352dff9d6da82be75cf"
+  },
+  {
+   "path": "tools/transcription_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a878312ec34d07d30e67ef8e93cc08b748107097aab4ebfe67d9a7a9828ce894",
+   "ours_sha256": "023761833b65acddc10035d6783103d07549e5fc58f3f66ccc9a23f8ff4d9dd4",
+   "theirs_sha256": "26e55f4dda7b50127d3387f1253f66adf913ac295e0ad08131c0f6babcda3854",
+   "result_sha256": "26e55f4dda7b50127d3387f1253f66adf913ac295e0ad08131c0f6babcda3854"
+  },
+  {
+   "path": "tools/tts_streaming.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "4d8c31437188a6dd47e48108517ca7aa7bdd9f0e59aea3ba0dcb4a4b4ab4e020",
+   "ours_sha256": "4d8c31437188a6dd47e48108517ca7aa7bdd9f0e59aea3ba0dcb4a4b4ab4e020",
+   "theirs_sha256": "8ea9272ebe7446f8ca6143e8b0e76271c9366c2a4ad5006bc6f4def883e4bf56",
+   "result_sha256": "8ea9272ebe7446f8ca6143e8b0e76271c9366c2a4ad5006bc6f4def883e4bf56"
+  },
+  {
+   "path": "tools/tts_text_normalize.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "b9f505432c55080ba50f0ae7d7ddba0ad059228ce8a403b72cc219002e7fd974",
+   "ours_sha256": "05012126083d87858bd411df75424d81e9bdb1a878d403b2c22da89eff1e2ebc",
+   "theirs_sha256": "05012126083d87858bd411df75424d81e9bdb1a878d403b2c22da89eff1e2ebc",
+   "result_sha256": "05012126083d87858bd411df75424d81e9bdb1a878d403b2c22da89eff1e2ebc"
+  },
+  {
+   "path": "tools/tts_tool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "9fe1931b8f47a2dab49ce8369070999deeed982b633bf93bc5bbc47cd7689305",
+   "ours_sha256": "c2dbd3626092ce9d07cd48b1743ebc9b6301eb27efda834f14345e3bda40b485",
+   "theirs_sha256": "4c9ec84aefab76e1b36c2c265497c1ae44f8dfeca0de1c2ad7352aa373430e8a",
+   "result_sha256": "4c9ec84aefab76e1b36c2c265497c1ae44f8dfeca0de1c2ad7352aa373430e8a"
+  },
+  {
+   "path": "tools/tts_tool_delivery.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "cfd95d16a408e9a53e1a4c83a30d00c943fd3af11b82c7fdb3b130b76c2aca6f",
+   "ours_sha256": "cfd95d16a408e9a53e1a4c83a30d00c943fd3af11b82c7fdb3b130b76c2aca6f",
+   "theirs_sha256": "edfe970409ab0a270dd24378389029ea03d29132c64e3cd0709c36328c8a4dd4",
+   "result_sha256": "edfe970409ab0a270dd24378389029ea03d29132c64e3cd0709c36328c8a4dd4"
+  },
+  {
+   "path": "tools/tts_tool_lifecycle.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "06b37d25624a869f462438cb1dedd33fd66d210d351e9b8c0f35f0b671de593c",
+   "ours_sha256": "966764da7e442d326dbb3a7d4beb32662c0630491f0bc69220cac38e5e8b8fb2",
+   "theirs_sha256": "966764da7e442d326dbb3a7d4beb32662c0630491f0bc69220cac38e5e8b8fb2",
+   "result_sha256": "966764da7e442d326dbb3a7d4beb32662c0630491f0bc69220cac38e5e8b8fb2"
+  },
+  {
+   "path": "tools/tts_tool_local.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "49c4af60d8eedb4fbc22ea610018a29136d50380afe22648d96187ce9f989562",
+   "ours_sha256": "49c4af60d8eedb4fbc22ea610018a29136d50380afe22648d96187ce9f989562",
+   "theirs_sha256": "9f1c15605d6321619a02eff407c7df063cb5a35dd92dd5e84127216e8f8435a1",
+   "result_sha256": "9f1c15605d6321619a02eff407c7df063cb5a35dd92dd5e84127216e8f8435a1"
+  },
+  {
+   "path": "tools/tts_tool_openai.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "e20fb8e7e27e3fb622f96c7ebc002d5bc4323757b8d9cb5cbdbd0f6bde07cfc9",
+   "ours_sha256": "e20fb8e7e27e3fb622f96c7ebc002d5bc4323757b8d9cb5cbdbd0f6bde07cfc9",
+   "theirs_sha256": "7229863515a95da6aa8bb040787b51d5123dc9c90b259c86197c066ab0469410",
+   "result_sha256": "7229863515a95da6aa8bb040787b51d5123dc9c90b259c86197c066ab0469410"
+  },
+  {
+   "path": "tools/tts_tool_providers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "f1d446a26661867f35c4c1bf445b67da5ea7ba752d89ec71e5a1e274be88ebfb",
+   "ours_sha256": "f0c542ece347a19e59ce7de6224fe9b29da1ce7eece4e7bb5ce57bc73f31fe26",
+   "theirs_sha256": "04e1b03ef201758ed304a4b49f066013133a824ae429dbad75896dd498a34ca3",
+   "result_sha256": "04e1b03ef201758ed304a4b49f066013133a824ae429dbad75896dd498a34ca3"
+  },
+  {
+   "path": "tools/tts_tool_speaker.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "12babb03fe2679f4d911badd9641d63d21f7b4f574fe8c403bd0eb22382097fe",
+   "ours_sha256": "12babb03fe2679f4d911badd9641d63d21f7b4f574fe8c403bd0eb22382097fe",
+   "theirs_sha256": "e507d7cd10b07819ebb8bb6caf838c4e299f334de48ed8a5680fb739c3979ddc",
+   "result_sha256": "e507d7cd10b07819ebb8bb6caf838c4e299f334de48ed8a5680fb739c3979ddc"
+  },
+  {
+   "path": "tools/url_safety.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "f52e133fa811434d084a029dfe779e10665d87c51540aa0fe9569b81f163d73c",
+   "ours_sha256": "f52e133fa811434d084a029dfe779e10665d87c51540aa0fe9569b81f163d73c",
+   "theirs_sha256": "cfdc9832c6d04d670c21fefa44cdeb39e5c01e1b71f149674d2350015a280250",
+   "result_sha256": "cfdc9832c6d04d670c21fefa44cdeb39e5c01e1b71f149674d2350015a280250"
+  },
+  {
+   "path": "tools/video_generation_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "0f018a096f0c9e29052fe4a783ddeb6e7547303feb1151b184c4d267c3dcc789",
+   "ours_sha256": "0f018a096f0c9e29052fe4a783ddeb6e7547303feb1151b184c4d267c3dcc789",
+   "theirs_sha256": "80c1f1fef0358f5091ba823381fb19a1b6bdde4bed561d867007444fd45d49f1",
+   "result_sha256": "80c1f1fef0358f5091ba823381fb19a1b6bdde4bed561d867007444fd45d49f1"
+  },
+  {
+   "path": "tools/vision_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "ebc47572a4a11cc79072acb3e0fbc05dd34ea88ef441c7ff1ffc647ba3615e5b",
+   "ours_sha256": "84c74e384c2519f1cb62e16592604dc697c4630e1c7fa14bb61d60d6730c0bf6",
+   "theirs_sha256": "08daa2a66cfdaedd9e8752cb588692f5730cf5aabc39c66b7a12f5cc9d7082f0",
+   "result_sha256": "08daa2a66cfdaedd9e8752cb588692f5730cf5aabc39c66b7a12f5cc9d7082f0"
+  },
+  {
+   "path": "tools/vision_tools_image_prep.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a05628de8e3648df4cbf738a6efeb2164cba3244ea1f8c8e161d5b4f52f37654",
+   "ours_sha256": "119ad3241ee88e059bb8f931d6e9306990a7db76d52a6863dc0d26979afd0dbc",
+   "theirs_sha256": "975d3cfa6ea46d6a8cc1360275abc035b137e8f3ced34489aacdbc105d36df1c",
+   "result_sha256": "975d3cfa6ea46d6a8cc1360275abc035b137e8f3ced34489aacdbc105d36df1c"
+  },
+  {
+   "path": "tools/voice_client_config.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "8a938907310843b3e616a27242d1c072a5466c2e1ada3426dce0fe026b9a1ee7",
+   "ours_sha256": "8a938907310843b3e616a27242d1c072a5466c2e1ada3426dce0fe026b9a1ee7",
+   "theirs_sha256": "2792a4b921250fd6d60baeaced27cc0519e0c0bcc9ecb0482e1afab59d6e0ee1",
+   "result_sha256": "2792a4b921250fd6d60baeaced27cc0519e0c0bcc9ecb0482e1afab59d6e0ee1"
+  },
+  {
+   "path": "tools/voice_live.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "55cc954f3398c4e0a9825ef2ba5e298d8272584fd2f5b01bf60eb126c6dba398",
+   "ours_sha256": "55cc954f3398c4e0a9825ef2ba5e298d8272584fd2f5b01bf60eb126c6dba398",
+   "theirs_sha256": "db0da218e7b816f960fcf965f725e0423872a0cc4a1960b852be94fbd9be01fb",
+   "result_sha256": "db0da218e7b816f960fcf965f725e0423872a0cc4a1960b852be94fbd9be01fb"
+  },
+  {
+   "path": "tools/voice_mode.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "34ca0477835a33acde1a1f50208b28744b18189c316daf1ed87702e696576a62",
+   "ours_sha256": "0dd1c150d815193ca9a3947aa2de3d0b6495fce250c7bb1e449d29d15a7ed5d3",
+   "theirs_sha256": "06315ab2e0a8479e811f75e7f7c81d3175ffc8a57fdc330efd47e34763d321ea",
+   "result_sha256": "06315ab2e0a8479e811f75e7f7c81d3175ffc8a57fdc330efd47e34763d321ea"
+  },
+  {
+   "path": "tools/wake_word.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "a53091ce1be66705e2ea0940d4c5fd7f4db63f74bd60529fb6590bd2362ac21e",
+   "ours_sha256": "2b82cf23ea114039582406c0af3555b5546b2f9efc62a91b1eb2eadd1f18f450",
+   "theirs_sha256": "2ccce15235506e4a31f7c512b1d5da7e6d219d601d805d6f616502c62a3a5db2",
+   "result_sha256": "2ccce15235506e4a31f7c512b1d5da7e6d219d601d805d6f616502c62a3a5db2"
+  },
+  {
+   "path": "tools/wake_word_engines.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "dd4023b78a77e92675ceaaf6f0d255181703b92cad2a98097b1f6731323d919c",
+   "ours_sha256": "e051dc4e9e93c096a82f33a8bef8791672104182ab11973532d12e6aa5f4c550",
+   "theirs_sha256": "8ff7b3c16d07d62bac8da273452bf6153951f531d5809cbf7ea6981f1a5ae905",
+   "result_sha256": "8ff7b3c16d07d62bac8da273452bf6153951f531d5809cbf7ea6981f1a5ae905"
+  },
+  {
+   "path": "tools/wakewords/README.md",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "aea05096f21e2af0addc84e8d3a4cdf5892a69c6855fea6f79541cfe1aec3f5c",
+   "ours_sha256": "0ddbd235a874dc50957ebfba308eb8b02ccfe6d56be0b17a6fb7ee3a07fc8330",
+   "theirs_sha256": "0ddbd235a874dc50957ebfba308eb8b02ccfe6d56be0b17a6fb7ee3a07fc8330",
+   "result_sha256": "0ddbd235a874dc50957ebfba308eb8b02ccfe6d56be0b17a6fb7ee3a07fc8330"
+  },
+  {
+   "path": "tools/wakewords/hey_hermes.onnx",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "DELETED",
+   "action": "delete",
+   "bucket": "tools",
+   "base_sha256": "b0fa7b9fc59d8559b83b3c4d00bf22d58b503f9653a97ee71d27528c662096df",
+   "ours_sha256": null,
+   "theirs_sha256": null,
+   "result_sha256": null
+  },
+  {
+   "path": "tools/web_result_cache.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "6d8d41ebab87979c3ae2acf8d7a5646f3684f6fc37844fb8b8d3548451374854",
+   "ours_sha256": "ff042f9454c12537ab4cda348032f6b4c376b9514d50c60508875c73792c44f9",
+   "theirs_sha256": "33b841f6bdcef99b85c9be99100f9137616c0ced455d0cbce33bcf251b3a08f6",
+   "result_sha256": "33b841f6bdcef99b85c9be99100f9137616c0ced455d0cbce33bcf251b3a08f6"
+  },
+  {
+   "path": "tools/web_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "22a28021fabbd5b2824a528832bbf6f74bb9132f4d426babee6e6a907b78aa51",
+   "ours_sha256": "055168c8a64034c3a94b5c4c58681f432a3fdb6252ae6839f824edcf36417831",
+   "theirs_sha256": "d14cf81ec45ff25a70549c600a54b332189443659ab1d6b19542fdf6ffe8784a",
+   "result_sha256": "d14cf81ec45ff25a70549c600a54b332189443659ab1d6b19542fdf6ffe8784a"
+  },
+  {
+   "path": "tools/web_tools_extract.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "3b36430bc640a7b4f085eaf4812146037ae514473fe36429e42d41d481e4327d",
+   "ours_sha256": "3b36430bc640a7b4f085eaf4812146037ae514473fe36429e42d41d481e4327d",
+   "theirs_sha256": "414e1cecaf12b282b0dfee34b5ec2974b8423255bef9de2d0df0229bee43fb17",
+   "result_sha256": "414e1cecaf12b282b0dfee34b5ec2974b8423255bef9de2d0df0229bee43fb17"
+  },
+  {
+   "path": "tools/web_tools_rescue.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "3a4e814752f05e80f7f4616ef3fc6f4d27fb663f3d21741e3a2bb353e0ab4452",
+   "ours_sha256": "02963c002fc97cb62138de7a078a55a6de912b615ba4e6c866a44b4904f1255f",
+   "theirs_sha256": "c9c900ac6a11e287388178f9e23da9e105cae7172e65f63053e6e0fa3bea2089",
+   "result_sha256": "c9c900ac6a11e287388178f9e23da9e105cae7172e65f63053e6e0fa3bea2089"
+  },
+  {
+   "path": "tools/web_tools_truncate.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "885108d5b8b2e7ae464d1d617994b1914a60486362f79d83c0831b0a0029e429",
+   "ours_sha256": "885108d5b8b2e7ae464d1d617994b1914a60486362f79d83c0831b0a0029e429",
+   "theirs_sha256": "c25af49f62409674a8cfcf633a1fd2d6ab078feaf76af0bc3335cce6fe734c7e",
+   "result_sha256": "c25af49f62409674a8cfcf633a1fd2d6ab078feaf76af0bc3335cce6fe734c7e"
+  },
+  {
+   "path": "tools/website_policy.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "701fc3cdb11e615cf808f58d50b7f43ca77d33273738d1e1bed65b7c04b44d2a",
+   "ours_sha256": "9334f8bbd33f94180d87db64627110543a73de4862eeb8bb873f0138a475d961",
+   "theirs_sha256": "11f4003cca91b49d871edc91e0322f07ba2decc6ecee35d47e4e479f9481510d",
+   "result_sha256": "11f4003cca91b49d871edc91e0322f07ba2decc6ecee35d47e4e479f9481510d"
+  },
+  {
+   "path": "tools/working_diff.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tools",
+   "base_sha256": "fe08ee0784c5b87cceff28c97ad40e1ff38fd903d153d825574c0bfe6b4a91b7",
+   "ours_sha256": "614fb0e3fdd7d6a22fd50211755e391d760d520b710130c1b950102511c93d55",
+   "theirs_sha256": "614fb0e3fdd7d6a22fd50211755e391d760d520b710130c1b950102511c93d55",
+   "result_sha256": "614fb0e3fdd7d6a22fd50211755e391d760d520b710130c1b950102511c93d55"
+  },
+  {
+   "path": "tools/write_approval.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "8f0a730a98dbe8c99c557239a24f07b8ec31b3118e63114c84a70d100e7eecaa",
+   "ours_sha256": "86c11bd0a11f40ac7c190949ce73c547bcf559d6dc76f8eba3e265fcad807846",
+   "theirs_sha256": "f3034dc94ba9c435f88b229dbacf1d93e4432f557b4301b8acd73289320e92cf",
+   "result_sha256": "f3034dc94ba9c435f88b229dbacf1d93e4432f557b4301b8acd73289320e92cf"
+  },
+  {
+   "path": "tools/x_search_tool.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "d332a6900823e8f3e60710c3a383a99e5d1f86f35a85256cd0721ffc146b2058",
+   "ours_sha256": "d332a6900823e8f3e60710c3a383a99e5d1f86f35a85256cd0721ffc146b2058",
+   "theirs_sha256": "b99c96cda9e10a1e7e08ae204572890e8afe8d2bd234db778fa8fb85cf91fac7",
+   "result_sha256": "b99c96cda9e10a1e7e08ae204572890e8afe8d2bd234db778fa8fb85cf91fac7"
+  },
+  {
+   "path": "tools/xai_http.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "67802b863a6d803c4118dbb42b0fb61bdf0dd2c3f9fd1301afd026ea90e57b08",
+   "ours_sha256": "152dcac2f2034e1d7e93e3e041c6b6ba485d1eac8869d56158dd394b362ef965",
+   "theirs_sha256": "e68680a6b840bc6752bc3d3372186b2b7ba55785e8e90e1798764daeed779953",
+   "result_sha256": "e68680a6b840bc6752bc3d3372186b2b7ba55785e8e90e1798764daeed779953"
+  },
+  {
+   "path": "tools/xai_video_tools.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tools",
+   "base_sha256": "18ab8cc69b66234e5fa24c1d74ac0d91df4c225afad2f8ec359941bd3bec069a",
+   "ours_sha256": "18ab8cc69b66234e5fa24c1d74ac0d91df4c225afad2f8ec359941bd3bec069a",
+   "theirs_sha256": "b3eac736d3d2fccfad3ba4456f6556dbf18403ec29230e7c254e261bed937e49",
+   "result_sha256": "b3eac736d3d2fccfad3ba4456f6556dbf18403ec29230e7c254e261bed937e49"
   }
  ]
 }
