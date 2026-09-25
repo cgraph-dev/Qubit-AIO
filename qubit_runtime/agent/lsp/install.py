@@ -82,7 +82,7 @@ def _is_windows() -> bool:
     return os.name == "nt"
 
 
-def hermes_lsp_bin_dir() -> Path:
+def qubit_lsp_bin_dir() -> Path:
     """Return the Qubit-owned bin staging dir for LSP servers."""
     from qubit_constants import get_qubit_home
 
@@ -114,7 +114,7 @@ def _first_existing(*bases: Path, is_windows: Optional[bool] = None) -> Optional
 
 def _npm_bin_dir() -> Path:
     """npm's own ``node_modules/.bin`` under the staging tree, where its ``%~dp0``-relative wrappers work."""
-    return hermes_lsp_bin_dir().parent / "node_modules" / ".bin"
+    return qubit_lsp_bin_dir().parent / "node_modules" / ".bin"
 
 
 def _existing_binary(name: str, *, is_windows: Optional[bool] = None) -> Optional[str]:
@@ -123,7 +123,7 @@ def _existing_binary(name: str, *, is_windows: Optional[bool] = None) -> Optiona
     ``is_windows`` overrides the host check so the Windows resolution is testable as data on every lane.
     """
     win = _is_windows() if is_windows is None else is_windows
-    bases = [hermes_lsp_bin_dir() / name] + ([_npm_bin_dir() / name] if win else [])
+    bases = [qubit_lsp_bin_dir() / name] + ([_npm_bin_dir() / name] if win else [])
     for staged in (c for base in bases for c in _native_binary_candidates(base, is_windows=win)):
         if staged.exists() and os.access(staged, os.X_OK):
             return str(staged)
@@ -197,7 +197,7 @@ def _run_installer(tool: str, pkg: str, cmd: list, *, timeout: int, env: Optiona
 
 def _link_into_bin(target: Path) -> str:
     """Symlink (or copy, where symlinks fail) ``target`` into ``lsp/bin/`` and return the path to use."""
-    link = hermes_lsp_bin_dir() / target.name
+    link = qubit_lsp_bin_dir() / target.name
     if not link.exists():
         try:
             link.symlink_to(target)
@@ -250,7 +250,7 @@ def _install_npm(pkg: str, bin_name: str, extra_pkgs: Optional[list] = None) -> 
         logger.warning("[install] cannot install %s: lsp.package_manager is %r but no usable %s was found "
                        "(install it, or set lsp.package_manager: npm)", pkg, pm, pm)
         return None
-    staging = hermes_lsp_bin_dir().parent  # <QUBIT_HOME>/lsp/
+    staging = qubit_lsp_bin_dir().parent  # <QUBIT_HOME>/lsp/
     install_targets = [pkg] + list(extra_pkgs or [])
     cmd = [pm_bin, *_NODE_PM_ARGV[pm](str(staging)), *install_targets]
     logger.info("[install] %s %s", pm, " ".join(cmd[1:]))
@@ -271,7 +271,7 @@ def _install_go(pkg: str, bin_name: str) -> Optional[str]:
     if go is None:
         logger.info("[install] cannot install %s: go not on PATH", pkg)
         return None
-    staging = hermes_lsp_bin_dir()
+    staging = qubit_lsp_bin_dir()
     logger.info("[install] go install %s (GOBIN=%s)", pkg, staging)
     if not _run_installer("go", pkg, [go, "install", pkg], timeout=600, env={**os.environ, "GOBIN": str(staging)}):
         return None
@@ -309,4 +309,4 @@ def detect_status(pkg: str) -> str:
     return "manual-only" if recipe and recipe.get("strategy") == "manual" else "missing"
 
 
-__all__ = ["INSTALL_RECIPES", "try_install", "detect_status", "hermes_lsp_bin_dir"]
+__all__ = ["INSTALL_RECIPES", "try_install", "detect_status", "qubit_lsp_bin_dir"]

@@ -139,12 +139,13 @@ def _is_dir_or_denied(path: Path) -> bool:
 
 
 def _find_qubit_md(cwd: Path) -> Optional[Path]:
-    """Nearest ``.hermes.md`` / ``HERMES.md`` from *cwd* up to the git root, else None."""
+    """Nearest ``.qubit.md`` / ``QUBIT.md`` (read-old ``.hermes.md`` / ``HERMES.md``)
+    from *cwd* up to the git root, else None."""
     stop_at = _find_git_root(cwd)
     current = cwd.resolve()
     # No git root: cwd only — walking parents could pick up a file planted in /tmp, /home, etc.
     for directory in [current, *current.parents] if stop_at else [current]:
-        found = next((directory / n for n in (".hermes.md", "HERMES.md") if _is_file_or_denied(directory / n)), None)
+        found = next((directory / n for n in (".qubit.md", "QUBIT.md", ".hermes.md", "HERMES.md") if _is_file_or_denied(directory / n)), None)
         if found or directory == stop_at:
             return found
     return None
@@ -1602,7 +1603,7 @@ def _context_section(content: str, label: str, warn_name: str, path: Path, conte
 
 
 def _qubit_md_candidates(cwd_path: Path) -> list[tuple[str, Path, str]]:
-    """.hermes.md / HERMES.md — nearest match walking up to the git root."""
+    """.qubit.md / QUBIT.md (read-old .hermes.md / HERMES.md) — nearest match walking up to the git root."""
     path = _find_qubit_md(cwd_path)
     if path is None:
         return []
@@ -1690,10 +1691,10 @@ def _project_context_suppressed(cwd: Optional[str], cwd_path: Path, allow_instal
 
 
 def _load_qubit_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
-    """.hermes.md / HERMES.md — nearest match walking up to the git root."""
+    """.qubit.md / QUBIT.md (read-old .hermes.md / HERMES.md) — nearest match walking up to the git root."""
     for label, path, content in _qubit_md_candidates(cwd_path):
         if content:
-            return _context_section(_strip_yaml_frontmatter(content), label, ".hermes.md", path, context_length)
+            return _context_section(_strip_yaml_frontmatter(content), label, ".qubit.md", path, context_length)
     return ""
 
 

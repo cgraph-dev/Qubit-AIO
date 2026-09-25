@@ -92,7 +92,7 @@ def test_lsp_package_manager_config_selects_installer_argv_and_never_falls_back_
     from agent.lsp import install as install_mod
 
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
-    staging = str(install_mod.hermes_lsp_bin_dir().parent)
+    staging = str(install_mod.qubit_lsp_bin_dir().parent)
     cfg = {"lsp": {}}
     monkeypatch.setattr("qubit_cli.config.load_config_readonly", lambda: cfg)
     runs = []
