@@ -2921,9 +2921,9 @@ def _resolve_qubit_bin() -> Optional[list[str]]:
     except Exception:
         pass
     import shutil
-    hermes_bin = shutil.which("hermes")
-    if hermes_bin:
-        return [hermes_bin]
+    qubit_bin = shutil.which("qubit") or shutil.which("hermes")
+    if qubit_bin:
+        return [qubit_bin]
     return None
 
 

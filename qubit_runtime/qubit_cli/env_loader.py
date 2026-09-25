@@ -394,12 +394,19 @@ def load_qubit_dotenv(
     project_env: str | os.PathLike | None = None,
     load_external_secrets: bool = True,
 ) -> list[Path]:
-    """Load Qubit env files: ``~/.hermes/.env`` overrides stale shell exports; project ``.env`` is a dev
+    """Load Qubit env files: ``~/.qubit/.env`` overrides stale shell exports; project ``.env`` is a dev
     fallback that only fills gaps when the user env exists (and overrides shell vars when it does not)."""
     # Process home on purpose (never the per-turn override): a startup .env load must not follow a routed
     # profile — see the multiplex guard below.
-    from qubit_constants import get_process_qubit_home
-    home_path = Path(qubit_home) if qubit_home else get_process_qubit_home()
+    if qubit_home:
+        home_path = Path(qubit_home)
+    else:
+        try:
+            from qubit_constants import get_process_qubit_home
+            home_path = get_process_qubit_home()
+        except Exception:
+            # Stdlib-only fallback: QUBIT_HOME env, else the Qubit-owned default home.
+            home_path = Path(os.environ.get("QUBIT_HOME", "") or (Path.home() / ".qubit"))
 
     # Multiplex gateway: while a routed profile-home override is active, copying that profile's .env
     # into os.environ would expose its credentials to sibling turns and every spawned child. Unscoped
@@ -671,4 +678,4 @@ def _process_qubit_home() -> Path:
 
         return get_routing_process_qubit_home()
     except Exception:
-        return Path.home() / ".hermes"
+        return Path.home() / ".qubit"

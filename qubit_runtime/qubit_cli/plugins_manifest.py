@@ -34,8 +34,8 @@ _KNOWN_MANIFEST_FIELDS: Set[str] = {
     "kind", "hooks", "label", "optional_env", "platforms", "external_dependencies",
     "pip_dependencies", "provides_browser_providers", "provides_web_providers",
     "manifest_version", "api_version", "requires_plugins", "python_dependencies", "config_schema",
-    "license", "homepage", "tags", "capabilities", "emits", "listens", "hermes", "depends",
-    "requires_hermes", "python_runtime",
+    "license", "homepage", "tags", "capabilities", "emits", "listens", "qubit", "hermes", "depends",
+    "requires_qubit", "requires_hermes", "python_runtime",
 }
 
 # Highest manifest schema version this Qubit understands.

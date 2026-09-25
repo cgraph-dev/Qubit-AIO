@@ -500,6 +500,8 @@ def _dashboard_plugin_search_dirs() -> List[tuple]:
     # ``true`` / ``yes`` / ``on``) so the gate matches ``qubit_cli/plugins.py`` and the documented user
     # contract.
     if env_var_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
+        # Qubit-owned project dir first, legacy ``.hermes`` as read-old fallback.
+        search_dirs.append((Path.cwd() / ".qubit" / "plugins", "project"))
         search_dirs.append((Path.cwd() / ".hermes" / "plugins", "project"))
     return search_dirs
 

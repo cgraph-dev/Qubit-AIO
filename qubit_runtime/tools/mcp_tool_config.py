@@ -172,7 +172,9 @@ def _node_fallback(command: str, *, windows: Optional[bool] = None) -> str:
     home = os.path.expanduser("~")
     # /usr/local/bin: canonical Node location (from-source Linux, Qubit Docker image, Intel Homebrew),
     # needed when a hand-authored env.PATH omits it — npx's shebang re-execs /usr/bin/env node.
-    directories = [*map(str, iter_qubit_node_dirs(get_qubit_home())), os.path.join(home, ".local", "bin"),
+    directories = [*map(str, iter_qubit_node_dirs(get_qubit_home())),
+                   os.path.join(home, ".qubit", "node", "bin"),
+                   os.path.join(home, ".local", "bin"),
                    os.path.join(os.sep, "usr", "local", "bin")]
     candidates = (c for d in directories for c in _npx_bin_candidates(d, command, windows=windows))
     return next((c for c in candidates if os.path.isfile(c) and os.access(c, os.X_OK)), command)

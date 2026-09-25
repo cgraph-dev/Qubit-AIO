@@ -413,7 +413,7 @@ class TestInstall:
         mf = DistributionManifest(
             name="future",
             version="1.0.0",
-            hermes_requires=">=99.0.0",
+            qubit_requires=">=99.0.0",
         )
         staged = _make_staging_dir(profile_env, "future", manifest=mf)
         with pytest.raises(DistributionError, match="requires Hermes"):

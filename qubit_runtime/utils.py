@@ -1,4 +1,4 @@
-"""Shared utility functions for hermes-agent."""
+"""Shared utility functions for Qubit."""
 
 import errno
 import json
@@ -31,9 +31,29 @@ def is_truthy_value(value: Any, default: bool = False) -> bool:
     return bool(value)
 
 
+def env_var_alias(name: str) -> str | None:
+    """The rebrand counterpart of an env name: ``HERMES_X`` <-> ``QUBIT_X``.
+
+    Returns None when *name* carries neither prefix. The Qubit-owned spelling is
+    canonical; the legacy one stays a read-only alias.
+    """
+    if name.startswith("HERMES_"):
+        return "QUBIT_" + name[len("HERMES_"):]
+    if name.startswith("QUBIT_"):
+        return "HERMES_" + name[len("QUBIT_"):]
+    return None
+
+
 def env_var_enabled(name: str, default: str = "") -> bool:
-    """Return True when an environment variable is set to a truthy value."""
-    return is_truthy_value(os.getenv(name, default), default=False)
+    """Return True when an environment variable is set to a truthy value.
+
+    A ``HERMES_*``/``QUBIT_*`` name also honors its rebrand counterpart so the
+    Qubit-owned spelling a user sets (or the legacy one) both take effect.
+    """
+    if is_truthy_value(os.getenv(name, default), default=False):
+        return True
+    alias = env_var_alias(name)
+    return bool(alias) and is_truthy_value(os.getenv(alias, ""), default=False)
 
 
 def file_signature(st: os.stat_result) -> "tuple[int, int, int, int]":

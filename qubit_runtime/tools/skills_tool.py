@@ -610,9 +610,9 @@ def skill_view(
             return _serve_skill_file(
                 skill_dir, file_path, name, list_available=True, mark_read=True,
                 hint="Use a relative path within the skill directory")
-        # tags/related_skills: metadata.hermes.* (agentskills.io) first, then top-level.
+        # tags/related_skills: metadata.qubit.* (read-old metadata.hermes.*) first, then top-level.
         metadata = frontmatter.get("metadata")
-        qubit_meta = (metadata.get("hermes", {}) or {}) if isinstance(metadata, dict) else {}
+        qubit_meta = (metadata.get("qubit") or metadata.get("hermes") or {}) if isinstance(metadata, dict) else {}
         tags, related_skills = (
             _parse_tags(qubit_meta.get(k) or frontmatter.get(k, "")) for k in ("tags", "related_skills"))
         linked_files = _skill_linked_files(skill_dir)

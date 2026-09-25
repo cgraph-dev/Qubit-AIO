@@ -217,15 +217,19 @@ class OptionalSkillSource(SkillSource):
         return self._remote_dirs
 
     def _upstream_pointer_from_content(self, content: Union[str, bytes]) -> Optional[Dict[str, str]]:
-        """Parse ``metadata.hermes.upstream: {repo: owner/name, path: ...}`` out of SKILL.md content
-        (a catalog stub); None for vendored skills."""
+        """Parse ``metadata.qubit.upstream: {repo: owner/name, path: ...}`` (read-old
+        ``metadata.hermes.upstream``) out of SKILL.md content (a catalog stub); None for
+        vendored skills."""
         if isinstance(content, bytes):
             try:
                 content = content.decode("utf-8")
             except UnicodeDecodeError:
                 return None
         meta_block = _parse_frontmatter(content).get("metadata")
-        qubit_meta = meta_block.get("hermes") if isinstance(meta_block, dict) else None
+        qubit_meta = (
+            (meta_block.get("qubit") or meta_block.get("hermes"))
+            if isinstance(meta_block, dict) else None
+        )
         upstream = qubit_meta.get("upstream") if isinstance(qubit_meta, dict) else None
         if not isinstance(upstream, dict):
             return None

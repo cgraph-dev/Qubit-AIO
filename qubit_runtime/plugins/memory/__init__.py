@@ -27,7 +27,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MEMORY_PLUGINS_DIR = Path(__file__).parent
+QUBIT_ENTRY_POINTS_GROUP = "qubit_agent.memory_providers"
 ENTRY_POINTS_GROUP = "hermes_agent.memory_providers"
+ENTRY_POINTS_GROUPS = (QUBIT_ENTRY_POINTS_GROUP, ENTRY_POINTS_GROUP)
 # Per Qubit home (plugin managers are per home too): pruning under one multiplexed profile must
 # only retract that profile's provider skills, never a sibling profile's.
 _REGISTERED_MEMORY_PROVIDER_SKILLS: dict[str, dict[str, Path]] = {}
@@ -48,14 +50,19 @@ _get_user_plugins_dir = _loader.user_plugins_dir
 
 
 def _get_project_plugins_dir() -> Optional[Path]:
-    """``./.hermes/plugins/`` or None. Gated on HERMES_ENABLE_PROJECT_PLUGINS like the
-    PluginManager scan: a repo you merely ``cd`` into must not offer a memory backend."""
+    """``./.qubit/plugins/`` (legacy ``./.hermes/plugins/`` as fallback), or None.
+
+    Gated on ``QUBIT_ENABLE_PROJECT_PLUGINS``/``HERMES_ENABLE_PROJECT_PLUGINS``
+    like the PluginManager scan: a repo you merely ``cd`` into must not offer a
+    memory backend."""
     try:
         from qubit_cli.plugins import _env_enabled
 
         if not _env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
             return None
-        d = Path.cwd() / ".hermes" / "plugins"
+        d = Path.cwd() / ".qubit" / "plugins"
+        if not d.is_dir():
+            d = Path.cwd() / ".hermes" / "plugins"
         return d if d.is_dir() else None
     except Exception:
         return None
@@ -110,12 +117,28 @@ def _iter_provider_dirs() -> List[Tuple[str, Path]]:
 
 
 def _iter_entry_points():
-    """Yield pip-installed memory provider entry points."""
+    """Return pip-installed memory provider entry points.
+
+    Reads the Qubit-owned group first and the legacy upstream group as a
+    read-old fallback, deduped by ``(name, value)``.
+    """
     try:
         eps = importlib.metadata.entry_points()
-        if hasattr(eps, "select"):
-            return list(eps.select(group=ENTRY_POINTS_GROUP))
-        return list(eps.get(ENTRY_POINTS_GROUP, [])) if isinstance(eps, dict) else [ep for ep in eps if ep.group == ENTRY_POINTS_GROUP]
+        out, seen = [], set()
+        for group in ENTRY_POINTS_GROUPS:
+            if hasattr(eps, "select"):
+                group_eps = list(eps.select(group=group))
+            elif isinstance(eps, dict):
+                group_eps = list(eps.get(group, []))
+            else:
+                group_eps = [ep for ep in eps if ep.group == group]
+            for ep in group_eps:
+                key = (getattr(ep, "name", ""), getattr(ep, "value", ""))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(ep)
+        return out
     except Exception as exc:
         logger.debug("Memory provider entry-point scan failed: %s", exc)
         return []

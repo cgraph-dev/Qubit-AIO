@@ -46,8 +46,9 @@ def _render_distribution_plan(plan) -> None:
         print(f"  {mf.description}")
     if mf.author:
         print(f"  Author:   {mf.author}")
-    if mf.hermes_requires:
-        print(f"  Requires: Qubit {mf.hermes_requires}")
+    qubit_requires = getattr(mf, "qubit_requires", "") or getattr(mf, "hermes_requires", "")
+    if qubit_requires:
+        print(f"  Requires: Qubit {qubit_requires}")
     print(f"  Source:   {plan.provenance}")
     print(f"  Target:   {plan.target_dir}")
     if plan.existing:
@@ -565,7 +566,7 @@ _INFO_FIELDS = (
     ("description", "Description:  "),
     ("author", "Author:       "),
     ("license", "License:      "),
-    ("hermes_requires", "Requires:     Qubit "),
+    ("qubit_requires", "Requires:     Qubit "),
     ("source", "Source:       "),
     ("installed_at", "Installed:    "),
 )
