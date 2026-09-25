@@ -1,6 +1,6 @@
-"""Argument layer for the legacy ``hermes-agent`` runner (``run_agent.main``).
+"""Argument layer for the legacy ``qubit-agent`` runner (``run_agent.main``).
 
-A console script calls its target with no arguments, so pointing ``hermes-agent``
+A console script calls its target with no arguments, so pointing ``qubit-agent``
 at ``run_agent.main`` ignored argv entirely: ``--help``, ``--version`` and a bare
 invocation all ran a real model turn with ``main()``'s built-in demo query, and
 ``--query`` was silently dropped (#54648). ``python run_agent.py`` routes through
@@ -15,11 +15,14 @@ try:
 except ModuleNotFoundError:
     pass  # partial `qubit update` — only skips the Windows UTF-8 stdio setup
 
-# The `hermes-agent` console script lands here without qubit_cli.main: repair a `qubit update` killed
+# The `qubit-agent` console script lands here without qubit_cli.main: repair a `qubit update` killed
 # while git wrote the new tree before importing anything else from the checkout.
 from qubit_cli import _early_recovery
 
-if _early_recovery.restore_interrupted_pull():
+# The v0.21.1 tree this entry point was first ported onto predate the recovery
+# helpers; guard so a partial/older checkout still starts instead of ImportError.
+_restore = getattr(_early_recovery, "restore_interrupted_pull", None)
+if callable(_restore) and _restore():
     _early_recovery.relaunch_after_restore()
 
 import argparse  # noqa: E402
@@ -30,7 +33,7 @@ def _build_parser() -> argparse.ArgumentParser:
     from qubit_cli import __release_date__, __version__
 
     parser = argparse.ArgumentParser(
-        prog="hermes-agent",
+        prog="qubit-agent",
         description="Legacy single-query Qubit Agent runner. For the full CLI use `qubit`.",
     )
     parser.add_argument("--version", action="version", version=f"Qubit Agent v{__version__} ({__release_date__})")
