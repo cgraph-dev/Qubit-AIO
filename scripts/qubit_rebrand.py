@@ -299,7 +299,11 @@ def _path_renames():
                 if old != new:
                     renames.append((old.relative_to(REPO).as_posix(),
                                     new.relative_to(REPO).as_posix()))
-    return sorted(set(renames), key=lambda x: x[0].count("/"), reverse=True)
+    # Deepest paths first so a parent-directory rename never hides a child
+    # rename; the (old, new) tiebreak makes the plan independent of the
+    # string-hash iteration order of ``set`` (PYTHONHASHSEED).
+    return sorted(set(renames),
+                  key=lambda x: (-x[0].count("/"), x[0], x[1]))
 
 
 def build_plan():
