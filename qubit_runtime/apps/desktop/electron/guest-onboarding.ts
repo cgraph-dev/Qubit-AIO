@@ -1,4 +1,4 @@
-// The Nous free tier is gated by ONE launch-time decision. The Python backend
+// The Qubit free tier is gated by ONE launch-time decision. The Python backend
 // reads HERMES_GUEST_ONBOARDING and treats exactly "1" as on; the desktop
 // decides once at launch (env or `--guest-onboarding` argv) and stamps that
 // answer onto every backend it spawns, so the app and its backends can never

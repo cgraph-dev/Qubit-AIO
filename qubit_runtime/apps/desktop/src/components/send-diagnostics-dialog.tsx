@@ -7,7 +7,7 @@
 //               with an explicit Upload button; nothing is sent before it.
 //   uploading — spinner while the backend collects, redacts and uploads.
 //   done      — the private view link (copyable) + where to pick up the
-//               discussion: GitHub Issues · Nous Portal Support · Discord.
+//               discussion: GitHub Issues · Qubit Support · Discord.
 import { useStore } from '@nanostores/react'
 
 import { Button } from '@/components/ui/button'
@@ -26,9 +26,9 @@ import { ExternalLink, Loader2Icon, Lock } from '@/lib/icons'
 import { $sendDiagnostics, confirmSendDiagnostics, dismissSendDiagnostics } from '@/store/send-diagnostics'
 
 const SUPPORT_LINKS = [
-  { key: 'github', url: 'https://github.com/NousResearch/hermes-agent/issues' },
-  { key: 'portal', url: 'https://portal.nousresearch.com/help' },
-  { key: 'discord', url: 'https://discord.gg/NousResearch' }
+  { key: 'github', url: 'https://github.com/cgraph-dev/qubit-voicebridge/issues' },
+  { key: 'portal', url: 'https://github.com/cgraph-dev/qubit-voicebridge/help' },
+  { key: 'discord', url: 'https://github.com/cgraph-dev/qubit-voicebridge' }
 ] as const
 
 export function SendDiagnosticsHost() {

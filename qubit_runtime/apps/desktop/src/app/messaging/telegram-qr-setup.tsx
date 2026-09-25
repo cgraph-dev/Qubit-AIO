@@ -60,7 +60,7 @@ export interface TelegramQrSetupProps {
 }
 
 /**
- * Telegram "Quick setup": the Nous pairing service mints a bot on the user's
+ * Telegram "Quick setup": the Qubit pairing service mints a bot on the user's
  * behalf; we show its QR/deep link, poll until Telegram confirms, let the user
  * review the allowlist, and apply. Mirrors the dashboard's Channels flow so
  * the Desktop no longer sends users to @BotFather by hand.

@@ -354,7 +354,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       message.display_kind === 'process_complete' ||
       message.display_kind === 'auto_continue' ||
       message.display_kind === 'personality_switch' ||
-      // Hermes closing a failed turn, not the model speaking.
+      // Qubit closing a failed turn, not the model speaking.
       message.display_kind === 'failed_turn'
         ? 'system'
         : message.role

@@ -1,7 +1,7 @@
 /**
  * cloud-boot-cascade.ts
  *
- * Pure decision seam for self-healing a Hermes Cloud agent connection at boot.
+ * Pure decision seam for self-healing a Qubit Cloud agent connection at boot.
  *
  * A `cloud` connection authenticates to its agent through the silent per-agent
  * cascade (main.ts `cloudAgentSilentSignIn`): open the agent's protected root in
@@ -29,7 +29,7 @@ export interface CloudBootCascadeCandidate {
  * silent per-agent sign-in and a single retry, rather than surfacing the
  * reauth error immediately. Requires all of:
  *
- *   - the connection is a Hermes Cloud agent (`remoteKind: 'cloud'`);
+ *   - the connection is a Qubit Cloud agent (`remoteKind: 'cloud'`);
  *   - it authenticates with cookies (`authMode: 'oauth'`), which is the only
  *     mode the cascade can mint a session for;
  *   - the failure is the terminal reauth error (`isReauthRequired`), i.e. the

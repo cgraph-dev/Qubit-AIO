@@ -1083,7 +1083,7 @@ function groupChatSyncPayloadEqual(
 /** Every default-profile gateway route this Desktop can currently reach.
  *  The projection fans out to ALL of them, so any single gateway can die or
  *  be removed without losing the shared room state, and gateway-only
- *  clients (Hermes Go, headless backends) see rooms regardless of which
+ *  clients (Qubit Go, headless backends) see rooms regardless of which
  *  gateway a Desktop was foregrounding when the room was used. */
 async function groupChatSyncTargetConnections() {
   const targets = new Set<string>()
@@ -1430,10 +1430,10 @@ export const GROUP_CHAT_MAX_MEMBERS = 6
  *  a Bot Mode title or a core profile display_name (e.g. default renamed to
  *  "Lucy") labels the speaker everywhere this helper feeds — the "X is
  *  thinking…" working line, the activity feed, and transcript lines — so a
- *  renamed bot never shows up as its raw profile id or a stale "Hermes"
- *  (community report, Aug 21 2026: renamed default still read "Hermes is
+ *  renamed bot never shows up as its raw profile id or a stale "Qubit"
+ *  (community report, Aug 21 2026: renamed default still read "Qubit is
  *  thinking…" in group rooms). The untitled primary profile is literally
- *  named "default" — render it as Hermes (matching displayName and the
+ *  named "default" — render it as Qubit (matching displayName and the
  *  @hermes handle) so the main agent never loses its name in rooms.
  *
  *  Accepts either a member key (`connectionId::profile`, what the activity
@@ -1443,7 +1443,7 @@ export const GROUP_CHAT_MAX_MEMBERS = 6
  *  same pipeline the Bots tab renders — and a raw name resolves the same
  *  way when exactly one roster row carries it. Same-named members that
  *  resolve to the same label get their connection label appended, so two
- *  failing `default`s are never one anonymous "Hermes" — judged against the
+ *  failing `default`s are never one anonymous "Qubit" — judged against the
  *  ROOM's seats when the caller names the room (#94869: a room whose only
  *  `reviewer` is local reads plain "Reviewer" however many other connections
  *  expose one), against the whole roster otherwise. A key with no roster row
@@ -1479,7 +1479,7 @@ export function groupSpeakerLabel(name?: null | string, group?: null | string) {
     const connection = trimmed.slice(0, boundary)
     const profile = trimmed.slice(boundary + 2)
     const title = String(meta?.[trimmed]?.title || meta?.[profile]?.title || '').trim()
-    const label = title || (profile.toLowerCase() === 'default' ? 'Hermes' : profile)
+    const label = title || (profile.toLowerCase() === 'default' ? 'Qubit' : profile)
 
     // Another connection still exposes this name: keep them tellable apart.
     return rows.some(bot => bot.name === profile) ? `${label} · ${connection}` : label
@@ -1495,7 +1495,7 @@ export function groupSpeakerLabel(name?: null | string, group?: null | string) {
   }
 
   // Legacy rungs for names the roster cannot place: a bare-keyed Bot Mode
-  // title, then the local row's display_name, then default → Hermes.
+  // title, then the local row's display_name, then default → Qubit.
   const title = String(meta?.[trimmed]?.title || '').trim()
 
   if (title) {
@@ -1509,7 +1509,7 @@ export function groupSpeakerLabel(name?: null | string, group?: null | string) {
     return renamed
   }
 
-  return isDefault ? 'Hermes' : trimmed
+  return isDefault ? 'Qubit' : trimmed
 }
 
 /** Trim a room log + its watermarks to the retained window, keeping

@@ -118,7 +118,7 @@ export function useScreenPortalState(bot: RosterRow) {
         }
       })
       .catch((error: unknown) => {
-        // An older Hermes without display.* is a settled answer (hide the surface);
+        // An older Qubit without display.* is a settled answer (hide the surface);
         // an offline bot is transient and stays in its unknown state.
         if (!cancelled && isDisplayUnavailable(error)) {
           setScreenUnavailable(bot)

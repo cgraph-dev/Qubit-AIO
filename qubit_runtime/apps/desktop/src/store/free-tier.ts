@@ -7,7 +7,7 @@ import type { FreeTierStatus } from '@/types/hermes'
  *  still homed on the free tier after a sign-in. */
 export const FREE_TIER_MODEL = 'nous/welcome'
 
-/** The provider slug the free-tier route and a signed-in Nous account share. */
+/** The provider slug the free-tier route and a signed-in Qubit account share. */
 export const NOUS_PROVIDER_ID = 'nous'
 
 export type FreeTierRequester = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>

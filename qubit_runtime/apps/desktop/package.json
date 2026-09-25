@@ -1,13 +1,13 @@
 {
-  "name": "hermes",
-  "productName": "Hermes",
+  "name": "qubit-desktop",
+  "productName": "Qubit",
   "private": true,
   "version": "0.0.0",
-  "description": "Native desktop shell for Hermes Agent.",
-  "author": "Nous Research",
+  "description": "Native desktop shell for Qubit Agent.",
+  "author": "Qubit Labs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NousResearch/hermes-agent.git"
+    "url": "git+https://github.com/cgraph-dev/qubit-voicebridge.git"
   },
   "type": "module",
   "main": "dist/electron-main.mjs",
