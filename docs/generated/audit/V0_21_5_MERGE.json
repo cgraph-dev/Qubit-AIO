@@ -5,27 +5,28 @@
  "theirs_root": "/tmp/qubit-sdd/qubit_runtime",
  "merge_rule": "TAKE_OURS->ours; REAPPLY_THEIRS->merge_file; CONFLICT->keep theirs; add candidate-only",
  "totals": {
-  "changed": 364,
+  "changed": 366,
   "written": 53,
   "deleted": 1,
-  "conflicts": 175,
+  "conflicts": 177,
   "by_resolution": {
    "AUTO_OURS": 42,
    "ADDED": 11,
    "MERGE_FILE": 135,
-   "KEEP_THEIRS_CONFLICT": 175,
+   "KEEP_THEIRS_CONFLICT": 177,
    "KEEP_THEIRS": 0,
    "DELETED": 1,
    "SKIP_IDENTICAL": 0
   },
   "by_class": {
-   "CONFLICT": 175,
+   "CONFLICT": 177,
    "REAPPLY_THEIRS": 135,
    "TAKE_OURS": 54
   },
   "by_bucket": {
    "agent": 220,
    "gateway": 127,
+   "providers": 2,
    "qubit_state*": 17
   },
   "by_bucket_resolution": {
@@ -41,6 +42,9 @@
     "AUTO_OURS": 5,
     "KEEP_THEIRS_CONFLICT": 69,
     "MERGE_FILE": 51
+   },
+   "providers": {
+    "KEEP_THEIRS_CONFLICT": 2
    },
    "qubit_state*": {
     "ADDED": 1,
@@ -1098,6 +1102,18 @@
   {
    "path": "gateway/whatsapp_identity.py",
    "bucket": "gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "providers/__init__.py",
+   "bucket": "providers",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "providers/base.py",
+   "bucket": "providers",
    "kind": "MERGE_MARKERS",
    "action": "noop"
   }
@@ -5470,6 +5486,30 @@
    "ours_sha256": "2b17f6f9c218a74c0af9e020edef9207a4db95884028cf425770d73ad09627c4",
    "theirs_sha256": "11722e2ec169f8af813acb655d79a8d84277727770ba82d3514a68e6bc821cef",
    "result_sha256": "11722e2ec169f8af813acb655d79a8d84277727770ba82d3514a68e6bc821cef"
+  },
+  {
+   "path": "providers/__init__.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "providers",
+   "base_sha256": "3d54a3e216d5ac1277811c406d7bd9e434bd64de0b31aae26b60c81254cf55de",
+   "ours_sha256": "798793857497fc6b57e0b783d4aca9c6b49c25e99c09ce2407064307413f781c",
+   "theirs_sha256": "7e201eb2d849daab3130cca812aeb14c0c09d267b76cedd80e26e6205f7f8456",
+   "result_sha256": "7e201eb2d849daab3130cca812aeb14c0c09d267b76cedd80e26e6205f7f8456"
+  },
+  {
+   "path": "providers/base.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "providers",
+   "base_sha256": "88f175bea9d1fbf97d76edebeca16f07fbb41f0c5af3924bb1b399037be65f19",
+   "ours_sha256": "3ff31fff36830ca500d9c98905c431c72f8df46c43b48368a4a57bc7dd8b8605",
+   "theirs_sha256": "5765ab03cc784ff4e231b7d028bb57f1aed2661641e4eea65cc5cbdd7c951186",
+   "result_sha256": "5765ab03cc784ff4e231b7d028bb57f1aed2661641e4eea65cc5cbdd7c951186"
   }
  ]
 }
