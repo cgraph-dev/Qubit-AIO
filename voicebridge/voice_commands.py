@@ -1210,6 +1210,23 @@ def _b_projects(ctx, args):
     raise ValueError(f"unknown projects action {action!r}")
 
 
+def _b_chat_workspaces(ctx, args):
+    """Real chat-workspace picker data (same project store the dashboard reads).
+
+    ``GET /api/chat/workspaces`` (new in v0.21.5) lists the projects + active
+    folder a fresh ``/chat`` may start in. Qubit's canonical project registry
+    (:mod:`voicebridge.projects`) is the same store the dashboard Projects page
+    and the vendored picker derive from, so this read is real backend work,
+    never a stub or fabricated list.
+    """
+    from . import projects as PJ
+
+    return {"chat_workspaces": {
+        "projects": PJ.list_projects(ctx.cfg),
+        "active": PJ.active_project(ctx.cfg),
+    }}
+
+
 def _int_arg(args: Dict[str, Any], key: str, default: int = 0) -> int:
     """Coerce an int arg without leaking OverflowError/ValueError to callers.
 
@@ -5105,6 +5122,7 @@ _BACKENDS: Dict[str, Callable] = {
     "voice_unsupported": _b_voice_unsupported,
     "sessions": _b_sessions,
     "sessions_cli": _b_sessions_cli,
+    "chat_workspaces": _b_chat_workspaces,
     "chat_sessions": _b_chat_sessions,
     "capability": _b_capability,
     "checkpoints": _b_checkpoints,
@@ -11828,6 +11846,178 @@ _CLI_GUARDS: Dict[str, Tuple[str, str]] = {
 }
 for _lit, (_guide, _code) in _CLI_GUARDS.items():
     _CG(_lit, _guide, _code)
+
+
+# ----------------------- wave 21: v0.21.5 new-capability voice intents
+# The v0.21.5 rebase added capabilities that had NO voice path at all. Each is
+# now bound to the real backend the dashboard/CLI already call, or to an
+# audited ``voice_unsupported`` refusal that names the exact counterpart — a
+# typed refusal is always an explicit guard here, never a silent no-op:
+#
+# * ``GET /api/chat/workspaces`` — a real read over the canonical project
+#   registry (the same store the dashboard workspace picker derives from);
+# * ``POST /api/local-models/download/{pause,resume}`` — brokered, dashboard-
+#   owned download jobs, so no spoken-safe execution path exists;
+# * ``computer-use screen {status,start,stop,install}`` — the upstream Bot
+#   Desktop host surface (not Qubit's Control-UI ``computer-use screen``);
+# * ``plugins {adopt,trust-update-url,check-updates}`` — vendored fork
+#   subcommands that write provenance / probe external feeds;
+# * ``WEBSOCKET /api/display/ws`` — the Qubit Desktop display stream.
+_CB("chat_workspaces", "List chat workspaces",
+    ("chat workspaces", "list chat workspaces", "show chat workspaces",
+     "chat workspace picker"),
+    "chat_workspaces",
+    examples=("qubit, chat workspaces",),
+    help="Projects + active folder a fresh /chat can start in (read-only; the "
+         "same canonical project store the dashboard workspace picker reads).")
+
+_CB("guard_local_models_download_pause",
+    "Pause a local model download (voice guard)",
+    ("pause local model download", "pause model download",
+     "pause the model download"),
+    "voice_unsupported",
+    fixed=(("op", "local_models_download_pause"),
+           ("guidance", "local-model downloads are brokered and dashboard-owned; "
+                        "use the dashboard Local Models page or run `qubit "
+                        "local-models download` in a terminal"),
+           ("code", "VOICE_BROKERED_ONLY")),
+    summary="guidance",
+    examples=("qubit, pause local model download",),
+    help="Typed refusal with guidance: the brokered download job has no "
+         "spoken-safe pause path, so the spoken attempt never claims success.")
+
+_CB("guard_local_models_download_resume",
+    "Resume a local model download (voice guard)",
+    ("resume local model download", "resume model download",
+     "resume the model download"),
+    "voice_unsupported",
+    fixed=(("op", "local_models_download_resume"),
+           ("guidance", "local-model downloads are brokered and dashboard-owned; "
+                        "use the dashboard Local Models page or run `qubit "
+                        "local-models download` in a terminal"),
+           ("code", "VOICE_BROKERED_ONLY")),
+    summary="guidance",
+    examples=("qubit, resume local model download",),
+    help="Typed refusal with guidance: the brokered download job has no "
+         "spoken-safe resume path, so the spoken attempt never claims success.")
+
+_CB("guard_computer_use_screen_status",
+    "Bot Desktop screen status (voice guard)",
+    ("computer-use screen status", "computer use screen status",
+     "bot desktop screen status"),
+    "voice_unsupported",
+    fixed=(("op", "computer_use_screen_status"),
+           ("guidance", "the Bot Desktop screen is a host/desktop surface; run "
+                        "`qubit agent computer-use screen status` in a terminal "
+                        "or use Qubit Desktop -> Bots -> Screen"),
+           ("code", "VOICE_HOST_SERVICE")),
+    summary="guidance",
+    examples=("qubit, computer-use screen status",),
+    help="Typed refusal with guidance: host display state is terminal/Desktop-"
+         "only; Qubit's own `computer-use screen` arranges Control-UI panes.")
+
+_CB("guard_computer_use_screen_start",
+    "Start the Bot Desktop screen (voice guard)",
+    ("computer-use screen start", "computer use screen start",
+     "start the bot desktop screen"),
+    "voice_unsupported",
+    fixed=(("op", "computer_use_screen_start"),
+           ("guidance", "the Bot Desktop screen is a host/desktop surface; run "
+                        "`qubit agent computer-use screen start` in a terminal "
+                        "or use Qubit Desktop -> Bots -> Screen"),
+           ("code", "VOICE_HOST_SERVICE")),
+    summary="guidance",
+    examples=("qubit, computer-use screen start",),
+    help="Typed refusal with guidance: starting a host display is not a "
+         "spoken-safe operation.")
+
+_CB("guard_computer_use_screen_stop",
+    "Stop the Bot Desktop screen (voice guard)",
+    ("computer-use screen stop", "computer use screen stop",
+     "stop the bot desktop screen"),
+    "voice_unsupported",
+    fixed=(("op", "computer_use_screen_stop"),
+           ("guidance", "the Bot Desktop screen is a host/desktop surface; run "
+                        "`qubit agent computer-use screen stop` in a terminal "
+                        "or use Qubit Desktop -> Bots -> Screen"),
+           ("code", "VOICE_HOST_SERVICE")),
+    summary="guidance",
+    examples=("qubit, computer-use screen stop",),
+    help="Typed refusal with guidance: stopping a host display is not a "
+         "spoken-safe operation.")
+
+_CB("guard_computer_use_screen_install",
+    "Install the Bot Desktop screen (voice guard)",
+    ("computer-use screen install", "computer use screen install",
+     "install the bot desktop screen"),
+    "voice_unsupported",
+    fixed=(("op", "computer_use_screen_install"),
+           ("guidance", "the Bot Desktop screen installs host packages; run "
+                        "`qubit agent computer-use screen install` in a terminal "
+                        "or use Qubit Desktop -> Bots -> Screen"),
+           ("code", "VOICE_HOST_SERVICE")),
+    summary="guidance",
+    examples=("qubit, computer-use screen install",),
+    help="Typed refusal with guidance: privileged package installation is "
+         "terminal-only and never spoken.")
+
+_CB("guard_plugins_adopt",
+    "Adopt a self-cloned plugin (voice guard)",
+    ("plugins adopt", "adopt a plugin", "adopt plugin"),
+    "voice_unsupported",
+    fixed=(("op", "plugins_adopt"),
+           ("guidance", "adopting a plugin writes provenance and is terminal-"
+                        "only; run `qubit agent plugins adopt <name>` in a "
+                        "terminal"),
+           ("code", "VOICE_TERMINAL_ONLY")),
+    summary="guidance",
+    examples=("qubit, plugins adopt my-plugin",),
+    help="Typed refusal with guidance: provenance adoption is not a spoken-safe "
+         "mutation.")
+
+_CB("guard_plugins_trust_update_url",
+    "Trust a plugin update URL (voice guard)",
+    ("plugins trust-update-url", "trust plugin update url",
+     "trust update url of a plugin"),
+    "voice_unsupported",
+    fixed=(("op", "plugins_trust_update_url"),
+           ("guidance", "trusting a changed plugin update URL is a reviewed, "
+                        "terminal-only decision; run `qubit agent plugins "
+                        "trust-update-url <name>` in a terminal"),
+           ("code", "VOICE_TERMINAL_ONLY")),
+    summary="guidance",
+    examples=("qubit, plugins trust-update-url my-plugin",),
+    help="Typed refusal with guidance: moving a saved update_url tag requires "
+         "human review in a terminal.")
+
+_CB("guard_plugins_check_updates",
+    "Check for plugin updates (voice guard)",
+    ("plugins check-updates", "check plugin updates",
+     "check for plugin updates"),
+    "voice_unsupported",
+    fixed=(("op", "plugins_check_updates"),
+           ("guidance", "checking for plugin updates probes external feeds; use "
+                        "the dashboard Plugins page or run `qubit agent plugins "
+                        "check-updates` in a terminal"),
+           ("code", "VOICE_NETWORK_REGISTRY")),
+    summary="guidance",
+    examples=("qubit, check for plugin updates",),
+    help="Typed refusal with guidance: network update probes are not run "
+         "silently from a spoken request.")
+
+_CB("guard_display_ws",
+    "Stream the Desktop display (voice guard)",
+    ("desktop display stream", "list desktop displays", "display websocket"),
+    "voice_unsupported",
+    fixed=(("op", "display_ws"),
+           ("guidance", "the live display stream is a Qubit Desktop client "
+                        "surface; view it in Qubit Desktop (the websocket has "
+                        "no voice path)"),
+           ("code", "VOICE_HOST_SERVICE")),
+    summary="guidance",
+    examples=("qubit, desktop display stream",),
+    help="Typed refusal with guidance: the display websocket is Desktop-client-"
+         "only; no voice semantics exist.")
 
 
 # ------------------------------------------------- wave 4: plugin fleet
