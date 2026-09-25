@@ -30,7 +30,7 @@ def _adapter():
 @pytest.fixture
 def boot_notice(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_qubit_home", tmp_path)
     # Await the boot task to completion and propagate failures deterministically.
     monkeypatch.setattr(gateway_run, "_startup_restore_drain_timeout_secs", lambda: 0)
     runner = object.__new__(gateway_run.GatewayRunner)

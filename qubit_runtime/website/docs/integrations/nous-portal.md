@@ -1,20 +1,20 @@
 ---
 sidebar_position: 1
-title: "Qubit Labs"
-description: "One subscription, 300+ frontier models, and the Tool Gateway — the recommended way to run Qubit Agent"
+title: "Nous Portal"
+description: "One subscription, 300+ frontier models, and the Tool Gateway — the recommended way to run Hermes Agent"
 ---
 
-# Qubit Labs
+# Nous Portal
 
-[Qubit Labs](https://portal.nousresearch.com) is Qubit Labs's unified subscription gateway and **the recommended way to run Qubit Agent**. One OAuth login replaces the juggling act of separate accounts, API keys, and billing relationships across every model lab, search API, image generator, and browser provider you'd otherwise need to wire up by hand.
+[Nous Portal](https://portal.nousresearch.com) is Nous Research's unified subscription gateway and **the recommended way to run Hermes Agent**. One OAuth login replaces the juggling act of separate accounts, API keys, and billing relationships across every model lab, search API, image generator, and browser provider you'd otherwise need to wire up by hand.
 
 If you only have time to set up one thing, set up this. The fastest path:
 
 ```bash
-qubit setup --portal
+hermes setup --portal
 ```
 
-That single command runs the Portal OAuth, lets you pick a Qubit model, sets Qubit as your inference provider in `config.yaml`, and turns on the Tool Gateway. You're ready to `qubit chat` immediately after.
+That single command runs the Portal OAuth, lets you pick a Nous model, sets Nous as your inference provider in `config.yaml`, and turns on the Tool Gateway. You're ready to `hermes chat` immediately after.
 
 Don't have a subscription yet? [portal.nousresearch.com/manage-subscription](https://portal.nousresearch.com/manage-subscription) — sign up, then come back and run the command above.
 
@@ -22,7 +22,7 @@ Don't have a subscription yet? [portal.nousresearch.com/manage-subscription](htt
 
 ### 300+ frontier models, one bill
 
-The Portal proxies a curated catalog of agentic models from across the ecosystem — billed against your Qubit subscription instead of one credit balance per lab.
+The Portal proxies a curated catalog of agentic models from across the ecosystem — billed against your Nous subscription instead of one credit balance per lab.
 
 | Family | Models |
 |--------|--------|
@@ -39,44 +39,44 @@ The Portal proxies a curated catalog of agentic models from across the ecosystem
 | **Tencent** | Hunyuan 3 Preview |
 | **Xiaomi** | MiMo V2.5 Pro |
 | **StepFun** | Step 3.5 Flash |
-| **Qubit** | Qubit-4-70B, Qubit-4-405B (chat, see [note below](#a-note-on-hermes-4)) |
+| **Hermes** | Hermes-4-70B, Hermes-4-405B (chat, see [note below](#a-note-on-hermes-4)) |
 | **+ everything else** | 280+ additional models — the full agentic frontier |
 
-Under the hood, the Portal routes each model to the backend best suited for it — some models go through OpenRouter, others through proprietary or secondary providers, and the routing for a given model can change over time. Everything is billed against your Qubit subscription either way. Switch between Claude Sonnet 4.6 for code and Gemini 3 Pro for long context with `/model` mid-session — no new credentials, no top-ups, no surprise zero-balance errors.
+Under the hood, the Portal routes each model to the backend best suited for it — some models go through OpenRouter, others through proprietary or secondary providers, and the routing for a given model can change over time. Everything is billed against your Nous subscription either way. Switch between Claude Sonnet 4.6 for code and Gemini 3 Pro for long context with `/model` mid-session — no new credentials, no top-ups, no surprise zero-balance errors.
 
 :::note
 Because routing is per-model and not always through OpenRouter, OpenRouter-specific request extensions (such as `provider` routing preferences, `session_id` sticky routing, or top-level `cache_control`) are not part of the Portal's API contract and may be ignored depending on which backend serves the model.
 :::
 
-### The Qubit Tool Gateway
+### The Nous Tool Gateway
 
-The same subscription unlocks the [Tool Gateway](/user-guide/features/tool-gateway), which routes Qubit Agent's tool calls through Qubit-managed infrastructure. Five backends, one login:
+The same subscription unlocks the [Tool Gateway](../user-guide/features/tool-gateway.md), which routes Hermes Agent's tool calls through Nous-managed infrastructure. Five backends, one login:
 
 | Tool | Partner | What it does |
 |------|---------|--------------|
-| **Web search & extract** | Firecrawl | Agent-grade search and full-page extraction. No Firecrawl API key, no rate limit babysitting. |
+| **Web search & extract** | Nous-managed | Agent-grade search and full-page extraction. No search API key, no rate limit babysitting. |
 | **Image generation** | FAL | Nine models under one endpoint: FLUX 2 Klein 9B, FLUX 2 Pro, Z-Image Turbo, Nano Banana Pro (Gemini 3 Pro Image), GPT Image 1.5, GPT Image 2, Ideogram V3, Recraft V4 Pro, Qwen Image. |
-| **Text-to-speech** | OpenAI TTS | High-quality TTS without a separate OpenAI key. Enables [voice mode](/user-guide/features/voice-mode) across messaging platforms. |
+| **Text-to-speech** | OpenAI TTS | High-quality TTS without a separate OpenAI key. Enables [voice mode](../user-guide/features/voice-mode.md) across messaging platforms. |
 | **Cloud browser automation** | Browser Use | Headless Chromium sessions for `browser_navigate`, `browser_click`, `browser_type`, `browser_vision`. No Browserbase account needed. |
 | **Cloud terminal sandbox** | Modal | Serverless terminal sandboxes for code execution (optional add-on). |
 
-Without the gateway, hooking each of those up means a Firecrawl account, a FAL account, a Browser Use account, an OpenAI key, and a Modal account — five separate signups, five separate dashboards, five separate top-up flows. With the gateway, all of it routes through one subscription.
+Without the gateway, hooking each of those up means a web search account, a FAL account, a Browser Use account, an OpenAI key, and a Modal account — five separate signups, five separate dashboards, five separate top-up flows. With the gateway, all of it routes through one subscription.
 
 You can also enable just specific gateway tools (e.g. web search but not image generation) — see [Mixing the gateway with your own backends](#mixing-the-gateway-with-your-own-backends) below.
 
 ### No credentials in your dotfiles
 
-Because everything routes through one OAuth-authenticated Portal session, you don't accumulate a `.env` file with a dozen long-lived API keys. The refresh token at `~/.hermes/auth.json` is the only credential on disk, and Qubit mints short-lived JWTs from it per request — see [Token handling](#token-handling) below.
+Because everything routes through one OAuth-authenticated Portal session, you don't accumulate a `.env` file with a dozen long-lived API keys. The refresh token at `~/.hermes/auth.json` is the only credential on disk, and Hermes mints short-lived JWTs from it per request — see [Token handling](#token-handling) below.
 
 ### Cross-platform parity
 
-[Native Windows](/user-guide/windows-native) makes per-tool API key setup its rough edge — installing a Firecrawl account, a FAL account, a Browser Use account, an OpenAI key from Windows is the highest-friction part of getting a useful agent. A Portal subscription smooths that out: one OAuth covers the model and every gateway tool, so Windows users get the same experience as macOS/Linux without manually configuring four backends.
+[Native Windows](../user-guide/windows-native.md) makes per-tool API key setup its rough edge — installing a web search account, a FAL account, a Browser Use account, an OpenAI key from Windows is the highest-friction part of getting a useful agent. A Portal subscription smooths that out: one OAuth covers the model and every gateway tool, so Windows users get the same experience as macOS/Linux without manually configuring four backends.
 
-## A note on Qubit 4
+## A note on Hermes 4
 
-Qubit Labs's own **Qubit 4** family (Qubit-4-70B, Qubit-4-405B) is available through the Portal at heavily discounted rates. These are **frontier hybrid-reasoning chat models** — strong at math, science, instruction following, schema adherence, roleplay, and long-form writing.
+Nous Research's own **Hermes 4** family (Hermes-4-70B, Hermes-4-405B) is available through the Portal at heavily discounted rates. These are **frontier hybrid-reasoning chat models** — strong at math, science, instruction following, schema adherence, roleplay, and long-form writing.
 
-They are **not recommended for use inside Qubit Agent**, however. Qubit 4 is tuned for chat and reasoning, not the rapid-fire tool-calling loop the agent relies on. Use them for research workflows or via the [subscription proxy](/user-guide/features/subscription-proxy) from other tooling — but for agent work, pick a frontier agentic model from the catalog instead:
+They are **not recommended for use inside Hermes Agent**, however. Hermes 4 is tuned for chat and reasoning, not the rapid-fire tool-calling loop the agent relies on. Use them for research workflows or via the [subscription proxy](../user-guide/features/subscription-proxy.md) from other tooling — but for agent work, pick a frontier agentic model from the catalog instead:
 
 ```bash
 /model anthropic/claude-sonnet-4.6     # best general-purpose agentic model
@@ -85,76 +85,76 @@ They are **not recommended for use inside Qubit Agent**, however. Qubit 4 is tun
 /model deepseek/deepseek-v4-pro        # cost-effective coder
 ```
 
-The Portal's own [model info page](https://portal.nousresearch.com/info) carries the same warning, so this isn't a Qubit-side opinion — it's the official guidance from Qubit Labs.
+The Portal's own [model info page](https://portal.nousresearch.com/info) carries the same warning, so this isn't a Hermes-side opinion — it's the official guidance from Nous Research.
 
 ## Setup
 
 ### Fresh install — one command
 
 ```bash
-qubit setup --portal
+hermes setup --portal
 ```
 
 This runs the full setup in one shot:
 
 1. Opens your browser to portal.nousresearch.com for OAuth login
 2. Stores the refresh token at `~/.hermes/auth.json`
-3. Lets you pick a Qubit model from the curated list (or skip to keep your current one)
-4. Sets Qubit as your inference provider in `~/.hermes/config.yaml` (when you pick a model)
+3. Lets you pick a Nous model from the curated list (or skip to keep your current one)
+4. Sets Nous as your inference provider in `~/.hermes/config.yaml` (when you pick a model)
 5. Turns on the Tool Gateway (web, image, TTS, browser routing)
-6. Returns you to your terminal ready to `qubit chat`
+6. Returns you to your terminal ready to `hermes chat`
 
 If you don't have a subscription yet, sign up at [portal.nousresearch.com/manage-subscription](https://portal.nousresearch.com/manage-subscription) first.
 
 ### Existing install — add Portal alongside other providers
 
-If you already have Qubit configured with OpenRouter, Anthropic, or any other provider and you want to add the Portal alongside them:
+If you already have Hermes configured with OpenRouter, Anthropic, or any other provider and you want to add the Portal alongside them:
 
 ```bash
-qubit model
-# pick "Qubit Labs" from the provider list
+hermes model
+# pick "Nous Portal" from the provider list
 # browser opens, sign in, done
 ```
 
-Your existing providers stay configured. You can switch between them with `/model` mid-session or `qubit model` between sessions — the Portal becomes one of your available providers, not your only one.
+Your existing providers stay configured. You can switch between them with `/model` mid-session or `hermes model` between sessions — the Portal becomes one of your available providers, not your only one.
 
 ### Headless / SSH / remote setup
 
-OAuth needs a browser, but the loopback callback runs on the machine where Qubit is running. For remote hosts, see [OAuth over SSH / Remote Hosts](/guides/oauth-over-ssh) — the same patterns work for the Portal as for any other OAuth-based provider (`ssh -L` port forwarding).
+OAuth needs a browser, but the loopback callback runs on the machine where Hermes is running. For remote hosts, see [OAuth over SSH / Remote Hosts](../guides/oauth-over-ssh.md) — the same patterns work for the Portal as for any other OAuth-based provider (`ssh -L` port forwarding).
 
-### Profile setup
+### Profile setup {#profile-setup}
 
-If you use [Qubit profiles](/user-guide/profiles), the Portal refresh token is automatically shared across all profiles via a shared token store. Sign in once on any profile, and the rest pick it up automatically — no need to repeat the OAuth flow per profile.
+If you use [Hermes profiles](../user-guide/profiles.md), the Portal refresh token is automatically shared across all profiles via a shared token store. Sign in once on any profile, and the rest pick it up automatically — no need to repeat the OAuth flow per profile.
 
 ## Using the Portal day-to-day
 
 ### Inspecting what's wired up
 
 ```bash
-qubit portal            # log in to Qubit Labs + set it up (one-shot onboarding)
-qubit portal info       # login status, subscription info, model + gateway routing
-qubit portal status     # alias for `portal info`
-qubit portal tools      # detailed Tool Gateway catalog with per-tool routing
-qubit portal open       # open the subscription management page in your browser
+hermes portal            # log in to Nous Portal + set it up (one-shot onboarding)
+hermes portal info       # login status, subscription info, model + gateway routing
+hermes portal status     # alias for `portal info`
+hermes portal tools      # detailed Tool Gateway catalog with per-tool routing
+hermes portal open       # open the subscription management page in your browser
 ```
 
-`qubit portal` (with no subcommand) is the human-readable alias for `qubit auth add qubit --type oauth` — it logs you in, lets you pick a Qubit model, sets Qubit as your inference provider, and offers the Tool Gateway opt-in (identical to `qubit setup --portal`, and the same Qubit flow as the first-time quick setup).
+`hermes portal` (with no subcommand) is the human-readable alias for `hermes auth add nous --type oauth` — it logs you in, lets you pick a Nous model, sets Nous as your inference provider, and offers the Tool Gateway opt-in (identical to `hermes setup --portal`, and the same Nous flow as the first-time quick setup).
 
-`qubit portal info` gives you the high-level overview:
+`hermes portal info` gives you the high-level overview:
 
 ```
-  Qubit Labs
+  Nous Portal
   ───────────
   Auth:    ✓ logged in
   Portal:  https://portal.nousresearch.com
-  Model:   ✓ using Qubit as inference provider
+  Model:   ✓ using Nous as inference provider
 
   Tool Gateway
   ────────────
-  Web search & extract  via Qubit Labs
-  Image generation      via Qubit Labs
-  Text-to-speech        via Qubit Labs
-  Browser automation    via Qubit Labs
+  Web search & extract  via Nous Portal
+  Image generation      via Nous Portal
+  Text-to-speech        via Nous Portal
+  Browser automation    via Nous Portal
   Cloud terminal        not configured
 ```
 
@@ -178,89 +178,89 @@ Or open the picker:
 Outside a session (the full setup wizard, useful when adding a new provider):
 
 ```bash
-qubit model
+hermes model
 ```
 
 ### Mixing the gateway with your own backends
 
-If you already have, say, a Browserbase account and want to keep using it while routing web search and image generation through Qubit, that's supported. Use `qubit tools` to pick backends per tool:
+If you already have, say, a Browserbase account and want to keep using it while routing web search and image generation through Nous, that's supported. Use `hermes tools` to pick backends per tool:
 
 ```bash
-qubit tools
-# → Web search       → "Qubit Subscription"
-# → Image generation → "Qubit Subscription"
+hermes tools
+# → Web search       → "Nous Subscription"
+# → Image generation → "Nous Subscription"
 # → Browser          → "Browserbase"  (your existing key)
-# → TTS              → "Qubit Subscription"
+# → TTS              → "Nous Subscription"
 ```
 
-The Tool Gateway is opt-in per tool, not all-or-nothing. The managed backends show up in `qubit tools` whether or not you're logged into Qubit Labs — if you pick "Qubit Subscription" before authenticating, Qubit runs the Portal login inline (it won't change your inference provider or touch your other tools). See the [Tool Gateway docs](/user-guide/features/tool-gateway) for the full per-tool configuration matrix.
+The Tool Gateway is opt-in per tool, not all-or-nothing. The managed backends show up in `hermes tools` whether or not you're logged into Nous Portal — if you pick "Nous Subscription" before authenticating, Hermes runs the Portal login inline (it won't change your inference provider or touch your other tools). See the [Tool Gateway docs](../user-guide/features/tool-gateway.md) for the full per-tool configuration matrix.
 
 ### Subscription management
 
 Manage your plan, view usage, or upgrade/cancel at any time:
 
 - **Web:** [portal.nousresearch.com/manage-subscription](https://portal.nousresearch.com/manage-subscription)
-- **CLI shortcut:** `qubit portal open` (opens the same page in your default browser)
+- **CLI shortcut:** `hermes portal open` (opens the same page in your default browser)
 
 ## Configuration reference
 
-After `qubit setup --portal`, `~/.hermes/config.yaml` will look like:
+After `hermes setup --portal`, `~/.hermes/config.yaml` will look like:
 
 ```yaml
 model:
-  provider: qubit
+  provider: nous
   default: anthropic/claude-sonnet-4.6     # or whatever model you picked
   base_url: https://inference-api.nousresearch.com/v1
 ```
 
-The Tool Gateway settings live under their respective tool sections — each category has a single selection key, and picking **Qubit Subscription** in `qubit tools` (or `qubit setup --portal`) writes the value `qubit`:
+The Tool Gateway settings live under their respective tool sections — each category has a single selection key, and picking **Nous Subscription** in `hermes tools` (or `hermes setup --portal`) writes the value `nous`:
 
 ```yaml
 web:
-  backend: qubit          # web search/extract routes through Tool Gateway
+  backend: nous          # web search/extract routes through Tool Gateway
 
 image_gen:
-  provider: qubit
+  provider: nous
 
 tts:
-  provider: qubit
+  provider: nous
 
 browser:
-  cloud_provider: qubit
+  cloud_provider: nous
 ```
 
-The runtime always follows the stored selection — direct API keys left in `.env` are ignored while a category is set to `qubit`, and picking a direct provider (e.g. `image_gen.provider: fal`) without its key produces a clear error rather than silently rerouting through the gateway. (Older configs used a legacy `use_gateway: true` flag; it is read as equivalent to `qubit` but is no longer written.)
+The runtime always follows the stored selection — direct API keys left in `.env` are ignored while a category is set to `nous`, and picking a direct provider (e.g. `image_gen.provider: fal`) without its key produces a clear error rather than silently rerouting through the gateway. (Older configs used a legacy `use_gateway: true` flag; it is read as equivalent to `nous` but is no longer written.)
 
 The OAuth refresh token is stored separately at `~/.hermes/auth.json` (not in `config.yaml` — credentials and configuration are kept separate by design).
 
 ## Token handling
 
-Qubit mints a short-lived JWT from your stored Portal refresh token on each inference call rather than reusing a long-lived API key. The token lifecycle is fully automatic — refresh, mint, retry on transient 401 — and you never see it.
+Hermes mints a short-lived JWT from your stored Portal refresh token on each inference call rather than reusing a long-lived API key. The token lifecycle is fully automatic — refresh, mint, retry on transient 401 — and you never see it.
 
 Long-running gateway and dashboard processes also run a background keepalive that refreshes the token before it expires, so idle agents don't pay a 401 round-trip on their first request of each credential lifetime. The keepalive derives its tick from the lifetime the Portal actually issued (several ticks per lifetime), bounded above by:
 
 ```yaml
-qubit:
+nous:
   keepalive_interval_seconds: 900   # upper bound on the tick; 0 disables the keepalive
 ```
 
-If the Portal invalidates the refresh token (password change, manual revoke, session expiry), the invalid refresh token is **quarantined locally** so Qubit stops replaying it and you don't see a stream of identical 401s. The next call surfaces a clear "re-authentication required" message. Run `qubit auth add qubit` to log in again; the quarantine clears on the next successful login.
+If the Portal invalidates the refresh token (password change, manual revoke, session expiry), the invalid refresh token is **quarantined locally** so Hermes stops replaying it and you don't see a stream of identical 401s. The next call surfaces a clear "re-authentication required" message. Run `hermes auth add nous` to log in again; the quarantine clears on the next successful login.
 
 ## Troubleshooting
 
-### `qubit portal info` shows "not logged in"
+### `hermes portal info` shows "not logged in"
 
 You haven't completed the OAuth flow, or your refresh token was wiped. Run:
 
 ```bash
-qubit portal
+hermes portal
 ```
 
-or use `qubit model` and re-select Qubit Labs.
+or use `hermes model` and re-select Nous Portal.
 
 ### Got a "re-authentication required" message mid-session
 
-Your Portal refresh token was invalidated (password change, manual revoke, or session expiry). Run `qubit auth add qubit` and your next request will use the new credentials. Any quarantine on the old token clears automatically on successful re-login.
+Your Portal refresh token was invalidated (password change, manual revoke, or session expiry). Run `hermes auth add nous` and your next request will use the new credentials. Any quarantine on the old token clears automatically on successful re-login.
 
 ### Want to use a specific provider model that the Portal doesn't expose
 
@@ -270,17 +270,17 @@ The Portal routes each model to a suitable backend — some through OpenRouter, 
 /model anthropic/claude-opus-4.6
 ```
 
-If a model is genuinely missing, [open an issue](https://github.com/NousResearch/hermes-agent/issues) — we surface the Portal's catalog to Qubit and gaps usually mean a routing config we can update.
+If a model is genuinely missing, [open an issue](https://github.com/NousResearch/hermes-agent/issues) — we surface the Portal's catalog to Hermes and gaps usually mean a routing config we can update.
 
 ### Bills not appearing on my Portal account
 
-Check `qubit portal info` first — if it shows you're using a different provider (`Model: currently openrouter` instead of `using Qubit as inference provider`), your local config has drifted. Run `qubit model`, pick Qubit Labs, and the next request will route through your subscription.
+Check `hermes portal info` first — if it shows you're using a different provider (`Model: currently openrouter` instead of `using Nous as inference provider`), your local config has drifted. Run `hermes model`, pick Nous Portal, and the next request will route through your subscription.
 
 ## See also
 
-- **[Tool Gateway](/user-guide/features/tool-gateway)** — Full details on every gateway tool, per-tool config, and pricing
-- **[Subscription proxy](/user-guide/features/subscription-proxy)** — Use your Portal subscription from non-Qubit tools (other agents, scripts, third-party clients)
-- **[Voice mode](/user-guide/features/voice-mode)** — Voice conversations using the Portal's OpenAI TTS
-- **[AI Providers](/integrations/providers)** — Full provider catalog if you want to compare alternatives
-- **[OAuth over SSH](/guides/oauth-over-ssh)** — Login from remote hosts or browser-only environments
-- **[Profiles](/user-guide/profiles)** — Multiple Qubit configurations sharing one Portal login
+- **[Tool Gateway](../user-guide/features/tool-gateway.md)** — Full details on every gateway tool, per-tool config, and pricing
+- **[Subscription proxy](../user-guide/features/subscription-proxy.md)** — Use your Portal subscription from non-Hermes tools (other agents, scripts, third-party clients)
+- **[Voice mode](../user-guide/features/voice-mode.md)** — Voice conversations using the Portal's OpenAI TTS
+- **[AI Providers](./providers.md)** — Full provider catalog if you want to compare alternatives
+- **[OAuth over SSH](../guides/oauth-over-ssh.md)** — Login from remote hosts or browser-only environments
+- **[Profiles](../user-guide/profiles.md)** — Multiple Hermes configurations sharing one Portal login

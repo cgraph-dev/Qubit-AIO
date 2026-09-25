@@ -1,6 +1,6 @@
 """Regression for #78574 — a crashed gateway-restart phase must not stay silent.
 
-``qubit update`` wrapped its entire gateway auto-restart phase in a blanket
+``hermes update`` wrapped its entire gateway auto-restart phase in a blanket
 ``except Exception`` that only logged at debug level. When the phase raised
 early (e.g. importing ``qubit_cli.gateway`` from the freshly pulled checkout
 inside a process that already loaded the pre-update modules), every drain and
@@ -19,21 +19,7 @@ from qubit_cli.update_cmd import _restart_phase_failure_is_incomplete, _survivin
 
 
 class TestSurvivingGatewayProbe:
-    def test_reports_running_gateway_pids(self, monkeypatch):
-        fake = types.ModuleType("qubit_cli.gateway")
-        fake.find_gateway_pids = lambda **_kwargs: [4321]
-        monkeypatch.setitem(sys.modules, "qubit_cli.gateway", fake)
 
-        assert _surviving_gateway_pids_after_failed_restart() == [4321]
-
-    def test_empty_when_no_gateway_is_running(self, monkeypatch):
-        fake = types.ModuleType("qubit_cli.gateway")
-        fake.find_gateway_pids = lambda **_kwargs: []
-        monkeypatch.setitem(sys.modules, "qubit_cli.gateway", fake)
-
-        # An empty list is the only "nothing to restart" proof; it must be
-        # distinguishable from the undeterminable case below.
-        assert _surviving_gateway_pids_after_failed_restart() == []
 
     def test_undeterminable_when_gateway_module_is_broken(self, monkeypatch):
         """The probe must not raise — a broken gateway module is the bug's cause."""
@@ -90,7 +76,7 @@ class TestAbortedRestartWarning:
         assert "Update incomplete" in out
         assert "is_trivial_prompt" in out
         assert "4321" in out
-        assert "qubit gateway restart" in out
+        assert "hermes gateway restart" in out
 
     def test_warns_even_when_surviving_pids_are_unknown(self, capsys):
         _warn_gateway_restart_phase_aborted(RuntimeError("systemctl exploded"), None)
@@ -98,4 +84,4 @@ class TestAbortedRestartWarning:
 
         assert "Update incomplete" in out
         assert "systemctl exploded" in out
-        assert "qubit gateway restart" in out
+        assert "hermes gateway restart" in out

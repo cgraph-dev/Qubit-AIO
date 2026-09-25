@@ -527,7 +527,7 @@ collect_install_side_logs
 # launcher exists. No-desktop legs retain the legacy missing-launcher recovery.
 if [ "$EXPECT_DESKTOP" = "present" ] || ! source_hermes "$INSTALL_DIR" >/dev/null 2>&1; then
   step "next ordinary startup after the update (completes deferred source-update work)"
-  STARTUP_HERMES="$(source_hermes_for_startup "$INSTALL_DIR")" \
+  STARTUP_HERMES="$(source_qubit_for_startup "$INSTALL_DIR")" \
     || fail "no installed command to start after the update"
   startup_rc=0
   source_build_env "$STARTUP_HERMES" status > "$LOG_DIR/post-update-startup.log" 2>&1 || startup_rc=$?

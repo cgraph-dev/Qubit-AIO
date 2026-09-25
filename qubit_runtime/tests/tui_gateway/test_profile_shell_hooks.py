@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import yaml
+import qubit_yaml as yaml
 
 
 def test_agent_build_arms_only_consented_profile_policy(tmp_path, monkeypatch):
@@ -19,7 +19,7 @@ def test_agent_build_arms_only_consented_profile_policy(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, 'home', lambda: tmp_path / 'os-home')
     monkeypatch.setenv('HERMES_IGNORE_RULES', '1')
     monkeypatch.delenv('HERMES_ACCEPT_HOOKS', raising=False)
-    monkeypatch.setattr(server, '_hermes_home', tmp_path)
+    monkeypatch.setattr(server, '_qubit_home', tmp_path)
     monkeypatch.setattr(server, '_get_db', lambda: None)
     # Only provider resolution is a fixture; registration, agent, hook process,
     # consent, manager selection and public dispatch are the real implementation.

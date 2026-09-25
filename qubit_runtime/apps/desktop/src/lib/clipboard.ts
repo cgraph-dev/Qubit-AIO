@@ -4,7 +4,7 @@
 // path runs in the main process and is unconditional.
 
 export function installClipboardShim() {
-  const ipc = window.qubitDesktop?.writeClipboard
+  const ipc = window.hermesDesktop?.writeClipboard
 
   if (!ipc || !navigator.clipboard) {
     return

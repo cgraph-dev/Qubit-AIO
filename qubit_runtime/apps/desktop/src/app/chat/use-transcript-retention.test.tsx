@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { stubThreadEnvironment } from '@/components/assistant-ui/test-utils'
 import { type TranscriptWindowValue, useTranscriptWindow } from '@/components/assistant-ui/thread/transcript-window'
-import type * as QubitApi from '@/hermes'
+import type * as HermesApi from '@/hermes'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { RENDER_WEIGHT_CHARS } from '@/lib/render-weight'
 import type * as SessionStates from '@/store/session-states'
@@ -17,7 +17,7 @@ import { useTranscriptRetention } from './use-transcript-retention'
 import { ChatRuntimeBoundary } from '.'
 
 vi.mock('@/hermes', async importOriginal => ({
-  ...(await importOriginal<typeof QubitApi>()),
+  ...(await importOriginal<typeof HermesApi>()),
   getOlderSessionMessages: vi.fn()
 }))
 vi.mock('@/store/session-states', async importOriginal => ({

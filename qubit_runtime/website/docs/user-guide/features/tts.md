@@ -6,10 +6,14 @@ description: "Text-to-speech and voice message transcription across all platform
 
 # Voice & TTS
 
-Qubit Agent supports both text-to-speech output and voice message transcription across all messaging platforms.
+Python dependency commands on this page use a
+[PM-prepared source checkout](../../reference/package-management.md#developer-workflow).
+After a dependency change, reactivate the checkout and restart Hermes.
 
-:::tip Qubit Subscribers
-If you have a paid [Qubit Labs](https://portal.nousresearch.com) subscription, OpenAI TTS is available through the **[Tool Gateway](tool-gateway.md)** without a separate OpenAI API key. New installs can run `qubit setup --portal` to log in and turn on every gateway tool at once; existing installs can pick **Qubit Subscription** for just TTS via `qubit model` or `qubit tools`.
+Hermes Agent supports both text-to-speech output and voice message transcription across all messaging platforms.
+
+:::tip Nous Subscribers
+If you have a paid [Nous Portal](https://portal.nousresearch.com) subscription, OpenAI TTS is available through the **[Tool Gateway](tool-gateway.md)** without a separate OpenAI API key. New installs can run `hermes setup --portal` to log in and turn on every gateway tool at once; existing installs can pick **Nous Subscription** for just TTS via `hermes model` or `hermes tools`.
 :::
 
 ## Text-to-Speech
@@ -44,7 +48,7 @@ Convert text to speech with eleven providers:
 ```yaml
 # In ~/.hermes/config.yaml
 tts:
-  provider: "edge"              # "edge" | "elevenlabs" | "openai" | "minimax" | "mistral" | "gemini" | "xai" | "deepinfra" | "neutts" | "kittentts" | "piper" — or "nous" for the managed Tool Gateway (written when you pick Qubit Subscription in `qubit tools`)
+  provider: "edge"              # "edge" | "elevenlabs" | "openai" | "minimax" | "mistral" | "gemini" | "xai" | "deepinfra" | "neutts" | "kittentts" | "piper" — or "nous" for the managed Tool Gateway (written when you pick Nous Subscription in `hermes tools`)
   speed: 1.0                    # Global speed multiplier (provider-specific settings override this)
   edge:
     voice: "en-US-AriaNeural"   # 322 voices, 74 languages
@@ -56,8 +60,12 @@ tts:
     model: "gpt-4o-mini-tts"
     voice: "alloy"              # alloy, echo, fable, onyx, nova, shimmer
     base_url: "https://api.openai.com/v1"  # Override for OpenAI-compatible TTS endpoints
+    pcm_sample_rate: 24000      # Streaming PCM rate expected from the endpoint (auto-overridden by X-Audio-Sample-Rate)
     speed: 1.0                  # 0.25 - 4.0
     # language: "es"            # Sent as lang_code — only for OpenAI-compatible endpoints that support it (e.g. Kokoro)
+    # consent_attestation: "I have the speaker's consent"  # Required by some OpenAI-compatible servers for cloned voices
+  streaming:
+    min_len: 20                 # Streaming TTS: shortest first sentence (chars) spoken on its own; CJK setups use ~6
   minimax:
     region: "global"           # "global" or "cn"; see selection rules below
     model: "speech-02-hd"     # speech-02-hd (default), speech-02-turbo
@@ -105,12 +113,14 @@ tts:
     # normalize_audio: true
 ```
 
+KittenTTS is not available on Intel macOS or Windows ARM64: its dependencies publish no `onnxruntime` or PyTorch wheels for those platforms. Selecting it there reports the provider unavailable.
+
 MiniMax TTS selects its region, endpoint, and credential together:
 
 - `region: "global"` uses `https://api.minimax.io/v1/t2a_v2` with `MINIMAX_API_KEY`.
 - `region: "cn"` uses `https://api.minimaxi.com/v1/t2a_v2` with `MINIMAX_CN_API_KEY`.
-- If `region` is omitted, `MINIMAX_API_KEY` keeps precedence for backward compatibility. If only `MINIMAX_CN_API_KEY` is configured, Qubit selects `cn`.
-- An explicitly selected region must have its matching credential. Qubit never borrows the other region's key. A `base_url` override does not change the selected credential, and an override pointing at the other region's official endpoint is rejected.
+- If `region` is omitted, `MINIMAX_API_KEY` keeps precedence for backward compatibility. If only `MINIMAX_CN_API_KEY` is configured, Hermes selects `cn`.
+- An explicitly selected region must have its matching credential. Hermes never borrows the other region's key. A `base_url` override does not change the selected credential, and an override pointing at the other region's official endpoint is rejected.
 
 **Speed control**: The global `tts.speed` value applies to all providers by default. Each provider can override it with its own `speed` setting (e.g., `tts.openai.speed: 1.5`). Provider-specific speed takes precedence over the global value. Default is `1.0` (normal speed).
 
@@ -118,7 +128,7 @@ MiniMax TTS selects its region, endpoint, and credential together:
 
 Gemini TTS can follow natural-language performance direction. Set `tts.gemini.persona_prompt_file` to a local Markdown or text file that describes the voice persona. The file can include Gemini-style sections such as `AUDIO PROFILE`, `SCENE`, `DIRECTOR'S NOTES`, `SAMPLE CONTEXT`, and `TRANSCRIPT`.
 
-If the file contains `{transcript}` or `{{ transcript }}`, Qubit replaces that placeholder with the live TTS text. Otherwise, Qubit appends a labeled `TRANSCRIPT` section automatically. The persona prompt stays local and is not shown in the chat reply.
+If the file contains `{transcript}` or `{{ transcript }}`, Hermes replaces that placeholder with the live TTS text. Otherwise, Hermes appends a labeled `TRANSCRIPT` section automatically. The persona prompt stays local and is not shown in the chat reply.
 
 ```yaml
 tts:
@@ -130,7 +140,7 @@ tts:
 
 ### Audio Tags (Gemini, xAI)
 
-Google's Gemini 3.1 Flash TTS and xAI's Grok TTS support freeform square-bracket audio tags such as `[whispers]`, `[excitedly]`, `[very slow]`, `[laughs]`, and other expressive delivery notes. Enable `tts.gemini.audio_tags` or `tts.xai.auto_speech_tags` to have Qubit run a hidden rewrite pass before TTS. The rewrite inserts inline tags into the TTS script only; the visible chat reply stays unchanged.
+Google's Gemini 3.1 Flash TTS and xAI's Grok TTS support freeform square-bracket audio tags such as `[whispers]`, `[excitedly]`, `[very slow]`, `[laughs]`, and other expressive delivery notes. Enable `tts.gemini.audio_tags` or `tts.xai.auto_speech_tags` to have Hermes run a hidden rewrite pass before TTS. The rewrite inserts inline tags into the TTS script only; the visible chat reply stays unchanged.
 
 ```yaml
 tts:
@@ -144,12 +154,16 @@ tts:
 
 The rewrite uses `auxiliary.tts_audio_tags` and defaults to your main chat model. Override that auxiliary task if you want tag insertion handled by a cheaper or faster model.
 
+**Streaming sample rate (OpenAI-compatible endpoints)**: streaming playback receives headerless raw PCM, so Hermes must know its sample rate. The official OpenAI API emits 24 kHz. A compatible server that reports its rate — the `X-Audio-Sample-Rate` response header, or `rate=` in the `Content-Type` (`audio/pcm; rate=44100`) — is honored automatically: the speaker, the temp-WAV player and the gateway audio stream all open at the reported rate once the response arrives. For servers that report nothing, set `tts.openai.pcm_sample_rate` to the endpoint's output rate (e.g. `22050` for Piper-backed servers); otherwise speech plays at the wrong speed and pitch. Invalid values log a warning and fall back to `24000`.
+
 **Language (OpenAI-compatible endpoints)**: `tts.openai.language` is forwarded to the endpoint as a `lang_code` request parameter. It is intended for OpenAI-compatible TTS servers that support `lang_code` — for example [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI), where `language: "es"` selects the Spanish phonemizer instead of the English default. Leave it unset when using the official OpenAI API, which does not accept this parameter. When unset, nothing extra is sent.
+
+**Cloned-voice consent (OpenAI-compatible endpoints)**: some self-hosted OpenAI-compatible TTS servers reject a cloned voice with `400 consent_required` unless the request carries a `consent_attestation` field. Set `tts.openai.consent_attestation` to the attestation text your server expects; Hermes forwards it verbatim in the request body on every OpenAI-compatible path (whole-file synthesis, streaming, and the desktop's client-direct voice). Leave it unset for the official OpenAI API — when unset, the field is not sent.
 
 
 ### Input length limits
 
-Each provider has a documented per-request input-character cap. Qubit splits longer replies into ordered, sentence-aware chunks before calling the provider, so the full normalized text is preserved instead of silently truncated:
+Each provider has a documented per-request input-character cap. Hermes splits longer replies into ordered, sentence-aware chunks before calling the provider, so the full normalized text is preserved instead of silently truncated:
 
 | Provider | Default cap (chars) |
 |----------|---------------------|
@@ -231,7 +245,9 @@ See the [xAI Custom Voices docs](https://docs.x.ai/developers/model-capabilities
 
 Piper is a fast, local neural TTS engine from the Open Home Foundation (the Home Assistant maintainers). It runs entirely on CPU, supports **44 languages** with pre-trained voices, and needs no API key.
 
-**Install via `qubit tools`** → Voice & TTS → Piper — Qubit runs `pip install piper-tts` for you. Or install manually: `pip install piper-tts`.
+**Install via `hermes tools`** → Voice & TTS → Piper. Hermes requests the
+`piper` extra through PM. From a prepared source checkout, the explicit command
+is `python -c "import pm; pm.sync_venv(['piper'], explicit=True)"`. Platform markers still apply.
 
 **Switch to Piper:**
 
@@ -242,7 +258,7 @@ tts:
     voice: en_US-lessac-medium
 ```
 
-On the first TTS call for a voice that isn't cached locally, Qubit runs `python -m piper.download_voices <name>` and downloads the model (~20-90MB depending on quality tier) into `~/.hermes/cache/piper-voices/`. Subsequent calls reuse the cached model.
+On the first TTS call for a voice that isn't cached locally, Hermes runs `python -m piper.download_voices <name>` and downloads the model (~20-90MB depending on quality tier) into `~/.hermes/cache/piper-voices/`. Subsequent calls reuse the cached model.
 
 **Picking a voice.** The [full voice catalog](https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/VOICES.md) covers English, Spanish, French, German, Italian, Dutch, Portuguese, Russian, Polish, Turkish, Chinese, Arabic, Hindi, and more — each with `x_low` / `low` / `medium` / `high` quality tiers. Sample voices at [rhasspy.github.io/piper-samples](https://rhasspy.github.io/piper-samples/).
 
@@ -258,12 +274,12 @@ tts:
 
 ### Warm-up and unload via speech toggles (local engines)
 
-Local engines (Piper, KittenTTS) load their model lazily, so without help the *first* spoken reply after you turn speech on pays the whole model load — and on a fresh install the voice download — as silence before the first word. Qubit treats the speech-output toggles as the signal that TTS is about to be needed:
+Local engines (Piper, KittenTTS) load their model lazily, so without help the *first* spoken reply after you turn speech on pays the whole model load — and on a fresh install the voice download — as silence before the first word. Hermes treats the speech-output toggles as the signal that TTS is about to be needed:
 
 - **Desktop** — **Read replies aloud** is a desktop-local preference, independent of the gateway's `voice.auto_tts` setting in Settings → Voice. It migrates the shared value once, then later gateway configuration changes do not override the desktop toggle. If local storage is full or unavailable, the choice still lasts for this window; persistence across a reload remains best-effort. Turning on **Read replies aloud**, or starting a **voice conversation**, pre-loads the configured engine in the background right away. Turning both off again unloads the resident model (a Piper voice is tens of MB; KittenTTS up to ~80MB) so it isn't parked in RAM for nothing.
 - **CLI / TUI** — `/voice tts` (and `/voice on` when `voice.auto_tts` is set) do the same; `/voice off` releases.
 
-Each toggle holds a *lease* on the engine; the model is only unloaded when the last lease across surfaces is released, so switching off read-aloud in one Desktop window never pulls the voice out from under a conversation running in another. For cloud providers there is no model to hold — the toggle only makes sure a lazily-installed SDK (edge-tts, ElevenLabs, Mistral) is present. Warm-up is best-effort: if the engine can't load, the toggle still succeeds and the first reply falls back to loading on demand as before.
+Each toggle holds a *lease* on the engine; the model is only unloaded when the last lease across surfaces is released, so switching off read-aloud in one Desktop window never pulls the voice out from under a conversation running in another. The unload waits `tts.keep_warm_seconds` (default `60`) after the last release, and any toggle turning speech back on within that window keeps the loaded model, so a wake-word loop or a quickly restarted voice conversation doesn't reload the voice each time. Set it to `0` to unload immediately. For cloud providers there is no model to hold — the toggle only makes sure a lazily-installed SDK (edge-tts, ElevenLabs, Mistral) is present. Warm-up is best-effort: if the engine can't load, the toggle still succeeds and the first reply falls back to loading on demand as before.
 
 The Desktop calls `POST /api/audio/tts-lease` with `{"lease": "<name>", "active": true|false}`; other frontends can use the same endpoint.
 
@@ -271,7 +287,7 @@ The same lease also reaches user-declared providers, so a self-hosted TTS server
 
 ### Custom command providers
 
-If a TTS engine you want isn't natively supported (VoxCPM, MLX-Kokoro, XTTS CLI, a voice-cloning script, anything else that exposes a CLI), you can wire it in as a **command-type provider** without writing any Python. Qubit writes the input text to a temp UTF-8 file, runs your shell command, and reads the audio file the command produced.
+If a TTS engine you want isn't natively supported (VoxCPM, MLX-Kokoro, XTTS CLI, a voice-cloning script, anything else that exposes a CLI), you can wire it in as a **command-type provider** without writing any Python. Hermes writes the input text to a temp UTF-8 file, runs your shell command, and reads the audio file the command produced.
 
 Declare one or more providers under `tts.providers.<name>` and switch between them with `tts.provider: <name>` — the same way you switch between built-ins like `edge` and `openai`.
 
@@ -298,9 +314,9 @@ tts:
       output_format: wav
 ```
 
-**Supported `output_format` values:** `mp3` (default), `wav`, `ogg`, `flac`, `m4a`, `aac`, `amr`, `opus`. Your command must actually produce that format (e.g. via `ffmpeg`); Qubit only validates the declared value and names the output file accordingly. An unknown value falls back to `mp3`. The chosen format is also exposed to the command as the `{format}` placeholder.
+**Supported `output_format` values:** `mp3` (default), `wav`, `ogg`, `flac`, `m4a`, `aac`, `amr`, `opus`. Your command must actually produce that format (e.g. via `ffmpeg`); Hermes only validates the declared value and names the output file accordingly. An unknown value falls back to `mp3`. The chosen format is also exposed to the command as the `{format}` placeholder.
 
-**Subprocess environment:** command providers (TTS and STT) run with Qubit secrets scrubbed from the child environment — gateway bot tokens, LLM provider API keys, and internal relay credentials are removed; `PATH`, `HOME`, locale, and other normal variables are kept. If your command template needs its own API key from the environment (e.g. a `curl` one-liner), list the variable names under `env_passthrough` in the provider config:
+**Subprocess environment:** command providers (TTS and STT) run with Hermes secrets scrubbed from the child environment — gateway bot tokens, LLM provider API keys, and internal relay credentials are removed; `PATH`, `HOME`, locale, and other normal variables are kept. If your command template needs its own API key from the environment (e.g. a `curl` one-liner), list the variable names under `env_passthrough` in the provider config:
 
 ```yaml
 tts:
@@ -315,6 +331,9 @@ tts:
 #### Example: Doubao (Chinese seed-tts-2.0)
 
 For high-quality Chinese TTS via ByteDance's [seed-tts-2.0](https://www.volcengine.com/docs/6561/1257544) bidirectional-streaming API, install the [`doubao-speech`](https://pypi.org/project/doubao-speech/) PyPI package and wire it in as a command provider:
+
+Install this external command provider in its own tool environment, not in
+Hermes's Python environment. Make its executable available on `PATH`.
 
 ```bash
 pip install doubao-speech
@@ -334,15 +353,15 @@ tts:
       timeout: 30
 ```
 
-Credentials come from your shell environment (`VOLCENGINE_APP_ID` / `VOLCENGINE_ACCESS_TOKEN`) or `~/.doubao-speech/config.yaml`. Pick a voice by adding `--voice zh-female-warm` (or any other alias from `doubao-speech list-voices`) to the command. `doubao-speech` also bundles streaming ASR — see the [STT section below](#example-doubao--volcengine-asr) for Qubit integration. Source and full docs: [github.com/Hypnus-Yuan/doubao-speech](https://github.com/Hypnus-Yuan/doubao-speech).
+Credentials come from your shell environment (`VOLCENGINE_APP_ID` / `VOLCENGINE_ACCESS_TOKEN`) or `~/.doubao-speech/config.yaml`. Pick a voice by adding `--voice zh-female-warm` (or any other alias from `doubao-speech list-voices`) to the command. `doubao-speech` also bundles streaming ASR — see the [STT section below](#example-doubao--volcengine-asr) for Hermes integration. Source and full docs: [github.com/Hypnus-Yuan/doubao-speech](https://github.com/Hypnus-Yuan/doubao-speech).
 
 #### Placeholders
 
-Your command template can reference these placeholders. Qubit substitutes them at render time and shell-quotes each value for the surrounding context (bare / single-quoted / double-quoted), so paths with spaces and other shell-sensitive characters are safe.
+Your command template can reference these placeholders. Hermes substitutes them at render time and shell-quotes each value for the surrounding context (bare / single-quoted / double-quoted), so paths with spaces and other shell-sensitive characters are safe.
 
 | Placeholder      | Meaning                                              |
 |------------------|------------------------------------------------------|
-| `{input_path}`   | Path to the temp UTF-8 text file Qubit wrote        |
+| `{input_path}`   | Path to the temp UTF-8 text file Hermes wrote        |
 | `{text_path}`    | Alias for `{input_path}`                             |
 | `{output_path}`  | Path the command must write audio to                 |
 | `{format}`       | `mp3` / `wav` / `ogg` / `flac`                       |
@@ -357,8 +376,8 @@ Use `{{` and `}}` for literal braces.
 | Key                | Default | Meaning                                                                                                    |
 |--------------------|---------|------------------------------------------------------------------------------------------------------------|
 | `timeout`          | `120`   | Idle seconds; stdout or stderr output resets the deadline. The process tree is killed after inactivity (Unix `killpg`, Windows `taskkill /T`). |
-| `output_format`    | `mp3`   | One of `mp3` / `wav` / `ogg` / `flac`. Auto-inferred from the output extension if Qubit picks a path.      |
-| `voice_compatible` | `false` | When `true`, Qubit converts MP3/WAV output to Opus/OGG via ffmpeg so Telegram renders a voice bubble.      |
+| `output_format`    | `mp3`   | One of `mp3` / `wav` / `ogg` / `flac`. Auto-inferred from the output extension if Hermes picks a path.      |
+| `voice_compatible` | `false` | When `true`, Hermes converts MP3/WAV output to Opus/OGG via ffmpeg so Telegram renders a voice bubble.      |
 | `max_text_length`  | `5000`  | Maximum input characters per command invocation; longer text is split into ordered chunks.                  |
 | `voice` / `model`  | empty   | Passed to the command as placeholder values only.                                                           |
 | `warm_command` / `release_command` | unset | Shell commands run when a surface toggles speech output on / when the last lease across surfaces is released — e.g. `curl -s localhost:5002/load?model={model}` to preload a local TTS server, and its `unload` counterpart. Best-effort and non-blocking: run in the background with the same `timeout`, `env_passthrough` and `{voice}` / `{model}` / `{speed}` placeholders as `command`; output is discarded and failures are only logged at debug. |
@@ -373,7 +392,7 @@ Use `{{` and `}}` for literal braces.
 
 #### Security
 
-Command-type providers run whatever shell command you configure, with your user's permissions. Qubit quotes placeholder values and enforces the configured timeout, but the command template itself is trusted local input — treat it the same way you would a shell script on your PATH.
+Command-type providers run whatever shell command you configure, with your user's permissions. Hermes quotes placeholder values and enforces the configured timeout, but the command template itself is trusted local input — treat it the same way you would a shell script on your PATH.
 
 ### Python plugin providers
 
@@ -387,7 +406,7 @@ For TTS engines that can't be expressed as a single shell command — Python SDK
 | Two or three CLIs chained with shell pipes | **Command provider** |
 | A Python SDK only — no CLI | **Plugin** |
 | Streaming bytes you want to deliver chunked (mid-generation voice bubbles) | **Plugin** (override `stream()`) |
-| A voice-listing API used by `qubit setup` | **Plugin** (override `list_voices()`) |
+| A voice-listing API used by `hermes setup` | **Plugin** (override `list_voices()`) |
 | OAuth refresh flow (not a static bearer token) | **Plugin** |
 
 Built-ins always win, and command providers win over a same-name plugin — so plugins are safe to register against any non-built-in name without worrying about shadowing your existing config.
@@ -440,15 +459,15 @@ def register(ctx):
     ctx.register_tts_provider(MyTTSProvider())
 ```
 
-Enable it (`qubit plugins enable my-tts`), point `tts.provider` at it (`tts.provider: my-tts` in `config.yaml`), and the `text_to_speech` tool will route through your plugin.
+Enable it (`hermes plugins enable my-tts`), point `tts.provider` at it (`tts.provider: my-tts` in `config.yaml`), and the `text_to_speech` tool will route through your plugin.
 
 #### Optional hooks
 
 Override these on your provider class for richer integration:
 
-- `list_voices()` → list of `{id, display, language, gender, preview_url}` dicts shown in `qubit tools`.
+- `list_voices()` → list of `{id, display, language, gender, preview_url}` dicts shown in `hermes tools`.
 - `list_models()` → list of `{id, display, languages, max_text_length}` dicts.
-- `get_setup_schema()` → return `{name, badge, tag, env_vars: [{key, prompt, url}]}` to power the picker row in `qubit tools` / `qubit setup`. Without this, the plugin still works but its row in the picker is minimal.
+- `get_setup_schema()` → return `{name, badge, tag, env_vars: [{key, prompt, url}]}` to power the picker row in `hermes tools` / `hermes setup`. Without this, the plugin still works but its row in the picker is minimal.
 - `stream(text, *, voice, model, format, **extra)` → iterator yielding audio bytes for streaming delivery (default raises `NotImplementedError`).
 - `voice_compatible` property → set `True` if your output is Opus-compatible and the gateway should deliver it as a voice bubble (default `False` = regular audio attachment).
 - `warm()` / `release()` → called when a surface toggles speech output on / when the last lease across surfaces is released, while your provider is the configured `tts.provider` — preload or unload a local model server here. Both default to no-ops; exceptions are logged at debug and never fail the toggle.
@@ -466,7 +485,7 @@ Voice messages sent on Telegram, Discord, WhatsApp, Slack, or Signal are automat
 | **OpenAI Whisper API** | Good–Best | Paid | `VOICE_TOOLS_OPENAI_KEY` or `OPENAI_API_KEY` |
 
 :::info Zero Config
-Local transcription works out of the box when `faster-whisper` is installed. If that's unavailable, Qubit can also use a local `whisper` CLI from common install locations (like `/opt/homebrew/bin`) or a custom command via `HERMES_LOCAL_STT_COMMAND`.
+Local transcription works out of the box when `faster-whisper` is installed. If that's unavailable, Hermes can also use a local `whisper` CLI from common install locations (like `/opt/homebrew/bin`) or a custom command via `HERMES_LOCAL_STT_COMMAND`.
 :::
 
 ### Configuration
@@ -502,19 +521,31 @@ stt:
 | `medium` | ~1.5 GB | Slower | Great |
 | `large-v3` | ~3 GB | Slowest | Best |
 
+The first use downloads the selected model from `huggingface.co`; later loads prefer the local cache and do not require an online revision check. On networks where the Hub is unavailable, export an accessible mirror in the shell or service that starts Hermes:
+
+```bash
+HF_ENDPOINT=https://your-hugging-face-mirror.example
+HF_HUB_DISABLE_XET=1
+```
+
+`HF_HUB_DISABLE_XET=1` keeps downloads on the mirror's regular HTTP path instead of contacting Xet CAS hosts that do not honor `HF_ENDPOINT`.
+
 **Groq API** — Requires `GROQ_API_KEY`. Good cloud fallback when you want a free hosted STT option. Set `stt.groq.language` (or the global `HERMES_LOCAL_STT_LANGUAGE` env var) to skip Whisper's auto-detect and reduce latency on known-language audio.
 
 **OpenAI API** — Accepts `VOICE_TOOLS_OPENAI_KEY` first and falls back to `OPENAI_API_KEY`. Supports `whisper-1`, `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, and `gpt-transcribe`.
 
-**Mistral API (Voxtral Transcribe)** — Requires `MISTRAL_API_KEY`. Uses Mistral's [Voxtral Transcribe](https://docs.mistral.ai/capabilities/audio/speech_to_text/) models. Supports 13 languages, speaker diarization, and word-level timestamps. Install with `cd ~/.hermes/hermes-agent && uv pip install -e ".[mistral]"`.
+**Mistral API (Voxtral Transcribe)** — Requires `MISTRAL_API_KEY`. Uses Mistral's [Voxtral Transcribe](https://docs.mistral.ai/capabilities/audio/speech_to_text/) models. Supports 13 languages, speaker diarization, and word-level timestamps. Install with `cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['mistral'], explicit=True)"`.
 
 **xAI Grok STT** — Requires `XAI_API_KEY`. Posts to `https://api.x.ai/v1/stt` as multipart/form-data. Good choice if you're already using xAI for chat or TTS and want one API key for everything. Auto-detection order puts it after Groq — explicitly set `stt.provider: xai` to force it.
 
-**Custom local CLI fallback** — Set `HERMES_LOCAL_STT_COMMAND` if you want Qubit to call a local transcription command directly. The command template supports `{input_path}`, `{output_dir}`, `{language}`, and `{model}` placeholders. Qubit tokenizes the rendered template into an argument list and executes it without a shell, so operators such as `|`, `>`, `&&`, and `;` are passed as literal arguments. Your command must write a `.txt` transcript somewhere under `{output_dir}`.
+**Custom local CLI fallback** — Set `HERMES_LOCAL_STT_COMMAND` if you want Hermes to call a local transcription command directly. The command template supports `{input_path}`, `{output_dir}`, `{language}`, and `{model}` placeholders. Hermes tokenizes the rendered template into an argument list and executes it without a shell, so operators such as `|`, `>`, `&&`, and `;` are passed as literal arguments. Your command must write a `.txt` transcript somewhere under `{output_dir}`.
 
 #### Example: Doubao / Volcengine ASR
 
 If you use [`doubao-speech`](https://pypi.org/project/doubao-speech/) for Doubao TTS (see [above](#example-doubao-chinese-seed-tts-20)), the same package handles speech-to-text via the local-command STT surface:
+
+Install this external command provider in its own tool environment, not in
+Hermes's Python environment. Make its executable available on `PATH`.
 
 ```bash
 pip install doubao-speech
@@ -536,13 +567,13 @@ stt:
   provider: local_command
 ```
 
-Qubit writes the incoming voice message to `{input_path}`, runs the command, and reads the `.txt` file produced under `{output_dir}`. Language is auto-detected by the Volcengine bigmodel endpoint.
+Hermes writes the incoming voice message to `{input_path}`, runs the command, and reads the `.txt` file produced under `{output_dir}`. Language is auto-detected by the Volcengine bigmodel endpoint.
 
 ### Fallback Behavior
 
-An **explicit** `stt.provider` selection (written in `config.yaml`, e.g. via `qubit tools`) is honored strictly — if that provider can't run, transcription fails with a clear error (`stt is configured to use <provider> (set via qubit tools), but <failure>. Run 'qubit tools' to change it.`) instead of silently switching engines. Note that `stt.provider: local` written in your config counts as an explicit selection.
+An **explicit** `stt.provider` selection (written in `config.yaml`, e.g. via `hermes tools`) is honored strictly — if that provider can't run, transcription fails with a clear error (`stt is configured to use <provider> (set via hermes tools), but <failure>. Run 'hermes tools' to change it.`) instead of silently switching engines. Note that `stt.provider: local` written in your config counts as an explicit selection.
 
-When **no provider has ever been selected**, Qubit auto-detects from what's available:
+When **no provider has ever been selected**, Hermes auto-detects from what's available:
 - **Local faster-whisper unavailable** → Tries a local `whisper` CLI or `HERMES_LOCAL_STT_COMMAND` before cloud providers
 - **Groq key not set** → Skipped; next available provider
 - **OpenAI key not set** → Skipped; next available provider
@@ -551,7 +582,7 @@ When **no provider has ever been selected**, Qubit auto-detects from what's avai
 
 ### STT custom command providers
 
-If the STT engine you want isn't natively supported (Doubao ASR, NVIDIA Parakeet, a whisper.cpp build, an open-source SenseVoice CLI, anything else that exposes a shell command), wire it in as a **command-type provider** without writing any Python. Qubit runs your shell command against the audio file and reads back the transcript.
+If the STT engine you want isn't natively supported (Doubao ASR, NVIDIA Parakeet, a whisper.cpp build, an open-source SenseVoice CLI, anything else that exposes a shell command), wire it in as a **command-type provider** without writing any Python. Hermes runs your shell command against the audio file and reads back the transcript.
 
 Declare one or more providers under `stt.providers.<name>` and switch between them with `stt.provider: <name>` — same shape as the TTS [command-provider registry](#custom-command-providers), adapted for the input=audio → output=transcript direction.
 
@@ -581,7 +612,7 @@ This complements the legacy `HERMES_LOCAL_STT_COMMAND` escape hatch via the buil
 
 #### STT placeholders
 
-Your command template can reference these placeholders. Qubit substitutes them at render time and shell-quotes each value for the surrounding context (bare / single-quoted / double-quoted), so paths with spaces are safe.
+Your command template can reference these placeholders. Hermes substitutes them at render time and shell-quotes each value for the surrounding context (bare / single-quoted / double-quoted), so paths with spaces are safe.
 
 | Placeholder       | Meaning                                                              |
 |-------------------|----------------------------------------------------------------------|
@@ -598,13 +629,13 @@ Use `{{` and `}}` for literal braces (handy when embedding JSON snippets in the 
 
 After your command exits successfully:
 
-1. If `{output_path}` exists and is non-empty → Qubit reads it as UTF-8 text.
-2. Otherwise, if the command wrote to stdout → Qubit uses that.
+1. If `{output_path}` exists and is non-empty → Hermes reads it as UTF-8 text.
+2. Otherwise, if the command wrote to stdout → Hermes uses that.
 3. Otherwise → error: "Command STT provider wrote no output file and produced no stdout".
 
 This lets you use the registry for both file-writing CLIs (`whisper-cli`, `parakeet-asr`) and curl-style one-liners that emit transcript to stdout (`curl … | jq -r .text`).
 
-For `format: json` / `srt` / `vtt`, Qubit returns the raw file content as the `transcript` field. Extracting `.text` from JSON is out of scope for the runner — either configure `format: txt`, or post-process JSON downstream.
+For `format: json` / `srt` / `vtt`, Hermes returns the raw file content as the `transcript` field. Extracting `.text` from JSON is out of scope for the runner — either configure `format: txt`, or post-process JSON downstream.
 
 #### STT command-provider optional keys
 
@@ -623,7 +654,7 @@ For `format: json` / `srt` / `vtt`, Qubit returns the raw file content as the `t
 
 #### STT command-provider security
 
-The shell command runs under the same user as Qubit with full filesystem access — same trust model as `tts.providers.<name>: type: command` and `HERMES_LOCAL_STT_COMMAND`. Only declare command providers from sources you trust.
+The shell command runs under the same user as Hermes with full filesystem access — same trust model as `tts.providers.<name>: type: command` and `HERMES_LOCAL_STT_COMMAND`. Only declare command providers from sources you trust.
 
 ### Python plugin providers (STT)
 
@@ -722,7 +753,7 @@ def register(ctx):
     ctx.register_transcription_provider(MySTTProvider())
 ```
 
-Enable it (`qubit plugins enable my-stt`), set `stt.provider: my-stt` in `config.yaml`, and voice-message transcription will route through your plugin.
+Enable it (`hermes plugins enable my-stt`), set `stt.provider: my-stt` in `config.yaml`, and voice-message transcription will route through your plugin.
 
 #### Optional hooks
 
@@ -730,6 +761,6 @@ Override these on your provider class for richer integration:
 
 - `list_models()` → list of `{id, display, languages, max_audio_seconds}` dicts.
 - `default_model()` → string returned when the user doesn't override the model.
-- `get_setup_schema()` → return `{name, badge, tag, env_vars: [{key, prompt, url}]}` to power picker rows in `qubit tools` / `qubit setup` (the picker category for STT is not yet shipped — this metadata is available to plugins for forward compatibility).
+- `get_setup_schema()` → return `{name, badge, tag, env_vars: [{key, prompt, url}]}` to power picker rows in `hermes tools` / `hermes setup` (the picker category for STT is not yet shipped — this metadata is available to plugins for forward compatibility).
 
 See `agent/transcription_provider.py` for the full ABC including docstrings.

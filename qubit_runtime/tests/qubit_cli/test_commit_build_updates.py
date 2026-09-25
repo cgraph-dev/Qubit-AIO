@@ -71,16 +71,16 @@ def test_commit_backend_update_routes_refuse_before_checks_or_spawns(commit_buil
     import qubit_cli.web_server as server
     import qubit_cli.web_server_gateway as gateway
     from qubit_cli import banner, source_check
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
     monkeypatch.setattr(server, "PROJECT_ROOT", commit_build)
     monkeypatch.setattr(gateway, "_ACTION_LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr("qubit_cli.web_server_files._dashboard_local_update_managed_externally", lambda: managed)
     spawn = Mock(side_effect=AssertionError("no updater process"))
-    monkeypatch.setattr(gateway, "_spawn_hermes_action", spawn)
+    monkeypatch.setattr(gateway, "_spawn_qubit_action", spawn)
     check = Mock(side_effect=AssertionError("no update check"))
     monkeypatch.setattr(source_check, "check_for_updates", check)
-    cache = get_hermes_home() / ".update_check"
+    cache = get_qubit_home() / ".update_check"
     cache.write_text("source checkout cache")
     client = TestClient(server.app)
     client.headers[server._SESSION_HEADER_NAME] = server._SESSION_TOKEN

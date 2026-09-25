@@ -34,12 +34,12 @@ def _reset_caches():
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     """Point Hermes at an isolated home directory."""
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    # Some modules cache get_hermes_home; clear if needed.
+    # Some modules cache get_qubit_home; clear if needed.
     import qubit_constants
     if hasattr(qubit_constants, "_HERMES_HOME_CACHE"):
         qubit_constants._HERMES_HOME_CACHE = None  # type: ignore[attr-defined]

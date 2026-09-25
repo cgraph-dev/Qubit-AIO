@@ -2,14 +2,14 @@
 
 Official skills maintained by Qubit Labs that are **not activated by default**.
 
-These skills ship with the qubit-agent repository but are not copied to
-`$QUBIT_HOME/skills/` during setup. They are discoverable via the Skills Hub:
+These skills ship with the hermes-agent repository but are not copied to
+`~/.hermes/skills/` during setup. They are discoverable via the Skills Hub:
 
 ```bash
 qubit skills browse               # browse all skills, official shown first
 qubit skills browse --source official  # browse only official optional skills
 qubit skills search <query>       # finds optional skills labeled "official"
-qubit skills install <identifier> # copies to $QUBIT_HOME/skills/ and activates
+qubit skills install <identifier> # copies to ~/.hermes/skills/ and activates
 ```
 
 ## Why optional?

@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitGateway } from '@/hermes'
+import type { HermesGateway } from '@/hermes'
 import { $gateway } from '@/store/gateway'
 import { $activeGatewayProfile } from '@/store/profile'
 
@@ -37,6 +37,7 @@ vi.mock('../routes', () => ({
 vi.mock('./latest-actions', () => ({ latestChatActions: () => ({}), latestSidebarActions: () => ({}) }))
 vi.mock('./panes', () => ({ setStatusbarItemGroup: vi.fn(), useStatusbarContributions: () => [] }))
 vi.mock('../shell/model-menu-panel', () => ({ ModelMenuPanel: () => null }))
+vi.mock('../shell/reasoning-menu-panel', () => ({ ReasoningMenuPanel: () => null }))
 
 afterEach(() => {
   cleanup()
@@ -46,8 +47,8 @@ afterEach(() => {
 
 describe('ChatRoutesSurface', () => {
   it('passes the live gateway after an open-to-open profile switch', () => {
-    const gatewayA = { id: 'a' } as unknown as QubitGateway
-    const gatewayB = { id: 'b' } as unknown as QubitGateway
+    const gatewayA = { id: 'a' } as unknown as HermesGateway
+    const gatewayB = { id: 'b' } as unknown as HermesGateway
 
     $gateway.set(gatewayA)
     const actions = { getGateway: () => $gateway.get() } as unknown as WiringActions

@@ -36,7 +36,7 @@ def qubit_home(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(home))
     # get_qubit_home() prefers the context-local override over the env
     # var, so a set_qubit_home_override() leaked by ANY earlier test in
-    # this xdist worker would silently point the goals DB at a dead tmp
+    # this process would silently point the goals DB at a dead tmp
     # dir and make resume enqueue nothing (CI-only flake). Pin the
     # override to THIS home so the fixture is immune to leaks.
     from qubit_constants import (
@@ -79,9 +79,9 @@ def _exhaust_budget(session_id: str, goal_text: str = "ship the benchmark"):
 
 
 def _make_cli(session_id: str):
-    from cli import QubitCLI
+    from cli import HermesCLI
 
-    cli = QubitCLI.__new__(QubitCLI)
+    cli = HermesCLI.__new__(HermesCLI)
     cli._pending_input = queue.Queue()
     cli.session_id = session_id
     cli.agent = MagicMock()

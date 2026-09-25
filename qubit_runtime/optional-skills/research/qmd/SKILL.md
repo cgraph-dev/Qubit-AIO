@@ -8,7 +8,7 @@ platforms: [macos, linux]
 metadata:
   qubit:
     tags: [Search, Knowledge-Base, RAG, Notes, MCP, Local-AI]
-    related_skills: [obsidian, qubit-agent, arxiv]
+    related_skills: [obsidian, hermes-agent, arxiv]
 ---
 
 # QMD — Query Markup Documents
@@ -226,7 +226,7 @@ without needing to load this skill.
 
 ### Option A: Stdio Mode (Simple)
 
-Add to `$QUBIT_HOME/config.yaml`:
+Add to `~/.hermes/config.yaml`:
 
 ```yaml
 mcp_servers:
@@ -291,9 +291,9 @@ cat > ~/Library/LaunchAgents/com.qmd.daemon.plist << 'EOF'
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/qmd-daemon.log</string>
+  <string>/Users/YOU/.hermes/cache/scratch/qmd-daemon.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/qmd-daemon.log</string>
+  <string>/Users/YOU/.hermes/cache/scratch/qmd-daemon.log</string>
 </dict>
 </plist>
 EOF

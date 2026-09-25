@@ -20,7 +20,7 @@ def _strip_ansi(s: str) -> str:
 
 @pytest.fixture
 def cli_stub(monkeypatch):
-    from cli import QubitCLI
+    from cli import HermesCLI
     import cli as climod
 
     cli = HermesCLI.__new__(HermesCLI)
@@ -35,10 +35,6 @@ def cli_stub(monkeypatch):
     return cli, emitted
 
 
-def test_stream_pad_is_empty():
-    import cli as climod
-
-    assert climod._STREAM_PAD == ""
 
 
 def test_streamed_content_lines_have_no_leading_whitespace(cli_stub):

@@ -1,6 +1,6 @@
 """Tests for the launch-time stale-bytecode sweep (checkout fingerprint guard).
 
-Bug class: the checkout's ``.py`` files change (``qubit update``, manual
+Bug class: the checkout's ``.py`` files change (``hermes update``, manual
 ``git pull``, ZIP update) while ``__pycache__`` retains bytecode compiled
 from the previous revision; the next process to import trusts the stale
 ``.pyc`` and dies with ``cannot import name ...`` (#6207, #60242).
@@ -13,7 +13,7 @@ updaters).
 
 from pathlib import Path
 
-from qubit_cli import main as qubit_main
+from qubit_cli import main as hermes_main
 from qubit_cli import main_web_build
 
 
@@ -37,13 +37,13 @@ def _make_pycache(repo: Path, subdir: str = "qubit_cli") -> Path:
 def test_sweep_clears_pycache_when_checkout_changed(monkeypatch, tmp_path):
     repo = _make_repo(tmp_path, sha="b" * 40)
     cache = _make_pycache(repo)
-    monkeypatch.setattr(qubit_main, "PROJECT_ROOT", repo)
+    monkeypatch.setattr(hermes_main, "PROJECT_ROOT", repo)
     # Stamp records a different (older) fingerprint.
     (repo / main_web_build._BYTECODE_FINGERPRINT_FILE).write_text(
         "git:refs/heads/main:" + "a" * 40, encoding="utf-8"
     )
 
-    qubit_main._sweep_stale_bytecode_if_checkout_changed()
+    hermes_main._sweep_stale_bytecode_if_checkout_changed()
 
     assert not cache.exists()
     # Stamp updated to the current fingerprint.

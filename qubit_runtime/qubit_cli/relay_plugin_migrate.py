@@ -6,7 +6,7 @@ so users who followed the earlier docs lost every trace silently. This module tu
 into ``<profile home>/relay-plugins.toml`` (built from the ``nemo_relay.observability`` dataclasses so
 the file is exactly what Relay validates), points ``HERMES_NEMO_RELAY_PLUGINS_TOML`` at it, and
 comments the legacy lines out. It runs from ``qubit update`` for every profile home and from
-``qubit migrate relay`` for the active one.
+``qubit relay migrate`` for the active one.
 """
 
 from __future__ import annotations
@@ -218,7 +218,7 @@ def migrate_all_profile_relay_envs(*, validate: bool = True) -> list[RelayMigrat
 
 
 def print_relay_migration_report(results: list[RelayMigrationResult]) -> None:
-    """Loud, actionable notice for `qubit update` / `qubit migrate relay`."""
+    """Loud, actionable notice for `qubit update` / `qubit relay migrate`."""
     migrated = [r for r in results if r.migrated]
     failed = [r for r in results if r.validation_error]
     if not migrated and not failed:

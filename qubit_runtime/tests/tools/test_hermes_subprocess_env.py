@@ -7,7 +7,7 @@ full credential environment. Two tiers:
 
   * Tier 1 (_ALWAYS_STRIP_KEYS): gateway bot tokens, GitHub auth, infra
     secrets — stripped even when inherit_credentials=True.
-  * Tier 2 (_HERMES_PROVIDER_ENV_BLOCKLIST): LLM provider/tool keys — stripped
+  * Tier 2 (_QUBIT_PROVIDER_ENV_BLOCKLIST): LLM provider/tool keys — stripped
     unless the caller opts into inherit_credentials=True.
 """
 
@@ -15,7 +15,7 @@ import os
 from unittest.mock import patch
 
 from tools.environments.local import qubit_subprocess_env
-from tools.environments.local_env_policy import _ALWAYS_STRIP_KEYS, _HERMES_PROVIDER_ENV_FORCE_PREFIX
+from tools.environments.local_env_policy import _ALWAYS_STRIP_KEYS, _QUBIT_PROVIDER_ENV_FORCE_PREFIX
 
 
 _TIER1_SAMPLE = {

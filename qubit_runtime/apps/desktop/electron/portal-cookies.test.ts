@@ -25,7 +25,7 @@ test('either portal credential family signs in, and refresh-only material is a s
   }
 })
 
-// Contract: the jar also holds Qubit GATEWAY session cookies, NAS provider
+// Contract: the jar also holds Hermes GATEWAY session cookies, NAS provider
 // routing hints and logout identifiers. None of those authenticate the portal.
 test('gateway cookies, routing hints, empty values and non-arrays are never a portal credential', () => {
   const noise = [

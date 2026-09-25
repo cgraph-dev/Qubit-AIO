@@ -44,11 +44,11 @@ class TestKimiEffortVocabulary:
             "max": "max",
             "ultra": "max",
         }
-        for qubit_level, wire_level in expected.items():
+        for hermes_level, wire_level in expected.items():
             kw = _kimi_kwargs(
-                "kimi-k3", {"enabled": True, "effort": qubit_level}
+                "kimi-k3", {"enabled": True, "effort": hermes_level}
             )
-            assert kw["reasoning_effort"] == wire_level, qubit_level
+            assert kw["reasoning_effort"] == wire_level, hermes_level
 
     def test_k3_default_is_high(self):
         kw = _kimi_kwargs("kimi-k3", None)

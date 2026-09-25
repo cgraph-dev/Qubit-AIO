@@ -6,7 +6,7 @@ import os
 import pytest
 
 from pm.environments import site_packages, store_root, venv_python_version
-from qubit_constants import get_default_hermes_root
+from qubit_constants import get_default_qubit_root
 
 
 def test_store_resolution_follows_relocated_payload(tmp_path, monkeypatch):
@@ -45,7 +45,7 @@ def test_store_resolution_follows_relocated_payload(tmp_path, monkeypatch):
     (destination / "manifest.json").write_text(json.dumps({"repo": "other-repo"}))
     assert store_root(repo) == override
     (repo / "install-stamp.json").unlink()
-    assert store_root(repo) == get_default_hermes_root() / "tools"
+    assert store_root(repo) == get_default_qubit_root() / "tools"
 
 
 @pytest.mark.parametrize("escape", ["relative", "absolute", "symlink"])

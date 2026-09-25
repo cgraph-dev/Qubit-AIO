@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit
 
 from qubit_constants import get_qubit_home
-from utils import atomic_write_text
+from utils import atomic_write_bytes
 
 VAULT_KINDS = ("login", "payment", "address")
 
@@ -205,7 +205,7 @@ class VaultStore:
     def _ensure_dir(self) -> None:
         self._base.mkdir(mode=0o700, parents=True, exist_ok=True)
         # Route through the canonical securer (honors managed/NixOS
-        # group-share mode and QUBIT_UID/GID ownership) rather than a
+        # group-share mode and HERMES_UID/GID ownership) rather than a
         # bespoke chmod — same requirement as the browser-profile snapshot
         # dir (f1d05c review).
         try:
@@ -296,15 +296,8 @@ class VaultStore:
         self._ensure_dir()
         payload = json.dumps({"version": 1, "items": items}).encode("utf-8")
         blob = self._fernet().encrypt(payload)
-        # The reference used ``utils.atomic_write_bytes`` (absent in this vendored
-        # tree). A Fernet token is URL-safe-base64 ASCII, so a text atomic write
-        # preserves the exact on-disk bytes and format; 0600 is carried by
-        # ``create_mode``. The directory entry is made durable by the atomic
-        # replace the vendored writer already performs.
-        atomic_write_text(
-            self._vault_path, blob.decode("ascii"), create_mode=0o600,
-            tmp_prefix=".vault_",
-        )
+        # fsync_dir: the directory entry must be durable too (power loss between rename and next sync).
+        atomic_write_bytes(self._vault_path, blob, mode=0o600, fsync_dir=True)
 
     # -- public API ----------------------------------------------------------
 

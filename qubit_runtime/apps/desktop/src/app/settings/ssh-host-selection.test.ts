@@ -8,7 +8,7 @@ const state = {
   sshUser: 'operator',
   sshPort: 2222,
   sshKeyPath: '/keys/linux',
-  sshRemoteQubitPath: '/opt/hermes'
+  sshRemoteHermesPath: '/opt/hermes'
 }
 
 describe('selectSshHost', () => {
@@ -19,7 +19,7 @@ describe('selectSshHost', () => {
       sshUser: '',
       sshPort: null,
       sshKeyPath: '',
-      sshRemoteQubitPath: ''
+      sshRemoteHermesPath: ''
     })
   })
 

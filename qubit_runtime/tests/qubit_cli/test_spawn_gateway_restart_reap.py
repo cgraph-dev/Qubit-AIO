@@ -27,7 +27,7 @@ class TestSpawnGatewayRestartReapsOrphans:
 
 
     @patch("qubit_cli.web_server_gateway._gateway_subcommand", return_value=["gateway", "restart"])
-    @patch("qubit_cli.web_server_gateway._spawn_hermes_action")
+    @patch("qubit_cli.web_server_gateway._spawn_qubit_action")
     @patch("qubit_cli.web_server_gateway._ACTION_PROCS", {})
     def test_reap_failure_does_not_block_spawn(self, mock_spawn, mock_subcmd):
         """If reap raises, the restart still proceeds."""

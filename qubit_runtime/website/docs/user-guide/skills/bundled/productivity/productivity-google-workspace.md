@@ -15,23 +15,23 @@ Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/productivity\google-workspace` |
+| Path | `skills/productivity/google-workspace` |
 | Version | `1.2.0` |
-| Author | Qubit Labs |
+| Author | Nous Research |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Google`, `Gmail`, `Calendar`, `Drive`, `Sheets`, `Docs`, `Contacts`, `Email`, `OAuth` |
-| Related skills | [`himalaya`](/docs/user-guide/skills/bundled/email/email-himalaya) |
+| Related skills | [`himalaya`](../../bundled/email/email-himalaya.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Google Workspace
 
-Gmail, Calendar, Drive, Contacts, Sheets, and Docs — through Qubit-managed OAuth and a thin CLI wrapper. When `gws` is installed, the skill uses it as the execution backend for broader Google Workspace coverage; otherwise it falls back to the bundled Python client implementation.
+Gmail, Calendar, Drive, Contacts, Sheets, and Docs — through Hermes-managed OAuth and a thin CLI wrapper. When `gws` is installed, the skill uses it as the execution backend for broader Google Workspace coverage; otherwise it falls back to the bundled Python client implementation.
 
 ## References
 
@@ -41,17 +41,22 @@ Gmail, Calendar, Drive, Contacts, Sheets, and Docs — through Qubit-managed OAu
 ## Scripts
 
 - `scripts/setup.py` — OAuth2 setup (run once to authorize)
-- `scripts/google_api.py` — compatibility wrapper CLI. It prefers `gws` for operations when available, while preserving Qubit' existing JSON output contract.
+- `scripts/google_api.py` — compatibility wrapper CLI. It prefers `gws` for operations when available, while preserving Hermes' existing JSON output contract.
 
 ## First-Time Setup
 
 The setup is fully non-interactive — you drive it step by step so it works
 on CLI, Telegram, Discord, or any platform.
 
+Run the setup script with Python from the Hermes environment, not an unrelated
+system Python. `--install-deps` syncs Hermes' declared Google extra through PM;
+after syncing, restart Hermes and rerun the OAuth command. If Hermes is not
+importable, use `hermes setup` first rather than installing packages with pip.
+
 Define a shorthand first:
 
 ```bash
-GSETUP="python ${QUBIT_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/setup.py"
+GSETUP="python ${HERMES_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/setup.py"
 ```
 
 ### Step 0: Check if already set up
@@ -113,7 +118,7 @@ Tell the user:
 >    Audience → Test users → Add users
 > 6. Download the JSON file and tell me the file path
 >
-> Important Qubit CLI note: if the file path starts with `/`, do NOT send only the bare path as its own message in the CLI, because it can be mistaken for a slash command. Send it in a sentence instead, like:
+> Important Hermes CLI note: if the file path starts with `/`, do NOT send only the bare path as its own message in the CLI, because it can be mistaken for a slash command. Send it in a sentence instead, like:
 > `The JSON file path is: ~/Downloads/client_secret_....json`
 
 Once they provide the path:
@@ -182,7 +187,7 @@ Should print `AUTHENTICATED`. Setup is complete — token refreshes automaticall
 All commands go through the API script. Set `GAPI` as a shorthand:
 
 ```bash
-GAPI="python ${QUBIT_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/google_api.py"
+GAPI="python ${HERMES_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/google_api.py"
 ```
 
 ### Gmail
@@ -288,8 +293,9 @@ $GAPI sheets append SHEET_ID "Sheet1!A:C" --values '[["new","row","data"]]'
 ### Docs
 
 ```bash
-# Read
+# Read (a tabbed Doc returns a "tabs" array; single-tab and legacy Docs also return "body")
 $GAPI docs get DOC_ID
+$GAPI docs get DOC_ID --tab TAB_ID     # read one tab of a tabbed Doc
 
 # Create a new Doc (optionally seeded with body text)
 $GAPI docs create --title "Meeting Notes"
@@ -297,6 +303,7 @@ $GAPI docs create --title "Draft" --body "First paragraph..."
 
 # Append text to the end of an existing Doc
 $GAPI docs append DOC_ID --text "Additional content to append"
+$GAPI docs append DOC_ID --tab TAB_ID --text "..."   # --tab required when the Doc has multiple tabs
 ```
 
 ## Output Format

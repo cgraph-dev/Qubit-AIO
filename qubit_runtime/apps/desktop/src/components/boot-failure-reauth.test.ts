@@ -8,7 +8,6 @@ import {
   isRemoteReauthError,
   isRemoteReauthFailure,
   shouldApplyPostBootProgressError,
-  signInLabel,
   sshFailureMessage
 } from './boot-failure-reauth'
 
@@ -29,7 +28,7 @@ function config(overrides: Partial<DesktopConnectionConfig> = {}): DesktopConnec
     sshUser: '',
     sshPort: null,
     sshKeyPath: '',
-    sshRemoteQubitPath: '',
+    sshRemoteHermesPath: '',
     sshRemoteProfile: '',
     ...overrides
   }
@@ -107,10 +106,11 @@ describe('isRemoteReauthError', () => {
   it('recognizes auth-shaped boot errors', () => {
     expect(isRemoteReauthError('Your remote gateway session has expired.')).toBe(true)
     expect(isRemoteReauthError('OAuth: please sign in')).toBe(true)
+    expect(isRemoteReauthError('Reached the gateway over HTTP, but the app token is invalid.')).toBe(true)
   })
 
   it('ignores non-auth boot errors and nullish', () => {
-    expect(isRemoteReauthError('Qubit background process exited during startup.')).toBe(false)
+    expect(isRemoteReauthError('Hermes background process exited during startup.')).toBe(false)
     expect(isRemoteReauthError(null)).toBe(false)
   })
 })
@@ -120,7 +120,7 @@ describe('shouldApplyPostBootProgressError', () => {
     expect(shouldApplyPostBootProgressError('Your remote gateway session has expired.')).toBe(true)
     expect(
       shouldApplyPostBootProgressError(
-        'Could not reach the remote Qubit gateway while refreshing its WebSocket ticket. Try reconnecting.'
+        'Could not reach the remote Hermes gateway while refreshing its WebSocket ticket. Try reconnecting.'
       )
     ).toBe(false)
     expect(shouldApplyPostBootProgressError('Lost connection to the gateway')).toBe(false)
@@ -151,43 +151,25 @@ describe('deriveProviderShape', () => {
   })
 
   it('OAuth shape when the provider is a redirect IDP', () => {
-    expect(deriveProviderShape([{ name: 'nous', displayName: 'Qubit Labs', supportsPassword: false }])).toEqual({
+    expect(deriveProviderShape([{ name: 'nous', displayName: 'Nous Research', supportsPassword: false }])).toEqual({
       isPassword: false,
-      providerLabel: 'Qubit Labs'
+      providerLabel: 'Nous Research'
     })
   })
 
   it('mixed deployment keeps generic OAuth copy (not every provider is password)', () => {
     const shape = deriveProviderShape([
       { name: 'basic', displayName: 'Username & Password', supportsPassword: true },
-      { name: 'nous', displayName: 'Qubit Labs', supportsPassword: false }
+      { name: 'nous', displayName: 'Nous Research', supportsPassword: false }
     ])
 
     expect(shape.isPassword).toBe(false)
-    expect(shape.providerLabel).toBe('Username & Password / Qubit Labs')
+    expect(shape.providerLabel).toBe('Username & Password / Nous Research')
   })
 
   it('falls back to name when displayName is empty', () => {
     expect(deriveProviderShape([{ name: 'basic', displayName: '', supportsPassword: true }]).providerLabel).toBe(
       'basic'
     )
-  })
-})
-
-describe('signInLabel', () => {
-  it('password gateway gets the plain "Sign in to remote gateway" copy', () => {
-    expect(signInLabel({ url: 'x', isPassword: true, providerLabel: 'Username & Password' })).toBe(
-      'Sign in to remote gateway'
-    )
-  })
-
-  it('OAuth gateway names the provider', () => {
-    expect(signInLabel({ url: 'x', isPassword: false, providerLabel: 'Qubit Labs' })).toBe(
-      'Sign in with Qubit Labs'
-    )
-  })
-
-  it('null reauth falls back to the generic provider phrase', () => {
-    expect(signInLabel(null)).toBe('Sign in with your identity provider')
   })
 })

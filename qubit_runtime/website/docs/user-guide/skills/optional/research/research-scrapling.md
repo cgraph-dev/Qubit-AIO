@@ -14,19 +14,19 @@ Scrape sites with stealth browsing and Cloudflare bypass.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/research/scrapling` |
-| Path | `optional-skills/research\scrapling` |
+| Source | Optional — install with `hermes skills install official/research/scrapling` |
+| Path | `optional-skills/research/scrapling` |
 | Version | `1.0.0` |
 | Author | FEUAZUR |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Web Scraping`, `Browser`, `Cloudflare`, `Stealth`, `Crawling`, `Spider` |
-| Related skills | [`duckduckgo-search`](/docs/user-guide/skills/optional/research/research-duckduckgo-search), [`domain-intel`](/docs/user-guide/skills/optional/research/research-domain-intel) |
+| Related skills | [`duckduckgo-search`](../../optional/research/research-duckduckgo-search.md), [`domain-intel`](../../optional/research/research-domain-intel.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Scrapling

@@ -43,16 +43,16 @@ from tools import browser_tool_install as bt_install
 def isolated_home(monkeypatch):
     """Temp QUBIT_HOME with config + clean credential env vars."""
     test_home = tempfile.mkdtemp(prefix="hermes_test_31179_")
-    hermes_home = os.path.join(test_home, ".hermes")
-    os.makedirs(hermes_home)
-    monkeypatch.setenv("QUBIT_HOME", hermes_home)
+    qubit_home = os.path.join(test_home, ".hermes")
+    os.makedirs(qubit_home)
+    monkeypatch.setenv("QUBIT_HOME", qubit_home)
 
     # Strip all credential-shaped env vars so each scenario starts hermetic.
     for k in list(os.environ.keys()):
         if k.endswith("_API_KEY") or k.endswith("_TOKEN"):
             monkeypatch.delenv(k, raising=False)
 
-    yield hermes_home
+    yield qubit_home
     shutil.rmtree(test_home, ignore_errors=True)
 
 

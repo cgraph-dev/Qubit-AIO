@@ -26,7 +26,7 @@ def homes(tmp_path, monkeypatch):
     for seed in ("HERMES_MODEL", "HERMES_INFERENCE_MODEL"):
         monkeypatch.delenv(seed, raising=False)
     monkeypatch.setenv("GLM_API_KEY", "launch-own-key")
-    monkeypatch.setattr(server, "_hermes_home", launch)
+    monkeypatch.setattr(server, "_qubit_home", launch)
     monkeypatch.setattr(server, "_cfg_cache", None)
     monkeypatch.setattr(server, "_cfg_sig", None)
     monkeypatch.setattr(server, "_cfg_path", None)

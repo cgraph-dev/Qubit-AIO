@@ -1,12 +1,12 @@
 ---
 sidebar_position: 13
 title: "Webhooks"
-description: "接收来自 GitHub、GitLab 等服务的事件以触发 Qubit agent 运行"
+description: "接收来自 GitHub、GitLab 等服务的事件以触发 Hermes agent 运行"
 ---
 
 # Webhooks
 
-接收来自外部服务（GitHub、GitLab、JIRA、Stripe 等）的事件，并自动触发 Qubit agent 运行。Webhook 适配器运行一个 HTTP 服务器，接受 POST 请求、验证 HMAC 签名、将 payload（载荷）转换为 agent prompt（提示词），并将响应路由回来源或其他已配置的平台。
+接收来自外部服务（GitHub、GitLab、JIRA、Stripe 等）的事件，并自动触发 Hermes agent 运行。Webhook 适配器运行一个 HTTP 服务器，接受 POST 请求、验证 HMAC 签名、将 payload（载荷）转换为 agent prompt（提示词），并将响应路由回来源或其他已配置的平台。
 
 agent 处理事件后，可通过在 PR 上发布评论、向 Telegram/Discord 发送消息或记录结果来响应。
 
@@ -15,7 +15,7 @@ agent 处理事件后，可通过在 PR 上发布评论、向 Telegram/Discord �
 <div style={{position: 'relative', width: '100%', aspectRatio: '16 / 9', marginBottom: '1.5rem'}}>
   <iframe
     src="https://www.youtube.com/embed/WNYe5mD4fY8"
-    title="Qubit Agent — Webhooks Tutorial"
+    title="Hermes Agent — Webhooks Tutorial"
     style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0}}
     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
     allowFullScreen
@@ -26,8 +26,8 @@ agent 处理事件后，可通过在 PR 上发布评论、向 Telegram/Discord �
 
 ## 快速开始
 
-1. 通过 `qubit gateway setup` 或环境变量启用
-2. 在 `config.yaml` 中定义路由，**或**使用 `qubit webhook subscribe` 动态创建
+1. 通过 `hermes gateway setup` 或环境变量启用
+2. 在 `config.yaml` 中定义路由，**或**使用 `hermes webhook subscribe` 动态创建
 3. 将你的服务指向 `http://your-server:8644/webhooks/<route-name>`
 
 ---
@@ -39,7 +39,7 @@ agent 处理事件后，可通过在 PR 上发布评论、向 Telegram/Discord �
 ### 通过设置向导
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
 按照提示启用 webhooks、设置端口和全局 HMAC secret。
@@ -87,6 +87,7 @@ curl http://localhost:8644/health
 | `deliver` | 否 | 响应发送目标：`github_comment`、`telegram`、`discord`、`slack`、`signal`、`sms`、`whatsapp`、`matrix`、`mattermost`、`homeassistant`、`email`、`dingtalk`、`feishu`、`wecom`、`weixin`、`bluebubbles`、`qqbot`，或 `log`（默认）。 |
 | `deliver_extra` | 否 | 额外的投递配置——键取决于 `deliver` 类型（例如 `repo`、`pr_number`、`chat_id`）。值支持与 `prompt` 相同的 `{dot.notation}` 模板语法。 |
 | `deliver_only` | 否 | 若为 `true`，完全跳过 agent——渲染后的 `prompt` 模板直接作为消息体投递。零 LLM token 消耗，亚秒级投递。参见[直接投递模式](#direct-delivery-mode)了解使用场景。要求 `deliver` 为真实目标（非 `log`）。 |
+| `cron_job` | 否 | 每次事件触发一个已有的 cron 任务（按 ID 或名称），而不是启动新的 webhook agent 会话。渲染后的 `prompt` 作为单次运行的临时上下文；以任务自身的 prompt、skills、模型和投递设置为准。与 `deliver_only` 互斥。参见[事件触发的 Cron 任务](#event-triggered-cron-jobs)。 |
 
 ### 完整示例
 
@@ -254,7 +255,7 @@ gh auth login
 
 ### 4. 测试
 
-在仓库中打开一个 pull request。webhook 触发后，Qubit 处理事件并在 PR 上发布审查评论。
+在仓库中打开一个 pull request。webhook 触发后，Hermes 处理事件并在 PR 上发布审查评论。
 
 ---
 
@@ -365,7 +366,7 @@ platforms:
 ### 示例：通过 CLI 动态订阅
 
 ```bash
-qubit webhook subscribe antenna-matches \
+hermes webhook subscribe antenna-matches \
   --deliver telegram \
   --deliver-chat-id "123456789" \
   --deliver-only \
@@ -395,14 +396,62 @@ qubit webhook subscribe antenna-matches \
 
 ---
 
+## 事件触发的 Cron 任务 {#event-triggered-cron-jobs}
+
+在路由上设置 `cron_job`，即可在事件到达时触发一个**已有的 cron 任务**——无需按固定周期轮询，也不会启动新的 webhook agent 会话。这让任何定时任务都能变成事件驱动的任务：把原有的定时计划保留为兜底扫描（或设为低频），让 webhook 在事情真正发生的那一刻立即触发它。
+
+
+工作原理：
+
+1. 事件经过与其他路由相同的 HMAC 认证、速率限制、`events`/`filters`/`script` 过滤和幂等去重。
+2. 路由的 `prompt` 模板根据 payload 渲染后，作为**单次运行的临时上下文**注入任务（与 `cronjob(action='run', prompt=...)` 走同一条通道——任务存储的 prompt 永远不会被修改）。
+3. 任务通过与调度器相同的 at-most-once 认领机制触发，因此 webhook 突发流量不会重复触发正在运行的任务，任务自身的投递目标会收到输出。
+
+### 示例：在收到 review 反馈时触发 PR 审查任务
+
+```yaml
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      routes:
+        pr-feedback:
+          events: ["pull_request_review"]
+          secret: "github-webhook-secret"
+          cron_job: "pr-review-sweeper"        # 已有任务的 ID 或名称
+          prompt: |
+            {repository.full_name} 的 PR #{number} 收到了来自
+            {review.user.login} 的新审查反馈：{review.body}
+```
+
+### 通过 CLI
+
+```bash
+hermes webhook subscribe pr-feedback \
+  --events "pull_request_review" \
+  --cron-job "pr-review-sweeper" \
+  --prompt "PR #{number} 收到反馈：{review.body}"
+```
+
+创建订阅时会立即校验任务引用，拼写错误会当场报错。
+
+### 注意事项
+
+- `cron_job` 与 `deliver_only` 互斥（路由同时设置两者时适配器拒绝启动）。cron 任务自行处理投递。
+- `cron_job` 路由会忽略路由级的 `deliver`、`deliver_extra` 和 `skills` 字段——以任务自身的设置为准。
+- 已暂停/已禁用的任务不会被触发；事件会被记录并丢弃。
+- POST 立即返回 `202 Accepted`；任务在后台运行。
+
+---
+
 ## 动态订阅（CLI） {#dynamic-subscriptions}
 
-除了 `config.yaml` 中的静态路由，还可以使用 `qubit webhook` CLI 命令动态创建 webhook 订阅。当 agent 本身需要设置事件驱动触发器时，这尤为有用。
+除了 `config.yaml` 中的静态路由，还可以使用 `hermes webhook` CLI 命令动态创建 webhook 订阅。当 agent 本身需要设置事件驱动触发器时，这尤为有用。
 
 ### 创建订阅
 
 ```bash
-qubit webhook subscribe github-issues \
+hermes webhook subscribe github-issues \
   --events "issues" \
   --prompt "New issue #{issue.number}: {issue.title}\nBy: {issue.user.login}\n\n{issue.body}" \
   --deliver telegram \
@@ -415,20 +464,20 @@ qubit webhook subscribe github-issues \
 ### 列出订阅
 
 ```bash
-qubit webhook list
+hermes webhook list
 ```
 
 ### 删除订阅
 
 ```bash
-qubit webhook remove github-issues
+hermes webhook remove github-issues
 ```
 
 ### 测试订阅
 
 ```bash
-qubit webhook test github-issues
-qubit webhook test github-issues --payload '{"issue": {"number": 42, "title": "Test"}}'
+hermes webhook test github-issues
+hermes webhook test github-issues --payload '{"issue": {"number": 42, "title": "Test"}}'
 ```
 
 ### 动态订阅的工作原理
@@ -441,7 +490,7 @@ qubit webhook test github-issues --payload '{"issue": {"number": 42, "title": "T
 
 ### agent 驱动的订阅
 
-agent 可通过 terminal 工具在 `webhook-subscriptions` skill 的引导下创建订阅。向 agent 请求"为 GitHub issues 设置 webhook"，它将运行相应的 `qubit webhook subscribe` 命令。
+agent 可通过 terminal 工具在 `webhook-subscriptions` skill 的引导下创建订阅。向 agent 请求"为 GitHub issues 设置 webhook"，它将运行相应的 `hermes webhook subscribe` 命令。
 
 ---
 
@@ -526,7 +575,7 @@ Webhook payload 包含攻击者可控的数据——PR 标题、commit 消息、
 
 ### Agent 未响应
 
-- 在前台运行 gateway 以查看日志：`qubit gateway run`
+- 在前台运行 gateway 以查看日志：`hermes gateway run`
 - 检查 prompt 模板是否正确渲染
 - 验证投递目标已配置并连接
 

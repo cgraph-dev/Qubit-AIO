@@ -12,7 +12,7 @@ import sys
 import time
 from datetime import datetime
 
-import yaml
+import qubit_yaml as yaml
 
 from qubit_cli.cli_commands_mixin import CLICommandsMixin
 
@@ -42,9 +42,9 @@ def test_timestamps_on_sets_and_persists(tmp_path, monkeypatch):
 
 
 def _render_history(history, show_ts):
-    from cli import QubitCLI
+    from cli import HermesCLI
 
-    h = QubitCLI.__new__(QubitCLI)
+    h = HermesCLI.__new__(HermesCLI)
     h.show_timestamps = show_ts
     h.conversation_history = history
     h._show_recent_sessions = lambda reason="history", limit=10: True

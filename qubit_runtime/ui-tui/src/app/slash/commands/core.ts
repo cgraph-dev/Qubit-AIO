@@ -1,4 +1,4 @@
-import { forceRedraw, type MouseTrackingMode } from '@qubit/ink'
+import { forceRedraw, type MouseTrackingMode } from '@hermes/ink'
 
 import { DASHBOARD_TUI_MODE, NO_CONFIRM_DESTRUCTIVE } from '../../../config/env.js'
 import { dailyFortune, randomFortune } from '../../../content/fortunes.js'
@@ -147,7 +147,7 @@ export const coreCommands: SlashCommand[] = [
   },
 
   {
-    help: 'update Qubit to the latest version (exits TUI)',
+    help: 'update Qubit Agent to the latest version (exits TUI)',
     name: 'update',
     run: (_arg, ctx) => {
       if (DASHBOARD_TUI_MODE) {
@@ -712,7 +712,9 @@ export const coreCommands: SlashCommand[] = [
                 `steer queued — arrives after next tool call: "${payload.slice(0, 50)}${payload.length > 50 ? '…' : ''}"`
               )
             } else {
-              ctx.transcript.sys('steer rejected')
+              // The turn ended before the steer landed (#64578): keep the words as the next turn.
+              ctx.composer.enqueue(payload)
+              ctx.transcript.sys('steer rejected — no active turn, queued for next turn')
             }
           })
         )

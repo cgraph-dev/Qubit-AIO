@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import type { ProfileScope } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Loader2 } from '@/lib/icons'
-import { QUBIT_DOCS_ORIGIN } from '@/lib/qubit-links'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import {
@@ -18,17 +17,14 @@ import {
 import { notify, notifyError } from '@/store/notifications'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 
-// The REAL Skills Hub page embedded as a one-click picker — when the deployment
-// configures a Qubit docs origin (`VITE_QUBIT_DOCS_ORIGIN`, see
-// `@/lib/qubit-links`). `?embed=picker` hides the docs chrome and adds a
-// "+ Add to this Agent" button per card, which posts
+// The REAL Skills Hub page (docs site) embedded as a one-click picker — the
+// same trick the Bot Mode agent editor uses. `?embed=picker` hides the docs
+// chrome and adds a "+ Add to this Agent" button per card, which posts
 //   { type: 'hermes-skill-pick', name, identifier, installCmd, source }
 // to the parent window. We validate the origin and route the install through
 // the standard hub action pipeline (background action + tailed log + Skills
-// list invalidation), scoped to the Capabilities profile selector. Without a
-// configured origin there is no hub to embed and the caller renders its local
-// fallback.
-const HUB_ORIGIN = QUBIT_DOCS_ORIGIN
+// list invalidation), scoped to the Capabilities profile selector.
+const HUB_ORIGIN = 'https://hermes-agent.nousresearch.com'
 const HUB_PICKER_URL = `${HUB_ORIGIN}/docs/skills?embed=picker`
 
 // Hub viewport height: persisted through the shared pane store (same one the

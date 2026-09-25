@@ -50,7 +50,7 @@ def packaged_gui_app_paths() -> "list[Path]":
     electron-builder output locations for the "Qubit" product."""
     home = Path.home()
     if sys.platform == "darwin":
-        return [Path("/Applications/Qubit.app"), home / "Applications" / "Qubit.app"]
+        return [Path("/Applications/Hermes.app"), home / "Applications" / "Hermes.app"]
     if sys.platform == "win32":
         local_base = _env_dir("LOCALAPPDATA", home / "AppData" / "Local")
         # NSIS per-user install (perMachine=false), an older/alternate layout, NSIS per-machine (needs admin).
@@ -64,7 +64,8 @@ def packaged_gui_app_paths() -> "list[Path]":
     icons = data_base / "icons" / "hicolor"
     # "scalable" plus every fixed-size dir the installer may have written (panel sizes + older native copies).
     return [desktop_entry_path(), data_base / "applications" / "Hermes.desktop"] + [
-        icons / size / "apps" / name for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024") for name in ("qubit.png", "hermes.png")]
+        icons / size / "apps" / "hermes.png"
+        for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024")]
 
 
 def agent_is_installed(qubit_home: Path) -> bool:
@@ -82,11 +83,25 @@ def gui_install_summary(qubit_home: "Path | None" = None) -> dict:
     """JSON-serializable snapshot of what's installed, for the desktop UI to render via IPC."""
     home: Path = qubit_home if qubit_home is not None else get_qubit_home()
     userdata = desktop_userdata_dir()
-    return {"hermes_home": str(home), "agent_installed": agent_is_installed(home),
-            "gui_installed": gui_is_installed(home),
-            "source_built_artifacts": [str(p) for p in source_built_gui_artifacts(home) if p.exists()],
-            "packaged_app_paths": [str(p) for p in packaged_gui_app_paths() if p.exists()],
-            "userdata_dir": str(userdata), "userdata_exists": userdata.exists(), "platform": sys.platform}
+    # Steward facts, so the UI can gate its destructive options on the same
+    # ladder the CLI uninstaller uses: only a git checkout may have its code
+    # removed; sealed trees (nix / desktop-app / docker) get data-only.
+    from qubit_cli import steward as steward_mod
+
+    steward, code_removal_allowed = steward_mod.classify_install(home / "hermes-agent")
+
+    return {
+        "hermes_home": str(home),
+        "agent_installed": agent_is_installed(home),
+        "gui_installed": gui_is_installed(home),
+        "source_built_artifacts": [str(p) for p in source_built_gui_artifacts(home) if p.exists()],
+        "packaged_app_paths": [str(p) for p in packaged_gui_app_paths() if p.exists()],
+        "userdata_dir": str(userdata),
+        "userdata_exists": userdata.exists(),
+        "platform": sys.platform,
+        "steward": steward,
+        "code_removal_allowed": code_removal_allowed,
+    }
 
 
 def _remove_path(path: Path) -> bool:

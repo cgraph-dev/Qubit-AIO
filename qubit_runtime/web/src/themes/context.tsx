@@ -32,37 +32,13 @@ import { api } from "@/lib/api";
 
 /** LocalStorage key — pre-applied before the React tree mounts to avoid
  *  a visible flash of the default palette on theme-overridden installs. */
-const STORAGE_KEY = "qubit-dashboard-theme";
-/** Pre-rebrand key, migrated one-time on first read so existing users keep
- *  their saved theme. */
-const LEGACY_STORAGE_KEY = "hermes-dashboard-theme";
+const STORAGE_KEY = "hermes-dashboard-theme";
 
 /** LocalStorage key for the font override (independent of theme). Holds a
  *  font id from the catalog in `fonts.ts`, or the `THEME_DEFAULT_FONT_ID`
  *  sentinel / absent = "use the active theme's font". Pre-applied before
  *  the React tree mounts (see `main.tsx`) to avoid a font flash. */
-const FONT_STORAGE_KEY = "qubit-dashboard-font";
-/** Pre-rebrand font key, migrated one-time on first read. */
-const LEGACY_FONT_STORAGE_KEY = "hermes-dashboard-font";
-
-/** Read a preference under its Qubit key, one-time migrating the pre-rebrand
- *  key so existing users keep their saved setting. Returns null when neither
- *  key is present or storage is unavailable (SSR / privacy mode). */
-function readStoredPreference(key: string, legacyKey: string): string | null {
-  try {
-    const current = window.localStorage.getItem(key);
-    if (current !== null) return current;
-    const legacy = window.localStorage.getItem(legacyKey);
-    if (legacy !== null) {
-      window.localStorage.setItem(key, legacy);
-      window.localStorage.removeItem(legacyKey);
-      return legacy;
-    }
-  } catch {
-    /* SSR / privacy mode — fall through to the caller's default */
-  }
-  return null;
-}
+const FONT_STORAGE_KEY = "hermes-dashboard-font";
 
 /** Renames of built-in theme keys we've shipped previously. Without this,
  *  users who saved one of the old names in localStorage (or had it
@@ -281,7 +257,7 @@ let _PREV_DYNAMIC_VAR_KEYS: Set<string> = new Set();
 
 /** ID for the injected <style> tag that carries a theme's customCSS.
  *  A single tag is reused + replaced on every theme switch. */
-const CUSTOM_CSS_STYLE_ID = "qubit-theme-custom-css";
+const CUSTOM_CSS_STYLE_ID = "hermes-theme-custom-css";
 
 function applyCustomCSS(css: string | undefined) {
   if (typeof document === "undefined") return;
@@ -293,7 +269,7 @@ function applyCustomCSS(css: string | undefined) {
   if (!el) {
     el = document.createElement("style");
     el.id = CUSTOM_CSS_STYLE_ID;
-    el.setAttribute("data-qubit-theme-css", "true");
+    el.setAttribute("data-hermes-theme-css", "true");
     document.head.appendChild(el);
   }
   el.textContent = css;
@@ -325,7 +301,7 @@ function injectFontStylesheet(url: string | undefined) {
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = url;
-  link.setAttribute("data-qubit-theme-font", "true");
+  link.setAttribute("data-hermes-theme-font", "true");
   document.head.appendChild(link);
   INJECTED_FONT_URLS.add(url);
 }
@@ -436,7 +412,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Name of the currently active theme (built-in id or user YAML name). */
   const [themeName, setThemeName] = useState<string>(() => {
     if (typeof window === "undefined") return "default";
-    const stored = readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ?? "default";
+    const stored = window.localStorage.getItem(STORAGE_KEY) ?? "default";
     const migrated = migrateThemeName(stored);
     // Write the migrated name back so future reads converge on the new
     // key and we eventually retire the alias entry.
@@ -466,7 +442,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
    *  = no override. Seeded from localStorage so it's applied flash-free. */
   const [fontId, setFontId] = useState<string>(() => {
     if (typeof window === "undefined") return THEME_DEFAULT_FONT_ID;
-    const stored = readStoredPreference(FONT_STORAGE_KEY, LEGACY_FONT_STORAGE_KEY);
+    const stored = window.localStorage.getItem(FONT_STORAGE_KEY);
     const valid = stored && getFontChoice(stored) ? stored : THEME_DEFAULT_FONT_ID;
     _ACTIVE_FONT_OVERRIDE = valid;
     return valid;

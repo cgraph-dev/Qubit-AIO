@@ -44,7 +44,7 @@ async def test_origin_issued_metadata_shim_does_not_read_non_discovery_response(
     provider = QubitProviderMixin.__new__(QubitProviderMixin)
     response = ResourceResponse()
 
-    assert await provider._hermes_accept_origin_issued_metadata(response) is response
+    assert await provider._qubit_accept_origin_issued_metadata(response) is response
 
 
 def _asm(issuer):
@@ -100,7 +100,7 @@ async def _run_flow(tmp_path, monkeypatch, issuer_doc):
     async def callback():
         return _authorization_code_result("code-1", seen["state"], iss=AS_ORIGIN)
 
-    storage = HermesTokenStorage("srv")
+    storage = QubitTokenStorage("srv")
     provider = _HERMES_PROVIDER_CLS(
         server_name="srv", server_url=RESOURCE, storage=storage,
         client_metadata=OAuthClientMetadata(redirect_uris=[AnyUrl("http://127.0.0.1:1/cb")], client_name="Hermes Agent"),

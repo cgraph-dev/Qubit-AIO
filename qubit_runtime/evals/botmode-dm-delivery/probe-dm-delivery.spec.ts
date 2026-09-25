@@ -50,7 +50,7 @@ test('cron output waits for a CLI-only owner and arrives after owner release', a
   try {
     await fixture.mock.waitForHeldCompletion()
     const script = 'import json; from cron.scheduler_delivery import _deliver_to_bot_chat; j={"id":"cli-residual","name":"CLI residual","execution_id":"fixed-execution"}; result=_deliver_to_bot_chat(j,"CLI_OWNER_CRON_SENTINEL","beta"); print(json.dumps({"result":result,"job":j}))'
-    const setup = process.env.BOT_DM_EXCEPTION ? 'from pathlib import Path; from cron.bot_chat_delivery import defer; from qubit_constants import get_hermes_home; defer("e"*64,{"id":"exception-head"},"EXCEPTION_MUST_NOT_RUN","beta",get_hermes_home()/"profiles"/"beta"); ' : ''
+    const setup = process.env.BOT_DM_EXCEPTION ? 'from pathlib import Path; from cron.bot_chat_delivery import defer; from qubit_constants import get_qubit_home; defer("e"*64,{"id":"exception-head"},"EXCEPTION_MUST_NOT_RUN","beta",get_qubit_home()/"profiles"/"beta"); ' : ''
     const result = JSON.parse(execFileSync(python, ['-c', setup + script], { env: cronEnv, cwd: repo, encoding: 'utf8', timeout: 30_000 }))
     console.log('CLI_OWNER_CRON_ADMISSION', JSON.stringify(result))
     fs.writeFileSync(path.join(evidence, 'cli-owner-admission.json'), JSON.stringify(result, null, 2))

@@ -1,11 +1,11 @@
-"""`qubit vault sources --disable` must not crash on a hand-edited non-dict
+"""`hermes vault sources --disable` must not crash on a hand-edited non-dict
 ``vault:`` section in config.yaml (the same YAML-shape hazard class
 ``_voice_cfg_dict`` guards for voice.*, #19835): the malformed section is
 coerced to a dict before the opt-out is written."""
 
 from types import SimpleNamespace
 
-import yaml
+import qubit_yaml as yaml
 
 from agent.vault_store import VaultStore
 from qubit_cli.vault import _cmd_sources, vault_command
@@ -42,7 +42,7 @@ def test_vault_command_surfaces_corrupt_store_as_clean_error(tmp_path, monkeypat
     monkeypatch.setenv("QUBIT_HOME", str(home))
     _corrupt_vault(home)
 
-    vault_command(SimpleNamespace())  # bare `qubit vault` -> _cmd_list
+    vault_command(SimpleNamespace())  # bare `hermes vault` -> _cmd_list
 
     out = capsys.readouterr().out
     assert "Error" in out

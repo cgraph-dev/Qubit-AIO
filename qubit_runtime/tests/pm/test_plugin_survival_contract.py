@@ -19,7 +19,7 @@ resolves offline local path-source fixtures):
    The retry path — re-admitting only the resolvable candidate —
    commits through the same public function.
 3. Active-home propagation. The active CONTEXT home
-   (qubit_constants.set_hermes_home_override) is what wrapper/sidecar
+   (qubit_constants.set_qubit_home_override) is what wrapper/sidecar
    subprocess launches must inherit through build_subprocess_env.
 """
 
@@ -439,7 +439,7 @@ def test_plugin_our_version_rejects_sits_out_without_being_disabled(admission_en
     tmp_path, home = admission_env
     core = tmp_path / "core"
     # A tagless checkout (CI's) has no parseable version, which makes requires_hermes permissive.
-    monkeypatch.setattr(plugins_manifest, "running_hermes_version", lambda: "1.0.0")
+    monkeypatch.setattr(plugins_manifest, "running_qubit_version", lambda: "1.0.0")
     for name in ("fits", "needs-newer"):
         plugin = home / "plugins" / name
         plugin.mkdir(parents=True)
@@ -519,13 +519,13 @@ def test_update_sync_retries_a_fetch_failure_once_before_disabling(admission_env
 
 
 def test_active_context_home_exported_to_wrapper_subprocess(monkeypatch, tmp_path):
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
     from tools.environments.local import build_subprocess_env
 
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "ambient"))
     active = tmp_path / "custom-root/profiles/worker"
     active.mkdir(parents=True)
-    token = set_hermes_home_override(active)
+    token = set_qubit_home_override(active)
     try:
         child_env = build_subprocess_env()
         child = subprocess.run(
@@ -534,4 +534,4 @@ def test_active_context_home_exported_to_wrapper_subprocess(monkeypatch, tmp_pat
         )
         assert child.stdout == str(active)
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)

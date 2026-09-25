@@ -1,12 +1,12 @@
 ---
 sidebar_position: 5
 title: "Prompt Assembly"
-description: "How Qubit builds the system prompt, preserves cache stability, and injects ephemeral layers"
+description: "How Hermes builds the system prompt, preserves cache stability, and injects ephemeral layers"
 ---
 
 # Prompt Assembly
 
-Qubit deliberately separates:
+Hermes deliberately separates:
 
 - **cached system prompt state**
 - **ephemeral API-call-time additions**
@@ -46,11 +46,13 @@ provider cache reuses. A session with no workspace snapshot keeps its trailing g
 tier; the runtime environment block always ends the volatile tier.
 
 Consequence for stored prompts: `_stored_prompt_matches_runtime()` (`agent/conversation_loop.py`) reads
-the first host-info paragraph after the rendered `# Qubit runtime environment` boundary, with a
+the first host-info paragraph after the rendered `# Hermes runtime environment` boundary, with a
 closing marker at the absolute end distinguishing this layout from legacy prose quoting the heading.
 The runtime boundary follows all project, operator, memory and plugin text, so examples in those
-blocks do not masquerade as the runtime cwd. Model/provider/platform are read before the runtime
-boundary, excluding embedder descriptions. Legacy prompts retain their original
+blocks do not masquerade as the runtime cwd. Model/provider are read before the runtime boundary,
+excluding embedder descriptions. `Platform:` is deliberately not an identity field: a surface switch
+(desktop ↔ TUI) keeps the stored bytes and delivers the current surface's guidance as a one-shot note on
+the per-turn user-message channel (`agent/surface_switch.py`), so the cached prefix survives (#104414). Legacy prompts retain their original
 host-before-context anchor, so prompts persisted before the reorder still validate.
 
 When `skip_context_files` is set (e.g., subagent delegation), SOUL.md is not loaded and the hardcoded `DEFAULT_AGENT_IDENTITY` is used instead.
@@ -61,16 +63,16 @@ Here is a simplified view of what the final system prompt looks like when all la
 
 ```
 # Layer 1: Agent Identity (from ~/.hermes/SOUL.md)
-You are Qubit, an AI assistant created by Qubit Labs.
+You are Hermes, an AI assistant created by Nous Research.
 You are an expert software engineer and researcher.
 You value correctness, clarity, and efficiency.
 ...
 
 # Layer 2: Tool-aware behavior guidance
-You have persistent memory across sessions. Save durable facts using
-the memory tool: user preferences, environment details, tool quirks,
-and stable conventions. Memory is injected into every turn, so keep
-it compact and focused on facts that will still matter later.
+Task-learned procedures, pitfalls, and task-specific preferences belong
+in skills. Memory is the narrow exception for facts that apply to EVERY
+session regardless of task. Skill-writing instructions appear here only
+when skill_manage is available; its absence does not widen memory's scope.
 ...
 When the user references something from a past conversation or you
 suspect relevant cross-session context exists, use session_search
@@ -132,7 +134,7 @@ renderable inside a terminal.
 
 ## Customizing platform hints
 
-The platform hint (Layer 10 above) is the per-surface guidance Qubit
+The platform hint (Layer 10 above) is the per-surface guidance Hermes
 injects for Telegram, WhatsApp, Slack, CLI, and other platforms — for
 example "you are on a terminal, avoid Markdown." The built-in defaults
 live in `PLATFORM_HINTS` (`agent/system_prompt.py`); plugin-provided
@@ -161,6 +163,14 @@ platform_hints:
   unmodified default, so a bad config value can never break prompt
   assembly or leak across platforms.
 
+Cron jobs run as platform `cron`, but their final response lands on the
+job's `deliver` channel, so a cron agent's prompt also carries that
+channel's hint (built-in text plus its `platform_hints.<channel>`
+override) under a `Delivery destination (<channel>):` line. A
+`platform_hints.slack.append` therefore reaches Slack-delivered scheduled
+jobs as well as live Slack chats; `platform_hints.cron` still governs the
+cron paragraph itself.
+
 The override is resolved when the system prompt is built (session start,
 and again on compaction since that rebuilds the prompt). It produces a
 byte-stable hint for a fixed config, so it lives in the **stable** tier
@@ -178,7 +188,7 @@ def load_soul_md() -> Optional[str]:
     if not soul_path.exists():
         return None
     content = soul_path.read_text(encoding="utf-8").strip()
-    content = _scan_context_content(content, "SOUL.md")  # Security scan
+    content = _scan_context_content(content, "SOUL.md", user_authored=True)  # Security scan: warn + load, never block
     content = _truncate_content(content, "SOUL.md")       # Cap scales with model context window (20k floor); config override wins
     return content
 ```
@@ -188,7 +198,7 @@ When `load_soul_md()` returns content, it replaces the hardcoded `DEFAULT_AGENT_
 If `SOUL.md` doesn't exist, the system falls back to:
 
 ```
-You are Qubit Agent, built by Qubit Labs. Be direct: match the length
+You are Hermes Agent, built by Nous Research. Be direct: match the length
 of your reply to the weight of the ask — a one-line question gets a
 one-line answer, and finished work gets a short report of what changed,
 what's verified, and what's left, never a replay of the process. No
@@ -221,7 +231,7 @@ def build_context_files_prompt(cwd=None, skip_soul=False):
     if project_context:
         sections.append(project_context)
 
-    # SOUL.md from QUBIT_HOME (independent of project context)
+    # SOUL.md from HERMES_HOME (independent of project context)
     if not skip_soul:
         soul_content = load_soul_md()
         if soul_content:
@@ -242,13 +252,13 @@ def build_context_files_prompt(cwd=None, skip_soul=False):
 
 | Priority | Files | Search scope | Notes |
 |----------|-------|-------------|-------|
-| 1 | `.hermes.md`, `HERMES.md` | CWD up to git root | Qubit-native project config |
+| 1 | `.hermes.md`, `HERMES.md` | CWD up to git root | Hermes-native project config |
 | 2 | `AGENTS.md` | CWD only | Common agent instruction file |
 | 3 | `CLAUDE.md` | CWD only | Claude Code compatibility |
 | 4 | `.cursorrules`, `.cursor/rules/*.mdc` | CWD only | Cursor compatibility |
 
 All context files are:
-- **Security scanned** — checked for prompt injection patterns (invisible unicode, "ignore previous instructions", credential exfiltration attempts)
+- **Security scanned** — checked for prompt injection patterns (invisible unicode, "ignore previous instructions", credential exfiltration attempts). A hit replaces a project file with a `[BLOCKED: …]` marker; the user's own `SOUL.md` in `HERMES_HOME` is warned about and loaded anyway (it is human-approved on write, so it is the same trust class as `config.yaml`)
 - **Truncated** — capped at `context_file_max_chars` characters using a 70/20 head/tail split with a truncation marker. The cap scales with the model's context window (20,000-char floor, 500K ceiling); an explicit `context_file_max_chars` in `config.yaml` always wins.
 - **YAML frontmatter stripped** — `.hermes.md` frontmatter is removed (reserved for future config overrides)
 
@@ -261,7 +271,7 @@ These are intentionally *not* persisted as part of the cached system prompt:
 - gateway-derived session context overlays
 - later-turn Honcho/external recall injected into the current-turn user message
 
-`pre_llm_call` plugin context also lands in this API-call-time path: it is appended to the current turn's **user message**, not written into the cached system prompt. When multiple plugins return context, Qubit concatenates those context blocks (see [Hooks → `pre_llm_call`](../user-guide/features/hooks.md#pre_llm_call)).
+`pre_llm_call` plugin context also lands in this API-call-time path: it is appended to the current turn's **user message**, not written into the cached system prompt. When multiple plugins return context, Hermes concatenates those context blocks (see [Hooks → `pre_llm_call`](../user-guide/features/hooks.md#pre_llm_call)).
 
 This separation keeps the stable prefix stable for caching.
 
@@ -288,7 +298,7 @@ The skills system contributes a compact skills index to the prompt when skills t
 
 ## Supported prompt customization surfaces
 
-Most users should treat `agent/prompt_builder.py` as implementation code, not a configuration surface. The supported customization path is to change the prompt inputs Qubit already loads, rather than editing Python templates in place.
+Most users should treat `agent/prompt_builder.py` as implementation code, not a configuration surface. The supported customization path is to change the prompt inputs Hermes already loads, rather than editing Python templates in place.
 
 ### Use these surfaces first
 
@@ -296,7 +306,7 @@ Most users should treat `agent/prompt_builder.py` as implementation code, not a 
 - `~/.hermes/MEMORY.md` and `~/.hermes/USER.md` — provide durable cross-session facts and user profile data that should be snapshotted into new sessions.
 - Project context files such as `.hermes.md`, `HERMES.md`, `AGENTS.md`, `CLAUDE.md`, or `.cursorrules` — inject repo-specific working rules.
 - Skills — package reusable workflows and references without editing core prompt code.
-- Optional system prompt config / API overrides — add deployment-specific instruction text without forking Qubit.
+- Optional system prompt config / API overrides — add deployment-specific instruction text without forking Hermes.
 - Ephemeral overlays such as `HERMES_EPHEMERAL_SYSTEM_PROMPT` or prefill messages — add turn-scoped guidance that should not become part of the cached prompt prefix.
 
 ### When to edit code instead
@@ -308,7 +318,7 @@ In other words:
 - if you want a different assistant identity, edit `SOUL.md`
 - if you want different repo rules, edit project context files
 - if you want reusable operating procedures, add or modify skills
-- if you want to change how Qubit assembles prompts for everyone, change Python and treat it as a code contribution
+- if you want to change how Hermes assembles prompts for everyone, change Python and treat it as a code contribution
 
 ## Why prompt assembly is split this way
 

@@ -24,7 +24,7 @@ def test_user_platform_plugins_inject_env_metadata_but_non_platforms_do_not(monk
         "name: nested-platform\nrequires_env:\n  - NESTED_PLATFORM_SECRET\n"))
     _manifest(home / "plugins" / "ignore-me", "name: ignore-me\nkind: backend\nrequires_env:\n  - IGNORE_ME_TOKEN\n")
     keys = ["DEMO_PLATFORM_TOKEN", "DEMO_PLATFORM_ROOM", "NESTED_PLATFORM_SECRET", "IGNORE_ME_TOKEN"]
-    monkeypatch.setattr(config_mod, "get_hermes_home", lambda: home)
+    monkeypatch.setattr(config_mod, "get_qubit_home", lambda: home)
     for key in keys:
         monkeypatch.delitem(config_mod.OPTIONAL_ENV_VARS, key, raising=False)
 

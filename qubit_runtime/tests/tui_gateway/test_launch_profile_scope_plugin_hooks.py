@@ -22,7 +22,7 @@ import pytest
 
 from agent.secret_scope import set_multiplex_active
 from qubit_cli import plugins as plugins_mod
-from qubit_constants import get_hermes_home, get_hermes_home_override
+from qubit_constants import get_qubit_home, get_qubit_home_override
 from tools.daemon_pool import DaemonThreadPoolExecutor
 from tools.thread_context import propagate_context_to_thread
 import tui_gateway.server as server
@@ -40,7 +40,7 @@ def two_homes(tmp_path, monkeypatch):
             encoding="utf-8")
         (home / ".env").write_text("", encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(launch))
-    monkeypatch.setattr(server, "_hermes_home", launch)
+    monkeypatch.setattr(server, "_qubit_home", launch)
     monkeypatch.setattr(server, "_served_profile_homes", set())
     monkeypatch.setattr(lpp, "_snapshot", None)
     plugins_mod._reset_plugin_managers_for_tests()
@@ -49,18 +49,18 @@ def two_homes(tmp_path, monkeypatch):
     def stub_pre_tool_call(**_kw):
         from qubit_cli.config import load_config_readonly
         entry = ((load_config_readonly().get("plugins") or {}).get("entries") or {}).get("stub") or {}
-        seen.append({"home": get_hermes_home().name, "x": (entry.get("settings") or {}).get("x"),
-                     "bound": get_hermes_home_override() is not None})
+        seen.append({"home": get_qubit_home().name, "x": (entry.get("settings") or {}).get("x"),
+                     "bound": get_qubit_home_override() is not None})
         return None
 
     # Plugin managers are keyed per home: each profile loads its own copy of the plugin.
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
     for home in (launch, routed):
-        token = set_hermes_home_override(str(home))
+        token = set_qubit_home_override(str(home))
         try:
             manager = plugins_mod.get_plugin_manager()
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         manager._discovered = True  # never scan the real plugin tree
         manager._hooks.setdefault("pre_tool_call", []).append(stub_pre_tool_call)
     yield launch, routed, seen
@@ -86,7 +86,7 @@ def _fire_off_turn_workers(launch_manager_hook_seen):
     observed: list[dict] = []
 
     def observer(**_kw):
-        observed.append({"home": get_hermes_home().name, "bound": get_hermes_home_override() is not None})
+        observed.append({"home": get_qubit_home().name, "bound": get_qubit_home_override() is not None})
 
     manager._hooks.setdefault("on_stream_end", []).append(observer)
     manager._subscribe_event("stub", "stub:tick", observer)
@@ -123,7 +123,7 @@ def test_launch_profile_turn_hooks_see_bound_scope_a_b_a(two_homes):
     assert all(r["bound"] for r in seen), seen
     assert off_turn_a == [{"home": "hermes_home", "bound": True}] * 2, off_turn_a
     assert off_turn_b == [{"home": "beta", "bound": True}] * 2, off_turn_b
-    assert get_hermes_home_override() is None  # every scope released
+    assert get_qubit_home_override() is None  # every scope released
 
 
 def test_single_profile_launch_scope_binds_no_override(two_homes):
@@ -132,9 +132,9 @@ def test_single_profile_launch_scope_binds_no_override(two_homes):
     launch, _routed, seen = two_homes
     scopes = server._profile_runtime_scope_tokens(None)
     try:
-        assert get_hermes_home_override() is None
+        assert get_qubit_home_override() is None
         _fire_from_tool_worker()
     finally:
         server._release_profile_runtime_scope_tokens(scopes)
     assert seen == [{"home": "hermes_home", "x": "alpha", "bound": False}]
-    assert Path(get_hermes_home()) == launch
+    assert Path(get_qubit_home()) == launch

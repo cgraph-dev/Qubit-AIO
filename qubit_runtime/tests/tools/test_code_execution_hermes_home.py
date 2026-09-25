@@ -12,9 +12,9 @@ import sys
 import pytest
 
 from qubit_constants import (
-    get_hermes_home_override,
-    reset_hermes_home_override,
-    set_hermes_home_override,
+    get_qubit_home_override,
+    reset_qubit_home_override,
+    set_qubit_home_override,
 )
 from tools.code_execution_env import _build_child_env
 
@@ -24,12 +24,12 @@ def home_override():
     tokens = []
 
     def _set(path):
-        tokens.append(set_hermes_home_override(path))
+        tokens.append(set_qubit_home_override(path))
         return str(path)
 
     yield _set
     for token in reversed(tokens):
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
 
 def _child_env():
@@ -53,7 +53,7 @@ class TestMultiplexedHermesHome:
 
     def test_no_override_leaves_inherited_value_untouched(self, monkeypatch):
         """Dedicated per-profile processes (no override): zero behavior change."""
-        assert get_hermes_home_override() is None
+        assert get_qubit_home_override() is None
         monkeypatch.setenv("QUBIT_HOME", "/machine/default/.hermes")
 
         assert _child_env()["QUBIT_HOME"] == "/machine/default/.hermes"

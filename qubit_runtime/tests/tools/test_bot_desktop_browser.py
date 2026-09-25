@@ -35,14 +35,14 @@ def test_user_pinned_profile_wins(tmp_path, monkeypatch):
     assert browser.profile_dir() == tmp_path / "mine"
 
 
-def test_pinned_profile_honours_tilde_and_resolves_relative_paths_against_hermes_home(tmp_path, monkeypatch):
+def test_pinned_profile_honours_tilde_and_resolves_relative_paths_against_qubit_home(tmp_path, monkeypatch):
     """Regression for #110029: the docs say setting AGENT_BROWSER_PROFILE pins your own user-data-dir, but only
     an absolute value was honoured — `~/pin` and `pin` silently fell back to the default and the human's dock
     browser and the agent's browser could end up on different jars. A relative path is anchored where the rest
     of this profile's screen state lives (its QUBIT_HOME), so two profiles never share one 'pin'."""
     home = tmp_path / "hermes-home"
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setattr(runtime, "get_hermes_home", lambda: home)
+    monkeypatch.setattr(runtime, "get_qubit_home", lambda: home)
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "user")
     monkeypatch.setenv("HOME", str(tmp_path / "user"))
 

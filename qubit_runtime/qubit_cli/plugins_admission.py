@@ -61,11 +61,11 @@ def admit_plugin_set_change(
     No config or dependency selection is written by this application process. *plugin* names the
     plugin being admitted so a resolver conflict is reported against it (:class:`DependencyConflict`).
     """
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from pm.client import sync_venv
     from pm.plugin_inputs import Selection
 
-    home = Path(active_plugins_dir).parent if active_plugins_dir is not None else get_hermes_home()
+    home = Path(active_plugins_dir).parent if active_plugins_dir is not None else get_qubit_home()
     try:
         sync_venv(explicit=True, plugins=Selection({
             "home": str(home.resolve()), "enabled": sorted(candidate_enabled),

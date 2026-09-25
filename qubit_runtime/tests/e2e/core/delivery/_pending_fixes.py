@@ -44,7 +44,7 @@ PROBES: Dict[int, tuple] = {
 from datetime import datetime
 from cron import jobs
 # what an unconfigured clock returns: the process zone's offset of the moment, as a fixed offset
-jobs._hermes_now = lambda: datetime.fromisoformat("2026-03-07T09:00:30-05:00")
+jobs._qubit_now = lambda: datetime.fromisoformat("2026-03-07T09:00:30-05:00")
 nxt = jobs.compute_next_run({"kind": "cron", "expr": "0 9 * * *"})
 print("fixed" if nxt == "2026-03-08T09:00:00-04:00" else "open")
 '''),

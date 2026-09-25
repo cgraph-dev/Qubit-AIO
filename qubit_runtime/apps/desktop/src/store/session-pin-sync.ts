@@ -236,7 +236,7 @@ function reconcile(): void {
 
 function reconcileInner(): void {
   // Config/session REST is only reachable through the Electron bridge.
-  if (!window.qubitDesktop) {
+  if (!window.hermesDesktop) {
     return
   }
 

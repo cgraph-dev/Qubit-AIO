@@ -92,6 +92,19 @@ def peek_cached_pricing(base_url: str) -> dict[str, dict[str, Any]]:
     return _cached_catalog(root) or {}
 
 
+def pricing_fetch_suppressed(base_url: str) -> bool:
+    """A fetch for *base_url* failed recently and its empty result is still cached, so re-fetching now
+    returns that ``{}`` without dialing (see ``_cache_catalog``). Lets a caller that would otherwise
+    start a background refresh on a cold peek skip it for the rest of the failure window."""
+    root = _strip_v1((base_url or "").rstrip("/"))
+    now = time.monotonic()
+    return any(
+        _pricing_cache.get(key) == {} and _pricing_cache_retry_after.get(key, 0.0) > now
+        for key in list(_pricing_cache)
+        if key == root or key.startswith(root + _PRICING_AUTH_KEY_PREFIX)
+    )
+
+
 def _strip_v1(url: str) -> str:
     return url[:-3].rstrip("/") if url.endswith("/v1") else url
 
@@ -211,7 +224,7 @@ def fetch_models_with_pricing(
     ...}}``, cached per *base_url* and per credential so one caller's catalog never answers
     another's read. *include_sale_original* (Qubit Labs only) copies the gateway's pre-discount
     ``pricing.original`` rates through as a nested ``original`` dict for sale chrome."""
-    from qubit_cli.models import _QUBIT_USER_AGENT
+    from qubit_cli.models import _HERMES_USER_AGENT
     url_root = (base_url or "").rstrip("/")
     cache_key = url_root + _pricing_auth_fingerprint(api_key)
     if not force_refresh:
@@ -220,7 +233,7 @@ def fetch_models_with_pricing(
             return cached
 
     url = url_root + "/v1/models"
-    headers = {"Accept": "application/json", "User-Agent": _QUBIT_USER_AGENT}
+    headers = {"Accept": "application/json", "User-Agent": _HERMES_USER_AGENT}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     payload = _get_json(url, headers, timeout)
@@ -243,6 +256,9 @@ def fetch_models_with_pricing(
                               if original.get(key) not in (None, "")}
                 if orig_entry.get("prompt") or orig_entry.get("completion"):
                     entry["original"] = orig_entry
+            # Qubit Labs-only: the gateway bills this row to a subscription the account holds, not to credits.
+            if include_sale_original and item.get("billing_mode") == "subscription":
+                entry["billing_mode"] = "subscription"
             result[mid] = entry
 
     return _cache_catalog(cache_key, result, cache_ttl_seconds)
@@ -529,7 +545,7 @@ def _fireworks_pricing_from_models_dev(*, force_refresh: bool = False) -> dict[s
 def _fetch_novita_pricing(timeout: float = 8.0, *, force_refresh: bool = False) -> dict[str, dict[str, str]]:
     """NovitaAI /v1/models pricing (per-million prices in units of 0.0001 USD → per-token strings),
     cached on the resolved base URL so menu renders don't re-hit the network."""
-    from qubit_cli.models import _QUBIT_USER_AGENT
+    from qubit_cli.models import _HERMES_USER_AGENT
     api_key = os.getenv("NOVITA_API_KEY", "").strip()
     if not api_key:
         return {}
@@ -540,7 +556,7 @@ def _fetch_novita_pricing(timeout: float = 8.0, *, force_refresh: bool = False) 
         if cached is not None:
             return cached
 
-    headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json", "User-Agent": _QUBIT_USER_AGENT}
+    headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json", "User-Agent": _HERMES_USER_AGENT}
     payload = _get_json(cache_key + "/models", headers, timeout)
     if payload is None:
         return _cache_catalog(cache_key, {})

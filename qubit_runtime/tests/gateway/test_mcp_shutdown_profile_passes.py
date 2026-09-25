@@ -53,7 +53,7 @@ async def test_every_pass_shares_the_callers_budget(homes, monkeypatch):
 async def test_teardown_thread_does_not_inherit_the_callers_home_override(tmp_path, monkeypatch):
     import tools.mcp_tool_lifecycle as lifecycle
     from qubit_constants import (
-        get_hermes_home_override, reset_hermes_home_override, set_hermes_home_override)
+        get_qubit_home_override, reset_qubit_home_override, set_qubit_home_override)
 
     launch = tmp_path / "launch"
     poison = tmp_path / "profiles" / "poison"
@@ -64,12 +64,12 @@ async def test_teardown_thread_does_not_inherit_the_callers_home_override(tmp_pa
     seen: list = []
     monkeypatch.setattr(
         lifecycle, "shutdown_mcp_servers",
-        lambda **_kw: seen.append(get_hermes_home_override()))
+        lambda **_kw: seen.append(get_qubit_home_override()))
 
-    token = set_hermes_home_override(str(poison))
+    token = set_qubit_home_override(str(poison))
     try:
         await gateway_run._shutdown_mcp_servers_nonblocking(timeout=5.0, config=None)
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
     assert seen == [None], f"the wildcard teardown ran inside {seen} instead of a fresh context"

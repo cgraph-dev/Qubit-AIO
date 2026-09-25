@@ -47,7 +47,7 @@ def _interpreter_version() -> str:
 
 def static_verdicts(entries: list[Entry], python_version: str) -> tuple[dict[Path, str], dict[Path, str]]:
     """``(disable, sit out)`` reasons found without a resolver, keyed by resolved dir."""
-    from qubit_cli.plugins_manifest import requires_hermes_error
+    from qubit_cli.plugins_manifest import requires_qubit_error
     from pm.plugin_declarations import manifest_version_error, read_python_declaration
 
     reasons: dict[Path, str] = {}
@@ -62,7 +62,7 @@ def static_verdicts(entries: list[Entry], python_version: str) -> tuple[dict[Pat
             reasons[key] = f"its dependency declaration is invalid: {exc}"
             continue
         # Mirrors enabled_member_dirs, so the recorded stamp is the one boot expects.
-        qubit = requires_hermes_error(declaration.manifest)
+        qubit = requires_qubit_error(declaration.manifest)
         if qubit:
             waiting[key] = qubit
             continue

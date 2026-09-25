@@ -6,20 +6,20 @@ sidebar_position: 1
 
 # LLM and Model Providers
 
-This page covers setting up inference providers for Qubit Agent — from cloud APIs like OpenRouter and Anthropic, to self-hosted endpoints like Ollama and vLLM, to advanced routing and fallback configurations. You need at least one provider configured to use Qubit.
+This page covers setting up inference providers for Hermes Agent — from cloud APIs like OpenRouter and Anthropic, to self-hosted endpoints like Ollama and vLLM, to advanced routing and fallback configurations. You need at least one provider configured to use Hermes.
 
 ## Inference Providers
 
-You need at least one way to connect to an LLM. Use `qubit model` to switch providers and models interactively, or configure directly:
+You need at least one way to connect to an LLM. Use `hermes model` to switch providers and models interactively, or configure directly:
 
 | Provider | Setup |
 |----------|-------|
-| **Qubit Labs** | `qubit model` (OAuth, subscription-based) |
-| **OpenAI Codex** | `qubit model` → **ChatGPT or Codex Subscription** (ChatGPT OAuth, uses Codex models) |
-| **GitHub Copilot** | `qubit model` (OAuth device code flow, `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`) |
-| **GitHub Copilot ACP** | `qubit model` (spawns local `copilot --acp --stdio`) |
-| **Anthropic** | `qubit model` (Claude Max + extra usage credits via OAuth; also supports Anthropic API key or manual setup-token — see note below) |
-| **OpenRouter** | `OPENROUTER_API_KEY` in `~/.hermes/.env` |
+| **Nous Portal** | `hermes model` (OAuth, subscription-based) |
+| **OpenAI Codex** | `hermes model` → **ChatGPT or Codex Subscription** (ChatGPT OAuth, uses Codex models) |
+| **GitHub Copilot** | `hermes model` (OAuth device code flow, `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`) |
+| **GitHub Copilot ACP** | `hermes model` (spawns local `copilot --acp --stdio`) |
+| **Anthropic** | `hermes model` (Claude Max + extra usage credits via OAuth; also supports Anthropic API key or manual setup-token — see note below) |
+| **OpenRouter** | `OPENROUTER_API_KEY` in `~/.hermes/.env`, or `hermes auth add openrouter --type oauth` (browser login via OpenRouter's PKCE flow; stores a key in the credential pool) |
 | **Ramp Router** | `RAMP_ROUTER_API_KEY` in `~/.hermes/.env` (provider: `router`; aliases: `ramp-router`, `ramp`, `router.com`; Responses-native gateway, live account-scoped catalog) |
 | **Fireworks AI** | `FIREWORKS_API_KEY` in `~/.hermes/.env` (provider: `fireworks`; aliases: `fireworks-ai`, `fw`) |
 | **NovitaAI** | `NOVITA_API_KEY` in `~/.hermes/.env` (provider: `novita`, 200+ models, Model API, Agent Sandbox, GPU Cloud) |
@@ -30,11 +30,11 @@ You need at least one way to connect to an LLM. Use `qubit model` to switch prov
 | **Arcee AI** | `ARCEEAI_API_KEY` in `~/.hermes/.env` (provider: `arcee`; aliases: `arcee-ai`, `arceeai`) |
 | **GMI Cloud** | `GMI_API_KEY` in `~/.hermes/.env` (provider: `gmi`; aliases: `gmi-cloud`, `gmicloud`) |
 | **Nebius Token Factory** | `NEBIUS_API_KEY` in `~/.hermes/.env` (provider: `nebius-token-factory`; aliases: `nebius`, `nebius-tf`, `tokenfactory`) |
-| **Actual Computer** | `ACTUAL_API_KEY` in `~/.hermes/.env` for the hosted relay, or `ACTUAL_BASE_URL=http://127.0.0.1:8080` for the local daemon — no key needed on loopback (provider: `actual`; aliases: `actual-computer`, `actualcomputer`, `aci`) |
+| **Actual Computer** | `ACTUAL_API_KEY` in `~/.hermes/.env` for the hosted relay; set `model.base_url` in `config.yaml` for a local daemon (no key needed on loopback). Provider: `actual`; aliases: `actual-computer`, `actualcomputer`, `aci`. |
 | **MiniMax** | `MINIMAX_API_KEY` in `~/.hermes/.env` (provider: `minimax`) |
 | **MiniMax China** | `MINIMAX_CN_API_KEY` in `~/.hermes/.env` (provider: `minimax-cn`) |
 | **xAI (Grok) — Responses API** | `XAI_API_KEY` in `~/.hermes/.env` (provider: `xai`) |
-| **xAI Grok OAuth (SuperGrok)** | `qubit model` → "xAI Grok OAuth (SuperGrok / Premium+)" — browser login, no API key. See [guide](../guides/xai-grok-oauth.md) |
+| **xAI Grok OAuth (SuperGrok)** | `hermes model` → "xAI Grok OAuth (SuperGrok / Premium+)" — browser login, no API key. See [guide](../guides/xai-grok-oauth.md) |
 | **Qwen Cloud (Alibaba DashScope)** | `DASHSCOPE_API_KEY` in `~/.hermes/.env` (provider: `alibaba`; mainland-China endpoint: `alibaba-cn`) |
 | **Alibaba Cloud (Coding Plan)** | `ALIBABA_CODING_PLAN_API_KEY` (falls back to `DASHSCOPE_API_KEY`) (provider: `alibaba-coding-plan`, alias: `alibaba_coding`; mainland-China endpoint: `alibaba-coding-plan-cn` with `ALIBABA_CODING_PLAN_CN_API_KEY`, falling back to the shared keys) — separate billing SKU, different endpoint |
 | **Alibaba Cloud (Token Plan)** | `ALIBABA_TOKEN_PLAN_API_KEY` in `~/.hermes/.env` (provider: `alibaba-token-plan`; mainland-China endpoint: `alibaba-token-plan-cn` with `ALIBABA_TOKEN_PLAN_CN_API_KEY`, falling back to the shared key) — Model Studio flat-token tier |
@@ -45,115 +45,134 @@ You need at least one way to connect to an LLM. Use `qubit model` to switch prov
 | **OpenCode Zen** | `OPENCODE_ZEN_API_KEY` in `~/.hermes/.env` (provider: `opencode-zen`) |
 | **CommandCode** | `COMMANDCODE_API_KEY` in `~/.hermes/.env` (provider: `commandcode`, alias: `commandcode-chat`; Claude models via `commandcode-anthropic`, alias: `commandcode-claude`). Works with GOAT/Pro/Max/Provider plans (not the $1 Go plan — no API access). |
 | **OpenCode Go** | `OPENCODE_GO_API_KEY` in `~/.hermes/.env` (provider: `opencode-go`) |
-| **OpenCode Free** | Keyless — no API key or account needed (provider: `opencode-free`, aliases: `free`, `opencode_free`). Select via `qubit model` or `/model free`; requests are sent anonymously. The model list refreshes automatically from OpenCode's live catalog, so rotating free promotions appear (and delisted ones disappear) without a Qubit update |
 | **DeepSeek** | `DEEPSEEK_API_KEY` in `~/.hermes/.env` (provider: `deepseek`) |
 | **Hugging Face** | `HF_TOKEN` in `~/.hermes/.env` (provider: `huggingface`, aliases: `hf`) |
 | **Google / Gemini** | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) in `~/.hermes/.env` (provider: `gemini`) |
-| **Google Vertex AI** | `qubit model` → "Google Vertex AI" (provider: `vertex`; OAuth2 via service-account JSON or ADC, GCP billing) |
+| **Google Vertex AI** | `hermes model` → "Google Vertex AI" (provider: `vertex`; OAuth2 via service-account JSON or ADC, GCP billing) |
 | **OpenAI API (direct)** | `OPENAI_API_KEY` in `~/.hermes/.env` (provider: `openai-api`, optional `OPENAI_BASE_URL`) |
-| **Azure AI Foundry** | `qubit model` → "Azure AI Foundry" (provider: `azure-foundry`; uses Azure OpenAI / Foundry endpoint and key) |
-| **AWS Bedrock** | `qubit model` → "AWS Bedrock" (provider: `bedrock`; standard AWS credentials chain via boto3) |
+| **Azure AI Foundry** | `hermes model` → "Azure AI Foundry" (provider: `azure-foundry`; uses Azure OpenAI / Foundry endpoint and key) |
+| **AWS Bedrock** | `hermes model` → "AWS Bedrock" (provider: `bedrock`; standard AWS credentials chain via boto3) |
 | **NVIDIA Build** | `NVIDIA_API_KEY` in `~/.hermes/.env` (provider: `nvidia`; NIM-hosted models on build.nvidia.com) |
-| **Ollama Cloud** | `qubit model` → "Ollama Cloud" (provider: `ollama-cloud`; cloud-hosted Ollama API) |
-| **Qwen OAuth** | `qubit model` → "Qwen OAuth" (provider: `qwen-oauth`; browser PKCE login) |
-| **MiniMax OAuth** | `qubit model` → "MiniMax (OAuth)" (provider: `minimax-oauth`; browser PKCE login) |
+| **Ollama Cloud** | `hermes model` → "Ollama Cloud" (provider: `ollama-cloud`; cloud-hosted Ollama API) |
+| **Qwen OAuth** | `hermes model` → "Qwen OAuth" (provider: `qwen-oauth`; browser PKCE login) |
+| **MiniMax OAuth** | `hermes model` → "MiniMax (OAuth)" (provider: `minimax-oauth`; browser PKCE login) |
 | **StepFun** | `STEPFUN_API_KEY` in `~/.hermes/.env` (provider: `stepfun`) |
-| **LM Studio** | `qubit model` → "LM Studio" (provider: `lmstudio`, optional `LM_API_KEY`) |
-| **Custom Endpoint** | `qubit model` → choose "Custom endpoint" (saved in `config.yaml`) |
+| **LM Studio** | `hermes model` → "LM Studio" (provider: `lmstudio`, optional `LM_API_KEY`) |
+| **Custom Endpoint** | `hermes model` → choose "Custom endpoint" (saved in `config.yaml`) |
 
-All three OpenCode providers send an opaque, per-conversation `x-opencode-session` header on every request (main turns on every transport plus auxiliary calls such as compression and titles). OpenCode uses it to pin a conversation to one backend so its prompt cache stays warm; the value is derived from the Qubit session id and carries no personal data.
+Both built-in OpenCode providers send an opaque, per-conversation `x-opencode-session` header on every request (main turns on every transport plus auxiliary calls such as compression, titles, approval checks, skills-hub lookups and `/btw` side questions — including the ones that run in the background after the turn has ended; headless Kanban `specify`/`decompose` and dashboard estimate calls use a per-task key; one-shots with no live session at all, such as Desktop commit-message generation from the review panel, send a fresh ephemeral key). OpenCode uses it to pin a conversation to one backend so its prompt cache stays warm; the value is derived from the Hermes session id (or the Kanban task id) and carries no personal data.
 
-For the official API-key path, see the dedicated [Google Gemini guide](/guides/google-gemini).
+The two built-in OpenCode providers each pin their own relay on `opencode.ai` (`opencode-zen` → `/zen/v1`, `opencode-go` → `/zen/go/v1`). A `model.base_url` left behind by the other relay is healed to the selected provider's relay, and the model you pick (`-m`, `/model`, a fallback entry or a channel override) decides which relay is used — so switching from a Zen model to a Go-only one never sends the request to Zen. The same per-model routing is re-applied when a session is resumed (`hermes --resume`, `/resume`, the TUI and desktop resume paths): a wire format or relay URL recorded while the session ran a different OpenCode model never carries over to the model the session is reopened on. OpenCode models whose id carries a `-vision` marker (for example `deepseek-v4-flash-vision-exp`) are treated as vision-capable even before models.dev lists them, so `agent.image_input_mode: auto` attaches images natively without a `supports_vision` override. A custom provider you define under `providers:` whose name extends a family slug (for example `opencode-go-bridge`) still gets the family's per-model API-mode routing and `/v1` handling, but its `base_url` is taken as declared: name it after the relay it actually points at. Auxiliary tasks (`auxiliary.compression`, titles, vision, MoA) pointed at an OpenCode provider follow the same per-model table, so a Responses-only model such as `gpt-5.6-luna` or an Anthropic-wire one such as `minimax-m2.5` works there exactly as it does for the main conversation.
+
+For the official API-key path, see the dedicated [Google Gemini guide](../guides/google-gemini.md).
 
 :::tip Model key alias
 In the `model:` config section, you can use either `default:` or `model:` as the key name for your model ID. Both `model: { default: my-model }` and `model: { model: my-model }` work identically.
 :::
 
 
-### Qubit Labs
+### Nous Portal
 
-[Qubit Labs](https://portal.nousresearch.com) is Qubit Labs's unified subscription gateway and **the recommended way to run Qubit Agent**. One OAuth login covers 300+ frontier agentic models (Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Grok, ...) plus the [Tool Gateway](/user-guide/features/tool-gateway) (web search, image generation, TTS, browser automation) — billed against your Qubit subscription instead of separate per-provider accounts.
+[Nous Portal](https://portal.nousresearch.com) is Nous Research's unified subscription gateway and **the recommended way to run Hermes Agent**. One OAuth login covers 300+ frontier agentic models (Claude, GPT, Gemini, DeepSeek, Qwen, Kimi, GLM, MiniMax, Grok, ...) plus the [Tool Gateway](../user-guide/features/tool-gateway.md) (web search, image generation, TTS, browser automation) — billed against your Nous subscription instead of separate per-provider accounts.
 
 ```bash
-qubit setup --portal     # fresh install — OAuth + provider + gateway in one command
-qubit model              # existing install — pick "Qubit Labs" from the list
-qubit portal info        # inspect login + routing at any time
+hermes setup --portal     # fresh install — OAuth + provider + gateway in one command
+hermes model              # existing install — pick "Nous Portal" from the list
+hermes portal info        # inspect login + routing at any time
 ```
 
 Don't have a subscription yet? Get one at [portal.nousresearch.com/manage-subscription](https://portal.nousresearch.com/manage-subscription).
 
-**For full details:** see the dedicated [Qubit Labs integration page](/integrations/nous-portal) (what's in the subscription, model catalog, troubleshooting) and the step-by-step [Run Qubit Agent with Qubit Labs guide](/guides/run-hermes-with-nous-portal).
+**For full details:** see the dedicated [Nous Portal integration page](./nous-portal.md) (what's in the subscription, model catalog, troubleshooting) and the step-by-step [Run Hermes Agent with Nous Portal guide](../guides/run-hermes-with-nous-portal.md).
 
-**Client identification.** Every Portal request from Qubit Agent carries a `client=hermes-client-v<version>` tag (e.g. `client=hermes-client-v0.13.0`) auto-aligned to your installed release. This is sent on all Portal pathways — main chat loop, auxiliary calls, compression summarizer, web extraction — and lets Portal-side telemetry distinguish Qubit traffic from other clients. No config required; the tag updates automatically when you `qubit update`.
+**Client identification.** Every Portal request from Hermes Agent carries a `client=hermes-client-v<version>` tag (e.g. `client=hermes-client-v0.13.0`) auto-aligned to your installed release. This is sent on all Portal pathways — main chat loop, auxiliary calls, compression summarizer, web extraction — and lets Portal-side telemetry distinguish Hermes traffic from other clients. No config required; the tag updates automatically when you `hermes update`.
 
-**JWT auth (automatic).** Qubit prefers scoped `inference:invoke` JWTs for Portal requests with the legacy opaque session-key path as a fallback. No configuration is required — credentials are managed by the OAuth flow and rotate transparently. Revoked refresh tokens are quarantined to avoid replay loops.
+**JWT auth (automatic).** Hermes prefers scoped `inference:invoke` JWTs for Portal requests with the legacy opaque session-key path as a fallback. No configuration is required — credentials are managed by the OAuth flow and rotate transparently. Revoked refresh tokens are quarantined to avoid replay loops.
 
 
 :::info Codex Note
-The OpenAI Codex provider authenticates via device code (open a URL, enter a code). Qubit stores the resulting credentials in its own auth store under `~/.hermes/auth.json` and can import existing Codex CLI credentials from `~/.codex/auth.json` when present. No Codex CLI installation is required.
+The OpenAI Codex provider authenticates via device code by default (open a URL, enter a code). Organizations that disable the device-code grant can opt in to the browser authorization-code + PKCE flow instead: `hermes auth add openai-codex --browser` (one login) or `auth.codex_login_flow: browser` in `config.yaml` (every Codex login, including `hermes model`). That flow listens on `http://localhost:1455/auth/callback` — the redirect URI registered for the Codex client, so the port is fixed; if it is already taken (a Codex CLI sign-in in progress) Hermes says so and falls back to device code. Over SSH the listener needs a tunnel (`ssh -N -L 1455:127.0.0.1:1455 user@host`, see [OAuth over SSH](../guides/oauth-over-ssh.md)). Hermes stores the resulting credentials in its own auth store under `~/.hermes/auth.json` and can import existing Codex CLI credentials from `~/.codex/auth.json` when present. No Codex CLI installation is required. Automatic adoption of the Codex CLI login (when Hermes' own refresh fails) is controlled by `auth.adopt_external_logins` — see [Borrowed CLI logins](../user-guide/security.md#borrowed-cli-logins).
 
-If a token refresh fails with a terminal error (HTTP 4xx, `invalid_grant`, revoked grant, etc.), Qubit marks the refresh token as dead and stops replaying it so you don't see a flood of identical auth failures. The next request surfaces a typed re-auth message instead. Run `qubit auth add openai-codex` (or `qubit model` → **ChatGPT or Codex Subscription**) to start a fresh device-code login; the quarantine clears on the next successful exchange.
+If a token refresh fails with a terminal error (HTTP 4xx, `invalid_grant`, revoked grant, etc.), Hermes marks the refresh token as dead and stops replaying it so you don't see a flood of identical auth failures. The next request surfaces a typed re-auth message instead. Run `hermes auth add openai-codex` (or `hermes model` → **ChatGPT or Codex Subscription**) to start a fresh login (device code, or `--browser` for the loopback PKCE flow); the quarantine clears on the next successful exchange.
+
+Device login can fail with `[SSL: UNEXPECTED_EOF_WHILE_READING]` or a TLS handshake timeout on Python/OpenSSL 3.5+ when a middlebox rejects post-quantum groups such as X25519MLKEM768 (curl may still work). A one-off dropped connection is not fatal: while waiting for your browser approval Hermes keeps polling through up to six consecutive transport errors (and retries the device-code request and token exchange twice) before giving up, so only a persistently broken network surfaces this error. Hermes does not change default TLS policy. Point `OPENSSL_CONF` at a config that restricts `Groups` to classic curves before running `hermes model`, or diagnose with TLS 1.2:
+
+```ini
+openssl_conf = openssl_init
+
+[openssl_init]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+Groups = x25519:secp256r1:secp384r1:x448
+```
 :::
 
 :::warning
-Even when using Qubit Labs, Codex, or a custom endpoint, some tools (vision, web summarization, MoA) use a separate "auxiliary" model. By default (`auxiliary.*.provider: "auto"`), Qubit routes these tasks to your **main chat model** — the same model you picked in `qubit model`. You can override each task individually to route it to a cheaper/faster model (e.g. Gemini Flash on OpenRouter) — see [Auxiliary Models](/user-guide/configuration#auxiliary-models).
+Even when using Nous Portal, Codex, or a custom endpoint, some tools (vision, web summarization, MoA) use a separate "auxiliary" model. By default (`auxiliary.*.provider: "auto"`), Hermes routes these tasks to your **main chat model** — the same model you picked in `hermes model`. You can override each task individually to route it to a cheaper/faster model (e.g. Gemini Flash on OpenRouter) — see [Auxiliary Models](../user-guide/configuration.md#auxiliary-models).
 :::
 
-:::tip Qubit Tool Gateway
-Paid Qubit Labs subscribers also get access to the **[Tool Gateway](/user-guide/features/tool-gateway)** — web search, image generation, TTS, and browser automation routed through your subscription. No extra API keys needed. On a fresh install, `qubit setup --portal` logs you in, sets Qubit as your provider, and turns the gateway on in one command. Existing users can enable it from `qubit model` or per-tool from `qubit tools`. Inspect routing at any time with `qubit portal info`.
+:::tip Nous Tool Gateway
+Paid Nous Portal subscribers also get access to the **[Tool Gateway](../user-guide/features/tool-gateway.md)** — web search, image generation, TTS, and browser automation routed through your subscription. No extra API keys needed. On a fresh install, `hermes setup --portal` logs you in, sets Nous as your provider, and turns the gateway on in one command. Existing users can enable it from `hermes model` or per-tool from `hermes tools`. Inspect routing at any time with `hermes portal info`.
 :::
 
 ### Two Commands for Model Management
 
-Qubit has **two** model commands that serve different purposes:
+Hermes has **two** model commands that serve different purposes:
 
 | Command | Where to run | What it does |
 |---------|-------------|--------------|
-| **`qubit model`** | Your terminal (outside any session) | Full setup wizard — add providers, run OAuth, enter API keys, configure endpoints |
-| **`/model`** | Inside a Qubit chat session | Quick switch between **already-configured** providers and models |
+| **`hermes model`** | Your terminal (outside any session) | Full setup wizard — add providers, run OAuth, enter API keys, configure endpoints |
+| **`/model`** | Inside a Hermes chat session | Quick switch between **already-configured** providers and models |
 
-If you're trying to switch to a provider you haven't set up yet (e.g. you only have OpenRouter configured and want to use Anthropic), you need `qubit model`, not `/model`. Exit your session first (`Ctrl+C` or `/quit`), run `qubit model`, complete the provider setup, then start a new session.
+If you're trying to switch to a provider you haven't set up yet (e.g. you only have OpenRouter configured and want to use Anthropic), you need `hermes model`, not `/model`. Exit your session first (`Ctrl+C` or `/quit`), run `hermes model`, complete the provider setup, then start a new session.
 
 
 ### Subscription plans: what your plan pays for
 
-Several providers let you sign in to Qubit with a **consumer subscription** (Claude Max, ChatGPT, SuperGrok / X Premium+, …) instead of an API key. What that subscription actually pays for — and what it doesn't — differs per provider, and it's the single most common source of billing surprises. The table below is the short version; each provider's own section has the details.
+Several providers let you sign in to Hermes with a **consumer subscription** (Claude Max, ChatGPT, SuperGrok / X Premium+, …) instead of an API key. What that subscription actually pays for — and what it doesn't — differs per provider, and it's the single most common source of billing surprises. The table below is the short version; each provider's own section has the details.
 
-> Cells marked *not currently documented* mean exactly that: Qubit docs do not yet specify the behavior. Don't assume — check your provider's billing dashboard, and treat these as open questions.
+> Cells marked *not currently documented* mean exactly that: Hermes docs do not yet specify the behavior. Don't assume — check your provider's billing dashboard, and treat these as open questions.
 
-| Plan / path | Can Qubit use it? | What gets consumed | What does NOT get consumed | Common surprise |
+| Plan / path | Can Hermes use it? | What gets consumed | What does NOT get consumed | Common surprise |
 |---|---|---|---|---|
-| **Anthropic — Claude Max + OAuth** | ✅ Yes — `qubit model` → Anthropic OAuth. Requires Max **and** purchased extra usage credits | The **extra/overage credits** you've added on top of the Max plan | The **base Max plan allowance** (the usage included in Claude Code by default) | All Qubit usage bills as "extra usage" even while your included Max allowance sits untouched |
+| **Anthropic — Claude Max + OAuth** | ✅ Yes — `hermes model` → Anthropic OAuth. Requires Max **and** purchased extra usage credits | The **extra/overage credits** you've added on top of the Max plan | The **base Max plan allowance** (the usage included in Claude Code by default) | All Hermes usage bills as "extra usage" even while your included Max allowance sits untouched |
 | **Anthropic — Claude Pro** | ❌ No — Pro subscribers cannot use the OAuth path | Nothing (path unavailable) | Your Pro subscription | Pro looks like it should work; it doesn't. Use an `ANTHROPIC_API_KEY` instead (pay-per-token, independent of any Claude subscription) |
-| **OpenAI Codex — ChatGPT plan OAuth** | ✅ Yes — `qubit model` → **ChatGPT or Codex Subscription** (ChatGPT OAuth device-code login, uses Codex models) | *Not currently documented* | *Not currently documented* | Docs cover auth and token refresh only; plan-quota semantics are not yet documented |
+| **OpenAI Codex — ChatGPT plan OAuth** | ✅ Yes — `hermes model` → **ChatGPT or Codex Subscription** (ChatGPT OAuth device-code login, uses Codex models) | *Not currently documented* | *Not currently documented* | Docs cover auth and token refresh only; plan-quota semantics are not yet documented |
 | **xAI — SuperGrok / X Premium+ OAuth** | ✅ Yes — browser OAuth, no API key needed | Your **subscription quota** (documented explicitly for X Search: OAuth is preferred over an API key and "uses your subscription quota instead of API spend"). Inference quota semantics beyond that: *not currently documented* | `XAI_API_KEY` / pay-per-token API spend, when OAuth credentials are configured and preferred | `HTTP 403` after a successful login — xAI has restricted OAuth API access to specific SuperGrok tiers despite an active in-app subscription |
-| **Google — Gemini consumer plan (Google AI Pro / Ultra)** | ❌ No documented path — the `gemini` provider is API-key only (`GOOGLE_API_KEY` / `GEMINI_API_KEY`); Vertex AI uses GCP billing | Your **API key's quota** (free tier or billing-enabled Google Cloud project) — *consumer-plan consumption not currently documented* | *Not currently documented* | Free-tier keys can be exhausted after a handful of agent turns, because Qubit may make several model calls per user turn |
+| **Google — Gemini consumer plan (Google AI Pro / Ultra)** | ❌ No documented path — the `gemini` provider is API-key only (`GOOGLE_API_KEY` / `GEMINI_API_KEY`); Vertex AI uses GCP billing | Your **API key's quota** (free tier or billing-enabled Google Cloud project) — *consumer-plan consumption not currently documented* | *Not currently documented* | Free-tier keys can be exhausted after a handful of agent turns, because Hermes may make several model calls per user turn |
 
-**Anthropic.** The OAuth path routes as Claude Code against your Anthropic account and **only works on a Claude Max plan with purchased extra usage credits** — the base Max allowance is never consumed by Qubit, only the extra/overage credits on top. Claude Pro subscribers cannot use this path; the supported alternative is an `ANTHROPIC_API_KEY`, billed pay-per-token against that key's organization at standard API pricing. See [Anthropic (Native)](#anthropic-native) below.
+**Anthropic.** The OAuth path routes as Claude Code against your Anthropic account and **only works on a Claude Max plan with purchased extra usage credits** — the base Max allowance is never consumed by Hermes, only the extra/overage credits on top. Claude Pro subscribers cannot use this path; the supported alternative is an `ANTHROPIC_API_KEY`, billed pay-per-token against that key's organization at standard API pricing. See [Anthropic (Native)](#anthropic-native) below.
 
-**OpenAI Codex.** Qubit authenticates via ChatGPT device-code OAuth, stores credentials in `~/.hermes/auth.json`, and can import existing Codex CLI credentials from `~/.codex/auth.json`. Which ChatGPT plan tiers are eligible, and how Qubit usage counts against your plan's Codex limits, are **not currently documented** — the Codex note under [Qubit Labs](#nous-portal) covers authentication and token-refresh behavior only.
+**OpenAI Codex.** Hermes authenticates via ChatGPT device-code OAuth, stores credentials in `~/.hermes/auth.json`, and can import existing Codex CLI credentials from `~/.codex/auth.json`. Which ChatGPT plan tiers are eligible, and how Hermes usage counts against your plan's Codex limits, are **not currently documented** — the Codex note under [Nous Portal](#nous-portal) covers authentication and token-refresh behavior only.
 
 **xAI (SuperGrok / X Premium+).** Browser OAuth works with either an active SuperGrok subscription or an X Premium+ subscription on the linked X account, and the same bearer token is reused by direct-to-xAI tools (TTS, image gen, video gen, transcription, X Search). If inference returns `HTTP 403` after a successful login, that's a tier/entitlement restriction on xAI's side, not a stale token — the workaround is switching to an `XAI_API_KEY`. See [xAI (Grok)](#xai-grok--responses-api--prompt-caching) below and the [xAI Grok OAuth guide](../guides/xai-grok-oauth.md).
 
-**Google Gemini.** There is currently no way to sign in to Qubit with a consumer Gemini subscription — the `gemini` provider takes an API key, and [Google Vertex AI](#google-vertex-ai) bills to your GCP project. A billing-enabled Google Cloud project is recommended for agent use; free-tier quotas are too small for long-running agent sessions. See the [Google Gemini guide](/guides/google-gemini).
+**Google Gemini.** There is currently no way to sign in to Hermes with a consumer Gemini subscription — the `gemini` provider takes an API key, and [Google Vertex AI](#google-vertex-ai) bills to your GCP project. A billing-enabled Google Cloud project is recommended for agent use; free-tier quotas are too small for long-running agent sessions. See the [Google Gemini guide](../guides/google-gemini.md).
 
 :::tip One subscription instead of five
-If you'd rather not track per-provider plan semantics at all, [Qubit Labs](#nous-portal) covers 300+ models under a single subscription with one OAuth login.
+If you'd rather not track per-provider plan semantics at all, [Nous Portal](#nous-portal) covers 300+ models under a single subscription with one OAuth login.
 :::
 
 ### Anthropic (Native)
 
 Use Claude models directly through the Anthropic API — no OpenRouter proxy needed. Supports three auth methods:
 
-When no explicit environment credential is selected, Qubit-owned OAuth grants
+When no explicit environment credential is selected, Hermes-owned OAuth grants
 in the credential pool take precedence over a borrowed Claude Code login. The
-borrowed login remains the fallback when no owned OAuth grant is available.
+borrowed login remains the fallback when no owned OAuth grant is available —
+unless `auth.adopt_external_logins: false` is set, in which case Hermes never
+reads or refreshes Claude Code's credentials (see
+[Borrowed CLI logins](../user-guide/security.md#borrowed-cli-logins)).
 Auxiliary authentication recovery refreshes the credential used by the failed
 request, not an unrelated ambient login; rotating a borrowed login can otherwise
 invalidate its owner's refresh token.
 
 :::caution Requires Claude Max "extra usage" credits
-When you authenticate via `qubit model` → Anthropic OAuth (or via `qubit auth add anthropic --type oauth`), Qubit routes as Claude Code against your Anthropic account. **It only works if you're on a Claude Max plan and have purchased extra usage credits.** The base Max plan allowance (the usage included in Claude Code by default) is not consumed by Qubit — only the extra/overage credits you've added on top are. Claude Pro subscribers cannot use this path.
+When you authenticate via `hermes model` → Anthropic OAuth (or via `hermes auth add anthropic --type oauth`), Hermes routes as Claude Code against your Anthropic account. **It only works if you're on a Claude Max plan and have purchased extra usage credits.** The base Max plan allowance (the usage included in Claude Code by default) is not consumed by Hermes — only the extra/overage credits you've added on top are. Claude Pro subscribers cannot use this path.
 
 If you don't have Max + extra credits, use an `ANTHROPIC_API_KEY` instead — requests are billed pay-per-token against that key's organization (standard API pricing, independent of any Claude subscription).
 :::
@@ -161,21 +180,21 @@ If you don't have Max + extra credits, use an `ANTHROPIC_API_KEY` instead — re
 ```bash
 # With an API key (pay-per-token)
 export ANTHROPIC_API_KEY=***
-qubit chat --provider anthropic --model claude-sonnet-4-6
+hermes chat --provider anthropic --model claude-sonnet-4-6
 
-# Preferred: authenticate through `qubit model`
-# Qubit will use Claude Code's credential store directly when available
-qubit model
+# Preferred: authenticate through `hermes model`
+# Hermes will use Claude Code's credential store directly when available
+hermes model
 
 # Manual override with a setup-token (fallback / legacy)
 export ANTHROPIC_TOKEN=***  # setup-token or manual OAuth token
-qubit chat --provider anthropic
+hermes chat --provider anthropic
 
 # Auto-detect Claude Code credentials (if you already use Claude Code)
-qubit chat --provider anthropic  # reads Claude Code credential files automatically
+hermes chat --provider anthropic  # reads Claude Code credential files automatically
 ```
 
-When you choose Anthropic OAuth through `qubit model`, Qubit prefers Claude Code's own credential store over copying the token into `~/.hermes/.env`. That keeps refreshable Claude credentials refreshable.
+When you choose Anthropic OAuth through `hermes model`, Hermes prefers Claude Code's own credential store over copying the token into `~/.hermes/.env`. That keeps refreshable Claude credentials refreshable.
 
 Or set it permanently:
 ```yaml
@@ -190,12 +209,12 @@ model:
 
 ### GitHub Copilot
 
-Qubit supports GitHub Copilot as a first-class provider with two modes:
+Hermes supports GitHub Copilot as a first-class provider with two modes:
 
 **`copilot` — Direct Copilot API** (recommended). Uses your GitHub Copilot subscription to access GPT-5.x, Claude, Gemini, and other models through the Copilot API.
 
 ```bash
-qubit chat --provider copilot --model gpt-5.4
+hermes chat --provider copilot --model gpt-5.4
 ```
 
 **Authentication options** (checked in this order):
@@ -205,30 +224,30 @@ qubit chat --provider copilot --model gpt-5.4
 3. `GITHUB_TOKEN` environment variable
 4. `gh auth token` CLI fallback
 
-If no token is found, `qubit model` offers an **OAuth device code login** — the same flow used by the Copilot CLI and opencode.
+If no token is found, `hermes model` offers an **OAuth device code login** — the same flow used by the Copilot CLI and opencode.
 
 :::warning Token types
 The Copilot API does **not** support classic Personal Access Tokens (`ghp_*`). Supported token types:
 
 | Type | Prefix | How to get |
 |------|--------|------------|
-| OAuth token | `gho_` | `qubit model` → GitHub Copilot → Login with GitHub |
+| OAuth token | `gho_` | `hermes model` → GitHub Copilot → Login with GitHub |
 | Fine-grained PAT | `github_pat_` | GitHub Settings → Developer settings → Fine-grained tokens (needs **Copilot Requests** permission) |
 | GitHub App token | `ghu_` | Via GitHub App installation |
 
-If your `gh auth token` returns a `ghp_*` token, use `qubit model` to authenticate via OAuth instead.
+If your `gh auth token` returns a `ghp_*` token, use `hermes model` to authenticate via OAuth instead.
 :::
 
-:::info Copilot auth behavior in Qubit
-Qubit sends a supported GitHub token (`gho_*`, `github_pat_*`, or `ghu_*`) directly to `api.githubcopilot.com` and includes Copilot-specific headers (`Editor-Version`, `Copilot-Integration-Id`, `Openai-Intent`, `x-initiator`).
+:::info Copilot auth behavior in Hermes
+Hermes sends a supported GitHub token (`gho_*`, `github_pat_*`, or `ghu_*`) directly to `api.githubcopilot.com` and includes Copilot-specific headers (`Editor-Version`, `Copilot-Integration-Id`, `Openai-Intent`, `x-initiator`).
 
-On HTTP 401, Qubit now performs a one-shot credential recovery before fallback:
+On HTTP 401, Hermes now performs a one-shot credential recovery before fallback:
 
 1. Re-resolve token via the normal priority chain (`COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN` → `gh auth token`)
 2. Rebuild the shared OpenAI client with refreshed headers
 3. Retry the request once
 
-Some older community proxies use `api.github.com/copilot_internal/v2/token` exchange flows. That endpoint can be unavailable for some account types (returns 404). Qubit therefore keeps direct-token auth as the primary path and relies on runtime credential refresh + retry for robustness.
+Some older community proxies use `api.github.com/copilot_internal/v2/token` exchange flows. That endpoint can be unavailable for some account types (returns 404). Hermes therefore keeps direct-token auth as the primary path and relies on runtime credential refresh + retry for robustness.
 :::
 
 **API routing**: GPT-5+ models (except `gpt-5-mini`) automatically use the Responses API. All other models (GPT-4o, Claude, Gemini, etc.) use Chat Completions. Models are auto-detected from the live Copilot catalog.
@@ -236,7 +255,7 @@ Some older community proxies use `api.github.com/copilot_internal/v2/token` exch
 **`copilot-acp` — Copilot ACP agent backend**. Spawns the local Copilot CLI as a subprocess:
 
 ```bash
-qubit chat --provider copilot-acp --model copilot-acp
+hermes chat --provider copilot-acp --model copilot-acp
 # Requires the GitHub Copilot CLI in PATH and an existing `copilot login` session
 ```
 
@@ -259,72 +278,72 @@ These providers have built-in support with dedicated provider IDs. Set the API k
 
 ```bash
 # Fireworks AI
-qubit chat --provider fireworks --model accounts/fireworks/models/kimi-k2p6
+hermes chat --provider fireworks --model accounts/fireworks/models/kimi-k2p6
 # Requires: FIREWORKS_API_KEY in ~/.hermes/.env
 
 # NovitaAI Model API
-qubit chat --provider novita --model moonshotai/kimi-k2.5
+hermes chat --provider novita --model moonshotai/kimi-k2.5
 # Requires: NOVITA_API_KEY in ~/.hermes/.env
 
 # Ramp Router (model IDs come from your account's live catalog)
-qubit chat --provider router --model gpt-5.4-mini
+hermes chat --provider router --model gpt-5.4-mini
 # Requires: RAMP_ROUTER_API_KEY in ~/.hermes/.env
 
 # z.ai / ZhipuAI GLM
-qubit chat --provider zai --model glm-5
+hermes chat --provider zai --model glm-5
 # Requires: GLM_API_KEY in ~/.hermes/.env
 
 # Kimi / Moonshot AI (international: api.moonshot.ai)
-qubit chat --provider kimi-coding --model kimi-for-coding
+hermes chat --provider kimi-coding --model kimi-for-coding
 # Requires: KIMI_API_KEY in ~/.hermes/.env
 
 # Kimi / Moonshot AI (China: api.moonshot.cn)
-qubit chat --provider kimi-coding-cn --model kimi-k2.5
+hermes chat --provider kimi-coding-cn --model kimi-k2.5
 # Requires: KIMI_CN_API_KEY in ~/.hermes/.env
 
 # MiniMax (global endpoint)
-qubit chat --provider minimax --model MiniMax-M2.7
+hermes chat --provider minimax --model MiniMax-M2.7
 # Requires: MINIMAX_API_KEY in ~/.hermes/.env
 
 # MiniMax (China endpoint)
-qubit chat --provider minimax-cn --model MiniMax-M2.7
+hermes chat --provider minimax-cn --model MiniMax-M2.7
 # Requires: MINIMAX_CN_API_KEY in ~/.hermes/.env
 
 # Qwen Cloud / DashScope (Qwen models)
-qubit chat --provider alibaba --model qwen3.5-plus
+hermes chat --provider alibaba --model qwen3.5-plus
 # Requires: DASHSCOPE_API_KEY in ~/.hermes/.env
 
 # Xiaomi MiMo
-qubit chat --provider xiaomi --model mimo-v2-pro
+hermes chat --provider xiaomi --model mimo-v2-pro
 # Requires: XIAOMI_API_KEY in ~/.hermes/.env
 
 # Tencent TokenHub (Hy4 preview)
-qubit chat --provider tencent-tokenhub --model hy4-preview
+hermes chat --provider tencent-tokenhub --model hy4-preview
 # Requires: TOKENHUB_API_KEY in ~/.hermes/.env
 
 # Tencent TokenPlan (Hy4 preview via Anthropic Messages endpoint)
-qubit chat --provider tencent-tokenplan --model hy4-preview
+hermes chat --provider tencent-tokenplan --model hy4-preview
 # Requires: TOKENPLAN_API_KEY in ~/.hermes/.env
 
 # Arcee AI (Trinity models)
-qubit chat --provider arcee --model trinity-large-thinking
+hermes chat --provider arcee --model trinity-large-thinking
 # Requires: ARCEEAI_API_KEY in ~/.hermes/.env
 
 # Meta Model API (Muse Spark family)
-qubit chat --provider meta-ai --model muse-spark-1.2
+hermes chat --provider meta-ai --model muse-spark-1.2
 # Requires: MODEL_API_KEY in ~/.hermes/.env
 
 # GMI Cloud
 # Use the exact model ID returned by GMI's /v1/models endpoint.
-qubit chat --provider gmi --model zai-org/GLM-5.1-FP8
+hermes chat --provider gmi --model zai-org/GLM-5.1-FP8
 # Requires: GMI_API_KEY in ~/.hermes/.env
 
 # Nebius Token Factory
-qubit chat --provider nebius --model deepseek-ai/DeepSeek-V4-Pro
+hermes chat --provider nebius --model deepseek-ai/DeepSeek-V4-Pro
 # Requires: NEBIUS_API_KEY in ~/.hermes/.env
 ```
 
-Fireworks uses its native slash-form catalog IDs, such as `accounts/fireworks/models/kimi-k2p6`. Run `qubit model`, choose **Fireworks AI**, and select from the live catalog or enter another Fireworks model ID. The default endpoint is `https://api.fireworks.ai/inference/v1`; configure a different endpoint through `model.base_url` in `config.yaml`, not `.env`.
+Fireworks uses its native slash-form catalog IDs, such as `accounts/fireworks/models/kimi-k2p6`. Run `hermes model`, choose **Fireworks AI**, and select from the live catalog or enter another Fireworks model ID. The default endpoint is `https://api.fireworks.ai/inference/v1`; configure a different endpoint through `model.base_url` in `config.yaml`, not `.env`.
 
 Or set the provider permanently in `config.yaml`:
 ```yaml
@@ -340,26 +359,26 @@ Base URLs can be overridden with `NOVITA_BASE_URL`, `GLM_BASE_URL`, `KIMI_BASE_U
 :::
 
 :::note Z.AI Endpoint Auto-Detection
-When using the Z.AI / GLM provider, Qubit automatically probes multiple endpoints (global, China, coding variants) to find one that accepts your API key. You don't need to set `GLM_BASE_URL` manually — the working endpoint is detected and cached automatically.
+When using the Z.AI / GLM provider, Hermes automatically probes multiple endpoints (global, China, coding variants) to find one that accepts your API key. You don't need to set `GLM_BASE_URL` manually — the working endpoint is detected and cached automatically.
 :::
 
 ### xAI (Grok) — Responses API + Prompt Caching
 
-xAI is wired through the Responses API (`codex_responses` transport) for automatic reasoning support on Grok 4 models — no `reasoning_effort` parameter needed, the server reasons by default. Set `XAI_API_KEY` in `~/.hermes/.env` and pick xAI in `qubit model`, or drop `grok` as a shortcut into `/model grok-4-fast-reasoning`.
+xAI is wired through the Responses API (`codex_responses` transport) for automatic reasoning support on Grok 4 models — no `reasoning_effort` parameter needed, the server reasons by default. Set `XAI_API_KEY` in `~/.hermes/.env` and pick xAI in `hermes model`, or drop `grok` as a shortcut into `/model grok-4-fast-reasoning`.
 
-SuperGrok and X Premium+ subscribers can sign in with browser OAuth instead of using an API key — pick **xAI Grok OAuth (SuperGrok / Premium+)** in `qubit model`, or run `qubit auth add xai-oauth`. The same OAuth bearer token is automatically reused by direct-to-xAI tools (TTS, image gen, video gen, transcription). See the [xAI Grok OAuth guide](../guides/xai-grok-oauth.md) for the full flow — and if Qubit runs on a remote host, also see [OAuth over SSH / Remote Hosts](../guides/oauth-over-ssh.md) for the required `ssh -L` tunnel.
+SuperGrok and X Premium+ subscribers can sign in with browser OAuth instead of using an API key — pick **xAI Grok OAuth (SuperGrok / Premium+)** in `hermes model`, or run `hermes auth add xai-oauth`. The same OAuth bearer token is automatically reused by direct-to-xAI tools (TTS, image gen, video gen, transcription). See the [xAI Grok OAuth guide](../guides/xai-grok-oauth.md) for the full flow — and if Hermes runs on a remote host, also see [OAuth over SSH / Remote Hosts](../guides/oauth-over-ssh.md) for the required `ssh -L` tunnel.
 
-When using xAI as a provider (any base URL containing `x.ai`), Qubit automatically enables prompt caching by sending the `x-grok-conv-id` header with every API request. This routes requests to the same server within a conversation session, allowing xAI's infrastructure to reuse cached system prompts and conversation history.
+When using xAI as a provider (any base URL containing `x.ai`), Hermes automatically enables prompt caching by sending the `x-grok-conv-id` header with every API request. This routes requests to the same server within a conversation session, allowing xAI's infrastructure to reuse cached system prompts and conversation history.
 
 No configuration is needed — caching activates automatically when an xAI endpoint is detected and a session ID is available. This reduces latency and cost for multi-turn conversations.
 
-xAI also ships a dedicated TTS endpoint (`/v1/tts`). Select **xAI TTS** in `qubit tools` → Voice & TTS, or see the [Voice & TTS](../user-guide/features/tts.md#text-to-speech) page for config.
+xAI also ships a dedicated TTS endpoint (`/v1/tts`). Select **xAI TTS** in `hermes tools` → Voice & TTS, or see the [Voice & TTS](../user-guide/features/tts.md#text-to-speech) page for config.
 
-**Retired xAI model migration (May 15, 2026):** xAI is retiring `grok-4*`, `grok-3`, `grok-code-fast-1`, and `grok-imagine-image-pro` on 2026-05-15. `qubit doctor` and `qubit chat` startup both detect any config still pointing at a retired ref and print the recommended replacement. Use `qubit migrate xai` for a one-shot config rewrite — dry-run by default, add `--apply` to write changes (a timestamped `config.yaml.bak-pre-migrate-xai-*` backup is created automatically).
+**Retired xAI model migration (May 15, 2026):** xAI is retiring `grok-4*`, `grok-3`, `grok-code-fast-1`, and `grok-imagine-image-pro` on 2026-05-15. `hermes doctor` and `hermes chat` startup both detect any config still pointing at a retired ref and print the recommended replacement. Use `hermes migrate xai` for a one-shot config rewrite — dry-run by default, add `--apply` to write changes (a timestamped copy of the previous config lands in `backups/config/` first).
 
 ```bash
-qubit migrate xai          # preview replacements
-qubit migrate xai --apply  # rewrite ~/.hermes/config.yaml in place
+hermes migrate xai          # preview replacements
+hermes migrate xai --apply  # rewrite ~/.hermes/config.yaml in place
 ```
 
 **xAI Web Search backend.** When the [Web Search](../user-guide/features/web-search.md) toolset is enabled, `web.backend: xai` routes search through xAI's hosted search endpoint using the same `XAI_API_KEY` / OAuth credentials. No additional setup required if xAI is already configured as a provider.
@@ -370,11 +389,11 @@ qubit migrate xai --apply  # rewrite ~/.hermes/config.yaml in place
 
 ```bash
 # Use any available model
-qubit chat --provider novita --model moonshotai/kimi-k2.5
+hermes chat --provider novita --model moonshotai/kimi-k2.5
 # Requires: NOVITA_API_KEY in ~/.hermes/.env
 
 # Short alias
-qubit chat --provider novita-ai --model deepseek/deepseek-v3-0324
+hermes chat --provider novita-ai --model deepseek/deepseek-v3-0324
 ```
 
 Or set it permanently in `config.yaml`:
@@ -389,10 +408,10 @@ Get your API key at [novita.ai/settings/key-management](https://novita.ai/settin
 
 ### Ollama Cloud — Managed Ollama Models, OAuth + API Key
 
-[Ollama Cloud](https://ollama.com/cloud) hosts the same open-weight catalog as local Ollama but without the GPU requirement. Pick it in `qubit model` as **Ollama Cloud**, paste your API key from [ollama.com/settings/keys](https://ollama.com/settings/keys), and Qubit auto-discovers the available models.
+[Ollama Cloud](https://ollama.com/cloud) hosts the same open-weight catalog as local Ollama but without the GPU requirement. Pick it in `hermes model` as **Ollama Cloud**, paste your API key from [ollama.com/settings/keys](https://ollama.com/settings/keys), and Hermes auto-discovers the available models.
 
 ```bash
-qubit model
+hermes model
 # → pick "Ollama Cloud"
 # → paste your OLLAMA_API_KEY
 # → select from discovered models (gpt-oss:120b, glm-4.6:cloud, qwen3-coder:480b-cloud, etc.)
@@ -411,16 +430,20 @@ The model catalog is fetched dynamically from `ollama.com/v1/models` and cached 
 Both speak the same OpenAI-compatible API. Cloud is a first-class provider (`--provider ollama-cloud`, `OLLAMA_API_KEY`); local Ollama is reached via the Custom Endpoint flow (base URL `http://localhost:11434/v1`, no key). Use cloud for large models you can't run locally; use local for privacy or offline work.
 :::
 
+### DeepInfra
+
+DeepInfra (`--provider deepinfra`, `DEEPINFRA_API_KEY`) is discovered live from its catalog. Reasoning is controlled through DeepInfra's top-level `reasoning_effort` field, so `agent.reasoning_effort`, `/reasoning <level>`, `--reasoning` and per-model `agent.reasoning_overrides` work in **both directions**: an effort turns thinking on for models that default off (DeepSeek-V4.x), `/reasoning none` turns it off for models that default on (GLM-4.6, Qwen3-Thinking). Leaving reasoning unset keeps DeepInfra's per-model default; `xhigh` is native and `ultra` is sent as `max`.
+
 ### AWS Bedrock
 
 Anthropic Claude, Amazon Nova, DeepSeek v3.2, Meta Llama 4, and other models via AWS Bedrock. Uses the AWS SDK (`boto3`) credential chain — no API key, just standard AWS auth.
 
 ```bash
 # Simplest — named profile in ~/.aws/credentials
-qubit chat --provider bedrock --model us.anthropic.claude-sonnet-4-6
+hermes chat --provider bedrock --model us.anthropic.claude-sonnet-4-6
 
 # Or with explicit env vars
-AWS_PROFILE=myprofile AWS_REGION=us-east-1 qubit chat --provider bedrock --model us.anthropic.claude-sonnet-4-6
+AWS_PROFILE=myprofile AWS_REGION=us-east-1 hermes chat --provider bedrock --model us.anthropic.claude-sonnet-4-6
 ```
 
 Or permanently in `config.yaml`:
@@ -441,11 +464,11 @@ Authentication uses the standard boto3 chain: explicit `AWS_ACCESS_KEY_ID`/`AWS_
 
 Bedrock uses the **Converse API** under the hood — requests are translated to Bedrock's model-agnostic shape, so the same config works for Claude, Nova, DeepSeek, and Llama models. Set `BEDROCK_BASE_URL` only if you're calling a non-default regional endpoint.
 
-See the [AWS Bedrock guide](/guides/aws-bedrock) for a walkthrough of IAM setup, region selection, and cross-region inference.
+See the [AWS Bedrock guide](../guides/aws-bedrock.md) for a walkthrough of IAM setup, region selection, and cross-region inference.
 
 ### Google Vertex AI
 
-Gemini models on Google Cloud Vertex AI via Vertex's OpenAI-compatible endpoint. Authentication is **OAuth2** — a short-lived access token (~1 hour) minted from a service-account JSON or Application Default Credentials (ADC). There is **no static API key**; Qubit mints and auto-refreshes the token for you, including re-minting on a mid-session `401`.
+Gemini models on Google Cloud Vertex AI via Vertex's OpenAI-compatible endpoint. Authentication is **OAuth2** — a short-lived access token (~1 hour) minted from a service-account JSON or Application Default Credentials (ADC). There is **no static API key**; Hermes mints and auto-refreshes the token for you, including re-minting on a mid-session `401`.
 
 ```bash
 # Service account JSON (recommended for servers / gateways)
@@ -453,7 +476,7 @@ echo "VERTEX_CREDENTIALS_PATH=/path/to/service-account.json" >> ~/.hermes/.env
 # or Application Default Credentials
 gcloud auth application-default login
 
-qubit model   # → "Google Vertex AI" → project → region → model
+hermes model   # → "Google Vertex AI" → project → region → model
 ```
 
 Or in `config.yaml` (project/region are non-secret and live here; the credential path stays in `.env`):
@@ -466,19 +489,19 @@ vertex:
   region: "global"               # required for the Gemini 3.x previews
 ```
 
-`VERTEX_PROJECT_ID` / `VERTEX_REGION` env vars override the `config.yaml` values. Qubit lazy-installs `google-auth` on first use; run `qubit setup` if the managed install needs repair. See the [Google Vertex AI guide](/guides/google-vertex) for the full walkthrough, and the [Google Gemini guide](/guides/google-gemini) for the static-API-key AI Studio path instead.
+`VERTEX_PROJECT_ID` / `VERTEX_REGION` env vars override the `config.yaml` values. Hermes lazy-installs `google-auth` on first use; run `hermes setup` if the managed install needs repair. See the [Google Vertex AI guide](../guides/google-vertex.md) for the full walkthrough, and the [Google Gemini guide](../guides/google-gemini.md) for the static-API-key AI Studio path instead.
 
 ### Qwen Portal (OAuth)
 
-Alibaba's Qwen Portal with browser-based OAuth login. Pick **Qwen OAuth (Portal)** in `qubit model`, sign in through the browser, and Qubit persists the refresh token.
+Alibaba's Qwen Portal with browser-based OAuth login. Pick **Qwen OAuth (Portal)** in `hermes model`, sign in through the browser, and Hermes persists the refresh token.
 
 ```bash
-qubit model
+hermes model
 # → pick "Qwen OAuth (Portal)"
 # → browser opens; sign in with your Alibaba account
 # → confirm — credentials are saved to ~/.hermes/auth.json
 
-qubit chat   # uses portal.qwen.ai/v1 endpoint
+hermes chat   # uses portal.qwen.ai/v1 endpoint
 ```
 
 Or configure `config.yaml`:
@@ -496,7 +519,7 @@ Set `HERMES_QWEN_BASE_URL` only if the portal endpoint relocates (default: `http
 
 ### Alibaba Cloud (Coding Plan)
 
-If you're subscribed to Alibaba's **Coding Plan** (a pricing SKU separate from standard DashScope API access), Qubit exposes it as its own first-class provider: `alibaba-coding-plan`. Endpoint: `https://coding-intl.dashscope.aliyuncs.com/v1`. It's OpenAI-compatible like the regular `alibaba` provider but with a different base URL and billing surface.
+If you're subscribed to Alibaba's **Coding Plan** (a pricing SKU separate from standard DashScope API access), Hermes exposes it as its own first-class provider: `alibaba-coding-plan`. Endpoint: `https://coding-intl.dashscope.aliyuncs.com/v1`. It's OpenAI-compatible like the regular `alibaba` provider but with a different base URL and billing surface.
 
 ```yaml
 model:
@@ -507,7 +530,7 @@ model:
 Or from the CLI:
 
 ```bash
-qubit chat --provider alibaba_coding --model qwen3-coder-plus
+hermes chat --provider alibaba_coding --model qwen3-coder-plus
 ```
 
 `alibaba_coding` uses the same `DASHSCOPE_API_KEY` your `alibaba` entry already uses — no separate key needed, just a different routing target. Before this provider was registered, users who set `provider: alibaba_coding` in `config.yaml` silently fell through to OpenRouter routing.
@@ -516,15 +539,15 @@ For the mainland-China endpoint (`alibaba-coding-plan-cn`, `https://coding.dashs
 
 ### MiniMax (OAuth)
 
-MiniMax-M2.7 via browser OAuth login — no API key needed. Pick **MiniMax (OAuth)** in `qubit model`, sign in through the browser, and Qubit persists the access + refresh tokens. Uses the Anthropic Messages-compatible endpoint (`/anthropic`) under the hood.
+MiniMax-M2.7 via browser OAuth login — no API key needed. Pick **MiniMax (OAuth)** in `hermes model`, sign in through the browser, and Hermes persists the access + refresh tokens. Uses the Anthropic Messages-compatible endpoint (`/anthropic`) under the hood.
 
 ```bash
-qubit model
+hermes model
 # → pick "MiniMax (OAuth)"
 # → browser opens; sign in with your MiniMax account (global or CN region)
 # → confirm — credentials are saved to ~/.hermes/auth.json
 
-qubit chat   # uses api.minimax.io/anthropic endpoint
+hermes chat   # uses api.minimax.io/anthropic endpoint
 ```
 
 Or configure `config.yaml`:
@@ -537,7 +560,7 @@ model:
 Supported models: `MiniMax-M2.7` (main) and `MiniMax-M2.7-highspeed` (wired as the default auxiliary model). The OAuth path ignores `MINIMAX_API_KEY` / `MINIMAX_BASE_URL`.
 
 :::tip MiniMax OAuth vs API key
-`minimax-oauth` uses MiniMax's consumer-facing portal with OAuth login — no billing setup required. The `minimax` and `minimax-cn` providers use `MINIMAX_API_KEY` / `MINIMAX_CN_API_KEY` — for programmatic access. See the [MiniMax OAuth guide](/guides/minimax-oauth) for a full walkthrough.
+`minimax-oauth` uses MiniMax's consumer-facing portal with OAuth login — no billing setup required. The `minimax` and `minimax-cn` providers use `MINIMAX_API_KEY` / `MINIMAX_CN_API_KEY` — for programmatic access. See the [MiniMax OAuth guide](../guides/minimax-oauth.md) for a full walkthrough.
 :::
 
 ### NVIDIA NIM
@@ -546,11 +569,11 @@ Nemotron and other open source models via [build.nvidia.com](https://build.nvidi
 
 ```bash
 # Cloud (build.nvidia.com)
-qubit chat --provider nvidia --model nvidia/nemotron-3-super-120b-a12b
+hermes chat --provider nvidia --model nvidia/nemotron-3-super-120b-a12b
 # Requires: NVIDIA_API_KEY in ~/.hermes/.env
 
 # Local NIM endpoint — override base URL
-NVIDIA_BASE_URL=http://localhost:8000/v1 qubit chat --provider nvidia --model nvidia/nemotron-3-super-120b-a12b
+NVIDIA_BASE_URL=http://localhost:8000/v1 hermes chat --provider nvidia --model nvidia/nemotron-3-super-120b-a12b
 ```
 
 Or set it permanently in `config.yaml`:
@@ -564,7 +587,7 @@ model:
 For on-prem deployments (DGX Spark, local GPU), set `NVIDIA_BASE_URL=http://localhost:8000/v1`. NIM exposes the same OpenAI-compatible chat completions API as build.nvidia.com, so switching between cloud and local is a one-line env-var change.
 :::
 
-Qubit automatically attaches the NIM billing-origin header on every request to `build.nvidia.com` — no configuration needed. This routes consumption against the correct origin in NVIDIA's billing dashboard.
+Hermes automatically attaches the NIM billing-origin header on every request to `build.nvidia.com` — no configuration needed. This routes consumption against the correct origin in NVIDIA's billing dashboard.
 
 ### GMI Cloud
 
@@ -572,7 +595,7 @@ Open and reasoning models via [GMI Cloud](https://www.gmicloud.ai/) — OpenAI-c
 
 ```bash
 # GMI Cloud
-qubit chat --provider gmi --model deepseek-ai/DeepSeek-V3.2
+hermes chat --provider gmi --model deepseek-ai/DeepSeek-V3.2
 # Requires: GMI_API_KEY in ~/.hermes/.env
 ```
 
@@ -587,31 +610,33 @@ The base URL can be overridden with `GMI_BASE_URL` (default: `https://api.gmi-se
 
 ### Actual Computer
 
-Your own hardware as a private inference cluster via [Actual Computer](https://actual.inc). Two serving modes, both OpenAI-compatible (Qubit uses the Responses API transport):
+Your own hardware as a private inference cluster via [Actual Computer](https://actual.inc). Two serving modes, both using Chat Completions so reasoning and final content are returned together:
 
 - **Hosted relay** — `https://api.actual.inc`, end-to-end encrypted, routes to *your* cluster. Authenticate with an `ac_` inference key from [actual.inc/user/keys](https://actual.inc/user/keys).
-- **Local daemon** — on-device at `http://127.0.0.1:8080`, fully offline. No API key needed: Qubit detects the loopback base URL and authenticates with an internal placeholder automatically.
+- **Local daemon** — on-device at `http://127.0.0.1:8080`, fully offline. No API key needed: Hermes detects the loopback base URL and authenticates with an internal placeholder automatically.
 
 ```bash
 # Hosted relay (ACTUAL_API_KEY in ~/.hermes/.env)
-qubit chat --provider actual --model <model-id-from-your-cluster>
+hermes chat --provider actual --model <model-id-from-your-cluster>
 
-# Local daemon (ACTUAL_BASE_URL=http://127.0.0.1:8080 in ~/.hermes/.env, no key)
-qubit chat --provider actual --model <installed-model-name>
+# Local daemon (model.base_url in ~/.hermes/config.yaml, no key)
+hermes chat --provider actual --model <installed-model-name>
 ```
 
-Or set it permanently in `config.yaml`:
+Store provider settings in `~/.hermes/config.yaml`; only the hosted API key belongs in `.env`:
 ```yaml
 model:
   provider: "actual"
   default: "<model-id>"
+  base_url: "http://127.0.0.1:8080/v1" # Omit for the hosted relay.
 ```
 
 Notes:
-- Model IDs come from your cluster's `GET /v1/models` — discover with `qubit model` or `curl -s https://api.actual.inc/v1/models -H "Authorization: Bearer $ACTUAL_API_KEY"`.
-- Bare hosts are normalized: `ACTUAL_BASE_URL=http://127.0.0.1:8080` becomes `http://127.0.0.1:8080/v1` automatically.
+- Model IDs come from your cluster's `GET /v1/models` — discover with `hermes model` or `curl -s https://api.actual.inc/v1/models -H "Authorization: Bearer $ACTUAL_API_KEY"`.
+- Bare hosts in `model.base_url` are normalized: `http://127.0.0.1:8080` becomes `http://127.0.0.1:8080/v1` automatically. The legacy `ACTUAL_BASE_URL` environment variable is a fallback when no Actual URL is configured in YAML.
+- Actual uses `/v1/chat/completions` for chat, compaction, title generation, and every other auxiliary task. This also applies to custom providers targeting `api.actual.inc`, model switches, and fallbacks. Legacy Responses settings in the main model, custom provider, or auxiliary task configuration are overridden automatically.
 - Reasoning effort is clamped to Actual's supported range (`none/low/medium/high/max`) — a global `xhigh`/`ultra` setting will not 400 requests.
-- Small local models: Qubit' full default toolset plus the system prompt can exceed a 32k context window, producing an empty-stream error from llama.cpp-family servers. Restrict the toolset (`-t file,web`) or load the model with a larger context. The optional `actual-setup` skill (`qubit skills install official/devops/actual-setup`) covers setup and troubleshooting in detail.
+- Small local models: Hermes' full default toolset plus the system prompt can exceed a 32k context window, producing an empty-stream error from llama.cpp-family servers. Restrict the toolset (`-t file,web`) or load the model with a larger context. The optional `actual-setup` skill (`hermes skills install official/devops/actual-setup`) covers setup and troubleshooting in detail.
 - Aliases: `actual-computer`, `actualcomputer`, `aci`.
 
 ### StepFun
@@ -620,7 +645,7 @@ Step-series models via [StepFun](https://platform.stepfun.com) — OpenAI-compat
 
 ```bash
 # StepFun
-qubit chat --provider stepfun --model step-3.5-flash
+hermes chat --provider stepfun --model step-3.5-flash
 # Requires: STEPFUN_API_KEY in ~/.hermes/.env
 ```
 
@@ -639,11 +664,11 @@ The base URL can be overridden with `STEPFUN_BASE_URL` (default: `https://api.st
 
 ```bash
 # Use any available model
-qubit chat --provider huggingface --model Qwen/Qwen3.5-397B-A17B
+hermes chat --provider huggingface --model Qwen/Qwen3.5-397B-A17B
 # Requires: HF_TOKEN in ~/.hermes/.env
 
 # Short alias
-qubit chat --provider hf --model deepseek-ai/DeepSeek-V3.2
+hermes chat --provider hf --model deepseek-ai/DeepSeek-V3.2
 ```
 
 Or set it permanently in `config.yaml`:
@@ -661,7 +686,7 @@ The base URL can be overridden with `HF_BASE_URL`.
 
 ## Custom & Self-Hosted LLM Providers
 
-Qubit Agent works with **any OpenAI-compatible API endpoint**. If a server implements `/v1/chat/completions`, you can point Qubit at it. This means you can use local models, GPU inference servers, multi-provider routers, or any third-party API.
+Hermes Agent works with **any OpenAI-compatible API endpoint**. If a server implements `/v1/chat/completions`, you can point Hermes at it. This means you can use local models, GPU inference servers, multi-provider routers, or any third-party API.
 
 ### General Setup
 
@@ -669,7 +694,7 @@ Three ways to configure a custom endpoint:
 
 **Interactive setup (recommended):**
 ```bash
-qubit model
+hermes model
 # Select "Custom endpoint (self-hosted / VLLM / etc.)"
 # Enter: API base URL, API key, Model name
 ```
@@ -682,22 +707,23 @@ model:
   provider: custom
   base_url: http://localhost:8000/v1
   api_key: your-key-or-leave-empty-for-local
+  # key_env: MY_PROVIDER_API_KEY  # env var holding the key (alternative to api_key)
 ```
 
 :::warning Legacy env vars
-`LLM_MODEL` in `.env` is **removed** — `config.yaml` is the single source of truth for model and endpoint configuration. `OPENAI_BASE_URL` is still honored, but **only** for the `openai-api` provider (it overrides the OpenAI endpoint for direct API-key access). For other providers and custom endpoints, use `qubit model` or set `model.base_url` in `config.yaml` directly. If you have stale entries in your `.env`, they are automatically cleared on the next `qubit setup` or config migration.
+`LLM_MODEL` in `.env` is **removed** — `config.yaml` is the single source of truth for model and endpoint configuration. `OPENAI_BASE_URL` is still honored, but **only** for the `openai-api` provider (it overrides the OpenAI endpoint for direct API-key access). For other providers and custom endpoints, use `hermes model` or set `model.base_url` in `config.yaml` directly. If you have stale entries in your `.env`, they are automatically cleared on the next `hermes setup` or config migration.
 :::
 
 Both approaches persist to `config.yaml`, which is the source of truth for model, provider, and base URL.
 
 ### Switching Models with `/model`
 
-:::warning qubit model vs /model
-**`qubit model`** (run from your terminal, outside any chat session) is the **full provider setup wizard**. Use it to add new providers, run OAuth flows, enter API keys, and configure custom endpoints.
+:::warning hermes model vs /model
+**`hermes model`** (run from your terminal, outside any chat session) is the **full provider setup wizard**. Use it to add new providers, run OAuth flows, enter API keys, and configure custom endpoints.
 
-**`/model`** (typed inside an active Qubit chat session) can only **switch between providers and models you've already set up**. It cannot add new providers, run OAuth, or prompt for API keys. If you've only configured one provider (e.g. OpenRouter), `/model` will only show models for that provider.
+**`/model`** (typed inside an active Hermes chat session) can only **switch between providers and models you've already set up**. It cannot add new providers, run OAuth, or prompt for API keys. If you've only configured one provider (e.g. OpenRouter), `/model` will only show models for that provider.
 
-**To add a new provider:** Exit your session (`Ctrl+C` or `/quit`), run `qubit model`, set up the new provider, then start a new session.
+**To add a new provider:** Exit your session (`Ctrl+C` or `/quit`), run `hermes model`, set up the new provider, then start a new session.
 :::
 
 Once you have at least one custom endpoint configured, you can switch models mid-session:
@@ -715,7 +741,7 @@ If you have **named custom providers** configured (see below), use the triple sy
 /model custom:work:llama3       # Use the "work" custom provider with llama3
 ```
 
-When switching providers, Qubit persists the base URL and provider to config so the change survives restarts. When switching away from a custom endpoint to a built-in provider, the stale base URL is automatically cleared.
+When switching providers, Hermes persists the base URL and provider to config so the change survives restarts. When switching away from a custom endpoint to a built-in provider, the stale base URL is automatically cleared.
 
 :::tip
 `/model custom` (bare, no model name) queries your endpoint's `/models` API and auto-selects the model if exactly one is loaded. Useful for local servers running a single model.
@@ -735,10 +761,10 @@ ollama pull qwen2.5-coder:32b
 ollama serve   # Starts on port 11434
 ```
 
-Then configure Qubit:
+Then configure Hermes:
 
 ```bash
-qubit model
+hermes model
 # Select "Custom endpoint (self-hosted / VLLM / etc.)"
 # Enter URL: http://localhost:11434/v1
 # Skip API key (Ollama doesn't need one)
@@ -764,7 +790,7 @@ Ollama does **not** use your model's full context window by default. Depending o
 | 24–48 GB | 32,768 tokens |
 | 48+ GB | 256,000 tokens |
 
-Qubit Agent requires at least **64,000 tokens** of context for agent use with tools. Smaller windows are rejected at startup because the system prompt, tool schemas, and working conversation state need enough room for reliable multi-step workflows.
+Hermes Agent requires at least **64,000 tokens** of context for agent use with tools. Smaller windows are rejected at startup because the system prompt, tool schemas, and working conversation state need enough room for reliable multi-step workflows.
 
 **How to increase it** (pick one):
 
@@ -782,7 +808,7 @@ echo -e "FROM qwen2.5-coder:32b\nPARAMETER num_ctx 64000" > Modelfile
 ollama create qwen2.5-coder-64k -f Modelfile
 ```
 
-**You cannot set context length through the OpenAI-compatible API** (`/v1/chat/completions`). It must be configured server-side or via a Modelfile. This is the #1 source of confusion when integrating Ollama with tools like Qubit.
+**You cannot set context length through the OpenAI-compatible API** (`/v1/chat/completions`). It must be configured server-side or via a Modelfile. This is the #1 source of confusion when integrating Ollama with tools like Hermes.
 :::
 
 **Verify your context is set correctly:**
@@ -809,13 +835,13 @@ vllm serve meta-llama/Llama-3.1-70B-Instruct \
   --max-model-len 65536 \
   --tensor-parallel-size 2 \
   --enable-auto-tool-choice \
-  --tool-call-parser qubit
+  --tool-call-parser hermes
 ```
 
-Then configure Qubit:
+Then configure Hermes:
 
 ```bash
-qubit model
+hermes model
 # Select "Custom endpoint (self-hosted / VLLM / etc.)"
 # Enter URL: http://localhost:8000/v1
 # Skip API key (or enter one if you configured vLLM with --api-key)
@@ -828,12 +854,12 @@ qubit model
 
 | Flag | Purpose |
 |------|---------|
-| `--enable-auto-tool-choice` | Required for `tool_choice: "auto"` (the default in Qubit) |
+| `--enable-auto-tool-choice` | Required for `tool_choice: "auto"` (the default in Hermes) |
 | `--tool-call-parser <name>` | Parser for the model's tool call format |
 
-Supported parsers: `qubit` (Qwen 2.5, Qubit 2/3), `llama3_json` (Llama 3.x), `mistral`, `deepseek_v3`, `deepseek_v31`, `xlam`, `pythonic`. Without these flags, tool calls won't work — the model will output tool calls as text.
+Supported parsers: `hermes` (Qwen 2.5, Hermes 2/3), `llama3_json` (Llama 3.x), `mistral`, `deepseek_v3`, `deepseek_v31`, `xlam`, `pythonic`. Without these flags, tool calls won't work — the model will output tool calls as text.
 
-**Qwen reasoning parsers:** Qubit preserves structured reasoning metadata such as `reasoning`, `reasoning_content`, and streamed reasoning deltas when OpenAI-compatible servers return them. That metadata is treated as reasoning/thinking trace data, not as a replacement for the assistant's visible answer. For Qwen reasoning models served by vLLM, make sure the final user-visible response still appears in `content`. If `--reasoning-parser qwen3` leaves `content` empty in your deployment, either disable that parser or pass a server-supported request option such as `chat_template_kwargs.enable_thinking: false` through `extra_body`.
+**Qwen reasoning parsers:** Hermes preserves structured reasoning metadata such as `reasoning`, `reasoning_content`, and streamed reasoning deltas when OpenAI-compatible servers return them. That metadata is treated as reasoning/thinking trace data, not as a replacement for the assistant's visible answer. For Qwen reasoning models served by vLLM, make sure the final user-visible response still appears in `content`. If `--reasoning-parser qwen3` leaves `content` empty in your deployment, either disable that parser or pass a server-supported request option such as `chat_template_kwargs.enable_thinking: false` through `extra_body`.
 
 :::tip
 vLLM supports human-readable sizes: `--max-model-len 64k` (lowercase k = 1000, uppercase K = 1024).
@@ -855,10 +881,10 @@ python -m sglang.launch_server \
   --tool-call-parser qwen
 ```
 
-Then configure Qubit:
+Then configure Hermes:
 
 ```bash
-qubit model
+hermes model
 # Select "Custom endpoint (self-hosted / VLLM / etc.)"
 # Enter URL: http://localhost:30000/v1
 # Enter model name: meta-llama/Llama-3.1-70B-Instruct
@@ -869,7 +895,7 @@ qubit model
 **Tool calling:** Use `--tool-call-parser` with the appropriate parser for your model family: `qwen` (Qwen 2.5), `llama3`, `llama4`, `deepseekv3`, `mistral`, `glm`. Without this flag, tool calls come back as plain text.
 
 :::caution SGLang defaults to 128 max output tokens
-If responses seem truncated, check the server's generation default and configure it on the server (for example SGLang's `--default-max-tokens`). Qubit does not expose an output-token cap setting.
+If responses seem truncated, check the server's generation default and configure it on the server (for example SGLang's `--default-max-tokens`). Hermes does not expose an output-token cap setting.
 :::
 
 ---
@@ -889,12 +915,12 @@ cmake -B build && cmake --build build --config Release
   --port 8080 --host 0.0.0.0
 ```
 
-**Context length (`-c`):** Recent builds default to `0` which reads the model's training context from the GGUF metadata. For models with 128k+ training context, this can OOM trying to allocate the full KV cache. Set `-c` explicitly to at least 64,000 tokens for Qubit. If using parallel slots (`-np`), the total context is divided among slots — with `-c 64000 -np 4`, each slot only gets 16k, which is below Qubit' minimum per active session.
+**Context length (`-c`):** Recent builds default to `0` which reads the model's training context from the GGUF metadata. For models with 128k+ training context, this can OOM trying to allocate the full KV cache. Set `-c` explicitly to at least 64,000 tokens for Hermes. If using parallel slots (`-np`), the total context is divided among slots — with `-c 64000 -np 4`, each slot only gets 16k, which is below Hermes' minimum per active session.
 
-Then configure Qubit to point at it:
+Then configure Hermes to point at it:
 
 ```bash
-qubit model
+hermes model
 # Select "Custom endpoint (self-hosted / VLLM / etc.)"
 # Enter URL: http://localhost:8080/v1
 # Skip API key (local servers don't need one)
@@ -904,9 +930,9 @@ qubit model
 This saves the endpoint to `config.yaml` so it persists across sessions.
 
 :::caution `--jinja` is required for tool calling
-Without `--jinja`, llama-server ignores the `tools` parameter entirely. The model will try to call tools by writing JSON in its response text, but Qubit won't recognize it as a tool call — you'll see raw JSON like `{"name": "web_search", ...}` printed as a message instead of an actual search.
+Without `--jinja`, llama-server ignores the `tools` parameter entirely. The model will try to call tools by writing JSON in its response text, but Hermes won't recognize it as a tool call — you'll see raw JSON like `{"name": "web_search", ...}` printed as a message instead of an actual search.
 
-Native tool calling support (best performance): Llama 3.x, Qwen 2.5 (including Coder), Qubit 2/3, Mistral, DeepSeek, Functionary. All other models use a generic handler that works but may be less efficient. See the [llama.cpp function calling docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md) for the full list.
+Native tool calling support (best performance): Llama 3.x, Qwen 2.5 (including Coder), Hermes 2/3, Mistral, DeepSeek, Functionary. All other models use a generic handler that works but may be less efficient. See the [llama.cpp function calling docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md) for the full list.
 
 You can verify tool support is active by checking `http://localhost:8080/props` — the `chat_template` field should be present.
 :::
@@ -928,17 +954,17 @@ lms server start                        # Starts on port 1234
 lms load qwen2.5-coder --context-length 64000
 ```
 
-Then configure Qubit:
+Then configure Hermes:
 
 ```bash
-qubit model
+hermes model
 # Select "LM Studio"
 # Press Enter to use http://localhost:1234/v1
 # Pick one of the discovered models
 # If LM Studio server auth is enabled, enter LM_API_KEY when prompted
 ```
 
-Qubit preserves the context of an already-loaded LM Studio instance. For an unloaded model in the default explicit mode, Qubit omits `context_length` unless you configured one in Qubit, so LM Studio can apply its own model setting. Qubit then uses only the context length LM Studio reports after loading.
+Hermes preserves the context of an already-loaded LM Studio instance. For an unloaded model in the default explicit mode, Hermes omits `context_length` unless you configured one in Hermes, so LM Studio can apply its own model setting. Hermes then uses only the context length LM Studio reports after loading.
 
 To change context length in LM Studio:
 
@@ -954,25 +980,25 @@ You can use the CLI to estimate if the model will fit: `lms load model-name --co
 To set persistent per-model defaults: My Models tab → gear icon on the model → set context size.
 :::
 
-If you use LM Studio's Just-In-Time loading / Auto-Evict feature and want LM Studio to manage model loading and eviction from normal chat requests, skip Qubit' explicit preload step:
+If you use LM Studio's Just-In-Time loading / Auto-Evict feature and want LM Studio to manage model loading and eviction from normal chat requests, skip Hermes' explicit preload step:
 
 ```bash
-qubit config set model.lmstudio_load_mode jit
+hermes config set model.lmstudio_load_mode jit
 ```
 
 Set it back to the default explicit preload behavior with:
 
 ```bash
-qubit config set model.lmstudio_load_mode explicit
+hermes config set model.lmstudio_load_mode explicit
 ```
 
-**Tool calling:** Supported since LM Studio 0.3.6. Models with native tool-calling training (Qwen 2.5, Llama 3.x, Mistral, Qubit) are auto-detected and shown with a tool badge. Other models use a generic fallback that may be less reliable.
+**Tool calling:** Supported since LM Studio 0.3.6. Models with native tool-calling training (Qwen 2.5, Llama 3.x, Mistral, Hermes) are auto-detected and shown with a tool badge. Other models use a generic fallback that may be less reliable.
 
 ---
 
 ### WSL2 Networking (Windows Users)
 
-Since Qubit Agent requires a Unix environment, Windows users run it inside WSL2. If your model server (Ollama, LM Studio, etc.) runs on the **Windows host**, you need to bridge the network gap — WSL2 uses a virtual network adapter with its own subnet, so `localhost` inside WSL2 refers to the Linux VM, **not** the Windows host.
+Since Hermes Agent requires a Unix environment, Windows users run it inside WSL2. If your model server (Ollama, LM Studio, etc.) runs on the **Windows host**, you need to bridge the network gap — WSL2 uses a virtual network adapter with its own subnet, so `localhost` inside WSL2 refers to the Linux VM, **not** the Windows host.
 
 :::tip Both in WSL2? No problem.
 If your model server also runs inside WSL2 (common for vLLM, SGLang, and llama-server), `localhost` works as expected — they share the same network namespace. Skip this section.
@@ -1015,7 +1041,7 @@ ip route show | grep -i default | awk '{ print $3 }'
 # Example output: 172.29.192.1
 ```
 
-Use that IP in your Qubit config:
+Use that IP in your Hermes config:
 
 ```yaml
 model:
@@ -1077,17 +1103,17 @@ curl http://localhost:11434/v1/models          # Mirrored mode
 curl http://172.29.192.1:11434/v1/models       # NAT mode (use your actual host IP)
 ```
 
-If you get a JSON response listing your models, you're good. Use that same URL as the `base_url` in your Qubit config.
+If you get a JSON response listing your models, you're good. Use that same URL as the `base_url` in your Hermes config.
 
 ---
 
 ### Troubleshooting Local Models
 
-These issues affect **all** local inference servers when used with Qubit.
+These issues affect **all** local inference servers when used with Hermes.
 
 #### "Connection refused" from WSL2 to a Windows-hosted model server
 
-If you're running Qubit inside WSL2 and your model server on the Windows host, `http://localhost:<port>` won't work in WSL2's default NAT networking mode. See [WSL2 Networking](#wsl2-networking-windows-users) above for the fix.
+If you're running Hermes inside WSL2 and your model server on the Windows host, `http://localhost:<port>` won't work in WSL2's default NAT networking mode. See [WSL2 Networking](#wsl2-networking-windows-users) above for the fix.
 
 #### Tool calls appear as text instead of executing
 
@@ -1098,19 +1124,19 @@ The model outputs something like `{"name": "web_search", "arguments": {...}}` as
 | Server | Fix |
 |--------|-----|
 | **llama.cpp** | Add `--jinja` to the startup command |
-| **vLLM** | Add `--enable-auto-tool-choice --tool-call-parser qubit` |
+| **vLLM** | Add `--enable-auto-tool-choice --tool-call-parser hermes` |
 | **SGLang** | Add `--tool-call-parser qwen` (or appropriate parser) |
 | **Ollama** | Tool calling is enabled by default — make sure your model supports it (check with `ollama show model-name`) |
 | **LM Studio** | Update to 0.3.6+ and use a model with native tool support |
 
 #### Model seems to forget context or give incoherent responses
 
-**Cause:** Context window is too small. When the conversation exceeds the context limit, most servers silently drop older messages. Qubit's system prompt + tool schemas alone can use 4k–8k tokens.
+**Cause:** Context window is too small. When the conversation exceeds the context limit, most servers silently drop older messages. Hermes's system prompt + tool schemas alone can use 4k–8k tokens.
 
 **Diagnosis:**
 
 ```bash
-# Check what Qubit thinks the context is
+# Check what Hermes thinks the context is
 # Look at startup line: "Context limit: X tokens"
 
 # Check your server's actual context
@@ -1121,9 +1147,11 @@ The model outputs something like `{"name": "web_search", "arguments": {...}}` as
 
 **Fix:** Set context to at least **64,000 tokens** for agent use. See each server's section above for the specific flag.
 
+The startup refusal for a local endpoint (`127.0.0.1`, LAN, Docker service names) says which window the server is serving and names the fix for any OpenAI-compatible server, not just Ollama: raise the server's context (llama.cpp `-c 64000`, vLLM `--max-model-len`, Ollama `OLLAMA_CONTEXT_LENGTH`/Modelfile `num_ctx`) or set `model.ollama_num_ctx` in `config.yaml` to the window the server really serves (at least 64K). `model.ollama_num_ctx` is honoured on every local endpoint; only the automatic detection behind it uses Ollama's `/api/show`.
+
 #### "Context limit: 2048 tokens" at startup
 
-Qubit auto-detects context length from your server's `/v1/models` endpoint. If the server reports a low value (or doesn't report one at all), Qubit uses the model's declared limit which may be wrong.
+Hermes auto-detects context length from your server's `/v1/models` endpoint. If the server reports a low value (or doesn't report one at all), Hermes uses the model's declared limit which may be wrong.
 
 **Fix:** Set it explicitly in `config.yaml`:
 
@@ -1138,8 +1166,8 @@ model:
 #### Responses get cut off mid-sentence
 
 **Possible causes:**
-1. **Low output limit on the server** — configure the server's generation default (for example SGLang's `--default-max-tokens`). Qubit does not expose an output-token cap setting. Response length is distinct from the conversation's context window (`context_length`).
-2. **Context exhaustion** — The model filled its context window. Increase `model.context_length` or enable [context compression](/user-guide/configuration#context-compression) in Qubit.
+1. **Low output limit on the server** — configure the server's generation default (for example SGLang's `--default-max-tokens`). Hermes does not expose an output-token cap setting. Response length is distinct from the conversation's context window (`context_length`).
+2. **Context exhaustion** — The model filled its context window. Increase `model.context_length` or enable [context compression](../user-guide/configuration.md#context-compression) in Hermes.
 
 ---
 
@@ -1156,7 +1184,7 @@ litellm --model anthropic/claude-sonnet-4 --port 4000
 litellm --config litellm_config.yaml --port 4000
 ```
 
-Then configure Qubit with `qubit model` → Custom endpoint → `http://localhost:4000/v1`.
+Then configure Hermes with `hermes model` → Custom endpoint → `http://localhost:4000/v1`.
 
 Example `litellm_config.yaml` with fallback:
 ```yaml
@@ -1184,7 +1212,7 @@ router_settings:
 npx @blockrun/clawrouter    # Starts on port 8402
 ```
 
-Then configure Qubit with `qubit model` → Custom endpoint → `http://localhost:8402/v1` → model name `blockrun/auto`.
+Then configure Hermes with `hermes model` → Custom endpoint → `http://localhost:8402/v1` → model name `blockrun/auto`.
 
 Routing profiles:
 | Profile | Strategy | Savings |
@@ -1220,7 +1248,7 @@ Any service with an OpenAI-compatible API works. Some popular options:
 | [LocalAI](https://localai.io) | `http://localhost:8080/v1` | Self-hosted, multi-model |
 | [Jan](https://jan.ai) | `http://localhost:1337/v1` | Desktop app with local models |
 
-Configure any of these with `qubit model` → Custom endpoint, or in `config.yaml`:
+Configure any of these with `hermes model` → Custom endpoint, or in `config.yaml`:
 
 ```yaml
 model:
@@ -1235,16 +1263,16 @@ model:
 ### Context Length Detection
 
 :::note Context windows and output limits are different
-**`context_length`** is the **total context window** — the combined budget for input *and* output tokens (e.g. 200,000 for Claude Opus 4.6). Qubit uses this to decide when to compress history and to validate API requests.
+**`context_length`** is the **total context window** — the combined budget for input *and* output tokens (e.g. 200,000 for Claude Opus 4.6). Hermes uses this to decide when to compress history and to validate API requests.
 
 Output limits govern a single generated response, not the conversation history.
-Qubit no longer reads `model.max_tokens`, `HERMES_MAX_TOKENS`, provider output-cap
+Hermes no longer reads `model.max_tokens`, `HERMES_MAX_TOKENS`, provider output-cap
 settings, or `model_overrides.*.*.max_output_tokens`. Remove these legacy settings.
 Custom OpenAI-compatible endpoints receive no automatic catalog-sized output cap.
 Their server defaults apply; these can be lower than the model maximum.
 
 Native Anthropic Messages (including the native Anthropic Bedrock path) requires
-`max_tokens`, so Qubit supplies an internal value. Bedrock Converse is a separate
+`max_tokens`, so Hermes supplies an internal value. Bedrock Converse is a separate
 protocol: its optional `inferenceConfig.maxTokens` is omitted by default, which
 [AWS documents as the model maximum](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InferenceConfiguration.html).
 Internal bounded tasks and provider-specific protocol requirements remain implementation
@@ -1254,15 +1282,15 @@ Set `context_length` when auto-detection gets the window size wrong.
 
 :::
 
-Qubit uses a multi-source resolution chain to detect the correct context window for your model and provider:
+Hermes uses a multi-source resolution chain to detect the correct context window for your model and provider:
 
-1. **Config override** — `model.context_length` in config.yaml (highest priority)
+1. **Config override** — `model.context_length` in config.yaml (highest priority). This is an explicit **pin**: it always wins over provider metadata, so Hermes labels it `(pinned)` wherever the window is shown (welcome banner, `/model`, `/usage`, the status bar) and logs one warning at startup when the pin disagrees with the window the provider is known to advertise. The pin is dropped automatically when you switch model, provider or base URL.
 2. **Custom provider per-model** — `providers.<name>.models.<id>.context_length`
 3. **Persistent cache** — previously discovered values (survives restarts)
 4. **Endpoint `/models`** — queries your server's API (local/custom endpoints)
 5. **Anthropic `/v1/models`** — queries Anthropic's API for `max_input_tokens` (API-key users only)
 6. **OpenRouter API** — live model metadata from OpenRouter
-7. **Qubit Labs** — suffix-matches Qubit model IDs against OpenRouter metadata
+7. **Nous Portal** — suffix-matches Nous model IDs against OpenRouter metadata
 8. **[models.dev](https://models.dev)** — community-maintained registry with provider-specific context lengths for 3800+ models across 100+ providers
 9. **Fallback defaults** — broad model family patterns (128K default)
 
@@ -1290,7 +1318,7 @@ providers:
         context_length: 65536
 ```
 
-`qubit model` will prompt for context length when configuring a custom endpoint. Leave it blank for auto-detection.
+`hermes model` will prompt for context length when configuring a custom endpoint. Leave it blank for auto-detection.
 
 :::tip When to set this manually
 - You're using Ollama with a custom `num_ctx` that's lower than the model's maximum
@@ -1308,18 +1336,18 @@ If you work with multiple custom endpoints (e.g., a local dev server and a remot
 providers:
   local:
     api: http://localhost:8080/v1
-    # api_key omitted — Qubit uses "no-key-required" for keyless local servers
+    # api_key omitted — Hermes uses "no-key-required" for keyless local servers
   work:
     api: https://gpu-server.internal.corp/v1
     key_env: CORP_API_KEY
-    transport: chat_completions   # set explicitly by `qubit model` → Custom Endpoint wizard; auto-detection still happens as a fallback
+    transport: chat_completions   # set explicitly by `hermes model` → Custom Endpoint wizard; auto-detection still happens as a fallback
   anthropic-proxy:
     api: https://proxy.example.com/anthropic
     key_env: ANTHROPIC_PROXY_KEY
     transport: anthropic_messages  # for Anthropic-compatible proxies
 ```
 
-Each entry accepts: `api` (the endpoint base URL — `base_url`/`url` are accepted aliases), `name` (optional display name; defaults to the dict key), `key_env` or inline `api_key` or `key_cmd` (see below), `transport` (`chat_completions` / `anthropic_messages` / `codex_responses`), `default_model`, `models`, `context_length`, `discover_models`, `extra_body`, `extra_headers`, `ssl_ca_cert` / `ssl_verify`, and `enabled: false` to hide an entry without deleting it.
+Each entry accepts: `api` (the endpoint base URL — `base_url`/`url` are accepted aliases), `name` (optional display name; defaults to the dict key), `key_env` or inline `api_key` or `key_cmd` (see below), `transport` (`chat_completions` / `anthropic_messages` / `codex_responses`), `default_model`, `models`, `context_length`, `discover_models`, `extra_body`, `extra_headers`, `session_affinity_header` (name of a header that carries the conversation id, for session-aware proxies; off unless set), `ssl_ca_cert` / `ssl_verify`, `catalog_provider` (see below), and `enabled: false` to hide an entry without deleting it.
 
 #### Command-minted credentials (`key_cmd`)
 
@@ -1332,7 +1360,7 @@ Native local-model probes remove inherited Authorization on a failed explicit
 callable while retaining unrelated configured headers. Chat retains its normal
 error handling.
 
-Enterprise gateways often issue short-lived bearer tokens (SSO/OIDC brokers, cloud IAM, internal auth proxies) rather than static API keys, so a token copied into `.env` goes stale mid-session and requests start returning 401. `key_cmd` names a command that *prints* a token; Qubit runs it and caches the result until shortly before expiry, so long sessions keep working with no restart:
+Enterprise gateways often issue short-lived bearer tokens (SSO/OIDC brokers, cloud IAM, internal auth proxies) rather than static API keys, so a token copied into `.env` goes stale mid-session and requests start returning 401. `key_cmd` names a command that *prints* a token; Hermes runs it and caches the result until shortly before expiry, so long sessions keep working with no restart:
 
 ```yaml
 providers:
@@ -1348,13 +1376,26 @@ The command must print **only** the token on stdout: either bare, or as JSON wit
 
 Precedence: an explicit `--api-key` flag still wins; otherwise `key_cmd` beats a static `api_key`/`key_env` on the same entry. The minted credential applies to the main agent turn and to auxiliary tasks (title generation, compression, vision, embedding) alike.
 
+Model discovery also honors `key_cmd` for both `providers:` and legacy
+`custom_providers:` entries, including `hermes model` setup. Helpers run only when
+an authenticated live catalog probe is needed: disabled discovery and warm catalog
+cache reads do not mint tokens. Catalogs are scoped to the command identity, so
+rotating a bearer does not invalidate the catalog. Probe helpers use their own
+short-lived token source, not the inference client's token cache; minted bearers
+are never saved to `config.yaml`. If a helper fails, discovery falls back to the
+configured model without exposing the helper's output.
+
 Not to be confused with `secrets.command`, which runs a helper **once at startup** to populate env vars process-wide. Use that for a vault/keychain helper handing back many secrets; use `key_cmd` when one provider's credential must be re-minted *during* a session.
 
 :::note Legacy format
-Older configs used a top-level `custom_providers:` list instead. It still works — Qubit reads both — and `qubit update` auto-migrates it to the `providers:` dict (config v12). Field names differ slightly in the dict format: legacy `model` is `default_model`, and legacy `api_mode` is `transport`.
+Older configs used a top-level `custom_providers:` list instead. It still works — Hermes reads both — and `hermes update` auto-migrates it to the `providers:` dict (config v12). Field names differ slightly in the dict format: legacy `model` is `default_model`, and legacy `api_mode` is `transport`.
 :::
 
-Some OpenAI-compatible endpoints need provider-specific request body fields. Add an `extra_body` map to the matching custom provider and Qubit will merge it into each chat-completions request for that endpoint:
+**Context window on `codex_responses` proxies.** A custom entry with `transport: codex_responses` (a local Codex proxy, for example) resolves the context window of Codex OAuth models (`gpt-6-astra`, `gpt-5.6-sol`/`-terra`/`-luna`, `gpt-5.5`, …) from the Codex OAuth table — 272K for most slugs — not from the 1.05M direct-API catalog, so compression fires before the Codex backend's limit and its 272K billing tier. The decision follows the transport, not the hostname; the same holds for `openai-codex` behind `HERMES_CODEX_BASE_URL` or `model.base_url`. A per-model `models.<id>.context_length`, an entry-level `context_length`, or `model.context_length` still wins; the opt-in `-900k` picker variants keep their verified 900K.
+
+**Reasoning effort on custom endpoints.** The configured `reasoning_effort` (`/reasoning max`, `agent.reasoning_effort`) reaches a custom endpoint unchanged on both the `chat_completions` and the `codex_responses` transport — up to `max`; only the Hermes-internal `ultra` is clamped to `max`. Two exceptions follow the host rather than the entry: a custom entry pointed at `api.openai.com` keeps OpenAI's per-model ladder (`max` is a gpt-5.6-only level there), and an entry pointed at a provider whose profile publishes a per-model vocabulary (Ramp Router) is clamped to that catalog. An endpoint that rejects the level answers with an HTTP 400 instead of Hermes silently downgrading it. When no effort is configured at all, `chat_completions` requests carry `reasoning_effort: medium` — the same default the Nous Portal and OpenRouter routes apply — rather than leaving the endpoint's own default in charge (kimi-k3's is `max`, about 3x the reasoning tokens of `medium`); models marked `supports_reasoning: false` in the catalog or `model_overrides`, and Ollama models without the `thinking` capability, keep the field off.
+
+Some OpenAI-compatible endpoints need provider-specific request body fields. Add an `extra_body` map to the matching custom provider and Hermes will merge it into each chat-completions request for that endpoint:
 
 ```yaml
 providers:
@@ -1384,9 +1425,9 @@ extra_body:
 
 The configured `extra_body` follows the provider everywhere: it is merged at agent construction, **survives every gateway turn** (including turns where `/fast` layers `service_tier`/`speed` overrides on top — those merge over your `extra_body` rather than replacing it), and is **re-derived on `/model` switches** — switching to a named custom provider applies its `extra_body`, and switching away clears it so it never leaks to another provider.
 
-The `qubit model` → Custom Endpoint wizard now prompts for the API mode explicitly and persists your answer to `config.yaml` (as `transport` on the provider entry). URL-based auto-detection (e.g. `/anthropic` paths → `anthropic_messages`) still happens as a fallback when the field is left blank.
+The `hermes model` → Custom Endpoint wizard now prompts for the API mode explicitly and persists your answer to `config.yaml` (as `transport` on the provider entry). URL-based auto-detection (e.g. `/anthropic` paths → `anthropic_messages`) still happens as a fallback when the field is left blank.
 
-**Native vision for custom-provider models.** If your custom endpoint serves a vision-capable model that isn't in models.dev, set `model.supports_vision: true` so Qubit routes attached images natively (as `image_url` parts) instead of pre-processing them through `vision_analyze`. Single knob — no need to also set `agent.image_input_mode: native`.
+**Native vision for custom-provider models.** If your custom endpoint serves a vision-capable model that isn't in models.dev, set `model.supports_vision: true` so Hermes routes attached images natively (as `image_url` parts) instead of pre-processing them through `vision_analyze`. Single knob — no need to also set `agent.image_input_mode: native`.
 
 ```yaml
 model:
@@ -1398,6 +1439,20 @@ model:
 
 The same key is honored on per-named-provider models (`providers.<name>.models.<id>.supports_vision`) and accepts standard YAML booleans (`true/false/yes/no/on/off/1/0`).
 
+A `model_overrides` entry that only corrects metadata (for example `context_window`) for a model the catalog does not know leaves vision and reasoning capability and the output-token limit **unknown** — `vision_analyze`, `video_analyze` and the reasoning-effort picker stay available. Only an explicit `supports_vision: false` / `supports_reasoning: false` in the override marks the model as text-only or non-reasoning.
+
+**Inheriting a catalogued vendor's metadata (`catalog_provider`).** When a named custom provider (a gateway, proxy or reseller) serves models that Hermes already knows under a built-in provider, point the entry at that vendor and its models inherit the catalogued context window, output limit, vision and reasoning flags — no `model_overrides` needed:
+
+```yaml
+providers:
+  my-gateway:
+    api: https://gateway.example.com/v1
+    key_env: GATEWAY_API_KEY
+    catalog_provider: deepseek   # metadata lookups use DeepSeek's catalog entries
+```
+
+`catalog_provider` accepts a Hermes provider id (`deepseek`, `anthropic`, `openai`, …) or a models.dev id. It affects metadata lookups only — requests still go to your `api` URL with your credentials — and an explicit `model_overrides` entry for the same model still wins.
+
 Switch between them mid-session with the triple syntax:
 
 ```
@@ -1406,7 +1461,7 @@ Switch between them mid-session with the triple syntax:
 /model custom:anthropic-proxy:claude-sonnet-4  # Use the proxy
 ```
 
-You can also select named custom providers from the interactive `qubit model` menu.
+You can also select named custom providers from the interactive `hermes model` menu.
 
 ---
 
@@ -1444,7 +1499,7 @@ Switch models mid-session:
 /model custom:together:deepseek-ai/DeepSeek-V3
 ```
 
-Together's `/v1/models` endpoint works, so `qubit model` can auto-discover available models.
+Together's `/v1/models` endpoint works, so `hermes model` can auto-discover available models.
 
 #### Groq
 
@@ -1488,6 +1543,8 @@ model:
 PERPLEXITY_API_KEY=your-perplexity-key
 ```
 
+Perplexity's Agent API (`api: https://api.perplexity.ai/v1` with `api_mode: codex_responses`) reserves the function names `web_search`, `search_files`, `fetch_url`, `people_search` and `finance_search` for its own built-in tools. Hermes renames its client tools of the same name to `hermes_<name>` on the wire and maps them back before dispatch, for the main agent loop and auxiliary calls (title generation, compression, MoA aggregation) alike — the same treatment OpenCode's `/v1/responses` endpoints get.
+
 #### Multiple providers in one config
 
 The three recipes compose — use all of them together and switch per turn with `/model custom:<name>:<model>`:
@@ -1510,8 +1567,8 @@ model:
 ```
 
 :::tip Troubleshooting
-- `qubit doctor` should print no `Unknown provider` warnings for any of these names after the CLI validator fixes in #15083.
-- If a provider's `/v1/models` endpoint is unreachable (Perplexity is the common one), `qubit model` will persist the model with a warning rather than hard-reject — see #15136.
+- `hermes doctor` should print no `Unknown provider` warnings for any of these names after the CLI validator fixes in #15083.
+- If a provider's `/v1/models` endpoint is unreachable (Perplexity is the common one), `hermes model` will persist the model with a warning rather than hard-reject — see #15136.
 - To skip named providers entirely and use bare `provider: custom` with `CUSTOM_BASE_URL` env var, see #15103.
 :::
 
@@ -1521,7 +1578,7 @@ model:
 
 | Use Case | Recommended |
 |----------|-------------|
-| **Just want it to work** | OpenRouter (default) or Qubit Labs |
+| **Just want it to work** | OpenRouter (default) or Nous Portal |
 | **Local models, easy setup** | Ollama |
 | **Production GPU serving** | vLLM or SGLang |
 | **Mac / no GPU** | Ollama or llama.cpp |
@@ -1532,7 +1589,7 @@ model:
 | **Chinese AI models** | z.ai (GLM), Kimi/Moonshot (`kimi-coding` or `kimi-coding-cn`), MiniMax, Xiaomi MiMo, or Tencent TokenHub (first-class providers) |
 
 :::tip
-You can switch between providers at any time with `qubit model` — no restart required. Your conversation history, memory, and skills carry over regardless of which provider you use.
+You can switch between providers at any time with `hermes model` — no restart required. Your conversation history, memory, and skills carry over regardless of which provider you use.
 :::
 
 ## Optional API Keys
@@ -1550,7 +1607,7 @@ You can switch between providers at any time with `qubit model` — no restart r
 
 ### Self-Hosting Firecrawl
 
-By default, Qubit uses the [Firecrawl cloud API](https://firecrawl.dev/) for web search and scraping. If you prefer to run Firecrawl locally, you can point Qubit at a self-hosted instance instead. See Firecrawl's [SELF_HOST.md](https://github.com/firecrawl/firecrawl/blob/main/SELF_HOST.md) for complete setup instructions.
+By default, Hermes uses the [Firecrawl cloud API](https://firecrawl.dev/) for web search and scraping. If you prefer to run Firecrawl locally, you can point Hermes at a self-hosted instance instead. See Firecrawl's [SELF_HOST.md](https://github.com/firecrawl/firecrawl/blob/main/SELF_HOST.md) for complete setup instructions.
 
 **What you get:** No API key required, no rate limits, no per-page costs, full data sovereignty.
 
@@ -1566,9 +1623,9 @@ By default, Qubit uses the [Firecrawl cloud API](https://firecrawl.dev/) for web
    docker compose up -d
    ```
 
-2. Point Qubit at your instance (no API key needed):
+2. Point Hermes at your instance (no API key needed):
    ```bash
-   qubit config set FIRECRAWL_API_URL http://localhost:3002
+   hermes config set FIRECRAWL_API_URL http://localhost:3002
    ```
 
 You can also set both `FIRECRAWL_API_KEY` and `FIRECRAWL_API_URL` if your self-hosted instance has authentication enabled.
@@ -1590,7 +1647,7 @@ provider_routing:
   #   "anthropic/claude-fable-5.1": {only: ["anthropic"]}
 ```
 
-**Shortcuts:** Append `:nitro` to any model name for throughput sorting (e.g., `anthropic/claude-sonnet-4:nitro`), or `:floor` for price sorting. Per-model details: [Provider Routing](/user-guide/features/provider-routing#per-model-overrides-models).
+**Shortcuts:** Append `:nitro` to any model name for throughput sorting (e.g., `anthropic/claude-sonnet-4:nitro`), or `:floor` for price sorting. Per-model details: [Provider Routing](../user-guide/features/provider-routing.md#per-model-overrides-models).
 
 ## OpenRouter Pareto Code Router
 
@@ -1611,11 +1668,11 @@ Notes:
 - Set to empty string (or remove the line) to let OpenRouter pick the strongest available coder — its documented behavior when the plugins block is omitted.
 - Selection is deterministic per score on a given day, but the actual model chosen can shift as the Pareto frontier moves (new models, benchmark updates).
 - See OpenRouter's [Pareto Router docs](https://openrouter.ai/docs/guides/routing/routers/pareto-router) for the full router behavior.
-- To use the Pareto Code router for a specific **auxiliary task** (compression, vision, etc.) instead of the main agent, set `extra_body.plugins` under that task — see [Auxiliary Models → OpenRouter routing & Pareto Code for auxiliary tasks](/user-guide/configuration#openrouter-routing--pareto-code-for-auxiliary-tasks).
+- To use the Pareto Code router for a specific **auxiliary task** (compression, vision, etc.) instead of the main agent, set `extra_body.plugins` under that task — see [Auxiliary Models → OpenRouter routing & Pareto Code for auxiliary tasks](../user-guide/configuration.md#openrouter-routing--pareto-code-for-auxiliary-tasks).
 
 ## Fallback Providers
 
-Configure a chain of backup providers Qubit tries in order when the primary model fails (rate limits, server errors, auth failures). The canonical format is a top-level `fallback_providers:` list:
+Configure a chain of backup providers Hermes tries in order when the primary model fails (rate limits, server errors, auth failures). The canonical format is a top-level `fallback_providers:` list:
 
 ```yaml
 fallback_providers:
@@ -1624,8 +1681,10 @@ fallback_providers:
   - provider: anthropic
     model: claude-sonnet-4
     # base_url: http://localhost:8000/v1    # optional, for custom endpoints
-    # api_mode: chat_completions           # optional override
+    # api_mode: chat_completions           # optional override (`transport:` is an accepted alias)
 ```
+
+An entry that names a `providers.<name>` block (`provider: my-relay` or `provider: custom:my-relay`) inherits that block's `transport` / `api_mode` when the entry sets none, so a Responses-only or Anthropic-Messages relay keeps its declared wire on fallback. Set `api_mode` on the entry to override it.
 
 The legacy single-pair `fallback_model:` dict is still accepted for back-compat:
 
@@ -1637,15 +1696,15 @@ fallback_model:
 
 When activated, the fallback swaps the model and provider mid-session without losing your conversation. The chain is tried entry-by-entry; activation is one-shot per session.
 
-Supported providers: `openrouter`, `qubit`, `novita`, `openai-codex`, `copilot`, `copilot-acp`, `anthropic`, `gemini`, `qwen-oauth`, `huggingface`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `minimax-oauth`, `deepseek`, `nvidia`, `xai`, `xai-oauth`, `ollama-cloud`, `bedrock`, `ai-gateway`, `azure-foundry`, `opencode-zen`, `opencode-go`, `commandcode`, `commandcode-anthropic`, `kilocode`, `xiaomi`, `arcee`, `gmi`, `actual`, `stepfun`, `lmstudio`, `alibaba`, `alibaba-coding-plan`, `tencent-tokenhub`, `tencent-tokenplan`, `nebius-token-factory`, `router`, `custom`.
+Supported providers: `openrouter`, `nous`, `novita`, `openai-codex`, `copilot`, `copilot-acp`, `anthropic`, `gemini`, `qwen-oauth`, `huggingface`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `minimax-oauth`, `deepseek`, `nvidia`, `xai`, `xai-oauth`, `ollama-cloud`, `bedrock`, `ai-gateway`, `azure-foundry`, `opencode-zen`, `opencode-go`, `commandcode`, `commandcode-anthropic`, `kilocode`, `xiaomi`, `arcee`, `gmi`, `actual`, `stepfun`, `lmstudio`, `alibaba`, `alibaba-coding-plan`, `tencent-tokenhub`, `tencent-tokenplan`, `nebius-token-factory`, `router`, `custom`.
 
 :::tip
-Fallback is configured exclusively through `config.yaml` — or interactively via `qubit fallback`. For full details on when it triggers, how the chain advances, and how it interacts with auxiliary tasks and delegation, see [Fallback Providers](/user-guide/features/fallback-providers).
+Fallback is configured exclusively through `config.yaml` — or interactively via `hermes fallback`. For full details on when it triggers, how the chain advances, and how it interacts with auxiliary tasks and delegation, see [Fallback Providers](../user-guide/features/fallback-providers.md).
 :::
 
 ---
 
 ## See Also
 
-- [Configuration](/user-guide/configuration) — General configuration (directory structure, config precedence, terminal backends, memory, compression, and more)
-- [Environment Variables](/reference/environment-variables) — Complete reference of all environment variables
+- [Configuration](../user-guide/configuration.md) — General configuration (directory structure, config precedence, terminal backends, memory, compression, and more)
+- [Environment Variables](../reference/environment-variables.md) — Complete reference of all environment variables

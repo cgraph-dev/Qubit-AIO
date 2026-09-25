@@ -8,7 +8,7 @@ platforms: [linux, macos]
 metadata:
   qubit:
     tags: [Coding-Agent, OpenHands, Model-Agnostic, LiteLLM]
-    related_skills: [claude-code, codex, opencode, qubit-agent]
+    related_skills: [claude-code, codex, opencode, hermes-agent]
 ---
 
 # OpenHands CLI
@@ -135,7 +135,7 @@ The cli prints all stderr from LiteLLM/Authlib first — see Pitfalls. Parse onl
 ```
 terminal(
   command="OPENHANDS_SUPPRESS_BANNER=1 LLM_MODEL=openrouter/openai/gpt-4o-mini LLM_API_KEY=$OPENROUTER_API_KEY LLM_BASE_URL=https://openrouter.ai/api/v1 openhands --headless --json --override-with-envs --exit-without-confirmation -t 'Print the string OPENHANDS_OK to stdout via the terminal tool.'",
-  workdir="/tmp",
+  workdir="~/.hermes/cache/scratch",
   timeout=120
 )
 ```
@@ -146,4 +146,4 @@ If the JSONL stream ends with a `FinishAction` whose `action.message` mentions `
 
 - [OpenHands GitHub](https://github.com/All-Hands-AI/OpenHands)
 - [OpenHands CLI command reference](https://docs.openhands.dev/openhands/usage/cli/command-reference)
-- Sibling skills: `claude-code` (Anthropic-only), `codex` (OpenAI-only), `opencode` (multi-provider via OpenCode), `qubit-agent` (Qubit subagents via `delegate_task`).
+- Sibling skills: `claude-code` (Anthropic-only), `codex` (OpenAI-only), `opencode` (multi-provider via OpenCode), `hermes-agent` (Qubit subagents via `delegate_task`).

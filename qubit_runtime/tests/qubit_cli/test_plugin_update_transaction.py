@@ -188,7 +188,7 @@ def test_failed_update_keeps_code_metadata_config_and_environment(installed, mon
         # A checkout without a vX.Y.Z tag (CI's depth-1 clone) runs an unparseable version,
         # which the gate deliberately treats as permissive; pin a real one so it can refuse.
         from qubit_cli import plugins_manifest
-        monkeypatch.setattr(plugins_manifest, "running_hermes_version", lambda: "1.0.0")
+        monkeypatch.setattr(plugins_manifest, "running_qubit_version", lambda: "1.0.0")
     if failure == "manifest":
         (repo / "plugin.yaml").write_text("name: [broken", encoding="utf-8")
         state["sha"] = _commit(repo, "invalid manifest")

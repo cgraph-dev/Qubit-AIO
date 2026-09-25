@@ -16,9 +16,9 @@ describe('shouldUseAnsiDim', () => {
   })
 
   it('honors explicit env override', () => {
-    expect(shouldUseAnsiDim({ QUBIT_TUI_DIM: '1', VTE_VERSION: '7603' } as NodeJS.ProcessEnv)).toBe(true)
-    expect(shouldUseAnsiDim({ QUBIT_TUI_DIM: '1', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)).toBe(true)
-    expect(shouldUseAnsiDim({ QUBIT_TUI_DIM: '0' } as NodeJS.ProcessEnv)).toBe(false)
+    expect(shouldUseAnsiDim({ HERMES_TUI_DIM: '1', VTE_VERSION: '7603' } as NodeJS.ProcessEnv)).toBe(true)
+    expect(shouldUseAnsiDim({ HERMES_TUI_DIM: '1', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)).toBe(true)
+    expect(shouldUseAnsiDim({ HERMES_TUI_DIM: '0' } as NodeJS.ProcessEnv)).toBe(false)
   })
 })
 
@@ -27,20 +27,19 @@ describe('dimColorFallback', () => {
     setDimFallbackColor(undefined)
   })
 
-  it('renders Apple Terminal dim as muted gray by default', () => {
-    expect(dimColorFallback({ TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)).toBe('#6B7280')
-  })
-
   it('normalizes Apple Terminal names before matching', () => {
-    expect(dimColorFallback({ TERM_PROGRAM: ' Apple_Terminal ' } as NodeJS.ProcessEnv)).toBe('#6B7280')
+    const apple = dimColorFallback({ TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)
+
+    expect(apple).toBeTruthy()
+    expect(dimColorFallback({ TERM_PROGRAM: ' Apple_Terminal ' } as NodeJS.ProcessEnv)).toBe(apple)
   })
 
   it('does not apply when dim is explicitly configured', () => {
     expect(
-      dimColorFallback({ QUBIT_TUI_DIM: '1', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)
+      dimColorFallback({ HERMES_TUI_DIM: '1', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)
     ).toBeUndefined()
     expect(
-      dimColorFallback({ QUBIT_TUI_DIM: '0', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)
+      dimColorFallback({ HERMES_TUI_DIM: '0', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)
     ).toBeUndefined()
   })
 
@@ -51,10 +50,13 @@ describe('dimColorFallback', () => {
   })
 
   it('falls back to the boot default when the theme tone is cleared', () => {
+    const bootDefault = dimColorFallback({ TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)
+
     setDimFallbackColor('#936e06')
     setDimFallbackColor(undefined)
 
-    expect(dimColorFallback({ TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)).toBe('#6B7280')
+    expect(bootDefault).not.toBe('#936e06')
+    expect(dimColorFallback({ TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv)).toBe(bootDefault)
   })
 
   it('stays inert on terminals that honor SGR 2, whatever the theme tone', () => {

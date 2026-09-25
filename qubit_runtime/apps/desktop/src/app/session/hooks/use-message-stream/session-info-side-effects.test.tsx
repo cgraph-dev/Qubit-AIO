@@ -19,7 +19,7 @@ import { PRE_TURN_LIVE_SETTLE_GRACE_MS } from './utils'
 const ACTIVE_SID = 'session-active'
 const ACTIVE_PROFILE = 'compass'
 let stream: MessageStreamHarness
-let refreshQubitConfig: ReturnType<typeof vi.fn<() => Promise<void>>>
+let refreshHermesConfig: ReturnType<typeof vi.fn<() => Promise<void>>>
 let refreshSessions: ReturnType<typeof vi.fn<() => Promise<void>>>
 let hydrateFromStoredSession: ReturnType<typeof vi.fn<() => Promise<void>>>
 let queryClient: QueryClient
@@ -30,7 +30,7 @@ function mountStream() {
     activeGatewayProfile: ACTIVE_PROFILE,
     hydrateFromStoredSession,
     queryClient,
-    refreshQubitConfig,
+    refreshHermesConfig,
     refreshSessions
   })
   sessionStates = stream.states
@@ -41,7 +41,7 @@ const sessionInfo = (sessionId: string, payload: Record<string, unknown>) =>
 
 beforeEach(() => {
   sessionStates = null
-  refreshQubitConfig = vi.fn<() => Promise<void>>(async () => undefined)
+  refreshHermesConfig = vi.fn<() => Promise<void>>(async () => undefined)
   refreshSessions = vi.fn<() => Promise<void>>(async () => undefined)
   hydrateFromStoredSession = vi.fn<() => Promise<void>>(async () => undefined)
   queryClient = new QueryClient()
@@ -67,13 +67,13 @@ describe('session.info config refetch gating', () => {
     sessionInfo(ACTIVE_SID, { model: 'm1', running: false })
     sessionInfo(ACTIVE_SID, { model: 'm1', title: 't' })
 
-    expect(refreshQubitConfig).not.toHaveBeenCalled()
+    expect(refreshHermesConfig).not.toHaveBeenCalled()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(400)
     })
 
-    expect(refreshQubitConfig).toHaveBeenCalledTimes(1)
+    expect(refreshHermesConfig).toHaveBeenCalledTimes(1)
   })
 
   it('never fetches config for a background session heartbeat', async () => {
@@ -87,7 +87,7 @@ describe('session.info config refetch gating', () => {
       await vi.advanceTimersByTimeAsync(400)
     })
 
-    expect(refreshQubitConfig).not.toHaveBeenCalled()
+    expect(refreshHermesConfig).not.toHaveBeenCalled()
   })
 })
 
@@ -284,6 +284,26 @@ describe('session.info settles an incomplete live turn', () => {
 })
 
 describe('empty message.complete after streamed text (#95514)', () => {
+  it('keeps a reasoning-only stream and does not hydrate over it (#118755)', () => {
+    mountStream()
+
+    act(() => stream.handleEvent({ payload: {}, session_id: ACTIVE_SID, type: 'message.start' }))
+    act(() =>
+      stream.handleEvent({
+        payload: { text: 'The answer lives in reasoning.' },
+        session_id: ACTIVE_SID,
+        type: 'reasoning.delta'
+      })
+    )
+    act(() => stream.handleEvent({ payload: { text: '' }, session_id: ACTIVE_SID, type: 'message.complete' }))
+
+    const assistant = stream.state(ACTIVE_SID).messages.find(message => message.role === 'assistant')
+    expect(assistant?.parts.filter(part => part.type === 'reasoning').map(part => part.text)).toEqual([
+      'The answer lives in reasoning.'
+    ])
+    expect(hydrateFromStoredSession).not.toHaveBeenCalled()
+  })
+
   it('keeps streamed text and does not hydrate over it', () => {
     mountStream()
 

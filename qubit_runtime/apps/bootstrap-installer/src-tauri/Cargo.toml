@@ -1,17 +1,17 @@
 [package]
-name = "qubit-bootstrap"
-version = "0.0.1"
-description = "Qubit Setup — signed installer that drives scripts/install.ps1"
-authors = ["Qubit Labs"]
+name = "hermes-bootstrap"
+version = "0.0.0"
+description = "Hermes Setup — signed installer that drives scripts/install.ps1"
+authors = ["Nous Research <info@nousresearch.com>"]
 edition = "2021"
 rust-version = "1.77"
 
 # Rename the output binary so the distributed artifact is literally
-# `Qubit-Setup.exe` on disk — not `qubit-bootstrap.exe`. Grandma sees
+# `Hermes-Setup.exe` on disk — not `hermes-bootstrap.exe`. Grandma sees
 # what we hand her, period. Tauri honors [[bin]] over [package].name
 # for the produced executable name.
 [[bin]]
-name = "Qubit-Setup"
+name = "Hermes-Setup"
 path = "src/main.rs"
 
 # The library target name MUST match the `withGlobalTauri` binding name that

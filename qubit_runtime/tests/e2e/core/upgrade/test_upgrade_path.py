@@ -256,7 +256,7 @@ class Leg:
     origin: Path
     install: Path
     env: dict[str, str]
-    hermes_home: Path
+    qubit_home: Path
     wrap_dir: Path
     snapshot: dict = field(default_factory=dict)
 
@@ -269,7 +269,7 @@ class Leg:
     def python(self) -> str:
         from pm.environments import install_key
 
-        facts = self.hermes_home / "installs" / install_key(self.install) / "facts.json"
+        facts = self.qubit_home / "installs" / install_key(self.install) / "facts.json"
         if facts.exists():
             selected = json.loads(facts.read_text(encoding="utf-8"))["packages"]["venv"]["environment"]
             return str(Path(selected) / "bin" / "python")
@@ -308,11 +308,11 @@ def _make_origin(root: Path) -> Path:
     return origin
 
 
-def _write_wrappers(leg_root: Path, install: Path, hermes_home: Path) -> Path:
+def _write_wrappers(leg_root: Path, install: Path, qubit_home: Path) -> Path:
     """Managed uv (as the installer provisions it) and an armable PATH git wrapper."""
     real_uv = _real_uv()
     real_git = shutil.which("git")
-    bin_dir = hermes_home / "bin"
+    bin_dir = qubit_home / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     uv = bin_dir / "uv"
     uv.write_text(
@@ -378,13 +378,13 @@ def make_leg(root: Path, template_home: Path | None) -> Leg:
                         env=uv_env, capture_output=True, text=True, timeout=1800)
     assert cp.returncode == 0, f"N-1 venv install from its uv.lock failed:\n{cp.stderr[-4000:]}"
     env_probe = H.isolated_env(root)
-    hermes_home = Path(env_probe["QUBIT_HOME"])
+    qubit_home = Path(env_probe["QUBIT_HOME"])
     if template_home is not None:
-        shutil.rmtree(hermes_home)
-        shutil.copytree(template_home, hermes_home, symlinks=True)
-    wrap = _write_wrappers(root, install, hermes_home)
+        shutil.rmtree(qubit_home)
+        shutil.copytree(template_home, qubit_home, symlinks=True)
+    wrap = _write_wrappers(root, install, qubit_home)
     env = H.isolated_env(root, extra_path=[wrap])
-    return Leg(root=root, origin=origin, install=install, env=env, hermes_home=hermes_home, wrap_dir=wrap)
+    return Leg(root=root, origin=origin, install=install, env=env, qubit_home=qubit_home, wrap_dir=wrap)
 
 
 # ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ def db_fingerprint(db: Path) -> dict:
 
 
 def _profile_homes(leg: Leg) -> dict[str, Path]:
-    return {"default": leg.hermes_home, "work": leg.hermes_home / "profiles" / "work"}
+    return {"default": leg.qubit_home, "work": leg.qubit_home / "profiles" / "work"}
 
 
 def snapshot_state(leg: Leg) -> dict:
@@ -428,7 +428,7 @@ def snapshot_state(leg: Leg) -> dict:
             "env": (home / ".env").read_bytes() if (home / ".env").exists() else None,
             "db": db_fingerprint(home / "state.db"),
         }
-    snap["cron"] = json.loads((leg.hermes_home / "cron" / "jobs.json").read_text(encoding="utf-8"))
+    snap["cron"] = json.loads((leg.qubit_home / "cron" / "jobs.json").read_text(encoding="utf-8"))
     return snap
 
 
@@ -488,7 +488,7 @@ def assert_healthy_at_head(leg: Leg, provider: FakeLLMServer, final: subprocess.
         assert fp["messages"] == before[name]["db"]["messages"], f"{name} pre-existing messages changed"
         if before[name]["env"] is not None:
             assert (home / ".env").read_bytes() == before[name]["env"], f"{name} .env rewritten by the update"
-    jobs_after = json.loads((leg.hermes_home / "cron" / "jobs.json").read_text(encoding="utf-8"))
+    jobs_after = json.loads((leg.qubit_home / "cron" / "jobs.json").read_text(encoding="utf-8"))
     assert _job_ids(jobs_after) == _job_ids(before["cron"]) and _job_ids(jobs_after), "cron jobs lost/changed"
     # 3. config: exactly HEAD's documented migrations, nothing else
     for name, home in _profile_homes(leg).items():
@@ -523,7 +523,7 @@ def assert_healthy_at_head(leg: Leg, provider: FakeLLMServer, final: subprocess.
     assert provider.default_text in turn.stdout, H.describe(turn)
     new = provider.main_requests()[n_before:]
     assert len(new) == 1 and marker in json.dumps(new[0]["messages"]), "one-shot turn did not reach the provider once"
-    fp = db_fingerprint(leg.hermes_home / "state.db")
+    fp = db_fingerprint(leg.qubit_home / "state.db")
     assert fp["integrity"] == [("ok",)]
     assert len(fp["sessions"]) == len(before["default"]["db"]["sessions"]) + 1, "post-update turn not persisted"
     # HEAD's first real use of the DB (its schema migrations run on open) keeps every old row intact.
@@ -553,14 +553,14 @@ def template_home(tmp_path_factory, provider) -> Path:
     seed = make_leg(tmp_path_factory.mktemp("seed"), None)
     version = _base_config_version(seed)
     cfg = user_config(provider.base_url, version)
-    (seed.hermes_home / "config.yaml").write_text(cfg, encoding="utf-8")
-    (seed.hermes_home / ".env").write_text("OPENAI_API_KEY=sk-fake-e2e\n", encoding="utf-8")
+    (seed.qubit_home / "config.yaml").write_text(cfg, encoding="utf-8")
+    (seed.qubit_home / ".env").write_text("OPENAI_API_KEY=sk-fake-e2e\n", encoding="utf-8")
     for prompt in ("first session before the upgrade", "second session before the upgrade"):
         cp = seed.run("-z", prompt)
         assert cp.returncode == 0, H.describe(cp)
     cp = seed.run("profile", "create", "work", "--no-alias")
     assert cp.returncode == 0, H.describe(cp)
-    work = seed.hermes_home / "profiles" / "work"
+    work = seed.qubit_home / "profiles" / "work"
     (work / "config.yaml").write_text(cfg, encoding="utf-8")
     (work / ".env").write_text("OPENAI_API_KEY=sk-fake-e2e-work\n", encoding="utf-8")
     cp = seed.run("-p", "work", "-z", "work profile session before the upgrade")
@@ -568,10 +568,10 @@ def template_home(tmp_path_factory, provider) -> Path:
     cp = seed.run("cron", "create", "--name", "nightly", "0 3 * * *", "summarize the day")
     assert cp.returncode == 0, H.describe(cp)
     # Configs were written by hand AFTER the N-1 CLI touched them; re-pin them to the user's bytes.
-    (seed.hermes_home / "config.yaml").write_text(cfg, encoding="utf-8")
+    (seed.qubit_home / "config.yaml").write_text(cfg, encoding="utf-8")
     (work / "config.yaml").write_text(cfg, encoding="utf-8")
     template = seed.root / "template-home"
-    shutil.copytree(seed.hermes_home, template, symlinks=True)
+    shutil.copytree(seed.qubit_home, template, symlinks=True)
     return template
 
 

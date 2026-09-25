@@ -9,12 +9,31 @@ vi.mock('@/lib/desktop-fs', () => ({
 }))
 
 import {
+  isLoopbackPreviewUrl,
   localPreviewTarget,
   normalizeOrLocalPreviewTarget,
   openPreviewTargetInBrowser,
   remoteHtmlPreviewDocument,
   validatedRemoteHtmlDataUrl
 } from './local-preview'
+
+describe('isLoopbackPreviewUrl', () => {
+  it.each(['http://localhost:5173', 'https://127.0.0.2:8443/app', 'http://0.0.0.0:3000', 'http://[::1]:4173'])(
+    'accepts loopback origin %s',
+    url => {
+      expect(isLoopbackPreviewUrl(url)).toBe(true)
+    }
+  )
+
+  // mDNS and LAN names are other devices (homeassistant.local), not the dev
+  // server the agent is building.
+  it.each(['https://x.com', 'https://localhost.example.com', 'http://homeassistant.local:8123', 'not a URL'])(
+    'rejects non-loopback or malformed origin %s',
+    url => {
+      expect(isLoopbackPreviewUrl(url)).toBe(false)
+    }
+  )
+})
 
 const remoteTarget = {
   kind: 'file' as const,
@@ -28,7 +47,7 @@ const remoteTarget = {
 describe('remote HTML previews', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    window.qubitDesktop = {
+    window.hermesDesktop = {
       normalizePreviewTarget: vi.fn(async () => remoteTarget)
     } as never
   })
@@ -105,7 +124,7 @@ describe('remote HTML previews', () => {
     const dataUrl = `data:text/html;base64,${btoa('<h1>remote</h1>')}`
     const saveImageBuffer = vi.fn(async (_data: ArrayBuffer | Uint8Array, _ext: string) => '/tmp/report #1?.html')
     const openPreviewInBrowser = vi.fn(async () => undefined)
-    window.qubitDesktop = { openPreviewInBrowser, saveImageBuffer } as never
+    window.hermesDesktop = { openPreviewInBrowser, saveImageBuffer } as never
 
     await openPreviewTargetInBrowser({ ...remoteTarget, dataUrl })
 
@@ -118,7 +137,7 @@ describe('remote HTML previews', () => {
     const dataUrl = `data:text/html;base64,${btoa('<h1>remote</h1>')}`
     const saveImageBuffer = vi.fn(async () => '\\\\server\\share\\report #1.html')
     const openPreviewInBrowser = vi.fn(async () => undefined)
-    window.qubitDesktop = { openPreviewInBrowser, saveImageBuffer } as never
+    window.hermesDesktop = { openPreviewInBrowser, saveImageBuffer } as never
 
     await openPreviewTargetInBrowser({ ...remoteTarget, dataUrl })
 
@@ -129,6 +148,19 @@ describe('remote HTML previews', () => {
     expect(localPreviewTarget('/tmp/report\\draft.html')?.url).toBe('file:///tmp/report%5Cdraft.html')
   })
 
+  // #85132: a Windows absolute path is absolute; joining it onto cwd made
+  // `/repo/C:\\Users\\...` which no filesystem has.
+  it.each(['C:\\Users\\me\\report.html', 'C:/Users/me/report.html', '\\\\server\\share\\report.html'])(
+    'treats Windows absolute path %s as absolute instead of joining it onto cwd',
+    raw => {
+      expect(localPreviewTarget(raw, '/repo')).toMatchObject({ label: 'report.html', path: raw, previewKind: 'html' })
+    }
+  )
+
+  it('still joins relative paths onto cwd', () => {
+    expect(localPreviewTarget('out/report.html', '/repo')?.path).toBe('/repo/out/report.html')
+  })
+
   it('preserves POSIX double-slash file paths', () => {
     expect(localPreviewTarget('//srv/share/report #1?.html')?.url).toBe('file:////srv/share/report%20%231%3F.html')
   })
@@ -136,7 +168,7 @@ describe('remote HTML previews', () => {
   it('opens ordinary targets without staging them', async () => {
     const openPreviewInBrowser = vi.fn(async () => undefined)
     const saveImageBuffer = vi.fn()
-    window.qubitDesktop = { openPreviewInBrowser, saveImageBuffer } as never
+    window.hermesDesktop = { openPreviewInBrowser, saveImageBuffer } as never
 
     await openPreviewTargetInBrowser(remoteTarget)
 
@@ -146,7 +178,7 @@ describe('remote HTML previews', () => {
 
   it('keeps local HTML source browser opens on their existing path', async () => {
     const openPreviewInBrowser = vi.fn(async () => undefined)
-    window.qubitDesktop = { openPreviewInBrowser } as never
+    window.hermesDesktop = { openPreviewInBrowser } as never
 
     await openPreviewTargetInBrowser({
       ...remoteTarget,
@@ -160,7 +192,7 @@ describe('remote HTML previews', () => {
 
   it('does not send failed remote HTML paths to the local browser', async () => {
     const openPreviewInBrowser = vi.fn(async () => undefined)
-    window.qubitDesktop = { openPreviewInBrowser } as never
+    window.hermesDesktop = { openPreviewInBrowser } as never
 
     await expect(
       openPreviewTargetInBrowser({ ...remoteTarget, renderMode: 'source', transient: true })
@@ -186,7 +218,7 @@ describe('PDF previews', () => {
 
   it('does not UTF-8-enrich remote PDFs before loading their bytes', async () => {
     vi.clearAllMocks()
-    window.qubitDesktop = {
+    window.hermesDesktop = {
       normalizePreviewTarget: vi.fn(async () => null)
     } as never
 

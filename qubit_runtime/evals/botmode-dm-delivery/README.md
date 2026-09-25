@@ -17,7 +17,7 @@ rm apps/desktop/e2e/probe-dm-delivery.spec.ts
 
 Use the current seat's actual Xauthority path and an existing runtime venv.
 Artifacts default to `/tmp/botmode-dm-review/native` (override with `BOT_DM_EVIDENCE`); sandbox path is printed. The
-fixture's generated qubit shim pins every child to this checkout, not an installed launcher.
+fixture's generated hermes shim pins every child to this checkout, not an installed launcher.
 
 ## Verified results
 
@@ -82,7 +82,7 @@ is intentional, with no TTL or automatic ambiguous retry introduced here.
 `apps/desktop/e2e/` and run with the same native fixture (no mock-trigger patch
 needed for this case). It keeps default's real Desktop Bot Chat lease, submits
 ordinary cron output to unowned Alpha from a separate Python producer under a
-custom Qubit root, and holds the real quiet CLI child at loopback inference.
+custom Hermes root, and holds the real quiet CLI child at loopback inference.
 The child shim PID must match Alpha's real CLI lease; default's lease is unchanged.
 After release, Alpha has exactly one input and Desktop renders the output.
 The same case removes unused Beta and verifies delivery neither recreates Beta nor
@@ -99,7 +99,7 @@ behavior checks rather than retaining the broken expectation.
 Evidence: `/tmp/botmode-cron-root/{before2,origin-main,after}.log`,
 `after/{owners.json,children.log,rows.json,result.json,missing.json,ordinary-recipient.png}`.
 The first fixture attempt (`before.log`) used the wrong default row label; the
-actual Desktop label is Qubit. No production failure is claimed for that attempt.
+actual Desktop label is Hermes. No production failure is claimed for that attempt.
 Full cron directory: **1346 passed, 1 skipped across 116 files**; sibling mailbox,
 DM, gateway consumer and profile tests: **124 passed, 3 skipped across 4 files**.
 Credit @fangliquanflq's #104066 for the root-boundary diagnosis and anchoring fix;

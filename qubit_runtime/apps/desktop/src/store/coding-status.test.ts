@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitRepoStatus } from '@/global'
+import type { HermesRepoStatus } from '@/global'
 
 import {
   $repoStatus,
@@ -15,7 +15,7 @@ import {
 } from './coding-status'
 import { $currentCwd, $selectedStoredSessionId } from './session'
 
-const sampleStatus: QubitRepoStatus = {
+const sampleStatus: HermesRepoStatus = {
   branch: 'feature/login',
   defaultBranch: 'main',
   detached: false,
@@ -31,7 +31,7 @@ const sampleStatus: QubitRepoStatus = {
   files: []
 }
 
-const otherStatus: QubitRepoStatus = {
+const otherStatus: HermesRepoStatus = {
   ...sampleStatus,
   branch: 'bb/other-worktree',
   added: 3,
@@ -41,8 +41,8 @@ const otherStatus: QubitRepoStatus = {
   unstaged: 1
 }
 
-function stubProbe(impl: (cwd: string) => Promise<QubitRepoStatus | null>) {
-  ;(window as unknown as { qubitDesktop?: unknown }).qubitDesktop = { git: { repoStatus: impl } }
+function stubProbe(impl: (cwd: string) => Promise<HermesRepoStatus | null>) {
+  ;(window as unknown as { hermesDesktop?: unknown }).hermesDesktop = { git: { repoStatus: impl } }
 }
 
 describe('refreshRepoStatus', () => {
@@ -53,7 +53,7 @@ describe('refreshRepoStatus', () => {
     $selectedStoredSessionId.set(null)
     // Drain the cwd/session subscribe side-effects the sets above kick off.
     vi.advanceTimersByTime(200)
-    delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
     _resetCodingStatusForTests()
   })
 
@@ -61,7 +61,7 @@ describe('refreshRepoStatus', () => {
     _resetCodingStatusForTests()
     vi.clearAllTimers()
     vi.useRealTimers()
-    delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
 
   it('populates the per-cwd cache and the primary computed for that cwd', async () => {
@@ -119,7 +119,7 @@ describe('refreshRepoStatus', () => {
   })
 
   it('never publishes an old worktree status onto the primary after the active cwd moves', async () => {
-    let resolveOld!: (status: QubitRepoStatus | null) => void
+    let resolveOld!: (status: HermesRepoStatus | null) => void
     stubProbe(
       () =>
         new Promise(resolve => {
@@ -161,7 +161,7 @@ describe('refreshRepoStatus', () => {
   })
 
   it('runs one probe at a time and coalesces overlap into one trailing refresh per drain', async () => {
-    const resolvers: Array<(status: QubitRepoStatus | null) => void> = []
+    const resolvers: Array<(status: HermesRepoStatus | null) => void> = []
     const calls: string[] = []
     let active = 0
     let maxActive = 0
@@ -268,7 +268,7 @@ describe('repoChangeKindForPath', () => {
     $repoStatusByCwd.set({
       '/repo': {
         ...sampleStatus,
-        files: [{ path: 'b.ts', untracked: true } as QubitRepoStatus['files'][number]]
+        files: [{ path: 'b.ts', untracked: true } as HermesRepoStatus['files'][number]]
       }
     })
     expect(listener).toHaveBeenCalledTimes(1)
@@ -276,7 +276,7 @@ describe('repoChangeKindForPath', () => {
     $repoStatusByCwd.set({
       '/repo': {
         ...sampleStatus,
-        files: [{ path: 'a.ts', untracked: true } as QubitRepoStatus['files'][number]]
+        files: [{ path: 'a.ts', untracked: true } as HermesRepoStatus['files'][number]]
       }
     })
     expect(listener).toHaveBeenCalledTimes(2)

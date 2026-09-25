@@ -156,9 +156,9 @@ class _Registry:
 
 _REGISTRY = _Registry()
 from tools.daemon_pool import DaemonThreadPoolExecutor as _DaemonExecutor  # daemon: a wedged child never blocks exit
-_EXECUTOR = _DaemonExecutor(max_workers=8, thread_name_prefix="qubit-lifecycle")
+_EXECUTOR = _DaemonExecutor(max_workers=8, thread_name_prefix="hermes-lifecycle")
 _SECRET = secrets.token_bytes(32)
-_ACTIVE_PARENT_AGENT: contextvars.ContextVar[Any] = contextvars.ContextVar("qubit_subagent_lifecycle_parent", default=None)
+_ACTIVE_PARENT_AGENT: contextvars.ContextVar[Any] = contextvars.ContextVar("hermes_subagent_lifecycle_parent", default=None)
 
 
 @contextmanager

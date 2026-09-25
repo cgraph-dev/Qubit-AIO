@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from agent import secret_scope
 from gateway.config import GatewayConfig
 from gateway.run import GatewayRunner
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 
 
 def _runner(profile_homes: dict[str, Path]) -> GatewayRunner:
@@ -30,7 +30,7 @@ def _seen_after_release(runner, key, *, wait_scope=None) -> dict:
 
     def target(agent, k):
         seen["scope"] = secret_scope.current_secret_scope()
-        seen["home"] = get_hermes_home()
+        seen["home"] = get_qubit_home()
         done.set()
 
     runner._spawn_release_thread(target, (None, key), f"t-{key}", inline_fallback=False, session_key=key)
@@ -70,7 +70,7 @@ def test_in_turn_cap_eviction_keeps_the_callers_scope(tmp_path, monkeypatch):
 def test_in_turn_cap_eviction_of_another_profiles_agent_enters_the_owners_scope(tmp_path, monkeypatch):
     """The LRU cap is enforced inside the REQUESTING turn (profile A's scope), and the agent it
     evicts may be profile B's. B's end-of-session commit must run under B, not under A."""
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
     default_home = tmp_path / ".hermes"
     prof_a, prof_b = default_home / "profiles" / "a", default_home / "profiles" / "b"
@@ -78,13 +78,13 @@ def test_in_turn_cap_eviction_of_another_profiles_agent_enters_the_owners_scope(
     (prof_b / ".env").write_text("HINDSIGHT_LLM_API_KEY=key-of-b\n")
     monkeypatch.setenv("QUBIT_HOME", str(default_home))
     secret_scope.set_multiplex_active(True)
-    home_token = set_hermes_home_override(str(prof_a))
+    home_token = set_qubit_home_override(str(prof_a))
     scope_token = secret_scope.set_secret_scope({"HINDSIGHT_LLM_API_KEY": "key-of-a"})
     try:
         seen = _seen_after_release(_runner({"agent:b:telegram:dm:1": prof_b}), "agent:b:telegram:dm:1")
     finally:
         secret_scope.reset_secret_scope(scope_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
         secret_scope.set_multiplex_active(False)
     assert seen["home"] == prof_b
     assert seen["scope"].get("HINDSIGHT_LLM_API_KEY") == "key-of-b"
@@ -93,20 +93,20 @@ def test_in_turn_cap_eviction_of_another_profiles_agent_enters_the_owners_scope(
 def test_in_turn_cap_eviction_of_a_default_profile_agent_leaves_the_secondarys_scope(tmp_path, monkeypatch):
     """Inverse: secondary A's turn evicts a default-profile session (``agent:main:`` — no named
     owner in the key). The commit runs under the default home, not under A."""
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
     default_home = tmp_path / ".hermes"
     prof_a = default_home / "profiles" / "a"
     prof_a.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(default_home))
     secret_scope.set_multiplex_active(True)
-    home_token = set_hermes_home_override(str(prof_a))
+    home_token = set_qubit_home_override(str(prof_a))
     scope_token = secret_scope.set_secret_scope({"MARKER": "profile-a"})
     try:
         seen = _seen_after_release(_runner({}), "agent:main:telegram:dm:9")
     finally:
         secret_scope.reset_secret_scope(scope_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
         secret_scope.set_multiplex_active(False)
     assert seen["home"] == default_home
     assert seen["scope"] is not None and seen["scope"].get("MARKER") is None
@@ -116,7 +116,7 @@ def test_default_profile_owner_is_the_root_even_when_launched_under_a_named_prof
     """``hermes -p x gateway`` sets QUBIT_HOME to x's home and serves the default profile as a
     secondary. An ``agent:main:`` session still belongs to the default profile at the ROOT, not to
     the launch profile x — otherwise x's turn would commit default's transcript under x."""
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
     root = tmp_path / ".hermes"
     prof_x = root / "profiles" / "x"
@@ -124,13 +124,13 @@ def test_default_profile_owner_is_the_root_even_when_launched_under_a_named_prof
     (root / ".env").write_text("MARKER=default-root\n")
     monkeypatch.setenv("QUBIT_HOME", str(prof_x))  # launched under x
     secret_scope.set_multiplex_active(True)
-    home_token = set_hermes_home_override(str(prof_x))
+    home_token = set_qubit_home_override(str(prof_x))
     scope_token = secret_scope.set_secret_scope({"MARKER": "profile-x"})
     try:
         seen = _seen_after_release(_runner({}), "agent:main:telegram:dm:3")
     finally:
         secret_scope.reset_secret_scope(scope_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
         secret_scope.set_multiplex_active(False)
     assert seen["home"] == root
     assert seen["scope"].get("MARKER") == "default-root"

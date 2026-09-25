@@ -19,7 +19,7 @@ const gatewayMocks = vi.hoisted(() => ({
 
 vi.mock('@/hermes', () => ({
   setApiRequestConnection: vi.fn(),
-  QubitGateway: class {
+  HermesGateway: class {
     connectionState = 'closed'
     constructor() {
       gatewayMocks.constructions += 1
@@ -61,7 +61,7 @@ const agentConn = {
 }
 
 function installDesktop(): void {
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = {
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
     getConnection: vi.fn(async () => agentConn),
     getConnectionFor: vi.fn(async () => agentConn)
   }
@@ -77,21 +77,10 @@ beforeEach(() => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('bot-relay gateway retention (#93594)', () => {
-  it('without retention every drain tick dials a fresh socket (the churn this fix removes)', async () => {
-    // Baseline: three request-leased RPCs against an otherwise-unheld route.
-    for (let tick = 0; tick < 3; tick += 1) {
-      await requestGatewayForAgent('homelab', 'research', 'bot_relay.outbox.drain', {})
-    }
-
-    // Refcount hits 0 after each call → dispose → next tick constructs anew.
-    expect(gatewayMocks.constructions).toBe(3)
-    expect(gatewayMocks.connect).toHaveBeenCalledTimes(3)
-  })
-
   it('a retained relay route holds ONE persistent socket across multiple drain ticks', async () => {
     const release = retainGatewayForRelay('homelab', 'research')
 

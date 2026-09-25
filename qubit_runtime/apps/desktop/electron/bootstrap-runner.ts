@@ -1,7 +1,7 @@
 /**
  * bootstrap-runner.ts
  *
- * Drives apps/desktop's first-launch install of Qubit Agent by spawning
+ * Drives apps/desktop's first-launch install of Hermes Agent by spawning
  * scripts/install.ps1 stage-by-stage and streaming progress events back to
  * the renderer.
  *
@@ -20,7 +20,7 @@
  *   { type: 'manifest',  stages: [{name, title, category, needs_user_input}, ...] }
  *   { type: 'stage',     name, state: 'running'|'succeeded'|'skipped'|'failed',
  *                        json?, durationMs?, error? }
- *   { type: 'log',       stage?, line, stream: 'stdout'|'stderr' } // raw line from install.ps1
+ *   { type: 'log',       stage?, line, stream: 'stdout'|'stderr' } // one installer line, escapes stripped
  *   { type: 'complete',  marker: <written marker payload> }
  *   { type: 'failed',    stage?, error }     // bootstrap aborted
  *
@@ -37,6 +37,10 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import https from 'node:https'
 import path from 'node:path'
+
+// Relative, not `@hermes/shared/ansi`: the electron bundle is built by esbuild
+// with no tsconfig path resolution (see scripts/bundle-electron-main.mjs).
+import { stripAnsi } from '../../shared/src/ansi'
 
 import { hiddenWindowsChildOptions } from './windows-child-options'
 
@@ -58,15 +62,20 @@ type ResolveHeadFn = (activeRoot: string | null | undefined) => string | null
  * (all-zero) install stamps still produce a marker that
  * isBootstrapComplete() accepts (pinnedCommit length >= 7).
  */
-function resolveCheckoutHead(activeRoot: string | null | undefined, opts: { execGit?: ExecGitFn } = {}): string | null {
+function resolveCheckoutHead(
+  activeRoot: string | null | undefined,
+  opts: { execGit?: ExecGitFn; gitBinary?: string } = {}
+): string | null {
   if (!activeRoot) {
     return null
   }
 
+  // Bare 'git' takes the first PATH hit, which can exist yet be unlaunchable
+  // (Intel-only build on Apple Silicon); main.ts passes its probed binary.
   const run: ExecGitFn =
     opts.execGit ||
     ((args, cwd) =>
-      execFileSync('git', args, {
+      execFileSync(opts.gitBinary || 'git', args, {
         cwd,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -101,8 +110,10 @@ function readExistingPinnedCommit(activeRoot: string | null | undefined): string
 
 /**
  * Pick the commit to store on the bootstrap-complete marker.
- * Packaged fallback stamps must NOT win (all-zero is not a real pin); after a
- * successful install the checkout's HEAD (or install.ps1's marker) does.
+ * The installed checkout owns source runtime identity: its live HEAD wins, so
+ * a repair/update bootstrap reports the commit the checkout is actually at,
+ * never the older commit baked into the packaged app. Packaged fallback stamps
+ * (all-zero) are not real pins and never win.
  */
 function resolveMarkerPinnedCommit(
   installStamp: { commit?: string; branch?: string | null } | null | undefined,
@@ -111,14 +122,14 @@ function resolveMarkerPinnedCommit(
 ): string | null {
   const resolveHead = opts.resolveHead || resolveCheckoutHead
 
-  if (installStamp && isPinnedCommit(installStamp.commit)) {
-    return installStamp.commit
-  }
-
   const head = resolveHead(activeRoot)
 
   if (head) {
     return head
+  }
+
+  if (installStamp && isPinnedCommit(installStamp.commit)) {
+    return installStamp.commit
   }
 
   return readExistingPinnedCommit(activeRoot)
@@ -187,20 +198,20 @@ function resolveLocalInstallScript(sourceRepoRoot) {
   }
 }
 
-function bootstrapCacheDir(qubitHome) {
-  return path.join(qubitHome, 'bootstrap-cache')
+function bootstrapCacheDir(hermesHome) {
+  return path.join(hermesHome, 'bootstrap-cache')
 }
 
 // The install.sh / install.ps1 that ships inside the already-installed agent
 // checkout under ~/.hermes/hermes-agent. Used as a last-resort fallback when
 // the pinned commit can't be fetched from GitHub (e.g. a locally-built desktop
 // app stamped to an unpushed HEAD).
-function installedAgentInstallScript(qubitHome) {
-  if (!qubitHome) {
+function installedAgentInstallScript(hermesHome) {
+  if (!hermesHome) {
     return null
   }
 
-  const candidate = path.join(qubitHome, 'hermes-agent', 'scripts', installScriptName())
+  const candidate = path.join(hermesHome, 'hermes-agent', 'scripts', installScriptName())
 
   try {
     fs.accessSync(candidate, fs.constants.R_OK)
@@ -223,8 +234,8 @@ function hasExistingGitCheckout(activeRoot) {
   }
 }
 
-function cachedScriptPath(qubitHome, commit) {
-  return path.join(bootstrapCacheDir(qubitHome), `install-${commit}.${process.platform === 'win32' ? 'ps1' : 'sh'}`)
+function cachedScriptPath(hermesHome, commit) {
+  return path.join(bootstrapCacheDir(hermesHome), `install-${commit}.${process.platform === 'win32' ? 'ps1' : 'sh'}`)
 }
 
 function downloadInstallScript(ref, destPath) {
@@ -233,7 +244,7 @@ function downloadInstallScript(ref, destPath) {
   // ref so local builds can still bootstrap without pretending the all-zero
   // placeholder is a real GitHub commit.
   const scriptName = installScriptName()
-  const url = `https://raw.githubusercontent.com/cgraph-dev/qubit-voicebridge/${ref}/scripts/${scriptName}`
+  const url = `https://raw.githubusercontent.com/NousResearch/hermes-agent/${ref}/scripts/${scriptName}`
 
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destPath), { recursive: true })
@@ -317,7 +328,7 @@ function downloadInstallScript(ref, destPath) {
 async function resolveInstallScript({
   installStamp,
   sourceRepoRoot,
-  qubitHome,
+  hermesHome,
   emit,
   _download = downloadInstallScript
 }) {
@@ -344,7 +355,7 @@ async function resolveInstallScript({
     )
   }
 
-  const cached = cachedScriptPath(qubitHome, installRef.cacheKey)
+  const cached = cachedScriptPath(hermesHome, installRef.cacheKey)
   const resolvedCommit = installRef.pinned ? installRef.ref : null
 
   try {
@@ -377,7 +388,7 @@ async function resolveInstallScript({
     // write-build-stamp.mjs fromLocalGit). Fall back to the installer that
     // ships inside the already-installed agent checkout so dev/self-builds can
     // still bootstrap instead of dying with a fatal 404.
-    const installed = installedAgentInstallScript(qubitHome)
+    const installed = installedAgentInstallScript(hermesHome)
 
     if (installed) {
       emit({
@@ -456,7 +467,19 @@ function resolveWindowsPowerShell() {
   return 'powershell.exe'
 }
 
-function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, qubitHome }: any = {}) {
+// install.sh (and the git/curl/uv children it drives) writes SGR colours,
+// cursor/erase sequences, OSC titles and \r progress redraws into the pipe as
+// if it were a TTY. The install overlay renders each line as plain text, so
+// strip them ONCE here, at the emitter: the main-process log ring, the
+// renderer's Details panel and "Copy output" all read the same clean line
+// (#112675). \r redraws collapse to the last frame a terminal would show.
+function cleanInstallerLogLine(raw: string): string {
+  const frames = raw.split('\r').map(stripAnsi).filter(Boolean)
+
+  return frames.length ? frames[frames.length - 1] : ''
+}
+
+function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, hermesHome }: any = {}) {
   return new Promise<any>((resolve, reject) => {
     const ps = process.platform === 'win32' ? resolveWindowsPowerShell() : 'pwsh'
     const fullArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args]
@@ -470,7 +493,7 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, qubit
           ...process.env,
           // Pass QUBIT_HOME through so install.ps1 respects the caller's
           // choice rather than re-computing the default.
-          QUBIT_HOME: qubitHome || process.env.QUBIT_HOME || ''
+          QUBIT_HOME: hermesHome || process.env.QUBIT_HOME || ''
         }
       })
     )
@@ -508,7 +531,7 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, qubit
       let nl
 
       while ((nl = stdoutBuf.indexOf('\n')) !== -1) {
-        const line = stdoutBuf.slice(0, nl).replace(/\r$/, '')
+        const line = cleanInstallerLogLine(stdoutBuf.slice(0, nl))
         stdoutBuf = stdoutBuf.slice(nl + 1)
 
         if (line) {
@@ -524,7 +547,7 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, qubit
       let nl
 
       while ((nl = stderrBuf.indexOf('\n')) !== -1) {
-        const line = stderrBuf.slice(0, nl).replace(/\r$/, '')
+        const line = cleanInstallerLogLine(stderrBuf.slice(0, nl))
         stderrBuf = stderrBuf.slice(nl + 1)
 
         if (line) {
@@ -547,12 +570,15 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, qubit
       }
 
       // Flush any trailing bytes
-      if (stdoutBuf) {
-        emit && emit({ type: 'log', stage: stageName, line: stdoutBuf, stream: 'stdout' } as any)
+      const stdoutTail = cleanInstallerLogLine(stdoutBuf)
+      const stderrTail = cleanInstallerLogLine(stderrBuf)
+
+      if (stdoutTail) {
+        emit && emit({ type: 'log', stage: stageName, line: stdoutTail, stream: 'stdout' } as any)
       }
 
-      if (stderrBuf) {
-        emit && emit({ type: 'log', stage: stageName, line: stderrBuf, stream: 'stderr' } as any)
+      if (stderrTail) {
+        emit && emit({ type: 'log', stage: stageName, line: stderrTail, stream: 'stderr' } as any)
       }
 
       resolve({ stdout, stderr, code, signal, killed } as any)
@@ -560,13 +586,13 @@ function spawnPowerShell(scriptPath, args, { emit, stageName, abortSignal, qubit
   })
 }
 
-function spawnBash(scriptPath, args, { emit, stageName, abortSignal, qubitHome }: any = {}) {
+function spawnBash(scriptPath, args, { emit, stageName, abortSignal, hermesHome }: any = {}) {
   return new Promise<any>((resolve, reject) => {
     const child = spawn('bash', [scriptPath, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        QUBIT_HOME: qubitHome || process.env.QUBIT_HOME || ''
+        QUBIT_HOME: hermesHome || process.env.QUBIT_HOME || ''
       }
     })
 
@@ -602,7 +628,7 @@ function spawnBash(scriptPath, args, { emit, stageName, abortSignal, qubitHome }
       let nl
 
       while ((nl = stdoutBuf.indexOf('\n')) !== -1) {
-        const line = stdoutBuf.slice(0, nl).replace(/\r$/, '')
+        const line = cleanInstallerLogLine(stdoutBuf.slice(0, nl))
         stdoutBuf = stdoutBuf.slice(nl + 1)
 
         if (line) {
@@ -618,7 +644,7 @@ function spawnBash(scriptPath, args, { emit, stageName, abortSignal, qubitHome }
       let nl
 
       while ((nl = stderrBuf.indexOf('\n')) !== -1) {
-        const line = stderrBuf.slice(0, nl).replace(/\r$/, '')
+        const line = cleanInstallerLogLine(stderrBuf.slice(0, nl))
         stderrBuf = stderrBuf.slice(nl + 1)
 
         if (line) {
@@ -640,12 +666,15 @@ function spawnBash(scriptPath, args, { emit, stageName, abortSignal, qubitHome }
         abortSignal.removeEventListener('abort', onAbort)
       }
 
-      if (stdoutBuf) {
-        emit && emit({ type: 'log', stage: stageName, line: stdoutBuf, stream: 'stdout' })
+      const stdoutTail = cleanInstallerLogLine(stdoutBuf)
+      const stderrTail = cleanInstallerLogLine(stderrBuf)
+
+      if (stdoutTail) {
+        emit && emit({ type: 'log', stage: stageName, line: stdoutTail, stream: 'stdout' })
       }
 
-      if (stderrBuf) {
-        emit && emit({ type: 'log', stage: stageName, line: stderrBuf, stream: 'stderr' })
+      if (stderrTail) {
+        emit && emit({ type: 'log', stage: stageName, line: stderrTail, stream: 'stderr' })
       }
 
       resolve({ stdout, stderr, code, signal, killed })
@@ -676,8 +705,8 @@ function buildPinArgs(installStamp, { pinCommit = true } = {}) {
   return args
 }
 
-function buildPosixPinArgs({ installStamp, activeRoot, qubitHome, pinCommit = true }) {
-  const args = ['--dir', activeRoot, '--hermes-home', qubitHome]
+function buildPosixPinArgs({ installStamp, activeRoot, hermesHome, pinCommit = true }) {
+  const args = ['--dir', activeRoot, '--hermes-home', hermesHome]
 
   if (installStamp && installStamp.branch) {
     args.push('--branch', installStamp.branch)
@@ -690,22 +719,37 @@ function buildPosixPinArgs({ installStamp, activeRoot, qubitHome, pinCommit = tr
   return args
 }
 
-async function fetchManifest({ scriptPath, installerKind, emit, qubitHome, activeRoot, installStamp, pinCommit }) {
+async function fetchManifest({
+  scriptPath,
+  installerKind,
+  emit,
+  hermesHome,
+  activeRoot,
+  installStamp,
+  pinCommit,
+  abortSignal
+}) {
+  abortSignal?.throwIfAborted()
   const isPosix = installerKind === 'posix'
 
   const args = isPosix
-    ? ['--manifest', ...buildPosixPinArgs({ installStamp, activeRoot, qubitHome, pinCommit })]
+    ? ['--manifest', ...buildPosixPinArgs({ installStamp, activeRoot, hermesHome, pinCommit })]
     : ['-Manifest', ...buildPinArgs(installStamp, { pinCommit })]
 
   const result = await (isPosix ? spawnBash : spawnPowerShell)(scriptPath, args, {
     emit,
     stageName: '__manifest__',
-    qubitHome
+    abortSignal,
+    hermesHome
   })
 
   if (result.code !== 0) {
+    // The tail lands in the Setup failure banner, not the log ring, so strip
+    // the installer's colour/OSC bytes here too (#112675).
+    const tail = stripAnsi(result.stderr || result.stdout).trim()
+
     throw new Error(
-      `${isPosix ? 'install.sh --manifest' : 'install.ps1 -Manifest'} failed: exit ${result.code}\n${result.stderr || result.stdout}`
+      `${isPosix ? 'install.sh --manifest' : 'install.ps1 -Manifest'} failed: exit ${result.code}\n${tail}`
     )
   }
 
@@ -757,7 +801,7 @@ async function runStage({
   installerKind,
   stage,
   emit,
-  qubitHome,
+  hermesHome,
   activeRoot,
   abortSignal,
   installStamp,
@@ -774,7 +818,7 @@ async function runStage({
         stage.name,
         '--non-interactive',
         '--json',
-        ...buildPosixPinArgs({ installStamp, activeRoot, qubitHome, pinCommit })
+        ...buildPosixPinArgs({ installStamp, activeRoot, hermesHome, pinCommit })
       ]
     : ['-Stage', stage.name, '-NonInteractive', '-Json', ...buildPinArgs(installStamp, { pinCommit })]
 
@@ -782,7 +826,7 @@ async function runStage({
     emit,
     stageName: stage.name,
     abortSignal,
-    qubitHome
+    hermesHome
   })
 
   const durationMs = Date.now() - startedAt
@@ -861,11 +905,12 @@ async function runBootstrap(opts) {
     installStamp,
     activeRoot,
     sourceRepoRoot,
-    qubitHome,
+    hermesHome,
     logRoot,
     onEvent,
     abortSignal,
-    writeMarker // callback to write the bootstrap-complete marker; main.ts provides
+    writeMarker, // callback to write the bootstrap-complete marker; main.ts provides
+    gitBinary // probed git path from main.ts; bare 'git' when absent
   } = opts
 
   // Bail before spawning anything if the user already cancelled — otherwise an
@@ -883,7 +928,7 @@ async function runBootstrap(opts) {
     return { ok: false, cancelled: true }
   }
 
-  const runLog = openRunLog(logRoot || path.join(qubitHome, 'logs'))
+  const runLog = openRunLog(logRoot || path.join(hermesHome, 'logs'))
 
   // Tee every event to the runLog AND the caller's onEvent. This gives us a
   // forensic trail per bootstrap run AND lets the renderer subscribe live.
@@ -927,7 +972,9 @@ async function runBootstrap(opts) {
     }
 
     // 1. Resolve the platform installer.
-    const scriptInfo = await resolveInstallScript({ installStamp, sourceRepoRoot, qubitHome, emit })
+    const scriptInfo = await resolveInstallScript({ installStamp, sourceRepoRoot, hermesHome, emit })
+    abortSignal?.throwIfAborted()
+
     const installerKind = scriptInfo.kind || 'powershell'
 
     // 2. Fetch manifest
@@ -935,11 +982,14 @@ async function runBootstrap(opts) {
       scriptPath: scriptInfo.path,
       installerKind,
       emit,
-      qubitHome,
+      hermesHome,
       activeRoot,
       installStamp,
-      pinCommit
+      pinCommit,
+      abortSignal
     })
+
+    abortSignal?.throwIfAborted()
 
     emit({
       type: 'manifest',
@@ -963,7 +1013,7 @@ async function runBootstrap(opts) {
         installerKind,
         stage,
         emit,
-        qubitHome,
+        hermesHome,
         activeRoot,
         abortSignal,
         installStamp,
@@ -981,7 +1031,9 @@ async function runBootstrap(opts) {
     // not real pins -- resolve HEAD from the checkout we just installed so
     // isBootstrapComplete() (pinnedCommit.length >= 7) accepts the marker
     // instead of re-running bootstrap on every launch (#50823 review).
-    const pinnedCommit = resolveMarkerPinnedCommit(installStamp, activeRoot)
+    const pinnedCommit = resolveMarkerPinnedCommit(installStamp, activeRoot, {
+      resolveHead: root => resolveCheckoutHead(root, { gitBinary })
+    })
 
     if (!pinnedCommit) {
       emit({
@@ -1007,12 +1059,18 @@ async function runBootstrap(opts) {
 
     return { ok: true, marker }
   } catch (err) {
+    if (abortSignal?.aborted) {
+      emit({ type: 'failed', error: 'bootstrap cancelled by user' })
+
+      return { ok: false, cancelled: true }
+    }
+
     emit({ type: 'failed', error: err.message || String(err) })
 
     return { ok: false, error: err.message || String(err) }
   } finally {
     try {
-      runLog.stream.end()
+      await new Promise<void>(resolve => runLog.stream.end(resolve))
     } catch {
       void 0
     }
@@ -1023,6 +1081,7 @@ export {
   buildPinArgs,
   buildPosixPinArgs,
   cachedScriptPath,
+  cleanInstallerLogLine,
   hasExistingGitCheckout,
   installedAgentInstallScript,
   installRefForStamp,

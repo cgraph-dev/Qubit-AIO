@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 
 import { useSessionView } from '@/app/chat/session-view'
-import type { QubitGateway } from '@/hermes'
+import type { HermesGateway } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
 import { currentPickerSelection } from '@/lib/model-status-label'
@@ -28,7 +28,7 @@ export interface ModelSelection {
 }
 
 export interface ModelMenuHostProps {
-  gateway?: QubitGateway
+  gateway?: HermesGateway
   ownerConnectionId?: string
   onSelectModel: (selection: ModelSelection) => Promise<boolean> | void
   profile?: string
@@ -59,6 +59,7 @@ export function useModelMenuController({
   const currentProvider = useStore(view.$provider)
   const currentReasoningEffort = useStore(view.$reasoningEffort)
   const currentReasoningEffortWire = useStore(view.$reasoningEffortWire)
+  const currentReasoningEffortPending = useStore(view.$reasoningEffortPending)
   const modelPresets = useStore($modelPresets)
   const defaultEffort = useStore($defaultReasoningEffort) || DEFAULT_REASONING_EFFORT
   const touchesPrimary = view.kind === 'primary'
@@ -89,6 +90,7 @@ export function useModelMenuController({
       sessionTileDelegate()?.updateSession(activeSessionId, state => ({
         ...state,
         reasoningEffort: next,
+        reasoningEffortPending: false,
         reasoningEffortWire: ''
       }))
     }
@@ -164,6 +166,7 @@ export function useModelMenuController({
 
     current: {
       effort: currentReasoningEffort,
+      effortPending: currentReasoningEffortPending,
       effortWire: currentReasoningEffortWire,
       fast: currentFastMode,
       model: optionsModel,

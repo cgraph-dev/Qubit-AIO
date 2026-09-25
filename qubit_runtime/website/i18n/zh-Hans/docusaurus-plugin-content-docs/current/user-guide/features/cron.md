@@ -6,7 +6,7 @@ description: "用自然语言调度自动化任务，通过单一 cron 工具管
 
 # 定时任务（Cron）
 
-使用自然语言或 cron 表达式调度自动运行的任务。Qubit 通过单一 `cronjob` 工具暴露 cron 管理能力，采用动作式操作，而非分散的 schedule/list/remove 工具。
+使用自然语言或 cron 表达式调度自动运行的任务。Hermes 通过单一 `cronjob` 工具暴露 cron 管理能力，采用动作式操作，而非分散的 schedule/list/remove 工具。
 
 ## Cron 当前能做什么
 
@@ -18,11 +18,12 @@ Cron 任务可以：
 - 将结果回传到来源会话、本地文件或已配置的平台目标
 - 在全新的 agent 会话中运行，使用正常的静态工具列表
 - 以**无 agent 模式**运行——按计划执行脚本，其 stdout 原样投递，零 LLM 参与（参见下方[无 agent 模式](#no-agent-mode-script-only-jobs)章节）
+- 由**外部事件触发**——设置了 `cron_job` 的 webhook 路由会在事情发生的那一刻（PR 收到反馈、服务发出告警）立即触发任务，而不是等待下一次定时 tick。参见[事件触发的 Cron 任务](../messaging/webhooks.md#event-triggered-cron-jobs)。
 
-所有这些功能均可通过 `cronjob` 工具由 Qubit 自身使用，因此你可以用自然语言创建、暂停、编辑和删除任务——无需 CLI。
+所有这些功能均可通过 `cronjob` 工具由 Hermes 自身使用，因此你可以用自然语言创建、暂停、编辑和删除任务——无需 CLI。
 
 :::warning
-Cron 运行的会话不能递归创建更多 cron 任务。Qubit 在 cron 执行内部禁用了 cron 管理工具，以防止失控的调度循环。
+Cron 运行的会话不能递归创建更多 cron 任务。Hermes 在 cron 执行内部禁用了 cron 管理工具，以防止失控的调度循环。
 :::
 
 ## 创建定时任务
@@ -39,9 +40,9 @@ Cron 运行的会话不能递归创建更多 cron 任务。Qubit 在 cron 执行
 ### 从独立 CLI
 
 ```bash
-qubit cron create "every 2h" "Check server status"
-qubit cron create "every 1h" "Summarize new feed items" --skill blogwatcher
-qubit cron create "every 1h" "Use both skills and combine the result" \
+hermes cron create "every 2h" "Check server status"
+hermes cron create "every 1h" "Summarize new feed items" --skill blogwatcher
+hermes cron create "every 1h" "Use both skills and combine the result" \
   --skill blogwatcher \
   --skill maps \
   --name "Skill combo"
@@ -49,13 +50,13 @@ qubit cron create "every 1h" "Use both skills and combine the result" \
 
 ### 通过自然对话
 
-直接向 Qubit 描述：
+直接向 Hermes 描述：
 
 ```text
 Every morning at 9am, check Hacker News for AI news and send me a summary on Telegram.
 ```
 
-Qubit 会在内部使用统一的 `cronjob` 工具。
+Hermes 会在内部使用统一的 `cronjob` 工具。
 
 ## 附带 skill 的 cron 任务
 
@@ -95,7 +96,7 @@ Cron 任务默认与任何代码仓库脱离运行——不加载 `AGENTS.md`、
 
 ```bash
 # 独立 CLI（schedule 和 prompt 为位置参数）
-qubit cron create "every 1d at 09:00" \
+hermes cron create "every 1d at 09:00" \
   "Audit open PRs, summarize CI health, and post to #eng" \
   --workdir /home/me/projects/acme
 ```
@@ -123,11 +124,11 @@ cronjob(
 
 ## 在指定 profile 中运行 cron 任务
 
-默认情况下，cron 任务继承创建它的 gateway/CLI 所属的 Qubit profile。传入 `--profile <name>`（CLI）或 `profile=`（cronjob 工具）可将任务重定向到不同的 profile——调度器会解析该 profile 的 `QUBIT_HOME`，在运行期间临时切换到该 profile，加载其 `.env` 和 `config.yaml`，并在其中执行任务：
+默认情况下，cron 任务继承创建它的 gateway/CLI 所属的 Hermes profile。传入 `--profile <name>`（CLI）或 `profile=`（cronjob 工具）可将任务重定向到不同的 profile——调度器会解析该 profile 的 `HERMES_HOME`，在运行期间临时切换到该 profile，加载其 `.env` 和 `config.yaml`，并在其中执行任务：
 
 ```bash
 # 将任务固定到 `night-ops` profile，无论在哪里调度
-qubit cron create "every 1d at 03:00" \
+hermes cron create "every 1d at 03:00" \
   "Tail the security log and flag anomalies" \
   --profile night-ops
 ```
@@ -142,12 +143,12 @@ cronjob(
 )
 ```
 
-使用 `--profile default` 可显式固定到根 Qubit profile。指定的 profile 必须已存在；调度器不会动态创建 profile。在 `cron edit` 时清除 profile 固定，传入空字符串（`--profile ""` 或 `profile=""`）——任务将恢复在调度器当前所在的 profile 中运行。
+使用 `--profile default` 可显式固定到根 Hermes profile。指定的 profile 必须已存在；调度器不会动态创建 profile。在 `cron edit` 时清除 profile 固定，传入空字符串（`--profile ""` 或 `profile=""`）——任务将恢复在调度器当前所在的 profile 中运行。
 
 如果固定的 profile 后来被删除，调度器会记录警告并回退到在当前 profile 中运行该任务，而不是崩溃——因此过期的 `profile` 引用不会卡住任务。
 
 :::note 串行化
-设置了 `profile` 的任务也串行运行，原因与 `workdir` 固定任务相同：切换 `QUBIT_HOME` 是进程全局变更，两个 profile 固定任务并行运行会产生竞争。未固定的任务仍在正常并行池中运行。
+设置了 `profile` 的任务也串行运行，原因与 `workdir` 固定任务相同：切换 `HERMES_HOME` 是进程全局变更，两个 profile 固定任务并行运行会产生竞争。未固定的任务仍在正常并行池中运行。
 :::
 
 ## 编辑任务
@@ -171,12 +172,12 @@ cronjob(
 ### 独立 CLI
 
 ```bash
-qubit cron edit <job_id> --schedule "every 4h"
-qubit cron edit <job_id> --prompt "Use the revised task"
-qubit cron edit <job_id> --skill blogwatcher --skill maps
-qubit cron edit <job_id> --add-skill maps
-qubit cron edit <job_id> --remove-skill blogwatcher
-qubit cron edit <job_id> --clear-skills
+hermes cron edit <job_id> --schedule "every 4h"
+hermes cron edit <job_id> --prompt "Use the revised task"
+hermes cron edit <job_id> --skill blogwatcher --skill maps
+hermes cron edit <job_id> --add-skill maps
+hermes cron edit <job_id> --remove-skill blogwatcher
+hermes cron edit <job_id> --clear-skills
 ```
 
 注意：
@@ -203,13 +204,13 @@ Cron 任务现在拥有比创建/删除更完整的生命周期。
 ### 独立 CLI
 
 ```bash
-qubit cron list
-qubit cron pause <job_id>
-qubit cron resume <job_id>
-qubit cron run <job_id>
-qubit cron remove <job_id>
-qubit cron status
-qubit cron tick
+hermes cron list
+hermes cron pause <job_id>
+hermes cron resume <job_id>
+hermes cron run <job_id>
+hermes cron remove <job_id>
+hermes cron status
+hermes cron tick
 ```
 
 各操作说明：
@@ -224,17 +225,17 @@ qubit cron tick
 **Cron 执行由 gateway 守护进程处理。** Gateway 每 60 秒 tick 一次调度器，在隔离的 agent 会话中运行到期的任务。
 
 ```bash
-qubit gateway install     # 安装为用户服务
-sudo qubit gateway install --system   # Linux：服务器开机启动的系统服务
-qubit gateway             # 或在前台运行
+hermes gateway install     # 安装为用户服务
+sudo hermes gateway install --system   # Linux：服务器开机启动的系统服务
+hermes gateway             # 或在前台运行
 
-qubit cron list
-qubit cron status
+hermes cron list
+hermes cron status
 ```
 
 ### Gateway 调度器行为
 
-每次 tick 时，Qubit：
+每次 tick 时，Hermes：
 
 1. 从 `~/.hermes/cron/jobs.json` 加载任务
 2. 对照当前时间检查 `next_run_at`
@@ -248,9 +249,9 @@ qubit cron status
 
 ### 执行历史
 
-Qubit 会在执行器或调度提供程序分派之前，将每次已领取的 cron 尝试记录到当前 profile 的 `~/.hermes/cron/executions.db`。尝试会依次进入 `claimed`、`running`，然后进入不可变的终态：`completed`、`failed` 或 `unknown`。重启后，只有原 PID 与进程启动时间指纹能够证明所有者已经消失时，Qubit 才会将遗留尝试标记为 `unknown`。未知尝试仅用于审计，绝不会自动重跑。
+Hermes 会在执行器或调度提供程序分派之前，将每次已领取的 cron 尝试记录到当前 profile 的 `~/.hermes/cron/executions.db`。尝试会依次进入 `claimed`、`running`，然后进入不可变的终态：`completed`、`failed` 或 `unknown`。重启后，只有原 PID 与进程启动时间指纹能够证明所有者已经消失时，Hermes 才会将遗留尝试标记为 `unknown`。未知尝试仅用于审计，绝不会自动重跑。
 
-使用 `qubit cron runs [job-id] --limit 20`（别名：`history`）查看最近的尝试。终态历史有界，活动尝试不会被清理；快速备份也包含该账本。
+使用 `hermes cron runs [job-id] --limit 20`（别名：`history`）查看最近的尝试。终态历史有界，活动尝试不会被清理；快速备份也包含该账本。
 
 ## 投递选项
 
@@ -343,7 +344,7 @@ cron:
 
 行为为**优先使用话题**，范围限定在任务的来源聊天：
 
-- **支持话题的平台**（Telegram 话题、Discord/Slack 话题）：每次投递都会新建
+- **支持话题的平台**（Telegram 话题、Discord/Slack/Matrix 话题）：每次投递都会新建
   专用话题，并将简报植入该话题的会话中，因此在话题内回复即可带完整上下文继续。
 - **仅 DM 的平台**（WhatsApp、Signal、SMS）：不存在话题，因此简报会被镜像进
   来源 DM 会话——DM 本身就是继续的载体。
@@ -427,7 +428,7 @@ cron:
 对于不需要 LLM 推理的周期性任务——经典的看门狗、磁盘/内存告警、心跳、CI ping——在创建时传入 `no_agent=True`。调度器按计划运行你的脚本，并直接投递其 stdout，完全跳过 agent：
 
 ```bash
-qubit cron create "every 5m" \
+hermes cron create "every 5m" \
   --no-agent \
   --script memory-watchdog.sh \
   --deliver telegram \
@@ -446,13 +447,13 @@ qubit cron create "every 5m" \
 
 ### Agent 为你设置这些
 
-`cronjob` 工具的 schema 直接向 Qubit 暴露了 `no_agent`，因此你可以在聊天中描述一个看门狗，让 agent 来配置它：
+`cronjob` 工具的 schema 直接向 Hermes 暴露了 `no_agent`，因此你可以在聊天中描述一个看门狗，让 agent 来配置它：
 
 ```text
 Ping me on Telegram if RAM is over 85%, every 5 minutes.
 ```
 
-Qubit 会通过 `write_file` 将检查脚本写入 `~/.hermes/scripts/`，然后调用：
+Hermes 会通过 `write_file` 将检查脚本写入 `~/.hermes/scripts/`，然后调用：
 
 ```python
 cronjob(action="create", schedule="every 5m",
@@ -462,7 +463,7 @@ cronjob(action="create", schedule="every 5m",
 
 当消息内容完全由脚本决定时（看门狗、阈值告警、心跳），它会自动选择 `no_agent=True`。同一工具也让 agent 可以暂停、恢复、编辑和删除任务——整个生命周期都通过聊天驱动，无需任何人接触 CLI。
 
-参见[纯脚本 Cron 任务指南](/guides/cron-script-only)获取实际示例。
+参见[纯脚本 Cron 任务指南](../../guides/cron-script-only.md)获取实际示例。
 
 ## 通过 `context_from` 串联任务
 
@@ -499,7 +500,7 @@ cronjob(
 
 **工作原理：**
 
-- 任务 2 触发时，Qubit 从 `~/.hermes/cron/output/{job1_id}/*.md` 读取任务 1 的最新输出
+- 任务 2 触发时，Hermes 从 `~/.hermes/cron/output/{job1_id}/*.md` 读取任务 1 的最新输出
 - 该输出自动前置到任务 2 的 prompt
 - 任务 2 无需硬编码"读取此文件"——它以上下文形式接收内容
 - 链可以是任意长度：任务 1 → 任务 2 → 任务 3 → …
@@ -524,13 +525,13 @@ cronjob(
 Cron 任务继承你配置的回退 provider 和凭证池轮换。如果主 API key 被限速或 provider 返回错误，cron agent 可以：
 
 - **回退到备用 provider**，前提是你在 `config.yaml` 中配置了 `fallback_providers`（或旧版 `fallback_model`）
-- **轮换到下一个凭证**，即同一 provider 的[凭证池](/user-guide/configuration#credential-pool-strategies)中的下一个
+- **轮换到下一个凭证**，即同一 provider 的[凭证池](../configuration.md#credential-pool-strategies)中的下一个
 
 这意味着高频运行或在高峰时段运行的 cron 任务更具弹性——单个被限速的 key 不会导致整次运行失败。
 
 ## 调度格式
 
-Agent 的最终响应会自动投递——你**无需**在 cron prompt 中为同一目标包含 `send_message`。如果 cron 运行调用了 `send_message` 且目标与调度器已投递的目标完全相同，Qubit 会跳过该重复发送，并告知模型将面向用户的内容放在最终响应中。仅对额外或不同的目标使用 `send_message`。
+Agent 的最终响应会自动投递——你**无需**在 cron prompt 中为同一目标包含 `send_message`。如果 cron 运行调用了 `send_message` 且目标与调度器已投递的目标完全相同，Hermes 会跳过该重复发送，并告知模型将面向用户的内容放在最终响应中。仅对额外或不同的目标使用 `send_message`。
 
 ### 相对延迟（一次性）
 
@@ -601,10 +602,10 @@ cronjob(action="remove", job_id="...")
 
 ## Cron 任务可用的工具集
 
-Cron 在全新的 agent 会话中运行每个任务，不附加任何聊天平台。默认情况下，cron agent 获得**你在 `qubit tools` 中为 `cron` 平台配置的工具集**——不是 CLI 默认值，也不是所有工具。
+Cron 在全新的 agent 会话中运行每个任务，不附加任何聊天平台。默认情况下，cron agent 获得**你在 `hermes tools` 中为 `cron` 平台配置的工具集**——不是 CLI 默认值，也不是所有工具。
 
 ```bash
-qubit tools
+hermes tools
 # → 在 curses UI 中选择 "cron" 平台
 # → 像 Telegram/Discord 等平台一样切换工具集开关
 ```
@@ -618,11 +619,11 @@ cronjob(action="create", name="weekly-news-summary",
         prompt="Summarize this week's AI news: ...")
 ```
 
-当任务上设置了 `enabled_toolsets` 时，它优先生效；否则 `qubit tools` 的 cron 平台配置生效；否则 Qubit 回退到内置默认值。这对成本控制很重要：在每个小型"获取新闻"任务中携带 `moa`、`browser`、`delegation` 会在每次 LLM 调用时膨胀工具 schema prompt。
+当任务上设置了 `enabled_toolsets` 时，它优先生效；否则 `hermes tools` 的 cron 平台配置生效；否则 Hermes 回退到内置默认值。这对成本控制很重要：在每个小型"获取新闻"任务中携带 `moa`、`browser`、`delegation` 会在每次 LLM 调用时膨胀工具 schema prompt。
 
 ### 完全跳过 agent：`wakeAgent`
 
-如果你的 cron 任务附加了预检脚本（通过 `script=`），脚本可以在运行时决定 Qubit 是否应该调用 agent。在 stdout 最后一行输出如下格式：
+如果你的 cron 任务附加了预检脚本（通过 `script=`），脚本可以在运行时决定 Hermes 是否应该调用 agent。在 stdout 最后一行输出如下格式：
 
 ```text
 {"wakeAgent": false}
@@ -651,7 +652,7 @@ print(json.dumps({"wakeAgent": True, "context": {"new_issues": latest - prev}}))
 **文件变更门控**——仅在被监视文件自上次成功 tick 以来有新内容时运行。调度器记录每个任务的 `last_run_at`；将其与文件的 mtime 比较。
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 # ~/.hermes/scripts/feed-changed.sh
 FEED="$HOME/data/feed.json"
 STATE="$HOME/.hermes/scripts/.feed-changed.last"
@@ -676,7 +677,7 @@ cronjob(action="create", name="process-feed",
 **外部标志门控**——仅在其他进程发出就绪信号时运行（例如，部署 hook 落下一个文件，CI 任务在状态存储中设置一个值）。
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 # ~/.hermes/scripts/flag-ready.sh
 if test -f /tmp/new-data-ready; then
   rm -f /tmp/new-data-ready
@@ -719,7 +720,7 @@ cronjob(action="create", name="summarize-new-msgs",
 同样的模式适用于任何可以从脚本查询的数据源——Postgres、HTTP API、你自己的状态存储——无需将 SQL 求值器内置到 cron 子系统中。
 
 :::tip
-Qubit 自身的 `~/.hermes/state.db` 是内部 schema，会在版本间变更。不要从预运行门控中查询它——指向你自己的数据库或 feed。
+Hermes 自身的 `~/.hermes/state.db` 是内部 schema，会在版本间变更。不要从预运行门控中查询它——指向你自己的数据库或 feed。
 :::
 
 致谢：此方案集由 @iankar8 在 [#2654](https://github.com/NousResearch/hermes-agent/pull/2654) 中的探索所启发，该 PR 提议将 sql/file/command 触发器作为并行机制添加。`script` + `wakeAgent` 门控已以零成本覆盖了所有三种情况，因此该工作以文档形式落地。
@@ -741,7 +742,7 @@ cronjob(action="create", name="daily-digest",
 
 任务存储在 `~/.hermes/cron/jobs.json`。任务运行的输出保存到 `~/.hermes/cron/output/{job_id}/{timestamp}.md`。
 
-任务可能将 `model` 和 `provider` 存储为 `null`。省略这些字段时，Qubit 在执行时从全局配置中解析它们。只有设置了单任务覆盖时，这些字段才会出现在任务记录中。
+任务可能将 `model` 和 `provider` 存储为 `null`。省略这些字段时，Hermes 在执行时从全局配置中解析它们。只有设置了单任务覆盖时，这些字段才会出现在任务记录中。
 
 存储使用原子文件写入，因此中断的写入不会留下部分写入的任务文件。
 

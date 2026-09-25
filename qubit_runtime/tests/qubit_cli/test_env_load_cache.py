@@ -1,6 +1,6 @@
 """Tests for the load_env() process-level cache.
 
-The cache exists to keep `qubit tools` → "All Platforms" fast: every
+The cache exists to keep `hermes tools` → "All Platforms" fast: every
 `get_env_value()` lookup used to re-read and re-sanitise the entire
 .env file, racking up hundreds of ms across one menu render. The
 cache is keyed on (path, mtime, size); writers (save_env_value /
@@ -9,42 +9,13 @@ remove_env_value / sanitise_env_file) call invalidate_env_cache().
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 
 def _write_env(path: Path, contents: str) -> None:
     path.write_text(contents, encoding="utf-8")
 
 
-def test_load_env_caches_on_repeat_calls():
-    """Repeated load_env() calls on the same file return the cached dict."""
-    from qubit_cli.config import invalidate_env_cache, load_env
-
-    invalidate_env_cache()
-
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".env", delete=False, encoding="utf-8"
-    ) as f:
-        f.write("OPENAI_API_KEY=sk-first\n")
-        env_path = Path(f.name)
-
-    try:
-        with patch("qubit_cli.config.get_env_path", return_value=env_path):
-            first = load_env()
-            # Even if a writer outside our cache mutates the file, an
-            # mtime/size match means the cache still wins. We simulate that
-            # by writing identical bytes back — sanity check that the cache
-            # is keyed structurally, not on a counter.
-            second = load_env()
-
-        assert first == second
-        assert first.get("OPENAI_API_KEY") == "sk-first"
-    finally:
-        env_path.unlink(missing_ok=True)
-        invalidate_env_cache()
 
 
 

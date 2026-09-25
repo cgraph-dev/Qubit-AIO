@@ -4,7 +4,7 @@ scope (home + secrets) and never mutate the dashboard process environment.
 Regression for the cross-profile leak class in ``hermes dashboard`` / ``hermes serve``:
 ``_config_profile_scope`` bound only QUBIT_HOME, so ``GET /api/config?profile=B`` expanded B's
 ``${VAR}`` refs to the DEFAULT profile's plaintext credentials (its ``os.environ``), and console
-``send`` for B (``send_cmd._load_hermes_env``) copied B's ``.env`` into the shared process env with
+``send`` for B (``send_cmd._load_qubit_env``) copied B's ``.env`` into the shared process env with
 ``override=True``, so every later default-profile read saw B's tokens.
 """
 
@@ -84,7 +84,7 @@ def test_console_send_for_named_profile_does_not_write_process_env(two_homes, mo
     def fake_send(args):
         import qubit_cli.send_cmd as send_cmd
         from gateway.config import _getenv
-        send_cmd._load_hermes_env()
+        send_cmd._load_qubit_env()
         seen["loader_sees"] = _getenv("TELEGRAM_BOT_TOKEN")
         seen["environ_has"] = "TELEGRAM_BOT_TOKEN" in os.environ
         seen["home"] = Path(os.environ.get("QUBIT_HOME", ""))

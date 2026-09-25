@@ -64,7 +64,7 @@ class ReviewerNeverSpawned(AssertionError):
 
 
 def _seed_review_skill(board: Board) -> None:
-    skill = board.hermes_home / "skills" / "devops" / REVIEW_SKILL
+    skill = board.qubit_home / "skills" / "devops" / REVIEW_SKILL
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text(
         f"---\nname: {REVIEW_SKILL}\ndescription: Review Kanban handoffs (e2e stand-in).\n---\n\n"

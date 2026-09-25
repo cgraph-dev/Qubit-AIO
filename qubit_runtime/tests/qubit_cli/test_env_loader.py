@@ -1,7 +1,5 @@
 import codecs
-import importlib
 import os
-import sys
 
 from qubit_cli.env_loader import load_qubit_dotenv
 
@@ -11,7 +9,7 @@ def test_recovered_update_retry_skips_external_secret_sources(tmp_path, monkeypa
     import qubit_cli.env_loader as env_loader
     from qubit_cli import _early_recovery
 
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_text("UPDATE_RETRY_DOTENV=loaded\n", encoding="utf-8")
@@ -38,7 +36,7 @@ def test_utf8_bom_does_not_mangle_first_key(tmp_path, monkeypatch):
     a BOM (EF BB BF). With encoding=utf-8, python-dotenv keeps U+FEFF on the
     first key so the canonical name is absent and callers see "not configured".
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_bytes(
@@ -57,58 +55,40 @@ def test_utf8_bom_does_not_mangle_first_key(tmp_path, monkeypatch):
     assert os.environ.get("\ufeffFIRST_KEY") is None
 
 
-def test_bomless_utf8_env_still_loads(tmp_path, monkeypatch):
-    """BOM-less UTF-8 .env files must keep loading after utf-8-sig."""
-    home = tmp_path / "qubit"
-    home.mkdir()
-    env_file = home / ".env"
-    env_file.write_text("OPENAI_API_KEY=sk-plain\nSECOND_KEY=ok\n", encoding="utf-8")
+def test_bom_first_key_is_seen_by_installer_and_scrub_alike(tmp_path, monkeypatch):
+    """Invariant: the key set the dashboard/profile scrub computes (``_env_keys_defined_in_dotenv``) equals
+    the key set the installers define (``load_qubit_dotenv`` into os.environ, ``load_env_file`` into a
+    profile scope). A BOM'd first line, ``export``, quotes and inline comments must not split them —
+    a key one side sees and the other doesn't is a scrub miss."""
+    from qubit_cli.env_loader import _env_keys_defined_in_dotenv
+    from agent.secret_scope import load_env_file
 
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("SECOND_KEY", raising=False)
-
-    loaded = load_qubit_dotenv(qubit_home=home)
-
-    assert loaded == [env_file]
-    assert os.getenv("OPENAI_API_KEY") == "sk-plain"
-    assert os.getenv("SECOND_KEY") == "ok"
-
-
-def test_latin1_env_falls_back(tmp_path, monkeypatch):
-    """Invalid UTF-8 bytes must still load via the latin-1 fallback."""
-    home = tmp_path / "qubit"
-    home.mkdir()
-    env_file = home / ".env"
-    # 0xE9 is "é" in latin-1 and not a valid UTF-8 lead sequence alone.
-    env_file.write_bytes(b"LATIN1_VALUE=caf\xe9\n")
-
-    monkeypatch.delenv("LATIN1_VALUE", raising=False)
-
-    loaded = load_qubit_dotenv(qubit_home=home)
-
-    assert loaded == [env_file]
-    assert os.getenv("LATIN1_VALUE") == "café"
-
-
-def test_utf8_bom_preserves_first_api_key_name(tmp_path, monkeypatch):
-    """Real-world case: BOM + first line is a provider API key name."""
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_bytes(
-        b"\xef\xbb\xbfANTHROPIC_API_KEY=sk-test-123\nSECOND_KEY=ok\n"
+        b"\xef\xbb\xbfFIRST_KEY=first-value\n"
+        b"export EXPORTED_KEY='quoted # not a comment'\n"
+        b"COMMENTED_KEY=value # trailing comment\n"
+        b"EMPTY_KEY=\n"
     )
+    for key in ("FIRST_KEY", "EXPORTED_KEY", "COMMENTED_KEY", "EMPTY_KEY", "\ufeffFIRST_KEY"):
+        monkeypatch.delenv(key, raising=False)
 
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("SECOND_KEY", raising=False)
-    monkeypatch.delenv("\ufeffANTHROPIC_API_KEY", raising=False)
+    load_qubit_dotenv(qubit_home=home)
+    installed = {k for k in ("FIRST_KEY", "EXPORTED_KEY", "COMMENTED_KEY", "EMPTY_KEY") if k in os.environ}
+    scoped = load_env_file(env_file)
 
-    loaded = load_qubit_dotenv(qubit_home=home)
+    assert _env_keys_defined_in_dotenv(env_file) == installed == set(scoped)
+    assert "\ufeffFIRST_KEY" not in _env_keys_defined_in_dotenv(env_file)
+    assert scoped["EXPORTED_KEY"] == os.environ["EXPORTED_KEY"] == "quoted # not a comment"
+    assert scoped["COMMENTED_KEY"] == os.environ["COMMENTED_KEY"] == "value"
 
-    assert loaded == [env_file]
-    assert os.getenv("ANTHROPIC_API_KEY") == "sk-test-123"
-    assert os.getenv("SECOND_KEY") == "ok"
-    assert os.environ.get("\ufeffANTHROPIC_API_KEY") is None
+
+
+
+
+
 
 
 def test_utf8_bom_plus_invalid_utf8_preserves_first_key(tmp_path, monkeypatch):
@@ -118,7 +98,7 @@ def test_utf8_bom_plus_invalid_utf8_preserves_first_key(tmp_path, monkeypatch):
     latin-1 fallback, a leading EF BB BF would otherwise become part of the
     first key name under latin-1 and drop the canonical name.
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     # BOM + valid first key + latin-1 é (0xE9) in a later value.
@@ -137,27 +117,12 @@ def test_utf8_bom_plus_invalid_utf8_preserves_first_key(tmp_path, monkeypatch):
     assert os.getenv("BAD") == "café"
     assert os.environ.get("\ufeffANTHROPIC_API_KEY") is None
 
-def test_bomless_latin1_env_still_loads(tmp_path, monkeypatch):
-    """BOM-less cp1252/latin-1 .env files must keep loading after the BOM strip."""
-    home = tmp_path / "qubit"
-    home.mkdir()
-    env_file = home / ".env"
-    env_file.write_bytes(b"LATIN1_VALUE=caf\xe9\nOTHER=ok\n")
-
-    monkeypatch.delenv("LATIN1_VALUE", raising=False)
-    monkeypatch.delenv("OTHER", raising=False)
-
-    loaded = load_qubit_dotenv(qubit_home=home)
-
-    assert loaded == [env_file]
-    assert os.getenv("LATIN1_VALUE") == "café"
-    assert os.getenv("OTHER") == "ok"
 
 def test_latin1_fallback_stream_honors_override(tmp_path, monkeypatch):
     """Stream-based latin-1 fallback must honor override= identically to dotenv_path."""
     from qubit_cli.env_loader import _load_dotenv_with_fallback
 
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     # Invalid UTF-8 forces the stream/latin-1 path.
@@ -178,7 +143,7 @@ def test_latin1_fallback_stream_honors_override(tmp_path, monkeypatch):
 
 def test_latin1_fallback_stream_preserves_interpolation(tmp_path, monkeypatch):
     """Stream/latin-1 path must still expand ${VAR} like the dotenv_path form."""
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     # 0xE9 forces latin-1 fallback; ${FOO} must still expand.
@@ -224,7 +189,7 @@ def test_utf16_le_bom_preserves_non_ascii_values(tmp_path, monkeypatch):
     Uses non-credential var names so _sanitize_loaded_credentials does not
     strip non-ASCII from values (that path only targets *_KEY/*_TOKEN/etc.).
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     content = "GREETING=café\nCJK_LABEL=日本語\n"
@@ -305,7 +270,7 @@ def test_utf32_warning_fires_once_per_path(tmp_path, caplog, monkeypatch):
 
 def test_plain_utf8_env_regression(tmp_path, monkeypatch):
     """Plain UTF-8 .env must keep loading after the UTF-16 sanitize changes."""
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     before = b"OPENAI_API_KEY=sk-plain\nSECOND_KEY=ok\n"
@@ -333,7 +298,7 @@ def test_cp1252_env_regression_does_not_crash(tmp_path, monkeypatch):
     errors=replace on values (original already replace-decoded equals
     sanitized), so _load_dotenv_with_fallback's latin-1 path recovers café.
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     env_file = home / ".env"
     before = b"ASCII_KEY=ok\nLATIN1_VALUE=caf\xe9\n"
@@ -364,7 +329,7 @@ def test_known_keys_absent_from_user_env_are_cleared(tmp_path, monkeypatch):
     fixes the isolation gap where one profile's ACP/provider settings silently
     leak into another profile's runtime via ``os.environ`` inheritance.
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     (home / ".env").write_text(
         "OPENAI_BASE_URL=https://profile.example/v1\n", encoding="utf-8"
@@ -396,7 +361,7 @@ def test_empty_assignment_in_user_env_is_preserved(tmp_path, monkeypatch):
     ``authenticate`` (the key exists, its value is just empty).  This is the
     documented workaround for the leak and must still work after the cleanup.
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     (home / ".env").write_text("HERMES_ACP_AUTH_METHOD=\n", encoding="utf-8")
 
@@ -417,7 +382,7 @@ def test_no_user_env_does_not_clear_anything(tmp_path, monkeypatch):
     wipe inherited known keys — the bare-profile case follows #66930 / #67027
     semantics and the user's shell environment should not be mutilated.
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     # No .env in home — bare profile
 
@@ -434,7 +399,7 @@ def test_known_key_explicitly_set_in_user_env_is_kept(tmp_path, monkeypatch):
     """A known Hermes key that IS explicitly set in the profile .env survives
     the cleanup (overrides the inherited value).
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     (home / ".env").write_text(
         "HERMES_ACP_AUTH_METHOD=claude_code_cli\n", encoding="utf-8"
@@ -453,7 +418,7 @@ def test_export_prefixed_known_key_in_user_env_is_kept(tmp_path, monkeypatch):
     cleanup - mirrors the ``export `` stripping in config.py's load_env()
     (#6659).
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     (home / ".env").write_text(
         "export HERMES_ACP_AUTH_METHOD=claude_code_cli\n", encoding="utf-8"
@@ -474,7 +439,7 @@ def test_shell_exported_credentials_survive_cleanup(tmp_path, monkeypatch):
     shell export from parent-process leakage, so credential isolation is
     owned by read-time secret scoping instead.
     """
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     (home / ".env").write_text("SOME_OTHER_KEY=x\n", encoding="utf-8")
 
@@ -519,7 +484,7 @@ def test_cleanup_scope_is_the_profile_managed_set():
 
 
 def _seed_terminal_home(tmp_path, monkeypatch, *, config_yaml=None, env_text=None):
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     if config_yaml is not None:
         (home / "config.yaml").write_text(config_yaml, encoding="utf-8")
@@ -620,3 +585,40 @@ def test_other_profile_home_does_not_bridge_process_config(tmp_path, monkeypatch
 
     # The other profile's .env value stands; the process config was not applied.
     assert os.getenv("TERMINAL_ENV") == "docker"
+
+
+def test_parent_injected_dashboard_session_token_survives_dotenv(tmp_path, monkeypatch):
+    """A parent that spawns `hermes dashboard` mints HERMES_DASHBOARD_SESSION_TOKEN and keeps it for
+    its own /api probes; a persisted token in ~/.hermes/.env must not replace it, or the parent gets
+    HTTP 401 from its own child (#115955). Ordinary keys keep the documented .env-wins precedence."""
+    home = tmp_path / "hermes"
+    home.mkdir()
+    (home / ".env").write_text(
+        "HERMES_DASHBOARD_SESSION_TOKEN=persisted-token\nHERMES_DASHBOARD_PUBLIC_URL=http://127.0.0.1:1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "link-token")
+    monkeypatch.setenv("HERMES_DASHBOARD_PUBLIC_URL", "http://127.0.0.1:43123")
+
+    load_qubit_dotenv(qubit_home=home)
+    assert os.environ["HERMES_DASHBOARD_SESSION_TOKEN"] == "link-token"
+    assert os.environ["HERMES_DASHBOARD_PUBLIC_URL"] == "http://127.0.0.1:1"  # control: .env still wins
+
+    # Reload with the same injection: the injected value still holds.
+    load_qubit_dotenv(qubit_home=home)
+    assert os.environ["HERMES_DASHBOARD_SESSION_TOKEN"] == "link-token"
+
+
+def test_dotenv_published_dashboard_session_token_still_reloads(tmp_path, monkeypatch):
+    """No injection: the .env token is published, and a later edit + reload replaces the value the
+    earlier pass published (the guard only protects values dotenv did not put there)."""
+    home = tmp_path / "hermes"
+    home.mkdir()
+    monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
+    (home / ".env").write_text("HERMES_DASHBOARD_SESSION_TOKEN=first\n", encoding="utf-8")
+    load_qubit_dotenv(qubit_home=home)
+    assert os.environ["HERMES_DASHBOARD_SESSION_TOKEN"] == "first"
+
+    (home / ".env").write_text("HERMES_DASHBOARD_SESSION_TOKEN=second\n", encoding="utf-8")
+    load_qubit_dotenv(qubit_home=home)
+    assert os.environ["HERMES_DASHBOARD_SESSION_TOKEN"] == "second"

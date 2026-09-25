@@ -14,6 +14,8 @@ without any external IDP.  Exercises:
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from fastapi.testclient import TestClient
@@ -145,7 +147,7 @@ def _complete_stub_login(client) -> None:
     """Walk the stub OAuth round trip so ``client`` carries a valid session.
 
     TestClient persists Set-Cookie across calls, so after this returns the
-    client's cookie jar holds ``qubit_session_at`` / ``qubit_session_rt``
+    client's cookie jar holds ``hermes_session_at`` / ``hermes_session_rt``
     and subsequent gated requests authenticate.
     """
     r1 = client.get("/auth/login?provider=stub", follow_redirects=False)
@@ -257,6 +259,38 @@ def test_invalid_cookie_returns_401_on_api(gated_app):
     assert r.status_code == 401
 
 
+def test_bearer_401_audits_client_facing_reason(gated_app, tmp_path):
+    """A rejected app bearer is a 401 the operator can see in the audit log.
+
+    The reason written to disk is the same reason returned to the client.
+    The bearer value itself must not appear in the log.
+    """
+    bearer = "stale-app-bearer-do-not-log"
+    response = gated_app.post(
+        "/api/auth/ws-ticket",
+        headers={"Authorization": f"Bearer {bearer}"},
+    )
+    assert response.status_code == 401
+    body = response.json()
+    assert body["reason"] == "invalid_or_expired_session"
+
+    log_path = tmp_path / "hermes_test" / "logs" / "dashboard-auth.log"
+    raw = log_path.read_text(encoding="utf-8")
+    assert bearer not in raw
+    rejected = [
+        event
+        for line in raw.splitlines()
+        if line.strip()
+        for event in [json.loads(line)]
+        if event.get("event") == "session_rejected"
+    ]
+    assert rejected, raw
+    latest = rejected[-1]
+    assert latest["reason"] == body["reason"]
+    assert latest["path"] == "/api/auth/ws-ticket"
+    assert latest.get("ip")
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -330,12 +364,12 @@ def _mint_stub_at(stub: StubAuthProvider) -> str:
     ls = stub.start_login(redirect_uri="https://fly-app.fly.dev/auth/callback")
     state = dict(
         seg.split("=", 1)
-        for seg in ls.cookie_payload["qubit_session_pkce"].split(";")
+        for seg in ls.cookie_payload["hermes_session_pkce"].split(";")
         if "=" in seg
     )["state"]
     verifier = dict(
         seg.split("=", 1)
-        for seg in ls.cookie_payload["qubit_session_pkce"].split(";")
+        for seg in ls.cookie_payload["hermes_session_pkce"].split(";")
         if "=" in seg
     )["verifier"]
     session = stub.complete_login(

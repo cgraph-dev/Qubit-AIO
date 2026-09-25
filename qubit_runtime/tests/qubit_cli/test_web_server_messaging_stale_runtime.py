@@ -14,17 +14,17 @@ _VALID_BOT_TOKEN = "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_1234"
 
 
 @pytest.fixture
-def client(monkeypatch, _isolate_hermes_home):
+def client(monkeypatch, _isolate_qubit_home):
     try:
         from starlette.testclient import TestClient
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
 
     import qubit_state
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from qubit_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
-    home = get_hermes_home()
+    home = get_qubit_home()
     monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", home / "state.db")
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     (home / ".env").write_text(f"TELEGRAM_BOT_TOKEN={_VALID_BOT_TOKEN}\nTELEGRAM_ALLOWED_USERS=42\n", encoding="utf-8")
@@ -59,9 +59,9 @@ def test_operator_stopped_gateway_does_not_report_retained_startup_failure(clien
     """``hermes gateway stop`` keeps the last ``startup_failed`` + ``exit_reason`` on disk with
     ``desired_state: stopped``; the Channels page must read that as stopped, exactly like
     ``/api/status`` does, not wear a "Start failed" badge with the stale reason (#112517)."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
-    (get_hermes_home() / "gateway_state.json").write_text(json.dumps({
+    (get_qubit_home() / "gateway_state.json").write_text(json.dumps({
         "kind": "gateway", "pid": 999_999_999, "start_time": 1.0,
         "gateway_state": "startup_failed", "desired_state": "stopped",
         "exit_reason": "Port 8642 already in use", "updated_at": "2026-01-01T00:00:00+00:00",

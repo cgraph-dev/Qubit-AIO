@@ -98,7 +98,7 @@ def _slash(b: TuiBackend, sid: str, command: str) -> str:
 class Store:
     b: TuiBackend
     sid: str
-    hermes_home: Path
+    qubit_home: Path
     outside: Path
     memory_ids: list[str]
     memory_texts: list[str]
@@ -106,11 +106,11 @@ class Store:
     skill_texts: list[str]
 
     def pending_ids(self, subsystem: str) -> set[str]:
-        d = self.hermes_home / "pending" / subsystem
+        d = self.qubit_home / "pending" / subsystem
         return {p.stem for p in d.glob("*.json")} if d.is_dir() else set()
 
     def memory_blob(self) -> str:
-        d = self.hermes_home / "memories"
+        d = self.qubit_home / "memories"
         return "".join(p.read_text(encoding="utf-8", errors="replace") for p in d.glob("*")) if d.is_dir() else ""
 
 
@@ -137,7 +137,7 @@ def store(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Store]:
             ids = [r["pending_id"] for r in staged]
             s = Store(b, sid, home / ".hermes", outside, ids[:3], memory_texts, ids[3:], skill_texts)
             assert s.pending_ids("memory") == set(ids[:3]) and s.pending_ids("skills") == set(ids[3:]), \
-                f"pending store on disk does not match the staged ids: {sorted((s.hermes_home / 'pending').rglob('*'))}"
+                f"pending store on disk does not match the staged ids: {sorted((s.qubit_home / 'pending').rglob('*'))}"
             yield s
         finally:
             b.close()
@@ -147,7 +147,7 @@ def _plant_victim(s: Store, where: str) -> tuple[Path, str, str]:
     """A record-shaped JSON file outside the store: ``(path, id spelling, canary)``. Record-shaped so a
     traversal that reaches it is observable on every verb (reject deletes it, approve applies its payload,
     diff prints its summary)."""
-    victim, spelled = ((s.hermes_home / "auth.json", "../../auth") if where == "home"
+    victim, spelled = ((s.qubit_home / "auth.json", "../../auth") if where == "home"
                        else (s.outside / "victim.json", str(s.outside / "victim")))
     mark = H.canary("victim")
     victim.write_text(json.dumps({"id": spelled, "subsystem": "memory", "summary": mark, "origin": "foreground",

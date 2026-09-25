@@ -417,7 +417,7 @@ def test_dashboard_action_boots_selected_dependencies(tmp_path, monkeypatch):
     select_generation(repo, 'current', 'selected')
     monkeypatch.setattr(web_server, "PROJECT_ROOT", repo)
     monkeypatch.setattr(web_server_gateway, "_ACTION_LOG_DIR", home / "logs")
-    proc = web_server_gateway._spawn_hermes_action(["--version"], "gateway-restart")
+    proc = web_server_gateway._spawn_qubit_action(["--version"], "gateway-restart")
     try:
         assert proc.wait(timeout=30) == 7
         log = (home / "logs" / web_server_gateway._ACTION_LOG_FILES["gateway-restart"]).read_text(encoding="utf-8-sig")

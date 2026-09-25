@@ -12,9 +12,9 @@
  *  - `/my-page?item=x` / `#/my-page?item=x` (hash-router paths)
  */
 
-export type QubitOpenTarget = string | { href: string } | { path: string; params?: Record<string, string> }
+export type HermesOpenTarget = string | { href: string } | { path: string; params?: Record<string, string> }
 
-const QUBIT_PROTOCOL = 'hermes:'
+const HERMES_PROTOCOL = 'hermes:'
 
 /** Hostnames owned by core deep-link handlers — never treated as plugin routes. */
 const RESERVED_DEEP_LINK_KINDS = new Set([
@@ -66,7 +66,7 @@ function isPluginDeepLinkHost(host: string): boolean {
 }
 
 /** Normalize a string target to a hash-router path, or null. */
-export function normalizeQubitOpenString(raw: string): string | null {
+export function normalizeHermesOpenString(raw: string): string | null {
   const trimmed = raw.trim()
 
   if (!trimmed) {
@@ -121,13 +121,13 @@ export function normalizeQubitOpenString(raw: string): string | null {
 }
 
 /** Resolve any supported activate/open target to a hash-router path, or null. */
-export function resolveQubitOpenPath(target: QubitOpenTarget | null | undefined): string | null {
+export function resolveHermesOpenPath(target: HermesOpenTarget | null | undefined): string | null {
   if (target == null) {
     return null
   }
 
   if (typeof target === 'string') {
-    return normalizeQubitOpenString(target)
+    return normalizeHermesOpenString(target)
   }
 
   if (typeof target !== 'object') {
@@ -135,11 +135,11 @@ export function resolveQubitOpenPath(target: QubitOpenTarget | null | undefined)
   }
 
   if ('href' in target && typeof target.href === 'string') {
-    return normalizeQubitOpenString(target.href)
+    return normalizeHermesOpenString(target.href)
   }
 
   if ('path' in target && typeof target.path === 'string') {
-    const base = normalizeQubitOpenString(target.path)
+    const base = normalizeHermesOpenString(target.path)
 
     if (!base) {
       return null
@@ -155,23 +155,23 @@ export function resolveQubitOpenPath(target: QubitOpenTarget | null | undefined)
  * Build a navigate path from a parsed deep-link payload
  * (`hermes://<kind>/<name>?…` → kind/name/params).
  */
-export function pathFromQubitDeepLink(kind: string, name: string, params: Record<string, string> = {}): string | null {
+export function pathFromHermesDeepLink(kind: string, name: string, params: Record<string, string> = {}): string | null {
   if (!kind || !name) {
     return null
   }
 
   if (kind === 'open') {
-    return resolveQubitOpenPath({ path: `/${name.replace(/^\//, '')}`, params })
+    return resolveHermesOpenPath({ path: `/${name.replace(/^\//, '')}`, params })
   }
 
   if (!isPluginDeepLinkHost(kind)) {
     return null
   }
 
-  return resolveQubitOpenPath({ path: `/${kind}/${name.replace(/^\//, '')}`, params })
+  return resolveHermesOpenPath({ path: `/${kind}/${name.replace(/^\//, '')}`, params })
 }
 
 /** Convenience for `hermes://open/<name>?…` payloads. */
 export function pathFromOpenDeepLink(name: string, params: Record<string, string> = {}): string | null {
-  return pathFromQubitDeepLink('open', name, params)
+  return pathFromHermesDeepLink('open', name, params)
 }

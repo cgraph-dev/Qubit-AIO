@@ -1,16 +1,20 @@
 ---
 sidebar_position: 5
 title: "Microsoft Teams"
-description: "Set up Qubit Agent as a Microsoft Teams bot"
+description: "Set up Hermes Agent as a Microsoft Teams bot"
 ---
 
 # Microsoft Teams Setup
 
-Connect Qubit Agent to Microsoft Teams as a bot. Unlike Slack's Socket Mode, Teams delivers messages by calling a **public HTTPS webhook**, so your instance needs a publicly reachable endpoint — either a dev tunnel (local dev) or a real domain (production).
+Python dependency commands on this page use a
+[PM-prepared source checkout](../../reference/package-management.md#developer-workflow).
+After a dependency change, reactivate the checkout and restart Hermes.
 
-Need meeting summaries from Microsoft Graph events rather than normal bot conversations? Use the dedicated setup page: [Teams Meetings](/user-guide/messaging/teams-meetings).
+Connect Hermes Agent to Microsoft Teams as a bot. Unlike Slack's Socket Mode, Teams delivers messages by calling a **public HTTPS webhook**, so your instance needs a publicly reachable endpoint — either a dev tunnel (local dev) or a real domain (production).
 
-> Run `qubit gateway setup` and pick **Microsoft Teams** for a guided walk-through.
+Need meeting summaries from Microsoft Graph events rather than normal bot conversations? Use the dedicated setup page: [Teams Meetings](./teams-meetings.md).
+
+> Run `hermes gateway setup` and pick **Microsoft Teams** for a guided walk-through.
 
 ## How the Bot Responds
 
@@ -20,7 +24,9 @@ Need meeting summaries from Microsoft Graph events rather than normal bot conver
 | **Group chat** | Bot only responds when @mentioned. |
 | **Channel** | Bot only responds when @mentioned. |
 
-Teams delivers @mentions as regular messages with `<at>BotName</at>` tags, which Qubit strips automatically before processing.
+Teams delivers @mentions as regular messages with `<at>BotName</at>` tags, which Hermes strips automatically before processing.
+
+Without resource-specific consent (RSC) Teams only delivers messages that @mention the bot, so no filtering is needed. Once the app manifest grants `ChannelMessage.Read.Group` or `ChatMessage.Read.Chat`, Teams delivers **every** message in the conversation — set `require_mention: true` (or `TEAMS_REQUIRE_MENTION=true`) so the bot only answers channel/group-chat messages that @mention it or reply to one of its own messages. Personal chats are never gated, and a gated message is dropped before its attachments are downloaded.
 
 ---
 
@@ -28,9 +34,7 @@ For source or local installs, include the Teams extra so the bundled adapter can
 import the Microsoft Teams SDK:
 
 ```bash
-uv sync --extra teams
-# or, for editable installs:
-uv pip install -e ".[teams]"
+python -c "import pm; pm.sync_venv(['teams'], explicit=True)"
 ```
 
 ## Step 1: Install the Teams CLI
@@ -69,7 +73,7 @@ cloudflared tunnel --url http://localhost:3978  # replace 3978 with TEAMS_PORT i
 
 Copy the `https://` URL from the output — you'll use it in the next step. Leave the tunnel running while developing.
 
-The public tunnel URL uses HTTPS, but Qubit' local webhook listener uses plain HTTP. The tunnel terminates TLS and forwards HTTP to port `3978`; do not configure the local tunnel port as HTTPS.
+The public tunnel URL uses HTTPS, but Hermes' local webhook listener uses plain HTTP. The tunnel terminates TLS and forwards HTTP to port `3978`; do not configure the local tunnel port as HTTPS.
 
 For production, point your bot's endpoint at your server's public domain instead (see [Production Deployment](#production-deployment)).
 
@@ -79,7 +83,7 @@ For production, point your bot's endpoint at your server's public domain instead
 
 ```bash
 teams app create \
-  --name "Qubit" \
+  --name "Hermes" \
   --endpoint "https://<your-tunnel-url>/api/messages"
 ```
 
@@ -113,18 +117,20 @@ cd /path/to/hermes-agent
 HERMES_UID=$(id -u) HERMES_GID=$(id -g) docker compose up -d gateway
 ```
 
-**Native / systemd install** (typical `qubit` one-liner installer under `~/.hermes/hermes-agent`):
+**Native / systemd install** (typical `hermes` one-liner installer under `~/.hermes/hermes-agent`):
 
 ```bash
-qubit gateway restart
-# or foreground: qubit gateway run
+hermes gateway restart
+# or foreground: hermes gateway run
 ```
 
-The Teams SDK is optional; when Teams is enabled, the gateway lazy-installs it into Qubit' own venv on first start (do **not** use system `pip install` on Ubuntu 24.04 — that hits PEP 668 `externally-managed-environment`). To install manually into the Qubit venv:
+The Teams SDK is optional. When policy permits, the gateway requests the
+`teams` extra through PM on first start. PM prepares a complete environment
+instead of modifying the running interpreter. To request the extra explicitly
+from the prepared source checkout:
 
 ```bash
-~/.hermes/hermes-agent/venv/bin/pip install microsoft-teams-apps aiohttp
-# or from a clone of the agent: uv sync --extra teams
+python -c "import pm; pm.sync_venv(['teams'], explicit=True)"
 ```
 
 The default webhook port is `3978` (override with `TEAMS_PORT`). Check that it's running:
@@ -132,9 +138,9 @@ The default webhook port is `3978` (override with `TEAMS_PORT`). Check that it's
 ```bash
 curl http://localhost:3978/health   # should return: ok
 # Docker:
-docker logs -f qubit
+docker logs -f hermes
 # Native:
-qubit gateway status -l
+hermes gateway status -l
 ```
 
 Look for:
@@ -168,6 +174,7 @@ Open the printed link in your browser — it opens directly in the Teams client.
 | `TEAMS_HOME_CHANNEL` | Conversation ID for cron/proactive message delivery |
 | `TEAMS_HOME_CHANNEL_NAME` | Display name for the home channel |
 | `TEAMS_PORT` | Webhook port (default: `3978`) |
+| `TEAMS_REQUIRE_MENTION` | Set `true` to answer only @mentions / replies to the bot in channels and group chats (default: `false`; for apps with RSC message-read consent) |
 
 ### config.yaml
 
@@ -182,6 +189,7 @@ platforms:
       client_secret: "your-secret"
       tenant_id: "your-tenant-id"
       port: 3978
+    require_mention: false   # true once the app has RSC message-read consent
 ```
 
 ---
@@ -201,7 +209,7 @@ Clicking a button resolves the approval inline and replaces the card with the de
 
 ### Meeting Summary Delivery (Teams Meeting Pipeline)
 
-When the [Teams meeting pipeline plugin](/user-guide/messaging/msgraph-webhook) is enabled, this adapter also handles outbound delivery of meeting summaries — one Teams integration surface, not two. After a meeting's transcript is summarized, the writer posts the summary into your chosen Teams target.
+When the [Teams meeting pipeline plugin](./msgraph-webhook.md) is enabled, this adapter also handles outbound delivery of meeting summaries — one Teams integration surface, not two. After a meeting's transcript is summarized, the writer posts the summary into your chosen Teams target.
 
 Pipeline summary delivery is configured under the `teams` platform entry alongside the bot config:
 
@@ -226,7 +234,7 @@ platforms:
 | Mode | Use when | Trade-off |
 |------|----------|-----------|
 | `incoming_webhook` | Simple "post a summary into this channel" with a static Teams-generated URL. | No reply threading, no reactions, shows as the webhook's configured identity. |
-| `graph` | Threaded channel posts or 1:1/group chat posts under the bot's identity via Microsoft Graph. | Requires the [Graph app registration](/guides/microsoft-graph-app-registration) with `ChannelMessage.Send` (channel) or `Chat.ReadWrite.All` (chat) application permissions. |
+| `graph` | Threaded channel posts or 1:1/group chat posts under the bot's identity via Microsoft Graph. | Requires the [Graph app registration](../../guides/microsoft-graph-app-registration.md) with `ChannelMessage.Send` (channel) or `Chat.ReadWrite.All` (chat) application permissions. |
 
 If the `teams_pipeline` plugin is **not** enabled, these settings are inert — they only wire up when the pipeline runtime binds to the Graph webhook ingress.
 
@@ -234,11 +242,11 @@ If the `teams_pipeline` plugin is **not** enabled, these settings are inert — 
 
 ## Production Deployment
 
-For a permanent server, terminate TLS at a reverse proxy and forward requests to the plain HTTP Qubit listener, normally `http://127.0.0.1:3978`. Register the proxy's public HTTPS endpoint with Teams:
+For a permanent server, terminate TLS at a reverse proxy and forward requests to the plain HTTP Hermes listener, normally `http://127.0.0.1:3978`. Register the proxy's public HTTPS endpoint with Teams:
 
 ```bash
 teams app create \
-  --name "Qubit" \
+  --name "Hermes" \
   --endpoint "https://your-domain.com/api/messages"
 ```
 
@@ -248,7 +256,7 @@ If you've already created the bot and just need to update the endpoint:
 teams app update --id <teamsAppId> --endpoint "https://your-domain.com/api/messages"
 ```
 
-Make sure the public HTTPS endpoint is reachable from the internet and uses a valid TLS certificate. Teams rejects self-signed certificates. Keep the Qubit listener behind the proxy; port `3978` does not serve HTTPS itself.
+Make sure the public HTTPS endpoint is reachable from the internet and uses a valid TLS certificate. Teams rejects self-signed certificates. Keep the Hermes listener behind the proxy; port `3978` does not serve HTTPS itself.
 
 ---
 
@@ -256,16 +264,16 @@ Make sure the public HTTPS endpoint is reachable from the internet and uses a va
 
 | Problem | Solution |
 |---------|----------|
-| `Can't find a suitable configuration file` from `docker compose` | You are not in the repo that has `docker-compose.yml`, or you are on a native install — use `qubit gateway restart` instead, or `cd` into the clone first |
-| `requirements not met` / `Teams SDK missing` / `No adapter available for teams` | Restart gateway so lazy-install can run, or install into the **Qubit venv**: `~/.hermes/hermes-agent/venv/bin/pip install microsoft-teams-apps aiohttp`. System `pip` fails on Ubuntu 24.04 (PEP 668) and would not affect the service anyway |
+| `Can't find a suitable configuration file` from `docker compose` | You are not in the repo that has `docker-compose.yml`, or you are on a native install — use `hermes gateway restart` instead, or `cd` into the clone first |
+| `requirements not met` / `Teams SDK missing` / `No adapter available for teams` | Request the `teams` extra through PM as shown above, then restart the gateway. Do not install into a system Python or mutate the Hermes environment. |
 | `health` endpoint works but bot doesn't respond | Check that your tunnel is still running and the bot's messaging endpoint matches the tunnel URL |
-| Logs show `"UNKNOWN / HTTP/1.0" 400` when Teams sends a message | The tunnel or reverse proxy is forwarding HTTPS to Qubit' plain HTTP listener. Terminate TLS at the proxy and forward HTTP to port `3978` |
+| Logs show `"UNKNOWN / HTTP/1.0" 400` when Teams sends a message | The tunnel or reverse proxy is forwarding HTTPS to Hermes' plain HTTP listener. Terminate TLS at the proxy and forward HTTP to port `3978` |
 | `KeyError: 'teams'` in logs | Restart the container — this is fixed in the current version |
 | Bot responds with auth errors | Verify `TEAMS_CLIENT_ID`, `TEAMS_CLIENT_SECRET`, and `TEAMS_TENANT_ID` are all set correctly |
 | `No inference provider configured` | Check that `ANTHROPIC_API_KEY` (or another provider key) is set in `~/.hermes/.env` |
 | Bot receives messages but ignores them | Your AAD object ID may not be in `TEAMS_ALLOWED_USERS`. Run `teams status --verbose` to find it |
 | Tunnel URL changes on restart | devtunnel URLs are persistent if you use a named tunnel (`devtunnel create hermes-bot`). ngrok and cloudflared generate a new URL each run unless you have a paid plan — update the bot endpoint with `teams app update` when it changes |
-| Teams shows "This bot is not responding" | The webhook returned an error. Check `docker logs qubit` / `qubit gateway status -l` for tracebacks |
+| Teams shows "This bot is not responding" | The webhook returned an error. Check `docker logs hermes` / `hermes gateway status -l` for tracebacks |
 | `[teams] Failed to connect` in logs | The SDK failed to authenticate. Double-check your credentials and that the tenant ID matches the account you used in `teams login` |
 
 ---
@@ -284,5 +292,5 @@ Treat `TEAMS_CLIENT_SECRET` like a password — rotate it periodically via the A
 
 ## Related Docs
 
-- [Teams Meetings](/user-guide/messaging/teams-meetings)
-- [Operate the Teams Meeting Pipeline](/guides/operate-teams-meeting-pipeline)
+- [Teams Meetings](./teams-meetings.md)
+- [Operate the Teams Meeting Pipeline](../../guides/operate-teams-meeting-pipeline.md)

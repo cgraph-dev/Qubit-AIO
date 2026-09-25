@@ -15,18 +15,18 @@ Weekly reset: commitments, stalled work, next-week plan.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/productivity\weekly-review-planning` |
+| Path | `skills/productivity/weekly-review-planning` |
 | Version | `0.1.0` |
-| Author | Ben Barclay (benbarclay), Qubit Agent |
+| Author | Ben Barclay (benbarclay), Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Weekly-Review`, `Planning`, `Tasks`, `Calendar`, `Productivity` |
-| Related skills | [`obsidian`](/docs/user-guide/skills/bundled/note-taking/note-taking-obsidian), [`notion`](/docs/user-guide/skills/bundled/productivity/productivity-notion), [`airtable`](/docs/user-guide/skills/bundled/productivity/productivity-airtable), [`google-workspace`](/docs/user-guide/skills/bundled/productivity/productivity-google-workspace), [`email-inbox-triage`](/docs/user-guide/skills/bundled/email/email-email-inbox-triage) |
+| Related skills | [`obsidian`](../../bundled/note-taking/note-taking-obsidian.md), [`notion`](../../bundled/productivity/productivity-notion.md), [`airtable`](../../bundled/productivity/productivity-airtable.md), [`google-workspace`](../../bundled/productivity/productivity-google-workspace.md), [`email-inbox-triage`](../../bundled/email/email-email-inbox-triage.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Weekly Review and Planning

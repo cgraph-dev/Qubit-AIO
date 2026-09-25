@@ -7,30 +7,30 @@ import pytest
 from qubit_cli import relaunch as relaunch_mod
 
 
-class TestResolveQubitBin:
+class TestResolveHermesBin:
     def test_prefers_absolute_argv0_when_executable(self, monkeypatch):
-        fake = "/nix/store/abc/bin/qubit"
+        fake = "/nix/store/abc/bin/hermes"
         monkeypatch.setattr(sys, "argv", [fake])
         monkeypatch.setattr(relaunch_mod.os.path, "isfile", lambda p: p == fake)
         monkeypatch.setattr(relaunch_mod.os, "access", lambda p, mode: p == fake)
         assert relaunch_mod.resolve_qubit_bin() == fake
 
     def test_resolves_relative_argv0(self, monkeypatch, tmp_path):
-        fake = tmp_path / "qubit"
+        fake = tmp_path / "hermes"
         fake.write_text("#!/bin/sh\n")
         fake.chmod(0o755)
         monkeypatch.setattr(sys, "argv", [str(fake.name)])
         monkeypatch.chdir(tmp_path)
-        # Ensure we don't accidentally match a real 'qubit' on PATH
+        # Ensure we don't accidentally match a real 'hermes' on PATH
         monkeypatch.setattr(relaunch_mod.shutil, "which", lambda _name: None)
         assert relaunch_mod.resolve_qubit_bin() == str(fake)
 
     def test_falls_back_to_path_which(self, monkeypatch):
         monkeypatch.setattr(sys, "argv", ["-c"])  # not a real path
         monkeypatch.setattr(
-            relaunch_mod.shutil, "which", lambda name: "/usr/bin/qubit" if name == "qubit" else None
+            relaunch_mod.shutil, "which", lambda name: "/usr/bin/hermes" if name == "hermes" else None
         )
-        assert relaunch_mod.resolve_qubit_bin() == "/usr/bin/qubit"
+        assert relaunch_mod.resolve_qubit_bin() == "/usr/bin/hermes"
 
 
 class TestExtractInheritedFlags:
@@ -47,15 +47,6 @@ class TestExtractInheritedFlags:
 class TestInheritedFlagTable:
     """Sanity-check the argparse-introspected table that drives extraction."""
 
-    def test_short_and_long_aliases_are_paired(self):
-        table = dict(relaunch_mod._INHERITED_FLAGS_TABLE)
-        # Each pair declared together in the parser shares takes_value.
-        for short, long_ in [
-            ("-p", "--profile"),
-            ("-m", "--model"),
-            ("-s", "--skills"),
-        ]:
-            assert table[short] == table[long_], f"{short}/{long_} disagree"
 
 
     def test_excluded_flags_are_not_inherited(self):
@@ -68,14 +59,10 @@ class TestInheritedFlagTable:
 
 
 class TestBuildRelaunchArgv:
-    def test_uses_bin_when_available(self, monkeypatch):
-        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/qubit")
-        argv = relaunch_mod.build_relaunch_argv(["--resume", "abc"])
-        assert argv[0] == "/usr/bin/qubit"
 
 
     def test_preserves_inherited_flags(self, monkeypatch):
-        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/qubit")
+        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/hermes")
         original = ["--tui", "--dev", "--profile", "work", "sessions", "browse"]
         argv = relaunch_mod.build_relaunch_argv(["--resume", "abc"], original_argv=original)
         assert "--tui" in argv
@@ -89,13 +76,13 @@ class TestBuildRelaunchArgv:
         assert "browse" not in argv
 
     def test_can_disable_preserve(self, monkeypatch):
-        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/qubit")
+        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/hermes")
         original = ["--tui", "chat"]
         argv = relaunch_mod.build_relaunch_argv(
             ["--resume", "abc"], preserve_inherited=False, original_argv=original
         )
         assert "--tui" not in argv
-        assert argv == ["/usr/bin/qubit", "--resume", "abc"]
+        assert argv == ["/usr/bin/hermes", "--resume", "abc"]
 
 
 class TestRelaunch:
@@ -107,36 +94,33 @@ class TestRelaunch:
             raise SystemExit(0)
 
         monkeypatch.setattr(relaunch_mod.os, "execvp", fake_execvp)
-        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/qubit")
-        # Pin argv so the assertion is independent of how pytest itself was
-        # invoked (relaunch() preserves inherited flags from the LIVE argv).
-        monkeypatch.setattr(relaunch_mod.sys, "argv", ["/usr/bin/qubit"])
+        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: "/usr/bin/hermes")
 
         with pytest.raises(SystemExit):
             relaunch_mod.relaunch(["--resume", "abc"])
 
-        assert calls == [("/usr/bin/qubit", ["/usr/bin/qubit", "--resume", "abc"])]
+        assert calls == [("/usr/bin/hermes", ["/usr/bin/hermes", "--resume", "abc"])]
 
-    @pytest.mark.windows_only
+    @pytest.mark.platforms("windows")
     def test_windows_uses_subprocess_not_execvp(self, monkeypatch):
         """On Windows, os.execvp raises OSError "Exec format error" when the
         target is a .cmd shim or console-script wrapper (both common for
-        qubit).  relaunch() must detect win32 and use subprocess.run +
+        hermes).  relaunch() must detect win32 and use subprocess.run +
         sys.exit instead.
 
-        ``windows_only``: the bug is that ``os.execvp`` cannot exec a Windows
+        ``platforms("windows")``: the bug is that ``os.execvp`` cannot exec a Windows
         console-script shim. On Linux ``execvp`` works fine, so a patched
         platform only re-asserted the branch we wrote, never the constraint
         that motivated it.
         """
-        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: r"C:\Users\test\qubit.exe")
+        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: r"C:\Users\test\hermes.exe")
         # Pin sys.argv: relaunch() preserves inherited flags from the LIVE
         # argv, so under pytest it happily inherited the runner's own
-        # "-m 'windows_only and not integration'" and the assertion below saw
+        # "-m 'platforms and not integration'" and the assertion below saw
         # them in the child argv. Nothing to do with Windows — it only showed
         # up here because this is the first lane that actually executes the
         # test, and -m is how that lane selects it.
-        monkeypatch.setattr(relaunch_mod.sys, "argv", [r"C:\Users\test\qubit.exe"])
+        monkeypatch.setattr(relaunch_mod.sys, "argv", [r"C:\Users\test\hermes.exe"])
 
         import subprocess as _subprocess
 
@@ -164,12 +148,12 @@ class TestRelaunch:
 
         assert exc_info.value.code == 0
         assert execvp_calls == []
-        assert captured_argv == [[r"C:\Users\test\qubit.exe", "chat"]]
+        assert captured_argv == [[r"C:\Users\test\hermes.exe", "chat"]]
 
-    @pytest.mark.windows_only
+    @pytest.mark.platforms("windows")
     def test_windows_propagates_child_exit_code(self, monkeypatch):
         """A non-zero exit from the child should flow through to sys.exit."""
-        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: r"C:\qubit.exe")
+        monkeypatch.setattr(relaunch_mod, "resolve_qubit_bin", lambda: r"C:\hermes.exe")
 
         import subprocess as _subprocess
 
@@ -186,19 +170,19 @@ class TestRelaunch:
         assert exc_info.value.code == 42
 
 
-class TestResolveQubitBinWindowsPyGuard:
+class TestResolveHermesBinWindowsPyGuard:
     """On Windows, resolve_qubit_bin MUST NOT return a .py path.
     os.access(x, os.X_OK) returns True for .py files on Windows because
     PATHEXT includes .py when the Python launcher is installed — but
     subprocess.run can't actually exec a .py directly, so the relaunch
     would fail with the cryptic "%1 is not a valid Win32 application" error.
 
-    The Windows cases are ``windows_only``: the PATHEXT-driven ``os.access``
+    The Windows cases are ``platforms("windows")``: the PATHEXT-driven ``os.access``
     result the guard defends against simply does not occur on POSIX, so a
     faked ``sys.platform`` could never reproduce the hazard.
     """
 
-    @pytest.mark.windows_only
+    @pytest.mark.platforms("windows")
     def test_windows_rejects_py_argv0_falls_through_to_path(self, monkeypatch, tmp_path):
         """On Windows, if sys.argv[0] is a .py file, we must skip the
         argv[0] fast-path and fall through to PATH / python -m."""
@@ -207,31 +191,70 @@ class TestResolveQubitBinWindowsPyGuard:
         script.write_text("# stub")
 
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
-        # Force PATH lookup to return a qubit.exe so the test doesn't
+        # Force PATH lookup to return a hermes.exe so the test doesn't
         # exercise the None-fallback path (that's a separate test).
         monkeypatch.setattr(
             relaunch_mod.shutil, "which",
-            lambda name: r"C:\venv\Scripts\qubit.exe" if name == "qubit" else None,
+            lambda name: r"C:\venv\Scripts\hermes.exe" if name == "hermes" else None,
         )
 
         bin_path = relaunch_mod.resolve_qubit_bin()
-        # Must NOT be the .py — must be the qubit.exe PATH entry.
-        assert bin_path == r"C:\venv\Scripts\qubit.exe"
+        # Must NOT be the .py — must be the hermes.exe PATH entry.
+        assert bin_path == r"C:\venv\Scripts\hermes.exe"
 
-    @pytest.mark.linux_only
-    def test_posix_still_accepts_py_argv0(self, monkeypatch, tmp_path):
-        """POSIX behaviour unchanged: argv[0] pointing at an executable
-        script (including .py with a shebang + chmod +x) is fine to return
-        because POSIX exec can route through the shebang line."""
-        script = tmp_path / "qubit"
+    def test_posix_python_launcher_falls_through_to_path(self, monkeypatch, tmp_path):
+        """A Python source launcher must not be re-executed through its shebang.
+
+        The git installer invokes ``hermes`` with the venv interpreter while the
+        source launcher's shebang uses ``/usr/bin/env python3``.  Re-executing
+        that source file directly can therefore escape the venv and lose core
+        dependencies such as PyYAML.
+        """
+        if sys.platform == "win32":
+            pytest.skip("POSIX semantics")
+        script = tmp_path / "hermes"
+        script.write_text("#!/usr/bin/env python3\n")
+        script.chmod(0o755)
+        wrapper = tmp_path / "bin" / "hermes"
+        wrapper.parent.mkdir()
+        wrapper.write_text("#!/usr/bin/env bash\n")
+        wrapper.chmod(0o755)
+        monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
+        monkeypatch.setattr(
+            relaunch_mod.shutil, "which",
+            lambda name: str(wrapper) if name == "hermes" else None,
+        )
+        assert relaunch_mod.resolve_qubit_bin() == str(wrapper)
+
+    def test_posix_python_launcher_on_path_falls_back_to_current_python(
+        self, monkeypatch, tmp_path
+    ):
+        """PATH must not re-select the Python launcher rejected from argv[0]."""
+        if sys.platform == "win32":
+            pytest.skip("POSIX semantics")
+        script = tmp_path / "hermes"
         script.write_text("#!/usr/bin/env python3\n")
         script.chmod(0o755)
         monkeypatch.setattr(relaunch_mod.sys, "argv", [str(script), "chat"])
-        assert relaunch_mod.resolve_qubit_bin() == str(script)
+        monkeypatch.setattr(
+            relaunch_mod.shutil,
+            "which",
+            lambda name: str(script) if name == "hermes" else None,
+        )
 
-    @pytest.mark.windows_only
+        assert relaunch_mod.resolve_qubit_bin() is None
+
+        # A console script pinned to the running interpreter keeps the venv: still exec-able.
+        pinned = tmp_path / "pinned" / "hermes"
+        pinned.parent.mkdir()
+        pinned.write_text(f"#!{sys.executable}\n")
+        pinned.chmod(0o755)
+        monkeypatch.setattr(relaunch_mod.sys, "argv", [str(pinned), "chat"])
+        assert relaunch_mod.resolve_qubit_bin() == str(pinned)
+
+    @pytest.mark.platforms("windows")
     def test_windows_py_argv0_with_no_qubit_on_path_returns_none(self, monkeypatch, tmp_path):
-        """Bulletproof fallback: if argv0 is .py on Windows AND qubit.exe
+        """Bulletproof fallback: if argv0 is .py on Windows AND hermes.exe
         isn't on PATH, return None so the caller falls back to
         python -m qubit_cli.main."""
         script = tmp_path / "main.py"

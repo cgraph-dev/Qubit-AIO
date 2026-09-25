@@ -55,8 +55,10 @@ class ServiceManager(Protocol):
 def detect_service_manager() -> ServiceManagerKind:
     """Return "s6" (s6-svscan is PID 1), "windows", "launchd", "systemd" (working bus) or "none".
 
-    Does NOT replace ``supports_systemd_services()`` for host call sites; it exists for
-    backend-agnostic code (profile hooks, the s6 dispatch in ``qubit gateway``).
+    This function does NOT replace ``supports_systemd_services()`` —
+    host call sites continue to use that. It exists for new backend-
+    agnostic code (profile create/delete hooks, the s6 dispatch path
+    in ``qubit gateway start/stop/restart``).
     """
     # Deferred so importing this module (Protocol type, validate_profile_name) doesn't drag in
     # the whole gateway dependency graph.
@@ -256,7 +258,7 @@ def _write_gateway_desired_state(name: str, desired_state: str) -> None:
         if not profile_dir.exists():
             return
         try:
-            data = json.loads(state_file.read_text(encoding="utf-8")) if state_file.exists() else {}
+            data = json.loads(state_file.read_text(encoding="utf-8-sig")) if state_file.exists() else {}
             if not isinstance(data, dict):
                 data = {}
         except (OSError, json.JSONDecodeError):
@@ -268,6 +270,24 @@ def _write_gateway_desired_state(name: str, desired_state: str) -> None:
         tmp.replace(state_file)
     except OSError:
         return
+
+
+def register_unregistered_profile_gateway(mgr: ServiceManager, profile: str) -> bool:
+    """Register a ``down`` s6 slot for a profile whose directory exists but was never registered.
+
+    `qubit profile create` can only register a slot when it runs inside the container; created
+    from the host against a bind-mounted home, the directory lands where the container reads it
+    but no ``/run/service/gateway-<name>`` exists, and the boot reconciler only notices on the
+    next container restart. Returns False without touching anything unless the directory carries
+    ``SOUL.md`` — the reconciler's own "real profile" marker — so a mistyped ``-p`` name cannot
+    mint a phantom slot. ``start_now=False``: the caller's ordinary ``start`` stays the single
+    owner of the ``desired_state`` write.
+    """
+    profile_dir = _profile_dir_for_gateway_service(f"{S6_SERVICE_PREFIX}{profile}")
+    if not (profile_dir / "SOUL.md").exists():
+        return False
+    mgr.register_profile_gateway(profile, start_now=False)
+    return True
 
 
 # s6-overlay installs its binaries under /command/ and only adds it to PATH inside the supervision
@@ -288,13 +308,13 @@ def _s6_run(cmd: str, *args: str, timeout: float = 5, check: bool = False):
 
 # UID/GID of the in-image ``qubit`` user; hardcoded to match what ``stage2-hook.sh`` enforces
 # (tests/docker/test_uid_remap.py). s6-supervise starts as root and drops via ``s6-setuidgid``.
-_QUBIT_UID = 10000
-_QUBIT_GID = 10000
+_HERMES_UID = 10000
+_HERMES_GID = 10000
 
 
-def _chown_qubit(path: Path) -> None:
+def _chown_hermes(path: Path) -> None:
     try:
-        os.chown(path, _QUBIT_UID, _QUBIT_GID)
+        os.chown(path, _HERMES_UID, _HERMES_GID)
     except PermissionError:
         # Already running as qubit → the dir is hermes-owned by default; swallowing keeps root
         # and unprivileged callers on one code path.
@@ -325,7 +345,7 @@ def _seed_supervise_skeleton(svc_dir: Path) -> None:
             return
         path.mkdir(parents=False, exist_ok=False)
         path.chmod(mode)
-        _chown_qubit(path)
+        _chown_hermes(path)
 
     def _seed(root: Path) -> None:
         # Service-root event/ is the s6-svlisten1 subscription dir, distinct from supervise/event/.
@@ -340,7 +360,7 @@ def _seed_supervise_skeleton(svc_dir: Path) -> None:
         if not control.exists():
             os.mkfifo(control, 0o660)
             control.chmod(0o660)
-            _chown_qubit(control)
+            _chown_hermes(control)
 
     _seed(svc_dir)
     log_dir = svc_dir / "log"
@@ -426,7 +446,6 @@ class S6ServiceManager:
             "set -e",
             "export HOME=/opt/data",
             "cd /opt/data",
-            ". /opt/qubit/.venv/bin/activate",
         ]
         for k, v in sorted(extra_env.items()):
             lines.append(f"export {k}={shlex.quote(v)}")

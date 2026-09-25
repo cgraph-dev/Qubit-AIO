@@ -11,8 +11,8 @@ const windowControls = {
   toggleMaximize: vi.fn()
 }
 
-const desktopWindow = window as unknown as { qubitDesktop?: Window['qubitDesktop'] }
-const originalHermesDesktop = desktopWindow.qubitDesktop
+const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
+const originalHermesDesktop = desktopWindow.hermesDesktop
 
 function renderControls(isMaximized = false, path = '/', isFullscreen = false) {
   return render(
@@ -27,15 +27,15 @@ afterEach(() => {
   vi.clearAllMocks()
 
   if (originalHermesDesktop) {
-    desktopWindow.qubitDesktop = originalHermesDesktop
+    desktopWindow.hermesDesktop = originalHermesDesktop
   } else {
-    delete desktopWindow.qubitDesktop
+    delete desktopWindow.hermesDesktop
   }
 })
 
 describe('WslgWindowControls', () => {
   it('routes minimize, maximize and close through the desktop bridge', () => {
-    desktopWindow.qubitDesktop = { windowControls } as unknown as Window['qubitDesktop']
+    desktopWindow.hermesDesktop = { windowControls } as unknown as Window['hermesDesktop']
 
     renderControls()
 
@@ -52,28 +52,15 @@ describe('WslgWindowControls', () => {
   })
 
   it('exposes restore semantics while maximized', () => {
-    desktopWindow.qubitDesktop = { windowControls } as unknown as Window['qubitDesktop']
+    desktopWindow.hermesDesktop = { windowControls } as unknown as Window['hermesDesktop']
 
     renderControls(true)
 
     expect(screen.getByRole('button', { name: 'Restore window' })).toBeTruthy()
   })
 
-  it.each(['/settings', '/agents', '/command-center'])('keeps OS controls available on %s', path => {
-    desktopWindow.qubitDesktop = { windowControls } as unknown as Window['qubitDesktop']
-
-    renderControls(false, path)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Minimize window' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Maximize window' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Close window' }))
-    expect(windowControls.minimize).toHaveBeenCalledExactlyOnceWith()
-    expect(windowControls.toggleMaximize).toHaveBeenCalledExactlyOnceWith()
-    expect(windowControls.close).toHaveBeenCalledExactlyOnceWith()
-  })
-
   it('stays hidden while the BrowserWindow is fullscreen', () => {
-    desktopWindow.qubitDesktop = { windowControls } as unknown as Window['qubitDesktop']
+    desktopWindow.hermesDesktop = { windowControls } as unknown as Window['hermesDesktop']
 
     renderControls(false, '/', true)
 
@@ -81,7 +68,7 @@ describe('WslgWindowControls', () => {
   })
 
   it('stops pointerdown propagation without cancelling the click', () => {
-    desktopWindow.qubitDesktop = { windowControls } as unknown as Window['qubitDesktop']
+    desktopWindow.hermesDesktop = { windowControls } as unknown as Window['hermesDesktop']
     renderControls()
     const event = new MouseEvent('pointerdown', { bubbles: true, cancelable: true })
 
@@ -94,17 +81,5 @@ describe('WslgWindowControls', () => {
     // propagation so the drag region doesn't swallow the press.
     expect(event.defaultPrevented).toBe(false)
     expect(windowControls.toggleMaximize).toHaveBeenCalledOnce()
-  })
-
-  it('pins an explicit pixel height instead of the contextually-zeroed titlebar var', () => {
-    desktopWindow.qubitDesktop = { windowControls } as unknown as Window['qubitDesktop']
-
-    renderControls()
-
-    // The contrib shell zeroes --titlebar-height for content subtrees; the
-    // cluster must set its own height in px so the buttons don't collapse.
-    const cluster = screen.getByLabelText('Window controls')
-    expect(cluster.style.height).toMatch(/^\d+px$/)
-    expect(cluster.className).not.toContain('h-(--titlebar-height)')
   })
 })

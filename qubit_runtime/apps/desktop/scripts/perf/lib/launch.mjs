@@ -167,7 +167,7 @@ export async function startIsolatedInstance({
   devPort = 5174,
   prod = false,
   coldStart = false,
-  qubitHome,
+  hermesHome,
   userDataDir,
   seedConfig = true,
   settleMs = 2500,
@@ -183,11 +183,11 @@ export async function startIsolatedInstance({
     return dir
   }
 
-  const home = qubitHome ?? mkTemp('hermes-perf-home-')
+  const home = hermesHome ?? mkTemp('hermes-perf-home-')
   const userData = userDataDir ?? mkTemp('hermes-perf-ud-')
   const devUrl = prod ? null : `http://127.0.0.1:${devPort}`
 
-  if (seedConfig && !qubitHome) {
+  if (seedConfig && !hermesHome) {
     seedConfigFrom(join(homedir(), '.hermes'), home)
   }
 
@@ -242,12 +242,12 @@ export async function startIsolatedInstance({
       // remote-debugging-port switch AFTER argv, so on a non-default --port the
       // Chromium flag below loses and the instance binds 9222 anyway. The env
       // override is the supported knob — set it so --port actually wins.
-      QUBIT_DESKTOP_CDP_PORT: String(port),
+      HERMES_DESKTOP_CDP_PORT: String(port),
       XCURSOR_SIZE: '24'
     }
 
     if (devUrl) {
-      env.QUBIT_DESKTOP_DEV_SERVER = devUrl
+      env.HERMES_DESKTOP_DEV_SERVER = devUrl
     }
 
     const spawnAt = Date.now()
@@ -355,7 +355,7 @@ export async function coldStartSamples({ runs = 3, port = 9222, devPort = 5174, 
           devPort: devPort + i,
           prod,
           coldStart: true,
-          qubitHome: home,
+          hermesHome: home,
           userDataDir,
           seedConfig: false
         })

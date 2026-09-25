@@ -27,7 +27,7 @@ from typing import Any, Callable, Iterable
 
 import qubit_yaml as yaml
 
-from tests.fakes.fake_llm_provider import FakeLLMServer, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, write_qubit_home
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 TURN_TIMEOUT = 180.0
@@ -50,7 +50,7 @@ class WinHome:
 
     root: Path
     profile: Path
-    hermes_home: Path
+    qubit_home: Path
     project: Path
     extra_env: dict[str, str] = field(default_factory=dict)
 
@@ -68,7 +68,7 @@ class WinHome:
             "HOME": str(self.profile),
             "LOCALAPPDATA": str(local),
             "APPDATA": str(roaming),
-            "QUBIT_HOME": str(self.hermes_home),
+            "QUBIT_HOME": str(self.qubit_home),
             "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1",
             "NO_COLOR": "1",
@@ -81,24 +81,24 @@ class WinHome:
         return env
 
     def update_config(self, mutate: Callable[[dict], None]) -> None:
-        path = self.hermes_home / "config.yaml"
+        path = self.qubit_home / "config.yaml"
         cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         mutate(cfg)
         path.write_text(yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
     @property
     def db_path(self) -> Path:
-        return self.hermes_home / "state.db"
+        return self.qubit_home / "state.db"
 
 
 def make_home(tmp_path: Path, base_url: str, *, extra_config: str = "") -> WinHome:
     root = tmp_path
     profile = root / "Users" / "e2e"
-    hermes_home = profile / ".hermes"
+    qubit_home = profile / ".hermes"
     project = root / "project"
     project.mkdir(parents=True, exist_ok=True)
-    write_hermes_home(hermes_home, base_url, extra_config=extra_config)
-    home = WinHome(root=root, profile=profile, hermes_home=hermes_home, project=project)
+    write_qubit_home(qubit_home, base_url, extra_config=extra_config)
+    home = WinHome(root=root, profile=profile, qubit_home=qubit_home, project=project)
 
     def _hermetic(cfg: dict) -> None:
         cfg["updates"] = {"check": False}  # offline: no GitHub round trip / git lazy fetch
@@ -281,7 +281,7 @@ def owned_processes(home: WinHome, *, since: float) -> list[Any]:
     import psutil
 
     root = os.path.normcase(os.path.normpath(str(home.root)))
-    hermes_home = os.path.normcase(os.path.normpath(str(home.hermes_home)))
+    qubit_home = os.path.normcase(os.path.normpath(str(home.qubit_home)))
     me = os.getpid()
     owned = []
     for proc in psutil.process_iter():
@@ -290,7 +290,7 @@ def owned_processes(home: WinHome, *, since: float) -> list[Any]:
                 continue
         except psutil.Error:
             continue
-        if _owned_by(proc, root, hermes_home):
+        if _owned_by(proc, root, qubit_home):
             owned.append(proc)
     return owned
 

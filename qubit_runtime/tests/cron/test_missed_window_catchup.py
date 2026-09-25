@@ -49,7 +49,7 @@ def slot_env(tmp_path, monkeypatch):
     monkeypatch.setattr(J, "JOBS_FILE", home / "cron" / "jobs.json")
     monkeypatch.setattr(J, "OUTPUT_DIR", home / "cron" / "output")
     monkeypatch.setattr(E, "EXECUTIONS_FILE", home / "cron" / "executions.db")
-    monkeypatch.setattr(S, "_hermes_home", home)
+    monkeypatch.setattr(S, "_qubit_home", home)
     S._running_job_ids.clear()
     S._running_since.clear()
     S._running_futures.clear()
@@ -60,7 +60,7 @@ def slot_env(tmp_path, monkeypatch):
     (home / "scripts" / "fire.sh").chmod(0o755)
     job = J.create_job(prompt=None, schedule="every 1h", name="slot", script="fire.sh",
                        no_agent=True, deliver="local")
-    slot = (J._hermes_now() - timedelta(minutes=1)).replace(microsecond=0).isoformat()
+    slot = (J._qubit_now() - timedelta(minutes=1)).replace(microsecond=0).isoformat()
     stored = J.load_jobs()
     next(r for r in stored if r["id"] == job["id"])["next_run_at"] = slot
     J.save_jobs(stored)
@@ -87,7 +87,7 @@ class TestMissedWindowCatchUp:
 
         slot_env["crash"]()
         after_crash = J.get_job(job_id)
-        assert J._ensure_aware(J.datetime.fromisoformat(after_crash["next_run_at"])) > J._hermes_now()
+        assert J._ensure_aware(J.datetime.fromisoformat(after_crash["next_run_at"])) > J._qubit_now()
         assert slot_env["fires"]() == 0
 
         # Restarted scheduler: the occurrence must come back and run exactly once.
@@ -102,7 +102,7 @@ class TestMissedWindowCatchUp:
         assert slot_env["fires"]() == 1
         rec = J.get_job(job_id)
         assert "pending_slot" not in rec
-        assert J._ensure_aware(J.datetime.fromisoformat(rec["next_run_at"])) > J._hermes_now()
+        assert J._ensure_aware(J.datetime.fromisoformat(rec["next_run_at"])) > J._qubit_now()
 
     def test_fired_slot_is_not_replayed_after_restart(self, slot_env):
         """Contract half two: a slot that DID run before the restart stays run."""

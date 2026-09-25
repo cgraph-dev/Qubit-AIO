@@ -71,14 +71,14 @@ def test_saved_opt_in_roundtrip_reaches_schema_and_board(surface, tmp_path, monk
         assert "file" in selected()
         # A second profile in the same process must not borrow this grant or
         # poison the first profile's cached schema on return.
-        from qubit_constants import set_hermes_home_override, reset_hermes_home_override
+        from qubit_constants import set_qubit_home_override, reset_qubit_home_override
         other_home = tmp_path / "profiles" / "observer"
-        token = set_hermes_home_override(other_home)
+        token = set_qubit_home_override(other_home)
         try:
             save_config({"platform_toolsets": {"cli": ["file"]}})
             assert not _names(selected())
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         assert _names(selected()) == enabled_names
         from agent.skill_utils import _detect_kanban
         assert _detect_kanban(), "Saved opt-in still hides the Kanban playbook"

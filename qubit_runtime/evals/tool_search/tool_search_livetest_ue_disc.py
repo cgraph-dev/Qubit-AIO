@@ -127,10 +127,10 @@ def _bridge_query_text(call: Dict[str, Any]) -> str:
 def run_one(scenario, mode, rep, out_dir: Path):
     model = os.environ.get("TS_UE_MODEL", "anthropic/claude-opus-4.8")
     lmax = int(os.environ.get("TS_UE_LISTING_MAX", "30000"))
-    hermes_home = base.setup_isolated_home(
+    qubit_home = base.setup_isolated_home(
         True, listing=("auto" if mode == "listing" else "off"),
         listing_max_tokens=lmax, model=model)
-    os.environ["QUBIT_HOME"] = str(hermes_home)
+    os.environ["QUBIT_HOME"] = str(qubit_home)
     base.reset_module_state()
     register_epic_tools_adversarial()
 

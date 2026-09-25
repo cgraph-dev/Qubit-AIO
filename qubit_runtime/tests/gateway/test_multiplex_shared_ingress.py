@@ -49,12 +49,12 @@ async def _publish_line(adapter, runner) -> list[tuple[str, Path]]:
     """Wire the LINE webhook app the way ``connect()`` does, without the LINE API or a bind, and
     record the QUBIT_HOME the handler ran under."""
     from gateway.platforms.shared_ingress import bind_listener
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     seen: list[tuple[str, Path]] = []
     adapter.gateway_runner = runner
 
     async def dispatch(event):
-        seen.append((event.get("type"), Path(get_hermes_home())))
+        seen.append((event.get("type"), Path(get_qubit_home())))
 
     adapter._dispatch_event = dispatch
     app = web.Application(client_max_size=1024)
@@ -72,7 +72,7 @@ def mux_home(tmp_path, monkeypatch):
         (root / "profiles" / name / ".env").write_text(f"LINE_CHANNEL_SECRET=secret-{name}\n")
     monkeypatch.setenv("QUBIT_HOME", str(root))
     import qubit_constants
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     from agent import secret_scope
     monkeypatch.setattr(secret_scope, "_MULTIPLEX_ACTIVE", True)

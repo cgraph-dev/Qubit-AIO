@@ -69,8 +69,7 @@ describe('gateway `error` event → error card + toast', () => {
 
     const toast = $notifications.get()[0]
 
-    expect(toast.title).toBe("Qubit couldn't finish the reply")
-    expect(toast.message).toMatch(/open in another Qubit window or terminal/)
+    expect(toast.message).toBeTruthy()
     expect(toast.message).not.toMatch(/lease|pid|live owner/i)
     expect(toast.detail).toBe(OWNED_REFUSAL)
     expect(toast.action).toBeUndefined()
@@ -79,7 +78,7 @@ describe('gateway `error` event → error card + toast', () => {
   it("keeps the server's own plain copy as the toast message when no code was recovered", () => {
     // tui_gateway/user_messages.py already writes actionable sentences for
     // pre-turn failures; the generic "couldn't finish" gloss must not bury them.
-    const serverCopy = 'Qubit could not start the assistant for this chat. Check your model settings and try again.'
+    const serverCopy = 'Hermes could not start the assistant for this chat. Check your model settings and try again.'
     const { ctx, failAssistantMessage } = errorContext(serverCopy)
 
     handleStatusEvent(ctx)

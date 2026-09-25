@@ -15,18 +15,18 @@ GitHub via gh CLI: PRs, issues, reviews, repos, auth.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/software-development\github` |
+| Path | `skills/software-development/github` |
 | Version | `2.0.0` |
-| Author | Ben Barclay (benbarclay), Qubit Agent |
+| Author | Ben Barclay (benbarclay), Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `github`, `gh`, `git`, `pull-requests`, `issues`, `code-review`, `repos`, `auth`, `ci` |
-| Related skills | [`codebase-inspection`](/docs/user-guide/skills/bundled/software-development/software-development-codebase-inspection), [`requesting-code-review`](/docs/user-guide/skills/bundled/software-development/software-development-requesting-code-review) |
+| Related skills | [`codebase-inspection`](../../bundled/software-development/software-development-codebase-inspection.md), [`requesting-code-review`](../../bundled/software-development/software-development-requesting-code-review.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # GitHub

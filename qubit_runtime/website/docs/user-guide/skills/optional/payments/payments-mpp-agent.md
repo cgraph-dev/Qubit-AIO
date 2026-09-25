@@ -14,24 +14,24 @@ Pay HTTP 402 APIs via Machine Payments Protocol (MPP).
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/payments/mpp-agent` |
-| Path | `optional-skills/payments\mpp-agent` |
+| Source | Optional — install with `hermes skills install official/payments/mpp-agent` |
+| Path | `optional-skills/payments/mpp-agent` |
 | Version | `0.1.0` |
-| Author | Teknium (teknium1), Qubit Agent |
+| Author | Teknium (teknium1), Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos |
 | Tags | `Payments`, `MPP`, `HTTP-402`, `Tempo`, `Stripe` |
-| Related skills | [`stripe-link-cli`](/docs/user-guide/skills/optional/payments/payments-stripe-link-cli), [`stripe-projects`](/docs/user-guide/skills/optional/payments/payments-stripe-projects) |
+| Related skills | [`stripe-link-cli`](../../optional/payments/payments-stripe-link-cli.md), [`stripe-projects`](../../optional/payments/payments-stripe-projects.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # MPP Agent Skill
 
-Wraps the Machine Payments Protocol (MPP, https://mpp.dev) clients so Qubit can pay for per-request API access against servers that respond with `HTTP 402 Payment Required`.
+Wraps the Machine Payments Protocol (MPP, https://mpp.dev) clients so Hermes can pay for per-request API access against servers that respond with `HTTP 402 Payment Required`.
 
 Three client options, all distributed via npm. Pick the lightest one that solves the user's need. Gated `[linux, macos]` while the broader payments tooling matures on Windows.
 

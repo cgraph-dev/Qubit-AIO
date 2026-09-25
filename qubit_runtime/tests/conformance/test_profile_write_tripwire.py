@@ -125,7 +125,7 @@ def profile_tripwire(tmp_path, monkeypatch):
        The suite conftest deliberately re-points that constant at its own
        fake home, which trips the escape hatch in ``_default_db_path()``
        (a re-pointed constant wins over everything).  Closing the hatch
-       makes resolution flow through ``get_hermes_home()`` — the production
+       makes resolution flow through ``get_qubit_home()`` — the production
        path, and the one #88532 regressed.
 
     Yields a :class:`ProfileTripwire`; teardown re-asserts the invariant so

@@ -49,7 +49,7 @@ def test_describe_matches_the_runtime_once_legacy_disabled_is_migrated(profile_d
     migration turns it into the ``enabled: false`` the runtime resolver honours."""
     from qubit_cli.config_migrations import run_migrations
     from qubit_cli.tools_config import enabled_mcp_server_names
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
     _write_mcp(profile_dir, {
         "on": {"command": "on", "enabled": True},
@@ -61,11 +61,11 @@ def test_describe_matches_the_runtime_once_legacy_disabled_is_migrated(profile_d
     expected = {"on": True, "off": False, "legacy-off": False, "implicit-on": True}
     assert _described() == expected
 
-    token = set_hermes_home_override(profile_dir)
+    token = set_qubit_home_override(profile_dir)
     try:
         run_migrations(45, {"env_added": [], "config_added": [], "warnings": []}, quiet=True)
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
     live = enabled_mcp_server_names({"mcp_servers": _read_mcp(profile_dir)})
     assert {name: name in live for name in expected} == expected == _described()

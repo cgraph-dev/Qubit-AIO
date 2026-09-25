@@ -136,8 +136,8 @@ def test_transform_tool_result_integration_with_real_plugin(monkeypatch, tmp_pat
     """End-to-end: load a real plugin from QUBIT_HOME and verify it rewrites results."""
     import qubit_yaml as yaml
 
-    hermes_home = Path(os.environ["QUBIT_HOME"])
-    plugins_dir = hermes_home / "plugins"
+    qubit_home = Path(os.environ["QUBIT_HOME"])
+    plugins_dir = qubit_home / "plugins"
     plugin_dir = plugins_dir / "transform_result_canon"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "plugin.yaml").write_text("name: transform_result_canon\n", encoding="utf-8")
@@ -148,7 +148,7 @@ def test_transform_tool_result_integration_with_real_plugin(monkeypatch, tmp_pat
         encoding="utf-8",
     )
     # Plugins are opt-in — must be listed in plugins.enabled to load.
-    cfg_path = hermes_home / "config.yaml"
+    cfg_path = qubit_home / "config.yaml"
     cfg_path.write_text(
         yaml.safe_dump({"plugins": {"enabled": ["transform_result_canon"]}}),
         encoding="utf-8",

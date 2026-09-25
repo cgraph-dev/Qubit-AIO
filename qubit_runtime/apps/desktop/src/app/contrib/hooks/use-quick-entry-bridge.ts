@@ -105,7 +105,7 @@ export function useQuickEntryBridge({ startFreshSessionDraft, submitText }: Quic
       return
     }
 
-    const api = window.qubitDesktop?.quickEntry
+    const api = window.hermesDesktop?.quickEntry
 
     if (!api?.pushState) {
       return

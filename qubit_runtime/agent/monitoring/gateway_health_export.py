@@ -96,7 +96,7 @@ class GatewayHealthExportRuntime:
                     item.shutdown()
 
         if closeables:
-            worker = threading.Thread(target=_close, name="qubit-gateway-health-export-shutdown", daemon=True)
+            worker = threading.Thread(target=_close, name="hermes-gateway-health-export-shutdown", daemon=True)
             worker.start()
             worker.join(timeout=2.0)
         self.streamer = self.log_streamer = self.metric_provider = self.thread = self.stop_event = None
@@ -287,7 +287,7 @@ def start_gateway_health_export(config: Dict[str, Any]) -> GatewayHealthExportRu
     sdk: Optional[Dict[str, Any]] = None
     if metrics_on or diagnostics_on:
         try:
-            sdk = otlp_exporter._require_sdk(_METRICS_SDK, auto_install=True, prompt=False)
+            sdk = otlp_exporter._require_sdk(_METRICS_SDK, auto_install=True)
         except Exception:
             logger.warning("monitoring.gateway_health_export.enabled but OTLP SDK is unavailable; install 'hermes-agent[otlp]'", exc_info=True)
             return GatewayHealthExportRuntime(enabled=False, reason="otlp_unavailable")
@@ -325,7 +325,7 @@ def start_gateway_health_export(config: Dict[str, Any]) -> GatewayHealthExportRu
                 while not stop_event.wait(interval):
                     _emit_snapshot_events(config)
 
-            thread = threading.Thread(target=_run, name="qubit-gateway-health-export", daemon=True)
+            thread = threading.Thread(target=_run, name="hermes-gateway-health-export", daemon=True)
             thread.start()
             runtime.thread = thread
         except Exception:

@@ -8,7 +8,7 @@ platforms: [linux, macos, windows]
 metadata:
   qubit:
     tags: [video, kanban, multi-agent, orchestration, production-pipeline]
-    related_skills: [ascii-video, manim-video, p5js, comfyui, touchdesigner-mcp, pixel-art, ascii-art, songwriting-and-ai-music, heartmula, songsee, youtube-content, claude-design, excalidraw, architecture-diagram, concept-diagrams, baoyu-comic, baoyu-infographic, humanizer, gif-search, meme-generation]
+    related_skills: [ascii-video, manim-video, p5js, comfyui, pixel-art, ascii-art, songwriting-and-ai-music, heartmula, songsee, youtube-content, claude-design, excalidraw, architecture-diagram, concept-diagrams, baoyu-comic, baoyu-infographic, humanizer, gif-search, meme-generation]
     credits: |
       The single-project workspace layout, profile-config patching pattern,
       SOUL.md-per-profile model, TEAM.md task-graph convention, and
@@ -183,7 +183,7 @@ task graphs. See **[references/examples.md](references/examples.md)**.
    right human-review gates.
 
 8. **Verify API keys BEFORE firing.** External APIs (TTS, image-gen,
-   image-to-video) need keys in `$QUBIT_HOME/.env` or the user's secret store.
+   image-to-video) need keys in `${QUBIT_HOME:-~/.hermes}/.env` or the user's secret store.
    A worker that hits a missing-key error wastes a task slot. The setup
    script's `check_key` helper aborts cleanly if a required key is missing.
 

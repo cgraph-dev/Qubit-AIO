@@ -44,7 +44,7 @@ Multilingual trigger examples (not exhaustive):
 
 ## Prerequisites
 
-Before using the pipeline, verify these are set in `$QUBIT_HOME/.env`:
+Before using the pipeline, verify these are set in `${QUBIT_HOME:-~/.hermes}/.env`:
 
 ```bash
 MSGRAPH_TENANT_ID=...

@@ -101,7 +101,7 @@ describe('useStepUpFlow', () => {
       gatewayMock.emit('billing.step_up.verification', {
         payload: {
           user_code: 'ABCD-1234',
-          verification_url: 'https://portal.qubit.test/device'
+          verification_url: 'https://portal.nousresearch.com/device'
         },
         type: 'billing.step_up.verification'
       })
@@ -110,11 +110,11 @@ describe('useStepUpFlow', () => {
     expect(result.current.phase).toBe('verifying')
     expect(result.current.verification).toEqual({
       code: 'ABCD-1234',
-      url: 'https://portal.qubit.test/device'
+      url: 'https://portal.nousresearch.com/device'
     })
 
     result.current.openVerification()
-    expect(window.qubitDesktop?.openExternal).toHaveBeenCalledWith('https://portal.qubit.test/device')
+    expect(window.hermesDesktop?.openExternal).toHaveBeenCalledWith('https://portal.nousresearch.com/device')
 
     await act(async () => {
       resolveStepUp({ data: { granted: true, ok: true }, ok: true })

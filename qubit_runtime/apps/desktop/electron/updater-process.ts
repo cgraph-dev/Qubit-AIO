@@ -1,25 +1,136 @@
-import { spawn, type SpawnOptions } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { spawn, type SpawnOptions, spawnSync, type SpawnSyncReturns } from 'node:child_process'
+import { existsSync, realpathSync, statSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
-import { hiddenWindowsChildOptions } from './windows-child-options'
+/** Historical layouts still matter when uninstalling or migrating a source install. */
+export function resolveVenvDir(updateRoot: string): string {
+  for (const name of ['venv', '.venv']) {
+    const candidate: string = path.join(updateRoot, name)
 
-/** File prerequisites only: dependency recovery must remain reachable through update. */
-export function windowsUpdatePrerequisiteError(updateRoot: string): string | null {
-  const maintainedDir = path.join(updateRoot, 'scripts', 'desktop-update')
-  const required = [path.join(updateRoot, 'venv', 'Scripts', 'python.exe')]
-
-  // Pre-reorg flat scripts remain supported; damaged modern trees do not.
-  if (existsSync(maintainedDir)) {
-    required.push(path.join(maintainedDir, 'windows.ps1'))
+    try {
+      if (statSync(candidate).isDirectory()) {
+        return candidate
+      }
+    } catch {
+      // Try the other supported layout, then retain the legacy diagnostic path.
+    }
   }
 
-  for (const candidate of required) {
+  return path.join(updateRoot, 'venv')
+}
+
+import { platformDefaultHermesHome } from './data-paths'
+import { hiddenWindowsChildOptions } from './windows-child-options'
+
+/** Exact installation identity; PATH may refer to another checkout. */
+export function resolveInstallationLauncher(
+  updateRoot: string,
+  isWindows: boolean = process.platform === 'win32',
+  hermesHome: string = process.env.QUBIT_HOME ?? ''
+): string | null {
+  const names: string[] = isWindows ? ['hermes.exe', 'hermes.cmd'] : ['hermes']
+
+  for (const name of names) {
+    const candidate: string = path.join(updateRoot, '.hermes', 'bin', name)
+
     if (stagedFileExists(candidate)) {
-      continue
+      return candidate
+    }
+  }
+
+  // Earlier PM installers published only to user-bin. Trust that historical
+  // launcher only after its existing version surface proves exact source identity.
+  if (stagedFileExists(path.join(updateRoot, 'qubit_cli', '_launchers.py'))) {
+    const defaultHome: string = platformDefaultHermesHome(os.homedir(), process.env, isWindows ? 'win32' : 'linux')
+
+    const dirs: string[] = isWindows
+      ? [
+          path.join(hermesHome || defaultHome, 'bin'),
+          path.join(defaultHome, 'bin'),
+          path.join(path.dirname(updateRoot), 'bin')
+        ]
+      : [path.join(os.homedir(), '.local', 'bin'), path.join(hermesHome || defaultHome, 'bin')]
+
+    for (const dir of new Set(dirs)) {
+      for (const name of names) {
+        const candidate: string = path.join(dir, name)
+
+        if (stagedFileExists(candidate) && launcherTargetsInstallation(candidate, updateRoot)) {
+          return candidate
+        }
+      }
+    }
+  }
+
+  // An old shim is a migration rung, never a damaged PM install fallback.
+  if (!existsSync(path.join(updateRoot, 'pm'))) {
+    const legacy: string = path.join(updateRoot, 'venv', isWindows ? 'Scripts' : 'bin', names[0])
+
+    if (stagedFileExists(legacy)) {
+      return legacy
+    }
+  }
+
+  return null
+}
+
+// cmd.exe re-parses its command line, so a launcher path carrying any of
+// these would change the command instead of naming a file.
+const CMD_UNSAFE_PATH: RegExp = /["%&|<>^\r\n]/
+
+export function launcherTargetsInstallation(launcher: string, root: string): boolean {
+  try {
+    // Node refuses to exec a .cmd directly (CVE-2024-27980), and `shell:true`
+    // would hand an interpolated path to cmd.exe wholesale. Invoke cmd.exe
+    // explicitly instead: a fixed argv, the path quoted verbatim and screened
+    // for cmd metacharacters, and nothing else for the shell to interpret.
+    const viaCmd: boolean = process.platform === 'win32' && /\.cmd$/i.test(launcher)
+
+    if (viaCmd && CMD_UNSAFE_PATH.test(launcher)) {
+      return false
     }
 
-    return `Update aborted: ${candidate} is missing or unreadable. Repair the installation and review antivirus quarantine before retrying.`
+    const command: string = viaCmd ? (process.env.ComSpec ?? 'cmd.exe') : launcher
+    const args: string[] = viaCmd ? ['/d', '/s', '/c', `""${launcher}" --version"`] : ['--version']
+
+    const probe: SpawnSyncReturns<string> = spawnSync(command, args, {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 15000,
+      windowsHide: true,
+      windowsVerbatimArguments: viaCmd,
+      env: { ...process.env, HERMES_INSTALL_ROOT: root }
+    })
+
+    if (probe.error || probe.status !== 0) {
+      return false
+    }
+
+    const reported: string | undefined = /^Install directory: (.+)$/m.exec(probe.stdout)?.[1]?.trim()
+
+    return reported !== undefined && realpathSync(reported) === realpathSync(root)
+  } catch {
+    return false
+  }
+}
+
+/** File prerequisites only: dependency recovery remains reachable through update. */
+export function windowsUpdatePrerequisiteError(updateRoot: string, hermesHome?: string): string | null {
+  if (!resolveInstallationLauncher(updateRoot, true, hermesHome)) {
+    return `Update aborted: the installation launcher under ${updateRoot} is missing. Repair this installation before retrying.`
+  }
+
+  const maintainedDir: string = path.join(updateRoot, 'scripts', 'desktop-update')
+
+  if (existsSync(maintainedDir)) {
+    for (const name of ['windows.ps1']) {
+      const candidate: string = path.join(maintainedDir, name)
+
+      if (!stagedFileExists(candidate)) {
+        return `Update aborted: ${candidate} is missing or unreadable. Repair the installation and review antivirus quarantine before retrying.`
+      }
+    }
   }
 
   return null
@@ -49,7 +160,7 @@ export interface UpdateScriptHandoff {
  * published — which historically lags main by months and strands users on
  * long-fixed bugs (cache resolver #67369, marker self-adopt #74782; the
  * 2026-08-09 incident chain). `scripts/desktop-update/windows.ps1` lives in the repo
- * checkout instead: every `qubit update` refreshes the code that drives the
+ * checkout instead: every `hermes update` refreshes the code that drives the
  * NEXT update, and only PowerShell itself is frozen.
  *
  * Returns the spawn recipe when the script exists in the checkout, or null
@@ -93,13 +204,13 @@ export function resolveUpdateScriptHandoff(
  * Repo-owned POSIX update hand-off (the mac/linux twin of the above).
  *
  * Replaces the in-app posix updater: the Desktop spawns the script detached
- * and QUITS, the script waits it out, runs `qubit update`, swaps/relaunches
+ * and QUITS, the script waits it out, runs `hermes update`, swaps/relaunches
  * the app, and writes .hermes-update-result.json. With the app gone before
  * the update starts, the HERMES_DESKTOP_CHILD_PID reaper-exclusion dance is
  * unnecessary — there are no live desktop backends to spare.
  *
  * Null when the checkout predates the script (caller surfaces the manual
- * `qubit update` card — old checkouts pull the script on their next update).
+ * `hermes update` card — old checkouts pull the script on their next update).
  */
 export function resolvePosixScriptHandoff(
   updateRoot: string,
@@ -126,24 +237,34 @@ export function resolvePosixScriptHandoff(
 }
 
 /**
- * Wrap a PowerShell hand-off invocation so it survives a detached, hidden
- * spawn from Electron.
+ * Wrap a PowerShell hand-off invocation so it survives a hidden spawn from
+ * Electron without ever showing a console window (#116161).
  *
  * Verified empirically (2026-08-09, Windows 11): `spawn('powershell', [...,
  * '-File', script], { detached: true, stdio: 'ignore', windowsHide: true })`
  * exits 0 WITHOUT executing a single line of the script. powershell.exe is a
- * console-subsystem binary; detached+windowsHide gives it no console to
- * attach to, and Windows PowerShell 5.1 dies during console init before
- * -File processing (the same class of failure as #54220's conhost work, on
- * the launch side). The same spawn with a visible console, or non-detached,
- * runs fine — so unit tests and foreground use hide the bug.
+ * console-subsystem binary; libuv maps `detached: true` to DETACHED_PROCESS,
+ * which gives the child NO console (and makes the OS ignore CREATE_NO_WINDOW),
+ * and Windows PowerShell 5.1 dies during console init before -File processing
+ * (the same class of failure as #54220's conhost work, on the launch side).
  *
- * `cmd /c start "" /min powershell ...` was the variant that survived the
- * full detached+hidden production shape in testing: `start` allocates the
- * child its own (minimized) console and fully detaches it from cmd.exe,
- * which exits immediately. The spawned pid is therefore the WRAPPER's —
- * callers must not use it as a marker owner (the script claims the marker
- * itself with its own $PID).
+ * The parent-console model that follows from that (and that every other
+ * hidden spawn in this app relies on): a console child inherits its parent's
+ * console; only a console-LESS parent forces the OS to allocate a new,
+ * visible one. So the wrapper cmd.exe is spawned NON-detached — libuv then
+ * honours `windowsHide` (CREATE_NO_WINDOW) and cmd.exe owns one hidden
+ * console — and `start "" /b powershell ...` runs the script inside that
+ * hidden console (`/min` would tell `start` to allocate a NEW console for the
+ * child, which is what flashed a minimized PowerShell window on every
+ * hand-off; `/b` shares the wrapper's). The console outlives cmd.exe for as
+ * long as powershell is attached to it.
+ *
+ * Survival past our own exit does not need `detached`: libuv's per-process
+ * job object has JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK, so grandchildren
+ * (`start`'s powershell) are never members and Windows does not tie a
+ * process's lifetime to its parent. `start` returns immediately, so the
+ * spawned pid is the WRAPPER's — callers must not use it as a marker owner
+ * (the script claims the marker itself with its own $PID).
  */
 export function wrapHandoffForDetachedConsole(
   handoff: UpdateScriptHandoff,
@@ -151,10 +272,13 @@ export function wrapHandoffForDetachedConsole(
 ): {
   command: string
   args: string[]
+  /** Spawn NON-detached so the wrapper gets a hidden console the script inherits. */
+  detached: false
 } {
   return {
     command: 'cmd.exe',
-    args: ['/d', '/s', '/c', 'start', '', '/min', handoff.command, ...handoff.args, ...extraArgs]
+    args: ['/d', '/s', '/c', 'start', '', '/b', handoff.command, ...handoff.args, ...extraArgs],
+    detached: false
   }
 }
 
@@ -248,7 +372,7 @@ function stagedFileMtimeMs(candidate: string): number | null {
  * The Tauri installer self-copies into QUBIT_HOME on *every* platform
  * (`hermes-setup.exe` on Windows, `hermes-setup` elsewhere — see
  * apps/bootstrap-installer `paths::installer_dest` and
- * `bootstrap::copy_self_to_hermes_home`), so finding that binary on macOS or
+ * `bootstrap::copy_self_to_qubit_home`), so finding that binary on macOS or
  * Linux is expected, not leftover junk.
  *
  * Handing an update to it is nonetheless a Windows-only policy. Windows needs
@@ -256,7 +380,7 @@ function stagedFileMtimeMs(candidate: string): number | null {
  * running desktop from rewriting its own bits; macOS and Linux have no such
  * lock and update in place through applyUpdatesPosixInApp(). Off Windows the
  * hand-off therefore buys nothing and costs a great deal: a staged binary older
- * than the hand-off protocol holds the update marker, spawns `qubit update`,
+ * than the hand-off protocol holds the update marker, spawns `hermes update`,
  * and that child refuses its own parent — wedging the in-app Update button for
  * good, with no route (update, re-download, reinstall) to a newer binary
  * (#74836). Returning null off Windows is what routes those platforms to the
@@ -266,7 +390,7 @@ function stagedFileMtimeMs(candidate: string): number | null {
  * install that never went through the installer); callers degrade gracefully.
  */
 export function resolveStagedUpdaterBinary(
-  qubitHome: string,
+  hermesHome: string,
   deps: ResolveStagedUpdaterBinaryDeps = {}
 ): string | null {
   const isWindows = deps.isWindows ?? process.platform === 'win32'
@@ -276,7 +400,7 @@ export function resolveStagedUpdaterBinary(
   }
 
   const fileExists = deps.fileExists ?? stagedFileExists
-  const candidate = path.join(qubitHome, 'hermes-setup.exe')
+  const candidate = path.join(hermesHome, 'hermes-setup.exe')
 
   return fileExists(candidate) ? candidate : null
 }
@@ -284,15 +408,15 @@ export function resolveStagedUpdaterBinary(
 /**
  * True when the staged installer is new enough to survive a pre-written marker.
  *
- * `copy_self_to_hermes_home` deliberately no-ops during `--update`
+ * `copy_self_to_qubit_home` deliberately no-ops during `--update`
  * (apps/bootstrap-installer/src-tauri/src/paths.rs), so the binary staged by a
  * user's ORIGINAL install orchestrates every later update — forever. Installers
  * predating #74782 have no self-PID exclusion in `UpdateMarkerGuard::acquire`,
  * so when the desktop pre-writes the marker naming that very updater, the
  * updater reads its own claim as a foreign live owner and aborts with
- * "Another Qubit update is already running (PID <itself>, started 1s ago)" —
+ * "Another Hermes update is already running (PID <itself>, started 1s ago)" —
  * the observed infinite "Install didn't finish" loop. Skipping the pre-write
- * for those binaries lets them acquire cleanly and run `qubit update`, which
+ * for those binaries lets them acquire cleanly and run `hermes update`, which
  * pulls the permanent fixes. See shouldPrewriteUpdateMarker.
  *
  * We cannot ask the binary its version without executing it, so use its mtime:
@@ -355,6 +479,20 @@ export interface UpdaterHandoffOutcome {
 export interface ObserveUpdaterHandoffDeps {
   setTimeoutFn?: (callback: () => void, ms: number) => unknown
   clearTimeoutFn?: (timer: unknown) => void
+}
+
+/**
+ * User-facing copy for a hand-off that did not take (spawn error or early exit).
+ * The lead sentence is plain: nothing changed and Hermes keeps running. The raw
+ * outcome message (exit code / signal / spawn error) stays on a trailing
+ * "Details:" line for logs and support.
+ */
+export function describeUpdaterHandoffFailure(outcome: Pick<UpdaterHandoffOutcome, 'message'>): string {
+  const lead =
+    "The updater couldn't start, so nothing was changed and Hermes keeps running as before. " +
+    'Try again; if it keeps failing, open the logs and send them to support.'
+
+  return outcome.message ? `${lead}\n\nDetails: ${outcome.message}` : lead
 }
 
 /**

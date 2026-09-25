@@ -37,7 +37,6 @@ class ProviderDescriptor:
     base_url_env_var: str          # base-URL override env var (may be "")
     signup_url: str                # signup / console URL (may be "")
     order: int                     # CANONICAL_PROVIDERS index — mirrors `qubit model`
-    keyless: bool = False          # served anonymously — no credential exists to configure
 
 
 def tab_for_auth_type(auth_type: str) -> str:
@@ -73,7 +72,7 @@ def provider_catalog() -> list[ProviderDescriptor]:
     OPTIONAL_ENV_VARS = _safe_import("qubit_cli.config", "OPTIONAL_ENV_VARS", {})
     # Overlays carry auth_type for providers with no registry/profile entry — notably the ``moa``
     # virtual provider (auth_type "virtual"), which has no credential and no network endpoint.
-    QUBIT_OVERLAYS = _safe_import("qubit_cli.providers", "HERMES_OVERLAYS", {})
+    HERMES_OVERLAYS = _safe_import("qubit_cli.providers", "HERMES_OVERLAYS", {})
     try:
         from providers import list_providers
         profiles = {p.name: p for p in list_providers()}
@@ -84,7 +83,7 @@ def provider_catalog() -> list[ProviderDescriptor]:
         slug = entry.slug
         cfg = PROVIDER_REGISTRY.get(slug)
         prof = profiles.get(slug)
-        overlay = QUBIT_OVERLAYS.get(slug)
+        overlay = HERMES_OVERLAYS.get(slug)
         # auth_type: registry is authoritative; then profile, then overlay (moa → "virtual"), then api_key.
         auth_type = ((cfg.auth_type if cfg else "") or (prof.auth_type if prof else "")
                      or (overlay.auth_type if overlay else "") or "api_key")
@@ -104,9 +103,6 @@ def provider_catalog() -> list[ProviderDescriptor]:
                 slug=slug, label=label, description=(prof.description if prof else "") or entry.tui_desc or label,
                 auth_type=auth_type, tab=tab_for_auth_type(auth_type), api_key_env_vars=api_key_vars,
                 base_url_env_var=base_url_var, signup_url=signup_url, order=order,
-                # Keyless providers (opencode-free) are served anonymously: no key card in the GUI,
-                # and contract tests exempt them.
-                keyless=bool(overlay.keyless) if overlay else False,
             )
         )
     return out

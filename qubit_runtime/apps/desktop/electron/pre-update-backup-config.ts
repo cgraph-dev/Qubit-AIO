@@ -12,16 +12,16 @@ export function preUpdateBackupEnabled(value: unknown): boolean {
   return typeof value !== 'string' || !DISABLED_BACKUP_MODES.has(value.trim().toLowerCase())
 }
 
-export interface QubitConfigRuntime {
-  command?: string
+export interface HermesConfigRuntime {
+  command?: string | null
   args?: string[]
   env?: NodeJS.ProcessEnv
   shell?: boolean
 }
 
 export async function readPreUpdateBackupEnabled(
-  runtime: QubitConfigRuntime | Promise<QubitConfigRuntime>,
-  qubitHome: string,
+  runtime: HermesConfigRuntime | Promise<HermesConfigRuntime>,
+  hermesHome: string,
   run = execFileAsync
 ): Promise<boolean> {
   try {
@@ -33,7 +33,7 @@ export async function readPreUpdateBackupEnabled(
 
     const result = await run(resolvedRuntime.command, resolvedRuntime.args, {
       encoding: 'utf8',
-      env: { ...process.env, ...resolvedRuntime.env, QUBIT_HOME: qubitHome },
+      env: { ...process.env, ...resolvedRuntime.env, QUBIT_HOME: hermesHome },
       shell: Boolean(resolvedRuntime.shell),
       timeout: 15_000,
       windowsHide: true

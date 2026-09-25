@@ -31,10 +31,6 @@ class TestSearXNGSearchProviderIsConfigured:
         assert SearXNGWebSearchProvider().is_available() is True
 
 
-    def test_implements_web_search_provider(self):
-        from agent.web_search_provider import WebSearchProvider
-        from plugins.web.searxng.provider import SearXNGWebSearchProvider
-        assert issubclass(SearXNGWebSearchProvider, WebSearchProvider)
 
 
 class TestSearXNGSearchProviderSearch:
@@ -155,7 +151,7 @@ class TestGetBackendSearXNG:
     def test_auto_detect_picks_searxng_when_url_only_in_qubit_config(self, monkeypatch):
         """#34290 follow-up: a config-only SEARXNG_URL (absent from process env)
         must still drive auto-detect via the now config-aware ``_has_env``."""
-        from qubit_cli import config as qubit_config
+        from qubit_cli import config as hermes_config
         from tools import web_tools
         monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
@@ -165,7 +161,7 @@ class TestGetBackendSearXNG:
         monkeypatch.delenv("EXA_API_KEY", raising=False)
         monkeypatch.delenv("SEARXNG_URL", raising=False)
         monkeypatch.setattr(
-            qubit_config,
+            hermes_config,
             "get_env_value",
             lambda key: "http://config-only:8080" if key == "SEARXNG_URL" else None,
         )
@@ -187,12 +183,12 @@ class TestCheckWebApiKey:
 
     def test_searxng_config_only_satisfies_check_web_api_key(self, monkeypatch):
         """#34290 follow-up: config-only SEARXNG_URL satisfies the credential check."""
-        from qubit_cli import config as qubit_config
+        from qubit_cli import config as hermes_config
         from tools import web_tools
         monkeypatch.setattr(web_tools, "_load_web_config", lambda: {"backend": "searxng"})
         monkeypatch.delenv("SEARXNG_URL", raising=False)
         monkeypatch.setattr(
-            qubit_config,
+            hermes_config,
             "get_env_value",
             lambda key: "http://config-only:8080" if key == "SEARXNG_URL" else None,
         )

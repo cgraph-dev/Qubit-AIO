@@ -36,7 +36,7 @@ interface BootThemeFile {
 
 // Profile-aware: the Python launcher exports QUBIT_HOME (set by
 // _apply_profile_override) before spawning the TUI. Falling back to
-// ~/.hermes matches get_hermes_home()'s default.
+// ~/.hermes matches get_qubit_home()'s default.
 const bootFilePath = () => join(process.env.QUBIT_HOME ?? join(homedir(), '.hermes'), 'tui-theme-boot.json')
 
 // Never touch the user's real ~/.hermes from test runs (the TS suite has no
@@ -150,7 +150,7 @@ export function seedBootEnvironment(boot: BootTheme | null, env: NodeJS.ProcessE
 
   seeded = result
 
-  if (!boot || env.QUBIT_TUI_THEME || env.QUBIT_TUI_LIGHT) {
+  if (!boot || env.HERMES_TUI_THEME || env.HERMES_TUI_LIGHT) {
     return result
   }
 
@@ -159,7 +159,7 @@ export function seedBootEnvironment(boot: BootTheme | null, env: NodeJS.ProcessE
   // background, and without the pin the first skin resolution flips to the
   // physical pole before config hydration flips it back (multi-stage flash).
   if (boot.mode) {
-    env.QUBIT_TUI_THEME = boot.mode
+    env.HERMES_TUI_THEME = boot.mode
     result.seededPin = true
   }
 
@@ -169,9 +169,9 @@ export function seedBootEnvironment(boot: BootTheme | null, env: NodeJS.ProcessE
     // before the distrust rule existed must not poison this session's
     // detection (it would also suppress the macOS-appearance fallback).
     boot.background.toLowerCase() !== '#000000' &&
-    !env.QUBIT_TUI_BACKGROUND
+    !env.HERMES_TUI_BACKGROUND
   ) {
-    env.QUBIT_TUI_BACKGROUND = boot.background
+    env.HERMES_TUI_BACKGROUND = boot.background
     result.seededBackground = boot.background
   }
 
@@ -187,11 +187,11 @@ export function seedBootEnvironment(boot: BootTheme | null, env: NodeJS.ProcessE
  * Returns true when the slot was cleared.
  */
 export function invalidateBootBackground(env: NodeJS.ProcessEnv = process.env): boolean {
-  if (!seeded.seededBackground || env.QUBIT_TUI_BACKGROUND !== seeded.seededBackground) {
+  if (!seeded.seededBackground || env.HERMES_TUI_BACKGROUND !== seeded.seededBackground) {
     return false
   }
 
-  delete env.QUBIT_TUI_BACKGROUND
+  delete env.HERMES_TUI_BACKGROUND
   seeded.seededBackground = null
 
   return true

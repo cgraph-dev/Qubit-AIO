@@ -32,7 +32,7 @@ def own_home(monkeypatch, tmp_path):
 
 
 def _pid_homes(monkeypatch, mapping: dict):
-    monkeypatch.setattr(dashboard_procs, "_hermes_home_for_pid", lambda pid: mapping.get(pid))
+    monkeypatch.setattr(dashboard_procs, "_qubit_home_for_pid", lambda pid: mapping.get(pid))
 
 
 def test_systemd_unit_of_another_home_is_left_alone(monkeypatch, own_home):

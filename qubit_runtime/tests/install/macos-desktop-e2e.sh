@@ -414,7 +414,7 @@ PYEOF
   # launching the app; launcher presence alone does not prove completion.
   step "next ordinary startup after the update (completes deferred source-update work)"
   local startup_hermes startup_rc=0
-  startup_hermes="$(source_hermes_for_startup "$INSTALL_DIR")" \
+  startup_hermes="$(source_qubit_for_startup "$INSTALL_DIR")" \
     || fail "no installed command to start after the update"
   source_build_env "$startup_hermes" status > "$LOG_DIR/post-update-startup.log" 2>&1 || startup_rc=$?
   log_group "post-update startup" "$LOG_DIR/post-update-startup.log"

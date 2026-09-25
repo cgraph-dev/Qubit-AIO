@@ -61,7 +61,7 @@ Do not use this skill for general Q&A, coding help, or non-memory tasks.
 Cards are stored in a JSON file at:
 
 ```
-$QUBIT_HOME/skills/productivity/memento-flashcards/data/cards.json
+~/.hermes/skills/productivity/memento-flashcards/data/cards.json
 ```
 
 **Never edit this file directly.** Always use `memento_cards.py` subcommands. The script handles atomic writes (write to temp file, then rename) to prevent corruption.
@@ -100,7 +100,7 @@ Rules:
 **Step 2:** Call the script to store the card:
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py add \
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py add \
   --question "What year did World War 2 end?" \
   --answer "1945" \
   --collection "History"
@@ -124,13 +124,13 @@ Then call `memento_cards.py add` as above.
 When the user wants to review, fetch all due cards:
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py due
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py due
 ```
 
 This returns a JSON array of cards where `next_review_at <= now`. If a collection filter is needed:
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py due --collection "History"
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py due --collection "History"
 ```
 
 **Review flow (free-text grading):**
@@ -163,7 +163,7 @@ Here is an example of the EXACT interaction pattern you must follow. The user an
 5. Then show the next question.
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py rate \
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py rate \
   --id CARD_ID --rating easy --user-answer "what the user said"
 ```
 
@@ -197,15 +197,26 @@ When the user sends a YouTube URL and wants a quiz:
 **Step 2:** Fetch the transcript:
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/youtube_quiz.py fetch VIDEO_ID
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/youtube_quiz.py fetch VIDEO_ID
 ```
 
 This returns `{"title": "...", "transcript": "..."}` or an error.
 
-If the script reports `missing_dependency`, tell the user to install it:
+If the script reports `missing_dependency`, use `terminal` with a PM-prepared
+Qubit checkout to prepare the declared `youtube` extra, then reactivate:
+
 ```bash
-pip install youtube-transcript-api
+python -c "import pm; pm.sync_venv(['youtube'], explicit=True)"
+source ./activate
+python -c "import youtube_transcript_api; print(youtube_transcript_api.__file__)"
 ```
+
+Follow the isolated development-home setup in
+[Package Management](https://hermes-agent.nousresearch.com/docs/reference/package-management#developer-workflow)
+before preparation. Retry `youtube_quiz.py` with that Python and the actual
+skill directory returned by `skill_view`. For a remote or sandbox terminal,
+prepare an independent helper environment on that host. Never pip-install into
+Qubit's selected environment.
 
 **Step 3:** Generate 5 quiz questions from the transcript. Use these rules:
 
@@ -239,7 +250,7 @@ Use the first 15,000 characters of the transcript as context. Generate the quest
 **Step 5:** Store quiz cards:
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py add-quiz \
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py add-quiz \
   --video-id "VIDEO_ID" \
   --questions '[{"question":"...","answer":"..."},...]' \
   --collection "Quiz - Episode Title"
@@ -254,7 +265,7 @@ The script deduplicates by `video_id` — if cards for that video already exist,
 4. **IMPORTANT: You MUST reply to the user with feedback before doing anything else.** Show the grade, the correct answer, and when the card is next due. Do NOT silently skip to the next question. Keep it short and plain-text. Example: "Not quite. Answer: {answer}. Next review tomorrow."
 5. **After showing feedback**, call the rate command and then show the next question in the same message:
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py rate \
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py rate \
   --id CARD_ID --rating easy --user-answer "what the user said"
 ```
 6. Repeat. Every answer MUST receive visible feedback before the next question.
@@ -263,7 +274,7 @@ python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards
 
 **Export:**
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py export \
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py export \
   --output ~/flashcards.csv
 ```
 
@@ -271,7 +282,7 @@ Produces a 3-column CSV: `question,answer,collection` (no header row).
 
 **Import:**
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py import \
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py import \
   --file ~/flashcards.csv \
   --collection "Imported"
 ```
@@ -281,7 +292,7 @@ Reads a CSV with columns: question, answer, and optionally collection (column 3)
 ### Statistics
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py stats
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py stats
 ```
 
 Returns JSON with:
@@ -295,7 +306,7 @@ Returns JSON with:
 
 - **Never edit `cards.json` directly** — always use the script subcommands to avoid corruption
 - **Transcript failures** — some YouTube videos have no English transcript or have transcripts disabled; inform the user and suggest another video
-- **Optional dependency** — `youtube_quiz.py` needs `youtube-transcript-api`; if missing, tell the user to run `pip install youtube-transcript-api`
+- **Optional dependency** — `youtube_quiz.py` needs `youtube-transcript-api`; use the PM preparation and interpreter check above if missing.
 - **Large imports** — CSV imports with thousands of rows work fine but the JSON output may be verbose; summarize the result for the user
 - **Video ID extraction** — support both `youtube.com/watch?v=ID` and `youtu.be/ID` URL formats
 
@@ -304,15 +315,15 @@ Returns JSON with:
 Verify the helper scripts directly:
 
 ```bash
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py stats
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py add --question "Capital of France?" --answer "Paris" --collection "General"
-python3 $QUBIT_HOME/skills/productivity/memento-flashcards/scripts/memento_cards.py due
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py stats
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py add --question "Capital of France?" --answer "Paris" --collection "General"
+python3 ~/.hermes/skills/productivity/memento-flashcards/scripts/memento_cards.py due
 ```
 
 If you are testing from the repo checkout, run:
 
 ```bash
-pytest tests/skills/test_memento_cards.py tests/skills/test_youtube_quiz.py -q
+scripts/run_tests.sh tests/skills/test_memento_cards.py tests/skills/test_youtube_quiz.py -q
 ```
 
 Agent-level verification:

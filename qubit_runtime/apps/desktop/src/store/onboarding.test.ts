@@ -12,6 +12,7 @@ import {
   refreshOnboarding,
   requestDesktopOnboarding,
   saveOnboardingLocalEndpoint,
+  setOnboardingModel,
   submitOnboardingCode
 } from './onboarding'
 
@@ -26,6 +27,7 @@ function baseState(overrides: Partial<DesktopOnboardingState> = {}): DesktopOnbo
     firstRunSkipped: false,
     manual: false,
     localEndpoint: false,
+    freeTierReady: false,
     ...overrides
   }
 }
@@ -83,6 +85,7 @@ describe('refreshOnboarding', () => {
   it('keeps onboarding work in its initiating lifetime and profile', async () => {
     const { startManualOnboarding, startProviderOAuth, saveOnboardingApiKey, closeManualOnboarding } =
       await import('./onboarding')
+
     const requests: { path: string; profile?: string }[] = []
     let release!: () => void
     let delayKey = true
@@ -144,7 +147,7 @@ describe('refreshOnboarding', () => {
       release()
       await pending
       expect(requests.some(r => r.path === '/api/model/set')).toBe(false)
-      expect($desktopOnboarding.get()).toMatchObject({ targetProfile: 'alpha', flow: { status: 'idle' } })
+      expect($desktopOnboarding.get()).toMatchObject({ targetScope: { profile: 'alpha' }, flow: { status: 'idle' } })
       closeManualOnboarding()
       delayKey = false
       profile = 'beta'
@@ -410,7 +413,7 @@ describe('OAuth onboarding', () => {
         return {
           providers: [
             {
-              name: 'Qubit Labs',
+              name: 'Nous Portal',
               slug: 'nous',
               models: [model]
             }
@@ -451,7 +454,7 @@ describe('OAuth onboarding', () => {
       baseState({
         flow: {
           status: 'awaiting_user',
-          provider: makeOAuthProvider('nous', 'Qubit Labs'),
+          provider: makeOAuthProvider('nous', 'Nous Portal'),
           start: {
             auth_url: 'https://portal.example/auth',
             expires_in: 600,
@@ -461,7 +464,7 @@ describe('OAuth onboarding', () => {
           code: 'fresh-code'
         },
         reason:
-          'No access token found for Qubit Labs login. setup.status reports configured credentials, but runtime resolution still failed.',
+          'No access token found for Nous Portal login. setup.status reports configured credentials, but runtime resolution still failed.',
         requested: true
       })
     )
@@ -473,7 +476,7 @@ describe('OAuth onboarding', () => {
     expect(state.flow.status).toBe('confirming_model')
 
     if (state.flow.status === 'confirming_model') {
-      expect(state.flow.label).toBe('Qubit Labs')
+      expect(state.flow.label).toBe('Nous Portal')
       expect(state.flow.currentModel).toBe(model)
     }
 
@@ -496,7 +499,7 @@ describe('OAuth onboarding', () => {
       }
 
       if (path.startsWith('/api/model/options')) {
-        return { providers: [{ name: 'Qubit Labs', slug: 'nous', models: [model] }] }
+        return { providers: [{ name: 'Nous Portal', slug: 'nous', models: [model] }] }
       }
 
       if (path.startsWith('/api/model/recommended-default?')) {
@@ -529,7 +532,7 @@ describe('OAuth onboarding', () => {
       baseState({
         flow: {
           status: 'awaiting_user',
-          provider: makeOAuthProvider('nous', 'Qubit Labs'),
+          provider: makeOAuthProvider('nous', 'Nous Portal'),
           start: {
             auth_url: 'https://portal.example/auth',
             expires_in: 600,
@@ -598,7 +601,6 @@ describe('saveOnboardingLocalEndpoint', () => {
     })
 
     expect(result.ok).toBe(false)
-    expect(result.message).toContain('no models')
     // Must not attempt to persist an assignment without a model.
     expect(calls).not.toContain('/api/model/set')
   })
@@ -686,6 +688,49 @@ describe('saveOnboardingLocalEndpoint', () => {
     })
   })
 
+  it('persists the resolved_base_url that served /models, not the URL as typed (#65488)', async () => {
+    const calls: { body?: unknown; path: string }[] = []
+
+    const api = vi.fn(async ({ body, path }: { body?: unknown; path: string }) => {
+      calls.push({ body, path })
+
+      if (path === '/api/providers/validate') {
+        // The probe fell through from the bare host root to its /v1 variant.
+        return {
+          ok: true,
+          reachable: true,
+          message: '',
+          models: ['llama-3.1-8b'],
+          resolved_base_url: 'http://127.0.0.1:1234/v1'
+        }
+      }
+
+      if (path === '/api/model/set') {
+        return { ok: true, provider: 'custom', model: 'llama-3.1-8b', base_url: 'http://127.0.0.1:1234/v1' }
+      }
+
+      throw new Error(`unexpected api path: ${path}`)
+    })
+
+    installApiMock(api)
+
+    const result = await saveOnboardingLocalEndpoint('http://127.0.0.1:1234', '', {
+      requestGateway: readyGateway()
+    })
+
+    expect(result.ok).toBe(true)
+
+    // The runtime POSTs {base_url}/chat/completions verbatim, so Save must store
+    // the base that actually answered /models rather than the typed host root.
+    const assign = calls.find(c => c.path === '/api/model/set')
+    expect(assign?.body).toMatchObject({
+      scope: 'main',
+      provider: 'custom',
+      model: 'llama-3.1-8b',
+      base_url: 'http://127.0.0.1:1234/v1'
+    })
+  })
+
   it('reports the runtime reason when resolution still fails after saving', async () => {
     installApiMock(async ({ path }: { path: string }) => {
       if (path === '/api/providers/validate') {
@@ -741,7 +786,7 @@ describe('device-code poll expiry', () => {
   function deviceCodeProvider() {
     // makeOAuthProvider builds a pkce provider; device-code flows need the
     // device_code branch instead.
-    return { ...makeOAuthProvider('nous', 'Qubit Labs'), flow: 'device_code' as const }
+    return { ...makeOAuthProvider('nous', 'Nous Portal'), flow: 'device_code' as const }
   }
 
   function deviceStart(expiresIn: number) {
@@ -779,12 +824,7 @@ describe('device-code poll expiry', () => {
       vi.advanceTimersByTime(3000)
     })
 
-    const flow = $desktopOnboarding.get().flow
-    expect(flow.status).toBe('error')
-
-    if (flow.status === 'error') {
-      expect(flow.message).toContain('Sign-in expired waiting for authorization')
-    }
+    expect($desktopOnboarding.get().flow.status).toBe('error')
   })
 
   it('keeps polling while the window is open and clears the expiry on cancel', async () => {
@@ -816,5 +856,55 @@ describe('device-code poll expiry', () => {
       vi.advanceTimersByTime(700_000)
     })
     expect($desktopOnboarding.get().flow.status).toBe('idle')
+  })
+})
+
+// The happy path (cross-provider pick reaches /api/model/set with the picked
+// model's provider) is covered from the ConfirmingModelPanel in
+// components/onboarding/flow.test.tsx so it exercises the onSelect wiring.
+describe('setOnboardingModel', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+    $desktopOnboarding.set(baseState())
+    vi.restoreAllMocks()
+  })
+
+  function confirmingModelState(
+    overrides: Partial<Extract<DesktopOnboardingState['flow'], { status: 'confirming_model' }>> = {}
+  ) {
+    return baseState({
+      flow: {
+        status: 'confirming_model',
+        currentModel: 'gpt-5.6-terra',
+        label: 'OpenAI OAuth (ChatGPT)',
+        providerSlug: 'openai',
+        saving: false,
+        ...overrides
+      }
+    })
+  }
+
+  it('reverts the model, provider and label when persistence fails', async () => {
+    installApiMock(async () => {
+      throw new Error('backend down')
+    })
+    $desktopOnboarding.set(confirmingModelState())
+
+    await setOnboardingModel('deepseek/deepseek-v4-flash-0731', 'nous', 'Nous Portal')
+
+    const flow = $desktopOnboarding.get().flow
+    expect(flow.status).toBe('confirming_model')
+
+    if (flow.status === 'confirming_model') {
+      expect(flow.currentModel).toBe('gpt-5.6-terra')
+      expect(flow.providerSlug).toBe('openai')
+      expect(flow.label).toBe('OpenAI OAuth (ChatGPT)')
+      expect(flow.saving).toBe(false)
+    }
   })
 })

@@ -27,12 +27,6 @@ def broken_replace(monkeypatch):
     import utils
 
     monkeypatch.setattr(utils, "atomic_replace", _failing_replace)
-    # The fork's gateway mirror binds atomic_replace directly at import
-    # (``from utils import atomic_replace``); patch where production reads so
-    # the failure injection is deterministic regardless of import order.
-    import gateway.session_persistence as _sp
-
-    monkeypatch.setattr(_sp, "atomic_replace", _failing_replace)
 
 
 def test_sessions_json_failed_replace_keeps_old_bytes_and_no_temp(tmp_path, monkeypatch, broken_replace):
@@ -91,7 +85,7 @@ def test_surrogate_escaped_strings_round_trip_through_atomic_json_write(tmp_path
     assert _leftovers(target.parent, target.name) == []
 
 
-@pytest.mark.linux_only
+@pytest.mark.platforms("linux")
 def test_new_non_secret_file_follows_umask_while_secret_and_existing_modes_hold(tmp_path):
     """The writers this helper replaced created files at process umask; only ``mode=`` tightens."""
     import os
@@ -118,7 +112,7 @@ def test_new_non_secret_file_follows_umask_while_secret_and_existing_modes_hold(
         os.umask(old_umask)
 
 
-@pytest.mark.linux_only
+@pytest.mark.platforms("linux")
 def test_mkstemp_heritage_writers_keep_new_files_owner_only(tmp_path):
     """Writers that published through mkstemp on main created NEW files at 0600 regardless of umask
     (bot mailboxes, turn markers); folding them into utils must not loosen that to umask."""
@@ -131,10 +125,7 @@ def test_mkstemp_heritage_writers_keep_new_files_owner_only(tmp_path):
     old_umask = os.umask(0o022)
     try:
         relay_target = tmp_path / "relay" / "inbox.json"
-        # The fork's internal writer requires an existing parent (callers ensure
-        # it); the 0600 new-file contract below is what this test locks.
-        relay_target.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write_json(relay_target, {"k": 1}, prefix=".relay-")
+        _atomic_write_json(relay_target, {"k": 1})
         marker = tmp_path / "turn-marker.json"
         _store(marker, {"sess": {"started_at": 1.0}})
         for path in (relay_target, marker):

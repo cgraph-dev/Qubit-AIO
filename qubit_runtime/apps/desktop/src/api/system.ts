@@ -13,7 +13,7 @@ import type {
   MemoryStatusResponse
 } from '@/types/hermes'
 
-import { capabilityScoped, qubitApi, type ProfileScope, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type OwnerScope, ownerScoped, type ProfileScope, profileScoped } from './client'
 
 export const AUDIO_SPEAK_MIN_REQUEST_TIMEOUT_MS = 180_000
 export const AUDIO_SPEAK_MAX_REQUEST_TIMEOUT_MS = 600_000
@@ -48,7 +48,7 @@ export function audioTranscribeRequestTimeoutMs(dataUrl: string): number {
 
 // surface=declared serves the curated desktop schema; the dashboard consumes the raw plugin schema.
 export function getMemoryProviderConfig(provider: string, profile?: null | string): Promise<MemoryProviderConfig> {
-  return qubitApi<MemoryProviderConfig>({
+  return hermesApi<MemoryProviderConfig>({
     ...profileScoped(profile),
     path: `/api/memory/providers/${encodeURIComponent(provider)}/config?surface=declared`
   })
@@ -59,7 +59,7 @@ export function saveMemoryProviderConfig(
   values: Record<string, string>,
   profile?: null | string
 ): Promise<{ ok: boolean }> {
-  return qubitApi<{ ok: boolean }>({
+  return hermesApi<{ ok: boolean }>({
     ...profileScoped(profile),
     path: `/api/memory/providers/${encodeURIComponent(provider)}/config?surface=declared`,
     method: 'PUT',
@@ -73,7 +73,7 @@ export function startMemoryProviderOAuth(
   provider: string,
   profile?: null | string
 ): Promise<MemoryProviderOAuthStatus> {
-  return qubitApi<MemoryProviderOAuthStatus>({
+  return hermesApi<MemoryProviderOAuthStatus>({
     ...profileScoped(profile),
     path: `/api/memory/providers/${encodeURIComponent(provider)}/oauth/start`,
     method: 'POST'
@@ -84,7 +84,7 @@ export function getMemoryProviderOAuthStatus(
   provider: string,
   profile?: null | string
 ): Promise<MemoryProviderOAuthStatus> {
-  return qubitApi<MemoryProviderOAuthStatus>({
+  return hermesApi<MemoryProviderOAuthStatus>({
     ...profileScoped(profile),
     path: `/api/memory/providers/${encodeURIComponent(provider)}/oauth/status`
   })
@@ -95,14 +95,14 @@ export function getMemoryProviderOAuthStatus(
 // ---------------------------------------------------------------------------
 
 export function getMemoryStatus(): Promise<MemoryStatusResponse> {
-  return qubitApi<MemoryStatusResponse>({
+  return hermesApi<MemoryStatusResponse>({
     ...profileScoped(),
     path: '/api/memory'
   })
 }
 
 export function resetMemory(target: 'all' | 'memory' | 'user'): Promise<{ ok: boolean; deleted: string[] }> {
-  return qubitApi<{ ok: boolean; deleted: string[] }>({
+  return hermesApi<{ ok: boolean; deleted: string[] }>({
     ...profileScoped(),
     path: '/api/memory/reset',
     method: 'POST',
@@ -111,14 +111,14 @@ export function resetMemory(target: 'all' | 'memory' | 'user'): Promise<{ ok: bo
 }
 
 export function getCuratorStatus(): Promise<CuratorStatusResponse> {
-  return qubitApi<CuratorStatusResponse>({
+  return hermesApi<CuratorStatusResponse>({
     ...profileScoped(),
     path: '/api/curator'
   })
 }
 
 export function setCuratorPaused(paused: boolean): Promise<{ ok: boolean; paused: boolean }> {
-  return qubitApi<{ ok: boolean; paused: boolean }>({
+  return hermesApi<{ ok: boolean; paused: boolean }>({
     ...profileScoped(),
     path: '/api/curator/paused',
     method: 'PUT',
@@ -127,7 +127,7 @@ export function setCuratorPaused(paused: boolean): Promise<{ ok: boolean; paused
 }
 
 export function runCurator(): Promise<ActionResponse> {
-  return qubitApi<ActionResponse>({
+  return hermesApi<ActionResponse>({
     ...profileScoped(),
     path: '/api/curator/run',
     method: 'POST',
@@ -136,17 +136,17 @@ export function runCurator(): Promise<ActionResponse> {
 }
 
 export function restartGateway(): Promise<ActionResponse> {
-  return qubitApi<ActionResponse>({
+  return hermesApi<ActionResponse>({
     ...profileScoped(),
     path: '/api/gateway/restart',
     method: 'POST'
   })
 }
 
-export function updateQubit(): Promise<ActionResponse> {
-  return qubitApi<ActionResponse>({
+export function updateHermes(): Promise<ActionResponse> {
+  return hermesApi<ActionResponse>({
     ...profileScoped(),
-    path: '/api/qubit/update',
+    path: '/api/hermes/update',
     method: 'POST'
   })
 }
@@ -154,22 +154,22 @@ export function updateQubit(): Promise<ActionResponse> {
 /** Query the connected backend's own update state. In remote mode this is the
  *  authoritative source for the backend's behind-count + "what's changed",
  *  distinct from the Electron client clone's git state. */
-export function checkQubitUpdate(force = false): Promise<BackendUpdateCheckResponse> {
-  return qubitApi<BackendUpdateCheckResponse>({
+export function checkHermesUpdate(force = false): Promise<BackendUpdateCheckResponse> {
+  return hermesApi<BackendUpdateCheckResponse>({
     ...profileScoped(),
-    path: `/api/qubit/update/check${force ? '?force=true' : ''}`
+    path: `/api/hermes/update/check${force ? '?force=true' : ''}`
   })
 }
 
 export function getActionStatus(name: string, lines = 200, profile?: ProfileScope): Promise<ActionStatusResponse> {
-  return window.qubitDesktop.api<ActionStatusResponse>({
+  return window.hermesDesktop.api<ActionStatusResponse>({
     ...capabilityScoped(profile),
     path: `/api/actions/${encodeURIComponent(name)}/status?lines=${Math.max(1, lines)}`
   })
 }
 
 export function transcribeAudio(dataUrl: string, mimeType?: string): Promise<AudioTranscriptionResponse> {
-  return qubitApi<AudioTranscriptionResponse>({
+  return hermesApi<AudioTranscriptionResponse>({
     path: '/api/audio/transcribe',
     method: 'POST',
     ...profileScoped(),
@@ -184,9 +184,11 @@ export function transcribeAudio(dataUrl: string, mimeType?: string): Promise<Aud
   })
 }
 
-export function speakText(text: string): Promise<AudioSpeakResponse> {
-  return qubitApi<AudioSpeakResponse>({
-    ...profileScoped(),
+// `owner` = the speaking session's (connection, profile) — a Bot's own TTS
+// voice on its own gateway; omitted halves → the active scope.
+export function speakText(text: string, owner?: OwnerScope): Promise<AudioSpeakResponse> {
+  return hermesApi<AudioSpeakResponse>({
+    ...ownerScoped(owner),
     path: '/api/audio/speak',
     method: 'POST',
     body: { text },
@@ -208,7 +210,7 @@ export const AUDIO_TTS_LEASE_REQUEST_TIMEOUT_MS = 180_000
  * `lease` names the toggle — `desktop:read-aloud`, `desktop:conversation`.
  */
 export function setTtsLease(lease: string, active: boolean): Promise<AudioTtsLeaseResponse> {
-  return qubitApi<AudioTtsLeaseResponse>({
+  return hermesApi<AudioTtsLeaseResponse>({
     ...profileScoped(),
     path: '/api/audio/tts-lease',
     method: 'POST',
@@ -218,7 +220,7 @@ export function setTtsLease(lease: string, active: boolean): Promise<AudioTtsLea
 }
 
 export function getElevenLabsVoices(profile?: null | string): Promise<ElevenLabsVoicesResponse> {
-  return qubitApi<ElevenLabsVoicesResponse>({
+  return hermesApi<ElevenLabsVoicesResponse>({
     path: '/api/audio/elevenlabs/voices',
     ...profileScoped(profile)
   })
@@ -228,7 +230,7 @@ export function getElevenLabsVoices(profile?: null | string): Promise<ElevenLabs
  *  (GitHub is deliberately not an MCP — the github/* skills are the
  *  integration). Backend caches for 5 minutes; `refresh` bypasses. */
 export function getGhAuthStatus(refresh = false): Promise<{ available: boolean; authenticated: boolean }> {
-  return qubitApi<{ available: boolean; authenticated: boolean }>({
+  return hermesApi<{ available: boolean; authenticated: boolean }>({
     ...profileScoped(),
     path: `/api/git/gh-auth${refresh ? '?refresh=true' : ''}`
   })
@@ -239,18 +241,29 @@ export function getGhAuthStatus(refresh = false): Promise<{ available: boolean; 
 // audit` / `hermes backup` / `hermes debug share` and the dashboard System
 // page). All except debug share are spawn-based background actions tailed via
 // getActionStatus().
+//
+// Every one carries the ambient profile: Electron pins the whole /api/ops
+// family to the shared primary backend (connection-config's
+// LOCAL_PRIMARY_SCOPED_ROUTES), so an unprofiled call acts on that backend's
+// LAUNCH profile — and debug share uploads a home's logs and config.
 // ---------------------------------------------------------------------------
 
 export function runDoctor(): Promise<ActionResponse> {
-  return qubitApi<ActionResponse>({ path: '/api/ops/doctor', method: 'POST', body: {} })
+  return hermesApi<ActionResponse>({ ...profileScoped(), path: '/api/ops/doctor', method: 'POST', body: {} })
 }
 
 export function runSecurityAudit(): Promise<ActionResponse> {
-  return qubitApi<ActionResponse>({ path: '/api/ops/security-audit', method: 'POST', body: {} })
+  return hermesApi<ActionResponse>({
+    ...profileScoped(),
+    path: '/api/ops/security-audit',
+    method: 'POST',
+    body: {}
+  })
 }
 
 export function runBackup(): Promise<ActionResponse & { archive?: string }> {
-  return qubitApi<ActionResponse & { archive?: string }>({
+  return hermesApi<ActionResponse & { archive?: string }>({
+    ...profileScoped(),
     path: '/api/ops/backup',
     method: 'POST',
     body: {}
@@ -258,7 +271,8 @@ export function runBackup(): Promise<ActionResponse & { archive?: string }> {
 }
 
 export function runDebugShare(): Promise<DebugShareResponse> {
-  return qubitApi<DebugShareResponse>({
+  return hermesApi<DebugShareResponse>({
+    ...profileScoped(),
     path: '/api/ops/debug-share',
     method: 'POST',
     body: {},

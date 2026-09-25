@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import logging
 import os
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+
+from agent.transports.qubit_tools_mcp_server import HERMES_TOOLS_MCP_SERVER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,7 @@ class MigrationReport:
     migrated_plugins: list[str] = field(default_factory=list)
     plugin_query_error: Optional[str] = None
     wrote_permissions_default: Optional[str] = None
+    preserved_user_servers: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     written: bool = False
     dry_run: bool = False
@@ -54,13 +58,17 @@ class MigrationReport:
             lines.append(f"Codex plugin discovery skipped: {self.plugin_query_error}")
         if self.wrote_permissions_default:
             lines.append(f"Wrote default_permissions = {self.wrote_permissions_default!r}")
+        if self.preserved_user_servers:
+            lines.append(
+                f"Kept {len(self.preserved_user_servers)} user-owned MCP server(s) already in "
+                f"config.toml (Qubit projection skipped): {', '.join(self.preserved_user_servers)}")
         lines.extend(f"⚠ {err}" for err in self.errors)
         return "\n".join(lines)
 
 
 # Qubit MCP keys codex understands (transport stdio/http, timeouts, general). Any other key is
 # dropped with a warning: ``sampling`` has no codex equivalent; the rest are unknown Qubit keys.
-_KNOWN_QUBIT_KEYS = {
+_KNOWN_HERMES_KEYS = {
     "command", "args", "env", "cwd",
     "url", "headers", "transport",
     "timeout", "connect_timeout",
@@ -78,7 +86,7 @@ def _str_map(d: dict) -> dict[str, str]:
     return {str(k): str(v) for k, v in d.items()}
 
 
-def _translate_one_server(name: str, qubit_cfg: dict) -> tuple[Optional[dict], list[str]]:
+def _translate_one_server(name: str, hermes_cfg: dict) -> tuple[Optional[dict], list[str]]:
     """Translate one Qubit MCP server config to codex's inline-table dict.
 
     Returns ``(codex_entry, skipped_keys)``; ``codex_entry`` is None when the config is unusable.
@@ -86,40 +94,40 @@ def _translate_one_server(name: str, qubit_cfg: dict) -> tuple[Optional[dict], l
     informational only — codex auto-negotiates. ``enabled`` is emitted only when explicitly false
     (codex defaults to true).
     """
-    if not isinstance(qubit_cfg, dict):
+    if not isinstance(hermes_cfg, dict):
         return None, []
     skipped: list[str] = []
     out: dict[str, Any] = {}
-    if qubit_cfg.get("command"):
-        if qubit_cfg.get("url"):
+    if hermes_cfg.get("command"):
+        if hermes_cfg.get("url"):
             skipped.append("url (both command and url set; preferring stdio)")
-        out["command"] = str(qubit_cfg["command"])
-        if qubit_cfg.get("args"):
-            out["args"] = [str(a) for a in qubit_cfg["args"]]
-        if qubit_cfg.get("env"):
-            out["env"] = _str_map(qubit_cfg["env"])
-        if qubit_cfg.get("cwd"):
-            out["cwd"] = str(qubit_cfg["cwd"])
-    elif qubit_cfg.get("url"):
-        out["url"] = str(qubit_cfg["url"])
-        if qubit_cfg.get("headers"):
-            out["http_headers"] = _str_map(qubit_cfg["headers"])
-        if qubit_cfg.get("transport") == "sse":
+        out["command"] = str(hermes_cfg["command"])
+        if hermes_cfg.get("args"):
+            out["args"] = [str(a) for a in hermes_cfg["args"]]
+        if hermes_cfg.get("env"):
+            out["env"] = _str_map(hermes_cfg["env"])
+        if hermes_cfg.get("cwd"):
+            out["cwd"] = str(hermes_cfg["cwd"])
+    elif hermes_cfg.get("url"):
+        out["url"] = str(hermes_cfg["url"])
+        if hermes_cfg.get("headers"):
+            out["http_headers"] = _str_map(hermes_cfg["headers"])
+        if hermes_cfg.get("transport") == "sse":
             skipped.append("transport=sse (codex auto-negotiates)")
     else:
         return None, ["no command or url field"]
-    for qubit_key, codex_key, note in _TIMEOUT_KEYS:
-        if qubit_key in qubit_cfg:
+    for hermes_key, codex_key, note in _TIMEOUT_KEYS:
+        if hermes_key in hermes_cfg:
             try:
-                out[codex_key] = float(qubit_cfg[qubit_key])
+                out[codex_key] = float(hermes_cfg[hermes_key])
             except (TypeError, ValueError):
                 skipped.append(note)
-    if qubit_cfg.get("enabled") is False:
+    if hermes_cfg.get("enabled") is False:
         out["enabled"] = False
-    for key in qubit_cfg:
+    for key in hermes_cfg:
         if key in _KEYS_DROPPED_WITH_WARNING:
             skipped.append(f"{key} (no codex equivalent)")
-        elif key not in _KNOWN_QUBIT_KEYS:
+        elif key not in _KNOWN_HERMES_KEYS:
             skipped.append(f"{key} (unknown Qubit key)")
     return out, skipped
 
@@ -234,6 +242,38 @@ def _strip_unmanaged_plugin_tables(toml_text: str) -> str:
     return "".join(out)
 
 
+def _unmanaged_mcp_server_names(toml_text: str) -> set[str]:
+    """Names of ``[mcp_servers.<name>]`` tables the USER owns (text outside the managed block).
+
+    Unlike ``[plugins.*]`` — where ``plugin/list`` is the source of truth and we own the
+    namespace — ``mcp_servers`` is shared: the docs promise that anything outside the managed
+    block is the user's. A Qubit server whose name is already declared by the user is therefore
+    NOT re-emitted (the user's table wins and is preserved verbatim); emitting both would be a
+    duplicate table header, which is invalid TOML that codex refuses to load (issue #79023).
+    """
+    try:
+        parsed = tomllib.loads(toml_text).get("mcp_servers")
+    except tomllib.TOMLDecodeError:
+        parsed = None
+    if isinstance(parsed, dict):  # covers inline tables, dotted keys, `[ mcp_servers.x ]`
+        return {str(name) for name in parsed}
+    names: set[str] = set()
+    for line in toml_text.splitlines():
+        stripped = line.lstrip()
+        if not _looks_like_table_header(stripped) or not stripped.startswith("[mcp_servers."):
+            continue
+        # ``[mcp_servers.foo]`` -> ``foo``; ``[mcp_servers."foo bar"]`` -> ``foo bar``.
+        # Sub-tables (``[mcp_servers.foo.env]``) resolve to their server name ``foo``.
+        name_part = stripped[1:stripped.index("]")][len("mcp_servers."):].strip()
+        if name_part.startswith('"'):
+            name_part = name_part[1:name_part.index('"', 1)]
+        else:
+            name_part = name_part.split(".", 1)[0]
+        if name_part:
+            names.add(name_part)
+    return names
+
+
 def _looks_like_table_header(stripped_line: str) -> bool:
     """True for ``[name]`` / ``[[name]]`` headers (optional trailing comment); the closing ``]``
     must be on the same line and no ``=`` may precede it (``key = [x]`` is not a header)."""
@@ -275,7 +315,8 @@ def _strip_existing_managed_block(toml_text: str) -> str:
 
 
 def _query_codex_plugins(
-    codex_home: Optional[Path] = None, timeout: float = 8.0) -> tuple[list[dict], Optional[str]]:
+    codex_home: Optional[Path] = None, timeout: float = 8.0, codex_bin: str = "codex",
+) -> tuple[list[dict], Optional[str]]:
     """Spawn ``codex app-server`` briefly and return ``(installed plugins, error)`` from
     ``plugin/list``. Any failure yields ``([], error)`` and is non-fatal (servers and
     permissions still write). Plugins codex reports unavailable (broken install, missing OAuth,
@@ -287,7 +328,7 @@ def _query_codex_plugins(
     except Exception as exc:
         return [], f"transport unavailable: {exc}"
     try:
-        with CodexAppServerClient(codex_home=str(codex_home) if codex_home else None) as client:
+        with CodexAppServerClient(codex_bin=codex_bin, codex_home=str(codex_home) if codex_home else None) as client:
             client.initialize(client_name="hermes-migration")
             resp = client.request("plugin/list", {}, timeout=timeout)
     except Exception as exc:
@@ -323,7 +364,7 @@ def _query_codex_plugins(
 
 
 # pytest tempdir shapes: ``pytest-of-<user>/pytest-<n>/``, macOS ``/private/var/folders/…/T``.
-_TEST_TEMPDIR_NEEDLES = ("pytest-of-", "/pytest-", "/tmp/pytest", "/private/var/folders/")
+_TEST_TEMPDIR_NEEDLES = ("pytest-of-", "/pytest-", "/tmp/pytest", "/private/var/folders/")  # no-tmp: ok — detection needle for pytest temp homes
 
 
 def _looks_like_test_tempdir(path: str) -> bool:
@@ -374,25 +415,13 @@ def _build_qubit_tools_mcp_entry() -> dict:
 
 
 def _write_atomic(target: Path, text: str) -> None:
-    """Write via a same-directory temp file + rename (atomic on POSIX, ReplaceFile on Windows) so a
-    crash mid-write never leaves a half-written config.toml that codex would refuse to load."""
-    import tempfile
-    tmp_fd, tmp_path_str = tempfile.mkstemp(prefix=".config.toml.", dir=str(target.parent))
-    tmp_path = Path(tmp_path_str)
-    try:
-        with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        tmp_path.replace(target)
-    except Exception:
-        try:
-            tmp_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-        raise
+    """Atomic rewrite so a crash mid-write never leaves a half-written config.toml codex refuses to load."""
+    from utils import atomic_write_text
+    atomic_write_text(target, text, tmp_prefix=".config.toml.", preserve_mode=True)
 
 
 def migrate(
-    qubit_config: dict, *, codex_home: Optional[Path] = None, dry_run: bool = False,
+    hermes_config: dict, *, codex_home: Optional[Path] = None, dry_run: bool = False,
     discover_plugins: bool = True, default_permission_profile: Optional[str] = ":workspace",
     expose_qubit_tools: bool = True) -> MigrationReport:
     """Translate Qubit mcp_servers config + Codex curated plugins into ~/.codex/config.toml.
@@ -405,15 +434,16 @@ def migrate(
     server so the codex subprocess can call back for tools it lacks.
     """
     report = MigrationReport(dry_run=dry_run)
-    codex_home = codex_home or Path.home() / ".codex"
+    codex_home = codex_home or Path(
+        os.getenv("CODEX_HOME", "").strip() or str(Path.home() / ".codex")).expanduser()
     target = codex_home / "config.toml"
     report.target_path = target
-    qubit_servers = (qubit_config or {}).get("mcp_servers") or {}
-    if not isinstance(qubit_servers, dict):
+    hermes_servers = (hermes_config or {}).get("mcp_servers") or {}
+    if not isinstance(hermes_servers, dict):
         report.errors.append("mcp_servers in Qubit config is not a dict; cannot migrate.")
         return report
     translated: dict[str, dict] = {}
-    for raw_name, cfg in qubit_servers.items():
+    for raw_name, cfg in hermes_servers.items():
         name = str(raw_name)
         out, skipped = _translate_one_server(name, cfg or {})
         if out is None:
@@ -427,7 +457,9 @@ def migrate(
     plugins: list[dict] = []
     plugin_query_succeeded = False
     if discover_plugins and not dry_run:
-        plugins, plugin_err = _query_codex_plugins(codex_home=codex_home)
+        from qubit_cli.codex_runtime_switch import get_configured_codex_binary
+        plugins, plugin_err = _query_codex_plugins(
+            codex_home=codex_home, codex_bin=get_configured_codex_binary(hermes_config))
         if plugin_err:
             report.plugin_query_error = plugin_err
         # An authoritative plugin/list (even an empty one) means we own [plugins.*] for this
@@ -437,22 +469,42 @@ def migrate(
     if default_permission_profile:
         report.wrote_permissions_default = default_permission_profile
     if expose_qubit_tools:
-        translated["hermes-tools"] = _build_qubit_tools_mcp_entry()
-        if "hermes-tools" not in report.migrated:
-            report.migrated.append("hermes-tools")
-    managed_block = render_codex_toml_section(
-        translated, plugins=plugins, default_permission_profile=default_permission_profile)
-    new_text = managed_block
+        translated[HERMES_TOOLS_MCP_SERVER_NAME] = _build_qubit_tools_mcp_entry()
+        if HERMES_TOOLS_MCP_SERVER_NAME not in report.migrated:
+            report.migrated.append(HERMES_TOOLS_MCP_SERVER_NAME)
+    without_managed = ""
     if target.exists():
         try:
-            existing = target.read_text(encoding="utf-8")
+            existing = target.read_text(encoding="utf-8-sig")
         except Exception as exc:
             report.errors.append(f"could not read {target}: {exc}")
             return report
+        if report.plugin_query_error:
+            try:
+                tomllib.loads(existing)
+            except tomllib.TOMLDecodeError:
+                # codex could not load the pre-broken file, so plugin/list failed for that reason.
+                report.plugin_query_error += (
+                    "; existing config.toml was unloadable — re-run `qubit codex-runtime migrate` "
+                    "to migrate plugins")
         without_managed = _strip_existing_managed_block(existing)
         if plugin_query_succeeded:
             without_managed = _strip_unmanaged_plugin_tables(without_managed)
-        new_text = _insert_managed_block_at_top_level(without_managed, managed_block)
+        # Preserve-user policy: a name the user already declares outside the managed block is
+        # theirs; skip our projection for it instead of emitting a duplicate table header.
+        for name in sorted(_unmanaged_mcp_server_names(without_managed) & set(translated)):
+            del translated[name]
+            report.migrated.remove(name)
+            report.preserved_user_servers.append(name)
+    managed_block = render_codex_toml_section(
+        translated, plugins=plugins, default_permission_profile=default_permission_profile)
+    new_text = _insert_managed_block_at_top_level(without_managed, managed_block)
+    try:
+        tomllib.loads(new_text)
+    except tomllib.TOMLDecodeError as exc:
+        # Never replace a loadable config.toml with one codex would refuse to start on.
+        report.errors.append(f"refusing to write {target}: rendered config is not valid TOML ({exc})")
+        return report
     if dry_run:
         return report
     try:

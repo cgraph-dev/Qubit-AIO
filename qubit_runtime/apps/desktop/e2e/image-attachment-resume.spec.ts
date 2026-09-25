@@ -14,16 +14,16 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
+import { writeEnvFile, writeMockProviderConfig } from '../../../tests-js/scripts/mock-provider-config'
+import { type MockServer, startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
   launchDesktop,
   type Sandbox,
   waitForAppReady,
-  writeEnvFile,
-  writeMockProviderConfig,
 } from './fixtures'
-import { type MockServer, startMockServer } from './mock-server'
 import { RealSessionBuilder } from './real-session-builder'
 import { type ElectronApplication, expect, type Page, test } from './test'
 
@@ -60,10 +60,10 @@ function writeImage(sandbox: Sandbox): string {
 async function setupSeededDesktop(): Promise<SeededFixture> {
   const mock = await startMockServer()
   const sandbox = createSandbox('image-attachment')
-  writeMockProviderConfig(sandbox.qubitHome, mock.url, undefined, NATIVE_IMAGE_CONFIG)
-  writeEnvFile(sandbox.qubitHome)
+  writeMockProviderConfig(sandbox.hermesHome, mock.url, undefined, NATIVE_IMAGE_CONFIG)
+  writeEnvFile(sandbox.hermesHome)
 
-  const builder = await RealSessionBuilder.start(sandbox.qubitHome)
+  const builder = await RealSessionBuilder.start(sandbox.hermesHome)
 
   try {
     await builder.createSession({

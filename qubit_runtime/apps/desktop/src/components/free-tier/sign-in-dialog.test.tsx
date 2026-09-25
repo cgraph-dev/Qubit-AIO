@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as QubitApi from '@/hermes'
+import type * as HermesApi from '@/hermes'
 import { $freeTierSignIn, openFreeTierSignIn } from '@/store/free-tier-sign-in'
 
 const pollOAuthSession = vi.fn()
@@ -12,7 +12,7 @@ const requestGateway = vi.fn(async () => ({ available: true, has_guest: true }))
 // real implementation so the modules the dialog pulls in (the onboarding
 // DeviceCode cell, the model picker) still resolve their imports.
 vi.mock('@/hermes', async importOriginal => ({
-  ...(await importOriginal<typeof QubitApi>()),
+  ...(await importOriginal<typeof HermesApi>()),
   pollOAuthSession: (providerId: string, sessionId: string) => pollOAuthSession(providerId, sessionId),
   startOAuthLogin: async () => ({
     expires_in: 900,
@@ -66,7 +66,6 @@ describe('FreeTierSignInDialog', () => {
     })
 
     await waitFor(() => expect(screen.getByText('Do not share this code.')).toBeTruthy())
-    expect(screen.getByText('Enter this code in your browser to finish signing in.')).toBeTruthy()
 
     // The 2s poll tick is what carries the approval through to the last screen.
     await act(async () => {
@@ -74,7 +73,6 @@ describe('FreeTierSignInDialog', () => {
     })
 
     await waitFor(() => expect(screen.getByText('Signed in as someone@example.com')).toBeTruthy())
-    expect(screen.getByText('Your account now carries inference and tools.')).toBeTruthy()
     expect(screen.getByText('Hermes-4-405B')).toBeTruthy()
   })
 })

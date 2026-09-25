@@ -8,9 +8,7 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-#: Production ingest endpoint. Internal wire value only, never a served/public link:
-#: the shipped ``telemetry.shared_metrics.endpoint`` config default is empty and this
-#: value is used solely when that key is unset. Overridable through config only — NOT by an
+#: Production ingest endpoint. Overridable through config only — deliberately NOT by an
 #: environment variable: AGENTS.md reserves HERMES_* for secrets, and an inherited variable
 #: could silently redirect consented metrics to any host with nothing visible in config.
 #: Tests and the staging E2E write this key into a throwaway profile instead.

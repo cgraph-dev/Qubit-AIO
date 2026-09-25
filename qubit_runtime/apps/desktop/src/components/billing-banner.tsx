@@ -3,7 +3,6 @@ import { useStore } from '@nanostores/react'
 import { StatusRow } from '@/components/chat/status-row'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
-import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { $billingBlock, billingCtaLabel, clearBillingBlock, runBillingRecovery } from '@/store/billing-block'
 
@@ -16,7 +15,7 @@ function firstLine(text: string): string {
  * {@link StatusRow} — same chrome as its status-stack siblings, so it reads as
  * one piece with the composer card (no bordered alert-in-a-card). It never
  * disables the composer — slash commands (`/topup`, `/model`, `/login`) stay
- * usable — it only offers recovery: Qubit opens Settings → Billing in-app, other
+ * usable — it only offers recovery: Nous opens Settings → Billing in-app, other
  * providers deep-link out. The sticky toast is the loud surface; this is the calm
  * reminder that outlives it.
  */
@@ -47,18 +46,16 @@ export function BillingBanner({ sessionId }: { sessionId: null | string }) {
           >
             {billingCtaLabel(block, copy)}
           </Button>
-          <Tip label={copy.dismiss}>
-            <Button
-              aria-label={copy.dismiss}
-              className="size-4 rounded-md text-muted-foreground/60 hover:text-foreground/90"
-              onClick={() => clearBillingBlock(sessionId)}
-              size="icon-xs"
-              type="button"
-              variant="ghost"
-            >
-              <Codicon name="close" size="0.75rem" />
-            </Button>
-          </Tip>
+          <Button
+            aria-label={copy.dismiss}
+            className="size-4 rounded-md text-muted-foreground/60 hover:text-foreground/90"
+            onClick={() => clearBillingBlock(sessionId)}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <Codicon name="close" size="0.75rem" />
+          </Button>
         </>
       }
       trailingVisible

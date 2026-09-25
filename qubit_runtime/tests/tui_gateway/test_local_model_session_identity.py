@@ -79,7 +79,7 @@ def test_session_info_recovers_identity_from_the_owning_profile(tmp_path, monkey
     import json
     from pathlib import Path
 
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
     launch = tmp_path / "launch"
     secondary = launch / "profiles" / "secondary"
@@ -91,7 +91,7 @@ def test_session_info_recovers_identity_from_the_owning_profile(tmp_path, monkey
         (home / "config.yaml").write_text(json.dumps(config), encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(launch))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr(server, "_hermes_home", launch)
+    monkeypatch.setattr(server, "_qubit_home", launch)
     monkeypatch.setattr(server, "_probe_credentials", lambda agent: None)
     monkeypatch.setattr("qubit_cli.banner.get_update_result", lambda **kw: None)
     monkeypatch.setattr("qubit_cli.banner.get_available_skills", lambda: {})
@@ -100,12 +100,12 @@ def test_session_info_recovers_identity_from_the_owning_profile(tmp_path, monkey
     session = {"cwd": str(tmp_path), "session_key": "profile-identity", "profile_home": str(secondary)}
     # Broadcast/resume can publish metadata outside the session's profile scope.
     assert server._session_info(agent, session)["provider"] == "custom:secondary-route"
-    assert get_hermes_home() == launch
+    assert get_qubit_home() == launch
     # A launch-profile session must also ignore an ambient secondary-profile scope.
     with server._profile_build_scope(secondary):
         assert server._session_info(agent, {**session, "profile_home": None})["provider"] == "custom:launch-route"
-        assert get_hermes_home() == secondary
-    assert get_hermes_home() == launch
+        assert get_qubit_home() == secondary
+    assert get_qubit_home() == launch
     # Remote compute metadata remains authoritative; never reinterpret it using local profiles.
     session["_metadata_mirror"] = {"model": "remote-model", "provider": "custom:remote-route"}
     assert server._session_info(agent, session)["provider"] == "custom:remote-route"

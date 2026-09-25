@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 from gateway.run_agent_cache import GatewayAgentCacheMixin
 from qubit_constants import (
-    get_hermes_home,
-    reset_hermes_home_override,
-    set_hermes_home_override,
+    get_qubit_home,
+    reset_qubit_home_override,
+    set_qubit_home_override,
 )
 from tools.process_registry import process_registry
 
@@ -48,13 +48,13 @@ def test_interrupt_reaper_keeps_served_profile_home(tmp_path, monkeypatch):
 
     def _record_reap(_task_id, _baseline, *, source):
         assert source == "gateway_turn_interrupt"
-        seen_homes.append(get_hermes_home())
+        seen_homes.append(get_qubit_home())
         reaped.set()
         return 0
 
     monkeypatch.setattr(process_registry, "kill_started_since", _record_reap)
 
-    token = set_hermes_home_override(served_home)
+    token = set_qubit_home_override(served_home)
     try:
         GatewayAgentCacheMixin._interrupt_running_turn(
             _Runner(),
@@ -64,6 +64,6 @@ def test_interrupt_reaper_keeps_served_profile_home(tmp_path, monkeypatch):
         )
         assert reaped.wait(timeout=1.0), "reaper thread did not run"
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
     assert seen_homes == [served_home]

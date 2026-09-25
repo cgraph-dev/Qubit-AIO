@@ -34,4 +34,4 @@ def test_display_ticket_is_refused_as_a_gateway_login(gated_state):
     ws = _ws(ticket)
     reason, _credential = _web_server_chat._ws_auth_reason(ws)
     assert reason == "ticket_invalid"
-    assert not hasattr(ws, "_hermes_auth_identity")
+    assert not hasattr(ws, "_qubit_auth_identity")

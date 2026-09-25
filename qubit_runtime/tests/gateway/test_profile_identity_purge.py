@@ -43,9 +43,9 @@ def _entry(session_key, chat_id, profile):
 
 
 def _state_db():
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from qubit_state import SessionDB
-    return SessionDB(Path(get_hermes_home()) / "state.db")
+    return SessionDB(Path(get_qubit_home()) / "state.db")
 
 
 def _runner_stub(store):

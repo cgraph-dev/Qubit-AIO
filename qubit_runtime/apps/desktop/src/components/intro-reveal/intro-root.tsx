@@ -12,7 +12,7 @@ export function mountIntroReveal(): void {
     return
   }
 
-  document.title = 'Qubit'
+  document.title = 'Hermes'
   // Every intro measure is in rem, so this one root size scales the whole
   // composition. The app's default 16 px root is sized for a working window, which
   // is too small on a display the user sits back from.
@@ -33,7 +33,7 @@ export function mountIntroReveal(): void {
   // Native ready-to-show can precede the first React paint.
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      window.qubitDesktop?.introReveal?.ready()
+      window.hermesDesktop?.introReveal?.ready()
     })
   )
 }

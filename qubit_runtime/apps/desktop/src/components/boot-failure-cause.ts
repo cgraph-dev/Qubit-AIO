@@ -1,7 +1,7 @@
 /**
  * Plain-language cause for a LOCAL backend boot failure. The main process
  * reports what it saw ("exited before it became ready (1)", "Timed out
- * connecting to Qubit backend after 45000ms", an EACCES, a Python traceback
+ * connecting to Hermes backend after 45000ms", an EACCES, a Python traceback
  * tail…). None of that tells a non-developer what went wrong, so the overlay
  * leads with one classified sentence and keeps the raw text behind
  * "Show recent logs". Pure, table-driven, unit-tested without React.
@@ -21,7 +21,7 @@ const CAUSE_PATTERNS: readonly [LocalBootCause, RegExp][] = [
   ['portInUse', /address already in use|\bEADDRINUSE\b|port .* (?:is )?(?:already )?in use/i],
   [
     'installMissing',
-    /installation is missing|is missing or incomplete|venv missing|no module named|modulenotfounderror/i
+    /installation is missing|is missing or incomplete|missing or damaged|venv missing|no module named|modulenotfounderror/i
   ],
   ['timedOut', /timed out|timeout/i],
   ['exitedEarly', /exited before|exited \(|process exited|exited with|traceback \(most recent call last\)/i]

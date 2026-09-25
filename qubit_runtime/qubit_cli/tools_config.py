@@ -4,7 +4,7 @@ import json as _json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, NoReturn, Optional, Set
 
 from qubit_cli.cli_output import print_info as _print_info
 from qubit_cli.colors import Colors, color
@@ -14,17 +14,14 @@ from qubit_cli.nous_subscription import (
 from qubit_cli.platforms import PLATFORMS as _PLATFORMS_REGISTRY
 from qubit_cli.toolset_scope import (
     _TOOLSET_PLATFORM_RESTRICTIONS, toolset_allowed_for_platform as _toolset_allowed_for_platform)
+from qubit_cli.toolset_validation import parse_platform_toolsets_value
 # Re-exports: keep ``qubit_cli.tools_config.X`` callers and test patch targets resolving.
 from qubit_cli.tools_config_cua import (  # noqa: F401
     _post_setup_no_window_flags, _cua_driver_cmd, _cua_version_summary, _resolved_cua_driver_cmd, _cua_driver_env,
-    _cua_driver_contract_status, _cua_driver_install_ready, _pip_install, _cua_install_target_writable,
-    install_cua_driver, _CUA_INSTALLER_TIMEOUT, _CUA_INSTALLER_DRAIN_GRACE, _CUA_LOCK_STALE_AFTER,
-    _clear_stale_windows_cua_install_lock, _clear_stale_cua_install_lock, _cua_install_lock_held,
-    _cua_release_endpoint_reachable, _repair_cua_driver_autostart_windows, _run_cua_driver_installer)
+    _cua_driver_contract_status, _cua_driver_install_ready)
 from qubit_cli.tools_config_post_setup import (  # noqa: F401
     _ensure_browser_use_cli, _run_post_setup, valid_post_setup_keys, run_post_setup_command, _POST_SETUP_INSTALLED,
-    _post_setup_already_installed, _module_installed, active_restorable_python_tool_dependencies,
-    restorable_python_tool_dependency, _POST_SETUP_READY)
+    _post_setup_already_installed, _module_installed, _POST_SETUP_READY)
 from qubit_cli.tools_config_providers import (  # noqa: F401
     _plugin_image_gen_providers, _plugin_video_gen_providers, _plugin_web_search_providers, _plugin_browser_providers,
     _plugin_tts_providers, web_provider_capabilities, _visible_providers, provider_readiness_status,
@@ -37,7 +34,25 @@ from qubit_cli.tools_config_providers import (  # noqa: F401
 from qubit_cli.tools_config_mcp import (  # noqa: F401
     _configure_mcp_tools_interactive, _apply_toolset_change, _apply_mcp_change, tools_disable_enable_command)
 
+
+def _pip_install(
+    args: List[str], *, timeout: int = 300, capture_output: bool = True
+) -> NoReturn:
+    # Shim to suppress old updater work until relaunch, not install or report success.
+    from qubit_cli._old_updater import stop_for_relaunch
+
+    stop_for_relaunch()
+
+
 logger = logging.getLogger(__name__)
+
+
+def install_cua_driver(*args, **kwargs) -> NoReturn:
+    # A running pre-PM updater can still import the vendor installer here.
+    # Stop it before any old retry or completion branch can run.
+    from qubit_cli._old_updater import stop_for_relaunch
+
+    stop_for_relaunch()
 
 # Platforms already warned about an all-invalid platform_toolsets list (warn once, not per resolution).
 _warned_invalid_platform_toolsets: Set[str] = set()
@@ -91,7 +106,7 @@ def gui_toolset_label(label: str) -> str:
     return text
 
 
-# OFF by default for new installs (still in _HERMES_CORE_TOOLS; the checklist won't pre-select them). x_search
+# OFF by default for new installs (still in _QUBIT_CORE_TOOLS; the checklist won't pre-select them). x_search
 # auto-enables when xAI creds exist (mirrors HASS_TOKEN → homeassistant); its check_fn still gates the schema.
 _DEFAULT_OFF_TOOLSETS = {"homeassistant", "spotify", "discord", "discord_admin", "video", "video_gen", "x_search", "a2a", "kanban"}
 
@@ -109,12 +124,8 @@ def _xai_credentials_present() -> bool:
         return True
     except Exception:
         pass
-    try:
-        from tools.xai_http import get_env_value as _xai_get_env_value
-        if str(_xai_get_env_value("XAI_API_KEY") or "").strip():
-            return True
-    except Exception:
-        pass
+    if str(get_env_value("XAI_API_KEY") or "").strip():
+        return True
     try:
         from agent.secret_scope import get_secret
     except ImportError:  # pragma: no cover — secret_scope is in-repo
@@ -167,7 +178,7 @@ def _get_plugin_toolset_keys() -> set:
 
 def _checklist_toolset_keys(platform: str) -> Set[str]:
     """Toolset keys the ``qubit tools`` checklist offers for ``platform`` (mirrors ``_prompt_toolset_checklist``);
-    read-time-resolved toolsets (``kanban``, recovered composites, MCP names) are NOT here."""
+    read-time-resolved toolsets (recovered composites, MCP names) are NOT here."""
     return {
         ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()
         if _toolset_allowed_for_platform(ts_key, platform) and ts_key not in _CONFIG_ONLY_TOOLSETS}
@@ -272,9 +283,9 @@ TOOL_CATEGORIES = {
         # Provider rows come from plugins.web.<vendor> via _plugin_web_search_providers(). Only the two
         # non-provider firecrawl setup-flow rows live here: managed via Qubit subscription, and self-hosted.
         "providers": [
-            {"name": "Qubit Subscription", "badge": "subscription", "tag": "Managed Firecrawl billed to your subscription",
+            {"name": "Qubit Subscription", "badge": "subscription", "tag": "Managed web search and extract billed to your subscription",
              "web_backend": "firecrawl", "env_vars": [], **_NOUS, "managed_nous_feature": "web",
-             "override_env_vars": ["FIRECRAWL_API_KEY", "FIRECRAWL_API_URL"]},
+             "override_env_vars": ["FIRECRAWL_API_KEY", "FIRECRAWL_API_URL", "PERPLEXITY_API_KEY"]},
             {"name": "Firecrawl Self-Hosted", "badge": "free · self-hosted", "tag": "Run your own Firecrawl instance (Docker)",
              "web_backend": "firecrawl",
              "env_vars": [_key("FIRECRAWL_API_URL", "Your Firecrawl instance URL (e.g., http://localhost:3002)")]},
@@ -282,11 +293,14 @@ TOOL_CATEGORIES = {
     },
     "image_gen": {
         "name": "Image Generation", "icon": "🎨",
-        # Provider rows (FAL, OpenAI, OpenAI Codex, xAI) come from plugins.image_gen.<vendor> via
-        # _plugin_image_gen_providers(). Only the managed "Qubit Subscription" row lives here — fal backend, distinct UX.
+        # Provider rows (FAL, OpenAI, OpenAI Codex, xAI, Krea, …) come from plugins.image_gen.<vendor> via
+        # _plugin_image_gen_providers(). Only the managed "Qubit Subscription" row lives here: ONE row for the
+        # FAL, Krea and Portal gateways, whose union catalog is `imagegen_backend: "nous"`; the stored model id
+        # picks the gateway at run time (tools/image_generation_managed.py).
         "providers": [
-            _row("Qubit Subscription", "subscription", "Managed FAL image generation billed to your subscription", **_NOUS,
-                 managed_nous_feature="image_gen", override_env_vars=["FAL_KEY"], imagegen_backend="fal"),
+            _row("Qubit Subscription", "subscription",
+                 "Managed image generation (FAL, Krea 2, Qubit Labs models) billed to your subscription", **_NOUS,
+                 managed_nous_feature="image_gen", override_env_vars=["FAL_KEY"], imagegen_backend="nous"),
         ],
     },
     "video_gen": {
@@ -415,10 +429,12 @@ def enabled_mcp_server_names(config: dict) -> Set[str]:
     """MCP servers globally enabled in config.yaml or by a plugin (shared by platform + cron resolvers). Enabled
     unless ``enabled`` is explicitly falsey; portable-plugin servers (in-memory) count — enabling the plugin is
     the opt-in."""
+    from tools.mcp_tool_common import mcp_server_enabled
+
     mcp_servers = (config or {}).get("mcp_servers") or {}
     names = {
         str(name) for name, server_cfg in mcp_servers.items()
-        if isinstance(server_cfg, dict) and _parse_enabled_flag(server_cfg.get("enabled", True), default=True)
+        if isinstance(server_cfg, dict) and mcp_server_enabled(server_cfg)
     }
     try:
         from qubit_cli.plugins import get_portable_mcp_server_names_nowait
@@ -549,10 +565,32 @@ def _context_engine_active(config: dict) -> bool:
     return bool(name) and name != "compressor"
 
 
+def _coerce_platform_toolsets_value(value, platform: str):
+    """Read a list-literal string saved for ``platform_toolsets.<platform>`` as the list it encodes.
+
+    The parser is shared with ``qubit doctor`` and ``qubit plugins`` (``toolset_validation``
+    ``parse_platform_toolsets_value``) so every surface agrees on the user's selection (#115866).
+    Any other non-list value is warned about once (naming the expected shape) and left as-is, so
+    the default fallback below is loud rather than silent.
+    """
+    if value is None:
+        return None
+    parsed = parse_platform_toolsets_value(value)
+    if parsed is not None:
+        return parsed
+    if platform not in _warned_invalid_platform_toolsets:
+        _warned_invalid_platform_toolsets.add(platform)
+        logger.warning(
+            "platform_toolsets.%s is %r, expected a YAML list of toolset names "
+            "(e.g. [terminal, file, web]) - falling back to the platform default. "
+            "Run `qubit tools` to reconfigure.", platform, value)
+    return value
+
+
 def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_servers: bool = True) -> Set[str]:
     """Resolve which individual toolset names are enabled for a platform."""
     platform_toolsets = config.get("platform_toolsets") or {}
-    toolset_names = platform_toolsets.get(platform)
+    toolset_names = _coerce_platform_toolsets_value(platform_toolsets.get(platform), platform)
     # An explicitly saved list (even a composite like ``hermes-discord``) is an opt-in to the platform's
     # native default-off toolsets — see _default_off_toolsets.
     # Track whether the user explicitly saved a toolset list for this platform (vs. falling back to the
@@ -604,7 +642,7 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
         enabled_toolsets = _prune_toolsets_stripped_by_disabled(enabled_toolsets, disabled_names)
 
     if explicitly_configured and toolset_names:
-        _warn_all_invalid_platform_toolsets(platform, platform_toolsets[platform])
+        _warn_all_invalid_platform_toolsets(platform, toolset_names)
     return enabled_toolsets
 
 
@@ -693,7 +731,9 @@ def _save_platform_tools(config: dict, platform: str, enabled_toolset_keys: Set[
     # unchecked selections on the next read. Saving from the picker is consent to clear the "no_mcp" sentinel
     # (no checkbox for it; users who once set it by hand could otherwise never re-enable MCP via the UI).
     drop = _configurable_keys() | plugin_keys | _platform_default_keys() | {"no_mcp"}
-    existing_toolsets = cfg_get(config, "platform_toolsets", platform, default=[])
+    existing_toolsets = _coerce_platform_toolsets_value(
+        cfg_get(config, "platform_toolsets", platform, default=[]), platform
+    )
     preserved_entries = {str(e) for e in (existing_toolsets if isinstance(existing_toolsets, list) else [])
                          if str(e) not in drop}
     config["platform_toolsets"][platform] = sorted(enabled_toolset_keys | preserved_entries)
@@ -923,7 +963,7 @@ def _platform_menu_label(config: dict, pkey: str) -> str:
 def _print_tools_summary(config: dict, enabled_platforms: List[str]) -> None:
     """``qubit tools --summary``: enabled toolsets per platform, non-interactive."""
     total = len(_get_effective_configurable_toolsets())
-    print(color("⚕ Tool Summary", Colors.CYAN, Colors.BOLD))
+    print(color("☤ Tool Summary", Colors.CYAN, Colors.BOLD))
     print()
     for pkey, enabled in _platform_toolset_summary(config, enabled_platforms).items():
         print(color(f"  {PLATFORMS[pkey]['label']}", Colors.BOLD) + color(f"  ({len(enabled)}/{total})", Colors.DIM))
@@ -950,7 +990,7 @@ def _configure_list(to_configure: List[str], config: dict, *, selected: bool = T
 
 
 def _checklist_diff(new_enabled: Set[str], prev: Set[str], platform: str) -> tuple[Set[str], Set[str]]:
-    """``(added, removed)`` scoped to the checklist universe, so read-time toolsets (``kanban``) the user never
+    """``(added, removed)`` scoped to the checklist universe, so read-time toolsets (MCP names) the user never
     saw a checkbox for don't print as spurious removals."""
     universe = _checklist_toolset_keys(platform)
     return (new_enabled - prev) & universe, (prev - new_enabled) & universe
@@ -1030,10 +1070,10 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     if getattr(args, "summary", False):
         _print_tools_summary(config, enabled_platforms)
         return
-    print(color("⚕ Qubit Tool Configuration", Colors.CYAN, Colors.BOLD))
+    print(color("☤ Qubit Tool Configuration", Colors.CYAN, Colors.BOLD))
     print(color("  Enable or disable tools per platform.", Colors.DIM))
     print(color("  Tools that need API keys will be configured when enabled.", Colors.DIM))
-    print(color("  Guide: run 'qubit tools --help' for details.", Colors.DIM))
+    print(color("  Guide: https://hermes-agent.nousresearch.com/docs/user-guide/features/tools", Colors.DIM))
     print()
     if first_install:
         _first_install_flow(config, enabled_platforms)
@@ -1078,7 +1118,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     print()
     from qubit_constants import display_qubit_home
     print(color(f"  Tool configuration saved to {display_qubit_home()}/config.yaml", Colors.DIM))
-    print(color("  Changes take effect on next 'qubit' or gateway restart.", Colors.DIM))
+    print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
     print()
 
 

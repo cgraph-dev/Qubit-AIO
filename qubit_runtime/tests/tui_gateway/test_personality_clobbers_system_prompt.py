@@ -115,7 +115,7 @@ def test_switching_personality_leaves_no_stale_text(tmp_path, monkeypatch):
     in-session ephemeral prompt, not the durable global system prompt).
     """
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
-    monkeypatch.setattr(server, "_hermes_home", Path(tmp_path))
+    monkeypatch.setattr(server, "_qubit_home", Path(tmp_path))
     monkeypatch.setattr(server, "_cfg_path", None)
     monkeypatch.setattr(server, "_cfg_cache", None)
     _seed_config(str(tmp_path))

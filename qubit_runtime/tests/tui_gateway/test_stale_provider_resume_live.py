@@ -32,7 +32,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 OLD_URL = "https://old-endpoint.invalid/v1"
 NEW_URL = "https://new-endpoint.invalid/v1"
@@ -91,7 +91,7 @@ def live_home(monkeypatch):
     monkeypatch.setattr(qubit_state, "DEFAULT_DB_PATH", home / "state.db")
     monkeypatch.setattr(server, "_db", None, raising=False)
     monkeypatch.setattr(server, "_db_error", None, raising=False)
-    monkeypatch.setattr(server, "_hermes_home", str(home), raising=False)
+    monkeypatch.setattr(server, "_qubit_home", str(home), raising=False)
     yield home, server
     # Detach the shared handle so the tmpdir can be reclaimed.
     try:

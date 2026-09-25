@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
+from qubit_constants import display_qubit_home
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,7 +28,9 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Advisory:
     """``id`` is lowercase-hyphen, stable and never reused (it is what acks key on). ``remediation``
-    is ordered: uninstall command first, then credential audit/rotation guidance.
+    is ordered: uninstall command first, then credential audit/rotation guidance. Steps may use
+    ``{qubit_home}``; ``full_remediation_text`` fills it with ``display_qubit_home()`` at render
+    time so a profile / QUBIT_HOME user is sent to their own .env.
     """
 
     id: str
@@ -59,7 +63,7 @@ ADVISORIES: tuple[Advisory, ...] = (
         compromised=(("mistralai", frozenset({"2.4.6"})),),
         remediation=(
             "Run: pip uninstall -y mistralai  (or: uv pip uninstall mistralai)",
-            "Rotate API keys in ~/.config/qubit-voicebridge/.env (OpenRouter, Anthropic, OpenAI, "
+            "Rotate API keys in {qubit_home}/.env (OpenRouter, Anthropic, OpenAI, "
             "Qubit, GitHub, AWS, Google, Mistral, etc.).",
             "Audit ~/.npmrc, ~/.pypirc, ~/.aws/credentials, ~/.config/gh/hosts.yml, "
             "and any other credential files for tokens that may have been read.",
@@ -186,12 +190,12 @@ def full_remediation_text(hit: AdvisoryHit) -> list[str]:
         a.summary,
         "",
         "Remediation:",
-        *(f"  {i}. {step}" for i, step in enumerate(a.remediation, 1)),
+        *(f"  {i}. {step.format(qubit_home=display_qubit_home())}" for i, step in enumerate(a.remediation, 1)),
     ]
 
 
 # ─── Startup-banner gating ────────────────────────────────────────────────────
-# Once the banner is seen we cache that in ``$QUBIT_HOME/cache/advisory_banner_seen`` (one
+# Once the banner is seen we cache that in ``~/.hermes/cache/advisory_banner_seen`` (one
 # ``<id> <timestamp>`` line per advisory). Acked advisories never re-banner; cached-but-not-acked
 # ones re-banner after 24h so the user doesn't fully forget.
 
@@ -212,7 +216,7 @@ def _banner_cache_path() -> Optional[Path]:
 def _read_banner_cache() -> dict[str, float]:
     p = _banner_cache_path()
     try:
-        lines = p.read_text(encoding="utf-8").splitlines() if p is not None and p.exists() else []
+        lines = p.read_text(encoding="utf-8-sig").splitlines() if p is not None and p.exists() else []
     except Exception:
         return {}
     out: dict[str, float] = {}

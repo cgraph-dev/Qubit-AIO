@@ -116,7 +116,7 @@ function Invoke-Normalization {
         LOCALAPPDATA = (Join-Parts @($root, 'AppData', 'Local'))
         APPDATA      = (Join-Parts @($root, 'AppData', 'Roaming'))
         USERPROFILE  = $root
-        QUBIT_HOME  = ''
+        HERMES_HOME  = ''
     }
     foreach ($key in $Environment.Keys) { $env0[$key] = $Environment[$key] }
 
@@ -190,7 +190,7 @@ function Invoke-Normalization {
         Stdout     = $stdout
         Rewrites   = $rewrites
         InstallDir = $(if ($paths) { $paths.install_dir } else { $null })
-        QubitHome = $(if ($paths) { $paths.hermes_home } else { $null })
+        HermesHome = $(if ($paths) { $paths.hermes_home } else { $null })
         LongRoot   = $(if ($paths) { $paths.long_profile_root } else { $null })
     }
 }

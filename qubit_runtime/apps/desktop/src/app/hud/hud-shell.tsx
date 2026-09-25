@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { useViewedInterval } from '@/hooks/use-viewed-interval'
 import { chatMessageText } from '@/lib/chat-messages'
 import { $activeSessionAwaitingInput } from '@/store/prompts'
 import { $busy, $messages } from '@/store/session'
@@ -231,7 +232,11 @@ export function HudShell() {
   // hysteresis so the layout can't flutter while it's dragged along the line.
   const [edge, setEdge] = useState<'bottom' | 'top'>('top')
 
-  useEffect(() => {
+  // Viewed-gated (#88275): window position only changes while the user can
+  // see the window, so an ungated 300ms poll keeps the idle renderer hot
+  // forever. useViewedInterval parks the timer when hidden/unfocused and
+  // leading-ticks on return, so a drag is still picked up within one tick.
+  const measureEdge = useCallback(() => {
     // Measured on the WINDOW, and flush-only. Flipping is what lets the bar
     // reach the top of the screen at all: the window's top edge can sit against
     // the menu bar, and the flip moves the composer to that edge. Keying it off
@@ -242,33 +247,33 @@ export function HudShell() {
     const FLIP_ON = 0
     const FLIP_OFF = 4
 
-    const measure = () => {
-      // TRYING IT: the bar stays on top and the transcript always hangs below,
-      // wherever the HUD is parked. Flip the constant to re-enable the
-      // edge-aware layout (the CSS for both orientations is still here).
-      if (HUD_THREAD_ALWAYS_BELOW) {
-        setEdge('top')
+    // TRYING IT: the bar stays on top and the transcript always hangs below,
+    // wherever the HUD is parked. Flip the constant to re-enable the
+    // edge-aware layout (the CSS for both orientations is still here).
+    if (HUD_THREAD_ALWAYS_BELOW) {
+      setEdge('top')
 
-        return
-      }
-
-      // availTop ≈ menu bar / notch inset on macOS; screenY is in full-screen
-      // coordinates, so "parked at the top" means screenY ≈ availTop, not 0.
-      const availTop = (window.screen as { availTop?: number }).availTop ?? 0
-      const topGap = window.screenY - availTop
-
-      setEdge(prev => (topGap <= FLIP_ON ? 'top' : topGap >= FLIP_OFF ? 'bottom' : prev))
+      return
     }
 
-    measure()
-    const timer = setInterval(measure, 300)
-    window.addEventListener('resize', measure)
+    // availTop ≈ menu bar / notch inset on macOS; screenY is in full-screen
+    // coordinates, so "parked at the top" means screenY ≈ availTop, not 0.
+    const availTop = (window.screen as { availTop?: number }).availTop ?? 0
+    const topGap = window.screenY - availTop
+
+    setEdge(prev => (topGap <= FLIP_ON ? 'top' : topGap >= FLIP_OFF ? 'bottom' : prev))
+  }, [])
+
+  useViewedInterval(measureEdge, 300)
+
+  useEffect(() => {
+    measureEdge()
+    window.addEventListener('resize', measureEdge)
 
     return () => {
-      clearInterval(timer)
-      window.removeEventListener('resize', measure)
+      window.removeEventListener('resize', measureEdge)
     }
-  }, [])
+  }, [measureEdge])
 
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -290,7 +295,7 @@ export function HudShell() {
   // growth bug); the handle is the one sanctioned way to change size, driving
   // the same flip-resizable-for-the-call pattern the pet overlay uses.
   const { resizing: hudResizing, onPointerDown: onHudResizePointerDown } = useHudResizeHandle()
-  const hudWindowing = window.qubitDesktop?.hud?.windowing
+  const hudWindowing = window.hermesDesktop?.hud?.windowing
   const resizeDirections = hudResizeDirections(hudWindowing?.clientPlacement !== false)
   // Linux X11 cannot ignore-mouse; a visible band that also ignores the
   // pointer just eats the click. The stylesheet keys off this.
@@ -307,8 +312,12 @@ export function HudShell() {
     const style = document.createElement('style')
     style.textContent = 'html,body,#root{background:transparent !important;}'
     document.head.appendChild(style)
+    document.documentElement.setAttribute('data-hud-window', '')
 
-    return () => style.remove()
+    return () => {
+      style.remove()
+      document.documentElement.removeAttribute('data-hud-window')
+    }
   }, [])
 
   return (

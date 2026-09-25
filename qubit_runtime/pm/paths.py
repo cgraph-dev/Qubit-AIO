@@ -54,9 +54,9 @@ def partials_root() -> Path:
     on every install kind: ``%LOCALAPPDATA%\\qubit\\cache\\partials`` on
     Windows, ``~/.hermes/cache/partials`` on POSIX.
     """
-    from qubit_constants import get_default_hermes_root
+    from qubit_constants import get_default_qubit_root
 
-    return get_default_hermes_root() / "cache" / "partials"
+    return get_default_qubit_root() / "cache" / "partials"
 
 
 def facts_path() -> Path:
@@ -66,9 +66,9 @@ def facts_path() -> Path:
 def writable_store_root() -> Path:
     if not (store_root().parent / "manifest.json").is_file():
         return store_root()
-    from qubit_constants import get_default_hermes_root
+    from qubit_constants import get_default_qubit_root
 
-    return get_default_hermes_root() / "tools"
+    return get_default_qubit_root() / "tools"
 
 
 def runtime_facts_path() -> Path:

@@ -1,4 +1,4 @@
-"""display_hermes_home() renders POSIX separators on every platform.
+"""display_qubit_home() renders POSIX separators on every platform.
 
 Maintainer catch (#95681 arc): on Windows with a custom QUBIT_HOME under
 the user profile (e.g. AppData/Local/hermes), ``"~/" +
@@ -25,25 +25,25 @@ class TestDisplayHermesHomePosix(unittest.TestCase):
 
         fake_userhome = Path.home()
         nested = fake_userhome / "AppData" / "Local" / "hermes"
-        with patch.object(hc, "get_hermes_home", return_value=nested):
-            out = hc.display_hermes_home()
+        with patch.object(hc, "get_qubit_home", return_value=nested):
+            out = hc.display_qubit_home()
         self.assertEqual(out, "~/AppData/Local/hermes")
         self.assertNotIn("\\", out)
 
     def test_default_home_unchanged(self):
         import qubit_constants as hc
 
-        with patch.object(hc, "get_hermes_home",
+        with patch.object(hc, "get_qubit_home",
                           return_value=Path.home() / ".hermes"):
-            out = hc.display_hermes_home()
+            out = hc.display_qubit_home()
         self.assertEqual(out, "~/.hermes")
 
     def test_outside_home_falls_back_to_absolute(self):
         import qubit_constants as hc
 
         outside = Path("/opt/hermes-custom") if os.name != "nt" else Path("C:/opt/hermes-custom")
-        with patch.object(hc, "get_hermes_home", return_value=outside):
-            out = hc.display_hermes_home()
+        with patch.object(hc, "get_qubit_home", return_value=outside):
+            out = hc.display_qubit_home()
         self.assertEqual(out, str(outside))
 
     def test_no_serving_schema_carries_tilde_backslash_chimera(self):

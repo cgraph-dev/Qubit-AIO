@@ -6,7 +6,7 @@ description: "Runtime behavior of the tool registry, toolsets, dispatch, and ter
 
 # Tools Runtime
 
-Qubit tools are self-registering functions grouped into toolsets and executed through a central registry/dispatch system.
+Hermes tools are self-registering functions grouped into toolsets and executed through a central registry/dispatch system.
 
 Primary files:
 
@@ -66,7 +66,7 @@ Each import triggers the module's `registry.register()` calls. Errors in optiona
 After core tool discovery, MCP tools and plugin tools are also discovered:
 
 1. **MCP tools** — `tools.mcp_tool_discovery.discover_mcp_tools()` (re-exported by the `tools.mcp_tool` facade) reads MCP server config and registers tools from external servers.
-2. **Plugin tools** — `qubit_cli.plugins.discover_plugins()` loads user/project/pip plugins that may register additional tools.
+2. **Plugin tools** — `hermes_cli.plugins.discover_plugins()` loads user/project/pip plugins that may register additional tools.
 
 ## Tool availability checking (`check_fn`)
 
@@ -96,7 +96,7 @@ Key behaviors:
 
 ## Toolset resolution
 
-Toolsets are named bundles of tools. Qubit resolves them through:
+Toolsets are named bundles of tools. Hermes resolves them through:
 
 - explicit enabled/disabled toolset lists
 - platform presets (`hermes-cli`, `hermes-telegram`, etc.)
@@ -166,7 +166,7 @@ This ensures the model always receives a well-formed JSON string, never an unhan
 
 Four tools are intercepted before registry dispatch because they need agent-level state (TodoStore, MemoryStore, etc.):
 
-- `todo` — planning/task tracking
+- `todo_list` — planning/task tracking
 - `memory` — persistent memory writes
 - `session_search` — cross-session recall
 - `delegate_task` — spawns subagent sessions

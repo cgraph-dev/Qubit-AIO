@@ -58,7 +58,7 @@ class HomeIOGuard:
             if metadata and absolute.is_relative_to("/proc"):
                 return
             roots = self.roots()
-            # Resolving the root itself (get_default_hermes_root's relative_to
+            # Resolving the root itself (get_default_qubit_root's relative_to
             # probe) reads no state; only its contents are guarded.
             if metadata and absolute in roots:
                 return

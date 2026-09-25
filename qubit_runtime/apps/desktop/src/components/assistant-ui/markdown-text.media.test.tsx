@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $connection } from '@/store/session'
 
-import { MarkdownImage, MarkdownTextContent } from './markdown-text'
+import { MarkdownImage, MarkdownTextContent, MessageTextContent } from './markdown-text'
 
 const REMOTE_IMAGE_PATH = '/home/user/project/images/remote-preview.png'
 const REMOTE_IMAGE_DATA_URL = 'data:image/png;base64,cmVtb3RlLWltYWdl'
@@ -17,11 +17,11 @@ describe('MarkdownTextContent remote images', () => {
     throw new Error(`unexpected path ${path}`)
   })
 
-  let originalDesktop: typeof window.qubitDesktop
+  let originalDesktop: typeof window.hermesDesktop
 
   beforeEach(() => {
     api.mockClear()
-    originalDesktop = window.qubitDesktop
+    originalDesktop = window.hermesDesktop
     Object.defineProperty(window, 'hermesDesktop', {
       configurable: true,
       value: { api }
@@ -77,5 +77,16 @@ describe('MarkdownImage media routing', () => {
 
     expect(container.querySelector('video')).toBeNull()
     expect(container.querySelector('audio')).toBeNull()
+  })
+})
+
+describe('MessageTextContent MEDIA directives', () => {
+  afterEach(cleanup)
+
+  it('renders a raw audio MEDIA directive through the canonical player instead of exposing the directive', async () => {
+    const { container } = render(<MessageTextContent text="MEDIA:/tmp/group-voice.mp3" />)
+
+    await waitFor(() => expect(container.querySelector('audio[controls]')).not.toBeNull())
+    expect(container.textContent).not.toContain('MEDIA:')
   })
 })

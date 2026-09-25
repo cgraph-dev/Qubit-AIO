@@ -18,7 +18,7 @@ function Surface(): React.JSX.Element {
 function summary(allowed: boolean): DesktopUninstallSummary {
   return {
     code_removal_allowed: allowed,
-    hermes_home: '/test/home',
+    qubit_home: '/test/home',
     agent_installed: true,
     gui_installed: true,
     source_built_artifacts: [],

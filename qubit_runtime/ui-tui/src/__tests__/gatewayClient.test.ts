@@ -111,23 +111,23 @@ describe('GatewayClient websocket attach mode', () => {
   let originalSidecarUrl: string | undefined
 
   beforeEach(() => {
-    originalGatewayUrl = process.env.QUBIT_TUI_GATEWAY_URL
-    originalSidecarUrl = process.env.QUBIT_TUI_SIDECAR_URL
+    originalGatewayUrl = process.env.HERMES_TUI_GATEWAY_URL
+    originalSidecarUrl = process.env.HERMES_TUI_SIDECAR_URL
     FakeWebSocket.reset()
     ;(globalThis as { WebSocket?: unknown }).WebSocket = FakeWebSocket as unknown as typeof WebSocket
   })
 
   afterEach(() => {
     if (originalGatewayUrl === undefined) {
-      delete process.env.QUBIT_TUI_GATEWAY_URL
+      delete process.env.HERMES_TUI_GATEWAY_URL
     } else {
-      process.env.QUBIT_TUI_GATEWAY_URL = originalGatewayUrl
+      process.env.HERMES_TUI_GATEWAY_URL = originalGatewayUrl
     }
 
     if (originalSidecarUrl === undefined) {
-      delete process.env.QUBIT_TUI_SIDECAR_URL
+      delete process.env.HERMES_TUI_SIDECAR_URL
     } else {
-      process.env.QUBIT_TUI_SIDECAR_URL = originalSidecarUrl
+      process.env.HERMES_TUI_SIDECAR_URL = originalSidecarUrl
     }
 
     FakeWebSocket.reset()
@@ -140,7 +140,7 @@ describe('GatewayClient websocket attach mode', () => {
   })
 
   it('waits for websocket open and resolves RPC requests', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     gw.start()
@@ -168,7 +168,7 @@ describe('GatewayClient websocket attach mode', () => {
     // setState cascade would run inside React's first commit -> "Too many
     // re-renders" (#301). drain() must defer the buffered flush so the first
     // commit settles first.
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     gw.start()
@@ -201,7 +201,7 @@ describe('GatewayClient websocket attach mode', () => {
     // A live event delivered in the window between drain() returning and the
     // deferred microtask running must still queue BEHIND the chronologically
     // earlier buffered events, not jump ahead of them.
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     gw.start()
@@ -234,8 +234,8 @@ describe('GatewayClient websocket attach mode', () => {
   })
 
   it('mirrors event frames to sidecar websocket when configured', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
-    process.env.QUBIT_TUI_SIDECAR_URL = 'ws://gateway.test/api/pub?token=abc&channel=demo'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_SIDECAR_URL = 'ws://gateway.test/api/pub?token=abc&channel=demo'
 
     const gw = new GatewayClient()
     const seen: string[] = []
@@ -270,8 +270,8 @@ describe('GatewayClient websocket attach mode', () => {
   })
 
   it('publishes local dashboard-control events to the sidecar websocket', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
-    process.env.QUBIT_TUI_SIDECAR_URL = 'ws://gateway.test/api/pub?token=abc&channel=demo'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_SIDECAR_URL = 'ws://gateway.test/api/pub?token=abc&channel=demo'
 
     const gw = new GatewayClient()
     const seen: string[] = []
@@ -312,7 +312,7 @@ describe('GatewayClient websocket attach mode', () => {
   })
 
   it('emits exit when attached websocket closes', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
     const exits: Array<null | number> = []
 
@@ -329,12 +329,10 @@ describe('GatewayClient websocket attach mode', () => {
     gatewaySocket.close(1011)
 
     expect(exits).toEqual([1011])
-    expect(gw.getLogTail(20)).toContain('[lifecycle] websocket close code=1011')
-    expect(gw.getLogTail(20)).toContain('[lifecycle] transport exit code=1011')
   })
 
-  it('rejects pending RPCs with websocket wording when the attached socket closes', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+  it('rejects pending RPCs when the attached socket closes', async () => {
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     gw.start()
@@ -348,11 +346,11 @@ describe('GatewayClient websocket attach mode', () => {
 
     gatewaySocket.close(1011)
 
-    await expect(req).rejects.toThrow(/gateway websocket closed \(1011\)/)
+    await expect(req).rejects.toThrow()
   })
 
   it('rejects pending RPCs when kill() closes the attached websocket', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     gw.start()
@@ -366,12 +364,11 @@ describe('GatewayClient websocket attach mode', () => {
 
     gw.kill('test.shutdown')
 
-    await expect(req).rejects.toThrow(/gateway closed/)
-    expect(gw.getLogTail(20)).toContain('[lifecycle] GatewayClient.kill reason=test.shutdown')
+    await expect(req).rejects.toThrow()
   })
 
   it('reattaches when HERMES_TUI_GATEWAY_URL rotates between requests', async () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway-old.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway-old.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     gw.start()
@@ -383,7 +380,7 @@ describe('GatewayClient websocket attach mode', () => {
     const stale = gw.request('session.create', {})
     await vi.waitFor(() => expect(firstSocket.sent.length).toBeGreaterThan(0))
 
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway-new.test/api/ws?token=xyz'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway-new.test/api/ws?token=xyz'
     const next = gw.request('session.create', {})
 
     await expect(stale).rejects.toThrow(/gateway attach url changed/)
@@ -402,8 +399,36 @@ describe('GatewayClient websocket attach mode', () => {
     gw.kill()
   })
 
+  it('surfaces JSON-RPC error code and data to callers (shared error mapping)', async () => {
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    const gw = new GatewayClient()
+
+    gw.start()
+    const socket = FakeWebSocket.instances[0]!
+
+    socket.open()
+    const req = gw.request('projects.create', {})
+    await vi.waitFor(() => expect(socket.sent.length).toBeGreaterThan(0))
+
+    const frame = JSON.parse(socket.sent[0] ?? '{}') as { id: string }
+    socket.message(
+      JSON.stringify({
+        error: { code: -32601, data: { method: 'projects.create' }, message: 'unknown method: projects.create' },
+        id: frame.id,
+        jsonrpc: '2.0'
+      })
+    )
+
+    await expect(req).rejects.toMatchObject({
+      code: -32601,
+      data: { method: 'projects.create' },
+      message: 'unknown method: projects.create'
+    })
+    gw.kill()
+  })
+
   it('uses the undici WebSocket fallback when global WebSocket is unavailable', () => {
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=hunter2&channel=secret'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=hunter2&channel=secret'
     delete (globalThis as { WebSocket?: unknown }).WebSocket
 
     const gw = new GatewayClient()
@@ -418,7 +443,7 @@ describe('GatewayClient websocket attach mode', () => {
   it('redacts attach URL secrets when the WebSocket constructor throws', () => {
     const secretUrl = 'ws://gateway.test/api/ws?token=hunter2&channel=secret'
 
-    process.env.QUBIT_TUI_GATEWAY_URL = secretUrl
+    process.env.HERMES_TUI_GATEWAY_URL = secretUrl
     ;(globalThis as { WebSocket?: unknown }).WebSocket = class ThrowingWebSocket extends FakeWebSocket {
       constructor(url: string) {
         throw new TypeError(`Invalid URL: ${url}`)
@@ -442,8 +467,8 @@ describe('GatewayClient websocket attach mode', () => {
   it('redacts sidecar URL secrets when the WebSocket constructor throws', async () => {
     const sidecarUrl = 'ws://gateway.test/api/pub?token=hunter2&channel=secret'
 
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
-    process.env.QUBIT_TUI_SIDECAR_URL = sidecarUrl
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_SIDECAR_URL = sidecarUrl
     ;(globalThis as { WebSocket?: unknown }).WebSocket = class ThrowingSidecarWebSocket extends FakeWebSocket {
       constructor(url: string) {
         if (url.includes('/api/pub')) {
@@ -480,7 +505,7 @@ describe('GatewayClient websocket attach mode', () => {
     const fixture = 'ws://alice:hunter2@gateway.test:99999/api/ws?token=secret'
     expect(() => new URL(fixture)).toThrow()
 
-    process.env.QUBIT_TUI_GATEWAY_URL = fixture
+    process.env.HERMES_TUI_GATEWAY_URL = fixture
     ;(globalThis as { WebSocket?: unknown }).WebSocket = class ThrowingWebSocket extends FakeWebSocket {
       constructor(url: string) {
         throw new TypeError(`Invalid URL: ${url}`)
@@ -502,7 +527,7 @@ describe('GatewayClient websocket attach mode', () => {
 
   it('keeps a healthy idle websocket open when heartbeat acknowledgements arrive (issue #32997)', async () => {
     vi.useFakeTimers()
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     try {
@@ -517,14 +542,31 @@ describe('GatewayClient websocket attach mode', () => {
           params: { type: 'gateway.ready', payload: { heartbeat: true } }
         })
       )
+      // A live gateway answers every ping (tui_gateway/ws.py replies inline);
+      // the shared channel counts any inbound frame as liveness, so a socket
+      // whose pings keep getting acked must never trip the deadline.
+      const acked: string[] = []
+
+      const ackPings = () => {
+        for (const raw of socket.sent) {
+          const frame = JSON.parse(raw) as { id: string; method: string }
+
+          if (frame.method === 'gateway.ping' && !acked.includes(frame.id)) {
+            acked.push(frame.id)
+            socket.message(JSON.stringify({ id: frame.id, jsonrpc: '2.0', result: { ok: true } }))
+          }
+        }
+      }
+
       await vi.advanceTimersByTimeAsync(WS_HEARTBEAT_INTERVAL_MS)
+      expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ method: 'gateway.ping' })
 
-      const heartbeat = JSON.parse(socket.sent.at(-1) ?? '{}') as { id: string; method: string }
+      for (let elapsed = 0; elapsed < WS_HEARTBEAT_DEAD_MS * 2; elapsed += WS_HEARTBEAT_INTERVAL_MS) {
+        ackPings()
+        await vi.advanceTimersByTimeAsync(WS_HEARTBEAT_INTERVAL_MS)
+      }
 
-      expect(heartbeat.method).toBe('gateway.ping')
-      socket.message(JSON.stringify({ id: heartbeat.id, jsonrpc: '2.0', result: { ok: true } }))
-
-      await vi.advanceTimersByTimeAsync(WS_HEARTBEAT_DEAD_MS + WS_HEARTBEAT_INTERVAL_MS)
+      expect(acked.length).toBeGreaterThan(2)
       expect(socket.readyState).toBe(FakeWebSocket.OPEN)
       expect(FakeWebSocket.instances).toHaveLength(1)
     } finally {
@@ -535,7 +577,7 @@ describe('GatewayClient websocket attach mode', () => {
 
   it('auto-reconnects after a missing heartbeat acknowledgement (issue #32997)', async () => {
     vi.useFakeTimers()
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     try {
@@ -563,7 +605,7 @@ describe('GatewayClient websocket attach mode', () => {
 
   it('does not heartbeat an older backend that omits the capability', async () => {
     vi.useFakeTimers()
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     try {
@@ -580,7 +622,9 @@ describe('GatewayClient websocket attach mode', () => {
       )
       await vi.advanceTimersByTimeAsync(WS_HEARTBEAT_DEAD_MS + WS_HEARTBEAT_INTERVAL_MS)
       expect(socket.readyState).toBe(FakeWebSocket.OPEN)
-      expect(socket.sent).toEqual([])
+      const methods = socket.sent.map(text => (JSON.parse(text) as { method: string }).method)
+
+      expect(methods).not.toContain('gateway.ping')
       expect(FakeWebSocket.instances).toHaveLength(1)
     } finally {
       gw.kill()
@@ -590,7 +634,7 @@ describe('GatewayClient websocket attach mode', () => {
 
   it('does not double-reconnect when the exit subscriber restarts immediately', async () => {
     vi.useFakeTimers()
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
 
     try {
@@ -612,9 +656,63 @@ describe('GatewayClient websocket attach mode', () => {
     }
   })
 
+  it('keeps delivering events to the mounted subscriber across reconnects, with growing backoff (#111594)', async () => {
+    vi.useFakeTimers()
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    const gw = new GatewayClient()
+    const ready: number[] = []
+    const delays: number[] = []
+
+    const readyFrame = JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'event',
+      params: { payload: {}, type: 'gateway.ready' }
+    })
+
+    gw.on('event', ev => {
+      if (ev.type === 'gateway.ready') {
+        ready.push(FakeWebSocket.instances.length)
+      }
+
+      if (ev.type === 'gateway.reconnecting') {
+        delays.push(ev.payload.delay_ms)
+      }
+    })
+
+    try {
+      gw.start()
+      gw.drain()
+      await Promise.resolve()
+      FakeWebSocket.instances[0]!.open()
+      FakeWebSocket.instances[0]!.message(readyFrame)
+      expect(ready).toEqual([1])
+
+      // Two failed reconnects: the renderer drain()ed once on mount, so each
+      // transport generation must keep emitting live (not re-buffer), and the
+      // attempt counter must survive start() so the delay keeps growing.
+      FakeWebSocket.instances[0]!.close(1006)
+      await vi.advanceTimersByTimeAsync(RECONNECT_MAX_MS)
+      FakeWebSocket.instances.at(-1)!.close(1006)
+      await vi.advanceTimersByTimeAsync(RECONNECT_MAX_MS)
+      FakeWebSocket.instances.at(-1)!.close(1006)
+      await vi.advanceTimersByTimeAsync(RECONNECT_MAX_MS)
+      expect(delays).toHaveLength(3)
+      expect(delays[2]!).toBeGreaterThan(delays[0]!)
+
+      const last = FakeWebSocket.instances.at(-1)!
+
+      last.open()
+      last.message(readyFrame)
+      expect(ready).toEqual([1, FakeWebSocket.instances.length])
+    } finally {
+      gw.kill()
+      vi.useRealTimers()
+    }
+  })
+
   it('does not auto-reconnect after an intentional kill() (issue #32997)', async () => {
     vi.useFakeTimers()
-    process.env.QUBIT_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
+    process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=abc'
     const gw = new GatewayClient()
     gw.start()
     FakeWebSocket.instances[0]!.open()

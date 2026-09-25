@@ -15,7 +15,7 @@ export async function loadMachineProfile(): Promise<void> {
     return
   }
 
-  const profile = await window.qubitDesktop?.getMachineProfile?.().catch(() => null)
+  const profile = await window.hermesDesktop?.getMachineProfile?.().catch(() => null)
 
   if (profile) {
     $machine.set(profile)

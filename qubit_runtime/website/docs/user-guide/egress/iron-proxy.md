@@ -1,6 +1,6 @@
 # Egress credential-injection proxy (iron-proxy)
 
-When Qubit runs your agent inside a Docker terminal sandbox, that sandbox normally holds your real upstream API keys (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`, etc.). A prompt-injected agent in that sandbox can `cat ~/.config/openrouter/auth.json` or `printenv | grep -i key` and exfiltrate them.
+When Hermes runs your agent inside a Docker terminal sandbox, that sandbox normally holds your real upstream API keys (`OPENROUTER_API_KEY`, `OPENAI_API_KEY`, etc.). A prompt-injected agent in that sandbox can `cat ~/.config/openrouter/auth.json` or `printenv | grep -i key` and exfiltrate them.
 
 The egress proxy fixes this: the sandbox holds opaque **proxy tokens**, never the real keys. All outbound traffic from the sandbox routes through a local [iron-proxy](https://github.com/ironsh/iron-proxy) daemon (Apache-2.0, Go) on the host, which terminates TLS and swaps the proxy token for the real credential before forwarding the request upstream. Compromise the sandbox and the attacker walks away with tokens that only work behind the **configured trusted proxy boundary** — the CA private key and the proxy endpoint integrity are part of that boundary. If traffic can be redirected to attacker-controlled proxy infrastructure (e.g. a stolen CA private key or a hijacked proxy endpoint), the token guarantee no longer holds.
 
@@ -8,7 +8,7 @@ This release wires the egress proxy into the Docker backend only. Modal, Daytona
 
 ## What it is
 
-- A managed `iron-proxy` subprocess on the host, lazy-installed into `~/.hermes/bin/iron-proxy`
+- An `iron-proxy` subprocess on the host, with its pinned binary in the PM tool store
 - A local CA at `~/.hermes/proxy/ca.crt` that the sandbox trusts so iron-proxy can MITM TLS and rewrite headers
 - A `proxy.yaml` config at `~/.hermes/proxy/proxy.yaml` listing the upstream hosts you allow and the secrets-transform mapping
 - A `mappings.json` recording which proxy token corresponds to which real env var
@@ -17,7 +17,7 @@ The sandbox gets `HTTPS_PROXY=http://host.docker.internal:9090`, `HTTP_PROXY=htt
 
 ## What it is not
 
-- It is **not** the inbound `qubit proxy` command, which is an OAuth aggregator reverse proxy. Different command (`qubit egress`), different direction.
+- It is **not** the inbound `hermes proxy` command, which is an OAuth aggregator reverse proxy. Different command (`hermes egress`), different direction.
 - It does **not** sit between your local terminal and providers — only between the sandbox and providers.
 - It does **not** rewrite credentials for in-process LLM calls the host process makes. Those continue to use your `.env` keys directly. The threat model is the *sandbox*, not the host.
 
@@ -25,22 +25,22 @@ The sandbox gets `HTTPS_PROXY=http://host.docker.internal:9090`, `HTTP_PROXY=htt
 
 ```bash
 # 1. Install the iron-proxy binary (pinned version, SHA-256 verified)
-qubit egress install
+hermes egress install
 
 # 2. Run the wizard: generates CA, mints proxy tokens for every provider key
 #    in your env, writes proxy.yaml.
-qubit egress setup
+hermes egress setup
 
 # 3. Start the proxy daemon
-qubit egress start
+hermes egress start
 
 # 4. Check status
-qubit egress status
+hermes egress status
 ```
 
-`qubit egress setup` discovers provider keys from your environment. If your keys live only in `~/.hermes/.env` (not exported into your shell), setup reads that file automatically — you don't have to `export` them first.
+`hermes egress setup` discovers provider keys from your environment. If your keys live only in `~/.hermes/.env` (not exported into your shell), setup reads that file automatically — you don't have to `export` them first.
 
-When you re-run `setup` later (new allowlist host, rotated tokens, switched credential source), it stops the running daemon because its config is held in memory, then **offers to restart it for you** so the change takes effect immediately. On a tty it asks; pass `--restart` to always restart or `--no-restart` to leave it down. To apply changes any other time, `qubit egress restart` is the one-command stop-then-start.
+When you re-run `setup` later (new allowlist host, rotated tokens, switched credential source), it stops the running daemon because its config is held in memory, then **offers to restart it for you** so the change takes effect immediately. On a tty it asks; pass `--restart` to always restart or `--no-restart` to leave it down. To apply changes any other time, `hermes egress restart` is the one-command stop-then-start.
 
 Once running, the Docker terminal backend automatically:
 
@@ -99,7 +99,7 @@ proxy:
   # Extra allowed upstream hosts beyond the bundled defaults.
   # Wildcards (`*.foo.com`) are supported. The defaults cover OpenRouter,
   # OpenAI, Anthropic, Google, xAI, Mistral, Groq, Together, DeepSeek,
-  # and Qubit Labs.
+  # and Nous Research.
   extra_allowed_hosts: []
 ```
 
@@ -151,7 +151,7 @@ The `secrets` transform swaps the proxy token wherever it appears in a matched l
 
 | Provider | Env var | Swapped in |
 |---|---|---|
-| OpenRouter, OpenAI, Groq, Together, DeepSeek, Mistral, xAI, Qubit | `*_API_KEY` | `Authorization` header |
+| OpenRouter, OpenAI, Groq, Together, DeepSeek, Mistral, xAI, Nous | `*_API_KEY` | `Authorization` header |
 | Anthropic native | `ANTHROPIC_API_KEY` | `x-api-key` + `Authorization` |
 | Azure OpenAI | `AZURE_OPENAI_API_KEY` | `api-key` + `Authorization` (`*.openai.azure.com`, `*.cognitiveservices.azure.com`, `*.services.ai.azure.com`) |
 | Google AI Studio (Gemini) | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `x-goog-api-key` header or `?key=` query param |
@@ -167,14 +167,14 @@ Auth schemes that involve request signing or SDK-minted OAuth cannot be swapped 
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | AWS Bedrock / SageMaker | SigV4-signed requests |
 | `GOOGLE_APPLICATION_CREDENTIALS` | GCP Vertex AI | OAuth minted from a service-account file |
 
-These env vars are present on most developer laptops for unrelated tooling (terraform, gcloud, aws CLI, ECR push). They surface as warnings in the wizard and `qubit egress status` but never block the proxy from starting. If you don't use those providers from sandboxes, `unset` the vars to clear the warning.
+These env vars are present on most developer laptops for unrelated tooling (terraform, gcloud, aws CLI, ECR push). They surface as warnings in the wizard and `hermes egress status` but never block the proxy from starting. If you don't use those providers from sandboxes, `unset` the vars to clear the warning.
 
 ## Bitwarden integration
 
-If you already use Bitwarden Secrets Manager via [`qubit secrets bitwarden setup`](../secrets/bitwarden), the egress proxy can pull real credentials from there instead of `os.environ`:
+If you already use Bitwarden Secrets Manager via [`hermes secrets bitwarden setup`](../secrets/bitwarden), the egress proxy can pull real credentials from there instead of `os.environ`:
 
 ```bash
-qubit egress setup --from-bitwarden
+hermes egress setup --from-bitwarden
 ```
 
 This sets `proxy.credential_source: bitwarden` and discovers provider env names from your BW project.
@@ -184,17 +184,17 @@ This sets `proxy.credential_source: bitwarden` and discovers provider env names 
 When `credential_source: bitwarden`, the iron-proxy daemon refetches secrets from BWS via `bws secret list <project_id>` **every time it starts**. So the rotation flow is:
 
 1. Rotate a key in the Bitwarden web app.
-2. `qubit egress stop && qubit egress start` on the host.
+2. `hermes egress stop && hermes egress start` on the host.
 3. Sandboxes started after that point swap proxy tokens for the new value.
 
-No `.env` edits. No Qubit restart on the host. The proxy daemon is the only thing that touches the new value — your host process and `os.environ` are untouched.
+No `.env` edits. No Hermes restart on the host. The proxy daemon is the only thing that touches the new value — your host process and `os.environ` are untouched.
 
 ### Fail-loud at start
 
-When `credential_source: bitwarden`, `qubit egress start` pre-checks at the wizard layer AND `_build_proxy_subprocess_env` re-checks at the daemon layer:
+When `credential_source: bitwarden`, `hermes egress start` pre-checks at the wizard layer AND `_build_proxy_subprocess_env` re-checks at the daemon layer:
 
-- BWS access token env var is unset → refuse to start with a hint to `unset` and re-run, or `qubit egress setup --no-bitwarden` to switch back to env mode
-- `secrets.bitwarden.project_id` is empty → refuse to start with a hint to run `qubit secrets bitwarden setup`
+- BWS access token env var is unset → refuse to start with a hint to `unset` and re-run, or `hermes egress setup --no-bitwarden` to switch back to env mode
+- `secrets.bitwarden.project_id` is empty → refuse to start with a hint to run `hermes secrets bitwarden setup`
 - `bws secret list` returns no values for one or more mapped providers → refuse to start, listing the missing names
 
 This is intentional. Falling back to host env in BW mode reintroduces exactly the staleness bug the BW path is meant to defeat (operator picked BW for the rotation guarantee; silent fallback breaks that guarantee).
@@ -205,59 +205,59 @@ The `proxy.allow_env_fallback: true` config flag opts back in to the legacy "sil
 
 | From | To | Command |
 |---|---|---|
-| env | bitwarden | `qubit egress setup --from-bitwarden` |
-| bitwarden | env | `qubit egress setup --no-bitwarden` |
+| env | bitwarden | `hermes egress setup --from-bitwarden` |
+| bitwarden | env | `hermes egress setup --no-bitwarden` |
 
-**Re-running `qubit egress setup` WITHOUT either flag preserves the existing `credential_source`** — the wizard refuses to silently downgrade you back to env. This matters because once you've configured bitwarden mode, the rotation guarantee is what you signed up for; you have to explicitly say "I want env again" to change it.
+**Re-running `hermes egress setup` WITHOUT either flag preserves the existing `credential_source`** — the wizard refuses to silently downgrade you back to env. This matters because once you've configured bitwarden mode, the rotation guarantee is what you signed up for; you have to explicitly say "I want env again" to change it.
 
 ## Slash commands
 
 The CLI subcommand tree:
 
 ```
-qubit egress install                  # download the pinned iron-proxy binary
-qubit egress install --force          # re-download even if a managed copy exists
+hermes egress install                  # download the pinned iron-proxy binary
+hermes egress install --force          # check and repair the managed copy
 
-qubit egress setup                    # interactive wizard
-qubit egress setup --tunnel-port N    # override the tunnel listener port
-qubit egress setup --from-bitwarden   # use BWS as credential source (fail-loud)
-qubit egress setup --no-bitwarden     # explicitly switch back to env mode
-qubit egress setup --rotate-tokens    # mint fresh tokens for every provider
+hermes egress setup                    # interactive wizard
+hermes egress setup --tunnel-port N    # override the tunnel listener port
+hermes egress setup --from-bitwarden   # use BWS as credential source (fail-loud)
+hermes egress setup --no-bitwarden     # explicitly switch back to env mode
+hermes egress setup --rotate-tokens    # mint fresh tokens for every provider
                                        #   (default preserves existing)
 
-qubit egress start                    # spawn the managed proxy daemon
-qubit egress stop                     # SIGTERM (then SIGKILL after 5s grace)
-qubit egress restart                  # stop (if running) then start — needed when
+hermes egress start                    # spawn the managed proxy daemon
+hermes egress stop                     # SIGTERM (then SIGKILL after 5s grace)
+hermes egress restart                  # stop (if running) then start — needed when
                                        #   upstream SECRETS change (rotation, new provider)
-qubit egress reload                   # hot-reload the ruleset from proxy.yaml via the
+hermes egress reload                   # hot-reload the ruleset from proxy.yaml via the
                                        #   management API — no restart, no dropped
                                        #   connections (allowlist / mapping edits)
 
-qubit egress status                   # binary + config + pid + listening state + mappings
-qubit egress status --show-tokens     # print proxy tokens in full
+hermes egress status                   # binary + config + pid + listening state + mappings
+hermes egress status --show-tokens     # print proxy tokens in full
                                        #   (default: redacted prefix + suffix only)
 
-qubit egress disable                  # flip proxy.enabled = false
+hermes egress disable                  # flip proxy.enabled = false
                                        #   (does not stop a running proxy)
 
-qubit egress config                   # print the path to proxy.yaml for debugging
+hermes egress config                   # print the path to proxy.yaml for debugging
 ```
 
 ### Token rotation
 
-By default, `qubit egress setup` **preserves** proxy tokens for providers that already have them. Adding a new provider mints a fresh token only for the new one; existing tokens are unchanged. This avoids 401-ing running sandboxes when you re-run the wizard.
+By default, `hermes egress setup` **preserves** proxy tokens for providers that already have them. Adding a new provider mints a fresh token only for the new one; existing tokens are unchanged. This avoids 401-ing running sandboxes when you re-run the wizard.
 
 `--rotate-tokens` rolls every token:
 
 ```bash
-qubit egress setup --rotate-tokens
+hermes egress setup --rotate-tokens
 ```
 
 When there are existing tokens AND stdin is a tty, the wizard prompts for confirmation:
 
 ```
 ⚠  --rotate-tokens will invalidate proxy tokens in every running
-   Qubit sandbox.  They will start 401-ing against upstreams until restarted.
+   Hermes sandbox.  They will start 401-ing against upstreams until restarted.
 Type 'rotate' to confirm:
 ```
 
@@ -267,17 +267,24 @@ Non-tty invocations (CI, scripts) skip the prompt — the flag is treated as del
 backup: ~/.hermes/proxy/mappings.json.rotated-20260524T143012
 ```
 
-`qubit egress setup` stops a running daemon when it rewrites config or token mappings, because the daemon keeps the old YAML in memory. After `--rotate-tokens`:
+`hermes egress setup` stops a running daemon when it rewrites config or token mappings, because the daemon keeps the old YAML in memory. After `--rotate-tokens`:
 
 ```bash
-qubit egress start
+hermes egress start
 ```
 
-Containers already running hold the old tokens and will need to be restarted to pick up the new ones. New persistent Docker containers include an egress-posture label, so Qubit will not reuse a pre-egress or pre-rotation container for new sessions.
+Containers already running hold the old tokens and will need to be restarted to pick up the new ones. New persistent Docker containers include an egress-posture label, so Hermes will not reuse a pre-egress or pre-rotation container for new sessions.
 
 ## State directory layout
 
-Everything iron-proxy maintains lives in `~/.hermes/proxy/`:
+PM owns the managed binary. Hermes honors an `iron-proxy` executable on
+`PATH` before checking PM selection. If neither exists, `auto_install` requests the pinned package, subject
+to PM's lazy-install policy. Explicit installation checks and repairs managed
+entries without forcing a new download of valid files. See
+[PM security tools](../../reference/package-management.md#optional-security-tools) for hash and signature checks.
+
+Daemon configuration, credentials, and logs remain profile-scoped under
+`$HERMES_HOME/proxy/` (`~/.hermes/proxy/` by default):
 
 | Path | Mode | Purpose |
 |---|---|---|
@@ -369,7 +376,7 @@ This is a known v1 limitation. Track [github.com/ironsh/iron-proxy/issues](https
 
 ### docker\_env collisions
 
-If you set proxy-controlling env vars in your `docker_env:` config block (rare but possible), Qubit refuses to start the sandbox when `enforce_on_docker: true` is set. This includes both:
+If you set proxy-controlling env vars in your `docker_env:` config block (rare but possible), Hermes refuses to start the sandbox when `enforce_on_docker: true` is set. This includes both:
 
 - Egress-control vars: `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `REQUESTS_CA_BUNDLE`, `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, `NODE_EXTRA_CA_CERTS`
 - Real provider env vars: every name in `mappings.json` (e.g. `OPENROUTER_API_KEY`, `OPENAI_API_KEY`)
@@ -387,9 +394,9 @@ With `enforce_on_docker: false` the same situation surfaces as a warning and you
 
 ## PID and nonce defense
 
-The daemon's pidfile is written with `O_EXCL` + `O_NOFOLLOW` + ownership check. Concurrent `qubit egress start` calls produce one of two outcomes:
+The daemon's pidfile is written with `O_EXCL` + `O_NOFOLLOW` + ownership check. Concurrent `hermes egress start` calls produce one of two outcomes:
 
-- The existing pidfile points at a live iron-proxy → second start refuses with "another start in progress" + a hint to run `qubit egress stop`
+- The existing pidfile points at a live iron-proxy → second start refuses with "another start in progress" + a hint to run `hermes egress stop`
 - The existing pidfile is stale (crashed daemon) → second start unlinks it and retries once
 
 Beyond that, every `start_proxy` plants a fresh random nonce in two places:
@@ -397,7 +404,7 @@ Beyond that, every `start_proxy` plants a fresh random nonce in two places:
 - `HERMES_IRON_PROXY_NONCE=<nonce>` in the daemon's env
 - `~/.hermes/proxy/iron-proxy.nonce` (0o600 sibling of the pidfile)
 
-When `qubit egress stop` (or any other `_pid_alive` check) wants to confirm a PID still refers to *our* daemon — not an unrelated process that was assigned the same PID after iron-proxy crashed — it reads `/proc/<pid>/environ` and looks for the nonce. The on-disk copy is what makes this work across CLI invocations (the in-memory `_proxy_nonce` is per-process and resets on every `qubit` invocation).
+When `hermes egress stop` (or any other `_pid_alive` check) wants to confirm a PID still refers to *our* daemon — not an unrelated process that was assigned the same PID after iron-proxy crashed — it reads `/proc/<pid>/environ` and looks for the nonce. The on-disk copy is what makes this work across CLI invocations (the in-memory `_proxy_nonce` is per-process and resets on every `hermes` invocation).
 
 If the nonce check fails, the code falls back to matching `argv[0]` basename against `iron-proxy`. `stop_proxy` additionally captures `/proc/<pid>/stat` starttime before SIGTERM and re-verifies after the 5s grace window — if starttime drifted, the PID was recycled mid-wait and SIGKILL is suppressed with a warning.
 
@@ -424,18 +431,18 @@ If the nonce check fails, the code falls back to matching `argv[0]` basename aga
 
 ## Failure modes
 
-- **Binary not installed, `auto_install: true`** — first `qubit egress setup` or `qubit egress start` downloads it. SHA-256 verified against the upstream `checksums.txt`.
+- **Binary not installed, `auto_install: true`** — first `hermes egress setup` or `hermes egress start` downloads it. SHA-256 verified against the upstream `checksums.txt`.
 - **Binary not installed, `auto_install: false`** — `start` fails with a clear message pointing to manual install.
 - **`enabled: true` but proxy not running** — with `enforce_on_docker: true` (default), Docker sandbox creation refuses to start with an explanatory error. With `enforce_on_docker: false`, it falls back to direct outbound with real creds and logs a warning.
-- **Port collision** — iron-proxy exits immediately; `qubit egress start` reports the last 20 log lines and fails with non-zero exit.
+- **Port collision** — iron-proxy exits immediately; `hermes egress start` reports the last 20 log lines and fails with non-zero exit.
 - **Upstream-host denied** — sandbox gets HTTP 403 from the proxy with a body explaining which host wasn't allowed. The agent sees the error and reports it.
 - **Cloud metadata IP (169.254.169.254) requested** — refused by `upstream_deny_cidrs` regardless of allowlist.
 - **`docker_env` collides with a proxy-controlling var (enforce on)** — sandbox creation refuses with the names of the colliding keys.
 - **`docker_forward_env` tries to forward a protected provider key (enforce on)** — sandbox creation refuses; remove the key from `docker_forward_env` or opt out with `proxy.enforce_on_docker: false`.
-- **`docker_extra_args` overrides proxy env/network controls (enforce on)** — sandbox creation refuses; user-supplied `-e HTTPS_PROXY=...`, `--env-file`, or `--network` args run after Qubit' generated args and can bypass egress.
-- **BWS access token missing in `credential_source: bitwarden`** — `qubit egress start` refuses with `--no-bitwarden` as the recovery hint.
+- **`docker_extra_args` overrides proxy env/network controls (enforce on)** — sandbox creation refuses; user-supplied `-e HTTPS_PROXY=...`, `--env-file`, or `--network` args run after Hermes' generated args and can bypass egress.
+- **BWS access token missing in `credential_source: bitwarden`** — `hermes egress start` refuses with `--no-bitwarden` as the recovery hint.
 - **iron-proxy doesn't bind within 5 seconds** — process is killed, pidfile unlinked, error names the port + tail of `iron-proxy.log`.
-- **Concurrent `qubit egress start` calls** — second call refuses with "another start in progress" if the first's daemon is up; otherwise the second unlinks the stale pidfile and proceeds.
+- **Concurrent `hermes egress start` calls** — second call refuses with "another start in progress" if the first's daemon is up; otherwise the second unlinks the stale pidfile and proceeds.
 
 ## Troubleshooting
 
@@ -445,13 +452,13 @@ You enabled `credential_source: bitwarden` but the access-token env var isn't in
 
 ```bash
 export BWS_ACCESS_TOKEN=…   # one-shot
-qubit egress start
+hermes egress start
 ```
 
 Or move it into `~/.hermes/.env`. Or switch back to env mode:
 
 ```bash
-qubit egress setup --no-bitwarden
+hermes egress setup --no-bitwarden
 ```
 
 ### "iron-proxy exited immediately"
@@ -459,12 +466,12 @@ qubit egress setup --no-bitwarden
 Look at the last 20 lines of `~/.hermes/proxy/iron-proxy.log`. Common causes:
 
 - Port already in use → change `proxy.tunnel_port` or kill whatever else owns 9090
-- Invalid `proxy.yaml` → run `qubit egress setup` to regenerate
+- Invalid `proxy.yaml` → run `hermes egress setup` to regenerate
 - CA cert / key permissions wrong → `chmod 0o600 ~/.hermes/proxy/ca.key`
 
 ### "iron-proxy did not bind \<bind-host\>:9090 within 5s"
 
-The daemon started but never bound the listener. Usually means the binary is wedged or doing something expensive at startup. Check `~/.hermes/proxy/iron-proxy.log`. The orphan process is killed automatically and the pidfile cleaned up so you can just retry `qubit egress start`.
+The daemon started but never bound the listener. Usually means the binary is wedged or doing something expensive at startup. Check `~/.hermes/proxy/iron-proxy.log`. The orphan process is killed automatically and the pidfile cleaned up so you can just retry `hermes egress start`.
 
 ### Sandbox times out connecting to the proxy (Linux)
 
@@ -475,7 +482,7 @@ docker run --rm --add-host host.docker.internal:host-gateway busybox \
   nc -zv -w 3 host.docker.internal 9090
 ```
 
-If that times out while `qubit egress status` shows `listening`, allow the bridge subnet in your firewall, e.g. for ufw:
+If that times out while `hermes egress status` shows `listening`, allow the bridge subnet in your firewall, e.g. for ufw:
 
 ```bash
 sudo ufw allow in on docker0 to any port 9090 proto tcp
@@ -495,7 +502,7 @@ proxy:
     - "*.staging.example.com"
 ```
 
-Then `qubit egress setup` (to regenerate `proxy.yaml`) and `qubit egress stop && qubit egress start`.
+Then `hermes egress setup` (to regenerate `proxy.yaml`) and `hermes egress stop && hermes egress start`.
 
 ### Sandbox sees SSL verification errors
 
@@ -509,30 +516,30 @@ env | grep -E "^(REQUESTS|CURL|SSL|NODE).*CA"
 # Should list all four CA-bundle env vars pointing at /etc/ssl/certs/hermes-egress-ca.crt
 ```
 
-If the cert isn't there, check that `proxy.enabled: true` AND `qubit egress status` shows `Listening yes`. If the env vars are missing, the sandbox image might be running an entrypoint that strips them — check your `docker_env` config.
+If the cert isn't there, check that `proxy.enabled: true` AND `hermes egress status` shows `Listening yes`. If the env vars are missing, the sandbox image might be running an entrypoint that strips them — check your `docker_env` config.
 
 ### Sandbox sees `HTTP 401` from upstreams
 
 Two common causes:
 
-1. **Token-clobber on re-setup.** You ran `qubit egress setup --rotate-tokens` (or rotated tokens some other way) and the running sandboxes still hold the old tokens. Restart the sandboxes.
+1. **Token-clobber on re-setup.** You ran `hermes egress setup --rotate-tokens` (or rotated tokens some other way) and the running sandboxes still hold the old tokens. Restart the sandboxes.
 2. **Bitwarden refresh failed silently.** Should not happen with the new fail-loud behavior, but if you have `proxy.allow_env_fallback: true` set, the daemon may have started with stale env values. Check the daemon's environment (`/proc/<iron-proxy-pid>/environ`) for the expected `OPENROUTER_API_KEY` etc.
 
 ### "Address in use" after the parent process died
 
-The parent Qubit process died during `qubit egress start` (Ctrl-C during the listening probe, OOM, panic). The new fix-up logic writes the pidfile immediately after `Popen` so the orphan is recoverable:
+The parent Hermes process died during `hermes egress start` (Ctrl-C during the listening probe, OOM, panic). The new fix-up logic writes the pidfile immediately after `Popen` so the orphan is recoverable:
 
 ```bash
-qubit egress stop   # finds the orphan via the pidfile, kills it
-qubit egress start
+hermes egress stop   # finds the orphan via the pidfile, kills it
+hermes egress start
 ```
 
-If `qubit egress stop` says "iron-proxy was not running" but you can still see the daemon in `ps`, the pidfile got out of sync. Manual recovery:
+If `hermes egress stop` says "iron-proxy was not running" but you can still see the daemon in `ps`, the pidfile got out of sync. Manual recovery:
 
 ```bash
 pkill -TERM iron-proxy
 rm -f ~/.hermes/proxy/iron-proxy.pid ~/.hermes/proxy/iron-proxy.nonce
-qubit egress start
+hermes egress start
 ```
 
 ### Inspecting per-request behavior
@@ -556,8 +563,8 @@ When the pinned version moves to v0.40+ (which adds `log.audit_path`), per-reque
 - Docker backend only. Modal, Daytona, and SSH wiring will follow in separate PRs.
 - Providers with signature-based auth (AWS SigV4, GCP service-account OAuth) bypass the proxy entirely — see [Uncovered providers](#uncovered-providers). Header-token providers (bearer, `x-api-key`, `api-key`, `x-goog-api-key`) are all covered.
 - No native Windows binary upstream. Run on Linux / macOS / WSL.
-- The CA is a 10-year self-signed cert on first generation. Rotation requires `openssl genrsa ...` by hand (or wait for a follow-up that adds `qubit egress rotate-ca`).
-- Re-running setup stops a running daemon after rewriting config or mappings; restart (or `qubit egress reload` for ruleset-only changes) and restart already-running sandboxes after token rotation.
+- The CA is a 10-year self-signed cert on first generation. Rotation requires `openssl genrsa ...` by hand (or wait for a follow-up that adds `hermes egress rotate-ca`).
+- Re-running setup stops a running daemon after rewriting config or mappings; restart (or `hermes egress reload` for ruleset-only changes) and restart already-running sandboxes after token rotation.
 - iron-proxy in-memory secret zeroisation is upstream-controlled. Same-uid attackers with `/proc/<pid>/mem` read access can read swapped-in secrets from the daemon's memory.
 - iron-proxy v0.39 only supports a **single bind per daemon** (we bind the docker bridge gateway on Linux, loopback on Docker Desktop) and combines daemon + per-request records into a single log stream. When upstream adds `proxy.http_listens` (plural) and `log.audit_path`, a version bump can wire in multi-bind and the dedicated audit stream.
 
@@ -565,6 +572,6 @@ When the pinned version moves to v0.40+ (which adds `log.audit_path`), per-reque
 
 - Upstream project: [github.com/ironsh/iron-proxy](https://github.com/ironsh/iron-proxy)
 - Upstream docs: [docs.iron.sh](https://docs.iron.sh/)
-- Bitwarden integration: [`qubit secrets bitwarden`](../secrets/bitwarden)
-- Qubit Docker terminal backend: [Docker](../docker)
+- Bitwarden integration: [`hermes secrets bitwarden`](../secrets/bitwarden)
+- Hermes Docker terminal backend: [Docker](../docker)
 - Developer / contributor reference: [Egress proxy internals](../../developer-guide/egress-internals)

@@ -17,7 +17,7 @@ for (const boundary of ['resolution', 'manifest'] as const) {
     fs.mkdirSync(path.join(home, 'scripts'))
     fs.writeFileSync(
       path.join(home, 'scripts/install.sh'),
-      `#!/bin/bash\nprintf started > "$QUBIT_HOME/manifest-started"\nprintf 'manifest-pid=%s\\n' "$$"\nwhile :; do :; done\n`
+      `#!/usr/bin/env bash\nprintf started > "$QUBIT_HOME/manifest-started"\nprintf 'manifest-pid=%s\\n' "$$"\nwhile :; do :; done\n`
     )
 
     try {
@@ -25,7 +25,7 @@ for (const boundary of ['resolution', 'manifest'] as const) {
         installStamp: null,
         activeRoot: path.join(home, 'agent'),
         sourceRepoRoot: home,
-        qubitHome: home,
+        hermesHome: home,
         abortSignal: controller.signal,
         onEvent: event => {
           if (boundary === 'resolution' && event.line?.includes('using local')) {

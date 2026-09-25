@@ -1,4 +1,4 @@
-"""Orphan Desktop-local ``qubit serve`` reap at backend start.
+"""Orphan Desktop-local ``hermes serve`` reap at backend start.
 
 When Desktop dies uncleanly, local ``serve --host 127.0.0.1 --port 0``
 children can be reparented to pid 1 and keep full MCP trees alive. The next
@@ -22,7 +22,7 @@ def test_desktop_local_serve_shape_matches_ephemeral_loopback():
         "python -m qubit_cli.main serve --host 127.0.0.1 --port 0"
     )
     assert _is_desktop_local_serve_cmdline(
-        "qubit serve --isolated --host 127.0.0.1 --port 0 --ssh-owner-nonce abc"
+        "hermes serve --isolated --host 127.0.0.1 --port 0 --ssh-owner-nonce abc"
     )
     assert _is_desktop_local_serve_cmdline(
         "/venv/bin/hermes serve --host=127.0.0.1 --port=0"
@@ -31,23 +31,24 @@ def test_desktop_local_serve_shape_matches_ephemeral_loopback():
 
 def test_desktop_local_serve_shape_spares_fixed_port_and_non_serve():
     assert not _is_desktop_local_serve_cmdline(
-        "qubit serve --host 100.106.105.2 --port 9119 --skip-build"
+        "hermes serve --host 100.106.105.2 --port 9119 --skip-build"
     )
     assert not _is_desktop_local_serve_cmdline(
-        "qubit serve --host 127.0.0.1 --port 9119"
+        "hermes serve --host 127.0.0.1 --port 9119"
     )
-    assert not _is_desktop_local_serve_cmdline("qubit gateway run --replace")
+    assert not _is_desktop_local_serve_cmdline("hermes gateway run --replace")
+    # "serve" inside another token is not the serve subcommand (token matcher, not substring).
     assert not _is_desktop_local_serve_cmdline(
-        "vim notes about qubit serve --port 0"
+        "hermes kanban --preserve-cache --host 127.0.0.1 --port 0"
     )
 
 
 def test_reap_only_kills_ppid1_local_serves():
     scanned = [
-        (111, "qubit serve --host 127.0.0.1 --port 0"),  # orphan local
-        (222, "qubit serve --host 127.0.0.1 --port 0"),  # still has parent
-        (333, "qubit serve --host 100.1.2.3 --port 9119"),  # fixed remote
-        (444, "qubit serve --isolated --host 127.0.0.1 --port 0"),  # orphan isolated
+        (111, "hermes serve --host 127.0.0.1 --port 0"),  # orphan local
+        (222, "hermes serve --host 127.0.0.1 --port 0"),  # still has parent
+        (333, "hermes serve --host 100.1.2.3 --port 9119"),  # fixed remote
+        (444, "hermes serve --isolated --host 127.0.0.1 --port 0"),  # orphan isolated
     ]
     ppids = {111: 1, 222: 50, 333: 1, 444: 1}
     terms: list[int] = []
@@ -77,7 +78,6 @@ def test_reap_only_kills_ppid1_local_serves():
             side_effect=lambda pid: ppids.get(pid),
         ),
         patch("os.kill", side_effect=fake_kill),
-        patch("sys.platform", "darwin"),
     ):
         os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
         result = _reap_orphaned_desktop_local_serves(
@@ -100,7 +100,6 @@ def test_reap_passes_child_pid_exclude_to_scan():
             "qubit_cli.dashboard_procs._scan_dashboard_processes",
             return_value=[],
         ) as scan,
-        patch("sys.platform", "darwin"),
         patch.dict(os.environ, {"HERMES_DESKTOP_CHILD_PID": "999,111"}, clear=False),
     ):
         result = _reap_orphaned_desktop_local_serves(sleep_fn=lambda _s: None)
@@ -161,6 +160,28 @@ def test_lock_owned_serve_pids_reads_valid_backend_lock(tmp_path):
     assert _lock_owned_serve_pids(base_dir=lock_root) == {7777}
 
 
+def test_lock_owned_serve_pids_sees_root_home_locks_from_a_profile_home(tmp_path, monkeypatch):
+    """A profile backend (``QUBIT_HOME=<root>/profiles/<name>``) must still see the Desktop's SSH
+    locks, which live under ``<root>/desktop-ssh`` — otherwise its reaper kills the sibling
+    profile's live SSH backend on every profile switch (#89811)."""
+    import qubit_constants
+
+    root = tmp_path / ".hermes"
+    profile_home = root / "profiles" / "flocki"
+    profile_home.mkdir(parents=True)
+    oid = "f" * 32
+    nonce = "d" * 16
+    (root / "desktop-ssh" / oid).mkdir(parents=True)
+    (root / "desktop-ssh" / oid / "backend.lock.json").write_text(
+        json.dumps(_valid_lock_payload(7777, oid, nonce))
+    )
+    monkeypatch.setenv("QUBIT_HOME", str(profile_home))
+    monkeypatch.setattr(qubit_constants, "_get_platform_default_qubit_home", lambda: root)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None, raising=False)
+
+    assert _lock_owned_serve_pids() == {7777}
+
+
 def test_valid_lockfile_payload_rejects_wrong_owner_and_shape():
     oid = "f" * 32
     nonce = "d" * 16
@@ -193,8 +214,8 @@ def test_reap_spare_lock_owned_ssh_remote_backend_of_foreign_client():
     matches the Desktop-local serve shape and is orphaned at ppid 1, but a valid
     backend.lock.json owns its PID. The reap must NOT kill it."""
     scanned = [
-        (555, "qubit serve --host 127.0.0.1 --port 0"),  # lock-owned remote
-        (666, "qubit serve --host 127.0.0.1 --port 0"),  # genuine orphan
+        (555, "hermes serve --host 127.0.0.1 --port 0"),  # lock-owned remote
+        (666, "hermes serve --host 127.0.0.1 --port 0"),  # genuine orphan
     ]
     ppids = {555: 1, 666: 1}
     terms: list[int] = []
@@ -227,7 +248,6 @@ def test_reap_spare_lock_owned_ssh_remote_backend_of_foreign_client():
             side_effect=lambda pid: ppids.get(pid),
         ),
         patch("os.kill", side_effect=fake_kill),
-        patch("sys.platform", "darwin"),
     ):
         os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
         result = _reap_orphaned_desktop_local_serves(
@@ -247,7 +267,7 @@ def test_reap_spare_lock_owned_ssh_remote_backend_of_foreign_client():
 
 def test_reap_spares_young_backend_until_desktop_can_write_lock():
     """A concurrently-starting sibling has no lock yet but is not an orphan."""
-    scanned = [(777, "qubit serve --isolated --host 127.0.0.1 --port 0")]
+    scanned = [(777, "hermes serve --isolated --host 127.0.0.1 --port 0")]
     terms: list[int] = []
 
     def fake_kill(pid, sig):
@@ -264,7 +284,6 @@ def test_reap_spares_young_backend_until_desktop_can_write_lock():
         ),
         patch("qubit_cli.dashboard_procs._process_ppid", return_value=1),
         patch("os.kill", side_effect=fake_kill),
-        patch("sys.platform", "darwin"),
     ):
         result = _reap_orphaned_desktop_local_serves(
             sleep_fn=lambda _s: None,
@@ -279,7 +298,7 @@ def test_reap_spares_young_backend_until_desktop_can_write_lock():
 
 
 def test_reap_spares_backend_when_process_age_is_unknown():
-    scanned = [(778, "qubit serve --isolated --host 127.0.0.1 --port 0")]
+    scanned = [(778, "hermes serve --isolated --host 127.0.0.1 --port 0")]
     terms: list[int] = []
 
     def fake_age(_pid):
@@ -292,7 +311,6 @@ def test_reap_spares_backend_when_process_age_is_unknown():
         ),
         patch("qubit_cli.dashboard_procs._process_ppid", return_value=1),
         patch("os.kill", side_effect=lambda pid, sig: terms.append(pid) if sig == 15 else None),
-        patch("sys.platform", "darwin"),
     ):
         result = _reap_orphaned_desktop_local_serves(
             sleep_fn=lambda _s: None,
@@ -308,8 +326,8 @@ def test_reap_spares_backend_when_process_age_is_unknown():
 
 def test_reap_age_boundary_makes_180_second_orphan_eligible():
     scanned = [
-        (779, "qubit serve --isolated --host 127.0.0.1 --port 0"),
-        (780, "qubit serve --isolated --host 127.0.0.1 --port 0"),
+        (779, "hermes serve --isolated --host 127.0.0.1 --port 0"),
+        (780, "hermes serve --isolated --host 127.0.0.1 --port 0"),
     ]
     terms: list[int] = []
     live = {779, 780}
@@ -332,7 +350,6 @@ def test_reap_age_boundary_makes_180_second_orphan_eligible():
         ),
         patch("qubit_cli.dashboard_procs._process_ppid", return_value=1),
         patch("os.kill", side_effect=fake_kill),
-        patch("sys.platform", "darwin"),
     ):
         result = _reap_orphaned_desktop_local_serves(
             sleep_fn=lambda _s: None,
@@ -358,7 +375,7 @@ def test_reap_spare_lock_owned_backend_even_without_exclude_match(tmp_path):
         json.dumps(_valid_lock_payload(4242, oid, nonce))
     )
 
-    scanned = [(4242, "qubit serve --host 127.0.0.1 --port 0")]
+    scanned = [(4242, "hermes serve --host 127.0.0.1 --port 0")]
     terms: list[int] = []
 
     def fake_kill(pid, sig):
@@ -376,7 +393,6 @@ def test_reap_spare_lock_owned_backend_even_without_exclude_match(tmp_path):
             return_value=1,
         ),
         patch("os.kill", side_effect=fake_kill),
-        patch("sys.platform", "darwin"),
     ):
         os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
         result = _reap_orphaned_desktop_local_serves(
@@ -388,3 +404,40 @@ def test_reap_spare_lock_owned_backend_even_without_exclude_match(tmp_path):
 
     assert terms == []
     assert result["matched"] == []
+
+
+def test_reap_kills_descendants_of_killed_roots_but_spares_a_failed_roots_subtree():
+    """#112631: a SIGKILLed backend never ran PTY_REGISTRY.close_all(), so the reaper sweeps its
+    surviving hosted-TUI children — but only for roots it actually killed. A root whose own kill
+    raised (EPERM: not ours) keeps its subtree intact instead of being orphaned half-way."""
+    scanned = [
+        (111, "hermes serve --host 127.0.0.1 --port 0"),  # ours: killed, child 1111 swept
+        (444, "hermes serve --host 127.0.0.1 --port 0"),  # not ours: EPERM, child 4444 spared
+    ]
+    descendants = {1111: (111, 5.0), 4444: (444, 6.0)}
+    start_times = {1111: 5.0, 4444: 6.0}
+    sent: list[tuple[int, int]] = []
+
+    def fake_kill(pid, sig):
+        if pid == 444:
+            raise PermissionError("Operation not permitted")
+        sent.append((pid, sig))
+
+    with (
+        patch("qubit_cli.dashboard_procs._scan_dashboard_processes", return_value=scanned),
+        patch("qubit_cli.dashboard_procs._process_ppid", return_value=1),
+        patch("qubit_cli.dashboard_procs._posix_descendants", return_value=descendants) as snap,
+        patch("gateway.status.get_process_start_time", side_effect=start_times.get),
+        patch("psutil.pid_exists", return_value=True),
+        patch("os.kill", side_effect=fake_kill),
+    ):
+        os.environ.pop("HERMES_DESKTOP_CHILD_PID", None)
+        result = _reap_orphaned_desktop_local_serves(
+            sleep_fn=lambda _s: None, signal_term=15, signal_kill=9,
+            process_age_seconds_fn=lambda _pid: 600.0,
+        )
+
+    snap.assert_called_once_with([111, 444])  # snapshotted before the kill reparents them
+    assert result["killed"] == [111] and result["failed"] == [444]
+    assert (1111, 9) in sent, "surviving child of the killed backend was not swept"
+    assert not any(pid == 4444 for pid, _ in sent), "child of a root we could not kill was swept"

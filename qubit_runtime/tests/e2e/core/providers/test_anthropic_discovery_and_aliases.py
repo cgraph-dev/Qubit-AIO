@@ -64,7 +64,7 @@ def rig(tmp_path: Path):
 
 # The CLI's own startup sequence (load ~/.hermes/.env), then the picker entry point.
 _DISCOVERY_PROBE = (
-    "import json; from qubit_cli.env_loader import load_hermes_dotenv; load_hermes_dotenv(); "
+    "import json; from qubit_cli.env_loader import load_qubit_dotenv; load_qubit_dotenv(); "
     "from qubit_cli.models import provider_model_ids; "
     "print('IDS=' + json.dumps(list(provider_model_ids('anthropic', force_refresh=True))))"
 )
@@ -113,7 +113,7 @@ def test_model_discovery_probes_the_configured_anthropic_endpoint(rig, via: str)
 
 def _oauth_rig(rig, script) -> Rig:
     r = rig(script)
-    (r.hermes_home / ".env").write_text(f"ANTHROPIC_TOKEN={OAUTH_TOKEN}\n", encoding="utf-8")
+    (r.qubit_home / ".env").write_text(f"ANTHROPIC_TOKEN={OAUTH_TOKEN}\n", encoding="utf-8")
     return r
 
 
@@ -146,7 +146,7 @@ def test_oauth_wire_names_map_back_to_real_tools(rig) -> None:
     assert not {"memory", "session_search", "read_file"} & wire_names, "real names leaked onto the OAuth wire"
     results = _tool_results(mains[1]["body"])
     assert any("WIRE-FILE-CONTENT-93" in res for res in results), results
-    memory_md = r.hermes_home / "memories" / "MEMORY.md"
+    memory_md = r.qubit_home / "memories" / "MEMORY.md"
     assert memory_md.exists() and note in memory_md.read_text(encoding="utf-8"), (
         f"aliased context_notes call did not reach the memory tool: {results}")
     assert not r.srv.schema_errors(), r.srv.schema_errors()

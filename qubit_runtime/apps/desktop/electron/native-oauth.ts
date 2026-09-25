@@ -2,7 +2,7 @@
  * native-oauth.ts
  *
  * Pure, electron-free helpers for the desktop's RFC 8252 (OAuth 2.0 for Native
- * Apps) login to a gated Qubit gateway: system-browser + loopback redirect +
+ * Apps) login to a gated Hermes gateway: system-browser + loopback redirect +
  * PKCE, with tokens returned to the app (never browser session cookies).
  *
  * Kept standalone (no `import 'electron'`) so it unit-tests with `node --test`
@@ -11,7 +11,7 @@
  * safeStorage keychain writes) and calls these helpers for the pure logic.
  *
  * Why the gateway brokers the flow (not a direct desktop→IDP client): the
- * upstream IDP (Qubit Portal) issues a per-gateway-instance client_id and only
+ * upstream IDP (Nous Portal) issues a per-gateway-instance client_id and only
  * accepts a redirect_uri on the gateway's own origin, so a desktop loopback
  * redirect can't be a direct Portal client. Instead the gateway exposes
  * /auth/native/{authorize,token,refresh}: it is the authorization server to

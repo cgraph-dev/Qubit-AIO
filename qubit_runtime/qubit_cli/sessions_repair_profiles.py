@@ -1,16 +1,16 @@
 """``qubit sessions repair-profiles`` — settle crossed-profile durable state across every store.
 
-The per-profile store model and the identity fences that followed are forward-only: they put NEW rows
-in the right place and refuse to widen existing damage, but nothing walks the stores and settles what
-an earlier release left crossed. This does, for six kinds of crossing:
+The per-profile store model (#88734) and the identity fences that followed are forward-only: they
+put NEW rows in the right place and refuse to widen existing damage, but nothing walks the stores
+and settles what an earlier release left crossed. This does, for six kinds of crossing:
 
 1. ``sessions.profile_name`` disagreeing with the profile in the row's own ``session_key``;
 2. rows physically in the wrong store (a named profile's keys in the root ``state.db``, another
    profile's keys in ``profiles/<p>/state.db``) — moved to the owning profile's store;
 3. ``parent_session_id`` crossing namespaces — severed (the child's own identity is untouched);
 4. ``gateway_routing`` rows in a named profile's store (the routing index lives in the gateway's
-   home) — moved to the routing store when absent there, dropped otherwise — and root rows for a
-   namespace no profile claims;
+   home; #66887 copied every profile's rows into whichever store was scoped) — moved to the routing
+   store when absent there, dropped otherwise — and root rows for a namespace no profile claims;
 5. profile-less Telegram topic bindings and ``gateway_voice_mode.json`` entries owned by a
    non-default bot — relabelled from the evidence of the rows themselves;
 6. ``sessions.json`` mirror entries whose key namespace no served profile claims — dropped, since
@@ -18,24 +18,13 @@ an earlier release left crossed. This does, for six kinds of crossing:
 
 Legacy ``agent:main:`` rows inside a named profile's store are reported but NOT repaired unless
 ``--legacy-main`` says how: they are either a standalone (pre-multiplex) gateway's own history that
-must be rekeyed to ``agent:<p>:``, or a default-profile chat that leaked in under a scoped write and
-must move to the root store. The row carries no evidence that tells the two apart, and guessing wrong
-hands a conversation to the other bot.
+must be rekeyed to ``agent:<p>:`` (the #113884 incident), or a default-profile chat that leaked in
+under a scoped write (#102157) and must move to the root store. The row carries no evidence that
+tells the two apart, and guessing wrong hands a conversation to the other bot.
 
 Report-only by default. ``--apply`` refuses while a gateway owning any touched store is live (it
-holds the routing index in memory and writes it back), takes a quick snapshot of every store it will
-mutate, and is idempotent: a second run finds nothing.
-
-Provenance: reference ``hermes_cli/sessions_repair_profiles.py`` (``hermes`` 0.21.4). Vendored
-adaptations: the store's ``SessionDB`` is a :class:`RepairSessionDB` (0.21.1 does not mix the repair
-surface in), and the live-gateway probe / multiplex verdict come from
-``qubit_cli/gateway_multiplex_mode.py`` (the vendored stand-in for
-``gateway.status.live_gateway_pid_for_home`` / ``hermes_cli/gateway_multiplex_served.py``).
-
-The write path opens a dedicated :class:`RepairSessionDB` rather than the process-wide
-``qubit_state_registry.acquire`` handle: the repair surface must be attached, and this one-shot
-command refuses before any write while a gateway owning a touched store is live. A crash between a
-copy and its delete is still idempotent because the next run settles the duplicate.
+holds the routing index in memory and writes it back), takes a quick snapshot of every store it
+will mutate, and is idempotent: a second run finds nothing.
 """
 from __future__ import annotations
 
@@ -45,9 +34,6 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
-
-from qubit_cli.gateway_multiplex_mode import default_gateway_multiplexes, live_gateway_pid_for_home
-from qubit_cli.qubit_state_profile_repair import RepairSessionDB, session_key_profile
 
 logger = logging.getLogger(__name__)
 
@@ -99,17 +85,20 @@ class _Session:
         path = store.db_path
         if path not in self._dbs:
             if self.read_only:
-                self._dbs[path] = RepairSessionDB(path, read_only=True) if path.exists() else _EMPTY_STORE
+                from qubit_state import SessionDB
+                self._dbs[path] = SessionDB(path, read_only=True) if path.exists() else _EMPTY_STORE
             else:
-                self._dbs[path] = RepairSessionDB(path)
+                from qubit_state_registry import acquire
+                self._dbs[path] = acquire(path)
         return self._dbs[path]
 
     def close(self) -> None:
+        from qubit_state_registry import release_or_close
         for db in self._dbs.values():
             if db is _EMPTY_STORE:
                 continue
             with contextlib.suppress(Exception):
-                db.close()
+                release_or_close(db) if not self.read_only else db.close()
         self._dbs.clear()
 
 
@@ -148,6 +137,7 @@ def _gateway_multiplexes(root: Path) -> bool:
     """Does the default gateway serve every profile? Same reader as every other CLI surface: the live
     record, else the explicit flag, else False — an unset flag is a verdict only the gateway reaches,
     and guessing "yes" would uproot a standalone gateway's own routing index."""
+    from qubit_cli.gateway_multiplex_mode import default_gateway_multiplexes
     try:
         return default_gateway_multiplexes(root)
     except Exception:
@@ -155,6 +145,7 @@ def _gateway_multiplexes(root: Path) -> bool:
 
 
 def live_gateway_homes(stores: Iterable[Store]) -> List[Tuple[str, int]]:
+    from gateway.status import live_gateway_pid_for_home
     live = []
     for store in stores:
         pid = live_gateway_pid_for_home(store.home)
@@ -271,6 +262,7 @@ class RepairPlan:
                 _fix=lambda s, st=store, r=row: s.db(st).relabel_telegram_topic_rows([r])))
 
     def _scan_routing(self, session: _Session, store: Store) -> None:
+        from qubit_state_profile_repair import session_key_profile
         rows = session.db(store).list_gateway_routing_rows()
         for row in rows:
             key_profile = session_key_profile(row["session_key"])
@@ -307,7 +299,7 @@ class RepairPlan:
     def _scan_voice_modes(self, session: _Session, store: Store) -> None:
         path = store.home / _VOICE_MODE_FILE
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             return
         if not isinstance(data, dict):
@@ -333,9 +325,10 @@ class RepairPlan:
                 _fix=lambda s, p=path, k=key, o=owner: _rekey_voice_mode_entry(p, k, o)))
 
     def _scan_sessions_json(self, store: Store) -> None:
+        from qubit_state_profile_repair import session_key_profile
         path = store.home / "sessions" / "sessions.json"
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             return
         if not isinstance(data, dict):
@@ -375,16 +368,25 @@ class _MoveBatch:
     (parents before children, so a moved child keeps its moved parent), then delete from the source.
     Row by row, deleting a parent would detach the children still waiting in the source. Copy
     precedes delete, so a crash between the two leaves a duplicate the next run settles
-    (``present`` on import, then the delete)."""
+    (``present`` on import, then the delete). A row that fails is that row's failure alone: the
+    rest of the batch still moves, and only its lineage (descendants, and the parent it still
+    points at in the source) waits with it for the next run."""
 
     def __init__(self, src: Store, dst: Store) -> None:
         self.src, self.dst = src, dst
         self.ids: List[str] = []
         self._result: Optional[Dict[str, Dict[str, int]]] = None
+        self._errors: Dict[str, Exception] = {}
 
     def fix_for(self, sid: str) -> Callable[[_Session], Dict[str, int]]:
         self.ids.append(sid)
-        return lambda session: self.run(session).get(sid, {"missing": 1})
+        return lambda session: self._outcome(session, sid)
+
+    def _outcome(self, session: _Session, sid: str) -> Dict[str, int]:
+        result = self.run(session)
+        if sid in self._errors:
+            raise self._errors[sid]
+        return result.get(sid, {"missing": 1})
 
     def run(self, session: _Session) -> Dict[str, Dict[str, int]]:
         if self._result is not None:
@@ -394,18 +396,35 @@ class _MoveBatch:
         ordered = _parents_first([p for p in payloads.values() if p is not None])
         result: Dict[str, Dict[str, int]] = {sid: {"missing": 1} for sid, p in payloads.items() if p is None}
         for payload in ordered:
-            sid = payload["session"]["id"]
-            outcome = dst_db.import_moved_session(payload, profile_name=self.dst.profile)
+            sid, parent = payload["session"]["id"], payload["session"].get("parent_session_id")
+            if parent in self._errors:
+                # Imported now, it would land without the parent and never regain the link.
+                self._errors[sid] = RuntimeError(
+                    f"its parent {parent} did not move; kept in the {self.src.profile} store with it")
+                continue
+            try:
+                outcome = dst_db.import_moved_session(payload, profile_name=self.dst.profile)
+            except Exception as exc:
+                self._errors[sid] = exc
+                continue
             if dst_db.count_messages_all(sid) < len(payload["messages"]):
                 logger.warning("repair-profiles: %s copied into %s with fewer messages than the source; "
                                "source row kept", sid, self.dst.profile)
                 result[sid] = {"copied_incomplete": 1}
                 continue
             result[sid] = {outcome: 1}
+        # Deleting a row detaches its children still in the source; a child that did not move
+        # must find its parent there on the next run.
+        awaited = {p["session"].get("parent_session_id") for p in ordered if p["session"]["id"] in self._errors}
         for payload in ordered:
             sid = payload["session"]["id"]
-            if "copied_incomplete" not in result[sid] and src_db.delete_moved_session(sid):
-                result[sid]["moved"] = 1
+            if sid not in result or sid in awaited or "copied_incomplete" in result[sid]:
+                continue
+            try:
+                if src_db.delete_moved_session(sid):
+                    result[sid]["moved"] = 1
+            except Exception as exc:
+                self._errors[sid] = exc
         self._result = result
         return result
 
@@ -426,7 +445,7 @@ def _parents_first(payloads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _rekey_voice_mode_entry(path: Path, key: str, owner: str) -> Dict[str, int]:
     from utils import atomic_json_write
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if key not in data:
         return {}
     data.setdefault(f"{owner}:{key}", data.pop(key))
@@ -437,7 +456,7 @@ def _rekey_voice_mode_entry(path: Path, key: str, owner: str) -> Dict[str, int]:
 
 def _drop_sessions_json_entry(path: Path, key: str) -> Dict[str, int]:
     from utils import atomic_json_write
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if key not in data:
         return {}
     del data[key]

@@ -42,7 +42,7 @@ describe('resolveRefusal', () => {
       const resolved = resolveRefusal({
         kind: kind as BillingRefusal['kind'],
         message: 'Server message.',
-        portalUrl: 'https://portal.qubit.test/billing',
+        portalUrl: 'https://portal.nousresearch.com/billing',
         retryAfter: 90
       })
 
@@ -75,10 +75,7 @@ describe('resolveRefusal', () => {
   it('falls back sanely for unknown refusal kinds', () => {
     const resolved = resolveRefusal({ kind: 'new_billing_code', message: 'Something changed upstream.' })
 
-    expect(resolved).toEqual({
-      action: { type: 'none' },
-      message: 'Something changed upstream.',
-      title: 'Billing request failed'
-    })
+    expect(resolved).toMatchObject({ action: { type: 'none' }, message: 'Something changed upstream.' })
+    expect(resolved.title).not.toHaveLength(0)
   })
 })

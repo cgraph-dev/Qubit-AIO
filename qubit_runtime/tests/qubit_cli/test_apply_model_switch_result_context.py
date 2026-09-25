@@ -34,7 +34,7 @@ class _StubCLI:
     def _stage_and_swap_model(self, result, old_model):
         # Staging + in-place swap lives in a helper; run the real one on this stub.
         import cli as _cli_mod
-        return _cli_mod.QubitCLI._stage_and_swap_model(self, result, old_model)
+        return _cli_mod.HermesCLI._stage_and_swap_model(self, result, old_model)
 
     agent = None
     model = ""
@@ -55,7 +55,7 @@ def _run_display(monkeypatch, result):
     monkeypatch.setattr(cli_mod, "_cprint", lambda s, *a, **k: captured.append(str(s)))
     # Avoid writing to ~/.hermes/config.yaml during the test.
     monkeypatch.setattr(cli_mod, "save_config_value", lambda *a, **k: None)
-    cli_mod.QubitCLI._apply_model_switch_result(_StubCLI(), result, False)
+    cli_mod.HermesCLI._apply_model_switch_result(_StubCLI(), result, False)
     return captured
 
 
@@ -131,9 +131,8 @@ def test_global_switch_clears_context_pin_owned_by_previous_route(monkeypatch):
     writes = []
     monkeypatch.setattr(cli_mod, "_cprint", lambda *_a, **_k: None)
     monkeypatch.setattr(
-        cli_mod,
-        "save_config_value",
-        lambda key, value: writes.append((key, value)),
+        "utils.atomic_roundtrip_yaml_update",
+        lambda path, key, value: writes.append((key, value)),
     )
     cli = _StubCLI()
     cli.model = "shared-model"
@@ -169,8 +168,8 @@ def test_global_switch_clears_context_pin_owned_by_previous_route(monkeypatch):
             "agent.model_metadata.get_model_context_length",
             return_value=256_000,
         ),
-        patch("qubit_cli.config.load_config_readonly", return_value=configured),
+        patch("qubit_cli.config.read_user_config_raw", return_value=configured),
     ):
-        cli_mod.QubitCLI._apply_model_switch_result(cli, result, True)
+        cli_mod.HermesCLI._apply_model_switch_result(cli, result, True)
 
     assert ("model.context_length", None) in writes

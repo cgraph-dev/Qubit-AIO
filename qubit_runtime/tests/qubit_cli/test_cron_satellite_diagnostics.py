@@ -19,7 +19,7 @@ def served_root(tmp_path, monkeypatch):
     (tmp_path / "locks").mkdir()
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
-    monkeypatch.setattr("qubit_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
     monkeypatch.setattr(jobs, "CRON_DIR", home / "cron")
     monkeypatch.setattr(jobs, "JOBS_FILE", home / "cron/jobs.json")
     monkeypatch.setattr(jobs, "OUTPUT_DIR", home / "cron/output")

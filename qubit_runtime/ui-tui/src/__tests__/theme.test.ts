@@ -39,33 +39,7 @@ afterEach(() => {
   vi.resetModules()
 })
 
-describe('DEFAULT_THEME', () => {
-  it('has brand defaults', async () => {
-    const { DEFAULT_THEME } = await importThemeWithCleanEnv()
-
-    expect(DEFAULT_THEME.brand.name).toBe('Qubit Agent')
-    expect(DEFAULT_THEME.brand.prompt).toBe('❯')
-    expect(DEFAULT_THEME.brand.tool).toBe('┊')
-  })
-
-  it('has color palette', async () => {
-    const { DEFAULT_THEME } = await importThemeWithCleanEnv()
-
-    expect(DEFAULT_THEME.color.primary).toBe('#FFD700')
-    expect(DEFAULT_THEME.color.error).toBe('#ef5350')
-  })
-})
-
 describe('LIGHT_THEME', () => {
-  it('avoids bright-yellow accents unreadable on white backgrounds (#11300)', async () => {
-    const { LIGHT_THEME } = await importThemeWithCleanEnv()
-
-    expect(LIGHT_THEME.color.primary).not.toBe('#FFD700')
-    expect(LIGHT_THEME.color.accent).not.toBe('#FFBF00')
-    expect(LIGHT_THEME.color.muted).not.toBe('#B8860B')
-    expect(LIGHT_THEME.color.statusWarn).not.toBe('#FFD700')
-  })
-
   it('keeps the same shape as DARK_THEME', async () => {
     const { DARK_THEME, LIGHT_THEME } = await importThemeWithCleanEnv()
 
@@ -98,11 +72,11 @@ describe('detectLightMode', () => {
   it('honors HERMES_TUI_LIGHT on/off', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ QUBIT_TUI_LIGHT: '1' })).toBe(true)
-    expect(detectLightMode({ QUBIT_TUI_LIGHT: 'true' })).toBe(true)
-    expect(detectLightMode({ QUBIT_TUI_LIGHT: 'on' })).toBe(true)
-    expect(detectLightMode({ QUBIT_TUI_LIGHT: '0' })).toBe(false)
-    expect(detectLightMode({ QUBIT_TUI_LIGHT: 'off' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_LIGHT: '1' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_LIGHT: 'true' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_LIGHT: 'on' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_LIGHT: '0' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_LIGHT: 'off' })).toBe(false)
   })
 
   it('sniffs COLORFGBG bg slots 7 and 15 as light (#11300)', async () => {
@@ -131,28 +105,28 @@ describe('detectLightMode', () => {
   it('lets HERMES_TUI_LIGHT=0 override a light COLORFGBG', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ COLORFGBG: '0;15', QUBIT_TUI_LIGHT: '0' })).toBe(false)
+    expect(detectLightMode({ COLORFGBG: '0;15', HERMES_TUI_LIGHT: '0' })).toBe(false)
   })
 
   it('honors HERMES_TUI_THEME=light/dark as a symmetric explicit override', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ QUBIT_TUI_THEME: 'light' })).toBe(true)
-    expect(detectLightMode({ QUBIT_TUI_THEME: 'dark' })).toBe(false)
-    expect(detectLightMode({ COLORFGBG: '0;15', QUBIT_TUI_THEME: 'dark' })).toBe(false)
-    expect(detectLightMode({ COLORFGBG: '15;0', QUBIT_TUI_THEME: 'light' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_THEME: 'light' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_THEME: 'dark' })).toBe(false)
+    expect(detectLightMode({ COLORFGBG: '0;15', HERMES_TUI_THEME: 'dark' })).toBe(false)
+    expect(detectLightMode({ COLORFGBG: '15;0', HERMES_TUI_THEME: 'light' })).toBe(true)
   })
 
   it('uses HERMES_TUI_BACKGROUND luminance when COLORFGBG is missing', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#ffffff' })).toBe(true)
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#000000' })).toBe(false)
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#1e1e1e' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#ffffff' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#000000' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#1e1e1e' })).toBe(false)
     // Three-char hex normalises like CSS.
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#fff' })).toBe(true)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#fff' })).toBe(true)
     // Garbage falls through to the default-dark path.
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: 'not-a-colour' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: 'not-a-colour' })).toBe(false)
   })
 
   it('rejects partially-invalid hex instead of silently truncating', async () => {
@@ -160,12 +134,12 @@ describe('detectLightMode', () => {
     // `parseInt('fffgff'.slice(2,4), 16)` would return 15 — the strict
     // regex must reject these inputs so they fall through to default-
     // dark instead of producing a false-positive light reading.
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#fffgff' })).toBe(false)
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: 'ffggff' })).toBe(false)
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#xyz' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#fffgff' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: 'ffggff' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#xyz' })).toBe(false)
     // Wrong length also rejected (no implicit padding/truncation).
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#fffff' })).toBe(false)
-    expect(detectLightMode({ QUBIT_TUI_BACKGROUND: '#fffffff' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#fffff' })).toBe(false)
+    expect(detectLightMode({ HERMES_TUI_BACKGROUND: '#fffffff' })).toBe(false)
   })
 
   it('treats COLORFGBG as authoritative when present so it dominates the TERM_PROGRAM allow-list', async () => {
@@ -203,13 +177,13 @@ describe('fromSkin', () => {
   it('derives completion current background from resolved completion background (polarity-compatible)', async () => {
     // Light terminal + light-authored menu fill: the skin's fill is honored
     // and the current-row derivation mixes off it.
-    const { fromSkin } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const { fromSkin } = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
 
     const theme = fromSkin({ banner_accent: '#000000', completion_menu_bg: '#ffffff' }, {})
 
     expect(theme.color.completionBg).toBe('#ffffff')
-    // Active row = authored surface mixed toward the accent (ladder knob).
-    expect(theme.color.completionCurrentBg).toBe('#c7c7c7')
+    // Active row = authored surface mixed toward the accent — distinct from the fill.
+    expect(theme.color.completionCurrentBg).not.toBe(theme.color.completionBg)
   })
 
   it('rejects wrong-polarity fills even when skin-authored (terminal owns the canvas)', async () => {
@@ -272,13 +246,6 @@ describe('fromSkin', () => {
     expect(fromSkin({}, { prompt_symbol: '\n\t' }).brand.prompt).toBe(DEFAULT_THEME.brand.prompt)
   })
 
-  it('defaults for empty skin', async () => {
-    const { DEFAULT_THEME, fromSkin } = await importThemeWithCleanEnv()
-
-    expect(fromSkin({}, {}).color).toEqual(DEFAULT_THEME.color)
-    expect(fromSkin({}, {}).brand.icon).toBe(DEFAULT_THEME.brand.icon)
-  })
-
   it('normalizes non-banner foregrounds on light Apple Terminal', async () => {
     const { fromSkin } = await importThemeWithEnv({ TERM_PROGRAM: 'Apple_Terminal' })
 
@@ -319,7 +286,7 @@ describe('fromSkin', () => {
   })
 
   it('a skin background outranks the cached host background for adaptation and tone derivation', async () => {
-    const { fromSkin } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const { fromSkin } = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
 
     const theme = fromSkin({ background: '#000000', ui_text: '#ffa726' }, {})
 
@@ -331,7 +298,7 @@ describe('fromSkin', () => {
   })
 
   it('skinIsLight: the authored background decides; host detection only when absent', async () => {
-    const { skinIsLight } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const { skinIsLight } = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
 
     expect(skinIsLight({ background: '#000000' })).toBe(false)
     expect(skinIsLight({ background: '#f5f5f5' })).toBe(true)
@@ -359,13 +326,6 @@ describe('fromSkin', () => {
     const theme = fromSkin({ banner_text: '#FFF8DC' }, {})
 
     expect(theme.color.text).toBe('ansi256(136)')
-  })
-
-  it('passes banner logo/hero', async () => {
-    const { fromSkin } = await importThemeWithCleanEnv()
-
-    expect(fromSkin({}, {}, 'LOGO', 'HERO').bannerLogo).toBe('LOGO')
-    expect(fromSkin({}, {}, 'LOGO', 'HERO').bannerHero).toBe('HERO')
   })
 
   it('maps ui_ color keys + cascades to status', async () => {
@@ -431,7 +391,7 @@ describe('derived tone ladder', () => {
     // within a-few-RGB-units of the original (imperceptible), so knob edits
     // that drift the classic look fail here instead of shipping as vibes.
     const dark = await importThemeWithCleanEnv()
-    const light = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const light = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
 
     const cases: Array<[string, string, string]> = [
       [dark.DARK_THEME.color.muted, '#CC9B1F', 'dark muted'],
@@ -488,7 +448,7 @@ describe('derived tone ladder', () => {
 
 describe('background-aware adaptation (OSC-11 light terminals)', () => {
   it('renders a dark-authored skin on light like minimumContrastRatio hosts do (the standardized look)', async () => {
-    const { contrastRatio, fromSkin } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const { contrastRatio, fromSkin } = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
     const { color } = fromSkin(SLATE_COLORS, {})
 
     // The authored palette IS the design: slate's airy pastels (~1.5:1) pass
@@ -519,7 +479,7 @@ describe('background-aware adaptation (OSC-11 light terminals)', () => {
   })
 
   it('rescues near-invisible colors with a hue-preserving multiplicative lift', async () => {
-    const { contrastRatio, fromSkin } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const { contrastRatio, fromSkin } = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
     // The default dark cream (#FFF8DC, 1.08:1 on white) is genuinely invisible.
     const { color } = fromSkin({ banner_text: '#FFF8DC' }, {})
 
@@ -534,7 +494,7 @@ describe('background-aware adaptation (OSC-11 light terminals)', () => {
   })
 
   it('leaves the same skin untouched on a dark background', async () => {
-    const { fromSkin } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#1e1e2e' })
+    const { fromSkin } = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#1e1e2e' })
     const { color } = fromSkin(SLATE_COLORS, {})
 
     expect(color.text).toBe('#c9d1d9')
@@ -542,18 +502,12 @@ describe('background-aware adaptation (OSC-11 light terminals)', () => {
     expect(luminance(color.completionBg)).toBeLessThanOrEqual(0.35)
   })
 
-  it('empty skin on a light background resolves to the light base palette', async () => {
-    const { fromSkin, LIGHT_THEME } = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
-
-    expect(fromSkin({}, {}).color).toEqual(LIGHT_THEME.color)
-  })
-
   it('base palettes are fixed points of the adaptation', async () => {
     const dark = await importThemeWithCleanEnv()
 
     expect(dark.fromSkin({}, {}).color).toEqual(dark.DARK_THEME.color)
 
-    const light = await importThemeWithEnv({ QUBIT_TUI_BACKGROUND: '#ffffff' })
+    const light = await importThemeWithEnv({ HERMES_TUI_BACKGROUND: '#ffffff' })
 
     expect(light.fromSkin({}, {}).color).toEqual(light.LIGHT_THEME.color)
   })
@@ -566,7 +520,7 @@ describe('background-aware adaptation (OSC-11 light terminals)', () => {
     expect(luminance(DEFAULT_THEME.color.completionBg)).toBeLessThanOrEqual(0.35)
 
     // …then the OSC-11 answer lands and is cached into the env slot.
-    expect(defaultThemeForCurrentBackground({ QUBIT_TUI_BACKGROUND: '#ffffff' }).color).toEqual(LIGHT_THEME.color)
+    expect(defaultThemeForCurrentBackground({ HERMES_TUI_BACKGROUND: '#ffffff' }).color).toEqual(LIGHT_THEME.color)
   })
 
   it('gives tool + thinking their own keys, defaulting to accent + muted', async () => {

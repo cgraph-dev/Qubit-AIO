@@ -11,7 +11,8 @@ def build_egress_parser(subparsers) -> None:
         "egress", help="Manage the iron-proxy egress credential-injection firewall",
         description="Manage iron-proxy, the optional TLS-intercepting egress firewall "
             "that swaps proxy tokens for real API credentials before outbound "
-            "requests leave a sandbox.  Disabled by default.")
+            "requests leave a sandbox.  Disabled by default.  See: "
+            "https://hermes-agent.nousresearch.com/docs/user-guide/egress/iron-proxy")
 
     from qubit_cli import proxy_cli as _proxy_cli
     _proxy_cli.register_cli(egress_parser)

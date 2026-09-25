@@ -120,8 +120,8 @@ export const fr: Translations = {
     starting: "Démarrage",
     startedInBackground: "Démarré en arrière-plan — consultez les journaux pour la progression",
     stopped: "Arrêté",
-    updateQubit: "Mettre à jour Qubit",
-    updatingQubit: "Mise à jour de Qubit…",
+    updateHermes: "Mettre à jour Qubit",
+    updatingHermes: "Mise à jour de Qubit…",
     waitingForOutput: "En attente de la sortie…",
   },
 
@@ -165,6 +165,10 @@ export const fr: Translations = {
     failedToDeleteSelected: "Échec de la suppression des sessions sélectionnées",
     resumeInChat: "Reprendre dans le chat",
     newChat: "Nouveau chat",
+    workspace: "espace de travail",
+    workspaceDefault: "Par défaut",
+    workspaceRescan: "Rechercher à nouveau les dépôts",
+    workspaceCustom: "Autre chemin…",
     previousPage: "Page précédente",
     nextPage: "Page suivante",
     roles: {
@@ -325,6 +329,8 @@ export const fr: Translations = {
     disableRuntime: "Désactiver",
     enableAfterInstall: "Activer après l'installation",
     enableRuntime: "Activer",
+    toggleTakesEffectAfterRestart:
+      "Enregistré — redémarrez la passerelle pour appliquer la modification.",
     forceReinstall: "Forcer la réinstallation (supprimer d'abord le dossier existant)",
     headline:
       "Découvrez, installez, activez et mettez à jour les plugins Qubit (parité avec `qubit plugins`).",
@@ -344,8 +350,8 @@ export const fr: Translations = {
     providersHint:
       "Écrit memory.provider (vide = intégré) et context.engine dans config.yaml. Prend effet à la prochaine session.",
     refreshDashboard: "Re-scanner les extensions du tableau de bord",
-    removeConfirm: "Retirer ce plugin de $QUBIT_HOME/plugins/ ?",
-    removeHint: "Seuls les plugins installés par l'utilisateur sous $QUBIT_HOME/plugins peuvent être supprimés.",
+    removeConfirm: "Retirer ce plugin de ~/.hermes/plugins/ ?",
+    removeHint: "Seuls les plugins installés par l'utilisateur sous ~/.hermes/plugins peuvent être supprimés.",
     rescanHeading: "Registre des plugins SPA",
     rescanHint: "Re-scannez après avoir ajouté des fichiers sur le disque pour que la barre latérale prenne en compte les nouveaux manifestes.",
     runtimeHeading: "Exécution de la passerelle (plugins YAML)",
@@ -367,7 +373,7 @@ export const fr: Translations = {
     all: "Toutes",
     categories: "Catégories",
     filters: "Filtres",
-    noSkills: "Aucune compétence trouvée. Les compétences sont chargées depuis ~/.qubit/skills/",
+    noSkills: "Aucune compétence trouvée. Les compétences sont chargées depuis ~/.hermes/skills/",
     noSkillsMatch: "Aucune compétence ne correspond à votre recherche ou filtre.",
     skillCount: "{count} compétence{s}",
     resultCount: "{count} résultat{s}",
@@ -381,7 +387,7 @@ export const fr: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Filtres",
     sections: "Sections",
     exportConfig: "Exporter la configuration en JSON",

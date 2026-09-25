@@ -26,12 +26,12 @@ def build_auth_parser(subparsers, *, cmd_auth: Callable) -> None:
     auth_add.add_argument("--client-id", help="OAuth client id")
     auth_add.add_argument("--scope", help="OAuth scope override")
     auth_add.add_argument(
+        "--no-browser", action="store_true", help="Do not auto-open a browser for OAuth login")
+    auth_add.add_argument(
         "--browser", action="store_true",
         help="openai-codex only: sign in with the browser authorization-code (PKCE) flow on "
              "http://localhost:1455/auth/callback instead of the default device-code flow; falls back "
              "to device code when that port is busy (config: auth.codex_login_flow)")
-    auth_add.add_argument(
-        "--no-browser", action="store_true", help="Do not auto-open a browser for OAuth login")
     auth_add.add_argument("--timeout", type=float, help="OAuth/network timeout in seconds")
     auth_add.add_argument(
         "--insecure", action="store_true", help="Disable TLS verification for OAuth login")
@@ -65,7 +65,7 @@ def build_auth_parser(subparsers, *, cmd_auth: Callable) -> None:
         "logout", help="Log out a provider and clear stored auth state")
     auth_logout.add_argument("provider", help="Provider id")
     auth_upgrade = auth_subparsers.add_parser(
-        "upgrade", help="Sign in with a Nous account, keeping your connectors")
+        "upgrade", help="Sign in with a Qubit account, keeping your connectors")
     auth_upgrade.add_argument(
         "--no-browser", action="store_true", help="Do not auto-open a browser for sign-in")
     auth_upgrade.add_argument("--timeout", type=float, help="Network timeout in seconds")

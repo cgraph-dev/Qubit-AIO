@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 import pytest
 
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 from tools.bot_desktop import browser, lease, runtime as desktop
 from tools.computer_use import tool as cu
 from tools.computer_use_tool import registry
@@ -18,11 +18,11 @@ from tools.computer_use_tool import registry
 
 @contextmanager
 def _profile(home):
-    token = set_hermes_home_override(str(home))
+    token = set_qubit_home_override(str(home))
     try:
         yield
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
 
 def _spawn(fn, name):

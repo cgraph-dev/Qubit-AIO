@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 from qubit_cli.plugins import PluginContext, PluginManager, PluginManifest

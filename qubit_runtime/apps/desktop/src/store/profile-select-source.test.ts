@@ -20,6 +20,8 @@ const resetStarmapGraph = vi.fn()
 vi.mock('@/store/gateway', () => ({
   $gateway,
   activeGatewayConnectionId,
+  // Activation now verifies the socket's route before publishing the profile.
+  activeGatewayProfileKey: () => ensureGatewayForProfile.mock.lastCall?.[0] ?? $activeGatewayProfile.get(),
   ensureGatewayForAgent,
   ensureGatewayForProfile,
   openGatewayForProfile
@@ -123,7 +125,7 @@ describe('selectProfile startup preference (#79886)', () => {
     const getConnectionConfig = vi.fn(async () => ({ mode: 'local' }))
 
     ;(globalThis as { window?: unknown }).window = {
-      qubitDesktop: {
+      hermesDesktop: {
         getConnection,
         getConnectionConfig,
         profile: { remember: rememberProfile }
@@ -188,7 +190,7 @@ describe('selectProfile startup preference (#79886)', () => {
     const getConnectionConfig = vi.fn(async () => ({ mode: 'local' }))
 
     ;(globalThis as { window?: unknown }).window = {
-      qubitDesktop: {
+      hermesDesktop: {
         getConnection,
         getConnectionConfig,
         profile: { remember: rememberProfile }
@@ -209,7 +211,7 @@ describe('selectProfile startup preference (#79886)', () => {
     const getConnectionConfig = vi.fn(async () => ({ mode: 'ssh' }))
 
     ;(globalThis as { window?: unknown }).window = {
-      qubitDesktop: {
+      hermesDesktop: {
         getConnection,
         getConnectionConfig,
         profile: { remember: rememberProfile }

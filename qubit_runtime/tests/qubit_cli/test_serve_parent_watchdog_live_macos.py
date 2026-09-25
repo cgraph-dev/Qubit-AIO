@@ -26,7 +26,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-pytestmark = pytest.mark.macos_only
+pytestmark = pytest.mark.platforms("macos")
 
 
 def _lstart(pid: int, tz: str) -> str:
@@ -78,12 +78,12 @@ def test_live_backend_survives_timezone_drifted_parent_marker(tmp_path):
         env.update(
             TZ=backend_tz,
             QUBIT_HOME=str(home),
-            QUBIT_SERVE_HEADLESS="1",
+            HERMES_SERVE_HEADLESS="1",
             PYTHONUNBUFFERED="1",
-            QUBIT_PARENT_PID=str(parent.pid),
-            QUBIT_PARENT_START_MARKER=drifted_marker,
-            QUBIT_PARENT_NONCE="nonce-95693",
-            QUBIT_SERVE_WATCHDOG_POLL_S="0.5",
+            HERMES_PARENT_PID=str(parent.pid),
+            HERMES_PARENT_START_MARKER=drifted_marker,
+            HERMES_PARENT_NONCE="nonce-95693",
+            HERMES_SERVE_WATCHDOG_POLL_S="0.5",
         )
         env.pop("HERMES_DESKTOP", None)
         code = (

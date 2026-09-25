@@ -212,16 +212,16 @@ def test_background_review_whitelist_includes_configured_extra_tools(
     thread-local whitelist.  This config hook lets profiles grant a narrowly
     scoped, human-gated proposal tool without enabling unrelated side effects.
     """
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text(
+    qubit_home = tmp_path / ".hermes"
+    qubit_home.mkdir()
+    (qubit_home / "config.yaml").write_text(
         "auxiliary:\n"
         "  background_review:\n"
         "    extra_tools:\n"
         "      - propose_shared_memory\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
     import run_agent
     from qubit_cli import config as config_module

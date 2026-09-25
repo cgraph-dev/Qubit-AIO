@@ -1,5 +1,5 @@
 import { asText, normalize } from '@/lib/text'
-import type { ConfigFieldSchema, QubitConfigRecord, ToolsetInfo } from '@/types/hermes'
+import type { ConfigFieldSchema, HermesConfigRecord, ToolsetInfo } from '@/types/hermes'
 
 import { BUILTIN_PERSONALITIES, ENUM_OPTIONS, PROVIDER_GROUPS, SECTIONS } from './constants'
 
@@ -79,7 +79,7 @@ function safeSet(target: Record<string, unknown>, key: string, value: unknown): 
   })
 }
 
-export function getNested(obj: QubitConfigRecord, path: string): unknown {
+export function getNested(obj: HermesConfigRecord, path: string): unknown {
   let cur: unknown = obj
 
   for (const part of configPathParts(path)) {
@@ -113,8 +113,8 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * now-stale value. `PUT /api/config` deep-merges onto disk, so an omitted
  * key keeps whatever is currently there.
  */
-export function diffConfig(base: QubitConfigRecord, next: QubitConfigRecord): QubitConfigRecord {
-  const patch: QubitConfigRecord = {}
+export function diffConfig(base: HermesConfigRecord, next: HermesConfigRecord): HermesConfigRecord {
+  const patch: HermesConfigRecord = {}
 
   for (const key of Object.keys(next)) {
     const baseValue = base[key]
@@ -150,7 +150,7 @@ export function diffConfig(base: QubitConfigRecord, next: QubitConfigRecord): Qu
  * use this to confirm the destructive transition before applying it. Any edit
  * that keeps at least one toolset — or that never had one — returns false.
  */
-export function clearsEnabledToolsets(prev: QubitConfigRecord, next: QubitConfigRecord): boolean {
+export function clearsEnabledToolsets(prev: HermesConfigRecord, next: HermesConfigRecord): boolean {
   const prevToolsets = getNested(prev, 'toolsets')
   const nextToolsets = getNested(next, 'toolsets')
   const hadToolsets = Array.isArray(prevToolsets) && prevToolsets.length > 0
@@ -161,7 +161,7 @@ export function clearsEnabledToolsets(prev: QubitConfigRecord, next: QubitConfig
 
 // Voice renders only fields for the selected TTS/STT provider. Search and the
 // page share this rule so every indexed field can actually mount when opened.
-export function voiceFieldVisible(key: string, config: QubitConfigRecord): boolean {
+export function voiceFieldVisible(key: string, config: HermesConfigRecord): boolean {
   const match = /^(tts|stt)\.([^.]+)\./.exec(key)
 
   if (!match) {
@@ -174,7 +174,12 @@ export function voiceFieldVisible(key: string, config: QubitConfigRecord): boole
     return false
   }
 
-  return provider === String(getNested(config, `${domain}.provider`) ?? '')
+  const selected = String(getNested(config, `${domain}.provider`) ?? '')
+  // Backend defaults when the key is unset: TTS → edge, STT → local.
+  // An empty string used to hide every nested model field.
+  const fallback = domain === 'tts' ? 'edge' : 'local'
+
+  return provider === (selected || fallback)
 }
 
 export function inferFieldSchema(value: unknown): ConfigFieldSchema {
@@ -196,7 +201,7 @@ export function inferFieldSchema(value: unknown): ConfigFieldSchema {
 // Backend schema omits some declared keys; config presence is the availability signal.
 export function sectionFieldEntries(
   schema: Record<string, ConfigFieldSchema>,
-  config: QubitConfigRecord
+  config: HermesConfigRecord
 ): Map<string, [string, ConfigFieldSchema][]> {
   return new Map(
     SECTIONS.map(s => [
@@ -211,7 +216,7 @@ export function sectionFieldEntries(
   )
 }
 
-export function setNested(obj: QubitConfigRecord, path: string, value: unknown): QubitConfigRecord {
+export function setNested(obj: HermesConfigRecord, path: string, value: unknown): HermesConfigRecord {
   const clone = structuredClone(obj)
   const parts = configPathParts(path)
   let cur: Record<string, unknown> = clone
@@ -237,7 +242,7 @@ export function setNested(obj: QubitConfigRecord, path: string, value: unknown):
   return clone
 }
 
-function personalityOptions(config: QubitConfigRecord): string[] {
+function personalityOptions(config: HermesConfigRecord): string[] {
   const custom = getNested(config, 'agent.personalities')
 
   const customNames =
@@ -318,7 +323,7 @@ function isCommandProvider(value: unknown): boolean {
 // name the runtime would actually resolve as a command provider — built-ins are
 // excluded case-insensitively, matching the runtime's `provider.lower().strip()`
 // guard, so a ``providers.EDGE`` command block is not offered.
-function commandProviderNames(config: QubitConfigRecord, section: 'tts' | 'stt'): string[] {
+function commandProviderNames(config: HermesConfigRecord, section: 'tts' | 'stt'): string[] {
   const builtins = section === 'tts' ? BUILTIN_TTS_PROVIDERS : BUILTIN_STT_PROVIDERS
   const names = new Set<string>()
 
@@ -348,7 +353,7 @@ const OPENAI_TTS1_VOICES = new Set(['alloy', 'ash', 'coral', 'echo', 'fable', 'n
 export function enumOptionsFor(
   key: string,
   value: unknown,
-  config: QubitConfigRecord,
+  config: HermesConfigRecord,
   dynamicOptions?: string[]
 ): string[] | undefined {
   let opts = dynamicOptions ?? (key === 'display.personality' ? personalityOptions(config) : ENUM_OPTIONS[key])

@@ -40,8 +40,8 @@ def converged_host(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     monkeypatch.delenv("GATEWAY_MULTIPLEX_PROFILES", raising=False)
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
-    assert str(qubit_constants.get_default_hermes_root()).startswith(str(tmp_path))
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
+    assert str(qubit_constants.get_default_qubit_root()).startswith(str(tmp_path))
 
     served = ["default", "coder", "ops"]
     pid = os.getpid()

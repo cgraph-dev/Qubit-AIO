@@ -28,13 +28,15 @@ def _get_allowed() -> set[str]:
         return val
 
 
-# Cache for the config-based allowlist (loaded once per process).
-_config_passthrough: frozenset[str] | None = None
+# Config-based allowlist, keyed by Qubit home: under gateway.multiplex_profiles one process serves
+# many profiles, and a single slot would let the first profile's operator allowlist decide which env
+# vars tunnel into every other profile's sandbox children.
+_config_passthrough: dict[str, frozenset[str]] = {}
 
 
 def _is_qubit_provider_credential(name: str) -> bool:
     """True if ``name`` is a Qubit-managed provider credential per
-    ``_HERMES_PROVIDER_ENV_BLOCKLIST`` or a dynamic Qubit-internal secret
+    ``_QUBIT_PROVIDER_ENV_BLOCKLIST`` or a dynamic Qubit-internal secret
     (AUXILIARY_*_API_KEY / _BASE_URL, GATEWAY_RELAY_*). Skill-declared
     ``required_environment_variables`` must not override this — that was the
     GHSA-rhgp-j443-p4rf bypass (a skill registered ``OPENAI_API_KEY`` and received it
@@ -42,13 +44,16 @@ def _is_qubit_provider_credential(name: str) -> bool:
     registerable. Fails closed when the blocklist cannot be imported."""
     try:
         from tools.environments.local_env_policy import (
-            _QUBIT_PROVIDER_ENV_BLOCKLIST, _is_qubit_internal_secret)
+            _is_qubit_internal_secret, _is_provider_env_blocklisted)
     except Exception as e:
         logger.warning(
             "env passthrough: provider credential blocklist import failed; "
             "failing closed and refusing passthrough registration for %r: %s", name, e)
         return True
-    return _is_qubit_internal_secret(name) or name in _QUBIT_PROVIDER_ENV_BLOCKLIST
+    # Case-folded membership too: the remote-exec env builder resolves each
+    # registered name via os.getenv(), which is case-insensitive on Windows, so
+    # ``openai_api_key`` would tunnel the real OPENAI_API_KEY into children.
+    return _is_qubit_internal_secret(name) or _is_provider_env_blocklisted(name)
 
 
 def register_env_passthrough(var_names: Iterable[str]) -> None:
@@ -58,7 +63,7 @@ def register_env_passthrough(var_names: Iterable[str]) -> None:
     (web_search, web_extract, …); third-party keys pass normally."""
     for name in _accepted((n.strip() for n in var_names), (
         "env passthrough: refusing to register Qubit provider "
-        "credential %r (blocked by _HERMES_PROVIDER_ENV_BLOCKLIST). "
+        "credential %r (blocked by _QUBIT_PROVIDER_ENV_BLOCKLIST). "
         "Skills must not override the execute_code sandbox's "
         "credential scrubbing; see GHSA-rhgp-j443-p4rf."
     )):
@@ -82,9 +87,16 @@ def _load_config_passthrough() -> frozenset[str]:
     """Load ``tools.env_passthrough`` from config.yaml (cached). Same credential
     filter as register_env_passthrough: operator config must not tunnel provider
     credentials into sandbox children either (GHSA-rhgp-j443-p4rf)."""
-    global _config_passthrough
-    if _config_passthrough is not None:
-        return _config_passthrough
+    from qubit_constants import qubit_home_key
+
+    try:
+        home_key = qubit_home_key()
+    except (RuntimeError, OSError):
+        # No resolvable home (stripped environ in a sandbox child): nothing to scope by.
+        home_key = ""
+    cached = _config_passthrough.get(home_key)
+    if cached is not None:
+        return cached
     result: set[str] = set()
     try:
         passthrough = cfg_get(read_raw_config(), "terminal", "env_passthrough")
@@ -92,15 +104,15 @@ def _load_config_passthrough() -> frozenset[str]:
         result.update(_accepted((i.strip() for i in items if isinstance(i, str)), (
             "env passthrough: refusing to register Qubit "
             "provider credential %r from config.yaml (blocked "
-            "by _HERMES_PROVIDER_ENV_BLOCKLIST). Operator "
+            "by _QUBIT_PROVIDER_ENV_BLOCKLIST). Operator "
             "configuration must not override the execute_code "
             "sandbox's credential scrubbing; see "
             "GHSA-rhgp-j443-p4rf."
         )))
     except Exception as e:
         logger.debug("Could not read tools.env_passthrough from config: %s", e)
-    _config_passthrough = frozenset(result)
-    return _config_passthrough
+    _config_passthrough[home_key] = frozenset(result)
+    return _config_passthrough[home_key]
 
 
 def is_env_passthrough(var_name: str) -> bool:
@@ -130,6 +142,29 @@ def resolve_passthrough_value(name: str, fallback: str | None = None) -> str | N
     if current_secret_scope() is None:
         return get_secret(name) if multiplex_active else fallback
     return get_secret(name, None if multiplex_active else fallback)
+
+
+def scoped_passthrough_additions(present: Iterable[str]) -> dict[str, str]:
+    """Declared passthrough names the bound profile secret scope supplies but the env being
+    filtered (*present*) lacks. A routed profile's ``.env`` and hydrated sources never enter
+    ``os.environ`` (``load_qubit_dotenv`` skips the process-global load for a routed home), so a
+    name-by-name filter over the process env can only forward a declared name the LAUNCH profile
+    also happens to define — the served profile's own value has no way in (#114209). Reads the
+    bound scope alone: never ``os.environ``, never another profile. Empty without a scope, so
+    single-profile spawns are byte-identical."""
+    from agent.secret_scope import _is_global_env, current_secret_scope
+    scope = current_secret_scope()
+    if not scope:
+        return {}
+    present = set(present)
+    additions: dict[str, str] = {}
+    for name in get_all_passthrough():
+        if name in present or _is_global_env(name):
+            continue
+        value = scope.get(name)
+        if value is not None:
+            additions[name] = value
+    return additions
 
 
 def clear_env_passthrough() -> None:

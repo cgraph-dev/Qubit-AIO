@@ -117,9 +117,9 @@ _GATEWAY_CHILD = textwrap.dedent(
     """
     import gc, json, os, sys
     from pathlib import Path
-    repo, hermes_home, db_path = sys.argv[1], sys.argv[2], sys.argv[3]
+    repo, qubit_home, db_path = sys.argv[1], sys.argv[2], sys.argv[3]
     sys.path.insert(0, repo)
-    os.environ["QUBIT_HOME"] = hermes_home
+    os.environ["QUBIT_HOME"] = qubit_home
     import qubit_state_wal
     if qubit_state_wal.is_sqlite_wal_reset_vulnerable():
         qubit_state_wal.is_sqlite_wal_reset_vulnerable = lambda version_info=None: False
@@ -229,13 +229,13 @@ def gateway_writer(tmp_path: Path):
 
     The child is torn down (stdin closed, then wait → terminate → kill) on exit from the block."""
     repo_root = os.path.dirname(os.path.abspath(qubit_state.__file__))
-    hermes_home = tmp_path / "home"
-    hermes_home.mkdir()
+    qubit_home = tmp_path / "home"
+    qubit_home.mkdir()
     path = tmp_path / "state.db"
     stderr_path = tmp_path / "writer-stderr.log"
     with stderr_path.open("w", encoding="utf-8") as stderr:
         proc = subprocess.Popen(
-            [sys.executable, "-c", _GATEWAY_CHILD, repo_root, str(hermes_home), str(path)],
+            [sys.executable, "-c", _GATEWAY_CHILD, repo_root, str(qubit_home), str(path)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
             text=True, encoding="utf-8", bufsize=1,
             env={**os.environ, "HERMES_STATE_DB_GUARD_BYPASS": "1"},

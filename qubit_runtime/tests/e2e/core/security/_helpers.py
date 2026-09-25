@@ -77,13 +77,13 @@ def hermetic_env(home: Path, extra: dict[str, str] | None = None) -> dict[str, s
     return env
 
 
-def write_home(hermes_home: Path, base_url: str, *, api_key: str, config: str = "",
+def write_home(qubit_home: Path, base_url: str, *, api_key: str, config: str = "",
                env: dict[str, str] | None = None) -> Path:
     """config.yaml routing the model to the fake provider + .env with the (canary) key.
 
     ``config`` is appended verbatim (YAML top-level sections)."""
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "config.yaml").write_text(
+    qubit_home.mkdir(parents=True, exist_ok=True)
+    (qubit_home / "config.yaml").write_text(
         "model:\n"
         "  provider: custom\n"
         f"  base_url: {base_url}\n"
@@ -100,8 +100,8 @@ def write_home(hermes_home: Path, base_url: str, *, api_key: str, config: str = 
         encoding="utf-8",
     )
     lines = {"OPENAI_API_KEY": api_key, **(env or {})}
-    (hermes_home / ".env").write_text("".join(f"{k}={v}\n" for k, v in lines.items()), encoding="utf-8")
-    return hermes_home
+    (qubit_home / ".env").write_text("".join(f"{k}={v}\n" for k, v in lines.items()), encoding="utf-8")
+    return qubit_home
 
 
 def free_port() -> int:

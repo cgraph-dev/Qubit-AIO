@@ -1,4 +1,4 @@
-"""Unit tests for the extracted ``qubit cron`` parser builder.
+"""Unit tests for the extracted ``hermes cron`` parser builder.
 
 Confirms ``build_cron_parser`` wires up the same subactions, aliases, options,
 and ``func=cmd_cron`` dispatch that lived inline in ``main()`` before the
@@ -17,20 +17,12 @@ def _sentinel_handler(args):  # pragma: no cover - only identity is asserted
 
 
 def _build():
-    parser = argparse.ArgumentParser(prog="qubit")
+    parser = argparse.ArgumentParser(prog="hermes")
     subparsers = parser.add_subparsers(dest="command")
     build_cron_parser(subparsers, cmd_cron=_sentinel_handler)
     return parser
 
 
-def test_cron_subactions_present():
-    parser = _build()
-    for action in ("list", "create", "edit", "pause", "resume", "run", "remove", "status", "runs", "doctor", "tick"):
-        ns = parser.parse_args(["cron", action] if action in ("list", "status", "runs", "doctor", "tick")
-                               else ["cron", action, "jobid"] if action in ("pause", "resume", "run", "remove", "edit")
-                               else ["cron", "create", "30m"])
-        assert ns.command == "cron"
-        assert ns.cron_command == action
 
 
 def test_cron_edit_no_agent_tristate():

@@ -10,7 +10,7 @@ from qubit_cli.cli_loops_mixin import CLILoopsMixin
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     from pathlib import Path
     home = tmp_path / ".hermes"; home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -29,7 +29,7 @@ class _Cli(CLILoopsMixin):
         return self._mgr
 
 
-def test_idle_hook_queues_the_continuation_when_a_timed_barrier_has_elapsed(hermes_home):
+def test_idle_hook_queues_the_continuation_when_a_timed_barrier_has_elapsed(qubit_home):
     mgr = goals.GoalManager(session_id="resume-idle")
     mgr.set("finish the thing")
     mgr.wait_for_seconds(1, reason="cooldown")
@@ -46,7 +46,7 @@ def test_idle_hook_queues_the_continuation_when_a_timed_barrier_has_elapsed(herm
     assert mgr.state.waiting_until == 0.0            # barrier cleared
 
 
-def test_idle_hook_is_a_no_op_for_an_unparked_or_inactive_goal(hermes_home):
+def test_idle_hook_is_a_no_op_for_an_unparked_or_inactive_goal(qubit_home):
     mgr = goals.GoalManager(session_id="resume-noop")
     mgr.set("g")
     cli = _Cli(mgr)

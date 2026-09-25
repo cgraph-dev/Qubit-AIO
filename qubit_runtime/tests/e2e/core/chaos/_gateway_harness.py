@@ -72,13 +72,13 @@ class GatewayProc:
     extra_config: str = ""
 
     def __post_init__(self) -> None:
-        self.home, self.hermes_home = write_chaos_home(
+        self.home, self.qubit_home = write_chaos_home(
             self.root, self.base_url, extra=gateway_extra_config() + self.extra_config, **self.cfg)
-        plugin_dir = self.hermes_home / "plugins" / fake_platform.PLUGIN_DIR_NAME
+        plugin_dir = self.qubit_home / "plugins" / fake_platform.PLUGIN_DIR_NAME
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "plugin.yaml").write_text(PLUGIN_MANIFEST, encoding="utf-8")
         (plugin_dir / "__init__.py").write_text(PLUGIN_INIT, encoding="utf-8")
-        self.state_db = self.hermes_home / "state.db"
+        self.state_db = self.qubit_home / "state.db"
         self.log_path = self.root / "gateway.log"
         self.events: list[Event] = []
         self._cond = threading.Condition()
@@ -97,7 +97,7 @@ class GatewayProc:
         listener.listen(1)
         listener.settimeout(1.0)
         self._listener = listener
-        env = hermetic_env(self.home, self.hermes_home, self.tag)
+        env = hermetic_env(self.home, self.qubit_home, self.tag)
         for key in ("NOTIFY_SOCKET", "INVOCATION_ID", "WATCHDOG_USEC", "WATCHDOG_PID", "XDG_STATE_HOME",
                     "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
             env.pop(key, None)

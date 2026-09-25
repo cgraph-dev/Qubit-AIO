@@ -1,11 +1,11 @@
 /**
- * Qubit skin → DesktopTheme converter.
+ * Hermes skin → DesktopTheme converter.
  *
  * A "skin" is the CLI/TUI theme unit: a YAML file in `$QUBIT_HOME/skins/` (or a
  * built-in) resolved by `qubit_cli/skin_engine.py` and pushed to every surface
  * over JSON-RPC (`gateway.ready`, `skin.changed`, `config.get skin`). This is the
  * one place the desktop turns that CLI-shaped palette into a `DesktopTheme`, so a
- * skin Qubit authors from a prompt lights up all three surfaces from one file.
+ * skin Hermes authors from a prompt lights up all three surfaces from one file.
  *
  * Skins carry terminal-oriented keys (banner/status/completion). We seed the
  * desktop model from the load-bearing few (background, foreground, accent, error)
@@ -15,9 +15,10 @@
  * still picks `.dark` from the real background luminance.
  */
 
-import type { QubitSkin, SkinColors } from '@hermes/shared/skin'
+import { ensureContrast, mix } from '@hermes/shared/color'
+import type { HermesSkin, SkinColors } from '@hermes/shared/skin'
 
-import { ensureContrast, luminance, mix, normalizeHex, readableOn } from './color'
+import { luminance, normalizeHex, readableInk } from './color'
 import type { DesktopTheme, DesktopThemeColors } from './types'
 
 // The accent labels the sidebar in small uppercase text, so it must clear WCAG AA
@@ -43,7 +44,7 @@ const titleCase = (name: string): string => name.charAt(0).toUpperCase() + name.
  * Convert a resolved skin into a `DesktopTheme`, or null when it carries no
  * usable colors (so a broken/empty skin never registers junk).
  */
-export function skinToDesktopTheme(skin: QubitSkin): DesktopTheme | null {
+export function skinToDesktopTheme(skin: HermesSkin): DesktopTheme | null {
   const name = (skin.name ?? '').trim()
   const colors = skin.colors
 
@@ -86,7 +87,7 @@ export function skinToDesktopTheme(skin: QubitSkin): DesktopTheme | null {
     popover: mix(background, foreground, dark ? 0.08 : 0.05),
     popoverForeground: foreground,
     primary: accent,
-    primaryForeground: readableOn(accent),
+    primaryForeground: readableInk(accent),
     secondary: mix(accent, background, dark ? 0.72 : 0.86),
     secondaryForeground: foreground,
     accent: mix(accent, background, dark ? 0.82 : 0.88),
@@ -95,10 +96,10 @@ export function skinToDesktopTheme(skin: QubitSkin): DesktopTheme | null {
     input: pick(colors, ['completion_menu_bg'], background) ?? mix(background, foreground, dark ? 0.1 : 0.06),
     ring: accent,
     midground: accent,
-    midgroundForeground: readableOn(accent),
+    midgroundForeground: readableInk(accent),
     composerRing: accent,
     destructive,
-    destructiveForeground: readableOn(destructive),
+    destructiveForeground: readableInk(destructive),
     sidebarBackground: sidebar,
     sidebarBorder: border,
     userBubble: mix(background, accent, dark ? 0.18 : 0.12),
@@ -108,7 +109,7 @@ export function skinToDesktopTheme(skin: QubitSkin): DesktopTheme | null {
   return {
     name,
     label: titleCase(name),
-    description: 'Qubit skin',
+    description: 'Hermes skin',
     // Single palette in both slots: a skin is one-mode, so the light/dark toggle
     // shouldn't invert it. renderedModeFor still paints `.dark` from luminance.
     colors: palette,

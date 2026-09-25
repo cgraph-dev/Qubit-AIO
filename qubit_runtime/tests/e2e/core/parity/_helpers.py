@@ -30,7 +30,7 @@ from typing import Any, Callable, Iterable
 
 import qubit_yaml as yaml
 
-from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_qubit_home
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_MCP_SERVER = Path(__file__).with_name("fixture_mcp_server.py")
@@ -69,7 +69,7 @@ class ParityHome:
 
     root: Path
     home: Path
-    hermes_home: Path
+    qubit_home: Path
     project: Path
     markers: Path
     pid_log: Path
@@ -84,11 +84,11 @@ class ParityHome:
         # A tmp_path under ``~/.hermes/cache/scratch`` (TMPDIR when Hermes itself runs the suite)
         # is fine: the child's HOME is the fixture home, so its ``~/.hermes`` never resolves there.
         real_root = Path(pwd.getpwuid(os.getuid()).pw_dir, ".hermes").resolve()
-        fixture = self.hermes_home.resolve()
+        fixture = self.qubit_home.resolve()
         assert fixture != real_root and fixture.parent != real_root / "profiles", (
-            f"fixture QUBIT_HOME {self.hermes_home} is the real install's live home")
+            f"fixture QUBIT_HOME {self.qubit_home} is the real install's live home")
         assert fixture == (self.home / ".hermes").resolve(), (
-            f"fixture QUBIT_HOME {self.hermes_home} is not <fixture HOME>/.hermes")
+            f"fixture QUBIT_HOME {self.qubit_home} is not <fixture HOME>/.hermes")
         # Allowlist, not denylist: the runner may itself be a Hermes process whose
         # TERMINAL_CWD / HERMES_* / credential env would silently reroute the child.
         env = {
@@ -97,7 +97,7 @@ class ParityHome:
         }
         env.update({
             "HOME": str(self.home),
-            "QUBIT_HOME": str(self.hermes_home),
+            "QUBIT_HOME": str(self.qubit_home),
             "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1",
             "NO_COLOR": "1",
@@ -115,7 +115,7 @@ class ParityHome:
 
     def update_config(self, mutate: Callable[[dict], None]) -> None:
         """Apply ``mutate`` to config.yaml (for surfaces with a documented config-only channel)."""
-        path = self.hermes_home / "config.yaml"
+        path = self.qubit_home / "config.yaml"
         cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
         mutate(cfg)
         path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
@@ -129,22 +129,22 @@ def build_parity_home(root: Path, base_url: str, *, grandchild: bool = True,
                       death_tool: bool = False, mcp_timeout: int = 60) -> ParityHome:
     """Write the full fixture home under ``root`` (a tmp_path)."""
     home = root / "home"
-    hermes_home = home / ".hermes"
+    qubit_home = home / ".hermes"
     project = root / "project"
     markers = root / "markers"
-    for d in (hermes_home, project, markers):
+    for d in (qubit_home, project, markers):
         d.mkdir(parents=True, exist_ok=True)
     tag = uuid.uuid4().hex
     c = {name: f"{name.upper()}-{uuid.uuid4().hex[:12]}" for name in (
         "context", "skill", "memory", "shell_hook", "plugin_hook", "mcp")}
-    ph = ParityHome(root=root, home=home, hermes_home=hermes_home, project=project,
+    ph = ParityHome(root=root, home=home, qubit_home=qubit_home, project=project,
                     markers=markers, pid_log=root / "mcp_pids.log", tag=tag, canaries=c)
 
-    write_hermes_home(hermes_home, base_url)
-    cfg = yaml.safe_load((hermes_home / "config.yaml").read_text(encoding="utf-8"))
+    write_qubit_home(qubit_home, base_url)
+    cfg = yaml.safe_load((qubit_home / "config.yaml").read_text(encoding="utf-8"))
     cfg["agent"]["disabled_toolsets"] = [DISABLED_TOOLSET]
     cfg["hooks"] = {"pre_llm_call": [{
-        "command": f"{sys.executable} {hermes_home / 'agent-hooks' / 'shell_hook.py'}",
+        "command": f"{sys.executable} {qubit_home / 'agent-hooks' / 'shell_hook.py'}",
         "timeout": 30,
     }]}
     cfg["hooks_auto_accept"] = True
@@ -175,9 +175,9 @@ def build_parity_home(root: Path, base_url: str, *, grandchild: bool = True,
     # Keep turns hermetic and short: no title/aux model chatter decides anything here.
     cfg.setdefault("display", {})["compact"] = True
     cfg["updates"] = {"check": False}  # offline: no GitHub round-trip or git lazy fetch
-    (hermes_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    (qubit_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
-    hooks_dir = hermes_home / "agent-hooks"
+    hooks_dir = qubit_home / "agent-hooks"
     hooks_dir.mkdir()
     (hooks_dir / "shell_hook.py").write_text(
         "import json, os, sys\n"
@@ -189,7 +189,7 @@ def build_parity_home(root: Path, base_url: str, *, grandchild: bool = True,
         encoding="utf-8",
     )
 
-    plugin_dir = hermes_home / "plugins" / PLUGIN_NAME
+    plugin_dir = qubit_home / "plugins" / PLUGIN_NAME
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "plugin.yaml").write_text(
         f"name: {PLUGIN_NAME}\nversion: 1.0.0\ndescription: parity suite marker plugin\n",
@@ -207,7 +207,7 @@ def build_parity_home(root: Path, base_url: str, *, grandchild: bool = True,
         encoding="utf-8",
     )
 
-    skill_dir = hermes_home / "skills" / "parity-skill"
+    skill_dir = qubit_home / "skills" / "parity-skill"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
         "---\nname: parity-skill\n"
@@ -216,7 +216,7 @@ def build_parity_home(root: Path, base_url: str, *, grandchild: bool = True,
         encoding="utf-8",
     )
 
-    mem_dir = hermes_home / "memories"
+    mem_dir = qubit_home / "memories"
     mem_dir.mkdir()
     (mem_dir / "MEMORY.md").write_text(f"The parity memory canary is {c['memory']}.", encoding="utf-8")
 

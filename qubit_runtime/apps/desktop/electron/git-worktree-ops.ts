@@ -208,9 +208,9 @@ async function ensureGitRepo(gitBin, dir) {
       gitBin,
       [
         '-c',
-        'user.email=qubit@localhost',
+        'user.email=hermes@localhost',
         '-c',
-        'user.name=Qubit',
+        'user.name=Hermes',
         'commit',
         '--allow-empty',
         '-m',
@@ -298,7 +298,7 @@ async function addWorktree(repoPath, options, gitBin) {
   }
 
   const slug = slugify(opts.name || `work-${Date.now().toString(36)}`)
-  const branch = sanitizeBranch(opts.branch) || `qubit/${slug}`
+  const branch = sanitizeBranch(opts.branch) || `hermes/${slug}`
   const dir = uniqueDir(path.join(root, '.worktrees', slug))
 
   const args = ['worktree', 'add', '-b', branch, dir]
@@ -381,10 +381,20 @@ async function listBranches(repoPath, gitBin) {
   }
 
   try {
-    const [localOut, remoteOut] = await Promise.all([
+    // Both children own cwd handles: a failed probe must still wait for its
+    // sibling before the caller may remove or switch the repository directory.
+    const probes = await Promise.allSettled([
       runGit(gitBin, ['for-each-ref', '--format=%(refname:short)', '--sort=-committerdate', 'refs/heads'], resolved),
       runGit(gitBin, ['for-each-ref', '--format=%(refname:short)', '--sort=-committerdate', 'refs/remotes'], resolved)
     ])
+
+    const [local, remote] = probes
+
+    if (local.status === 'rejected' || remote.status === 'rejected') {
+      return []
+    }
+
+    const [localOut, remoteOut] = [local.value, remote.value]
 
     const trees = await listWorktrees(resolved, gitBin)
     const pathByBranch = new Map(trees.filter(tree => tree.branch).map(tree => [tree.branch, tree.path]))

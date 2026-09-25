@@ -15,7 +15,7 @@ import pytest
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     """Temp QUBIT_HOME + runtime dir so no test touches a real profile."""
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HERMES_RUNTIME_DIR", str(tmp_path / "runtime"))
@@ -52,7 +52,7 @@ def _run_cli_main(argv):
         sys.argv = old_argv
 
 
-def test_cli_main_runs_boot_bootstrap_once(hermes_home, boot_probe, capsys):
+def test_cli_main_runs_boot_bootstrap_once(qubit_home, boot_probe, capsys):
     _run_cli_main(["hermes", "--version"])
 
     assert len(boot_probe) == 1, "every dispatch through main() reaches the registry"
@@ -62,7 +62,7 @@ def test_cli_main_runs_boot_bootstrap_once(hermes_home, boot_probe, capsys):
     assert boot_probe[0] == str(install_root())
 
 
-def test_cli_main_skips_boot_bootstrap_during_update(hermes_home, boot_probe):
+def test_cli_main_skips_boot_bootstrap_during_update(qubit_home, boot_probe):
     _run_cli_main(["hermes", "update", "--help"])
 
     assert boot_probe == [], "the update flow owns its own maintenance pass"

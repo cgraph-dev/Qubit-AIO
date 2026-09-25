@@ -17,11 +17,11 @@ def test_run_conversation_exports_session_and_turn_cwds(tmp_path, monkeypatch):
     from run_agent import AIAgent
     from tools.terminal_tool import clear_session_cwd, record_session_cwd
 
-    hermes_home = tmp_path / "hermes-home"
+    qubit_home = tmp_path / "hermes-home"
     session_cwd = tmp_path / "session"
     turn_cwd = tmp_path / "task"
     atof_dir = tmp_path / "atof"
-    for directory in (hermes_home, session_cwd, turn_cwd, atof_dir):
+    for directory in (qubit_home, session_cwd, turn_cwd, atof_dir):
         directory.mkdir()
 
     config = tmp_path / "plugins.toml"
@@ -48,7 +48,7 @@ mode = "overwrite"
     )
     session_id = "cwd-e2e-session"
     task_id = "cwd-e2e-task"
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setenv(relay_runtime.RELAY_PLUGINS_CONFIG_ENV, str(config))
     monkeypatch.chdir(session_cwd)
     monkeypatch.setattr(

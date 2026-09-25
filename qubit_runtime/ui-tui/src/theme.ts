@@ -1,6 +1,7 @@
-import type { SkinBranding, SkinColors } from '@qubit/shared/skin'
+import { contrastRatio, ensureContrast, mix, parseColor, relativeLuminance, toHex } from '@hermes/shared/color'
+import type { SkinBranding, SkinColors } from '@hermes/shared/skin'
 
-import { desaturate, grayOf, liftForContrast, mix, parseColor, relativeLuminance, toHex } from './lib/color.js'
+import { desaturate, grayOf, liftForContrast } from './lib/color.js'
 
 export interface ThemeColors {
   primary: string
@@ -68,12 +69,13 @@ export interface Theme {
 
 // ── Color math ───────────────────────────────────────────────────────
 //
-// All generic color computation lives in lib/color.ts (the color primitive);
+// Generic color computation lives in @hermes/shared/color (the primitives,
+// shared with the desktop) and lib/color.ts (TUI-only lifts and re-toning);
 // this file keeps only the ANSI-256 remapping that is specific to the
 // limited-palette Apple Terminal path. contrastRatio/ensureContrast are
 // re-exported for existing consumers (tests, /theme-info).
 
-export { contrastRatio, ensureContrast } from './lib/color.js'
+export { contrastRatio, ensureContrast }
 
 const XTERM_6_LEVELS = [0, 95, 135, 175, 215, 255] as const
 const ANSI_LIGHT_MAX_LUMINANCE = 0.72
@@ -149,8 +151,8 @@ function circularDistance(a: number, b: number): number {
   return Math.min(distance, 1 - distance)
 }
 
-// Mirrors @qubit/ink's colorize.ts. Keep local: app code compiles from
-// ui-tui/src, while @qubit/ink is bundled separately from packages/.
+// Mirrors @hermes/ink's colorize.ts. Keep local: app code compiles from
+// ui-tui/src, while @hermes/ink is bundled separately from packages/.
 function richEightBitColorNumber(red: number, green: number, blue: number): number {
   const [, saturation, lightness] = rgbToHsl(red, green, blue)
 
@@ -250,11 +252,11 @@ export function themeToneHex(tone: string): string {
 // ── Defaults ─────────────────────────────────────────────────────────
 
 const BRAND: ThemeBrand = {
-  name: 'Qubit',
-  icon: '◆',
+  name: 'Qubit Agent',
+  icon: '☤',
   prompt: '❯',
   welcome: 'Type your message or /help for commands.',
-  goodbye: 'Goodbye!',
+  goodbye: 'Goodbye! ☤',
   tool: '┊',
   helpHeader: '(^_^)? Commands'
 }
@@ -544,7 +546,7 @@ function adaptColorsToBackground(colors: ThemeColors, isLight: boolean, base: Th
  *  answer when known (cached in HERMES_TUI_BACKGROUND), else the mode's
  *  assumed pole. */
 function referenceBackground(isLight: boolean, env: NodeJS.ProcessEnv = process.env): string {
-  const cached = (env.QUBIT_TUI_BACKGROUND ?? '').trim()
+  const cached = (env.HERMES_TUI_BACKGROUND ?? '').trim()
 
   if (cached && backgroundLuminance(cached) !== null) {
     return cached.startsWith('#') ? cached : `#${cached}`
@@ -705,7 +707,7 @@ export function detectLightMode(
   // precedence rule even though the production allow-list is empty.
   lightDefaultTermPrograms: ReadonlySet<string> = LIGHT_DEFAULT_TERM_PROGRAMS
 ): boolean {
-  const lightFlag = (env.QUBIT_TUI_LIGHT ?? '').trim().toLowerCase()
+  const lightFlag = (env.HERMES_TUI_LIGHT ?? '').trim().toLowerCase()
 
   if (TRUE_RE.test(lightFlag)) {
     return true
@@ -715,7 +717,7 @@ export function detectLightMode(
     return false
   }
 
-  const themeFlag = (env.QUBIT_TUI_THEME ?? '').trim().toLowerCase()
+  const themeFlag = (env.HERMES_TUI_THEME ?? '').trim().toLowerCase()
 
   if (themeFlag === 'light') {
     return true
@@ -725,7 +727,7 @@ export function detectLightMode(
     return false
   }
 
-  const bgHint = backgroundLuminance(env.QUBIT_TUI_BACKGROUND ?? '')
+  const bgHint = backgroundLuminance(env.HERMES_TUI_BACKGROUND ?? '')
 
   if (bgHint !== null) {
     return bgHint >= LUMA_LIGHT_THRESHOLD

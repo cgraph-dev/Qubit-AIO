@@ -17,16 +17,16 @@ Ground answers and documents in cited, verifiable sources.
 | Source | Bundled (installed by default) |
 | Path | `skills/research/grounded-citations` |
 | Version | `1.2.0` |
-| Author | Qubit Agent + Teknium |
+| Author | Hermes Agent + Teknium |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Research`, `Citations`, `Grounding`, `Sources`, `Web`, `Reports` |
-| Related skills | [`arxiv`](/docs/user-guide/skills/bundled/research/research-arxiv), [`pdf`](/docs/user-guide/skills/bundled/productivity/productivity-pdf), [`reddit-reading`](/docs/user-guide/skills/bundled/social-media/social-media-reddit-reading), [`rss-feeds`](/docs/user-guide/skills/bundled/research/research-rss-feeds), [`youtube-content`](/docs/user-guide/skills/bundled/media/media-youtube-content) |
+| Related skills | [`arxiv`](../../bundled/research/research-arxiv.md), [`pdf`](../../bundled/productivity/productivity-pdf.md), [`reddit-reading`](../../optional/social-media/social-media-reddit-reading.md), [`rss-feeds`](../../optional/research/research-rss-feeds.md), [`youtube-content`](../../bundled/media/media-youtube-content.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Grounded Citations
@@ -67,7 +67,7 @@ None beyond the standard toolset. `scripts/sources.py` is stdlib-only Python 3.
 Retrieval comes from whatever is configured: `web_search`, `web_extract`,
 `browser_navigate`, or `terminal` (curl, CLIs).
 
-Ledger location: `$QUBIT_HOME/cache/citations/ledger.json` (profile-aware).
+Ledger location: `$HERMES_HOME/cache/citations/ledger.json` (profile-aware).
 Override per task with `--ledger <path>` or `HERMES_CITATION_LEDGER`.
 
 ## How to Run
@@ -157,6 +157,10 @@ with every claim attributed to the platform it came from:
 | Video | `youtube-content` | walkthroughs, demos, talks |
 | Code | `terminal` with `gh search repos` / `gh search issues` | implementations, open bugs |
 | X/Twitter | `xurl` (needs API access) | announcements, developer chatter |
+
+The `reddit-reading` and `rss-feeds` skills are optional. If absent, install with
+`hermes skills install official/social-media/reddit-reading` or
+`hermes skills install official/research/rss-feeds` before using them.
 
 Register every URL from every route in the ledger as it arrives (step ②). Keep
 opinion and measurement apart: a Reddit thread is evidence that users *report*

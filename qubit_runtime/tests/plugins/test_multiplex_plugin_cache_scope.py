@@ -1,5 +1,5 @@
 """Plugin module-level caches must not hand profile A's state to profile B under a multiplexed
-QUBIT_HOME override (``qubit_constants.set_hermes_home_override``).
+QUBIT_HOME override (``qubit_constants.set_qubit_home_override``).
 
 One invariant per mechanism: home-keyed slot with the unscoped module slot intact (router; yuanbao's
 ClassVar twin), credential-fingerprinted catalog keys (openrouter), per-home registries (memory
@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -44,13 +44,13 @@ def homes(tmp_path, monkeypatch):
 
 @contextlib.contextmanager
 def scoped(home: Path):
-    t_home = set_hermes_home_override(str(home))
+    t_home = set_qubit_home_override(str(home))
     t_secret = set_secret_scope(build_profile_secret_scope(home))
     try:
         yield
     finally:
         reset_secret_scope(t_secret)
-        reset_hermes_home_override(t_home)
+        reset_qubit_home_override(t_home)
 
 
 class _Resp:
@@ -188,7 +188,7 @@ def test_openviking_atexit_commits_every_profile_provider(homes):
         for home in (a, b):
             with scoped(home):
                 provider = ov.OpenVikingMemoryProvider()
-                provider.initialize(session_id=f"s-{home.name}", hermes_home=str(home))
+                provider.initialize(session_id=f"s-{home.name}", qubit_home=str(home))
                 provider.on_session_end = lambda _msgs, _p=provider: committed.append(_p)
                 providers.append(provider)
         ov._atexit_commit_sessions()

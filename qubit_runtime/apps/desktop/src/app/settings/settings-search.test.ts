@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { Settings2, Wrench } from '@/lib/icons'
-import type { ConfigFieldSchema, QubitConfigRecord } from '@/types/hermes'
+import type { ConfigFieldSchema, HermesConfigRecord } from '@/types/hermes'
 
 import {
   buildConfigSearchEntries,
@@ -13,7 +13,7 @@ import { envVar } from './test-utils'
 
 const searchCopy = {
   fieldDescriptions: {
-    'display.personality': 'Choose how Qubit sounds in conversation.',
+    'display.personality': 'Choose how Hermes sounds in conversation.',
     'tts.edge.voice': 'Voice used by Edge TTS.'
   },
   fieldLabels: {
@@ -38,7 +38,7 @@ describe('settings search index', () => {
     const config = {
       display: { personality: 'default' },
       tts: { provider: 'edge', edge: { voice: '' }, openai: { voice: '' } }
-    } as unknown as QubitConfigRecord
+    } as unknown as HermesConfigRecord
 
     const entries = buildConfigSearchEntries(schema, config, searchCopy)
 
@@ -49,7 +49,7 @@ describe('settings search index', () => {
     ])
     expect(entries[0]).toMatchObject({
       context: 'Chat',
-      description: 'Choose how Qubit sounds in conversation.',
+      description: 'Choose how Hermes sounds in conversation.',
       label: 'Personality',
       target: { field: 'display.personality', view: 'config:chat' }
     })

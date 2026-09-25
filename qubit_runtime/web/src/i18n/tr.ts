@@ -120,8 +120,8 @@ export const tr: Translations = {
     starting: "Başlatılıyor",
     startedInBackground: "Arka planda başlatıldı — ilerleme için günlüklere bakın",
     stopped: "Durduruldu",
-    updateQubit: "Qubit'i Güncelle",
-    updatingQubit: "Qubit güncelleniyor…",
+    updateHermes: "Qubit'i Güncelle",
+    updatingHermes: "Qubit güncelleniyor…",
     waitingForOutput: "Çıktı bekleniyor…",
   },
 
@@ -165,6 +165,10 @@ export const tr: Translations = {
     failedToDeleteSelected: "Seçilen oturumlar silinemedi",
     resumeInChat: "Sohbette Devam Et",
     newChat: "Yeni sohbet",
+    workspace: "çalışma alanı",
+    workspaceDefault: "Varsayılan",
+    workspaceRescan: "Depoları yeniden tara",
+    workspaceCustom: "Başka yol…",
     previousPage: "Önceki sayfa",
     nextPage: "Sonraki sayfa",
     roles: {
@@ -324,6 +328,8 @@ export const tr: Translations = {
     disableRuntime: "Devre dışı bırak",
     enableAfterInstall: "Yüklemeden sonra etkinleştir",
     enableRuntime: "Etkinleştir",
+    toggleTakesEffectAfterRestart:
+      "Kaydedildi — değişikliği uygulamak için ağ geçidini yeniden başlatın.",
     forceReinstall: "Yeniden yüklemeyi zorla (önce mevcut klasörü sil)",
     headline:
       "Qubit eklentilerini keşfedin, yükleyin, etkinleştirin ve güncelleyin (`qubit plugins` ile eşdeğer).",
@@ -343,8 +349,8 @@ export const tr: Translations = {
     providersHint:
       "config.yaml'a memory.provider (boş = yerleşik) ve context.engine yazar. Bir sonraki oturumda etkili olur.",
     refreshDashboard: "Pano uzantılarını yeniden tara",
-    removeConfirm: "Bu eklenti $QUBIT_HOME/plugins/ içinden kaldırılsın mı?",
-    removeHint: "Yalnızca $QUBIT_HOME/plugins altındaki kullanıcı tarafından yüklenmiş eklentiler kaldırılabilir.",
+    removeConfirm: "Bu eklenti ~/.hermes/plugins/ içinden kaldırılsın mı?",
+    removeHint: "Yalnızca ~/.hermes/plugins altındaki kullanıcı tarafından yüklenmiş eklentiler kaldırılabilir.",
     rescanHeading: "SPA eklenti kayıt defteri",
     rescanHint: "Diske dosya ekledikten sonra yeniden tarayın, böylece pano kenar çubuğu yeni manifestleri algılar.",
     runtimeHeading: "Ağ geçidi çalışma zamanı (YAML eklentileri)",
@@ -366,7 +372,7 @@ export const tr: Translations = {
     all: "Tümü",
     categories: "Kategoriler",
     filters: "Filtreler",
-    noSkills: "Yetenek bulunamadı. Yetenekler ~/.qubit/skills/ adresinden yüklenir",
+    noSkills: "Yetenek bulunamadı. Yetenekler ~/.hermes/skills/ adresinden yüklenir",
     noSkillsMatch: "Aramanız veya filtrenizle eşleşen yetenek yok.",
     skillCount: "{count} yetenek{s}",
     resultCount: "{count} sonuç{s}",
@@ -380,7 +386,7 @@ export const tr: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Filtreler",
     sections: "Bölümler",
     exportConfig: "Yapılandırmayı JSON olarak dışa aktar",

@@ -44,7 +44,7 @@ class NativeHome:
         return self.root / "home"
 
     @property
-    def hermes_home(self) -> Path:
+    def qubit_home(self) -> Path:
         return self.home / ".hermes"
 
     @property
@@ -53,7 +53,7 @@ class NativeHome:
 
     @property
     def db_path(self) -> Path:
-        return self.hermes_home / "state.db"
+        return self.qubit_home / "state.db"
 
     def env(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         """Allowlisted env: no inherited credentials, HERMES_* or TERMINAL_* can reroute the child."""
@@ -63,7 +63,7 @@ class NativeHome:
         }
         env.update({
             "HOME": str(self.home),
-            "QUBIT_HOME": str(self.hermes_home),
+            "QUBIT_HOME": str(self.qubit_home),
             "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1",
             "NO_COLOR": "1",
@@ -85,7 +85,7 @@ def make_home(root: Path, model: dict[str, Any], *, env_file: dict[str, str] | N
               extra_config: dict[str, Any] | None = None) -> NativeHome:
     """Write config.yaml (``model`` block + offline defaults + ``extra_config``) and ``.env``."""
     nh = NativeHome(root)
-    for d in (nh.hermes_home, nh.project):
+    for d in (nh.qubit_home, nh.project):
         d.mkdir(parents=True, exist_ok=True)
     cfg: dict[str, Any] = {
         "model": model,
@@ -99,9 +99,9 @@ def make_home(root: Path, model: dict[str, Any], *, env_file: dict[str, str] | N
             cfg[key].update(value)
         else:
             cfg[key] = value
-    (nh.hermes_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    (nh.qubit_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     lines = [f"{k}={v}" for k, v in (env_file or {}).items()]
-    (nh.hermes_home / ".env").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    (nh.qubit_home / ".env").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     return nh
 
 

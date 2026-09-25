@@ -1,11 +1,11 @@
-# nix/homeManagerModules.nix — the Home Manager module for qubit-runtime
+# nix/homeManagerModules.nix — the Home Manager module for hermes-agent
 #
 # This module is the user-level equivalent of nixosModules.default. Qubit is
 # an agent for one person. The credentials, the memory, the sessions and the
 # cron jobs all belong to that person. Thus a user-level module is correct on
 # each distribution, and not only on NixOS.
 #
-# `services.qubit-runtime` is the same option set on both modules. All of the
+# `services.hermes-agent` is the same option set on both modules. All of the
 # options except the system-level ones come from nix/moduleCommon.nix, so an
 # example from the NixOS documentation works here without a change. Only the
 # necessary parts are different:
@@ -17,20 +17,20 @@
 #   changed   systemd.services         -> systemd.user.services or
 #                                        launchd.agents
 #   changed   system.activationScripts -> home.activation
-#   changed   addToSystemPackages      -> programs.qubit-runtime.enable and
+#   changed   addToSystemPackages      -> programs.hermes-agent.enable and
 #                                        home.sessionVariables
-#   added     programs.qubit-runtime    the CLI and the desktop application,
+#   added     programs.hermes-agent    the CLI and the desktop application,
 #                                      because Home Manager separates an
 #                                      installation from a daemon
-#   changed   stateDir (+ "/.qubit")  -> hermesHome, set directly
+#   changed   stateDir (+ "/.hermes")  -> hermesHome, set directly
 #
 # To use the module:
-#   imports = [ qubit-runtime.homeManagerModules.default ];
-#   programs.qubit-runtime = {
+#   imports = [ hermes-agent.homeManagerModules.default ];
+#   programs.hermes-agent = {
 #     enable = true;          # the qubit CLI on your PATH
 #     desktop.enable = true;  # the Electron application and a launcher
 #   };
-#   services.qubit-runtime = {
+#   services.hermes-agent = {
 #     enable = true;
 #     gateway.enable = true;
 #     settings.model.default = "anthropic/claude-sonnet-4";
@@ -54,12 +54,12 @@
     }:
 
     let
-      cfg = config.services.qubit-runtime;
-      cfgPrograms = config.programs.qubit-runtime;
+      cfg = config.services.hermes-agent;
+      cfgPrograms = config.programs.hermes-agent;
       common = import ./moduleCommon.nix { inherit lib; };
 
       effectivePackage = common.effectivePackage cfg;
-      qubit-runtime = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      hermes-agent = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
       inherit (pkgs.stdenv.hostPlatform) isDarwin isLinux;
 
@@ -73,7 +73,7 @@
 
       # ── The desktop launcher ───────────────────────────────────────────
       # A GUI launcher reads no shell profile, so home.sessionVariables does
-      # not reach it, and the application would open ~/.qubit while the
+      # not reach it, and the application would open ~/.hermes while the
       # services use hermesHome. Thus the launcher carries the value itself.
       #
       # HERMES_MANAGED rides along only when the services are enabled. That
@@ -82,7 +82,7 @@
       # activation and no managed configuration, so the application must not
       # claim one and refuse an edit that nothing else owns.
       desktopEnvironment = {
-        QUBIT_HOME = cfg.hermesHome;
+        HERMES_HOME = cfg.hermesHome;
       }
       // lib.optionalAttrs cfg.enable {
         inherit (processEnvironment) HERMES_MANAGED;
@@ -105,8 +105,8 @@
           HERMES_DESKTOP_REMOTE_TOKEN="$(tr -d '\r\n' < ${lib.escapeShellArg cfg.backend.sessionTokenFile})"
           export HERMES_DESKTOP_REMOTE_TOKEN
         else
-          echo "qubit-desktop: cannot read the session token at ${cfg.backend.sessionTokenFile}." >&2
-          echo "qubit-desktop: the application starts its own backend instead of the one of the service." >&2
+          echo "hermes-desktop: cannot read the session token at ${cfg.backend.sessionTokenFile}." >&2
+          echo "hermes-desktop: the application starts its own backend instead of the one of the service." >&2
         fi
       '';
 
@@ -178,32 +178,32 @@
 
     in
     {
-      # ── programs.qubit-runtime — the installation ───────────────────────
+      # ── programs.hermes-agent — the installation ───────────────────────
       # Home Manager separates "install this application for me" from "run
       # this daemon". Qubit needs both, and a person can want one without
       # the other: an application with no gateway, or a headless gateway on
       # a machine with no display.
       #
-      # `services.qubit-runtime` stays the authority for the state and the
+      # `services.hermes-agent` stays the authority for the state and the
       # configuration. This module reads hermesHome and the backend address
       # from it, and never the reverse.
-      options.programs.qubit-runtime = {
+      options.programs.hermes-agent = {
         enable = lib.mkEnableOption ''
           the Qubit Agent command line application.
 
-          This adds `qubit` to home.packages, and exports QUBIT_HOME with
+          This adds `qubit` to home.packages, and exports HERMES_HOME with
           home.sessionVariables. An interactive shell then uses the same
-          state as `services.qubit-runtime`
+          state as `services.hermes-agent`
         '';
 
         package = lib.mkOption {
           type = lib.types.package;
           default = effectivePackage;
-          defaultText = lib.literalExpression "config.services.qubit-runtime.package";
+          defaultText = lib.literalExpression "config.services.hermes-agent.package";
           description = ''
-            The qubit-runtime package to install.
+            The hermes-agent package to install.
 
-            The default follows `services.qubit-runtime.package`, and applies
+            The default follows `services.hermes-agent.package`, and applies
             `extraPythonPackages` and `extraDependencyGroups` from that
             module. Thus the command line and the services are one build,
             and a plugin that the services can load is a plugin that your
@@ -215,10 +215,10 @@
           enable = lib.mkEnableOption ''
             the Qubit Desktop application (Electron).
 
-            This adds `qubit-desktop` to home.packages, with an XDG
+            This adds `hermes-desktop` to home.packages, with an XDG
             launcher entry on Linux. The launcher starts the same Qubit
-            runtime that `package` gives, and reads the QUBIT_HOME of
-            `services.qubit-runtime`. Thus the application, the interactive
+            runtime that `package` gives, and reads the HERMES_HOME of
+            `services.hermes-agent`. Thus the application, the interactive
             shell and the services share one state directory.
 
             The Electron application carries its own Qubit runtime with
@@ -230,12 +230,12 @@
           package = lib.mkOption {
             type = lib.types.package;
             default = cfgPrograms.package.hermesDesktop;
-            defaultText = lib.literalExpression "config.programs.qubit-runtime.package.hermesDesktop";
+            defaultText = lib.literalExpression "config.programs.hermes-agent.package.hermesDesktop";
             description = ''
-              The qubit-desktop package to use.
+              The hermes-desktop package to use.
 
               The default follows `package`, and thus also
-              `services.qubit-runtime.extraPythonPackages` and
+              `services.hermes-agent.extraPythonPackages` and
               `extraDependencyGroups`, because the desktop application is a
               passthru of the agent package. A package that you set here
               carries its own Qubit runtime, and this module cannot make
@@ -245,32 +245,32 @@
         };
       };
 
-      options.services.qubit-runtime =
+      options.services.hermes-agent =
         common.sharedOptions {
-          defaultPackage = qubit-runtime;
-          defaultPackageText = lib.literalExpression "qubit-runtime.packages.\${system}.default";
+          defaultPackage = hermes-agent;
+          defaultPackageText = lib.literalExpression "hermes-agent.packages.\${system}.default";
           defaultWorkingDirectory = config.home.homeDirectory;
           defaultWorkingDirectoryText = lib.literalExpression "config.home.homeDirectory";
         }
         // {
           hermesHome = lib.mkOption {
             type = lib.types.str;
-            default = "${config.home.homeDirectory}/.qubit";
-            defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/.qubit"'';
+            default = "${config.home.homeDirectory}/.hermes";
+            defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/.hermes"'';
             description = ''
-              The value of QUBIT_HOME. This state directory holds
+              The value of HERMES_HOME. This state directory holds
               config.yaml, .env, auth.json, the sessions, the skills, the
               memory and the cron jobs.
 
-              The NixOS module takes a `stateDir` and adds `/.qubit` to it.
-              This module sets QUBIT_HOME directly. Thus an existing
-              ~/.qubit continues to work, and you can give the directory any
+              The NixOS module takes a `stateDir` and adds `/.hermes` to it.
+              This module sets HERMES_HOME directly. Thus an existing
+              ~/.hermes continues to work, and you can give the directory any
               name.
             '';
-            example = "/home/alice/.qubit-work";
+            example = "/home/alice/.hermes-work";
           };
 
-          # `installPackage` moved to `programs.qubit-runtime.enable`. The
+          # `installPackage` moved to `programs.hermes-agent.enable`. The
           # option is dead, but it must not be silent: it defaulted to true,
           # so a person who never named it still got the command line, and a
           # quiet removal gives them a machine with no `qubit` and no
@@ -282,7 +282,7 @@
             default = null;
             visible = false;
             description = ''
-              Removed. Use `programs.qubit-runtime.enable` instead.
+              Removed. Use `programs.hermes-agent.enable` instead.
             '';
           };
 
@@ -291,19 +291,19 @@
 
       config = lib.mkMerge [
 
-        # ── programs.qubit-runtime — the installation ──────────────────────
+        # ── programs.hermes-agent — the installation ──────────────────────
         # Outside the `services.enable` guard on purpose. A person can want
         # the command line or the application on a machine that runs no
         # daemon at all.
         (lib.mkIf cfgPrograms.enable {
           home.packages = [ cfgPrograms.package ];
-          home.sessionVariables.QUBIT_HOME = cfg.hermesHome;
+          home.sessionVariables.HERMES_HOME = cfg.hermesHome;
         })
 
         # A launcher from the desktop menu reads no shell profile, so the
-        # QUBIT_HOME that `programs.enable` exports does not reach it. Home
+        # HERMES_HOME that `programs.enable` exports does not reach it. Home
         # Manager writes only systemd.user.sessionVariables into
-        # environment.d, and this module does not put QUBIT_HOME there,
+        # environment.d, and this module does not put HERMES_HOME there,
         # because that file applies to each user unit. Thus the launcher
         # carries the value itself. See desktopEnvironment above.
         (lib.mkIf cfgPrograms.desktop.enable {
@@ -327,30 +327,30 @@
 
             # ── Merge MCP servers into settings ────────────────────────────
             (lib.mkIf (cfg.mcpServers != { }) {
-              services.qubit-runtime.settings.mcp_servers = common.mcpServersToConfig cfg.mcpServers;
+              services.hermes-agent.settings.mcp_servers = common.mcpServersToConfig cfg.mcpServers;
             })
 
             {
               assertions =
                 common.pluginNameAssertions {
                   inherit cfg;
-                  optionPath = "services.qubit-runtime";
+                  optionPath = "services.hermes-agent";
                 }
                 ++ common.workspaceFilesAssertions {
                   inherit cfg;
-                  opt = options.services.qubit-runtime.workingDirectory;
-                  optionPath = "services.qubit-runtime";
+                  opt = options.services.hermes-agent.workingDirectory;
+                  optionPath = "services.hermes-agent";
                 }
                 ++ common.backendBindAssertions {
                   inherit cfg;
-                  optionPath = "services.qubit-runtime";
+                  optionPath = "services.hermes-agent";
                 }
                 ++ [
                   {
                     # The interface poll reads `ip`, which iproute2 supplies on
                     # Linux only.
                     assertion = !isDarwin || cfg.backend.waitFor != "interface";
-                    message = "services.qubit-runtime.backend.waitFor = \"interface\" works on Linux only. Use \"hostname\" on Darwin.";
+                    message = "services.hermes-agent.backend.waitFor = \"interface\" works on Linux only. Use \"hostname\" on Darwin.";
                   }
                 ];
             }
@@ -394,14 +394,14 @@
 
             # ── Linux: systemd user services ───────────────────────────────
             (lib.mkIf (isLinux && cfg.gateway.enable) {
-              systemd.user.services.qubit-runtime = mkUnit {
+              systemd.user.services.hermes-agent = mkUnit {
                 description = "Qubit Agent Gateway";
                 argv = common.gatewayArgv cfg;
               };
             })
 
             (lib.mkIf (isLinux && cfg.backend.mode != "none") {
-              systemd.user.services.qubit-backend = mkUnit {
+              systemd.user.services.hermes-backend = mkUnit {
                 description = common.backendDescription cfg;
                 argv = common.backendArgv { inherit pkgs cfg; };
               };
@@ -409,16 +409,16 @@
 
             # ── Darwin: launchd agents ─────────────────────────────────────
             (lib.mkIf (isDarwin && cfg.gateway.enable) {
-              launchd.agents.qubit-runtime = mkAgent {
+              launchd.agents.hermes-agent = mkAgent {
                 argv = common.gatewayArgv cfg;
-                logName = "qubit-runtime";
+                logName = "hermes-agent";
               };
             })
 
             (lib.mkIf (isDarwin && cfg.backend.mode != "none") {
-              launchd.agents.qubit-backend = mkAgent {
+              launchd.agents.hermes-backend = mkAgent {
                 argv = common.backendArgv { inherit pkgs cfg; };
-                logName = "qubit-backend";
+                logName = "hermes-backend";
               };
             })
           ]

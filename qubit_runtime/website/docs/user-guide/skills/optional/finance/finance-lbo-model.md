@@ -14,19 +14,19 @@ Build leveraged buyout workbooks with IRR/MOIC in Excel.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/finance/lbo-model` |
-| Path | `optional-skills/finance\lbo-model` |
+| Source | Optional — install with `hermes skills install official/finance/lbo-model` |
+| Path | `optional-skills/finance/lbo-model` |
 | Version | `1.0.0` |
-| Author | Anthropic (adapted by Qubit Labs) |
+| Author | Anthropic (adapted by Nous Research) |
 | License | Apache-2.0 |
 | Platforms | linux, macos, windows |
 | Tags | `finance`, `valuation`, `lbo`, `private-equity`, `excel`, `openpyxl`, `modeling` |
-| Related skills | [`excel-author`](/docs/user-guide/skills/optional/finance/finance-excel-author), [`pptx-author`](/docs/user-guide/skills/optional/finance/finance-pptx-author), [`dcf-model`](/docs/user-guide/skills/optional/finance/finance-dcf-model), [`3-statement-model`](/docs/user-guide/skills/optional/finance/finance-3-statement-model) |
+| Related skills | [`excel-author`](../../optional/finance/finance-excel-author.md), [`pptx-author`](../../optional/finance/finance-pptx-author.md), [`dcf-model`](../../optional/finance/finance-dcf-model.md), [`3-statement-model`](../../optional/finance/finance-3-statement-model.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 ## Environment
@@ -294,9 +294,9 @@ Must return success with zero errors.
 
 ## Data sources — MCP first, web fallback
 
-Many passages below say "use the S&P Kensho MCP / Daloopa MCP / FactSet MCP". Those are commercial financial-data MCPs from the original Cowork plugin context. In Qubit:
+Many passages below say "use the S&P Kensho MCP / Daloopa MCP / FactSet MCP". Those are commercial financial-data MCPs from the original Cowork plugin context. In Hermes:
 
-- **If you have any structured financial-data MCP configured** (Qubit supports MCP — see `native-mcp` skill), prefer it for point-in-time comps, precedent transactions, and filings.
+- **If you have any structured financial-data MCP configured** (Hermes supports MCP — see `native-mcp` skill), prefer it for point-in-time comps, precedent transactions, and filings.
 - **Otherwise**, fall back to:
   - `web_search` / `web_extract` against SEC EDGAR (`https://www.sec.gov/cgi-bin/browse-edgar`) for US filings
   - Company IR pages for press releases, earnings decks

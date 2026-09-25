@@ -13,7 +13,7 @@ import pytest
 
 import cron.scheduler_delivery as delivery
 from agent.secret_scope import set_multiplex_active
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 
 @pytest.fixture
@@ -48,11 +48,11 @@ def test_an_own_profile_bot_chat_turn_runs_in_the_ticking_profiles_home(multiple
     root, captured = multiplexer
     for name in ("alpha", "beta", "alpha"):
         home = root / "profiles" / name
-        token = set_hermes_home_override(str(home))
+        token = set_qubit_home_override(str(home))
         try:
             assert delivery._deliver_to_bot_chat({"id": f"j-{name}", "name": "nightly"}, "the brief", "") is None
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         env = captured["env"]
         assert env["QUBIT_HOME"] == str(home)
         assert env["ANTHROPIC_API_KEY"] == f"sk-{name}"
@@ -63,11 +63,11 @@ def test_an_own_profile_bot_chat_turn_runs_in_the_ticking_profiles_home(multiple
 def test_an_explicit_target_profile_still_wins_over_the_ticking_profile(multiplexer):
     """Control: ``bot-chat:beta`` fired from alpha's tick is built for beta, not for alpha."""
     root, captured = multiplexer
-    token = set_hermes_home_override(str(root / "profiles" / "alpha"))
+    token = set_qubit_home_override(str(root / "profiles" / "alpha"))
     try:
         assert delivery._deliver_to_bot_chat({"id": "j", "name": "nightly"}, "the brief", "beta") is None
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
     assert captured["env"]["QUBIT_HOME"] == str(root / "profiles" / "beta")
     assert captured["env"]["ANTHROPIC_API_KEY"] == "sk-beta"
     assert "ALPHA_ONLY" not in captured["env"]

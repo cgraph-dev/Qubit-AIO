@@ -49,12 +49,12 @@ def test_activation_real_setup_pm_lifecycle(tmp_path, served):
     core.mkdir()
     home = tmp_path / "home"
     home.mkdir()
-    hermes_home = home / ".hermes"
+    qubit_home = home / ".hermes"
     runtime = tmp_path / "runtime"
     scratch = tmp_path / "tmp"
     scratch.mkdir()
     env = {
-        "PATH": os.environ["PATH"], "HOME": str(home), "QUBIT_HOME": str(hermes_home),
+        "PATH": os.environ["PATH"], "HOME": str(home), "QUBIT_HOME": str(qubit_home),
         "HERMES_RUNTIME_DIR": str(runtime), "SHELL": bash, "TMPDIR": str(scratch),
         "XDG_CONFIG_HOME": str(home / ".config"), "XDG_CACHE_HOME": str(home / ".cache"),
         "LANG": "C.UTF-8", "PYTHONNOUSERSITE": "1", "UV_OFFLINE": "1",
@@ -70,13 +70,13 @@ def test_activation_real_setup_pm_lifecycle(tmp_path, served):
     shutil.copytree(Path(ruamel.yaml.__file__).parent, core / "ruamel" / "yaml", ignore=shutil.ignore_patterns("__pycache__"))
 
     # Never copy real user files: these are deliberately public fixture sentinels.
-    protected = [core / ".env", home / ".local" / "bin", hermes_home / "skills",
+    protected = [core / ".env", home / ".local" / "bin", qubit_home / "skills",
                  home / ".bashrc", home / ".bash_profile", home / ".zshrc"]
-    for path in (home / ".local" / "bin" / "hermes", hermes_home / "skills" / "keep.md",
+    for path in (home / ".local" / "bin" / "hermes", qubit_home / "skills" / "keep.md",
                  home / ".bashrc", home / ".bash_profile", home / ".zshrc"):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("user-owned fixture\n", encoding="utf-8")
-    (hermes_home / "skills").chmod(0o755)
+    (qubit_home / "skills").chmod(0o755)
     (core / ".env.example").write_text("FIXTURE_ONLY=example\n", encoding="utf-8")
     (core / "skills").mkdir()
     (core / "skills" / "bundled.md").write_text("must not be seeded\n", encoding="utf-8")
@@ -120,7 +120,7 @@ def test_activation_real_setup_pm_lifecycle(tmp_path, served):
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     shutil.rmtree(seed)
-    assert not (hermes_home / "installs").exists()
+    assert not (qubit_home / "installs").exists()
 
     docroot, base_url = served
     # Both the shell bootstrap and PM's fallback downloader stay on loopback.
@@ -188,7 +188,7 @@ test "${PYTHONPATH-}" = "$prior_pythonpath" || exit 96
         return result
 
     def selection():
-        records = list(hermes_home.glob("installs/*/facts.json"))
+        records = list(qubit_home.glob("installs/*/facts.json"))
         assert len(records) == 1
         return json.loads(records[0].read_text())["packages"]["venv"]
 

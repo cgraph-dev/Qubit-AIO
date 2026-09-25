@@ -62,9 +62,9 @@ same 15-question banks and scored by the same judge.
 
 policy                  sweep   gui    prmerge  acp    AVG     retained state
 codex (real, post-cmp)  26.7%   40.0%  43.3%    36.7%  36.7%   ~4.5K (opaque blob + user msgs)
-qubit current          93.3%*  26.7%* 33.3%    30.0%  45.8%   ~162K
-qubit lean closed-book 40.0%   60.0%  23.3%    36.7%  40.0%   ~49K
-qubit lean+recovery    70.0%   80.0%  43.3%    80.0%  68.3%   ~49K
+hermes current          93.3%*  26.7%* 33.3%    30.0%  45.8%   ~162K
+hermes lean closed-book 40.0%   60.0%  23.3%    36.7%  40.0%   ~49K
+hermes lean+recovery    70.0%   80.0%  43.3%    80.0%  68.3%   ~49K
 
 Notes:
 - codex answers from its own post-compaction session — the honest analog of
@@ -155,10 +155,10 @@ mining, per-epoch anchor windows) before default flip.
    gold: `do NOT cherry-pick. Surgical reapply as maintainer-authored commit, Co-authored-by the GitHub PR author`
 8. **How should an agent handle a 'gh pr merge' 502 error?**  
    gold: `retry the same command once after the "Merge already in progress" settles (~45s); check PR state between attempts`
-9. **Which two properties shape almost every design decision in Qubit according to the Development Guide?**  
+9. **Which two properties shape almost every design decision in Hermes according to the Development Guide?**  
    gold: `Per-conversation prompt caching is sacred and The core is a narrow waist; capability lives at the edges.`
 10. **What error message does the live-checkout git guard display when blocking a history-rewriting command?**  
-   gold: `Blocked: `git <op>` would rewrite Qubit's live source checkout (/home/teknium/.hermes/hermes-agent) and can mix module `
+   gold: `Blocked: `git <op>` would rewrite Hermes's live source checkout (/home/teknium/.hermes/hermes-agent) and can mix module `
 11. **What happened to the Desktop cluster's 'npm ci' command that resulted in an error writing to /tmp/ccH06T4r.s?**  
    gold: `No space left on device`
 12. **What was the GraphQL API rate limit remaining for the user when the 'API rate limit already exceeded' error first occurred?**  
@@ -181,7 +181,7 @@ mining, per-epoch anchor windows) before default flip.
 
 <details><summary>15 exam questions (questions-36d3d87e0b.json)</summary>
 
-1. **What is the PR number for the authored fix addressing mid-turn message ordering bugs in Qubit Desktop?**  
+1. **What is the PR number for the authored fix addressing mid-turn message ordering bugs in Hermes Desktop?**  
    gold: `#86617`
 2. **According to the contribution rubric in AGENTS.md, which type of config belongs in '.env' and which belongs in 'config.yaml'?**  
    gold: `.env is for secrets only (API keys, tokens, passwords). All behavioral settings... go in config.yaml.`
@@ -195,9 +195,9 @@ mining, per-epoch anchor windows) before default flip.
    gold: `pane sash grab band made asymmetric 1px/7px`
 7. **Which contributor's email was mapped to 'baihemax' during the attribution audit of PR #86588?**  
    gold: `602028@ky-tech.com.cn`
-8. **What error message does the Qubit terminal tool return when a git command is blocked to prevent rewriting the live source checkout?**  
-   gold: `Blocked: `git <op>` would rewrite Qubit's live source checkout`
-9. **What is the core design principle regarding 'Narrow Waist' in Qubit development?**  
+8. **What error message does the Hermes terminal tool return when a git command is blocked to prevent rewriting the live source checkout?**  
+   gold: `Blocked: `git <op>` would rewrite Hermes's live source checkout`
+9. **What is the core design principle regarding 'Narrow Waist' in Hermes development?**  
    gold: `The core is a narrow waist; capability lives at the edges.`
 10. **What was the result of the rebase-merge attempt for PR #86589?**  
    gold: `GraphQL: Pull Request has merge conflicts (mergePullRequest)`
@@ -225,7 +225,7 @@ mining, per-epoch anchor windows) before default flip.
 4. **Which contributor is credited with adding the 'Brazilian Portuguese localization' in PR #86292?**  
    gold: `@gui8515`
 5. **What specific error message is reported in issue #83562 regarding the Windows Desktop update?**  
-   gold: `Qubit backend exited (0)`
+   gold: `Hermes backend exited (0)`
 6. **What is the 'core problem' identified in the parallel-subagent-salvage-orchestration.md reference?**  
    gold: `subagents share the parent's worktree + main checkout`
 7. **Why was the 'nix (macos-latest)' build failing in the salvage batches according to the orchestration reference?**  
@@ -315,7 +315,7 @@ mining, per-epoch anchor windows) before default flip.
 5. **What is the mandatory line limit for PR reviews requested by Teknium?**  
    gold: `<= 15 lines`
 6. **What exact error message did the agent receive when attempting to checkout a worktree while in the live source directory?**  
-   gold: `Blocked: `git checkout` would rewrite Qubit's live source checkout (/home/teknium/.hermes/hermes-agent) and can mix mod`
+   gold: `Blocked: `git checkout` would rewrite Hermes's live source checkout (/home/teknium/.hermes/hermes-agent) and can mix mod`
 7. **Why was PR #74658 necessary to fix Slack 'broken on main'?**  
    gold: `SlackResponse isn't a dict subclass, so every gate is always False.`
 8. **What was the final merge commit SHA for the Slack SDK response fix on main?**  

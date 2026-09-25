@@ -56,8 +56,8 @@ def _wings(*glyphs) -> List[List[str]]:
 
 
 # Branding shared by every Qubit-named built-in (mono/daylight override help_header).
-_QUBIT_BRANDING: Dict[str, str] = _branding(
-    "Qubit", "◆", "Goodbye!", prompt="❯", help_header="(^_^)? Available Commands")
+_HERMES_BRANDING: Dict[str, str] = _branding(
+    "Qubit", "☤", "Goodbye! ☤", prompt="❯", help_header="(^_^)? Available Commands")
 
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
     "default": {
@@ -91,7 +91,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "completion_menu_bg": "#F5F5F5", "completion_menu_current_bg": "#E0D1BF",
             "selection_bg": "#D4E4F7", "status_bar_bg": "#F5F5F5", "voice_status_bg": "#F5F5F5"},
         "spinner": {},  # empty = hardcoded defaults in display.py
-        "branding": _QUBIT_BRANDING,
+        "branding": _HERMES_BRANDING,
         "tool_prefix": "┊"},
     "ares": {
         "name": "ares", "description": "War-god theme — crimson and bronze",
@@ -152,7 +152,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "completion_menu_current_bg": "#464646", "selection_bg": "#505050",
             "shell_dollar": "#aaaaaa", "voice_status_bg": "#1F1F1F"},
         "spinner": {},
-        "branding": {**_QUBIT_BRANDING, "help_header": "[?] Available Commands"},
+        "branding": {**_HERMES_BRANDING, "help_header": "[?] Available Commands"},
         "tool_prefix": "┊"},
     "slate": {
         "name": "slate", "description": "Cool blue — developer-focused",
@@ -168,7 +168,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "session_border": "#545E6B", "completion_menu_bg": "#151C2F",
             "completion_menu_current_bg": "#324867", "selection_bg": "#3A5375",
             "shell_dollar": "#7eb8f6", "voice_status_bg": "#151C2F"},
-        "spinner": {}, "branding": _QUBIT_BRANDING, "tool_prefix": "┊"},
+        "spinner": {}, "branding": _HERMES_BRANDING, "tool_prefix": "┊"},
     "daylight": {
         "name": "daylight",
         "description": "Light theme for bright terminals with dark text and cool blue accents",
@@ -186,7 +186,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "completion_menu_meta_current_bg": "#BFDBFE", "selection_bg": "#D3E0FB",
             "shell_dollar": "#2563EB", "voice_status_bg": "#E5EDF8"},
         "spinner": {},
-        "branding": {**_QUBIT_BRANDING, "help_header": "[?] Available Commands"},
+        "branding": {**_HERMES_BRANDING, "help_header": "[?] Available Commands"},
         "tool_prefix": "│"},
     "warm-lightmode": {
         "name": "warm-lightmode",
@@ -204,7 +204,7 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
             "completion_menu_current_bg": "#E8DCC8", "completion_menu_meta_bg": "#F0E8D8",
             "completion_menu_meta_current_bg": "#DFCFB0", "selection_bg": "#E8DAD0",
             "shell_dollar": "#8B4513", "voice_status_bg": "#F5F0E8"},
-        "spinner": {}, "branding": _QUBIT_BRANDING, "tool_prefix": "┊"},
+        "spinner": {}, "branding": _HERMES_BRANDING, "tool_prefix": "┊"},
     "poseidon": {
         "name": "poseidon", "description": "Ocean-god theme — deep blue and seafoam",
         "colors": {
@@ -342,6 +342,23 @@ _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
 
 _active_skin: Optional[SkinConfig] = None
 _active_skin_name: str = "default"
+# Routed multiplex profiles: (name, skin) per home key. ``display.skin`` and ``<home>/skins/*.yaml``
+# are per profile, and the relay display name / TUI skin payload are read under each profile's
+# override — one module slot would be last-writer-wins across profiles. Unscoped keeps the module slot.
+_active_skin_by_home: Dict[str, Tuple[str, SkinConfig]] = {}
+
+
+def _routed_home_key() -> Optional[str]:
+    from qubit_constants import get_qubit_home_override, qubit_home_key
+    return None if get_qubit_home_override() is None else qubit_home_key()
+
+
+def _profile_config() -> dict:
+    try:
+        from qubit_cli.config import load_config_readonly
+        return load_config_readonly() or {}
+    except Exception:
+        return {}
 
 
 def _skins_dir() -> Path:
@@ -351,8 +368,8 @@ def _skins_dir() -> Path:
 def _load_skin_from_yaml(path: Path) -> Optional[Dict[str, Any]]:
     """Load a skin definition from a YAML file; None on any failure."""
     try:
-        import yaml
-        with open(path, "r", encoding="utf-8") as f:
+        import qubit_yaml as yaml
+        with open(path, "r", encoding="utf-8-sig") as f:
             data = yaml.safe_load(f)
         if isinstance(data, dict) and "name" in data:
             return data
@@ -414,6 +431,14 @@ def load_skin(name: str) -> SkinConfig:
 def get_active_skin() -> SkinConfig:
     """Currently active skin config (cached)."""
     global _active_skin
+    home_key = _routed_home_key()
+    if home_key is not None:
+        entry = _active_skin_by_home.get(home_key)
+        if entry is None:
+            # Cold routed profile: its own ``display.skin`` (nobody ran init_skin_from_config for it).
+            init_skin_from_config(_profile_config())
+            entry = _active_skin_by_home[home_key]
+        return entry[1]
     if _active_skin is None:
         _active_skin = load_skin(_active_skin_name)
     return _active_skin
@@ -422,12 +447,21 @@ def get_active_skin() -> SkinConfig:
 def set_active_skin(name: str) -> SkinConfig:
     """Switch the active skin. Returns the new SkinConfig."""
     global _active_skin, _active_skin_name
+    skin = load_skin(name)
+    home_key = _routed_home_key()
+    if home_key is not None:
+        _active_skin_by_home[home_key] = (name, skin)
+        return skin
     _active_skin_name = name
-    _active_skin = load_skin(name)
+    _active_skin = skin
     return _active_skin
 
 
 def get_active_skin_name() -> str:
+    home_key = _routed_home_key()
+    if home_key is not None:
+        entry = _active_skin_by_home.get(home_key)
+        return entry[0] if entry else "default"
     return _active_skin_name
 
 
@@ -455,7 +489,7 @@ def get_active_help_header(fallback: str = "(^_^)? Available Commands") -> str:
     return _active_branding("help_header", fallback)
 
 
-def get_active_goodbye(fallback: str = "Goodbye! ⚕") -> str:
+def get_active_goodbye(fallback: str = "Goodbye! ☤") -> str:
     return _active_branding("goodbye", fallback)
 
 
@@ -485,6 +519,9 @@ _STYLE_TEMPLATES = {
     "status-bar-dim": "bg:{status_bg} {status_dim}", "status-bar-good": "bg:{status_bg} {status_good} bold",
     "status-bar-warn": "bg:{status_bg} {status_warn} bold", "status-bar-bad": "bg:{status_bg} {status_bad} bold",
     "status-bar-critical": "bg:{status_bg} {status_critical} bold",
+    "subagent-dock": "bg:{status_bg} {status_text}",
+    "subagent-dock.heading": "bg:{status_bg} {status_strong} bold",
+    "subagent-dock.selected": "bg:{menu_current_bg} {text} bold",
     "input-rule": "{input_rule}", "image-badge": "{label} bold",
     "completion-menu": "bg:{menu_bg} {text}", "completion-menu.completion": "bg:{menu_bg} {text}",
     "completion-menu.completion.current": "bg:{menu_current_bg} {title}",

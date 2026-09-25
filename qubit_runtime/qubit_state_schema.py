@@ -28,6 +28,7 @@ from qubit_state_common import (
 )
 from qubit_state_fts import _drop_orphan_fts_shadow_tables
 from qubit_state_holders import _read_proc_argv
+from qubit_state_errors import is_sqlite_lock_error
 
 # Pre-split logger identity so log filtering/capture is unchanged.
 logger = logging.getLogger("qubit_state")
@@ -681,7 +682,7 @@ class SessionSchemaMixin:
 
     def _trigram_tokenizer_available(self, cursor: sqlite3.Cursor) -> bool:
         """Probe trigram support without publishing a persistent FTS object."""
-        probe = "temp.qubit_fts5_trigram_probe"
+        probe = "temp.hermes_fts5_trigram_probe"
         cursor.execute(f"DROP TABLE IF EXISTS {probe}")
         try:
             cursor.execute(f"CREATE VIRTUAL TABLE {probe} USING fts5(content, tokenize='trigram')")
@@ -767,7 +768,7 @@ class SessionSchemaMixin:
                         # A sibling process won the ADD race; store is correct.
                         logger.debug("reconcile %s.%s: %s", table_name, col_name, exc)
                         continue
-                    if "locked" in message or "busy" in message:
+                    if is_sqlite_lock_error(exc):
                         # Swallowing lock contention left the store half-reconciled ("no such
                         # column" on every read). Re-raise so the lock-patience wrapper retries init.
                         raise

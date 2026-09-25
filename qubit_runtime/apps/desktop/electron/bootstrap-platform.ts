@@ -40,10 +40,6 @@ function isWindowsBinaryPathInWsl(
   )
 }
 
-function bundledRuntimeImportCheck(platform = process.platform) {
-  return platform === 'win32' ? 'import fastapi, uvicorn, winpty' : 'import fastapi, uvicorn, ptyprocess'
-}
-
 const GPU_OVERRIDE_ON = new Set(['1', 'true', 'yes', 'on'])
 const GPU_OVERRIDE_OFF = new Set(['0', 'false', 'no', 'off'])
 
@@ -64,7 +60,7 @@ function detectRemoteDisplay(options: { env?: NodeJS.ProcessEnv; platform?: Node
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
 
-  const override = String(env.QUBIT_DESKTOP_DISABLE_GPU || '')
+  const override = String(env.HERMES_DESKTOP_DISABLE_GPU || '')
     .trim()
     .toLowerCase()
 
@@ -115,7 +111,7 @@ const LINUX_PASSWORD_STORES = new Set(['gnome-libsecret', 'kwallet', 'kwallet5',
  * Without the switch Chromium often fails to pick a keychain backend when the
  * app is launched outside a full desktop session, safeStorage reports
  * encryption as unavailable, and hardening.ts refuses to persist remote
- * gateway tokens. The `qubit desktop` launcher detects the session keychain
+ * gateway tokens. The `hermes desktop` launcher detects the session keychain
  * (or reads `desktop.password_store` from config.yaml) and bridges the value
  * in via HERMES_DESKTOP_PASSWORD_STORE.
  *
@@ -128,7 +124,7 @@ function resolveLinuxPasswordStore(options: { env?: NodeJS.ProcessEnv; platform?
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
 
-  const requested = String(env.QUBIT_DESKTOP_PASSWORD_STORE || '').trim()
+  const requested = String(env.HERMES_DESKTOP_PASSWORD_STORE || '').trim()
 
   if (platform !== 'linux' || !requested) {
     return { store: null, warning: null }
@@ -141,10 +137,4 @@ function resolveLinuxPasswordStore(options: { env?: NodeJS.ProcessEnv; platform?
   return { store: requested, warning: null }
 }
 
-export {
-  bundledRuntimeImportCheck,
-  detectRemoteDisplay,
-  isWindowsBinaryPathInWsl,
-  isWslEnvironment,
-  resolveLinuxPasswordStore
-}
+export { detectRemoteDisplay, isWindowsBinaryPathInWsl, isWslEnvironment, resolveLinuxPasswordStore }

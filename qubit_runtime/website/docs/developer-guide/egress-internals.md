@@ -1,35 +1,38 @@
 ---
 sidebar_position: 14
 title: "Egress proxy internals"
-description: "How the iron-proxy egress firewall integrates with Qubit — module layout, lifecycle, security invariants, and extension points"
+description: "How the iron-proxy egress firewall integrates with Hermes — module layout, lifecycle, security invariants, and extension points"
 ---
 
 # Egress proxy internals
 
-This page covers the architecture of the egress credential-injection firewall (`qubit egress` / iron-proxy) from a contributor / plugin author's perspective. End-user setup + usage docs live at [Egress proxy](../user-guide/egress/iron-proxy.md).
+This page covers the architecture of the egress credential-injection firewall (`hermes egress` / iron-proxy) from a contributor / plugin author's perspective. End-user setup + usage docs live at [Egress proxy](../user-guide/egress/iron-proxy.md).
 
 The threat model and high-level design are summarised on the user page; this page is about *how* it's wired, where the security-relevant code lives, and what invariants you have to preserve if you touch it.
 
 ## Module layout
 
 ```text
-agent/proxy_sources/iron_proxy.py     Core: binary install, CA gen, config build,
+pm/security_packages.py              Pinned binary acquisition and publication
+                                       through PM. Release provenance staging.
+
+agent/proxy_sources/iron_proxy.py     Core: binary lookup, GPG checks, CA gen, config build,
                                        subprocess lifecycle, mappings I/O, PID/nonce
                                        defense.  Pure-function surface where possible.
 
-qubit_cli/proxy_cli.py               Wizard + slash command handlers.
-                                       `qubit egress {install,setup,start,stop,
+hermes_cli/proxy_cli.py               Wizard + slash command handlers.
+                                       `hermes egress {install,setup,start,stop,
                                        status,disable,config}`.  Wires the
                                        core module into argparse.
 
-qubit_cli/subcommands/egress.py:_dispatch_egress
+hermes_cli/subcommands/egress.py:_dispatch_egress
                                        Top-level subparser dispatcher.
                                        dest='egress_command' (intentionally
                                        disjoint from the inbound OAuth
-                                       `qubit proxy` subparser, which uses
+                                       `hermes proxy` subparser, which uses
                                        dest='proxy_command').
 
-qubit_cli/config.py: proxy schema    The `proxy:` block in DEFAULT_CONFIG.
+hermes_cli/config.py: proxy schema    The `proxy:` block in DEFAULT_CONFIG.
                                        Adding a knob means: add it here, add a
                                        wizard prompt or `setdefault` in
                                        proxy_cli.cmd_setup, and document it
@@ -46,18 +49,18 @@ tools/environments/docker.py
                                        _HERMES_EGRESS_NODE_OPTIONS_APPEND
                                        sentinel, enforce_on_docker precedence.
 
-tests/test_iron_proxy.py              Hermetic tests (~70).  Binary install
+tests/agent/test_iron_proxy.py              Hermetic tests (~70).  Binary install
                                        path, config build, mappings I/O,
                                        subprocess lifecycle, docker arg builder,
                                        deny CIDR defaults, bind policy, CA
                                        TOCTOU, ensure_audit_log behaviour, etc.
 
-tests/test_iron_proxy_cli.py          CLI handler unit tests (~20).  Argparse
+tests/hermes_cli/test_iron_proxy_cli.py          CLI handler unit tests (~20).  Argparse
                                        wiring, fail-loud paths, BWS refresh
                                        wire-up, dest='egress_command'
                                        regression guard.
 
-tests/test_iron_proxy_e2e.py          Live E2E (gated on HERMES_RUN_E2E=1).
+tests/agent/test_iron_proxy_e2e.py          Live E2E (gated on HERMES_RUN_E2E=1).
                                        Real iron-proxy binary, real curl,
                                        end-to-end token swap verified.
 ```
@@ -65,19 +68,18 @@ tests/test_iron_proxy_e2e.py          Live E2E (gated on HERMES_RUN_E2E=1).
 ## Lifecycle
 
 ```text
-qubit egress install
+hermes egress install
   -> agent.proxy_sources.iron_proxy.install_iron_proxy(force=...)
-       Downloads pinned tarball + checksums.txt from GitHub Releases.
-       SHA-256 verification before extraction.
-       tarfile.extract(..., filter="data") on Python 3.12+ (PEP 706);
-         falls back to plain extract on older Python with member-name
-         sanitisation via _pick_tar_member.
-       Stage into ~/.hermes/bin/.iron-proxy_XXXX, chmod 755, os.replace
-         to ~/.hermes/bin/iron-proxy (atomic).
-       _VERSION_CACHE.pop(target) so a forced reinstall re-probes
-         --version on next call.
+       pm.ensure("iron-proxy", explicit=True) installs or repairs the entry.
+       PM checks archive and provenance hashes against pm/lock.json.
+       Package staging checks that release checksums cover the pinned archive,
+         then calls the GPG checker. Missing GPG permits hash-only installation.
+         An explicit signature rejection aborts installation.
+       PM publishes the entry and records its identity and digest in facts.
+       pm.installed_package("iron-proxy").binary returns the selected path.
+       _VERSION_CACHE.pop(target) makes the next status call probe --version.
 
-qubit egress setup [--from-bitwarden | --no-bitwarden] [--rotate-tokens]
+hermes egress setup [--from-bitwarden | --no-bitwarden] [--rotate-tokens]
   -> proxy_cli.cmd_setup
        Step 1. find_iron_proxy(install_if_missing=False) -> install if absent.
        Step 2. ensure_ca_cert()
@@ -100,7 +102,7 @@ qubit egress setup [--from-bitwarden | --no-bitwarden] [--rotate-tokens]
                (do NOT silently downgrade bitwarden -> env on re-run);
                save_config(cfg).
 
-qubit egress start
+hermes egress start
   -> proxy_cli.cmd_start
        Pre-checks (refuse-start path):
          - credential_source=bitwarden? -> pre-validate access_token_env + project_id
@@ -129,7 +131,7 @@ qubit egress start
                 time.sleep(0.1)
             If not listening at exit: _kill_and_wait(proc) + unlink pidfile + raise.
 
-qubit egress stop
+hermes egress stop
   -> iron_proxy.stop_proxy
        _read_pid + _pid_alive guard.
        starttime_before = _pid_proc_starttime(pid)   # Linux only; None elsewhere
@@ -181,7 +183,7 @@ Regression: `test_default_bind_is_loopback_not_zero_zero` (asserts no INADDR_ANY
 
 ### Metrics port collision
 
-`metrics.listen` defaults to `:9090` in iron-proxy v0.39 — the SAME port as Qubit's default `tunnel_port: 9090`.  `build_proxy_config` MUST explicitly pin `metrics.listen: 127.0.0.1:0` so the metrics binding gets an ephemeral loopback port that can never collide with the proxy listener regardless of operator-chosen `tunnel_port`.
+`metrics.listen` defaults to `:9090` in iron-proxy v0.39 — the SAME port as Hermes's default `tunnel_port: 9090`.  `build_proxy_config` MUST explicitly pin `metrics.listen: 127.0.0.1:0` so the metrics binding gets an ephemeral loopback port that can never collide with the proxy listener regardless of operator-chosen `tunnel_port`.
 
 Regression: `test_metrics_listener_pinned_to_loopback_ephemeral`.
 
@@ -224,13 +226,13 @@ Regression: `test_stop_proxy_suppresses_sigkill_on_pid_recycle`, `test_pid_proc_
 
 ### Token preservation on re-setup
 
-`merge_mappings(existing, discovered, rotate=False)` MUST return prior tokens for providers that overlap.  Re-running `qubit egress setup` cannot silently 401 running sandboxes.  `--rotate-tokens` is the explicit opt-in.
+`merge_mappings(existing, discovered, rotate=False)` MUST return prior tokens for providers that overlap.  Re-running `hermes egress setup` cannot silently 401 running sandboxes.  `--rotate-tokens` is the explicit opt-in.
 
 Regression: `test_merge_mappings_preserves_existing_tokens`, `test_merge_mappings_rotate_mints_fresh_tokens`.
 
 ### `credential_source` preservation
 
-`cmd_setup` MUST NOT downgrade `credential_source: bitwarden` to `env` on re-run without an explicit `--no-bitwarden` flag.  Running `qubit egress setup` (no flag) preserves whatever was previously configured.
+`cmd_setup` MUST NOT downgrade `credential_source: bitwarden` to `env` on re-run without an explicit `--no-bitwarden` flag.  Running `hermes egress setup` (no flag) preserves whatever was previously configured.
 
 Tested via the `cmd_setup` flow in CLI tests (the bitwarden-preservation path is exercised when `--from-bitwarden` is followed by a plain `setup` re-run).
 
@@ -268,7 +270,7 @@ Use `aliases` ONLY for interchangeable env-var names of the *same* credential (e
 
 ### Adding a new signature-auth provider (uncovered)
 
-If the provider uses SigV4 / SDK-minted OAuth / request signatures, a static header swap cannot cover it.  Add the env var to `_NON_BEARER_PROVIDERS` so the wizard and `qubit egress status` warn about it:
+If the provider uses SigV4 / SDK-minted OAuth / request signatures, a static header swap cannot cover it.  Add the env var to `_NON_BEARER_PROVIDERS` so the wizard and `hermes egress status` warn about it:
 
 ```python
 _NON_BEARER_PROVIDERS: Tuple[str, ...] = (
@@ -298,14 +300,14 @@ iron-proxy writes line-delimited JSON to `~/.hermes/proxy/iron-proxy.log` on the
 
 ```bash
 # Hermetic suite (no network, no real binary)
-scripts/run_tests.sh tests/test_iron_proxy.py tests/test_iron_proxy_cli.py
+scripts/run_tests.sh tests/agent/test_iron_proxy.py tests/hermes_cli/test_iron_proxy_cli.py
 
 # Live E2E (real binary, real curl, real CONNECT tunnel)
-HERMES_RUN_E2E=1 scripts/run_tests.sh tests/test_iron_proxy_e2e.py
+HERMES_RUN_E2E=1 scripts/run_tests.sh tests/agent/test_iron_proxy_e2e.py
 
-# Live PTY smoke against `qubit egress`
-QUBIT_HOME=/tmp/hermes-egress-test python3 -m qubit_cli.main egress --help
-QUBIT_HOME=/tmp/hermes-egress-test python3 -m qubit_cli.main egress setup --help
+# Live PTY smoke against `hermes egress`
+HERMES_HOME=$HOME/.hermes/cache/scratch/hermes-egress-test python3 -m hermes_cli.main egress --help
+HERMES_HOME=$HOME/.hermes/cache/scratch/hermes-egress-test python3 -m hermes_cli.main egress setup --help
 ```
 
 The CLI uses argparse, so `--help` is a good first probe for "did my new flag register correctly".
@@ -314,6 +316,6 @@ The CLI uses argparse, so `--help` is a good first probe for "did my new flag re
 
 - User-facing setup + troubleshooting: [Egress proxy](https://hermes-agent.nousresearch.com/docs/user-guide/egress/iron-proxy)
 - Docker backend internals: [Docker](https://hermes-agent.nousresearch.com/docs/user-guide/docker)
-- Bitwarden Secrets Manager integration: [`qubit secrets bitwarden`](https://hermes-agent.nousresearch.com/docs/user-guide/secrets/bitwarden)
-- CLI command reference: [`qubit egress`](https://hermes-agent.nousresearch.com/docs/reference/cli-commands#hermes-egress)
+- Bitwarden Secrets Manager integration: [`hermes secrets bitwarden`](https://hermes-agent.nousresearch.com/docs/user-guide/secrets/bitwarden)
+- CLI command reference: [`hermes egress`](https://hermes-agent.nousresearch.com/docs/reference/cli-commands#hermes-egress)
 - Sandbox-injected environment variables: [Egress proxy (sandbox-injected)](https://hermes-agent.nousresearch.com/docs/reference/environment-variables#egress-proxy-sandbox-injected)

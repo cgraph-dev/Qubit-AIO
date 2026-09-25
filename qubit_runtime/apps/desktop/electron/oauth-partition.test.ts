@@ -5,7 +5,7 @@ import { LEGACY_OAUTH_PARTITION, resolveOauthPartition } from './oauth-partition
 // #92183 — two basic-auth (cookie-flow) gateways registered in the v2
 // connections registry must not share one cookie jar. Chromium cookie jars
 // ignore the port, so two gateways on the same VPN host (different ports)
-// evict each other's `qubit_session*` cookies when they ride the single
+// evict each other's `hermes_session*` cookies when they ride the single
 // shared `persist:hermes-remote-oauth` partition — and, worse, gateway A's
 // cookie is silently PRESENTED to gateway B on every request. The resolver
 // under test keys the jar on the registry connection's identity instead.
@@ -129,6 +129,24 @@ describe('resolveOauthPartition (#92183 per-connection cookie jars)', () => {
     expect(got.startsWith('persist:')).toBe(true)
     expect(got).not.toMatch(/[\s/€]/)
     expect(resolveOauthPartition('https://gw-a.example.com', { registry: reg })).toBe(got)
+  })
+
+  it('keeps the on-disk path component colon-free and %-free (Windows cookie-store regression)', () => {
+    // Electron escapes ':' in a partition name to '%3A' for the folder name.
+    // A Windows profile folder containing '%3A' gets a cookie store that reads
+    // empty and never persists, so every cookie-auth connection would 401 and
+    // re-prompt for sign-in on each dial. The partition path component must
+    // therefore never need escaping, for ANY connection id.
+    for (const id of ['10-0-0-88-9119', 'we ird/id:€', 'a:b/c%3Ad']) {
+      const reg = registry('local', [remote(id, 'https://gw-a.example.com')])
+
+      const pathComponent = resolveOauthPartition('https://gw-a.example.com/api/auth/ws-ticket', {
+        registry: reg
+      }).slice('persist:'.length)
+
+      expect(pathComponent).not.toContain(':')
+      expect(pathComponent).not.toContain('%')
+    }
   })
 
   it('breaks same-URL ties deterministically (identical jar for identical gateway)', () => {

@@ -18,7 +18,7 @@ def host_gateway(tmp_path, monkeypatch):
     locks = tmp_path / "locks"
     locks.mkdir()
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(locks))
-    monkeypatch.setattr("qubit_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
     hr.publish_record(hr.ROLE_GATEWAY, profiles=("default", "coder"))
     return root
 

@@ -6,7 +6,7 @@ description: "AI-native persistent memory via Honcho — dialectic reasoning, mu
 
 # Honcho Memory
 
-[Honcho](https://github.com/plastic-labs/honcho) is an AI-native memory backend that adds dialectic reasoning and deep user modeling on top of Qubit's built-in memory system. Instead of simple key-value storage, Honcho maintains a running model of who the user is — their preferences, communication style, goals, and patterns — by reasoning about conversations after they happen.
+[Honcho](https://github.com/plastic-labs/honcho) is an AI-native memory backend that adds dialectic reasoning and deep user modeling on top of Hermes's built-in memory system. Instead of simple key-value storage, Honcho maintains a running model of who the user is — their preferences, communication style, goals, and patterns — by reasoning about conversations after they happen.
 
 :::info Honcho is a Memory Provider Plugin
 Honcho is integrated into the [Memory Providers](./memory-providers.md) system. All features below are available through the unified memory provider interface.
@@ -28,12 +28,12 @@ Honcho is integrated into the [Memory Providers](./memory-providers.md) system. 
 
 **Session-scoped context**: Base context now includes the session summary alongside the user representation and peer card. This gives the agent awareness of what has already been discussed in the current session, reducing repetition and enabling continuity.
 
-**Multi-agent profiles**: When multiple Qubit instances talk to the same user (e.g., a coding assistant and a personal assistant), Honcho maintains separate "peer" profiles. Each peer sees only its own observations and conclusions, preventing cross-contamination of context.
+**Multi-agent profiles**: When multiple Hermes instances talk to the same user (e.g., a coding assistant and a personal assistant), Honcho maintains separate "peer" profiles. Each peer sees only its own observations and conclusions, preventing cross-contamination of context.
 
 ## Setup
 
 ```bash
-qubit memory setup    # select "honcho" from the provider list
+hermes memory setup    # select "honcho" from the provider list
 ```
 
 Or configure manually:
@@ -104,11 +104,11 @@ The auto-injected dialectic scales `dialecticReasoningLevel` by query length: +1
 
 ## Configuration Options
 
-Honcho is configured in `~/.honcho/config.json` (global) or `$QUBIT_HOME/honcho.json` (profile-local). The setup wizard handles this for you.
+Honcho is configured in `~/.honcho/config.json` (global) or `$HERMES_HOME/honcho.json` (profile-local). The setup wizard handles this for you.
 
 ### Self-Hosted Honcho with Authentication
 
-When pointing Qubit at a self-hosted Honcho server, `qubit honcho setup` (and `qubit memory setup`) ask for a **local JWT / bearer token** after the base URL. Paste a JWT signed with the server's `AUTH_JWT_SECRET` (the Honcho compose env var) to enable authenticated access; leave it blank for servers running with `AUTH_USE_AUTH=false`. The local token is stored under the host block (`hosts.<host>.apiKey` in `honcho.json`), separate from any cloud `apiKey`, so you can flip the `Cloud or local?` prompt back to `cloud` later without losing either credential.
+When pointing Hermes at a self-hosted Honcho server, `hermes honcho setup` (and `hermes memory setup`) ask for a **local JWT / bearer token** after the base URL. Paste a JWT signed with the server's `AUTH_JWT_SECRET` (the Honcho compose env var) to enable authenticated access; leave it blank for servers running with `AUTH_USE_AUTH=false`. The local token is stored under the host block (`hosts.<host>.apiKey` in `honcho.json`), separate from any cloud `apiKey`, so you can flip the `Cloud or local?` prompt back to `cloud` later without losing either credential.
 
 ### Full Config Reference
 
@@ -123,6 +123,8 @@ When pointing Qubit at a self-hosted Honcho server, `qubit honcho setup` (and `q
 | `dialecticDynamic` | `true` | When `true`, model can override reasoning level per-call via tool param |
 | `dialecticMaxChars` | `600` | Max chars of dialectic result injected into system prompt |
 | `recallMode` | `'hybrid'` | `hybrid` (auto-inject + tools), `context` (inject only), `tools` (tools only) |
+| `initOnSessionStart` | `false` | `tools` mode only. `true` creates the Honcho session **synchronously at session start** so it is ready before the first tool call; `false` (default) defers it to the first `honcho_*` call. See the startup note below |
+| `timeout` | `null` (SDK default) | Seconds allowed for each Honcho SDK call (`requestTimeout` and the `HONCHO_TIMEOUT` env var are accepted too). Caps how long an unreachable server can hold a call, including the eager init above |
 | `writeFrequency` | `'async'` | When to flush messages: `async` (background thread), `turn` (sync), `session` (batch on end), or integer N |
 | `saveMessages` | `true` | Whether to persist messages to Honcho API |
 | `observationMode` | `'directional'` | `directional` (all on) or `unified` (shared pool). Override with `observation` object for granular control |
@@ -132,12 +134,21 @@ When pointing Qubit at a self-hosted Honcho server, `qubit honcho setup` (and `q
 | `pinUserPeer` | `false` | Gateway only. When `true`, every platform user collapses to `peerName` |
 | `userPeerAliases` | `{}` | Gateway only. Map of runtime IDs to peers (`{"7654321": "alice"}`). Many-to-one |
 | `runtimePeerPrefix` | `""` | Gateway only. Namespaces unknown runtime IDs (`telegram_7654321`) when no alias matches |
+| `a2aSessions` | `true` | Write DMs from other bots into their own Honcho session per sender bot, never the human's. `false` skips bot-authored turns entirely |
 
 **Session strategy** controls how Honcho sessions map to your work:
-- `per-session` — each `qubit` run gets a fresh session. Clean starts, memory via tools. Recommended for new users.
+- `per-session` — each `hermes` run gets a fresh session. Clean starts, memory via tools. Recommended for new users.
 - `per-directory` — one Honcho session per working directory. Context accumulates across runs.
 - `per-repo` — one session per git repository.
 - `global` — single session across all directories.
+
+Directory-based strategies and manual `sessions` mappings use the logical session working directory, not the backend's launch directory. Desktop/TUI project workspaces and ACP session directories are passed during agent construction, including deferred builds. When no directory is supplied, Honcho uses the runtime cwd resolver: session context, then the scoped `terminal.cwd` setting, then the process launch directory.
+
+Messaging gateways keep their stable per-chat session key regardless of strategy or title. For other sessions, `per-session` identity takes priority, followed by a manual directory mapping, an explicit title, and the configured strategy.
+
+Automatically generated Hermes titles (`derived` or `llm`), including lineage titles for Desktop branches, are display metadata and do not override `sessionStrategy`. An explicit user title remains an intentional session-name override for non-gateway, non-`per-session` sessions without a manual mapping.
+
+Sessions created before title provenance was recorded retain legacy behavior: because an old automatic title cannot be distinguished from an old user title, a title with no source is treated as an explicit override.
 
 **Recall mode** controls how memory flows into conversations:
 - `hybrid` — context auto-injected into system prompt AND tools available (model decides when to query).
@@ -157,9 +168,11 @@ When pointing Qubit at a self-hosted Honcho server, `qubit honcho setup` (and `q
 
 In `tools` mode, the model is fully in control — it calls `honcho_reasoning` when it wants, at whatever `reasoning_level` it picks. Cadence and budget settings only apply to modes with auto-injection (`hybrid` and `context`).
 
+**Startup behaviour and `initOnSessionStart`.** In `hybrid` and `context` mode the session is created in a background thread and startup fails open if Honcho is slow or down. `tools` mode is different by design: with `initOnSessionStart: false` (the default) nothing touches Honcho until the first `honcho_*` tool call, and with `initOnSessionStart: true` the session is created **synchronously during agent construction** so a tool call on turn 1 never races a half-initialized session. That guarantee means startup waits for Honcho: if the server is unreachable, every SDK call in that eager path runs to its connection/`timeout` limit before the agent is ready, which on Desktop shows up as `request timed out: session.resume` / `prompt.submit` (the renderer gives up after 30 s). Keep `initOnSessionStart` at `false` on Desktop and whenever your Honcho is a local service that may not be running, and set `timeout` (seconds) in `honcho.json` to bound each call if you do enable it.
+
 ## Gateway Identity Mapping
 
-These settings only matter when you run the [Qubit gateway](../../developer-guide/gateway-internals.md) — the one entrypoint where users arrive with platform-native runtime IDs (Telegram UID, Discord snowflake, Slack user). CLI, TUI, and desktop sessions have no runtime ID and always resolve to `peerName`, so off-gateway these keys do nothing.
+These settings only matter when you run the [Hermes gateway](../../developer-guide/gateway-internals.md) — the one entrypoint where users arrive with platform-native runtime IDs (Telegram UID, Discord snowflake, Slack user). CLI, TUI, and desktop sessions have no runtime ID and always resolve to `peerName`, so off-gateway these keys do nothing.
 
 The setup wizard detects whether a gateway platform is connected and skips this step entirely if not. When it runs, it asks one question — *who talks to this gateway?* — and derives the keys:
 
@@ -172,6 +185,8 @@ The setup wizard detects whether a gateway platform is connected and skips this 
 Pick `[e]` at the prompt to set the three keys directly instead.
 
 The resolver tries the keys top-down, first match wins: `pinUserPeer` → `userPeerAliases[id]` → `runtimePeerPrefix + id` → raw runtime ID → `peerName` → session-key fallback.
+
+Each turn is written under the peer of whoever wrote it, so in a shared chat the first person to message no longer collects everyone else's facts. A turn from another bot (a Bot Mode DM tagged `bot:<profile>`, or a platform account the adapter flags as a bot) always gets its own peer: `pinUserPeer` unifies one person's accounts, never a bot. Its turn lands in a per-sender `a2a` session (see `a2aSessions`), and `honcho_conclude` / `honcho_profile` refuse writes while such a turn runs, since conclusions and cards describe the human.
 
 :::warning Un-pinning orphans pooled memory
 Flipping `pinUserPeer` from `true` to `false` does not migrate data — memory accumulated under `peerName` stays there, and platform users resolve to fresh, empty peers. To keep your own continuity, choose the **pooled** path so your runtime IDs alias back to `peerName`. The wizard offers this steer automatically when it detects the transition.
@@ -214,7 +229,7 @@ Common patterns:
 | AI shouldn't re-model the user from its own replies | `"ai": {"observeMe": true, "observeOthers": false}` |
 | Strong persona the AI peer shouldn't update from self-observation | `"ai": {"observeMe": false, "observeOthers": true}` |
 
-Server-side toggles set via the [Honcho dashboard](https://app.honcho.dev) win over local defaults — Qubit syncs them back at session init.
+Server-side toggles set via the [Honcho dashboard](https://app.honcho.dev) win over local defaults — Hermes syncs them back at session init.
 
 ## Tools
 
@@ -230,35 +245,35 @@ When Honcho is active as the memory provider, five tools become available:
 
 ## CLI Commands
 
-The `qubit honcho` subcommand is **only registered when Honcho is the active memory provider** (`memory.provider: honcho` in `config.yaml`). On a fresh install, configure Honcho directly with `qubit memory setup honcho` (or run `qubit memory setup` and pick it from the list); the `qubit honcho` subcommand then appears on the next invocation.
+The `hermes honcho` subcommand is **only registered when Honcho is the active memory provider** (`memory.provider: honcho` in `config.yaml`). On a fresh install, configure Honcho directly with `hermes memory setup honcho` (or run `hermes memory setup` and pick it from the list); the `hermes honcho` subcommand then appears on the next invocation.
 
 ```bash
-qubit memory setup honcho    # Configure Honcho directly (works before activation)
-qubit honcho status          # Connection status, config, and key settings
-qubit honcho setup           # Redirects to `qubit memory setup` (post-activation alias)
-qubit honcho strategy        # Show or set session strategy (per-session/per-directory/per-repo/global)
-qubit honcho peer            # Show or update peer names + dialectic reasoning level
-qubit honcho mode            # Show or set recall mode (hybrid/context/tools)
-qubit honcho tokens          # Show or set token budget for context and dialectic
-qubit honcho identity        # Seed or show the AI peer's Honcho identity
-qubit honcho sync            # Sync Honcho config to all existing profiles
-qubit honcho peers           # Show peer identities across all profiles
-qubit honcho sessions        # List known Honcho session mappings
-qubit honcho map             # Map current directory to a Honcho session name
-qubit honcho enable          # Enable Honcho for the active profile
-qubit honcho disable         # Disable Honcho for the active profile
-qubit honcho migrate         # Step-by-step migration guide from openclaw-honcho
+hermes memory setup honcho    # Configure Honcho directly (works before activation)
+hermes honcho status          # Connection status, config, and key settings
+hermes honcho setup           # Redirects to `hermes memory setup` (post-activation alias)
+hermes honcho strategy        # Show or set session strategy (per-session/per-directory/per-repo/global)
+hermes honcho peer            # Show or update peer names + dialectic reasoning level
+hermes honcho mode            # Show or set recall mode (hybrid/context/tools)
+hermes honcho tokens          # Show or set token budget for context and dialectic
+hermes honcho identity        # Seed or show the AI peer's Honcho identity
+hermes honcho sync            # Sync Honcho config to all existing profiles
+hermes honcho peers           # Show peer identities across all profiles
+hermes honcho sessions        # List known Honcho session mappings
+hermes honcho map             # Map current directory to a Honcho session name
+hermes honcho enable          # Enable Honcho for the active profile
+hermes honcho disable         # Disable Honcho for the active profile
+hermes honcho migrate         # Step-by-step migration guide from openclaw-honcho
 ```
 
-## Migrating from `qubit honcho`
+## Migrating from `hermes honcho`
 
-If you previously used the standalone `qubit honcho setup`:
+If you previously used the standalone `hermes honcho setup`:
 
 1. Your existing configuration (`honcho.json` or `~/.honcho/config.json`) is preserved
 2. Your server-side data (memories, conclusions, user profiles) is intact
 3. Set `memory.provider: honcho` in config.yaml to reactivate
 
-No re-login or re-setup needed. Run `qubit memory setup` and select "honcho" — the wizard detects your existing config.
+No re-login or re-setup needed. Run `hermes memory setup` and select "honcho" — the wizard detects your existing config.
 
 ## Full Documentation
 

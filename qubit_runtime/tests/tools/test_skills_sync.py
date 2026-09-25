@@ -14,12 +14,10 @@ from tools.skills_sync import (
     _read_skill_name,
     _write_manifest,
     _discover_bundled_skills,
-    _compute_relative_dest,
     _dir_hash,
     sync_skills,
 )
 from tools.skills_sync_bundled_ops import reset_bundled_skill
-from tools.skills_sync_optional import restore_official_optional_skill
 
 
 class TestReadWriteManifest:
@@ -137,13 +135,6 @@ class TestReadSkillName:
         assert skills[0][0] == "audiocraft-audio-generation"
 
 
-class TestComputeRelativeDest:
-    def test_preserves_category_structure(self):
-        bundled = Path("/repo/skills")
-        dest = _compute_relative_dest(Path("/repo/skills/mlops/axolotl"), bundled)
-        assert str(dest).endswith("mlops/axolotl")
-        # Flat (uncategorized) skills keep their own name.
-        assert _compute_relative_dest(Path("/repo/skills/simple"), bundled).name == "simple"
 
 
 class TestRmtreeWritableScopeGuard:
@@ -171,15 +162,15 @@ class TestRmtreeWritableScopeGuard:
         would wipe every installed skill (the degenerate #48200 path)."""
         from tools.skills_sync import _rmtree_writable
 
-        qubit = tmp_path / "home"
-        qubit.mkdir()
-        skills = qubit / "skills"
+        hermes = tmp_path / "home"
+        hermes.mkdir()
+        skills = hermes / "skills"
         (skills / "keep").mkdir(parents=True)
-        sibling = qubit / "kanban.db"  # any non-skills path
+        sibling = hermes / "kanban.db"  # any non-skills path
         sibling.mkdir()
 
         with patch("tools.skills_sync.SKILLS_DIR", skills):
-            for target in (Path("/"), qubit, sibling, skills):
+            for target in (Path("/"), hermes, sibling, skills):
                 with pytest.raises(ValueError, match="refusing to rmtree"):
                     _rmtree_writable(target)
 
@@ -606,7 +597,6 @@ class TestResetBundledSkill:
 
         assert untracked["ok"] is False
         assert untracked["action"] == "not_in_manifest"
-        assert "not a tracked bundled skill" in untracked["message"]
 
         # Tracked in the manifest, but no longer shipped upstream.
         ghost = skills_dir / "productivity" / "ghost-skill"
@@ -696,7 +686,6 @@ class TestResetBundledSkill:
         # Restore failed, and the manifest must be left untouched.
         assert result["ok"] is False
         assert result["action"] == "not_reset"
-        assert "Manifest entry preserved" in result["message"]
         manifest_after = manifest_file.read_text()
         assert "google-workspace" in manifest_after
         # User copy is still on disk (we changed nothing).

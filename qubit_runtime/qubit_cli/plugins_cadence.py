@@ -23,11 +23,11 @@ _DEFAULT_INTERVAL_HOURS = 24
 
 def _marker_path() -> Path:
     """The last-run marker, resolved per call (tests monkeypatch
-    get_hermes_home). Derivation only — NO mkdir: a due-check or any
+    get_qubit_home). Derivation only — NO mkdir: a due-check or any
     read path must not create user state."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
-    return get_hermes_home() / _MARKERS_DIR / "last-run"
+    return get_qubit_home() / _MARKERS_DIR / "last-run"
 
 
 def _markers_dir() -> Path:

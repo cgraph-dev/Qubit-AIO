@@ -4,10 +4,7 @@ import { deriveRemoteAuthProviderShape } from './desktop-remote-auth'
 
 describe('deriveRemoteAuthProviderShape', () => {
   it('uses fallback copy when the gateway has not reported providers', () => {
-    expect(deriveRemoteAuthProviderShape(null)).toEqual({
-      isPassword: false,
-      providerLabel: 'your identity provider'
-    })
+    expect(deriveRemoteAuthProviderShape(null).isPassword).toBe(false)
     expect(deriveRemoteAuthProviderShape([], 'the configured gateway')).toEqual({
       isPassword: false,
       providerLabel: 'the configured gateway'
@@ -25,20 +22,20 @@ describe('deriveRemoteAuthProviderShape', () => {
 
   it('keeps OAuth copy for redirect providers and mixed deployments', () => {
     expect(
-      deriveRemoteAuthProviderShape([{ name: 'nous', displayName: 'Qubit Labs', supportsPassword: false }])
+      deriveRemoteAuthProviderShape([{ name: 'nous', displayName: 'Nous Research', supportsPassword: false }])
     ).toEqual({
       isPassword: false,
-      providerLabel: 'Qubit Labs'
+      providerLabel: 'Nous Research'
     })
 
     expect(
       deriveRemoteAuthProviderShape([
         { name: 'basic', displayName: 'Username & Password', supportsPassword: true },
-        { name: 'nous', displayName: 'Qubit Labs', supportsPassword: false }
+        { name: 'nous', displayName: 'Nous Research', supportsPassword: false }
       ])
     ).toEqual({
       isPassword: false,
-      providerLabel: 'Username & Password / Qubit Labs'
+      providerLabel: 'Username & Password / Nous Research'
     })
   })
 

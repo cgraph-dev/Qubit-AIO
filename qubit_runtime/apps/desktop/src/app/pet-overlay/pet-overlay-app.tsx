@@ -6,6 +6,7 @@ import { PetBubble } from '@/components/pet/pet-bubble'
 import { PetSprite } from '@/components/pet/pet-sprite'
 import { type PetZoomAnchor, usePetZoomGesture } from '@/components/pet/use-pet-zoom-gesture'
 import { Mail } from '@/lib/icons'
+import { isSubmitEnter } from '@/lib/ime'
 import { $petActivity, $petInfo, setPetInfo } from '@/store/pet'
 import { overlayWindowSize } from '@/store/pet-overlay'
 import { setAwaitingResponse, setBusy } from '@/store/session'
@@ -82,14 +83,14 @@ export function PetOverlayApp() {
   const setIgnore = (ignore: boolean) => {
     if (ignoreRef.current !== ignore) {
       ignoreRef.current = ignore
-      window.qubitDesktop?.petOverlay?.setIgnoreMouse(ignore)
+      window.hermesDesktop?.petOverlay?.setIgnoreMouse(ignore)
     }
   }
 
   // Mirror pushed state into the shared atoms so PetSprite/PetBubble just work.
   // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
-    const off = window.qubitDesktop?.petOverlay?.onState(payload => {
+    const off = window.hermesDesktop?.petOverlay?.onState(payload => {
       setPetInfo(payload.info)
       $petActivity.set(payload.activity ?? {})
       setBusy(Boolean(payload.busy))
@@ -112,7 +113,7 @@ export function PetOverlayApp() {
 
     // Tell the main renderer we're mounted so it pushes the current frame (the
     // subscribe-time pushes during open() can land before this view exists).
-    window.qubitDesktop?.petOverlay?.control({ type: 'ready' })
+    window.hermesDesktop?.petOverlay?.control({ type: 'ready' })
 
     return off
   }, [])
@@ -190,7 +191,7 @@ export function PetOverlayApp() {
   useEffect(() => {
     composerOpenRef.current = composerOpen
 
-    window.qubitDesktop?.petOverlay?.setFocusable(composerOpen)
+    window.hermesDesktop?.petOverlay?.setFocusable(composerOpen)
 
     if (composerOpen) {
       setIgnore(false)
@@ -228,7 +229,7 @@ export function PetOverlayApp() {
       drag.moved = true
     }
 
-    window.qubitDesktop?.petOverlay?.setBounds({
+    window.hermesDesktop?.petOverlay?.setBounds({
       height: drag.height,
       width: drag.width,
       x: e.screenX - drag.offX,
@@ -253,7 +254,7 @@ export function PetOverlayApp() {
 
       // Remember the spot on the desktop (screen coords) so the pet reopens here
       // next time / after a restart.
-      window.qubitDesktop?.petOverlay?.control({
+      window.hermesDesktop?.petOverlay?.control({
         bounds: { height: drag.height, width: drag.width, x: e.screenX - drag.offX, y: e.screenY - drag.offY },
         type: 'bounds'
       })
@@ -263,7 +264,7 @@ export function PetOverlayApp() {
 
     // Shift-click always pops the pet back in (no double-click ambiguity).
     if (e.shiftKey) {
-      window.qubitDesktop?.petOverlay?.control({ type: 'pop-in' })
+      window.hermesDesktop?.petOverlay?.control({ type: 'pop-in' })
 
       return
     }
@@ -273,7 +274,7 @@ export function PetOverlayApp() {
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current)
       clickTimerRef.current = undefined
-      window.qubitDesktop?.petOverlay?.control({ type: 'toggle-app' })
+      window.hermesDesktop?.petOverlay?.control({ type: 'toggle-app' })
 
       return
     }
@@ -288,7 +289,7 @@ export function PetOverlayApp() {
     const text = draft.trim()
 
     if (text) {
-      window.qubitDesktop?.petOverlay?.control({ text, type: 'submit' })
+      window.hermesDesktop?.petOverlay?.control({ text, type: 'submit' })
     }
 
     setDraft('')
@@ -298,7 +299,7 @@ export function PetOverlayApp() {
   const openApp = () => {
     // Hide the icon immediately; the main renderer also clears the source flag.
     setUnread(false)
-    window.qubitDesktop?.petOverlay?.control({ type: 'open-app' })
+    window.hermesDesktop?.petOverlay?.control({ type: 'open-app' })
   }
 
   // Alt+wheel over the popped-out pet resizes it. The overlay has no gateway,
@@ -308,7 +309,7 @@ export function PetOverlayApp() {
   const onScale = useCallback((next: number, anchor: PetZoomAnchor) => {
     zoomAnchorRef.current = anchor
     setPetInfo({ ...$petInfo.get(), scale: next })
-    window.qubitDesktop?.petOverlay?.control({ scale: next, type: 'scale' })
+    window.hermesDesktop?.petOverlay?.control({ scale: next, type: 'scale' })
   }, [])
 
   usePetZoomGesture(petRef, onScale, Boolean(info.enabled && info.spritesheetBase64))
@@ -357,8 +358,8 @@ export function PetOverlayApp() {
       y: Math.round(window.screenY + ay - (ay - (curH - PET_PADDING_BOTTOM)) * ratio - (height - PET_PADDING_BOTTOM))
     }
 
-    window.qubitDesktop?.petOverlay?.setBounds(bounds)
-    window.qubitDesktop?.petOverlay?.control({ bounds, type: 'bounds' })
+    window.hermesDesktop?.petOverlay?.setBounds(bounds)
+    window.hermesDesktop?.petOverlay?.control({ bounds, type: 'bounds' })
   }, [info.enabled, info.spritesheetBase64, info.scale, info.frameW, info.frameH])
 
   if (!info.enabled || !info.spritesheetBase64) {
@@ -390,7 +391,7 @@ export function PetOverlayApp() {
         <input
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (isSubmitEnter(e) && !e.shiftKey) {
               e.preventDefault()
               send()
             } else if (e.key === 'Escape') {
@@ -447,7 +448,7 @@ export function PetOverlayApp() {
               stopPropagation keeps a click from starting a window drag. */}
           {unread && (
             <button
-              aria-label="Open in Qubit"
+              aria-label="Open in Hermes"
               onClick={openApp}
               onPointerDown={e => e.stopPropagation()}
               onPointerUp={e => e.stopPropagation()}
@@ -468,7 +469,6 @@ export function PetOverlayApp() {
                 top: 0,
                 width: 24
               }}
-              title="Open in Qubit"
               type="button"
             >
               <Mail style={{ height: 13, width: 13 }} />

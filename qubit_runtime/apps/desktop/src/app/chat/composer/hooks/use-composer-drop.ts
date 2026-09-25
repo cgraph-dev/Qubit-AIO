@@ -2,7 +2,7 @@ import { type DragEvent as ReactDragEvent, useRef, useState } from 'react'
 
 import { triggerHaptic } from '@/lib/haptics'
 
-import { extractDroppedFiles, QUBIT_PATHS_MIME, partitionDroppedFiles } from '../../hooks/use-composer-actions'
+import { extractDroppedFiles, HERMES_PATHS_MIME, partitionDroppedFiles } from '../../hooks/use-composer-actions'
 import { dragHasAttachments, droppedFileInlineRefs, type InlineRefInput } from '../inline-refs'
 import type { ChatBarProps } from '../types'
 
@@ -10,6 +10,7 @@ interface UseComposerDropArgs {
   cwd: ChatBarProps['cwd']
   insertInlineRefs: (refs: InlineRefInput[]) => boolean
   onAttachDroppedItems: ChatBarProps['onAttachDroppedItems']
+  recordUndoPoint: () => void
   requestMainFocus: () => void
 }
 
@@ -24,6 +25,7 @@ export function useComposerDrop({
   cwd,
   insertInlineRefs,
   onAttachDroppedItems,
+  recordUndoPoint,
   requestMainFocus
 }: UseComposerDropArgs) {
   const [dragActive, setDragActive] = useState(false)
@@ -35,7 +37,7 @@ export function useComposerDrop({
   }
 
   const handleDragEnter = (event: ReactDragEvent<HTMLFormElement>) => {
-    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, QUBIT_PATHS_MIME)) {
+    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
       return
     }
 
@@ -48,7 +50,7 @@ export function useComposerDrop({
   }
 
   const handleDragOver = (event: ReactDragEvent<HTMLFormElement>) => {
-    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, QUBIT_PATHS_MIME)) {
+    if (!onAttachDroppedItems || !dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
       return
     }
 
@@ -105,7 +107,7 @@ export function useComposerDrop({
   }
 
   const handleInputDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, QUBIT_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
       return
     }
 
@@ -115,7 +117,12 @@ export function useComposerDrop({
   }
 
   const handleInputDrop = (event: ReactDragEvent<HTMLDivElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, QUBIT_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+      // A plain text drag within the editor mutates the DOM without a
+      // React-visible beforeinput (insertFromDrop), so the undo snapshot has
+      // to be banked here — before Chromium applies the move.
+      recordUndoPoint()
+
       return
     }
 

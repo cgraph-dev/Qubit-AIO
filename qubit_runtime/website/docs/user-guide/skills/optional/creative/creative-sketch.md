@@ -14,19 +14,19 @@ Throwaway HTML mockups: 2-3 design variants to compare.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/creative/sketch` |
-| Path | `optional-skills/creative\sketch` |
+| Source | Optional — install with `hermes skills install official/creative/sketch` |
+| Path | `optional-skills/creative/sketch` |
 | Version | `1.0.1` |
-| Author | Qubit Agent (adapted from gsd-build/get-shit-done) |
+| Author | Hermes Agent (adapted from gsd-build/get-shit-done) |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `sketch`, `mockup`, `design`, `ui`, `prototype`, `html`, `variants`, `exploration`, `wireframe`, `comparison` |
-| Related skills | [`spike`](/docs/user-guide/skills/bundled/software-development/software-development-spike), [`claude-design`](/docs/user-guide/skills/bundled/creative/creative-claude-design), [`popular-web-designs`](/docs/user-guide/skills/bundled/creative/creative-popular-web-designs), [`excalidraw`](/docs/user-guide/skills/optional/creative/creative-excalidraw) |
+| Related skills | [`spike`](../../bundled/software-development/software-development-spike.md), [`claude-design`](../../bundled/creative/creative-claude-design.md), [`popular-web-designs`](../../bundled/creative/creative-popular-web-designs.md), [`excalidraw`](../../optional/creative/creative-excalidraw.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Sketch
@@ -44,7 +44,7 @@ Load this when the user says things like "sketch this screen", "show me what X c
 
 ## If the user has the full GSD system installed
 
-If `gsd-sketch` shows up as a sibling skill (installed via `npx get-shit-done-cc --qubit`), you can use **`gsd-sketch`** for the fuller workflow: persistent `.planning/sketches/` with MANIFEST, frontier mode analysis, consistency audits across past sketches, and integration with the rest of GSD. This skill is the lightweight standalone version — one-off sketching without the state machinery.
+If `gsd-sketch` shows up as a sibling skill (installed via `npx get-shit-done-cc --hermes`), you can use **`gsd-sketch`** for the fuller workflow: persistent `.planning/sketches/` with MANIFEST, frontier mode analysis, consistency audits across past sketches, and integration with the rest of GSD. This skill is the lightweight standalone version — one-off sketching without the state machinery.
 
 > **Note:** The upstream GSD project ([gsd-build/get-shit-done](https://github.com/gsd-build/get-shit-done)) is **archived / no longer maintained** on GitHub. The npm package (`get-shit-done-cc`) still installs, but treat it as an archived community project — this standalone `sketch` skill is the maintained path and needs nothing extra.
 
@@ -107,7 +107,7 @@ Each variant is a **single self-contained HTML file**:
 
 Open it in a browser. If it looks broken, fix it before showing the user.
 
-**Verify variants visually — use Qubit' browser tools.** Don't just write HTML and hope it renders; load each variant and look at it:
+**Verify variants visually — use Hermes' browser tools.** Don't just write HTML and hope it renders; load each variant and look at it:
 
 ```
 browser_navigate(url="file:///absolute/path/to/sketches/001-calm-editorial/index.html")
@@ -237,4 +237,4 @@ Repeat for each variant, then present the comparison table.
 
 ## Attribution
 
-Adapted from the GSD (Get Shit Done) project's `/gsd-sketch` workflow — MIT © 2025 Lex Christopherson ([gsd-build/get-shit-done]( 3 )). The upstream GSD repo is now **archived/unmaintained** on GitHub; the `get-shit-done-cc` npm package still installs (`npx get-shit-done-cc --hermes --global`) and ships persistent sketch state, theme/variant pattern references, and consistency-audit workflows, but treat it as an archived community project.
+Adapted from the GSD (Get Shit Done) project's `/gsd-sketch` workflow — MIT © 2025 Lex Christopherson ([gsd-build/get-shit-done](https://github.com/gsd-build/get-shit-done)). The upstream GSD repo is now **archived/unmaintained** on GitHub; the `get-shit-done-cc` npm package still installs (`npx get-shit-done-cc --hermes --global`) and ships persistent sketch state, theme/variant pattern references, and consistency-audit workflows, but treat it as an archived community project.

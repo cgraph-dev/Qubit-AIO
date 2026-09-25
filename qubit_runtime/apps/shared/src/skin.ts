@@ -1,5 +1,5 @@
 /**
- * Canonical Qubit skin — the theme SDK's cross-surface contract.
+ * Canonical Hermes skin — the theme SDK's cross-surface contract.
  *
  * A skin is authored once as YAML in `$QUBIT_HOME/skins/<name>.yaml` (or a
  * built-in), resolved by the Python skin engine (`qubit_cli/skin_engine.py`),
@@ -92,7 +92,7 @@ export type SkinColors = Partial<Record<SkinColorToken, string>> & { [key: strin
 export type SkinBranding = Partial<Record<SkinBrandingToken, string>> & { [key: string]: string | undefined }
 
 /** The resolved skin payload (matches Python's `resolve_skin()`). */
-export interface QubitSkin {
+export interface HermesSkin {
   name?: string
   description?: string
   colors?: SkinColors

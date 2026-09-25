@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S bash -c 'exec "$BASH" "$(dirname "$0")/_hermes-python" "$0" "$@"'
 """Build the Qubit Model Catalog — a centralized JSON manifest of curated models.
 
 This script reads the in-repo hardcoded curated lists (``OPENROUTER_MODELS``,
@@ -86,8 +86,6 @@ def build_catalog() -> dict:
                 "metadata": {
                     "display_name": "Qubit Labs",
                     "note": (
-                        "Free-tier gating is determined live via Portal pricing "
-                        "(partition_nous_models_by_tier), not this manifest. "
                         'The entry labeled "default": true is the model Qubit '
                         "silently lands on when the user never picked one."
                     ),

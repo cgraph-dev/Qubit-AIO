@@ -73,6 +73,7 @@ import { useProfileScope } from "@/contexts/useProfileScope";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { ProfileScopeBanner } from "@/components/ProfileScopeBanner";
 import { MemoryPressureBanner } from "@/components/MemoryPressureBanner";
+import { MultiplexStandaloneBanner } from "@/components/MultiplexStandaloneBanner";
 import { useSystemActions } from "@/contexts/useSystemActions";
 import type { SystemAction } from "@/contexts/system-actions-context";
 // Route pages are lazy-loaded so the initial dashboard shell does not pay for
@@ -105,6 +106,7 @@ import type { PluginManifest } from "@/plugins";
 import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { latchChatActivation } from "@/lib/chat-activation";
+import { sharedGatewayProfiles, sharedGatewayRestartDescription } from "@/lib/shared-gateway";
 import { api } from "@/lib/api";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
 
@@ -367,10 +369,7 @@ function buildRoutes(
   return routes;
 }
 
-const SIDEBAR_COLLAPSED_KEY = "qubit-sidebar-collapsed";
-/** Pre-rebrand key, migrated one-time on first read so existing users keep
- *  their saved sidebar state. */
-const LEGACY_SIDEBAR_COLLAPSED_KEY = "hermes-sidebar-collapsed";
+const SIDEBAR_COLLAPSED_KEY = "hermes-sidebar-collapsed";
 
 export default function App() {
   const { t } = useI18n();
@@ -382,15 +381,7 @@ export default function App() {
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      const current = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      if (current !== null) return current === "true";
-      const legacy = localStorage.getItem(LEGACY_SIDEBAR_COLLAPSED_KEY);
-      if (legacy !== null) {
-        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, legacy);
-        localStorage.removeItem(LEGACY_SIDEBAR_COLLAPSED_KEY);
-        return legacy === "true";
-      }
-      return false;
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
     } catch {
       return false;
     }
@@ -543,7 +534,8 @@ export default function App() {
           "bg-background-base",
         )}
         style={{
-          background: "var(--component-header-background)",
+          background:
+            "var(--component-header-background, var(--background-base))",
           borderImage: "var(--component-header-border-image)",
           clipPath: "var(--component-header-clip-path)",
         }}
@@ -585,6 +577,7 @@ export default function App() {
       <PluginSlot name="header-banner" />
       <ProfileScopeBanner />
       <MemoryPressureBanner status={sidebarStatus} />
+      <MultiplexStandaloneBanner status={sidebarStatus} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex min-h-0 min-w-0 flex-1">
@@ -602,7 +595,8 @@ export default function App() {
               collapsed && "lg:w-14",
             )}
             style={{
-              background: "var(--component-sidebar-background)",
+              background:
+                "var(--component-sidebar-background, var(--background-base))",
               clipPath: "var(--component-sidebar-clip-path)",
               borderImage: "var(--component-sidebar-border-image)",
             }}
@@ -677,7 +671,7 @@ export default function App() {
 
               {sidebarNav.pluginItems.length > 0 && (
                 <div
-                  aria-labelledby="qubit-sidebar-plugin-nav-heading"
+                  aria-labelledby="hermes-sidebar-plugin-nav-heading"
                   className="flex flex-col border-t border-current/10 pb-2"
                   role="group"
                 >
@@ -687,7 +681,7 @@ export default function App() {
                       "font-sans text-display text-xs tracking-[0.12em] text-text-tertiary",
                       isDesktopCollapsed && "lg:hidden",
                     )}
-                    id="qubit-sidebar-plugin-nav-heading"
+                    id="hermes-sidebar-plugin-nav-heading"
                   >
                     {t.app.pluginNavSection}
                   </span>
@@ -951,7 +945,9 @@ function SidebarSystemActions({
   const navigate = useNavigate();
   const { activeAction, isBusy, isRunning, pendingAction, runAction } =
     useSystemActions();
-  const canUpdateQubit = status?.can_update_qubit === true;
+  const canUpdateHermes = status?.can_update_hermes === true;
+  // Served by the shared multiplexer: a restart blips every bot on this device — say which.
+  const sharedGateway = sharedGatewayProfiles(status);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
   const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
   const [updateConfirmInfo, setUpdateConfirmInfo] =
@@ -966,7 +962,7 @@ function SidebarSystemActions({
     let cancelled = false;
     setUpdateConfirmChecking(true);
     api
-      .checkQubitUpdate(false)
+      .checkHermesUpdate(false)
       .then((info) => {
         if (!cancelled) setUpdateConfirmInfo(info);
       })
@@ -989,10 +985,10 @@ function SidebarSystemActions({
     }
     const cmd = updateConfirmInfo?.update_command ?? "qubit update";
     return (
-      t.status.updateQubitConfirmMessage ??
+      t.status.updateHermesConfirmMessage ??
       `This will run 'qubit update' (${cmd}) and restart the gateway when it finishes.`
     );
-  }, [t.status.updateQubitConfirmMessage, updateConfirmInfo]);
+  }, [t.status.updateHermesConfirmMessage, updateConfirmInfo]);
 
   const items: SystemActionItem[] = [
     {
@@ -1003,12 +999,12 @@ function SidebarSystemActions({
       spin: true,
     },
   ];
-  if (canUpdateQubit) {
+  if (canUpdateHermes) {
     items.push({
       action: "update",
       icon: Download,
-      label: t.status.updateQubit,
-      runningLabel: t.status.updatingQubit,
+      label: t.status.updateHermes,
+      runningLabel: t.status.updatingHermes,
       spin: false,
     });
   }
@@ -1085,23 +1081,27 @@ function SidebarSystemActions({
 
     <ConfirmDialog
       cancelLabel={t.common.cancel}
-      confirmLabel={t.status.restartGateway}
+      confirmLabel={sharedGateway ? "Restart all" : t.status.restartGateway}
       description={
-        t.status.restartGatewayConfirmMessage ??
-        "This restarts the Qubit gateway process. Connected channels and active sessions will reconnect afterward."
+        sharedGateway
+          ? sharedGatewayRestartDescription(sharedGateway)
+          : (t.status.restartGatewayConfirmMessage ??
+            "This restarts the Qubit gateway process. Connected channels and active sessions will reconnect afterward.")
       }
       loading={pendingAction === "restart"}
       onCancel={() => setRestartConfirmOpen(false)}
       onConfirm={confirmRestart}
       open={restartConfirmOpen}
       title={
-        t.status.restartGatewayConfirmTitle ?? `${t.status.restartGateway}?`
+        sharedGateway
+          ? "Restart the shared gateway?"
+          : (t.status.restartGatewayConfirmTitle ?? `${t.status.restartGateway}?`)
       }
     />
 
     <ConfirmDialog
       cancelLabel={t.common.cancel}
-      confirmLabel={t.status.updateQubitConfirmNow ?? "Update now"}
+      confirmLabel={t.status.updateHermesConfirmNow ?? "Update now"}
       description={
         updateConfirmChecking ? t.common.loading : updateConfirmDescription
       }
@@ -1109,7 +1109,7 @@ function SidebarSystemActions({
       onCancel={() => setUpdateConfirmOpen(false)}
       onConfirm={confirmUpdate}
       open={updateConfirmOpen}
-      title={t.status.updateQubitConfirmTitle ?? `${t.status.updateQubit}?`}
+      title={t.status.updateHermesConfirmTitle ?? `${t.status.updateHermes}?`}
     />
     </>
   );

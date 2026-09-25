@@ -1,11 +1,11 @@
 ---
 title: "CLI Symbols Glossary"
-description: "What every symbol in the Qubit terminal UI means — transcript markers, status-bar badges, overlay glyphs, and approval prompts."
+description: "What every symbol in the Hermes terminal UI means — transcript markers, status-bar badges, overlay glyphs, and approval prompts."
 ---
 
 # CLI Symbols Glossary
 
-The Qubit terminal interfaces speak a compact visual language: dots, chevrons, braille spinners, and status glyphs. This page is the decoder ring. It covers the [TUI](../user-guide/tui.md) (where most of these render) and notes the pieces shared with the [Classic CLI](../user-guide/cli.md).
+The Hermes terminal interfaces speak a compact visual language: dots, chevrons, braille spinners, and status glyphs. This page is the decoder ring. It covers the [TUI](../user-guide/tui.md) (where most of these render) and notes the pieces shared with the [Classic CLI](../user-guide/cli.md).
 
 :::note Skins can restyle some of these
 Glyphs marked *themeable* below are brand defaults — a [skin](../user-guide/features/skins.md) can override them (for example `tool_prefix` and the prompt symbol). Everything else is fixed in the renderer.
@@ -37,7 +37,7 @@ The single line at the bottom of the TUI. Segments appear only when relevant and
 | Symbol | Meaning |
 |--------|---------|
 | `⠋⠙⠹…` (braille patterns) | Busy spinner. Thinking and tool phases use different braille animation sets. |
-| `⚕ 🌀 🤔 ✨ 🍵 🔮` | Frames of the `emoji` busy-indicator style (`/indicator emoji`). The default style rotates kaomoji faces instead. |
+| `☤ 🌀 🤔 ✨ 🍵 🔮` | Frames of the `emoji` busy-indicator style (`/indicator emoji`). The default style rotates kaomoji faces instead. |
 | <code>&#124; / - &#92;</code> | Frames of the `ascii` busy-indicator style. |
 | `⏱` | Per-prompt elapsed time while the turn runs, e.g. `⏱ 12s/3m 45s` (turn time / session time). |
 | `⏲` | The same timer, frozen after the turn completes. |
@@ -49,7 +49,7 @@ The single line at the bottom of the TUI. Segments appear only when relevant and
 | `● REC` | Voice mode is recording. |
 | `◉ STT` | Voice recording stopped; speech-to-text is transcribing. |
 | `◉ focus` | Focus view is on (reduced output). Pinned so it never drops off a narrow terminal. |
-| `♥` | Affection flash — Qubit noticed you being nice to it. |
+| `♥` | Affection flash — Hermes noticed you being nice to it. |
 | `⚡` / `🔋` | Battery indicator (opt-in): plugged in / on battery, with percentage. |
 | `N bg` | N background terminal processes tracked in this session. |
 | `N live sessions` | Open TUI sessions in this process — click to open the session switcher. |

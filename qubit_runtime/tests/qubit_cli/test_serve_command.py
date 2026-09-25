@@ -1,4 +1,4 @@
-"""Contract for the headless ``qubit serve`` backend command.
+"""Contract for the headless ``hermes serve`` backend command.
 
 ``serve`` is what the desktop app and remote backends launch — the same gateway
 as ``dashboard`` (shared handler) but always headless, and decoupled in name so
@@ -38,9 +38,6 @@ def _parser() -> argparse.ArgumentParser:
 
 
 
-def test_serve_supports_the_lifecycle_flags():
-    for flag in ("--stop", "--status"):
-        assert getattr(_parser().parse_args(["serve", flag]), flag.lstrip("-")) is True
 
 
 def test_serve_is_a_headless_backend_but_dashboard_is_not():

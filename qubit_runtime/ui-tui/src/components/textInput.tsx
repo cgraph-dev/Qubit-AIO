@@ -1,5 +1,5 @@
-import type { InputEvent, Key } from '@qubit/ink'
-import * as Ink from '@qubit/ink'
+import type { InputEvent, Key } from '@hermes/ink'
+import * as Ink from '@hermes/ink'
 import { type MutableRefObject, useEffect, useMemo, useRef, useState } from 'react'
 
 import { setInputSelection } from '../app/inputSelectionStore.js'
@@ -488,7 +488,7 @@ export function killToLineEnd(value: string, cursor: number): { value: string; c
  * boundary rather than delete a single word.
  *
  * Only the *super* bit qualifies. It is tempting to reuse `isActionMod`,
- * but that accepts `key.meta` on macOS — and qubit-ink reports Option as
+ * but that accepts `key.meta` on macOS — and hermes-ink reports Option as
  * `meta`, so Option+Backspace (delete-word, the macOS standard) would be
  * swallowed. On Linux/Windows `isActionMod` is `key.ctrl`, and
  * Ctrl+Backspace is delete-word there too. `super` is set only by kitty
@@ -669,7 +669,7 @@ export function supportsFastEchoTerminal(env: NodeJS.ProcessEnv = process.env): 
   // stale paints at soft-wrap boundaries on tall/narrow viewports. Keep this
   // off by default in Termux mode; allow explicit opt-in for local debugging.
   if (isTermuxTuiMode(env)) {
-    const override = String(env.QUBIT_TUI_TERMUX_FAST_ECHO ?? '')
+    const override = String(env.HERMES_TUI_TERMUX_FAST_ECHO ?? '')
       .trim()
       .toLowerCase()
 
@@ -782,6 +782,8 @@ export function TextInput({
   onSubmit,
   mask,
   mouseApiRef,
+  cursorSnapshotRef,
+  ignoreVerticalArrows = false,
   voiceRecordKey = DEFAULT_VOICE_RECORD_KEY,
   placeholder = '',
   placeholderColor,
@@ -789,7 +791,10 @@ export function TextInput({
   color,
   focus = true
 }: TextInputProps) {
-  const [cur, setCur] = useState(value.length)
+  const [cur, setCur] = useState(() =>
+    cursorSnapshotRef?.current?.value === value ? cursorSnapshotRef.current.cursor : value.length
+  )
+
   const [sel, setSel] = useState<null | { end: number; start: number }>(null)
   const fwdDel = useFwdDelete(focus)
   const termFocus = useTerminalFocus()
@@ -800,6 +805,10 @@ export function TextInput({
   const selRef = useRef<null | { end: number; start: number }>(null)
   const vRef = useRef(value)
   const self = useRef(false)
+  // The last value handed to onChange. While a deferred key-burst flush is in
+  // flight the user can type past it, so the parent's echo comes back older
+  // than vRef; matching against this keeps such echoes on the own-change path.
+  const emittedValueRef = useRef<string | null>(null)
   const keyBurstTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const editVersionRef = useRef(0)
   const parentChangeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -919,13 +928,28 @@ export function TextInput({
   }, [accentOpen, cur, display, focus, highlights, nativeCursor, placeholder, placeholderColor, selected])
 
   useEffect(() => {
-    const ownEcho = self.current && value === vRef.current
+    // `value === vRef.current` misses a deferred flush still in flight: the
+    // user typed past the emitted value, so the echo comes back older than
+    // vRef. Treating it as external rewound local keystrokes (cursor jumped
+    // backward, letters vanished — #111934). An echo matching the last value
+    // we emitted is still our own; the pending flush for the newer local
+    // value converges the parent on its next timer.
+    const ownEcho = self.current && (value === vRef.current || value === emittedValueRef.current)
     self.current = false
 
-    if (ownEcho) {
+    if (ownEcho || value === vRef.current) {
       return
     }
 
+    // An external value replaced the draft. A key burst still waiting on its
+    // 16ms flush is now stale; letting it fire would hand the parent the old
+    // draft on top of the value it just set.
+    if (parentChangeTimer.current) {
+      clearTimeout(parentChangeTimer.current)
+      parentChangeTimer.current = null
+    }
+
+    pendingParentValue.current = null
     setCur(value.length)
     setSel(null)
     curRef.current = value.length
@@ -935,6 +959,17 @@ export function TextInput({
     undo.current = []
     redo.current = []
   }, [value])
+
+  // The composer unmounts while full-screen monitors own input. Keep its
+  // insertion point with the shell, not with transient steer/secret inputs.
+  useEffect(
+    () => () => {
+      if (cursorSnapshotRef) {
+        cursorSnapshotRef.current = { cursor: curRef.current, value: vRef.current }
+      }
+    },
+    [cursorSnapshotRef]
+  )
 
   useEffect(() => {
     if (!focus) {
@@ -1030,6 +1065,7 @@ export function TextInput({
 
     if (next !== null) {
       self.current = true
+      emittedValueRef.current = next
       cbChange.current(next)
     }
   }
@@ -1123,6 +1159,7 @@ export function TextInput({
       if (syncParent) {
         flushParentChange()
         self.current = true
+        emittedValueRef.current = next
         cbChange.current(next)
         // A full Ink repaint just happened. Mark it so any fast-echo backspace
         // later in this IME recompose burst is suppressed (it would write
@@ -1350,7 +1387,7 @@ export function TextInput({
       // actually get voice toggled instead of a paste (Copilot round-7
       // follow-up on #19835). The pass-through predicate is a no-op for
       // ordinary typing and plain paste when voice is unbound to 'v'.
-      if (shouldPassThroughToGlobalHandler(inp, k, voiceRecordKey)) {
+      if (event.keypress.name === 'f7' || shouldPassThroughToGlobalHandler(inp, k, voiceRecordKey)) {
         flushKeyBurst()
 
         return
@@ -1393,7 +1430,7 @@ export function TextInput({
         return
       }
 
-      if (k.upArrow || k.downArrow) {
+      if ((k.upArrow || k.downArrow) && !ignoreVerticalArrows) {
         flushKeyBurst()
 
         const next = lineNav(vRef.current, curRef.current, k.upArrow ? -1 : 1)
@@ -1437,7 +1474,9 @@ export function TextInput({
       const delFwd = k.delete || fwdDel.current
 
       const isPrintableInput =
-        (event.keypress.isPasted || inp.length > 0) && PRINTABLE.test(inp.replace(BRACKET_PASTE, ''))
+        !event.isControlChord &&
+        (event.keypress.isPasted || inp.length > 0) &&
+        PRINTABLE.test(inp.replace(BRACKET_PASTE, ''))
 
       if (!isPrintableInput) {
         flushKeyBurst()
@@ -1447,7 +1486,10 @@ export function TextInput({
         return swap(undo, redo)
       }
 
-      if ((mod && inp === 'y') || (mod && k.shift && inp === 'z')) {
+      // Extended-key terminals (kitty CSI-u / modifyOtherKeys) deliver a shifted
+      // letter as its uppercase char, so Cmd+Shift+Z arrives as inp 'Z' — match
+      // case-insensitively like the copy/paste chords above.
+      if ((mod && inp === 'y') || (mod && k.shift && inp.toLowerCase() === 'z')) {
         return swap(redo, undo)
       }
 
@@ -1495,7 +1537,7 @@ export function TextInput({
         c = wordRight(v, c)
       } else if (wordMod && inp === 'd') {
         // meta+d (readline kill-word). The web dashboard maps Ctrl+Delete to
-        // ESC d, which qubit-ink decodes as meta+'d'; without this branch it
+        // ESC d, which hermes-ink decodes as meta+'d'; without this branch it
         // fell through to the printable path and typed a literal "d".
         if (range) {
           v = v.slice(0, range.start) + v.slice(range.end)
@@ -1574,7 +1616,7 @@ export function TextInput({
         } else {
           ;({ cursor: c, value: v } = killToLineEnd(v, c))
         }
-      } else if (event.keypress.isPasted || inp.length > 0) {
+      } else if (event.keypress.isPasted || (inp.length > 0 && !event.isControlChord)) {
         const bracketed = event.keypress.isPasted || inp.includes('[200~')
         const text = inp.replace(BRACKET_PASTE, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
@@ -1774,13 +1816,21 @@ export interface PasteEvent {
   value: string
 }
 
+export interface InputCursorSnapshot {
+  cursor: number
+  value: string
+}
+
 interface TextInputProps {
   /** Hex/ansi256 tone for `/skill`, `@ref`, and `[[ token ]]` spans. */
   accentColor?: string
   /** Hex color for typed text (theme text); terminal default when omitted. */
   color?: string
   columns?: number
+  cursorSnapshotRef?: MutableRefObject<InputCursorSnapshot | null>
   focus?: boolean
+  /** Leave ↑/↓ to the owner: a form that moves field focus with them owns the key, not the field. */
+  ignoreVerticalArrows?: boolean
   mask?: string
   mouseApiRef?: MutableRefObject<null | TextInputMouseApi>
   onChange: (v: string) => void
@@ -1831,6 +1881,7 @@ export const shouldPassThroughToGlobalHandler = (
   (key.ctrl && input === 'c') ||
   (key.ctrl && input === 'x') ||
   (key.ctrl && input === 'o') ||
+  (key.ctrl && (input === 'r' || input === 't')) ||
   key.tab ||
   (key.shift && key.tab) ||
   key.pageUp ||

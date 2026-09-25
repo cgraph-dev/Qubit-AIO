@@ -6,7 +6,7 @@ description: "Real language servers (pyright, gopls, rust-analyzer, …) wired i
 
 # Language Server Protocol (LSP)
 
-Qubit runs full language servers — pyright, gopls, rust-analyzer,
+Hermes runs full language servers — pyright, gopls, rust-analyzer,
 typescript-language-server, clangd, and ~20 more — as background
 subprocesses and feeds their semantic diagnostics into the post-write
 lint check used by `write_file` and `patch`. When the agent edits a
@@ -14,7 +14,7 @@ file, it sees exactly the errors that edit introduced — not just
 syntax errors, but **type errors, undefined names, missing imports,
 and project-wide semantic issues** the language server detects.
 
-This is the same architecture top-tier coding agents use. Qubit
+This is the same architecture top-tier coding agents use. Hermes
 ships it self-contained: no editor host required, no plugins to
 install, no separate daemon to manage.
 
@@ -33,7 +33,7 @@ falls back silently to the syntax-only result.
 
 Concretely, on every successful `write_file` or `patch`:
 
-1. Qubit captures a baseline of current diagnostics for the file.
+1. Hermes captures a baseline of current diagnostics for the file.
 2. Performs the write.
 3. Re-queries the language server, filters out diagnostics that were
    already in the baseline, and surfaces only the new ones.
@@ -72,6 +72,7 @@ agent sees a syntax-clean file with semantic problems as
 | YAML | `yaml-language-server` | npm |
 | Lua | `lua-language-server` | manual (GitHub releases) |
 | PHP | `intelephense` | npm |
+| Laravel Blade (`.blade.php`) | `laravel-lsp` | manual (composer) |
 | OCaml | `ocaml-lsp` | manual (opam) |
 | Dockerfile | `dockerfile-language-server-nodejs` | npm |
 | Terraform | `terraform-ls` | manual |
@@ -90,8 +91,8 @@ agent sees a syntax-clean file with semantic problems as
 
 For "manual" entries, install the server through whatever toolchain
 manager makes sense for that language (rustup, ghcup, opam, brew,
-…). Qubit auto-detects the binary on PATH or in
-`<QUBIT_HOME>/lsp/bin/`.
+…). Hermes auto-detects the binary on PATH or in
+`<HERMES_HOME>/lsp/bin/`.
 
 ### PowerShell
 
@@ -104,36 +105,63 @@ host. Setup:
 2. Download the latest release zip from
    [PowerShellEditorServices releases](https://github.com/PowerShell/PowerShellEditorServices/releases)
    and extract it.
-3. Point Qubit at the extracted bundle — the directory that contains
+3. Point Hermes at the extracted bundle — the directory that contains
    `PowerShellEditorServices/Start-EditorServices.ps1`. Either:
    - set `lsp.servers.powershell.command: ["/path/to/bundle"]` in
      `config.yaml`, or
-   - extract it to `<QUBIT_HOME>/lsp/PowerShellEditorServices`, or
+   - extract it to `<HERMES_HOME>/lsp/PowerShellEditorServices`, or
    - export `PSES_BUNDLE_PATH=/path/to/bundle`.
 
-`qubit lsp status` reports `installed` once `pwsh` is found; if the
+`hermes lsp status` reports `installed` once `pwsh` is found; if the
 bundle is missing you'll see a one-time warning in the logs with the
 download link.
 
+### Laravel Blade
+
+`.blade.php` templates go to [laravel-lsp](https://github.com/laravel/lsp)
+(Blade, Eloquent, Facades) while plain `.php` files stay with
+intelephense. Install it once with Composer and make sure the binary
+is on PATH (or pin it with `lsp.servers.laravel-lsp.command`):
+
+```bash
+composer global require laravel/lsp
+export PATH="$HOME/.config/composer/vendor/bin:$PATH"
+```
+
+Hermes launches it as `laravel-lsp lsp` (stdio). There is no
+auto-install recipe; `hermes lsp status` shows `manual-only` until the
+binary is found.
+
 A few servers are installed alongside a peer dependency that npm
-won't auto-pull. The current case is `typescript-language-server`,
-which requires the `typescript` SDK importable from the same
-`node_modules` tree — Qubit installs both packages together when you
-run `qubit lsp install typescript` or auto-install fires on first
-use.
+won't auto-pull. `typescript-language-server` and `@vue/language-server`
+require the `typescript` SDK importable from the same `node_modules`
+tree — Hermes installs `typescript@6` (the last JavaScript-based line;
+TypeScript 7 is the Go port and ships no `tsserver.js`) together with
+the server when you run `hermes lsp install typescript` /
+`hermes lsp install vue-language-server` or auto-install fires on first use.
+
+Vue is pinned to `@vue/language-server@2`, started with
+`vue.hybridMode: false` so it hosts its own TypeScript service. The 3.x
+line only works behind a client-hosted `tsserver` tunnel (the VS Code /
+Neovim setup) that Hermes's generic client does not run, so it never
+publishes diagnostics. If an earlier Hermes installed 3.x, the log shows a
+one-time `vue-language-server: ... 3.x` warning; delete
+`<HERMES_HOME>/lsp/node_modules/@vue` and `<HERMES_HOME>/lsp/bin/vue-language-server*`,
+then run `hermes lsp install vue-language-server` (the recipe co-installs the
+TypeScript SDK).
 
 ## CLI
 
 ```
-qubit lsp status          # service state + per-server install status
-qubit lsp list            # registry, optionally --installed-only
-qubit lsp install <id>    # eagerly install one server
-qubit lsp install-all     # try every server with a known recipe
-qubit lsp restart         # tear down running clients
-qubit lsp which <id>      # print resolved binary path
+hermes lsp status          # service state + per-server install status
+hermes lsp list            # registry, optionally --installed-only
+hermes lsp install <id>    # eagerly install one server
+hermes lsp install-all     # try every server with a known recipe
+hermes lsp restart         # tear down running clients
+hermes lsp which <id>      # print resolved binary path
 ```
 
-`qubit lsp status` is the best starting point — it shows which
+`hermes lsp status` is the best starting point — it shows which
 languages will get semantic diagnostics today and which need a
 binary installed.
 
@@ -151,18 +179,57 @@ lsp:
 
   # How long to wait for diagnostics after each write.
   wait_mode: document      # "document" or "full"
-  # Max seconds to wait for the server to re-check the file after an
-  # edit. Only *fresh* diagnostics (produced for the post-edit
+  # Max seconds to wait for the server on each of the two waits an
+  # edit makes: the pre-edit baseline snapshot and the post-edit
+  # re-check. Only *fresh* diagnostics (produced for the post-edit
   # content) are ever reported; if the server doesn't finish within
   # this budget, the edit reports "no LSP data" rather than stale
   # errors from before the edit. Raise this for slow servers on big
   # projects (tsserver, rust-analyzer mid-indexing).
   wait_timeout: 5.0
 
+  # Budget for the FIRST request against a workspace whose server is
+  # not running yet — spawn, initialize and the server's initial program
+  # build all happen inside it (tsserver on a 10k-file project can need
+  # a minute). Once the client is up, wait_timeout applies again.
+  # 0 = no extra grace (same as wait_timeout).
+  warmup_timeout: 0
+
+  # After a server fails for a workspace (spawn error, or the request
+  # outran its budget) that (server, root) pair is skipped. 0 = for the
+  # rest of the process (until `hermes lsp restart`); N = retried after
+  # N seconds, so one transient stall does not silence a workspace
+  # forever. Skips are logged once per root at INFO with the retry time.
+  broken_retry_seconds: 0
+
+  # Workspace roots where no language server runs at all — glob
+  # patterns matched against the resolved project root (~ expanded; a
+  # bare path also matches everything beneath it). Use it for the one
+  # huge monorepo whose server cannot finish in budget while every other
+  # workspace keeps its diagnostics — unlike servers.<id>.disabled,
+  # which switches the server off everywhere. Must be a list; any other
+  # shape logs a warning and skips LSP for every workspace until fixed.
+  exclude_roots: []
+  # exclude_roots: ["~/work/huge-monorepo", "/srv/checkouts/*/vendor"]
+
   # How to handle missing server binaries.
-  #   auto    — install via npm/pip/go install into <QUBIT_HOME>/lsp/bin
+  #   auto    — install via npm/pip/go install into <HERMES_HOME>/lsp/bin
   #   manual  — only use binaries already on PATH
   install_strategy: auto
+
+  # Node package manager for the npm-based servers: npm (default), pnpm
+  # or yarn. Installs still land in <HERMES_HOME>/lsp/node_modules; a
+  # manager that is configured but not installed — or a value outside
+  # npm|pnpm|yarn — skips the install with a warning instead of silently
+  # using npm, so a pnpm/yarn supply-chain policy (minimumReleaseAge,
+  # allowBuilds, …) is never bypassed. Yarn Berry (2+): its default PnP
+  # linker writes no node_modules/.bin, so set `nodeLinker: node-modules`
+  # in <HERMES_HOME>/lsp/.yarnrc.yml. pnpm 11 blocks git-hosted transitive
+  # deps by default (ERR_PNPM_EXOTIC_SUBDEP); @vue/language-server 2.x pulls
+  # one in, so under pnpm that server is skipped with the pnpm error in the
+  # log — install it once with npm, or relax block-exotic-subdeps in
+  # <HERMES_HOME>/lsp/.npmrc if your policy allows it.
+  package_manager: npm
 
   # How long an unused language-server client stays alive (seconds).
   # Idle servers are shut down automatically and respawned on the next
@@ -196,16 +263,42 @@ lsp:
   `initializationOptions` payload sent in the `initialize`
   handshake. Server-specific; consult the language server's docs.
 
+### Custom servers
+
+Any `lsp.servers` key that is **not** a built-in server id declares
+your own language server. It needs `command` and `extensions`; the
+other keys are optional. Custom servers are matched *before* the
+built-ins, so they can also take over an extension Hermes already
+handles.
+
+```yaml
+lsp:
+  servers:
+    panache:
+      command: ["panache-lsp", "--stdio"]   # PATH lookup or an absolute/~ path
+      extensions: [".pnch"]                 # or basenames like "Justfile"
+      root_markers: ["panache.toml"]        # nearest dir with one of these; default: workspace root
+      language_id: "panache"                # didOpen languageId; default: derived from the extension
+      description: "Panache markdown"
+      env: { PANACHE_LOG: "warn" }          # same optional keys as built-ins
+      initialization_options: {}
+```
+
+Custom servers are never auto-installed: put the binary on PATH (or
+give an absolute path) and `hermes lsp status` lists it as
+`installed`. A malformed entry is logged and skipped without
+affecting the other servers.
+
 ## Installation locations
 
-When `install_strategy: auto`, Qubit installs binaries into
-`<QUBIT_HOME>/lsp/bin/`. NPM packages land in
-`<QUBIT_HOME>/lsp/node_modules/` with bin symlinks one level up.
+When `install_strategy: auto`, Hermes installs binaries into
+`<HERMES_HOME>/lsp/bin/`. NPM packages land in
+`<HERMES_HOME>/lsp/node_modules/` with bin symlinks one level up.
 Go binaries come from `go install` with `GOBIN` pointed at the
 staging dir.
 
 Nothing is ever installed to `/usr/local/`, `~/.local/`, or any other
-shared location — the staging dir is fully Qubit-owned and is
+shared location — the staging dir is fully Hermes-owned and is
 removed when you reset the profile.
 
 ## Performance characteristics
@@ -220,7 +313,24 @@ The LSP layer adds a few milliseconds to clean writes when no
 diagnostics are emitted. When diagnostics are emitted, the wait
 budget is `wait_timeout` seconds — typically the server responds in
 tens of milliseconds for pyright/tsserver and a few seconds for
-rust-analyzer mid-indexing.
+rust-analyzer mid-indexing. Each edit waits twice (a pre-edit
+baseline snapshot for the delta, then the post-edit re-check), so a
+server that never answers costs at most `2 × wait_timeout` per edit.
+The very first request against a workspace also pays the spawn and the
+server's initial program build; give large projects room with
+`lsp.warmup_timeout` (only that first, cold request uses it — the
+steady-state budget is unchanged) rather than raising `wait_timeout`,
+which would let every later edit block for the cold-build duration.
+
+A server that fails for a workspace — spawn error, or a request that
+outran its budget — marks that `(server, root)` pair broken and every
+later request for it is skipped (logged once per root at INFO). By
+default the pair stays broken until `hermes lsp restart` or process
+exit; `lsp.broken_retry_seconds: N` retries it after N seconds so one
+transient stall does not cost the workspace its diagnostics for good.
+A root you never want served — one monorepo whose server cannot finish
+in any budget — goes in `lsp.exclude_roots`; other workspaces keep
+their servers.
 
 Diagnostics are **freshness-gated**: a result only counts when the
 server produced it for the content of the current edit (a
@@ -237,8 +347,18 @@ respawned automatically on the next relevant file operation. Set
 `idle_timeout: 0` to disable reaping and hold every server's index warm
 for the life of the process.
 
+Servers are also released when their workspace goes away, even if they
+are not idle: removing a Hermes-managed worktree (`hermes -w` session
+end, Kanban task cleanup, a delegated subagent's pruned worktree) shuts
+down that tree's language servers before `git worktree remove` runs, and
+the periodic sweep shuts down any server whose project root no longer
+exists on disk (deleted outside Hermes). The sweep is part of the idle
+reaper, so `idle_timeout: 0` also disables deleted-root reaping; the
+worktree-removal release always runs. A multi-root server only drops the
+vanished folder and keeps serving its sibling roots.
+
 Servers that support multi-root workspaces (currently pyright) run as a
-**single process** per Qubit process: the first Python project spawns
+**single process** per Hermes process: the first Python project spawns
 it, and every further project root — for example sibling git worktrees
 edited by parallel subagents — is attached to that same server as an
 additional workspace folder instead of starting another copy.
@@ -261,19 +381,19 @@ lsp:
 
 ## Troubleshooting
 
-**`qubit lsp status` shows a server as "missing"**
+**`hermes lsp status` shows a server as "missing"**
 
-The binary isn't on PATH and isn't in `<QUBIT_HOME>/lsp/bin/`. Run
-`qubit lsp install <server_id>` to attempt an auto-install, or
+The binary isn't on PATH and isn't in `<HERMES_HOME>/lsp/bin/`. Run
+`hermes lsp install <server_id>` to attempt an auto-install, or
 install the binary manually through the language's normal toolchain.
 
-**`Backend warnings` section in `qubit lsp status`**
+**`Backend warnings` section in `hermes lsp status`**
 
 Some servers ship as thin wrappers around an external CLI for actual
 diagnostics — they spawn cleanly and accept requests but never emit
 errors when the sidecar binary is missing. The most common case is
 `bash-language-server`, which delegates diagnostics to `shellcheck`.
-When `qubit lsp status` shows a `Backend warnings` section, install
+When `hermes lsp status` shows a `Backend warnings` section, install
 the named tool through your OS package manager:
 
 ```
@@ -297,7 +417,7 @@ subsequent edits picking them up.
 **Server crashed**
 
 A crashed server is added to the broken-set and won't be retried for
-the rest of the session. Run `qubit lsp restart` to clear the set;
+the rest of the session. Run `hermes lsp restart` to clear the set;
 the next edit re-spawns.
 
 **Editing a file outside any git repo**

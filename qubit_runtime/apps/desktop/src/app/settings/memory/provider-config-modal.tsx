@@ -106,7 +106,7 @@ export function ProviderConfigModal({
               href={config.docs_url}
               onClick={event => {
                 event.preventDefault()
-                void window.qubitDesktop?.openExternal?.(config.docs_url)
+                void window.hermesDesktop?.openExternal?.(config.docs_url)
               }}
               rel="noreferrer"
               target="_blank"

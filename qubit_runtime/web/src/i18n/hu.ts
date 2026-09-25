@@ -120,8 +120,8 @@ export const hu: Translations = {
     starting: "Indul",
     startedInBackground: "Háttérben elindítva — kövesse a naplókat a folyamathoz",
     stopped: "Leállítva",
-    updateQubit: "Qubit frissítése",
-    updatingQubit: "Qubit frissítése…",
+    updateHermes: "Qubit frissítése",
+    updatingHermes: "Qubit frissítése…",
     waitingForOutput: "Várakozás a kimenetre…",
   },
 
@@ -165,6 +165,10 @@ export const hu: Translations = {
     failedToDeleteSelected: "Nem sikerült törölni a kijelölt munkameneteket",
     resumeInChat: "Folytatás a csevegésben",
     newChat: "Új csevegés",
+    workspace: "munkaterület",
+    workspaceDefault: "Alapértelmezett",
+    workspaceRescan: "Tárolók újrakeresése",
+    workspaceCustom: "Másik útvonal…",
     previousPage: "Előző oldal",
     nextPage: "Következő oldal",
     roles: {
@@ -324,6 +328,8 @@ export const hu: Translations = {
     disableRuntime: "Letiltás",
     enableAfterInstall: "Engedélyezés a telepítés után",
     enableRuntime: "Engedélyezés",
+    toggleTakesEffectAfterRestart:
+      "Mentve — indítsa újra az átjárót a módosítás alkalmazásához.",
     forceReinstall: "Kényszerített újratelepítés (a meglévő mappa előbb törlődik)",
     headline:
       "Qubit-bővítmények felfedezése, telepítése, engedélyezése és frissítése (a `qubit plugins` paritás).",
@@ -343,8 +349,8 @@ export const hu: Translations = {
     providersHint:
       "A memory.provider (üres = beépített) és a context.engine értékét írja a config.yaml fájlba. A következő munkamenetben lép életbe.",
     refreshDashboard: "Vezérlőpult-bővítmények újraolvasása",
-    removeConfirm: "Eltávolítja ezt a bővítményt a $QUBIT_HOME/plugins/ mappából?",
-    removeHint: "Csak a felhasználó által a $QUBIT_HOME/plugins alá telepített bővítmények távolíthatók el.",
+    removeConfirm: "Eltávolítja ezt a bővítményt a ~/.hermes/plugins/ mappából?",
+    removeHint: "Csak a felhasználó által a ~/.hermes/plugins alá telepített bővítmények távolíthatók el.",
     rescanHeading: "SPA-bővítményregiszter",
     rescanHint: "Olvassa újra a fájlokat a lemezen történő hozzáadás után, hogy az oldalsáv felvegye az új manifesteket.",
     runtimeHeading: "Átjáró-futási idő (YAML-bővítmények)",
@@ -366,7 +372,7 @@ export const hu: Translations = {
     all: "Összes",
     categories: "Kategóriák",
     filters: "Szűrők",
-    noSkills: "Nem található készség. A készségek a ~/.qubit/skills/ mappából töltődnek be",
+    noSkills: "Nem található készség. A készségek a ~/.hermes/skills/ mappából töltődnek be",
     noSkillsMatch: "Nincs a keresésnek vagy szűrőnek megfelelő készség.",
     skillCount: "{count} készség{s}",
     resultCount: "{count} találat{s}",
@@ -380,7 +386,7 @@ export const hu: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Szűrők",
     sections: "Szakaszok",
     exportConfig: "Konfiguráció exportálása JSON-ba",
@@ -524,7 +530,7 @@ export const hu: Translations = {
       highest_tier: "Legmagasabb szint",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "Legutóbbi",
-      latest_hint_empty: "futtasd többet a Qubitot",
+      latest_hint_empty: "futtasd többet a Hermest",
       none_yet: "Még semmi",
     },
     state: {

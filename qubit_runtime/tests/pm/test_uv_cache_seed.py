@@ -10,7 +10,7 @@ import shutil
 
 import pytest
 
-from qubit_constants import get_default_hermes_root
+from qubit_constants import get_default_qubit_root
 from pm import packages
 from pm import paths
 
@@ -26,7 +26,7 @@ def payload_cache(tmp_path, monkeypatch):
     store = payload / "tools"
     store.mkdir()
     monkeypatch.setattr(paths, "store_root", lambda: store)
-    return get_default_hermes_root() / "cache" / "uv"
+    return get_default_qubit_root() / "cache" / "uv"
 
 
 def test_partial_seed_is_retried_on_the_next_install(payload_cache, monkeypatch):

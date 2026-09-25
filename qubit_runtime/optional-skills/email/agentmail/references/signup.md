@@ -11,7 +11,7 @@ agentmail agent sign-up \
   --human-email you@example.com \
   --username my-agent \
   --source agentmail-cli \
-  --referrer qubit-agent \
+  --referrer hermes-agent \
   --format json
 ```
 

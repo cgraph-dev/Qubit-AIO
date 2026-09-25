@@ -26,7 +26,7 @@ const flush = () => Promise.resolve()
 
 beforeAll(() => {
   ;(globalThis as { window?: unknown }).window ??= {}
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = {}
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {}
   // Attach the listeners once — module state is process-global.
   watchSessionPins()
 })

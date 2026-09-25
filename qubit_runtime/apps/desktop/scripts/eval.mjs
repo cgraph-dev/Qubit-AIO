@@ -5,7 +5,7 @@
 //
 // Needs a renderer with a debugging port: launch `hgui` / `npm run dev` with
 // HERMES_DESKTOP_CDP_PORT set (see electron/dev-cdp.ts).
-const port = Number(process.env.QUBIT_DESKTOP_CDP_PORT || 9222)
+const port = Number(process.env.HERMES_DESKTOP_CDP_PORT || 9222)
 let targets
 
 try {

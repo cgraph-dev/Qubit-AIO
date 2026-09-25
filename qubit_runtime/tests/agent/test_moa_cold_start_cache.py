@@ -242,17 +242,17 @@ def test_slot_runtime_cache_is_scoped_per_profile_home(monkeypatch, tmp_path):
     monkeypatch.setattr(
         rt_mod, "resolve_runtime_provider",
         lambda **kw: {"provider": "openai", "model": "gpt-5",
-                      "api_key": f"key-{qubit_constants.get_hermes_home().name}",
+                      "api_key": f"key-{qubit_constants.get_qubit_home().name}",
                       "base_url": "https://x", "api_mode": None})
 
     slot = {"provider": "openai", "model": "gpt-5"}
-    tok = qubit_constants.set_hermes_home_override(str(a))
+    tok = qubit_constants.set_qubit_home_override(str(a))
     try:
         assert moa._slot_runtime(slot)["api_key"] == "key-a"
     finally:
-        qubit_constants.reset_hermes_home_override(tok)
-    tok = qubit_constants.set_hermes_home_override(str(b))
+        qubit_constants.reset_qubit_home_override(tok)
+    tok = qubit_constants.set_qubit_home_override(str(b))
     try:
         assert moa._slot_runtime(slot)["api_key"] == "key-b"
     finally:
-        qubit_constants.reset_hermes_home_override(tok)
+        qubit_constants.reset_qubit_home_override(tok)

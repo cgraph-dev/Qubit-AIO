@@ -101,7 +101,7 @@ def test_restart_all_refuses_to_sweep_a_host_multiplexer_owned_by_another_profil
 
     monkeypatch.setattr(gw, "kill_gateway_processes", _never)
     monkeypatch.setattr(gw, "_stop_installed_service", lambda system: False)
-    monkeypatch.setattr("gateway.status._get_process_hermes_home",
+    monkeypatch.setattr("gateway.status._get_process_qubit_home",
                         lambda: Path(tmp_path / "root" / "profiles" / "ops"))
 
     with pytest.raises(SystemExit) as exc:
@@ -116,7 +116,7 @@ def test_restart_all_does_not_attach_to_the_process_it_just_stopped(
     Without both, the re-entered ``gateway run`` read the corpse's record, decided ATTACH and
     exited 0 — a restart that silently left the host with no gateway at all.
     """
-    monkeypatch.setattr("gateway.status._get_process_hermes_home", lambda: host_owner.home)
+    monkeypatch.setattr("gateway.status._get_process_qubit_home", lambda: host_owner.home)
     monkeypatch.setattr(gw, "_stop_installed_service", lambda system: False)
     monkeypatch.setattr(gw, "kill_gateway_processes", lambda **k: 1)
     monkeypatch.setattr(gw, "_wait_for_api_server_port_free", lambda *a, **k: None)

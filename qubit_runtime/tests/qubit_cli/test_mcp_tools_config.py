@@ -20,7 +20,7 @@ def test_disabling_tool_writes_include_list(capsys):
     """Unchecking a tool produces an include list of the still-chosen tools.
 
     Standardized on tools.include (whitelist) across the codebase — the
-    catalog flow, `qubit mcp configure`, and this UI all write the same
+    catalog flow, `hermes mcp configure`, and this UI all write the same
     shape so users don\'t see config drift across UIs.
     """
     config = {
@@ -73,3 +73,19 @@ def test_empty_tools_server_skipped(capsys):
     assert len(checklist_calls) == 0
     captured = capsys.readouterr()
     assert "no tools found" in captured.out
+
+
+def test_empty_include_reopens_with_nothing_preselected():
+    """``include: []`` is the runtime's block-all whitelist; the picker must not reopen it as
+    "all tools enabled" and must persist it when the user keeps zero tools checked (#12865)."""
+    config = {"mcp_servers": {"github": {"command": "npx", "tools": {"include": []}}}}
+    tools = [("create_issue", "Create an issue"), ("search_repos", "Search repos")]
+
+    with patch(_PROBE, return_value={"github": tools}), \
+         patch(_CHECKLIST, side_effect=lambda title, labels, pre, **kw: pre) as checklist, \
+         patch(_SAVE) as mock_save:
+        _configure_mcp_tools_interactive(config)
+
+    assert checklist.call_args.args[2] == set()
+    mock_save.assert_not_called()
+    assert config["mcp_servers"]["github"]["tools"] == {"include": []}

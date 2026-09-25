@@ -15,18 +15,18 @@ Turn meeting notes into cited decisions, owners, tickets.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/productivity\meeting-action-items` |
+| Path | `skills/productivity/meeting-action-items` |
 | Version | `0.1.0` |
-| Author | Ben Barclay (benbarclay), Qubit Agent |
+| Author | Ben Barclay (benbarclay), Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Meetings`, `Action-Items`, `Follow-Up`, `Productivity` |
-| Related skills | [`teams-meeting-pipeline`](/docs/user-guide/skills/bundled/productivity/productivity-teams-meeting-pipeline), [`google-workspace`](/docs/user-guide/skills/bundled/productivity/productivity-google-workspace), [`notion`](/docs/user-guide/skills/bundled/productivity/productivity-notion) |
+| Related skills | [`teams-meeting-pipeline`](../../bundled/productivity/productivity-teams-meeting-pipeline.md), [`google-workspace`](../../bundled/productivity/productivity-google-workspace.md), [`notion`](../../bundled/productivity/productivity-notion.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Meeting Action Items

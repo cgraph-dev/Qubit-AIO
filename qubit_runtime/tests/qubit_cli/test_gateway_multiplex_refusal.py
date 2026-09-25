@@ -23,7 +23,7 @@ def standalone_home(tmp_path, monkeypatch):
     (root / "config.yaml").write_text("model:\n  default: x\n", encoding="utf-8")
     (home / "config.yaml").write_text("gateway:\n  standalone: true\n", encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
     from qubit_cli import gateway as gw
     # The probe seams live on the qubit_cli.gateway facade, like the other refusal tests.
     monkeypatch.setattr(gw, "_is_service_installed", lambda: False)

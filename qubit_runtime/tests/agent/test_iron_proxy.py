@@ -29,7 +29,7 @@ from agent.proxy_sources import iron_proxy as ip
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     """Point QUBIT_HOME at a temp dir so install paths don't touch the real $HOME."""
 
     home = tmp_path / "hermes"
@@ -53,10 +53,10 @@ def test_mint_proxy_token_has_prefix_and_length():
     assert len(t) >= len("alpha-") + 32
 
 
-def test_management_token_path_is_single_authority(hermes_home):
-    """One token path: <hermes_home>/proxy/management.token, shared by mint, reuse and readers."""
+def test_management_token_path_is_single_authority(qubit_home):
+    """One token path: <qubit_home>/proxy/management.token, shared by mint, reuse and readers."""
     assert ip._management_token_path() == ip._proxy_state_dir_ro() / "management.token"
-    assert not (hermes_home / "proxy").exists()
+    assert not (qubit_home / "proxy").exists()
 
     token = ip.ensure_management_token()
     assert token.startswith("hermes-mgmt-")
@@ -139,7 +139,7 @@ def test_audit_log_kwarg_does_not_inject_audit_path_v039(tmp_path):
     )
 
 
-def test_load_mappings_handles_corrupt_json(hermes_home):
+def test_load_mappings_handles_corrupt_json(qubit_home):
     state = ip._proxy_state_dir()
     (state / "mappings.json").write_text("{not json", encoding="utf-8")
     assert ip.load_mappings() == []
@@ -162,7 +162,7 @@ def test_load_mappings_handles_corrupt_json(hermes_home):
 
 # ── GPG release-signature verification (maxpetrusenko P1) ────────────────────
 
-def test_verify_checksums_signature_skips_without_gpg(hermes_home, monkeypatch, tmp_path):
+def test_verify_checksums_signature_skips_without_gpg(qubit_home, monkeypatch, tmp_path):
     """No gpg on PATH → degrade gracefully (return False), do not raise."""
     monkeypatch.setattr(ip.shutil, "which", lambda name: None)
     cks = tmp_path / "checksums.txt"
@@ -175,7 +175,7 @@ def test_verify_checksums_signature_skips_without_gpg(hermes_home, monkeypatch, 
 # ---------------------------------------------------------------------------
 
 
-def test_start_proxy_idempotent_when_already_running(hermes_home, monkeypatch):
+def test_start_proxy_idempotent_when_already_running(qubit_home, monkeypatch):
     state = ip._proxy_state_dir()
     pid_file = state / "iron-proxy.pid"
     pid_file.write_text("12345")
@@ -207,7 +207,7 @@ def test_start_proxy_idempotent_when_already_running(hermes_home, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_subprocess_env_strips_unrelated_secrets(hermes_home, monkeypatch):
+def test_subprocess_env_strips_unrelated_secrets(qubit_home, monkeypatch):
     """``_build_proxy_subprocess_env`` must NOT carry every host secret
     over to the proxy.  /proc/<pid>/environ on the proxy would otherwise
     expose all of them to same-uid local processes."""
@@ -233,7 +233,7 @@ def test_subprocess_env_strips_unrelated_secrets(hermes_home, monkeypatch):
 
 
 @pytest.mark.platforms("linux")
-def test_ca_key_created_with_0o600(hermes_home, monkeypatch):
+def test_ca_key_created_with_0o600(qubit_home, monkeypatch):
     """The CA private key must NEVER exist on disk with default umask
     permissions, even transiently.  Fix: open with explicit mode=0o600
     so the very first byte is written under tight perms."""
@@ -269,7 +269,7 @@ def test_ca_key_created_with_0o600(hermes_home, monkeypatch):
 
 
 @pytest.mark.platforms("linux")
-def test_ensure_audit_log_creates_with_0o600(hermes_home, tmp_path):
+def test_ensure_audit_log_creates_with_0o600(qubit_home, tmp_path):
     audit = tmp_path / "audit.log"
     ip.ensure_audit_log(audit)
     assert audit.exists()
@@ -278,7 +278,7 @@ def test_ensure_audit_log_creates_with_0o600(hermes_home, tmp_path):
 
 
 @pytest.mark.platforms("linux")
-def test_ensure_audit_log_tightens_existing_perms(hermes_home, tmp_path):
+def test_ensure_audit_log_tightens_existing_perms(qubit_home, tmp_path):
     audit = tmp_path / "audit.log"
     audit.write_text("preexisting content\n")
     os.chmod(audit, 0o644)
@@ -293,7 +293,7 @@ def test_ensure_audit_log_tightens_existing_perms(hermes_home, tmp_path):
 
 
 @pytest.mark.platforms("linux")
-def test_proxy_state_dir_is_0o700(hermes_home):
+def test_proxy_state_dir_is_0o700(qubit_home):
     state = ip._proxy_state_dir()
     mode = state.stat().st_mode & 0o777
     assert mode == 0o700
@@ -329,7 +329,7 @@ def test_proxy_state_dir_is_0o700(hermes_home):
 # ---------------------------------------------------------------------------
 
 
-def test_mappings_roundtrip_preserves_headers_and_aliases(hermes_home):
+def test_mappings_roundtrip_preserves_headers_and_aliases(qubit_home):
     m = ip.TokenMapping(
         proxy_token=ip.mint_proxy_token("gemini"),
         real_env_name="GEMINI_API_KEY",
@@ -349,18 +349,18 @@ def test_mappings_roundtrip_preserves_headers_and_aliases(hermes_home):
 
 
 @pytest.mark.platforms("linux")
-def test_management_token_is_private(hermes_home):
+def test_management_token_is_private(qubit_home):
     ip.ensure_management_token()
     assert (ip._management_token_path().stat().st_mode & 0o777) == 0o600
 
 
-def test_reload_proxy_refuses_when_not_running(hermes_home, monkeypatch):
+def test_reload_proxy_refuses_when_not_running(qubit_home, monkeypatch):
     monkeypatch.setattr(ip, "_read_pid", lambda: None)
     with pytest.raises(RuntimeError, match="not running"):
         ip.reload_proxy()
 
 
-def test_reload_proxy_posts_bearer_to_management_endpoint(hermes_home, monkeypatch):
+def test_reload_proxy_posts_bearer_to_management_endpoint(qubit_home, monkeypatch):
     monkeypatch.setattr(ip, "_read_pid", lambda: 4242)
     monkeypatch.setattr(ip, "_pid_alive", lambda pid: True)
     monkeypatch.setattr(
@@ -395,7 +395,7 @@ def test_reload_proxy_posts_bearer_to_management_endpoint(hermes_home, monkeypat
 
 
 @pytest.mark.platforms("linux")
-def test_start_proxy_injects_management_key_env(hermes_home, monkeypatch):
+def test_start_proxy_injects_management_key_env(qubit_home, monkeypatch):
     """When the generated config has a management listener, start_proxy
     must inject the bearer key env var — v0.39 refuses to start when
     api_key_env is empty."""
@@ -403,13 +403,13 @@ def test_start_proxy_injects_management_key_env(hermes_home, monkeypatch):
     cfg_path = ip._proxy_state_dir() / "proxy.yaml"
     cfg = ip.build_proxy_config(
         mappings=[_sample_mapping()],
-        ca_cert=hermes_home / "ca.crt",
-        ca_key=hermes_home / "ca.key",
+        ca_cert=qubit_home / "ca.crt",
+        ca_key=qubit_home / "ca.key",
         http_listen=["127.0.0.1:9090"],
     )
     ip.write_proxy_config(cfg)
-    (hermes_home / "bin").mkdir(parents=True, exist_ok=True)
-    fake_bin = hermes_home / "bin" / "iron-proxy"
+    (qubit_home / "bin").mkdir(parents=True, exist_ok=True)
+    fake_bin = qubit_home / "bin" / "iron-proxy"
     fake_bin.write_text("#!/bin/sh\nsleep 60\n")
     fake_bin.chmod(0o755)
 
@@ -461,7 +461,7 @@ def test_start_proxy_injects_management_key_env(hermes_home, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_docker_egress_node_options_uses_sentinel(hermes_home, monkeypatch):
+def test_docker_egress_node_options_uses_sentinel(qubit_home, monkeypatch):
     """``_egress_proxy_args_for_docker`` should NOT put NODE_OPTIONS in
     env_overrides directly; it uses a sentinel key
     ``_HERMES_EGRESS_NODE_OPTIONS_APPEND`` so DockerEnvironment can
@@ -510,7 +510,7 @@ def test_docker_egress_node_options_uses_sentinel(hermes_home, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_persisted_nonce_roundtrip(hermes_home, monkeypatch):
+def test_persisted_nonce_roundtrip(qubit_home, monkeypatch):
     """Write the nonce next to the pidfile (simulating one CLI invocation
     finishing start_proxy), then verify a fresh _read_persisted_nonce
     can pick it up — that's what cross-process _pid_alive uses."""
@@ -527,7 +527,7 @@ def test_persisted_nonce_roundtrip(hermes_home, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_get_status_probes_configured_bind_host(hermes_home, monkeypatch):
+def test_get_status_probes_configured_bind_host(qubit_home, monkeypatch):
     """get_status must probe the configured bind host (e.g. the docker
     bridge IP), not loopback unconditionally."""
 
@@ -555,7 +555,7 @@ def test_get_status_probes_configured_bind_host(hermes_home, monkeypatch):
 
 
 def test_partial_bitwarden_secrets_honor_allow_env_fallback(
-    hermes_home, monkeypatch,
+    qubit_home, monkeypatch,
 ):
     """The missing-secret branch's own error message tells operators to
     set proxy.allow_env_fallback — so the flag must actually work there
@@ -583,7 +583,7 @@ def test_partial_bitwarden_secrets_honor_allow_env_fallback(
 
 
 def test_partial_bitwarden_secrets_raise_without_fallback(
-    hermes_home, monkeypatch,
+    qubit_home, monkeypatch,
 ):
     """Strict default: missing BWS secrets raise."""
 
@@ -604,7 +604,7 @@ def test_partial_bitwarden_secrets_raise_without_fallback(
 
 
 def test_bitwarden_importerror_raise_without_fallback(
-    hermes_home, monkeypatch,
+    qubit_home, monkeypatch,
 ):
     """Strict default: ImportError on BWS module raises when
     allow_env_fallback is unset, matching the sibling branches."""

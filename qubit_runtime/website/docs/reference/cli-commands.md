@@ -1,10 +1,14 @@
 ---
 sidebar_position: 1
 title: "CLI Commands Reference"
-description: "Authoritative reference for Qubit terminal commands and command families"
+description: "Authoritative reference for Hermes terminal commands and command families"
 ---
 
 # CLI Commands Reference
+
+Python dependency commands on this page use a
+[PM-prepared source checkout](./package-management.md#developer-workflow).
+After a dependency change, reactivate the checkout and restart Hermes.
 
 This page covers the **terminal commands** you run from your shell.
 
@@ -13,7 +17,7 @@ For in-chat slash commands, see [Slash Commands Reference](./slash-commands.md).
 ## Global entrypoint
 
 ```bash
-qubit [global-options] <command> [subcommand/options]
+hermes [global-options] <command> [subcommand/options]
 ```
 
 ### Global options
@@ -21,7 +25,7 @@ qubit [global-options] <command> [subcommand/options]
 | Option | Description |
 |--------|-------------|
 | `--version`, `-V` | Show version and exit. |
-| `--profile <name>`, `-p <name>` | Select which Qubit profile to use for this invocation. Overrides the sticky default set by `qubit profile use`. |
+| `--profile <name>`, `-p <name>` | Select which Hermes profile to use for this invocation. Overrides the sticky default set by `hermes profile use`. |
 | `--resume <session>`, `-r <session>` | Resume a previous session by ID or title. The keyword `latest` resumes the most recent session (workspace-scoped, same lookup as `-c`). |
 | `--continue [name]`, `-c [name]` | Resume the most recent session, or the most recent session matching a title. |
 | `--in <dir>` | Change into `<dir>` before starting or resuming. Scopes `--resume latest` / `-c` lookups to that directory's workspace and keeps the session there (skips the recorded-cwd restore). |
@@ -34,77 +38,84 @@ qubit [global-options] <command> [subcommand/options]
 | `--cli` | Force the classic prompt_toolkit REPL. Use this to override `display.interface: tui` for a single invocation. |
 | `--dev` | With `--tui`: run the TypeScript sources directly via `tsx` instead of the prebuilt bundle (for TUI contributors). |
 
+### `hermes-agent` (legacy single-query runner)
+
+The install also ships `hermes-agent`, a minimal runner that sends one query and exits: `hermes-agent --query "summarize README.md"` (or `hermes-agent "summarize README.md"`). `hermes-agent --help` lists its options (`--model`, `--base-url`, `--max-turns`, `--enabled-toolsets`, `--disabled-toolsets`, `--list-tools`, `--save-trajectories`, …) and `hermes-agent --version` prints the version; neither starts the agent. Run with no query, it prints the same help and exits. For anything else use `hermes` (`hermes -z <prompt>` is the scripted one-shot).
+
 ## Top-level commands
 
 | Command | Purpose |
 |---------|---------|
-| `qubit chat` | Interactive or one-shot chat with the agent. |
-| `qubit model` | Interactively choose the default provider and model. |
-| `qubit moa` | Configure named Mixture of Agents presets selectable from the model picker. |
-| `qubit fallback` | Manage fallback providers tried when the primary model errors. |
-| `qubit gateway` | Run or manage the messaging gateway service. |
-| `qubit proxy` | Local OpenAI-compatible proxy that attaches OAuth provider credentials. See [Subscription Proxy](../user-guide/features/subscription-proxy.md). |
-| `qubit egress` | Outbound credential-injection firewall for remote terminal sandboxes (iron-proxy). Disabled by default. See [Egress proxy](../user-guide/egress/iron-proxy.md). |
-| `qubit lsp` | Manage Language Server Protocol integration (semantic diagnostics for write_file/patch). |
-| `qubit setup` | Interactive setup wizard for all or part of the configuration. |
-| `qubit whatsapp` | Configure and pair the WhatsApp bridge. |
-| `qubit whatsapp-cloud` | Configure the official Meta WhatsApp Business Cloud API adapter (Business account + public webhook required). Distinct from `qubit whatsapp` (Baileys personal-account bridge). |
-| `qubit slack` | Slack helpers (currently: generate the app manifest with every command as a native slash). |
-| `qubit auth` | Manage credentials — add, list, remove, reset, status, logout. Handles OAuth flows for Codex/Qubit/Anthropic. |
-| `qubit login` / `logout` | **Deprecated** — use `qubit auth` instead. |
-| `qubit send` | Send a one-shot message to a configured messaging platform (Telegram, Discord, Slack, Signal, SMS, …). Useful from shell scripts, cron jobs, CI hooks, and monitoring daemons — no agent loop, no LLM. |
-| `qubit peer` | Register peer Qubit gateways on other machines and DM their agents' canonical Bot Chats (`qubit peer dm <peer>[/<agent>] "…"`). The transport behind cross-machine bot-to-bot messaging. |
-| `qubit secrets` | Manage external secret sources (currently Bitwarden Secrets Manager) for pulling API keys at process startup instead of from `~/.hermes/.env`. |
-| `qubit migrate` | Diagnose and (optionally) rewrite `config.yaml` to replace references to retired models or deprecated settings (e.g. `migrate xai`). |
-| `qubit status` | Show agent, auth, and platform status. |
-| `qubit cron` | Inspect and tick the cron scheduler. |
-| `qubit kanban` | Multi-profile collaboration board (tasks, links, dispatcher). |
-| `qubit project` | Manage named, multi-folder workspaces (projects). Anchors desktop session grouping and, when bound to a kanban board, gives tasks a deterministic worktree + branch convention. State is per-profile. |
-| `qubit webhook` | Manage dynamic webhook subscriptions for event-driven activation. |
-| `qubit hooks` | Inspect, approve, or remove shell-script hooks declared in `config.yaml`. |
-| `qubit doctor` | Diagnose config and dependency issues. |
-| `qubit security audit` | On-demand supply-chain audit (OSV.dev) for the venv, plugin requirements, and pinned MCP servers. |
-| `qubit approvals` | Approval-prompt tools — mine approval history into allowlist proposals. |
-| `qubit dump` | Copy-pasteable setup summary for support/debugging. |
-| `qubit prompt-size` | Show a byte breakdown of the system prompt + tool schemas (skills index, memory, profile). Runs offline. |
-| `qubit debug` | Debug tools — upload logs and system info for support. |
-| `qubit backup` | Back up Qubit home directory to a zip file. |
-| `qubit checkpoints` | Inspect / prune / clear `~/.hermes/checkpoints/` (the shadow store used by `/rollback`). Run with no args for a status overview. |
-| `qubit import` | Restore a Qubit backup from a zip file. |
-| `qubit logs` | View, tail, and filter agent/gateway/error log files. |
-| `qubit config` | Show, edit, migrate, and query configuration files. |
-| `qubit skin` | List, switch, and tweak display skins. |
-| `qubit console` | Open the safe Qubit command console. |
-| `qubit pairing` | Approve or revoke messaging pairing codes. |
-| `qubit skills` | Browse, install, publish, audit, and configure skills. |
-| `qubit bundles` | Group several skills under a single `/<name>` slash command. See [Skill Bundles](../user-guide/features/skills.md#skill-bundles). |
-| `qubit curator` | Background skill maintenance — status, run, pause, pin. See [Curator](../user-guide/features/curator.md). |
-| `qubit journey` (aliases `learning`, `memory-graph`) | Timeline of learned skills + memories over time. |
-| `qubit memory` | Configure external memory provider. Plugin-specific subcommands (e.g. `qubit honcho`) register automatically when their provider is active. |
-| `qubit acp` | Run Qubit as an ACP server for editor integration. |
-| `qubit mcp` | Manage MCP server configurations and run Qubit as an MCP server. |
-| `qubit plugins` | Manage Qubit Agent plugins (install, enable, disable, remove). |
-| `qubit portal` | Qubit Labs status, subscription link, and Tool Gateway routing. See [Tool Gateway](../user-guide/features/tool-gateway.md). |
-| `qubit tools` | Configure enabled tools per platform. |
-| `qubit computer-use` | Install or check the Computer Use (cua-driver) backend (macOS/Windows/Linux). |
-| `qubit pets` | Browse, install, and select [petdex](../user-guide/features/pets.md) animated pets shown across the CLI, TUI, and desktop app. Subcommands: `list`, `install`, `select`, `show`, `off`, `scale`, `remove`, `doctor`. |
-| `qubit sessions` | Browse, export, prune, rename, and delete sessions. |
-| `qubit insights` | Show token/cost/activity analytics. |
-| `qubit claw` | Qubit migration helpers. |
-| `qubit import-agent` | Import a Claude Code (`~/.claude`) or Codex CLI (`~/.codex`) setup. |
-| `qubit dashboard` | Launch the web dashboard for managing config, API keys, and sessions. |
-| `qubit serve` | Start the Qubit backend server (headless; powers the desktop app and remote backends). |
-| `qubit desktop` (alias `gui`) | Build and launch the native Electron desktop app. |
-| `qubit profile` | Manage profiles — multiple isolated Qubit instances. |
-| `qubit completion` | Print shell completion scripts (bash/zsh/fish). |
-| `qubit --version` | Show version information. |
-| `qubit update` | Pull latest code and reinstall dependencies. `--check` previews without installing; `--backup` takes a pre-pull `QUBIT_HOME` snapshot. |
-| `qubit uninstall` | Remove Qubit from the system. |
+| `hermes chat` | Interactive or one-shot chat with the agent. |
+| `hermes model` | Interactively choose the default provider and model. |
+| `hermes moa` | Configure named Mixture of Agents presets selectable from the model picker. |
+| `hermes fallback` | Manage fallback providers tried when the primary model errors. |
+| `hermes gateway` | Run or manage the messaging gateway service. |
+| `hermes proxy` | Local OpenAI-compatible proxy that attaches OAuth provider credentials. See [Subscription Proxy](../user-guide/features/subscription-proxy.md). |
+| `hermes egress` | Outbound credential-injection firewall for remote terminal sandboxes (iron-proxy). Disabled by default. See [Egress proxy](../user-guide/egress/iron-proxy.md). |
+| `hermes lsp` | Manage Language Server Protocol integration (semantic diagnostics for write_file/patch). |
+| `hermes setup` | Interactive setup wizard for all or part of the configuration. |
+| `hermes whatsapp` | Configure and pair the WhatsApp bridge. |
+| `hermes whatsapp-cloud` | Configure the official Meta WhatsApp Business Cloud API adapter (Business account + public webhook required). Distinct from `hermes whatsapp` (Baileys personal-account bridge). |
+| `hermes slack` | Slack helpers (currently: generate the app manifest with every command as a native slash). |
+| `hermes auth` | Manage credentials — add, list, remove, reset, status, logout. Handles OAuth flows for Codex/Nous/Anthropic. |
+| `hermes login` / `logout` | **Deprecated** — use `hermes auth` instead. |
+| `hermes send` | Send a one-shot message to a configured messaging platform (Telegram, Discord, Slack, Signal, SMS, …). Useful from shell scripts, cron jobs, CI hooks, and monitoring daemons — no agent loop, no LLM. |
+| `hermes peer` | Register peer Hermes gateways on other machines and DM their agents' canonical Bot Chats (`hermes peer dm <peer>[/<agent>] "…"`). The transport behind cross-machine bot-to-bot messaging. |
+| `hermes secrets` | Manage external secret sources (currently Bitwarden Secrets Manager) for pulling API keys at process startup instead of from `~/.hermes/.env`. |
+| `hermes migrate` | Diagnose and (optionally) rewrite `config.yaml` to replace references to retired models or deprecated settings (e.g. `migrate xai`). |
+| `hermes codex-runtime` | Noninteractive counterpart of `/codex-runtime`: `migrate [--dry-run] [--json]` regenerates the Hermes-managed block in `~/.codex/config.toml` for the selected profile. See [Codex app-server runtime](../user-guide/features/codex-app-server-runtime.md#running-the-migration-from-a-script). |
+| `hermes status` | Show agent, auth, and platform status. |
+| `hermes usage` | Show the configured account's rate-limit windows (the `/usage` block) without a session; `--json` for scripts. |
+| `hermes cron` | Inspect and tick the cron scheduler. |
+| `hermes pause` / `hermes resume` | Global emergency stop: no new cron fires (built-in ticker, managed-cron webhook, misfire catch-up), kanban dispatch or gateway turns start until resumed; in-flight work is never killed. |
+| `hermes kanban` | Multi-profile collaboration board (tasks, links, dispatcher). |
+| `hermes project` | Manage named, multi-folder workspaces (projects). Anchors desktop session grouping and, when bound to a kanban board, gives tasks a deterministic worktree + branch convention. State is per-profile. |
+| `hermes webhook` | Manage dynamic webhook subscriptions for event-driven activation. |
+| `hermes hooks` | Inspect, approve, or remove shell-script hooks declared in `config.yaml`. |
+| `hermes doctor` | Diagnose config and dependency issues. |
+| `hermes security audit` | On-demand supply-chain audit (OSV.dev) for the venv, plugin requirements, and pinned MCP servers. |
+| `hermes approvals` | Approval-prompt tools — mine approval history into allowlist proposals. |
+| `hermes dump` | Copy-pasteable setup summary for support/debugging. |
+| `hermes prompt-size` | Show a byte breakdown of the system prompt + tool schemas (skills index, memory, profile). Runs offline. |
+| `hermes debug` | Debug tools — upload logs and system info for support. |
+| `hermes backup` | Back up Hermes home directory to a zip file. |
+| `hermes checkpoints` | Inspect / prune / clear `~/.hermes/checkpoints/` (the shadow store used by `/rollback`). Run with no args for a status overview. |
+| `hermes import` | Restore a Hermes backup from a zip file. |
+| `hermes logs` | View, tail, and filter agent/gateway/error log files. |
+| `hermes config` | Show, edit, migrate, and query configuration files. |
+| `hermes skin` | List, switch, and tweak display skins. |
+| `hermes console` | Open the safe Hermes command console. |
+| `hermes pairing` | Approve or revoke messaging pairing codes. |
+| `hermes skills` | Browse, install, publish, audit, and configure skills. |
+| `hermes bundles` | Group several skills under a single `/<name>` slash command. See [Skill Bundles](../user-guide/features/skills.md#skill-bundles). |
+| `hermes curator` | Background skill maintenance — status, run, pause, pin. See [Curator](../user-guide/features/curator.md). |
+| `hermes journey` (aliases `learning`, `memory-graph`) | Timeline of learned skills + memories over time. |
+| `hermes memory` | Configure external memory provider. Plugin-specific subcommands (e.g. `hermes honcho`) register automatically when their provider is active. |
+| `hermes acp` | Run Hermes as an ACP server for editor integration. |
+| `hermes mcp` | Manage MCP server configurations and run Hermes as an MCP server. |
+| `hermes plugins` | Manage Hermes Agent plugins (install, enable, disable, remove). |
+| `hermes portal` | Nous Portal status, subscription link, and Tool Gateway routing. See [Tool Gateway](../user-guide/features/tool-gateway.md). |
+| `hermes tools` | Configure enabled tools per platform. |
+| `hermes computer-use` | Install or check the Computer Use (cua-driver) backend (macOS/Windows/Linux). |
+| `hermes pets` | Browse, install, and select [petdex](../user-guide/features/pets.md) animated pets shown across the CLI, TUI, and desktop app. Subcommands: `list`, `install`, `select`, `show`, `off`, `scale`, `remove`, `doctor`. |
+| `hermes sessions` | Browse, export, prune, rename, and delete sessions. |
+| `hermes insights` | Show token/cost/activity analytics. |
+| `hermes claw` | OpenClaw migration helpers. |
+| `hermes import-agent` | Import a Claude Code (`~/.claude`) or Codex CLI (`~/.codex`) setup. |
+| `hermes dashboard` | Launch the web dashboard for managing config, API keys, and sessions. |
+| `hermes serve` | Start the Hermes backend server (headless; powers the desktop app and remote backends). |
+| `hermes desktop` (alias `gui`) | Build and launch the native Electron desktop app. |
+| `hermes profile` | Manage profiles — multiple isolated Hermes instances. |
+| `hermes completion` | Print shell completion scripts (bash/zsh/fish). |
+| `hermes --version` | Show version information. |
+| `hermes update` | Pull latest code and reinstall dependencies. `--check` previews without installing; `--backup` takes a pre-pull `HERMES_HOME` snapshot. |
+| `hermes uninstall` | Remove Hermes from the system. |
 
-## `qubit chat`
+## `hermes chat`
 
 ```bash
-qubit chat [options]
+hermes chat [options]
 ```
 
 Common options:
@@ -116,10 +127,11 @@ Common options:
 | `--oneshot` | With `-q`/`--query-file`: answer the query and exit (the pre-0.21 single-query behavior) instead of seeding an interactive session. Implied on non-TTY stdio and by `-Q`. |
 | `-m`, `--model <model>` | Override the model for this run. |
 | `-t`, `--toolsets <csv>` | Enable a comma-separated set of toolsets. |
-| `--provider <provider>` | Force a provider: `auto`, `openrouter`, `qubit`, `openai-codex`, `copilot-acp`, `copilot`, `anthropic`, `gemini`, `huggingface`, `novita` (aliases `novita-ai`, `novitaai`), `openai-api`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `minimax-oauth`, `kilocode`, `xiaomi`, `arcee`, `gmi`, `upstage` (alias `solar`), `alibaba`, `alibaba-cn`, `alibaba-coding-plan` (alias `alibaba_coding`), `alibaba-coding-plan-cn`, `alibaba-token-plan`, `alibaba-token-plan-cn`, `deepseek`, `nvidia`, `ollama-cloud`, `xai` (alias `grok`), `xai-oauth` (alias `grok-oauth`), `qwen-oauth`, `bedrock`, `opencode-zen`, `opencode-go`, `opencode-free` (aliases `free`, `opencode_free`; keyless), `commandcode`, `commandcode-anthropic`, `ai-gateway`, `azure-foundry`, `lmstudio`, `stepfun`, `tencent-tokenhub` (alias `tencent`, `tokenhub`), `router` (aliases `ramp-router`, `ramp`), `nebius-token-factory` (aliases `nebius`, `nebius-tf`, `tokenfactory`), `tencent-tokenplan` (aliases `tokenplan`, `tencent-lkeap`). |
+| `--provider <provider>` | Force a provider: `auto`, `openrouter`, `nous`, `openai-codex` (aliases `chatgpt`, `chatgpt-codex`), `copilot-acp`, `copilot`, `anthropic`, `gemini`, `huggingface`, `novita` (aliases `novita-ai`, `novitaai`), `openai-api`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `minimax-oauth`, `kilocode`, `xiaomi`, `arcee`, `gmi`, `upstage` (alias `solar`), `alibaba`, `alibaba-cn`, `alibaba-coding-plan` (alias `alibaba_coding`), `alibaba-coding-plan-cn`, `alibaba-token-plan`, `alibaba-token-plan-cn`, `deepseek`, `nvidia`, `ollama-cloud`, `xai` (alias `grok`), `xai-oauth` (alias `grok-oauth`), `qwen-oauth`, `bedrock`, `opencode-zen`, `opencode-go`, `commandcode`, `commandcode-anthropic`, `ai-gateway`, `azure-foundry`, `lmstudio`, `stepfun`, `tencent-tokenhub` (alias `tencent`, `tokenhub`), `router` (aliases `ramp-router`, `ramp`), `nebius-token-factory` (aliases `nebius`, `nebius-tf`, `tokenfactory`), `tencent-tokenplan` (aliases `tokenplan`, `tencent-lkeap`). |
 | `-s`, `--skills <name>` | Preload one or more skills for the session (can be repeated or comma-separated). |
 | `-v`, `--verbose` | Verbose output. |
 | `-Q`, `--quiet` | Programmatic mode: suppress banner/spinner/tool previews. |
+| `--format stream-json` | Emit structured JSONL for a `-q` / `--query` invocation. Implies `--quiet`; cannot be combined with `--tui`. |
 | `--image <path>` | Attach a local image to a single query. |
 | `--resume <session>` / `--continue [name]` | Resume a session directly from `chat`. |
 | `--worktree` | Create an isolated git worktree for this run. |
@@ -128,34 +140,95 @@ Common options:
 | `--pass-session-id` | Pass the session ID into the system prompt. |
 | `--ignore-user-config` | Ignore `~/.hermes/config.yaml` and use built-in defaults. Credentials in `.env` are still loaded. Useful for isolated CI runs, reproducible bug reports, and third-party integrations. |
 | `--ignore-rules` | Skip auto-injection of `AGENTS.md`, `SOUL.md`, `.cursorrules`, persistent memory, and preloaded skills. Combine with `--ignore-user-config` for a fully isolated run. |
-| `--safe-mode` | Troubleshooting mode: disable ALL customizations — user config, rules/memory injection, plugins, shell hooks, and MCP servers (implies `--ignore-user-config` and `--ignore-rules`). Use to isolate whether a problem comes from your setup or from Qubit itself. |
-| `--source <tag>` | Session source tag for filtering (default: `cli`). Use `tool` for third-party integrations that should not appear in user session lists. |
+| `--safe-mode` | Troubleshooting mode: disable ALL customizations — user config, rules/memory injection, plugins, shell hooks, and MCP servers (implies `--ignore-user-config` and `--ignore-rules`). Use to isolate whether a problem comes from your setup or from Hermes itself. |
+| `--source <tag>` | Session source tag for filtering (default: `cli`; one-shot runs default to `oneshot`, which pickers hide). Use `tool` for third-party integrations that should not appear in user session lists. An explicit `--source` is always stored as given, even for a one-shot run launched from inside a TUI or Desktop session. |
 | `--max-turns <N>` | Maximum tool-calling iterations per conversation turn (default: 500, or `agent.max_turns` in config). |
 
 Examples:
 
 ```bash
-qubit
-qubit chat -q "Summarize the latest PRs"          # seeds an interactive session
-qubit chat --oneshot -q "Summarize the latest PRs"  # answer and exit
-qubit chat --provider openrouter --model anthropic/claude-sonnet-4.6
-qubit chat --toolsets web,terminal,skills
-qubit chat --quiet -q "Return only JSON"
-qubit chat --worktree -q "Review this repo and open a PR"
-qubit chat --ignore-user-config --ignore-rules -q "Repro without my personal setup"
-qubit chat --safe-mode -q "Is this bug mine or Qubit'?"
+hermes
+hermes chat -q "Summarize the latest PRs"          # seeds an interactive session
+hermes chat --oneshot -q "Summarize the latest PRs"  # answer and exit
+hermes chat --provider openrouter --model anthropic/claude-sonnet-4.6
+hermes chat --toolsets web,terminal,skills
+hermes chat --quiet -q "Return only JSON"
+hermes chat -q "Inspect this repository" --format stream-json
+hermes chat --worktree -q "Review this repo and open a PR"
+hermes chat --ignore-user-config --ignore-rules -q "Repro without my personal setup"
+hermes chat --safe-mode -q "Is this bug mine or Hermes'?"
 ```
 
-### `qubit -z <prompt>` — scripted one-shot
+### `--format stream-json` — structured JSONL output
 
-For programmatic callers (shell scripts, CI, cron, parent processes piping in a prompt), `qubit -z` is the purest one-shot entry point: **single prompt in, final response text out, nothing else on stdout or stderr.** No banner, no spinner, no tool previews, no `Session:` line — just the agent's final reply as plain text.
+Use `--format stream-json` when a program needs to consume progress without
+scraping terminal output. It requires `-q` / `--query` (or `--query-file`), implies
+quiet non-interactive CLI mode, and rejects an explicit `--tui` request. Every
+stdout line is one JSON object; diagnostics and the `session_id:` line stay on stderr.
 
 ```bash
-qubit -z "What's the capital of France?"
+hermes chat -q "Summarize this repository" --format stream-json
+```
+
+Every event carries `timestamp` (Unix epoch milliseconds).
+
+| Event `type` | Fields |
+|---|---|
+| `system` | `subtype: "init"`, `model`, `session_id` |
+| `text` | `text` — a streamed assistant text delta |
+| `tool_use` | `name`; `input` when the tool arguments are available |
+| `tool_result` | `name`, `output` (capped at 5000 chars), `duration_ms`, `is_error` |
+| `result` | `session_id`, `exit_code`, `text`, `tokens` (`input`, `output`, `total`, `cache_read`, `cache_write`), `duration_ms`; `error` when the turn failed |
+
+Once a conversation starts, its terminal record is always `result` — including
+`exit_code: 130` when it is interrupted with Ctrl-C. Treat that record as the
+completion signal; the process exit code matches its `exit_code`.
+
+#### Exit codes for one-shot runs
+
+When chat answers and exits (`-Q`, `chat --oneshot`, or a query with non-TTY
+stdio) the process exit code reports the turn's outcome, on both the quiet and
+the non-quiet path: `0` the turn completed; `1` it failed, stopped partway
+(`partial`), hit the iteration budget, or never ran (credentials / agent init
+failed); `130` it was interrupted. A Kanban dispatcher-spawned worker
+(`HERMES_KANBAN_TASK` set) whose turn failed only because the provider was
+rate-limited, overloaded, returning 5xx, timing out, or the account hit a
+billing/quota wall, exits
+`75` (`EX_TEMPFAIL`) so the dispatcher requeues the task without counting a
+failure. With `--format stream-json` the terminal `result` record carries the
+same `exit_code`.
+
+#### Delegation in finite chat runs
+
+When chat answers and exits (`-Q`, `chat --oneshot`, or a query with non-TTY
+stdio), `delegate_task` waits for its children and returns their results to the
+parent in the same turn. Batch children still run in parallel, subject to
+`delegation.max_concurrent_children`. The parent can use those results in its
+final response before the CLI exits.
+
+- **Automatic joining:** no opt-in or background-mode override is needed.
+  Interactive TTY chat and messaging sessions keep background delegation.
+- **Existing safeguards:** delegation limits, timeouts, cancellation, and
+  `approvals.single_query_mode` still apply. Joining does not auto-approve commands
+  or guarantee successful child outcomes. Inspect results and verify artifacts.
+- **Terminal completions:** this does not change background terminal notification
+  behavior or the bounded `terminal.oneshot_completion_wait_seconds` exit wait.
+  That setting is not a delegation timeout.
+
+Delegation remains process-local. Interrupting or terminating the parent can
+cancel unfinished children. Use a durable scheduler for work that must survive
+the initiating process.
+
+### `hermes -z <prompt>` — scripted one-shot
+
+For programmatic callers (shell scripts, CI, cron, parent processes piping in a prompt), `hermes -z` is the purest one-shot entry point: **single prompt in, final response text out, nothing else on stdout or stderr.** No banner, no spinner, no tool previews, no `Session:` line — just the agent's final reply as plain text.
+
+```bash
+hermes -z "What's the capital of France?"
 # → Paris.
 
 # Parent scripts can cleanly capture the response:
-answer=$(qubit -z "summarize this" < /path/to/file.txt)
+answer=$(hermes -z "summarize this" < /path/to/file.txt)
 ```
 
 Per-run overrides (no mutation to `~/.hermes/config.yaml`):
@@ -167,44 +240,54 @@ Per-run overrides (no mutation to `~/.hermes/config.yaml`):
 | `--usage-file <path>` | _(none)_ | Write a JSON usage report after the run (see below) |
 
 ```bash
-qubit -z "…" --provider openrouter --model openai/gpt-5.5
+hermes -z "…" --provider openrouter --model openai/gpt-5.5
 # or:
-HERMES_INFERENCE_MODEL=anthropic/claude-sonnet-4.6 qubit -z "…"
+HERMES_INFERENCE_MODEL=anthropic/claude-sonnet-4.6 hermes -z "…"
 ```
 
-Same agent, same tools, same skills — just strips every interactive / cosmetic layer. If you need tool output in the transcript too, use `qubit chat --oneshot -q` instead; `-z` is explicitly for "I only want the final answer".
+Same agent, same tools, same skills — just strips every interactive / cosmetic layer. If you need tool output in the transcript too, use `hermes chat --oneshot -q` instead; `-z` is explicitly for "I only want the final answer".
+
+Exit codes: `0` the turn completed; `2` it failed or stopped partway (`partial`,
+iteration budget, `completed: false`) — even when an explanation was printed;
+`130` it was interrupted; `1` a completed turn produced no text at all; `2` also
+for usage errors (bad flags) before the run starts. These codes intentionally
+differ from `chat -q`/`-Q` above (which exit `1` for failed/partial/budget and
+`0` for a completed turn with no text): `-z` reserves `1` for "answered nothing".
+Judge the run by the exit code (or the `--usage-file` flags), not by whether
+stdout is non-empty.
 
 #### `--usage-file` — JSON usage report for pipelines
 
-`qubit -z "…" --usage-file /path/report.json` writes a machine-readable usage report after the run: `estimated_cost_usd`, `input_tokens` / `output_tokens` / `cache_read_tokens` / `cache_write_tokens` / `reasoning_tokens` / `total_tokens`, `api_calls`, `model`, `provider`, `session_id`, `service_tier`, and `completed` / `failed` flags. The report is written **even when the run fails**, so batch pipelines can always account for spend. It has no effect outside `-z`/`--oneshot`, and a broken usage write never masks the run's own outcome.
+`hermes -z "…" --usage-file /path/report.json` writes a machine-readable usage report after the run: `estimated_cost_usd`, `input_tokens` / `output_tokens` / `cache_read_tokens` / `cache_write_tokens` / `reasoning_tokens` / `total_tokens`, `api_calls`, `model`, `provider`, `session_id`, `service_tier`, the `completed` / `failed` / `partial` / `interrupted` flags and `turn_exit_reason` (why `completed` is false, e.g. `max_iterations_reached(3/3)`). Those top-level counters cover the **main agent loop** only. Auxiliary LLM calls made on the same run (title generation, vision, context compression, `web_extract`, background review, …) are reported separately under `auxiliary` — the same totals plus a per-task `by_task` map — and `total_including_auxiliary` (`estimated_cost_usd`, `total_tokens`, `api_calls`) is the grand total to bill on. The report is written **even when the run fails**, so batch pipelines can always account for spend. It has no effect outside `-z`/`--oneshot`, and a broken usage write never masks the run's own outcome.
 
 ```bash
-qubit -z "summarize this repo" --usage-file /tmp/usage.json
-jq .estimated_cost_usd /tmp/usage.json
+hermes -z "summarize this repo" --usage-file ~/.hermes/cache/scratch/usage.json
+jq .total_including_auxiliary.estimated_cost_usd ~/.hermes/cache/scratch/usage.json
+jq .auxiliary.by_task ~/.hermes/cache/scratch/usage.json      # what did title generation / vision cost?
 ```
 
-## `qubit model`
+## `hermes model`
 
-Interactive provider + model selector. **This is the command for adding new providers, setting up API keys, and running OAuth flows.** Run it from your terminal — not from inside an active Qubit chat session.
+Interactive provider + model selector. **This is the command for adding new providers, setting up API keys, and running OAuth flows.** Run it from your terminal — not from inside an active Hermes chat session.
 
 ```bash
-qubit model
+hermes model
 ```
 
 Use this when you want to:
 - **add a new provider** (OpenRouter, Anthropic, Copilot, DeepSeek, custom, etc.)
-- log into OAuth-backed providers (Anthropic, Copilot, Codex, Qubit Labs)
+- log into OAuth-backed providers (Anthropic, Copilot, Codex, Nous Portal)
 - enter or update API keys
 - pick from provider-specific model lists
 - configure a custom/self-hosted endpoint
 - save the new default into config
 
-:::warning qubit model vs /model — know the difference
-**`qubit model`** (run from your terminal, outside any Qubit session) is the **full provider setup wizard**. It can add new providers, run OAuth flows, prompt for API keys, and configure endpoints.
+:::warning hermes model vs /model — know the difference
+**`hermes model`** (run from your terminal, outside any Hermes session) is the **full provider setup wizard**. It can add new providers, run OAuth flows, prompt for API keys, and configure endpoints.
 
-**`/model`** (typed inside an active Qubit chat session) can only **switch between providers and models you've already set up**. It cannot add new providers, run OAuth, or prompt for API keys.
+**`/model`** (typed inside an active Hermes chat session) can only **switch between providers and models you've already set up**. It cannot add new providers, run OAuth, or prompt for API keys.
 
-**If you need to add a new provider:** Exit your Qubit session first (`Ctrl+C` or `/quit`), then run `qubit model` from your terminal prompt.
+**If you need to add a new provider:** Exit your Hermes session first (`Ctrl+C` or `/quit`), then run `hermes model` from your terminal prompt.
 :::
 
 ### `/model` slash command (mid-session)
@@ -228,15 +311,15 @@ By default, `/model` changes apply **to the current session only**. Add `--globa
 ```
 
 :::info What if I only see OpenRouter models?
-If you've only configured OpenRouter, `/model` will only show OpenRouter models. To add another provider (Anthropic, DeepSeek, Copilot, etc.), exit your session and run `qubit model` from the terminal.
+If you've only configured OpenRouter, `/model` will only show OpenRouter models. To add another provider (Anthropic, DeepSeek, Copilot, etc.), exit your session and run `hermes model` from the terminal.
 :::
 
 On a `--global` switch, provider and base URL changes are persisted to `config.yaml` alongside the model. When switching away from a custom endpoint, the stale base URL is cleared to prevent it leaking into other providers.
 
-## `qubit gateway`
+## `hermes gateway`
 
 ```bash
-qubit gateway <subcommand>
+hermes gateway <subcommand>
 ```
 
 Subcommands:
@@ -252,35 +335,38 @@ Subcommands:
 | `install` | Install as a systemd (Linux) or launchd (macOS) background service. |
 | `uninstall` | Remove the installed service. |
 | `setup` | Interactive messaging-platform setup. |
+| `migrate` | Fold per-profile standalone gateways onto the one host gateway (`--multiplex`, the only mode — `hermes update` runs it automatically unless a real boundary blocks it). Re-running it converges a half-migrated host; a manifest on disk is the resume record, never a rollback (there is no `--standalone`). Runs a preflight (duplicate bot tokens, secondary port-binders without a `/p/<profile>/` ingress) and changes nothing when blocked. Flags: `--dry-run`, `-y`/`--yes`. See [Migrating from per-profile gateways](../user-guide/multi-profile-gateways.md#migrating-from-per-profile-gateways). |
 | `migrate-legacy` | Remove legacy `hermes.service` units left over from pre-rename installs. Profile units (`hermes-gateway-<profile>.service`) and unrelated services are never touched. Flags: `--dry-run`, `-y`/`--yes`. |
-| `enroll` | Experimental: enroll this gateway with a relay connector and save relay credentials for connector-backed platforms. See [Qubit Relay](/user-guide/messaging/relay). |
+| `enroll` | Experimental: enroll this gateway with a relay connector and save relay credentials for connector-backed platforms. See [Hermes Relay](../user-guide/messaging/relay.md). |
 
 Options:
 
 | Option | Description |
 |--------|-------------|
-| `--all` | On `start` / `restart` / `stop`: act on **every profile's** gateway, not just the active `QUBIT_HOME`. Useful if you run multiple profiles side-by-side and want to restart them all after `qubit update`. |
+| `--all` | On `start` / `restart` / `stop`: act on **every profile's** gateway, not just the active `HERMES_HOME`. Useful if you run multiple profiles side-by-side and want to restart them all after `hermes update`. |
 | `--no-supervise` | On `run`: inside the s6-overlay Docker image, opt out of auto-supervision and use pre-s6 foreground semantics — gateway runs as the container's main process with no auto-restart. No-op outside the s6 image. Equivalent to setting `HERMES_GATEWAY_NO_SUPERVISE=1`. |
 | `--external-supervisor` | On `run`: declare that a wrapper-provided process manager owns the foreground gateway. Use this when `sudo`, `env -i`, or another wrapper strips launchd/systemd's native environment marker. In-chat restarts and updates exit back to that manager instead of spawning a detached replacement. |
 
-`--external-supervisor` is a restart-policy contract: an in-chat restart or
-service-restart update exits with status `75`, so the wrapper's supervisor must
+`--external-supervisor` is a restart-policy contract: an in-chat restart,
+`hermes gateway restart`, or service-restart update exits with status `75`
+(the CLI then waits for the supervisor's fresh PID instead of running a
+foreground gateway of its own), so the wrapper's supervisor must
 relaunch the gateway after that nonzero exit. For systemd, use
 `Restart=on-failure` or `Restart=always` and do not include `75` in
 `RestartPreventExitStatus`; for launchd, configure `KeepAlive` to relaunch after
 unsuccessful exits. Without that policy, a requested restart leaves the gateway
 stopped.
 
-`qubit gateway enroll` accepts `--token`, `--connector-url`, `--gateway-id`, and `--wake-url`. It exchanges the enrollment token with the connector and writes the resulting `GATEWAY_RELAY_ID`, `GATEWAY_RELAY_SECRET`, `GATEWAY_RELAY_DELIVERY_KEY`, optional `GATEWAY_RELAY_URL`, and (when `--wake-url` is given) `GATEWAY_RELAY_WAKE_URL` values to the active profile's `.env`.
+`hermes gateway enroll` accepts `--token`, `--connector-url`, `--gateway-id`, and `--wake-url`. It exchanges the enrollment token with the connector and writes the resulting `GATEWAY_RELAY_ID`, `GATEWAY_RELAY_SECRET`, `GATEWAY_RELAY_DELIVERY_KEY`, optional `GATEWAY_RELAY_URL`, and (when `--wake-url` is given) `GATEWAY_RELAY_WAKE_URL` values to the active profile's `.env`.
 
 :::tip WSL users
-Use `qubit gateway run` instead of `qubit gateway start` — WSL's systemd support is unreliable. Wrap it in tmux for persistence: `tmux new -s qubit 'qubit gateway run'`. See [WSL FAQ](/reference/faq#wsl-gateway-keeps-disconnecting-or-hermes-gateway-start-fails) for details.
+Use `hermes gateway run` instead of `hermes gateway start` — WSL's systemd support is unreliable. Wrap it in tmux for persistence: `tmux new -s hermes 'hermes gateway run'`. See [WSL FAQ](./faq.md#wsl-gateway-keeps-disconnecting-or-hermes-gateway-start-fails) for details.
 :::
 
-## `qubit lsp`
+## `hermes lsp`
 
 ```bash
-qubit lsp <subcommand>
+hermes lsp <subcommand>
 ```
 
 Manage the Language Server Protocol integration. LSP runs real
@@ -301,16 +387,16 @@ Subcommands:
 | `restart` | Tear down running clients so the next edit re-spawns. |
 | `which <id>` | Print the resolved binary path for one server. |
 
-See [LSP — Semantic Diagnostics](/user-guide/features/lsp) for
+See [LSP — Semantic Diagnostics](../user-guide/features/lsp.md) for
 the full guide, supported languages, and configuration knobs.
 
-## `qubit setup`
+## `hermes setup`
 
 ```bash
-qubit setup [model|tts|terminal|gateway|tools|agent] [--non-interactive] [--reset] [--quick] [--reconfigure] [--portal]
+hermes setup [model|tts|terminal|gateway|tools|agent] [--non-interactive] [--reset] [--quick] [--reconfigure] [--portal]
 ```
 
-**Easiest path:** `qubit setup --portal` — OAuth into Qubit Labs and opt into the [Tool Gateway](../user-guide/features/tool-gateway.md) in one shot.
+**Easiest path:** `hermes setup --portal` — OAuth into Nous Portal and opt into the [Tool Gateway](../user-guide/features/tool-gateway.md) in one shot.
 
 **First run:** launches the first-time wizard.
 
@@ -333,40 +419,40 @@ Options:
 | `--quick` | On returning-user runs: only prompt for items that are missing or unset. Skip items you already have configured. |
 | `--non-interactive` | Use defaults / environment values without prompts. |
 | `--reset` | Reset configuration to defaults before setup. |
-| `--reconfigure` | Backwards-compat alias — bare `qubit setup` on an existing install now does this by default. |
-| `--portal` | One-shot Qubit Labs setup: log in via OAuth, set Qubit as the inference provider, and opt into the [Tool Gateway](../user-guide/features/tool-gateway.md). Skips the rest of the wizard. |
+| `--reconfigure` | Backwards-compat alias — bare `hermes setup` on an existing install now does this by default. |
+| `--portal` | One-shot Nous Portal setup: log in via OAuth, set Nous as the inference provider, and opt into the [Tool Gateway](../user-guide/features/tool-gateway.md). Skips the rest of the wizard. |
 
-## `qubit portal`
+## `hermes portal`
 
 ```bash
-qubit portal [status|open|tools]
+hermes portal [status|open|tools]
 ```
 
-Inspect Qubit Labs auth, Tool Gateway routing, and reach the subscription page. Subcommand-less invocation runs `status`.
+Inspect Nous Portal auth, Tool Gateway routing, and reach the subscription page. Subcommand-less invocation runs `status`.
 
 | Subcommand | Description |
 |------------|-------------|
 | `status` (default) | Portal auth state + per-tool Tool Gateway routing summary. Also shown when no subcommand is given. |
 | `open` | Open `portal.nousresearch.com/manage-subscription` in your default browser. |
-| `tools` | List every Tool Gateway partner (Firecrawl, FAL, OpenAI TTS, Browser Use, Modal) and which are routed via Qubit. |
+| `tools` | List every Tool Gateway partner (Firecrawl, FAL, OpenAI TTS, Browser Use, Modal) and which are routed via Nous. |
 
-For configuration of the gateway itself, see [Tool Gateway](../user-guide/features/tool-gateway.md). For the one-shot setup path, see `qubit setup --portal` above.
+For configuration of the gateway itself, see [Tool Gateway](../user-guide/features/tool-gateway.md). For the one-shot setup path, see `hermes setup --portal` above.
 
-## `qubit whatsapp`
+## `hermes whatsapp`
 
 ```bash
-qubit whatsapp
+hermes whatsapp
 ```
 
 Runs the WhatsApp pairing/setup flow, including mode selection and QR-code pairing.
 
-## `qubit slack`
+## `hermes slack`
 
 ```bash
-qubit slack manifest              # print manifest to stdout
-qubit slack manifest --write      # write to ~/.hermes/slack-manifest.json
-qubit slack manifest --long-description-file AGENTS.md --write
-qubit slack manifest --slashes-only  # just the features.slash_commands array
+hermes slack manifest              # print manifest to stdout
+hermes slack manifest --write      # write to ~/.hermes/slack-manifest.json
+hermes slack manifest --long-description-file AGENTS.md --write
+hermes slack manifest --slashes-only  # just the features.slash_commands array
 ```
 
 Generates a Slack app manifest that registers every gateway command in
@@ -379,29 +465,29 @@ reinstall if scopes or slash commands changed.
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--write [PATH]` | stdout | Write to a file instead of stdout. Bare `--write` writes `$QUBIT_HOME/slack-manifest.json`. |
-| `--name NAME` | `Qubit` | Bot display name in Slack. |
+| `--write [PATH]` | stdout | Write to a file instead of stdout. Bare `--write` writes `$HERMES_HOME/slack-manifest.json`. |
+| `--name NAME` | `Hermes` | Bot display name in Slack. |
 | `--description DESC` | default blurb | Bot description shown in the Slack app directory. |
 | `--long-description TEXT` | unset | Set `display_information.long_description` inline (175–4,000 characters). Incompatible with `--slashes-only`. |
 | `--long-description-file PATH` | unset | Read the long description from a UTF-8 text file, preserving its contents exactly. Mutually exclusive with `--long-description` and incompatible with `--slashes-only`. |
 | `--slashes-only` | off | Emit only `features.slash_commands` for merging into a manually-maintained manifest. |
 
-Run `qubit slack manifest --write` again after `qubit update` to pick
+Run `hermes slack manifest --write` again after `hermes update` to pick
 up any new commands.
 
 
-## `qubit send`
+## `hermes send`
 
 ```bash
-qubit send --to <target> "message text"
-qubit send --to <target> --file <path>
-echo "message" | qubit send --to <target>
-qubit send --list [platform]
+hermes send --to <target> "message text"
+hermes send --to <target> --file <path>
+echo "message" | hermes send --to <target>
+hermes send --list [platform]
 ```
 
 Send a one-shot message to a configured messaging platform without spinning up an agent or gateway loop. Reuses the gateway's already-configured credentials (`~/.hermes/.env` + `~/.hermes/config.yaml`) so ops scripts, cron jobs, CI hooks, and monitoring daemons can post status updates without reimplementing each platform's REST client.
 
-For bot-token platforms (Telegram, Discord, Slack, Signal, SMS, WhatsApp-CloudAPI) no running gateway is required — `qubit send` talks directly to the platform's REST endpoint. Plugin platforms that need a persistent adapter still require a live gateway.
+For bot-token platforms (Telegram, Discord, Slack, Signal, SMS, WhatsApp-CloudAPI) no running gateway is required — `hermes send` talks directly to the platform's REST endpoint. Plugin platforms that need a persistent adapter still require a live gateway.
 
 | Option | Description |
 |--------|-------------|
@@ -412,55 +498,55 @@ For bot-token platforms (Telegram, Discord, Slack, Signal, SMS, WhatsApp-CloudAP
 | `-q`, `--quiet` | Suppress stdout on success — useful in scripts (rely on exit code only). |
 | `--json` | Emit raw JSON result instead of human-readable output. |
 
-If neither a positional `message` argument nor `--file` is provided, `qubit send` reads from stdin when it is not a TTY. Exit codes: `0` on success, `1` on delivery/backend failure, `2` on usage errors.
+If neither a positional `message` argument nor `--file` is provided, `hermes send` reads from stdin when it is not a TTY. Exit codes: `0` on success, `1` on delivery/backend failure, `2` on usage errors.
 
 ### Sending images and other media
 
 `--file` is for *text* bodies only. To deliver an image, document, video, or audio file as a native platform attachment, reference it inside the message text with the `MEDIA:<local_path>` directive:
 
 ```bash
-qubit send --to telegram "MEDIA:/tmp/screenshot.png"
-qubit send --to telegram "Build chart for today MEDIA:/tmp/chart.png"   # with caption
-qubit send --to discord:#ops "MEDIA:/tmp/report.pdf"
+hermes send --to telegram "MEDIA:~/.hermes/cache/scratch/screenshot.png"
+hermes send --to telegram "Build chart for today MEDIA:~/.hermes/cache/scratch/chart.png"   # with caption
+hermes send --to discord:#ops "MEDIA:~/.hermes/cache/scratch/report.pdf"
 ```
 
 By default, image files are sent as photos (platforms like Telegram recompress these). Add `[[as_document]]` to the message to deliver them as uncompressed file attachments instead:
 
 ```bash
-qubit send --to telegram "[[as_document]] MEDIA:/tmp/screenshot.png"
+hermes send --to telegram "[[as_document]] MEDIA:~/.hermes/cache/scratch/screenshot.png"
 ```
 
 Examples:
 
 ```bash
-qubit send --to telegram "deploy finished"
-echo "RAM 92%" | qubit send --to telegram:-1001234567890
-qubit send --to discord:#ops --file /tmp/report.md
-qubit send --to slack:#eng --subject "[CI]" --file build.log
-qubit send --list                  # all platforms
-qubit send --list telegram         # filter by platform
+hermes send --to telegram "deploy finished"
+echo "RAM 92%" | hermes send --to telegram:-1001234567890
+hermes send --to discord:#ops --file ~/.hermes/cache/scratch/report.md
+hermes send --to slack:#eng --subject "[CI]" --file build.log
+hermes send --list                  # all platforms
+hermes send --list telegram         # filter by platform
 ```
 
 
 
-## `qubit peer`
+## `hermes peer`
 
 ```bash
-qubit peer add <name> --url http://host:port --key <API_SERVER_KEY>
-qubit peer list
-qubit peer dm <peer>[/<agent>] "message"
-qubit peer run <peer>[/<agent>] --idempotency-key <key> "message"
-qubit peer status <peer>[/<agent>] <run_id>
-qubit peer stop <peer>[/<agent>] <run_id>
-qubit peer remove <name>
+hermes peer add <name> --url http://host:port --key <API_SERVER_KEY>
+hermes peer list
+hermes peer dm <peer>[/<agent>] "message"
+hermes peer run <peer>[/<agent>] --idempotency-key <key> "message"
+hermes peer status <peer>[/<agent>] <run_id>
+hermes peer stop <peer>[/<agent>] <run_id>
+hermes peer remove <name>
 ```
 
-Bot-to-bot DMs across machines. Register another Qubit gateway (any machine
+Bot-to-bot DMs across machines. Register another Hermes gateway (any machine
 running the `api_server` platform) as a *peer*, then message its agents:
-`qubit peer dm` resolves the remote agent's canonical **Bot Chat** session
+`hermes peer dm` resolves the remote agent's canonical **Bot Chat** session
 over the peer's API server, runs one agent turn there, and prints the reply
 on stdout — the cross-machine twin of the local
-`qubit -p <bot> chat --in ~ -c "Bot Chat" …` bot-messaging command.
+`hermes -p <bot> chat --in ~ -c "Bot Chat" …` bot-messaging command.
 
 `<peer>` alone targets the peer gateway's main agent;
 `<peer>/<agent>` targets a named profile on a multiplexed peer (routed via
@@ -478,17 +564,17 @@ its `/p/<profile>/` mirror).
 
 When at least one peer is registered, the Bot Mode messaging protocol
 (`agent.bot_mode_protocol`) taught to every canonical Bot Chat automatically
-includes the peer roster and the `qubit peer dm` pattern, so agents discover
+includes the peer roster and the `hermes peer dm` pattern, so agents discover
 cross-machine teammates without SOUL edits. See
 [Bot Mode](../user-guide/bot-mode.md).
 
 Exit codes: `0` on success, `1` on delivery/peer failure, `2` on usage errors.
 
-## `qubit secrets`
+## `hermes secrets`
 
 ```bash
-qubit secrets bitwarden <subcommand>
-qubit secrets bw <subcommand>          # short alias
+hermes secrets bitwarden <subcommand>
+hermes secrets bw <subcommand>          # short alias
 ```
 
 Pull API keys from an external secret manager at process startup instead of storing them in `~/.hermes/.env`. Currently supports **Bitwarden Secrets Manager**. See the full guide: [Bitwarden integration](../user-guide/secrets/bitwarden.md).
@@ -501,14 +587,14 @@ Pull API keys from an external secret manager at process startup instead of stor
 | `status` | Show current config, binary path/version, and token validation status. |
 | `token` | Rotate the access token: validates the new token against Bitwarden before storing it in `.env` (a rejected token changes nothing). Accepts `--access-token` for non-interactive use and `--no-verify` to skip the probe. |
 | `sync` | Fetch secrets now and report what changed. Add `--apply` to actually export the secrets into the current shell's environment (default is dry-run). |
-| `install` | Download and verify the pinned `bws` binary. `--force` re-downloads even if a managed copy already exists. |
+| `install` | Install or repair the PM-pinned `bws` binary. `--force` requests the same integrity check and repair, not an unconditional download. |
 | `disable` | Turn off the Bitwarden integration. |
 
 
-## `qubit migrate`
+## `hermes migrate`
 
 ```bash
-qubit migrate <type>
+hermes migrate <type>
 ```
 
 Diagnose and (optionally) rewrite the active `config.yaml` to replace references to retired models or deprecated settings. A timestamped backup of the original `config.yaml` is taken before any rewrite (skip with `--no-backup`).
@@ -524,31 +610,45 @@ Common flags for migration subcommands:
 | `--apply` | Rewrite `config.yaml` in-place (default: dry-run, no writes). |
 | `--no-backup` | Skip the timestamped backup of `config.yaml` when applying. |
 
-> Not to be confused with `qubit claw migrate` (one-shot import of Qubit configuration into Qubit) — `qubit migrate` is the top-level config-rewrite command.
+> Not to be confused with `hermes claw migrate` (one-shot import of OpenClaw configuration into Hermes) — `hermes migrate` is the top-level config-rewrite command.
 
 
-## `qubit proxy`
+## `hermes codex-runtime`
 
 ```bash
-qubit proxy <subcommand>
+hermes codex-runtime migrate [--dry-run] [--json]
 ```
 
-Run a local OpenAI-compatible HTTP server that forwards requests to an OAuth-authenticated upstream provider (e.g. Qubit Labs, xAI). External apps can point at the proxy with any bearer token; the proxy attaches your real OAuth credentials on the way out. See [Subscription Proxy](../user-guide/features/subscription-proxy.md) for the full guide.
+Runs the `~/.codex/config.toml` migration that `/codex-runtime codex_app_server` triggers, without a chat session: Hermes' `mcp_servers` (plus installed codex plugins and the `default_permissions` default) are projected into the managed block for the selected profile (`hermes -p <name> codex-runtime migrate`). User text outside the block is kept verbatim; a user-owned `[mcp_servers.<name>]` with the same name as a Hermes server is preserved and the Hermes projection for that name skipped (reported as `preserved_user_servers`). The result is validated as TOML before an atomic write; exit code is 1 when the report contains errors.
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Compute and report the migration without writing `config.toml`. |
+| `--json` | Print the full migration report as JSON (`migrated`, `preserved_user_servers`, `skipped_keys_per_server`, `errors`, `target_path`, `written`). |
+
+
+## `hermes proxy`
+
+```bash
+hermes proxy <subcommand>
+```
+
+Run a local OpenAI-compatible HTTP server that forwards requests to an OAuth-authenticated upstream provider (e.g. Nous Portal, xAI). External apps can point at the proxy with any bearer token; the proxy attaches your real OAuth credentials on the way out. See [Subscription Proxy](../user-guide/features/subscription-proxy.md) for the full guide.
 
 | Subcommand | Description |
 |------------|-------------|
-| `start` | Run the proxy in the foreground. Flags: `--provider <qubit\|xai>` (default `qubit`), `--host <addr>` (default `127.0.0.1`; use `0.0.0.0` to expose on LAN), `--port <int>` (default `8645`). |
+| `start` | Run the proxy in the foreground. Flags: `--provider <nous\|xai>` (default `nous`), `--host <addr>` (default `127.0.0.1`; use `0.0.0.0` to expose on LAN), `--port <int>` (default `8645`). |
 | `status` | Show which proxy upstreams are ready (credentials present, OAuth valid). |
 | `providers` | List available proxy upstream providers. |
 
 
-## `qubit security`
+## `hermes security`
 
 ```bash
-qubit security <subcommand>
+hermes security <subcommand>
 ```
 
-On-demand vulnerability scan against [OSV.dev](https://osv.dev). Covers the Qubit venv (installed PyPI distributions), Python dependencies declared by plugins under `~/.hermes/plugins/`, and pinned `npx`/`uvx` MCP servers in `config.yaml`. Does NOT scan globally-installed packages or editor/browser extensions.
+On-demand vulnerability scan against [OSV.dev](https://osv.dev). Covers the Hermes venv (installed PyPI distributions), Python dependencies declared by plugins under `~/.hermes/plugins/`, and pinned `npx`/`uvx` MCP servers in `config.yaml`. Does NOT scan globally-installed packages or editor/browser extensions.
 
 | Subcommand | Description |
 |------------|-------------|
@@ -560,44 +660,89 @@ On-demand vulnerability scan against [OSV.dev](https://osv.dev). Covers the Qubi
 |------|---------|-------------|
 | `--json` | off | Emit machine-readable JSON instead of human-readable text. |
 | `--fail-on <level>` | `critical` | Exit non-zero when any finding meets this severity (`low`, `moderate`, `high`, `critical`). |
-| `--skip-venv` | off | Skip scanning the Qubit Python venv. |
+| `--skip-venv` | off | Skip scanning the Hermes Python venv. |
 | `--skip-plugins` | off | Skip scanning plugin requirements files. |
 | `--skip-mcp` | off | Skip scanning pinned MCP servers in `config.yaml`. |
 
 
-## `qubit login` / `qubit logout` *(Deprecated)*
+## `hermes login` / `hermes logout` *(Deprecated)*
 
 :::caution
-`qubit login` has been removed. Use `qubit auth` to manage OAuth credentials, `qubit model` to select a provider, or `qubit setup` for full interactive setup.
+`hermes login` has been removed. Use `hermes auth` to manage OAuth credentials, `hermes model` to select a provider, or `hermes setup` for full interactive setup.
 :::
 
-## `qubit auth`
+## `hermes auth`
 
-Manage credential pools for same-provider key rotation. See [Credential Pools](/user-guide/features/credential-pools) for full documentation.
+Manage credential pools for same-provider key rotation. See [Credential Pools](../user-guide/features/credential-pools.md) for full documentation.
 
 ```bash
-qubit auth                                              # Interactive wizard
-qubit auth list                                         # Show all pools
-qubit auth list openrouter                              # Show specific provider
-qubit auth add openrouter --api-key sk-or-v1-xxx        # Add API key
-qubit auth add anthropic --type oauth                   # Add OAuth credential
-qubit auth add openai-codex --type oauth --priority 0   # Add an account and try it first
-qubit auth remove openrouter 2                          # Remove by index
-qubit auth priority openrouter backup-key 0             # Move a credential to the front of fill_first order
-qubit auth reset openrouter                             # Clear cooldowns
-qubit auth reset openrouter 2                           # Clear the cooldown on one credential
-qubit auth refresh openai-codex work                    # Refresh one OAuth credential and clear its cooldown
-qubit auth status anthropic                             # Show auth status for a provider
-qubit auth logout anthropic                             # Log out and clear stored auth state
-qubit auth spotify                                      # Authenticate Qubit with Spotify via PKCE
+hermes auth                                              # Interactive wizard
+hermes auth list                                         # Show all pools
+hermes auth list openrouter                              # Show specific provider
+hermes auth add openrouter --api-key sk-or-v1-xxx        # Add API key
+hermes auth add openrouter --type oauth                  # Browser login (OpenRouter PKCE) mints a key for you
+hermes auth add anthropic --type oauth                   # Add OAuth credential
+hermes auth add openai-codex --type oauth --priority 0   # Add an account and try it first
+hermes auth add openai-codex --browser                   # Codex: browser auth-code + PKCE on localhost:1455 instead of device code
+hermes auth remove openrouter 2                          # Remove by index
+hermes auth priority openrouter backup-key 0             # Move a credential to the front of fill_first order
+hermes auth reset openrouter                             # Clear cooldowns
+hermes auth reset openrouter 2                           # Clear the cooldown on one credential
+hermes auth refresh openai-codex work                    # Refresh one OAuth credential and clear its cooldown
+hermes auth status anthropic                             # Show auth status for a provider
+hermes auth logout anthropic                             # Log out and clear stored auth state
+hermes auth spotify                                      # Authenticate Hermes with Spotify via PKCE
 ```
 
 Subcommands: `add`, `list`, `remove`, `reset`, `priority`, `refresh`, `status`, `logout`, `spotify`. When called with no subcommand, launches the interactive management wizard.
 
-## `qubit status`
+## `hermes usage`
+
+The account-limits block of the `/usage` slash command — Codex 5-hour / weekly windows, plan and banked
+resets; Anthropic OAuth windows; OpenRouter credits — without starting a session, so shell scripts and cron
+jobs can read it.
 
 ```bash
-qubit status [--all] [--deep]
+hermes usage                          # configured model provider, human-readable block
+hermes usage --provider openai-codex  # a specific provider
+hermes usage --json                   # one JSON document on stdout
+```
+
+| Option | Description |
+|--------|-------------|
+| `--provider NAME` | Provider to query (default: the configured `model.provider`). Supported: `openai-codex`, `anthropic`, `openrouter`. |
+| `--json` | Print one JSON document instead of the human-readable block. |
+
+Credentials resolve exactly as they do for `/usage` in a session with no live agent (the auth store, then
+the credential pool); the command never adds or refreshes a credential it would not use for chat. Exit code
+`0` on success; `1` with a single stderr line when no credential is configured for the provider, the provider
+has no usage endpoint, or the fetch fails (stdout stays empty).
+
+`--json` schema (keys are stable; new keys may be added):
+
+```json
+{
+  "provider": "openai-codex",
+  "source": "usage_api",
+  "title": "Account limits",
+  "plan": "Plus",
+  "fetched_at": "2026-09-19T07:58:55+00:00",
+  "windows": [
+    {"label": "Session", "used_percent": 37.0, "resets_at": "2026-09-19T21:00:00+00:00", "detail": null},
+    {"label": "Weekly", "used_percent": 12.5, "resets_at": "2026-09-25T09:00:00+00:00", "detail": null}
+  ],
+  "details": ["You have 1 reset banked - use /usage reset to activate"],
+  "unavailable_reason": null
+}
+```
+
+`used_percent` is `null` when the provider did not report the window; `resets_at` is ISO-8601 UTC or `null`
+(some windows carry a free-text `detail` instead); `plan` is `null` when unknown.
+
+## `hermes status`
+
+```bash
+hermes status [--all] [--deep]
 ```
 
 | Option | Description |
@@ -605,10 +750,10 @@ qubit status [--all] [--deep]
 | `--all` | Show all details in a shareable redacted format. |
 | `--deep` | Run deeper checks that may take longer. |
 
-## `qubit cron`
+## `hermes cron`
 
 ```bash
-qubit cron <list|create|edit|pause|resume|run|remove|status|runs|incidents|doctor|tick>
+hermes cron <list|create|edit|pause|resume|run|remove|status|runs|incidents|doctor|tick>
 ```
 
 | Subcommand | Description |
@@ -617,7 +762,7 @@ qubit cron <list|create|edit|pause|resume|run|remove|status|runs|incidents|docto
 | `create` / `add` | Create a scheduled job from a prompt, optionally attaching one or more skills via repeated `--skill`. Supports a per-job reasoning pin via `--reasoning-effort <none\|minimal\|low\|medium\|high\|xhigh\|max\|ultra>`. |
 | `edit` | Update a job's schedule, prompt, name, delivery, repeat count, or attached skills. Supports `--clear-skills`, `--add-skill`, and `--remove-skill`, plus `--reasoning-effort` (empty string clears the pin). |
 | `pause` | Pause a job without deleting it. |
-| `resume` | Resume a paused job and compute its next future run. |
+| `resume` | Resume a paused job. A recurring slot that came due while paused stays due (one catch-up run or a logged skip on the next tick); otherwise the next future run is computed. |
 | `run` | Trigger a job on the next scheduler tick. |
 | `remove` | Delete a scheduled job. |
 | `status` | Check whether the cron scheduler is running. |
@@ -629,14 +774,14 @@ The cron **trigger** is pluggable via the `cron.provider` config key. Empty
 NAS-managed provider for scale-to-zero hosted gateways) — configured via the
 `cron.chronos.*` keys (`portal_url`, `callback_url`, `expected_audience`,
 `nas_jwks_url`) — or name a custom provider under `plugins/cron/<name>/` or
-`$QUBIT_HOME/plugins/<name>/`. An unknown or unavailable provider falls back to
+`$HERMES_HOME/plugins/<name>/`. An unknown or unavailable provider falls back to
 the built-in, so cron is never left without a trigger. See the
 [cron internals](../developer-guide/cron-internals.md#gateway-integration) doc.
 
-## `qubit kanban`
+## `hermes kanban`
 
 ```bash
-qubit kanban [--board <slug>] <action> [options]
+hermes kanban [--board <slug>] <action> [options]
 ```
 
 Multi-profile, multi-project collaboration board. Each install can host many boards (one per project, repo, or domain); each board is a standalone queue with its own SQLite DB and dispatcher scope. New installs start with one board called `default`, whose DB is `~/.hermes/kanban.db` for back-compat; additional boards live at `~/.hermes/kanban/boards/<slug>/kanban.db`. The gateway-embedded dispatcher sweeps every board per tick.
@@ -645,9 +790,9 @@ Multi-profile, multi-project collaboration board. Each install can host many boa
 
 | Flag | Purpose |
 |------|---------|
-| `--board <slug>` | Operate on a specific board. Defaults to the current board (set via `qubit kanban boards switch`, the `HERMES_KANBAN_BOARD` env var, or `default`). |
+| `--board <slug>` | Operate on a specific board. Defaults to the current board (set via `hermes kanban boards switch`, the `HERMES_KANBAN_BOARD` env var, or `default`). |
 
-**This is the human / scripting surface.** Agent workers spawned by the dispatcher drive the board through a dedicated `kanban_*` [toolset](/user-guide/features/kanban#how-workers-interact-with-the-board) (`kanban_show`, `kanban_complete`, `kanban_request_review`, `kanban_request_changes`, `kanban_block`, `kanban_create`, `kanban_link`, `kanban_comment`, `kanban_heartbeat`; orchestrator profiles also get `kanban_list` and `kanban_unblock`) instead of shelling to `qubit kanban`. Workers have `HERMES_KANBAN_BOARD` pinned in their env so they physically cannot see other boards.
+**This is the human / scripting surface.** Agent workers spawned by the dispatcher drive the board through a dedicated `kanban_*` [toolset](../user-guide/features/kanban.md#how-workers-interact-with-the-board) (`kanban_show`, `kanban_complete`, `kanban_request_review`, `kanban_request_changes`, `kanban_block`, `kanban_create`, `kanban_link`, `kanban_comment`, `kanban_heartbeat`; orchestrator profiles also get `kanban_list` and `kanban_unblock`) instead of shelling to `hermes kanban`. Workers have `HERMES_KANBAN_BOARD` pinned in their env so they physically cannot see other boards.
 
 | Action | Purpose |
 |--------|---------|
@@ -678,56 +823,56 @@ Multi-profile, multi-project collaboration board. Each install can host many boa
 | `dispatch` | One dispatcher pass on the active board. Flags: `--dry-run`, `--max N`, `--failure-limit N`, `--json`. |
 | `context <id>` | Print the full context a worker would see (title + body + parent results + comments). |
 | `specify <id>` / `specify --all` | Flesh out a triage-column task into a concrete spec (title + body with goal, approach, acceptance criteria) via the auxiliary LLM, then promote it to `todo`. Flags: `--tenant` (scope `--all` to one tenant), `--author`, `--json`. Configure the model under `auxiliary.triage_specifier` in `config.yaml`. |
-| `decompose <id>` / `decompose --all` | Fan a triage-column task out into a graph of child tasks routed to specialist profiles by description. Falls back to specify-style single-task promotion when the LLM decides the task doesn't benefit from fan-out. Same flags as `specify`. Configure the decomposer model under `auxiliary.kanban_decomposer` in `config.yaml`; `kanban.orchestrator_profile` only controls who owns the root/orchestration task after fan-out. Also runs automatically every dispatcher tick when `kanban.auto_decompose: true` (the default). See [Auto vs Manual orchestration](/user-guide/features/kanban#auto-vs-manual-orchestration). |
+| `decompose <id>` / `decompose --all` | Fan a triage-column task out into a graph of child tasks routed to specialist profiles by description. Falls back to specify-style single-task promotion when the LLM decides the task doesn't benefit from fan-out. Same flags as `specify`. Configure the decomposer model under `auxiliary.kanban_decomposer` in `config.yaml`; `kanban.orchestrator_profile` only controls who owns the root/orchestration task after fan-out. Also runs automatically every dispatcher tick when `kanban.auto_decompose: true` (the default). See [Auto vs Manual orchestration](../user-guide/features/kanban.md#auto-vs-manual-orchestration). |
 | `gc` | Remove scratch workspaces for archived tasks. |
 
 Examples:
 
 ```bash
 # Create a second board and put a task on it without switching away.
-qubit kanban boards create atm10-server --name "ATM10 Server" --icon 🎮
-qubit kanban --board atm10-server create "Restart server" --assignee ops
+hermes kanban boards create atm10-server --name "ATM10 Server" --icon 🎮
+hermes kanban --board atm10-server create "Restart server" --assignee ops
 
 # Switch the active board for subsequent calls.
-qubit kanban boards switch atm10-server
-qubit kanban list                  # shows atm10-server tasks
+hermes kanban boards switch atm10-server
+hermes kanban list                  # shows atm10-server tasks
 
 # Archive a board (recoverable) or hard-delete it.
-qubit kanban boards rm atm10-server
-qubit kanban boards rm atm10-server --delete
+hermes kanban boards rm atm10-server
+hermes kanban boards rm atm10-server --delete
 ```
 
 Board resolution order (highest precedence first): `--board <slug>` flag → `HERMES_KANBAN_BOARD` env var → `~/.hermes/kanban/current` file → `default`.
 
 All actions are also available as a slash command in the gateway (`/kanban …`), with the same argument surface — including `boards` subcommands and the `--board` flag.
 
-For the full design — comparison with Cline Kanban / Paperclip / NanoClaw / Gemini Enterprise, eight collaboration patterns, four user stories, concurrency correctness proof — see `docs/hermes-kanban-v1-spec.pdf` in the repository or the [Kanban user guide](/user-guide/features/kanban).
+For the full design — comparison with Cline Kanban / Paperclip / NanoClaw / Gemini Enterprise, eight collaboration patterns, four user stories, concurrency correctness proof — see the [Kanban user guide](../user-guide/features/kanban.md).
 
-## `qubit egress`
+## `hermes egress`
 
 Outbound credential-injection firewall for remote terminal sandboxes. Wraps the [iron-proxy](https://github.com/ironsh/iron-proxy) daemon — a TLS-intercepting proxy that swaps opaque proxy tokens for real upstream API credentials at the network boundary, so sandboxes never hold real keys. Disabled by default; see the full [Egress proxy](../user-guide/egress/iron-proxy.md) page for setup + architecture.
 
 ```bash
-qubit egress install                  # download the pinned iron-proxy binary
-qubit egress install --force          # re-download even if already installed
+hermes egress install                  # download the pinned iron-proxy binary
+hermes egress install --force          # check and repair the managed copy
 
-qubit egress setup                    # interactive wizard: CA, mappings, config
-qubit egress setup --tunnel-port N    # override the tunnel listener port (default 9090)
-qubit egress setup --from-bitwarden   # use Bitwarden Secrets Manager as credential source
-qubit egress setup --no-bitwarden     # explicitly switch back to env-based credentials
-qubit egress setup --rotate-tokens    # mint fresh proxy tokens (default preserves existing)
+hermes egress setup                    # interactive wizard: CA, mappings, config
+hermes egress setup --tunnel-port N    # override the tunnel listener port (default 9090)
+hermes egress setup --from-bitwarden   # use Bitwarden Secrets Manager as credential source
+hermes egress setup --no-bitwarden     # explicitly switch back to env-based credentials
+hermes egress setup --rotate-tokens    # mint fresh proxy tokens (default preserves existing)
 
-qubit egress start                    # spawn the managed proxy daemon
-qubit egress stop                     # SIGTERM (then SIGKILL after 5s grace)
-qubit egress restart                  # stop (if running) then start — needed for secret changes
-qubit egress reload                   # hot-reload the ruleset in-place (no restart, no dropped
+hermes egress start                    # spawn the managed proxy daemon
+hermes egress stop                     # SIGTERM (then SIGKILL after 5s grace)
+hermes egress restart                  # stop (if running) then start — needed for secret changes
+hermes egress reload                   # hot-reload the ruleset in-place (no restart, no dropped
                                        #   connections) via the loopback management API
 
-qubit egress status                   # binary + config + pid + listening + mappings
-qubit egress status --show-tokens     # print proxy tokens in full (default: redacted)
+hermes egress status                   # binary + config + pid + listening + mappings
+hermes egress status --show-tokens     # print proxy tokens in full (default: redacted)
 
-qubit egress disable                  # flip proxy.enabled = false (does not stop a running proxy)
-qubit egress config                   # print the path to proxy.yaml for inspection
+hermes egress disable                  # flip proxy.enabled = false (does not stop a running proxy)
+hermes egress config                   # print the path to proxy.yaml for inspection
 ```
 
 ### Common flows
@@ -735,28 +880,28 @@ qubit egress config                   # print the path to proxy.yaml for inspect
 ```bash
 # First-time setup
 export OPENROUTER_API_KEY=…
-qubit egress setup && qubit egress start
-qubit config set terminal.backend docker   # if not already
+hermes egress setup && hermes egress start
+hermes config set terminal.backend docker   # if not already
 
 # Switching credential source after the fact
-qubit egress setup --from-bitwarden       # env → bitwarden
-qubit egress setup --no-bitwarden         # bitwarden → env
+hermes egress setup --from-bitwarden       # env → bitwarden
+hermes egress setup --no-bitwarden         # bitwarden → env
 # (just `setup` without either flag preserves the existing mode)
 
 # Rotating all tokens (e.g. after a suspected token leak)
-qubit egress setup --rotate-tokens    # setup offers to restart the running daemon for you
+hermes egress setup --rotate-tokens    # setup offers to restart the running daemon for you
 # (running sandboxes still hold old tokens; restart them too)
 
 # Adding a new upstream
 # Edit ~/.hermes/config.yaml proxy.extra_allowed_hosts: [api.example.com]
-qubit egress setup
-qubit egress restart                  # one-command apply (stop + start)
+hermes egress setup
+hermes egress restart                  # one-command apply (stop + start)
 ```
 
 ### Diagnostic shortcuts
 
 ```bash
-qubit egress status                     # current state in one view
+hermes egress status                     # current state in one view
 cat ~/.hermes/proxy/proxy.yaml           # the rendered iron-proxy config
 tail -20 ~/.hermes/proxy/iron-proxy.log  # daemon-level diagnostics
 tail -f ~/.hermes/proxy/iron-proxy.log | jq  # daemon + per-request log (line-delimited JSON; v0.39 combines both streams)
@@ -764,10 +909,10 @@ tail -f ~/.hermes/proxy/iron-proxy.log | jq  # daemon + per-request log (line-de
 
 Common failure modes + recovery are covered in [Egress proxy → Troubleshooting](../user-guide/egress/iron-proxy.md#troubleshooting).
 
-## `qubit project`
+## `hermes project`
 
 ```bash
-qubit project <create|list|show|add-folder|remove-folder|rename|set-primary|use|archive|restore|bind-board>
+hermes project <create|list|show|add-folder|remove-folder|rename|set-primary|use|archive|restore|bind-board>
 ```
 
 Projects are human-named workspaces that can span multiple folders / repos. They anchor desktop session grouping and, when bound to a kanban board, give tasks a deterministic worktree + branch convention. State is per-profile.
@@ -786,10 +931,10 @@ Projects are human-named workspaces that can span multiple folders / repos. They
 | `restore` | Restore an archived project. |
 | `bind-board` | Bind a kanban board to this project. |
 
-## `qubit webhook`
+## `hermes webhook`
 
 ```bash
-qubit webhook <subscribe|list|remove|test>
+hermes webhook <subscribe|list|remove|test>
 ```
 
 Manage dynamic webhook subscriptions for event-driven agent activation. Requires the webhook platform to be enabled in config — if not configured, prints setup instructions.
@@ -801,10 +946,10 @@ Manage dynamic webhook subscriptions for event-driven agent activation. Requires
 | `remove` / `rm` | Delete a dynamic subscription. Static routes from config.yaml are not affected. |
 | `test` | Send a test POST to verify a subscription is working. |
 
-### `qubit webhook subscribe`
+### `hermes webhook subscribe`
 
 ```bash
-qubit webhook subscribe <name> [options]
+hermes webhook subscribe <name> [options]
 ```
 
 | Option | Description |
@@ -817,27 +962,40 @@ qubit webhook subscribe <name> [options]
 | `--deliver-chat-id` | Target chat/channel ID for cross-platform delivery. |
 | `--secret` | Custom HMAC secret. Auto-generated if omitted. |
 | `--deliver-only` | Skip the agent — deliver the rendered `--prompt` as the literal message. Zero LLM cost, sub-second delivery. Requires `--deliver` to be a real target (not `log`). |
+| `--mirror-to-session` | Also write each delivered message into the target chat's session, so replying to it in that chat has context. Off by default; only enable it for sources whose content you trust in your conversation. |
 | `--script` | Filter/transform script under `~/.hermes/scripts/`. The webhook payload is passed as JSON on stdin; JSON stdout replaces the payload, and empty stdout, `[SILENT]`, or a nonzero exit code ignores the webhook. See [Script Filters and Transforms](../user-guide/messaging/webhooks.md#script-filters-and-transforms). |
+| `--route-profile` | Bind the route to a multiplexed profile: it is then reachable only at `/p/<profile>/webhooks/<name>` and the agent runs as that profile. Validated against existing profiles; kept on update when omitted. Not the same as the global `-p/--profile`, which selects the gateway whose subscriptions file is written. See [Multi-profile gateways](../user-guide/multi-profile-gateways.md). |
 
-Subscriptions persist to `~/.hermes/webhook_subscriptions.json` and are hot-reloaded by the webhook adapter without a gateway restart.
+Subscriptions persist to `~/.hermes/webhook_subscriptions.json` and are hot-reloaded by the webhook adapter without a gateway restart. Re-running `subscribe` for an existing name keeps its secret and profile binding unless you pass `--secret` / `--route-profile`.
 
-## `qubit doctor`
+## `hermes doctor`
 
 ```bash
-qubit doctor [--fix]
+hermes doctor [--fix]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--fix` | Attempt automatic repairs where possible. |
 
-## `qubit dump`
+Exit status: `0` when the report lists no unresolved problems, `1` when at least one remains (including problems `--fix` could not repair), so a health gate or CI step can trust `hermes doctor` as a check.
+
+The **API Connectivity** section includes an `IPv6 route` check: it opens one short (2 s) IPv6 TCP connection to a known dual-stack host. A route that is advertised but only times out (a blackholed IPv6 prefix) is reported as a warning naming the remedy, `network.force_ipv4: true`. Having no IPv6 route at all is healthy and reported as OK; the check is skipped when `force_ipv4` is already set.
+
+Custom-endpoint config checks (both warn-only; `--fix` does not rewrite them):
+
+- `custom_providers` that is not a YAML list (for example a string left by a bad `config set`) is reported as an error naming the key and the received type — the runtime ignores every custom endpoint until it is a list again.
+- A legacy `custom_providers` list entry with no matching `providers:` entry (same endpoint URL) is reported with the move to make: such an entry is still served from the retired list store (the model picker and the Custom Endpoints page dual-read it) rather than the `providers:` map every other surface edits, and the one-shot v12 migration that moved the list into `providers:` does not run again.
+
+**Config Structure** also flags any list/mapping setting stored as one quoted string (`plugins.enabled: '["a","b"]'`, `model_catalog.excluded_providers: '["openai-api"]'` — the shape older `config set` versions wrote): every reader ignores such a string, so the plugins silently stay unmounted and the exclusion never applies. The finding names the key and the `hermes config set <key> '<literal>'` command that stores a real list; the same warning appears in the startup banner. `--fix` does not rewrite the file.
+
+## `hermes dump`
 
 ```bash
-qubit dump [--show-keys]
+hermes dump [--show-keys]
 ```
 
-Outputs a compact, plain-text summary of your entire Qubit setup. Designed to be copy-pasted into Discord, GitHub issues, or Telegram when asking for support — no ANSI colors, no special formatting, just data.
+Outputs a compact, plain-text summary of your entire Hermes setup. Designed to be copy-pasted into Discord, GitHub issues, or Telegram when asking for support — no ANSI colors, no special formatting, just data.
 
 | Option | Description |
 |--------|-------------|
@@ -847,9 +1005,9 @@ Outputs a compact, plain-text summary of your entire Qubit setup. Designed to be
 
 | Section | Details |
 |---------|---------|
-| **Header** | Qubit version, release date, git commit hash |
+| **Header** | Hermes version, release date, git commit hash |
 | **Environment** | OS, Python version, OpenAI SDK version |
-| **Identity** | Active profile name, QUBIT_HOME path |
+| **Identity** | Active profile name, HERMES_HOME path |
 | **Model** | Configured default model and provider |
 | **Terminal** | Backend type (local, docker, ssh, etc.) |
 | **API keys** | Presence check for all 22 provider/tool API keys |
@@ -861,7 +1019,7 @@ Outputs a compact, plain-text summary of your entire Qubit setup. Designed to be
 ### Example output
 
 ```
---- qubit dump ---
+--- hermes dump ---
 version:          0.8.0 (2026.4.8) [af4abd2f]
 os:               Linux 6.14.0-37-generic x86_64
 python:           3.11.14
@@ -876,7 +1034,7 @@ api_keys:
   openrouter           set
   openai               not set
   anthropic            set
-  qubit                 not set
+  nous                 not set
   firecrawl            set
   ...
 
@@ -904,13 +1062,13 @@ config_overrides:
 - Quick sanity check when something isn't working
 
 :::tip
-`qubit dump` is specifically designed for sharing. For interactive diagnostics, use `qubit doctor`. For a visual overview, use `qubit status`.
+`hermes dump` is specifically designed for sharing. For interactive diagnostics, use `hermes doctor`. For a visual overview, use `hermes status`.
 :::
 
-## `qubit debug`
+## `hermes debug`
 
 ```bash
-qubit debug share [options]
+hermes debug share [options]
 ```
 
 Upload a debug report (system info + recent logs) to a paste service and get a shareable URL. Useful for quick support requests — includes everything a helper needs to diagnose your issue.
@@ -919,70 +1077,77 @@ Upload a debug report (system info + recent logs) to a paste service and get a s
 |--------|-------------|
 | `--lines <N>` | Number of log lines to include per log file (default: 200). |
 | `--expire <days>` | Paste expiry in days (default: 7). |
-| `--qubit` | Upload to Qubit-internal diagnostics storage instead of a public paste service. Use this when Qubit support asks for a private diagnostic bundle. |
+| `--nous` | Upload to Nous-internal diagnostics storage instead of a public paste service. Use this when Nous support asks for a private diagnostic bundle. |
 | `--local` | Print the report locally instead of uploading. |
 | `--no-redact` | Disable upload-time secret redaction. By default, uploads are redacted. |
 
-The report includes system info (OS, Python version, Qubit version), recent agent, gateway, GUI/dashboard, and desktop logs (512 KB limit per file), and redacted API key status. By default, uploads are redacted so secrets are not included.
+The report includes system info (OS, Python version, Hermes version), recent agent, gateway, GUI/dashboard, and desktop logs (512 KB limit per file), and redacted API key status. By default, uploads are redacted so secrets are not included.
 
-Default uploads use public paste services tried in order: paste.rs, dpaste.com. `--qubit` uploads the same debug bundle to private Qubit diagnostics storage instead; the returned viewer link is for the Qubit team and auto-deletes after 14 days.
+Default uploads use public paste services tried in order: paste.rs, dpaste.com. `--nous` uploads the same debug bundle to private Nous diagnostics storage instead; the returned viewer link is for the Nous team and auto-deletes after 14 days.
 
 ### Examples
 
 ```bash
-qubit debug share              # Upload debug report, print URL
-qubit debug share --lines 500  # Include more log lines
-qubit debug share --expire 30  # Keep paste for 30 days
-qubit debug share --qubit       # Upload a private diagnostics bundle for Qubit support
-qubit debug share --local      # Print report to terminal (no upload)
+hermes debug share              # Upload debug report, print URL
+hermes debug share --lines 500  # Include more log lines
+hermes debug share --expire 30  # Keep paste for 30 days
+hermes debug share --nous       # Upload a private diagnostics bundle for Nous support
+hermes debug share --local      # Print report to terminal (no upload)
 ```
 
-## `qubit backup`
+## `hermes backup`
 
 ```bash
-qubit backup [options]
+hermes backup [options]
 ```
 
-Create a zip archive of your Qubit configuration, skills, sessions, and data. The backup excludes the hermes-agent codebase itself, and it does not nest earlier backup artifacts (`backups/`, `state-snapshots/`) — each of those already contains its own copy of `state.db`.
+Create a zip archive of your Hermes configuration, skills, sessions, and data. The backup excludes the hermes-agent codebase itself, and it does not nest earlier backup artifacts (`backups/`, `state-snapshots/`) — each of those already contains its own copy of `state.db`.
 
 | Option | Description |
 |--------|-------------|
 | `-o`, `--output <path>` | Output path for the zip file (default: `~/hermes-backup-<timestamp>.zip`). |
 | `-q`, `--quick` | Quick snapshot: only critical state files (config.yaml, state.db, .env, auth, cron jobs). Much faster than a full backup. |
 | `-l`, `--label <name>` | Label for the snapshot (only used with `--quick`). |
+| `-k`, `--keep <N>` | After a full backup, delete older `hermes-backup-*.zip` files in the output directory beyond the newest N (default 3; `0` keeps everything). Custom-named zips are never touched. |
 
-The backup uses SQLite's `backup()` API for safe copying, so it works correctly even when Qubit is running (WAL-mode safe).
+The backup uses SQLite's `backup()` API for safe copying, so it works correctly even when Hermes is running (WAL-mode safe).
+
+**Exit status:** `0` only when every selected file landed in the archive. If some files could not be added (`Backup incomplete: …`), the zip is kept so the rest can still be restored, but the command exits `1` — a cron or systemd timer will not report a partial archive as success, and `--keep` pruning is skipped so older complete archives survive. `2` means another backup was already running.
 
 **What's excluded from the zip:**
 
 - `*.db-wal`, `*.db-shm`, `*.db-journal` — SQLite's WAL / shared-memory / journal sidecars. The `*.db` file already got a consistent snapshot via `sqlite3.backup()`; shipping the live sidecars alongside it would let a restore see a half-committed state.
 - `checkpoints/` — per-session trajectory caches. Hash-keyed and regenerated per session; wouldn't port cleanly to another install anyway.
+- `models/`, `runtimes/`, `node/` at the root of `~/.hermes` (and of each `profiles/<name>/`) — regenerable runtime downloads, often tens of GB. Deeper directories with the same names (a skill's `models/`) are kept.
+- Browser profiles: `browser-profile/` (the real-profile snapshot — copied Cookies / Login Data), `browser-profiles/` (live CDP profiles) at any depth, and `browser_profiles/` (the Browser Use CLI backend's Chromium user-data dir, with its own Login Data / Cookies) at the root of `~/.hermes` and of each `profiles/<name>/`. Credential stores that must never enter an archive; all are regenerated on the next launch.
+- Regenerable entries of `cache/` at those same roots — model/plugin catalogs, stamps, browser profiles, tool-output spill. Durable artifacts stay in: `cache/images`, `cache/audio`, `cache/videos`, `cache/documents`, `cache/screenshots` (media delivered to or received from you) and `cache/citations` (the grounded-citations ledger). A deeper `cache/` (inside a skill) is kept whole.
+- Unix sockets, devices, and symlinks — a zip cannot hold them; before they were excluded, a stray `gateway.sock` made every full backup report `Backup incomplete`.
 - The `hermes-agent` code itself (this is a user-data backup, not a repo snapshot).
 
 ### Examples
 
 ```bash
-qubit backup                           # Full backup to ~/hermes-backup-*.zip
-qubit backup -o /tmp/hermes.zip        # Full backup to specific path
-qubit backup --quick                   # Quick state-only snapshot
-qubit backup --quick --label "pre-upgrade"  # Quick snapshot with label
+hermes backup                           # Full backup to ~/hermes-backup-*.zip
+hermes backup -o ~/backups/hermes.zip   # Full backup to specific path
+hermes backup --quick                   # Quick state-only snapshot
+hermes backup --quick --label "pre-upgrade"  # Quick snapshot with label
 ```
 
-## `qubit checkpoints`
+## `hermes checkpoints`
 
 ```bash
-qubit checkpoints [COMMAND]
+hermes checkpoints [COMMAND]
 ```
 
 Inspect and manage the shadow git store at `~/.hermes/checkpoints/` — the storage layer behind the in-session `/rollback` command. Safe to run any time; does not require the agent to be running.
 
 | Subcommand | Description |
 |------------|-------------|
-| `status` (default) | Show total size, project count, and per-project breakdown. Bare `qubit checkpoints` is equivalent. |
+| `status` (default) | Show total size, project count, and per-project breakdown. Bare `hermes checkpoints` is equivalent. |
 | `list` | Alias for `status`. |
 | `prune` | Force a cleanup sweep — delete orphan and stale projects, GC the store, enforce the size cap. Ignores the 24h idempotency marker. |
 | `clear` | Delete the entire checkpoint base. Irreversible; asks for confirmation unless `-f`. |
-| `clear-legacy` | Delete only the `legacy-<timestamp>/` archives produced by the v1→v2 migration. |
+| `clear-legacy` | Delete only the `legacy-<timestamp>/` archives produced by the v1→v2 migration. Exits `2` (after printing `Could not delete N archive(s)`) when any archive could not be removed, e.g. read-only git objects on Windows. |
 
 ### Options
 
@@ -997,22 +1162,22 @@ Inspect and manage the shadow git store at `~/.hermes/checkpoints/` — the stor
 ### Examples
 
 ```bash
-qubit checkpoints                                  # status overview
-qubit checkpoints prune --retention-days 3         # aggressive cleanup
-qubit checkpoints prune --max-size-mb 200          # tighten size cap once
-qubit checkpoints clear-legacy -f                  # drop v1 archive dirs
-qubit checkpoints clear -f                         # wipe everything
+hermes checkpoints                                  # status overview
+hermes checkpoints prune --retention-days 3         # aggressive cleanup
+hermes checkpoints prune --max-size-mb 200          # tighten size cap once
+hermes checkpoints clear-legacy -f                  # drop v1 archive dirs
+hermes checkpoints clear -f                         # wipe everything
 ```
 
 See [Checkpoints and `/rollback`](../user-guide/checkpoints-and-rollback.md) for the full architecture and the in-session commands.
 
-## `qubit import`
+## `hermes import`
 
 ```bash
-qubit import <zipfile> [options]
+hermes import <zipfile> [options]
 ```
 
-Restore a previously created Qubit backup into your Qubit home directory. All files in the archive overwrite existing files in your Qubit home; `--force` only skips the confirmation prompt that fires when the target already has a Qubit installation.
+Restore a previously created Hermes backup into your Hermes home directory. All files in the archive overwrite existing files in your Hermes home; `--force` only skips the confirmation prompt that fires when the target already has a Hermes installation.
 
 | Option | Description |
 |--------|-------------|
@@ -1021,6 +1186,8 @@ Restore a previously created Qubit backup into your Qubit home directory. All fi
 :::warning
 Stop the gateway before importing to avoid conflicts with running processes.
 :::
+
+**Exit status:** `1` when the archive is damaged — before anything is written, every member is decompressed once and its CRC checked; if any fail, the command prints `Error: backup archive is damaged (N member(s) …)` with the offending members and stops with the Hermes home untouched. Also `1` when any file from the archive could not be restored (listed under `Warnings (N files skipped)` and summarised as `Import incomplete: …`). The files that did land stay in place, but a script or the dashboard will not report a partial restore as success. Runtime files the import deliberately keeps from this machine (`gateway.pid`, `gateway_state.json`, …) and the older-backup session warning below do not change the exit status.
 
 ### SQLite databases
 
@@ -1034,22 +1201,22 @@ Importing an older backup over newer work is still allowed, but it is no longer 
   ⚠ Session data replaced by older backup contents:
     state.db: 12 session(s) / 8912 message(s) -> 3 / 24
     Anything recorded after the backup was taken is not in it.
-    Recover from a newer backup or snapshot: qubit snapshot list
+    Recover from a newer backup or snapshot: hermes snapshot list
 ```
 
 ### Examples
 ```bash
-qubit import ~/hermes-backup-20260423.zip           # Prompts before overwriting existing config
-qubit import ~/hermes-backup-20260423.zip --force   # Overwrite without prompting
+hermes import ~/hermes-backup-20260423.zip           # Prompts before overwriting existing config
+hermes import ~/hermes-backup-20260423.zip --force   # Overwrite without prompting
 ```
 
-## `qubit logs`
+## `hermes logs`
 
 ```bash
-qubit logs [log_name] [options]
+hermes logs [log_name] [options]
 ```
 
-View, tail, and filter Qubit log files. All logs are stored in `~/.hermes/logs/` (or `<profile>/logs/` for non-default profiles).
+View, tail, and filter Hermes log files. All logs are stored in `~/.hermes/logs/` (or `<profile>/logs/` for non-default profiles).
 
 ### Log files
 
@@ -1077,25 +1244,25 @@ View, tail, and filter Qubit log files. All logs are stored in `~/.hermes/logs/`
 
 ```bash
 # View the last 50 lines of agent.log (default)
-qubit logs
+hermes logs
 
 # Follow agent.log in real time
-qubit logs -f
+hermes logs -f
 
 # View the last 100 lines of gateway.log
-qubit logs gateway -n 100
+hermes logs gateway -n 100
 
 # Show only warnings and errors from the last hour
-qubit logs --level WARNING --since 1h
+hermes logs --level WARNING --since 1h
 
 # Filter by a specific session
-qubit logs --session abc123
+hermes logs --session abc123
 
 # Follow errors.log, starting from 30 minutes ago
-qubit logs errors --since 30m -f
+hermes logs errors --since 30m -f
 
 # List all log files with their sizes
-qubit logs list
+hermes logs list
 ```
 
 ### Filtering
@@ -1104,20 +1271,20 @@ Filters can be combined. When multiple filters are active, a log line must pass 
 
 ```bash
 # WARNING+ lines from the last 2 hours containing session "tg-12345"
-qubit logs --level WARNING --since 2h --session tg-12345
+hermes logs --level WARNING --since 2h --session tg-12345
 ```
 
 Lines without a parseable timestamp are included when `--since` is active (they may be continuation lines from a multi-line log entry). Lines without a detectable level are included when `--level` is active.
 
 ### Log rotation
 
-Qubit uses Python's `RotatingFileHandler`. Old logs are rotated automatically — look for `agent.log.1`, `agent.log.2`, etc. The `qubit logs list` subcommand shows all log files including rotated ones.
+Hermes uses Python's `RotatingFileHandler`. Old logs are rotated automatically — look for `agent.log.1`, `agent.log.2`, etc. The `hermes logs list` subcommand shows all log files including rotated ones.
 
 
-## `qubit prompt-size`
+## `hermes prompt-size`
 
 ```bash
-qubit prompt-size [--platform <name>] [--json]
+hermes prompt-size [--platform <name>] [--json]
 ```
 
 Reports the fixed prompt budget for a fresh session — what gets sent on every
@@ -1132,7 +1299,7 @@ It builds the same system prompt the agent would, then breaks it down:
 - **Skills index** — the `<available_skills>` block. This is often the largest
   single block when many skills are installed.
 - **Memory** and **user profile** — your `MEMORY.md` / `USER.md` snapshots.
-- **Prompt tiers** — stable / context / volatile, matching how Qubit layers
+- **Prompt tiers** — stable / context / volatile, matching how Hermes layers
   the prompt for cache-friendliness.
 - **Tool schemas** — the JSON for all enabled tools (the other half of the
   fixed per-call payload).
@@ -1141,26 +1308,26 @@ Runs entirely offline — no API call, works with no credentials configured.
 
 ```bash
 # Human-readable breakdown for the CLI platform (default)
-qubit prompt-size
+hermes prompt-size
 
 # Simulate a messaging platform's prompt (different platform hint)
-qubit prompt-size --platform telegram
+hermes prompt-size --platform telegram
 
 # Machine-readable output for scripts
-qubit prompt-size --json
+hermes prompt-size --json
 ```
 
 :::tip
 The skills index and tool schemas scale with how many skills and tools you have
-enabled. To shrink the prompt, disable unused toolsets (`qubit tools`) or
-uninstall skills you don't need (`qubit skills`). Context files (AGENTS.md,
+enabled. To shrink the prompt, disable unused toolsets (`hermes tools`) or
+uninstall skills you don't need (`hermes skills`). Context files (AGENTS.md,
 .cursorrules) in your current directory also count toward the total.
 :::
 
-## `qubit config`
+## `hermes config`
 
 ```bash
-qubit config <subcommand>
+hermes config <subcommand>
 ```
 
 Subcommands:
@@ -1169,27 +1336,34 @@ Subcommands:
 |------------|-------------|
 | `show` | Show current config values. |
 | `edit` | Open `config.yaml` in your editor. |
-| `get <key> [--json]` | Print a single config value by dotted key (e.g. `qubit config get model.default`). `--json` emits machine-readable output. |
-| `set <key> <value>` | Set a config value. |
-| `unset <key>` | Remove a config key, reverting it to the built-in default. |
+| `get <key> [--json] [--raw]` | Print a single config value by dotted key (e.g. `hermes config get model.default`). `--json` emits machine-readable output. Credential-shaped values (`api_key`, `*_TOKEN`, `*_SECRET`, `password`, …) are masked (`sk-o...7890`) because the agent runs this from sessions whose transcripts persist; `--raw` prints the real value (or set `security.redact_secrets: false`). A nested key under a known section that the schema does not define (`compression.compressor.enabled`) still prints its file value, plus a stderr notice that Hermes may not read it; stdout and the exit code (0) are unchanged. |
+| `set <key> <value> [--force]` | Set a config value. Dotted paths go to `config.yaml`; every `UPPER_SNAKE` name (`OPENROUTER_API_KEY`, `DISCORD_HOME_CHANNEL`, `TELEGRAM_GROUP_ALLOWED_USERS`, `HERMES_TIMEZONE`, …) is an environment variable and goes to `.env` — the same file the platform setup flows and `/sethome` write, and the one every runtime reader resolves against. `config set` never writes an `UPPER_SNAKE` key into `config.yaml`, `--force` included; names on the env writer's denylist (`HERMES_YOLO_MODE`, `PATH`, …) are refused outright; any other `UPPER_SNAKE` name is saved to `.env` as-is (plugins, skills and external tools read it from the process environment). A known key written under the wrong prefix (`gateway.discord.foo`, where `discord.foo` is itself a known key) is refused with a did-you-mean and nothing is written; any other unknown path under a known section (`agent.max_turnz`, or a runtime-read key that has no seeded default) is written with a did-you-mean notice, and an unknown lowercase *top-level* key is written with a notice (top-level scalars are bridged into the environment for skills). `--force` writes the refused wrong-prefix path too. Values are type-checked against the schema: a key that must hold a list or a mapping (`custom_providers`, `model.aliases`, `display.platforms`, `plugins.enabled`/`plugins.disabled`, `model_catalog.excluded_providers`, any key already holding one) refuses a plain string or a wrong-shaped literal, and a value that looks like a list/mapping but is not valid YAML/JSON is refused instead of being stored as a string — nothing is written and the error names the expected type. Pass a YAML/JSON literal (`hermes config set custom_providers '[{name: x, base_url: https://...}]'`); to store a string that merely starts with `[` or `{`, quote it in YAML (`"'[text'"`). `--force` still replaces a whole mapping section; a non-list in a list slot has no override, except that a bare name for a list of names read leniently (`agent.disabled_toolsets`, `skills.disabled`) is stored as a one-item list. |
+| `unset <key>` | Remove a config key, reverting it to the built-in default. For `UPPER_SNAKE` names this removes the `.env` entry and also drops a stale top-level `config.yaml` copy left by older `config set` runs (`get` reports such a copy as stale). |
 | `path` | Print the config file path. |
 | `env-path` | Print the `.env` file path. |
 | `check` | Check for missing or stale config. |
 | `migrate` | Add newly introduced options interactively. |
 
+`config set model.provider <provider>` keeps the `model:` block on one route: a `model.base_url` /
+`model.api_mode` left over from the previous provider is removed (and listed) when it is another
+provider's endpoint — otherwise the new provider's key would be posted to the old endpoint and fail
+with a credential error naming the wrong provider. A URL that is the new provider's own endpoint, a
+named `custom_providers` entry's endpoint, or any URL under `custom`/local aliases stays; an
+unrecognised host (a proxy, a LAN server) stays with a warning that it still applies.
+
 ### Dots inside key names
 
-`qubit config set/get/unset` use `.` as the nesting separator, but many real
+`hermes config set/get/unset` use `.` as the nesting separator, but many real
 key names contain literal dots — model IDs (`grok-4.6`, `glm-5.3-flash`),
 Matrix room IDs (`!room:example.org`), versioned provider names. Two rules
 make these addressable:
 
 - **Existing keys just work.** When navigating an existing mapping, an
   existing literal key that matches the dotted remainder is preferred over
-  splitting. `qubit config set providers.p.models.grok-4.6.supports_vision true`
+  splitting. `hermes config set providers.p.models.grok-4.6.supports_vision true`
   updates the real `grok-4.6` entry (and `get`/`unset` resolve the same way).
 - **Creating a new dotted key requires escaping.** Escape literal dots with a
-  backslash: `qubit config set 'providers.p.models.grok-4\.7.context_length' 128000`
+  backslash: `hermes config set 'providers.p.models.grok-4\.7.context_length' 128000`
   creates the literal `grok-4.7` key. (Quote the key so your shell keeps the
   backslash.)
 
@@ -1198,10 +1372,10 @@ dotted sibling (e.g. creating `grok-4` next to an existing `grok-4.6`), the
 command fails with an error instead of silently writing a phantom entry the
 runtime would never read.
 
-## `qubit pairing`
+## `hermes pairing`
 
 ```bash
-qubit pairing <list|approve|revoke|clear-pending>
+hermes pairing <list|approve|revoke|clear-pending>
 ```
 
 | Subcommand | Description |
@@ -1211,10 +1385,10 @@ qubit pairing <list|approve|revoke|clear-pending>
 | `revoke <platform> <user-id>` | Revoke a user's access. |
 | `clear-pending` | Clear pending pairing codes. |
 
-## `qubit skills`
+## `hermes skills`
 
 ```bash
-qubit skills <subcommand>
+hermes skills <subcommand>
 ```
 
 Subcommands:
@@ -1231,8 +1405,8 @@ Subcommands:
 | `audit` | Re-scan installed hub skills. |
 | `uninstall` | Remove a hub-installed skill. |
 | `reset` | Un-stick a bundled skill flagged as `user_modified` by clearing its manifest entry. With `--restore`, also replaces the user copy with the bundled version. |
-| `opt-out` | Stop bundled skills from being seeded into the active profile. Writes a `.no-bundled-skills` marker so the installer, `qubit update`, and any sync skip bundled-skill seeding. Safe by default — nothing on disk is touched. With `--remove`, also deletes already-present bundled skills that are **unmodified** (user-edited, hub-installed, and hand-written skills are never removed; previews and confirms first, `--yes` to skip). |
-| `opt-in` | Undo `opt-out` by removing the `.no-bundled-skills` marker so bundled skills are seeded again on the next `qubit update`. With `--sync`, re-seed immediately. |
+| `opt-out` | Stop bundled skills from being seeded into the active profile. Writes a `.no-bundled-skills` marker so the installer, `hermes update`, and any sync skip bundled-skill seeding. Safe by default — nothing on disk is touched. With `--remove`, also deletes already-present bundled skills that are **unmodified** (user-edited, hub-installed, and hand-written skills are never removed; previews and confirms first, `--yes` to skip). |
+| `opt-in` | Undo `opt-out` by removing the `.no-bundled-skills` marker so bundled skills are seeded again on the next `hermes update`. With `--sync`, re-seed immediately. |
 | `publish` | Publish a skill to a registry. |
 | `snapshot` | Export/import skill configurations. |
 | `tap` | Manage custom skill sources. |
@@ -1241,38 +1415,38 @@ Subcommands:
 Common examples:
 
 ```bash
-qubit skills browse
-qubit skills browse --source official
-qubit skills search react --source skills-sh
-qubit skills search https://mintlify.com/docs --source well-known
-qubit skills inspect official/security/1password
-qubit skills inspect skills-sh/vercel-labs/json-render/json-render-react
-qubit skills install official/migration/openclaw-migration
-qubit skills install skills-sh/anthropics/skills/pdf --force
-qubit skills install https://sharethis.chat/SKILL.md                     # Direct URL (+ referenced support files)
-qubit skills install https://example.com/SKILL.md --name my-skill        # Override name when frontmatter has none
-qubit skills check
-qubit skills update
-qubit skills config
-qubit skills reset google-workspace
-qubit skills reset google-workspace --restore --yes
-qubit skills opt-out                  # stop future bundled-skill seeding (nothing deleted)
-qubit skills opt-out --remove --yes   # also delete UNMODIFIED bundled skills
-qubit skills opt-in --sync            # undo: remove marker and re-seed now
+hermes skills browse
+hermes skills browse --source official
+hermes skills search react --source skills-sh
+hermes skills search https://mintlify.com/docs --source well-known
+hermes skills inspect official/security/1password
+hermes skills inspect skills-sh/vercel-labs/json-render/json-render-react
+hermes skills install official/migration/openclaw-migration
+hermes skills install skills-sh/anthropics/skills/pdf --force
+hermes skills install https://sharethis.chat/SKILL.md                     # Direct URL (+ referenced support files)
+hermes skills install https://example.com/SKILL.md --name my-skill        # Override name when frontmatter has none
+hermes skills check
+hermes skills update
+hermes skills config
+hermes skills reset google-workspace
+hermes skills reset google-workspace --restore --yes
+hermes skills opt-out                  # stop future bundled-skill seeding (nothing deleted)
+hermes skills opt-out --remove --yes   # also delete UNMODIFIED bundled skills
+hermes skills opt-in --sync            # undo: remove marker and re-seed now
 ```
 
 Notes:
 - `--force` can override non-dangerous policy blocks for third-party/community skills.
 - `--force` does not override a `dangerous` scan verdict.
 - `--source skills-sh` searches the public `skills.sh` directory.
-- `--source well-known` lets you point Qubit at a site exposing `/.well-known/skills/index.json`.
+- `--source well-known` lets you point Hermes at a site exposing `/.well-known/skills/index.json`.
 - `--source browse-sh` searches [browse.sh](https://browse.sh)'s catalog of 200+ site-specific browser-automation skills. Identifiers look like `browse-sh/airbnb.com/search-listings-ddgioa`.
 - Passing an `http(s)://…/*.md` URL installs `SKILL.md` plus explicitly referenced files under `references/`, `templates/`, `scripts/`, `assets/`, and `examples/`. When frontmatter has no `name:` and the URL slug isn't a valid identifier, an interactive terminal prompts for a name; non-interactive surfaces (`/skills install` inside the TUI, gateway platforms) require `--name <x>` instead.
 
-## `qubit bundles`
+## `hermes bundles`
 
 ```bash
-qubit bundles <subcommand>
+hermes bundles <subcommand>
 ```
 
 Skill bundles group several skills under one `/<bundle-name>` slash command. Invoking the bundle loads every referenced skill into a single combined user message. Storage: `~/.hermes/skill-bundles/<slug>.yaml`. See [Skill Bundles](../user-guide/features/skills.md#skill-bundles) for the YAML schema and behavior.
@@ -1290,23 +1464,23 @@ Subcommands:
 Examples:
 
 ```bash
-qubit bundles create backend-dev \
+hermes bundles create backend-dev \
   --skill github-code-review \
   --skill test-driven-development \
   --skill github-pr-workflow \
   -d "Backend feature work"
 
-qubit bundles list
-qubit bundles show backend-dev
-qubit bundles delete backend-dev
+hermes bundles list
+hermes bundles show backend-dev
+hermes bundles delete backend-dev
 ```
 
 In a chat session, `/bundles` lists installed bundles and `/<bundle-name>` loads one.
 
-## `qubit curator`
+## `hermes curator`
 
 ```bash
-qubit curator <subcommand>
+hermes curator <subcommand>
 ```
 
 The curator is an auxiliary-model background task that periodically reviews agent-created skills, prunes stale ones, consolidates overlaps, and archives obsolete skills. Bundled and hub-installed skills are never touched. Archives are recoverable; auto-deletion never happens.
@@ -1331,26 +1505,26 @@ The curator is an auxiliary-model background task that periodically reviews agen
 | `prune` | Manually prune skills the curator would normally clean up |
 | `list-archived` | List archived skills (recoverable via `restore`) |
 
-On a fresh install the first scheduled pass is deferred by one full `interval_hours` (7 days by default) — the gateway will not curate immediately on the first tick after `qubit update`. Use `qubit curator run --dry-run` to preview before that happens.
+On a fresh install the first scheduled pass is deferred by one full `interval_hours` (7 days by default) — the gateway will not curate immediately on the first tick after `hermes update`. Use `hermes curator run --dry-run` to preview before that happens.
 
 See [Curator](../user-guide/features/curator.md) for behavior and config.
 
-## `qubit moa`
+## `hermes moa`
 
 Configure named Mixture of Agents presets. Presets appear as selectable models under a `Mixture of Agents` provider in every model picker; `/moa <prompt>` runs one prompt through the default preset.
 
 ```bash
-qubit moa list
-qubit moa configure [name]
-qubit moa delete <name>
+hermes moa list
+hermes moa configure [name]
+hermes moa delete <name>
 ```
 
-`qubit moa configure` reuses Qubit' provider → model picker for each reference model and the aggregator. A preset is an execution-mode configuration, not a primary model or provider.
+`hermes moa configure` reuses Hermes' provider → model picker for each reference model and the aggregator. A preset is an execution-mode configuration, not a primary model or provider.
 
-## `qubit fallback`
+## `hermes fallback`
 
 ```bash
-qubit fallback <subcommand>
+hermes fallback <subcommand>
 ```
 
 Manage the fallback provider chain. Fallback providers are tried in order when the primary model fails with rate-limit, overload, or connection errors.
@@ -1358,16 +1532,16 @@ Manage the fallback provider chain. Fallback providers are tried in order when t
 | Subcommand | Description |
 |------------|-------------|
 | `list` (alias: `ls`) | Show the current fallback chain (default when no subcommand) |
-| `add` | Pick a provider + model (same picker as `qubit model`) and append to the chain |
+| `add` | Pick a provider + model (same picker as `hermes model`) and append to the chain |
 | `remove` (alias: `rm`) | Pick an entry to delete from the chain |
 | `clear` | Remove all fallback entries |
 
 See [Fallback Providers](../user-guide/features/fallback-providers.md).
 
-## `qubit hooks`
+## `hermes hooks`
 
 ```bash
-qubit hooks <subcommand>
+hermes hooks <subcommand>
 ```
 
 Inspect shell-script hooks declared in `~/.hermes/config.yaml`, test them against synthetic payloads, and manage the first-use consent allowlist at `~/.hermes/shell-hooks-allowlist.json`.
@@ -1381,13 +1555,13 @@ Inspect shell-script hooks declared in `~/.hermes/config.yaml`, test them agains
 
 See [Hooks](../user-guide/features/hooks.md) for event signatures and payload shapes.
 
-## `qubit memory`
+## `hermes memory`
 
 ```bash
-qubit memory <subcommand>
+hermes memory <subcommand>
 ```
 
-Set up and manage external memory provider plugins. Available providers: honcho, openviking, mem0, hindsight, holographic, retaindb, byterover, supermemory. Only one external provider can be active at a time. Built-in memory (MEMORY.md/USER.md) is always active.
+Set up and manage external memory provider plugins. Bundled providers: honcho, openviking, mem0, holographic, retaindb, byterover, supermemory; hindsight (plugin catalog) after `hermes plugins install hindsight`. Only one external provider can be active at a time. Built-in memory (MEMORY.md/USER.md) is always active.
 
 Subcommands:
 
@@ -1398,16 +1572,16 @@ Subcommands:
 | `off` | Disable external provider (built-in only). |
 
 :::info Provider-specific subcommands
-When an external memory provider is active, it may register its own top-level `qubit <provider>` command for provider-specific management (e.g. `qubit honcho` when Honcho is active). Inactive providers do not expose their subcommands. Run `qubit --help` to see what's currently wired in.
+When an external memory provider is active, it may register its own top-level `hermes <provider>` command for provider-specific management (e.g. `hermes honcho` when Honcho is active). Inactive providers do not expose their subcommands. Run `hermes --help` to see what's currently wired in.
 :::
 
-## `qubit acp`
+## `hermes acp`
 
 ```bash
-qubit acp
+hermes acp
 ```
 
-Starts Qubit as an ACP (Agent Client Protocol) stdio server for editor integration.
+Starts Hermes as an ACP (Agent Client Protocol) stdio server for editor integration.
 
 Related entrypoints:
 
@@ -1419,25 +1593,25 @@ python -m acp_adapter
 Install support first:
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e '.[acp]'
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['acp'], explicit=True)"
 ```
 
 See [ACP Editor Integration](../user-guide/features/acp.md) and [ACP Internals](../developer-guide/acp-internals.md).
 
-## `qubit mcp`
+## `hermes mcp`
 
 ```bash
-qubit mcp <subcommand>
+hermes mcp <subcommand>
 ```
 
-Manage MCP (Model Context Protocol) server configurations and run Qubit as an MCP server.
+Manage MCP (Model Context Protocol) server configurations and run Hermes as an MCP server.
 
 | Subcommand | Description |
 |------------|-------------|
-| *(none)* or `picker` | Interactive catalog picker — browse Qubit-approved MCPs and install/enable/disable. |
-| `catalog` | List Qubit-approved MCPs (plain text, scriptable). |
-| `install <name>` | Install a catalog entry (e.g. `qubit mcp install n8n`). |
-| `serve [-v\|--verbose]` | Run Qubit as an MCP server — expose conversations to other agents. |
+| *(none)* or `picker` | Interactive catalog picker — browse Nous-approved MCPs and install/enable/disable. |
+| `catalog` | List Nous-approved MCPs (plain text, scriptable). |
+| `install <name>` | Install a catalog entry (e.g. `hermes mcp install deepwiki`). |
+| `serve [-v\|--verbose]` | Run Hermes as an MCP server — expose conversations to other agents. |
 | `add <name> [--url URL] [--command CMD] [--auth oauth\|header] [--args ...]` | Add a custom MCP server with automatic tool discovery. `--args` passes the remaining argv to the stdio command, so put it last. |
 | `remove <name>` (alias: `rm`) | Remove an MCP server from config. |
 | `list` (alias: `ls`) | List configured MCP servers. |
@@ -1445,15 +1619,15 @@ Manage MCP (Model Context Protocol) server configurations and run Qubit as an MC
 | `configure <name>` (alias: `config`) | Toggle tool selection for a server. |
 | `login <name>` | Force re-authentication for an OAuth-based MCP server. |
 
-See [MCP Config Reference](./mcp-config-reference.md), [Use MCP with Qubit](../guides/use-mcp-with-hermes.md), and [MCP Server Mode](../user-guide/features/mcp.md#running-hermes-as-an-mcp-server).
+See [MCP Config Reference](./mcp-config-reference.md), [Use MCP with Hermes](../guides/use-mcp-with-hermes.md), and [MCP Server Mode](../user-guide/features/mcp.md#running-hermes-as-an-mcp-server).
 
-## `qubit plugins`
+## `hermes plugins`
 
 ```bash
-qubit plugins [subcommand]
+hermes plugins [subcommand]
 ```
 
-Unified plugin management — general plugins, memory providers, and context engines in one place. Running `qubit plugins` with no subcommand opens a composite interactive screen with two sections:
+Unified plugin management — general plugins, memory providers, and context engines in one place. Running `hermes plugins` with no subcommand opens a composite interactive screen with two sections:
 
 - **General Plugins** — multi-select checkboxes to enable/disable installed plugins
 - **Provider Plugins** — single-select configuration for Memory Provider and Context Engine. Press ENTER on a category to open a radio picker.
@@ -1461,9 +1635,9 @@ Unified plugin management — general plugins, memory providers, and context eng
 | Subcommand | Description |
 |------------|-------------|
 | *(none)* | Composite interactive UI — general plugin toggles + provider plugin configuration. |
-| `install <identifier> [--force] [--ref COMMIT_SHA]` | Install a plugin from a Git URL, `owner/repo`, or a bare index name. Bare names (no slash) are resolved through the community plugin index to `owner/repo` plus the index-pinned commit; ambiguous names list candidates and exit. `--ref` accepts only a full 40-character commit SHA, installs that exact immutable revision, and overrides any index pin. |
-| `search [term] [--json] [--capability CAP] [--refresh]` | Search the community plugin index (fuzzy match on name/description/tags; omit `term` to browse). Fetched from `plugins.index_url` (default: the NousResearch plugin index), cached under `~/.hermes/cache/` for 24h, falling back to the stale cache and then the bundled seed when offline. Indexed ≠ audited — inclusion is a metadata review only. |
-| `update <name>` | Pull latest changes for an unpinned installed plugin. Pinned plugins must be reinstalled with `--force --ref <new-commit>` to move. |
+| `install <identifier> [--force] [--ref COMMIT_SHA] [--allow-removed]` | Install a plugin from the Hermes plugin catalog (bare entry name), a Git URL, or `owner/repo` shorthand. Catalog names resolve to the reviewed 40-hex commit SHA and show declared capabilities. Source, checked-out revision, and a nested catalog-provenance block are recorded in the installer's `plugins/.install-metadata.json`; the `.hermes-catalog.json` copy inside the plugin directory is only for convenience and is never trusted. Raw URLs are flagged as custom (unreviewed) sources. `--ref` selects a full-SHA custom pin and records the SHA actually checked out. `--allow-removed` (DANGEROUS) bypasses the removed-plugin blocklist at install and exempts that install from update, enable, and load-time kill-list checks. |
+| `search [term] [--json]` | Search the Hermes plugin catalog (matches entry names, descriptions, and declared tools; omit `term` to list everything). The catalog is curated in-repo (`plugin-catalog/`), refreshed from the live repo with a 6-hour cache, and falls back to the in-tree copy offline. Cataloged ≠ audited — admission reviews the entry, not the code. |
+| `update <name>` | Re-pin catalog installs to the reviewed catalog SHA, or update a custom Git install from its recorded source/feed. PM validates active-plugin dependencies before code publication. Explicit custom pins move only with `install --force --ref <new-commit>`. |
 | `remove <name>` (aliases: `rm`, `uninstall`) | Remove an installed plugin. |
 | `enable <name>` | Enable a disabled plugin. |
 | `disable <name>` | Disable a plugin without removing it. |
@@ -1482,12 +1656,12 @@ Git installs also record only their canonical source, exact installed revision, 
 pin status in the profile-local `plugins/.install-metadata.json` sidecar. It does
 not contain plugin config, environment values, secrets, or capability grants.
 
-See [Plugins](../user-guide/features/plugins.md) and [Build a Qubit Plugin](../developer-guide/plugins/index.md).
+See [Plugins](../user-guide/features/plugins.md) and [Build a Hermes Plugin](../developer-guide/plugins/index.md).
 
-## `qubit tools`
+## `hermes tools`
 
 ```bash
-qubit tools [--summary]
+hermes tools [--summary]
 ```
 
 | Option | Description |
@@ -1496,10 +1670,10 @@ qubit tools [--summary]
 
 Without `--summary`, this launches the interactive per-platform tool configuration UI.
 
-## `qubit computer-use`
+## `hermes computer-use`
 
 ```bash
-qubit computer-use <subcommand>
+hermes computer-use <subcommand>
 ```
 
 Subcommands:
@@ -1513,43 +1687,43 @@ Subcommands:
 | `permissions status [--json]` | Report macOS Accessibility and Screen Recording grants. |
 | `permissions grant` | Ask macOS to grant Accessibility and Screen Recording to Cua Driver. |
 
-`qubit computer-use install` is the stable entry point for installing the
+`hermes computer-use install` is the stable entry point for installing the
 [cua-driver](https://github.com/trycua/cua) binary used by the
 `computer_use` toolset. It runs the same upstream installer that
-`qubit tools` invokes when you first enable Computer Use, so it's safe
+`hermes tools` invokes when you first enable Computer Use, so it's safe
 to use for re-running the install if the toolset toggle didn't trigger
 it (for example, on returning-user setups).
 
-If cua-driver is already present, Qubit checks its version and runtime
+If cua-driver is already present, Hermes checks its version and runtime
 manifest. A compatible 0.20.0 or newer installation is left in place. An old or
 incomplete standard installation is repaired with the current upstream
-installer. Qubit never replaces a custom binary selected through
+installer. Hermes never replaces a custom binary selected through
 `HERMES_CUA_DRIVER_CMD`; update that binary directly or remove the override.
-`qubit computer-use status` reports when repair is required.
+`hermes computer-use status` reports when repair is required.
 
-The built-in `computer_use` toolset is the recommended Qubit integration.
+The built-in `computer_use` toolset is the recommended Hermes integration.
 Registering raw Cua MCP tools is an alternative when you need Cua's low-level
-tool vocabulary. `cua-driver skills install` detects Qubit and links Cua's
-skill pack into the Qubit skills directory automatically.
+tool vocabulary. `cua-driver skills install` detects Hermes and links Cua's
+skill pack into the Hermes skills directory automatically.
 
 Permission mode and capability-manifest approval
-belong to runtime launch. In bounded mode Qubit passes Cua's canonical
+belong to runtime launch. In bounded mode Hermes passes Cua's canonical
 `--capability-manifest` and `--approve-capability-manifest` flags. Every MCP
 transport owns a private lifecycle session inside its runtime. Public session
 names label cursor and session state; they do not own or share the runtime.
 
-`qubit update` automatically re-runs the upstream installer at the end
+`hermes update` automatically re-runs the upstream installer at the end
 of the update if cua-driver is on PATH, so most users will not need to
 call `--upgrade` manually. Use it when upstream ships a fix you want
-right now without waiting for the next Qubit update.
+right now without waiting for the next Hermes update.
 
-## `qubit pets`
+## `hermes pets`
 
 ```bash
-qubit pets <list|install|select|show|off|scale|remove|doctor>
+hermes pets <list|install|select|show|off|scale|remove|doctor>
 ```
 
-[Petdex](https://github.com/crafter-station/petdex) is a public gallery of animated sprite pets for coding agents. Install one and Qubit shows it reacting to agent activity across the CLI, TUI, and desktop app.
+[Petdex](https://github.com/crafter-station/petdex) is a public gallery of animated sprite pets for coding agents. Install one and Hermes shows it reacting to agent activity across the CLI, TUI, and desktop app.
 
 | Subcommand | Description |
 |------------|-------------|
@@ -1564,10 +1738,10 @@ qubit pets <list|install|select|show|off|scale|remove|doctor>
 
 You can also generate a brand-new pet from a text description with the `/hatch` slash command. See [Pets](../user-guide/features/pets.md).
 
-## `qubit sessions`
+## `hermes sessions`
 
 ```bash
-qubit sessions <subcommand>
+hermes sessions <subcommand>
 ```
 
 Subcommands:
@@ -1586,13 +1760,14 @@ Subcommands:
 | `optimize-storage` | Migrate the full-text search index to the compact v23 external-content layout; on large databases this reclaims a large fraction of `state.db`. |
 | `repair` | Repair a malformed `state.db` schema (e.g. `table messages_fts already exists`) so hidden sessions reappear; a backup is made first. |
 | `repair-routing` | Re-attach gateway conversations stranded in session rows that lost their routing identity (a chat "jumping back in time" after a restart). Dry-run by default; `--apply` performs the adoptions (stop the gateway first); `--max-gap-seconds N` tunes the contiguity window. Only unambiguous cases are repaired. See [Sessions → Repair Stranded Gateway Sessions](../user-guide/sessions.md#repair-stranded-gateway-sessions). |
+| `repair-profiles` | Settle session, routing, Telegram-topic and voice-mode state that landed under the wrong profile (rows in another profile's store, labels disagreeing with the session key, parent links crossing profiles, index rows for deleted profiles). Dry-run by default; `--apply` performs the repairs after snapshotting every store (stop the gateway first); `--legacy-main rekey\|move` decides what `agent:main` rows inside a named profile's store are; `--json` for automation. See [Sessions → Repair State Crossed Between Profiles](../user-guide/sessions.md#repair-state-crossed-between-profiles). |
 | `recover` | Offline, non-destructive recovery of a damaged `state.db` into a separate clean database. |
 | `retitle-skills` | Regenerate titles for sessions opened with a `/skill`, using what the user actually typed; lists changes unless `--apply` is passed. |
 
-## `qubit insights`
+## `hermes insights`
 
 ```bash
-qubit insights [--days N] [--source platform]
+hermes insights [--days N] [--source platform]
 ```
 
 | Option | Description |
@@ -1600,35 +1775,35 @@ qubit insights [--days N] [--source platform]
 | `--days <n>` | Analyze the last `n` days (default: 30). |
 | `--source <platform>` | Filter by source such as `cli`, `telegram`, or `discord`. |
 
-## `qubit claw`
+## `hermes claw`
 
 ```bash
-qubit claw migrate [options]
+hermes claw migrate [options]
 ```
 
-Migrate your Qubit setup to Qubit. Reads from `~/.qubit` (or a custom path) and writes to `~/.hermes`. Automatically detects legacy directory names (`~/.clawdbot`, `~/.moltbot`) and config filenames (`clawdbot.json`, `moltbot.json`).
+Migrate your OpenClaw setup to Hermes. Reads from `~/.openclaw` (or a custom path) and writes to `~/.hermes`. Automatically detects legacy directory names (`~/.clawdbot`, `~/.moltbot`) and config filenames (`clawdbot.json`, `moltbot.json`).
 
 | Option | Description |
 |--------|-------------|
 | `--dry-run` | Preview what would be migrated without writing anything. |
 | `--preset <name>` | Migration preset: `full` (all compatible settings) or `user-data` (excludes infrastructure config). Neither preset imports secrets — pass `--migrate-secrets` explicitly. |
-| `--overwrite` | Overwrite existing Qubit files on conflicts (default: refuse to apply when the plan has conflicts). |
+| `--overwrite` | Overwrite existing Hermes files on conflicts (default: refuse to apply when the plan has conflicts). |
 | `--migrate-secrets` | Include API keys in migration. Required even under `--preset full`. |
-| `--no-backup` | Skip the pre-migration zip snapshot of `~/.hermes/` (by default a single restore-point archive is written to `~/.hermes/backups/pre-migration-*.zip` before apply; restorable with `qubit import`). |
-| `--source <path>` | Custom Qubit directory (default: `~/.qubit`). |
+| `--no-backup` | Skip the pre-migration zip snapshot of `~/.hermes/` (by default a single restore-point archive is written to `~/.hermes/backups/pre-migration-*.zip` before apply; restorable with `hermes import`). |
+| `--source <path>` | Custom OpenClaw directory (default: `~/.openclaw`). |
 | `--workspace-target <path>` | Target directory for workspace instructions (AGENTS.md). |
 | `--skill-conflict <mode>` | Handle skill name collisions: `skip` (default), `overwrite`, or `rename`. |
 | `--yes` | Skip the confirmation prompt. |
 
 ### What gets migrated
 
-The migration covers 30+ categories across persona, memory, skills, model providers, messaging platforms, agent behavior, session policies, MCP servers, TTS, and more. Items are either **directly imported** into Qubit equivalents or **archived** for manual review.
+The migration covers 30+ categories across persona, memory, skills, model providers, messaging platforms, agent behavior, session policies, MCP servers, TTS, and more. Items are either **directly imported** into Hermes equivalents or **archived** for manual review.
 
 **Directly imported:** SOUL.md, MEMORY.md, USER.md, AGENTS.md, skills (4 source directories), default model, custom providers, MCP servers, messaging platform tokens and allowlists (Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Mattermost), agent defaults (reasoning effort, compression, human delay, timezone, sandbox), approval rules, TTS config, browser settings, tool settings, exec timeout, command allowlist, gateway config, and API keys from 3 sources.
 
 **Archived for manual review:** Cron jobs, plugins, hooks/webhooks, memory backend (QMD), skills registry config, UI/identity, logging, multi-agent setup, channel bindings, IDENTITY.md, TOOLS.md, HEARTBEAT.md, BOOTSTRAP.md.
 
-**API key resolution** checks three sources in priority order: config values → `~/.qubit/.env` → `auth-profiles.json`. All token fields handle plain strings, env templates (`${VAR}`), and SecretRef objects.
+**API key resolution** checks three sources in priority order: config values → `~/.openclaw/.env` → `auth-profiles.json`. All token fields handle plain strings, env templates (`${VAR}`), and SecretRef objects.
 
 For the complete config key mapping, SecretRef handling details, and post-migration checklist, see the **[full migration guide](../guides/migrate-from-openclaw.md)**.
 
@@ -1636,28 +1811,28 @@ For the complete config key mapping, SecretRef handling details, and post-migrat
 
 ```bash
 # Preview what would be migrated
-qubit claw migrate --dry-run
+hermes claw migrate --dry-run
 
 # Full migration (all compatible settings, no secrets)
-qubit claw migrate --preset full
+hermes claw migrate --preset full
 
 # Full migration including API keys
-qubit claw migrate --preset full --migrate-secrets
+hermes claw migrate --preset full --migrate-secrets
 
 # Migrate user data only (no secrets), overwrite conflicts
-qubit claw migrate --preset user-data --overwrite
+hermes claw migrate --preset user-data --overwrite
 
-# Migrate from a custom Qubit path
-qubit claw migrate --source /home/user/old-qubit
+# Migrate from a custom OpenClaw path
+hermes claw migrate --source /home/user/old-openclaw
 ```
 
-## `qubit import-agent`
+## `hermes import-agent`
 
 ```bash
-qubit import-agent [claude-code|codex] [options]
+hermes import-agent [claude-code|codex] [options]
 ```
 
-Import a **Claude Code** (`~/.claude`) or **OpenAI Codex CLI** (`~/.codex`) setup into Qubit. Maps `CLAUDE.md`/`AGENTS.md` instructions to memory entries, `Bash(...)` permission allow/deny rules to `command_allowlist`/`approvals.deny`, MCP servers to `mcp_servers` in `config.yaml`, and skill directories into `~/.hermes/skills/`. Always previews before applying; API keys and credentials are never imported.
+Import a **Claude Code** (`~/.claude`) or **OpenAI Codex CLI** (`~/.codex`) setup into Hermes. Maps `CLAUDE.md`/`AGENTS.md` instructions to memory entries, `Bash(...)` permission allow/deny rules to `command_allowlist`/`approvals.deny`, MCP servers to `mcp_servers` in `config.yaml`, and skill directories into `~/.hermes/skills/`. Always previews before applying; API keys and credentials are never imported.
 
 | Option | Description |
 | --- | --- |
@@ -1666,26 +1841,27 @@ Import a **Claude Code** (`~/.claude`) or **OpenAI Codex CLI** (`~/.codex`) setu
 | `--dry-run` | Preview only — write nothing. |
 | `--overwrite` | Replace conflicting MCP servers / skills (default: skip). |
 | `--yes`, `-y` | Skip confirmation prompts. |
+| `--sync` | Re-import every previously imported source whose files changed since the last import. Prompt-free; combine with `--dry-run` to preview. |
 
-See the **[import guide](../user-guide/import-from-other-agents.md)** for the full mapping tables.
+Every successful import registers its source in `~/.hermes/import-sync.json`; `hermes import-agent --sync` then re-imports any registered source whose files changed (a cron-friendly way to keep an imported Claude Code / Codex setup current). See the **[import guide](../user-guide/import-from-other-agents.md)** for the full mapping tables.
 
-## `qubit serve`
-
-```bash
-qubit serve [options]
-```
-
-Start the Qubit **backend server** — the JSON-RPC/WebSocket gateway the [desktop app](/user-guide/desktop) and remote clients connect to. It is the same server `qubit dashboard` runs, but **headless**: it never opens a browser UI. The desktop app launches its own `qubit serve` backend; use this command directly when you want a headless backend on a remote host. Accepts the same `--host` / `--port` / `--insecure` / `--skip-build` / `--stop` / `--status` options as `qubit dashboard` below (a non-loopback bind engages the same auth gate). Requires the `[web]` extra; the embedded Chat socket additionally needs `[pty]` on a POSIX host.
-
-**Port conflicts:** if the requested port (default `9119`) is already held by another process (e.g. a second `qubit serve` or the gateway), the command prints a machine-readable sentinel line `BACKEND_PORT_IN_USE port=<port>` to stdout, a human hint naming the likely holder, and exits with code **75** (`EX_TEMPFAIL`) instead of a generic error — so scripts and the desktop app can tell "port occupied" apart from "backend broken". Pass `--port 0` to bind a free ephemeral port (the successful boot announces the chosen port via `HERMES_BACKEND_READY port=<port>`).
-
-## `qubit dashboard`
+## `hermes serve`
 
 ```bash
-qubit dashboard [options]
+hermes serve [options]
 ```
 
-Launch the web dashboard — a browser-based UI for managing configuration, API keys, and monitoring sessions. (For a headless backend with no browser UI — e.g. what the desktop app spawns — use [`qubit serve`](#hermes-serve) above.) Requires `cd ~/.hermes/hermes-agent && uv pip install -e ".[web]"` (FastAPI + Uvicorn). The embedded browser Chat tab is always available and additionally needs the `pty` extra (`cd ~/.hermes/hermes-agent && uv pip install -e ".[web,pty]"`) plus a POSIX PTY environment such as Linux, macOS, or WSL2. See [Web Dashboard](/user-guide/features/web-dashboard) for full documentation.
+Start the Hermes **backend server** — the JSON-RPC/WebSocket gateway the [desktop app](../user-guide/desktop.md) and remote clients connect to. It is the same server `hermes dashboard` runs, but **headless**: it never opens a browser UI. The desktop app launches its own `hermes serve` backend; use this command directly when you want a headless backend on a remote host. Accepts the same `--host` / `--port` / `--insecure` / `--skip-build` / `--stop` / `--status` options as `hermes dashboard` below (a non-loopback bind engages the same auth gate). Requires the `[web]` extra; the embedded Chat socket additionally needs `[pty]` on a POSIX host.
+
+**Port conflicts:** if the requested port (default `9119`) is already held by another process (e.g. a second `hermes serve` or the gateway), the command prints a machine-readable sentinel line `BACKEND_PORT_IN_USE port=<port>` to stdout, a human hint naming the likely holder, and exits with code **75** (`EX_TEMPFAIL`) instead of a generic error — so scripts and the desktop app can tell "port occupied" apart from "backend broken". Pass `--port 0` to bind a free ephemeral port (the successful boot announces the chosen port via `HERMES_BACKEND_READY port=<port>`).
+
+## `hermes dashboard`
+
+```bash
+hermes dashboard [options]
+```
+
+Launch the web dashboard to manage configuration, API keys, and sessions. For a headless backend, use [`hermes serve`](#hermes-serve). FastAPI, Uvicorn, and the platform PTY helper are core dependencies. The `web` extra adds exact HTTP-stack constraints and is selected by standard PM setup through `all`. If dependencies are damaged, run `hermes pm repair`. The embedded Chat tab requires a POSIX PTY environment, such as Linux, macOS, or WSL2. See [Web Dashboard](../user-guide/features/web-dashboard.md).
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -1695,44 +1871,44 @@ Launch the web dashboard — a browser-based UI for managing configuration, API 
 | `--insecure` | off | **Deprecated / no-op.** Formerly bypassed auth on a non-loopback bind. Since the June 2026 hardening a public bind *always* requires an auth provider (password or OAuth). Bind `127.0.0.1` and tunnel to keep it local. |
 | `--skip-build` | off | Skip the web UI build step and serve the existing `dist` directly. Useful for non-interactive contexts (Windows Scheduled Tasks, CI) where npm isn't available. Pre-build with `cd web && npm run build`. |
 | `--isolated` | off | When launched from a named profile (`worker dashboard`), run a dedicated per-profile server instead of routing to the machine dashboard. |
-| `--stop` | — | Stop running `qubit dashboard` processes and exit. |
-| `--status` | — | List running `qubit dashboard` processes and exit. |
+| `--stop` | — | Stop the running `hermes dashboard` / `hermes serve` backend **of this Hermes home** and exit (`-p <profile>` / `HERMES_HOME` select which; backends of other profiles, other installs on the machine, and the shell you typed the command into are never touched — a backend whose owner cannot be read is left alone). SIGTERM, a 10s grace, then SIGKILL; a hosted Chat TUI that outlives its backend is stopped too (it would otherwise keep the deleted `state.db-wal` open and block the next start). Messaging-gateway bots started from the dashboard are not touched. |
+| `--status` | — | List running `hermes dashboard` processes and exit. |
 
-### `qubit dashboard register`
+### `hermes dashboard register`
 
-Register this install as a self-hosted dashboard with your Qubit Labs account. Creates an OAuth client, writes `HERMES_DASHBOARD_OAUTH_CLIENT_ID` into `~/.hermes/.env`, and prints how to engage the login gate. Requires being logged in (`qubit setup`).
+Register this install as a self-hosted dashboard with your Nous Portal account. Creates an OAuth client, writes `HERMES_DASHBOARD_OAUTH_CLIENT_ID` into `~/.hermes/.env`, and prints how to engage the login gate. Requires being logged in (`hermes setup`).
 
 | Option | Description |
 |--------|-------------|
 | `--name` | Human-readable label for the dashboard (default: auto-generated). |
 | `--redirect-uri` | Public HTTPS OAuth redirect URI (e.g. `https://hermes.example.com/auth/callback`). Omit for localhost-only use. |
-| `--portal-url` | Override the Qubit Labs base URL for registration (default: the portal you logged into). Also settable via `HERMES_DASHBOARD_PORTAL_URL`. |
+| `--portal-url` | Override the Nous Portal base URL for registration (default: the portal you logged into). Also settable via `HERMES_DASHBOARD_PORTAL_URL`. |
 
 ```bash
 # Default — opens browser to http://127.0.0.1:9119
-qubit dashboard
+hermes dashboard
 
 # Custom port, no browser
-qubit dashboard --port 8080 --no-open
+hermes dashboard --port 8080 --no-open
 
 # From a profile alias — routes to the machine dashboard with the
 # profile preselected in the sidebar switcher (attach if running)
 worker dashboard
 ```
 
-## `qubit profile`
+## `hermes profile`
 
 ```bash
-qubit profile <subcommand>
+hermes profile <subcommand>
 ```
 
-Manage profiles — multiple isolated Qubit instances, each with its own config, sessions, skills, and home directory.
+Manage profiles — multiple isolated Hermes instances, each with its own config, sessions, skills, and home directory.
 
 | Subcommand | Description |
 |------------|-------------|
 | `list` | List all profiles. |
 | `use <name>` | Set a sticky default profile. |
-| `create <name> [--clone] [--clone-all] [--clone-from <source>] [--no-alias]` | Create a new profile. `--clone` copies config, `.env`, `SOUL.md`, and skills from the active profile. `--clone-all` copies all state. `--clone-from` specifies a source profile and implies config clone unless paired with `--clone-all`. |
+| `create <name> [--clone] [--clone-all] [--clone-from <source>] [--no-alias]` | Create a new profile. `--clone` copies config, `.env`, `SOUL.md`, skills, and the curated `MEMORY.md`/`USER.md` memory files from the active profile. `--clone-all` copies all state. `--clone-from` specifies a source profile and implies config clone unless paired with `--clone-all`. |
 | `delete <name> [-y]` | Delete a profile. |
 | `show <name>` | Show profile details (home directory, config, etc.). |
 | `alias <name> [--remove] [--name NAME]` | Manage wrapper scripts for quick profile access. |
@@ -1746,76 +1922,107 @@ Manage profiles — multiple isolated Qubit instances, each with its own config,
 Examples:
 
 ```bash
-qubit profile list
-qubit profile create work --clone
-qubit profile use work
-qubit profile alias work --name h-work
-qubit profile export work -o work-backup.tar.gz
-qubit profile import work-backup.tar.gz --name restored
-qubit profile install github.com/user/my-distro --alias
-qubit profile update work
-qubit -p work chat -q "Hello from work profile"
+hermes profile list
+hermes profile create work --clone
+hermes profile create work --clone --sync-imports   # also carry over the import-agent sync manifest
+hermes profile use work
+hermes profile alias work --name h-work
+hermes profile export work -o work-backup.tar.gz
+hermes profile import work-backup.tar.gz --name restored
+hermes profile install github.com/user/my-distro --alias
+hermes profile update work
+hermes -p work chat -q "Hello from work profile"
 ```
 
-## `qubit completion`
+## `hermes completion`
 
 ```bash
-qubit completion [bash|zsh|fish]
+hermes completion [bash|zsh|fish]
 ```
 
-Print a shell completion script to stdout. Source the output in your shell profile for tab-completion of Qubit commands, subcommands, and profile names.
+Print a shell completion script to stdout. Source the output in your shell profile for tab-completion of Hermes commands, subcommands, and profile names.
 
 Examples:
 
 ```bash
 # Bash
-qubit completion bash >> ~/.bashrc
+hermes completion bash >> ~/.bashrc
 
 # Zsh
-qubit completion zsh >> ~/.zshrc
+hermes completion zsh >> ~/.zshrc
 
 # Fish
-qubit completion fish > ~/.config/fish/completions/hermes.fish
+hermes completion fish > ~/.config/fish/completions/hermes.fish
 ```
 
-## `qubit update`
+## `hermes pm`
+
+Manage pinned tools, Python dependency environments, and their diagnostics.
+This command does not update the Hermes application itself.
 
 ```bash
-qubit update [--gateway] [--check] [--plan] [--no-backup] [--backup] [--yes]
+hermes pm --help
+hermes pm doctor
+hermes pm status
+hermes pm repair
+hermes pm install
+hermes pm install chromium
 ```
 
-Pulls the latest `hermes-agent` code and reinstalls dependencies in the managed venv, then re-runs the post-install hooks (MCP servers, skills sync, completion install). Safe to run on a live install. Use `--check` to see whether your checkout is behind `origin/main` without installing.
+For source development, run the setup script once, then activate the installed
+environment with `source ./activate` or PowerShell `. .\activate.ps1`.
+Use `deactivate` to restore the previous shell environment. See the
+[developer workflow](./package-management.md#developer-workflow) for preparation,
+daily commands, dependency refresh, and test environments.
 
-`qubit update` pulls the configured update branch (default: `main`). If your checkout is on another branch, Qubit may check out the update branch before pulling. Commit branch work before updating when you want to keep it outside the update autostash flow.
+See [Package management](./package-management.md) for every subcommand,
+source-versus-bundle behavior, lazy-install policy, and maintainer commands.
+
+## `hermes update`
+
+```bash
+hermes update [--gateway] [--check] [--plan] [--no-backup] [--backup] [--yes]
+```
+
+Updates an admitted source checkout and prepares dependencies through PM.
+Use `--check` to compare with its configured source target without applying
+the update. Desktop bundles, Docker, Nix, and Termux packages retain their
+external update owner. See [Updating & Uninstalling](../getting-started/updating.md).
+
+`hermes update` pulls the configured update branch (default: `main`). If your checkout is on another branch, Hermes may check out the update branch before pulling. Commit branch work before updating when you want to keep it outside the update autostash flow.
 
 | Option | Description |
 |--------|-------------|
+| `--install-id` | Print this installation's identity and path, then exit. |
+| `--set-channel CHANNEL` | Persist `main`, `stable`, or `canary` for this source installation without applying an update. Bundled applications have a fixed build channel and refuse channel changes. |
+| `--channel CHANNEL` | Select a source channel for this invocation only. |
+| `--branch NAME` | Select a source branch for this invocation; takes precedence over source channel selection. |
 | `--gateway` | Internal mode used by the messaging `/update` command. Uses file-based IPC for prompts and progress streaming instead of reading from terminal stdin. Not a gateway restart flag. |
 | `--check` | Check whether an update is available without pulling, installing dependencies, or restarting anything. |
-| `--plan` | Print the update plan and exit without changing anything: install kind (git/Docker/Nix/apt), every running Qubit service across all profiles with its supervisor and running code version, and how each will be restarted. On image- or package-managed installs, reports the correct external update command instead. Read-only. |
+| `--plan` | Print the update plan and exit without changing anything: install kind (git/Docker/Nix/apt), every running Hermes service across all profiles with its supervisor and running code version, and how each will be restarted. On image- or package-managed installs, reports the correct external update command instead. Read-only. |
 | `--no-backup` | Skip all pre-update backups for this run (both the quick state snapshot and the full zip), regardless of `updates.pre_update_backup`. |
-| `--backup` | Force a **full** pre-update backup for this run: the quick state snapshot plus a complete zip of `QUBIT_HOME` (config, auth, sessions, skills, pairing data). The default mode is `quick` — a lightweight state snapshot only. Set the permanent mode via `updates.pre_update_backup: quick | full | off` in `config.yaml`. |
-| `--yes`, `-y` | Assume yes for interactive prompts such as config migration and stash restore. API-key entry is skipped; run `qubit config migrate` separately for those. |
+| `--backup` | Force a **full** pre-update backup for this run: the quick state snapshot plus a complete zip of `HERMES_HOME` (config, auth, sessions, skills, pairing data). The default mode is `quick` — a lightweight state snapshot only. Set the permanent mode via `updates.pre_update_backup: quick | full | off` in `config.yaml`. |
+| `--yes`, `-y` | Assume yes for interactive prompts such as config migration and stash restore. API-key entry is skipped; run `hermes config migrate` separately for those. |
 
 Additional behavior:
 
-- **Gateway restart.** After a successful update, Qubit attempts to restart all running gateway profiles automatically so they pick up the new code. Use `qubit gateway restart` when you want to restart a gateway without applying an update.
+- **Gateway restart.** After a successful update, Hermes attempts to restart all running gateway profiles of the home being updated (its root and every `profiles/<name>` under it) automatically so they pick up the new code. Gateways and `hermes-gateway*` services that belong to a different `HERMES_HOME` on the same machine — another install, or a scratch home running `hermes update` — are named in the output and left alone. Use `hermes gateway restart` when you want to restart a gateway without applying an update.
 - **Restart-phase recovery.** If the in-process restart phase aborts while importing the freshly pulled tree, supervised gateway profiles are retried through a clean Python process. Only restarts independently confirmed by systemd (`systemctl --user is-active`) are reported as verified; a relaunch that merely exited 0 is recorded as `relaunch_attempted` and still fails the update conservatively. Manual gateways and serve/dashboard runtimes are never killed without a relaunch authority; they are recorded as skipped with a reason and remain in the incomplete-update report with the exact restart command.
 - **Update receipts + fleet version check.** Every run writes a machine-readable receipt to `~/.hermes/logs/update_receipts/` (pre-update fleet plan, steps, skips with reasons, restart outcome; `latest.json` points at the newest). After the restart phase the updater verifies each live gateway's running code against the updated checkout and prints a per-profile version matrix; a gateway still on pre-update code fails the update (exit 1) with the exact restart command.
 - **Local source changes.** For git installs, dirty tracked files and untracked files are auto-stashed before branch checkout or pull (`git stash push --include-untracked`). Interactive terminal updates ask before restoring the stash. Non-interactive updates restore it by default; set `updates.non_interactive_local_changes: discard` only on managed installs where local source edits should be thrown away after a successful pull. If stash restore conflicts or the pull fails, the stash is left in place for manual recovery.
-- **npm lockfile churn.** Before stashing or switching branches, Qubit makes a best-effort cleanup of tracked `package-lock.json` diffs produced by npm install/build steps. Commit or manually stash intentional lockfile edits before running `qubit update`.
-- **Pairing data snapshot.** Even when `--backup` is off, `qubit update` takes a lightweight snapshot of `~/.hermes/pairing/` and the Feishu comment rules before `git pull`. You can roll it back with `qubit backup restore --state pre-update` if a pull rewrites a file you were editing.
-- **Legacy `hermes.service` warning.** If Qubit detects a pre-rename `hermes.service` systemd unit (instead of the current `hermes-gateway.service`), it prints a one-time migration hint so you can avoid flap-loop issues.
+- **npm lockfile churn.** Before stashing or switching branches, Hermes makes a best-effort cleanup of tracked `package-lock.json` diffs produced by npm install/build steps. Commit or manually stash intentional lockfile edits before running `hermes update`.
+- **Pairing data snapshot.** Even when `--backup` is off, `hermes update` takes a lightweight snapshot of `~/.hermes/pairing/` and the Feishu comment rules before `git pull`. You can roll it back with `hermes backup restore --state pre-update` if a pull rewrites a file you were editing.
+- **Legacy `hermes.service` warning.** If Hermes detects a pre-rename `hermes.service` systemd unit (instead of the current `hermes-gateway.service`), it prints a one-time migration hint so you can avoid flap-loop issues.
 - **Exit codes.** `0` on success, `1` on pull/install/post-install errors, `2` on unexpected working-tree changes that block `git pull`.
 
 ## Maintenance commands
 
 | Command | Description |
 |---------|-------------|
-| `qubit --version` | Print version information. |
-| `qubit update` | Pull latest changes and reinstall dependencies. |
+| `hermes --version` | Print version information. |
+| `hermes update` | Pull latest changes and reinstall dependencies. |
 
-| `qubit uninstall [--full] [--gui] [--dry-run] [--yes]` | Remove Qubit, optionally deleting all config/data. `--gui` removes only the desktop Chat GUI, leaving the agent intact; `--full` also deletes config/data; `--dry-run` prints what would be removed without changing anything; `--yes` skips prompts. |
+| `hermes uninstall [--full] [--gui] [--data] [--dry-run] [--yes]` | Remove owned source-install files. `--gui` selects source-built desktop removal; `--full` also removes data. `--data` removes user data without deleting package-owned code. Sealed installs use their package owner for application removal. `--dry-run` previews the scope; `--yes` skips confirmation. |
 
 ## See also
 

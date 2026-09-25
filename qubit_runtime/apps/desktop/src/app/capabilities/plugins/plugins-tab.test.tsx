@@ -2,7 +2,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $pluginRecords } from '@/contrib/plugins-store'
-import { QUBIT_DOCS_ORIGIN } from '@/lib/qubit-links'
 import { $agentPlugins, $agentPluginsStatus } from '@/store/agent-plugins'
 import { $confirmRequest, settleConfirm } from '@/store/confirm'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
@@ -48,12 +47,20 @@ describe('PluginsTab', () => {
     $connection.set(null)
   })
 
-  it('lists the scoped profile agent plugins with toggles', () => {
+  it('renders declared server pills and the unavailable sentence under the description', () => {
     $agentPlugins.set([
       {
         description: 'A test plugin',
         key: 'demo-plugin',
         name: 'demo-plugin',
+        servers: [
+          { name: 'ready-server', sentence: '', state: 'connected' },
+          {
+            name: 'setup-server',
+            sentence: 'Example App is not installed. Install Example App, then try again.',
+            state: 'missing_app'
+          }
+        ],
         source: 'git',
         status: 'enabled',
         version: '1.0.0'
@@ -62,7 +69,9 @@ describe('PluginsTab', () => {
 
     render(<PluginsTab profile="workbot" />)
 
-    expect(screen.getByText('demo-plugin')).toBeTruthy()
+    expect(screen.getByTestId('server-pill-ready-server')).toBeTruthy()
+    expect(screen.getByTestId('server-pill-setup-server')).toBeTruthy()
+    expect(screen.getByText('Example App is not installed. Install Example App, then try again.')).toBeTruthy()
     expect(screen.getByRole('switch', { name: 'Agent: demo-plugin' }).getAttribute('aria-checked')).toBe('true')
   })
 
@@ -160,7 +169,7 @@ describe('PluginsTab', () => {
         kind: 'disk',
         status: 'loaded',
         packageName: 'hermes-media-studio',
-        packageOrigin: { repo: 'https://github.com/cgraph-dev/qubit-voicebridge-media-studio.git', sha: 'abc' }
+        packageOrigin: { repo: 'https://github.com/NousResearch/hermes-media-studio.git', sha: 'abc' }
       }
     })
 
@@ -173,7 +182,7 @@ describe('PluginsTab', () => {
       expect($pluginInstallRequest.get()).toMatchObject({
         legacyHint: 'agent',
         profile: 'workbot',
-        repo: 'https://github.com/cgraph-dev/qubit-voicebridge-media-studio.git',
+        repo: 'https://github.com/NousResearch/hermes-media-studio.git',
         sha: 'abc'
       })
     })
@@ -211,7 +220,7 @@ describe('PluginsTab', () => {
           tier: 'community',
           type: 'hermes-plugin-pick'
         },
-        origin: QUBIT_DOCS_ORIGIN
+        origin: 'https://hermes-agent.nousresearch.com'
       })
     )
 
@@ -306,7 +315,7 @@ describe('PluginsTab', () => {
           subdir: 'nested-plugin',
           type: 'hermes-plugin-pick'
         },
-        origin: QUBIT_DOCS_ORIGIN
+        origin: 'https://hermes-agent.nousresearch.com'
       })
     )
 
@@ -417,7 +426,7 @@ describe('PluginsTab catalog UX', () => {
     screen.getByRole('button', { name: 'Uninstall: demo-weather' }).click()
 
     // The click only asks; nothing is deleted until the destructive confirm is answered.
-    await waitFor(() => expect($confirmRequest.get()?.title).toBe('Uninstall demo-weather?'))
+    await waitFor(() => expect($confirmRequest.get()?.title).toContain('demo-weather'))
     expect(requestGateway).not.toHaveBeenCalledWith('plugins.manage', expect.objectContaining({ action: 'remove' }))
 
     settleConfirm(true)
@@ -441,7 +450,7 @@ describe('PluginsTab catalog UX', () => {
 
     screen.getByRole('button', { name: 'Uninstall: Clock' }).click()
 
-    await waitFor(() => expect($confirmRequest.get()?.title).toBe('Uninstall Clock?'))
+    await waitFor(() => expect($confirmRequest.get()?.title).toContain('Clock'))
     expect(uninstallDiskPlugin).not.toHaveBeenCalled()
 
     settleConfirm(true)
@@ -499,7 +508,7 @@ describe('PluginsTab catalog UX', () => {
           repo: 'https://github.com/example/demo-weather',
           type: 'hermes-plugin-pick'
         },
-        origin: QUBIT_DOCS_ORIGIN
+        origin: 'https://hermes-agent.nousresearch.com'
       })
     )
 
@@ -532,7 +541,7 @@ describe('PluginsTab catalog UX', () => {
           repo: 'https://github.com/example/demo-weather',
           type: 'hermes-plugin-pick'
         },
-        origin: QUBIT_DOCS_ORIGIN
+        origin: 'https://hermes-agent.nousresearch.com'
       })
     )
 

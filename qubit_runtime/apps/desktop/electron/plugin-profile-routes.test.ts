@@ -17,7 +17,7 @@ function config(overrides: Partial<ProfileRouteConfig> = {}): ProfileRouteConfig
     remoteUrl: '',
     sshHost: '',
     sshPort: null,
-    sshRemoteQubitPath: '',
+    sshRemoteHermesPath: '',
     sshRemoteProfile: '',
     sshUser: '',
     ...overrides
@@ -32,7 +32,7 @@ describe('buildOpaqueProfileRoutes', () => {
         config({
           mode: 'ssh',
           sshHost: 'lab-a',
-          sshRemoteQubitPath: '~/.hermes',
+          sshRemoteHermesPath: '~/.hermes',
           sshRemoteProfile: 'remote-research'
         })
       ],
@@ -41,7 +41,7 @@ describe('buildOpaqueProfileRoutes', () => {
         config({
           mode: 'ssh',
           sshHost: 'lab-b',
-          sshRemoteQubitPath: '~/.hermes',
+          sshRemoteHermesPath: '~/.hermes',
           sshRemoteProfile: 'remote-writing'
         })
       ]
@@ -74,7 +74,7 @@ describe('buildOpaqueProfileRoutes', () => {
 
   it('changes opaque IDs when the effective SSH destination changes', async () => {
     const options = {
-      getProfileConfig: () => config({ mode: 'ssh', sshHost: 'lab', sshRemoteQubitPath: '~/.hermes' }),
+      getProfileConfig: () => config({ mode: 'ssh', sshHost: 'lab', sshRemoteHermesPath: '~/.hermes' }),
       globalConfig: config(),
       installationId: 'install-a-secret',
       primaryProfile: 'default',

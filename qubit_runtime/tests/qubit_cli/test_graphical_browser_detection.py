@@ -1,6 +1,6 @@
 """Tests for `_can_open_graphical_browser()` in qubit_cli.auth.
 
-Guards the fix for the May 2026 report where `qubit auth add xai-oauth`
+Guards the fix for the May 2026 report where `hermes auth add xai-oauth`
 launched a text-mode browser (w3m) INSIDE the terminal on a headless Linux
 box — `_is_remote_session()` only checked SSH/cloud-shell env vars, so a plain
 local box with no GUI browser still called `webbrowser.open()`, which resolved
@@ -40,7 +40,7 @@ def _force_resolved_browser(monkeypatch, name: str):
     monkeypatch.setattr(webbrowser, "get", lambda *_a, **_kw: _FakeController(name))
 
 
-@pytest.mark.linux_only
+@pytest.mark.platforms("linux")
 def test_headless_linux_no_display_refuses(monkeypatch):
     """The reported bug: headless Linux, no display server → don't auto-open.
 

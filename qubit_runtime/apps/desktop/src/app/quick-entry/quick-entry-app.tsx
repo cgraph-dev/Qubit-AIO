@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef } from 'react'
 
+import { isSubmitEnter } from '@/lib/ime'
 import {
   initialQuickComposerState,
   QUICK_TARGET_CURRENT,
@@ -33,7 +34,7 @@ export function QuickEntryApp() {
   // the decision stays pure and testable while the effects stay in one place.
   const [state, dispatch] = useReducer((current: QuickComposerState, event: QuickComposerEvent) => {
     const { send, state: next } = quickComposerReducer(current, event)
-    const api = window.qubitDesktop?.quickEntry
+    const api = window.hermesDesktop?.quickEntry
 
     if (send) {
       api?.submit(send)
@@ -48,7 +49,7 @@ export function QuickEntryApp() {
   // and take the keyboard back for a fresh capture. Also adopt gateway-state
   // pushes (connection + recent sessions) relayed from the primary renderer.
   useEffect(() => {
-    const api = window.qubitDesktop?.quickEntry
+    const api = window.hermesDesktop?.quickEntry
 
     const offShown = api?.onShown(() => {
       dispatch({ type: 'shown' })
@@ -123,7 +124,7 @@ export function QuickEntryApp() {
             }}
             onChange={event => dispatch({ draft: event.target.value, type: 'edit' })}
             onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (isSubmitEnter(event) && !event.shiftKey) {
                 event.preventDefault()
                 dispatch({ type: 'submit' })
               } else if (event.key === 'Escape') {
@@ -131,7 +132,7 @@ export function QuickEntryApp() {
                 dispatch({ type: 'dismiss' })
               }
             }}
-            placeholder={state.connected ? 'Ask Qubit…' : 'Not connected — open Qubit to reconnect'}
+            placeholder={state.connected ? 'Ask Hermes…' : 'Not connected — open Hermes to reconnect'}
             ref={inputRef}
             spellCheck={false}
             style={{

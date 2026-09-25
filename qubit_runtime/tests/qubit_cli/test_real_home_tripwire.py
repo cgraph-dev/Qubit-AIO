@@ -174,7 +174,7 @@ def test_checkout_inside_a_guarded_root_is_not_qubit_state():
         guard.check(PROJECT_ROOT.parent / "config.yaml")
 
 
-def test_hermes_exported_scratch_tmp_is_not_the_test_temp_root(tmp_path):
+def test_qubit_exported_scratch_tmp_is_not_the_test_temp_root(tmp_path):
     """A Hermes-launched shell hands pytest TMPDIR=<home>/cache/scratch (tagged by
     HERMES_SCRATCH_DIR). With that home guarded, honoring it would put the session
     sandbox, basetemp and every tempfile default inside the guarded root; the

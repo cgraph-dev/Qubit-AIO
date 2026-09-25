@@ -5,7 +5,7 @@ Layout under ``<QUBIT_HOME>/bot-desktop/``: ``display`` (allocated X display num
 (Xvnc RFB Unix socket, 0600), ``Xauthority``, ``env`` (DISPLAY/XAUTHORITY/DBUS_SESSION_BUS_ADDRESS
 published by the launcher once Xfce's bus exists), ``launcher.pid``, ``launcher.log``, ``xdg/``
 (per-profile XDG_CONFIG_HOME so two profiles never share xfconf). Everything is profile-scoped via
-``get_hermes_home()`` so N profiles in one gateway get N desktops: one screen per bot on the shared
+``get_qubit_home()`` so N profiles in one gateway get N desktops: one screen per bot on the shared
 machine.
 
 The launcher is ``launcher.sh`` next to this module; :func:`desktop_env` is what cua-driver and headed
@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ PACKAGES = {
 
 
 def state_dir() -> Path:
-    return get_hermes_home() / "bot-desktop"
+    return get_qubit_home() / "bot-desktop"
 
 
 def is_supported_host() -> bool:

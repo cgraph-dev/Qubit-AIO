@@ -1,6 +1,6 @@
 """Fleet-wide config migration (#91277 Phase 2 — #20438/#54926/#79048 class).
 
-`qubit update` migrated only the active profile's config.yaml; sibling
+`hermes update` migrated only the active profile's config.yaml; sibling
 profiles silently drifted config versions until their gateway hit a config
 the new code couldn't read. `_migrate_sibling_profile_configs()` runs the
 same non-interactive safe migration for every sibling home, scoped via the
@@ -10,7 +10,7 @@ These tests use REAL config files on disk and the REAL migration pipeline —
 only the profile-root location is pointed at tmp_path.
 """
 
-import yaml
+import qubit_yaml as yaml
 from pathlib import Path
 
 import qubit_cli.update_cmd as update_cmd
@@ -42,12 +42,6 @@ def _setup(monkeypatch, tmp_path, active_home: Path):
     monkeypatch.setattr(
         qubit_constants, "get_process_qubit_home", lambda: active_home
     )
-    monkeypatch.setattr(
-        update_cmd, "_reload_config_modules", lambda: None
-    )  # module reload is orthogonal here; the real one re-imports from disk
-    monkeypatch.setattr(
-        update_cmd_config, "_reload_config_modules", lambda: None
-    )  # module reload is orthogonal here; the real one re-imports from disk
 
 
 def test_sibling_behind_is_migrated_on_disk(monkeypatch, tmp_path):

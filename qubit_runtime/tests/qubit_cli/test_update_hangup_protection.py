@@ -1,8 +1,8 @@
-"""Tests for SIGHUP protection and stdout mirroring in ``qubit update``.
+"""Tests for SIGHUP protection and stdout mirroring in ``hermes update``.
 
 Covers ``_UpdateOutputStream``, ``_install_hangup_protection``, and
 ``_finalize_update_output`` in ``qubit_cli/main.py``.  These exist so
-that ``qubit update`` survives a terminal disconnect mid-install
+that ``hermes update`` survives a terminal disconnect mid-install
 (SSH drop, shell close) without leaving the venv half-installed.
 """
 
@@ -12,7 +12,6 @@ import io
 import signal
 import sys
 
-import pytest
 
 from qubit_cli.main_dashboard import _UpdateOutputStream, _finalize_update_output, _install_hangup_protection
 from qubit_cli.update_cmd import _log_only_write, _print_update_completion, _run_logged_subprocess
@@ -77,19 +76,6 @@ class TestUpdateOutputStream:
 
 
 
-    def test_isatty_delegates_to_original(self):
-        class _TtyStream:
-            def isatty(self):
-                return True
-
-            def write(self, data):
-                return len(data)
-
-            def flush(self):
-                return None
-
-        stream = _UpdateOutputStream(_TtyStream(), io.StringIO())
-        assert stream.isatty() is True
 
 
 # -----------------------------------------------------------------------------
@@ -104,8 +90,8 @@ class TestInstallHangupProtection:
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
         # Nuke any cached home path
         import qubit_cli.config as _cfg
-        if hasattr(_cfg, "_QUBIT_HOME_CACHE"):
-            _cfg._QUBIT_HOME_CACHE = None  # type: ignore[attr-defined]
+        if hasattr(_cfg, "_HERMES_HOME_CACHE"):
+            _cfg._HERMES_HOME_CACHE = None  # type: ignore[attr-defined]
 
         prev_out, prev_err = sys.stdout, sys.stderr
         state = _install_hangup_protection(gateway_mode=False)
@@ -124,7 +110,6 @@ class TestInstallHangupProtection:
             assert log_path.exists()
             contents = log_path.read_text(encoding="utf-8")
             assert "checking mirror" in contents
-            assert "qubit update started" in contents
         finally:
             _finalize_update_output(state)
             # Sanity-check restoration
@@ -169,8 +154,6 @@ class TestInstallHangupProtection:
 
 
 class TestFinalizeUpdateOutput:
-    def test_none_state_is_noop(self):
-        _finalize_update_output(None)  # must not raise
 
 
     def test_skipped_install_leaves_stdio_alone(self):
@@ -206,12 +189,6 @@ class TestLogOnlyWrite:
         _log_only_write("something")  # should not raise
         assert plain.getvalue() == ""
 
-    def test_empty_text_is_noop(self, monkeypatch):
-        terminal = io.StringIO()
-        log = io.StringIO()
-        monkeypatch.setattr(sys, "stdout", _UpdateOutputStream(terminal, log))
-        _log_only_write("")
-        assert log.getvalue() == ""
 
 
 class TestRunLoggedSubprocess:

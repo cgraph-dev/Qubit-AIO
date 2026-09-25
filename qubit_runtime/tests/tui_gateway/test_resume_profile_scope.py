@@ -52,7 +52,7 @@ def homes(monkeypatch, tmp_path):
     _write_home(secondary, "model:\n  default: local-code\n  provider: custom:local-vllm\n"
                            f"providers:\n  local-vllm:\n    api: {_BASE_URL}\n    api_key: k-b\n")
     monkeypatch.setenv("QUBIT_HOME", str(launch))
-    monkeypatch.setattr(server, "_hermes_home", str(launch))
+    monkeypatch.setattr(server, "_qubit_home", str(launch))
     monkeypatch.setattr(server, "_profile_home", lambda p: secondary if p == "b" else None)
     monkeypatch.setattr(server, "_get_db", lambda: SessionDB(db_path=launch / "state.db"))
     monkeypatch.setattr(server, "_enable_gateway_prompts", lambda: None)

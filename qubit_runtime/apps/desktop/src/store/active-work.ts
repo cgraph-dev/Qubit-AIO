@@ -11,11 +11,11 @@
 
 import { computed } from 'nanostores'
 
-import type { QubitActiveWork } from '@/global'
+import type { HermesActiveWork } from '@/global'
 import { $sessions } from '@/store/session'
 import { $workingSessionIds } from '@/store/session-states'
 
-const $activeWork = computed([$workingSessionIds, $sessions], (workingIds, sessions): QubitActiveWork => {
+const $activeWork = computed([$workingSessionIds, $sessions], (workingIds, sessions): HermesActiveWork => {
   const titleById = new Map(sessions.map(session => [session.id, session.title?.trim() ?? '']))
 
   return {
@@ -37,6 +37,6 @@ if (typeof window !== 'undefined') {
     }
 
     lastSent = next
-    window.qubitDesktop?.setActiveWork?.(work)
+    window.hermesDesktop?.setActiveWork?.(work)
   })
 }

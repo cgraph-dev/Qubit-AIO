@@ -102,18 +102,18 @@ def activate_plugin_now(name: str, *, in_process: bool = True) -> Dict[str, Any]
     ``activation.live_now`` lists what is usable in open chats now; ``activation.deferred`` what waits
     for the next session. ``restart_required`` is True only when no gateway answered (old gateway, not
     running)."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     activation: Optional[Dict[str, Any]] = load_and_go_live(name) if in_process else None
     if not in_process:
-        activation = (notify_serve_backend(name, Path(get_hermes_home())) or {}).get("activation")
+        activation = (notify_serve_backend(name, Path(get_qubit_home())) or {}).get("activation")
     answer = None
     try:
         from gateway.control_socket import reload_gateway_plugins
-        from qubit_constants import get_default_hermes_root
-        home = Path(get_hermes_home())
+        from qubit_constants import get_default_qubit_root
+        home = Path(get_qubit_home())
         answer = reload_gateway_plugins(home)
         if answer is None:
-            root = Path(get_default_hermes_root())
+            root = Path(get_default_qubit_root())
             if root.resolve() != home.resolve():  # a served secondary: the multiplexer's socket
                 answer = reload_gateway_plugins(root, profile_home=home)
     except Exception:
@@ -162,9 +162,9 @@ def _go_live(name: str) -> Optional[Dict[str, Any]]:
     server = sys.modules.get("tui_gateway.server")  # loaded == this process hosts chats
     note = live_notice(activation)
     if server is not None and (servers or note):
-        from qubit_constants import get_hermes_home
+        from qubit_constants import get_qubit_home
         try:
-            server.refresh_plugin_sessions(Path(get_hermes_home()), note)
+            server.refresh_plugin_sessions(Path(get_qubit_home()), note)
         except Exception:
             logger.warning("open chats were not refreshed after activating %r", name, exc_info=True)
     return activation

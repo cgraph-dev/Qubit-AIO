@@ -120,8 +120,8 @@ export const ru: Translations = {
     starting: "Запуск",
     startedInBackground: "Запущено в фоне — следите за журналами",
     stopped: "Остановлено",
-    updateQubit: "Обновить Qubit",
-    updatingQubit: "Обновление Qubit…",
+    updateHermes: "Обновить Qubit",
+    updatingHermes: "Обновление Qubit…",
     waitingForOutput: "Ожидание вывода…",
   },
 
@@ -165,6 +165,10 @@ export const ru: Translations = {
     failedToDeleteSelected: "Не удалось удалить выбранные сессии",
     resumeInChat: "Продолжить в чате",
     newChat: "Новый чат",
+    workspace: "рабочая папка",
+    workspaceDefault: "По умолчанию",
+    workspaceRescan: "Пересканировать репозитории",
+    workspaceCustom: "Другой путь…",
     previousPage: "Предыдущая страница",
     nextPage: "Следующая страница",
     roles: {
@@ -324,6 +328,8 @@ export const ru: Translations = {
     disableRuntime: "Отключить",
     enableAfterInstall: "Включить после установки",
     enableRuntime: "Включить",
+    toggleTakesEffectAfterRestart:
+      "Сохранено — перезапустите шлюз, чтобы применить изменение.",
     forceReinstall: "Принудительная переустановка (сначала удалить существующую папку)",
     headline:
       "Поиск, установка, включение и обновление плагинов Qubit (аналог `qubit plugins`).",
@@ -343,8 +349,8 @@ export const ru: Translations = {
     providersHint:
       "Записывает memory.provider (пусто = встроенный) и context.engine в config.yaml. Применяется со следующей сессии.",
     refreshDashboard: "Пересканировать расширения панели",
-    removeConfirm: "Удалить этот плагин из $QUBIT_HOME/plugins/?",
-    removeHint: "Удалять можно только плагины, установленные пользователем в $QUBIT_HOME/plugins.",
+    removeConfirm: "Удалить этот плагин из ~/.hermes/plugins/?",
+    removeHint: "Удалять можно только плагины, установленные пользователем в ~/.hermes/plugins.",
     rescanHeading: "Реестр SPA-плагинов",
     rescanHint: "Пересканируйте после добавления файлов на диск, чтобы боковая панель подхватила новые манифесты.",
     runtimeHeading: "Рантайм шлюза (YAML-плагины)",
@@ -366,7 +372,7 @@ export const ru: Translations = {
     all: "Все",
     categories: "Категории",
     filters: "Фильтры",
-    noSkills: "Навыки не найдены. Навыки загружаются из ~/.qubit/skills/",
+    noSkills: "Навыки не найдены. Навыки загружаются из ~/.hermes/skills/",
     noSkillsMatch: "Нет навыков, соответствующих запросу или фильтру.",
     skillCount: "{count} навык{s}",
     resultCount: "{count} результат{s}",
@@ -380,7 +386,7 @@ export const ru: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Фильтры",
     sections: "Разделы",
     exportConfig: "Экспортировать конфигурацию в JSON",

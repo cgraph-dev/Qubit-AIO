@@ -24,11 +24,11 @@ def _write_plugin(root, rel, name, extra=""):
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / "hermes-home"
-    (hermes_home / "plugins").mkdir(parents=True)
-    (hermes_home / "config.yaml").write_text("plugins:\n  enabled: []\n  disabled: []\n", encoding="utf-8")
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
-    return hermes_home
+    qubit_home = tmp_path / "hermes-home"
+    (qubit_home / "plugins").mkdir(parents=True)
+    (qubit_home / "config.yaml").write_text("plugins:\n  enabled: []\n  disabled: []\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    return qubit_home
 
 
 @pytest.fixture(autouse=True)

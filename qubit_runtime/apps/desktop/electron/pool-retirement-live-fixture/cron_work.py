@@ -1,4 +1,4 @@
-"""A local-only script actually dispatched by Qubit' no-agent cron scheduler."""
+"""A local-only script actually dispatched by Hermes' no-agent cron scheduler."""
 
 import json
 import os

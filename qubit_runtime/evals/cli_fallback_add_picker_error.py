@@ -1,4 +1,4 @@
-"""Drive the real ``qubit fallback add`` under a Linux PTY into an ordinary picker error.
+"""Drive the real ``hermes fallback add`` under a Linux PTY into an ordinary picker error.
 
 Run from the checkout with the project Python. No provider requests are sent: the picker
 target is a saved custom provider with ``discover_models: false``. The auth store is made

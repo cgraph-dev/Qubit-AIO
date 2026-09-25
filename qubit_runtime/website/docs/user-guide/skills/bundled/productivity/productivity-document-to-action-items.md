@@ -15,18 +15,18 @@ Extract cited obligations, deadlines, tasks from documents.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/productivity\document-to-action-items` |
+| Path | `skills/productivity/document-to-action-items` |
 | Version | `0.1.0` |
-| Author | Ben Barclay (benbarclay), Qubit Agent |
+| Author | Ben Barclay (benbarclay), Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Documents`, `OCR`, `Action-Items`, `Deadlines`, `Extraction` |
-| Related skills | [`pdf`](/docs/user-guide/skills/bundled/productivity/productivity-pdf), [`pdf`](/docs/user-guide/skills/bundled/productivity/productivity-pdf), [`docx`](/docs/user-guide/skills/bundled/productivity/productivity-docx), [`notion`](/docs/user-guide/skills/bundled/productivity/productivity-notion) |
+| Related skills | [`pdf`](../../bundled/productivity/productivity-pdf.md), [`pdf`](../../bundled/productivity/productivity-pdf.md), [`docx`](../../bundled/productivity/productivity-docx.md), [`notion`](../../bundled/productivity/productivity-notion.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Document to Action Items

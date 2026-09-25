@@ -2,7 +2,7 @@
 
 Skill scripts may run outside the Qubit process (e.g. system Python,
 nix env, CI) where ``qubit_constants`` is not importable.  This module
-provides the same ``get_hermes_home()`` and ``display_hermes_home()``
+provides the same ``get_qubit_home()`` and ``display_qubit_home()``
 contracts as ``qubit_constants`` without requiring it on ``sys.path``.
 
 When ``qubit_constants`` IS available it is used directly so that any
@@ -20,22 +20,22 @@ import os
 from pathlib import Path
 
 try:
-    from qubit_constants import display_hermes_home as display_hermes_home
-    from qubit_constants import get_hermes_home as get_hermes_home
+    from qubit_constants import display_qubit_home as display_qubit_home
+    from qubit_constants import get_qubit_home as get_qubit_home
 except (ModuleNotFoundError, ImportError):
 
-    def get_hermes_home() -> Path:
+    def get_qubit_home() -> Path:
         """Return the Qubit home directory (default: ~/.hermes).
 
-        Mirrors ``qubit_constants.get_hermes_home()``."""
+        Mirrors ``qubit_constants.get_qubit_home()``."""
         val = os.environ.get("QUBIT_HOME", "").strip()
         return Path(val) if val else Path.home() / ".hermes"
 
-    def display_hermes_home() -> str:
+    def display_qubit_home() -> str:
         """Return a user-friendly ``~/``-shortened display string.
 
-        Mirrors ``qubit_constants.display_hermes_home()``."""
-        home = get_hermes_home()
+        Mirrors ``qubit_constants.display_qubit_home()``."""
+        home = get_qubit_home()
         try:
             return "~/" + home.relative_to(Path.home()).as_posix()
         except ValueError:

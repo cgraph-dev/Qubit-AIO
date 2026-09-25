@@ -5,6 +5,8 @@ art).
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from qubit_cli.dashboard_auth import clear_providers, get_provider
@@ -13,7 +15,7 @@ from qubit_cli.dashboard_auth.base import (
 )
 from qubit_cli.plugins import PluginContext, PluginManager, PluginManifest
 from qubit_cli.dashboard_auth import registry as _auth_registry
-from qubit_constants import qubit_home_key
+from qubit_constants import get_process_qubit_home, qubit_home_key
 
 
 class _Stub(DashboardAuthProvider):
@@ -62,9 +64,6 @@ def _make_ctx(name: str = "dashboard-auth-stub") -> PluginContext:
     return PluginContext(manifest=manifest, manager=_MinimalManager())  # type: ignore[arg-type]
 
 
-def test_plugin_ctx_exposes_register_dashboard_auth_provider():
-    ctx = _make_ctx()
-    assert hasattr(ctx, "register_dashboard_auth_provider")
 
 
 def test_plugin_ctx_silently_ignores_non_provider(caplog):
@@ -153,7 +152,7 @@ def test_auth_provider_kept_out_of_manager_teardown_order():
     manager, ctx = _real_ctx()
     ctx.register_dashboard_auth_provider(_Basic())
     assert manager._registration_order == []
-    # Still attributed to the plugin for `qubit plugins list`.
+    # Still attributed to the plugin for `hermes plugins list`.
     assert "basic" in manager._ownership_ledger
 
 
@@ -171,6 +170,40 @@ def test_auth_provider_re_register_rotates_in_place():
     assert get_provider("basic") is new
 
 
+def test_profile_manager_cannot_replace_launch_home_auth_provider():
+    """Profile plugin discovery must not rotate the dashboard's auth gate."""
+    manager, ctx = _real_ctx()
+    launch_provider = _Basic("launch-home")
+    ctx.register_dashboard_auth_provider(launch_provider)
+
+    profile_scope = qubit_home_key(Path(manager.scope_key) / "profiles" / "bot")
+    profile_manager = PluginManager(scope_key=profile_scope)
+    profile_ctx = PluginContext(
+        PluginManifest(name="basic", version="0.0.1", kind="backend"),
+        manager=profile_manager,
+    )
+
+    registration = profile_ctx.register_dashboard_auth_provider(_Basic("profile"))
+
+    assert registration is None
+    assert get_provider("basic") is launch_provider
+    assert "basic" not in profile_manager._ownership_ledger
+
+
+def test_profile_directory_can_be_the_process_launch_home(monkeypatch, tmp_path):
+    """A process launched directly into a profile owns dashboard auth."""
+    launch_home = tmp_path / "profiles" / "bot"
+    monkeypatch.setenv("QUBIT_HOME", str(launch_home))
+    manager, ctx = _real_ctx()
+    provider = _Basic("profile-launch-home")
+
+    registration = ctx.register_dashboard_auth_provider(provider)
+
+    assert manager.scope_key == qubit_home_key(get_process_qubit_home())
+    assert registration is not None
+    assert get_provider("basic") is provider
+
+
 # ---------------------------------------------------------------------------
 # #91701 follow-up: persistence must not outlive the plugin. A targeted
 # unload (plugin disable/uninstall) and a re-discovery that drops the plugin
@@ -185,7 +218,7 @@ def test_targeted_unload_disposes_persistent_auth_provider():
     ctx.register_dashboard_auth_provider(_Basic())
     assert get_provider("basic") is not None
 
-    # `qubit plugins disable basic` drives a targeted unload of that plugin.
+    # `hermes plugins disable basic` drives a targeted unload of that plugin.
     assert manager.unload("basic") is True
 
     assert get_provider("basic") is None, (

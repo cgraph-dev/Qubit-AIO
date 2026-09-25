@@ -1,15 +1,16 @@
-# Qubit-approved MCP catalog entry.
+# Nous-approved MCP catalog entry.
 # Presence in this directory = approval. Merged via PR review.
 manifest_version: 1
 
 name: notion
+connector_slug: notion
 description: >-
   Pages and databases from your Notion workspace.
 source: https://developers.notion.com/docs/mcp
 
-# Official vendor-hosted remote MCP (URL-only — Qubit never spawns a local
+# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
 # process for this entry). Native OAuth 2.1 + Dynamic Client Registration;
-# Qubit's MCP client + mcp_oauth_manager handle discovery, PKCE, token
+# Hermes's MCP client + mcp_oauth_manager handle discovery, PKCE, token
 # exchange, and refresh.
 transport:
   type: http
@@ -27,6 +28,6 @@ suggest:
     - notion.site
 
 post_install: |
-  On first connection Qubit opens a browser to authorize with
-  Notion (or run `qubit mcp login notion`). Approve access,
+  On first connection Hermes opens a browser to authorize with
+  Notion (or run `hermes mcp login notion`). Approve access,
   then restart the session so tools load.

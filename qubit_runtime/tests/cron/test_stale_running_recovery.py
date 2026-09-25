@@ -16,7 +16,7 @@ from datetime import timedelta
 import pytest
 
 import cron.executions as executions_mod
-from cron.executions import _hermes_now, _transaction, recover_interrupted_executions
+from cron.executions import _qubit_now, _transaction, recover_interrupted_executions
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ def _ledger(monkeypatch, tmp_path):
 
 
 def _seed_running(job_id: str, *, age_seconds: float, pid: int = 99999) -> str:
-    claimed_at = (_hermes_now() - timedelta(seconds=age_seconds)).isoformat()
+    claimed_at = (_qubit_now() - timedelta(seconds=age_seconds)).isoformat()
     with _transaction() as conn:
         eid = uuid.uuid4().hex
         conn.execute(

@@ -16,7 +16,7 @@ from agent.secret_scope import set_multiplex_active
 from gateway.config import Platform, PlatformConfig
 from gateway.run import GatewayRunner, _profile_runtime_scope
 from gateway.session import SessionSource
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 
 
 class RecordingAdapter:
@@ -27,15 +27,15 @@ class RecordingAdapter:
         self._active_sessions, self._pending_messages, self._session_tasks = {}, {}, {}
 
     async def send(self, chat_id, content, metadata=None, **kw):
-        self.calls.append(("send", str(get_hermes_home())))
+        self.calls.append(("send", str(get_qubit_home())))
         return SimpleNamespace(success=True, error=None)
 
     async def send_private_notice(self, chat_id, user_id, content, metadata=None, **kw):
-        self.calls.append(("send_private_notice", str(get_hermes_home())))
+        self.calls.append(("send_private_notice", str(get_qubit_home())))
         return SimpleNamespace(success=True, error=None)
 
     async def handle_message(self, event):
-        self.calls.append(("handle_message", str(get_hermes_home())))
+        self.calls.append(("handle_message", str(get_qubit_home())))
         event._gateway_accepted = True
 
 
@@ -52,7 +52,7 @@ def served(tmp_path, monkeypatch):
     (alpha / ".env").write_text("")
     monkeypatch.setenv("QUBIT_HOME", str(root))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr("qubit_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
     set_multiplex_active(True)
 
     runner = GatewayRunner.__new__(GatewayRunner)

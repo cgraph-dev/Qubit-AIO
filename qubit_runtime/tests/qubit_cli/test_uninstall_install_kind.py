@@ -142,7 +142,7 @@ def test_run_data_uninstall_removes_electron_userdata(monkeypatch, tmp_path):
     userdata = tmp_path / "electron-userdata"
     userdata.mkdir()
     (userdata / "connection.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(un, "get_hermes_home", lambda: home)
+    monkeypatch.setattr(un, "get_qubit_home", lambda: home)
     import qubit_cli.gui_uninstall as gu
 
     monkeypatch.setattr(gu, "desktop_userdata_dir", lambda: userdata)
@@ -158,7 +158,7 @@ def test_run_data_uninstall_works_on_sealed_trees(monkeypatch, tmp_path):
     (home / "hermes-agent" / "install-stamp.json").write_text(
         json.dumps({"distribution": "nix", "updateMechanism": "external"})
     , encoding="utf-8")
-    monkeypatch.setattr(un, "get_hermes_home", lambda: home)
+    monkeypatch.setattr(un, "get_qubit_home", lambda: home)
     import qubit_cli.gui_uninstall as gu
 
     monkeypatch.setattr(gu, "desktop_userdata_dir", lambda: tmp_path / "none")

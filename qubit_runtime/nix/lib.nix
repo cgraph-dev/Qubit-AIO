@@ -32,7 +32,7 @@
 let
   repoRoot = ./..;
 
-  npm12 = callPackage ./npm-12-0-2.nix { };
+  npm12 = callPackage ./npm-pinned.nix { };
   node_gyp_11_4_0 = callPackage ./node-gyp-11-4-0.nix { };
   nodejs_26_npm_12 = symlinkJoin {
     name = "nodejs-26-npm-12";
@@ -106,7 +106,7 @@ let
   # Python source: everything except JS/TS/docs/infra directories.
   pythonSrc = lib.cleanSourceWith {
     src = repoRoot;
-    name = "qubit-python-source";
+    name = "hermes-python-source";
     filter =
       path: type:
       let
@@ -136,7 +136,7 @@ let
             # Nix build definitions (Python build doesn't need these)
             "nix"
             # Skills are shipped via HERMES_BUNDLED_SKILLS /
-            # HERMES_OPTIONAL_SKILLS (see qubit-runtime.nix), not via the
+            # HERMES_OPTIONAL_SKILLS (see hermes-agent.nix), not via the
             # wheel's data_files — setup.py's _data_file_tree returns []
             # for a missing dir, so the wheel builds fine without them.
             # This keeps SKILL.md edits from rebuilding the Python venv.
@@ -169,11 +169,14 @@ let
           "SECURITY.md"
           "README.zh-CN.md"
           ".gitignore"
-          "setup-qubit.sh"
+          "setup-hermes.sh"
         ];
       in
       if relPath == "" then
         true
+      else if lib.hasPrefix "scripts/build/" relPath && lib.hasSuffix ".mjs" relPath then
+        # Frontend recipes belong to their product source filters, not Python.
+        false
       else if builtins.elem relPath excludedFiles then
         false
       else if builtins.elem topComponent excludedDirs then
@@ -209,6 +212,11 @@ let
   # keep in sync with it.
   npmDeps = importNpmLock.importNpmLock {
     npmRoot = npmDepsSrc;
+    # The lock already records override resolutions. importNpmLock changes
+    # direct specs to file:/nix/store tarballs, which conflict with the
+    # original semver overrides (EOVERRIDE). Drop them only from this offline
+    # build manifest; the hook restores the repository manifest afterwards.
+    package = builtins.removeAttrs rootPackageJson [ "overrides" ];
   };
 
   # Build a per-package npm source: workspace resolution files + the

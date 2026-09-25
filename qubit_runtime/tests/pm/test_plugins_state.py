@@ -21,7 +21,7 @@ def homes(tmp_path, monkeypatch):
     import qubit_constants
 
     monkeypatch.setattr(
-        qubit_constants, "get_default_hermes_root", lambda: default_home
+        qubit_constants, "get_default_qubit_root", lambda: default_home
     )
     monkeypatch.setattr(pstate, "_profiles_root", lambda: tmp_path / "profiles")
     return default_home, profile_home

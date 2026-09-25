@@ -14,7 +14,7 @@ description: "使用 HyperFrames 创建基于 HTML 的视频合成、动画标�
 
 | | |
 |---|---|
-| 来源 | 可选 — 通过 `qubit skills install official/creative/hyperframes` 安装 |
+| 来源 | 可选 — 通过 `hermes skills install official/creative/hyperframes` 安装 |
 | 路径 | `optional-skills/creative/hyperframes` |
 | 版本 | `1.0.0` |
 | 作者 | heygen-com |
@@ -26,7 +26,7 @@ description: "使用 HyperFrames 创建基于 HTML 的视频合成、动画标�
 ## 参考：完整 SKILL.md
 
 :::info
-以下是 Qubit 在触发本技能时加载的完整技能定义。这是 agent 在技能激活时所看到的指令内容。
+以下是 Hermes 在触发本技能时加载的完整技能定义。这是 agent 在技能激活时所看到的指令内容。
 :::
 
 # HyperFrames
@@ -202,4 +202,4 @@ npx hyperframes render --quality high --output final.mp4     # 最终交付
 - [gsap.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/creative/hyperframes/references/gsap.md) — HyperFrames 的 GSAP 核心 API（tween、ease、stagger、timeline、matchMedia）
 - [features.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/creative/hyperframes/references/features.md) — 字幕、TTS、音频响应、标记高亮、转场（按需加载）
 - [website-to-video.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/creative/hyperframes/references/website-to-video.md) — 7 步捕获转视频工作流
-- [troubleshooting.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/creative/hyperframes/references/troubleshooting.md) — Qubit 修复、环境变量、常见渲染错误
+- [troubleshooting.md](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/creative/hyperframes/references/troubleshooting.md) — OpenClaw 修复、环境变量、常见渲染错误

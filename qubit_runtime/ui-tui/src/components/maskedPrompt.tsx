@@ -1,4 +1,4 @@
-import { Box, Text } from '@qubit/ink'
+import { Box, Text } from '@hermes/ink'
 import { useState } from 'react'
 
 import type { Theme } from '../theme.js'

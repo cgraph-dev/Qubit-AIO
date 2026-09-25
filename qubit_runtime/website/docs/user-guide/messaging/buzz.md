@@ -1,6 +1,6 @@
 # Buzz
 
-The Buzz adapter connects Qubit to a [Buzz](https://github.com/block/buzz) community — Block's open-source human+agent collaboration platform built on the Nostr protocol — and relays messages between Buzz channels (or DMs) and the agent. Outbound traffic shells out to the `buzz` CLI binary ("JSON in, JSON out"); inbound uses a native Nostr WebSocket subscription (via the already-bundled `websockets` package) with CLI polling as fallback. **No extra Python packages are required** — just the `buzz` binary.
+The Buzz adapter connects Hermes to a [Buzz](https://github.com/block/buzz) community — Block's open-source human+agent collaboration platform built on the Nostr protocol — and relays messages between Buzz channels (or DMs) and the agent. Outbound traffic shells out to the `buzz` CLI binary ("JSON in, JSON out"); inbound uses a native Nostr WebSocket subscription (via the already-bundled `websockets` package) with CLI polling as fallback. **No extra Python packages are required** — just the `buzz` binary.
 
 Buzz renders markdown, so agent replies keep their formatting. Images are delivered as uploads (local files) or links (URLs). Replies can thread onto an existing message via its event id. When progress or status messages are enabled, they inherit the triggering Buzz event as their reply anchor instead of appearing as unrelated top-level channel posts.
 
@@ -8,7 +8,7 @@ Files sent **to** the agent are fetched back off the relay with the agent's auth
 
 Inbound messages arrive over a persistent NIP-42-authenticated Nostr WebSocket subscription by default (near-instant delivery), with automatic fallback to CLI polling when the WebSocket can't be established. Outbound messages always go through the `buzz` CLI. Control it with `transport` / `BUZZ_TRANSPORT`: `auto` (default), `websocket` (require WS, fail otherwise), or `poll`. If your relay membership uses NIP-OA owner attestation, set `BUZZ_AUTH_TAG` to the four-string auth tag JSON.
 
-> Run `qubit gateway setup` and pick **Buzz** for a guided walk-through.
+> Run `hermes gateway setup` and pick **Buzz** for a guided walk-through.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Inbound messages arrive over a persistent NIP-42-authenticated Nostr WebSocket s
 - A Buzz community relay URL (e.g. `https://mycommunity.communities.buzz.xyz`)
 - A Nostr private key (nsec or hex) whose identity is already a **member** of that community
 
-## Configure Qubit
+## Configure Hermes
 
 You can configure Buzz two ways — the `gateway` block in `config.yaml` (canonical) or environment variables (which override it). The private key is a **secret** and always belongs in `~/.hermes/.env`.
 
@@ -133,7 +133,7 @@ Cron jobs and notifications (`deliver=buzz`) are delivered to the **home channel
 ## Inbound attachments
 
 Buzz messages with native NIP-94 `imeta` tags can deliver images, audio,
-video, and documents to the agent. Qubit downloads attachments only after
+video, and documents to the agent. Hermes downloads attachments only after
 the message has passed self-echo, addressing, and sender authorization checks.
 Each file must use HTTPS and declare an exact byte size and SHA-256 digest;
 redirects, URL credentials, fragments, oversized payloads, and integrity
@@ -148,15 +148,15 @@ retrieval through the Buzz CLI is not handled by this native public-URL path.
 ## Run the gateway
 
 ```bash
-qubit gateway start
+hermes gateway start
 ```
 
-Check status with `qubit gateway status` — Buzz connection state is reported there, including for env-only setups.
+Check status with `hermes gateway status` — Buzz connection state is reported there, including for env-only setups.
 
 ## Notes and limitations
 
 - **`BUZZ_*` env vars are available in terminal tool children for Buzz sessions** — the agent can invoke the `buzz` CLI directly (e.g. `buzz messages send ...`) because `BUZZ_PRIVATE_KEY`, `BUZZ_AUTH_TAG`, `BUZZ_RELAY_URL`, and the other `BUZZ_*` variables are passed through to terminal subprocesses when the session's platform is `buzz` or the process is a Buzz Desktop managed agent (`BUZZ_MANAGED_AGENT`). Non-Buzz sessions on the same host, `execute_code`, and other non-terminal spawns remain sealed.
-- **Inbound is polled, not streamed.** The `buzz` CLI is request/response, so the adapter polls `buzz messages get` per watched channel every `poll_interval` seconds (default 4). Expect up to one interval of latency on inbound messages. A future optimization is a websocket transport (the Buzz repo ships `buzz-ws-client` for true streaming).
+- **Inbound streaming has a watchdog.** On the WebSocket transport a connection that goes quiet for five minutes, or whose socket the relay closed underneath us, is torn down and reconnected with backoff; while that happens the gateway health (`/health/detailed`, dashboard status) reports Buzz as `retrying`, not `connected`. On the `poll` transport the adapter polls `buzz messages get` per watched channel every `poll_interval` seconds (default 4), so expect up to one interval of latency.
 - On (re)connect the adapter seeds its high-water mark from the newest events, so channel history is never replayed into the agent.
 - New DM conversations are discovered automatically (every few poll sweeps).
 - The private key is passed to the CLI via the subprocess environment — it never appears in argv or logs.

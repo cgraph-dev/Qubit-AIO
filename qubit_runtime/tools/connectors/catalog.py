@@ -58,7 +58,7 @@ def target_scope(profile: str):
     from tui_gateway.launch_profile_policy import launch_profile_runtime_scope
 
     home = server._profile_home(profile)  # None = the launch profile; raises for a missing one
-    scope = (launch_profile_runtime_scope(server._hermes_home) if home is None
+    scope = (launch_profile_runtime_scope(server._qubit_home) if home is None
              else server._session_profile_runtime_scope({"profile_home": str(home)}))
     with scope:
         yield

@@ -10,7 +10,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 from qubit_cli.dashboard_auth import clear_providers, list_providers
 from qubit_cli.plugins import PluginManager, discover_plugins
@@ -27,7 +27,7 @@ def _reset_auth_registry():
 
 @pytest.fixture
 def qubit_home(tmp_path, monkeypatch):
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     return home

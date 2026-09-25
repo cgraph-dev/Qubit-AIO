@@ -22,15 +22,15 @@ def fake_root(tmp_path, monkeypatch):
     root.mkdir()
     monkeypatch.setattr(qubit_constants.Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(root))
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None, raising=False)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None, raising=False)
     return root
 
 
-def _live_record(hermes_home):
+def _live_record(qubit_home):
     return {
         "pid": _LIVE_PID, "kind": "hermes-gateway", "gateway_state": "running", "start_time": 1000,
         "argv": ["python", "-m", "qubit_cli.main", "-p", "eagle", "gateway", "run"],
-        "hermes_home": str(hermes_home),
+        "hermes_home": str(qubit_home),
     }
 
 

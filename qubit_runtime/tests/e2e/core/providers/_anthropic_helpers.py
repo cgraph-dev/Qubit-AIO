@@ -43,7 +43,7 @@ _PASSTHROUGH_ENV = frozenset({"PATH", "LANG", "LANGUAGE", "USER", "LOGNAME", "SH
 class Rig:
     root: Path
     home: Path
-    hermes_home: Path
+    qubit_home: Path
     project: Path
     srv: AnthropicMessagesServer
     proxy: TLSInterceptProxy
@@ -54,14 +54,14 @@ class Rig:
         import pwd  # POSIX-only; the suite is Linux-gated
 
         real_root = Path(pwd.getpwuid(os.getuid()).pw_dir, ".hermes").resolve()
-        fixture = self.hermes_home.resolve()
+        fixture = self.qubit_home.resolve()
         assert fixture != real_root and fixture.parent != real_root / "profiles", (
             f"fixture QUBIT_HOME {fixture} is the real install's live home")
         env = {k: v for k, v in os.environ.items()
                if (k in _PASSTHROUGH_ENV or k.startswith("LC_")) and not k.endswith(_SECRET_ENV_SUFFIXES)}
         loopback = "127.0.0.1,localhost"
         env.update({
-            "HOME": str(self.home), "QUBIT_HOME": str(self.hermes_home), "PYTHONPATH": str(REPO_ROOT),
+            "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home), "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1", "NO_COLOR": "1", "TERM": "dumb", TAG_VAR: self.tag,
             "HTTPS_PROXY": self.proxy.url, "https_proxy": self.proxy.url,
             "NO_PROXY": loopback, "no_proxy": loopback, "SSL_CERT_FILE": str(self.ca_pem),
@@ -72,12 +72,12 @@ class Rig:
         return env
 
     def config(self) -> dict[str, Any]:
-        return yaml.safe_load((self.hermes_home / "config.yaml").read_text(encoding="utf-8"))
+        return yaml.safe_load((self.qubit_home / "config.yaml").read_text(encoding="utf-8"))
 
     def update_config(self, mutate: Callable[[dict[str, Any]], None]) -> None:
         cfg = self.config()
         mutate(cfg)
-        (self.hermes_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+        (self.qubit_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
     def run(self, *args: str, timeout: float = TURN_TIMEOUT, extra_env: dict[str, str] | None = None,
             ) -> subprocess.CompletedProcess:
@@ -91,7 +91,7 @@ class Rig:
 
     def log_tail(self, chars: int = 3000, pattern: str = "") -> str:
         """The child's agent.log tail (CI prints only the assertion message, so failures carry it)."""
-        log = self.hermes_home / "logs" / "agent.log"
+        log = self.qubit_home / "logs" / "agent.log"
         if not log.exists():
             return "<no agent.log>"
         lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -99,7 +99,7 @@ class Rig:
 
     # persisted state ------------------------------------------------------------
     def _db(self) -> sqlite3.Connection:
-        return sqlite3.connect(f"file:{self.hermes_home / 'state.db'}?mode=ro", uri=True)
+        return sqlite3.connect(f"file:{self.qubit_home / 'state.db'}?mode=ro", uri=True)
 
     def session_ids(self) -> list[str]:
         with self._db() as db:
@@ -139,9 +139,9 @@ def start_rig(root: Path, script: list[Response] | Responder, *, config: dict[st
     ca = make_test_ca(root / "ca", [VENDOR_HOST])
     proxy = TLSInterceptProxy(srv, ca, [VENDOR_HOST]).start()  # type: ignore[arg-type]
     home = root / "home"
-    rig = Rig(root=root, home=home, hermes_home=home / ".hermes", project=root / "project", srv=srv,
+    rig = Rig(root=root, home=home, qubit_home=home / ".hermes", project=root / "project", srv=srv,
               proxy=proxy, ca_pem=ca.ca_pem)
-    rig.hermes_home.mkdir(parents=True)
+    rig.qubit_home.mkdir(parents=True)
     rig.project.mkdir()
     cfg: dict[str, Any] = {
         # No base_url: the production native route (the proxy intercepts api.anthropic.com).
@@ -153,8 +153,8 @@ def start_rig(root: Path, script: list[Response] | Responder, *, config: dict[st
     }
     for key, value in (config or {}).items():
         cfg[key] = {**cfg.get(key, {}), **value} if isinstance(value, dict) else value
-    (rig.hermes_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
-    (rig.hermes_home / ".env").write_text("ANTHROPIC_API_KEY=sk-ant-api03-e2e-fake-key\n", encoding="utf-8")
+    (rig.qubit_home / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    (rig.qubit_home / ".env").write_text("ANTHROPIC_API_KEY=sk-ant-api03-e2e-fake-key\n", encoding="utf-8")
     return rig
 
 

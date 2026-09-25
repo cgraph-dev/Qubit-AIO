@@ -4,7 +4,7 @@ import { homedir } from 'os'
 import { dirname, join } from 'path'
 import { pathToFileURL } from 'url'
 
-import { Box, Text } from '@qubit/ink'
+import { Box, Text } from '@hermes/ink'
 import * as React from 'react'
 
 import { Accordion } from '../components/accordion.js'

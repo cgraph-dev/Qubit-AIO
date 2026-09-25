@@ -266,6 +266,19 @@ const sudo: Handler = ctx => {
   notifyInput(ctx, translateNow('notifications.native.inputBody'))
 }
 
+/** Bot Screen package install (`tui_gateway/methods_display.py`): the same masked card as `sudo`,
+ *  but app-level. The gateway sends it sessionless — it belongs to the connection that clicked
+ *  Install, not to a chat — so it is stored under the null session and survives a chat switch. */
+const displayInstallSudo: Handler = ctx => {
+  rememberServerRequest(ctx.request)
+  setSudoRequest({
+    description: translateNow('prompts.sudoInstallDesc'),
+    requestId: ctx.request.id,
+    sessionId: null
+  })
+  notifyInput(ctx, translateNow('prompts.sudoInstallDesc'))
+}
+
 const secret: Handler = ctx => {
   const p = ctx.request.params
   const envVar = str(p.env_var)
@@ -364,7 +377,7 @@ const windowRead: Handler = ({ request }) => {
   // read_window_below tool: main owns native window enumeration. Empty =
   // unavailable (older shell without the handler, Wayland, …) — without an
   // answer the tool would stall its full 30s deadline.
-  const read = window.qubitDesktop?.readWindowBelow
+  const read = window.hermesDesktop?.readWindowBelow
 
   void Promise.resolve(read ? read() : null).then(
     result => answerValue(request, result),
@@ -417,6 +430,7 @@ const tour: Handler = ({ isActiveSession, request }) => {
 export const SERVER_REQUEST_HANDLERS: Record<string, Handler> = {
   approval,
   clarify,
+  'display.install.sudo': displayInstallSudo,
   'preview.act': previewAct,
   'preview.read': previewRead,
   secret,

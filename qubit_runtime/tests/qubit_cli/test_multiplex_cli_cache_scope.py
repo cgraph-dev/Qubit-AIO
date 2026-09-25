@@ -1,7 +1,7 @@
 """Multiplexed gateway: qubit_cli's process-wide caches must not hand profile A's value to profile B.
 
 Every test builds two real profile homes (config.yaml / .env / cache files that differ), warms a
-cache under ``set_hermes_home_override(A)`` and reads under B. Only the HTTP transport is canned —
+cache under ``set_qubit_home_override(A)`` and reads under B. Only the HTTP transport is canned —
 its payload depends on the Authorization header or URL so a leaked entry is observable.
 """
 
@@ -17,7 +17,7 @@ import httpx
 import pytest
 
 from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
-from qubit_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
 
 
 class _Resp(io.BytesIO):
@@ -39,13 +39,13 @@ class _Scoped:
         self.home = home
 
     def __enter__(self):
-        self._t = set_hermes_home_override(self.home)
+        self._t = set_qubit_home_override(self.home)
         self._s = set_secret_scope(build_profile_secret_scope(self.home))
         return self
 
     def __exit__(self, *a):
         reset_secret_scope(self._s)
-        reset_hermes_home_override(self._t)
+        reset_qubit_home_override(self._t)
 
 
 @pytest.fixture
@@ -130,7 +130,7 @@ def test_swr_refresh_runs_as_the_profile_that_spawned_it(homes):
     done = threading.Event()
 
     def refresh():
-        seen["home"] = str(get_hermes_home())
+        seen["home"] = str(get_qubit_home())
         done.set()
         return {"fp": "fp", "at": time.time(), "models": ["m"]}
 
@@ -217,7 +217,7 @@ def test_failed_guest_mint_only_suppresses_that_profile(homes, monkeypatch, tmp_
 
     def client(timeout_seconds, verify):
         def handler(request):
-            attempts.append(str(get_hermes_home()))
+            attempts.append(str(get_qubit_home()))
             if status["code"] == 429:
                 return httpx.Response(429, json={"error": "rate"})
             return httpx.Response(201, json={"token": "anon_b", "user_id": "u", "org_id": "o"})

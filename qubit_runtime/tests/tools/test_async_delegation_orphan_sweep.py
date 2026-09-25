@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from qubit_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
 from tools import async_delegation as ad
 from tools.process_registry import process_registry
 
@@ -83,11 +83,11 @@ class _Home:
         self.home = home
 
     def __enter__(self):
-        self._token = set_hermes_home_override(str(self.home))
+        self._token = set_qubit_home_override(str(self.home))
         return self
 
     def __exit__(self, *exc):
-        reset_hermes_home_override(self._token)
+        reset_qubit_home_override(self._token)
 
 
 def _drain(q) -> list:
@@ -210,7 +210,7 @@ def test_gateway_watcher_sweeps_each_served_ledger_in_its_own_scope(tmp_path, mo
     monkeypatch.setattr(process_registry, "completion_queue", isolated)
     runner = object.__new__(GatewayRunner)
     runner._primary_profile_name = "default"
-    runner._served_profile_homes = {"default": get_hermes_home(), "b": home_b}
+    runner._served_profile_homes = {"default": get_qubit_home(), "b": home_b}
     runner._sweep_orphaned_completion_ledgers()
     assert [e["delegation_id"] for e in _drain(isolated)] == [delegation_id]
 
@@ -225,7 +225,7 @@ def test_tui_notification_poller_sweeps_under_its_session_profile(tmp_path, monk
     seen = []
 
     def fake_sweep(target_queue):
-        seen.append((str(get_hermes_home()), target_queue))
+        seen.append((str(get_qubit_home()), target_queue))
         stop.set()
         return 0
 
@@ -305,7 +305,7 @@ def test_offer_released_after_a_failed_tui_turn_is_re_offered(tmp_path, monkeypa
 
 def test_throttle_runs_at_most_one_sweep_per_home_per_interval(tmp_path, monkeypatch):
     calls = []
-    monkeypatch.setattr(ad, "sweep_orphaned_completions", lambda q, **kw: calls.append(str(get_hermes_home())) or 0)
+    monkeypatch.setattr(ad, "sweep_orphaned_completions", lambda q, **kw: calls.append(str(get_qubit_home())) or 0)
     q = queue.Queue()
     with _Home(tmp_path / "a"):
         ad.maybe_sweep_orphaned_completions(q, now=100.0)

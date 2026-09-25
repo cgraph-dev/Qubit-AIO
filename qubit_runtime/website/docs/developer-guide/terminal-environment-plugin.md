@@ -1,13 +1,13 @@
 # Terminal Environment Provider Plugins
 
-Qubit runs shell commands through a pluggable set of **terminal backends**.
+Hermes runs shell commands through a pluggable set of **terminal backends**.
 The built-in backends (local, Docker, Singularity, Modal, Daytona, Vercel
 Sandbox, SSH) live in the core repo under `tools/environments/`. Third-party
 sandbox vendors integrate as **plugins** instead — a standalone plugin repo
 installed under `~/.hermes/plugins/`, registering a backend the user selects
 exactly like a built-in one via `terminal.backend` in `config.yaml`.
 
-This page mirrors the [Browser Provider Plugins](/developer-guide/browser-provider-plugin)
+This page mirrors the [Browser Provider Plugins](./browser-provider-plugin.md)
 guide — same registration flow, same scope semantics.
 
 ## What a provider controls
@@ -17,9 +17,9 @@ A registered backend automatically participates in every core surface:
 | Surface | Driven by |
 |---|---|
 | Command dispatch (`terminal`, `execute_code`, file tools) | `create_environment()` |
-| `qubit setup` backend picker | `display_name`, `description`, `setup_instructions()`, `post_setup()` |
+| `hermes setup` backend picker | `display_name`, `description`, `setup_instructions()`, `post_setup()` |
 | Dashboard terminal-backend picker (probe status) | `probe()` |
-| `qubit status` / `qubit doctor` | `doctor_checks()` |
+| `hermes status` / `hermes doctor` | `doctor_checks()` |
 | System-prompt environment hints | `is_remote`, `env_description` |
 | Dangerous-command approval skipping | `skip_container_guards` |
 | Container path/cwd handling | `is_container` |
@@ -95,8 +95,8 @@ kind: backend
 Enable it, select it, run:
 
 ```bash
-qubit plugins enable acmebox
-qubit config set terminal.backend acmebox
+hermes plugins enable acmebox
+hermes config set terminal.backend acmebox
 ```
 
 ## Rules

@@ -1,4 +1,4 @@
-"""Tests for `qubit checkpoints prune`'s orphan confirmation flow.
+"""Tests for `hermes checkpoints prune`'s orphan confirmation flow.
 
 Covers the P1 raised on PR #69141: the confirmation preview must cover
 BOTH v2 projects (`store_status()["projects"]`) and pre-v2 shadow repos
@@ -49,7 +49,7 @@ _MIXED_STATUS = {
 
 
 def _patch_checkpoint_manager(monkeypatch, status: dict, prune_calls: list):
-    import tools.checkpoint_manager as ckpt_mgr
+    import tools.checkpoint_maintenance as ckpt_mgr
 
     monkeypatch.setattr(ckpt_mgr, "store_status", lambda *a, **k: status)
 

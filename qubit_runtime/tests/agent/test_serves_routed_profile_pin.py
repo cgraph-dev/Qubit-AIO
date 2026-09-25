@@ -7,7 +7,7 @@ live env var then saw the served home as the launch home: MCP connections were k
 (shared across profiles), the launch residue was never stripped from the served profile's child env,
 the launch profile's bridged allow-all grant was seeded into the served profile's secret scope, and
 the served profile's ``terminal.*`` config was bridged into the shared process env.
-``qubit_constants.pin_process_hermes_home`` gives such hosts one stable anchor for all of them.
+``qubit_constants.pin_process_qubit_home`` gives such hosts one stable anchor for all of them.
 """
 from __future__ import annotations
 
@@ -17,18 +17,18 @@ import pytest
 
 import qubit_constants
 from agent.secret_scope import _is_process_home, serves_routed_profile
-from qubit_cli.env_loader import _process_hermes_home
+from qubit_cli.env_loader import _process_qubit_home
 from tools.environments.local import _is_routed_home
 from tools.mcp_tool_scope import _server_key
 
 
 def _under(home, fn):
     """Run *fn* with *home* installed as the task's Hermes-home override."""
-    token = qubit_constants.set_hermes_home_override(home)
+    token = qubit_constants.set_qubit_home_override(home)
     try:
         return fn()
     finally:
-        qubit_constants.reset_hermes_home_override(token)
+        qubit_constants.reset_qubit_home_override(token)
 
 
 # name -> "does this decision treat *home* as a routed (non-launch) profile?"
@@ -36,7 +36,7 @@ ROUTED = {
     "secret_scope.serves_routed_profile": lambda home: _under(home, serves_routed_profile),
     "secret_scope._is_process_home": lambda home: not _is_process_home(home),
     "environments.local._is_routed_home": lambda home: _is_routed_home(home),
-    "env_loader._process_hermes_home": lambda home: _process_hermes_home().resolve() != Path(home).resolve(),
+    "env_loader._process_qubit_home": lambda home: _process_qubit_home().resolve() != Path(home).resolve(),
     "mcp_tool_scope._server_key": lambda home: _under(home, lambda: _server_key("atlassian")) != "atlassian",
 }
 
@@ -53,10 +53,10 @@ def homes(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("decision", sorted(ROUTED))
-def test_pinned_launch_home_survives_a_mirrored_hermes_home(homes, monkeypatch, decision):
+def test_pinned_launch_home_survives_a_mirrored_qubit_home(homes, monkeypatch, decision):
     launch, served = homes
     routed = ROUTED[decision]
-    qubit_constants.pin_process_hermes_home(launch)
+    qubit_constants.pin_process_qubit_home(launch)
     monkeypatch.setenv("QUBIT_HOME", str(served))  # the host's per-turn mirror
 
     assert routed(served) is True
@@ -64,12 +64,12 @@ def test_pinned_launch_home_survives_a_mirrored_hermes_home(homes, monkeypatch, 
     # The served profile's MCP connection is its own, keyed by its home, not a bare shared name.
     assert _under(served, lambda: _server_key("atlassian")) == (qubit_constants.qubit_home_key(served), "atlassian")
     # Process-asset readers keep following the env var: only routing decisions use the pin.
-    assert qubit_constants.get_process_hermes_home() == served
-    assert qubit_constants.get_routing_process_hermes_home() == launch
+    assert qubit_constants.get_process_qubit_home() == served
+    assert qubit_constants.get_routing_process_qubit_home() == launch
 
 
 @pytest.mark.parametrize("decision", sorted(ROUTED))
-def test_unpinned_or_cleared_pin_keeps_hermes_home_semantics(homes, monkeypatch, decision):
+def test_unpinned_or_cleared_pin_keeps_qubit_home_semantics(homes, monkeypatch, decision):
     launch, served = homes
     routed = ROUTED[decision]
     for _ in ("never pinned", "pinned then cleared"):
@@ -78,5 +78,5 @@ def test_unpinned_or_cleared_pin_keeps_hermes_home_semantics(homes, monkeypatch,
         assert routed(launch) is False
         monkeypatch.setenv("QUBIT_HOME", str(served))  # mirrored: the env var IS the launch home
         assert routed(served) is False
-        qubit_constants.pin_process_hermes_home(launch)
-        qubit_constants.pin_process_hermes_home(None)
+        qubit_constants.pin_process_qubit_home(launch)
+        qubit_constants.pin_process_qubit_home(None)

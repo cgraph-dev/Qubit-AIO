@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from agent.secret_scope import set_multiplex_active
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 _PROBE = ("import json,os;print(json.dumps({k:os.environ.get(k) for k in "
           "('QUBIT_HOME','A_MARKER','B_MARKER','TERMINAL_ENV','HERMES_MODEL','FIRECRAWL_API_KEY')}))")
@@ -71,11 +71,11 @@ def test_slash_worker_child_runs_in_the_served_profiles_env(mux_homes, monkeypat
 
     with monkeypatch.context() as m:  # restored before the probe child spawns through the real Popen
         m.setattr(server.subprocess, "Popen", _Popen)
-        token = set_hermes_home_override(str(b))
+        token = set_qubit_home_override(str(b))
         try:
             server._SlashWorker("sess", "", profile_home=str(b))
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         served_env = captured["env"]
         # Outside multiplex the launch profile's own worker keeps its env untouched.
         set_multiplex_active(False)
@@ -92,7 +92,7 @@ def test_launch_profile_worker_spawns_with_own_home_after_multiplex_flip(mux_hom
     import tui_gateway.server as server
 
     a, _b = mux_homes
-    monkeypatch.setattr(server, "_hermes_home", str(a))  # launch profile home, captured at import
+    monkeypatch.setattr(server, "_qubit_home", str(a))  # launch profile home, captured at import
     captured = {}
 
     class _Popen:

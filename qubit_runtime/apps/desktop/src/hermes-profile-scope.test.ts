@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  checkQubitUpdate,
+  checkHermesUpdate,
   getActionStatus,
   getElevenLabsVoices,
   getMemoryProviderConfig,
@@ -11,7 +11,7 @@ import {
   setApiRequestProfile,
   speakText,
   transcribeAudio,
-  updateQubit
+  updateHermes
 } from './hermes'
 
 // Contract: every backend-targeted action helper must carry the active gateway
@@ -22,13 +22,13 @@ describe('backend action helpers are profile-scoped', () => {
   const api = vi.fn(async (_req: { path: string; profile?: string }) => ({}) as never)
 
   beforeEach(() => {
-    ;(window as { qubitDesktop?: unknown }).qubitDesktop = { api }
+    ;(window as { hermesDesktop?: unknown }).hermesDesktop = { api }
     api.mockClear()
   })
 
   afterEach(() => {
     setApiRequestProfile(null)
-    delete (window as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as { hermesDesktop?: unknown }).hermesDesktop
   })
 
   const lastProfile = () => api.mock.calls.at(-1)?.[0].profile
@@ -54,8 +54,8 @@ describe('backend action helpers are profile-scoped', () => {
 
     void getStatus()
     void restartGateway()
-    void updateQubit()
-    void checkQubitUpdate()
+    void updateHermes()
+    void checkHermesUpdate()
     void getActionStatus('gateway-restart')
 
     for (const call of api.mock.calls) {

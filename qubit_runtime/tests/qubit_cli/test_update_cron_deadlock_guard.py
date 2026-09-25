@@ -1,12 +1,12 @@
 """Regression tests for #100179: cron-update three-way restart deadlock.
 
-When `qubit update` runs INSIDE the gateway's own process tree (the
+When `hermes update` runs INSIDE the gateway's own process tree (the
 hermes-auto-update cron job), waiting for that gateway to exit is a
 circular wait:
 
   gateway waits on all in-flight work units (#77184)
-    -> cron agent session waits on the `qubit update` process
-      -> `qubit update` waits on the gateway to exit  [back to A]
+    -> cron agent session waits on the `hermes update` process
+      -> `hermes update` waits on the gateway to exit  [back to A]
 
 The wedged-loop probe cannot break it: the cron session posts activity
 every ~180s (process-tool poll return), so it is never marked wedged and
@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-linux_only = pytest.mark.linux_only
+linux_only = pytest.mark.platforms("linux")
 
 
 class TestAncestorDetectionGuard:
@@ -97,7 +97,7 @@ class TestSelfRestartFireAndForget:
 
         with patch.object(gw.os, "kill"), patch.object(
             gw, "_wait_for_pid_exit",
-            side_effect=lambda pid, t: waited.append((pid, t)) or True,
+            side_effect=lambda pid, t, **_: waited.append((pid, t)) or True,
         ):
             ok = gw._graceful_restart_via_sigusr1(4242, drain_timeout=7.0)
 
@@ -131,7 +131,7 @@ class TestDrainOrSignalTriage:
         monkeypatch.setattr(
             gw,
             "_graceful_restart_via_sigusr1",
-            lambda pid, drain_timeout: calls["drain"].append((pid, drain_timeout))
+            lambda pid, drain_timeout, **_: calls["drain"].append((pid, drain_timeout))
             or True,
         )
         return calls

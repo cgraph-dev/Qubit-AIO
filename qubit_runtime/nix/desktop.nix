@@ -4,7 +4,7 @@
 # `qubit` binary with the venv, runtime PATH, bundled skills/plugins, etc.
 # already wired up.  We point the desktop at it via the existing
 # `HERMES_DESKTOP_HERMES` override env var, so the desktop's resolver
-# uses our fully wrapped binary at step 4 ("existing Qubit CLI").
+# uses our fully wrapped binary before the mutable managed install.
 # No reimplementation of the agent resolution in this wrapper.
 {
   pkgs,
@@ -14,11 +14,13 @@
   hermesNpmLib,
   electron,
   hermesAgent,
+  installStampFile,
+  generatedIcons,
   python3,
   # Environment to bake into the launcher. A GUI launcher reads none of the
   # shell profile, so a variable that an interactive shell exports does not
   # reach an app that the desktop menu starts. The Home Manager module passes
-  # QUBIT_HOME and HERMES_MANAGED here, which gives the app the same state
+  # HERMES_HOME and HERMES_MANAGED here, which gives the app the same state
   # directory as the services.
   extraEnv ? { },
   # Shell lines to run before the app starts. A secret belongs here and never
@@ -53,7 +55,7 @@ let
     else if stdenv.hostPlatform.isLinux then
       "linux"
     else
-      throw "qubit-desktop: unsupported host platform for node-pty staging";
+      throw "hermes-desktop: unsupported host platform for node-pty staging";
 
   targetArch =
     if stdenv.hostPlatform.isAarch64 then
@@ -61,57 +63,52 @@ let
     else if stdenv.hostPlatform.isx86_64 then
       "x64"
     else
-      throw "qubit-desktop: unsupported host arch for node-pty staging";
+      throw "hermes-desktop: unsupported host arch for node-pty staging";
 
   # Build the renderer (dist/ + electron/ + package.json).
   renderer = hermesNpmLib.buildNpmPackage {
     dirs = [
       "apps/desktop"
       "apps/shared"
+      "scripts/build/desktop.mjs"
+      "scripts/build/freshness.mjs"
+      "scripts/build/frontend-common.mjs"
+      # product-identity.cjs resolves the channel request through the
+      # packaging helper (and its content-types table).
+      "scripts/msix-shared.mjs"
+      "scripts/release-content-types.json"
     ];
-    pname = "qubit-desktop-renderer";
+    pname = "hermes-desktop-renderer";
 
     doCheck = true;
 
     buildPhase = ''
       runHook preBuild
 
-      mkdir -p apps/desktop/build
-
       patchShebangs .
 
-      pushd apps/desktop
-        # typecheck :3
-        npm exec -- tsc -b
+      # The native provider runs before compilation. Use the headers for
+      # the exact Electron runtime shipped by this derivation, offline.
+      mkdir -p "$TMPDIR/electron-headers"
+      tar -xzf ${electronHeaders} -C "$TMPDIR/electron-headers" --strip-components=1
+      ${lib.getExe hermesNpmLib.node-gyp} rebuild \
+        --directory=node_modules/node-pty \
+        --build-from-source \
+        --runtime=electron \
+        --target=${electron.version} \
+        --arch=${targetArch} \
+        --nodedir="$TMPDIR/electron-headers" \
+        --disturl="" \
+        --offline
 
-        # build the renderer bundle
-        # vite's emptyOutDir wipes dist/ on every run
-        # so it has to be first
-        npm exec -- vite build
-
-        # build the electron bundle
-        node scripts/bundle-electron-main.mjs
-
-        # Compile node-pty against Electron's actual ABI (the nixpkgs
-        # `electron` we ship). Headers come from a pinned fetchurl input
-        # since the sandbox has no network here, so node-gyp's
-        # normal --disturl download path can't run.
-        mkdir -p "$TMPDIR/electron-headers"
-        tar -xzf ${electronHeaders} -C "$TMPDIR/electron-headers" --strip-components=1
-
-        ${lib.getExe hermesNpmLib.node-gyp} rebuild \
-          --directory=../../node_modules/node-pty \
-          --build-from-source \
-          --runtime=electron \
-          --target=${electron.version} \
-          --nodedir="$TMPDIR/electron-headers" \
-          --disturl="" \
-          --offline
-
-        # Target platform/arch come from stdenv.hostPlatform, not the
-        # build host's own process.platform/arch.
-        node scripts/stage-native-deps.mjs ${targetPlatform} ${targetArch}
-      popd
+      node apps/desktop/scripts/stage-native-deps.mjs \
+        --source "$PWD" --out "$TMPDIR/desktop-native-deps" \
+        --platform ${targetPlatform} --arch ${targetArch}
+      node scripts/build/desktop.mjs \
+        --source "$PWD" --out "$PWD/apps/desktop/dist" \
+        --icons ${generatedIcons} --stamp ${installStampFile} \
+        --native-deps "$TMPDIR/desktop-native-deps" \
+        --platform ${targetPlatform} --typecheck
 
       runHook postBuild
     '';
@@ -140,14 +137,10 @@ let
     installPhase = ''
       runHook preInstall
       mkdir -p $out
-      # vite writes to apps/desktop/dist/ (we cd'd there in buildPhase).
-      # stage-native-deps.mjs stages node-pty into dist/node_modules/node-pty,
-      # so copying dist/ wholesale carries the native dep along with the
-      # esbuild bundle that require()s it. apps/desktop/build was created
-      # before the cd.
+      # The shared product contains renderer, main/preload, and native deps.
       cp -rn apps/desktop/dist $out/
 
-      echo '{"schemaVersion":1,"commit":"nix-dummy-commit","branch":"nix","dirty":false,"source":"nix"}' > $out/install-stamp.json
+      cp ${installStampFile} $out/install-stamp.json
 
       cp -n apps/desktop/package.json $out/
       runHook postInstall
@@ -157,7 +150,7 @@ in
 
 # Electron wrapper: nixpkgs' electron binary pointed at the renderer dir.
 stdenv.mkDerivation {
-  pname = "qubit-desktop";
+  pname = "hermes-desktop";
   inherit (renderer) version;
 
   dontUnpack = true;
@@ -171,35 +164,35 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/share/qubit-desktop $out/bin
-    cp -r ${renderer}/* $out/share/qubit-desktop/
+    mkdir -p $out/share/hermes-desktop $out/bin
+    cp -r ${renderer}/* $out/share/hermes-desktop/
 
     # Standard nixpkgs pattern for electron-builder apps: patch process.resourcesPath
     # to point to the app's directory. In Nix, unpackaged electron defaults this
     # to the electron distribution's resources path, breaking extraResources lookups.
-    substituteInPlace $out/share/qubit-desktop/dist/electron-main.mjs \
-      --replace-fail "process.resourcesPath" "'$out/share/qubit-desktop'"
+    substituteInPlace $out/share/hermes-desktop/dist/electron-main.mjs \
+      --replace-fail "process.resourcesPath" "'$out/share/hermes-desktop'"
 
     # Wrap the nixpkgs electron binary to launch our app.  Set
     # HERMES_DESKTOP_HERMES to the absolute path of the nix-built `qubit`
-    # binary so the desktop's resolver step 4 ("existing Qubit CLI on
-    # PATH") uses our fully wrapped binary — venv with all deps,
+    # binary so the deployment override selects our fully wrapped binary
+    # before any mutable managed install — venv with all deps,
     # bundled skills/plugins, runtime PATH (ripgrep/git/ffmpeg/etc).
     # No reimplementation of the agent resolver in the wrapper.
-    makeWrapper ${lib.getExe electron} $out/bin/qubit-desktop \
-      --add-flags "$out/share/qubit-desktop" \
+    makeWrapper ${lib.getExe electron} $out/bin/hermes-desktop \
+      --add-flags "$out/share/hermes-desktop" \
       --set HERMES_DESKTOP_HERMES "${lib.getExe hermesAgent}" \
       --set ELECTRON_IS_DEV 0${extraEnvFlags}${extraRunFlags}
 
     # XDG launcher entry
     mkdir -p $out/share/applications $out/share/icons/hicolor/1024x1024/apps
-    install -m 0644 ${../apps/desktop/assets/icon.png} \
-      $out/share/icons/hicolor/1024x1024/apps/qubit.png
+    install -m 0644 ${generatedIcons}/apps/desktop/assets/icon.png \
+      $out/share/icons/hicolor/1024x1024/apps/hermes.png
     export PYTHONPATH=$(mktemp -d)
-    cp ${../qubit_cli/linux_desktop_entry.py} "$PYTHONPATH/linux_desktop_entry.py"
-    export DESKTOP_EXEC="$out/bin/qubit-desktop"
-    export DESKTOP_ICON="$out/share/icons/hicolor/1024x1024/apps/qubit.png"
-    python3 -c 'import os; from linux_desktop_entry import render_desktop_entry; print(render_desktop_entry(os.environ["DESKTOP_EXEC"], os.environ["DESKTOP_ICON"]))' > $out/share/applications/qubit.desktop
+    cp ${../hermes_cli/linux_desktop_entry.py} "$PYTHONPATH/linux_desktop_entry.py"
+    export DESKTOP_EXEC="$out/bin/hermes-desktop"
+    export DESKTOP_ICON="$out/share/icons/hicolor/1024x1024/apps/hermes.png"
+    python3 -c 'import os; from linux_desktop_entry import render_desktop_entry; print(render_desktop_entry(os.environ["DESKTOP_EXEC"], os.environ["DESKTOP_ICON"]))' > $out/share/applications/hermes.desktop
     runHook postInstall
   '';
 
@@ -209,9 +202,9 @@ stdenv.mkDerivation {
 
   meta = with lib; {
     description = "Native Electron desktop shell for Qubit Agent";
-    homepage = "https://github.com/NousResearch/qubit-runtime";
+    homepage = "https://github.com/NousResearch/hermes-agent";
     license = licenses.mit;
     platforms = platforms.unix;
-    mainProgram = "qubit-desktop";
+    mainProgram = "hermes-desktop";
   };
 }

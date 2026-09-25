@@ -1,14 +1,14 @@
 ---
 sidebar_position: 5
 title: "内置技能目录"
-description: "随 Qubit Agent 附带的内置技能目录"
+description: "随 Hermes Agent 附带的内置技能目录"
 ---
 
 # 内置技能目录
 
-Qubit 附带一个大型内置技能库，安装时会复制到 `~/.hermes/skills/`。下方每个技能均链接至专属页面，包含完整定义、配置和用法说明。
+Hermes 附带一个大型内置技能库，安装时会复制到 `~/.hermes/skills/`。下方每个技能均链接至专属页面，包含完整定义、配置和用法说明。
 
-Qubit 在执行 `qubit update` 时也会同步内置技能，但同步清单会尊重本地删除和用户编辑。如果此处列出的某个技能在你的 `~/.hermes/skills/` 目录树中缺失，它仍随 Qubit 一同发布；可通过 `qubit skills reset <name> --restore` 恢复。
+Hermes 在执行 `hermes update` 时也会同步内置技能，但同步清单会尊重本地删除和用户编辑。如果此处列出的某个技能在你的 `~/.hermes/skills/` 目录树中缺失，它仍随 Hermes 一同发布；可通过 `hermes skills reset <name> --restore` 恢复。
 
 如果某个技能未出现在此列表中但存在于仓库中，目录由 `website/scripts/generate-skill-docs.py` 重新生成。
 
@@ -28,7 +28,7 @@ Qubit 在执行 `qubit update` 时也会同步内置技能，但同步清单会�
 |-------|-------------|------|
 | [`claude-code`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-claude-code) | 将编码任务委托给 Claude Code CLI（功能开发、PR）。 | `autonomous-ai-agents/claude-code` |
 | [`codex`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-codex) | 将编码任务委托给 OpenAI Codex CLI（功能开发、PR）。 | `autonomous-ai-agents/codex` |
-| [`hermes-agent`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent) | 配置、扩展或贡献 Qubit Agent。 | `autonomous-ai-agents/hermes-agent` |
+| [`hermes-agent`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent) | 配置、扩展或贡献 Hermes Agent。 | `autonomous-ai-agents/hermes-agent` |
 | [`opencode`](/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-opencode) | 将编码任务委托给 OpenCode CLI（功能开发、PR 审查）。 | `autonomous-ai-agents/opencode` |
 
 ## creative
@@ -50,7 +50,6 @@ Qubit 在执行 `qubit update` 时也会同步内置技能，但同步清单会�
 | [`pretext`](/user-guide/skills/bundled/creative/creative-pretext) | 使用 @chenglou/pretext 构建创意浏览器 demo——无 DOM 的文本布局，支持 ASCII 艺术、绕障碍物的排版流、文字即几何游戏、动态排版和文字驱动的生成艺术。生成单文件 HTML。 | `creative/pretext` |
 | [`sketch`](/user-guide/skills/bundled/creative/creative-sketch) | 一次性 HTML 原型：生成 2-3 个设计变体供对比。 | `creative/sketch` |
 | [`songwriting-and-ai-music`](/user-guide/skills/bundled/creative/creative-songwriting-and-ai-music) | 歌曲创作技巧与 Suno AI 音乐 prompt（提示词）。 | `creative/songwriting-and-ai-music` |
-| [`touchdesigner-mcp`](/user-guide/skills/bundled/creative/creative-touchdesigner-mcp) | 通过 twozero MCP 控制运行中的 TouchDesigner 实例——创建算子、设置参数、连接节点、执行 Python、构建实时视觉效果。36 个原生工具。 | `creative/touchdesigner-mcp` |
 
 ## devops
 
@@ -120,7 +119,7 @@ Qubit 在执行 `qubit update` 时也会同步内置技能，但同步清单会�
 | [`notion`](/user-guide/skills/bundled/productivity/productivity-notion) | Notion API + ntn CLI：页面、数据库、Markdown、Workers。 | `productivity/notion` |
 | [`ocr-and-documents`](/user-guide/skills/bundled/productivity/productivity-ocr-and-documents) | 从 PDF/扫描件中提取文本（pymupdf、marker-pdf）。 | `productivity/ocr-and-documents` |
 | [`powerpoint`](/user-guide/skills/bundled/productivity/productivity-powerpoint) | 创建、读取、编辑 .pptx 演示文稿、幻灯片、备注、模板。 | `productivity/powerpoint` |
-| [`teams-meeting-pipeline`](/user-guide/skills/bundled/productivity/productivity-teams-meeting-pipeline) | 通过 Qubit CLI 操作 Teams 会议摘要流水线——汇总会议、检查流水线状态、重放任务、管理 Microsoft Graph 订阅。 | `productivity/teams-meeting-pipeline` |
+| [`teams-meeting-pipeline`](/user-guide/skills/bundled/productivity/productivity-teams-meeting-pipeline) | 通过 Hermes CLI 操作 Teams 会议摘要流水线——汇总会议、检查流水线状态、重放任务、管理 Microsoft Graph 订阅。 | `productivity/teams-meeting-pipeline` |
 
 ## research
 

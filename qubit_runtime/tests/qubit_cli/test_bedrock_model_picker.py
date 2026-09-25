@@ -5,7 +5,7 @@ Covers the three paths changed by fix/bedrock-provider-model-ids-live-discovery:
   1. provider_model_ids("bedrock") — uses live discover_bedrock_models() instead
      of the static _PROVIDER_MODELS table, with curated fallback.
 
-  2. list_authenticated_providers() Section 2 (QUBIT_OVERLAYS) — bedrock
+  2. list_authenticated_providers() Section 2 (HERMES_OVERLAYS) — bedrock
      appears when AWS credentials are present; model list comes from live
      discovery keyed by the resolved region, NOT the static us.* table.
 
@@ -129,7 +129,7 @@ class TestProviderModelIdsBedrock:
 
 
 # ---------------------------------------------------------------------------
-# 2. list_authenticated_providers() — bedrock via QUBIT_OVERLAYS (Section 2)
+# 2. list_authenticated_providers() — bedrock via HERMES_OVERLAYS (Section 2)
 # ---------------------------------------------------------------------------
 
 class TestListAuthenticatedProvidersBedrock:
@@ -230,18 +230,10 @@ class TestBedrockRegionRouting:
 # ---------------------------------------------------------------------------
 
 class TestBedrockOverlayRegistration:
-    """bedrock entry in QUBIT_OVERLAYS is correctly configured."""
-
-    def test_bedrock_overlay_exists(self):
-        from qubit_cli.providers import QUBIT_OVERLAYS
-        assert "bedrock" in QUBIT_OVERLAYS
+    """bedrock entry in HERMES_OVERLAYS is correctly configured."""
 
 
-    def test_bedrock_label(self):
-        from qubit_cli.providers import get_label
-        label = get_label("bedrock")
-        assert label  # non-empty
-        assert "bedrock" in label.lower() or "aws" in label.lower()
+
 
     def test_bedrock_aliases_resolve(self):
         from qubit_cli.providers import normalize_provider

@@ -37,11 +37,6 @@ def corrupt_db(tmp_path):
     db.close()
 
 
-@pytest.mark.skip(
-    reason="W9-tests2-F6: fork session_export._format_timestamp raises "
-    "OverflowError on corrupt timestamps where the pin degrades to '?' — "
-    "product follow-up, then unskip"
-)
 def test_list_export_and_insights_survive_corrupt_timestamp_rows(corrupt_db, capsys, caplog):
     with caplog.at_level(logging.WARNING, logger="qubit_cli.timefmt"):
         _cmd_list(corrupt_db, argparse.Namespace(limit=20, source=None, all=False, workspace=None))

@@ -1,21 +1,37 @@
 ---
 sidebar_position: 7
-title: "Qubit Docker Setup"
-description: "Running Qubit Agent in Docker and using Docker as a terminal backend"
+title: "Hermes Docker Setup"
+description: "Running Hermes Agent in Docker and using Docker as a terminal backend"
 ---
 
-# Qubit Docker Setup
+# Hermes Docker Setup
 
-There are two distinct ways Docker intersects with Qubit Agent:
+There are two distinct ways Docker intersects with Hermes Agent:
 
-1. **Running Qubit IN Docker** — the agent itself runs inside a container (this page's primary focus)
-2. **Docker as a terminal backend** — the agent runs on your host but executes every command inside a single, persistent Docker sandbox container that survives across tool calls, `/new`, and subagents for the life of the Qubit process (see [Configuration → Docker Backend](./configuration.md#docker-backend))
+1. **Running Hermes IN Docker** — the agent itself runs inside a container (this page's primary focus)
+2. **Docker as a terminal backend** — the agent runs on your host but executes every command inside a single, persistent Docker sandbox container that survives across tool calls, `/new`, and subagents for the life of the Hermes process (see [Configuration → Docker Backend](./configuration.md#docker-backend))
 
 This page covers option 1. The container stores all user data (config, API keys, sessions, skills, memories) in a single directory mounted from the host at `/opt/data`. The image itself is stateless and can be upgraded by pulling a new version without losing any configuration.
 
+## Image channels and runtime ownership
+
+| Image tag | Meaning |
+|---|---|
+| `latest` / `stable` | The image accepted by the stable release gate. |
+| `main` | The development image published from main-branch builds. |
+| `X.Y.Z` | A versioned stable image. Use a digest for an exact deployment pin. |
+
+The workflow builds and tests amd64 and arm64 images. Stable publication uses
+the tested image archives rather than rebuilding them. Only the full release
+promotion moves `stable` and `latest`; a main push does not advance those tags.
+
+The image's Python environment follows `pyproject.toml` and `uv.lock` (currently
+Python 3.14). Its curated extras are not the native desktop bundle's
+`--all-extras` set. It does not include an Electron desktop app.
+
 ## Quick start
 
-If this is your first time running Qubit Agent, create a data directory on the host and start the container interactively to run the setup wizard:
+If this is your first time running Hermes Agent, create a data directory on the host and start the container interactively to run the setup wizard:
 
 :::caution Avoid browser-based VPS consoles for the install commands
 Some VPS providers (Hetzner Cloud, and several others) offer a browser-based
@@ -40,7 +56,7 @@ docker run -it --rm \
 This drops you into the setup wizard, which will prompt you for your API keys and write them to `~/.hermes/.env`. You only need to do this once. It is highly recommended to set up a chat system for the gateway to work with at this point.
 
 :::tip
-Inside the container, run `qubit setup --portal` once — the refresh token persists in the mounted `~/.hermes` volume. See [Qubit Labs](/integrations/nous-portal).
+Inside the container, run `hermes setup --portal` once — the refresh token persists in the mounted `~/.hermes` volume. See [Nous Portal](../integrations/nous-portal.md).
 :::
 
 ## Running in gateway mode
@@ -49,7 +65,7 @@ Once configured, run the container in the background as a persistent gateway (Te
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   --restart unless-stopped \
   -v ~/.hermes:/opt/data \
   -p 8642:8642 \
@@ -83,7 +99,7 @@ Note: the API server is gated on `API_SERVER_ENABLED=true`. To expose it beyond 
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   --restart unless-stopped \
   -v ~/.hermes:/opt/data \
   -p 8642:8642 \
@@ -102,7 +118,7 @@ The built-in web dashboard runs as a supervised s6-rc service alongside the gate
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   --restart unless-stopped \
   -v ~/.hermes:/opt/data \
   -p 8642:8642 \
@@ -130,7 +146,7 @@ The dashboard's auth gate engages automatically when both of the following are t
 There are three bundled ways to satisfy the second condition:
 
 - **Username/password** — the simplest for a self-hosted / on-prem / homelab container on a trusted network or behind a VPN: set `HERMES_DASHBOARD_BASIC_AUTH_USERNAME` + `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD` (and `HERMES_DASHBOARD_BASIC_AUTH_SECRET` for restart-stable sessions). Not suitable for direct public-internet exposure.
-- **OAuth (Qubit Labs)** — for hosted/public deploys: the `dashboard_auth/qubit` provider activates whenever `HERMES_DASHBOARD_OAUTH_CLIENT_ID` is set.
+- **OAuth (Nous Portal)** — for hosted/public deploys: the `dashboard_auth/nous` provider activates whenever `HERMES_DASHBOARD_OAUTH_CLIENT_ID` is set.
 - **Self-hosted OIDC** — to authenticate against your own identity provider via standard OpenID Connect: the `dashboard_auth/self_hosted` provider activates when `HERMES_DASHBOARD_OIDC_ISSUER` + `HERMES_DASHBOARD_OIDC_CLIENT_ID` are set.
 
 Whichever you choose, the gate redirects callers to a login page before they can reach any protected route. See [Web Dashboard → Authentication](features/web-dashboard.md#authentication-gated-mode) for all three providers.
@@ -151,7 +167,7 @@ dashboard:
 
 This allows the proxy's `X-Forwarded-Proto: https` to control secure OAuth
 cookies while leaving forwarding headers from other peers untrusted. Do not
-use `*`, `0.0.0.0/0`, or `::/0`; Qubit rejects those unbounded entries.
+use `*`, `0.0.0.0/0`, or `::/0`; Hermes rejects those unbounded entries.
 
 If no provider is registered and the bind is non-loopback, the dashboard **fails closed at startup** with a specific error pointing at the missing env var. There is no longer an escape hatch that serves the dashboard unauthenticated on a public bind: `HERMES_DASHBOARD_INSECURE=1` is now a deprecated no-op (it logs a warning and is ignored). Configure a provider, or bind `HERMES_DASHBOARD_HOST=127.0.0.1` and reach the dashboard over an SSH tunnel / Tailscale instead.
 
@@ -174,85 +190,100 @@ docker run -it --rm \
 Or if you have already opened a terminal in your running container (via Docker Desktop for instance), just run:
 
 ```sh
-/opt/qubit/.venv/bin/qubit
+/opt/hermes/.venv/bin/hermes
 ```
 
 ## Persistent volumes
 
-The `/opt/data` volume is the single source of truth for all Qubit state. It maps to your host's `~/.hermes/` directory and contains:
+The `/opt/data` volume is the single source of truth for all Hermes state. It maps to your host's `~/.hermes/` directory and contains:
 
 | Path | Contents |
 |------|----------|
 | `.env` | API keys and secrets |
-| `config.yaml` | All Qubit configuration |
+| `config.yaml` | All Hermes configuration |
 | `SOUL.md` | Agent personality/identity |
 | `sessions/` | Conversation history |
 | `memories/` | Persistent memory store |
 | `skills/` | Installed skills |
-| `home/` | Per-profile HOME for Qubit tool subprocesses (`git`, `ssh`, `gh`, `npm`, and skill CLIs) |
+| `home/` | Per-profile HOME for Hermes tool subprocesses (`git`, `ssh`, `gh`, `npm`, and skill CLIs) |
 | `cron/` | Scheduled job definitions |
 | `hooks/` | Event hooks |
 | `logs/` | Runtime logs |
 | `skins/` | Custom CLI skins |
 
+### Filesystem requirements for `state.db` in containers
+
+Hermes keeps sessions in a SQLite database (`/opt/data/state.db`) that is opened in WAL journal mode by default. WAL relies on shared memory (`state.db-shm`) being coherent between every process that has the file open. Bind mounts that cross a VM boundary do not provide that: **virtiofs** (Docker Desktop and Podman on macOS, OrbStack) and **9p / drvfs** (Docker Desktop on Windows) both let concurrent writers silently corrupt a WAL database while the main file still passes `PRAGMA integrity_check`.
+
+What Hermes does about it (since v2026.9.14):
+
+- A **fresh** database whose directory is on a virtiofs/9p mount is created in rollback (`DELETE`) journal mode and a one-time warning is logged. Nothing to do.
+- An **existing** WAL database on such a mount is never live-downgraded — other Hermes processes may hold it open, and a live switch destroys their uncheckpointed commits. Instead, every process logs a one-time error at startup and `hermes doctor` flags the database. Fix it one of two ways:
+  1. Stop every Hermes process that uses the database, then run a one-time offline conversion with the Python that ships in the image (it has no `sqlite3` shell): `docker exec hermes python3 -c "import sqlite3; print(sqlite3.connect('/opt/data/state.db').execute('PRAGMA journal_mode=DELETE').fetchone()[0])"`. Set `database.journal_mode: delete` in `config.yaml` so a later open does not switch it back to WAL.
+  2. Move the data directory onto a native volume — a named Docker volume (`-v hermes-data:/opt/data`) lives on the VM's own ext4 filesystem and supports WAL normally.
+
+Detection reads `/proc/self/mountinfo` inside the container, so it works regardless of the host operating system. It does not classify NFS, SMB, or generic FUSE mounts; on those, set `database.journal_mode: delete` explicitly. Hermes does not offer SQLite's `locking_mode=EXCLUSIVE` as an alternative because the gateway, cron, and worker processes open the database concurrently.
+
 ### Immutable install tree
 
-In hosted and published Docker images, `/opt/qubit` is the installed application tree. It is root-owned and read-only to the runtime `qubit` user, so agent turns, gateway sessions, dashboard actions, and normal `docker exec qubit qubit ...` commands cannot edit the core source, bundled `.venv`, `node_modules`, or TUI bundle in place.
+In hosted and published Docker images, `/opt/hermes` is the installed application tree. It is root-owned and read-only to the runtime `hermes` user, so agent turns, gateway sessions, dashboard actions, and normal `docker exec hermes hermes ...` commands cannot edit the core source, bundled `.venv`, `node_modules`, or TUI bundle in place.
 
-All mutable Qubit state belongs under `/opt/data`: config, `.env`, profiles, skills, memories, sessions, logs, dashboard uploads, plugins, and other user-managed files. The image also disables runtime `.pyc` writes and Qubit lazy dependency installs into `/opt/qubit`; optional platform dependencies needed by the published image should be baked into the image or installed through a new image build.
+All mutable Hermes state belongs under `/opt/data`: config, `.env`, profiles, skills, memories, sessions, logs, dashboard uploads, plugins, and other user-managed files. The image also disables runtime `.pyc` writes and Hermes lazy dependency installs into `/opt/hermes`; optional platform dependencies needed by the published image should be baked into the image or installed through a new image build.
 
-On hosted/published images, agent self-improvement is scoped to skills, memory, plugins, and config under `/opt/data`. The installed core source under `/opt/qubit` is immutable; core changes are made via PRs to the repo and shipped by updating the image, not by live-editing the running install.
+On hosted/published images, agent self-improvement is scoped to skills, memory, plugins, and config under `/opt/data`. The installed core source under `/opt/hermes` is immutable; core changes are made via PRs to the repo and shipped by updating the image, not by live-editing the running install.
 
-If an operator needs to repair or inspect files outside `/opt/data`, use a root shell intentionally. The `qubit` shim normally drops `docker exec qubit qubit ...` back to the runtime user; set `HERMES_DOCKER_EXEC_AS_ROOT=1` for a one-off root invocation when you explicitly need root semantics.
+If an operator needs to repair or inspect files outside `/opt/data`, use a root shell intentionally. The `hermes` shim normally drops `docker exec hermes hermes ...` back to the runtime user; set `HERMES_DOCKER_EXEC_AS_ROOT=1` for a one-off root invocation when you explicitly need root semantics.
 
-Skill CLIs that store credentials under `~` must be initialized against the subprocess HOME, not just the data-volume root. For example, the [xurl skill](./skills/bundled/social-media/social-media-xurl.md) stores OAuth state in `~/.xurl`; in the official Docker layout, Qubit tool calls read that as `/opt/data/home/.xurl`, so run manual xurl auth with `HOME=/opt/data/home` and verify with `HOME=/opt/data/home xurl auth status`.
+Skill CLIs that store credentials under `~` must be initialized against the subprocess HOME, not just the data-volume root. For example, the [xurl skill](./skills/bundled/social-media/social-media-xurl.md) stores OAuth state in `~/.xurl`; in the official Docker layout, Hermes tool calls read that as `/opt/data/home/.xurl`, so run manual xurl auth with `HOME=/opt/data/home` and verify with `HOME=/opt/data/home xurl auth status`.
 
 :::warning
-Never run two Qubit **gateway** containers against the same data directory simultaneously — session files and memory stores are not designed for concurrent write access.
+Never run two Hermes **gateway** containers against the same data directory simultaneously — session files and memory stores are not designed for concurrent write access.
 :::
 
 ## Multi-profile support
 
-Qubit supports [multiple profiles](../reference/profile-commands.md) — separate `~/.hermes/` subdirectories that let you run independent agents (different SOUL, skills, memory, sessions, credentials) from a single installation. **Inside the official Docker image, the s6 supervision tree treats each profile as a first-class supervised service**, so the recommended deployment is **one container hosting all profiles**.
+Hermes supports [multiple profiles](../reference/profile-commands.md) — separate `~/.hermes/` subdirectories that let you run independent agents (different SOUL, skills, memory, sessions, credentials) from a single installation. **Inside the official Docker image, the s6 supervision tree treats each profile as a first-class supervised service**, so the recommended deployment is **one container hosting all profiles**.
 
-Each profile created with `qubit profile create <name>` gets:
+Each profile created with `hermes profile create <name>` gets:
 
 - A dedicated s6 service slot at `/run/service/gateway-<name>/`, registered dynamically by the runtime — no container rebuild required.
 - Auto-restart on crash, backoff-managed by `s6-supervise`.
-- Per-profile rotated logs at `${QUBIT_HOME}/logs/gateways/<name>/current` (10 archives × 1 MB each).
-- State persistence across container restarts: the boot-time reconciler reads `gateway_state.json` from each profile directory and brings the slot back up only for profiles whose last recorded state was `running`. Only a gateway you explicitly stopped (`qubit gateway stop`) stays down across a restart — a container restart, image upgrade, or unexpected exit leaves the recorded state as `running`, so the gateway auto-starts on the next boot.
+- Per-profile rotated logs at `${HERMES_HOME}/logs/gateways/<name>/current` (10 archives × 1 MB each).
+- State persistence across container restarts: the boot-time reconciler reads `gateway_state.json` from each profile directory and brings the slot back up only for profiles whose last recorded state was `running`. Only a gateway you explicitly stopped (`hermes gateway stop`) stays down across a restart — a container restart, image upgrade, or unexpected exit leaves the recorded state as `running`, so the gateway auto-starts on the next boot.
+
+A profile created from the **host** against a bind-mounted `~/.hermes` gets its directory but no slot (the host process cannot reach the container's `/run/service`). Inside the container, `hermes -p <name> gateway start` registers the missing slot on demand and starts it — no `docker restart` needed. Only `start` does this, and only for a real profile directory (one carrying `SOUL.md`); `stop`/`restart` on an unregistered profile and a mistyped `-p` name still fail with `✗ no such gateway`.
 
 The lifecycle commands you'd run on the host work the same way from inside the container:
 
 ```sh
 # Create a profile — registers the gateway-<name> s6 slot.
-docker exec qubit qubit profile create coder
+docker exec hermes hermes profile create coder
 
 # Start / stop / restart — dispatches s6-svc; the gateway lifecycle survives docker restart.
-docker exec qubit qubit -p coder gateway start
-docker exec qubit qubit -p coder gateway stop
-docker exec qubit qubit -p coder gateway restart
+docker exec hermes hermes -p coder gateway start
+docker exec hermes hermes -p coder gateway stop
+docker exec hermes hermes -p coder gateway restart
 
 # Status — reports `Manager: s6 (container supervisor)` inside the container.
-docker exec qubit qubit -p coder gateway status
+docker exec hermes hermes -p coder gateway status
 
 # Remove a profile — tears down the s6 slot too.
-docker exec qubit qubit profile delete coder
+docker exec hermes hermes profile delete coder
 ```
 
-Under the hood, `qubit gateway start/stop/restart` inside the container is intercepted and routed to `s6-svc` against the right service directory; you don't need to learn the s6 commands directly. For raw supervisor state, use `/command/s6-svstat /run/service/gateway-<name>` (note `/command/` is on PATH only for processes spawned by the supervision tree — when calling from `docker exec`, pass the absolute path).
+Under the hood, `hermes gateway start/stop/restart` inside the container is intercepted and routed to `s6-svc` against the right service directory; you don't need to learn the s6 commands directly. For raw supervisor state, use `/command/s6-svstat /run/service/gateway-<name>` (note `/command/` is on PATH only for processes spawned by the supervision tree — when calling from `docker exec`, pass the absolute path).
 
 ### Reaching more than one profile from outside the container
 
 Two different surfaces reach a profile's gateway from outside, and they behave differently — don't conflate them:
 
-**Qubit Desktop (and the web dashboard).** The Desktop app's **Remote Gateway** connection talks to a `qubit dashboard` backend (default **port 9119**, enabled by `HERMES_DASHBOARD=1`) — *not* the OpenAI API server. One dashboard backend serves **every** co-located profile: the app's profile switcher sends the target profile with each request and the backend opens that profile's `QUBIT_HOME` on disk. So you do **not** need a second port — or a second connection — per profile for Desktop; one `:9119` connection covers them all through the switcher.
+**Hermes Desktop (and the web dashboard).** The Desktop app's **Remote Gateway** connection talks to a `hermes dashboard` backend (default **port 9119**, enabled by `HERMES_DASHBOARD=1`) — *not* the OpenAI API server. One dashboard backend serves **every** co-located profile: the app's profile switcher sends the target profile with each request and the backend opens that profile's `HERMES_HOME` on disk. So you do **not** need a second port — or a second connection — per profile for Desktop; one `:9119` connection covers them all through the switcher.
 
 **OpenAI-compatible API clients (Open WebUI, LobeChat, `/v1/...`).** These talk to each profile's **API server**, which binds **port 8642 for every profile** (resolved from `API_SERVER_PORT` / `platforms.api_server.extra.port` — there is no auto-allocation and no `config.yaml`/`gateway.port` key). If you want a client to reach a *specific* second profile, give that profile a distinct `API_SERVER_PORT` in **its own** `.env`, otherwise its gateway tries to bind 8642 too and conflicts with the default profile:
 
 ```sh
 # Create the profile (registers its gateway-<name> s6 slot)
-docker exec qubit qubit profile create work
+docker exec hermes hermes profile create work
 
 # Point its API server at a free port (write to the profile's own .env)
 cat >> /opt/data/profiles/work/.env <<'EOF'
@@ -260,7 +291,7 @@ API_SERVER_ENABLED=true
 API_SERVER_PORT=8643
 EOF
 
-docker exec qubit qubit -p work gateway restart
+docker exec hermes hermes -p work gateway restart
 ```
 
 Keep `API_SERVER_PORT` in each profile's **own** `.env`, never in the container-wide `environment:` block — a global value would force every profile onto the same port and they would collide. With bridge networking, publish the extra port in `docker-compose.yml` (`- "8643:8643"`); with `network_mode: host` it is already reachable on the host. The default profile's 8642 connection is untouched.
@@ -273,7 +304,7 @@ Before the s6 migration, "one container per profile" was the recommended pattern
 |---|---|---|
 | Disk overhead | One image, one bundled venv, one Playwright cache | N images / N caches |
 | Memory overhead | Shared Python interpreter cache, shared node_modules | Duplicated per container |
-| Profile creation | `docker exec ... qubit profile create <name>` (seconds) | New `docker run` invocation + port allocation + bind-mount config |
+| Profile creation | `docker exec ... hermes profile create <name>` (seconds) | New `docker run` invocation + port allocation + bind-mount config |
 | Per-profile crash recovery | `s6-supervise` auto-restart | Docker's `--restart unless-stopped` (slower, kills sibling work) |
 | Logs | Per-profile rotated file via `s6-log`, plus container-boot audit log | `docker logs <name>` per container — no built-in rotation |
 | Backup | One `~/.hermes` directory | N directories to coordinate |
@@ -322,10 +353,10 @@ The s6 container has four distinct log surfaces, and "why isn't my gateway showi
 
 | Source | Where it lands | How to read it |
 |---|---|---|
-| **Per-profile gateway** (`qubit gateway run` and per-profile gateways under s6) | Tee'd to two places: `docker logs <container>` (real time, no extra prefix) **and** `${QUBIT_HOME}/logs/gateways/<profile>/current` (rotated, ISO-8601 timestamped, 10 archives × 1 MB each) | `docker logs -f qubit` or `tail -F ~/.hermes/logs/gateways/default/current` on the host |
-| **Dashboard** (when `HERMES_DASHBOARD=1`) | `docker logs <container>` (no prefix) | `docker logs -f qubit` — interleaved with gateway lines |
-| **Boot reconciler** (records which profile gateways were restored on each container start) | `${QUBIT_HOME}/logs/container-boot.log` (append-only audit log) | `tail -F ~/.hermes/logs/container-boot.log` |
-| **Generic Qubit logs** (`agent.log`, `errors.log`) | `${QUBIT_HOME}/logs/` (profile-aware) | `docker exec qubit qubit logs --follow [--level WARNING] [--session <id>]` |
+| **Per-profile gateway** (`hermes gateway run` and per-profile gateways under s6) | Tee'd to two places: `docker logs <container>` (real time, no extra prefix) **and** `${HERMES_HOME}/logs/gateways/<profile>/current` (rotated, ISO-8601 timestamped, 10 archives × 1 MB each) | `docker logs -f hermes` or `tail -F ~/.hermes/logs/gateways/default/current` on the host |
+| **Dashboard** (when `HERMES_DASHBOARD=1`) | `docker logs <container>` (no prefix) | `docker logs -f hermes` — interleaved with gateway lines |
+| **Boot reconciler** (records which profile gateways were restored on each container start) | `${HERMES_HOME}/logs/container-boot.log` (append-only audit log) | `tail -F ~/.hermes/logs/container-boot.log` |
+| **Generic Hermes logs** (`agent.log`, `errors.log`) | `${HERMES_HOME}/logs/` (profile-aware) | `docker exec hermes hermes logs --follow [--level WARNING] [--session <id>]` |
 
 Two practical consequences worth knowing:
 
@@ -347,7 +378,7 @@ docker run -it --rm \
 Direct `-e` flags override values from `.env`. This is useful for CI/CD or secrets-manager integrations where you don't want keys on disk.
 
 :::note Looking for Docker as the **terminal backend**?
-This page covers running Qubit itself inside Docker. If you want Qubit to execute the agent's `terminal` / `execute_code` calls inside a Docker sandbox container (one long-lived container shared across Qubit processes — see issue #20561), that's a separate config block — `terminal.backend: docker` plus `terminal.docker_image`, `terminal.docker_volumes`, `terminal.docker_forward_env`, `terminal.docker_env`, `terminal.docker_run_as_host_user`, `terminal.docker_extra_args`, `terminal.docker_persist_across_processes`, and `terminal.docker_orphan_reaper`. See [Configuration → Docker Backend](configuration.md#docker-backend) for the full set including container-lifecycle rules.
+This page covers running Hermes itself inside Docker. If you want Hermes to execute the agent's `terminal` / `execute_code` calls inside a Docker sandbox container (one long-lived container shared across Hermes processes — see issue #20561), that's a separate config block — `terminal.backend: docker` plus `terminal.docker_image`, `terminal.docker_volumes`, `terminal.docker_forward_env`, `terminal.docker_env`, `terminal.docker_run_as_host_user`, `terminal.docker_extra_args`, `terminal.docker_persist_across_processes`, and `terminal.docker_orphan_reaper`. See [Configuration → Docker Backend](configuration.md#docker-backend) for the full set including container-lifecycle rules.
 :::
 
 ## Docker Compose example
@@ -356,9 +387,9 @@ For persistent deployment with both the gateway and dashboard, a `docker-compose
 
 ```yaml
 services:
-  qubit:
+  hermes:
     image: nousresearch/hermes-agent:latest
-    container_name: qubit
+    container_name: hermes
     restart: unless-stopped
     command: gateway run
     ports:
@@ -379,14 +410,14 @@ services:
           cpus: "2.0"
 ```
 
-Start with `docker compose up -d` and view logs with `docker compose logs -f`. The supervised gateway's stdout is also tee'd to `${QUBIT_HOME}/logs/gateways/<profile>/current` on the volume — see [Where the logs go](#where-the-logs-go) for the full routing map.
+Start with `docker compose up -d` and view logs with `docker compose logs -f`. The supervised gateway's stdout is also tee'd to `${HERMES_HOME}/logs/gateways/<profile>/current` on the volume — see [Where the logs go](#where-the-logs-go) for the full routing map.
 
 ## Optional: Linux desktop audio bridge
 
-Voice mode in Docker needs two separate things to work: Qubit must be allowed to probe audio devices inside the container, and the container must be able to reach your host audio server. The setup below covers the host audio plumbing for Linux desktops that expose a PulseAudio-compatible socket, including many PipeWire setups.
+Voice mode in Docker needs two separate things to work: Hermes must be allowed to probe audio devices inside the container, and the container must be able to reach your host audio server. The setup below covers the host audio plumbing for Linux desktops that expose a PulseAudio-compatible socket, including many PipeWire setups.
 
 :::caution
-This is a Linux desktop workaround, not a general Docker Desktop feature. It is useful when you already have host audio working and want CLI voice mode inside the Qubit container. If Qubit still reports `Running inside Docker container -- no audio devices`, use a build that includes Docker audio probing support for `PULSE_SERVER` / `PIPEWIRE_REMOTE`.
+This is a Linux desktop workaround, not a general Docker Desktop feature. It is useful when you already have host audio working and want CLI voice mode inside the Hermes container. If Hermes still reports `Running inside Docker container -- no audio devices`, use a build that includes Docker audio probing support for `PULSE_SERVER` / `PIPEWIRE_REMOTE`.
 :::
 
 First, create an ALSA config next to your Compose file:
@@ -424,17 +455,18 @@ Use that image in Compose and pass through the host user's PulseAudio socket and
 
 ```yaml
 services:
-  qubit:
+  hermes:
     build:
       context: .
       dockerfile: Dockerfile.audio
     image: hermes-agent-audio
-    container_name: qubit
+    container_name: hermes
     restart: unless-stopped
     command: gateway run
     volumes:
       - ~/.hermes:/opt/data
       - /run/user/${HERMES_UID}/pulse:/run/user/${HERMES_UID}/pulse
+      # no-tmp: ok — path inside the container
       - ~/.config/pulse/cookie:/tmp/pulse-cookie:ro
       - ./asound.conf:/etc/asound.conf:ro
     environment:
@@ -442,6 +474,7 @@ services:
       - HERMES_GID=${HERMES_GID}
       - XDG_RUNTIME_DIR=/run/user/${HERMES_UID}
       - PULSE_SERVER=unix:/run/user/${HERMES_UID}/pulse/native
+      # no-tmp: ok — path inside the container
       - PULSE_COOKIE=/tmp/pulse-cookie
 ```
 
@@ -456,12 +489,12 @@ docker compose up -d --build
 To verify what PortAudio sees inside the container:
 
 ```sh
-docker exec qubit /opt/qubit/.venv/bin/python -c "import sounddevice as sd; print(sd.query_devices())"
+docker exec hermes /opt/hermes/.venv/bin/python -c "import sounddevice as sd; print(sd.query_devices())"
 ```
 
 ## Resource limits
 
-The Qubit container needs moderate resources. Recommended minimums:
+The Hermes container needs moderate resources. Recommended minimums:
 
 | Resource | Minimum | Recommended |
 |----------|---------|-------------|
@@ -475,7 +508,7 @@ Set limits in Docker:
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   --restart unless-stopped \
   --memory=4g --cpus=2 \
   -v ~/.hermes:/opt/data \
@@ -484,29 +517,55 @@ docker run -d \
 
 ## What the Dockerfile does
 
-The official image is based on `debian:13.4` and includes:
+The image uses Debian 13.4 and includes:
 
-- Python 3.13 with dependencies synced from the lockfile via `uv sync --frozen --no-install-project` for the baked extras (`all`, `messaging`, Anthropic/Bedrock/Azure identity, Hindsight, Matrix), followed by a no-dependency editable install of Qubit itself.
-- Node.js 26 + npm (for browser automation, WhatsApp bridge, TUI/Desktop bundles, and workspace build tooling)
-- Playwright with Chromium (`npx playwright install --with-deps chromium --only-shell`)
-- ripgrep, ffmpeg, git, and `xz-utils` as system utilities
-- **`docker-cli`** — so agents running inside the container can drive the host's Docker daemon (bind-mount `/var/run/docker.sock` to opt in) for `docker build`, `docker run`, container inspection, etc.
-- **`openssh-client`** — enables the [SSH terminal backend](/user-guide/configuration#ssh-backend) from inside the container. The SSH backend shells out to the system `ssh` binary; without this, it failed silently in containerized installs.
-- The WhatsApp bridge (`scripts/whatsapp-bridge/`)
-- **[`s6-overlay`](https://github.com/just-containers/s6-overlay) v3** as PID 1 (replaces the older `tini`) — supervises the dashboard and per-profile gateways with auto-restart on crash, reaps zombie subprocesses, and forwards signals.
 
-The image treats `/opt/qubit` as an immutable install tree at runtime. Optional Python extras, Node workspaces, and TUI assets that must be available inside Docker need to be baked during the image build; runtime lazy installs are disabled so supervised gateways and `docker exec qubit …` commands do not try to write dependency artifacts back into the read-only source tree.
+- A Python 3.14 environment synchronized from the committed `uv.lock`, followed
+  by a no-dependency editable install of Hermes.
+- The curated extras `all`, `messaging`, `otlp`, `anthropic`, `bedrock`,
+  `azure-identity`, and `matrix`. This is not `--all-extras`.
+- Node.js 26 and npm from the digest-pinned Node source image.
+- PM-pinned uv, full Chromium, FFmpeg, and ripgrep in `/opt/hermes/tools`.
+- System Git, OpenSSH, Docker CLI, and Chromium shared libraries.
+- Prebuilt TUI/dashboard assets and baked Photon sidecar dependencies.
+- s6-overlay for supervision and zombie-process cleanup.
+
+Chromium is staged through PM, not `npx playwright install`. The build records
+its resolved executable in `/etc/hermes/agent-browser-executable-path`.
+`PLAYWRIGHT_BROWSERS_PATH` names `/opt/hermes/tools`, outside the data mount.
+
+Every image, including the unsuffixed (non-`-desktop`) tags, carries the full
+Chromium build rather than Playwright's lighter headless shell: one pinned,
+checksummed browser serves both headless browsing and headed Bot Screen
+sessions. The cost is image size — the full build is larger than the headless
+shell earlier images shipped.
+
+Opt-in backend SDKs (Edge TTS, Firecrawl, Exa, platform adapters, plugin
+dependencies) install on first use into PM dependency generations under
+`/opt/data/installs`, so they survive container recreation and image updates.
+The image's own `/opt/hermes/.venv` is never modified. On each boot the
+container re-resolves the recorded selection against the new image's lock
+before services start; if that fails (for example offline), it boots the
+image's own environment and keeps the recorded extras for the next boot or
+install. Set `security.allow_lazy_installs: false` to refuse on-demand
+installs. The old `lazy-packages` overlay is not used.
+
+Image provenance lives at `/etc/hermes/image-provenance.json`, outside both the
+source and data mounts. The build stamp lives at `/opt/hermes/install-stamp.json`.
+A local build without a supplied stamp reports an unknown revision rather than
+inventing a commit. `hermes update` refuses image-owned code changes; replace
+the image to update the application.
 
 The container's `ENTRYPOINT` is a small dispatcher (`docker/entrypoint-dispatch.sh`). When the container owns PID 1 (normal Docker / Podman), it exec's s6-overlay's `/init` and you get the full supervision tree described below. When a platform wraps the image entrypoint under its own PID-1 init (Fly.io Machines, `docker run --init`, some Nomad/Kubernetes setups), `/init` would abort with `s6-overlay-suexec: fatal: can only run as pid 1` — so the dispatcher instead runs the stage2 bootstrap directly and exec's the main wrapper without s6. On that fallback path the requested command still runs, but supervised services (dashboard, per-profile gateways) are unavailable.
 
 On the PID-1 path, `/init`:
 1. Runs `/etc/cont-init.d/01-hermes-setup` (= `docker/stage2-hook.sh`) as root: optional UID/GID remap, fixes volume ownership, seeds `.env` / `config.yaml` / `SOUL.md` on first boot, runs non-interactive config-schema migrations unless `HERMES_SKIP_CONFIG_MIGRATION=1`, syncs bundled skills.
-2. Runs `/etc/cont-init.d/02-reconcile-profiles` (= `qubit_cli.container_boot`): walks `$QUBIT_HOME/profiles/<name>/`, recreates the per-profile gateway s6 service slot under `/run/service/gateway-<profile>/`, and auto-starts only those whose last recorded state was `running` (see [Per-profile gateway supervision](#per-profile-gateway-supervision)).
-3. Starts the static `main-qubit` and `dashboard` s6-rc services.
-4. Exec's the container's CMD as the main program (`/opt/qubit/docker/main-wrapper.sh`), which routes the arguments the user passed to `docker run`:
-   - no args → `qubit` (the default)
+2. Runs `/etc/cont-init.d/02-reconcile-profiles` (= `hermes_cli.container_boot`): walks `$HERMES_HOME/profiles/<name>/`, recreates the per-profile gateway s6 service slot under `/run/service/gateway-<profile>/`, and auto-starts only those whose last recorded state was `running` (see [Per-profile gateway supervision](#per-profile-gateway-supervision)).
+3. Starts the static `main-hermes` and `dashboard` s6-rc services.
+4. Exec's the container's CMD as the main program (`/opt/hermes/docker/main-wrapper.sh`), which routes the arguments the user passed to `docker run`:
+   - no args → `hermes` (the default)
    - first arg is an executable on PATH (e.g. `sleep`, `bash`) → exec it directly
-   - anything else → `qubit <args>` (subcommand passthrough)
+   - anything else → `hermes <args>` (subcommand passthrough)
    The container exits when this main program exits, with its exit code.
 
 :::warning Breaking change vs. pre-s6 images
@@ -514,47 +573,64 @@ The container ENTRYPOINT is now the `entrypoint-dispatch.sh` dispatcher (which d
 :::
 
 :::warning Privilege model
-Do not override the image entrypoint unless you keep `/init` (or, equivalently, the legacy `docker/entrypoint.sh` shim that forwards to the stage2 hook) in the command chain. s6-overlay's `/init` runs as root so it can chown the volume on first boot, then drops to the `qubit` user via `s6-setuidgid` for every supervised service AND for the main program. Starting `qubit gateway run` as root inside the official image is refused by default because it can leave root-owned files in `/opt/data` and break later dashboard or gateway starts. Set `HERMES_ALLOW_ROOT_GATEWAY=1` only when you intentionally accept that risk.
+Do not override the image entrypoint unless you keep `/init` (or, equivalently, the legacy `docker/entrypoint.sh` shim that forwards to the stage2 hook) in the command chain. s6-overlay's `/init` runs as root so it can chown the volume on first boot, then drops to the `hermes` user via `s6-setuidgid` for every supervised service AND for the main program. Starting `hermes gateway run` as root inside the official image is refused by default because it can leave root-owned files in `/opt/data` and break later dashboard or gateway starts. Set `HERMES_ALLOW_ROOT_GATEWAY=1` only when you intentionally accept that risk.
 :::
 
-### `docker exec` automatically drops to the `qubit` user
+:::warning Overriding `entrypoint:` also removes the zombie reaper
+`/init` is what reaps orphaned grandchildren (headless browsers, MCP servers, `git`/`npm` helpers spawned by tools). A Compose service that overrides `entrypoint:` to call `hermes` directly — for example to run the dashboard as a non-root user — makes the hermes process itself PID 1, and nothing above it ever calls `wait()`: every orphan stays a `<defunct>` entry forever (one deployment reached 284 zombies in under three hours). Hermes prints `[hermes] WARNING: this process is PID 1 with no init above it` at startup in that configuration.
 
-`docker exec qubit <cmd>` defaults to running as root inside the container, but the image ships a thin shim at `/opt/qubit/bin/qubit` (earliest on PATH) that detects root callers and transparently re-execs through `s6-setuidgid qubit`. So `docker exec qubit login`, `docker exec qubit profile create …`, `docker exec qubit setup`, etc. all write files owned by UID 10000 — i.e. readable by the supervised gateway — with no extra `--user` flag needed. Non-root callers (the supervised processes themselves, `docker exec --user qubit`, kanban subagents inside the container) hit a short-circuit that exec's the venv binary directly, so there's no overhead on the hot paths.
+If you must override the entrypoint, add Docker's init as PID 1 so orphans are reaped:
+
+```yaml
+services:
+  hermes-dashboard:
+    image: nousresearch/hermes-agent:latest
+    init: true                                      # docker-init becomes PID 1 and reaps orphans
+    entrypoint: ["/opt/hermes/.venv/bin/hermes"]
+    command: ["dashboard", "--host", "0.0.0.0", "--port", "9119", "--no-open", "--skip-build"]
+```
+
+(`docker run --init …` is the equivalent flag.) This fixes the zombie accumulation only — with `/init` out of the chain, the s6 supervision tree is still gone: the dashboard, `hermes gateway run` and per-profile gateways are unsupervised, exactly as the dispatcher's own non-PID-1 warning says. Keep the default `ENTRYPOINT` whenever you can.
+:::
+
+### `docker exec` automatically drops to the `hermes` user
+
+`docker exec hermes <cmd>` defaults to running as root inside the container, but the image ships a thin shim at `/opt/hermes/bin/hermes` (earliest on PATH) that detects root callers and transparently re-execs through `s6-setuidgid hermes`. So `docker exec hermes hermes login`, `docker exec hermes hermes profile create …`, `docker exec hermes hermes setup`, etc. all write files owned by UID 10000 — i.e. readable by the supervised gateway — with no extra `--user` flag needed. Non-root callers (the supervised processes themselves, `docker exec --user hermes`, kanban subagents inside the container) hit a short-circuit that exec's the venv binary directly, so there's no overhead on the hot paths.
 
 If you specifically need a `docker exec` that retains root semantics (diagnostic sessions, inspecting root-only state, files outside `/opt/data` that root happens to own), opt out per invocation:
 
 ```sh
-docker exec -e HERMES_DOCKER_EXEC_AS_ROOT=1 qubit <cmd>
+docker exec -e HERMES_DOCKER_EXEC_AS_ROOT=1 hermes <cmd>
 ```
 
-The shim accepts `1` / `true` / `yes` (case-insensitive). Anything else — including typos like `=0` — falls through to the drop, so silent opt-outs aren't possible. If `s6-setuidgid` isn't available (custom builds that stripped s6-overlay), the shim refuses to run as root and exits 126 instead, surfacing the broken privilege model loudly rather than regressing to the historical footgun where `docker exec qubit login` would write `auth.json` as `root:root` and break the supervised gateway's auth on every chat platform message.
+The shim accepts `1` / `true` / `yes` (case-insensitive). Anything else — including typos like `=0` — falls through to the drop, so silent opt-outs aren't possible. If `s6-setuidgid` isn't available (custom builds that stripped s6-overlay), the shim refuses to run as root and exits 126 instead, surfacing the broken privilege model loudly rather than regressing to the historical footgun where `docker exec hermes login` would write `auth.json` as `root:root` and break the supervised gateway's auth on every chat platform message.
 
 ### Per-profile gateway supervision
 
-Each profile created with `qubit profile create <name>` automatically gets an s6-supervised gateway service registered at `/run/service/gateway-<name>/`, with state-persistent auto-restart across container restarts. See [Multi-profile support](#multi-profile-support) above for the user-facing workflow and the lifecycle commands.
+Each profile created with `hermes profile create <name>` automatically gets an s6-supervised gateway service registered at `/run/service/gateway-<name>/`, with state-persistent auto-restart across container restarts. See [Multi-profile support](#multi-profile-support) above for the user-facing workflow and the lifecycle commands.
 
 **Supervision benefits over the pre-s6 image:**
 
 - Gateway crashes are auto-restarted by `s6-supervise` after a ~1s backoff.
 - Dashboard, when enabled with `HERMES_DASHBOARD=1`, is supervised on the same supervision tree and gets the same auto-restart treatment.
-- `docker restart`, image upgrades (`docker compose up -d --force-recreate`), and unexpected exits preserve running gateways: the cont-init reconciler reads `$QUBIT_HOME/profiles/<name>/gateway_state.json` and brings the slot back up if the last recorded state was `running`. Only an explicit `qubit gateway stop` records `stopped` and keeps the gateway down across the restart; the container/s6 SIGTERM sent on a restart or upgrade is treated as "still running" and auto-starts.
-- Per-profile gateway logs persist under `$QUBIT_HOME/logs/gateways/<profile>/current` (rotated by `s6-log`), and the reconciler's actions are appended to `$QUBIT_HOME/logs/container-boot.log` per boot. See [Where the logs go](#where-the-logs-go) for the full routing map.
+- `docker restart`, image upgrades (`docker compose up -d --force-recreate`), and unexpected exits preserve running gateways: the cont-init reconciler reads `$HERMES_HOME/profiles/<name>/gateway_state.json` and brings the slot back up if the last recorded state was `running`. Only an explicit `hermes gateway stop` records `stopped` and keeps the gateway down across the restart; the container/s6 SIGTERM sent on a restart or upgrade is treated as "still running" and auto-starts.
+- Per-profile gateway logs persist under `$HERMES_HOME/logs/gateways/<profile>/current` (rotated by `s6-log`), and the reconciler's actions are appended to `$HERMES_HOME/logs/container-boot.log` per boot. See [Where the logs go](#where-the-logs-go) for the full routing map.
 
-`qubit status` inside the container reports `Manager: s6 (container supervisor)`. Use `/command/s6-svstat /run/service/gateway-<name>` for the raw supervisor view (note `/command/` is on PATH for supervision-tree processes only; pass the absolute path when calling from `docker exec`).
+`hermes status` inside the container reports `Manager: s6 (container supervisor)`. Use `/command/s6-svstat /run/service/gateway-<name>` for the raw supervisor view (note `/command/` is on PATH for supervision-tree processes only; pass the absolute path when calling from `docker exec`).
 
 ## Upgrading
 
 Pull the latest image and recreate the container. Your data directory is
 preserved, and the container runs non-interactive config-schema migrations
-against the mounted `$QUBIT_HOME/config.yaml` before starting the gateway.
-When a migration is needed, Qubit writes timestamped backups next to
+against the mounted `$HERMES_HOME/config.yaml` before starting the gateway.
+When a migration is needed, Hermes writes timestamped backups next to
 `config.yaml` and `.env` first.
 
 ```sh
 docker pull nousresearch/hermes-agent:latest
-docker rm -f qubit
+docker rm -f hermes
 docker run -d \
-  --name qubit \
+  --name hermes \
   --restart unless-stopped \
   -v ~/.hermes:/opt/data \
   nousresearch/hermes-agent gateway run
@@ -572,7 +648,7 @@ persisted config manually before letting the new image rewrite it.
 
 ## Skills and credential files
 
-When using Docker as the execution environment (not the methods above, but when the agent runs commands inside a Docker sandbox — see [Configuration → Docker Backend](./configuration.md#docker-backend)), Qubit reuses a single long-lived container for all tool calls and automatically bind-mounts the skills directory (`~/.hermes/skills/`) and any credential files declared by skills into that container as read-only volumes. Skill scripts, templates, and references are available inside the sandbox without manual configuration, and because the container persists for the life of the Qubit process, any dependencies you install or files you write stay around for the next tool call.
+When using Docker as the execution environment (not the methods above, but when the agent runs commands inside a Docker sandbox — see [Configuration → Docker Backend](./configuration.md#docker-backend)), Hermes reuses a single long-lived container for all tool calls and automatically bind-mounts the skills directory (`~/.hermes/skills/`) and any credential files declared by skills into that container as read-only volumes. Skill scripts, templates, and references are available inside the sandbox without manual configuration, and because the container persists for the life of the Hermes process, any dependencies you install or files you write stay around for the next tool call.
 
 The same syncing happens for SSH and Modal backends — skills and credential files are uploaded via rsync or the Modal mount API before each command.
 
@@ -582,13 +658,17 @@ The official image ships with a curated set of utilities (see [What the Dockerfi
 
 ### npm or Python tools — use `npx` or `uvx`
 
-For any tool published to npm or PyPI, instruct Qubit to run it via `npx` (npm) or `uvx` (Python) and to remember that command in its persistent memory. If the tool needs a config file or credentials, instruct it to drop those under `/opt/data` (e.g. `/opt/data/<tool>/config.yaml`).
+For any tool published to npm or PyPI, instruct Hermes to run it via `npx` (npm) or `uvx` (Python) and to remember that command in its persistent memory. If the tool needs a config file or credentials, instruct it to drop those under `/opt/data` (e.g. `/opt/data/<tool>/config.yaml`).
 
 Dependencies are fetched on demand and cached for the life of the container. Configuration written under `/opt/data` survives container restarts because it lives on the bind-mounted host directory. The package cache itself is rebuilt after a `docker rm`, but `npx` and `uvx` re-fetch transparently the next time the tool runs.
 
 ### Other tools (apt packages, binaries) — install and remember
 
-For anything outside npm or PyPI — `apt` packages, prebuilt binaries, language runtimes not already in the image — instruct Qubit how to install it (e.g. `apt-get update && apt-get install -y <package>`) and tell it to remember the install command. The tool persists for the rest of the container's lifetime, and Qubit will re-run the install command after a container restart when it next needs the tool.
+The runtime user cannot install system APT packages. For occasional tools, an
+operator can deliberately use a root shell; those changes last only until the
+container is replaced. A container restart retains its writable layer, while
+recreation does not. Memory of an install command is not automatic provisioning.
+Use a derived image for repeatable system dependencies.
 
 This is a good fit for tools that are quick to install and used occasionally. For tools used constantly, prefer the next approach.
 
@@ -603,32 +683,32 @@ USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends <your-package> \
     && rm -rf /var/lib/apt/lists/*
-USER qubit
+# Keep the root entrypoint; s6 drops privileges for the runtime.
 ```
 
 Build it and use it in place of the official image:
 
 ```sh
-docker build -t my-qubit:latest .
+docker build -t my-hermes:latest .
 docker run -d \
-  --name qubit \
+  --name hermes \
   --restart unless-stopped \
   -v ~/.hermes:/opt/data \
   -p 8642:8642 \
-  my-qubit:latest gateway run
+  my-hermes:latest gateway run
 ```
 
 The entrypoint script and `/opt/data` semantics are inherited unchanged, so the rest of this page still applies. Remember to rebuild the image when pulling a newer upstream `nousresearch/hermes-agent`.
 
 ### Complex tools or multi-service stacks — run a sidecar container
 
-For tools that bring their own service (a database, a web server, a queue, a headless browser farm) or that are too heavy to live inside the Qubit container, run them as a separate container on a shared Docker network. Qubit reaches the sidecar by container name, the same way it reaches a local inference server (see [Connecting to local inference servers](#connecting-to-local-inference-servers-vllm-ollama-etc)).
+For tools that bring their own service (a database, a web server, a queue, a headless browser farm) or that are too heavy to live inside the Hermes container, run them as a separate container on a shared Docker network. Hermes reaches the sidecar by container name, the same way it reaches a local inference server (see [Connecting to local inference servers](#connecting-to-local-inference-servers-vllm-ollama-etc)).
 
 ```yaml
 services:
-  qubit:
+  hermes:
     image: nousresearch/hermes-agent:latest
-    container_name: qubit
+    container_name: hermes
     restart: unless-stopped
     command: gateway run
     ports:
@@ -650,15 +730,15 @@ networks:
     driver: bridge
 ```
 
-From inside the Qubit container, the sidecar is reachable at `http://my-tool:<port>` (or whatever protocol it serves). This pattern keeps each service's lifecycle, resource limits, and upgrade cadence independent, and avoids bloating the Qubit image with dependencies that are only needed by one tool.
+From inside the Hermes container, the sidecar is reachable at `http://my-tool:<port>` (or whatever protocol it serves). This pattern keeps each service's lifecycle, resource limits, and upgrade cadence independent, and avoids bloating the Hermes image with dependencies that are only needed by one tool.
 
 ### Broadly useful tools — open an issue or pull request
 
-If a tool is likely to be useful to most Qubit Agent users, consider contributing it upstream rather than carrying it in a private derived image. Open an issue or pull request on the [hermes-agent repository](https://github.com/NousResearch/hermes-agent) describing the tool and its use case. Tools that get bundled into the official image benefit every user and avoid the maintenance overhead of a downstream fork.
+If a tool is likely to be useful to most Hermes Agent users, consider contributing it upstream rather than carrying it in a private derived image. Open an issue or pull request on the [hermes-agent repository](https://github.com/NousResearch/hermes-agent) describing the tool and its use case. Tools that get bundled into the official image benefit every user and avoid the maintenance overhead of a downstream fork.
 
 ## Connecting to local inference servers (vLLM, Ollama, etc.)
 
-When running Qubit in Docker and your inference server (vLLM, Ollama, text-generation-inference, etc.) is also running on the host or in another container, networking requires extra attention.
+When running Hermes in Docker and your inference server (vLLM, Ollama, text-generation-inference, etc.) is also running on the host or in another container, networking requires extra attention.
 
 ### Docker Compose (recommended)
 
@@ -684,9 +764,9 @@ services:
           devices:
             - capabilities: [gpu]
 
-  qubit:
+  hermes:
     image: nousresearch/hermes-agent:latest
-    container_name: qubit
+    container_name: hermes
     restart: unless-stopped
     command: gateway run
     ports:
@@ -712,7 +792,7 @@ model:
 ```
 
 :::tip Key points
-- Use the **container name** (`vllm`) as the hostname — not `localhost` or `127.0.0.1`, which refer to the Qubit container itself.
+- Use the **container name** (`vllm`) as the hostname — not `localhost` or `127.0.0.1`, which refer to the Hermes container itself.
 - The `model` value must match the `--served-model-name` you passed to vLLM.
 - Set `api_key` to any non-empty string (vLLM requires the header but doesn't validate it by default).
 - Do **not** include a trailing slash in `base_url`.
@@ -726,7 +806,7 @@ If your inference server runs directly on the host (not in Docker), use `host.do
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   -v ~/.hermes:/opt/data \
   -p 8642:8642 \
   nousresearch/hermes-agent gateway run
@@ -745,7 +825,7 @@ model:
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   --network host \
   -v ~/.hermes:/opt/data \
   nousresearch/hermes-agent gateway run
@@ -765,10 +845,10 @@ model:
 
 ### Verifying connectivity
 
-From inside the Qubit container, confirm the inference server is reachable:
+From inside the Hermes container, confirm the inference server is reachable:
 
 ```sh
-docker exec qubit curl -s http://vllm:8000/v1/models
+docker exec hermes curl -s http://vllm:8000/v1/models
 ```
 
 You should see a JSON response listing your served model. If this fails, check:
@@ -793,39 +873,46 @@ model:
 
 ### Container exits immediately
 
-Check logs: `docker logs qubit`. Common causes:
+Check logs: `docker logs hermes`. Common causes:
 - Missing or invalid `.env` file — run interactively first to complete setup
 - Port conflicts if running with exposed ports
 
 ### "Permission denied" errors
 
-The container's stage2 hook drops privileges to the non-root `qubit` user (UID 10000) via `s6-setuidgid` inside each supervised service. If your host `~/.hermes/` is owned by a different UID, set `HERMES_UID`/`HERMES_GID` — or their `PUID`/`PGID` aliases, for parity with LinuxServer.io and NAS images — to match your host user, or ensure the data directory is writable:
+The container's stage2 hook drops privileges to the non-root `hermes` user (UID 10000) via `s6-setuidgid` inside each supervised service. If your host `~/.hermes/` is owned by a different UID, set `HERMES_UID`/`HERMES_GID` — or their `PUID`/`PGID` aliases, for parity with LinuxServer.io and NAS images — to match your host user, or ensure the data directory is writable:
 
-```sh
-chmod -R 755 ~/.hermes
-```
+Do not make the whole data tree world-readable. It contains credentials.
+Match the container UID/GID to the bind mount's owner instead.
 
 On a NAS (UGOS, Synology, unRAID) the data directory is typically a **bind mount** owned by a host UID the container cannot `chown`. Set `PUID`/`PGID` (or `HERMES_UID`/`HERMES_GID`) to that host user so the runtime runs as the owner of the mount rather than UID 10000:
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   -e PUID=1000 -e PGID=10 \
-  -v /volume1/docker/qubit:/opt/data \
+  -v /volume1/docker/hermes:/opt/data \
   nousresearch/hermes-agent gateway run
 ```
 
-`docker exec qubit <cmd>` automatically drops to UID 10000 too — see [`docker exec` automatically drops to the `qubit` user](#docker-exec-automatically-drops-to-the-hermes-user) for details and the per-invocation opt-out.
+`docker exec hermes <cmd>` automatically drops to UID 10000 too — see [`docker exec` automatically drops to the `hermes` user](#docker-exec-automatically-drops-to-the-hermes-user) for details and the per-invocation opt-out.
+
+### Shared data directory keeps resetting to `0700`
+
+Outside a container Hermes locks `HERMES_HOME` (and its `cron/`, `sessions/`, `logs/`, `memories/` subdirectories) to owner-only `0700` on every start. Inside a container it leaves directory modes alone, so a bind mount shared with a sibling container running as a different UID (a web UI, a permissions fixer) keeps whatever mode and ACLs you set on the host. To force a specific directory mode anyway, set `HERMES_HOME_MODE` (octal, e.g. `HERMES_HOME_MODE=0755`); it is applied in containers too.
 
 ### "Permission denied" on every `docker exec` (install dir locked to 0700)
 
-Images built before late August 2026 had a bug where writing a credential file directly under `/opt/qubit` restricted that directory to `0700`, locking the `qubit` user (UID 10000) out of the install tree. Every new `docker exec` then fails with `Permission denied`.
+Images built before late August 2026 had a bug where writing a credential file directly under `/opt/hermes` restricted that directory to `0700`, locking the `hermes` user (UID 10000) out of the install tree. Every new `docker exec` then fails with `Permission denied`.
 
 Pulling a newer image and recreating the container fixes it permanently (the install dir ships as `0755` and current releases no longer restrict it). If you need to recover a running container in place without recreating it:
 
 ```sh
-docker exec -u root qubit chmod 0755 /opt/qubit
+docker exec -u root hermes chmod 0755 /opt/hermes
 ```
+
+### Zombie (`<defunct>`) processes piling up under PID 1
+
+`ps -eo stat,ppid,comm | awk '$1 ~ /^Z/'` inside the container lists dead children that were never reaped. This happens when hermes itself is PID 1 — almost always because a Compose service overrides `entrypoint:` and so skips `docker/entrypoint-dispatch.sh` → `/init`. Hermes also warns about it at startup (`this process is PID 1 with no init above it`). Restore the default entrypoint, or add `init: true` (Compose) / `docker run --init` so `docker-init` reaps orphans; see [What the Dockerfile does](#what-the-dockerfile-does). Recreating the container clears the existing zombies.
 
 ### Browser tools not working
 
@@ -833,7 +920,7 @@ Playwright needs shared memory. Add `--shm-size=1g` to your Docker run command:
 
 ```sh
 docker run -d \
-  --name qubit \
+  --name hermes \
   --shm-size=1g \
   -v ~/.hermes:/opt/data \
   nousresearch/hermes-agent gateway run
@@ -844,13 +931,13 @@ docker run -d \
 The `--restart unless-stopped` flag handles most transient failures. If the gateway is stuck, restart the container:
 
 ```sh
-docker restart qubit
+docker restart hermes
 ```
 
 ### Checking container health
 
 ```sh
-docker logs --tail 50 qubit          # Recent logs
-docker run -it --rm nousresearch/hermes-agent:latest version     # Verify version
-docker stats qubit                    # Resource usage
+docker logs --tail 50 hermes          # Recent logs
+docker run -it --rm nousresearch/hermes-agent:latest --version   # Verify version
+docker stats hermes                    # Resource usage
 ```

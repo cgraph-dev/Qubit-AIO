@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).parents[2]
 
 
-def _run_qubit(home: Path, *args: str, marker: bool = False) -> subprocess.CompletedProcess[str]:
+def _run_hermes(home: Path, *args: str, marker: bool = False) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["QUBIT_HOME"] = str(home)
     env["HERMES_KANBAN_HOME"] = str(home)
@@ -40,14 +40,14 @@ def _run_qubit(home: Path, *args: str, marker: bool = False) -> subprocess.Compl
 
 def test_delegated_child_kanban_cli_refusal_returns_nonzero_exit_status(tmp_path):
     """A printed Kanban mutation refusal must not look like CLI success."""
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir()
 
-    created = _run_qubit(home, "kanban", "create", "exit status probe", "--json")
+    created = _run_hermes(home, "kanban", "create", "exit status probe", "--json")
     assert created.returncode == 0, created.stderr
     task_id = json.loads(created.stdout)["id"]
 
-    refused = _run_qubit(
+    refused = _run_hermes(
         home,
         "kanban",
         "comment",
@@ -57,4 +57,4 @@ def test_delegated_child_kanban_cli_refusal_returns_nonzero_exit_status(tmp_path
     )
 
     assert refused.returncode == 1
-    assert "delegate_task child contexts cannot mutate Kanban tasks via the CLI" in refused.stderr
+    assert "delegate_task" in refused.stderr

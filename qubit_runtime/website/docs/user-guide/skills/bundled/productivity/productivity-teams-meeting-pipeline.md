@@ -15,9 +15,9 @@ Teams meeting summaries, job replay, Graph subscriptions.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/productivity\teams-meeting-pipeline` |
+| Path | `skills/productivity/teams-meeting-pipeline` |
 | Version | `1.1.0` |
-| Author | Qubit Agent + Teknium |
+| Author | Hermes Agent + Teknium |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Teams`, `Microsoft Graph`, `Meetings`, `Productivity`, `Operations` |
@@ -25,14 +25,14 @@ Teams meeting summaries, job replay, Graph subscriptions.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Teams Meeting Pipeline
 
 Use this skill whenever the user asks about Microsoft Teams meeting summaries, transcripts, recordings, action items, Graph subscriptions, or any operational question about the Teams meeting pipeline. Works in any language — the triggers below are examples, not an exhaustive list.
 
-Everything operator-facing is a `qubit teams-pipeline` subcommand run via the terminal tool. There are no new model tools for this pipeline — the CLI is the surface.
+Everything operator-facing is a `hermes teams-pipeline` subcommand run via the terminal tool. There are no new model tools for this pipeline — the CLI is the surface.
 
 ## When to use this skill
 
@@ -51,7 +51,7 @@ Multilingual trigger examples (not exhaustive):
 
 ## Prerequisites
 
-Before using the pipeline, verify these are set in `${QUBIT_HOME:-~/.hermes}/.env`:
+Before using the pipeline, verify these are set in `${HERMES_HOME:-~/.hermes}/.env`:
 
 ```bash
 MSGRAPH_TENANT_ID=...
@@ -66,36 +66,36 @@ If any are missing, direct the user to the Azure app registration guide at `/doc
 ### Status and inspection (start here)
 
 ```bash
-qubit teams-pipeline validate              # config snapshot — run first after any change
-qubit teams-pipeline token-health          # Graph token status
-qubit teams-pipeline token-health --force-refresh   # force a fresh token acquisition
-qubit teams-pipeline list                  # recent meeting jobs
-qubit teams-pipeline list --status failed  # only failed jobs
-qubit teams-pipeline show <job-id>         # full detail of one job
-qubit teams-pipeline subscriptions         # current Graph webhook subscriptions
+hermes teams-pipeline validate              # config snapshot — run first after any change
+hermes teams-pipeline token-health          # Graph token status
+hermes teams-pipeline token-health --force-refresh   # force a fresh token acquisition
+hermes teams-pipeline list                  # recent meeting jobs
+hermes teams-pipeline list --status failed  # only failed jobs
+hermes teams-pipeline show <job-id>         # full detail of one job
+hermes teams-pipeline subscriptions         # current Graph webhook subscriptions
 ```
 
 ### Re-running / debugging
 
 ```bash
-qubit teams-pipeline run <job-id>          # replay a stored job (re-summarize, re-deliver)
-qubit teams-pipeline fetch --meeting-id <id>   # dry-run: resolve meeting + transcript without persisting
-qubit teams-pipeline fetch --join-web-url "<url>"   # dry-run by join URL
-qubit teams-pipeline fetch --join-web-url "<url>" --organizer-user-id <id>   # organizer-scoped lookup (required for /meet/ short URLs)
+hermes teams-pipeline run <job-id>          # replay a stored job (re-summarize, re-deliver)
+hermes teams-pipeline fetch --meeting-id <id>   # dry-run: resolve meeting + transcript without persisting
+hermes teams-pipeline fetch --join-web-url "<url>"   # dry-run by join URL
+hermes teams-pipeline fetch --join-web-url "<url>" --organizer-user-id <id>   # organizer-scoped lookup (required for /meet/ short URLs)
 ```
 
 ### Subscription management
 
 ```bash
-qubit teams-pipeline subscribe \
+hermes teams-pipeline subscribe \
   --resource communications/onlineMeetings/getAllTranscripts \
   --notification-url https://<your-public-host>/msgraph/webhook \
   --client-state "$MSGRAPH_WEBHOOK_CLIENT_STATE"
 
-qubit teams-pipeline renew-subscription <sub-id> --expiration <iso-8601>
-qubit teams-pipeline delete-subscription <sub-id>
-qubit teams-pipeline maintain-subscriptions            # renew near-expiry ones
-qubit teams-pipeline maintain-subscriptions --dry-run  # show what would be renewed
+hermes teams-pipeline renew-subscription <sub-id> --expiration <iso-8601>
+hermes teams-pipeline delete-subscription <sub-id>
+hermes teams-pipeline maintain-subscriptions            # renew near-expiry ones
+hermes teams-pipeline maintain-subscriptions --dry-run  # show what would be renewed
 ```
 
 ## Decision tree for common asks
@@ -110,9 +110,9 @@ qubit teams-pipeline maintain-subscriptions --dry-run  # show what would be rene
 Microsoft Graph caps webhook subscriptions at 72 hours and **will not auto-renew them**. If `maintain-subscriptions` is not scheduled, meeting notifications silently stop arriving 3 days after any manual subscription creation.
 
 When the user reports "the pipeline worked yesterday but nothing is arriving today":
-1. Run `qubit teams-pipeline subscriptions` — if it's empty or all entries show `expirationDateTime` in the past, that's the cause.
+1. Run `hermes teams-pipeline subscriptions` — if it's empty or all entries show `expirationDateTime` in the past, that's the cause.
 2. Recreate with `subscribe` as shown above.
-3. **Set up automated renewal immediately** via `qubit cron add`, a systemd timer, or plain crontab. The operator runbook at `/docs/guides/operate-teams-meeting-pipeline#automating-subscription-renewal-required-for-production` has all three options. 12-hour interval is safe (6x headroom against the 72h limit).
+3. **Set up automated renewal immediately** via `hermes cron add`, a systemd timer, or plain crontab. The operator runbook at `/docs/guides/operate-teams-meeting-pipeline#automating-subscription-renewal-required-for-production` has all three options. 12-hour interval is safe (6x headroom against the 72h limit).
 
 ## Other pitfalls
 

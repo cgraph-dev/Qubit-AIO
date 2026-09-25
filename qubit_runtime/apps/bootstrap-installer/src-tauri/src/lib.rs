@@ -1,4 +1,4 @@
-//! Qubit Setup — Tauri entrypoint.
+//! Hermes Setup — Tauri entrypoint.
 //!
 //! Spawns a single window pointed at the React frontend (apps/bootstrap-installer/src/).
 //! All install-time work lives in `bootstrap.rs` and is invoked through the Tauri
@@ -100,10 +100,10 @@ pub fn run() {
 
     let mode = AppMode::from_args(std::env::args().skip(1));
     // Escape hatch: `--reinstall`/`--repair` forces the installer UI even when
-    // Qubit is already installed, so users can re-run setup to repair a broken
+    // Hermes is already installed, so users can re-run setup to repair a broken
     // install instead of the launcher fast path silently relaunching the app.
     let force_setup = force_setup_from_args(std::env::args().skip(1));
-    tracing::info!(?mode, force_setup, "Qubit installer starting");
+    tracing::info!(?mode, force_setup, "Hermes installer starting");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -114,15 +114,15 @@ pub fn run() {
         .setup(move |app| {
             use tauri::Manager;
             // Launcher fast path (macOS only): a bare ("Install") launch when
-            // Qubit is already installed should NOT show the installer or
+            // Hermes is already installed should NOT show the installer or
             // rebuild — it should just open the app, so the /Applications
-            // "Qubit" doubles as a normal launcher (first run installs, every
+            // "Hermes" doubles as a normal launcher (first run installs, every
             // later run launches instantly). The window is kept hidden until
             // here via `"visible": false` so this path never flashes a window.
             //
             // Gated to macOS deliberately: on Windows/Linux the installer keeps
             // its existing behavior (Windows users relaunch via the Start
-            // Menu/Desktop "Qubit" shortcuts that install.ps1 creates, and a
+            // Menu/Desktop "Hermes" shortcuts that install.ps1 creates, and a
             // reliable detached relaunch there needs the DETACHED_PROCESS +
             // startup-grace handling used by launch_hermes_desktop — out of
             // scope here). So this is a pure no-op on non-macOS.
@@ -182,7 +182,7 @@ pub fn run() {
             paths::open_log_dir,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Qubit Setup");
+        .expect("error while running Hermes Setup");
 }
 
 #[cfg(test)]

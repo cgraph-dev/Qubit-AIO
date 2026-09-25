@@ -6,18 +6,18 @@ description: "开箱即用的自动化蓝图——定时任务、GitHub 事件�
 
 # 自动化蓝图
 
-常见自动化模式的复制粘贴蓝图。每个蓝图使用 Qubit 内置的 [cron 调度器](/user-guide/features/cron) 实现基于时间的触发，使用 [webhook 平台](/user-guide/messaging/webhooks) 实现事件驱动触发。
+常见自动化模式的复制粘贴蓝图。每个蓝图使用 Hermes 内置的 [cron 调度器](../user-guide/features/cron.md) 实现基于时间的触发，使用 [webhook 平台](../user-guide/messaging/webhooks.md) 实现事件驱动触发。
 
 所有蓝图适用于**任意模型**——不绑定单一提供商。
 
-如需带表单的参数化蓝图（无需手写 cron 语法），请参阅[自动化蓝图目录](/reference/automation-blueprints-catalog)。
+如需带表单的参数化蓝图（无需手写 cron 语法），请参阅[自动化蓝图目录](../reference/automation-blueprints-catalog.mdx)。
 
 :::tip 三种触发类型
 | 触发方式 | 方式 | 工具 |
 |---------|-----|------|
 | **定时** | 按周期运行（每小时、每晚、每周） | `cronjob` 工具或 `/cron` 斜杠命令 |
-| **GitHub 事件** | PR 开启、推送、issue、CI 结果时触发 | Webhook 平台（`qubit webhook subscribe`） |
-| **API 调用** | 外部服务向你的端点 POST JSON | Webhook 平台（config.yaml 路由或 `qubit webhook subscribe`） |
+| **GitHub 事件** | PR 开启、推送、issue、CI 结果时触发 | Webhook 平台（`hermes webhook subscribe`） |
+| **API 调用** | 外部服务向你的端点 POST JSON | Webhook 平台（config.yaml 路由或 `hermes webhook subscribe`） |
 
 三种方式均支持投递到 Telegram、Discord、Slack、SMS、邮件、GitHub 评论或本地文件。
 :::
@@ -33,7 +33,7 @@ description: "开箱即用的自动化蓝图——定时任务、GitHub 事件�
 **触发方式：** 定时（每晚）
 
 ```bash
-qubit cron create "0 2 * * *" \
+hermes cron create "0 2 * * *" \
   "You are a project manager triaging the NousResearch/hermes-agent GitHub repo.
 
 1. Run: gh issue list --repo NousResearch/hermes-agent --state open --json number,title,labels,author,createdAt --limit 30
@@ -58,7 +58,7 @@ PR 开启时自动进行审查，并直接在 PR 上发布审查评论。
 **方式 A——动态订阅（CLI）：**
 
 ```bash
-qubit webhook subscribe github-pr-review \
+hermes webhook subscribe github-pr-review \
   --events "pull_request" \
   --prompt "Review this pull request:
 Repository: {repository.full_name}
@@ -115,15 +115,15 @@ platforms:
 **触发方式：** 定时（每周）
 
 ```bash
-qubit cron create "0 9 * * 1" \
+hermes cron create "0 9 * * 1" \
   "Scan the NousResearch/hermes-agent repo for documentation drift.
 
 1. Run: gh pr list --repo NousResearch/hermes-agent --state merged --json number,title,files,mergedAt --limit 30
 2. Filter to PRs merged in the last 7 days
 3. For each merged PR, check if it modified:
    - Tool schemas (tools/*.py) — may need docs/reference/tools-reference.md update
-   - CLI commands (qubit_cli/commands.py, qubit_cli/main.py) — may need docs/reference/cli-commands.md update
-   - Config options (qubit_cli/config.py) — may need docs/user-guide/configuration.md update
+   - CLI commands (hermes_cli/commands.py, hermes_cli/main.py) — may need docs/reference/cli-commands.md update
+   - Config options (hermes_cli/config.py) — may need docs/user-guide/configuration.md update
    - Environment variables — may need docs/reference/environment-variables.md update
 4. Cross-reference: for each code change, check if the corresponding docs page was also updated in the same PR
 
@@ -139,12 +139,12 @@ Report any gaps where code changed but docs didn't. If everything is in sync, re
 **触发方式：** 定时（每日）
 
 ```bash
-qubit cron create "0 6 * * *" \
+hermes cron create "0 6 * * *" \
   "Run a dependency security audit on the hermes-agent project.
 
-1. cd ~/.hermes/hermes-agent && source .venv/bin/activate
-2. Run: pip audit --format json 2>/dev/null || pip audit 2>&1
-3. Run: npm audit --json 2>/dev/null (in website/ directory if it exists)
+1. Locate the hermes-agent checkout and its pyproject.toml and uv.lock. Do not activate or mutate Hermes's dependency environment.
+2. Scan uv.lock with an independently installed scanner that supports that lock format (check its --help). Preserve the complete findings and errors. If no scanner is available, report the blocker; do not install one into Hermes.
+3. Run: npm audit --json in website/ if it exists. Preserve stderr and distinguish findings from a failed scan.
 4. Check for any CVEs with CVSS score >= 7.0
 
 If vulnerabilities found:
@@ -168,7 +168,7 @@ If no vulnerabilities, respond with [SILENT]." \
 **触发方式：** API 调用（webhook）
 
 ```bash
-qubit webhook subscribe deploy-verify \
+hermes webhook subscribe deploy-verify \
   --events "deployment" \
   --prompt "A deployment just completed:
 Service: {service}
@@ -202,7 +202,7 @@ curl -X POST http://your-server:8644/webhooks/deploy-verify \
 **触发方式：** API 调用（webhook）
 
 ```bash
-qubit webhook subscribe alert-triage \
+hermes webhook subscribe alert-triage \
   --prompt "Monitoring alert received:
 Alert: {alert.name}
 Severity: {alert.severity}
@@ -241,7 +241,7 @@ results = []
 for ep in ENDPOINTS:
     try:
         start = time.time()
-        req = urllib.request.Request(ep["url"], headers={"User-Agent": "Qubit-Monitor/1.0"})
+        req = urllib.request.Request(ep["url"], headers={"User-Agent": "Hermes-Monitor/1.0"})
         resp = urllib.request.urlopen(req, timeout=10)
         elapsed = round((time.time() - start) * 1000)
         results.append({"name": ep["name"], "status": resp.getcode(), "ms": elapsed})
@@ -259,7 +259,7 @@ else:
 ```
 
 ```bash
-qubit cron create "every 30m" \
+hermes cron create "every 30m" \
   "If the script reports OUTAGE DETECTED, summarize which services are down and suggest likely causes. If NO_ISSUES, respond with [SILENT]." \
   --script ~/.hermes/scripts/check-uptime.py \
   --name "Uptime monitor" \
@@ -277,7 +277,7 @@ qubit cron create "every 30m" \
 **触发方式：** 定时（每日）
 
 ```bash
-qubit cron create "0 8 * * *" \
+hermes cron create "0 8 * * *" \
   "Scout these AI agent repositories for notable activity in the last 24 hours:
 
 Repos to check:
@@ -310,7 +310,7 @@ If there are findings, organize by repo with brief analysis of each item." \
 **触发方式：** 定时（每周）
 
 ```bash
-qubit cron create "0 9 * * 1" \
+hermes cron create "0 9 * * 1" \
   "Generate a weekly AI news digest covering the past 7 days:
 
 1. Search the web for major AI announcements, model releases, and research breakthroughs
@@ -335,8 +335,8 @@ Keep each item to 1-2 sentences. Include links. Total under 600 words." \
 **触发方式：** 定时（每日）
 
 ```bash
-qubit cron create "0 8 * * *" \
-  "Search arXiv for the 3 most interesting papers on 'language model reasoning' OR 'tool-use agents' from the past day. For each paper, create an Obsidian note with the title, authors, abstract summary, key contribution, and potential relevance to Qubit Agent development." \
+hermes cron create "0 8 * * *" \
+  "Search arXiv for the 3 most interesting papers on 'language model reasoning' OR 'tool-use agents' from the past day. For each paper, create an Obsidian note with the title, authors, abstract summary, key contribution, and potential relevance to Hermes Agent development." \
   --skill arxiv --skill obsidian \
   --name "Paper digest" \
   --deliver local
@@ -353,7 +353,7 @@ qubit cron create "0 8 * * *" \
 **触发方式：** GitHub webhook
 
 ```bash
-qubit webhook subscribe github-issues \
+hermes webhook subscribe github-issues \
   --events "issues" \
   --prompt "New GitHub issue received:
 Repository: {repository.full_name}
@@ -415,7 +415,7 @@ platforms:
 **触发方式：** GitHub webhook
 
 ```bash
-qubit webhook subscribe auto-port \
+hermes webhook subscribe auto-port \
   --events "pull_request" \
   --prompt "PR merged in the source repository:
 Repository: {repository.full_name}
@@ -447,7 +447,7 @@ If action is not 'closed' or not merged, respond with [SILENT]." \
 **触发方式：** API 调用（webhook）
 
 ```bash
-qubit webhook subscribe stripe-payments \
+hermes webhook subscribe stripe-payments \
   --events "payment_intent.succeeded,payment_intent.payment_failed,charge.dispute.created" \
   --prompt "Stripe event received:
 Event type: {type}
@@ -477,7 +477,7 @@ Keep responses concise for the ops channel." \
 **触发方式：** 定时（每日）
 
 ```bash
-qubit cron create "0 8 * * *" \
+hermes cron create "0 8 * * *" \
   "Generate a morning business metrics summary.
 
 Search the web for:
@@ -502,7 +502,7 @@ Deliver as a clean, scannable message." \
 **触发方式：** 定时（每周）
 
 ```bash
-qubit cron create "0 3 * * 0" \
+hermes cron create "0 3 * * 0" \
   "Run a comprehensive security audit of the hermes-agent codebase.
 
 1. Check for dependency vulnerabilities (pip audit, npm audit)
@@ -528,7 +528,7 @@ If nothing found, report a clean bill of health." \
 **触发方式：** 定时（每周）
 
 ```bash
-qubit cron create "0 10 * * 3" \
+hermes cron create "0 10 * * 3" \
   "Research and draft a technical blog post outline about a trending topic in AI agents.
 
 1. Search the web for the most discussed AI agent topics this week

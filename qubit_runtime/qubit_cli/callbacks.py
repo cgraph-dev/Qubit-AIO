@@ -10,7 +10,9 @@ from qubit_constants import display_qubit_home
 
 
 def _invalidate(cli) -> None:
-    if getattr(cli, "_app", None):
+    if hasattr(cli, "_paint_now"):
+        cli._paint_now()
+    elif getattr(cli, "_app", None):
         cli._app.invalidate()
 
 

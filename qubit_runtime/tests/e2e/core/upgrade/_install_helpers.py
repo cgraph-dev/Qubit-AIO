@@ -89,12 +89,12 @@ class Sandbox:
         return Path(self.env["HOME"])
 
     @property
-    def hermes_home(self) -> Path:
+    def qubit_home(self) -> Path:
         return Path(self.env["QUBIT_HOME"])
 
     @property
     def checkout(self) -> Path:
-        return self.hermes_home / "hermes-agent"
+        return self.qubit_home / "hermes-agent"
 
     @property
     def hermes(self) -> str:
@@ -106,7 +106,7 @@ class Sandbox:
         """The installed PM generation's selected interpreter, not a legacy checkout venv."""
         from pm.environments import install_key
 
-        facts = self.hermes_home / "installs" / install_key(self.checkout) / "facts.json"
+        facts = self.qubit_home / "installs" / install_key(self.checkout) / "facts.json"
         assert facts.is_file(), f"installer did not publish PM facts at {facts}"
         selected = json.loads(facts.read_text(encoding="utf-8"))["packages"]["venv"]["environment"]
         python = Path(selected) / "bin" / "python"

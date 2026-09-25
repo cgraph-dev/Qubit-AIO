@@ -23,6 +23,12 @@ from agent.verification_evidence import (
 from agent.verification_stop import build_verify_on_stop_nudge
 from qubit_cli.verify_cmd import run_verify_command
 
+@pytest.fixture(autouse=True)
+def _ledger_on(monkeypatch):
+    """The ledger is inert unless verify-on-stop is enabled; these tests exercise the ledger."""
+    monkeypatch.setenv("HERMES_VERIFY_ON_STOP", "1")
+
+
 
 def make_args(path, **overrides):
     defaults = dict(
@@ -55,9 +61,9 @@ def _workspace(tmp_path, *, scripts=None, manifest_recipe=None):
         json.dumps({"scripts": scripts} if scripts else {}), encoding="utf-8"
     )
     if manifest_recipe is not None:
-        qubit_dir = project / ".hermes"
-        qubit_dir.mkdir()
-        (qubit_dir / "environment.json").write_text(
+        hermes_dir = project / ".hermes"
+        hermes_dir.mkdir()
+        (hermes_dir / "environment.json").write_text(
             json.dumps({"version": 1, "recipe": manifest_recipe}), encoding="utf-8"
         )
     return project

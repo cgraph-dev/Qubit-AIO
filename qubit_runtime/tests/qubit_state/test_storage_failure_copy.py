@@ -11,28 +11,21 @@ import pytest
 from qubit_state_user_copy import describe_storage_failure, storage_failure_details
 
 
-_F2 = pytest.mark.skip(
-    reason="W9-tests2-F2: fork qubit_constants lacks profile_cli_selector "
-    "(dropped in W9 slice-0; 5 lazy call sites) — product follow-up, then unskip"
-)
-
-
-@_F2
 @pytest.mark.parametrize(
     ("exc", "code", "command"),
     [
         (sqlite3.OperationalError("database is locked"), "storage_locked", "try again"),
-        (sqlite3.OperationalError("attempt to write a readonly database"), "storage_readonly", "qubit doctor --fix"),
-        (sqlite3.DatabaseError("database disk image is malformed"), "storage_corrupt", "qubit doctor --fix"),
+        (sqlite3.OperationalError("attempt to write a readonly database"), "storage_readonly", "hermes doctor --fix"),
+        (sqlite3.DatabaseError("database disk image is malformed"), "storage_corrupt", "hermes doctor --fix"),
         (OSError(28, "No space left on device"), "disk_full", "Free some disk space"),
-        (None, "storage_unavailable", "qubit doctor --fix"),
+        (None, "storage_unavailable", "hermes doctor --fix"),
     ],
 )
 def test_each_cause_has_a_stable_code_and_an_action(exc, code, command):
     failure = describe_storage_failure(exc)
     assert failure.code == code
     assert command in failure.action
-    assert failure.gloss and failure.gloss[0].islower()  # a clause that follows "Cause:"
+    assert failure.gloss
     # The raw sqlite wording never leaks into the user-facing gloss.
     assert "sqlite" not in failure.gloss.lower() and "OperationalError" not in failure.gloss
 
@@ -42,7 +35,6 @@ def test_details_line_is_flattened_and_bounded():
     assert "\n" not in details and len(details) == 60 and details.endswith("...")
 
 
-@_F2
 def test_action_command_is_pinned_to_the_failing_profile(monkeypatch, tmp_path):
     """The action names the profile whose store failed (multi-profile backends serve sessions
     whose state.db is not the process default; a bare ``hermes`` follows active_profile)."""

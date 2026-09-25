@@ -1,9 +1,9 @@
 """Cookie helpers for dashboard auth.
 
-All HttpOnly, ``SameSite=Lax`` unless noted, Path = proxy prefix or /: ``qubit_session_at``
-(access token; Max-Age = token TTL), ``qubit_session_rt`` (rotating refresh token; written only
-when the provider returned one, always cleared on logout/expiry), ``qubit_session_provider``
-(non-secret routing hint so an RT is not handed to the wrong provider), ``qubit_session_pkce``
+All HttpOnly, ``SameSite=Lax`` unless noted, Path = proxy prefix or /: ``hermes_session_at``
+(access token; Max-Age = token TTL), ``hermes_session_rt`` (rotating refresh token; written only
+when the provider returned one, always cleared on logout/expiry), ``hermes_session_provider``
+(non-secret routing hint so an RT is not handed to the wrong provider), ``hermes_session_pkce``
 (PKCE state + CSRF nonce + provider hint, 10 min; ``SameSite=None; Secure`` over HTTPS because it
 is set on the /auth/login 302 and must survive the cross-site redirect chain — Chromium drops Lax
 cookies set on such a 302, crbug 40508226), ``hermes_sso_attempt`` (auto-SSO loop guard, 60 s).
@@ -24,10 +24,10 @@ from urllib.parse import unquote
 from fastapi import Request
 from fastapi.responses import Response
 
-SESSION_AT_COOKIE = "qubit_session_at"
-SESSION_RT_COOKIE = "qubit_session_rt"
-SESSION_PROVIDER_COOKIE = "qubit_session_provider"
-PKCE_COOKIE = "qubit_session_pkce"
+SESSION_AT_COOKIE = "hermes_session_at"
+SESSION_RT_COOKIE = "hermes_session_rt"
+SESSION_PROVIDER_COOKIE = "hermes_session_provider"
+PKCE_COOKIE = "hermes_session_pkce"
 SSO_ATTEMPT_COOKIE = "hermes_sso_attempt"
 
 # Name variants a reader may have to try; most strict first.

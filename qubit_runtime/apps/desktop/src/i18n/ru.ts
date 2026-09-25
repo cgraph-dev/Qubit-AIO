@@ -26,7 +26,7 @@ const RU_NOUN = (count: number | string, one: string, few: string, many: string)
 export const ru = defineLocale({
   sessionImport: {
     title: 'Продолжить из другого приложения',
-    subtitle: 'Перенесите разговор в Qubit и продолжите с того места, где остановились.',
+    subtitle: 'Перенесите разговор в Hermes и продолжите с того места, где остановились.',
     action: 'Импортировать сессию',
     readingFrom: 'Читаем с',
     connectedComputer: 'подключённого компьютера',
@@ -44,18 +44,18 @@ export const ru = defineLocale({
     more: 'Загрузить ещё сессии',
     messages: 'сообщений',
     choose: 'Разговор, который стоит продолжить',
-    chooseHelp: 'Выберите сессию, чтобы прочитать историю перед импортом в Qubit.',
+    chooseHelp: 'Выберите сессию, чтобы прочитать историю перед импортом в Hermes.',
     previewLoading: 'Открываем просмотр',
     previewError: 'Просмотр недоступен',
     previewHelp: 'Исходный файл мог переместиться или измениться. Обновите список и повторите попытку.',
     previewLimit: 'Просмотр сокращён для удобства чтения. Импортируется весь разговор.',
     you: 'Вы',
-    snapshot: 'Этот разговор уже есть в Qubit. Откройте существующую копию, чтобы продолжить.',
+    snapshot: 'Этот разговор уже есть в Hermes. Откройте существующую копию, чтобы продолжить.',
     copyNotice:
       'Копируется текст разговора. Исходные файлы не меняются. Вывод инструментов и рассуждения не переносятся.',
     importing: 'Импорт…',
-    open: 'Открыть в Qubit',
-    continue: 'Продолжить в Qubit',
+    open: 'Открыть в Hermes',
+    continue: 'Продолжить в Hermes',
     importError: 'Не удалось импортировать разговор.'
   },
   common: {
@@ -73,6 +73,7 @@ export const ru = defineLocale({
     connect: 'Подключить',
     connecting: 'Подключение',
     continue: 'Продолжить',
+    bots: 'Боты',
     copied: 'Скопировано',
     copy: 'Копировать',
     copyFailed: 'Не удалось скопировать',
@@ -115,22 +116,23 @@ export const ru = defineLocale({
     renameLabel: 'Новое имя',
     deleteTitle: name => `Удалить ${name}?`,
     deleteBody: 'Элемент будет перемещён в корзину — его можно восстановить оттуда.',
-    pathCopied: 'Путь скопирован'
+    pathCopied: 'Путь скопирован',
+    revealMissing: 'Этой папки нет на этом компьютере'
   },
   boot: {
-    ready: 'Qubit Desktop готов',
+    ready: 'Hermes Desktop готов',
     desktopBootFailedWithMessage: message => `Не удалось запустить приложение: ${message}`,
     steps: {
       connectingGateway: 'Подключение к шлюзу',
-      loadingSettings: 'Загрузка настроек Qubit',
+      loadingSettings: 'Загрузка настроек Hermes',
       loadingSessions: 'Загрузка последних сеансов',
-      retryingRemoteBackend: 'Переподключение к удалённому бэкенду Qubit…',
+      retryingRemoteBackend: 'Переподключение к удалённому бэкенду Hermes…',
       startingDesktopConnection: 'Запуск подключения приложения',
-      startingQubitDesktop: 'Запуск Qubit Desktop…'
+      startingHermesDesktop: 'Запуск Hermes Desktop…'
     },
     errors: {
-      backgroundExited: 'Фоновый процесс Qubit завершён.',
-      backgroundExitedDuringStartup: 'Фоновый процесс Qubit завершился при запуске.',
+      backgroundExited: 'Фоновый процесс Hermes завершён.',
+      backgroundExitedDuringStartup: 'Фоновый процесс Hermes завершился при запуске.',
       backendStopped: 'Бэкенд остановлен',
       desktopBootFailed: 'Не удалось запустить приложение',
       gatewayConnectionLost: 'Соединение с шлюзом потеряно',
@@ -138,7 +140,7 @@ export const ru = defineLocale({
       ipcBridgeUnavailable: 'IPC-мост приложения недоступен.'
     },
     failure: {
-      title: 'Qubit не удалось запустить',
+      title: 'Hermes не удалось запустить',
       description:
         'Фоновый шлюз не запустился. Попробуйте один из шагов восстановления ниже. Ничто из этого не удаляет ваши чаты и настройки.',
       remoteTitle: 'Требуется вход в удалённый шлюз',
@@ -168,6 +170,8 @@ export const ru = defineLocale({
     }
   },
   notifications: {
+    sharedProfileWarning:
+      'Другая установка Hermes использует этот профиль. Обе установки используют общие настройки и данные, поэтому изменения могут конфликтовать. Можно продолжить работу или закрыть другую установку перед внесением изменений.',
     region: 'Уведомления',
     hide: 'Скрыть',
     show: 'Показать',
@@ -180,9 +184,9 @@ export const ru = defineLocale({
     copyDetailFailed: 'Не удалось скопировать подробность уведомления',
     backendOutOfDateTitle: 'Устаревший бэкенд',
     backendOutOfDateMessage:
-      'Ваш бэкенд Qubit старше этой сборки приложения и может работать некорректно. Обновите их, чтобы они совпали.',
+      'Ваш бэкенд Hermes старше этой сборки приложения и может работать некорректно. Обновите их, чтобы они совпали.',
     installMethodUnsupportedTitle: 'Неподдерживаемый способ установки',
-    updateQubit: 'Обновить Qubit',
+    updateHermes: 'Обновить Hermes',
     updateReadyTitle: 'Обновление готово',
     updateReadyMessage: count =>
       `Доступно ${count} ${count % 10 === 1 && count % 100 !== 11 ? 'новое изменение' : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? 'новых изменения' : 'новых изменений'}.`,
@@ -194,7 +198,10 @@ export const ru = defineLocale({
       errorTitle: 'Сервер MCP недоступен',
       errorMessage: name => `MCP ${name} не прошёл проверку работоспособности.`,
       signIn: 'Войти',
-      view: 'Просмотр'
+      view: 'Просмотр',
+      disable: 'Отключить',
+      disabledMessage: name => `${name} MCP отключён. Включить снова можно в любой момент в разделе Возможности → MCP.`,
+      disableFailed: name => `Не удалось отключить ${name} MCP.`
     },
     errors: {
       elevenLabsNeedsKey: 'Для STT ElevenLabs нужен ELEVENLABS_API_KEY.',
@@ -202,10 +209,9 @@ export const ru = defineLocale({
       diskFull: 'Диск заполнен — освободите место и повторите.',
       gatewayAuthFailed: 'Аутентификация шлюза не удалась — проверьте API_SERVER_KEY.',
       methodNotAllowed:
-        'Бэкенд приложения отклонил запрос (405 Method Not Allowed). Попробуйте перезапустить Qubit Desktop.',
+        'Бэкенд приложения отклонил запрос (405 Method Not Allowed). Попробуйте перезапустить Hermes Desktop.',
       microphonePermission: 'Доступ к микрофону запрещён.',
       openaiRejectedApiKey: 'OpenAI отклонил API-ключ.',
-      openaiRejectedApiKeyWithStatus: status => `OpenAI отклонил API-ключ (${status} invalid_api_key).`,
       openaiTtsNeedsKey: 'Для TTS OpenAI нужен VOICE_TOOLS_OPENAI_KEY или OPENAI_API_KEY.'
     },
     voice: {
@@ -230,11 +236,13 @@ export const ru = defineLocale({
     },
     native: {
       approvalTitle: 'Требуется одобрение',
+      approvalTitleNamed: session => `Требуется одобрение — ${session}`,
       approveAction: 'Одобрить',
       rejectAction: 'Отклонить',
       inputTitle: 'Требуется ввод',
-      inputBody: 'Qubit ожидает ваш ответ.',
-      turnDoneTitle: 'Qubit завершил',
+      inputTitleNamed: session => `Требуется ввод — ${session}`,
+      inputBody: 'Hermes ожидает ваш ответ.',
+      turnDoneTitle: 'Hermes завершил',
       turnDoneBody: '',
       turnErrorTitle: 'Ход не удался',
       backgroundDoneTitle: 'Фоновая задача завершена',
@@ -248,7 +256,7 @@ export const ru = defineLocale({
   },
 
   billingBlock: {
-    titleNous: 'Кредиты Qubit закончились',
+    titleNous: 'Кредиты Nous закончились',
     titleProvider: provider => `Кредиты закончились — ${provider}`,
     fallbackMessage: 'В вашем аккаунте закончились кредиты. Пополните баланс, чтобы продолжить.',
     openBilling: 'Открыть биллинг',
@@ -300,7 +308,7 @@ export const ru = defineLocale({
       'nav.commandCenter': 'Открыть центр команд',
       'nav.settings': 'Открыть настройки',
       'nav.profiles': 'Открыть профили',
-      'nav.skills': 'Открыть навыки',
+      'nav.capabilities': 'Открыть навыки',
       'nav.messaging': 'Открыть мессенджеры',
       'nav.artifacts': 'Открыть артефакты',
       'nav.cron': 'Открыть запланированные задачи',
@@ -327,11 +335,14 @@ export const ru = defineLocale({
       'composer.focus': 'Сфокусировать композер',
       'composer.modelPicker': 'Открыть выбор модели',
       'composer.voice': 'Начать / остановить голосовой диалог',
+      'composer.dictate': 'Начать / остановить диктовку',
       'view.toggleSidebar': 'Показать / скрыть панель сеансов',
       'view.toggleRightSidebar': 'Показать / скрыть браузер файлов',
       'view.toggleReview': 'Показать / скрыть панель ревью',
       'view.toggleStatusbar': 'Показать / скрыть строку состояния',
       'view.toggleTabStrip': 'Показать / скрыть вкладки',
+      'view.toggleProfileRail': 'Показать / скрыть панель профилей',
+      'view.toggleSimpleMode': 'Переключить простой режим',
       'view.showFiles': 'Показать браузер файлов',
       'view.showBrowser': 'Открыть браузер',
       'view.toggleHud': 'Включить / выключить режим HUD',
@@ -341,7 +352,7 @@ export const ru = defineLocale({
       'view.nextTerminal': 'Следующий терминал',
       'view.prevTerminal': 'Предыдущий терминал',
       'view.closeTerminal': 'Закрыть терминал',
-      'view.terminalSelection': 'Отправить выделенное из терминала в композер',
+      'view.selectionToComposer': 'Отправить выделенное из терминала в композер',
       'view.terminalCopy': 'Копировать выделенное из терминала',
       'view.terminalPaste': 'Вставить в терминал',
       'view.closeTab': 'Закрыть вкладку',
@@ -401,11 +412,62 @@ export const ru = defineLocale({
     noResults: 'Языки не найдены'
   },
   settings: {
+    subpages: {
+      appearanceTheme: 'Тема',
+      appearanceTypography: 'Шрифты и масштаб',
+      appearanceWindowLayout: 'Окно и расположение',
+      appearanceChatDisplay: 'Отображение чата',
+      appearancePet: 'Питомец',
+      appearanceGeneral: 'Общие',
+      modelMain: 'Основная модель',
+      modelAuxiliary: 'Вспомогательные модели',
+      modelMoa: 'Совместная работа агентов',
+      modelFallbacks: 'Резервные модели',
+      chatBehavior: 'Поведение',
+      chatAttachments: 'Вложения',
+      workspaceProjects: 'Проекты и поиск',
+      workspaceShell: 'Среда оболочки',
+      workspaceFiles: 'Файлы и выполнение',
+      safetyApprovals: 'Подтверждения',
+      safetyPrivacy: 'Приватность и сеть',
+      safetyCheckpoints: 'Контрольные точки',
+      browserProfile: 'Профиль браузера',
+      browserNetwork: 'Локальные и частные URL',
+      memoryPersistent: 'Постоянная память',
+      memoryContext: 'Контекст и сжатие',
+      voiceConversation: 'Голосовой разговор',
+      voiceTranscription: 'Речь в текст',
+      voiceSpeech: 'Текст в речь',
+      advancedRuntime: 'Ограничения агента',
+      advancedTools: 'Доступ к инструментам',
+      advancedTerminal: 'Сервер терминала',
+      advancedOutput: 'Ограничения вывода',
+      advancedDelegation: 'Субагенты',
+      advancedDesktop: 'Приложение и запуск',
+      gatewayConnection: 'Это окно',
+      gatewayDevices: 'Сохранённые подключения',
+      gatewayManagedUpdates: 'Удалённые обновления',
+      gatewayManagedUpdatesUnavailable: 'Нужна версия приложения с поддержкой управляемых обновлений SSH.',
+      gatewayManagedUpdatesEmpty: 'Добавьте SSH в сохранённые подключения, чтобы управлять его обновлениями здесь.',
+      keyboardShortcuts: 'Назначения клавиш',
+      hudGesture: 'Жест HUD',
+      screenCapture: 'Захват экрана',
+      notificationAlerts: 'Системные уведомления',
+      notificationSounds: 'Звуки',
+      archivedSessions: 'Архив и хранение',
+      defaultDirectory: 'Папка проекта по умолчанию',
+      vaultCredentials: 'Сохранённые учётные данные',
+      vaultSources: 'Менеджеры паролей',
+      appUpdates: 'Версия и обновления',
+      uninstall: 'Удаление',
+      billingOverview: 'Обзор',
+      billingPlans: 'Тарифы'
+    },
     closeSettings: 'Закрыть настройки',
     exportConfig: 'Экспорт конфигурации',
     importConfig: 'Импорт конфигурации',
     resetToDefaults: 'Сбросить к значениям по умолчанию',
-    resetConfirm: 'Сбросить все настройки к значениям Qubit по умолчанию?',
+    resetConfirm: 'Сбросить все настройки к значениям Hermes по умолчанию?',
     exportFailed: 'Не удалось экспортировать',
     resetFailed: 'Не удалось сбросить',
     nav: {
@@ -420,16 +482,16 @@ export const ru = defineLocale({
       keysSettings: 'Настройки',
       mcp: 'MCP',
       archivedChats: 'Архив чатов',
+      sessions: 'Сеансы',
       about: 'О программе',
       billing: 'Оплата',
-      notifications: 'Уведомления',
-      plugins: 'Плагины'
+      notifications: 'Уведомления'
     },
     plugins: {
       title: 'Плагины приложения',
       blurb: 'Встроенные или добавленные в папку desktop-plugins. Отключите, чтобы выгрузить без перезапуска.',
       count: n => `Установлено: ${n}`,
-      openFolder: 'Открыть папку плагинов',
+      openFolder: 'Открыть папку плагинов приложения',
       rescan: 'Пересканировать',
       reveal: 'Показать в файловом менеджере',
       enable: 'Включить',
@@ -437,26 +499,6 @@ export const ru = defineLocale({
       failed: 'ошибка',
       empty: 'Плагины приложения пока не установлены.',
       kinds: { bundled: 'встроенный', disk: 'на диске', runtime: 'runtime' },
-      agent: {
-        title: 'Плагины агента',
-        blurb:
-          'Плагины, установленные в бэкенд Qubit — инструменты, навыки, MCP-серверы, хуки и slash-команды. Переносимые — пакеты Agent Plugins (навыки + MCP-бандлы, работающие и в других агентах). Переключатели действуют для новых сеансов.',
-        appliesTo: 'Применяется к:',
-        empty: 'Плагины агента пока не установлены.',
-        loadFailed: 'Не удалось загрузить плагины агента',
-        portable: 'переносимый',
-        search: 'Поиск плагинов…',
-        noMatches: 'Плагины, подходящие под поиск, не найдены.',
-        toggleFailed: name => `Не удалось переключить ${name}`,
-        updateBackendToManage: 'Обновите бэкенд Qubit, чтобы управлять этим плагином из приложения.',
-        sources: {
-          bundled: 'встроенный',
-          user: 'пользовательский',
-          git: 'git',
-          project: 'проектный',
-          entrypoint: 'pip'
-        }
-      },
       installModal: {
         title: 'Установка плагина',
         description: 'Перед установкой посмотрите, что содержит этот репозиторий.',
@@ -464,7 +506,8 @@ export const ru = defineLocale({
         includesHeading: 'Состав пакета',
         agentLabel: 'Плагин агента',
         desktopLabel: 'UI приложения',
-        agentTargetLocal: profile => `Устанавливается в локальный бэкенд ${profile} (~/.hermes/plugins/)`,
+        profileLabel: 'Установить для профиля',
+        agentTargetLocal: (profile, dir) => `Устанавливается в локальный бэкенд ${profile} (${dir})`,
         agentTargetRemote: profile => `Устанавливается в подключённый бэкенд ${profile}`,
         desktopTarget: 'Устанавливается в локальную папку desktop-plugins этого приложения',
         desktopOnlyNote: 'Пакеты только для приложения не устанавливают плагин агента.',
@@ -479,6 +522,11 @@ export const ru = defineLocale({
         gitCloneLabel: 'URL для git clone',
         enableAgent: 'Включить плагин агента после установки',
         forceReinstall: 'Принудительная переустановка (заменить, если уже установлен)',
+        pinToCommit: 'Закрепить на коммите (необязательно)',
+        pinToCommitPlaceholder: 'Полный SHA коммита (40 символов)',
+        pinToCommitHint:
+          'Все, кто установит этот SHA, получат одинаковый код; плагин перестанет обновляться до смены пина. Оставьте пустым для последнего коммита.',
+        pinToCommitInvalid: 'Нужен полный SHA коммита из 40 символов (ветки и теги не принимаются).',
         install: 'Установить',
         installing: 'Установка…',
         probing: 'Осмотр репозитория…',
@@ -488,8 +536,14 @@ export const ru = defineLocale({
         agentSuccess: name => `Плагин агента ${name} установлен`,
         desktopSuccess: name => `Плагин приложения ${name} установлен`,
         agentFailed: 'Не удалось установить плагин агента',
+        installUncertain:
+          'Hermes перестал ждать результат установки, но плагин может всё ещё устанавливаться. Закройте это окно и обновите список плагинов перед повторной установкой.',
         desktopFailed: 'Не удалось установить плагин приложения',
-        missingEnv: vars => `Не хватает переменных окружения: ${vars}. Добавьте их в Настройки → Ключи.`
+        missingEnv: (_name, vars) => `Не хватает переменных окружения: ${vars}. Добавьте их в Настройки → Ключи.`,
+        toolsConnected: n => `Подключено инструментов: ${n}`,
+        skillsReady: names => (names.length === 1 ? `навык ${names[0]} готов` : `готово навыков: ${names.length}`),
+        nextChat: 'остальные инструменты появятся в следующем чате',
+        serverNotConnected: (server, reason) => `MCP-сервер ${server} не подключён${reason ? `: ${reason}` : '.'}`
       }
     },
     notifications: {
@@ -497,7 +551,7 @@ export const ru = defineLocale({
       intro: 'Системные уведомления (не всплывающие внутри приложения). Настраивается для каждого устройства.',
       enableAll: 'Включить уведомления',
       enableAllDesc: 'Если выключено — все уведомления ниже будут заглушены.',
-      focusedHint: 'Оповещения о завершении срабатывают только пока Qubit в фоне.',
+      focusedHint: 'Оповещения о завершении срабатывают только пока Hermes в фоне.',
       kinds: {
         approval: {
           label: 'Нужно одобрение',
@@ -505,11 +559,11 @@ export const ru = defineLocale({
         },
         input: {
           label: 'Нужен ввод',
-          description: 'Qubit задал вопрос или требует пароль/секрет.'
+          description: 'Hermes задал вопрос или требует пароль/секрет.'
         },
         turnDone: {
           label: 'Ответ готов',
-          description: 'Ход завершился, пока Qubit был в фоне.'
+          description: 'Ход завершился, пока Hermes был в фоне.'
         },
         turnError: {
           label: 'Ход не удался',
@@ -525,11 +579,11 @@ export const ru = defineLocale({
         },
         plugin: {
           label: 'Уведомления плагинов',
-          description: 'Плагин приложения отправил уведомление, пока Qubit был в фоне.'
+          description: 'Плагин приложения отправил уведомление, пока Hermes был в фоне.'
         }
       },
       test: 'Отправить тестовое уведомление',
-      testTitle: 'Qubit',
+      testTitle: 'Hermes',
       testBody: 'Уведомления работают.',
       testSent:
         'Тест отправлен. Если ничего не появилось, проверьте разрешения на уведомления в системе и режим «Не беспокоить».',
@@ -549,7 +603,7 @@ export const ru = defineLocale({
       advanced: 'Дополнительно'
     },
     searchPlaceholder: {
-      about: 'О Qubit Desktop',
+      about: 'О Hermes Desktop',
       config: 'Поиск настроек…',
       gateway: 'Подключение шлюза…',
       keys: 'Поиск API-ключей…',
@@ -565,9 +619,14 @@ export const ru = defineLocale({
       title: 'Внешний вид',
       intro: 'Только для приложения. Режим — это яркость, тема — палитра и оформление чата.',
       colorMode: 'Цветовой режим',
-      colorModeDesc: 'Выберите фиксированный режим или позвольте Qubit следовать настройкам системы.',
+      colorModeDesc: 'Выберите фиксированный режим или позвольте Hermes следовать настройкам системы.',
       toolViewTitle: 'Отображение вызовов инструментов',
       toolViewDesc: 'Режим «Продукт» скрывает сырые данные инструментов, «Технический» показывает полный вход/выход.',
+      hideCodeDiffsTitle: 'Скрывать изменения кода',
+      hideCodeDiffsDesc:
+        'Показывать правки файлов строками инструментов с числом добавленных и удалённых строк, без кода.',
+      hideThreadTimelineTitle: 'Скрывать полоски истории диалога',
+      hideThreadTimelineDesc: 'Скрывать полоски навигации вдоль правого края каждого диалога.',
       reasoningCollapsedTitle: 'Сворачивать «мышление» по умолчанию',
       reasoningCollapsedDesc:
         'Стриминговое рассуждение остаётся доступным, но не разворачивается, пока вы его не откроете.',
@@ -580,16 +639,28 @@ export const ru = defineLocale({
       sessionDensityComfortable: 'Комфортно',
       sessionDensityDetailed: 'Подробно',
       tabStripTitle: 'Панель вкладок',
-      tabStripDesc: 'Показывать вкладки над зоной. Автоматически скрываются, когда в зоне только одна панель.',
+      tabStripDesc:
+        'Показывать вкладки над зоной. Автоматически скрываются для одной панели, если не открыта другая зона чата или плитки.',
       tabStripAuto: 'Авто',
       tabStripAlways: 'Всегда',
       tabStripNever: 'Никогда',
+      appActionsTitle: 'Действия приложения',
+      appActionsDesc: 'Где в заголовке окна сидят Настройки, Макет и HUD. Справа оставляют место для вкладок слева.',
+      appActionsLeft: 'Слева',
+      appActionsRight: 'Справа',
       terminalFontTitle: 'Шрифт терминала',
       terminalFontDesc:
         'Выберите установленный шрифт для терминалов приложения. Nerd Fonts отображают Powerlevel10k и иконки оболочки; оставьте пустым, чтобы использовать встроенный JetBrains Mono.',
       terminalFontPlaceholder: 'MesloLGS NF или CSS-стек шрифтов',
       terminalFontPreview: 'Предпросмотр глифов',
       terminalFontReset: 'Использовать по умолчанию',
+      chatFontTitle: 'Шрифт чата',
+      chatFontDesc:
+        'Выберите установленный шрифт для чата и всего интерфейса. Удобно для шрифтов повышенной читаемости, например OpenDyslexic; оставьте пустым, чтобы использовать шрифт темы.',
+      chatFontPlaceholder: 'OpenDyslexic или CSS-стек шрифтов',
+      chatFontPreview: 'Предпросмотр',
+      chatFontSample: 'Съешь же ещё этих мягких французских булок. 0123456789',
+      chatFontReset: 'Шрифт темы',
       translucencyTitle: 'Полупрозрачность окна',
       translucencyDesc:
         'Рабочий стол виден сквозь всё окно, включая текст. Отдельная настройка для светлой и тёмной тем.',
@@ -615,10 +686,14 @@ export const ru = defineLocale({
       backdropDesc: 'Блёклый силуэт позади диалога.',
       userBubbleTitle: 'Пузырь сообщения',
       userBubbleDesc: 'Насколько прозрачны ваши сообщения. 0 — сплошная заливка, 100 — остаётся только контур.',
+      textDirectionTitle: 'Направление текста',
+      textDirectionDesc:
+        'Как сообщения чата и поле ввода выбирают направление. «Авто» ориентируется на первую букву каждого абзаца; выберите направление, если смешанный текст выстраивается неправильно. Код всегда остаётся слева направо.',
+      textDirection: { auto: 'Авто', rtl: 'Справа налево', ltr: 'Слева направо' },
       introSplashTitle: 'Экран приветствия',
       introSplashDesc: 'Логотип и подсказка, показываемые на пустом чате.',
       reactionsTitle: 'Реакции на сообщения',
-      reactionsDesc: 'Эмодзи-тапбеки в стиле iMessage — реагируйте на сообщения, и Qubit сможет реагировать на ваши.',
+      reactionsDesc: 'Эмодзи-тапбеки в стиле iMessage — реагируйте на сообщения, и Hermes сможет реагировать на ваши.',
       composerPopoutTitle: 'Плавающий композер',
       composerPopoutDesc: 'Позволяет вытягивать композер из его док-зоны. Отключите, чтобы он был закреплён снизу.',
       embedsTitle: 'Встроенные превью',
@@ -652,11 +727,9 @@ export const ru = defineLocale({
       pet: {
         title: 'Питомец',
         intro:
-          'Заберите анимированного питомца из petdex, который парит над приложением и реагирует на действия Qubit — «бегает», пока выполняются инструменты, радуется успеху и хмурится при ошибках.',
+          'Заберите анимированного питомца из petdex, который парит над приложением и реагирует на действия Hermes — «бегает», пока выполняются инструменты, радуется успеху и хмурится при ошибках.',
         restartHint:
-          'Питомцам нужен быстрый перезапуск — текущее приложение запустилось до появления этой функции. Выйдите из Qubit и откройте снова, затем вернитесь сюда.',
-        on: 'Вкл',
-        off: 'Выкл',
+          'Питомцам нужен быстрый перезапуск — текущее приложение запустилось до появления этой функции. Выйдите из Hermes и откройте снова, затем вернитесь сюда.',
         scaleTitle: 'Размер',
         scaleDesc: 'Меняет размер парящего питомца. Применяется мгновенно везде.',
         roamTitle: 'Блуждание',
@@ -691,7 +764,8 @@ export const ru = defineLocale({
     },
     fieldLabels: defineFieldCopy({
       model: 'Модель по умолчанию',
-      modelContextLength: 'Окно контекста',
+      modelContextLength:
+        'Переопределяет обнаруженное окно контекста ТОЛЬКО основной модели чата (в токенах). Оставьте 0, чтобы использовать обнаруженное значение выбранной модели. Не влияет на вспомогательные модели и модели MoA.',
       fallbackProviders: 'Резервные модели',
       toolsets: 'Включённые наборы инструментов',
       timezone: 'Часовой пояс',
@@ -750,7 +824,6 @@ export const ru = defineLocale({
         maxSnapshots: 'Лимит чекпоинтов'
       },
       voice: {
-        recordKey: 'Горячая клавиша голосового ввода',
         maxRecordingSeconds: 'Макс. длительность записи',
         autoTts: 'Зачитывать ответы вслух'
       },
@@ -841,8 +914,14 @@ export const ru = defineLocale({
       compression: {
         enabled: 'Авто-сжатие',
         threshold: 'Порог сжатия',
+        codexGpt55Autoraise: 'Автоповышение сжатия Codex',
         targetRatio: 'Целевое сжатие',
         protectLastN: 'Защищённые недавние сообщения'
+      },
+      auxiliary: {
+        compression: {
+          timeout: 'Таймаут модели сжатия (с)'
+        }
       },
       delegation: {
         model: 'Модель субагента',
@@ -873,7 +952,7 @@ export const ru = defineLocale({
       timezone: 'Идентификатор часового пояса IANA. Пустое значение — системный часовой пояс.',
       agent: {
         imageInputMode: 'Управляет тем, как вложения изображений отправляются модели.',
-        maxTurns: 'Верхний предел ходов с вызовами инструментов, после которого Qubit останавливает запуск.'
+        maxTurns: 'Верхний предел ходов с вызовами инструментов, после которого Hermes останавливает запуск.'
       },
       terminal: {
         cwd: 'Папка проекта по умолчанию для инструментов и терминала.',
@@ -887,9 +966,9 @@ export const ru = defineLocale({
       codeExecution: {
         mode: 'Насколько строго выполнение кода ограничено текущим проектом.'
       },
-      fileReadMaxChars: 'Максимальное число символов, которые Qubit может прочитать из одного запроса к файлу.',
+      fileReadMaxChars: 'Максимальное число символов, которые Hermes может прочитать из одного запроса к файлу.',
       approvals: {
-        mode: 'Как Qubit обрабатывает команды, требующие явного подтверждения.',
+        mode: 'Как Hermes обрабатывает команды, требующие явного подтверждения.',
         timeout: 'Как долго запросы подтверждения ждут перед тайм-аутом.'
       },
       security: {
@@ -906,7 +985,14 @@ export const ru = defineLocale({
         engine: 'Стратегия управления длинными диалогами у предела контекста.'
       },
       compression: {
-        enabled: 'Сжимать более старый контекст, когда диалоги становятся большими.'
+        enabled: 'Сжимать более старый контекст, когда диалоги становятся большими.',
+        codexGpt55Autoraise: 'Повышает порог сжатия до 85% для поддерживаемых моделей ChatGPT Codex OAuth.'
+      },
+      auxiliary: {
+        compression: {
+          timeout:
+            'Сколько секунд ждать вспомогательную модель сжатия за один вызов (по умолчанию 120). Увеличьте для медленных локальных моделей.'
+        }
       },
       voice: {
         autoTts: 'Автоматически зачитывать ответы ассистента.'
@@ -936,43 +1022,18 @@ export const ru = defineLocale({
       },
       updates: {
         nonInteractiveLocalChanges:
-          'Когда Qubit обновляет себя из приложения (без запроса в терминале), сохранять локальные правки исходников (stash) или выбрасывать (discard). Обновления из терминала всегда спрашивают.'
+          'Когда Hermes обновляет себя из приложения (без запроса в терминале), сохранять локальные правки исходников (stash) или выбрасывать (discard). Обновления из терминала всегда спрашивают.'
       }
     }),
     about: {
-      heading: 'Qubit Desktop',
-      version: value => `Версия ${value}`,
-      versionUnavailable: 'Версия недоступна',
-      bundleOutOfSync: 'Сборка приложения устарела',
-      bundleOutOfSyncDesc:
-        'Рантайм Qubit обновлён, но само приложение — ещё старая сборка: новые функции интерфейса (например, Bot Mode) не появятся до обновления. Запустите обновление ниже, чтобы пересобрать приложение. Если предупреждение не исчезнет, переустановите с последнего установщика.',
-      bundleOutOfSyncAction: 'Скачать установщик',
-      updates: 'Обновления',
-      checkNow: 'Проверить сейчас',
-      checking: 'Проверка…',
-      seeWhatsNew: 'Смотреть, что нового',
-      updateNow: 'Обновить сейчас',
-      releaseNotes: 'Заметки о выпуске',
-      onLatest: 'У вас последняя версия.',
-      installing: 'Сейчас устанавливается обновление.',
-      cantUpdate: 'Эта сборка не может обновляться изнутри приложения.',
-      cantReach: 'Не удалось связаться с сервером обновлений.',
-      tapCheck: 'Нажмите «Проверить сейчас», чтобы найти обновления.',
-      updateReady: count =>
-        `Готово новое обновление (включено ${count} ${RU_PLURAL(count, 'изменение', 'изменения', 'изменений')}).`,
-      updateReadyUnknown: 'Готово новое обновление.',
-      lastChecked: age => `Проверено ${age}`,
-      justNowSuffix: ' · только что',
-      automaticUpdates: 'Автоматические обновления',
-      automaticUpdatesDesc: 'Qubit автоматически проверяет обновления в фоне и сообщает, когда они готовы.',
-      branchCommit: (branch, commit) => `Ветка ${branch} · Коммит ${commit}`,
-      never: 'никогда',
-      justNow: 'только что',
-      minAgo: count => `${count} ${RU_NOUN(count, 'минуту', 'минуты', 'минут')} назад`,
-      hoursAgo: count => `${count} ${RU_NOUN(count, 'час', 'часа', 'часов')} назад`,
-      daysAgo: count => `${count} ${RU_NOUN(count, 'день', 'дня', 'дней')} назад`
+      updates: 'Обновления'
     },
     config: {
+      minimizeToTrayTitle: 'Сворачивать в трей',
+      minimizeToTrayDesc:
+        'Сворачивание окон или закрытие главного окна скрывает их в системном трее (строке меню macOS), оставляя Hermes работать. Для выхода выберите «Выйти из Hermes» в меню трея или нажмите Cmd+Q. По умолчанию выключено; действует только на этом устройстве.',
+      minimizeToTrayUnavailable:
+        'Системный трей недоступен. Окна будут сворачиваться и закрываться как обычно. Выключите и снова включите настройку, чтобы повторить попытку.',
       none: 'Нет',
       noneParen: '(нет)',
       builtinOnly: 'Только встроенные',
@@ -981,7 +1042,7 @@ export const ru = defineLocale({
       searchPlaceholder: 'Поиск…',
       noResults: 'Ничего не найдено',
       systemDefault: 'Системное по умолчанию',
-      loading: 'Загрузка конфигурации Qubit…',
+      loading: 'Загрузка конфигурации Hermes…',
       emptyTitle: 'Настраивать нечего',
       emptyDesc: 'В этом разделе нет настраиваемых параметров.',
       failedLoad: 'Не удалось загрузить настройки',
@@ -996,16 +1057,59 @@ export const ru = defineLocale({
       disableF12Title: 'Отключить F12 DevTools',
       disableF12Desc:
         'Блокирует открытие Developer Tools по F12. Ctrl+Shift+I (на Mac — Cmd+Opt+I) продолжает работать.',
+      alwaysExternalLinksTitle: 'Всегда открывать ссылки во внешнем браузере',
+      alwaysExternalLinksDesc:
+        'Открывать каждую ссылку в системном браузере вместо встроенного. Пункт «Открыть во встроенном браузере» в контекстном меню продолжает работать.',
       attachmentSizeTitle: 'Макс. размер превью / загрузки изображений',
       attachmentSizeDesc:
         'Насколько большой локальный файл приложение будет загружать для превью и вложений, в МБ. По умолчанию 16. Для удалённых неграфических вложений действует отдельный лимит 256 МБ. Слишком большое значение загружает весь файл в память и может подвесить или уронить приложение.',
       attachmentSizeUnit: 'МБ',
-      attachmentSizeLabel: 'Макс. размер превью / загрузки изображений в мегабайтах'
+      attachmentSizeLabel: 'Макс. размер превью / загрузки изображений в мегабайтах',
+      voiceShortcutHintTitle: 'Горячая клавиша записи голоса',
+      voiceShortcutHintDesc:
+        'Настройте горячую клавишу записи голоса в разделе «Настройки → Горячие клавиши» («Начать / остановить голосовой диалог»). Параметр voice.record_key действует только в CLI и TUI.'
+    },
+    hudModifier: {
+      title: 'Вызов HUD коротким нажатием',
+      description:
+        'Нажмите и отпустите ⌘ + Option на Mac или Ctrl + Alt на Windows/Linux, чтобы вызвать HUD из любого приложения. По умолчанию выключено; действует только на этом устройстве.',
+      permission:
+        'Разрешите Hermes в Системных настройках → Конфиденциальность и безопасность → Мониторинг ввода, затем повторите попытку. Жест не записывает нажатия клавиш и не снимает экран.',
+      unavailable:
+        'Вспомогательная программа жеста HUD не запустилась или неожиданно остановилась. Повторите попытку или перезапустите Hermes. Обычное сочетание HUD по-прежнему работает внутри Hermes.',
+      missingHelper:
+        'В этой установке Hermes отсутствует вспомогательная программа жеста HUD. Обновите или переустановите Hermes и повторите попытку.',
+      unsupportedSession:
+        'Этот сеанс рабочего стола не поддерживает глобальные нажатия модификаторов. В Linux требуется X11; Wayland не поддерживается.'
+    },
+    screenshot: {
+      enabledTitle: 'Сочетание клавиш для снимка окна',
+      enabledDesc:
+        'Нажмите обе клавиши Command одновременно в любом приложении, чтобы снять его переднее окно и прикрепить снимок к текущему черновику Hermes. Автоматической отправки нет. По умолчанию выключено; действует только на этом Mac. Окно может содержать конфиденциальные данные — проверьте вложение перед отправкой.',
+      statusTitle: 'Состояние сочетания для снимка окна',
+      checking: 'Проверка сочетания для снимка окна…',
+      disabled: 'Сочетание для снимка окна выключено.',
+      starting: 'Запускается отслеживание сочетания. Оно пока не готово.',
+      ready: 'Сочетание готово. Снимки прикрепляются к текущему черновику без отправки.',
+      inputPermission:
+        'Разрешение на мониторинг ввода позволяет Hermes распознавать обе клавиши Command, когда активно другое приложение. Разрешите Hermes доступ в Системных настройках → Конфиденциальность и безопасность → Мониторинг ввода, затем вернитесь сюда и повторите попытку.',
+      screenPermission:
+        'Разрешение на запись экрана позволяет Hermes снимать переднее окно приложения при использовании этого сочетания. Разрешите Hermes доступ в Системных настройках → Конфиденциальность и безопасность → Запись экрана, затем вернитесь сюда и повторите попытку. Перезапустите Hermes, если macOS попросит.',
+      openSettings: 'Открыть Системные настройки',
+      retry: 'Повторить',
+      unavailable: 'Сочетание для снимка окна недоступно. Повторите попытку или выключите его.',
+      errorTitle: 'Ошибка сочетания для снимка окна',
+      loadFailed: 'Не удалось прочитать состояние сочетания. Повторите попытку, чтобы проверить текущую настройку.',
+      saveFailed: 'Не удалось подтвердить изменение сочетания. Повторите попытку, чтобы проверить текущую настройку.',
+      permissionFailed:
+        'Не удалось открыть Системные настройки. Откройте раздел «Конфиденциальность и безопасность» вручную и повторите попытку.',
+      captureFailed: 'Не удалось снять переднее окно. Ничего не прикреплено и не отправлено.',
+      contextChanged: 'Текущий черновик изменился во время съёмки. Снимок не прикреплён и не отправлен.'
     },
     quickEntry: {
       enabledTitle: 'Быстрый ввод',
       enabledDesc:
-        'Глобальным горячим ключом вызывайте маленький композер откуда угодно и отправляйте запрос, не открывая Qubit.',
+        'Глобальным горячим ключом вызывайте маленький композер откуда угодно и отправляйте запрос, не открывая Hermes.',
       shortcutTitle: 'Горячий ключ быстрого ввода',
       shortcutDesc: 'Нужен хотя бы один модификатор, например CommandOrControl+Shift+Space.',
       active: 'Горячий ключ активен.',
@@ -1036,7 +1140,7 @@ export const ru = defineLocale({
     connections: {
       title: 'Зарегистрированные шлюзы',
       intro:
-        'Управляйте этим устройством и всеми шлюзами Qubit, до которых можно дотянуться через удалённые, SSH или Cloud-соединения.',
+        'Управляйте этим устройством и всеми шлюзами Hermes, до которых можно дотянуться через удалённые, SSH или Cloud-соединения.',
       stagedNote:
         'Переключайтесь между шлюзами из раздела «Сеансы». Профили, чаты, мессенджеры и cron-задачи остаются за своим шлюзом; работа на других шлюзах продолжается.',
       launchModeTitle: 'При запуске возвращаться к «Сеансам» на последнем шлюзе',
@@ -1063,15 +1167,15 @@ export const ru = defineLocale({
       updateAllRunning: 'Обновление всех инстансов…',
       updateAllDone: 'Обновления разосланы',
       updateAllFailed: 'Не удалось разослать обновления',
-      updateSkippedCloud: 'Управляется Qubit Cloud',
+      updateSkippedCloud: 'Управляется Hermes Cloud',
       kindLocal: 'Локальный',
       kindRemote: 'Удалённый шлюз',
-      kindCloud: 'Qubit Cloud',
+      kindCloud: 'Hermes Cloud',
       kindSsh: 'SSH',
-      kindLocalDesc: 'Рантайм Qubit, которым управляет это приложение.',
-      kindRemoteDesc: 'Шлюз Qubit, доступный по HTTP(S) — LAN, Tailscale или интернет.',
-      kindCloudDesc: 'Хостинговая инстанция, обнаруженная через ваш аккаунт Qubit Cloud.',
-      kindSshDesc: 'Установка Qubit, доступная по SSH.',
+      kindLocalDesc: 'Рантайм Hermes, которым управляет это приложение.',
+      kindRemoteDesc: 'Шлюз Hermes, доступный по HTTP(S) — LAN, Tailscale или интернет.',
+      kindCloudDesc: 'Хостинговая инстанция, обнаруженная через ваш аккаунт Hermes Cloud.',
+      kindSshDesc: 'Установка Hermes, доступная по SSH.',
       labelTitle: 'Имя',
       labelDesc:
         'Обязательно. Показывается везде, где фигурирует эта инстанция; должно быть уникальным (напр. «Домашняя лаборатория», «Рабочий ноутбук»).',
@@ -1080,7 +1184,7 @@ export const ru = defineLocale({
       sshHostTitle: 'SSH-хост',
       headersTitle: 'Дополнительные заголовки шлюза',
       headersDesc:
-        'Отправляются с каждым HTTP- и WebSocket-запросом к этому шлюзу — например, для прокси доступа вроде Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Значения хранятся зашифрованными. Заголовки, которыми управляет Qubit (Authorization, Cookie, Host…), игнорируются.',
+        'Отправляются с каждым HTTP- и WebSocket-запросом к этому шлюзу — например, для прокси доступа вроде Cloudflare Access (CF-Access-Client-Id / CF-Access-Client-Secret). Значения хранятся зашифрованными. Заголовки, которыми управляет Hermes (Authorization, Cookie, Host…), игнорируются.',
       headerValuePlaceholder: 'Значение',
       headerValueSaved: 'Сохранено — оставьте пустым, чтобы не менять',
       headerAdd: 'Добавить заголовок',
@@ -1091,7 +1195,7 @@ export const ru = defineLocale({
       sameBackendHint: label => `Тот же бэкенд, что и «${label}»`,
       localAddHint: 'Локальное недоступно: управляемое локальное соединение уже существует (их всегда только одно).',
       cloudAddHint:
-        'Подсказка: вход в Qubit Cloud выше автоматически обнаруживает ваших агентов — эту форму используйте только для ручной регистрации известного URL инстанса.',
+        'Подсказка: вход в Hermes Cloud выше автоматически обнаруживает ваших агентов — эту форму используйте только для ручной регистрации известного URL инстанса.',
       save: 'Сохранить соединение',
       saving: 'Сохранение…',
       cancel: 'Отмена',
@@ -1104,23 +1208,23 @@ export const ru = defineLocale({
       title: 'Подключение шлюза',
       envOverride: 'переопределение переменными окружения',
       intro:
-        'По умолчанию — локальный. Используйте удалённый, когда приложение должно управлять бэкендом Qubit в другом месте. Соединения шлюзов — на уровне машины; профили обнаруживаются из подключённых шлюзов.',
+        'По умолчанию — локальный. Используйте удалённый, когда приложение должно управлять бэкендом Hermes в другом месте. Соединения шлюзов — на уровне машины; профили обнаруживаются из подключённых шлюзов.',
       envOverrideTitle: 'Переменные окружения управляют этой сессией приложения.',
       envOverrideDesc:
         'Сбросьте HERMES_DESKTOP_REMOTE_URL и HERMES_DESKTOP_REMOTE_TOKEN, чтобы использовать сохранённую настройку ниже.',
       modeTitle: 'Режим подключения',
       localTitle: 'Локальный шлюз',
-      localDesc: 'Запускает приватный бэкенд Qubit на localhost. Это значение по умолчанию, работает офлайн.',
+      localDesc: 'Запускает приватный бэкенд Hermes на localhost. Это значение по умолчанию, работает офлайн.',
       remoteTitle: 'Удалённый шлюз',
-      remoteDesc: 'Подключает это приложение к удалённому бэкенду Qubit.',
+      remoteDesc: 'Подключает это приложение к удалённому бэкенду Hermes.',
       remoteAuthHint:
         'Хостинговые шлюзы используют OAuth или логин/пароль; самохостинговые могут использовать токен сессии.',
-      cloudTitle: 'Qubit Cloud',
-      cloudDesc: 'Войдите в Qubit Cloud один раз и выбирайте агентов из своего аккаунта — без вставки URL.',
-      cloudSignInTitle: 'Qubit Cloud',
-      cloudSignIn: 'Войти в Qubit Cloud',
-      cloudSignedIn: 'Вы вошли в Qubit Cloud',
-      cloudNeedsSignIn: 'Войдите в Qubit Cloud, чтобы обнаружить агентов в вашем аккаунте.',
+      cloudTitle: 'Hermes Cloud',
+      cloudDesc: 'Войдите в Hermes Cloud один раз и выбирайте агентов из своего аккаунта — без вставки URL.',
+      cloudSignInTitle: 'Hermes Cloud',
+      cloudSignIn: 'Войти в Hermes Cloud',
+      cloudSignedIn: 'Вы вошли в Hermes Cloud',
+      cloudNeedsSignIn: 'Войдите в Hermes Cloud, чтобы обнаружить агентов в вашем аккаунте.',
       cloudSignedInDesc: 'Вы вошли. Выберите агента ниже; сессия обновляется автоматически.',
       cloudAgentsTitle: 'Ваши агенты',
       cloudOrgPickerTitle: 'Выберите организацию',
@@ -1130,17 +1234,22 @@ export const ru = defineLocale({
       cloudLoadingAgents: 'Загрузка ваших агентов…',
       cloudNoAgents: {
         before: 'Агенты на этом аккаунте не найдены. Создайте агента в',
-        linkText: 'портале Qubit',
+        linkText: 'портале Nous',
         after: ', затем обновите страницу.'
       },
       cloudRefresh: 'Обновить',
       cloudConnect: 'Подключиться',
+      cloudSavedTitle: 'Сохранённые облачные шлюзы',
+      cloudSavedDesc:
+        'Используйте сохранённый шлюз без изменения шлюза по умолчанию. Войдите ниже, чтобы добавить экземпляры. Имена и вход — в списке сохранённых подключений.',
+      cloudUseSaved: 'Использовать шлюз',
+      cloudActive: 'Активен в этом окне',
       cloudConnecting: 'Подключение…',
-      cloudDiscoverFailed: 'Не удалось загрузить агентов Qubit Cloud',
+      cloudDiscoverFailed: 'Не удалось загрузить агентов Hermes Cloud',
       cloudConnectFailed: 'Не удалось подключиться к этому агенту',
-      cloudSignInFailed: 'Не удалось войти в Qubit Cloud',
-      cloudSignedOutTitle: 'Выход из Qubit Cloud',
-      cloudSignedOutMessage: 'Сессия Qubit Cloud сброшена.',
+      cloudSignInFailed: 'Не удалось войти в Hermes Cloud',
+      cloudSignedOutTitle: 'Выход из Hermes Cloud',
+      cloudSignedOutMessage: 'Сессия Hermes Cloud сброшена.',
       cloudConnectedTitle: 'Подключено',
       cloudConnectedPill: 'Подключено',
       cloudConnectedTo: name => `Подключено к ${name}.`,
@@ -1169,11 +1278,11 @@ export const ru = defineLocale({
       pasteSessionToken: 'Вставьте токен сессии',
       plainTextConfirmTitle: 'Хранить токен шлюза в открытом виде?',
       plainTextConfirmDesc:
-        'Служба системного хранилища ключей на этой машине не найдена, поэтому токен будет сохранён без шифрования в файле настроек соединения приложения, и его сможет прочитать любой процесс, работающий от вашего имени. Для шифрованного хранилища установите и включите GNOME Keyring или KWallet.',
+        'Служба системного хранилища ключей на этой машине не найдена, поэтому токен будет сохранён без шифрования в файле настроек соединения приложения, и его сможет прочитать любой процесс, работающий от вашего имени. Для шифрованного хранилища установите и включите системное хранилище ключей (в Linux — GNOME Keyring или KWallet).',
       plainTextConfirmAction: 'Сохранить в открытом виде',
       plainTextStoredTitle: 'Токен сохранён в открытом виде',
       plainTextStoredDesc:
-        'Безопасное хранилище недоступно, поэтому сохранённый токен хранится без шифрования в файле настроек соединения приложения на этой машине. Установите и включите GNOME Keyring или KWallet для шифрования.',
+        'Безопасное хранилище недоступно, поэтому сохранённый токен хранится без шифрования в файле настроек соединения приложения на этой машине. Установите и включите системное хранилище ключей (в Linux — GNOME Keyring или KWallet) для шифрования.',
       testRemote: 'Проверить удалённый',
       saveForRestart: 'Сохранить до следующего перезапуска',
       saveAndReconnect: 'Сохранить и переподключиться',
@@ -1188,9 +1297,9 @@ export const ru = defineLocale({
       enterUrlFirst: 'Сначала введите удалённый URL.',
       restartingTitle: 'Перезапуск соединения шлюза',
       savedTitle: 'Настройки шлюза сохранены',
-      restartingMessage: 'Qubit Desktop переподключится с сохранёнными настройками — оболочка останется открытой.',
+      restartingMessage: 'Hermes Desktop переподключится с сохранёнными настройками — оболочка останется открытой.',
       savedMessage: 'Сохранено для следующего перезапуска.',
-      connectedTo: (baseUrl, version) => `Подключено к ${baseUrl}${version ? ` · Qubit ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `Подключено к ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'Удалённый шлюз доступен',
       signedOutTitle: 'Вы вышли',
       signedOutMessage: 'Сессия удалённого шлюза сброшена.',
@@ -1202,7 +1311,7 @@ export const ru = defineLocale({
       saveFailed: 'Не удалось сохранить настройки шлюза',
       sshTitle: 'Подключение по SSH',
       sshDesc:
-        'Qubit запускается на удалённой машине по SSH и туннелируется в это приложение — ничего не нужно запускать или открывать самим. Требуется рабочая SSH-аутентификация по ключу на хост.',
+        'Hermes запускается на удалённой машине по SSH и туннелируется в это приложение — ничего не нужно запускать или открывать самим. Требуется рабочая SSH-аутентификация по ключу на хост.',
       sshTrustHint:
         'Первый предъявленный ключ хоста доверяется и фиксируется; последующие изменения приведут к отказу.',
       sshHostTitle: 'Хост',
@@ -1218,25 +1327,25 @@ export const ru = defineLocale({
       sshPortDesc: 'Пусто = 22 или порт из ~/.ssh/config.',
       sshKeyTitle: 'Файл ключа',
       sshKeyDesc: 'Путь к закрытому ключу. Пусто = ssh-agent или ~/.ssh/config.',
-      sshQubitPathTitle: 'Путь к Qubit (необязательно)',
-      sshQubitPathDesc: 'Полный путь к бинарнику qubit на удалённой машине. Пусто = автоопределение.',
-      sshQubitPathPlaceholder: 'автоопределение',
+      sshHermesPathTitle: 'Путь к Hermes (необязательно)',
+      sshHermesPathDesc: 'Полный путь к бинарнику hermes на удалённой машине. Пусто = автоопределение.',
+      sshHermesPathPlaceholder: 'автоопределение',
       sshTestConnection: 'Проверить SSH',
       sshConnect: 'Подключиться',
       sshButtonsHint: '«Сохранить» применится при следующем запуске. «Подключиться» переподключится сейчас.',
-      sshReachable: (host, platform) => `Доступен: ${host} (${platform}) — Qubit найден`,
+      sshReachable: (host, platform) => `Доступен: ${host} (${platform}) — Hermes найден`,
       sshIncompleteHost: 'Введите SSH-хост перед подключением.',
       sshErrUnreachable: 'Не удалось достичь этого хоста по SSH. Проверьте хост, порт и сеть.',
       sshErrAuth:
-        'SSH-аутентификация не удалась. Загрузите ключ в ssh-agent (ssh-add) или задайте IdentityFile в ~/.ssh/config — Qubit запускает ssh в неинтерактивном режиме.',
+        'SSH-аутентификация не удалась. Загрузите ключ в ssh-agent (ssh-add) или задайте IdentityFile в ~/.ssh/config — Hermes запускает ssh в неинтерактивном режиме.',
       sshErrHostKey:
         'Ключ хоста ИЗМЕНИЛСЯ с последнего подключения. Убедитесь, что это ожидаемо, затем выполните ssh-keygen -R <host> и переподключитесь.',
       sshErrNotInstalled:
-        'Qubit не установлен на удалённой машине. Установите его там (см. https://github.com/cgraph-dev/qubit-voicebridge) или задайте путь к Qubit.',
+        'Hermes не установлен на удалённой машине. Установите его там (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh) или задайте путь к Hermes.',
       sshErrPlatform:
-        'Неподдерживаемая удалённая платформа. SSH-режим Qubit Desktop поддерживает удалённые хосты Linux, macOS и Windows.',
+        'Неподдерживаемая удалённая платформа. SSH-режим Hermes Desktop поддерживает удалённые хосты Linux, macOS и Windows.',
       sshErrTimeout: 'SSH-соединение истекло. Хост может быть недоступен или «спит».',
-      sshErrUpdateRequired: 'Перед подключением через SSH обновите Qubit на удалённой машине.',
+      sshErrUpdateRequired: 'Перед подключением через SSH обновите Hermes на удалённой машине.',
       sshErrUnknown: 'SSH-соединение не удалось.'
     },
     keys: {
@@ -1254,60 +1363,24 @@ export const ru = defineLocale({
     },
     mcp: {
       loading: 'Загрузка MCP-серверов…',
-      failedLoad: 'Не удалось загрузить конфигурацию MCP',
-      nameRequiredTitle: 'Нужно имя',
-      nameRequiredMessage: 'Задайте этому MCP-серверу ключ конфигурации.',
-      objectRequired: 'Конфигурация сервера должна быть JSON-объектом',
       invalidJson: 'Неверный JSON MCP',
       saveFailed: 'Не удалось сохранить',
       removeFailed: 'Не удалось удалить',
-      gatewayUnavailableTitle: 'Шлюз недоступен',
-      gatewayUnavailableMessage: 'Переподключите шлюз, прежде чем перезагружать MCP.',
-      reloadedTitle: 'Инструменты MCP перезагружены',
-      reloadedMessage: 'Новые схемы инструментов применяются к новым ходам.',
       reloadFailed: 'Не удалось перезагрузить MCP',
       savedTitle: 'MCP-сервер сохранён',
       savedMessage: name => `${name} применится после перезагрузки MCP.`,
-      newServer: 'Новый сервер',
-      reload: 'Перезагрузить MCP',
-      reloading: 'Перезагрузка…',
-      emptyTitle: 'MCP-серверов нет',
-      emptyDesc: 'Добавьте stdio- или HTTP-сервер, чтобы получить инструменты MCP.',
       disabled: 'отключён',
-      editServer: 'Изменить сервер',
       name: 'Имя',
       serverJson: 'JSON сервера',
       remove: 'Удалить',
-      saveServer: 'Сохранить сервер',
       test: 'Проверить соединение',
-      testing: 'Проверка…',
-      testOk: count =>
-        `Подключено — доступно ${count} ${RU_PLURAL(count, 'инструмент', 'инструмента', 'инструментов')}`,
-      testFailed: 'Не удалось подключиться',
-      enableServer: name => `Включить ${name}`,
-      disableServer: name => `Отключить ${name}`,
-      serverEnabled: name => `${name} включён — применится к новым сеансам.`,
-      serverDisabled: name => `${name} отключён — применится к новым сеансам.`,
-      toggleFailed: (name, enabled) => `Не удалось ${enabled ? 'включить' : 'отключить'} ${name}`,
-      tabServers: 'Серверы',
-      tabCatalog: 'Каталог',
       catalogLoading: 'Загрузка каталога MCP…',
-      catalogLoadFailed: 'Не удалось загрузить каталог MCP',
-      catalogEmpty: 'Записей каталога нет.',
-      catalogInstalled: 'Установлен',
-      catalogEnabled: 'Включён',
-      catalogNeedsInstall: 'Нужна сборка',
-      catalogInstall: 'Установить',
-      catalogInstalling: 'Установка…',
-      catalogInstallStarted: name => `Установка ${name}… применится к новым сеансам после завершения.`,
       catalogInstallFailed: name => `Не удалось установить ${name}`,
-      catalogEnvPrompt: name => `${name} требует учётные данные`,
       catalogEnvRequired: 'Заполните обязательные значения перед установкой.',
       capabilitySummary: (tools, prompts, resources) =>
         `${[`${tools} ${RU_NOUN(tools, 'инструмент', 'инструмента', 'инструментов')}`, ...(prompts ? [`${prompts} ${RU_NOUN(prompts, 'промпт', 'промпта', 'промптов')}`] : []), ...(resources ? [`${resources} ${RU_NOUN(resources, 'ресурс', 'ресурса', 'ресурсов')}`] : [])].join(', ')} включено`,
       costTokens: tokens => `~${tokens} ток/вызов`,
       usage30d: uses => `${uses} ${RU_NOUN(uses, 'использование', 'использования', 'использований')}/30д`,
-      unusedPill: 'не используется',
       statusConnecting: 'Подключение…',
       statusNeedsAuth: 'Нужна аутентификация',
       statusError: 'Ошибка',
@@ -1316,15 +1389,11 @@ export const ru = defineLocale({
       authenticatedTitle: 'Аутентифицирован',
       authenticatedMessage: (server, count) =>
         `${server}: ${count} ${RU_PLURAL(count, 'инструмент', 'инструмента', 'инструментов')}`,
-      waitingForBrowser: 'Ожидание браузера…',
       authenticate: 'Аутентифицироваться',
-      unsavedConnect: 'Не сохранено — сохраните mcp.json, чтобы подключиться.',
-      enableTool: tool => `Включить ${tool}`,
-      disableTool: tool => `Отключить ${tool}`,
       noOutput: 'Вывода пока нет.',
       deepLinkTitle: 'Добавить MCP-сервер?',
       deepLinkDescription:
-        'Ссылка запросила добавить этот MCP-сервер в Qubit. Проверьте конфигурацию ниже — она пришла из ссылки, а не из Qubit.',
+        'Ссылка запросила добавить этот MCP-сервер в Hermes. Проверьте конфигурацию ниже — она пришла из ссылки, а не из Hermes.',
       deepLinkStdioWarning:
         'Этот сервер запускает локальный процесс на вашей машине командой, показанной ниже. Продолжайте только если доверяете источнику.',
       deepLinkConfirm: 'Добавить сервер',
@@ -1335,15 +1404,31 @@ export const ru = defineLocale({
       deepLinkErrorConfig: 'Конфигурация в ссылке не является корректным JSON в base64.',
       deepLinkErrorShape: 'Конфигурация должна быть JSON-объектом со строковым полем `url` или `command`.',
       deepLinkErrorUrl: 'Разрешены только URL серверов http:// и https://.',
-      deepLinkErrorTooLarge: 'Пакет конфигурации превышает лимит 32 КБ.',
-      importButton: 'Импортировать',
-      importPlaceholder:
-        'Вставьте фрагмент mcp.json, команду npx/docker, строку claude mcp add, URL или ссылку Cursor…',
-      importNoMatch: 'В вставленном тексте не распознана конфигурация сервера.',
-      importConfirm: 'Добавить в mcp.json',
-      importConfirmMany: count => `Добавить ${count} ${RU_PLURAL(count, 'сервер', 'сервера', 'серверов')} в mcp.json`
+      deepLinkErrorTooLarge: 'Пакет конфигурации превышает лимит 32 КБ.'
     },
     model: {
+      moaPreset: 'Пресет',
+      moaDescription:
+        'Настройте именованные пресеты, которые появятся как модели провайдера Mixture of Agents. Модель-агрегатор выполняет каждый шаг цикла инструментов; почти вся стоимость запуска списывается у её провайдера. По умолчанию референсные модели дают совет один раз на сообщение пользователя.',
+      moaAggregator: 'Модель-агрегатор',
+      moaAggregatorBilled: 'исполняющая модель · на неё приходится стоимость запуска',
+      moaReferenceHint: 'по умолчанию советует один раз за ход',
+      setupProviderFallback: 'провайдер',
+      setUpProvider: name => `Настроить ${name}`,
+      staleAuxBefore: (count, names) => `Вспомогательные задачи (${count}: ${names}) по-прежнему используют `,
+      staleAuxAfter: ', а не основную модель.',
+      staleAuxOtherProviders: 'других провайдеров',
+      moaEnabled: 'Включено',
+      moaSetDefault: 'Сделать основным',
+      moaNewPresetPlaceholder: 'новый пресет',
+      moaAddPreset: 'Добавить пресет',
+      customModel: 'Своя модель…',
+      customModelPlaceholder: 'ID модели',
+      chooseFromList: 'Выбрать из списка',
+      moaDefault: 'По умолчанию:',
+      moaReferenceToggle: (enabled, index) => `${enabled ? 'Отключить' : 'Включить'} референс ${index}`,
+      moaReferenceTitle: index => `Референс ${index}`,
+      moaAddReference: 'Добавить референсную модель',
       loading: 'Загрузка конфигурации модели…',
       appliesDesc:
         'Применяется к новым сеансам. Для горячей смены модели в активном чате используйте выборщик модели в композере.',
@@ -1361,13 +1446,14 @@ export const ru = defineLocale({
       setToMain: 'На основную',
       change: 'Изменить',
       autoUseMain: 'авто · использовать основную модель',
+      inheritMainEffort: 'наследовать · усилие основной модели',
       providerDefault: '(по умолчанию провайдера)',
       fallbackAdd: 'Добавить запасную',
       fallbackEmpty: 'Запасных моделей нет — используется модель по умолчанию, если она не падает.',
       notInCatalog: 'нет в списке моделей этого провайдера — вызовы могут уходить на запасную.',
+      moaTitle: 'Смесь агентов',
       tasks: {
         vision: { label: 'Зрение', hint: 'Анализ изображений' },
-        web_extract: { label: 'Веб-извлечение', hint: 'Суммаризация страниц' },
         compression: { label: 'Сжатие', hint: 'Компрессия контекста' },
         skills_hub: { label: 'Хаб навыков', hint: 'Поиск навыков' },
         approval: { label: 'Одобрение', hint: 'Умное авто-одобрение' },
@@ -1380,7 +1466,7 @@ export const ru = defineLocale({
       connectAccount: 'Подключить аккаунт',
       haveApiKey: 'Ввести API-ключ вместо этого?',
       intro:
-        'Войдите по подписке — копировать API-ключ не нужно. Qubit проведёт вход в браузере прямо здесь, в приложении.',
+        'Войдите по подписке — копировать API-ключ не нужно. Hermes проведёт вход в браузере прямо здесь, в приложении.',
       connected: 'Подключено',
       collapse: 'Свернуть',
       connectAnother: 'Подключить другой провайдер',
@@ -1401,7 +1487,7 @@ export const ru = defineLocale({
       noKeysMatch: 'Провайдеры, подходящие под поиск, не найдены.',
       localEndpoint: {
         title: 'Локальный / свой эндпоинт',
-        description: 'Направьте Qubit на любой OpenAI-совместимый эндпоинт (Zyphra, vLLM, llama.cpp, Ollama и т. д.).'
+        description: 'Направьте Hermes на любой OpenAI-совместимый эндпоинт (Zyphra, vLLM, llama.cpp, Ollama и т. д.).'
       },
       loading: 'Загрузка провайдеров…'
     },
@@ -1409,7 +1495,7 @@ export const ru = defineLocale({
       loading: 'Загрузка архивных сеансов…',
       archivedTitle: 'Архивные сеансы',
       archivedIntro:
-        'Архивированные чаты скрыты из боковой панели, но сохраняют все сообщения. Чтобы архивировать чат из боковой панели — Ctrl/⌘-клик по нему.',
+        'Архивированные чаты скрыты из боковой панели, но сохраняют все сообщения. Чтобы архивировать чат из боковой панели — Alt/⌥+Shift-клик по нему.',
       emptyArchivedTitle: 'Архив пуст',
       emptyArchivedDesc: 'Архивируйте чат, чтобы скрыть его отсюда.',
       unarchive: 'Восстановить',
@@ -1464,13 +1550,13 @@ export const ru = defineLocale({
       activeBackend: 'Активен',
       activeBackendHint: 'Это ваш активный бэкенд',
       useBackend: 'Использовать этот бэкенд',
-      nousIncluded: 'Входит в подписку Qubit — войдите в Qubit Portal, чтобы активировать.',
-      nousAuthNeededTitle: 'Войдите в Qubit Portal',
-      nousAuthNeededMessage: provider => `${provider} сохранён, но не активируется, пока вы не войдёте в Qubit Portal.`,
+      nousIncluded: 'Входит в подписку Nous — войдите в Nous Portal, чтобы активировать.',
+      nousAuthNeededTitle: 'Войдите в Nous Portal',
+      nousAuthNeededMessage: provider => `${provider} сохранён, но не активируется, пока вы не войдёте в Nous Portal.`,
       nousAuthSignIn: 'Войти',
-      nousAuthDoneTitle: 'Qubit Portal подключён',
+      nousAuthDoneTitle: 'Nous Portal подключён',
       nousAuthDoneMessage: 'Ваши бэкенды по подписке теперь активны.',
-      nousAuthFailed: 'Вход в Qubit Portal не завершён',
+      nousAuthFailed: 'Вход в Nous Portal не завершён',
       noApiKeyRequired: 'API-ключ не требуется.',
       postSetupHint: step =>
         `Этому бэкенду нужна однократная установка (${step}). Выполняется на этой машине — может занять несколько минут.`,
@@ -1515,15 +1601,24 @@ export const ru = defineLocale({
         selectedMessage: backend =>
           `Команды терминала теперь выполняются через ${backend}. Применится к новым сеансам.`,
         failedSelect: backend => `Не удалось выбрать ${backend}`,
-        needsSetupHint: 'Этот бэкенд можно выбрать сейчас — команды будут падать, пока настройка не завершена.'
+        needsSetupHint:
+          'Этот бэкенд уже выбран без завершённой настройки — команды будут завершаться ошибкой, пока настройка не будет завершена.',
+        needsSetupConfirmTitle: backend => `Всё равно выбрать ${backend}?`,
+        needsSetupConfirmDescription: detail =>
+          `${detail} Сеансы, запущенные после этого изменения, останутся без терминала и файловых инструментов, пока настройка не завершена.`,
+        needsSetupConfirmDescriptionGeneric:
+          'Этот бэкенд ещё не настроен. Сеансы, запущенные после этого изменения, останутся без терминала и файловых инструментов, пока настройка не завершена.',
+        needsSetupConfirmAction: 'Выбрать всё равно'
       }
     }
   },
   skills: {
+    plugins: {
+      pageBlurb: 'Плагин может расширять приложение, агента или оба сразу — у каждой части свой переключатель.'
+    },
     tabSkills: 'Навыки',
     tabToolsets: 'Инструменты',
     configuringProfile: 'Настраивается:',
-    tabMcp: 'MCP',
     all: 'Все',
     searchSkills: 'Поиск навыков...',
     searchToolsets: 'Поиск инструментов...',
@@ -1574,7 +1669,7 @@ export const ru = defineLocale({
     edit: 'Изменить',
     archive: 'В архив',
     skillArchivedTitle: 'Навык в архиве',
-    skillArchivedMessage: 'Восстановить через qubit curator restore.',
+    skillArchivedMessage: 'Восстановить через hermes curator restore.',
     hub: {
       searchPlaceholder: 'Поиск в хабе навыков',
       search: 'Поиск',
@@ -1644,7 +1739,7 @@ export const ru = defineLocale({
     loadFailed: 'Не удалось загрузить граф памяти',
     loading: 'Загрузка…',
     emptyTitle: 'Пока ничего не изучено',
-    emptyDesc: 'По мере того как Qubit создаёт навыки и память для вашей работы, они появятся здесь.',
+    emptyDesc: 'По мере того как Hermes создаёт навыки и память для вашей работы, они появятся здесь.',
     share: 'Поделиться картой',
     shareHint:
       'Скопируйте код, чтобы поделиться этой картой, или вставьте код для загрузки. Включает только раскладку, а не вашу память или текст навыков.',
@@ -1660,6 +1755,10 @@ export const ru = defineLocale({
     resetToMine: 'Вернуться к моей карте'
   },
   agents: {
+    extendedTranscript: 'Подробный журнал',
+    transcriptTruncated: 'Последние 16 КиБ',
+    transcriptUnavailable: 'Текущий журнал недоступен',
+
     close: 'Закрыть агентов',
     title: 'Дерево запусков',
     subtitle: 'Активные субагенты текущего хода в реальном времени.',
@@ -1671,6 +1770,14 @@ export const ru = defineLocale({
     streaming: 'Стримится',
     files: 'Файлы',
     moreFiles: count => `+ещё ${count} ${RU_NOUN(count, 'файл', 'файла', 'файлов')}`,
+    moreAgents: count => `Ещё ${count} агентов`,
+    queued: 'В очереди',
+    waitingActivity: 'Ожидание активности',
+    steer: 'Направить',
+    steerPlaceholder: 'Инструкции этому субагенту',
+    steerQueued: 'В очереди до следующей контрольной точки',
+    stopRequested: 'Запрошена остановка',
+    requestRejected: 'Субагент не принял запрос',
     delegation: index => `Делегирование ${index}`,
     workers: count => `${count} ${RU_NOUN(count, 'воркер', 'воркера', 'воркеров')}`,
     workersActive: count => `${count} ${RU_NOUN(count, 'активен', 'активно', 'активных')}`,
@@ -1713,7 +1820,7 @@ export const ru = defineLocale({
       placeholder: 'Поиск питомцев…',
       loading: 'Загрузка галереи petdex…',
       error: 'Не удалось подключиться к галерее petdex.',
-      staleBackend: 'Перезапустите Qubit, чтобы использовать питомцев — бэкенд старше этой функции.',
+      staleBackend: 'Перезапустите Hermes, чтобы использовать питомцев — бэкенд старше этой функции.',
       empty: 'Совпадающих питомцев нет.',
       turnOff: 'Отключить',
       turnOn: 'Включить',
@@ -1740,8 +1847,8 @@ export const ru = defineLocale({
       hatchComposing: 'Собираем по частям…',
       hatchSaving: 'Почти готово…',
       namePlaceholder: 'Имя для вашего питомца',
-      staleBackend: 'Обновите Qubit, чтобы генерировать питомцев.',
-      backgroundHint: 'Можно закрыть — Qubit уведомит, когда будет готово.',
+      staleBackend: 'Обновите Hermes, чтобы генерировать питомцев.',
+      backgroundHint: 'Можно закрыть — Hermes уведомит, когда будет готово.',
       slowProviderHint: 'Это может занять несколько минут',
       remix: 'Ремикс',
       remixConfirmTitle: 'Сделать ремикс из этого облика?',
@@ -1777,8 +1884,8 @@ export const ru = defineLocale({
     },
     nav: {
       newChat: { title: 'Новый сеанс', detail: 'Начать новый сеанс' },
-      settings: { title: 'Настройки', detail: 'Настройка Qubit desktop' },
-      skills: { title: 'Возможности', detail: 'Навыки, инструменты и MCP-серверы' },
+      settings: { title: 'Настройки', detail: 'Настройка Hermes desktop' },
+      capabilities: { title: 'Возможности', detail: 'Навыки, инструменты и MCP-серверы' },
       messaging: { title: 'Сообщения', detail: 'Настройка Telegram, Slack, Discord и других' },
       artifacts: { title: 'Артефакты', detail: 'Просмотр сгенерированных результатов' }
     },
@@ -1799,11 +1906,15 @@ export const ru = defineLocale({
     noSessions: 'Сеансов пока нет.',
     gatewayRunning: 'Шлюз сообщений работает',
     gatewayStopped: 'Шлюз сообщений остановлен',
-    qubitActiveSessions: (version, count) => `Qubit ${version} · Активные сеансы: ${count}`,
+    hermesActiveSessions: (version, count) => `Hermes ${version} · Активные сеансы: ${count}`,
     restartGateway: 'Перезапустить шлюз',
     openBrowser: 'Открыть браузер',
     gatewayRestartFailed: 'Не удалось перезапустить шлюз.',
-    updateQubit: 'Обновить Qubit',
+    sharedGatewayRestartTitle: 'Перезапустить общий шлюз?',
+    sharedGatewayRestartDescription: bots => `Все боты на этом устройстве переподключатся: ${bots}`,
+    sharedGatewayRestartConfirm: 'Перезапустить все',
+    sharedGatewayRestarted: count => `Общий шлюз перезапущен (ботов: ${count})`,
+    updateHermes: 'Обновить Hermes',
     reloadWindow: 'Перезагрузить окно',
     actionRunning: 'выполняется',
     actionDone: 'готово',
@@ -1895,6 +2006,7 @@ export const ru = defineLocale({
     },
     unknown: 'Неизвестно',
     hintPendingRestart: 'Перезапустите шлюз из строки состояния, чтобы применить это изменение.',
+    sharedListenerUrl: 'Обслуживается общим слушателем шлюза по адресу',
     hintGatewayStopped: 'Запустите шлюз из строки состояния для подключения.',
     credentialsSet: 'Учётные данные заданы',
     needsSetup: 'Нужна настройка',
@@ -1921,6 +2033,8 @@ export const ru = defineLocale({
     restartToApply: 'Это изменение вступит в силу после перезапуска шлюза.',
     setupSaved: name => `Настройка ${name} сохранена`,
     restartToReconnect: 'Новые учётные данные вступят в силу после перезапуска шлюза.',
+    appliedLive: 'Применено к работающему шлюзу.',
+    connectingLive: 'Работающий шлюз подключается с новыми учётными данными.',
     keyCleared: key => `${key} очищено`,
     setupUpdated: name => `Настройка ${name} обновлена.`,
     failedUpdate: name => `Не удалось обновить ${name}`,
@@ -1944,6 +2058,41 @@ export const ru = defineLocale({
     failedRevoke: name => `Не удалось отозвать ${name}`,
     pairingLockedOut: 'Слишком много неудачных одобрений — эта платформа заблокирована. Попробуйте позже.',
     waitingSince: minutes => (minutes < 1 ? 'только что' : `${minutes}м назад`),
+    restartNeeded: 'Сохранено. Перезапустите шлюз сообщений, чтобы применить новые настройки.',
+    restartNow: 'Перезапустить',
+    restarting: 'Перезапуск…',
+    restartFailedManual: 'Не удалось перезапустить шлюз — перезапустите его вручную и проверьте журналы.',
+    telegramQr: {
+      title: 'Выберите способ подключения Telegram-бота',
+      subtitle:
+        'Оба способа подключают бота под вашим контролем и сохраняют его данные только в этой установке Hermes.',
+      quickSetup: 'Быстрая настройка',
+      recommended: 'Рекомендуется',
+      quickHelp:
+        'Отсканируйте QR-код и подтвердите в Telegram. Hermes создаст бота и определит ваш Telegram ID автоматически.',
+      createWithQr: 'Создать по QR',
+      starting: 'Запуск…',
+      replaceWarning:
+        'Данные Telegram уже настроены. Новая QR-настройка или токен заменят текущего бота при сохранении.',
+      scanHint: 'Отсканируйте в приложении Telegram на телефоне или откройте ссылку на этом компьютере.',
+      waiting: 'Ожидание Telegram…',
+      expiresIn: remaining => `Истекает через ${remaining}`,
+      expired: 'Истёк',
+      openTelegram: 'Открыть Telegram',
+      ready: 'Бот создан',
+      allowedUsers: 'Разрешённые пользователи',
+      ownerDetected: 'Владелец определён',
+      addAtLeastOne: 'Добавьте хотя бы один Telegram ID.',
+      userIdPlaceholder: 'Telegram ID пользователя',
+      add: 'Добавить',
+      numericOnly: 'Telegram ID должны быть числовыми.',
+      saveAndRestart: 'Сохранить и перезапустить',
+      applying: 'Сохранение…',
+      pairingExpired: 'Срок QR-настройки истёк. Начните новую.',
+      stillWaiting: detail => `Всё ещё ждём Telegram. Повтор после: ${detail}`,
+      savedRestarting: 'Telegram сохранён; шлюз перезапускается…',
+      savedRestartFailed: detail => `Telegram сохранён; перезапуск шлюза не удался${detail}`
+    },
     fieldCopy: {
       TELEGRAM_BOT_TOKEN: {
         label: 'Токен бота',
@@ -2007,7 +2156,7 @@ export const ru = defineLocale({
       },
       MATRIX_HOMESERVER: { label: 'URL homeserver', placeholder: 'https://matrix.org' },
       MATRIX_ACCESS_TOKEN: { label: 'Токен доступа' },
-      MATRIX_USER_ID: { label: 'ID пользователя бота', placeholder: '@qubit:example.org' },
+      MATRIX_USER_ID: { label: 'ID пользователя бота', placeholder: '@hermes:example.org' },
       MATRIX_ALLOWED_USERS: {
         label: 'Разрешённые ID пользователей Matrix',
         help: 'Рекомендуется. ID пользователей через запятую в формате @user:server.'
@@ -2123,6 +2272,12 @@ export const ru = defineLocale({
     actions: 'Действия',
     color: 'Цвет…',
     colorFor: 'Цвет',
+    openInNewWindow: 'Открыть в новом окне',
+    setAsDefault: 'Сделать по умолчанию',
+    defaultProfile: 'Профиль по умолчанию',
+    defaultSet: name => `${name} теперь используется по умолчанию`,
+    defaultDescription: 'Используется при запуске Hermes и для новых чатов. Профили существующих сессий не меняются.',
+    failedSetDefault: 'Не удалось установить профиль по умолчанию',
     setColor: color => `Установить цвет ${color}`,
     autoColor: 'Авто',
     noProfiles: 'Профилей пока нет.',
@@ -2157,7 +2312,7 @@ export const ru = defineLocale({
     deleteDescMid: ' и сотрёт его ',
     deleteDescSuffix: ' каталог. Это действие необратимо.',
     deleting: 'Удаление...',
-    createDesc: 'Профили — это независимые среды Qubit: отдельные настройки, навыки и SOUL.md.',
+    createDesc: 'Профили — это независимые среды Hermes: отдельные настройки, навыки и SOUL.md.',
     nameLabel: 'Имя',
     cloneFrom: 'Клонировать из',
     cloneFromNone: 'Нет (пустой)',
@@ -2190,18 +2345,14 @@ export const ru = defineLocale({
     failedCreate: 'Не удалось создать профиль',
     failedRename: 'Не удалось переименовать профиль'
   },
+  modelAssignment: {
+    saveFailed: 'Hermes не сохранил это изменение модели.'
+  },
+
   cron: {
     close: 'Закрыть cron',
     title: 'Запланированные задачи',
     count: count => `${count} ${RU_PLURAL(count, 'задача', 'задачи', 'задач')}`,
-    modelImpact: {
-      title: 'Запланированные задачи требуют проверки',
-      message: count =>
-        `Будет пропущено ${count} ${RU_NOUN(count, 'задача', 'задачи', 'задач')} до тех пор, пока вы не проверите их настройки модели.`,
-      detailMore: (names, remaining) => `${names} и ещё ${remaining}`,
-      review: 'Проверить запланированные задачи',
-      saveFailed: 'Qubit не сохранил это изменение модели.'
-    },
     search: 'Поиск cron-задач...',
     loading: 'Загрузка cron-задач...',
     states: {
@@ -2257,7 +2408,7 @@ export const ru = defineLocale({
     everyHourAt: minute => `Каждый час на :${minute}`,
     newCron: 'Новый cron',
     emptyDescNew:
-      'Запланируйте промпт, который будет выполняться по cron-выражению. Qubit выполнит его и доставит результаты в выбранное вами место.',
+      'Запланируйте промпт, который будет выполняться по cron-выражению. Hermes выполнит его и доставит результаты в выбранное вами место.',
     emptyDescSearch: 'Попробуйте более широкий запрос.',
     emptyTitleNew: 'Запланированных задач пока нет',
     emptyTitleSearch: 'Нет совпадений',
@@ -2388,13 +2539,55 @@ export const ru = defineLocale({
     missingBody: 'Этот артефакт больше нет в локальном реестре.'
   },
   sidebar: {
+    profileRail: 'Панель профилей',
+    filter: {
+      grouping: 'Группировка',
+      ordering: 'Сортировка',
+      show: 'Показывать',
+      inboxStyle: 'Стиль «Входящие»',
+      status: 'Статус',
+      pullRequest: 'Запрос на слияние',
+      profile: 'Профиль',
+      project: 'Проект',
+      archived: 'Архивные',
+      expandAll: 'Развернуть все',
+      collapseAll: 'Свернуть все',
+      updated: 'Обновление',
+      created: 'Создано',
+      tokens: 'Токены',
+      cost: 'Стоимость',
+      manual: 'Вручную',
+      preview: 'Превью',
+      pr: 'PR',
+      open: 'Открыт',
+      draft: 'Черновик',
+      merged: 'Слит',
+      closed: 'Закрыт',
+      needsInput: 'Нужен ввод',
+      working: 'В работе',
+      unread: 'Непрочитанные',
+      idle: 'Бездействие',
+      filters: 'Фильтры',
+      resetToDefaults: 'Сбросить настройки',
+      noPR: 'Без PR'
+    },
+    gatewayGroups: {
+      grouping: 'Шлюз и профиль',
+      rename: 'Переименовать группу',
+      aliasLabel: 'Отображаемое имя',
+      aliasHint: 'Меняется только отображаемое имя; имена шлюза и профиля остаются прежними.',
+      resetName: 'Сбросить имя',
+      moveUp: 'Переместить вверх',
+      moveDown: 'Переместить вниз',
+      reorder: 'Изменить порядок групп',
+      actions: 'Действия с группой'
+    },
     nav: {
       'new-session': 'Новый сеанс',
-      skills: 'Возможности',
+      capabilities: 'Возможности',
       messaging: 'Сообщения',
       artifacts: 'Артефакты',
-      cron: 'Запланированные задачи',
-      'session-import': 'Импортировать сессию'
+      cron: 'Запланированные задачи'
     },
     searchAria: 'Поиск сеансов',
     searchPlaceholder: 'Поиск сеансов…',
@@ -2403,6 +2596,10 @@ export const ru = defineLocale({
     results: 'Результаты',
     pinned: 'Закреплённые',
     sessions: 'Сеансы',
+    terminal: 'Терминал',
+    files: 'Файлы',
+    review: 'Проверка',
+    logs: 'Журналы',
     cronJobs: 'Cron-задачи',
     groupAriaGrouped: 'Показать сеансы одним списком',
     groupAriaUngrouped: 'Сгруппировать сеансы по рабочим пространствам',
@@ -2418,6 +2615,7 @@ export const ru = defineLocale({
     noSessions: 'Сеансов пока нет',
     noFilterMatches: 'Нет сеансов по этим фильтрам',
     projects: {
+      showAllSessions: 'Показать все сессии',
       sectionLabel: 'Проекты',
       home: 'Главная',
       newButton: 'Новый проект',
@@ -2454,8 +2652,8 @@ export const ru = defineLocale({
       removeFromSidebar: 'Скрыть из боковой панели',
       createFailed: 'Не удалось создать проект',
       staleBackend:
-        'Обновите бэкенд Qubit, чтобы создавать проекты — ваш бэкенд старше этого desktop-приложения (Настройки → Обновления → Бэкенд).',
-      deleteConfirm: 'Это удалит сохранённый проект из Qubit. Файлы, git-репозитории и worktrees не пострадают.',
+        'Обновите бэкенд Hermes, чтобы создавать проекты — ваш бэкенд старше этого desktop-приложения (Настройки → Обновления → Бэкенд).',
+      deleteConfirm: 'Это удалит сохранённый проект из Hermes. Файлы, git-репозитории и worktrees не пострадают.',
       startWork: 'Новый worktree',
       newWorktreeTitle: 'Новый worktree',
       newWorktreeDesc: 'Назовите ветку для этого worktree.',
@@ -2465,7 +2663,7 @@ export const ru = defineLocale({
       baseBranchNone: 'Ветки не найдены',
       startWorkFailed: 'Не удалось создать worktree',
       worktreeStaleBackend:
-        'Обновите бэкенд Qubit, чтобы создавать worktrees по этому удалённому соединению — он старше git worktree API.',
+        'Обновите бэкенд Hermes, чтобы создавать worktrees по этому удалённому соединению — он старше git worktree API.',
       worktreeProjectLabel: 'Проект',
       worktreeProjectPlaceholder: 'Поиск проектов…',
       worktreeProjectNone: 'Нет проектов с папкой',
@@ -2490,6 +2688,7 @@ export const ru = defineLocale({
       enter: label => `Открыть ${label}`,
       reorder: label => `Изменить порядок ${label}`,
       toggle: (label, open) => `${open ? 'Показать' : 'Скрыть'} сеансы ${label}`,
+      showAllCount: count => `Показать все сессии (${count})`,
       back: 'Все проекты'
     },
     newSessionIn: label => `Новый сеанс в ${label}`,
@@ -2559,12 +2758,12 @@ export const ru = defineLocale({
   composer: {
     message: 'Сообщение',
     wakingProfile: profile => `Пробуждаем ${profile}…`,
-    placeholderStarting: 'Запуск Qubit...',
-    placeholderReconnecting: 'Переподключение к Qubit…',
+    placeholderStarting: 'Запуск Hermes...',
+    placeholderReconnecting: 'Переподключение к Hermes…',
     placeholderFollowUp: 'Отправить продолжение',
     newSessionPlaceholders: [
       'Что будем делать?',
-      'Дайте Qubit задачу',
+      'Дайте Hermes задачу',
       'О чём вы думаете?',
       'Опишите, что нужно',
       'Что обсудим?',
@@ -2603,6 +2802,7 @@ export const ru = defineLocale({
     voiceDictation: 'Голосовая диктовка',
     speakReplies: 'Зачитывать ответы вслух',
     stopSpeakingReplies: 'Перестать зачитывать ответы вслух',
+    wakeWord: phrase => `Слово-пробуждение «${phrase}»`,
     wakeWordListening: phrase => `Слово-пробуждение: «${phrase}» — слушает`,
     wakeWordOff: phrase => `Слово-пробуждение: «${phrase}» — выключено`,
     wakeWordPausedVoice: phrase => `Слово-пробуждение: «${phrase}» — приостановлено во время голосового чата`,
@@ -2614,12 +2814,77 @@ export const ru = defineLocale({
     hotkeys: 'Горячие клавиши',
     helpFooter: 'открывает полную панель · backspace закрывает',
     commandDescs: {
-      '/help': 'полный список команд + горячих клавиш',
+      '/help': 'Показать слеш-команды приложения',
       '/clear': 'начать новый сеанс',
-      '/resume': 'возобновить прошлый сеанс',
+      '/resume': 'Возобновить сохранённый сеанс',
       '/details': 'уровень детализации транскрипта',
       '/copy': 'скопировать выделенное или последнее сообщение ассистента',
-      '/quit': 'выйти из qubit'
+      '/quit': 'выйти из hermes',
+      '/start': 'Подтвердить запуск платформы без ответа',
+      '/new': 'Начать новый чат в приложении',
+      '/topic': 'Включить или просмотреть темы личных сообщений Telegram',
+      '/save': 'Сохранить текущую переписку в JSON',
+      '/retry': 'Повторно отправить последнее сообщение агенту',
+      '/prompt': 'Написать следующий запрос в Markdown в $EDITOR и отправить',
+      '/undo': 'Вернуться на N ходов пользователя и повторить запрос (по умолчанию 1)',
+      '/title': 'Переименовать текущий сеанс',
+      '/handoff': 'Передать этот сеанс в мессенджер',
+      '/branch': 'Создать новый чат из последнего сообщения',
+      '/worktree': 'Показать, перечислить, создать или очистить изолированные рабочие деревья Git',
+      '/compress': 'Сжать контекст текущей беседы',
+      '/rollback': 'Показать или восстановить контрольные точки файлов, сохранив ручные правки',
+      '/export': 'Экспортировать профиль, настройки, навыки и тему в общий архив',
+      '/import': 'Импортировать архив как новый профиль',
+      '/stop': 'Остановить текущий ход и фоновые процессы',
+      '/pause': 'Приостановить новую работу глобально; /pause off возобновляет её',
+      '/bg': 'Выполнить запрос в отдельном фоновом сеансе',
+      '/btw': 'Задать побочный вопрос о беседе, не прерывая её',
+      '/agents': 'Показать активных агентов и выполняемые задачи',
+      '/journey': 'Открыть граф памяти — навыки и воспоминания во времени',
+      '/queue': 'Добавить, просмотреть, изменить, удалить, переместить или очистить запросы в очереди',
+      '/steer': 'Добавить сообщение после следующего вызова инструмента без прерывания',
+      '/goal': 'Задать постоянную цель, над которой Hermes работает до завершения',
+      '/heartbeat': 'Задать повторяющийся запрос для этого сеанса в состоянии простоя',
+      '/refine': 'Проанализировать беседу и сохранить выводы в памяти или навыках',
+      '/review': 'Запустить независимого субагента для проверки обсуждаемой работы',
+      '/loop': 'Повторять запрос с заданным интервалом в этом сеансе',
+      '/plan': 'Записать план реализации в Markdown в .hermes/plans/ без выполнения',
+      '/moa': 'Выполнить запрос через Mixture of Agents, затем вернуть исходную модель',
+      '/subgoal': 'Добавить или изменить критерии активной цели',
+      '/status': 'Показать состояние текущего сеанса',
+      '/egress': 'Показать состояние исходящего прокси Docker',
+      '/context': 'Показать использование контекста, категории, статистику сжатия и скорость обработки',
+      '/whoami': 'Показать права доступа к слеш-командам',
+      '/profile': 'Переключить активный профиль Hermes',
+      '/codex-runtime': 'Переключить среду Codex app-server для моделей OpenAI/Codex',
+      '/personality': 'Выбрать готовую личность',
+      '/battery': 'Переключить цветной индикатор батареи в строке состояния',
+      '/timestamps': 'Переключить метки времени в сообщениях и /history',
+      '/diff': 'Показать изменения Git в рабочем каталоге',
+      '/focus': 'Переключить вид только с запросом и итоговым ответом',
+      '/yolo': 'Переключить YOLO — автоматически одобрять опасные команды',
+      '/approvals': 'Показать или задать постоянный режим одобрения опасных команд',
+      '/reasoning': 'Управлять уровнем и отображением рассуждений',
+      '/skin': 'Переключить тему приложения или выбрать следующую',
+      '/wake': 'Управлять распознаванием фразы пробуждения [on|off|status]',
+      '/tools': 'Управлять доступными агенту инструментами',
+      '/memory': 'Просмотреть ожидающие записи в память или переключить их одобрение',
+      '/bundles': 'Показать наборы навыков',
+      '/pet': 'Переключить или выбрать питомца petdex',
+      '/hatch': 'Создать нового питомца',
+      '/learn': 'Создать навык на основе каталогов, URL, беседы или заметок',
+      '/init': 'Просканировать репозиторий и создать или обновить инструкции AGENTS.md',
+      '/suggestions': 'Просмотреть, принять или отклонить предложенные автоматизации',
+      '/blueprint': 'Настроить автоматизацию по шаблону',
+      '/browser': 'Управлять CDP-подключением браузера [connect|disconnect|status] (только локальный шлюз)',
+      '/palette': 'Открыть палитру команд',
+      '/usage': 'Показать расход токенов и лимиты; reset использует накопленный сброс лимита Codex',
+      '/subscription': 'Показать план Nous и изменить его в браузере',
+      '/topup': 'Показать баланс Nous и управлять оплатой',
+      '/platform': 'Приостановить, возобновить или перечислить сбоящие платформы шлюза',
+      '/version': 'Показать версию Hermes Agent',
+      '/debug': 'Загрузить отчёт отладки с данными системы и журналами и получить ссылку',
+      '/model': 'Переключить модель для этого сеанса'
     },
     hotkeyDescs: {
       'composer.mention': 'ссылки на файлы, папки, URL, git',
@@ -2632,7 +2897,7 @@ export const ru = defineLocale({
       'composer.history': 'переключать поповер / историю'
     },
     attachUrlTitle: 'Прикрепить URL',
-    attachUrlDesc: 'Qubit загрузит страницу и добавит её как контекст для этого хода.',
+    attachUrlDesc: 'Hermes загрузит страницу и добавит её как контекст для этого хода.',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: 'Укажите полный URL, например ',
     attach: 'Прикрепить',
@@ -2643,6 +2908,8 @@ export const ru = defineLocale({
     attachments: count => `${count} ${RU_NOUN(count, 'вложение', 'вложения', 'вложений')}`,
     editingInComposer: 'Редактирование в композере',
     editingQueuedInComposer: 'Редактирование хода в очереди в композере',
+    restoredDraftNotice: 'Восстановлено ваше неотправленное сообщение',
+    restoredDraftUndo: 'Отменить',
     queueEdit: 'Изменить',
     queueSendNext: 'Дальше',
     queueSteer: 'Направить — изменить текущий ход сейчас',
@@ -2734,6 +3001,8 @@ export const ru = defineLocale({
     }
   },
   statusStack: {
+    hideStack: 'Скрыть панель состояния',
+    showStack: 'Показать панель состояния',
     agents: 'Агенты',
     background: count => `${count} ${RU_NOUN(count, 'фоновая задача', 'фоновые задачи', 'фоновых задач')}`,
     goalActive: 'Цель активна',
@@ -2873,7 +3142,7 @@ export const ru = defineLocale({
       createPr: 'Создать PR',
       openPr: 'Открыть PR',
       ghMissing: 'Установите GitHub CLI (gh) и войдите, чтобы открывать PR',
-      agentShip: 'Попросить Qubit открыть PR',
+      agentShip: 'Попросить Hermes открыть PR',
       agentShipUnavailable: 'Чат, которому принадлежат эти изменения, не на экране.',
       agentShipPrompt:
         'Проверьте текущие изменения, закоммитьте их с ясным conventional-commit сообщением, запушьте ветку и создайте pull request.',
@@ -2885,15 +3154,22 @@ export const ru = defineLocale({
     }
   },
   updates: {
+    discontinuedTitle: 'Эта сборка Hermes больше не поддерживается',
+    discontinuedBody: 'Эта сборка Hermes больше не поддерживается и может перестать работать — удалите её. Ваши данные останутся на диске.',
+    channels: { stable: 'Стабильный', canary: 'Тестовый' },
+    bundleSwapPending: 'Перезапустите, чтобы завершить обновление',
+    bundleSwapPendingDesc:
+      'Обновлённое приложение уже установлено — достаточно перезапустить Hermes, чтобы загрузить его. Чаты и настройки не пострадают.',
+    bundleSwapPendingAction: 'Перезапустить Hermes',
     stages: {
       idle: 'Готовимся…',
       prepare: 'Готовимся…',
       fetch: 'Скачиваем…',
       pull: 'Почти готово…',
       pydeps: 'Завершаем…',
-      update: 'Обновляем Qubit…',
+      update: 'Обновляем Hermes…',
       rebuild: 'Пересобираем desktop-приложение…',
-      restart: 'Перезапускаем Qubit…',
+      restart: 'Перезапускаем Hermes…',
       done: 'Обновление завершено',
       manual: 'Обновление из терминала',
       guiSkew: 'Обновите desktop-приложение',
@@ -2903,44 +3179,46 @@ export const ru = defineLocale({
     checkFailedTitle: 'Не удалось проверить обновления',
     tryAgain: 'Попробовать снова',
     notAvailableTitle: 'Обновление недоступно',
-    unsupportedMessage: 'Эта версия Qubit не может обновлять себя из приложения.',
+    unsupportedMessage: 'Эта версия Hermes не может обновлять себя из приложения.',
     connectionRetry: 'Проверьте соединение и попробуйте снова.',
+    gitUnusable: 'Hermes не удалось запустить Git на этом компьютере, поэтому проверить обновления не получилось.',
     latestBody: 'У вас последняя версия.',
+    versionDetailsDistributionStore: 'Microsoft Store',
     latestBodyBackend: 'Бэкенд работает на последней версии.',
     allSetTitle: 'Всё готово',
     availableTitle: 'Доступно новое обновление',
-    availableBody: 'Новая версия Qubit готова к установке.',
+    availableBody: 'Новая версия Hermes готова к установке.',
     availableTitleBackend: 'Доступно обновление бэкенда',
-    availableBodyBackend: 'Новая версия подключённого бэкенда Qubit готова к установке.',
+    availableBodyBackend: 'Новая версия подключённого бэкенда Hermes готова к установке.',
     availableBodyNoChangelog: 'Новая версия готова. Заметки о выпуске недоступны для этого типа установки.',
     updateNow: 'Обновить сейчас',
     maybeLater: 'Возможно позже',
     moreChanges: count => `+ ещё ${count} ${RU_NOUN(count, 'изменение', 'изменения', 'изменений')} включено.`,
     manualTitle: 'Обновление из терминала',
     manualBody:
-      'Qubit установлен из командной строки, поэтому обновления тоже выполняются там. Вставьте это в терминал:',
-    manualPickedUp: 'Qubit подхватит новую версию при следующем запуске.',
+      'Hermes установлен из командной строки, поэтому обновления тоже выполняются там. Вставьте это в терминал:',
+    manualPickedUp: 'Hermes подхватит новую версию при следующем запуске.',
     guiSkewTitle: 'Обновите desktop-приложение',
     guiSkewBody:
-      'Бэкенд обновлён, но пакет этого desktop-приложения не изменился. Обновите или переустановите desktop-приложение Qubit (ваш AppImage / .deb / .rpm), чтобы версии совпали.',
+      'Бэкенд обновлён, но пакет этого desktop-приложения не изменился. Обновите или переустановите desktop-приложение Hermes (ваш AppImage / .deb / .rpm), чтобы версии совпали.',
     copy: 'Копировать',
     copied: 'Скопировано',
     done: 'Готово',
     applyingBody:
-      'Обновлятор Qubit возьмёт процесс на себя в своём окне и автоматически перезапустит Qubit, когда закончит. Пожалуйста, не открывайте Qubit вручную во время обновления.',
+      'Обновлятор Hermes возьмёт процесс на себя в своём окне и автоматически перезапустит Hermes, когда закончит. Пожалуйста, не открывайте Hermes вручную во время обновления.',
     applyingBodyBackend:
-      'Удалённый бэкенд применяет обновление и перезапустится. Qubit переподключится автоматически, когда он снова заработает.',
-    applyingClose: 'Это окно закроется во время обновления, затем Qubit откроется сам.',
+      'Удалённый бэкенд применяет обновление и перезапустится. Hermes переподключится автоматически, когда он снова заработает.',
+    applyingClose: 'Это окно закроется во время обновления, затем Hermes откроется сам.',
     errorTitle: 'Обновление не завершилось',
     errorBody: 'Не переживайте — ничего не потеряно. Можно попробовать снова прямо сейчас.',
-    blockerTitle: 'Закрыть локальные предпросмотры, чтобы обновить Qubit?',
+    blockerTitle: 'Закрыть локальные предпросмотры, чтобы обновить Hermes?',
     blockerBody:
-      'Qubit нужно остановить эти локальные предпросмотры перед обновлением. Ваши файлы не будут изменены или удалены.',
-    foreignBlockerTitle: 'Закрыть другие процессы, чтобы обновить Qubit',
+      'Hermes нужно остановить эти локальные предпросмотры перед обновлением. Ваши файлы не будут изменены или удалены.',
+    foreignBlockerTitle: 'Закрыть другие процессы, чтобы обновить Hermes',
     foreignBlockerBody:
-      'Qubit не может безопасно закрыть эти процессы автоматически. Закройте приложение, терминал или службу, которой принадлежит каждый из них, и повторите обновление.',
+      'Hermes не может безопасно закрыть эти процессы автоматически. Закройте приложение, терминал или службу, которой принадлежит каждый из них, и повторите обновление.',
     mixedBlockerBody:
-      'Qubit может закрыть локальные предпросмотры, перечисленные ниже. Остальные процессы нужно закрыть вручную, прежде чем обновление сможет продолжиться.',
+      'Hermes может закрыть локальные предпросмотры, перечисленные ниже. Остальные процессы нужно закрыть вручную, прежде чем обновление сможет продолжиться.',
     closePreviewsAndUpdate: 'Закрыть предпросмотры и обновить',
     closePreviewsAndCheckAgain: 'Закрыть предпросмотры и проверить снова',
     localPreview: 'Локальный предпросмотр',
@@ -2956,6 +3234,13 @@ export const ru = defineLocale({
     everythingSkipped: 'Пропущено',
     everythingRowFailed: 'Обновление не удалось',
     everythingFanoutFailedTitle: 'Не удалось обновить другие инстанции',
+    changeLogNew: 'Новое',
+    changeLogFixed: 'Исправления',
+    changeLogFaster: 'Быстродействие',
+    changeLogImproved: 'Улучшения',
+    changeLogOther: 'Другие улучшения',
+    changeLogFallbackLabel: 'В этом обновлении',
+    changeLogFallbackItem: 'Улучшения и исправления',
     applyStatus: {
       preparing: 'Обновляем бэкенд…',
       pulling: 'Бэкенд обновляется…',
@@ -2963,7 +3248,36 @@ export const ru = defineLocale({
       notAvailable: 'Обновление недоступно для этого бэкенда.',
       failed: 'Не удалось обновить бэкенд.',
       noReturn: 'Бэкенд не вернулся в сеть. Обновление могло не завершиться — проверьте хост бэкенда.'
-    }
+    },
+    // Restored About-card strings (moved from `settings.about.*` to `updates.*`).
+    version: value => `Версия ${value}`,
+    versionUnavailable: 'Версия недоступна',
+    checkNow: 'Проверить сейчас',
+    seeWhatsNew: 'Смотреть, что нового',
+    releaseNotes: 'Заметки о выпуске',
+    onLatest: 'У вас последняя версия.',
+    installing: 'Сейчас устанавливается обновление.',
+    cantReach: 'Не удалось связаться с сервером обновлений.',
+    tapCheck: 'Нажмите «Проверить сейчас», чтобы найти обновления.',
+    updateReady: count =>
+      `Готово новое обновление (включено ${count} ${RU_PLURAL(count, 'изменение', 'изменения', 'изменений')}).`,
+    updateReadyUnknown: 'Готово новое обновление.',
+    lastChecked: age => `Проверено ${age}`,
+    never: 'никогда',
+    justNow: 'только что',
+    minAgo: count => `${count} ${RU_NOUN(count, 'минуту', 'минуты', 'минут')} назад`,
+    hoursAgo: count => `${count} ${RU_NOUN(count, 'час', 'часа', 'часов')} назад`,
+    daysAgo: count => `${count} ${RU_NOUN(count, 'день', 'дня', 'дней')} назад`,
+    justNowSuffix: ' · только что',
+    bundleOutOfSync: 'Сборка приложения устарела',
+    bundleOutOfSyncDesc:
+      'Рантайм Hermes обновлён, но само приложение — ещё старая сборка: новые функции интерфейса (например, Bot Mode) не появятся до обновления. Запустите обновление ниже, чтобы пересобрать приложение. Если предупреждение не исчезнет, переустановите с последнего установщика.',
+    bundleOutOfSyncAction: 'Скачать установщик',
+    checkingShort: 'Проверка…'
+  },
+  guidedGreeting: {
+    line: 'Заходите. Я Hermes. Дайте мне пару минут — обустрою тут всё под вас, а потом займёмся тем, что вам правда нужно.\n\nДля начала: как к вам обращаться?',
+    nameSuggestion: (name: string) => `(Могу звать вас просто ${name}, если так удобнее.)`
   },
   install: {
     stageStates: {
@@ -2973,7 +3287,7 @@ export const ru = defineLocale({
       skipped: 'Пропущено',
       failed: 'Ошибка'
     },
-    oneTimeTitle: 'Qubit требует одноразовой установки',
+    oneTimeTitle: 'Hermes требует одноразовой установки',
     unsupportedDesc: platform =>
       `Автоматическая установка при первом запуске пока недоступна на ${platform}. Откройте Терминал и выполните команду ниже, затем перезапустите это приложение. При следующих запусках этот шаг будет пропущен.`,
     installCommand: 'Команда установки',
@@ -2981,23 +3295,23 @@ export const ru = defineLocale({
     viewDocs: 'Открыть документацию по установке',
     installTo: 'Будет установлено в',
     retryAfterRun: 'Я выполнил — попробовать снова',
-    setupChoiceTitle: 'Настройка Qubit Desktop',
+    setupChoiceTitle: 'Настройка Hermes Desktop',
     setupChoiceDesc:
-      'Подключите это приложение к уже работающему шлюзу Qubit или установите Qubit локально на этот компьютер.',
-    connectExistingTitle: 'Подключиться к существующему Qubit',
+      'Подключите это приложение к уже работающему шлюзу Hermes или установите Hermes локально на этот компьютер.',
+    connectExistingTitle: 'Подключиться к существующему Hermes',
     connectExistingShort: 'Подключить существующий',
     connectExistingDesc:
       'Используйте удалённый бэкенд с сессионным токеном или входом через браузер. Локальная установка не начнётся.',
-    installLocalTitle: 'Установить Qubit локально',
-    installLocalDesc: 'Скачайте Qubit, создайте его Python-окружение и запустите бэкенд на этом компьютере.',
-    localStartUnavailable: 'Не удалось начать локальную установку. Перезапустите Qubit Desktop и попробуйте снова.',
-    remoteSetupTitle: 'Подключиться к существующему Qubit',
-    remoteSetupDesc: 'Введите URL вашего шлюза. Qubit Desktop определит, нужен токен или вход через браузер.',
+    installLocalTitle: 'Установить Hermes локально',
+    installLocalDesc: 'Скачайте Hermes, создайте его Python-окружение и запустите бэкенд на этом компьютере.',
+    localStartUnavailable: 'Не удалось начать локальную установку. Перезапустите Hermes Desktop и попробуйте снова.',
+    remoteSetupTitle: 'Подключиться к существующему Hermes',
+    remoteSetupDesc: 'Введите URL вашего шлюза. Hermes Desktop определит, нужен токен или вход через браузер.',
     remoteUrlTitle: 'URL шлюза',
-    remoteUrlDesc: 'Используйте базовый URL шлюза Qubit, включая https:// для удалённых.',
+    remoteUrlDesc: 'Используйте базовый URL шлюза Hermes, включая https:// для удалённых.',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'Определяем аутентификацию шлюза...',
-    probeError: 'Не удалось подключиться к этому шлюзу Qubit.',
+    probeError: 'Не удалось подключиться к этому шлюзу Hermes.',
     identityProvider: 'ваш провайдер аутентификации',
     authTitle: 'Аутентификация',
     authNeedsOauth: provider => `Сначала войдите через ${provider}, чтобы проверить этот шлюз.`,
@@ -3017,12 +3331,12 @@ export const ru = defineLocale({
     applyRemote: 'Применить и переподключиться',
     backToSetup: 'Назад',
     failedTitle: 'Установка не удалась',
-    settingUpTitle: 'Настройка Qubit Agent',
+    settingUpTitle: 'Настройка Hermes Agent',
     finishingTitle: 'Завершаем',
     failedDesc:
-      'Один из шагов установки завершился ошибкой. На Windows это может произойти, если запущена другая инстанция Qubit CLI или desktop. Остановите все работающие инстанции Qubit и повторите. Подробности — ниже или в журнале desktop.',
+      'Один из шагов установки завершился ошибкой. На Windows это может произойти, если запущена другая инстанция Hermes CLI или desktop. Остановите все работающие инстанции Hermes и повторите. Подробности — ниже или в журнале desktop.',
     activeDesc:
-      'Это одноразовая настройка. Установщик Qubit скачивает зависимости и настраивает вашу машину. При следующих запусках этот шаг будет пропущен.',
+      'Это одноразовая настройка. Установщик Hermes скачивает зависимости и настраивает вашу машину. При следующих запусках этот шаг будет пропущен.',
     progress: (completed, total) => `Выполнено ${completed} из ${total} шагов`,
     currentStage: stage => ` — сейчас: ${stage}`,
     fetchingManifest: 'Загружаем манифест установщика...',
@@ -3039,10 +3353,10 @@ export const ru = defineLocale({
     reloadRetry: 'Перезагрузить и повторить'
   },
   onboarding: {
-    headerTitle: 'Настроим для вас Qubit Agent',
+    headerTitle: 'Настроим для вас Hermes Agent',
     headerDesc: 'Подключите провайдера модели, чтобы начать общение. Большинство вариантов — в один клик.',
-    preparingInstall: 'Qubit завершает установку. Обычно это занимает меньше минуты при первом запуске.',
-    starting: 'Запускаем Qubit…',
+    preparingInstall: 'Hermes завершает установку. Обычно это занимает меньше минуты при первом запуске.',
+    starting: 'Запускаем Hermes…',
     lookingUpProviders: 'Ищем провайдеров...',
     collapse: 'Свернуть',
     otherProviders: 'Другие провайдеры',
@@ -3050,7 +3364,7 @@ export const ru = defineLocale({
     chooseLater: 'Выберу провайдера позже',
     recommended: 'Рекомендуется',
     connected: 'Подключено',
-    featuredPitch: 'Одна подписка, 300+ передовых моделей — рекомендуемый способ запускать Qubit',
+    featuredPitch: 'Одна подписка, 300+ передовых моделей — рекомендуемый способ запускать Hermes',
     fireworksPitch: 'Прямой API моделей — передовые модели на хостинге Fireworks',
     openRouterPitch: 'Один ключ, сотни моделей — надёжный вариант по умолчанию',
     apiKeyOptions: {
@@ -3068,7 +3382,7 @@ export const ru = defineLocale({
       local: {
         short: 'self-hosted',
         description:
-          'Укажите Qubit локальный или self-hosted OpenAI-совместимый endpoint (vLLM, llama.cpp, Ollama и т.д.).'
+          'Укажите Hermes локальный или self-hosted OpenAI-совместимый endpoint (vLLM, llama.cpp, Ollama и т.д.).'
       }
     },
     backToSignIn: 'Назад ко входу',
@@ -3081,7 +3395,7 @@ export const ru = defineLocale({
     update: 'Обновить',
     flowSubtitles: {
       pkce: 'Откроет браузер для входа, затем продолжит здесь',
-      device_code: 'Откроет страницу подтверждения в браузере — Qubit подключится автоматически',
+      device_code: 'Откроет страницу подтверждения в браузере — Hermes подключится автоматически',
       external: 'Войдите один раз в терминале, затем вернитесь в чат'
     },
     startingSignIn: provider => `Начинаем вход для ${provider}...`,
@@ -3092,12 +3406,12 @@ export const ru = defineLocale({
     pickDifferentProvider: 'Выбрать другого провайдера',
     signInWith: provider => `Войти через ${provider}`,
     openedBrowser: provider => `Мы открыли ${provider} в вашем браузере.`,
-    authorizeThere: 'Авторизуйте Qubit там.',
+    authorizeThere: 'Авторизуйте Hermes там.',
     copyAuthCode: 'Скопируйте код авторизации и вставьте его ниже.',
     pasteAuthCode: 'Вставьте код авторизации',
     reopenAuthPage: 'Открыть страницу авторизации снова',
     autoBrowser: provider =>
-      `Мы открыли ${provider} в вашем браузере. Авторизуйте Qubit там, и подключение произойдёт автоматически — ничего копировать и вставлять не нужно.`,
+      `Мы открыли ${provider} в вашем браузере. Авторизуйте Hermes там, и подключение произойдёт автоматически — ничего копировать и вставлять не нужно.`,
     reopenSignInPage: 'Открыть страницу входа снова',
     waitingAuthorize: 'Ждём вашей авторизации...',
     externalPending: provider =>
@@ -3125,18 +3439,23 @@ export const ru = defineLocale({
     loadFailed: 'Не удалось загрузить модели',
     noAuthenticatedProviders: 'Нет провайдеров с аутентификацией.',
     pro: 'Pro',
-    proNeedsSubscription: 'Модели Pro требуют платной подписки Qubit.',
+    proNeedsSubscription: 'Модели Pro требуют платной подписки Nous.',
     free: 'Free',
     freeTier: 'Бесплатный тариф',
     priceTitle: 'Цена вход / выход за миллион токенов',
-    wasPrice: 'было'
+    wasPrice: 'было',
+    customModel: 'Своя модель',
+    addCustomModelAction: 'Добавить свою модель…',
+    customModelPlaceholder: 'Введите id модели, например openai/gpt-5'
   },
 
   modelVisibility: {
     title: 'Модели',
     search: 'Поиск моделей',
     noAuthenticatedProviders: 'Нет провайдеров с аутентификацией.',
-    addProvider: 'Добавить провайдера…'
+    addProvider: 'Добавить провайдера…',
+    addCustomModel: 'Добавить свою модель',
+    removeCustomModel: 'Удалить свою модель'
   },
   shell: {
     windowControls: 'Управление окном',
@@ -3162,6 +3481,7 @@ export const ru = defineLocale({
       xhigh: 'Очень высокое',
       max: 'Максимум',
       ultra: 'Ультра',
+      sendsOnRoute: (level: string) => `на этом маршруте отправляется ${level}`,
       updateFailed: 'Не удалось обновить опцию модели',
       fastFailed: 'Не удалось обновить быстрый режим'
     },
@@ -3197,13 +3517,13 @@ export const ru = defineLocale({
       update: 'обновление',
       updateInProgress: 'Обновление выполняется',
       commitsBehind: (count, branch) => `${count} ${RU_NOUN(count, 'коммит', 'коммита', 'коммитов')} позади ${branch}`,
-      desktopVersion: version => `Qubit Desktop v${version}`,
+      desktopVersion: version => `Hermes Desktop v${version}`,
       backendVersion: version => `Бэкенд v${version}`,
       clientLabel: version => `клиент v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `Удалённый: ${host}`,
       connectionCloud: host => `Облако: ${host}`,
-      connectionCloudTooltip: host => `Qubit Cloud · ${host}`,
+      connectionCloudTooltip: host => `Hermes Cloud · ${host}`,
       connectionSshTooltip: host => `SSH · ${host}`,
       connectionRemoteTooltip: host => `Удалённый · ${host}`,
       backendLabel: version => `бэкенд v${version}`,
@@ -3290,10 +3610,17 @@ export const ru = defineLocale({
     remotePickerTitle: 'Выбрать удалённую папку',
     remotePickerDescription: 'Просмотрите папки на подключённом бэкенде.',
     remotePickerSelect: 'Выбрать папку',
+    remotePickerNewFolder: 'Новая папка',
+    remotePickerFolderName: 'Имя папки',
+    remotePickerCreateFolder: 'Создать папку',
+    remotePickerInvalidFolderName: 'Введите одно имя папки без косых черт.',
+    remotePickerCreateFolderFailed: error => `Не удалось создать папку (${error}).`,
     folderTip: cwd => cwd,
     openFolder: 'Открыть папку',
     refreshTree: 'Обновить дерево',
     collapseAll: 'Свернуть все папки',
+    showIgnored: 'Показать файлы из gitignore',
+    hideIgnored: 'Скрыть файлы из gitignore',
     previewUnavailable: 'Предпросмотр недоступен',
     couldNotPreview: path => `Не удалось предпросмотреть ${path}`,
     noProjectTitle: 'Проект не открыт',
@@ -3334,7 +3661,7 @@ export const ru = defineLocale({
     binaryTitle: 'Похоже на бинарный файл',
     binaryBody: label => `Предпросмотр ${label} может показать нечитаемый текст.`,
     largeTitle: 'Этот файл большой',
-    largeBody: (label, size) => `${label} — ${size}. Qubit покажет только первые 512 КБ.`,
+    largeBody: (label, size) => `${label} — ${size}. Hermes покажет только первые 512 КБ.`,
     previewAnyway: 'Предпросмотр всё равно',
     truncated: 'Показаны первые 512 КБ.',
     noInlineTitle: 'Нет inline-предпросмотра',
@@ -3376,11 +3703,11 @@ export const ru = defineLocale({
         'Этот адрес указывает на машину, на которой работает ваш агент, а не на эту. Панель браузера загружает страницы локально, поэтому для удалённого dev-сервера нужен порт-форвардинг или доступный hostname.',
       failedToLoad: 'Не удалось загрузить предпросмотр',
       tryAgain: 'Попробовать снова',
-      restarting: 'Qubit перезапускается...',
-      askRestart: 'Попросить Qubit перезапустить сервер',
-      lookingRestart: taskId => `Qubit ищет сервер предпросмотра для перезапуска (${taskId})`,
+      restarting: 'Hermes перезапускается...',
+      askRestart: 'Попросить Hermes перезапустить сервер',
+      lookingRestart: taskId => `Hermes ищет сервер предпросмотра для перезапуска (${taskId})`,
       restartingTitle: 'Перезапуск сервера предпросмотра',
-      restartingMessage: 'Qubit работает в фоне. Следите за прогрессом в консоли предпросмотра.',
+      restartingMessage: 'Hermes работает в фоне. Следите за прогрессом в консоли предпросмотра.',
       startRestartFailed: message => `Не удалось запустить перезапуск сервера: ${message}`,
       restartFailed: 'Перезапуск сервера не удался',
       hideConsole: 'Скрыть консоль предпросмотра',
@@ -3392,16 +3719,16 @@ export const ru = defineLocale({
       reload: 'Перезагрузить страницу',
       address: 'Адрес',
       addressPlaceholder: 'Введите адрес',
-      blankPageBody: 'Введите адрес выше, чтобы просматривать, или попросите Qubit открыть страницу.',
-      finishedRestarting: message => `Qubit завершил перезапуск сервера предпросмотра${message ? `: ${message}` : ''}`,
+      blankPageBody: 'Введите адрес выше, чтобы просматривать, или попросите Hermes открыть страницу.',
+      finishedRestarting: message => `Hermes завершил перезапуск сервера предпросмотра${message ? `: ${message}` : ''}`,
       failedRestarting: message => `Перезапуск сервера не удался: ${message}`,
       unknownError: 'неизвестная ошибка',
       restartedTitle: 'Сервер предпросмотра перезапущен',
       reloadingNow: 'Перезагружаем предпросмотр.',
       restartFailedTitle: 'Перезапуск предпросмотра не удался',
-      restartFailedMessage: 'Qubit не смог перезапустить сервер.',
+      restartFailedMessage: 'Hermes не смог перезапустить сервер.',
       stillWorking:
-        'Qubit всё ещё работает, но результата перезапуска пока нет. Команда сервера может выполняться в foreground.',
+        'Hermes всё ещё работает, но результата перезапуска пока нет. Команда сервера может выполняться в foreground.',
       workspaceReloading: 'Рабочее пространство изменилось, перезагружаем предпросмотр',
       fileChanged: url => `Файл изменился, перезагружаем предпросмотр: ${url}`,
       filesChanged: (count, url) =>
@@ -3413,6 +3740,20 @@ export const ru = defineLocale({
       unreachableDescription: 'Страница предпросмотра недоступна.',
       openTarget: url => `Открыть ${url}`,
       fallbackTitle: 'Предпросмотр'
+    }
+  },
+  interfaceMode: {
+    title: 'Режим интерфейса',
+    hint: 'Меняет то, что показано, а не то, что умеет Hermes.',
+    sessionNote:
+      'Задано простым режимом. Изменение здесь действует до конца сеанса; переключитесь в расширенный, чтобы сделать его своим.',
+    simple: {
+      label: 'Простой',
+      description: 'Для общения с Hermes. Боковая панель и чат; без терминала, файлов и панелей diff.'
+    },
+    advanced: {
+      label: 'Расширенный',
+      description: 'Для разработчиков. Терминал, файлы, diff, строка состояния и раскладки — как вы их настроили.'
     }
   },
   zones: {
@@ -3436,7 +3777,7 @@ export const ru = defineLocale({
     closeAll: 'Закрыть все',
     newSessionTab: 'Вкладка нового сеанса',
     pluginDisabled: pluginId => `Плагин «${pluginId}» отключён`,
-    pluginDisabledBody: 'Включите его снова в Настройки → Плагины, чтобы вернуть панель.',
+    pluginDisabledBody: 'Включите его снова в Возможности → Плагины, чтобы вернуть панель.',
     missingPane: paneId => `нет панели: ${paneId}`,
     editTitle: 'Раскладки',
     editHint: 'Выберите раскладку или перетащите панели между зонами.',
@@ -3491,7 +3832,7 @@ export const ru = defineLocale({
     thread: {
       loadingSession: 'Загрузка сеанса',
       showEarlier: 'Показать ранние сообщения',
-      loadingResponse: 'Qubit загружает ответ',
+      loadingResponse: 'Hermes загружает ответ',
       resumeWhenBackgroundDone: count =>
         count === 1
           ? 'Продолжится, когда фоновая задача завершится'
@@ -3531,7 +3872,7 @@ export const ru = defineLocale({
       attachingFile: 'Прикрепление…'
     },
     approval: {
-      gatewayDisconnected: 'Шлюз Qubit не подключён',
+      gatewayDisconnected: 'Шлюз Hermes не подключён',
       sendFailed: 'Не удалось отправить ответ на подтверждение',
       run: 'Выполнить',
       command: 'Команда',
@@ -3542,12 +3883,12 @@ export const ru = defineLocale({
       reject: 'Отклонить',
       alwaysTitle: 'Всегда разрешать эту команду?',
       alwaysDescription: pattern =>
-        `Это добавит паттерн «${pattern}» в ваш постоянный список разрешений (~/.hermes/config.yaml). Qubit больше не будет спрашивать о подобных командах — ни в этом сеансе, ни в будущем.`,
+        `Это добавит паттерн «${pattern}» в ваш постоянный список разрешений (~/.hermes/config.yaml). Hermes больше не будет спрашивать о подобных командах — ни в этом сеансе, ни в будущем.`,
       alwaysAllow: 'Всегда разрешать'
     },
     clarify: {
       notReady: 'Запрос уточнения ещё не готов',
-      gatewayDisconnected: 'Шлюз Qubit не подключён',
+      gatewayDisconnected: 'Шлюз Hermes не подключён',
       sendFailed: 'Не удалось отправить ответ на уточнение',
       loadingQuestion: 'Загрузка вопроса…',
       other: 'Другое (введите ответ)',
@@ -3562,27 +3903,45 @@ export const ru = defineLocale({
       lateAnswerTip: 'Составить этот ответ как продолжение',
       lateAnswerHint: 'Этот промпт больше не ждёт. Выберите вариант, чтобы составить его как сообщение-продолжение.'
     },
+    catalogInstall: {
+      preparing: 'Готовим установку…',
+      install: 'Установить',
+      advanced: 'Дополнительно',
+      skip: 'Пропустить',
+      installing: 'Установка…',
+      installed: 'Установлено',
+      notInstalled: 'Не установлено',
+      failed: 'Ошибка',
+      showNames: 'показать имена',
+      hideNames: 'скрыть имена',
+      skill: name => `навык ${name}`,
+      kind: { plugin: 'плагин', skill: 'навык' },
+      tier: { official: 'официальный', community: 'сообщество' },
+      targetProfile: profile => `Установка в ваш профиль ${profile}`,
+      sendFailed: 'Не удалось отправить ответ. Попробуйте ещё раз.',
+      commitLabel: 'Коммит',
+      subdirLabel: 'Папка',
+      securityHeading: 'Безопасность',
+      scan: { passed: 'Проверка пройдена', warnings: 'Проверка нашла предупреждения', failed: 'Проверка не пройдена' },
+      requirementsLabel: 'Требования',
+      credentialsHeading: 'Учётные данные'
+    },
     mcpSetup: {
-      installTitle: server => `Добавить MCP-сервер ${server}?`,
-      enableTitle: server => `Включить MCP-сервер ${server}?`,
-      authorizeTitle: server => `Авторизовать MCP-сервер ${server}?`,
+      installTitle: 'Добавить MCP-серверы',
+      enableTitle: 'Включить MCP-серверы',
+      authorizeTitle: 'Авторизовать MCP-серверы',
       installAction: 'Установить',
       enableAction: 'Включить',
       authorizeAction: 'Авторизовать',
-      decline: 'Не сейчас',
-      declined: 'Отклонено',
       installed: server => `${server} установлен`,
       enabled: server => `${server} включён`,
       authorized: server => `${server} авторизован`,
       failed: server => `Настройка не удалась для ${server}`,
-      unanswered: 'Нет ответа',
       toolCount: count => `${count} ${RU_NOUN(count, 'инструмент', 'инструмента', 'инструментов')}`,
-      notInCatalog: server => `«${server}» нет в MCP-каталоге`,
-      catalogSource: 'Из каталога, одобренного Qubit',
       envRequired: 'Сначала заполните обязательные учётные данные',
       sendFailed: 'Не удалось отправить ответ на настройку MCP',
       reloadFailed: 'Сервер сохранён, но перезагрузка MCP-инструментов не удалась — они загрузятся в следующем сеансе',
-      gatewayDisconnected: 'Шлюз Qubit не подключён'
+      gatewayDisconnected: 'Шлюз Hermes не подключён'
     },
     tool: {
       copyCode: 'Копировать код',
@@ -3595,6 +3954,19 @@ export const ru = defineLocale({
       copyQuery: 'Копировать запрос',
       copyFile: 'Копировать файл',
       copyPath: 'Копировать путь',
+      failedCalls: (count: number) => `Вызовов с ошибкой: ${count}`,
+      skillActivity: {
+        loading: 'Загружается скилл',
+        loaded: 'Загружен скилл',
+        loadFailed: 'Не удалось загрузить скилл',
+        readingResource: 'Читается ресурс скилла',
+        readResource: 'Прочитан ресурс скилла',
+        resourceFailed: 'Не удалось прочитать ресурс скилла',
+        listing: 'Загружается список скиллов',
+        listed: 'Получен список скиллов',
+        listFailed: 'Не удалось получить список скиллов',
+        unavailable: 'Результат работы со скиллом недоступен'
+      },
       outputAlt: 'Вывод инструмента',
       rawResponse: 'Сырой ответ',
       copyActivity: 'Копировать активность',
@@ -3607,6 +3979,8 @@ export const ru = defineLocale({
       statusError: 'Ошибка',
       statusRecovered: 'Восстановлено',
       statusDone: 'Готово',
+      resultUnavailable: 'Результат недоступен',
+      resultInterrupted: 'Прервано',
       memoryWriteNoted: 'Запись в память отмечена',
       actions: {
         read: 'Чтение',
@@ -3685,15 +4059,18 @@ export const ru = defineLocale({
     }
   },
   prompts: {
-    gatewayDisconnected: 'Шлюз Qubit не подключён',
+    gatewayDisconnected: 'Шлюз Hermes не подключён',
     sudoSendFailed: 'Не удалось отправить пароль sudo',
     secretSendFailed: 'Не удалось отправить секрет',
     sudoTitle: 'Пароль администратора',
     sudoDesc:
-      'Qubit нужен ваш пароль sudo, чтобы выполнить команду с повышенными правами. Он отправляется только вашему локальному агенту.',
+      'Проверьте команду перед вводом пароля sudo. Пароль отправляется агенту, который её выполняет, и кэшируется на время сеанса.',
+    sudoCommandUnavailable: 'Агент не предоставил команду. Отмените запрос, если не можете проверить её в разговоре.',
+    sudoInstallDesc:
+      'Hermes нужен ваш пароль sudo, чтобы установить пакеты Bot Screen (TigerVNC + Xfce) на хосте шлюза. Он отправляется только на этот хост.',
     sudoPlaceholder: 'пароль sudo',
     secretTitle: 'Требуется секрет',
-    secretDesc: 'Qubit нужны учётные данные, чтобы продолжить.',
+    secretDesc: 'Hermes нужны учётные данные, чтобы продолжить.',
     secretPlaceholder: 'значение секрета'
   },
   desktop: {
@@ -3701,6 +4078,9 @@ export const ru = defineLocale({
     sessionUnavailable: 'Сеанс недоступен',
     createSessionFailed: 'Не удалось создать новый сеанс',
     promptFailed: 'Промпт не удался',
+    staleSessionTitle: 'Чат устарел',
+    staleSessionBody:
+      'Это окно отставало от другого вида того же чата. Загружены последние сообщения. Отправьте снова, если всё ещё хотите.',
     providerCredentialRequired: 'Добавьте учётные данные провайдера перед отправкой первого сообщения.',
     emptySlashCommand: 'пустая слэш-команда',
     desktopCommands: 'Команды desktop',
@@ -3727,6 +4107,9 @@ export const ru = defineLocale({
     resumeStrandedTitle: 'Не удалось загрузить этот сеанс',
     resumeStrandedBody:
       'Соединение с этим сеансом оборвалось, и автоматические повторные попытки исчерпаны. Проверьте, что шлюз работает, и попробуйте снова.',
+    poolSlotTimeoutBody:
+      'Все слоты локальных бэкендов профилей заняты. Увеличьте Warm Bot Backends в «Настройки» → «Дополнительно» или повторите попытку после освобождения неактивного бэкенда.',
+    poolSlotTimeoutOpenSettings: 'Открыть расширенные настройки',
     resumeRetry: 'Повторить',
     nothingToBranch: 'Нечего ветвить',
     branchNeedsChat: 'Начните или возобновите чат перед ветвлением.',
@@ -3741,13 +4124,19 @@ export const ru = defineLocale({
     cwdChangeFailed: 'Изменение рабочего каталога не удалось',
     cwdStagedTitle: 'Рабочий каталог поставлен в очередь',
     cwdStagedMessage: 'Перезапустите бэкенд desktop, чтобы применить изменения cwd к этому активному сеансу.',
+    modelSwitchConfirmBody: 'Эта смена модели требует подтверждения.',
+    modelSwitchConfirmLabel: 'Всё равно переключить',
+    modelSwitchConfirmTitle: (model: string) => `Переключиться на ${model}?`,
+    modelSwitchConfirmTitleFallback: 'Сменить модель?',
     modelSwitchFailed: 'Смена модели не удалась',
+    modelSwitchKeepLabel: 'Оставить текущую модель',
+    modelSwitchStaleNotice: 'Выбор изменился — смена модели не применена.',
     sessionExported: 'Сеанс экспортирован',
     sessionExportFailed: 'Не удалось экспортировать сеанс',
     imageSaved: 'Изображение сохранено',
     downloadStarted: 'Загрузка началась',
-    restartToUseSaveImage: 'Перезапустите Qubit Desktop, чтобы использовать «Сохранить изображение».',
-    restartToSaveImages: 'Перезапустите Qubit Desktop, чтобы сохранять изображения',
+    restartToUseSaveImage: 'Перезапустите Hermes Desktop, чтобы использовать «Сохранить изображение».',
+    restartToSaveImages: 'Перезапустите Hermes Desktop, чтобы сохранять изображения',
     imageDownloadFailed: 'Загрузка изображения не удалась',
     openImage: 'Открыть изображение',
     downloadImage: 'Скачать изображение',
@@ -3766,7 +4155,7 @@ export const ru = defineLocale({
       success: platform => `Передаём в ${platform}. Возобновите здесь в любой момент.`,
       systemNote: platform => `↻ Передано в ${platform} — возобновите здесь в любой момент.`,
       failed: error => `Передача не удалась: ${error}`,
-      timedOut: 'Превышено время ожидания шлюза. Выполняется ли `qubit gateway`?'
+      timedOut: 'Превышено время ожидания шлюза. Выполняется ли `hermes gateway`?'
     }
   },
   errors: {

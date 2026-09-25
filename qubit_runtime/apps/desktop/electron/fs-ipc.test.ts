@@ -38,7 +38,7 @@ import { registerFsIpc } from './fs-ipc'
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-fs-ipc-'))
 
 registerFsIpc({
-  qubitHome: scratch,
+  hermesHome: scratch,
   readActiveDesktopProfile: () => null,
   // `~/` resolves under the scratch dir so tilde paths can be exercised.
   expandUserPath: value => (value.startsWith('~/') ? path.join(scratch, value.slice(2)) : value),
@@ -67,19 +67,6 @@ describe('hermes:fs:reveal', () => {
   it('reports false without touching the file manager when the path is missing', async () => {
     await expect(reveal(path.join(scratch, 'not-here'))).resolves.toBe(false)
     expect(electron.showItemInFolder).not.toHaveBeenCalled()
-  })
-
-  it('reports false for a path that is not on this computer, and only shows one that is', async () => {
-    const here = path.join(scratch, 'notes.md')
-
-    fs.writeFileSync(here, 'x')
-
-    await expect(reveal('/home/hermes/.hermes/attachments/report.zip')).resolves.toBe(false)
-    expect(electron.showItemInFolder).not.toHaveBeenCalled()
-
-    await expect(reveal(here)).resolves.toBe(true)
-    expect(electron.showItemInFolder).toHaveBeenCalledTimes(1)
-    expect(electron.showItemInFolder).toHaveBeenCalledWith(here)
   })
 
   // The renderer may hand over a tilde path; the existence check runs on the

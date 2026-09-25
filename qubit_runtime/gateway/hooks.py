@@ -12,15 +12,28 @@ model, provider.  Forum follow-ups pass ``message_thread_id=int(thread_id)``.
 import asyncio
 import importlib.util
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-import yaml
+import qubit_yaml as yaml
 
 from qubit_cli.config import get_qubit_home
+from qubit_constants import qubit_home_key
 
 
 HOOKS_DIR = get_qubit_home() / "hooks"
+_HOOKS_DIR_AT_IMPORT = HOOKS_DIR
+
+
+def _resolve_hooks_dir() -> Path:
+    """Active profile's hooks dir at call time: the patched ``HOOKS_DIR`` when a test changed it,
+    else ``get_qubit_home()/hooks``. The import-time constant is the LAUNCH profile's; under
+    ``gateway.multiplex_profiles`` every served profile has its own ``hooks/``, and a registry
+    loaded from the launch home would run the default profile's handlers (arbitrary Python) on
+    every other profile's messages, responses and user ids."""
+    configured = Path(HOOKS_DIR)
+    return configured if configured != _HOOKS_DIR_AT_IMPORT else get_qubit_home() / "hooks"
 
 
 def _skip(name: str, reason: str) -> None:
@@ -32,7 +45,7 @@ def _load_hook_dir(hook_dir: Path) -> Optional[tuple]:
     manifest_path, handler_path = hook_dir / "HOOK.yaml", hook_dir / "handler.py"
     if not manifest_path.exists() or not handler_path.exists():
         return None
-    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8-sig"))
     if not manifest or not isinstance(manifest, dict):
         return _skip(hook_dir.name, "invalid HOOK.yaml")
     hook_name = manifest.get("name", hook_dir.name)
@@ -42,7 +55,7 @@ def _load_hook_dir(hook_dir: Path) -> Optional[tuple]:
     # Register in sys.modules BEFORE exec_module so Pydantic/dataclass forward references
     # (``from __future__ import annotations``) resolve; otherwise a handler declaring a
     # BaseModel fails at first dispatch with "TypeAdapter ... is not fully defined".
-    module_name = f"qubit_hook_{hook_name}"
+    module_name = f"hermes_hook_{hook_name}"
     spec = importlib.util.spec_from_file_location(module_name, handler_path)
     if spec is None or spec.loader is None:
         return _skip(hook_name, "could not load handler.py")
@@ -74,11 +87,12 @@ class HookRegistry:
         """Extension point for always-on built-in hooks; currently none shipped."""
 
     def discover_and_load(self) -> None:
-        """Register built-in hooks, then load every valid hook dir under HOOKS_DIR."""
+        """Register built-in hooks, then load every valid hook dir under the active profile's ``hooks/``."""
         self._register_builtin_hooks()
-        if not HOOKS_DIR.exists():
+        hooks_dir = _resolve_hooks_dir()
+        if not hooks_dir.exists():
             return
-        for hook_dir in sorted(HOOKS_DIR.iterdir()):
+        for hook_dir in sorted(hooks_dir.iterdir()):
             if not hook_dir.is_dir():
                 continue
             try:
@@ -123,3 +137,45 @@ class HookRegistry:
             except Exception as e:
                 print(f"[hooks] Error in handler for '{event_type}': {e}", flush=True)
         return results
+
+
+class ProfileHookRegistries:
+    """``HookRegistry`` per served profile home, picked at emit time from the active QUBIT_HOME.
+
+    The gateway holds ONE of these. Every hook emit already runs inside the routed profile's
+    ``_profile_runtime_scope`` (message handlers, /new, turn wiring), so resolving the registry by
+    ``get_qubit_home()`` there gives each profile its own ``hooks/`` and keeps the default
+    profile's handlers from seeing other profiles' messages. Each home's registry is loaded on its
+    first emit, i.e. inside that profile's scope (handler imports see its QUBIT_HOME); multiplexing off
+    means a single entry for the launch home, i.e. exactly the old behaviour.
+    """
+
+    def __init__(self):
+        self._by_home: Dict[str, HookRegistry] = {}
+        self._lock = threading.Lock()
+
+    def _active(self) -> HookRegistry:
+        key = qubit_home_key(get_qubit_home())
+        registry = self._by_home.get(key)
+        if registry is None:
+            with self._lock:
+                registry = self._by_home.get(key)
+                if registry is None:
+                    registry = HookRegistry()
+                    registry.discover_and_load()
+                    self._by_home[key] = registry
+        return registry
+
+    @property
+    def loaded_hooks(self) -> List[dict]:
+        return self._active().loaded_hooks
+
+    def discover_and_load(self) -> None:
+        """Load the active home's hooks now (startup, or a secondary profile's scoped startup)."""
+        self._active()
+
+    async def emit(self, event_type: str, context: Optional[Dict[str, Any]] = None) -> None:
+        await self._active().emit(event_type, context)
+
+    async def emit_collect(self, event_type: str, context: Optional[Dict[str, Any]] = None) -> List[Any]:
+        return await self._active().emit_collect(event_type, context)

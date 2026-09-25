@@ -18,7 +18,7 @@ const secondaryGateways: Array<{
 let connectGate: Promise<void> | null = null
 
 vi.mock('@/hermes', () => ({
-  QubitGateway: class {
+  HermesGateway: class {
     connectionState = 'closed'
     connect = vi.fn(async () => {
       if (this.connectionState === 'connecting') {
@@ -53,11 +53,12 @@ const {
   ensureGatewayForAgent,
   ensureGatewayForProfile,
   pruneSecondaryGateways,
-  setPrimaryGateway
+  setPrimaryGateway,
+  SECONDARY_MIN_LIFETIME_MS
 } = await import('./gateway')
 
 function installDesktop(): void {
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = {
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
     getConnection: vi.fn(async (profile: null | string) =>
       profile ? { port: 5151, profile, token: 'secondary-token' } : { port: 4242, token: 'primary-token' }
     ),
@@ -91,7 +92,7 @@ afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
   vi.useRealTimers()
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 // Flush microtasks until the dial registers its secondary (or bail). The dial
@@ -152,7 +153,11 @@ describe('activation lease vs. the live-work pruner (#89622)', () => {
     // lease released, the idle entry must be disposed exactly as before.
     await ensureGatewayForProfile('default')
 
+    // Age the socket past the min-lifetime grace so this prune asserts the
+    // lease release, not the freshly-opened spare (#94769).
+    vi.useFakeTimers({ now: Date.now() + SECONDARY_MIN_LIFETIME_MS + 1_000 })
     pruneSecondaryGateways(new Set())
+    vi.useRealTimers()
 
     expect(secondaryGateways[0].close).toHaveBeenCalled()
   })
@@ -176,10 +181,35 @@ describe('activation lease vs. the live-work pruner (#89622)', () => {
 
     // Past the lease window: reclaimed. (Lease is wall-clock bounded so a
     // leaked lease cannot pin a dead entry forever.)
-    vi.setSystemTime(Date.now() + 31_000)
+    vi.setSystemTime(Date.now() + SECONDARY_MIN_LIFETIME_MS + 1_000)
     pruneSecondaryGateways(new Set())
     expect(secondaryGateways[0].close).toHaveBeenCalled()
 
     releaseConnect()
+  })
+
+  it('a freshly opened idle secondary rides one prune tick before reaping (#94769)', async () => {
+    vi.useFakeTimers()
+
+    // A socket that just opened is a prune ↔ on-demand-dial race in the making:
+    // its consumer may not have registered in the keep-set yet, and closing it
+    // detaches the runtime → backend orphan-reap → `session.reclaimed` →
+    // re-resume on a fresh socket the next recompute closes again. The
+    // min-lifetime grace bounds that race without pinning the entry forever.
+    await ensureGatewayForProfile('bot')
+    expect(secondaryGateways[0].connectionState).toBe('open')
+
+    // Move away so 'bot' is neither active nor in the keep-set.
+    await ensureGatewayForProfile('default')
+    expect(secondaryGateways).toHaveLength(1)
+
+    // Immediately after open: spared by the grace window.
+    pruneSecondaryGateways(new Set())
+    expect(secondaryGateways[0].close).not.toHaveBeenCalled()
+
+    // Past the grace window: reclaimed as idle, as before.
+    vi.setSystemTime(Date.now() + SECONDARY_MIN_LIFETIME_MS + 1_000)
+    pruneSecondaryGateways(new Set())
+    expect(secondaryGateways[0].close).toHaveBeenCalled()
   })
 })

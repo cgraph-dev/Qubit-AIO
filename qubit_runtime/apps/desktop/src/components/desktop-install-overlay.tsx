@@ -19,12 +19,13 @@ import { AlertCircle, ChevronDown, ChevronRight, Globe, iconSize, Loader2, Monit
 import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
 
-import { FirstRunRemoteForm } from './first-run-remote-form'
+import { localCardPresentation } from './desktop-install-local-card'
+import { FirstRunRemoteSetup } from './remote-setup/first-run'
 
 /**
  * DesktopInstallOverlay
  *
- * Renders the first-launch install progress for Qubit Agent. Mounted always;
+ * Renders the first-launch install progress for Hermes Agent. Mounted always;
  * shows itself only when main.ts reports an in-flight bootstrap (state.active)
  * OR an error from a completed-failed bootstrap (state.error). When the
  * bootstrap finishes successfully the overlay fades out and the rest of the
@@ -161,6 +162,25 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err || 'Unknown error')
 }
 
+/** Split "lead sentence\nDetails: raw" into [lead, raw]; no marker → [text, null]. */
+export function splitFailureDetails(text: string | null): [string, string | null] {
+  const value = (text ?? '').trim()
+  const marker = value.search(/\n?\s*Details:\s*/)
+
+  if (marker < 0) {
+    return [value, null]
+  }
+
+  const lead = value.slice(0, marker).trim()
+
+  const detail = value
+    .slice(marker)
+    .replace(/^\s*Details:\s*/, '')
+    .trim()
+
+  return [lead || value, detail || null]
+}
+
 const EMPTY_STATE: DesktopBootstrapState = {
   active: false,
   manifest: null,
@@ -170,7 +190,8 @@ const EMPTY_STATE: DesktopBootstrapState = {
   startedAt: null,
   completedAt: null,
   setupChoice: null,
-  unsupportedPlatform: null
+  unsupportedPlatform: null,
+  bundled: false
 }
 
 function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): DesktopBootstrapState {
@@ -188,10 +209,13 @@ function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): De
       setupChoice: ev.active
         ? {
             platform: ev.platform || state.setupChoice?.platform || 'unknown',
-            activeRoot: ev.activeRoot || state.setupChoice?.activeRoot || ''
+            activeRoot: ev.activeRoot || state.setupChoice?.activeRoot || '',
+            local: ev.local || state.setupChoice?.local || 'none',
+            bundled: Boolean(ev.bundled)
           }
         : null,
-      unsupportedPlatform: null
+      unsupportedPlatform: null,
+      bundled: Boolean(ev.bundled)
     }
   }
 
@@ -298,7 +322,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
       return
     }
 
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
 
     if (!desktop || typeof desktop.onBootstrapEvent !== 'function') {
       return
@@ -393,10 +417,13 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
   }
 
   if (remoteOpen) {
-    return <FirstRunRemoteForm onBack={() => setRemoteOpen(false)} />
+    return <FirstRunRemoteSetup onBack={() => setRemoteOpen(false)} />
   }
 
   if (state.setupChoice) {
+    const localState = state.setupChoice.local
+    const localPres = localCardPresentation(localState)
+
     return (
       <div className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-background/90 p-4 backdrop-blur-md">
         <div className="w-full max-w-2xl rounded-xl border border-(--stroke-nous) bg-card p-8 shadow-nous">
@@ -404,7 +431,9 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
             <BrandMark className="size-11 shrink-0" />
             <div className="min-w-0">
               <h2 className="text-xl font-semibold tracking-tight">{copy.setupChoiceTitle}</h2>
-              <p className="mt-1.5 text-sm text-muted-foreground">{copy.setupChoiceDesc}</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {localState === 'none' ? copy.setupChoiceDesc : copy.setupChoiceDescLocal}
+              </p>
             </div>
           </div>
 
@@ -422,13 +451,13 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
             </button>
 
             <button
-              className="rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-4 text-left transition hover:bg-(--chrome-action-hover) disabled:cursor-wait disabled:opacity-60"
+              className="rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-4 text-left transition hover:bg-(--chrome-action-hover) disabled:cursor-not-allowed disabled:opacity-60"
               disabled={localStarting}
               onClick={async () => {
                 setLocalStart({ root: activeRoot, starting: true, error: null })
 
                 try {
-                  const desktop = window.qubitDesktop
+                  const desktop = window.hermesDesktop
 
                   if (!desktop || typeof desktop.continueBootstrapLocal !== 'function') {
                     throw new Error(copy.localStartUnavailable)
@@ -447,9 +476,9 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                 ) : (
                   <Monitor className="size-4 text-muted-foreground" />
                 )}
-                <span>{copy.installLocalTitle}</span>
+                <span>{copy[localPres.title]}</span>
               </div>
-              <p className="mt-2 text-sm leading-5 text-muted-foreground">{copy.installLocalDesc}</p>
+              <p className="mt-2 text-sm leading-5 text-muted-foreground">{copy[localPres.desc]}</p>
             </button>
           </div>
 
@@ -460,17 +489,19 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
             </div>
           ) : null}
 
-          <div className="mt-6 text-xs text-muted-foreground">
-            {copy.installTo}{' '}
-            <code className="font-mono text-(--ui-text-secondary)">{state.setupChoice.activeRoot}</code>
-          </div>
+          {localPres.showInstallTo ? (
+            <div className="mt-6 text-xs text-muted-foreground">
+              {copy.installTo}{' '}
+              <code className="font-mono text-(--ui-text-secondary)">{state.setupChoice.activeRoot}</code>
+            </div>
+          ) : null}
         </div>
       </div>
     )
   }
 
   // Unsupported-platform branch: macOS/Linux packaged builds hit this when
-  // there's no Qubit Agent installed yet and we can't drive install.sh
+  // there's no Hermes Agent installed yet and we can't drive install.sh
   // (no stage protocol equivalent yet). Show a copy-paste install command
   // and the docs URL; user runs it from Terminal and relaunches the app.
   if (state.unsupportedPlatform) {
@@ -500,7 +531,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
               </Button>
               <Button
                 onClick={() => {
-                  window.qubitDesktop?.openExternal?.(ups.docsUrl)
+                  window.hermesDesktop?.openExternal?.(ups.docsUrl)
                 }}
                 size="sm"
                 variant="ghost"
@@ -538,6 +569,9 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
 
   const totalCount = stages.length
   const failed = Boolean(state.error)
+  // Main writes a plain lead sentence and keeps the raw installer error after
+  // "Details:" (electron/bootstrap-failure-copy.ts); show them as two lines.
+  const [failureLead, failureDetail] = splitFailureDetails(state.error)
   // Count the running stage as half-done so the bar advances *during* a long
   // stage instead of sitting frozen at the last completed step while its logs
   // stream (e.g. "0 of 2" pinned at 0% for the whole first stage).
@@ -593,7 +627,12 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
               <ErrorIcon className="mt-0.5 shrink-0" size="1rem" />
               <div className="min-w-0">
                 <div className="font-medium text-destructive">{copy.error}</div>
-                <p className="mt-0.5 whitespace-pre-wrap break-words text-foreground/90">{state.error}</p>
+                <p className="mt-0.5 whitespace-pre-wrap break-words text-foreground/90">{failureLead}</p>
+                {failureDetail ? (
+                  <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                    {failureDetail}
+                  </p>
+                ) : null}
               </div>
             </div>
           )}
@@ -649,7 +688,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                   setCancelling(true)
 
                   try {
-                    await window.qubitDesktop?.cancelBootstrap?.()
+                    await window.hermesDesktop?.cancelBootstrap?.()
                   } catch {
                     // ignore -- the failed/cancelled event will surface the result
                   }
@@ -670,9 +709,16 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">
                 {copy.transcriptSaved}{' '}
-                <code className="font-mono text-(--ui-text-secondary)">%LOCALAPPDATA%\qubit\logs\</code>
+                <code className="font-mono text-(--ui-text-secondary)">%LOCALAPPDATA%\hermes\logs\</code>
               </span>
               <div className="flex gap-2">
+                <Button
+                  onClick={() => void window.hermesDesktop?.revealLogs?.().catch(() => undefined)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  {copy.openLogs}
+                </Button>
                 <Button
                   onClick={async () => {
                     const text = state.log
@@ -701,7 +747,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
                     // and main short-circuits to the latched error without
                     // re-running install.ps1.
                     try {
-                      await window.qubitDesktop?.resetBootstrap?.()
+                      await window.hermesDesktop?.resetBootstrap?.()
                     } catch {
                       // best-effort -- continue with reload regardless
                     }

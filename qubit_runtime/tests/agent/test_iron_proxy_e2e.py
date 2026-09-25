@@ -33,7 +33,7 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -64,7 +64,7 @@ class _CaptureHandler(BaseHTTPRequestHandler):
         return  # silence access log
 
 
-def test_iron_proxy_swaps_authorization_header_end_to_end(hermes_home, monkeypatch):
+def test_iron_proxy_swaps_authorization_header_end_to_end(qubit_home, monkeypatch):
     """Real binary, real CA, real curl. Verify the proxy swaps a proxy-token
     Authorization header for the real bearer value before forwarding."""
 
@@ -187,7 +187,7 @@ class _CaptureXApiKeyHandler(BaseHTTPRequestHandler):
         return
 
 
-def test_iron_proxy_swaps_x_api_key_header_end_to_end(hermes_home, monkeypatch):
+def test_iron_proxy_swaps_x_api_key_header_end_to_end(qubit_home, monkeypatch):
     """Header-auth providers: the secrets transform must swap the proxy
     token out of a NON-Authorization header (x-api-key — the Anthropic
     native scheme) on the pinned binary."""
@@ -274,7 +274,7 @@ def test_iron_proxy_swaps_x_api_key_header_end_to_end(hermes_home, monkeypatch):
         server.server_close()
 
 
-def test_iron_proxy_management_reload_end_to_end(hermes_home, monkeypatch):
+def test_iron_proxy_management_reload_end_to_end(qubit_home, monkeypatch):
     """Real binary: the management listener comes up, an authenticated
     POST /v1/reload succeeds after a config edit, and the edited ruleset
     takes effect WITHOUT a restart (same pid)."""

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 _CONTEXT_ENGINE_PLUGINS_DIR = Path(__file__).parent
 # Synthetic parent package for user-installed engines (keeps them out of the bundled namespace).
-_USER_NAMESPACE = "_hermes_user_context_engine"
+_USER_NAMESPACE = "_qubit_user_context_engine"
 
 
 def _is_context_engine_dir(path: Path) -> bool:

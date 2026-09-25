@@ -8,7 +8,7 @@ These tests pin the new behavior: reads and writes land in the REQUESTED
 profile's QUBIT_HOME, and the dashboard's own profile stays untouched.
 """
 import pytest
-import yaml
+import qubit_yaml as yaml
 import qubit_cli.web_server_gateway as _web_server_gateway
 import qubit_cli.web_server_profiles as _web_server_profiles
 
@@ -97,7 +97,7 @@ class TestProfileScopedHubActions:
     def test_hub_install_spawns_with_profile_flag(
         self, client, isolated_profiles, monkeypatch
     ):
-        """Hub installs must go through a fresh ``qubit -p <profile>``
+        """Hub installs must go through a fresh ``hermes -p <profile>``
         subprocess — the in-process scope can't reach skills_hub's
         import-time SKILLS_DIR binding."""
         import qubit_cli.web_server as web_server
@@ -111,7 +111,7 @@ class TestProfileScopedHubActions:
             calls.append((list(subcommand), name))
             return _FakeProc()
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _fake_spawn)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_qubit_action", _fake_spawn)
         resp = client.post(
             "/api/skills/hub/install",
             json={"identifier": "official/demo", "profile": "worker_alpha"},

@@ -4,7 +4,7 @@ import type { Message } from 'dbus-native'
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import type { QubitNotification } from './notification-types'
+import type { HermesNotification } from './notification-types'
 
 const host = vi.hoisted(() => ({ handle: vi.fn(), fromWebContents: vi.fn(), createClient: vi.fn() }))
 vi.mock('electron', () => ({
@@ -154,7 +154,7 @@ function setup(alreadyRunning = false) {
     platform: 'linux'
   })
 
-  const notify = (payload: QubitNotification) =>
+  const notify = (payload: HermesNotification) =>
     Promise.resolve(
       host.handle.mock.calls[0][1]({ sender: source.webContents } as unknown as IpcMainInvokeEvent, payload)
     )

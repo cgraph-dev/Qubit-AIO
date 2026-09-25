@@ -89,10 +89,10 @@ async function listDirs(dir: string): Promise<string[]> {
 }
 
 /** Every hermes home the app knows about locally: the default plus each profile. */
-export async function localHomes(qubitHome: string): Promise<string[]> {
-  const profiles = await listDirs(path.join(qubitHome, 'profiles'))
+export async function localHomes(hermesHome: string): Promise<string[]> {
+  const profiles = await listDirs(path.join(hermesHome, 'profiles'))
 
-  return [qubitHome, ...profiles.map(name => path.join(qubitHome, 'profiles', name))]
+  return [hermesHome, ...profiles.map(name => path.join(hermesHome, 'profiles', name))]
 }
 
 /** Move every `profiles/<name>/desktop-plugins/<id>` folder into the app-level
@@ -100,11 +100,11 @@ export async function localHomes(qubitHome: string): Promise<string[]> {
  *  id, so a duplicate is the same plugin installed twice); the profile copy is
  *  left in place for the user to delete rather than destroyed. Emptied profile
  *  roots are removed so the migration is a no-op on the next launch. */
-export async function migrateProfileScopedDesktopPlugins(qubitHome: string, appRoot: string): Promise<string[]> {
+export async function migrateProfileScopedDesktopPlugins(hermesHome: string, appRoot: string): Promise<string[]> {
   const moved: string[] = []
 
-  for (const profile of await listDirs(path.join(qubitHome, 'profiles'))) {
-    const scopedRoot = path.join(qubitHome, 'profiles', profile, DESKTOP_PLUGINS_DIR)
+  for (const profile of await listDirs(path.join(hermesHome, 'profiles'))) {
+    const scopedRoot = path.join(hermesHome, 'profiles', profile, DESKTOP_PLUGINS_DIR)
 
     for (const entry of await listDirs(scopedRoot)) {
       const from = path.join(scopedRoot, entry)
@@ -146,12 +146,28 @@ async function readMarker(dir: string): Promise<DesktopHalfMarker | null> {
   }
 }
 
+/** Same bytes on both paths. Unreadable either side answers `false` — a
+ *  comparison we cannot make is never evidence of a match. */
+async function sameFile(a: string, b: string): Promise<boolean> {
+  try {
+    const [left, right] = await Promise.all([fs.promises.readFile(a), fs.promises.readFile(b)])
+
+    return left.equals(right)
+  } catch {
+    return false
+  }
+}
+
+/** Write the marker into a desktop-half folder. The one place that serializes
+ *  it, so the git installer and this reconcile cannot drift. */
+export async function writeDesktopHalfMarker(dir: string, marker: DesktopHalfMarker): Promise<void> {
+  await fs.promises.writeFile(path.join(dir, PACKAGE_MARKER), JSON.stringify(marker, null, 2) + '\n')
+}
+
 /** Copy one unified package's `desktop/` half into the app root as
  *  `<appRoot>/<packageName>/`, stamping the marker. Skips when the root copy is
- *  already current for this source; replaces it when the source is newer. A
- *  root folder of the same name WITHOUT a marker is a standalone install the
- *  user made on purpose and is never overwritten. Returns the target path
- *  when a copy happened. */
+ *  already current for this source; replaces it when the source is newer.
+ *  Returns the target path when a copy (or an adoption) happened. */
 export async function materializeDesktopHalf(
   packageDir: string,
   appRoot: string,
@@ -179,12 +195,36 @@ export async function materializeDesktopHalf(
   const target = path.join(appRoot, packageName)
   const existing = await readMarker(target)
 
+  const marker: DesktopHalfMarker = {
+    package: packageName,
+    source: sourceDir,
+    sourceMtimeMs: stat.mtimeMs,
+    ...(await packageOrigin(packageDir))
+  }
+
   if (fs.existsSync(target)) {
     if (!existing) {
-      // A real standalone install has its entry point. A marker-less folder
-      // without one is an interrupted unified-package copy: the old copy
-      // wrote the marker last, so leaving it here would block every retry.
+      // A marker-less folder carrying the entry point is either a standalone
+      // plugin the user installed on purpose (never touch it) or a desktop half
+      // this app copied out before it stamped markers — `installDesktopPluginFromGit`
+      // published without one, which left the Plugins page waiting on "copying…"
+      // beside a second, already-enabled row, forever, because this function
+      // then refused the folder on every pass.
+      //
+      // Identical entry points tell the two apart: our own copy of this
+      // package's half still matches it byte for byte, so adopting it is a
+      // no-op on disk — stamp the marker in place and the row pairs, with the
+      // opt-in posture a marker implies. Anything that differs is the user's
+      // and is left exactly as it was (#112450). A marker-less folder with no
+      // entry point is an interrupted copy (the marker is written last) and is
+      // replaced as before.
       if (fs.existsSync(path.join(target, 'plugin.js'))) {
+        if (await sameFile(path.join(target, 'plugin.js'), entry)) {
+          await writeDesktopHalfMarker(target, marker)
+
+          return target
+        }
+
         return null
       }
     }
@@ -194,16 +234,7 @@ export async function materializeDesktopHalf(
     }
   }
 
-  const marker: DesktopHalfMarker = {
-    package: packageName,
-    source: sourceDir,
-    sourceMtimeMs: stat.mtimeMs,
-    ...(await packageOrigin(packageDir))
-  }
-
-  await publishDesktopTree(sourceDir, target, staged =>
-    fs.promises.writeFile(path.join(staged, PACKAGE_MARKER), JSON.stringify(marker, null, 2) + '\n')
-  )
+  await publishDesktopTree(sourceDir, target, staged => writeDesktopHalfMarker(staged, marker))
 
   return target
 }
@@ -267,11 +298,11 @@ async function sourceGone(name: string, entry: string): Promise<boolean> {
  *  desktop half. First home wins for a name that appears in several profiles
  *  (the default home is first). Also drops root copies whose source package
  *  is gone — an uninstalled agent package must not leave a ghost pane. */
-export async function reconcileUnifiedDesktopHalves(qubitHome: string, appRoot: string): Promise<string[]> {
+export async function reconcileUnifiedDesktopHalves(hermesHome: string, appRoot: string): Promise<string[]> {
   const touched: string[] = []
   const seen = new Set<string>()
 
-  for (const home of await localHomes(qubitHome)) {
+  for (const home of await localHomes(hermesHome)) {
     const pluginsRoot = path.join(home, 'plugins')
 
     for (const name of await listDirs(pluginsRoot)) {

@@ -27,7 +27,7 @@ def cron_store(tmp_path, monkeypatch):
     qubit_home = tmp_path / ".hermes"
     (qubit_home / "cron").mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-    monkeypatch.setattr(J, "QUBIT_DIR", qubit_home)
+    monkeypatch.setattr(J, "HERMES_DIR", qubit_home)
     monkeypatch.setattr(J, "CRON_DIR", qubit_home / "cron")
     monkeypatch.setattr(J, "JOBS_FILE", qubit_home / "cron" / "jobs.json")
     monkeypatch.setattr(J, "OUTPUT_DIR", qubit_home / "cron" / "output")

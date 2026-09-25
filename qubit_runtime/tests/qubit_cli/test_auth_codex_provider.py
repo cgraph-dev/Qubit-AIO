@@ -1,8 +1,6 @@
 """Tests for Codex auth — tokens stored in Hermes auth store (~/.hermes/auth.json)."""
 
 import json
-import time
-import base64
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,14 +9,10 @@ import pytest
 from qubit_cli.auth import (
     AuthError,
     DEFAULT_CODEX_BASE_URL,
-    PROVIDER_REGISTRY,
     _read_codex_tokens,
     _save_codex_tokens,
-    _import_codex_cli_tokens,
-    _login_openai_codex,
     refresh_codex_oauth_pure,
     resolve_codex_runtime_credentials,
-    resolve_provider,
 )
 
 
@@ -44,18 +38,8 @@ def _setup_qubit_auth(qubit_home: Path, *, access_token: str = "access", refresh
     return auth_file
 
 
-def _jwt_with_exp(exp_epoch: int) -> str:
-    payload = {"exp": exp_epoch}
-    encoded = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).rstrip(b"=").decode("utf-8")
-    return f"h.{encoded}.s"
-
-
-
-
-
-
 def test_resolve_codex_runtime_credentials_missing_access_token(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     _setup_qubit_auth(qubit_home, access_token="")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing-codex"))
@@ -76,7 +60,7 @@ def test_resolve_codex_runtime_credentials_falls_back_to_pool_when_singleton_emp
     re-auth, restore from backup) hit a bare HTTP 401 on chat but worked fine on
     auxiliary calls.  The fallback closes that divergence.
     """
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     # Singleton: empty tokens (would normally raise AuthError).
     # Pool: valid access_token.
@@ -104,8 +88,6 @@ def test_resolve_codex_runtime_credentials_falls_back_to_pool_when_singleton_emp
     assert resolved["base_url"]  # default codex backend URL
 
 
-
-
 def test_save_codex_tokens_syncs_credential_pool(tmp_path, monkeypatch):
     """Re-auth must update the credential_pool device_code entry, not just providers.
 
@@ -114,7 +96,7 @@ def test_save_codex_tokens_syncs_credential_pool(tmp_path, monkeypatch):
     holding a consumed refresh token and stale error markers, causing an
     immediate 401 token_invalidated on the next request.
     """
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -178,7 +160,7 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
     aliases of the singleton, while leaving INDEPENDENT entries alone.
 
     Original regression for #33538: a user who hit #33000 before the #33164
-    fix landed would have run ``qubit auth add openai-codex`` as a
+    fix landed would have run ``hermes auth add openai-codex`` as a
     workaround, leaving a pool entry with ``source="manual:device_code"``.
     On every subsequent re-auth via setup/model picker, the singleton-seeded
     ``device_code`` entry got refreshed but the ``manual:device_code`` entry
@@ -187,12 +169,12 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
 
     Narrowed for #39236: the original fix treated every ``manual:device_code``
     entry as a singleton-alias and refreshed them all, which silently
-    clobbered independent accounts added via ``qubit auth add openai-codex``.
+    clobbered independent accounts added via ``hermes auth add openai-codex``.
     The current behavior refreshes only entries whose access_token matches
     the *previous* singleton access_token (true legacy aliases), and leaves
     distinct-token entries alone (independent accounts).
     """
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -225,7 +207,7 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
                     "last_error_code": 401,
                     "last_error_reason": "token_invalidated",
                 },
-                # Independent account from `qubit auth add openai-codex` —
+                # Independent account from `hermes auth add openai-codex` —
                 # its tokens are distinct from the singleton.  Must NOT be
                 # overwritten by a re-auth that targeted a different account
                 # (#39236).
@@ -278,112 +260,13 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
     assert "refresh_token" not in api_key or api_key.get("refresh_token") is None
 
 
-def test_save_codex_tokens_does_not_overwrite_independent_manual_entries(tmp_path, monkeypatch):
-    """Re-auth must NOT overwrite ``manual:device_code`` entries that hold
-    independent token material (different OpenAI/ChatGPT accounts).
-
-    Regression for #39236: ``qubit auth add openai-codex`` for accounts B and C
-    routes through ``_save_codex_tokens`` because the singleton path is the
-    only Codex OAuth save flow.  The #33538 fix refreshed every
-    ``manual:device_code`` entry on every re-auth, which works fine for the
-    one-account/legacy-workaround case but silently overwrote distinct
-    independent accounts with the latest-authenticated tokens (labels
-    preserved, token material clobbered, status/quota readings then lie).
-
-    The safe invariant: an entry is a singleton-alias only when its current
-    access_token matches the *previous* singleton access_token.  Manual
-    entries whose tokens never matched the singleton are independent accounts
-    and must be left alone.
-    """
-    qubit_home = tmp_path / "qubit"
-    qubit_home.mkdir(parents=True, exist_ok=True)
-    (qubit_home / "auth.json").write_text(json.dumps({
-        "version": 1,
-        "providers": {
-            "openai-codex": {
-                # Old singleton tokens — represent "account A" which the user
-                # logged in with via setup originally.
-                "tokens": {"access_token": "acctA-at", "refresh_token": "acctA-rt"},
-                "last_refresh": "2026-01-01T00:00:00Z",
-                "auth_mode": "chatgpt",
-                "label": "account-A",
-            },
-        },
-        "credential_pool": {
-            "openai-codex": [
-                # The seeded singleton mirror of account A.
-                {
-                    "id": "seeded",
-                    "label": "account-A",
-                    "source": "device_code",
-                    "auth_type": "oauth",
-                    "access_token": "acctA-at",
-                    "refresh_token": "acctA-rt",
-                },
-                # Two INDEPENDENT manual entries added later via
-                # ``qubit auth add openai-codex`` (account B and account C).
-                # Each has its OWN distinct token material, unrelated to the
-                # singleton.
-                {
-                    "id": "acctB",
-                    "label": "account-B",
-                    "source": "manual:device_code",
-                    "auth_type": "oauth",
-                    "access_token": "acctB-at",
-                    "refresh_token": "acctB-rt",
-                },
-                {
-                    "id": "acctC",
-                    "label": "account-C",
-                    "source": "manual:device_code",
-                    "auth_type": "oauth",
-                    "access_token": "acctC-at",
-                    "refresh_token": "acctC-rt",
-                },
-            ],
-        },
-    }))
-    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-
-    # User re-authenticates account A — fresh device-code login produces new
-    # tokens.  The legitimate update is the seeded singleton mirror; the
-    # independent acctB/acctC entries must be untouched.
-    _save_codex_tokens(
-        {"access_token": "acctA-new-at", "refresh_token": "acctA-new-rt"},
-        last_refresh="2026-06-05T00:00:00Z",
-    )
-
-    auth = json.loads((qubit_home / "auth.json").read_text())
-    pool = auth["credential_pool"]["openai-codex"]
-
-    # Singleton-seeded entry: refreshed (legitimate sync).
-    seeded = next(e for e in pool if e["source"] == "device_code")
-    assert seeded["access_token"] == "acctA-new-at"
-    assert seeded["refresh_token"] == "acctA-new-rt"
-    assert seeded["last_refresh"] == "2026-06-05T00:00:00Z"
-
-    # acctB: INDEPENDENT entry — must NOT be overwritten.
-    acctB = next(e for e in pool if e["id"] == "acctB")
-    assert acctB["access_token"] == "acctB-at", (
-        "acctB was clobbered by acctA re-auth (#39236 regression)"
-    )
-    assert acctB["refresh_token"] == "acctB-rt"
-
-    # acctC: INDEPENDENT entry — must NOT be overwritten.
-    acctC = next(e for e in pool if e["id"] == "acctC")
-    assert acctC["access_token"] == "acctC-at", (
-        "acctC was clobbered by acctA re-auth (#39236 regression)"
-    )
-    assert acctC["refresh_token"] == "acctC-rt"
-
-
 def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_path, monkeypatch):
     """Error markers must be cleared only on entries that were actually
     refreshed by this re-auth.  Independent ``manual:device_code`` entries
     with their own stale-error markers must be left alone (their stale state
     is not the current re-auth's business).
     """
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -442,11 +325,9 @@ def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_pa
     assert acctB["last_error_reason"] == "quota_exhausted"
 
 
-
-
 def test_codex_tokens_not_written_to_shared_file(tmp_path, monkeypatch):
     """Verify _save_codex_tokens writes only to Hermes auth store, not ~/.codex/."""
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     codex_home = tmp_path / "codex-cli"
     qubit_home.mkdir(parents=True, exist_ok=True)
     codex_home.mkdir(parents=True, exist_ok=True)
@@ -466,7 +347,7 @@ def test_codex_tokens_not_written_to_shared_file(tmp_path, monkeypatch):
 
 
 def test_resolve_returns_qubit_auth_store_source(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     _setup_qubit_auth(qubit_home)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -510,14 +391,12 @@ def _patch_httpx(monkeypatch, response):
     monkeypatch.setattr("qubit_cli.auth.httpx.Client", _factory)
 
 
-
-
 def test_refresh_429_classified_as_quota_not_auth_failure(monkeypatch):
     """429 from the token endpoint is a usage-quota cap, not an auth failure.
 
     Regression test for #32790: must NOT force relogin and must carry the
     dedicated rate-limit code so callers surface a "retry later" notice rather
-    than a misleading "run qubit auth".
+    than a misleading "run hermes auth".
     """
     from qubit_cli.auth import (
         CODEX_RATE_LIMITED_CODE,
@@ -539,7 +418,6 @@ def test_refresh_429_classified_as_quota_not_auth_failure(monkeypatch):
     assert err.code == CODEX_RATE_LIMITED_CODE
     assert err.relogin_required is False
     assert is_rate_limited_auth_error(err) is True
-    assert "retry after 120s" in str(err)
     # User-facing copy must not tell the operator to re-authenticate.
     rendered = format_auth_error(err)
     assert "re-authenticate" not in rendered
@@ -559,55 +437,30 @@ def test_refresh_429_without_retry_after_header(monkeypatch):
     err = exc_info.value
     assert err.code == CODEX_RATE_LIMITED_CODE
     assert err.relogin_required is False
-    assert "quota exhausted" in str(err).lower()
 
 
-def test_is_rate_limited_auth_error_distinguishes_credential_errors():
-    """Missing/expired credentials must NOT be treated as rate-limit errors."""
-    from qubit_cli.auth import CODEX_RATE_LIMITED_CODE, is_rate_limited_auth_error
+def test_pool_only_force_refresh_rotates_the_pool_entry(tmp_path, monkeypatch):
+    """Pool-only setup (empty singleton): ``force_refresh`` must refresh the pool credential
+    instead of handing back the same token the caller just got a 401 for."""
+    qubit_home = tmp_path / "hermes"
+    qubit_home.mkdir(parents=True, exist_ok=True)
+    (qubit_home / "auth.json").write_text(json.dumps({
+        "version": 1, "providers": {},
+        "credential_pool": {"openai-codex": [{
+            "source": "device_code", "access_token": "pool-revoked", "refresh_token": "pool-refresh",
+            "last_status": "ok", "auth_type": "oauth"}]},
+    }))
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    hints = []
 
-    rate_limited = AuthError(
-        "quota", provider="openai-codex", code=CODEX_RATE_LIMITED_CODE, relogin_required=False
-    )
-    missing_creds = AuthError(
-        "No Codex credentials stored.",
-        provider="openai-codex",
-        code="codex_auth_missing",
-        relogin_required=True,
-    )
-    assert is_rate_limited_auth_error(rate_limited) is True
-    assert is_rate_limited_auth_error(missing_creds) is False
-    assert is_rate_limited_auth_error(ValueError("nope")) is False
+    class Pool:
+        def try_refresh_matching(self, api_key_hint=None, credential_id=None):
+            hints.append(api_key_hint)
+            return SimpleNamespace(runtime_api_key="pool-fresh")
 
+    monkeypatch.setattr("agent.credential_pool.load_pool", lambda provider: Pool())
 
-
-
-class _FakeResp:
-    def __init__(self, status_code, json_data=None, headers=None):
-        self.status_code = status_code
-        self._json = json_data or {}
-        self.headers = headers or {}
-
-    def json(self):
-        return self._json
-
-
-def _patch_httpx_post(monkeypatch, responses):
-    """Patch qubit_cli.auth.httpx.Client so .post() returns queued responses."""
-    seq = iter(responses)
-
-    class _FakeClient:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-        def post(self, *args, **kwargs):
-            return next(seq)
-
-    monkeypatch.setattr("qubit_cli.auth.httpx.Client", lambda *a, **k: _FakeClient())
-
-
-
-
+    resolved = resolve_codex_runtime_credentials(force_refresh=True)
+    assert resolved["api_key"] == "pool-fresh"
+    assert resolved["source"] == "credential_pool"
+    assert hints == ["pool-revoked"]

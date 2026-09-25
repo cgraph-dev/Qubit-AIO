@@ -120,8 +120,8 @@ export const it: Translations = {
     starting: "Avvio in corso",
     startedInBackground: "Avviato in background — controlla i log per i progressi",
     stopped: "Arrestato",
-    updateQubit: "Aggiorna Qubit",
-    updatingQubit: "Aggiornamento di Qubit…",
+    updateHermes: "Aggiorna Qubit",
+    updatingHermes: "Aggiornamento di Qubit…",
     waitingForOutput: "In attesa di output…",
   },
 
@@ -165,6 +165,10 @@ export const it: Translations = {
     failedToDeleteSelected: "Impossibile eliminare le sessioni selezionate",
     resumeInChat: "Riprendi nella chat",
     newChat: "Nuova chat",
+    workspace: "area di lavoro",
+    workspaceDefault: "Predefinito",
+    workspaceRescan: "Riesamina i repository",
+    workspaceCustom: "Altro percorso…",
     previousPage: "Pagina precedente",
     nextPage: "Pagina successiva",
     roles: {
@@ -324,6 +328,8 @@ export const it: Translations = {
     disableRuntime: "Disabilita",
     enableAfterInstall: "Abilita dopo l'installazione",
     enableRuntime: "Abilita",
+    toggleTakesEffectAfterRestart:
+      "Salvato: riavvia il gateway per applicare la modifica.",
     forceReinstall: "Forza reinstallazione (elimina prima la cartella esistente)",
     headline:
       "Scopri, installa, abilita e aggiorna i plugin Qubit (parità con `qubit plugins`).",
@@ -343,8 +349,8 @@ export const it: Translations = {
     providersHint:
       "Scrive memory.provider (vuoto = integrato) e context.engine in config.yaml. Effetto dalla prossima sessione.",
     refreshDashboard: "Riscansiona estensioni dashboard",
-    removeConfirm: "Rimuovere questo plugin da $QUBIT_HOME/plugins/?",
-    removeHint: "Solo i plugin installati dall'utente in $QUBIT_HOME/plugins possono essere rimossi.",
+    removeConfirm: "Rimuovere questo plugin da ~/.hermes/plugins/?",
+    removeHint: "Solo i plugin installati dall'utente in ~/.hermes/plugins possono essere rimossi.",
     rescanHeading: "Registro plugin SPA",
     rescanHint: "Riscansiona dopo aver aggiunto file su disco affinché la barra laterale rilevi i nuovi manifest.",
     runtimeHeading: "Runtime gateway (plugin YAML)",
@@ -366,7 +372,7 @@ export const it: Translations = {
     all: "Tutti",
     categories: "Categorie",
     filters: "Filtri",
-    noSkills: "Nessuna competenza trovata. Le competenze vengono caricate da ~/.qubit/skills/",
+    noSkills: "Nessuna competenza trovata. Le competenze vengono caricate da ~/.hermes/skills/",
     noSkillsMatch: "Nessuna competenza corrisponde alla ricerca o al filtro.",
     skillCount: "{count} competenz{s}",
     resultCount: "{count} risultat{s}",
@@ -380,7 +386,7 @@ export const it: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Filtri",
     sections: "Sezioni",
     exportConfig: "Esporta configurazione come JSON",

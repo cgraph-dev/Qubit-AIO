@@ -103,7 +103,7 @@ class TestTheFrozenFileIsSane:
         # pass vacuously.
         bare = set(_load_surface()["bare"])
         for anchor in (
-            "qubit_constants::with_hermes_node_path",
+            "qubit_constants::with_qubit_node_path",
             "qubit_constants::venv_python_path",
             "qubit_cli.gitlock::clear_stale_git_locks",
             "qubit_cli.managed_uv::ensure_uv",

@@ -1,15 +1,16 @@
-# Qubit-approved MCP catalog entry.
+# Nous-approved MCP catalog entry.
 # Presence in this directory = approval. Merged via PR review.
 manifest_version: 1
 
 name: sentry
+connector_slug: sentry_mcp
 description: >-
   Issues, stack traces, and error context from Sentry.
 source: https://docs.sentry.io/product/sentry-mcp/
 
-# Official vendor-hosted remote MCP (URL-only — Qubit never spawns a local
+# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
 # process for this entry). Native OAuth 2.1 + Dynamic Client Registration;
-# Qubit's MCP client + mcp_oauth_manager handle discovery, PKCE, token
+# Hermes's MCP client + mcp_oauth_manager handle discovery, PKCE, token
 # exchange, and refresh.
 transport:
   type: http
@@ -28,6 +29,6 @@ suggest:
     - sentry.io
 
 post_install: |
-  On first connection Qubit opens a browser to authorize with
-  Sentry (or run `qubit mcp login sentry`). Approve access,
+  On first connection Hermes opens a browser to authorize with
+  Sentry (or run `hermes mcp login sentry`). Approve access,
   then restart the session so tools load.

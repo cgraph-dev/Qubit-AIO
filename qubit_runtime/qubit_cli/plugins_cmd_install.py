@@ -137,7 +137,7 @@ def _prompt_plugin_env_vars(manifest: dict, console) -> None:
     if not missing:
         return
     from qubit_cli.config import save_env_value
-    from qubit_constants import display_hermes_home
+    from qubit_constants import display_qubit_home
     plugin_name = manifest.get("name", "this plugin")
     console.print(f"\n[bold]{plugin_name}[/bold] requires the following environment variables:\n")
     for spec in missing:
@@ -150,15 +150,15 @@ def _prompt_plugin_env_vars(manifest: dict, console) -> None:
         try:
             value = (_pc().masked_secret_prompt if spec.get("secret", False) else line_input)(f"  {name}: ").strip()
         except (EOFError, KeyboardInterrupt):
-            console.print(f"\n[dim]  Skipped (you can set these later in {display_hermes_home()}/.env)[/dim]")
+            console.print(f"\n[dim]  Skipped (you can set these later in {display_qubit_home()}/.env)[/dim]")
             return
 
         if value:
             save_env_value(name, value)
             os.environ[name] = value
-            console.print(f"  [green]✓[/green] Saved to {display_hermes_home()}/.env")
+            console.print(f"  [green]✓[/green] Saved to {display_qubit_home()}/.env")
         else:
-            console.print(f"  [dim]  Skipped (set {name} in {display_hermes_home()}/.env later)[/dim]")
+            console.print(f"  [dim]  Skipped (set {name} in {display_qubit_home()}/.env later)[/dim]")
 
     console.print()
 

@@ -15,7 +15,7 @@ def homed(tmp_path, monkeypatch):
     """Cadence state (markers) inside a temp hermes home."""
     import qubit_constants
 
-    monkeypatch.setattr(qubit_constants, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(qubit_constants, "get_qubit_home", lambda: tmp_path)
     return tmp_path
 
 

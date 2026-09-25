@@ -2,19 +2,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as QubitApi from '@/hermes'
+import type * as HermesApi from '@/hermes'
 import { $desktopOnboarding, type DesktopOnboardingState, type OnboardingContext } from '@/store/onboarding'
 
 import { FlowPanel } from './flow'
 
 // Only the catalog fetch is replaced; the model assignment keeps its real path
-// down to window.qubitDesktop.api so the test observes the wire body.
+// down to window.hermesDesktop.api so the test observes the wire body.
 vi.mock('@/hermes', async importOriginal => ({
-  ...(await importOriginal<typeof QubitApi>()),
+  ...(await importOriginal<typeof HermesApi>()),
   getGlobalModelOptions: async () => ({
     providers: [
       { free_tier: false, models: ['gpt-5.6-terra'], name: 'OpenAI OAuth (ChatGPT)', slug: 'openai' },
-      { models: ['deepseek/deepseek-v4-flash-0731'], name: 'Qubit Labs', slug: 'nous' }
+      { models: ['deepseek/deepseek-v4-flash-0731'], name: 'Nous Portal', slug: 'nous' }
     ]
   })
 }))
@@ -82,7 +82,7 @@ describe('ConfirmingModelPanel model pick', () => {
   it('persists a cross-provider pick against the picked model provider, not the sign-in provider', async () => {
     const calls: { body?: unknown; path: string }[] = []
 
-    Object.defineProperty(window, 'qubitDesktop', {
+    Object.defineProperty(window, 'hermesDesktop', {
       configurable: true,
       value: {
         api: async ({ body, path }: { body?: unknown; path: string }) => {
@@ -104,7 +104,7 @@ describe('ConfirmingModelPanel model pick', () => {
     await screen.findByText('Pro')
 
     // The user signed in with OpenAI OAuth; the picker offers a deepseek
-    // model that only Qubit Labs serves.
+    // model that only Nous Portal serves.
     fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     fireEvent.click(await screen.findByRole('button', { name: 'pick-nous-model' }))
 
@@ -121,7 +121,7 @@ describe('ConfirmingModelPanel model pick', () => {
 
     if (flow.status === 'confirming_model') {
       expect(flow.providerSlug).toBe('nous')
-      expect(flow.label).toBe('Qubit Labs')
+      expect(flow.label).toBe('Nous Portal')
     }
   })
 })

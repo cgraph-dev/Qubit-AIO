@@ -5,7 +5,7 @@ FOREVER after its timeout fires: run()'s cleanup kills the direct child and
 then joins the pipe reader threads with an unbounded ``communicate()``.  A
 descendant (``conhost.exe`` under wmic/powershell, ``git.exe`` under a
 launcher shim) holding duplicated pipe handles keeps the pipes from EOF and
-the join never returns.  ``qubit update`` wedged exactly there inside
+the join never returns.  ``hermes update`` wedged exactly there inside
 ``_scan_gateway_pids`` on machines where the full ``Win32_Process`` scan
 exceeds its budget.
 
@@ -100,7 +100,7 @@ def test_bounded_git_probe_delegates_same_contract():
     assert bounded_git_probe(["definitely-not-a-real-binary-87134"], timeout=5) == ""
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process-group check")
+@pytest.mark.platforms("posix")  # POSIX process-group check
 def test_posix_child_gets_own_process_group():
     """POSIX spawns use process_group=0 so timeout cleanup can killpg the
     whole tree (same contract bounded_git_probe had)."""

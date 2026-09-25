@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from qubit_cli._subprocess_compat import noninteractive_git_env
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 from utils import atomic_write_text
 
 
@@ -31,7 +31,7 @@ _EXACT_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def _install_metadata_path() -> Path:
-    return get_hermes_home() / "plugins" / ".install-metadata.json"
+    return get_qubit_home() / "plugins" / ".install-metadata.json"
 
 
 def _read_install_metadata() -> dict[str, dict[str, object]]:

@@ -5,7 +5,7 @@ import { useCallback } from 'react'
 import { useModelControls } from '@/app/session/hooks/use-model-controls'
 import type { ModelSelection } from '@/app/shell/model-menu-panel'
 import { ModelPickerDialog } from '@/components/model-picker'
-import type { QubitGateway } from '@/hermes'
+import type { HermesGateway } from '@/hermes'
 import { resolveModelPickerOwner } from '@/lib/model-picker-owner'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import {
@@ -21,7 +21,7 @@ import { requestForSessionProfile } from '@/store/session-request-router'
 import { $focusedRuntimeId, $focusedSessionState, $focusedStoredSessionId, $sessionTiles } from '@/store/session-states'
 
 interface ModelPickerOverlayProps {
-  gateway?: QubitGateway
+  gateway?: HermesGateway
   onSelect: (selection: ModelSelection) => void
   ownerConnectionId?: string
   profile: string
@@ -97,6 +97,7 @@ export function ModelPickerOverlay({
       profile={pickerOwner.profile}
       request={pickerOwner.route ? requestPickerGateway : undefined}
       sessionId={sessionId}
+      setupProfile={pickerOwner.route?.profile ?? pickerOwner.profile}
     />
   )
 }

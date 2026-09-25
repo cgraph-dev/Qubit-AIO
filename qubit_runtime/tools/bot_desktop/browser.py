@@ -30,7 +30,7 @@ def profile_dir() -> Path:
     state lives), so ``pin`` means ``<QUBIT_HOME>/pin`` and two profiles never share one jar by accident."""
     override = os.path.expanduser(os.environ.get("AGENT_BROWSER_PROFILE", "").strip())
     if override:
-        return Path(override) if os.path.isabs(override) else runtime.get_hermes_home() / override
+        return Path(override) if os.path.isabs(override) else runtime.get_qubit_home() / override
     return runtime.state_dir() / "browser-profile"
 
 

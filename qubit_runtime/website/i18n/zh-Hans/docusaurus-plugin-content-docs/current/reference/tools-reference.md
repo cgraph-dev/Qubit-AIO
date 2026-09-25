@@ -1,17 +1,17 @@
 ---
 sidebar_position: 3
 title: "内置工具参考"
-description: "Qubit 内置工具权威参考，按工具集分组"
+description: "Hermes 内置工具权威参考，按工具集分组"
 ---
 
 # 内置工具参考
 
-本页记录 Qubit 的内置工具，按工具集分组。可用性因平台、凭据和已启用的工具集而异。
+本页记录 Hermes 的内置工具，按工具集分组。可用性因平台、凭据和已启用的工具集而异。
 
 **当前注册表快速统计：** 约 71 个工具 —— 10 个浏览器工具（核心）+ 2 个 CDP 门控浏览器工具、4 个文件工具、4 个 Home Assistant 工具、2 个终端工具、2 个 Web 工具、5 个 Feishu 工具、7 个 Spotify 工具（由内置 `spotify` 插件注册）、5 个 Yuanbao 工具、9 个 kanban 工具（在 kanban 调度器生成 agent 时注册）、2 个 Discord 工具，以及若干独立工具（`memory`、`clarify`、`delegate_task`、`execute_code`、`cronjob`、`session_search`、`skill_view`/`skill_manage`/`skills_list`、`text_to_speech`、`image_generate`、`video_generate`、`vision_analyze`、`video_analyze`、`send_message`、`todo`、`computer_use`、`process`）。
 
 :::tip MCP 工具
-除内置工具外，Qubit 还可从 MCP 服务器动态加载工具。MCP 工具以 `mcp_<server>_` 为前缀（例如，`github` MCP 服务器的 `mcp_github_create_issue`）。配置方法见 [MCP 集成](/user-guide/features/mcp)。
+除内置工具外，Hermes 还可从 MCP 服务器动态加载工具。MCP 工具以 `mcp_<server>_` 为前缀（例如，`github` MCP 服务器的 `mcp_github_create_issue`）。配置方法见 [MCP 集成](../user-guide/features/mcp.md)。
 :::
 
 ## `browser` 工具集
@@ -48,7 +48,7 @@ description: "Qubit 内置工具权威参考，按工具集分组"
 
 | 工具 | 描述 | 所需环境 |
 |------|------|----------|
-| `execute_code` | 运行可以编程方式调用 Qubit 工具的 Python 脚本。当需要 3 次以上工具调用且调用之间有处理逻辑、需要在大型工具输出进入上下文前过滤/压缩、需要条件分支（…）时使用。 | — |
+| `execute_code` | 运行可以编程方式调用 Hermes 工具的 Python 脚本。当需要 3 次以上工具调用且调用之间有处理逻辑、需要在大型工具输出进入上下文前过滤/压缩、需要条件分支（…）时使用。 | — |
 
 ## `cronjob` 工具集
 
@@ -103,7 +103,7 @@ description: "Qubit 内置工具权威参考，按工具集分组"
 
 | 工具 | 描述 | 所需环境 |
 |------|------|----------|
-| `computer_use` | 通过 cua-driver 在后台控制 macOS 桌面——截图（SOM / vision / AX）、点击 / 拖拽 / 滚动 / 输入 / 按键 / 等待、`list_apps`、`focus_app`。**不会**抢占用户的光标或键盘焦点。适用于任何支持工具的模型。仅限 macOS。 | `cua-driver` 在 `$PATH` 中（通过 `qubit tools` 安装）。 |
+| `computer_use` | 通过 cua-driver 在后台控制 macOS 桌面——截图（SOM / vision / AX）、点击 / 拖拽 / 滚动 / 输入 / 按键 / 等待、`list_apps`、`focus_app`。**不会**抢占用户的光标或键盘焦点。适用于任何支持工具的模型。仅限 macOS。 | `cua-driver` 在 `$PATH` 中（通过 `hermes tools` 安装）。 |
 
 :::note
 **Honcho 工具**（`honcho_profile`、`honcho_search`、`honcho_context`、`honcho_reasoning`、`honcho_conclude`）不再是内置工具。它们通过 `plugins/memory/honcho/` 的 Honcho 记忆提供者插件提供。安装和使用方法见 [Memory Providers](../user-guide/features/memory-providers.md)。
@@ -117,7 +117,7 @@ description: "Qubit 内置工具权威参考，按工具集分组"
 
 ## `kanban` 工具集
 
-在以下情况下注册：(a) agent 由 kanban 调度器生成（设置了 `HERMES_KANBAN_TASK` 环境变量），或 (b) 在显式启用 `kanban` 工具集的 profile 中运行。任务范围的 worker 使用生命周期工具处理其分配的任务；编排器 profile 还额外获得 `kanban_list` 和 `kanban_unblock` 等看板路由工具。完整工作流见 [Kanban 多 Agent](/user-guide/features/kanban)。
+在以下情况下注册：(a) agent 由 kanban 调度器生成（设置了 `HERMES_KANBAN_TASK` 环境变量），或 (b) 在显式启用 `kanban` 工具集的 profile 中运行。任务范围的 worker 使用生命周期工具处理其分配的任务；编排器 profile 还额外获得 `kanban_list` 和 `kanban_unblock` 等看板路由工具。完整工作流见 [Kanban 多 Agent](../user-guide/features/kanban.md)。
 
 | 工具 | 描述 | 所需环境 |
 |------|------|----------|
@@ -186,14 +186,14 @@ description: "Qubit 内置工具权威参考，按工具集分组"
 
 ## `video_gen` 工具集
 
-可选工具集（默认 `hermes-cli` 集中不加载）。通过 `--toolsets video_gen` 添加，或在 `qubit tools` → Video Generation 中启用（同时引导你选择后端）。
+可选工具集（默认 `hermes-cli` 集中不加载）。通过 `--toolsets video_gen` 添加，或在 `hermes tools` → Video Generation 中启用（同时引导你选择后端）。
 
 后端以插件形式存放于 `plugins/video_gen/<name>/`：
 
 - **xAI Grok-Imagine** —— 文本生成视频和图片生成视频（SuperGrok OAuth 或 `XAI_API_KEY`）。
 - **FAL.ai** —— Veo 3.1、Pixverse v6、Kling O3（需要 `FAL_KEY`）。
 
-单个 `video_generate` 工具涵盖两种模态——传入 `image_url` 可为静态图片制作动画，省略则从文本生成。活跃后端自动路由到正确的端点。工具描述在会话启动时重建，以反映活跃后端的实际能力（模态、宽高比、分辨率、时长范围、最大参考图片数、音频支持）。后端开发见 [视频生成提供者插件](/developer-guide/video-gen-provider-plugin)。
+单个 `video_generate` 工具涵盖两种模态——传入 `image_url` 可为静态图片制作动画，省略则从文本生成。活跃后端自动路由到正确的端点。工具描述在会话启动时重建，以反映活跃后端的实际能力（模态、宽高比、分辨率、时长范围、最大参考图片数、音频支持）。后端开发见 [视频生成提供者插件](../developer-guide/video-gen-provider-plugin.md)。
 
 | 工具 | 描述 | 所需环境 |
 |------|------|----------|
@@ -210,7 +210,7 @@ description: "Qubit 内置工具权威参考，按工具集分组"
 
 | 工具 | 描述 | 所需环境 |
 |------|------|----------|
-| `x_search` | 使用 xAI 内置的 `x_search` Responses 工具搜索 X（Twitter）帖子、主页和话题串。用于获取 X 上的当前讨论、反应或观点，而非通用网页。默认关闭——通过 `qubit tools` → 🐦 X (Twitter) Search 选择启用。仅在配置了 xAI 凭据时注册 schema（check_fn 门控）。 | XAI_API_KEY **或** xAI Grok OAuth（SuperGrok / Premium+）登录 |
+| `x_search` | 使用 xAI 内置的 `x_search` Responses 工具搜索 X（Twitter）帖子、主页和话题串。用于获取 X 上的当前讨论、反应或观点，而非通用网页。默认关闭——通过 `hermes tools` → 🐦 X (Twitter) Search 选择启用。仅在配置了 xAI 凭据时注册 schema（check_fn 门控）。 | XAI_API_KEY **或** xAI Grok OAuth（SuperGrok / Premium+）登录 |
 
 ## `tts` 工具集
 
@@ -236,7 +236,7 @@ description: "Qubit 内置工具权威参考，按工具集分组"
 
 ## `spotify` 工具集
 
-由内置 `spotify` 插件注册。需要 OAuth token——运行一次 `qubit spotify setup` 进行授权。
+由内置 `spotify` 插件注册。需要 OAuth token——运行一次 `hermes spotify setup` 进行授权。
 
 | 工具 | 描述 | 所需环境 |
 |------|------|----------|

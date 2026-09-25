@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 _PLUGIN = textwrap.dedent(
     """
@@ -47,16 +47,16 @@ def homes(tmp_path, monkeypatch):
     monkeypatch.setattr(providers, "_PROVIDER_LIST_CACHE", None)
     monkeypatch.setattr(providers, "_HOME_LAYERS", {}, raising=False)
     yield launch, secondary
-    for mod in [m for m in sys.modules if m.startswith("_hermes_user_provider")]:
+    for mod in [m for m in sys.modules if m.startswith("_qubit_user_provider")]:
         del sys.modules[mod]
 
 
 def _bound(home: Path, fn):
-    token = set_hermes_home_override(home)
+    token = set_qubit_home_override(home)
     try:
         return fn()
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
 
 def test_secondary_profile_plugin_resolves_for_its_home_only(homes):

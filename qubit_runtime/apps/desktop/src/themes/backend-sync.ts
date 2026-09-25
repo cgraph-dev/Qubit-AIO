@@ -1,5 +1,5 @@
 /**
- * Live skin sync from the Qubit backend.
+ * Live skin sync from the Hermes backend.
  *
  * The backend resolves the active skin (built-in or `$QUBIT_HOME/skins/*.yaml`)
  * and announces it on `gateway.ready` / `skin.changed`, and answers `config.get
@@ -12,11 +12,11 @@
  *      `$pendingSkinApply`, which the ThemeProvider drains through `setTheme`.
  *
  * `gateway.ready` seeds the baseline WITHOUT applying, so a fresh connect never
- * stomps the user's persisted desktop theme; only a genuine name change (Qubit
+ * stomps the user's persisted desktop theme; only a genuine name change (Hermes
  * authoring/activating a skin from a prompt, or `/skin` elsewhere) repaints.
  */
 
-import type { QubitSkin } from '@hermes/shared/skin'
+import type { HermesSkin } from '@hermes/shared/skin'
 import { atom } from 'nanostores'
 
 import { readJson, writeJson } from '@/lib/storage'
@@ -30,6 +30,14 @@ import { type DesktopTheme, isValidTheme } from './types'
 // install. Without it the stored name failed `resolveTheme` on every launch
 // and the app silently painted the default until the next `skin.changed`.
 const BACKEND_THEMES_KEY = 'hermes-desktop-backend-themes-v1'
+
+// Electron reads the active local `display.skin` before it creates the
+// renderer. Seed it alongside the existing cache so an unreachable primary
+// gateway cannot leave a first-time custom skin unknown to the theme registry.
+const localSkinPayload = typeof window === 'undefined' ? null : window.hermesDesktop?.localSkin ?? null
+const localSkin = localSkinPayload?.skin ?? null
+export const localDisplaySkinName = (localSkin?.name ?? '').trim() || null
+export const localDisplaySkinProfile = localDisplaySkinName ? (localSkinPayload?.profile ?? '').trim() || 'default' : null
 
 const readCached = (): Record<string, DesktopTheme> =>
   Object.fromEntries(
@@ -66,7 +74,7 @@ export function __resetBackendSkinSync(): void {
  * records the baseline; `apply: true` (runtime change / poll) repaints on a name
  * change. Built-in names keep the desktop's own palette but can still be applied.
  */
-export function ingestBackendSkin(skin: QubitSkin | undefined | null, { apply }: { apply: boolean }): void {
+export function ingestBackendSkin(skin: HermesSkin | undefined | null, { apply }: { apply: boolean }): void {
   const name = (skin && typeof skin === 'object' ? (skin.name ?? '') : '').trim()
 
   if (!name) {
@@ -81,7 +89,7 @@ export function ingestBackendSkin(skin: QubitSkin | undefined | null, { apply }:
   // Built-in names (mono/slate/…) already have a hand-tuned desktop palette — we
   // never shadow it, but the name is still a valid apply target.
   if (name !== 'default' && !BUILTIN_THEMES[name]) {
-    const theme = skinToDesktopTheme(skin as QubitSkin)
+    const theme = skinToDesktopTheme(skin as HermesSkin)
 
     if (!theme) {
       return
@@ -108,4 +116,11 @@ export function ingestBackendSkin(skin: QubitSkin | undefined | null, { apply }:
     lastSynced = { applied: true, name }
     $pendingSkinApply.set(name)
   }
+}
+
+// This is a boot fallback, not a remote activation. ThemeProvider uses the
+// name only when the desktop has no saved appearance of its own, while this
+// registers the custom palette early enough for that first paint to resolve.
+if (localSkin) {
+  ingestBackendSkin(localSkin, { apply: false })
 }

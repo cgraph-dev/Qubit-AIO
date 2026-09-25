@@ -24,7 +24,7 @@ def _current_unit_with_dropin(tmp_path, monkeypatch, dropin_text: str):
     unit.write_text("[Unit]\nDescription=current\n", encoding="utf-8")
     monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit)
     monkeypatch.setattr(gateway_cli, "generate_systemd_unit", lambda **_: "[Unit]\nDescription=current\n")
-    monkeypatch.setattr(gateway_cli, "_sync_hermes_home_from_systemd_unit", lambda **_: None)
+    monkeypatch.setattr(gateway_cli, "_sync_qubit_home_from_systemd_unit", lambda **_: None)
     calls = []
     monkeypatch.setattr(gateway_cli, "_run_systemctl", lambda args, **kwargs: calls.append((args, kwargs)))
     dropin = unit.parent / f"{unit.name}.d" / "20-replace.conf"
@@ -33,7 +33,7 @@ def _current_unit_with_dropin(tmp_path, monkeypatch, dropin_text: str):
     return unit, dropin, calls
 
 
-def test_refresh_retires_the_hermes_replace_dropin_even_when_the_unit_text_is_current(tmp_path, monkeypatch, capsys):
+def test_refresh_retires_the_qubit_replace_dropin_even_when_the_unit_text_is_current(tmp_path, monkeypatch, capsys):
     """The base unit already matches the generator, so the old gate said "nothing to do" and the
     drop-in kept re-arming ``--replace`` on every restart."""
     unit, dropin, calls = _current_unit_with_dropin(tmp_path, monkeypatch, HERMES_DROPIN)

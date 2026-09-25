@@ -1,12 +1,12 @@
 ---
 sidebar_position: 3
 title: "Nix & NixOS 安装配置"
-description: "使用 Nix 安装和部署 Qubit Agent——从快速 `nix run` 到完全声明式的 NixOS 模块（含容器模式）"
+description: "使用 Nix 安装和部署 Hermes Agent——从快速 `nix run` 到完全声明式的 NixOS 模块（含容器模式）"
 ---
 
 # Nix & NixOS 安装配置
 
-Qubit Agent 提供了一个 Nix flake，支持三个层级的集成：
+Hermes Agent 提供了一个 Nix flake，支持三个层级的集成：
 
 | 层级 | 适用对象 | 提供内容 |
 |-------|-------------|--------------|
@@ -17,10 +17,21 @@ Qubit Agent 提供了一个 Nix flake，支持三个层级的集成：
 :::info 与标准安装的区别
 `curl | bash` 安装程序自行管理 Python、Node 及依赖项。Nix flake 替代了所有这些——每个 Python 依赖都是由 [uv2nix](https://github.com/pyproject-nix/uv2nix) 构建的 Nix derivation，运行时工具（Node.js、git、ripgrep、ffmpeg）已封装进二进制文件的 PATH 中。不需要运行时 pip，不需要激活 venv，不需要 `npm install`。
 
-**对于非 NixOS 用户**，这只影响安装步骤。之后的操作（`qubit setup`、`qubit gateway install`、编辑配置）与标准安装完全相同。
+**对于非 NixOS 用户**，这只影响安装步骤。之后的操作（`hermes setup`、`hermes gateway install`、编辑配置）与标准安装完全相同。
 
-**对于 NixOS 模块用户**，整个生命周期有所不同：配置存放在 `configuration.nix` 中，密钥通过 sops-nix/agenix 管理，服务是一个 systemd 单元，CLI 配置命令被屏蔽。管理 qubit 的方式与管理其他 NixOS 服务相同。
+**对于 NixOS 模块用户**，整个生命周期有所不同：配置存放在 `configuration.nix` 中，密钥通过 sops-nix/agenix 管理，服务是一个 systemd 单元，CLI 配置命令被屏蔽。管理 hermes 的方式与管理其他 NixOS 服务相同。
 :::
+
+## PM 固定版本
+
+`nix/npm-pinned.nix` 和 `nix/pm-packages.nix` 读取 PM 锁文件。
+`nix build .#pm-ripgrep` 等输出解包对应的固定归档，不等于完整应用或所有平台的运行证明。
+应用仍由 uv2nix 环境和 Nix 包装器组成。
+
+`nix/pythonLock.nix` 从 `pm/lock.json` 读取 Python 主/次版本。
+uv2nix 环境、覆盖包、插件依赖和开发 shell 使用同一个解释器系列。
+如果固定的 nixpkgs 不提供该系列，求值直接失败，不回退到其他 Python。
+原生 Nix 求值和构建仍由 CI 验证。通过 Nix 更新，不要向 Nix store 执行 pip 安装。
 
 ## 前提条件
 
@@ -40,11 +51,11 @@ nix run github:NousResearch/hermes-agent -- chat
 
 # 或持久化安装
 nix profile install github:NousResearch/hermes-agent
-qubit setup
-qubit chat
+hermes setup
+hermes chat
 ```
 
-执行 `nix profile install` 后，`qubit`、`hermes-agent` 和 `hermes-acp` 将出现在你的 PATH 中。之后的工作流与[标准安装](./installation.md)完全相同——`qubit setup` 引导你完成提供商选择，`qubit gateway install` 设置 launchd（macOS）或 systemd 用户服务，配置存放在 `~/.hermes/`。
+执行 `nix profile install` 后，`hermes`、`hermes-agent` 和 `hermes-acp` 将出现在你的 PATH 中。之后的工作流与[标准安装](./installation.md)完全相同——`hermes setup` 引导你完成提供商选择，`hermes gateway install` 设置 launchd（macOS）或 systemd 用户服务，配置存放在 `~/.hermes/`。
 
 <details>
 <summary><strong>从本地克隆构建</strong></summary>
@@ -53,7 +64,7 @@ qubit chat
 git clone https://github.com/NousResearch/hermes-agent.git
 cd hermes-agent
 nix build
-./result/bin/qubit setup
+./result/bin/hermes setup
 ```
 
 </details>
@@ -104,33 +115,33 @@ nix build
 }
 ```
 
-就这些。`nixos-rebuild switch` 会创建 `qubit` 用户、生成 `config.yaml`、连接密钥并启动 gateway——这是一个长期运行的服务，将 Agent 连接到消息平台（Telegram、Discord 等）并监听传入消息。
+就这些。`nixos-rebuild switch` 会创建 `hermes` 用户、生成 `config.yaml`、连接密钥并启动 gateway——这是一个长期运行的服务，将 Agent 连接到消息平台（Telegram、Discord 等）并监听传入消息。
 
 :::warning 密钥是必需的
-上面的 `environmentFiles` 行假设你已配置 [sops-nix](https://github.com/Mic92/sops-nix) 或 [agenix](https://github.com/ryantm/agenix)。该文件至少应包含一个 LLM 提供商密钥（例如 `OPENROUTER_API_KEY=sk-or-...`）。完整设置请参阅[密钥管理](#secrets-management)。如果你还没有密钥管理器，可以先使用普通文件——只需确保它不是全局可读的：
+上面的 `environmentFiles` 行假设你已配置 [sops-nix](https://github.com/Mic92/sops-nix) 或 [agenix](https://github.com/ryantm/agenix)。该文件至少应包含一个 LLM 提供商密钥（例如 `OPENROUTER_API_KEY=sk-or-...`）。完整设置请参阅[密钥管理](#密钥管理)。如果你还没有密钥管理器，可以先使用普通文件——只需确保它不是全局可读的：
 
 ```bash
-echo "OPENROUTER_API_KEY=sk-or-your-key" | sudo install -m 0600 -o qubit /dev/stdin /var/lib/qubit/env
+echo "OPENROUTER_API_KEY=sk-or-your-key" | sudo install -m 0600 -o hermes /dev/stdin /var/lib/hermes/env
 ```
 
 ```nix
-services.hermes-agent.environmentFiles = [ "/var/lib/qubit/env" ];
+services.hermes-agent.environmentFiles = [ "/var/lib/hermes/env" ];
 ```
 :::
 
 :::tip addToSystemPackages
-设置 `addToSystemPackages = true` 有两个作用：将 `qubit` CLI 添加到系统 PATH，**并**在系统范围内设置 `QUBIT_HOME`，使交互式 CLI 与 gateway 服务共享状态（会话、技能、cron）。不设置此项时，在 shell 中运行 `qubit` 会创建独立的 `~/.hermes/` 目录。
+设置 `addToSystemPackages = true` 有两个作用：将 `hermes` CLI 添加到系统 PATH，**并**在系统范围内设置 `HERMES_HOME`，使交互式 CLI 与 gateway 服务共享状态（会话、技能、cron）。不设置此项时，在 shell 中运行 `hermes` 会创建独立的 `~/.hermes/` 目录。
 :::
 
 ### 容器感知 CLI
 
 :::info
-当 `container.enable = true` 且 `addToSystemPackages = true` 时，主机上的**所有** `qubit` 命令都会自动路由到托管容器中执行。这意味着你的交互式 CLI 会话在与 gateway 服务相同的环境中运行——可以访问所有容器内安装的包和工具。
+当 `container.enable = true` 且 `addToSystemPackages = true` 时，主机上的**所有** `hermes` 命令都会自动路由到托管容器中执行。这意味着你的交互式 CLI 会话在与 gateway 服务相同的环境中运行——可以访问所有容器内安装的包和工具。
 
-- 路由是透明的：`qubit chat`、`qubit sessions list`、`qubit --version` 等命令都会在底层 exec 进容器
+- 路由是透明的：`hermes chat`、`hermes sessions list`、`hermes --version` 等命令都会在底层 exec 进容器
 - 所有 CLI 参数原样转发
 - 如果容器未运行，CLI 会短暂重试（交互式使用时显示 5 秒 spinner，脚本中静默等待 10 秒），然后以明确的错误退出——不会静默回退
-- 对于在 qubit 代码库上工作的开发者，设置 `HERMES_DEV=1` 可绕过容器路由，直接运行本地检出版本
+- 对于在 hermes 代码库上工作的开发者，设置 `HERMES_DEV=1` 可绕过容器路由，直接运行本地检出版本
 
 设置 `container.hostUsers` 可创建 `~/.hermes` 到服务状态目录的符号链接，使主机 CLI 和容器共享会话、配置和记忆：
 
@@ -142,7 +153,7 @@ services.hermes-agent = {
 };
 ```
 
-`hostUsers` 中列出的用户会自动加入 `qubit` 组以获得文件权限访问。
+`hostUsers` 中列出的用户会自动加入 `hermes` 组以获得文件权限访问。
 
 **Podman 用户：** NixOS 服务以 root 身份运行容器。Docker 用户通过 `docker` 组 socket 获得访问权限，但 Podman 的 rootful 容器需要 sudo。为你的容器运行时授予免密 sudo：
 
@@ -156,7 +167,7 @@ security.sudo.extraRules = [{
 }];
 ```
 
-CLI 会自动检测何时需要 sudo 并透明地使用它。没有此配置，你需要手动运行 `sudo qubit chat`。
+CLI 会自动检测何时需要 sudo 并透明地使用它。没有此配置，你需要手动运行 `sudo hermes chat`。
 :::
 
 ### 验证运行状态
@@ -171,8 +182,8 @@ systemctl status hermes-agent
 journalctl -u hermes-agent -f
 
 # 如果 addToSystemPackages 为 true，测试 CLI
-qubit --version
-qubit config       # 显示生成的配置
+hermes --version
+hermes config       # 显示生成的配置
 ```
 
 ### 选择部署模式
@@ -229,7 +240,7 @@ services.hermes-agent.settings = {
 两者在求值时深度合并。Nix 声明的键始终优先于磁盘上现有 `config.yaml` 中的键，但 **Nix 未涉及的用户添加键会被保留**。这意味着如果 Agent 或手动编辑添加了 `skills.disabled` 或 `streaming.enabled` 等键，它们在 `nixos-rebuild switch` 后仍会保留。
 
 :::note 模型命名
-`settings.model.default` 使用你的提供商所期望的模型标识符。使用 [OpenRouter](https://openrouter.ai)（默认）时，格式如 `"anthropic/claude-sonnet-4"` 或 `"google/gemini-3-flash"`。如果直接使用提供商（Anthropic、OpenAI），请将 `settings.model.base_url` 指向其 API，并使用其原生模型 ID（例如 `"claude-sonnet-4-20250514"`）。未设置 `base_url` 时，Qubit 默认使用 OpenRouter。
+`settings.model.default` 使用你的提供商所期望的模型标识符。使用 [OpenRouter](https://openrouter.ai)（默认）时，格式如 `"anthropic/claude-sonnet-4"` 或 `"google/gemini-3-flash"`。如果直接使用提供商（Anthropic、OpenAI），请将 `settings.model.base_url` 指向其 API，并使用其原生模型 ID（例如 `"claude-sonnet-4-20250514"`）。未设置 `base_url` 时，Hermes 默认使用 OpenRouter。
 :::
 
 :::tip 查找可用配置键
@@ -303,10 +314,10 @@ services.hermes-agent.settings = {
 如果你希望完全在 Nix 之外管理 `config.yaml`，请使用 `configFile`：
 
 ```nix
-services.hermes-agent.configFile = /etc/qubit/config.yaml;
+services.hermes-agent.configFile = /etc/hermes/config.yaml;
 ```
 
-这会完全绕过 `settings`——不合并，不生成。每次激活时，该文件会原样复制到 `$QUBIT_HOME/config.yaml`。
+这会完全绕过 `settings`——不合并，不生成。每次激活时，该文件会原样复制到 `$HERMES_HOME/config.yaml`。
 
 ### 自定义速查表
 
@@ -318,15 +329,15 @@ Nix 用户最常见自定义需求的快速参考：
 | 使用不同的提供商端点 | `settings.model.base_url` | `"https://openrouter.ai/api/v1"` |
 | 添加 API 密钥 | `environmentFiles` | `[ config.sops.secrets."hermes-env".path ]` |
 | 给 Agent 设置个性 | `${services.hermes-agent.stateDir}/.hermes/SOUL.md` | 直接管理该文件 |
-| 添加 MCP 工具服务器 | `mcpServers.<name>` | 参见 [MCP 服务器](#mcp-servers) |
+| 添加 MCP 工具服务器 | `mcpServers.<name>` | 参见 [MCP 服务器](#mcp-服务器) |
 | 将主机目录挂载到容器 | `container.extraVolumes` | `[ "/data:/data:rw" ]` |
 | 为容器传入 GPU 访问 | `container.extraOptions` | `[ "--gpus" "all" ]` |
 | 使用 Podman 替代 Docker | `container.backend` | `"podman"` |
 | 在主机 CLI 和容器间共享状态 | `container.hostUsers` | `[ "sidbin" ]` |
 | 为 Agent 提供额外工具 | `extraPackages` | `[ pkgs.pandoc pkgs.imagemagick ]` |
 | 使用自定义基础镜像 | `container.image` | `"ubuntu:24.04"` |
-| 覆盖 qubit 包 | `package` | `inputs.hermes-agent.packages.${system}.default.override { ... }` |
-| 更改状态目录 | `stateDir` | `"/opt/qubit"` |
+| 覆盖 hermes 包 | `package` | `inputs.hermes-agent.packages.${system}.default.override { ... }` |
+| 更改状态目录 | `stateDir` | `"/opt/hermes"` |
 | 设置 Agent 的工作目录 | `workingDirectory` | `"/home/user/projects"` |
 
 ---
@@ -337,7 +348,7 @@ Nix 用户最常见自定义需求的快速参考：
 Nix 表达式中的值会进入 `/nix/store`，该目录是全局可读的。请始终使用带有密钥管理器的 `environmentFiles`。
 :::
 
-`environment`（非密钥变量）和 `environmentFiles`（密钥文件）在激活时（`nixos-rebuild switch`）都会合并到 `$QUBIT_HOME/.env` 中。Qubit 在每次启动时读取此文件，因此更改在 `systemctl restart hermes-agent` 后生效——无需重建容器。
+`environment`（非密钥变量）和 `environmentFiles`（密钥文件）在激活时（`nixos-rebuild switch`）都会合并到 `$HERMES_HOME/.env` 中。Hermes 在每次启动时读取此文件，因此更改在 `systemctl restart hermes-agent` 后生效——无需重建容器。
 
 ### sops-nix
 
@@ -384,7 +395,7 @@ hermes-env: |
 ```nix
 {
   services.hermes-agent = {
-    authFile = config.sops.secrets."qubit/auth.json".path;
+    authFile = config.sops.secrets."hermes/auth.json".path;
     # authFileForceOverwrite = true;  # 每次激活时强制覆盖
   };
 }
@@ -396,12 +407,12 @@ hermes-env: |
 
 ## 文档
 
-`documents` 选项将文件安装到 Agent 的工作目录（即 `workingDirectory`，Agent 将其作为工作区读取）。Qubit 按约定查找特定文件名：
+`documents` 选项将文件安装到 Agent 的工作目录（即 `workingDirectory`，Agent 将其作为工作区读取）。Hermes 按约定查找特定文件名：
 
 - **`USER.md`** — 关于 Agent 正在交互的用户的上下文信息。
 - 你放置在此处的任何其他文件对 Agent 都可见，作为工作区文件。
 
-Agent 身份文件是独立的：Qubit 从 `$QUBIT_HOME/SOUL.md` 加载其主要 `SOUL.md`，在 NixOS 模块中对应 `${services.hermes-agent.stateDir}/.hermes/SOUL.md`。将 `SOUL.md` 放入 `documents` 只会创建一个工作区文件，不会替换主角色文件。
+Agent 身份文件是独立的：Hermes 从 `$HERMES_HOME/SOUL.md` 加载其主要 `SOUL.md`，在 NixOS 模块中对应 `${services.hermes-agent.stateDir}/.hermes/SOUL.md`。将 `SOUL.md` 放入 `documents` 只会创建一个工作区文件，不会替换主角色文件。
 
 ```nix
 {
@@ -438,7 +449,7 @@ Agent 身份文件是独立的：Qubit 从 `$QUBIT_HOME/SOUL.md` 加载其主要
 ```
 
 :::tip
-`env` 值中的环境变量在运行时从 `$QUBIT_HOME/.env` 解析。使用 `environmentFiles` 注入密钥——切勿将 token 直接放入 Nix 配置。
+`env` 值中的环境变量在运行时从 `$HERMES_HOME/.env` 解析。使用 `environmentFiles` 注入密钥——切勿将 token 直接放入 Nix 配置。
 :::
 
 ### HTTP 传输（远程服务器）
@@ -455,7 +466,7 @@ Agent 身份文件是独立的：Qubit 从 `$QUBIT_HOME/SOUL.md` 加载其主要
 
 ### 带 OAuth 的 HTTP 传输
 
-对于使用 OAuth 2.1 的服务器，设置 `auth = "oauth"`。Qubit 实现了完整的 PKCE 流程——元数据发现、动态客户端注册、token 交换和自动刷新。
+对于使用 OAuth 2.1 的服务器，设置 `auth = "oauth"`。Hermes 实现了完整的 PKCE 流程——元数据发现、动态客户端注册、token 交换和自动刷新。
 
 ```nix
 {
@@ -466,23 +477,23 @@ Agent 身份文件是独立的：Qubit 从 `$QUBIT_HOME/SOUL.md` 加载其主要
 }
 ```
 
-Token 存储在 `$QUBIT_HOME/mcp-tokens/<server-name>.json` 中，在重启和重建后持久保留。
+Token 存储在 `$HERMES_HOME/mcp-tokens/<server-name>.json` 中，在重启和重建后持久保留。
 
 <details>
 <summary><strong>无头服务器上的初始 OAuth 授权</strong></summary>
 
-首次 OAuth 授权需要基于浏览器的同意流程。在无头部署中，Qubit 将授权 URL 打印到 stdout/日志，而不是打开浏览器。
+首次 OAuth 授权需要基于浏览器的同意流程。在无头部署中，Hermes 将授权 URL 打印到 stdout/日志，而不是打开浏览器。
 
-**方案 A：交互式引导** — 通过 `docker exec`（容器）或 `sudo -u qubit`（原生）运行一次流程：
+**方案 A：交互式引导** — 通过 `docker exec`（容器）或 `sudo -u hermes`（原生）运行一次流程：
 
 ```bash
 # 容器模式
 docker exec -it hermes-agent \
-  qubit mcp add my-oauth-server --url https://mcp.example.com/mcp --auth oauth
+  hermes mcp add my-oauth-server --url https://mcp.example.com/mcp --auth oauth
 
 # 原生模式
-sudo -u qubit QUBIT_HOME=/var/lib/qubit/.hermes \
-  qubit mcp add my-oauth-server --url https://mcp.example.com/mcp --auth oauth
+sudo -u hermes HERMES_HOME=/var/lib/hermes/.hermes \
+  hermes mcp add my-oauth-server --url https://mcp.example.com/mcp --auth oauth
 ```
 
 容器使用 `--network=host`，因此 `127.0.0.1` 上的 OAuth 回调监听器可从主机浏览器访问。
@@ -490,10 +501,10 @@ sudo -u qubit QUBIT_HOME=/var/lib/qubit/.hermes \
 **方案 B：预置 token** — 在工作站上完成流程，然后复制 token：
 
 ```bash
-qubit mcp add my-oauth-server --url https://mcp.example.com/mcp --auth oauth
+hermes mcp add my-oauth-server --url https://mcp.example.com/mcp --auth oauth
 scp ~/.hermes/mcp-tokens/my-oauth-server{,.client}.json \
-    server:/var/lib/qubit/.hermes/mcp-tokens/
-# 确保：chown qubit:qubit，chmod 0600
+    server:/var/lib/hermes/.hermes/mcp-tokens/
+# 确保：chown hermes:hermes，chmod 0600
 ```
 
 </details>
@@ -522,20 +533,20 @@ scp ~/.hermes/mcp-tokens/my-oauth-server{,.client}.json \
 
 ## 托管模式
 
-当 qubit 通过 NixOS 模块运行时，以下 CLI 命令会被**屏蔽**，并显示指向 `configuration.nix` 的描述性错误：
+当 hermes 通过 NixOS 模块运行时，以下 CLI 命令会被**屏蔽**，并显示指向 `configuration.nix` 的描述性错误：
 
 | 被屏蔽的命令 | 原因 |
 |---|---|
-| `qubit setup` | 配置是声明式的——请在 Nix 配置中编辑 `settings` |
-| `qubit config edit` | 配置由 `settings` 生成 |
-| `qubit config set <key> <value>` | 配置由 `settings` 生成 |
-| `qubit gateway install` | systemd 服务由 NixOS 管理 |
-| `qubit gateway uninstall` | systemd 服务由 NixOS 管理 |
+| `hermes setup` | 配置是声明式的——请在 Nix 配置中编辑 `settings` |
+| `hermes config edit` | 配置由 `settings` 生成 |
+| `hermes config set <key> <value>` | 配置由 `settings` 生成 |
+| `hermes gateway install` | systemd 服务由 NixOS 管理 |
+| `hermes gateway uninstall` | systemd 服务由 NixOS 管理 |
 
 这可以防止 Nix 声明的内容与磁盘上实际内容之间产生漂移。检测使用两个信号：
 
 1. **`HERMES_MANAGED=true`** 环境变量——由 systemd 服务设置，对 gateway 进程可见
-2. **`.managed` 标记文件**，位于 `QUBIT_HOME` 中——由激活脚本设置，对交互式 shell 可见（例如 `docker exec -it hermes-agent qubit config set ...` 也会被屏蔽）
+2. **`.managed` 标记文件**，位于 `HERMES_HOME` 中——由激活脚本设置，对交互式 shell 可见（例如 `docker exec -it hermes-agent hermes config set ...` 也会被屏蔽）
 
 要更改配置，请编辑你的 Nix 配置并运行 `sudo nixos-rebuild switch`。
 
@@ -547,25 +558,25 @@ scp ~/.hermes/mcp-tokens/my-oauth-server{,.client}.json \
 本节仅在使用 `container.enable = true` 时相关。原生模式部署可跳过。
 :::
 
-启用容器模式后，qubit 在持久化 Ubuntu 容器内运行，Nix 构建的二进制文件以只读方式从主机绑定挂载：
+启用容器模式后，hermes 在持久化 Ubuntu 容器内运行，Nix 构建的二进制文件以只读方式从主机绑定挂载：
 
 ```
 主机                                    容器
 ────                                    ─────────
 /nix/store/...-hermes-agent-0.1.0  ──►  /nix/store/... (ro)
-~/.hermes -> /var/lib/qubit/.hermes       （符号链接桥接，按 hostUsers）
-/var/lib/qubit/                    ──►  /data/          (rw)
+~/.hermes -> /var/lib/hermes/.hermes       （符号链接桥接，按 hostUsers）
+/var/lib/hermes/                    ──►  /data/          (rw)
   ├── current-package -> /nix/store/...    （符号链接，每次重建更新）
   ├── .gc-root -> /nix/store/...           （防止 nix-collect-garbage）
   ├── .container-identity                  （sha256 哈希，触发重建）
-  ├── .hermes/                             （QUBIT_HOME）
+  ├── .hermes/                             （HERMES_HOME）
   │   ├── .env                             （从 environment + environmentFiles 合并）
   │   ├── config.yaml                      （Nix 生成，激活时深度合并）
   │   ├── .managed                         （标记文件）
   │   ├── .container-mode                  （路由元数据：backend、exec_user 等）
   │   ├── state.db, sessions/, memories/   （运行时状态）
   │   └── mcp-tokens/                      （MCP 服务器的 OAuth token）
-  ├── home/                                ──►  /home/qubit    (rw)
+  ├── home/                                ──►  /home/hermes    (rw)
   └── workspace/                           （MESSAGING_CWD）
       ├── SOUL.md                          （来自 documents 选项）
       └── （Agent 创建的文件）
@@ -573,11 +584,11 @@ scp ~/.hermes/mcp-tokens/my-oauth-server{,.client}.json \
 容器可写层（apt/pip/npm）：   /usr, /usr/local, /tmp
 ```
 
-Nix 构建的二进制文件能在 Ubuntu 容器内运行，是因为 `/nix/store` 被绑定挂载——它携带自己的解释器和所有依赖，不依赖容器的系统库。容器入口点通过 `current-package` 符号链接解析：`/data/current-package/bin/qubit gateway run --replace`。执行 `nixos-rebuild switch` 时，只更新符号链接——容器继续运行。
+Nix 构建的二进制文件能在 Ubuntu 容器内运行，是因为 `/nix/store` 被绑定挂载——它携带自己的解释器和所有依赖，不依赖容器的系统库。容器入口点通过 `current-package` 符号链接解析：`/data/current-package/bin/hermes gateway run --replace`。执行 `nixos-rebuild switch` 时，只更新符号链接——容器继续运行。
 
 ### 各事件的持久性
 
-| 事件 | 容器重建？ | `/data`（状态） | `/home/qubit` | 可写层（`apt`/`pip`/`npm`） |
+| 事件 | 容器重建？ | `/data`（状态） | `/home/hermes` | 可写层（`apt`/`pip`/`npm`） |
 |---|---|---|---|---|
 | `systemctl restart hermes-agent` | 否 | 保留 | 保留 | 保留 |
 | `nixos-rebuild switch`（代码变更） | 否（更新符号链接） | 保留 | 保留 | 保留 |
@@ -587,23 +598,23 @@ Nix 构建的二进制文件能在 Ubuntu 容器内运行，是因为 `/nix/stor
 | 卷/选项变更 | **是** | 保留 | 保留 | **丢失** |
 | `environment`/`environmentFiles` 变更 | 否 | 保留 | 保留 | 保留 |
 
-仅当容器的**身份哈希**发生变化时才会重建容器。哈希涵盖：schema 版本、镜像、`extraVolumes`、`extraOptions` 和入口点脚本。环境变量、settings、文档或 qubit 包本身的变更**不会**触发重建。
+仅当容器的**身份哈希**发生变化时才会重建容器。哈希涵盖：schema 版本、镜像、`extraVolumes`、`extraOptions` 和入口点脚本。环境变量、settings、文档或 hermes 包本身的变更**不会**触发重建。
 
 :::warning 可写层丢失
-当身份哈希发生变化（镜像升级、新卷、新容器选项）时，容器会被销毁并从 `container.image` 的全新拉取重建。可写层中通过 `apt install`、`pip install` 或 `npm install` 安装的包将丢失。`/data` 和 `/home/qubit` 中的状态会保留（这些是绑定挂载）。
+当身份哈希发生变化（镜像升级、新卷、新容器选项）时，容器会被销毁并从 `container.image` 的全新拉取重建。可写层中通过 `apt install`、`pip install` 或 `npm install` 安装的包将丢失。`/data` 和 `/home/hermes` 中的状态会保留（这些是绑定挂载）。
 
 如果 Agent 依赖特定包，考虑将其烘焙到自定义镜像中（`container.image = "my-registry/hermes-base:latest"`），或在 Agent 的 SOUL.md 中编写安装脚本。
 :::
 
 ### GC Root 保护
 
-`preStart` 脚本在 `${stateDir}/.gc-root` 创建一个指向当前 qubit 包的 GC root。这可以防止 `nix-collect-garbage` 删除正在运行的二进制文件。如果 GC root 损坏，重启服务会重新创建它。
+`preStart` 脚本在 `${stateDir}/.gc-root` 创建一个指向当前 hermes 包的 GC root。这可以防止 `nix-collect-garbage` 删除正在运行的二进制文件。如果 GC root 损坏，重启服务会重新创建它。
 
 ---
 
 ## 插件
 
-NixOS 模块支持声明式插件安装——无需命令式的 `qubit plugins install`。
+NixOS 模块支持声明式插件安装——无需命令式的 `hermes plugins install`。
 
 ### 目录插件（`extraPlugins`）
 
@@ -620,43 +631,43 @@ services.hermes-agent.extraPlugins = [
 ];
 ```
 
-插件在激活时以符号链接方式安装到 `$QUBIT_HOME/plugins/`。Qubit 通过其正常的目录扫描发现它们。从列表中移除插件并运行 `nixos-rebuild switch` 会删除符号链接。
+插件在激活时以符号链接方式安装到 `$HERMES_HOME/plugins/`。Hermes 通过其正常的目录扫描发现它们。从列表中移除插件并运行 `nixos-rebuild switch` 会删除符号链接。
 
 ### 入口点插件（`extraPythonPackages`）
 
-对于通过 `[project.entry-points."hermes_agent.plugins"]` 注册的 pip 打包插件（例如 [rtk-qubit](https://github.com/ogallotti/rtk-hermes)）：
+对于通过 `[project.entry-points."hermes_agent.plugins"]` 注册的 pip 打包插件（例如 [rtk-hermes](https://github.com/ogallotti/rtk-hermes)）：
 
 ```nix
 services.hermes-agent.extraPythonPackages = [
-  (pkgs.python312Packages.buildPythonPackage {
-    pname = "rtk-qubit";
+  (config.services.hermes-agent.package.python.pkgs.buildPythonPackage {
+    pname = "rtk-hermes";
     version = "1.0.0";
     src = pkgs.fetchFromGitHub {
       owner = "ogallotti";
-      repo = "rtk-qubit";
+      repo = "rtk-hermes";
       rev = "v1.0.0";
       hash = "sha256-...";
     };
     format = "pyproject";
-    build-system = [ pkgs.python312Packages.setuptools ];
+    build-system = [ config.services.hermes-agent.package.python.pkgs.setuptools ];
   })
 ];
 ```
 
-该包的 `site-packages` 会添加到 qubit wrapper 的 PYTHONPATH 中。`importlib.metadata` 在会话启动时发现入口点。
+该包的 `site-packages` 会添加到 hermes wrapper 的 PYTHONPATH 中。`importlib.metadata` 在会话启动时发现入口点。
 
 ### 可选依赖组（`extraDependencyGroups`）
 
-对于已在 hermes-agent 的 `pyproject.toml` 中声明的可选 extras（例如 `hindsight` 或 `honcho` 等记忆提供商），使用 `extraDependencyGroups` 在构建时将其包含到封闭的 venv 中：
+对于已在 hermes-agent 的 `pyproject.toml` 中声明的可选 extras（例如 `honcho` 等记忆提供商），使用 `extraDependencyGroups` 在构建时将其包含到封闭的 venv 中：
 
 ```nix
 services.hermes-agent = {
-  extraDependencyGroups = [ "hindsight" ];
-  settings.memory.provider = "hindsight";
+  extraDependencyGroups = [ "honcho" ];
+  settings.memory.provider = "honcho";
 };
 ```
 
-这由 uv 与核心依赖在单次解析中完成——不需要 PYTHONPATH 补丁，没有冲突风险。可用的组与 `pyproject.toml` 中 `[project.optional-dependencies]` 的键对应（例如 `"hindsight"`、`"honcho"`、`"voice"`、`"matrix"`、`"mistral"`、`"bedrock"`）。
+这由 uv 与核心依赖在单次解析中完成——不需要 PYTHONPATH 补丁，没有冲突风险。可用的组与 `pyproject.toml` 中 `[project.optional-dependencies]` 的键对应（例如 `"honcho"`、`"voice"`、`"matrix"`、`"mistral"`、`"bedrock"`）。
 
 **何时使用哪个：**
 
@@ -674,7 +685,7 @@ services.hermes-agent = {
 ```nix
 services.hermes-agent = {
   extraPlugins = [ my-plugin-src ];          # 插件源码
-  extraPythonPackages = [ pkgs.python312Packages.redis ];  # 其 Python 依赖
+  extraPythonPackages = [ config.services.hermes-agent.package.python.pkgs.redis ];  # 其 Python 依赖
   extraPackages = [ pkgs.redis ];            # 其需要的系统二进制文件
 };
 ```
@@ -690,7 +701,7 @@ services.hermes-agent = {
     nixpkgs.overlays = [ hermes-agent.overlays.default ];
     # 然后：
     #   pkgs.hermes-agent.override { extraPythonPackages = [...]; }
-    #   pkgs.hermes-agent.override { extraDependencyGroups = [ "hindsight" ]; }
+    #   pkgs.hermes-agent.override { extraDependencyGroups = [ "honcho" ]; }
   };
 }
 ```
@@ -707,7 +718,7 @@ services.hermes-agent.settings.plugins.enabled = [
 ```
 
 :::note
-构建时冲突检查可防止插件包覆盖核心 qubit 依赖。如果插件提供了封闭 venv 中已有的包，`nixos-rebuild` 会以明确的错误失败。
+构建时冲突检查可防止插件包覆盖核心 hermes 依赖。如果插件提供了封闭 venv 中已有的包，`nixos-rebuild` 会以明确的错误失败。
 :::
 
 ---
@@ -716,19 +727,16 @@ services.hermes-agent.settings.plugins.enabled = [
 
 ### 开发 Shell
 
-该 flake 提供了一个包含 Python 3.12、uv、Node.js 和所有运行时工具的开发 shell：
+该 flake 提供包含 `dev` 依赖组的可编辑 Python 环境，解释器主/次版本来自 PM 锁文件。
+`HERMES_PYTHON` 指向该解释器，不会把 Python 依赖安装到仓库内的 `.venv`。
+shell 还提供 Node.js 和运行时工具。npm hook 根据输入变更刷新 JS workspaces。
 
 ```bash
 cd hermes-agent
 nix develop
-
-# Shell 提供：
-#   - Python 3.12 + uv（首次进入时将依赖安装到 .venv）
-#   - Node.js 22、ripgrep、git、openssh、ffmpeg 在 PATH 上
-#   - 戳记文件优化：依赖未变更时重新进入几乎即时
-
-qubit setup
-qubit chat
+"$HERMES_PYTHON" -c "import sys; print(sys.executable); print(sys.version)"
+hermes setup
+hermes chat
 ```
 
 ### direnv（推荐）
@@ -738,7 +746,7 @@ qubit chat
 ```bash
 cd hermes-agent
 direnv allow    # 仅需一次
-# 后续进入几乎即时（戳记文件跳过依赖安装）
+# Nix 复用已构建的 Python 环境，npm hook 检查 JS 输入。
 ```
 
 ### Flake 检查
@@ -763,10 +771,10 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 
 | 检查 | 测试内容 |
 |---|---|
-| `package-contents` | `qubit` 和 `hermes-agent` 二进制文件存在且 `qubit --version` 可运行 |
+| `package-contents` | `hermes` 和 `hermes-agent` 二进制文件存在且 `hermes --version` 可运行 |
 | `entry-points-sync` | `pyproject.toml` 中 `[project.scripts]` 的每个条目在 Nix 包中都有对应的封装二进制文件 |
-| `cli-commands` | `qubit --help` 暴露 `gateway` 和 `config` 子命令 |
-| `managed-guard` | `HERMES_MANAGED=true qubit config set ...` 打印 NixOS 错误 |
+| `cli-commands` | `hermes --help` 暴露 `gateway` 和 `config` 子命令 |
+| `managed-guard` | `HERMES_MANAGED=true hermes config set ...` 打印 NixOS 错误 |
 | `bundled-skills` | skills 目录存在，包含 SKILL.md 文件，wrapper 中设置了 `HERMES_BUNDLED_SKILLS` |
 | `config-roundtrip` | 7 种合并场景：全新安装、Nix 覆盖、用户键保留、混合合并、MCP 累加合并、嵌套深度合并、幂等性 |
 
@@ -785,9 +793,9 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 | `user` | `str` | `"hermes"` | 系统用户 |
 | `group` | `str` | `"hermes"` | 系统组 |
 | `createUser` | `bool` | `true` | 自动创建用户/组 |
-| `stateDir` | `str` | `"/var/lib/qubit"` | 状态目录（`QUBIT_HOME` 的父目录） |
+| `stateDir` | `str` | `"/var/lib/hermes"` | 状态目录（`HERMES_HOME` 的父目录） |
 | `workingDirectory` | `str` | `"${stateDir}/workspace"` | Agent 工作目录（`MESSAGING_CWD`） |
-| `addToSystemPackages` | `bool` | `false` | 将 `qubit` CLI 添加到系统 PATH 并在系统范围内设置 `QUBIT_HOME` |
+| `addToSystemPackages` | `bool` | `false` | 将 `hermes` CLI 添加到系统 PATH 并在系统范围内设置 `HERMES_HOME` |
 
 ### 配置
 
@@ -800,7 +808,7 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 
 | 选项 | 类型 | 默认值 | 描述 |
 |---|---|---|---|
-| `environmentFiles` | `listOf str` | `[]` | 包含密钥的 env 文件路径。激活时合并到 `$QUBIT_HOME/.env` |
+| `environmentFiles` | `listOf str` | `[]` | 包含密钥的 env 文件路径。激活时合并到 `$HERMES_HOME/.env` |
 | `environment` | `attrsOf str` | `{}` | 非密钥环境变量。**在 Nix store 中可见**——请勿在此放置密钥 |
 | `authFile` | `null` 或 `path` | `null` | OAuth 凭据预置文件。仅在首次部署时复制 |
 | `authFileForceOverwrite` | `bool` | `false` | 每次激活时始终从 `authFile` 覆盖 `auth.json` |
@@ -832,11 +840,11 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 
 | 选项 | 类型 | 默认值 | 描述 |
 |---|---|---|---|
-| `extraArgs` | `listOf str` | `[]` | `qubit gateway` 的额外参数 |
-| `extraPackages` | `listOf package` | `[]` | Agent 可用的额外包。添加到 qubit 用户的每用户 profile，终端命令、skills 和 cron 任务均可见 |
-| `extraPlugins` | `listOf package` | `[]` | 以符号链接方式安装到 `$QUBIT_HOME/plugins/` 的目录插件包。每个包必须包含 `plugin.yaml` |
-| `extraPythonPackages` | `listOf package` | `[]` | 添加到 PYTHONPATH 用于入口点插件发现的 Python 包。使用 `python312Packages` 构建 |
-| `extraDependencyGroups` | `listOf str` | `[]` | 包含到封闭 venv 中的 pyproject.toml 可选 extras（例如 `["hindsight"]`）。由 uv 解析——无冲突 |
+| `extraArgs` | `listOf str` | `[]` | `hermes gateway` 的额外参数 |
+| `extraPackages` | `listOf package` | `[]` | Agent 可用的额外包。添加到 hermes 用户的每用户 profile，终端命令、skills 和 cron 任务均可见 |
+| `extraPlugins` | `listOf package` | `[]` | 以符号链接方式安装到 `$HERMES_HOME/plugins/` 的目录插件包。每个包必须包含 `plugin.yaml` |
+| `extraPythonPackages` | `listOf package` | `[]` | 添加到 PYTHONPATH 用于入口点插件发现的 Python 包。使用所选包的 `python.pkgs` 构建 |
+| `extraDependencyGroups` | `listOf str` | `[]` | 包含到封闭 venv 中的 pyproject.toml 可选 extras（例如 `["honcho"]`）。由 uv 解析——无冲突 |
 | `restart` | `str` | `"always"` | systemd `Restart=` 策略 |
 | `restartSec` | `int` | `5` | systemd `RestartSec=` 值 |
 
@@ -849,7 +857,7 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 | `container.image` | `str` | `"ubuntu:24.04"` | 基础镜像（运行时拉取） |
 | `container.extraVolumes` | `listOf str` | `[]` | 额外卷挂载（`host:container:mode`） |
 | `container.extraOptions` | `listOf str` | `[]` | 传递给 `docker create` 的额外参数 |
-| `container.hostUsers` | `listOf str` | `[]` | 获得 `~/.hermes` 符号链接（指向服务 stateDir）的交互式用户，自动加入 `qubit` 组 |
+| `container.hostUsers` | `listOf str` | `[]` | 获得 `~/.hermes` 符号链接（指向服务 stateDir）的交互式用户，自动加入 `hermes` 组 |
 
 ---
 
@@ -858,8 +866,8 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 ### 原生模式
 
 ```
-/var/lib/qubit/                     # stateDir（归 qubit:qubit 所有，权限 0750）
-├── .hermes/                         # QUBIT_HOME
+/var/lib/hermes/                     # stateDir（归 hermes:hermes 所有，权限 0750）
+├── .hermes/                         # HERMES_HOME
 │   ├── config.yaml                  # Nix 生成（每次重建深度合并）
 │   ├── .managed                     # 标记：CLI 配置变更被屏蔽
 │   ├── .env                         # 从 environment + environmentFiles 合并
@@ -884,9 +892,9 @@ nix build .#checks.x86_64-linux.config-roundtrip    # 合并脚本保留用户�
 
 | 容器路径 | 主机路径 | 模式 | 说明 |
 |---|---|---|---|
-| `/nix/store` | `/nix/store` | `ro` | Qubit 二进制文件 + 所有 Nix 依赖 |
-| `/data` | `/var/lib/qubit` | `rw` | 所有状态、配置、工作区 |
-| `/home/qubit` | `${stateDir}/home` | `rw` | 持久化 Agent home——`pip install --user`、工具缓存 |
+| `/nix/store` | `/nix/store` | `ro` | Hermes 二进制文件 + 所有 Nix 依赖 |
+| `/data` | `/var/lib/hermes` | `rw` | 所有状态、配置、工作区 |
+| `/home/hermes` | `${stateDir}/home` | `rw` | 持久化 Agent home——`pip install --user`、工具缓存 |
 | `/usr`、`/usr/local`、`/tmp` | （可写层） | `rw` | `apt`/`pip`/`npm` 安装——重启后持久，重建后丢失 |
 
 ---
@@ -939,7 +947,7 @@ docker exec hermes-agent cat /data/.container-identity
 ```bash
 sudo systemctl stop hermes-agent
 docker rm -f hermes-agent
-sudo rm /var/lib/qubit/.container-identity
+sudo rm /var/lib/hermes/.container-identity
 sudo systemctl start hermes-agent
 ```
 
@@ -949,7 +957,7 @@ sudo systemctl start hermes-agent
 
 ```bash
 # 原生模式
-sudo -u qubit cat /var/lib/qubit/.hermes/.env
+sudo -u hermes cat /var/lib/hermes/.hermes/.env
 
 # 容器模式
 docker exec hermes-agent cat /data/.hermes/.env
@@ -967,9 +975,9 @@ nix-store --query --roots $(docker exec hermes-agent readlink /data/current-pack
 |---|---|---|
 | `Cannot save configuration: managed by NixOS` | CLI 守卫已激活 | 编辑 `configuration.nix` 并执行 `nixos-rebuild switch` |
 | 容器意外重建 | `extraVolumes`、`extraOptions` 或 `image` 发生变更 | 预期行为——可写层重置。重新安装包或使用自定义镜像 |
-| `qubit --version` 显示旧版本 | 容器未重启 | `systemctl restart hermes-agent` |
-| `/var/lib/qubit` 权限拒绝 | 状态目录为 `0750 qubit:qubit` | 使用 `docker exec` 或 `sudo -u qubit` |
-| `nix-collect-garbage` 删除了 qubit | GC root 缺失 | 重启服务（preStart 会重新创建 GC root） |
-| `no container with name or ID "hermes-agent"`（Podman） | Podman rootful 容器对普通用户不可见 | 为 podman 添加免密 sudo（参见[容器模式](#container-mode)章节） |
-| `unable to find user qubit` | 容器仍在启动中（入口点尚未创建用户） | 等待几秒后重试——CLI 会自动重试 |
+| `hermes --version` 显示旧版本 | 容器未重启 | `systemctl restart hermes-agent` |
+| `/var/lib/hermes` 权限拒绝 | 状态目录为 `0750 hermes:hermes` | 使用 `docker exec` 或 `sudo -u hermes` |
+| `nix-collect-garbage` 删除了 hermes | GC root 缺失 | 重启服务（preStart 会重新创建 GC root） |
+| `no container with name or ID "hermes-agent"`（Podman） | Podman rootful 容器对普通用户不可见 | 为 podman 添加免密 sudo（参见[容器模式](#容器架构)章节） |
+| `unable to find user hermes` | 容器仍在启动中（入口点尚未创建用户） | 等待几秒后重试——CLI 会自动重试 |
 | 通过 `extraPackages` 添加的工具在终端中找不到 | 需要 `nixos-rebuild switch` 更新每用户 profile | 重建并重启：`nixos-rebuild switch && systemctl restart hermes-agent` |

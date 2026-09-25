@@ -5,7 +5,7 @@ sidebar_position: 16
 
 # Computer Use
 
-Qubit Agent can drive your desktop — clicking, typing, scrolling,
+Hermes Agent can drive your desktop — clicking, typing, scrolling,
 dragging — in the **background** on **macOS, Windows, and Linux**. Your
 cursor doesn't move, keyboard focus doesn't change, and your virtual
 desktops / Spaces don't switch on you. You and the agent co-work on the
@@ -18,7 +18,7 @@ about.
 
 ## How it works
 
-The built-in `computer_use` toolset is the recommended Qubit integration. It
+The built-in `computer_use` toolset is the recommended Hermes integration. It
 speaks MCP over stdio to
 [`cua-driver`](https://github.com/trycua/cua), an open-source background
 computer-use driver. Each platform uses the appropriate accessibility +
@@ -41,42 +41,42 @@ no-foreground invariant, click-dispatch internals — see
 
 ## Enabling
 
-**Fresh installs already have the driver.** The Qubit installer
-(`install.sh` / `install.ps1`) pre-installs `cua-driver` (best-effort;
-pass `--skip-computer-use` / `-SkipComputerUse` to opt out), so enabling
-Computer Use is just a config flip:
+**The driver is a PM-managed tool.** `cua-driver` is pinned in
+`pm/lock.json`; the installer does not fetch it up front (there is no
+`--skip-computer-use` / `-SkipComputerUse` flag), and it is prepared the
+first time something enables Computer Use:
 
-- **`qubit tools`** → pick `🖱️  Computer Use` — installs the driver
+- **`hermes tools`** → pick `🖱️  Computer Use` — installs the driver
   automatically if it's still missing.
 - **Dashboard / desktop app** → toggle the Computer Use toolset — if the
   driver is missing, the toggle kicks off the install in the background
   automatically (watch progress in the toolset panel).
 
-**Manual fallback (older installs, skipped installer step):**
+**Manual install / repair:**
 
 ```
-qubit computer-use install
+hermes computer-use install
 ```
 
-This fetches and runs the upstream cua-driver installer — `install.sh`
-on macOS/Linux, `install.ps1` on Windows. Use `qubit computer-use
-status` to verify the install.
+This asks PM to prepare the pinned `cua-driver` package (verified against
+`pm/lock.json`) — it does not run the upstream installer. Use
+`hermes computer-use status` to verify the install.
 
-Already have cua-driver? Qubit reuses it when it supports the 0.20 runtime
-contract. During setup, toolset enablement, `qubit update`, and the first
-`computer_use` call of a session, Qubit checks the local version and
+Already have cua-driver? Hermes reuses it when it supports the 0.20 runtime
+contract. During setup, toolset enablement, `hermes update`, and the first
+`computer_use` call of a session, Hermes checks the local version and
 manifest. It repairs an old or incomplete standard installation through
-the upstream installer (at most once per session at runtime). A binary
+PM (at most once per session at runtime). A binary
 selected with `HERMES_CUA_DRIVER_CMD` stays
-under your control, so Qubit reports the incompatibility and leaves it
+under your control, so Hermes reports the incompatibility and leaves it
 unchanged.
 
 If you install Cua Driver first, `cua-driver skills install` installs Cua's
-skill pack under `~/.cua-driver/skills/cua-driver`. Qubit autodetection is a
-planned cua-driver follow-up, so currently point Qubit at that directory or
+skill pack under `~/.cua-driver/skills/cua-driver`. Hermes autodetection is a
+planned cua-driver follow-up, so currently point Hermes at that directory or
 symlink it into your skill space. You can also register raw Cua MCP tools as a
 custom MCP server, but that is an alternative for users who need the low-level
-interface. The built-in toolset provides Qubit actions, configuration,
+interface. The built-in toolset provides Hermes actions, configuration,
 approvals, and diagnostics.
 
 After installing, regardless of which path you took, grant the
@@ -84,29 +84,29 @@ platform-appropriate prereqs:
 
 | Platform | Prereqs |
 |---|---|
-| **macOS** | System Settings → Privacy & Security → **Accessibility** + **Screen Recording**. Grant the identity named by `qubit computer-use doctor`. Standard mode uses CuaDriver.app; bounded and unrestricted modes use the Qubit host identity. |
+| **macOS** | System Settings → Privacy & Security → **Accessibility** + **Screen Recording**. Grant the identity named by `hermes computer-use doctor` (CuaDriver, `com.trycua.driver`, in every permission mode — the driver daemon always launches through `CuaDriver.app`). |
 | **Windows** | None at install time. If you're driving over SSH (not RDP / console), you need the autostart pattern — see [cua.ai/docs/how-to-guides/driver/windows-ssh](https://cua.ai/docs/how-to-guides/driver/windows-ssh) for the Session 0 ↔ Session 1+ proxy. |
 | **Linux** | A reachable display server: `DISPLAY` set for X11, or `XDG_SESSION_TYPE=wayland`. Wayland sessions need an XWayland bridge for capture. AT-SPI must be on (default on GNOME/KDE/Xfce). |
 
 Then start a session with the toolset enabled:
 
 ```
-qubit -t computer_use chat
+hermes -t computer_use chat
 ```
 
 or add `computer_use` to your enabled toolsets in `~/.hermes/config.yaml`.
 
 ## Permission modes and logged-in browser profiles
 
-Qubit maps its existing approval UX onto cua-driver's immutable runtime
+Hermes maps its existing approval UX onto cua-driver's immutable runtime
 modes. Permission mode and capability manifest approval are launch settings.
 They cannot change after the runtime starts:
 
-| Qubit session | cua-driver mode | Human intervention |
+| Hermes session | cua-driver mode | Human intervention |
 |---|---|---|
-| Manual or smart approvals (default) | `standard` | Normal Qubit approvals; Cua stops at its protected boundary |
+| Manual or smart approvals (default) | `standard` | Normal Hermes approvals; Cua stops at its protected boundary |
 | `computer_use.permission_mode: bounded` + reviewed manifest | private `bounded` daemon | You review and approve the capability manifest once, at launch |
-| `--yolo`, `/yolo`, or `approvals.mode: off` | private `unrestricted` daemon | One explicit Qubit risk acceptance; no runtime Cua prompts |
+| `--yolo`, `/yolo`, or `approvals.mode: off` | private `unrestricted` daemon | One explicit Hermes risk acceptance; no runtime Cua prompts |
 
 Browser work — including pages in a signed-in profile — goes through the
 `browser` toolset (`browser_exec`), not `computer_use`. The former
@@ -128,7 +128,7 @@ computer_use:
 The manifest names the apps, browser profile kinds, allowed origins, and
 typed tools the session may use (see the
 [cua-driver permission modes reference](https://cua.ai/docs/reference/cua-driver/permission-modes)
-for the format). Qubit launches a private runtime with
+for the format). Hermes launches a private runtime with
 `--capability-manifest ... --approve-capability-manifest`; anything outside
 the manifest fails closed inside cua-driver. A missing or unreadable manifest
 fails loudly at session start rather than silently downgrading. Session YOLO
@@ -136,7 +136,7 @@ still overrides bounded for that one session.
 
 On macOS, private-session daemons launch through the installed
 `CuaDriver.app` bundle (so permission grants attribute to the driver's own
-identity instead of resetting with every Qubit build), and Qubit verifies
+identity instead of resetting with every Hermes build), and Hermes verifies
 the bundle's code signature — exact `com.trycua.driver` identifier and the
 official signing team — before launching it. If you build cua-driver from
 source (unsigned), opt in explicitly:
@@ -150,12 +150,12 @@ computer_use:
 Each MCP transport owns a private lifecycle session inside its runtime. A
 public session name is only a label for cursor identity and session-scoped
 state. It does not select, share, or keep a runtime alive. Turning `/yolo` off,
-resetting or closing the Qubit session, cancellation cleanup, or process exit
-closes that transport session. Qubit also stops private runtimes that it
-launched for bounded or unrestricted access. One Qubit
+resetting or closing the Hermes session, cancellation cleanup, or process exit
+closes that transport session. Hermes also stops private runtimes that it
+launched for bounded or unrestricted access. One Hermes
 conversation cannot change another runtime's mode or grants. Bounded and
-unrestricted modes use a private
-embedded service under the Qubit host identity.
+unrestricted modes use a private embedded daemon, launched through
+`CuaDriver.app` on macOS (see above).
 
 `smart` approval remains `standard`: an LLM classification cannot stand in for
 a reviewed manifest.
@@ -168,14 +168,14 @@ compromise you accept.
 
 </div>
 
-## `qubit computer-use doctor` — your first triage stop
+## `hermes computer-use doctor` — your first triage stop
 
-`qubit computer-use doctor` runs cua-driver's structured
+`hermes computer-use doctor` runs cua-driver's structured
 `health_report` MCP tool and prints a per-check matrix. It's the single
 fastest way to find out *why* an action isn't working.
 
 ```
-$ qubit computer-use doctor
+$ hermes computer-use doctor
 ⚠️  cua-driver VERSION on darwin: degraded
   ✅ binary_version: cua-driver VERSION
   ✅ platform_supported: macOS 26.4.1 (arm64)
@@ -204,18 +204,29 @@ The check matrix is platform-aware: `bundle_identity` / `tcc_*` are
 `ax_capability` checks AX on macOS, UIA on Windows, AT-SPI on Linux —
 each with the right diagnostic hint when it can't reach.
 
+On Linux, where the daemon is a hand-written systemd user unit or XDG
+autostart entry rather than a managed autostart, doctor also reads those
+units: a `cua-driver` `ExecStart` pointing at a pruned
+`packages/releases/<version>/` directory is reported as a failing
+`daemon unit (...)` check (point it at `~/.cua-driver/packages/current/cua-driver`),
+and a unit that runs `cua-driver serve` gets a `daemon (...)` check that
+connects to its socket — `fail` when nothing is listening (crash loop,
+stopped, never started), `pass` when the daemon answers. Reinstalling the
+driver does not start a daemon; `systemctl --user status <unit>` does.
+`hermes computer-use status` prints the same dead-daemon line and exits 1.
+
 ## The agent cursor and sessions
 
 When the agent acts, you'll see a **tinted overlay cursor** glide
 across the screen to where each click / type / scroll lands. The real
 OS cursor never moves. The overlay shows where the agent is acting. Each
-Qubit run declares a public cua-driver **session name** (something like
+Hermes run declares a public cua-driver **session name** (something like
 `hermes-3a7b9c14d2e8`). The name labels cursor identity and related state, so
 concurrent runs and subagents get distinct cursors. The MCP transport owns the
 private lifecycle session inside the runtime; the public name does not.
 
 The overlay cursor is cosmetic — captures, clicks, and typing all work
-without it. Qubit disables it automatically where it is a known failure
+without it. Hermes disables it automatically where it is a known failure
 mode: macOS (idle CPU burn), headless Linux / WSL2 / containers, and
 **Linux X11 desktops** (the overlay is a fullscreen always-on-top window
 that can get stuck over every workspace after an unclean session end,
@@ -232,8 +243,8 @@ halo).
 
 ## Going deeper — the cua-driver skill pack
 
-Qubit keeps its wrapper skill (`skills/autonomous-ai-agents/computer-use/SKILL.md`)
-focused on the Qubit-side `computer_use` workflow and action vocabulary. For
+Hermes keeps its wrapper skill (`skills/autonomous-ai-agents/computer-use/SKILL.md`)
+focused on the Hermes-side `computer_use` workflow and action vocabulary. For
 platform details, recording semantics, browser page interaction, and other
 deep Cua behavior, install the skill pack that the cua-driver team ships and
 maintains directly:
@@ -242,10 +253,11 @@ maintains directly:
 cua-driver skills install
 ```
 
-The command installs the pack under `~/.cua-driver/skills/cua-driver`. Qubit
-autodetection is a planned cua-driver follow-up, so currently point Qubit at
-that directory or symlink it into your skill space. The wrapper remains the
-workflow layer and points to Cua's installed skill for driver behavior. The
+The command links the pack into `~/.hermes/skills/cua-driver` (Hermes is one
+of the agents `cua-driver skills status` reports). The wrapper remains the
+workflow layer: the pack documents the driver's own MCP vocabulary
+(`get_window_state`, `element_token`, `snapshot_id`), which the `computer_use`
+wrapper translates to for you — keep calling `computer_use(action=...)`. The
 pack contains:
 
 | File | Topic |
@@ -258,14 +270,14 @@ pack contains:
 | `WEB_APPS.md` | Browser-page interaction tips |
 | `TESTS.md` | Replay-by-trajectory workflow |
 
-These are **platform deep dives, not duplicates of the Qubit skill** —
+These are **platform deep dives, not duplicates of the Hermes skill** —
 when an agent reports "on Windows, my click landed on the wrong
 element," it reads `WINDOWS.md` for the UIA / UWP context that
 explains why and what to do differently.
 
 `cua-driver skills status` shows what's installed and which agent
 harnesses it's linked into. Today the autodetect list covers Claude
-Code, Codex, OpenCode, Qubit, and Antigravity; **Qubit
+Code, Codex, OpenCode, OpenClaw, and Antigravity; **Hermes
 autodetection is planned as a follow-up in `trycua/cua`** — until
 then, run `cua-driver skills install` once and point your harness at
 the resulting `~/.cua-driver/skills/cua-driver` directory (or symlink
@@ -294,7 +306,7 @@ app never comes to front.
 
 Screenshots taken during computer control are normally internal — they exist
 so the model can see the screen, and the agent replies in text. But every
-image capture also saves a bounded, shareable copy under Qubit' image cache
+image capture also saves a bounded, shareable copy under Hermes' image cache
 and reports its path, so on attachment-capable surfaces (Telegram, Discord,
 Desktop, and other gateway platforms) you can simply ask:
 
@@ -337,11 +349,18 @@ magic-byte sniffing.
 
 ## Safety
 
-Qubit applies multi-layer guardrails:
+Hermes applies multi-layer guardrails:
 
 - Destructive actions (click, type, drag, scroll, key, focus_app)
-  require approval — either interactively via the CLI dialog or via the
-  messaging-platform approval buttons.
+  require approval through the same gate as dangerous shell commands —
+  interactively via the CLI dialog or the messaging-platform approval
+  buttons. Once/session/always grants are keyed
+  `cua:<action>:<background|foreground>` and live in the shared
+  session/`command_allowlist` store (a background grant never covers the
+  visible foreground variant). Where nobody can answer — cron
+  (`approvals.cron_mode`), single-query, unattended platforms, or any
+  headless run — the action is refused rather than auto-approved;
+  `--yolo` / `/yolo` still bypass.
 - Hard-blocked key combos at the tool level: empty trash, force delete,
   lock screen, log out, force log out.
 - Hard-blocked type patterns: `curl | bash`, `sudo rm -rf /`, fork
@@ -355,11 +374,15 @@ want every action confirmed.
 
 ## Token efficiency
 
-Screenshots are expensive. Qubit applies four layers of optimisation:
+Screenshots are expensive. Hermes applies four layers of optimisation:
 
-- **Screenshot eviction** — the Anthropic adapter keeps only the 3 most
-  recent screenshots in context; older ones become `[screenshot removed
-  to save context]` placeholders.
+- **Screenshot eviction** — on every provider, screenshots ride each
+  request until it would cross Anthropic's documented per-request image
+  limit (20 image blocks, or 24 MB of image data); then the oldest batch becomes
+  `[screenshot removed to save context]` placeholders. Below the limit
+  nothing is rewritten, so the prompt-cache prefix survives; at it, one
+  slower turn per batch instead of one per screenshot. Images you attach
+  yourself count against the limit but are never removed.
 - **Client-side compression pruning** — the context compressor detects
   multimodal tool results and strips image parts from old ones.
 - **Image-aware token estimation** — each image is counted as ~1500
@@ -390,7 +413,7 @@ of screenshot context, not ~600K.
 - **Windows: elevated (admin) windows can't be driven from a normal
   agent.** Windows UIPI (User Interface Privilege Isolation) enforces
   integrity-level boundaries: a Medium-integrity process (the default
-  Qubit agent) cannot enumerate the UIA tree of, or inject mouse input
+  Hermes agent) cannot enumerate the UIA tree of, or inject mouse input
   into, a window owned by a High-integrity (Administrator) process.
   Symptom: `capture(mode='som')` returns 0 elements and `click(...)`
   reports success while doing nothing, even though the screenshot
@@ -398,22 +421,34 @@ of screenshot context, not ~600K.
   events partially bypass UIPI, so Tab / Enter can still navigate an
   elevated dialog. This is an OS constraint, not a cua-driver bug — it
   affects every Windows automation stack. To drive elevated windows,
-  run the Qubit agent itself at High integrity (launch from an
+  run the Hermes agent itself at High integrity (launch from an
   elevated terminal); otherwise target non-elevated windows.
+- **Windows: `hermes computer-use doctor` fails with "Access is denied"
+  while the tool works.** A cua-driver installed under
+  `C:\Program Files\WindowsApps` cannot be executed by the Hermes venv
+  interpreter (WinError 5 from `CreateProcess`), even though the shell
+  resolves the same binary fine. The doctor now reports this as a
+  diagnosis instead of a traceback. Fix once: reinstall with the upstream
+  installer (lands under your user profile) or set
+  `HERMES_CUA_DRIVER_CMD` to a copy outside `WindowsApps`.
 - **Platform-specific deployment gotchas:**
   - **macOS** uses private SkyLight SPIs. Apple can change them in any
-    OS update. Qubit warns when the installed cua-driver is older than
+    OS update. Hermes warns when the installed cua-driver is older than
     the version it was tested against.
   - **Windows** SSH sessions run in **Session 0**, which has no
-    interactive desktop. Drive Qubit from inside the RDP / console
+    interactive desktop. Drive Hermes from inside the RDP / console
     session, or set up cua-driver's autostart Scheduled Task —
     [windows-ssh](https://cua.ai/docs/how-to-guides/driver/windows-ssh)
     has the recipe.
   - **Linux** requires a reachable display server. Headless servers
-    need Xvfb (`Xvfb :99 -screen 0 1920x1080x24`) before
-    `computer_use` can capture or inject events. Pure Wayland sessions
-    need an XWayland bridge for screen capture (cua-driver's Wayland
-    inject path handles input independently).
+    get one from [Bot Screen](./bot-screen.md): a per-profile Xfce
+    desktop over TigerVNC, streamed into Hermes Desktop, where you can
+    take over for logins and 2FA. You start it from the Desktop's
+    Screen pane or `hermes computer-use screen start`; it starts on
+    first use (the first `computer_use` call or headed browser use) only
+    when `bot_desktop.auto_start: true` is set (off by default).
+    Pure Wayland sessions need an XWayland bridge for screen capture
+    (cua-driver's Wayland inject path handles input independently).
 
 For cross-platform GUI automation without the desktop overhead (and
 without TCC / Session 0 / X11 setup), the `browser` toolset uses a
@@ -430,7 +465,7 @@ computer_use:
   capability_manifest: ""          # capability manifest path, required for bounded
 ```
 
-On Linux, native Wayland support remains an explicit opt-in. Qubit passes the
+On Linux, native Wayland support remains an explicit opt-in. Hermes passes the
 opt-in to every cua-driver process, including gateway sessions, only when that
 process also has `WAYLAND_DISPLAY`:
 
@@ -456,8 +491,8 @@ HERMES_COMPUTER_USE_BACKEND=noop   # records calls, no side effects
 ### Telemetry
 
 cua-driver ships with anonymous usage telemetry (PostHog) enabled by default
-upstream. **Qubit disables it for you** — on every cua-driver invocation
-(the MCP backend, `status`, `doctor`, and install) Qubit sets
+upstream. **Hermes disables it for you** — on every cua-driver invocation
+(the MCP backend, `status`, `doctor`, and install) Hermes sets
 `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` in the driver's environment.
 
 To opt back in (let cua-driver use its own default and send telemetry), set
@@ -468,15 +503,15 @@ computer_use:
   cua_telemetry: true   # default: false (telemetry off)
 ```
 
-When it's on, `qubit computer-use doctor` reports `telemetry: enabled`;
+When it's on, `hermes computer-use doctor` reports `telemetry: enabled`;
 when off (the default), it reports `telemetry: disabled via
 CUA_DRIVER_RS_TELEMETRY_ENABLED`.
 
 ## Testing against a local cua-driver build
 
 When you're developing cua-driver itself — or want to test an
-unreleased fix — point Qubit at a binary you built from source instead
-of the published release. Qubit resolves the driver with
+unreleased fix — point Hermes at a binary you built from source instead
+of the published release. Hermes resolves the driver with
 `shutil.which("cua-driver")` and **does not enforce
 `HERMES_CUA_DRIVER_VERSION`**, so a local build (reported as
 `0.0.0-local-*`) is accepted as-is. Two approaches:
@@ -504,7 +539,7 @@ to your PATH:
   PATH) to it. macOS/Linux symlinks `cua-driver` into `~/.local/bin`
   (override with `--bin-dir <path>`).
 - `-NoAutoStart` skips registering the `cua-driver-serve` logon daemon
-  — you don't need it for Qubit testing (see notes).
+  — you don't need it for Hermes testing (see notes).
 
 Then open a fresh shell (so the PATH change is visible) and confirm:
 
@@ -514,7 +549,7 @@ cua-driver --version                 # local builds report 0.0.0-local-release
 # macOS/Linux:  which cua-driver
 ```
 
-### Option B — point Qubit straight at the built binary (fastest loop)
+### Option B — point Hermes straight at the built binary (fastest loop)
 
 Skip the install ceremony entirely: `cargo build` and set
 `HERMES_CUA_DRIVER_CMD` to the resulting binary. Best for rapid
@@ -531,20 +566,20 @@ HERMES_CUA_DRIVER_CMD=C:\path\to\cua\libs\cua-driver\rust\target\debug\cua-drive
 HERMES_CUA_DRIVER_CMD=/path/to/cua/libs/cua-driver/rust/target/debug/cua-driver
 ```
 
-### Confirm Qubit is using your build
+### Confirm Hermes is using your build
 
-- `qubit computer-use status` prints the resolved binary path and
+- `hermes computer-use status` prints the resolved binary path and
   version.
-- `qubit computer-use doctor` confirms the binary is reachable and
+- `hermes computer-use doctor` confirms the binary is reachable and
   exercises the full MCP path end-to-end.
 - In a session, `computer_use(action="capture")` exercises the spawned
   `cua-driver mcp` child process.
 
 ### Notes & gotchas
 
-- **Qubit spawns a `cua-driver mcp` stdio proxy.** In a normal session the
+- **Hermes spawns a `cua-driver mcp` stdio proxy.** In a normal session the
   proxy connects to (and may start) the standard machine daemon. In explicit
-  Qubit YOLO, Qubit instead owns a private `cua-driver serve --embedded`
+  Hermes YOLO, Hermes instead owns a private `cua-driver serve --embedded`
   child and points the proxy at its private socket or named pipe. The Windows
   autostart/UIAccess pattern still matters for interactive Session 1+ input
   from SSH — see the Limitations section.
@@ -556,28 +591,41 @@ HERMES_CUA_DRIVER_CMD=/path/to/cua/libs/cua-driver/rust/target/debug/cua-driver
   cua-driver-serve`).
 - **Rebuild loop.** After editing cua-driver source, re-run
   `install-local` (rebuilds, restages, flips the `current` junction)
-  for Option A, or just re-`cargo build` for Option B — no Qubit
+  for Option A, or just re-`cargo build` for Option B — no Hermes
   change needed either way.
-- **Local builds skip the version check.** Qubit warns when the
+- **Local builds skip the version check.** Hermes warns when the
   installed cua-driver is older than its per-OS tested baseline, but
   exempts `0.0.0-local-*` dev builds — so your local build never
   triggers that warning.
 
 ## Troubleshooting
 
-**First action when anything's off: run `qubit computer-use doctor`.**
+**First action when anything's off: run `hermes computer-use doctor`.**
 The structured per-check matrix tells you (and any agent helping you
 debug) exactly what's wrong.
 
 Specific failure modes the doctor doesn't catch:
 
 **`computer_use backend unavailable: cua-driver is not installed`** —
-Run `qubit computer-use install` to fetch the cua-driver binary, or
-run `qubit tools` and enable the Computer Use toolset.
+Run `hermes computer-use install` to fetch the cua-driver binary, or
+run `hermes tools` and enable the Computer Use toolset.
 
 **Clicks seem to have no effect** — Capture and verify. A modal you
 didn't see may be blocking input. Dismiss it with `escape` or the close
 button.
+
+**macOS: System Settings shows CuaDriver ON, but `hermes computer-use
+permissions status` / `doctor` report Accessibility or Screen Recording as
+not granted** — the stored grant is stale. macOS keys each permission row to
+the app's code-signing requirement; a row written for an earlier CuaDriver
+build stops matching after a driver update, and flipping the toggle does not
+rewrite it. Reset the affected rows and re-grant:
+
+```
+tccutil reset Accessibility com.trycua.driver
+tccutil reset ScreenCapture com.trycua.driver
+hermes computer-use permissions grant
+```
 
 **Element indices are stale** — SOM indices are only valid until the
 next `capture`. Re-capture after any state-changing action. The
@@ -589,7 +637,7 @@ matches the dangerous-shell-pattern list. Break the command up or
 reconsider.
 
 **Empty captures on Linux** — `DISPLAY` not set, or you're on pure
-Wayland without an XWayland bridge. `qubit computer-use doctor` will
+Wayland without an XWayland bridge. `hermes computer-use doctor` will
 flag this as `ax_capability: fail` with a `Set DISPLAY (X11)…` hint.
 
 **Empty captures on Windows over SSH** — You're in Session 0 (the
@@ -599,14 +647,14 @@ autostart pattern — see
 
 ## See also
 
-- **Qubit-side skill** — `skills/autonomous-ai-agents/computer-use/SKILL.md` — teaches the
-  Qubit `computer_use` action vocabulary; this is what the agent loads.
+- **Hermes-side skill** — `skills/autonomous-ai-agents/computer-use/SKILL.md` — teaches the
+  Hermes `computer_use` action vocabulary; this is what the agent loads.
 - **cua-driver skill pack** — for platform-specific deep dives
   (macOS no-foreground contract, Windows UIA + Session 0, Linux AT-SPI
   + X11/Wayland, recording, browser pages), run
   `cua-driver skills install` and read `MACOS.md` / `WINDOWS.md` /
-  `LINUX.md` / `RECORDING.md` / `WEB_APPS.md`. Qubit autodetection is a
-  planned follow-up; currently point Qubit at the installed pack directory
+  `LINUX.md` / `RECORDING.md` / `WEB_APPS.md`. Hermes autodetection is a
+  planned follow-up; currently point Hermes at the installed pack directory
   or symlink it into your skill space.
 - **cua.ai/docs** — the cua-driver project's documentation:
   - [What is computer use?](https://cua.ai/docs/explanation/what-is-computer-use) — concept intro
@@ -615,6 +663,6 @@ autostart pattern — see
   - [Personalize the agent cursor](https://cua.ai/docs/how-to-guides/driver/personalize-cursor) — built-in shapes, custom assets, runtime overrides
   - [Drive Windows over SSH](https://cua.ai/docs/how-to-guides/driver/windows-ssh) — the Session 0 → Session 1+ autostart pattern
   - [Keep cua-driver running](https://cua.ai/docs/how-to-guides/driver/keep-running) — autostart / daemon lifecycle
-  - [Connect your agent](https://cua.ai/docs/how-to-guides/driver/connect-your-agent) — register cua-driver with various harnesses (Qubit among them)
+  - [Connect your agent](https://cua.ai/docs/how-to-guides/driver/connect-your-agent) — register cua-driver with various harnesses (Hermes among them)
 - [cua-driver source (trycua/cua)](https://github.com/trycua/cua)
 - [Browser automation](./browser.md) for cross-platform web tasks where you don't need to drive native apps.

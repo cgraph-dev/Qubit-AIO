@@ -14,9 +14,10 @@ import pytest
 import qubit_cli.gateway_windows as gateway_windows
 
 
-@pytest.mark.windows_only
+@pytest.mark.platforms("windows")
 def test_status_warns_and_uninstall_removes_pre_suffix_launchers(tmp_path, monkeypatch, capsys):
-    home = tmp_path / "qubit"
+    # The shared isolation fixture uses tmp_path / "hermes" as the Windows native default.
+    home = tmp_path / "custom-hermes"
     (home / "gateway-service").mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
     appdata = tmp_path / "AppData" / "Roaming"
@@ -47,7 +48,7 @@ def test_status_warns_and_uninstall_removes_pre_suffix_launchers(tmp_path, monke
         assert "legacy pre-suffix Scheduled Task still installed: Hermes_Gateway" in out
         assert f"legacy pre-suffix Windows login item still installed: {legacy_vbs}" in out
         assert f"legacy pre-suffix task launcher still installed: {legacy_pair}" in out
-        assert "qubit gateway uninstall" in out
+        assert "hermes gateway uninstall" in out
 
         gateway_windows.uninstall()
         out = capsys.readouterr().out

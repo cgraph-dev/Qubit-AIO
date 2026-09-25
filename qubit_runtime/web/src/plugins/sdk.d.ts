@@ -19,7 +19,7 @@
  *      it is a deliberate act, visible in review, not an accidental
  *      consequence of refactoring an internal helper.
  *
- * Versioning: bump ``QubitPluginSDK["sdkVersion"]`` (and the
+ * Versioning: bump ``HermesPluginSDK["sdkVersion"]`` (and the
  * ``SDK_CONTRACT_VERSION`` const the host exposes) on any
  * backwards-incompatible change to this surface. Additive changes
  * (new optional fields, new helpers) don't require a major bump.
@@ -91,7 +91,7 @@ export interface PluginRegistry {
 // SDK surface (window.__HERMES_PLUGIN_SDK__)
 // ---------------------------------------------------------------------------
 
-export interface QubitPluginSDK {
+export interface HermesPluginSDK {
   /** Contract version of this SDK surface (see SDK_CONTRACT_VERSION). */
   readonly sdkVersion: string;
 
@@ -176,7 +176,7 @@ export interface QubitPluginSDK {
 
 declare global {
   interface Window {
-    __HERMES_PLUGIN_SDK__?: QubitPluginSDK;
+    __HERMES_PLUGIN_SDK__?: HermesPluginSDK;
     __HERMES_PLUGINS__?: PluginRegistry;
   }
 }

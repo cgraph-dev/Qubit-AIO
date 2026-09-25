@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 
 def _a2a_conversation(home):
@@ -28,7 +28,7 @@ def _mem0_qdrant(home):
 
 def _openviking_log(home):
     import plugins.memory.openviking as ov
-    return ov.get_hermes_home() / ov._OPENVIKING_SERVER_LOG_RELATIVE_PATH
+    return ov.get_qubit_home() / ov._OPENVIKING_SERVER_LOG_RELATIVE_PATH
 
 
 _RESOLVERS = {"a2a": _a2a_conversation, "photon": _photon_auth, "mem0-qdrant": _mem0_qdrant,
@@ -41,9 +41,9 @@ def test_plugin_path_follows_profile_override(name, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path / "user-home"))
     profile = tmp_path / "profiles" / "b"
     profile.mkdir(parents=True)
-    token = set_hermes_home_override(profile)
+    token = set_qubit_home_override(profile)
     try:
         resolved = str(_RESOLVERS[name](profile))
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
     assert resolved.startswith(str(profile)), f"{name} resolved {resolved!r} outside the active profile"

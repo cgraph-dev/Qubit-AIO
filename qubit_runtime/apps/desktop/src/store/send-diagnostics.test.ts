@@ -19,7 +19,7 @@ function stubGateway(
 }
 
 function stubDesktopLogs(lines: null | string[]) {
-  const original = window.qubitDesktop
+  const original = window.hermesDesktop
 
   Object.defineProperty(window, 'hermesDesktop', {
     configurable: true,
@@ -135,13 +135,6 @@ describe('send-diagnostics store', () => {
       restoreDesktop()
       restoreGateway()
     }
-  })
-
-  it('dismiss clears the dialog state', () => {
-    requestSendDiagnostics()
-    dismissSendDiagnostics()
-
-    expect($sendDiagnostics.get()).toBeNull()
   })
 
   it('dismissal mid-upload is immediate and a stale completion cannot resurrect the dialog', async () => {

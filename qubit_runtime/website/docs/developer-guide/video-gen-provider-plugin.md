@@ -1,15 +1,15 @@
 ---
 sidebar_position: 12
 title: "Video Generation Provider Plugins"
-description: "How to build a video-generation backend plugin for Qubit Agent"
+description: "How to build a video-generation backend plugin for Hermes Agent"
 ---
 
 # Building a Video Generation Provider Plugin
 
-Video-gen provider plugins register a backend that services every `video_generate` tool call. Built-in providers (xAI, FAL, DeepInfra) ship as plugins. Add a new one, or override a bundled one, by dropping a directory into `plugins/video_gen/<name>/`.
+Video-gen provider plugins register a backend that services every `video_generate` tool call. Built-in providers (xAI, FAL, OpenRouter, DeepInfra) ship as plugins. Add a new one, or override a bundled one, by dropping a directory into `plugins/video_gen/<name>/`.
 
 :::tip
-Video-gen mirrors [Image Generation Provider Plugins](/developer-guide/image-gen-provider-plugin) almost line-for-line — if you've built an image-gen backend, you already know the shape. The main differences: a `capabilities()` method advertising modalities/aspect-ratios/durations, and a routing convention (pass `image_url` to use image-to-video, omit it to use text-to-video — the provider picks the right endpoint internally).
+Video-gen mirrors [Image Generation Provider Plugins](./image-gen-provider-plugin.md) almost line-for-line — if you've built an image-gen backend, you already know the shape. The main differences: a `capabilities()` method advertising modalities/aspect-ratios/durations, and a routing convention (pass `image_url` to use image-to-video, omit it to use text-to-video — the provider picks the right endpoint internally).
 :::
 
 ## The unified surface (one tool, two modalities)
@@ -23,13 +23,13 @@ Edit and extend are intentionally out of scope. Most backends don't support them
 
 ## How discovery works
 
-Qubit scans for video-gen backends in three places:
+Hermes scans for video-gen backends in three places:
 
 1. **Bundled** — `<repo>/plugins/video_gen/<name>/` (auto-loaded with `kind: backend`)
 2. **User** — `~/.hermes/plugins/video_gen/<name>/` (opt-in via `plugins.enabled`)
 3. **Pip** — packages declaring a `hermes_agent.plugins` entry point
 
-Each plugin's `register(ctx)` function calls `ctx.register_video_gen_provider(...)`. The active provider is picked by `video_gen.provider` in `config.yaml`; `qubit tools` → Video Generation walks users through selection. Unlike `image_generate`, there is no in-tree legacy backend — every provider is a plugin.
+Each plugin's `register(ctx)` function calls `ctx.register_video_gen_provider(...)`. The active provider is picked by `video_gen.provider` in `config.yaml`; `hermes tools` → Video Generation walks users through selection. Unlike `image_generate`, there is no in-tree legacy backend — every provider is a plugin.
 
 ## Directory structure
 
@@ -101,7 +101,7 @@ class MyVideoGenProvider(VideoGenProvider):
         return {
             "name": "My Backend",
             "badge": "paid",
-            "tag": "Short description shown in `qubit tools`",
+            "tag": "Short description shown in `hermes tools`",
             "env_vars": [
                 {
                     "key": "MY_API_KEY",
@@ -179,9 +179,10 @@ The tool exposes one schema across every backend. Providers ignore parameters th
 | `negative_prompt` | Content to avoid (Pixverse/Kling only) |
 | `audio` | Native audio (Veo3 / Pixverse pricing tier) |
 | `seed` | Reproducibility |
-| `model` | Override the active model/family |
 
-The provider's `capabilities()` advertises which of these are honored. The agent sees the active backend's capabilities in the tool description, dynamically rebuilt when the user changes backend via `qubit tools`.
+There is deliberately no `model` parameter: the backend and model are user configuration (`video_gen.provider` / `video_gen.model`), never an agent choice. Your `generate()` still receives `model=` — it is the configured model, resolved by the tool layer.
+
+The provider's `capabilities()` advertises which of these are honored. The agent sees the active backend's capabilities in the tool description, dynamically rebuilt when the user changes backend via `hermes tools`.
 
 ## Model families and endpoint routing (the FAL pattern)
 
@@ -202,17 +203,18 @@ def generate(self, prompt, *, image_url=None, model=None, **kwargs):
     # ... build payload from family's declared capability flags, call endpoint ...
 ```
 
-The user picks `veo3.1` once in `qubit tools`. The agent never thinks about endpoints — it just passes (or doesn't pass) `image_url`.
+The user picks `veo3.1` once in `hermes tools`. The agent never thinks about endpoints — it just passes (or doesn't pass) `image_url`.
 
 ## Selection precedence
 
 For per-instance model knobs (see `plugins/video_gen/fal/__init__.py`):
 
-1. `model=` keyword from the tool call
-2. `<PROVIDER>_VIDEO_MODEL` env var
-3. `video_gen.<provider>.model` in `config.yaml`
-4. `video_gen.model` in `config.yaml` (when it's one of your IDs)
-5. Provider's `default_model()`
+1. `<PROVIDER>_VIDEO_MODEL` env var
+2. `video_gen.<provider>.model` in `config.yaml`
+3. `video_gen.model` in `config.yaml` (when it's one of your IDs)
+4. Provider's `default_model()`
+
+The `model=` keyword your `generate()` receives is the outcome of this resolution — a `model` in the agent's tool call is ignored, so the LLM cannot switch backends or billing tiers on its own.
 
 ## Response shape
 
@@ -224,7 +226,7 @@ Error keys: `success`, `video` (None), `error`, `error_type`, `model`, `prompt`,
 
 ## Where to save artifacts
 
-If your backend returns base64, use `save_b64_video()` to write under `$QUBIT_HOME/cache/videos/`. For raw bytes from a follow-up HTTP fetch, use `save_bytes_video()`. Otherwise return the upstream URL directly — the gateway resolves remote URLs on delivery.
+If your backend returns base64, use `save_b64_video()` to write under `$HERMES_HOME/cache/videos/`. For raw bytes from a follow-up HTTP fetch, use `save_bytes_video()`. Otherwise return the upstream URL directly — the gateway resolves remote URLs on delivery.
 
 ## Testing
 

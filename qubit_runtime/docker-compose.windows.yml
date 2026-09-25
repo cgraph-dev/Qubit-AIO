@@ -4,31 +4,31 @@
 # Differences from docker-compose.yml:
 #   - Removes `network_mode: host` (not supported on Docker Desktop for Windows)
 #   - Uses explicit port mappings instead
-#   - Uses Windows-style volume path for ~/.qubit
+#   - Uses Windows-style volume path for ~/.hermes
 #
 # Usage:
 #   docker compose -f docker-compose.windows.yml up -d
 #
 services:
   gateway:
-    image: qubitlabs/qubit-runtime:latest
+    image: nousresearch/hermes-agent:latest
     container_name: qubit
     restart: unless-stopped
     volumes:
-      - ${USERPROFILE}/.qubit:/opt/data
+      - ${USERPROFILE}/.hermes:/opt/data
     environment:
       - HERMES_UID=10000
       - HERMES_GID=10000
     command: ["gateway", "run"]
 
   dashboard:
-    image: qubitlabs/qubit-runtime:latest
-    container_name: qubit-dashboard
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-dashboard
     restart: unless-stopped
     depends_on:
       - gateway
     volumes:
-      - ${USERPROFILE}/.qubit:/opt/data
+      - ${USERPROFILE}/.hermes:/opt/data
     environment:
       - HERMES_UID=10000
       - HERMES_GID=10000

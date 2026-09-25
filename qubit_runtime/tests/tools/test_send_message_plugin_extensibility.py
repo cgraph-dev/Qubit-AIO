@@ -167,7 +167,7 @@ def test_cli_and_cron_share_plugin_target_normalization(plugin_platform, monkeyp
         quiet=False,
     )
 
-    monkeypatch.setattr("qubit_cli.send_cmd._load_hermes_env", lambda: None)
+    monkeypatch.setattr("qubit_cli.send_cmd._load_qubit_env", lambda: None)
     with patch("gateway.config.load_gateway_config", return_value=config), \
          patch("tools.interrupt.is_interrupted", return_value=False), \
          patch("gateway.mirror.mirror_to_session", return_value=True), \

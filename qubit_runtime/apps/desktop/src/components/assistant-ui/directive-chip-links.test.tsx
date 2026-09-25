@@ -6,17 +6,17 @@ import { $previewTabs, closeRightRail } from '@/store/preview'
 
 import { DirectiveContent } from './directive-text'
 
-const desktopWindow = window as unknown as { qubitDesktop?: Window['qubitDesktop'] }
+const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
 
-const PR_URL = 'https://github.com/cgraph-dev/qubit-voicebridge/pull/107950'
+const PR_URL = 'https://github.com/NousResearch/hermes-agent/pull/107950'
 
 function installDesktopBridge() {
   const openExternal = vi.fn().mockResolvedValue(undefined)
 
-  desktopWindow.qubitDesktop = {
+  desktopWindow.hermesDesktop = {
     fetchLinkTitle: vi.fn().mockResolvedValue(''),
     openExternal
-  } as unknown as Window['qubitDesktop']
+  } as unknown as Window['hermesDesktop']
 
   return openExternal
 }
@@ -25,7 +25,7 @@ afterEach(() => {
   closeRightRail()
   vi.restoreAllMocks()
   cleanup()
-  delete desktopWindow.qubitDesktop
+  delete desktopWindow.hermesDesktop
   document.body.replaceChildren()
 })
 

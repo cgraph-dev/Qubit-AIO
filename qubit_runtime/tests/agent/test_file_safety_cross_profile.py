@@ -13,7 +13,7 @@ import pytest
 
 
 @pytest.fixture
-def fake_qubit(tmp_path, monkeypatch):
+def fake_hermes(tmp_path, monkeypatch):
     """Build a fake Hermes layout:
 
         <tmp>/
@@ -50,7 +50,7 @@ def fake_qubit(tmp_path, monkeypatch):
     monkeypatch.setattr(qubit_constants, "get_default_qubit_root", lambda: root)
 
     import agent.file_safety as fs
-    monkeypatch.setattr(fs, "_hermes_root_path", lambda: root)
+    monkeypatch.setattr(fs, "_qubit_root_path", lambda: root)
 
     return {
         "root": root,
@@ -61,9 +61,9 @@ def fake_qubit(tmp_path, monkeypatch):
 
 
 def _set_active_home(monkeypatch, qubit_home: Path):
-    """Point file_safety._hermes_home_path at a specific profile dir."""
+    """Point file_safety._qubit_home_path at a specific profile dir."""
     import agent.file_safety as fs
-    monkeypatch.setattr(fs, "_hermes_home_path", lambda: qubit_home)
+    monkeypatch.setattr(fs, "_qubit_home_path", lambda: qubit_home)
 
 
 # ---------------------------------------------------------------------------
@@ -72,19 +72,19 @@ def _set_active_home(monkeypatch, qubit_home: Path):
 
 
 class TestResolveActiveProfileName:
-    def test_default_when_home_is_root(self, fake_qubit, monkeypatch):
-        _set_active_home(monkeypatch, fake_qubit["default_home"])
+    def test_default_when_home_is_root(self, fake_hermes, monkeypatch):
+        _set_active_home(monkeypatch, fake_hermes["default_home"])
         from agent.file_safety import _resolve_active_profile_name
         assert _resolve_active_profile_name() == "default"
 
 
-    def test_falls_back_to_default_on_resolution_failure(self, fake_qubit, monkeypatch):
+    def test_falls_back_to_default_on_resolution_failure(self, fake_hermes, monkeypatch):
         """If QUBIT_HOME resolution raises, return 'default' rather than crashing the tool."""
         import agent.file_safety as fs
 
         def _boom():
             raise RuntimeError("simulated")
 
-        monkeypatch.setattr(fs, "_hermes_home_path", _boom)
+        monkeypatch.setattr(fs, "_qubit_home_path", _boom)
         # Should not raise — falls back to "default"
         assert fs._resolve_active_profile_name() == "default"

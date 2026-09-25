@@ -24,7 +24,7 @@ from agent.secret_scope import (
     set_multiplex_active,
     set_secret_scope,
 )
-from qubit_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
 
 
 def _observe(routed_home: Path) -> tuple:
@@ -32,7 +32,7 @@ def _observe(routed_home: Path) -> tuple:
         secret = get_secret("FEISHU_PROBE_TOKEN")
     except UnscopedSecretError:
         secret = "<unscoped>"
-    return ("routed" if Path(get_hermes_home()) == routed_home else "launch", secret)
+    return ("routed" if Path(get_qubit_home()) == routed_home else "launch", secret)
 
 
 @pytest.fixture
@@ -41,13 +41,13 @@ def routed_scope(tmp_path):
     routed_home = tmp_path / "profiles" / "b"
     routed_home.mkdir(parents=True)
     set_multiplex_active(True)
-    home_token = set_hermes_home_override(str(routed_home))
+    home_token = set_qubit_home_override(str(routed_home))
     secret_token = set_secret_scope({"FEISHU_PROBE_TOKEN": "routed-value"})
     try:
         yield routed_home
     finally:
         reset_secret_scope(secret_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
         set_multiplex_active(False)
 
 

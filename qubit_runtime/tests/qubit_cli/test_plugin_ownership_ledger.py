@@ -8,7 +8,7 @@ from threading import Event
 from time import monotonic, sleep
 from types import MethodType
 
-import yaml
+import qubit_yaml as yaml
 
 
 def _write_plugin(qubit_home: Path) -> None:
@@ -122,7 +122,7 @@ def test_load_force_reload_and_unload_remove_every_manager_registration(
     from qubit_cli.plugins import PluginManager
     from tools.registry import registry
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     _write_plugin(qubit_home)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setattr(
@@ -455,7 +455,7 @@ def test_shared_entrypoint_module_uses_the_active_profile_scope(tmp_path):
     from tools.registry import ToolRegistry
 
     registry = ToolRegistry()
-    module_name = "third_party.shared_hermes_plugin"
+    module_name = "third_party.shared_qubit_plugin"
     home_a = str((tmp_path / "entrypoint-a").resolve())
     home_b = str((tmp_path / "entrypoint-b").resolve())
     home_c = str((tmp_path / "entrypoint-c").resolve())

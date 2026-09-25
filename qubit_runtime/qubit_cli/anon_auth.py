@@ -1,9 +1,9 @@
-"""Qubit free-tier identity: the ``anonymous`` auth method of the ``nous`` provider.
+"""Qubit free-tier identity: the ``anonymous`` auth method of the ``qubit`` provider.
 
 The identity is created in exactly one place, at boot (``qubit_cli.free_tier_bootstrap``), and only
 while ``HERMES_GUEST_ONBOARDING=1`` (see ``guest_enabled``). The bootstrap mints an anonymous Qubit
 account (``POST /api/anonymous/create``); its ``anon_`` credential is later exchanged for short-lived
-JWTs (``POST /api/anonymous/token``). The result is persisted as the singleton ``providers.nous``; it
+JWTs (``POST /api/anonymous/token``). The result is persisted as the singleton ``providers.qubit``; it
 becomes ``active_provider`` only when the bootstrap's inventory found nothing else usable, so an
 install with its own key keeps that key for inference and uses the identity for connectors only. In
 the resolver ladder (``resolve_provider``) an existing free-tier identity sits directly above the
@@ -12,7 +12,7 @@ pool, a logged-in ``active_provider``) beats it, and the ladder never creates on
 
 Only two mechanics differ from an OAuth login and both are isolated behind ``is_guest_state``:
 token acquisition (re-exchange the ``anon_`` credential; there is no refresh token) and routing
-(the welcome inference host, single model ``nous/welcome``).
+(the welcome inference host, single model ``qubit/welcome``).
 
 Users are never shown the words guest / anonymous / account for this state: surfaces say
 "Qubit · free tier". Two user-facing verbs reach the same flow, both keeping the identity's
@@ -42,7 +42,7 @@ logger = logging.getLogger("qubit_cli.auth")
 ANON_AUTH_METHOD = "anonymous"
 ANON_CLIENT_ID = "nas-anonymous"
 ANON_ACCOUNT_TIER = "anonymous"
-GUEST_MODEL = "nous/welcome"
+GUEST_MODEL = "qubit/welcome"
 ANON_SECRET_HEADER = "x-anonymous-api-secret"
 # The shared secret gates the anonymous surface during its integration phase. It is a deployment
 # secret (Sid's), read from the environment only.
@@ -178,7 +178,7 @@ def is_anonymous_agent(agent: Any) -> bool:
 
 
 def current_nous_state() -> Optional[Dict[str, Any]]:
-    """The profile's ``providers.nous`` state without locking or network (status/picker reads)."""
+    """The profile's ``providers.qubit`` state without locking or network (status/picker reads)."""
     from qubit_cli.auth import _load_auth_store, _load_provider_state
     try:
         return _load_provider_state(_load_auth_store(), "nous")
@@ -217,7 +217,7 @@ def welcome_hosts() -> frozenset[str]:
 
 
 def pin_model_for_route(provider: Any, base_url: Any, model: Any) -> Any:
-    """Model policy at agent START: on the Qubit welcome host the model is ``nous/welcome``; anywhere
+    """Model policy at agent START: on the Qubit welcome host the model is ``qubit/welcome``; anywhere
     else the caller's model stands. Used once, when the route is first finalized. Mid-conversation
     route changes go through :func:`route_can_serve_model` instead: a conversation's model is never
     silently rewritten by a credential rotation.
@@ -230,8 +230,8 @@ def pin_model_for_route(provider: Any, base_url: Any, model: Any) -> Any:
 
 
 def route_can_serve_model(provider: Any, base_url: Any, model: Any) -> bool:
-    """Eligibility for a credential ROTATION: the welcome host serves only ``nous/welcome``, so a
-    conversation on any other model must not be rotated onto it (and a ``nous/welcome`` conversation
+    """Eligibility for a credential ROTATION: the welcome host serves only ``qubit/welcome``, so a
+    conversation on any other model must not be rotated onto it (and a ``qubit/welcome`` conversation
     may move to the portal host, which serves it too). Non-Qubit routes are always eligible."""
     if provider != "nous" or not route_is_welcome_host(base_url):
         return True
@@ -239,7 +239,7 @@ def route_can_serve_model(provider: Any, base_url: Any, model: Any) -> bool:
 
 
 def route_is_welcome_host(base_url: Any) -> bool:
-    """The routing predicate for the free tier: the welcome host serves exactly ``nous/welcome``.
+    """The routing predicate for the free tier: the welcome host serves exactly ``qubit/welcome``.
 
     Keyed on the resolved endpoint, never on profile state, so a paid pool credential routed to the
     portal host keeps its model even when a guest singleton exists beside it.
@@ -539,7 +539,7 @@ def ensure_portal_identity(
     carries_inference: bool = True, force: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """Make sure this profile has a Qubit identity (guest or account); mint a guest only if the shared
-    store has none. Returns the ``providers.nous`` state, or None (disabled / failed once already).
+    store has none. Returns the ``providers.qubit`` state, or None (disabled / failed once already).
 
     ``explicit`` is required and must be True: the only callers are the boot bootstrap
     (``free_tier_bootstrap.run_bootstrap``), the desktop's ``free_tier.provision`` retry, and the
@@ -631,7 +631,7 @@ def clear_dead_guest(reason: str, *, dead_token: Optional[str] = None) -> None:
 # The inference gateway answers a welcome-tier request it will not serve with a structured 429
 # (``{status, message, reason, retry_after, alternates?, upgrade_url?}``), and a request on the wrong
 # host with a 400 (or a 403 while the tier is dark) whose message names the right host. A NAMED
-# account that still asks for ``nous/welcome`` is served the id's backing model and told what to
+# account that still asks for ``qubit/welcome`` is served the id's backing model and told what to
 # switch to in the ``x-nous-model-switch`` response header. Every rule for reading those lives here;
 # the error classifier and the turn loop only call in.
 
@@ -644,7 +644,7 @@ WELCOME_TIER_GATE_REASONS = frozenset({"model_not_free", "feature_not_free"})
 # Gateway messages (lowercased substrings) for a request on the wrong host or a dark tier.
 _WELCOME_ROUTE_REFUSALS = (
     ("anonymous accounts must use", "anon_on_paid_host"),
-    ("serves anonymous hermes agent accounts only", "named_on_welcome_host"),
+    ("serves anonymous qubit agent accounts only", "named_on_welcome_host"),
     ("anonymous accounts are not accepted", "tier_disabled"),
 )
 _WELCOME_ROUTE_COPY = {
@@ -749,7 +749,7 @@ def welcome_route_refusal_copy(kind: str, *, in_chat: bool = True, door: bool = 
 def note_model_switch(agent: Any, headers: Any) -> Optional[str]:
     """Record the gateway's ``x-nous-model-switch`` header on *agent* for the next call, if present.
 
-    The header arrives on a NAMED account's response that asked for ``nous/welcome`` (the gateway
+    The header arrives on a NAMED account's response that asked for ``qubit/welcome`` (the gateway
     served the backing model and billed it normally): the free tier's model no longer belongs in
     this install's configuration. Recorded here, applied by :func:`apply_model_switch` between
     calls so a response still streaming is never re-labelled under itself. Returns the backing id.
@@ -834,7 +834,7 @@ def guest_notice_pending() -> bool:
 
 
 def mark_guest_notice_shown() -> bool:
-    """Persist ``guest_notice_shown`` on the guest's ``providers.nous`` state (whichever store holds it).
+    """Persist ``guest_notice_shown`` on the guest's ``providers.qubit`` state (whichever store holds it).
 
     Returns True when a flag was written; False when there is no guest to mark."""
     from qubit_cli.auth import (
@@ -958,7 +958,7 @@ def _account_state_from_token(
     token_data: Dict[str, Any], *, portal_base_url: str, client_id: str, scope: Optional[str], verify: Any,
     timeout_seconds: float,
 ) -> Dict[str, Any]:
-    """The ``providers.nous`` shape for the signed-in account (same fields the device-code login writes)."""
+    """The ``providers.qubit`` shape for the signed-in account (same fields the device-code login writes)."""
     from qubit_cli.auth import PROVIDER_REGISTRY, _coerce_ttl_seconds, _optional_base_url, _tls_state_from_verify
     from qubit_cli.auth_nous import _NOUS_EMPTY_AGENT_KEY_FIELDS, _iso_after, refresh_nous_oauth_from_state
     now = datetime.now(timezone.utc)
@@ -981,9 +981,9 @@ def _account_state_from_token(
 def settle_after_upgrade(account_state: Dict[str, Any]) -> Dict[str, Any]:
     """After a sign-in from the free tier persisted the account: move the config off the free tier's route.
 
-    Picking the free-tier row may have written ``model.default: nous/welcome`` and ``model.base_url``
+    Picking the free-tier row may have written ``model.default: qubit/welcome`` and ``model.base_url``
     = welcome host. An account cannot keep either: the welcome host refuses account tokens, and the
-    portal host serves ``nous/welcome`` as a paid model. When the config is on the free tier's route,
+    portal host serves ``qubit/welcome`` as a paid model. When the config is on the free tier's route,
     ``model.base_url`` becomes the account's inference host and ``model.default`` the recommended
     default for the account's tier (:func:`qubit_cli.models.recommended_nous_default_model`, the
     same pick as ``GET /api/model/recommended-default``), through the same config write a plain Qubit

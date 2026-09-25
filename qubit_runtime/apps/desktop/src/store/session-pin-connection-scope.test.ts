@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitConnection } from '@/global'
+import type { HermesConnection } from '@/global'
 import { connectionScopeSuffix } from '@/lib/connection-scoped'
 import { readKey, storedStringArray, writeKey } from '@/lib/storage'
 import type { SessionInfo } from '@/types/hermes'
@@ -21,14 +21,14 @@ import { resetSessionPinMirror, watchSessionPins } from './session-pin-sync'
 
 const PIN_KEY = 'hermes.desktop.pinnedSessions'
 
-const remote = (profile: string, baseUrl = 'https://gw.example:8443'): QubitConnection =>
+const remote = (profile: string, baseUrl = 'https://gw.example:8443'): HermesConnection =>
   ({
     baseUrl,
     mode: 'remote',
     profile,
     token: 't',
     wsUrl: 'ws://x'
-  }) as unknown as QubitConnection
+  }) as unknown as HermesConnection
 
 const row = (id: string, extra: Partial<SessionInfo> = {}): SessionInfo =>
   ({ id, message_count: 1, source: 'cli', started_at: 0, title: id, ...extra }) as SessionInfo
@@ -37,7 +37,7 @@ const flush = () => Promise.resolve()
 
 beforeAll(() => {
   ;(globalThis as { window?: unknown }).window ??= {}
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = {}
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {}
   watchSessionPins()
 })
 

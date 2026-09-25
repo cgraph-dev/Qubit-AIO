@@ -58,11 +58,11 @@ def receipt_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(
-        "qubit_cli.config.get_hermes_home", lambda: home, raising=False
+        "qubit_cli.config.get_qubit_home", lambda: home, raising=False
     )
-    ur._current = None
+    ur._current.set(None)
     yield home
-    ur._current = None
+    ur._current.set(None)
 
 
 def _receipt_files(home):
@@ -126,7 +126,7 @@ class TestReceiptAlwaysFinalized:
         ur.record_step("git_pull", True)
         ur.record_step("pip_install", True)
         # Crash: module singleton is gone, finalize never ran.
-        ur._current = None
+        ur._current.set(None)
 
         assert _receipt_files(receipt_home) == []
         latest = ur.read_latest_receipt()
@@ -157,8 +157,8 @@ class TestSuccessImpliesAccounting:
         outcomes = match_runtime_outcomes(plan, **bookkeeping)
         incomplete = report_unaccounted_runtimes(outcomes)
         record_plan_in_receipt(plan)
-        if ur._current is not None:
-            ur._current.data["runtime_outcomes"] = outcomes
+        if ur._current.get() is not None:
+            ur._current.get().data["runtime_outcomes"] = outcomes
         # Exact outcome-selection expression from update_cmd.py ~8360.
         path = ur.finalize_update_receipt(
             "partial" if incomplete else "success"
@@ -249,7 +249,7 @@ class TestRefusalIsNotFailure:
 
         # Run 2: a preflight refusal (venv-holder / concurrent instance).
         ur.begin_update_receipt()
-        ur.record_step("venv_preflight", False, "another qubit holds venv")
+        ur.record_step("venv_preflight", False, "another hermes holds venv")
         refused_path = ur.finalize_pending_update_receipt(2, "sys.exit(2)")
         refused = json.loads(refused_path.read_text(encoding="utf-8"))
 

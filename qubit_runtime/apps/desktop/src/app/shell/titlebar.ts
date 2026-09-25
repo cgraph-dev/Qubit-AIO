@@ -1,6 +1,8 @@
-import type { QubitConnection } from '@/global'
+import type { HermesConnection } from '@/global'
 
 export const TITLEBAR_HEIGHT = 34
+/** Permanent native drag target beside a top-edge tab strip. */
+export const TITLEBAR_DRAG_HANDLE_WIDTH = 48
 export const MACOS_TRAFFIC_LIGHTS_HEIGHT = 14
 /** Titlebar tool hit target (both axes). */
 export const TITLEBAR_CONTROL_SIZE = 24
@@ -33,7 +35,7 @@ export const TITLEBAR_MAC_TRAFFIC_LIGHTS_Y_NUDGE = 'calc(var(--spacing) * 0.9)'
 export interface TitlebarChromeContext {
   darwinMajor?: number
   isFullscreen?: boolean
-  windowButtonPosition?: QubitConnection['windowButtonPosition']
+  windowButtonPosition?: HermesConnection['windowButtonPosition']
 }
 
 export function titlebarControlsYNudge({
@@ -89,7 +91,7 @@ export const titlebarHeaderShadowClass =
   "after:pointer-events-none after:absolute after:left-0 after:right-0 after:top-full after:h-4 after:bg-linear-to-b after:from-(--ui-chat-surface-background) after:to-transparent after:content-['']"
 
 export function titlebarControlsPosition(
-  windowButtonPosition: QubitConnection['windowButtonPosition'] | undefined,
+  windowButtonPosition: HermesConnection['windowButtonPosition'] | undefined,
   isFullscreen = false
 ) {
   const top = Math.max(0, TITLEBAR_CONTROLS_TOP)
@@ -107,3 +109,6 @@ export function titlebarControlsPosition(
     top
   }
 }
+
+/** Rebind panel measurements after titlebar nodes or their positions change. */
+export const TITLEBAR_CHROME_CHANGED_EVENT = 'hermes:titlebar-chrome-changed'

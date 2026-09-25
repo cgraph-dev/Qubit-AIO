@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/context-menu'
 import { DiffCount } from '@/components/ui/diff-count'
 import { Tip } from '@/components/ui/tooltip'
-import type { QubitReviewFile } from '@/global'
+import type { HermesReviewFile } from '@/global'
 import { useI18n } from '@/i18n'
 import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
 import { displayPath } from '@/lib/display-path'
@@ -361,7 +361,7 @@ function ReviewFileRow({ node, depth }: { node: ReviewTreeNode; depth: number })
         const preview = await normalizeOrLocalPreviewTarget(dragPath)
 
         if (preview) {
-          openPreview(preview, 'file-browser')
+          openPreview(preview)
         }
       } catch (error) {
         notifyError(error, t.rightSidebar.previewUnavailable)
@@ -479,7 +479,7 @@ function ReviewFileContextMenu({
   children: ReactNode
   cwd: null | string
   dragPath: string
-  file: QubitReviewFile
+  file: HermesReviewFile
   onOpenChanges: () => void
   onOpenFile: () => void
 }) {

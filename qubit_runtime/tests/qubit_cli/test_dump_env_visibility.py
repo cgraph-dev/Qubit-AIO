@@ -1,4 +1,4 @@
-"""`qubit debug` must not report a shell-only API key as plainly "set".
+"""`hermes debug` must not report a shell-only API key as plainly "set".
 
 The dump reads ``os.getenv`` — the invoking terminal's environment — but the
 managed backends (launchd / systemd / the desktop-spawned ``serve`` process)

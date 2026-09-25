@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live test harness for Qubit Agent's Tool Search feature.
+"""Live test harness for Hermes Agent's Tool Search feature.
 
 Spins up a real AIAgent against a real model, registers ~20 fake "MCP" tools
 with realistic shapes (github-like, slack-like, calendar-like, search-like),
@@ -35,7 +35,7 @@ from typing import Any, Dict, List, Tuple
 # Scenario D reads this file back; lives in the temp dir, never a hard-coded /tmp.
 FIXTURE_NOTES = Path(tempfile.gettempdir()) / "livetest" / "notes.txt"
 
-# Force-isolate the test environment BEFORE any qubit imports.
+# Force-isolate the test environment BEFORE any hermes imports.
 ORIGINAL_HOME = os.environ.get("QUBIT_HOME")
 ORIGINAL_AUTH = Path.home() / ".hermes" / "auth.json"
 
@@ -260,25 +260,25 @@ def setup_isolated_home(enabled: bool, listing: str = "off",
     the agent can authenticate against OpenRouter inside the isolated home.
     """
     home_dir = Path(tempfile.mkdtemp(prefix="hermes_ts_live_"))
-    hermes_home = home_dir / ".hermes"
-    hermes_home.mkdir(parents=True)
+    qubit_home = home_dir / ".hermes"
+    qubit_home.mkdir(parents=True)
 
     if ORIGINAL_AUTH.exists():
-        shutil.copy(ORIGINAL_AUTH, hermes_home / "auth.json")
+        shutil.copy(ORIGINAL_AUTH, qubit_home / "auth.json")
 
     # Copy .env so OPENROUTER_API_KEY (or others) are visible to the agent
     # running inside the isolated home.
     real_env_file = Path.home() / ".hermes" / ".env"
     if real_env_file.exists():
-        shutil.copy(real_env_file, hermes_home / ".env")
+        shutil.copy(real_env_file, qubit_home / ".env")
         # Also load the real user env into this process so the provider
         # resolver can authenticate. We go through the canonical loader
         # (python-dotenv under the hood) rather than parsing the file by
         # hand — it never materializes the secret in a local variable in
         # this module, which both avoids a hand-rolled parser bug and keeps
         # static analysis from tainting the transcript records with the key.
-        from qubit_cli.env_loader import load_hermes_dotenv
-        load_hermes_dotenv(hermes_home=str(Path.home() / ".hermes"))
+        from qubit_cli.env_loader import load_qubit_dotenv
+        load_qubit_dotenv(qubit_home=str(Path.home() / ".hermes"))
 
     cfg = {
         "model": {
@@ -297,13 +297,13 @@ def setup_isolated_home(enabled: bool, listing: str = "off",
         },
         "logging": {"level": "WARNING"},
     }
-    (hermes_home / "config.yaml").write_text(_yaml_dump(cfg), encoding="utf-8")
-    return hermes_home
+    (qubit_home / "config.yaml").write_text(_yaml_dump(cfg), encoding="utf-8")
+    return qubit_home
 
 
 def _yaml_dump(obj: Any) -> str:
     try:
-        import yaml
+        import qubit_yaml as yaml
         return yaml.safe_dump(obj, sort_keys=False)
     except ImportError:
         return json.dumps(obj, indent=2)

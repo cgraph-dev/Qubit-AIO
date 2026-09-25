@@ -27,7 +27,7 @@ def _make_plan(target_dir, env_requires):
         version="1.0.0",
         description="",
         author="",
-        qubit_requires="",
+        hermes_requires="",
         env_requires=env_requires,
     )
     return SimpleNamespace(

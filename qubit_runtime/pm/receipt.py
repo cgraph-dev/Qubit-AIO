@@ -124,9 +124,9 @@ def _utc_now_iso() -> str:
 def _receipt_dir() -> Path:
     """The receipts dir — a pure path computation, NO mkdir side
     effect: readers (latest()) must not create state."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
-    return get_hermes_home() / "logs" / "update_receipts"
+    return get_qubit_home() / "logs" / "update_receipts"
 
 
 def begin(kind: str) -> contextvars.Token:

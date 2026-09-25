@@ -1,23 +1,23 @@
 ---
-title: "Actual Setup — Set up Actual Computer (actual.inc) inference in Qubit"
+title: "Actual Setup — Set up Actual Computer (actual.inc) inference in Hermes"
 sidebar_label: "Actual Setup"
-description: "Set up Actual Computer (actual.inc) inference in Qubit"
+description: "Set up Actual Computer (actual.inc) inference in Hermes"
 ---
 
 {/* This page is auto-generated from the skill's SKILL.md by website/scripts/generate-skill-docs.py. Edit the source SKILL.md, not this page. */}
 
 # Actual Setup
 
-Set up Actual Computer (actual.inc) inference in Qubit.
+Set up Actual Computer (actual.inc) inference in Hermes.
 
 ## Skill metadata
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/devops/actual-setup` |
-| Path | `optional-skills/devops\actual-setup` |
+| Source | Optional — install with `hermes skills install official/devops/actual-setup` |
+| Path | `optional-skills/devops/actual-setup` |
 | Version | `2.0.0` |
-| Author | shl0ms + Qubit Agent |
+| Author | shl0ms + Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `actual`, `actual-inc`, `provider`, `local-inference`, `relay`, `gguf`, `setup` |
@@ -25,12 +25,12 @@ Set up Actual Computer (actual.inc) inference in Qubit.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Actual Computer Setup Skill
 
-Sets up [actual.inc](https://actual.inc) (Actual Computer) as a Qubit inference
+Sets up [actual.inc](https://actual.inc) (Actual Computer) as a Hermes inference
 provider. Actual turns the user's own hardware into a private inference cluster
 and exposes an OpenAI-compatible API two ways: a hosted end-to-end-encrypted
 relay at `https://api.actual.inc` (authenticated with an `ac_` key), and a local
@@ -41,15 +41,15 @@ a human in a browser.
 ## When to Use
 
 - User wants to add actual.inc as an inference provider (cloud relay or local).
-- User has an `ac_` key and wants Qubit routed through their Actual cluster.
+- User has an `ac_` key and wants Hermes routed through their Actual cluster.
 - User wants fully-local, on-device inference via the Actual daemon.
 - Troubleshooting: Actual requests failing with cryptic 400s or empty streams.
 
 ## Prerequisites
 
-- Qubit has **first-class `actual` provider support** (provider id `actual`,
+- Hermes has **first-class `actual` provider support** (provider id `actual`,
   aliases `actual-computer`, `actualcomputer`, `aci`). Do NOT configure Actual
-  as a `custom_providers` / `providers.actual.*` entry on current Qubit — the
+  as a `custom_providers` / `providers.actual.*` entry on current Hermes — the
   built-in provider owns the name and handles base-url normalization, the
   Responses transport, and local no-auth automatically.
 - Relay mode: an Actual account and an `ac_` inference key from
@@ -73,12 +73,12 @@ a human in a browser.
    ```
 3. Select provider + model:
    ```bash
-   qubit config set model.provider actual
-   qubit config set model.default "MODEL_ID_FROM_DISCOVERY"
+   hermes config set model.provider actual
+   hermes config set model.default "MODEL_ID_FROM_DISCOVERY"
    ```
 4. Verify end-to-end:
    ```bash
-   qubit chat -Q -q "Reply with exactly: ACTUAL_OK" --provider actual -m MODEL_ID
+   hermes chat -Q -q "Reply with exactly: ACTUAL_OK" --provider actual -m MODEL_ID
    ```
 
 ### Local mode
@@ -92,16 +92,16 @@ a human in a browser.
    actual models list        # note the INSTALLED name (differs from download id)
    actual models load "qwen2.5-0.5b-instruct-q4_k_m"   # load by installed name
    ```
-3. Point Qubit at the daemon. `ACTUAL_BASE_URL` with a loopback host flips the
+3. Point Hermes at the daemon. `ACTUAL_BASE_URL` with a loopback host flips the
    built-in provider into local no-auth mode automatically — no key needed:
    append `ACTUAL_BASE_URL=http://127.0.0.1:8080` to `~/.hermes/.env`, then:
    ```bash
-   qubit config set model.provider actual
-   qubit config set model.default "INSTALLED_MODEL_NAME"
+   hermes config set model.provider actual
+   hermes config set model.default "INSTALLED_MODEL_NAME"
    ```
 4. Verify (reduced toolset — see context-window pitfall below):
    ```bash
-   qubit chat -Q -q "Reply with exactly: LOCAL_OK" --provider actual -m INSTALLED_NAME -t file,web
+   hermes chat -Q -q "Reply with exactly: LOCAL_OK" --provider actual -m INSTALLED_NAME -t file,web
    ```
 
 ## Quick Reference
@@ -119,17 +119,17 @@ a human in a browser.
 
 ## Pitfalls
 
-1. **reasoning_effort trap (handled by Qubit since the first-class provider).**
+1. **reasoning_effort trap (handled by Hermes since the first-class provider).**
    Actual's SGLang/vLLM backends accept only `none/low/medium/high/max`;
    `xhigh`/`ultra` used to fail with a cryptic
    `Expecting value: line 1 column 1 (char 0)` (a wrapped HTTP 400). The
    built-in provider clamps `xhigh→high` and `ultra→max` on the wire. If a
-   request still 400s this way on an old Qubit, set a per-model cap:
+   request still 400s this way on an old Hermes, set a per-model cap:
    `agent.reasoning_overrides.<model>: high` in config.yaml.
-2. **Context-window overflow on small local models.** Qubit' default toolset
+2. **Context-window overflow on small local models.** Hermes' default toolset
    is ~26k tokens of schemas plus a ~9k-token system prompt. A model loaded
    with a 32k context overflows before the first turn, and llama.cpp-family
-   servers emit a bare `data: [DONE]` — Qubit reports
+   servers emit a bare `data: [DONE]` — Hermes reports
    `Provider returned an empty stream with no finish_reason`. This is NOT an
    SSE bug. Fixes: restrict tools (`-t file,web`), load the model with a
    larger `n_ctx`, or pick a >=64k-context model for the full toolset.
@@ -141,11 +141,11 @@ a human in a browser.
    `actual models load` takes the INSTALLED name from `actual models list`.
 4. **Reasoning models returning empty content.** GLM/Qwen reasoning variants
    emit thinking in a separate `reasoning` field and can burn a small
-   output budget entirely on reasoning. Check the server-side output default
-   before assuming failure.
+   `max_tokens` entirely on reasoning. Give generous max_tokens before
+   assuming failure.
 5. **Do not create a custom provider named `actual`.** Older setup guides
    (pre first-class support) wrote `providers.actual.*` config blocks. On
-   current Qubit the built-in provider wins the name; stale custom blocks
+   current Hermes the built-in provider wins the name; stale custom blocks
    are ignored or conflict. Remove them and use the env vars + model.provider
    flow above.
 
@@ -153,11 +153,11 @@ a human in a browser.
 
 ```bash
 # Relay:
-qubit chat -Q -q "Reply with exactly: ACTUAL_OK" --provider actual -m MODEL
+hermes chat -Q -q "Reply with exactly: ACTUAL_OK" --provider actual -m MODEL
 # Local (small model — reduced toolset):
-qubit chat -Q -q "Reply with exactly: LOCAL_OK" --provider actual -m MODEL -t file,web
+hermes chat -Q -q "Reply with exactly: LOCAL_OK" --provider actual -m MODEL -t file,web
 # Provider status (local no-auth shows key_source=local-offline):
-qubit status
+hermes status
 ```
 
 For other OpenAI-compatible clients (e.g. OpenCode), see

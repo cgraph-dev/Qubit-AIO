@@ -15,13 +15,13 @@
 
 import {
   JsonRpcGatewayClient,
-  buildQubitWebSocketUrl,
+  buildHermesWebSocketUrl,
   type ConnectionState,
   type GatewayEvent,
   type GatewayEventName,
 } from "@hermes/shared";
 
-import { QUBIT_BASE_PATH, buildWsAuthParam } from "@/lib/api";
+import { HERMES_BASE_PATH, buildWsAuthParam } from "@/lib/api";
 import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
 
 export type { ConnectionState, GatewayEvent, GatewayEventName };
@@ -53,9 +53,9 @@ export class GatewayClient extends JsonRpcGatewayClient {
     }
 
     await super.connect(
-      buildQubitWebSocketUrl({
+      buildHermesWebSocketUrl({
         authParam,
-        basePath: QUBIT_BASE_PATH,
+        basePath: HERMES_BASE_PATH,
         path: "/api/ws",
       }),
     );

@@ -1,11 +1,11 @@
 export type ParentWatchdogEnv = {
-  QUBIT_PARENT_PID: string
-  QUBIT_PARENT_START_MARKER?: string
-  QUBIT_PARENT_NONCE?: string
+  HERMES_PARENT_PID: string
+  HERMES_PARENT_START_MARKER?: string
+  HERMES_PARENT_NONCE?: string
   /** Spawn tag consumed by qubit_cli.process_identity (`v1:<install>:<purpose>:<spawner_pid>:<spawner_create_s>`).
    *  Install is `-` (unknown) from the Desktop — the Python side scopes by
    *  venv membership, so the tag only needs lineage, not install identity. */
-  QUBIT_SPAWN?: string
+  HERMES_SPAWN?: string
 }
 
 export interface ParentStartMarkerResolverOptions {
@@ -72,8 +72,8 @@ export function parentWatchdogEnv(pid: number, startMarker: string | null, nonce
     throw new Error('Parent watchdog requires a positive process ID.')
   }
 
-  const env: ParentWatchdogEnv = { QUBIT_PARENT_PID: String(pid) }
-  env.QUBIT_SPAWN = spawnTag(pid, startMarker)
+  const env: ParentWatchdogEnv = { HERMES_PARENT_PID: String(pid) }
+  env.HERMES_SPAWN = spawnTag(pid, startMarker)
 
   if (startMarker === null) {
     return env
@@ -83,8 +83,8 @@ export function parentWatchdogEnv(pid: number, startMarker: string | null, nonce
     throw new Error('Parent watchdog marker and nonce must be non-empty.')
   }
 
-  env.QUBIT_PARENT_START_MARKER = startMarker
-  env.QUBIT_PARENT_NONCE = nonce
+  env.HERMES_PARENT_START_MARKER = startMarker
+  env.HERMES_PARENT_NONCE = nonce
 
   return env
 }

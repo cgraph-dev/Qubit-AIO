@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { capabilityScoped, qubitApi, type ProfileScope } from '@/api/client'
+import { capabilityScoped, hermesApi, type ProfileScope } from '@/api/client'
 import {
   cachedTimelineIndex,
   previousPromptRowId,
@@ -46,7 +46,7 @@ export async function fetchHistoryWindow(
   // The Electron REST bridge cannot transfer AbortSignal over IPC. Cancellation
   // below releases the caller immediately and fences the eventual bounded read;
   // it does not pretend to cancel backend I/O or fall back to a full transcript.
-  const response = await qubitApi<HistoryWindowResponse>({
+  const response = await hermesApi<HistoryWindowResponse>({
     ...route,
     ...(typeof scope === 'object' && scope?.connectionId === 'local' ? { connectionId: 'local' } : {}),
     method: 'GET',
@@ -104,11 +104,13 @@ export function useHistoryWindow({ scopeKey, storedId, scope, isCurrent }: Histo
       if (signal.aborted || !Number.isSafeInteger(rowId) || rowId <= 0) {
         return null
       }
+
       const captured = latest.current
 
       if (!captured.storedId || !captured.isCurrent()) {
         return null
       }
+
       const controller = new AbortController()
       pending.current = controller
       const abort = () => controller.abort()
@@ -140,6 +142,7 @@ export function useHistoryWindow({ scopeKey, storedId, scope, isCurrent }: Histo
         if (!target) {
           return null
         }
+
         setSelection({ lifetime: captured.lifetime, page: next })
 
         return target.id

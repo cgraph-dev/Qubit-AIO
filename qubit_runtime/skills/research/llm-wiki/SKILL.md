@@ -35,7 +35,7 @@ Use this skill when the user:
 
 ## Wiki Location
 
-**Location:** Set via `WIKI_PATH` environment variable (e.g. in `$QUBIT_HOME/.env`).
+**Location:** Set via `WIKI_PATH` environment variable (e.g. in `${QUBIT_HOME:-~/.hermes}/.env`).
 
 If unset, defaults to `~/wiki`.
 

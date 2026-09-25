@@ -14,7 +14,7 @@ def _frozen_clock(monkeypatch):
     # Freeze both the scheduler's clock (normalisation) and the CLI's (overdue check): the
     # fixtures below are 2026-11 instants and must never start reading as overdue.
     now = datetime(2026, 10, 31, tzinfo=ZoneInfo("America/New_York"))
-    monkeypatch.setattr(job_store, "_hermes_now", lambda: now)
+    monkeypatch.setattr(job_store, "_qubit_now", lambda: now)
     monkeypatch.setattr("qubit_time.now", lambda: now)
 
 

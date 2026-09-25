@@ -140,13 +140,13 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
 
   return {
     legacyActivePath: '/home/u/.hermes/active_profile',
-    qubitHome: '/home/u/.hermes',
+    hermesHome: '/home/u/.hermes',
     profilesRoot: '/home/u/.hermes/profiles',
     existsSync: fs.existsSync,
     readFileSync: fs.readFileSync,
     statSync: fs.statSync,
     readdirSync: fs.readdirSync,
-    isQubitProcess: () => true,
+    isHermesProcess: () => true,
     now: () => NOW,
     writeJson: () => {},
     isValidProfileName,
@@ -210,14 +210,14 @@ test('findRunningGatewayProfiles returns [] when no pid files exist', () => {
   assert.deepEqual(
     findRunningGatewayProfiles('/home/u/.hermes/profiles', ['coder'], {
       ...fs,
-      isQubitProcess: () => true
+      isHermesProcess: () => true
     }),
     []
   )
 })
 
-test('findRunningGatewayProfiles drops stale (non-qubit) recycled PIDs', () => {
-  // Two profiles have pid files, but only coder's pid is a live qubit process.
+test('findRunningGatewayProfiles drops stale (non-hermes) recycled PIDs', () => {
+  // Two profiles have pid files, but only coder's pid is a live hermes process.
   // The recycled PID at 5678 belongs to an unrelated process (e.g. Chrome).
   const fs = makeFs({
     '/home/u/.hermes/profiles/coder/gateway.pid': { content: '{"pid":1234}' },
@@ -226,7 +226,7 @@ test('findRunningGatewayProfiles drops stale (non-qubit) recycled PIDs', () => {
 
   const deps = {
     ...fs,
-    isQubitProcess: (pid: number) => pid === 1234
+    isHermesProcess: (pid: number) => pid === 1234
   }
 
   assert.deepEqual(findRunningGatewayProfiles('/home/u/.hermes/profiles', ['coder', 'writer'], deps), ['coder'])
@@ -240,7 +240,7 @@ test('findRunningGatewayProfiles tolerates malformed pid files', () => {
   assert.deepEqual(
     findRunningGatewayProfiles('/home/u/.hermes/profiles', ['coder'], {
       ...fs,
-      isQubitProcess: () => true
+      isHermesProcess: () => true
     }),
     []
   )
@@ -256,7 +256,7 @@ test('findRunningGatewayProfiles drops non-integer and non-positive PIDs', () =>
   assert.deepEqual(
     findRunningGatewayProfiles('/home/u/.hermes/profiles', ['coder', 'writer', 'extra'], {
       ...fs,
-      isQubitProcess: () => true
+      isHermesProcess: () => true
     }),
     []
   )
@@ -268,7 +268,7 @@ test('findRunningGatewayProfiles preserves order of allProfiles', () => {
     '/home/u/.hermes/profiles/writer/gateway.pid': { content: '{"pid":2}' }
   })
 
-  const deps = { ...fs, isQubitProcess: () => true }
+  const deps = { ...fs, isHermesProcess: () => true }
   assert.deepEqual(findRunningGatewayProfiles('/home/u/.hermes/profiles', ['coder', 'writer'], deps), [
     'coder',
     'writer'
@@ -513,7 +513,7 @@ test('migrateActiveProfileIfMissing prefers a single running gateway over heuris
 
   const deps = baseDeps({
     ...fs,
-    isQubitProcess: (pid: number) => pid === 42,
+    isHermesProcess: (pid: number) => pid === 42,
     writeJson: (_p: string, payload: unknown) => {
       written = payload
     }
@@ -561,8 +561,8 @@ test('findRunningGatewayProfiles sees default gateway.pid at hermesHome', () => 
   assert.deepEqual(
     findRunningGatewayProfiles('/home/u/.hermes/profiles', ['default', 'coder'], {
       ...fs,
-      qubitHome: '/home/u/.hermes',
-      isQubitProcess: pid => pid === 99
+      hermesHome: '/home/u/.hermes',
+      isHermesProcess: pid => pid === 99
     }),
     ['default']
   )
@@ -621,7 +621,7 @@ test('migrateActiveProfileIfMissing does not pin default when only default gatew
 
   const deps = baseDeps({
     ...fs,
-    isQubitProcess: (pid: number) => pid === 7,
+    isHermesProcess: (pid: number) => pid === 7,
     writeJson: (_p: string, payload: unknown) => {
       written = payload
     }

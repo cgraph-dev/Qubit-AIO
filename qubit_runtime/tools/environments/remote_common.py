@@ -8,7 +8,7 @@ import subprocess
 from typing import Callable, Iterable
 
 from tools.environments.base_session_env import _SHELL_ENV_NAME_RE
-from tools.environments.local_env_policy import _QUBIT_PROVIDER_ENV_BLOCKLIST, _is_qubit_internal_secret
+from tools.environments.local_env_policy import _is_qubit_internal_secret, _is_provider_env_blocklisted
 
 
 def load_qubit_env_vars() -> dict[str, str]:
@@ -44,12 +44,13 @@ def resolve_passthrough_env(explicit_forward: Iterable[str] = (),
     except Exception:
         pass
     implicit_forward = {k for k in passthrough_keys if not _is_qubit_internal_secret(k)}
-    forward_keys = set(explicit_forward) | (implicit_forward - _QUBIT_PROVIDER_ENV_BLOCKLIST)
-    qubit_env = qubit_env_loader() if forward_keys else {}
+    forward_keys = set(explicit_forward) | {
+        k for k in implicit_forward if not _is_provider_env_blocklisted(k)}
+    hermes_env = qubit_env_loader() if forward_keys else {}
     exec_env: dict[str, str] = {}
     unset_names: set[str] = set()
     for key in sorted(forward_keys):
-        value = os.getenv(key) or qubit_env.get(key)
+        value = os.getenv(key) or hermes_env.get(key)
         if resolve_passthrough_value is not None:
             value = resolve_passthrough_value(key, value)
         if value is not None:
@@ -87,14 +88,12 @@ def bash_argv(cmd_string: str, login: bool = False) -> list[str]:
     return ["bash", "-l", "-c", cmd_string] if login else ["bash", "-c", cmd_string]
 
 
-def ensure_lazy_dep(feature: str) -> None:
-    """Lazy-install an optional SDK via ``tools.lazy_deps`` (idempotent). Missing ``tools.lazy_deps``
-    is tolerated (the SDK import that follows fails with its own message); any other failure
-    surfaces as ``ImportError``."""
+def ensure_lazy_dep(extra: str) -> None:
+    """Lazy-install an optional SDK's pm extra (idempotent). Install failures
+    surface as ``ImportError``."""
+    import pm
+
     try:
-        from tools.lazy_deps import ensure as _lazy_ensure
-        _lazy_ensure(feature, prompt=False)
-    except ImportError:
-        pass
+        pm.ensure_import(extra)
     except Exception as e:
         raise ImportError(str(e))

@@ -10,7 +10,7 @@ SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "optional-skills"
     / "migration"
-    / "qubit-migration"
+    / "openclaw-migration"
     / "scripts"
     / "openclaw_to_hermes.py"
 )
@@ -146,7 +146,7 @@ def _allowlist_migrator(mod, tmp_path: Path, existing_config: str):
     ), target / "config.yaml"
 
 
-MALFORMED_QUBIT_CONFIG = """\
+MALFORMED_HERMES_CONFIG = """\
 model: hermes-4-405b
 api_key_env: OPENROUTER_API_KEY
 command_allowlist:
@@ -169,7 +169,7 @@ def test_unreadable_config_is_refused_not_overwritten(tmp_path: Path):
     """
     mod = load_module()
     migrator, config_path = _allowlist_migrator(
-        mod, tmp_path, MALFORMED_QUBIT_CONFIG)
+        mod, tmp_path, MALFORMED_HERMES_CONFIG)
     before = config_path.read_bytes()
 
     report = migrator.migrate()
@@ -185,7 +185,7 @@ def test_unreadable_config_blocks_later_config_steps_instead_of_partial_writes(
     """One refusal flips the existing _config_apply_blocked short-circuit."""
     mod = load_module()
     migrator, config_path = _allowlist_migrator(
-        mod, tmp_path, MALFORMED_QUBIT_CONFIG)
+        mod, tmp_path, MALFORMED_HERMES_CONFIG)
 
     report = migrator.migrate()
 
@@ -196,7 +196,7 @@ def test_unreadable_config_blocks_later_config_steps_instead_of_partial_writes(
     }
     # Nothing claimed a successful config write.
     assert "migrated" not in statuses
-    assert config_path.read_text(encoding="utf-8") == MALFORMED_QUBIT_CONFIG
+    assert config_path.read_text(encoding="utf-8") == MALFORMED_HERMES_CONFIG
 
 
 def test_readable_config_keeps_every_pre_existing_key(tmp_path: Path):
@@ -211,7 +211,7 @@ def test_readable_config_keeps_every_pre_existing_key(tmp_path: Path):
 
     migrator.migrate()
 
-    import yaml
+    import qubit_yaml as yaml
 
     merged = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     assert merged["model"] == "hermes-4-405b"
@@ -282,7 +282,7 @@ def test_unreadable_config_refused_by_model_config_too(tmp_path: Path):
         encoding="utf-8",
     )
     config_path = target / "config.yaml"
-    config_path.write_text(MALFORMED_QUBIT_CONFIG, encoding="utf-8")
+    config_path.write_text(MALFORMED_HERMES_CONFIG, encoding="utf-8")
 
     report = mod.Migrator(
         source_root=source, target_root=target, execute=True,
@@ -290,7 +290,7 @@ def test_unreadable_config_refused_by_model_config_too(tmp_path: Path):
         output_dir=None, selected_options={"model-config"},
     ).migrate()
 
-    assert config_path.read_text(encoding="utf-8") == MALFORMED_QUBIT_CONFIG
+    assert config_path.read_text(encoding="utf-8") == MALFORMED_HERMES_CONFIG
     items = [i for i in report["items"] if i["kind"] == "model-config"]
     assert items and items[0]["status"] == mod.STATUS_ERROR
 
@@ -602,64 +602,14 @@ def test_skill_installs_cleanly_under_skills_guard():
 def test_rebrand_text_replaces_openclaw_variants():
     mod = load_module()
     # Mixed-case / capitalized matches → capital-H ``Hermes``.
-    assert mod.rebrand_text("OpenClaw prefers Python 3.11") == "Qubit prefers Python 3.11"
-    assert mod.rebrand_text("I told Open Claw to use dark mode") == "I told Qubit to use dark mode"
-    assert mod.rebrand_text("Open-Claw config is great") == "Qubit config is great"
-    assert mod.rebrand_text("OPENCLAW uses tools well") == "Qubit uses tools well"
+    assert mod.rebrand_text("OpenClaw prefers Python 3.11") == "Hermes prefers Python 3.11"
+    assert mod.rebrand_text("I told Open Claw to use dark mode") == "I told Hermes to use dark mode"
+    assert mod.rebrand_text("Open-Claw config is great") == "Hermes config is great"
+    assert mod.rebrand_text("OPENCLAW uses tools well") == "Hermes uses tools well"
     # All-lowercase matches → lowercase ``hermes``; this preserves the
     # real filesystem path ``~/.hermes`` (Hermes home) when rebranding
     # memory entries that reference ``~/.openclaw`` or ``openclaw`` prose.
-    assert mod.rebrand_text("openclaw should always respond concisely") == "qubit should always respond concisely"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ── migrate_model_config: alias resolution (issue #16745) ──────────────────
-
-def _run_model_migration(tmp_path: Path, openclaw_json: dict) -> dict:
-    """Helper: run just migrate_model_config on an openclaw.json and return
-    the parsed destination config.yaml."""
-    import yaml
-
-    mod = load_module()
-    source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
-    source.mkdir(parents=True)
-    target.mkdir(parents=True)
-    (source / "openclaw.json").write_text(json.dumps(openclaw_json), encoding="utf-8")
-
-    migrator = mod.Migrator(
-        source_root=source,
-        target_root=target,
-        execute=True,
-        workspace_target=None,
-        overwrite=True,
-        migrate_secrets=False,
-        output_dir=target / "migration-report",
-    )
-    migrator.migrate_model_config()
-
-    cfg_path = target / "config.yaml"
-    if not cfg_path.exists():
-        return {}
-    return yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
-
-
-def _extract_model(parsed: dict) -> str | None:
-    model = parsed.get("model")
-    if isinstance(model, dict):
-        return model.get("default")
-    return model
+    assert mod.rebrand_text("openclaw should always respond concisely") == "hermes should always respond concisely"
 
 
 

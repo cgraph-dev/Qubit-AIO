@@ -120,8 +120,8 @@ export const af: Translations = {
     starting: "Begin",
     startedInBackground: "Begin in agtergrond — kyk logs vir vordering",
     stopped: "Gestop",
-    updateQubit: "Werk Qubit op",
-    updatingQubit: "Besig om Qubit op te werk…",
+    updateHermes: "Werk Qubit op",
+    updatingHermes: "Besig om Qubit op te werk…",
     waitingForOutput: "Wag vir uitset…",
   },
 
@@ -165,6 +165,10 @@ export const af: Translations = {
     failedToDeleteSelected: "Kon nie gekose sessies skrap nie",
     resumeInChat: "Hervat in Klets",
     newChat: "Nuwe klets",
+    workspace: "werkruimte",
+    workspaceDefault: "Verstek",
+    workspaceRescan: "Herskandeer bewaarplekke",
+    workspaceCustom: "Ander pad…",
     previousPage: "Vorige bladsy",
     nextPage: "Volgende bladsy",
     roles: {
@@ -324,6 +328,8 @@ export const af: Translations = {
     disableRuntime: "Deaktiveer",
     enableAfterInstall: "Aktiveer ná installasie",
     enableRuntime: "Aktiveer",
+    toggleTakesEffectAfterRestart:
+      "Gestoor — herbegin die gateway om die verandering toe te pas.",
     forceReinstall: "Forseer herinstallasie (skrap eers bestaande gids)",
     headline:
       "Ontdek, installeer, aktiveer en werk Qubit-inproppe op (`qubit plugins` ekwivalent).",
@@ -343,8 +349,8 @@ export const af: Translations = {
     providersHint:
       "Skryf memory.provider (leeg = ingebou) en context.engine na config.yaml. Tree volgende sessie in werking.",
     refreshDashboard: "Herskandeer dashboard-uitbreidings",
-    removeConfirm: "Verwyder hierdie inprop uit $QUBIT_HOME/plugins/?",
-    removeHint: "Slegs gebruiker-geïnstalleerde inproppe onder $QUBIT_HOME/plugins kan verwyder word.",
+    removeConfirm: "Verwyder hierdie inprop uit ~/.hermes/plugins/?",
+    removeHint: "Slegs gebruiker-geïnstalleerde inproppe onder ~/.hermes/plugins kan verwyder word.",
     rescanHeading: "SPA-inprop-register",
     rescanHint: "Herskandeer ná die byvoeg van lêers op skyf sodat die dashboard-sybalk nuwe manifeste optel.",
     runtimeHeading: "Gateway-looptyd (YAML-inproppe)",
@@ -366,7 +372,7 @@ export const af: Translations = {
     all: "Alles",
     categories: "Kategorieë",
     filters: "Filters",
-    noSkills: "Geen vaardighede gevind nie. Vaardighede word gelaai uit ~/.qubit/skills/",
+    noSkills: "Geen vaardighede gevind nie. Vaardighede word gelaai uit ~/.hermes/skills/",
     noSkillsMatch: "Geen vaardighede stem ooreen met jou soektog of filter nie.",
     skillCount: "{count} vaardighe{s}id",
     resultCount: "{count} resulta{s}at",
@@ -380,7 +386,7 @@ export const af: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Filters",
     sections: "Afdelings",
     exportConfig: "Voer konfigurasie uit as JSON",

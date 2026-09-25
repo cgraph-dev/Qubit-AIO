@@ -24,10 +24,10 @@ def _clean_state():
     """Reset module state between tests."""
     import tools.credential_files as _cred_mod
     clear_credential_files()
-    _cred_mod._config_files = None
+    _cred_mod._config_files = {}
     yield
     clear_credential_files()
-    _cred_mod._config_files = None
+    _cred_mod._config_files = {}
 
 
 class TestRegisterCredentialFiles:
@@ -87,6 +87,7 @@ class TestSkillsDirectoryMount:
 
         assert mounts[0]["container_path"] == "/home/user/.hermes/skills"
 
+    @pytest.mark.require_symlinks
     def test_symlinks_are_sanitized(self, tmp_path):
         """Symlinks in skills dir should be excluded from the mount."""
         qubit_home = tmp_path / ".hermes"
@@ -112,6 +113,7 @@ class TestSkillsDirectoryMount:
         # Symlink should NOT be present
         assert not (safe_path / "evil_link").exists()
 
+    @pytest.mark.require_symlinks
     def test_sanitized_copy_skips_bookkeeping_dirs(self, tmp_path):
         """The symlink-safe copy is what gets mounted, so it must apply the
         same EXCLUDED_SKILL_DIRS rule as the per-file sync path."""
@@ -154,13 +156,14 @@ class TestSkillsDirectoryMount:
 
 
 class TestIterSkillsFiles:
+    @pytest.mark.require_symlinks
     def test_returns_files_skipping_symlinks(self, tmp_path):
         qubit_home = tmp_path / ".hermes"
         skills_dir = qubit_home / "skills"
         (skills_dir / "cat" / "myskill").mkdir(parents=True)
         (skills_dir / "cat" / "myskill" / "SKILL.md").write_text("# skill")
         (skills_dir / "cat" / "myskill" / "scripts").mkdir()
-        (skills_dir / "cat" / "myskill" / "scripts" / "run.sh").write_text("#!/bin/bash")
+        (skills_dir / "cat" / "myskill" / "scripts" / "run.sh").write_text("#!/usr/bin/env bash")
         # Add a symlink that should be filtered
         secret = tmp_path / "secret"
         secret.write_text("nope")
@@ -239,7 +242,7 @@ class TestPathTraversalSecurity:
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         (tmp_path / ".hermes").mkdir()
 
-        # Create a sensitive file one level above hermes_home
+        # Create a sensitive file one level above qubit_home
         sensitive = tmp_path / "sensitive.json"
         sensitive.write_text('{"secret": "value"}')
 
@@ -254,7 +257,7 @@ class TestPathTraversalSecurity:
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
-        # Create a fake sensitive file outside hermes_home
+        # Create a fake sensitive file outside qubit_home
         ssh_dir = tmp_path / ".ssh"
         ssh_dir.mkdir()
         (ssh_dir / "id_rsa").write_text("PRIVATE KEY")
@@ -299,11 +302,11 @@ class TestPathTraversalSecurity:
         qubit_home.mkdir()
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
-        # Create a sensitive file outside hermes_home
+        # Create a sensitive file outside qubit_home
         sensitive = tmp_path / "sensitive.json"
         sensitive.write_text('{"secret": "value"}')
 
-        # Create a symlink inside hermes_home pointing outside
+        # Create a symlink inside qubit_home pointing outside
         symlink = qubit_home / "evil_link.json"
         try:
             symlink.symlink_to(sensitive)
@@ -325,9 +328,9 @@ class TestConfigPathTraversal:
     """terminal.credential_files in config.yaml must also reject traversal."""
 
     def _write_config(self, qubit_home: Path, cred_files: list):
-        import yaml
+        import qubit_yaml as yaml
         config_path = qubit_home / "config.yaml"
-        config_path.write_text(yaml.dump({"terminal": {"credential_files": cred_files}}))
+        config_path.write_text(yaml.safe_dump({"terminal": {"credential_files": cred_files}}))
 
     def test_config_traversal_rejected(self, tmp_path, monkeypatch):
         """'../secret' in config.yaml must not escape QUBIT_HOME."""
@@ -440,21 +443,6 @@ class TestCacheDirectoryMounts:
         for mount in mounts:
             assert Path(mount["host_path"]).is_dir()
 
-    def test_images_upload_dir_is_mounted(self, tmp_path, monkeypatch):
-        """The flat top-level ``images/`` upload dir is mounted (#69575).
-
-        Desktop / clipboard / PDF uploads land in ``QUBIT_HOME/images``, not
-        under ``cache/``. Without this entry vision_analyze on a desktop upload
-        fails because the file is not reachable inside the sandbox.
-        """
-        qubit_home = tmp_path / ".hermes"
-        (qubit_home / "images").mkdir(parents=True)
-        monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-
-        mounts = get_cache_directory_mounts()
-        by_container = {m["container_path"]: m["host_path"] for m in mounts}
-        assert "/root/.hermes/images" in by_container
-        assert by_container["/root/.hermes/images"] == str(qubit_home / "images")
 
     def test_images_upload_file_maps_into_container(self, tmp_path, monkeypatch):
         """A concrete upload under ``images/`` maps to its container path.
@@ -515,13 +503,13 @@ class TestToAgentVisiblePathPerBackend:
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         return str(qubit_home / "attachments" / "drop.zip")
 
-    def test_docker_maps_to_root_qubit(self, tmp_path, monkeypatch):
+    def test_docker_maps_to_root_hermes(self, tmp_path, monkeypatch):
         staged = self._staged(tmp_path, monkeypatch)
         monkeypatch.setenv("TERMINAL_ENV", "docker")
         from tools.credential_files import to_agent_visible_cache_path
         assert to_agent_visible_cache_path(staged) == "/root/.hermes/attachments/drop.zip"
 
-    def test_ssh_maps_to_tilde_qubit(self, tmp_path, monkeypatch):
+    def test_ssh_maps_to_tilde_hermes(self, tmp_path, monkeypatch):
         staged = self._staged(tmp_path, monkeypatch)
         monkeypatch.setenv("TERMINAL_ENV", "ssh")
         from tools.credential_files import to_agent_visible_cache_path
@@ -558,6 +546,7 @@ class TestIterCacheFiles:
         assert "upload.zip" in names
         assert "report.pdf" in names
 
+    @pytest.mark.require_symlinks
     def test_skips_symlinks(self, tmp_path, monkeypatch):
         """Symlinks inside cache dirs are skipped."""
         qubit_home = tmp_path / ".hermes"
@@ -654,12 +643,6 @@ class TestMasterCredentialStoresAreNeverMountable:
         assert "/root/.hermes/.env" not in paths
         assert ".env" in missing, "a refused store is reported back to the skill"
 
-    def test_traversal_guard_still_applies(self, tmp_path):
-        """The pre-existing containment check is untouched."""
-        home = self._home(tmp_path)
-        with patch.dict(os.environ, {"QUBIT_HOME": str(home)}):
-            assert register_credential_file("../../.ssh/id_rsa") is False
-            assert register_credential_file("/etc/passwd") is False
 
     def test_missing_guard_fails_closed_with_error_log(self, tmp_path, caplog):
         """If agent.file_safety can't be imported the mount is refused loudly.

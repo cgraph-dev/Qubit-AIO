@@ -1,4 +1,4 @@
-"""Persistent slash-command worker — one QubitCLI per TUI session.
+"""Persistent slash-command worker — one HermesCLI per TUI session.
 
 Protocol: reads JSON lines from stdin {id, command}, writes {id, ok, output|error} to stdout.
 """
@@ -25,7 +25,7 @@ import threading
 import time
 
 import cli as cli_mod
-from cli import QubitCLI
+from cli import HermesCLI
 from tui_gateway._env import env_float
 from tui_gateway._stdin_recovery import handle_spurious_eof
 from rich.console import Console
@@ -43,7 +43,7 @@ def _is_orphaned(original_ppid, getppid=os.getppid) -> bool:
 
 
 def _prepare_slash_worker_runtime() -> None:
-    """Start bounded MCP discovery before QubitCLI snapshots tools: each slash_worker child is its
+    """Start bounded MCP discovery before HermesCLI snapshots tools: each slash_worker child is its
     own process — the parent ``qubit serve`` discovery thread does not populate this registry.
 
     See #61891.
@@ -64,7 +64,7 @@ def _start_parent_death_watchdog(original_ppid) -> None:
     threading.Thread(target=_loop, daemon=True).start()
 
 
-def _run(cli: QubitCLI, command: str) -> str:
+def _run(cli: HermesCLI, command: str) -> str:
     cmd = (command or "").strip()
     if not cmd:
         return ""
@@ -103,12 +103,12 @@ def main():
     args = p.parse_args()
     os.environ["HERMES_SESSION_KEY"] = args.session_key
     os.environ["HERMES_INTERACTIVE"] = "1"
-    # Start before the (hundreds-of-ms) QubitCLI build — that window is itself an orphan risk if the
+    # Start before the (hundreds-of-ms) HermesCLI build — that window is itself an orphan risk if the
     # gateway dies mid-spawn.
     _start_parent_death_watchdog(os.getppid())
     _prepare_slash_worker_runtime()
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        cli = QubitCLI(model=args.model or None, compact=True, resume=args.session_key, verbose=False)
+        cli = HermesCLI(model=args.model or None, compact=True, resume=args.session_key, verbose=False)
     # Spurious stdin-EOF recovery (same shared-file-description O_NONBLOCK issue as the gateway entry
     # point — any child inheriting fd 0 can flip the flag).
     _sw_recovery_times: list[float] = []

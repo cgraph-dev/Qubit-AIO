@@ -1,9 +1,6 @@
 type StorageLike = Pick<Storage, "getItem" | "removeItem" | "setItem">;
 
-const TOKEN_RELOAD_STORAGE_KEY = "qubit.tokenReloadAttempted";
-/** Pre-rebrand key, still checked/cleared so a guard set before the rename
- *  does not linger. */
-const LEGACY_TOKEN_RELOAD_STORAGE_KEY = "hermes.tokenReloadAttempted";
+const TOKEN_RELOAD_STORAGE_KEY = "hermes.tokenReloadAttempted";
 
 function dashboardAuthRequired(): boolean {
   return typeof window !== "undefined" && !!window.__HERMES_AUTH_REQUIRED__;
@@ -29,7 +26,6 @@ export function clearDashboardTokenReloadAttempt(
 ): void {
   try {
     storage?.removeItem(TOKEN_RELOAD_STORAGE_KEY);
-    storage?.removeItem(LEGACY_TOKEN_RELOAD_STORAGE_KEY);
   } catch {
     /* privacy mode / blocked storage — ignore */
   }
@@ -42,8 +38,7 @@ export function attemptDashboardTokenReloadOnce(
   let alreadyReloaded = false;
   try {
     alreadyReloaded =
-      storage?.getItem(TOKEN_RELOAD_STORAGE_KEY) === "1" ||
-      storage?.getItem(LEGACY_TOKEN_RELOAD_STORAGE_KEY) === "1";
+      storage?.getItem(TOKEN_RELOAD_STORAGE_KEY) === "1";
   } catch {
     /* privacy mode / blocked storage — fall through */
   }

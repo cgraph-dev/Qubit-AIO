@@ -32,7 +32,7 @@ export interface HostBackendRecord {
 export type SpawnOrAttachDecision =
   { action: 'attach'; record: HostBackendRecord } | { action: 'spawn'; reason: 'isolated' | 'no-running-backend' }
 
-/** Filename the CLI writes under the machine Qubit root. */
+/** Filename the CLI writes under the machine Hermes root. */
 export const SPAWN_LEDGER_FILENAME = 'spawn-ledger.json'
 
 /** Ledger purposes that denote a JSON-RPC/WebSocket backend we can attach to. */

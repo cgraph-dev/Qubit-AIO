@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
+import { isSubmitEnter } from '@/lib/ime'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $remoteOverrideDialogProfile,
@@ -79,7 +80,7 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
     setError(null)
     setCollision(null)
 
-    window.qubitDesktop
+    window.hermesDesktop
       ?.getConnectionConfig?.(profile)
       .then(config => {
         if (cancelled) {
@@ -100,7 +101,7 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
       })
       .catch(err => !cancelled && setError(err instanceof Error ? err.message : String(err)))
 
-    window.qubitDesktop?.connections
+    window.hermesDesktop?.connections
       ?.list()
       .then(registry => {
         if (cancelled) {
@@ -143,7 +144,7 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
     setError(null)
 
     try {
-      await window.qubitDesktop.applyConnectionConfig({
+      await window.hermesDesktop.applyConnectionConfig({
         mode: 'remote',
         profile,
         remoteAuthMode: 'token',
@@ -192,7 +193,7 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
     setError(null)
 
     try {
-      await window.qubitDesktop.applyConnectionConfig({ mode: 'local', profile })
+      await window.hermesDesktop.applyConnectionConfig({ mode: 'local', profile })
       notify({ kind: 'success', title: p.removedTitle, message: p.removedMessage(profile) })
       await refreshProfileRemoteOverrides(profileNames)
       closeRemoteOverrideDialog()
@@ -242,7 +243,7 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
                 <Input
                   autoCorrect="off"
                   onChange={event => setUrl(event.target.value)}
-                  onKeyDown={event => event.key === 'Enter' && submit()}
+                  onKeyDown={event => isSubmitEnter(event) && submit()}
                   placeholder={p.urlPlaceholder}
                   ref={urlRef}
                   spellCheck={false}
@@ -257,7 +258,7 @@ export function ProfileRemoteOverrideDialog({ profileNames }: { profileNames: st
                 <Input
                   autoComplete="off"
                   onChange={event => setToken(event.target.value)}
-                  onKeyDown={event => event.key === 'Enter' && submit()}
+                  onKeyDown={event => isSubmitEnter(event) && submit()}
                   placeholder={p.tokenPlaceholder}
                   type="password"
                   value={token}

@@ -75,9 +75,7 @@ def _cmd_approve(store, platform: str, code: str):
         mins = max(0, int(lockout_until - _time.time())) // 60
         print(f"\n  Platform '{platform}' is locked out after too many failed approval attempts.")
         print(f"  Lockout clears in ~{mins} minute(s).")
-        from qubit_constants import display_qubit_home
-        print(f"  To reset sooner, delete the '_lockout:{platform}' entry from "
-              f"{display_qubit_home()}/platforms/pairing/_rate_limits.json\n")
+        print(f"  To reset sooner, delete the '_lockout:{platform}' entry from ~/.hermes/platforms/pairing/_rate_limits.json\n")
     else:
         print(f"\n  Pairing request or code '{code}' not found or expired for platform '{platform}'.")
         print("  Run 'qubit pairing list' to see pending requests.\n")

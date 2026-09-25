@@ -1,4 +1,4 @@
-"""`qubit skin set` — deterministic single-color tweak of the active skin.
+"""`hermes skin set` — deterministic single-color tweak of the active skin.
 
 The whole point is that changing one token never disturbs the rest of the look
 (background especially), which hand-authoring kept getting wrong.
@@ -7,7 +7,7 @@ The whole point is that changing one token never disturbs the rest of the look
 import os
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 from qubit_cli import skin_cmd
 from qubit_constants import get_qubit_home
@@ -99,6 +99,7 @@ def test_set_persists_the_skin_durably():
     assert [p.name for p in _skins().iterdir() if p.name.endswith(".tmp")] == []
 
 
+@pytest.mark.require_symlinks
 def test_set_preserves_a_symlinked_skin_file():
     """Guard on the conversion, not a behavior change.
 

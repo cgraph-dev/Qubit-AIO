@@ -68,7 +68,7 @@ class TestLogIsolation:
         # fixture has sandboxed QUBIT_HOME, so reading it here would pass even
         # with the conftest block deleted. Assert the value captured at conftest
         # import, which is the moment that actually matters.
-        from tests.conftest import QUBIT_HOME_AT_CONFTEST_IMPORT as home
+        from tests.conftest import HERMES_HOME_AT_CONFTEST_IMPORT as home
 
         assert home, "conftest must set QUBIT_HOME before test modules import"
         assert Path(home).resolve() != _real_qubit_home().resolve(), (

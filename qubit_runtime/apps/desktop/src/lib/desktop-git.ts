@@ -1,13 +1,13 @@
 import type {
-  QubitGitBaseBranch,
-  QubitGitBranch,
-  QubitGitWorktree,
-  QubitRepoPullRequests,
-  QubitRepoStatus,
-  QubitReviewList,
-  QubitReviewShipInfo
+  HermesGitBaseBranch,
+  HermesGitBranch,
+  HermesGitWorktree,
+  HermesRepoPullRequests,
+  HermesRepoStatus,
+  HermesReviewList,
+  HermesReviewShipInfo
 } from '@/global'
-import { qubitApi } from '@/hermes'
+import { hermesApi } from '@/hermes'
 
 import { desktopFsProfile, isDesktopFsRemoteMode } from './desktop-fs'
 
@@ -20,13 +20,13 @@ import { desktopFsProfile, isDesktopFsRemoteMode } from './desktop-fs'
 type GitBridge = NonNullable<NonNullable<Window['hermesDesktop']>['git']>
 
 function desktopApi<T>(path: string, body?: Record<string, unknown>): Promise<T> {
-  const desktop = window.qubitDesktop
+  const desktop = window.hermesDesktop
 
   if (!desktop) {
-    throw new Error('Qubit Desktop bridge is unavailable')
+    throw new Error('Hermes Desktop bridge is unavailable')
   }
 
-  return qubitApi<T>(
+  return hermesApi<T>(
     body ? { body, method: 'POST', path, profile: desktopFsProfile() } : { path, profile: desktopFsProfile() }
   )
 }
@@ -49,7 +49,7 @@ function gitPost<T>(route: string, body: Record<string, unknown>): Promise<T> {
 
 const remoteGit: GitBridge = {
   worktreeList: async repoPath =>
-    (await gitGet<{ worktrees: QubitGitWorktree[] }>('worktrees', { path: repoPath })).worktrees,
+    (await gitGet<{ worktrees: HermesGitWorktree[] }>('worktrees', { path: repoPath })).worktrees,
 
   worktreeAdd: (repoPath, options) => gitPost('worktree/add', { path: repoPath, ...options }),
 
@@ -59,19 +59,19 @@ const remoteGit: GitBridge = {
   branchSwitch: (repoPath, branch) => gitPost('branch/switch', { branch, path: repoPath }),
 
   branchList: async repoPath =>
-    (await gitGet<{ branches: QubitGitBranch[] }>('branches', { path: repoPath })).branches,
+    (await gitGet<{ branches: HermesGitBranch[] }>('branches', { path: repoPath })).branches,
 
   baseBranchList: async repoPath =>
-    (await gitGet<{ branches: QubitGitBaseBranch[] }>('base-branches', { path: repoPath })).branches,
+    (await gitGet<{ branches: HermesGitBaseBranch[] }>('base-branches', { path: repoPath })).branches,
 
-  repoStatus: repoPath => gitGet<QubitRepoStatus | null>('status', { path: repoPath }),
+  repoStatus: repoPath => gitGet<HermesRepoStatus | null>('status', { path: repoPath }),
 
   fileDiff: async (repoPath, filePath) =>
     (await gitGet<{ diff: string }>('file-diff', { file: filePath, path: repoPath })).diff,
 
   review: {
     list: (repoPath, scope, baseRef) =>
-      gitGet<QubitReviewList>('review/list', { base: baseRef, path: repoPath, scope }),
+      gitGet<HermesReviewList>('review/list', { base: baseRef, path: repoPath, scope }),
 
     diff: async (repoPath, filePath, scope, baseRef, staged) =>
       (await gitGet<{ diff: string }>('review/diff', { base: baseRef, file: filePath, path: repoPath, scope, staged }))
@@ -92,14 +92,10 @@ const remoteGit: GitBridge = {
 
     push: repoPath => gitPost('review/push', { path: repoPath }),
 
-    shipInfo: repoPath => gitGet<QubitReviewShipInfo>('review/ship-info', { path: repoPath }),
+    shipInfo: repoPath => gitGet<HermesReviewShipInfo>('review/ship-info', { path: repoPath }),
 
     prList: (repoPath, branches, numbers) =>
-      gitPost<QubitRepoPullRequests>('review/pr-list', { branches, numbers: numbers ?? [], path: repoPath }),
-
-    // Remote gateways have no PR-comment route yet; resolve to null so the
-    // paste degrades to a plain URL instead of throwing mid-paste.
-    fetchPrComment: async () => null,
+      gitPost<HermesRepoPullRequests>('review/pr-list', { branches, numbers: numbers ?? [], path: repoPath }),
 
     createPr: repoPath => gitPost('review/create-pr', { path: repoPath })
   },
@@ -114,5 +110,5 @@ export function desktopGit(): GitBridge | undefined {
     return undefined
   }
 
-  return isDesktopFsRemoteMode() ? remoteGit : window.qubitDesktop?.git
+  return isDesktopFsRemoteMode() ? remoteGit : window.hermesDesktop?.git
 }

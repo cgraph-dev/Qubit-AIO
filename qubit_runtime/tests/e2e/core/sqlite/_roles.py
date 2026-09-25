@@ -204,7 +204,7 @@ def role_churn(a: dict, out: Out) -> int:
     start_fds = _fd_count()
     fds_after_warmup = None
 
-    def _hermes_cycle() -> None:
+    def _qubit_cycle() -> None:
         db = SessionDB(db_path=db_path)
         try:
             db.message_count()
@@ -220,7 +220,7 @@ def role_churn(a: dict, out: Out) -> int:
 
     try:
         for i in range(int(a["iterations"])):
-            _patient(a, out, "churn", _raw_cycle if i % 2 else _hermes_cycle)
+            _patient(a, out, "churn", _raw_cycle if i % 2 else _qubit_cycle)
             if i == 3:
                 fds_after_warmup = _fd_count()
     except BaseException as exc:

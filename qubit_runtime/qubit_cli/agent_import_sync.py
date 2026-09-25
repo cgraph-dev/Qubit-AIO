@@ -87,7 +87,7 @@ def load_sync_manifest(target_root: Path) -> Dict[str, Any]:
     if not path.exists():
         return {"version": 1, "agents": {}}
     try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        data = json.loads(path.read_text(encoding="utf-8-sig", errors="replace"))
     except (json.JSONDecodeError, OSError):
         logger.warning("Unreadable %s — starting a fresh sync manifest", path)
         return {"version": 1, "agents": {}}
@@ -135,8 +135,8 @@ def sync_imported_agents(args) -> None:
     from qubit_constants import get_qubit_home
 
     dry_run = bool(getattr(args, "dry_run", False))
-    hermes_home = get_qubit_home().resolve()
-    agents: Dict[str, Any] = load_sync_manifest(hermes_home).get("agents", {})
+    qubit_home = get_qubit_home().resolve()
+    agents: Dict[str, Any] = load_sync_manifest(qubit_home).get("agents", {})
     if not agents:
         print()
         print_info("No import sources registered yet.")
@@ -163,7 +163,7 @@ def sync_imported_agents(args) -> None:
                    + (" (dry run)" if dry_run else " — re-importing"))
         overwrite = bool(entry.get("overwrite", False))
         try:
-            report = AgentImporter(agent_name, source_dir, hermes_home, execute=not dry_run,
+            report = AgentImporter(agent_name, source_dir, qubit_home, execute=not dry_run,
                                    overwrite=overwrite, sync_skills=managed_skills(entry)).run()
         except Exception as exc:  # noqa: BLE001 — keep syncing the other sources
             print_error(f"{agent_name}: sync failed: {exc}")
@@ -177,7 +177,7 @@ def sync_imported_agents(args) -> None:
         if not dry_run:
             try:
                 # Errors keep the old source digest so the next sync retries the failed items.
-                update_sync_manifest(agent_name, source_dir, hermes_home, overwrite, report,
+                update_sync_manifest(agent_name, source_dir, qubit_home, overwrite, report,
                                      refresh_digest=not had_errors)
             except OSError as exc:
                 logger.warning("Could not update import sync manifest: %s", exc)

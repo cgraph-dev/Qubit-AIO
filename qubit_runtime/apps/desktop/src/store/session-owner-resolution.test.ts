@@ -22,12 +22,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('session owner topology', () => {
   it('fails closed while the modern registry bridge is present but its async cache is not loaded', () => {
-    ;(window as unknown as { qubitDesktop?: unknown }).qubitDesktop = {
+    ;(window as unknown as { hermesDesktop?: unknown }).hermesDesktop = {
       connections: { list: vi.fn(async () => Promise.reject(new Error('ipc unavailable'))) }
     }
     $connectionsRegistry.set(null)

@@ -1,7 +1,7 @@
 """Cross-profile kill refusal regression tests (#89315).
 
 A poisoned/contaminated ``gateway.pid`` inside one profile's QUBIT_HOME can
-truthfully name ANOTHER profile's live gateway (its ``hermes_home`` stamp
+truthfully name ANOTHER profile's live gateway (its ``qubit_home`` stamp
 records the real owner).  ``gateway stop`` / the restart force-kill escalation
 / ``profile delete`` must refuse to signal such a PID instead of starting the
 mutual cross-profile SIGTERM restart loop from the issue report.
@@ -27,7 +27,7 @@ def _spawn_gateway_lookalike(bin_dir: Path, lock_path: Path) -> subprocess.Popen
     """Real child process whose argv matches the gateway runtime matcher."""
     bin_dir.mkdir(parents=True, exist_ok=True)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    script = bin_dir / "qubit"
+    script = bin_dir / "hermes"
     if sys.platform == "win32":
         body = "import time\ntime.sleep(120)\n"
     else:
@@ -95,7 +95,10 @@ class TestRecordedGatewayHomeConflicts:
         )
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX flock harness")
+# The lookalike's argv ("<stub> gateway run") is what the guard's real-gateway spawn check matches;
+# the child is a sleep stub the test kills in ``finally``, never a runtime.
+@pytest.mark.spawns_gateway_lookalike
+@pytest.mark.platforms("posix")  # POSIX flock harness
 class TestCrossProfileStopRefusal:
     def test_stop_profile_gateway_refuses_other_profiles_pid(
         self, tmp_path, monkeypatch
@@ -118,7 +121,7 @@ class TestCrossProfileStopRefusal:
             tmp_path / "bin", tim_home / "gateway.lock"
         )
         try:
-            record = _pid_record(proc, tmp_path / "bin" / "qubit", root_home)
+            record = _pid_record(proc, tmp_path / "bin" / "hermes", root_home)
             (tim_home / "gateway.pid").write_text(json.dumps(record))
 
             from qubit_cli import gateway as gateway_cli
@@ -147,7 +150,7 @@ class TestCrossProfileStopRefusal:
             tmp_path / "bin", tim_home / "gateway.lock"
         )
         try:
-            record = _pid_record(proc, tmp_path / "bin" / "qubit", tim_home)
+            record = _pid_record(proc, tmp_path / "bin" / "hermes", tim_home)
             (tim_home / "gateway.pid").write_text(json.dumps(record))
 
             from qubit_cli import gateway as gateway_cli
@@ -163,7 +166,8 @@ class TestCrossProfileStopRefusal:
             proc.wait(timeout=10)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX flock harness")
+@pytest.mark.spawns_gateway_lookalike
+@pytest.mark.platforms("posix")  # POSIX flock harness
 class TestProfileDeleteStopRefusal:
     def test_stop_gateway_process_refuses_other_profiles_pid(
         self, tmp_path, capsys
@@ -177,7 +181,7 @@ class TestProfileDeleteStopRefusal:
             tmp_path / "bin", tim_home / "gateway.lock"
         )
         try:
-            record = _pid_record(proc, tmp_path / "bin" / "qubit", root_home)
+            record = _pid_record(proc, tmp_path / "bin" / "hermes", root_home)
             (tim_home / "gateway.pid").write_text(json.dumps(record))
 
             from qubit_cli.profiles import _stop_gateway_process
@@ -201,7 +205,7 @@ class TestProfileDeleteStopRefusal:
             tmp_path / "bin", tim_home / "gateway.lock"
         )
         try:
-            record = _pid_record(proc, tmp_path / "bin" / "qubit", tim_home)
+            record = _pid_record(proc, tmp_path / "bin" / "hermes", tim_home)
             (tim_home / "gateway.pid").write_text(json.dumps(record))
 
             from qubit_cli.profiles import _stop_gateway_process

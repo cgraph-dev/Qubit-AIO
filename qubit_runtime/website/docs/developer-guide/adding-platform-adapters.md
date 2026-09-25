@@ -4,7 +4,7 @@ sidebar_position: 9
 
 # Adding a Platform Adapter
 
-This guide covers adding a new messaging platform to the Qubit gateway. A platform adapter connects Qubit to an external messaging service (Telegram, Discord, WeCom, etc.) so users can interact with the agent through that service.
+This guide covers adding a new messaging platform to the Hermes gateway. A platform adapter connects Hermes to an external messaging service (Telegram, Discord, WeCom, etc.) so users can interact with the agent through that service.
 
 :::tip
 There are two ways to add a platform:
@@ -30,7 +30,7 @@ Inbound messages are received by the adapter and forwarded via `self.handle_mess
 
 ## Plugin Path (Recommended)
 
-The plugin system lets you add a platform adapter without modifying any core Qubit code. Your plugin is a directory with two files:
+The plugin system lets you add a platform adapter without modifying any core Hermes code. Your plugin is a directory with two files:
 
 ```
 ~/.hermes/plugins/my-platform/
@@ -40,7 +40,7 @@ The plugin system lets you add a platform adapter without modifying any core Qub
 
 ### plugin.yaml
 
-Plugin metadata. The `requires_env` and `optional_env` blocks auto-populate `qubit config` UI entries (see [Surfacing Env Vars](#surfacing-env-vars-in-hermes-config) below).
+Plugin metadata. The `requires_env` and `optional_env` blocks auto-populate `hermes config` UI entries (see [Surfacing Env Vars](#surfacing-env-vars-in-hermes-config) below).
 
 ```yaml
 name: my-platform
@@ -76,7 +76,7 @@ provides_tools:
   - my_platform_list
 ```
 
-With `provides_tools` declared, Qubit imports only `tools.py` during plugin
+With `provides_tools` declared, Hermes imports only `tools.py` during plugin
 discovery and registers the client tools in every process — CLI and TUI
 included — while the adapter stays deferred. Keep the package `__init__.py`
 import-light and pull the adapter in from inside `register()` so the eager
@@ -84,7 +84,7 @@ import stays cheap. Without the field, nothing changes: the whole plugin stays
 deferred.
 
 Users enable the toolset per platform like any other, e.g.
-`qubit tools enable my_platform --platform cli`, or by listing the toolset
+`hermes tools enable my_platform --platform cli`, or by listing the toolset
 key under `platform_toolsets` in `config.yaml`. Plugin platform names are
 also valid `--platform` targets, so an inbound session on your platform can
 be granted its own outbound tools.
@@ -92,7 +92,7 @@ be granted its own outbound tools.
 ### adapter.py
 
 ```python
-import os
+from gateway.platforms._shared import extra_or_secret, get_scoped_secret, seed_extra_from_env
 from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.event import MessageEvent, MessageType
 from gateway.config import Platform, PlatformConfig
@@ -101,8 +101,9 @@ from gateway.config import Platform, PlatformConfig
 class MyPlatformAdapter(BasePlatformAdapter):
     def __init__(self, config: PlatformConfig):
         super().__init__(config, Platform("my_platform"))
-        extra = config.extra or {}
-        self.token = os.getenv("MY_PLATFORM_TOKEN") or extra.get("token", "")
+        # Explicit env (profile-scoped) → this profile's config.extra (YAML) → default. Under multiplexing a
+        # scoped miss falls to the profile's own YAML, never to another profile's process env.
+        self.token = extra_or_secret(config.extra, "token", "MY_PLATFORM_TOKEN")
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         # Connect to the platform API, start listeners
@@ -121,44 +122,40 @@ class MyPlatformAdapter(BasePlatformAdapter):
 
 
 def check_requirements() -> bool:
-    return bool(os.getenv("MY_PLATFORM_TOKEN"))
+    return bool(get_scoped_secret("MY_PLATFORM_TOKEN"))
 
 
 def validate_config(config) -> bool:
-    extra = getattr(config, "extra", {}) or {}
-    return bool(os.getenv("MY_PLATFORM_TOKEN") or extra.get("token"))
+    return bool(extra_or_secret(getattr(config, "extra", None), "token", "MY_PLATFORM_TOKEN"))
 
 
 def _env_enablement() -> dict | None:
-    token = os.getenv("MY_PLATFORM_TOKEN", "").strip()
-    channel = os.getenv("MY_PLATFORM_CHANNEL", "").strip()
-    if not (token and channel):
+    if not get_scoped_secret("MY_PLATFORM_TOKEN", "").strip():
         return None
-    seed = {"token": token, "channel": channel}
-    home = os.getenv("MY_PLATFORM_HOME_CHANNEL")
-    if home:
-        seed["home_channel"] = {"chat_id": home, "name": "Home"}
-    return seed
+    return seed_extra_from_env(
+        (("MY_PLATFORM_TOKEN", "token", None), ("MY_PLATFORM_CHANNEL", "channel", None)),
+        home_env="MY_PLATFORM_HOME_CHANNEL",
+    )
 
 
 def register(ctx):
-    """Plugin entry point — called by the Qubit plugin system."""
+    """Plugin entry point — called by the Hermes plugin system."""
     ctx.register_platform(
         name="my_platform",
         label="My Platform",
-        adapter_factory=lambda cfg: MyPlatformAdapter(cfg),
+        adapter_factory=MyPlatformAdapter,
         # PASSIVE probe — "are deps/config present right now?".  Called from
         # status displays and config loading, so it must NEVER pip-install.
         check_fn=check_requirements,
         # ACTIVE installer (optional) — only for platforms with a
         # lazy-installable SDK.  create_adapter() calls it when check_fn
         # returns False, right before the gateway connects the platform.
-        # Typically wraps tools.lazy_deps.ensure_and_bind(...).  Omit it
+        # Typically wraps pm.extras.ensure_and_bind(...).  Omit it
         # and a False check_fn is a hard block.
         # ensure_deps_fn=ensure_requirements,
         validate_config=validate_config,
         required_env=["MY_PLATFORM_TOKEN"],
-        install_hint="pip install my-platform-sdk",
+        install_hint="Declare my-platform-sdk in this plugin's Python dependencies, then retry hermes plugins enable my-platform",
         # Env-driven auto-configuration — seeds PlatformConfig.extra from
         # env vars before adapter construction. See "Env-Driven Auto-
         # Configuration" section below.
@@ -219,7 +216,7 @@ When you call `ctx.register_platform()`, the following integration points are ha
 | Env-only auto-enable | `env_enablement_fn` seeds `PlatformConfig.extra` + `home_channel` |
 | YAML config bridge | `apply_yaml_config_fn` translates `config.yaml` keys into env vars / extras |
 | Cron delivery | `cron_deliver_env_var` makes `deliver=<name>` work |
-| `qubit config` UI entries | `requires_env` / `optional_env` in `plugin.yaml` auto-populate |
+| `hermes config` UI entries | `requires_env` / `optional_env` in `plugin.yaml` auto-populate |
 | send engine (`tools/send_message_tool.py`) | Routes through live gateway adapter |
 | Webhook cross-platform delivery | Registry checked for known platforms |
 | `/update` command access | `allow_update_command` flag |
@@ -227,16 +224,16 @@ When you call `ctx.register_platform()`, the following integration points are ha
 | System prompt hints | `platform_hint` injected into LLM context |
 | Message chunking | `max_message_length` for smart splitting |
 | PII redaction | `pii_safe` flag |
-| `qubit status` | Shows plugin platforms with `(plugin)` tag |
-| `qubit gateway setup` | Plugin platforms appear in setup menu |
-| `qubit tools` / `qubit skills` | Plugin platforms in per-platform config |
+| `hermes status` | Shows plugin platforms with `(plugin)` tag |
+| `hermes gateway setup` | Plugin platforms appear in setup menu |
+| `hermes tools` / `hermes skills` | Plugin platforms in per-platform config |
 | Token lock (multi-profile) | Use `acquire_scoped_lock()` in your `connect()` |
 | Orphaned config warning | Descriptive log when plugin is missing |
 
 ## Standalone send-path extensions
 
 A standalone platform can participate in host-driven outbound delivery through
-direct `qubit send --to ...` and cron `deliver=platform:...` by declaring send
+direct `hermes send --to ...` and cron `deliver=platform:...` by declaring send
 behavior on the same `PlatformEntry` created by `ctx.register_platform()`.
 `send_message` is intentionally not an agent-callable model tool; plugins must
 not register an equivalent model surface that lets the agent initiate outbound
@@ -274,7 +271,7 @@ def register(ctx):
         check_fn=check_requirements,
         parse_target_ref_fn=_parse_address,
         validate_target_ref_fn=_validate_address,
-        # May be a regular function or async def. Qubit awaits any awaitable
+        # May be a regular function or async def. Hermes awaits any awaitable
         # result, including callable objects and functools.partial wrappers.
         send_message_handler=_send_request,
         # Prefer this lower-level hook when cron must send from a process
@@ -293,39 +290,40 @@ the next profile.
 
 ## Env-Driven Auto-Configuration
 
-Most users set up a platform by dropping env vars into `~/.hermes/.env` rather than editing `config.yaml`. The `env_enablement_fn` hook lets your plugin pick those env vars up **before** the adapter is constructed, so `qubit gateway status`, `get_connected_platforms()`, and cron delivery see the correct state without instantiating the platform SDK.
+Most users set up a platform by dropping env vars into `~/.hermes/.env` rather than editing `config.yaml`. The `env_enablement_fn` hook lets your plugin pick those env vars up **before** the adapter is constructed, so `hermes gateway status`, `get_connected_platforms()`, and cron delivery see the correct state without instantiating the platform SDK.
+
+Read env through `gateway.platforms._shared.get_scoped_secret` — never `os.getenv`. Under `gateway.multiplex_profiles` the process env holds the DEFAULT profile's values; a secondary profile's `.env` exists only in its secret scope, and a raw read would enable your platform for the wrong profile with the wrong credentials. `seed_extra_from_env` builds the seed dict from a `(ENV_VAR, extra_key, conv)` table through that reader.
 
 ```python
+from gateway.platforms._shared import get_scoped_secret, seed_extra_from_env
+
+
 def _env_enablement() -> dict | None:
     """Seed PlatformConfig.extra from env vars.
 
     Called by the platform registry during load_gateway_config().
     Return None when the platform isn't minimally configured — the
     caller then skips auto-enabling. Return a dict to seed extras.
-
-    The special 'home_channel' key is extracted and becomes a proper
-    HomeChannel dataclass on the PlatformConfig; every other key is
-    merged into PlatformConfig.extra.
     """
-    token = os.getenv("MY_PLATFORM_TOKEN", "").strip()
-    channel = os.getenv("MY_PLATFORM_CHANNEL", "").strip()
+    token = get_scoped_secret("MY_PLATFORM_TOKEN", "").strip()
+    channel = get_scoped_secret("MY_PLATFORM_CHANNEL", "").strip()
     if not (token and channel):
         return None
-    seed = {"token": token, "channel": channel}
-    home = os.getenv("MY_PLATFORM_HOME_CHANNEL")
-    if home:
-        seed["home_channel"] = {
-            "chat_id": home,
-            "name": os.getenv("MY_PLATFORM_HOME_CHANNEL_NAME", "Home"),
-        }
-    return seed
+    # (ENV_VAR, extra_key, conv): blank values are skipped, a conv raising
+    # ValueError drops the key. home_env seeds the special 'home_channel'
+    # dict ({chat_id, name} from MY_PLATFORM_HOME_CHANNEL[_NAME], name
+    # defaults to "Home"), which the core hook lifts into a HomeChannel.
+    return {"token": token, "channel": channel, **seed_extra_from_env(
+        (("MY_PLATFORM_PORT", "port", int), ("MY_PLATFORM_NICK", "nick", None)),
+        home_env="MY_PLATFORM_HOME_CHANNEL",
+    )}
 
 
 def register(ctx):
     ctx.register_platform(
         name="my_platform",
         label="My Platform",
-        adapter_factory=lambda cfg: MyPlatformAdapter(cfg),
+        adapter_factory=MyPlatformAdapter,
         check_fn=check_requirements,
         validate_config=validate_config,
         env_enablement_fn=_env_enablement,
@@ -339,7 +337,16 @@ def register(ctx):
 Some users prefer setting `config.yaml` keys (`my_platform.require_mention`, `my_platform.allowed_channels`, etc.) over env vars. The `apply_yaml_config_fn` hook lets your plugin own this translation instead of forcing core `gateway/config.py` to know your platform's YAML schema.
 
 ```python
-import os
+from gateway.platforms._shared import apply_yaml_bridge
+
+# (yaml key, ENV_VAR, kind). "lower" bridges whenever the key is present
+# (booleans become "true"/"false"); "str" skips null/blank; "csv" comma-joins
+# lists; "json" dumps the value.
+_YAML_BRIDGE = (
+    ("require_mention", "MY_PLATFORM_REQUIRE_MENTION", "lower"),
+    ("allowed_channels", "MY_PLATFORM_ALLOWED_CHANNELS", "csv"),
+)
+
 
 def _apply_yaml_config(yaml_cfg: dict, platform_cfg: dict) -> dict | None:
     """Translate config.yaml `my_platform:` keys into env vars / extras.
@@ -347,18 +354,13 @@ def _apply_yaml_config(yaml_cfg: dict, platform_cfg: dict) -> dict | None:
     yaml_cfg     — the full top-level parsed config.yaml dict
     platform_cfg — the platform's own sub-dict (yaml_cfg.get("my_platform", {}))
 
-    May mutate os.environ directly (use `not os.getenv(...)` guards to
-    preserve env > YAML precedence) and/or return a dict to merge into
-    PlatformConfig.extra. Return None or {} for no extras.
+    apply_yaml_bridge writes each env var only when it is unset (env > YAML)
+    and NEVER while a multiplexed secondary profile's config is loading — a
+    write there would pin that profile's policy process-wide. It returns the
+    same values for PlatformConfig.extra, so read `extra` first in the adapter
+    and fall back to the env var (`_shared.extra_or_secret`).
     """
-    if "require_mention" in platform_cfg and not os.getenv("MY_PLATFORM_REQUIRE_MENTION"):
-        os.environ["MY_PLATFORM_REQUIRE_MENTION"] = str(platform_cfg["require_mention"]).lower()
-    allowed = platform_cfg.get("allowed_channels")
-    if allowed is not None and not os.getenv("MY_PLATFORM_ALLOWED_CHANNELS"):
-        if isinstance(allowed, list):
-            allowed = ",".join(str(v) for v in allowed)
-        os.environ["MY_PLATFORM_ALLOWED_CHANNELS"] = str(allowed)
-    return None  # nothing extra to merge into PlatformConfig.extra
+    return apply_yaml_bridge(platform_cfg, _YAML_BRIDGE)
 
 def register(ctx):
     ctx.register_platform(
@@ -389,7 +391,7 @@ The scheduler reads this env var when resolving the home target for `deliver=my_
 
 ### Out-of-process cron delivery
 
-`cron_deliver_env_var` makes your platform a recognized `deliver=` target. To make the actual send succeed when the cron job runs in a separate process from the gateway (i.e., `qubit cron run` separate from `qubit gateway`), register a `standalone_sender_fn`:
+`cron_deliver_env_var` makes your platform a recognized `deliver=` target. To make the actual send succeed when the cron job runs in a separate process from the gateway (i.e., `hermes cron run` separate from `hermes gateway`), register a `standalone_sender_fn`:
 
 ```python
 async def _standalone_send(
@@ -418,9 +420,9 @@ Why this hook is necessary: built-in platforms (Telegram, Discord, Slack, etc.) 
 
 The function receives the same `pconfig` and `chat_id` that the live adapter would, plus optional `thread_id`, `media_files`, and `force_document` keyword arguments. Returning `{"success": True, "message_id": ...}` is treated as a successful delivery; returning `{"error": "..."}` surfaces the message in cron's `delivery_errors`. Exceptions raised inside the function are caught by the dispatcher and reported as `Plugin standalone send failed: <reason>`. Reference implementations live in `plugins/platforms/{irc,teams,google_chat}/adapter.py`.
 
-## Surfacing Env Vars in `qubit config`
+## Surfacing Env Vars in `hermes config`
 
-`qubit_cli/config.py` scans `plugins/platforms/*/plugin.yaml` at import time and auto-populates `OPTIONAL_ENV_VARS` from `requires_env` and (optional) `optional_env` blocks. Use the rich-dict form to contribute proper descriptions, prompts, password flags, and URLs — the CLI setup UI picks them up for free.
+`hermes_cli/config.py` scans `plugins/platforms/*/plugin.yaml` at import time and auto-populates `OPTIONAL_ENV_VARS` from `requires_env` and (optional) `optional_env` blocks. Use the rich-dict form to contribute proper descriptions, prompts, password flags, and URLs — the CLI setup UI picks them up for free.
 
 ```yaml
 # plugins/platforms/my_platform/plugin.yaml
@@ -429,7 +431,7 @@ label: My Platform
 kind: platform
 version: 1.0.0
 description: >
-  My Platform gateway adapter for Qubit Agent.
+  My Platform gateway adapter for Hermes Agent.
 author: Your Name
 requires_env:
   - name: MY_PLATFORM_TOKEN
@@ -438,7 +440,7 @@ requires_env:
     url: "https://my-platform.example.com/bots"
     password: true
   - name: MY_PLATFORM_CHANNEL
-    description: "Channel to join (e.g. #qubit)"
+    description: "Channel to join (e.g. #hermes)"
     prompt: "Channel"
     password: false
 optional_env:
@@ -554,7 +556,7 @@ See `plugins/platforms/irc/` in the repo for a complete working example — a fu
 ## Step-by-Step Checklist (Built-in Path)
 
 :::note
-This checklist is for adding a platform directly to the Qubit core codebase — typically done by core contributors for officially supported platforms. Community/third-party platforms should use the [Plugin Path](#plugin-path-recommended) above.
+This checklist is for adding a platform directly to the Hermes core codebase — typically done by core contributors for officially supported platforms. Community/third-party platforms should use the [Plugin Path](#plugin-path-recommended) above.
 :::
 
 ### 1. Platform Enum
@@ -573,6 +575,7 @@ Create `plugins/platforms/newplat/adapter.py`:
 
 ```python
 from gateway.config import Platform, PlatformConfig
+from gateway.platforms._shared import extra_or_secret
 from gateway.platforms.base import BasePlatformAdapter, SendResult
 from gateway.platforms.event import MessageEvent, MessageType
 
@@ -585,7 +588,7 @@ class NewPlatAdapter(BasePlatformAdapter):
         super().__init__(config, Platform.NEWPLAT)
         # Read config from config.extra dict
         extra = config.extra or {}
-        self._api_key = extra.get("api_key") or os.getenv("NEWPLAT_API_KEY", "")
+        self._api_key = extra_or_secret(extra, "api_key", "NEWPLAT_API_KEY")
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         # Set up connection, start polling/webhook
@@ -649,12 +652,12 @@ Six touchpoints:
 
 ### 6. CLI Integration
 
-1. **`qubit_cli/config.py`** — Add all `NEWPLAT_*` vars to `_EXTRA_ENV_KEYS`
-2. **`qubit_cli/gateway.py`** — Add entry to `_PLATFORMS` list with key, label, emoji, token_var, setup_instructions, and vars
-3. **`qubit_cli/platforms.py`** — Add `PlatformInfo` entry with label and default_toolset (used by `skills_config` and `tools_config` TUIs)
-4. **`qubit_cli/setup.py`** — Add `_setup_newplat()` function (can delegate to `gateway.py`) and add tuple to the messaging platforms list
-5. **`qubit_cli/status.py`** — Add platform detection entry: `"NewPlat": ("NEWPLAT_TOKEN", "NEWPLAT_HOME_CHANNEL")`
-6. **`qubit_cli/dump.py`** — Add `"newplat": "NEWPLAT_TOKEN"` to platform detection dict
+1. **`hermes_cli/config.py`** — Add all `NEWPLAT_*` vars to `_EXTRA_ENV_KEYS`
+2. **`hermes_cli/gateway.py`** — Add entry to `_PLATFORMS` list with key, label, emoji, token_var, setup_instructions, and vars
+3. **`hermes_cli/platforms.py`** — Add `PlatformInfo` entry with label and default_toolset (used by `skills_config` and `tools_config` TUIs)
+4. **`hermes_cli/setup.py`** — Add `_setup_newplat()` function (can delegate to `gateway.py`) and add tuple to the messaging platforms list
+5. **`hermes_cli/status.py`** — Add platform detection entry: `"NewPlat": ("NEWPLAT_TOKEN", "NEWPLAT_HOME_CHANNEL")`
+6. **`hermes_cli/dump.py`** — Add `"newplat": "NEWPLAT_TOKEN"` to platform detection dict
 
 ### 7. Tools
 
@@ -756,6 +759,21 @@ async def _handle_callback(self, request):
 ```
 
 For platforms with tight response deadlines (e.g., WeCom's 5-second limit), always acknowledge immediately and deliver the agent's reply proactively via API later. Agent sessions run 3–30 minutes — inline replies within a callback response window are not feasible.
+
+### Inbound Deduplication
+
+Platforms redeliver: websocket resumes replay recent events, webhooks retry, and an unacknowledged poll batch comes back. Drop repeats with the shared helper, keyed on the platform's message ID:
+
+```python
+from gateway.platforms.helpers import MessageDeduplicator
+
+self._dedup = MessageDeduplicator(ttl_seconds=600)  # in __init__
+
+if self._dedup.is_duplicate(msg_id):  # in the inbound handler
+    return
+```
+
+When the gateway's reconnect watcher replaces a failed adapter with a new instance, it copies every `MessageDeduplicator` attribute's live IDs from the old instance to the new one, so a replay right after the reconnect is still dropped. A cache kept in another structure (a plain dict or set) starts empty on the new instance.
 
 ### Token Locks
 

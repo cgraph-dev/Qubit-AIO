@@ -1,5 +1,5 @@
 """End-to-end provider parity contract: the desktop Providers tabs must show
-the SAME provider universe as ``qubit model`` (the CLI/TUI picker).
+the SAME provider universe as ``hermes model`` (the CLI/TUI picker).
 
 This is the single load-bearing invariant of the unified provider catalog:
 
@@ -31,11 +31,7 @@ HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
 # derived from the catalog so any future virtual provider is covered without a
 # hardcoded slug.
 _VIRTUAL = {d.slug for d in provider_catalog() if d.auth_type == "virtual"}
-# Keyless providers (opencode-free) are served anonymously: no credential
-# exists, so there is nothing to configure on either Providers tab. Derived
-# from the catalog flag so any future keyless provider is covered.
-_KEYLESS = {d.slug for d in provider_catalog() if d.keyless}
-_EXEMPT = {"custom"} | _VIRTUAL | _KEYLESS
+_EXEMPT = {"custom"} | _VIRTUAL
 
 # Providers that legitimately offer BOTH auth methods and so intentionally
 # appear on both desktop tabs (an API-key card AND an account sign-in card).
@@ -61,7 +57,7 @@ def _accounts_tab_providers() -> set[str]:
 
 
 def test_every_qubit_model_provider_is_configurable_in_desktop():
-    """PARITY CONTRACT: GUI (keys ∪ accounts) ⊇ `qubit model` universe."""
+    """PARITY CONTRACT: GUI (keys ∪ accounts) ⊇ `hermes model` universe."""
     gui = _keys_tab_providers() | _accounts_tab_providers()
     missing = [
         e.slug
@@ -69,7 +65,7 @@ def test_every_qubit_model_provider_is_configurable_in_desktop():
         if e.slug not in _EXEMPT and e.slug not in gui
     ]
     assert not missing, (
-        "providers shown in `qubit model` but not configurable in the desktop "
+        "providers shown in `hermes model` but not configurable in the desktop "
         f"Providers tabs: {missing}"
     )
 

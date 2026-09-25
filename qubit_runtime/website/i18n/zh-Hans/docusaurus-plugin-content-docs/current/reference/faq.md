@@ -1,10 +1,13 @@
 ---
 sidebar_position: 3
 title: "常见问题与故障排查"
-description: "Qubit Agent 常见问题解答及常见问题解决方案"
+description: "Hermes Agent 常见问题解答及常见问题解决方案"
 ---
 
 # 常见问题与故障排查
+
+本页的 Python 依赖命令使用 [PM 准备的源码环境](./package-management.md#developer-workflow)。
+依赖变更后，请重新激活该 checkout 并重启 Hermes。
 
 针对最常见问题的快速解答与修复方法。
 
@@ -12,72 +15,62 @@ description: "Qubit Agent 常见问题解答及常见问题解决方案"
 
 ## 常见问题
 
-### Qubit 支持哪些 LLM 提供商？
+### Hermes 支持哪些 LLM 提供商？
 
-Qubit Agent 可与任何兼容 OpenAI 的 API 配合使用。支持的提供商包括：
+Hermes Agent 可与任何兼容 OpenAI 的 API 配合使用。支持的提供商包括：
 
 - **[OpenRouter](https://openrouter.ai/)** — 通过一个 API key 访问数百个模型（推荐，灵活性强）
-- **Qubit Labs** — Qubit Labs 自有推理端点
+- **Nous Portal** — Nous Research 自有推理端点
 - **OpenAI** — GPT-5.4、GPT-5-codex、GPT-4.1、GPT-4o 等
-- **Anthropic** — Claude 模型（直接 API、通过 `qubit auth add anthropic` 进行 OAuth、OpenRouter 或任何兼容代理）
+- **Anthropic** — Claude 模型（直接 API、通过 `hermes auth add anthropic` 进行 OAuth、OpenRouter 或任何兼容代理）
 - **Google** — Gemini 模型（通过 `gemini` 提供商直接调用 API、OpenRouter 或兼容代理）
 - **z.ai / ZhipuAI** — GLM 模型
 - **Kimi / Moonshot AI** — Kimi 模型
 - **MiniMax** — 全球及中国区端点
 - **本地模型** — 通过 [Ollama](https://ollama.com/)、[vLLM](https://docs.vllm.ai/)、[llama.cpp](https://github.com/ggerganov/llama.cpp)、[SGLang](https://github.com/sgl-project/sglang) 或任何兼容 OpenAI 的服务器
 
-使用 `qubit model` 设置提供商，或直接编辑 `~/.hermes/.env`。所有提供商 key 请参阅[环境变量](./environment-variables.md)参考文档。
+使用 `hermes model` 设置提供商，或直接编辑 `~/.hermes/.env`。所有提供商 key 请参阅[环境变量](./environment-variables.md)参考文档。
 
 ### 支持 Windows 吗？
 
-**原生不支持。** Qubit Agent 需要类 Unix 环境。在 Windows 上，请安装 [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) 并在其中运行 Qubit。标准安装命令在 WSL2 中可完美运行：
+**原生不支持。** Hermes Agent 需要类 Unix 环境。在 Windows 上，请安装 [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) 并在其中运行 Hermes。标准安装命令在 WSL2 中可完美运行：
 
 ```bash
 curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 ```
 
-### 我在 WSL2 中运行 Qubit，如何控制 Windows 上的普通 Chrome？
+### 我在 WSL2 中运行 Hermes，如何控制 Windows 上的普通 Chrome？
 
 推荐使用 MCP bridge（桥接），而非 `/browser connect`。
 
 推荐方案：
 
-- 在 WSL2 内运行 Qubit
+- 在 WSL2 内运行 Hermes
 - 继续使用 Windows 上已登录的普通 Chrome
 - 通过 `cmd.exe` 或 `powershell.exe` 将 `chrome-devtools-mcp` 添加为 MCP 服务器
-- 让 Qubit 使用生成的 MCP 浏览器工具
+- 让 Hermes 使用生成的 MCP 浏览器工具
 
-这比强制 Qubit 核心浏览器传输直接跨越 WSL2/Windows 边界进行附加更为可靠。
+这比强制 Hermes 核心浏览器传输直接跨越 WSL2/Windows 边界进行附加更为可靠。
 
 参见：
 
-- [在 Qubit 中使用 MCP](../guides/use-mcp-with-hermes.md#wsl2-bridge-hermes-in-wsl-to-windows-chrome)
-- [浏览器自动化](../user-guide/features/browser.md#wsl2--windows-chrome-prefer-mcp-over-browser-connect)
+- [在 Hermes 中使用 MCP](../guides/use-mcp-with-hermes.md#wsl2-bridge-hermes-in-wsl-to-windows-chrome)
+- [浏览器自动化](../user-guide/features/browser.md#wsl2--windows-chrome优先使用-mcp-而非-browser-connect)
 
-### 支持 Android / Termux 吗？
+### 支持 Android 吗？
 
-支持 — Qubit 现已为 Android 手机提供经过测试的 Termux 安装路径。
-
-快速安装：
-
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-```
-
-完整的手动步骤、支持的扩展及当前限制，请参阅 [Termux 指南](../getting-started/termux.md)。
-
-重要说明：完整的 `.[all]` 扩展目前在 Android 上不可用，因为 `voice` 扩展依赖 `faster-whisper` → `ctranslate2`，而 `ctranslate2` 未发布 Android wheel 包。请改用经过测试的 `.[termux]` 扩展。
+aarch64 设备可使用预发布的 Termux APT 软件包。请参阅 [Termux 指南](../getting-started/termux.md)了解签名仓库、安装步骤和限制。请使用 `pkg upgrade hermes-agent` 更新，不要使用 `hermes update` 或桌面和服务器的安装脚本。
 
 ### 我的数据会被发送到哪里？
 
-API 调用**仅发送至您配置的 LLM 提供商**（例如 OpenRouter、您本地的 Ollama 实例）。Qubit Agent 不收集遥测数据、使用数据或分析数据。您的对话、记忆和技能均存储在本地 `~/.hermes/` 目录中。
+API 调用**仅发送至您配置的 LLM 提供商**（例如 OpenRouter、您本地的 Ollama 实例）。Hermes Agent 不收集遥测数据、使用数据或分析数据。您的对话、记忆和技能均存储在本地 `~/.hermes/` 目录中。
 
 ### 可以离线使用 / 使用本地模型吗？
 
-可以。运行 `qubit model`，选择**自定义端点**，然后输入您服务器的 URL：
+可以。运行 `hermes model`，选择**自定义端点**，然后输入您服务器的 URL：
 
 ```bash
-qubit model
+hermes model
 # 选择：Custom endpoint（手动输入 URL）
 # API base URL: http://localhost:11434/v1
 # API key: ollama
@@ -94,25 +87,25 @@ model:
   base_url: http://localhost:11434/v1
 ```
 
-Qubit 会将端点、提供商和 base URL 持久化到 `config.yaml`，重启后仍然有效。如果您的本地服务器只加载了一个模型，`/model custom` 会自动检测到它。您也可以在 config.yaml 中设置 `provider: custom` — 这是一个一等提供商，不是其他任何东西的别名。
+Hermes 会将端点、提供商和 base URL 持久化到 `config.yaml`，重启后仍然有效。如果您的本地服务器只加载了一个模型，`/model custom` 会自动检测到它。您也可以在 config.yaml 中设置 `provider: custom` — 这是一个一等提供商，不是其他任何东西的别名。
 
 此方式适用于 Ollama、vLLM、llama.cpp server、SGLang、LocalAI 等。详情请参阅[配置指南](../user-guide/configuration.md)。
 
 :::tip Ollama 用户
-如果您在 Ollama 中设置了自定义 `num_ctx`（例如 `ollama run --num_ctx 16384`），请确保在 Qubit 中设置匹配的上下文长度 — Ollama 的 `/api/show` 报告的是模型的*最大*上下文，而非您配置的实际 `num_ctx`。
+如果您在 Ollama 中设置了自定义 `num_ctx`（例如 `ollama run --num_ctx 16384`），请确保在 Hermes 中设置匹配的上下文长度 — Ollama 的 `/api/show` 报告的是模型的*最大*上下文，而非您配置的实际 `num_ctx`。
 :::
 
 :::tip 本地模型超时问题
-Qubit 会自动检测本地端点并放宽流式传输超时（读取超时从 120s 提升至 1800s，禁用停滞流检测）。如果在非常大的上下文下仍然超时，请在 `.env` 中设置 `HERMES_STREAM_READ_TIMEOUT=1800`。详情请参阅[本地 LLM 指南](../guides/local-llm-on-mac.md#timeouts)。
+Hermes 会自动检测本地端点并放宽流式传输超时（读取超时从 120s 提升至 1800s，禁用停滞流检测）。如果在非常大的上下文下仍然超时，请在 `.env` 中设置 `HERMES_STREAM_READ_TIMEOUT=1800`。详情请参阅[本地 LLM 指南](../guides/local-llm-on-mac.md#超时设置)。
 :::
 
 ### 费用是多少？
 
-Qubit Agent 本身**免费且开源**（MIT 许可证）。您只需为所选提供商的 LLM API 用量付费。本地模型完全免费运行。
+Hermes Agent 本身**免费且开源**（MIT 许可证）。您只需为所选提供商的 LLM API 用量付费。本地模型完全免费运行。
 
 ### 多人可以使用同一个实例吗？
 
-可以。[消息网关](../user-guide/messaging/index.md)允许多个用户通过 Telegram、Discord、Slack、WhatsApp 或 Home Assistant 与同一个 Qubit Agent 实例交互。访问权限通过白名单（特定用户 ID）和私信配对（第一个发消息的用户获得访问权）来控制。
+可以。[消息网关](../user-guide/messaging/index.md)允许多个用户通过 Telegram、Discord、Slack、WhatsApp 或 Home Assistant 与同一个 Hermes Agent 实例交互。访问权限通过白名单（特定用户 ID）和私信配对（第一个发消息的用户获得访问权）来控制。
 
 ### 记忆（memory）和技能（skills）有什么区别？
 
@@ -123,7 +116,7 @@ Qubit Agent 本身**免费且开源**（MIT 许可证）。您只需为所选提
 
 ### 可以在我自己的 Python 项目中使用吗？
 
-可以。导入 `AIAgent` 类，以编程方式使用 Qubit：
+可以。导入 `AIAgent` 类，以编程方式使用 Hermes：
 
 ```python
 from run_agent import AIAgent
@@ -140,7 +133,7 @@ response = agent.chat("Explain quantum computing briefly")
 
 ### 安装问题
 
-#### 安装后出现 `qubit: command not found`
+#### 安装后出现 `hermes: command not found`
 
 **原因：** Shell 未重新加载更新后的 PATH。
 
@@ -155,34 +148,26 @@ source ~/.zshrc     # zsh
 
 如果仍然无效，请验证安装位置：
 ```bash
-which qubit
-ls ~/.local/bin/qubit
+which hermes
+ls ~/.local/bin/hermes
 ```
 
 :::tip
 安装程序会将 `~/.local/bin` 添加到您的 PATH。如果您使用非标准 shell 配置，请手动添加 `export PATH="$HOME/.local/bin:$PATH"`。
 :::
 
-#### Python 版本过旧
+#### Python 版本不受支持
 
-**原因：** Qubit 需要 Python 3.11 或更新版本。
-
-**解决方案：**
-```bash
-python3 --version   # 检查当前版本
-
-# 安装更新的 Python
-sudo apt install python3.12   # Ubuntu/Debian
-brew install python@3.12      # macOS
-```
-
-安装程序会自动处理此问题 — 如果在手动安装时看到此错误，请先升级 Python。
+Hermes 要求 Python 3.14（`>=3.14,<3.15`），不是任意更新版本。
+源码安装脚本和软件包会提供相应的运行时。
+手动开发环境请按照 [开发指南](../developer-guide/contributing.md)准备。
+不要在签名应用或容器内部替换 Python 来修复版本错误。
 
 #### 终端命令提示 `node: command not found`（或 `nvm`、`pyenv`、`asdf` 等）
 
-**原因：** Qubit 在启动时通过运行一次 `bash -l` 构建每个会话的环境快照。bash 登录 shell 会读取 `/etc/profile`、`~/.bash_profile` 和 `~/.profile`，但**不会 source `~/.bashrc`** — 因此在 `~/.bashrc` 中安装自身的工具（`nvm`、`asdf`、`pyenv`、`cargo`、自定义 `PATH` 导出）对快照不可见。当 Qubit 在 systemd 下运行或在未预加载交互式 shell 配置的最小 shell 中运行时，此问题最为常见。
+**原因：** Hermes 在启动时通过运行一次 `bash -l` 构建每个会话的环境快照。bash 登录 shell 会读取 `/etc/profile`、`~/.bash_profile` 和 `~/.profile`，但**不会 source `~/.bashrc`** — 因此在 `~/.bashrc` 中安装自身的工具（`nvm`、`asdf`、`pyenv`、`cargo`、自定义 `PATH` 导出）对快照不可见。当 Hermes 在 systemd 下运行或在未预加载交互式 shell 配置的最小 shell 中运行时，此问题最为常见。
 
-**解决方案：** Qubit 默认自动 source `~/.bashrc`。如果这还不够 — 例如您是 zsh 用户，PATH 在 `~/.zshrc` 中，或者您从独立文件初始化 `nvm` — 请在 `~/.hermes/config.yaml` 中列出需要额外 source 的文件：
+**解决方案：** Hermes 默认自动 source `~/.bashrc`。如果这还不够 — 例如您是 zsh 用户，PATH 在 `~/.zshrc` 中，或者您从独立文件初始化 `nvm` — 请在 `~/.hermes/config.yaml` 中列出需要额外 source 的文件：
 
 ```yaml
 terminal:
@@ -223,7 +208,7 @@ source ~/.bashrc
 ```bash
 # 不要对安装程序使用 sudo — 它安装到 ~/.local/bin
 # 如果之前使用 sudo 安装，请先清理：
-sudo rm /usr/local/bin/qubit
+sudo rm /usr/local/bin/hermes
 # 然后重新运行标准安装程序
 curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 ```
@@ -236,24 +221,24 @@ curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 
 **原因：** 会话内的 `/model` 只能在您**已配置**的提供商之间切换。如果您只设置了 OpenRouter，`/model` 就只会显示 OpenRouter。
 
-**解决方案：** 退出当前会话，在终端中使用 `qubit model` 添加新提供商：
+**解决方案：** 退出当前会话，在终端中使用 `hermes model` 添加新提供商：
 
 ```bash
-# 先退出 Qubit 聊天会话（Ctrl+C 或 /quit）
+# 先退出 Hermes 聊天会话（Ctrl+C 或 /quit）
 
 # 运行完整的提供商设置向导
-qubit model
+hermes model
 
 # 此命令可以：添加提供商、运行 OAuth、输入 API key、配置端点
 ```
 
-通过 `qubit model` 添加新提供商后，启动新的聊天会话 — `/model` 将显示所有已配置的提供商。
+通过 `hermes model` 添加新提供商后，启动新的聊天会话 — `/model` 将显示所有已配置的提供商。
 
 :::tip 快速参考
 | 目标 | 使用方式 |
 |-----------|-----|
-| 添加新提供商 | `qubit model`（从终端） |
-| 输入/更改 API key | `qubit model`（从终端） |
+| 添加新提供商 | `hermes model`（从终端） |
+| 输入/更改 API key | `hermes model`（从终端） |
 | 会话中途切换模型 | `/model <name>`（会话内） |
 | 切换到其他已配置的提供商 | `/model provider:model`（会话内） |
 :::
@@ -265,13 +250,13 @@ qubit model
 **解决方案：**
 ```bash
 # 检查您的配置
-qubit config show
+hermes config show
 
 # 重新配置您的提供商
-qubit model
+hermes model
 
 # 或直接设置
-qubit config set OPENROUTER_API_KEY sk-or-v1-xxxxxxxxxxxx
+hermes config set OPENROUTER_API_KEY sk-or-v1-xxxxxxxxxxxx
 ```
 
 :::warning
@@ -285,13 +270,13 @@ qubit config set OPENROUTER_API_KEY sk-or-v1-xxxxxxxxxxxx
 **解决方案：**
 ```bash
 # 列出您的提供商可用的模型
-qubit model
+hermes model
 
 # 设置有效的模型
-qubit config set HERMES_MODEL anthropic/claude-opus-4.7
+hermes config set HERMES_MODEL anthropic/claude-opus-4.7
 
 # 或按会话指定
-qubit chat --model openrouter/meta-llama/llama-3.1-70b-instruct
+hermes chat --model openrouter/meta-llama/llama-3.1-70b-instruct
 ```
 
 #### 速率限制（429 错误）
@@ -301,11 +286,11 @@ qubit chat --model openrouter/meta-llama/llama-3.1-70b-instruct
 **解决方案：** 稍等片刻后重试。对于持续使用，请考虑：
 - 升级您的提供商套餐
 - 切换到其他模型或提供商
-- 使用 `qubit chat --provider <alternative>` 路由到其他后端
+- 使用 `hermes chat --provider <alternative>` 路由到其他后端
 
 #### 上下文长度超限
 
-**原因：** 对话内容超出模型的上下文窗口，或 Qubit 检测到的模型上下文长度有误。
+**原因：** 对话内容超出模型的上下文窗口，或 Hermes 检测到的模型上下文长度有误。
 
 **解决方案：**
 ```bash
@@ -313,13 +298,13 @@ qubit chat --model openrouter/meta-llama/llama-3.1-70b-instruct
 /compress
 
 # 或开始新会话
-qubit chat
+hermes chat
 
 # 使用上下文窗口更大的模型
-qubit chat --model openrouter/google/gemini-3-flash-preview
+hermes chat --model openrouter/google/gemini-3-flash-preview
 ```
 
-如果在第一次长对话时就出现此问题，Qubit 可能检测到了错误的模型上下文长度。检查检测结果：
+如果在第一次长对话时就出现此问题，Hermes 可能检测到了错误的模型上下文长度。检查检测结果：
 
 查看 CLI 启动行 — 它会显示检测到的上下文长度（例如 `📊 Context limit: 128000 tokens`）。您也可以在会话中使用 `/usage` 查看。
 
@@ -343,7 +328,7 @@ custom_providers:
         context_length: 32768
 ```
 
-有关自动检测的工作原理及所有覆盖选项，请参阅[上下文长度检测](../integrations/providers.md#context-length-detection)。
+有关自动检测的工作原理及所有覆盖选项，请参阅[上下文长度检测](../integrations/providers.md#上下文长度检测)。
 
 ---
 
@@ -351,14 +336,14 @@ custom_providers:
 
 #### 命令被标记为危险而阻止
 
-**原因：** Qubit 检测到潜在的破坏性命令（例如 `rm -rf`、`DROP TABLE`）。这是一项安全功能。
+**原因：** Hermes 检测到潜在的破坏性命令（例如 `rm -rf`、`DROP TABLE`）。这是一项安全功能。
 
 **解决方案：** 出现提示时，检查命令并输入 `y` 批准执行。您也可以：
 - 要求智能体使用更安全的替代方案
 - 在[安全文档](../user-guide/security.md)中查看完整的危险模式列表
 
 :::tip
-这是预期行为 — Qubit 绝不会静默执行破坏性命令。审批提示会向您显示将要执行的确切内容。
+这是预期行为 — Hermes 绝不会静默执行破坏性命令。审批提示会向您显示将要执行的确切内容。
 :::
 
 #### 通过消息网关时 `sudo` 不起作用
@@ -368,7 +353,7 @@ custom_providers:
 **解决方案：**
 - 在消息中避免使用 `sudo` — 请智能体寻找替代方案
 - 如果必须使用 `sudo`，在 `/etc/sudoers` 中为特定命令配置免密 sudo
-- 或切换到终端界面执行管理任务：`qubit chat`
+- 或切换到终端界面执行管理任务：`hermes chat`
 
 #### Docker 后端无法连接
 
@@ -398,10 +383,10 @@ docker run hello-world
 **解决方案：**
 ```bash
 # 检查网关是否在运行
-qubit gateway status
+hermes gateway status
 
 # 启动网关
-qubit gateway start
+hermes gateway start
 
 # 查看错误日志
 cat ~/.hermes/logs/gateway.log | tail -50
@@ -412,7 +397,7 @@ cat ~/.hermes/logs/gateway.log | tail -50
 **原因：** 网络问题、bot token 已过期，或平台 webhook 配置错误。
 
 **解决方案：**
-- 使用 `qubit gateway setup` 验证您的 bot token 是否有效
+- 使用 `hermes gateway setup` 验证您的 bot token 是否有效
 - 检查网关日志：`cat ~/.hermes/logs/gateway.log | tail -50`
 - 对于基于 webhook 的平台（Slack、WhatsApp），确保您的服务器可公开访问
 
@@ -437,16 +422,16 @@ cat ~/.hermes/logs/gateway.log | tail -50
 **解决方案：**
 ```bash
 # 安装核心消息网关依赖项
-cd ~/.hermes/hermes-agent && uv pip install -e ".[messaging]"  # Telegram、Discord、Slack 及共享网关依赖
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['messaging'], explicit=True)"  # Telegram、Discord、Slack 及共享网关依赖
 
 # 检查端口冲突
 lsof -i :8080
 
 # 验证配置
-qubit config show
+hermes config show
 ```
 
-#### WSL：网关持续断开连接或 `qubit gateway start` 失败
+#### WSL：网关持续断开连接或 `hermes gateway start` 失败
 
 **原因：** WSL 的 systemd 支持不稳定。许多 WSL2 安装未启用 systemd，即使启用，服务也可能在 WSL 重启或 Windows 空闲关机后无法存活。
 
@@ -454,14 +439,14 @@ qubit config show
 
 ```bash
 # 方案一：直接前台运行（最简单）
-qubit gateway run
+hermes gateway run
 
 # 方案二：通过 tmux 持久运行（关闭终端后仍存活）
-tmux new -s qubit 'qubit gateway run'
-# 稍后重新连接：tmux attach -t qubit
+tmux new -s hermes 'hermes gateway run'
+# 稍后重新连接：tmux attach -t hermes
 
 # 方案三：通过 nohup 后台运行
-nohup qubit gateway run > ~/.hermes/logs/gateway.log 2>&1 &
+nohup hermes gateway run > ~/.hermes/logs/gateway.log 2>&1 &
 ```
 
 如果仍想尝试 systemd，请确保已启用：
@@ -478,7 +463,7 @@ nohup qubit gateway run > ~/.hermes/logs/gateway.log 2>&1 &
 
 :::tip Windows 开机自启
 如需可靠的自启动，使用 Windows 任务计划程序在登录时启动 WSL + 网关：
-1. 创建一个任务，运行 `wsl -d Ubuntu -- bash -lc 'qubit gateway run'`
+1. 创建一个任务，运行 `wsl -d Ubuntu -- bash -lc 'hermes gateway run'`
 2. 设置在用户登录时触发
 :::
 
@@ -486,11 +471,11 @@ nohup qubit gateway run > ~/.hermes/logs/gateway.log 2>&1 &
 
 **原因：** launchd 服务继承的是最小 PATH（`/usr/bin:/bin:/usr/sbin:/sbin`），不包含 Homebrew、nvm、cargo 或其他用户安装的工具目录。这通常会导致 WhatsApp bridge（`node not found`）或语音转录（`ffmpeg not found`）失败。
 
-**解决方案：** 网关在您运行 `qubit gateway install` 时会捕获您的 shell PATH。如果您在设置网关后安装了新工具，请重新运行 install 以捕获更新后的 PATH：
+**解决方案：** 网关在您运行 `hermes gateway install` 时会捕获您的 shell PATH。如果您在设置网关后安装了新工具，请重新运行 install 以捕获更新后的 PATH：
 
 ```bash
-qubit gateway install    # 重新快照当前 PATH
-qubit gateway start      # 检测到更新的 plist 并重新加载
+hermes gateway install    # 重新快照当前 PATH
+hermes gateway start      # 检测到更新的 plist 并重新加载
 ```
 
 您可以验证 plist 中的 PATH 是否正确：
@@ -508,8 +493,8 @@ qubit gateway start      # 检测到更新的 plist 并重新加载
 **原因：** 模型较大、API 服务器距离较远，或系统 prompt（提示词）包含过多工具。
 
 **解决方案：**
-- 尝试更快/更小的模型：`qubit chat --model openrouter/meta-llama/llama-3.1-8b-instruct`
-- 减少激活的工具集：`qubit chat -t "terminal"`
+- 尝试更快/更小的模型：`hermes chat --model openrouter/meta-llama/llama-3.1-8b-instruct`
+- 减少激活的工具集：`hermes chat -t "terminal"`
 - 检查到提供商的网络延迟
 - 对于本地模型，确保有足够的 GPU VRAM
 
@@ -540,10 +525,10 @@ qubit gateway start      # 检测到更新的 plist 并重新加载
 /compress
 
 # 开始新会话并引用旧会话
-qubit chat
+hermes chat
 
 # 如需稍后继续特定会话
-qubit chat --continue
+hermes chat --continue
 ```
 
 ---
@@ -557,7 +542,7 @@ qubit chat --continue
 **解决方案：**
 ```bash
 # 确保 MCP 依赖项已安装（标准安装中已包含）
-cd ~/.hermes/hermes-agent && uv pip install -e ".[mcp]"
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['mcp'], explicit=True)"
 
 # 对于基于 npm 的服务器，确保 Node.js 可用
 node --version
@@ -588,16 +573,16 @@ mcp_servers:
 
 ```bash
 # 验证 MCP 服务器已配置
-qubit config show | grep -A 12 mcp_servers
+hermes config show | grep -A 12 mcp_servers
 
-# 更改配置后重启 Qubit 或重新加载 MCP
-qubit chat
+# 更改配置后重启 Hermes 或重新加载 MCP
+hermes chat
 ```
 
 另请参阅：
-- [MCP（模型上下文协议）](/user-guide/features/mcp)
-- [在 Qubit 中使用 MCP](/guides/use-mcp-with-qubit)
-- [MCP 配置参考](/reference/mcp-config-reference)
+- [MCP（模型上下文协议）](../user-guide/features/mcp.md)
+- [在 Hermes 中使用 MCP](../guides/use-mcp-with-hermes.md)
+- [MCP 配置参考](./mcp-config-reference.md)
 
 #### MCP 超时错误
 
@@ -609,16 +594,16 @@ qubit chat
 - 对于远程 HTTP MCP 服务器，检查网络连接
 
 :::warning
-如果 MCP 服务器在请求中途崩溃，Qubit 会报告超时。请检查服务器自身的日志（而非仅 Qubit 日志）以诊断根本原因。
+如果 MCP 服务器在请求中途崩溃，Hermes 会报告超时。请检查服务器自身的日志（而非仅 Hermes 日志）以诊断根本原因。
 :::
 
 ---
 
 ## Profiles（配置文件）
 
-### Profiles 与直接设置 QUBIT_HOME 有何不同？
+### Profiles 与直接设置 HERMES_HOME 有何不同？
 
-Profiles 是构建在 `QUBIT_HOME` 之上的托管层。您*可以*在每次命令前手动设置 `QUBIT_HOME=/some/path`，但 profiles 会为您处理所有底层工作：创建目录结构、生成 shell 别名（`hermes-work`）、在 `~/.hermes/active_profile` 中跟踪活动 profile，以及自动跨所有 profiles 同步技能更新。它们还与 tab 补全集成，让您无需记忆路径。
+Profiles 是构建在 `HERMES_HOME` 之上的托管层。您*可以*在每次命令前手动设置 `HERMES_HOME=/some/path`，但 profiles 会为您处理所有底层工作：创建目录结构、生成 shell 别名（`hermes-work`）、在 `~/.hermes/active_profile` 中跟踪活动 profile，以及自动跨所有 profiles 同步技能更新。它们还与 tab 补全集成，让您无需记忆路径。
 
 ### 两个 profiles 可以共享同一个 bot token 吗？
 
@@ -626,11 +611,11 @@ Profiles 是构建在 `QUBIT_HOME` 之上的托管层。您*可以*在每次命�
 
 ### Profiles 共享记忆或会话吗？
 
-不共享。每个 profile 都有自己独立的记忆存储、会话数据库和技能目录，完全隔离。如果您想用现有的记忆和会话创建新 profile，请使用 `qubit profile create newname --clone-all` 从当前 profile 复制所有内容，或添加 `--clone-from <profile>` 从指定源 profile 复制。
+不共享。每个 profile 都有自己独立的记忆存储、会话数据库和技能目录，完全隔离。如果您想用现有的记忆和会话创建新 profile，请使用 `hermes profile create newname --clone-all` 从当前 profile 复制所有内容，或添加 `--clone-from <profile>` 从指定源 profile 复制。
 
-### 运行 `qubit update` 时会发生什么？
+### 运行 `hermes update` 时会发生什么？
 
-`qubit update` 拉取最新代码并重新安装依赖项**一次**（不是每个 profile 各一次）。然后自动将更新的技能同步到所有 profiles。您只需运行一次 `qubit update` — 它覆盖机器上的每个 profile。
+`hermes update` 拉取最新代码并重新安装依赖项**一次**（不是每个 profile 各一次）。然后自动将更新的技能同步到所有 profiles。您只需运行一次 `hermes update` — 它覆盖机器上的每个 profile。
 
 ### 可以运行多少个 profiles？
 
@@ -644,7 +629,7 @@ Profiles 是构建在 `QUBIT_HOME` 之上的托管层。您*可以*在每次命�
 
 **场景：** 您日常使用 GPT-5.4，但 Gemini 或 Grok 写社交媒体内容更好。每次手动切换模型很繁琐。
 
-**解决方案：委托配置。** Qubit 可以自动将子智能体路由到不同的模型。在 `~/.hermes/config.yaml` 中设置：
+**解决方案：委托配置。** Hermes 可以自动将子智能体路由到不同的模型。在 `~/.hermes/config.yaml` 中设置：
 
 ```yaml
 delegation:
@@ -652,7 +637,7 @@ delegation:
   provider: "openrouter"                    # 子智能体的提供商
 ```
 
-现在当您告诉 Qubit "帮我写一个关于 X 的 Twitter 帖子"并生成 `delegate_task` 子智能体时，该子智能体将在 Gemini 上运行，而非您的主模型。您的主对话仍在 GPT-5.4 上进行。
+现在当您告诉 Hermes "帮我写一个关于 X 的 Twitter 帖子"并生成 `delegate_task` 子智能体时，该子智能体将在 Gemini 上运行，而非您的主模型。您的主对话仍在 GPT-5.4 上进行。
 
 您也可以在 prompt 中明确指定：*"委托一个任务来撰写关于我们产品发布的社交媒体帖子。让你的子智能体负责实际写作。"* 智能体将使用 `delegate_task`，它会自动读取委托配置。
 
@@ -668,9 +653,9 @@ delegation:
 
 ### 在一个 WhatsApp 号码上运行多个智能体（按聊天绑定）
 
-**场景：** 在 Qubit 中，您可以将多个独立智能体绑定到特定的 WhatsApp 聊天 — 一个用于家庭购物清单群组，另一个用于您的私聊。Qubit 能做到吗？
+**场景：** 在 OpenClaw 中，您可以将多个独立智能体绑定到特定的 WhatsApp 聊天 — 一个用于家庭购物清单群组，另一个用于您的私聊。Hermes 能做到吗？
 
-**当前限制：** Qubit 的每个 profile 都需要自己的 WhatsApp 号码/会话。您无法将多个 profiles 绑定到同一个 WhatsApp 号码上的不同聊天 — WhatsApp bridge（Baileys）每个号码使用一个已认证的会话。
+**当前限制：** Hermes 的每个 profile 都需要自己的 WhatsApp 号码/会话。您无法将多个 profiles 绑定到同一个 WhatsApp 号码上的不同聊天 — WhatsApp bridge（Baileys）每个号码使用一个已认证的会话。
 
 **变通方案：**
 
@@ -686,7 +671,7 @@ delegation:
 
 ### 控制 Telegram 中显示的内容（隐藏日志和推理过程）
 
-**场景：** 您在 Telegram 中看到了网关执行日志、Qubit 推理过程和工具调用详情，而不是最终输出。
+**场景：** 您在 Telegram 中看到了网关执行日志、Hermes 推理过程和工具调用详情，而不是最终输出。
 
 **解决方案：** `config.yaml` 中的 `display.tool_progress` 设置控制显示多少工具活动：
 
@@ -711,9 +696,9 @@ display:
 
 ### 在 Telegram 上管理技能（slash 命令限制）
 
-**场景：** Telegram 有 100 个 slash 命令的限制，您的技能数量已超过此限制。您想禁用 Telegram 上不需要的技能，但 `qubit skills config` 设置似乎没有生效。
+**场景：** Telegram 有 100 个 slash 命令的限制，您的技能数量已超过此限制。您想禁用 Telegram 上不需要的技能，但 `hermes skills config` 设置似乎没有生效。
 
-**解决方案：** 使用 `qubit skills config` 按平台禁用技能。这会写入 `config.yaml`：
+**解决方案：** 使用 `hermes skills config` 按平台禁用技能。这会写入 `config.yaml`：
 
 ```yaml
 skills:
@@ -722,7 +707,7 @@ skills:
     telegram: [skill-a, skill-b]  # 仅在 telegram 上禁用
 ```
 
-更改后，**重启网关**（`qubit gateway restart` 或终止并重新启动）。Telegram bot 命令菜单在启动时重建。
+更改后，**重启网关**（`hermes gateway restart` 或终止并重新启动）。Telegram bot 命令菜单在启动时重建。
 
 :::tip
 描述过长的技能在 Telegram 菜单中会被截断为 40 个字符，以符合 payload 大小限制。如果技能未出现，可能是总 payload 大小问题而非 100 个命令数量限制 — 禁用未使用的技能对两者都有帮助。
@@ -732,7 +717,7 @@ skills:
 
 **场景：** 您有一个 Telegram 或 Discord 线程，多人在其中 @ bot。您希望该线程中的所有 @ 都属于一个共享对话，而非每个用户各自独立的会话。
 
-**当前行为：** Qubit 在大多数平台上按用户 ID 创建会话，因此每个人都有自己的对话上下文。这是出于隐私和上下文隔离的设计考量。
+**当前行为：** Hermes 在大多数平台上按用户 ID 创建会话，因此每个人都有自己的对话上下文。这是出于隐私和上下文隔离的设计考量。
 
 **变通方案：**
 
@@ -742,22 +727,24 @@ skills:
 
 3. **使用 Discord 频道。** Discord 会话按频道键控，因此同一频道中的所有用户共享上下文。为共享对话使用专用频道。
 
-### 将 Qubit 迁移到另一台机器
+### 将 Hermes 迁移到另一台机器
 
 **场景：** 您在一台机器上积累了技能、cron 作业和记忆，想将所有内容迁移到新的专用 Linux 机器。
 
 **解决方案：**
 
-1. 在新机器上安装 Qubit Agent：
+1. 在新机器上安装 Hermes Agent：
    ```bash
    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
    ```
 
 2. 在**源机器**上创建完整备份：
    ```bash
-   qubit backup
+   hermes backup
    ```
-   这会将您整个 `~/.hermes/` 目录（配置、API key、记忆、技能、会话和 profiles）打包为 zip 文件，保存到主目录 `~/hermes-backup-<timestamp>.zip`。
+   归档保存到 `~/hermes-backup-<timestamp>.zip`。
+   完整备份涵盖 Hermes 数据根目录中的配置、凭据、记忆、技能、会话和 profiles。
+   它不是应用程序或运行时的完整镜像。
 
 3. 将 zip 文件复制到新机器并导入：
    ```bash
@@ -765,10 +752,10 @@ skills:
    scp ~/hermes-backup-<timestamp>.zip newmachine:~/
 
    # 在新机器上
-   qubit import ~/hermes-backup-<timestamp>.zip
+   hermes import ~/hermes-backup-<timestamp>.zip
    ```
 
-4. 在新机器上运行 `qubit setup` 以验证 API key 和提供商配置是否正常工作。
+4. 在新机器上运行 `hermes setup` 以验证 API key 和提供商配置是否正常工作。
 
 ### 将单个 profile 迁移到另一台机器
 
@@ -776,23 +763,38 @@ skills:
 
 ```bash
 # 在源机器上
-qubit profile export work ./work-backup.tar.gz
+hermes profile export work ./work-backup.tar.gz
 
 # 将文件复制到目标机器，然后：
-qubit profile import ./work-backup.tar.gz work
+hermes profile import ./work-backup.tar.gz work
 ```
 
 导入的 profile 将包含导出时的所有配置、记忆、会话和技能。如果新机器的设置不同，您可能需要更新路径或重新向提供商进行身份验证。
 
-### `qubit backup` 与 `qubit profile export` 的对比
+### `hermes backup` 与 `hermes profile export` 的对比 {#hermes-backup-vs-hermes-profile-export}
 
-| 功能 | `qubit backup` | `qubit profile export` |
+| 功能 | `hermes backup` | `hermes profile export` |
 | :--- | :--- | :--- |
 | **使用场景** | **整机迁移** | **移植/共享特定 profile** |
-| **范围** | 全局（整个 `~/.hermes` 目录） | 局部（单个 profile 目录） |
+| **范围** | Hermes 数据根目录，下列排除项除外 | 单个 profile 目录 |
 | **包含内容** | 所有 profiles、全局配置、API key、会话 | 单个 profile：SOUL.md、记忆、会话、技能 |
 | **凭据** | **包含**（`.env` 和 `auth.json`） | **排除**（为安全共享而剥离） |
 | **格式** | `.zip` | `.tar.gz` |
+
+完整备份不包含以下内容：
+
+- 源代码仓库、依赖环境，以及下载的工具、模型和运行时。
+- 构建缓存、checkpoints、旧备份和快速快照。
+- 浏览器配置目录，包括真实浏览器凭据的副本。
+- 字节码、SQLite 辅助文件，以及 `gateway.pid`、`cron.pid` 和 `.backup.lock`。
+
+`hermes backup --quick` 只保存指定的状态文件，不生成完整归档。
+迁移机器前，它不能替代完整备份。
+
+完整备份会报告复制失败的文件。因此，即使归档已生成，也可能缺少部分数据。
+删除源安装前，请检查跳过文件的报告。
+还原后的软件包声明可让 PM 再次下载依赖项。字节码和 SQLite 辅助文件在本地重新生成。
+上述排除项不会把 `.env` 和 `auth.json` 排除在完整备份之外。
 
 **手动备选方案（rsync）：** 如果您倾向于直接复制文件，请排除代码仓库：
 ```bash
@@ -800,14 +802,14 @@ rsync -av --exclude='hermes-agent' ~/.hermes/ newmachine:~/.hermes/
 ```
 
 :::tip
-`qubit backup` 即使在 Qubit 正在运行时也能生成一致的快照。还原的归档文件不包含机器本地的运行时文件，如 `gateway.pid` 和 `cron.pid`。
+`hermes backup` 即使在 Hermes 正在运行时也能生成一致的快照。还原的归档文件不包含机器本地的运行时文件，如 `gateway.pid` 和 `cron.pid`。
 :::
 
 ### 安装后重新加载 shell 时出现权限拒绝
 
-**场景：** 运行 Qubit 安装程序后，`source ~/.zshrc` 提示权限拒绝错误。
+**场景：** 运行 Hermes 安装程序后，`source ~/.zshrc` 提示权限拒绝错误。
 
-**原因：** 这通常发生在 `~/.zshrc`（或 `~/.bashrc`）文件权限不正确，或安装程序无法干净写入时。这不是 Qubit 特有的问题 — 而是 shell 配置权限问题。
+**原因：** 这通常发生在 `~/.zshrc`（或 `~/.bashrc`）文件权限不正确，或安装程序无法干净写入时。这不是 Hermes 特有的问题 — 而是 shell 配置权限问题。
 
 **解决方案：**
 ```bash
@@ -837,13 +839,13 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 **解决方案：**
 ```bash
 # 检查已配置的模型和提供商
-qubit config show | head -20
+hermes config show | head -20
 
 # 重新运行模型选择
-qubit model
+hermes model
 
 # 或使用已知可用的模型测试
-qubit chat -q "hello" --model anthropic/claude-opus-4.7
+hermes chat -q "hello" --model anthropic/claude-opus-4.7
 ```
 
 如果使用 OpenRouter，请确保您的 API key 有余额。OpenRouter 返回 400 通常意味着该模型需要付费套餐，或模型 ID 有拼写错误。
@@ -855,5 +857,5 @@ qubit chat -q "hello" --model anthropic/claude-opus-4.7
 如果您的问题未在此处涵盖：
 
 1. **搜索现有 issue：** [GitHub Issues](https://github.com/NousResearch/hermes-agent/issues)
-2. **向社区提问：** [Qubit Labs Discord](https://discord.gg/nousresearch)
-3. **提交 bug 报告：** 请包含您的操作系统、Python 版本（`python3 --version`）、Qubit 版本（`qubit --version`）以及完整的错误信息
+2. **向社区提问：** [Nous Research Discord](https://discord.gg/nousresearch)
+3. **提交 bug 报告：** 请包含您的操作系统、Python 版本（`python3 --version`）、Hermes 版本（`hermes --version`）以及完整的错误信息

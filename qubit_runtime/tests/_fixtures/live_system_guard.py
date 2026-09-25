@@ -214,7 +214,7 @@ def _live_system_guard(request, monkeypatch):
                 return ""
         return str(cmd)
 
-    def _matches_hermes_gateway(cmd_str: str) -> bool:
+    def _matches_qubit_gateway(cmd_str: str) -> bool:
         low = cmd_str.lower()
         return any(tok in low for tok in _HERMES_TOKENS)
 
@@ -222,7 +222,7 @@ def _live_system_guard(request, monkeypatch):
         cmd_str = _cmd_to_string(cmd)
         if "systemctl" not in cmd_str:
             return False
-        if not _matches_hermes_gateway(cmd_str):
+        if not _matches_qubit_gateway(cmd_str):
             return False
         try:
             tokens = _shlex.split(cmd_str)
@@ -326,7 +326,7 @@ def _live_system_guard(request, monkeypatch):
                 "flow against a dedicated throwaway repo)."
             )
         # Block spawning a REAL gateway runtime (``python -m qubit_cli.main
-        # gateway run|start|restart``). ``_spawn_hermes_action`` launches it
+        # gateway run|start|restart``). ``_spawn_qubit_action`` launches it
         # with start_new_session=True, so it outlives the pytest worker; the
         # child inherits the pytest-tmp QUBIT_HOME, resolves the DEVELOPER's
         # ``hermes-gateway`` systemd unit (a tmp home hashes to no profile
@@ -350,7 +350,7 @@ def _live_system_guard(request, monkeypatch):
                 "detached), restarts the developer's live gateway, and "
                 "holds the webhook port. Patch the spawn seam where "
                 "production reads it (qubit_cli.web_server_gateway."
-                "_spawn_hermes_action), or mark with "
+                "_spawn_qubit_action), or mark with "
                 "@pytest.mark.spawns_gateway_lookalike a test that spawns "
                 "and reaps its own stub child."
             )

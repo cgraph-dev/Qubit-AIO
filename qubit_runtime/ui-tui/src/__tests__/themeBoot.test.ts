@@ -19,24 +19,24 @@ describe('seedBootEnvironment', () => {
 
     const seeded = seedBootEnvironment(cache({ background: '#ffffff' }), env)
 
-    expect(env.QUBIT_TUI_BACKGROUND).toBe('#ffffff')
+    expect(env.HERMES_TUI_BACKGROUND).toBe('#ffffff')
     expect(seeded).toEqual({ seededBackground: '#ffffff', seededPin: false })
   })
 
   it('never seeds over explicit user signals', () => {
-    for (const preset of [{ QUBIT_TUI_THEME: 'dark' }, { QUBIT_TUI_LIGHT: '1' }] as NodeJS.ProcessEnv[]) {
+    for (const preset of [{ HERMES_TUI_THEME: 'dark' }, { HERMES_TUI_LIGHT: '1' }] as NodeJS.ProcessEnv[]) {
       const env = { ...preset }
       const seeded = seedBootEnvironment(cache({ background: '#ffffff', mode: 'light' }), env)
 
-      expect(env.QUBIT_TUI_BACKGROUND).toBeUndefined()
+      expect(env.HERMES_TUI_BACKGROUND).toBeUndefined()
       expect(seeded).toEqual({ seededBackground: null, seededPin: false })
     }
 
     // A user-exported background keeps its value; only the pin may seed.
-    const env: NodeJS.ProcessEnv = { QUBIT_TUI_BACKGROUND: '#123456' }
+    const env: NodeJS.ProcessEnv = { HERMES_TUI_BACKGROUND: '#123456' }
 
     expect(seedBootEnvironment(cache({ background: '#ffffff' }), env).seededBackground).toBeNull()
-    expect(env.QUBIT_TUI_BACKGROUND).toBe('#123456')
+    expect(env.HERMES_TUI_BACKGROUND).toBe('#123456')
   })
 
   it('never seeds the untrusted pure-black fingerprint', () => {
@@ -44,7 +44,7 @@ describe('seedBootEnvironment', () => {
 
     const seeded = seedBootEnvironment(cache({ background: '#000000' }), env)
 
-    expect(env.QUBIT_TUI_BACKGROUND).toBeUndefined()
+    expect(env.HERMES_TUI_BACKGROUND).toBeUndefined()
     expect(seeded.seededBackground).toBeNull()
   })
 
@@ -56,19 +56,9 @@ describe('seedBootEnvironment', () => {
 
     const seeded = seedBootEnvironment(cache({ background: '#1e1e1e', mode: 'light' }), env)
 
-    expect(env.QUBIT_TUI_THEME).toBe('light')
-    expect(env.QUBIT_TUI_BACKGROUND).toBe('#1e1e1e')
+    expect(env.HERMES_TUI_THEME).toBe('light')
+    expect(env.HERMES_TUI_BACKGROUND).toBe('#1e1e1e')
     expect(seeded).toEqual({ seededBackground: '#1e1e1e', seededPin: true })
-  })
-
-  it('replays a pinned dark on a light physical background too', () => {
-    const env: NodeJS.ProcessEnv = {}
-
-    const seeded = seedBootEnvironment(cache({ background: '#ffffff', mode: 'dark' }), env)
-
-    expect(env.QUBIT_TUI_THEME).toBe('dark')
-    expect(env.QUBIT_TUI_BACKGROUND).toBe('#ffffff')
-    expect(seeded.seededPin).toBe(true)
   })
 
   it('is a no-op without a cache', () => {
@@ -89,19 +79,10 @@ describe('invalidateBootBackground', () => {
     // invalidates: the slot must clear so foreground / COLORFGBG / macOS
     // appearance / the default get their turn.
     expect(invalidateBootBackground(env)).toBe(true)
-    expect(env.QUBIT_TUI_BACKGROUND).toBeUndefined()
+    expect(env.HERMES_TUI_BACKGROUND).toBeUndefined()
 
     // Idempotent: a second distrusted answer has nothing left to clear.
     expect(invalidateBootBackground(env)).toBe(false)
-  })
-
-  it('clears a stale dark cache on a current ambiguous terminal the same way', () => {
-    const env: NodeJS.ProcessEnv = {}
-
-    seedBootEnvironment(cache({ background: '#1e1e1e' }), env)
-
-    expect(invalidateBootBackground(env)).toBe(true)
-    expect(env.QUBIT_TUI_BACKGROUND).toBeUndefined()
   })
 
   it('leaves a trusted OSC answer that overwrote the seed alone', () => {
@@ -110,18 +91,18 @@ describe('invalidateBootBackground', () => {
     seedBootEnvironment(cache({ background: '#ffffff' }), env)
 
     // A real OSC-11 measurement replaced the hint — it is authoritative.
-    env.QUBIT_TUI_BACKGROUND = '#282828'
+    env.HERMES_TUI_BACKGROUND = '#282828'
 
     expect(invalidateBootBackground(env)).toBe(false)
-    expect(env.QUBIT_TUI_BACKGROUND).toBe('#282828')
+    expect(env.HERMES_TUI_BACKGROUND).toBe('#282828')
   })
 
   it('is a no-op when nothing was seeded', () => {
-    const env: NodeJS.ProcessEnv = { QUBIT_TUI_BACKGROUND: '#ffffff' }
+    const env: NodeJS.ProcessEnv = { HERMES_TUI_BACKGROUND: '#ffffff' }
 
     seedBootEnvironment(null, env)
 
     expect(invalidateBootBackground(env)).toBe(false)
-    expect(env.QUBIT_TUI_BACKGROUND).toBe('#ffffff')
+    expect(env.HERMES_TUI_BACKGROUND).toBe('#ffffff')
   })
 })

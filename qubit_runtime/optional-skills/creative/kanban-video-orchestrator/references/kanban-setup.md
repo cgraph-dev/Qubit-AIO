@@ -13,7 +13,7 @@ JSON.
 > are adapted from alt-glitch's original multi-agent video pipeline:
 > [NousResearch/kanban-video-pipeline](https://github.com/NousResearch/kanban-video-pipeline).
 > This skill generalizes those patterns across video styles and replaces the
-> string-replacement config patcher with a PyYAML-based one.
+> string-replacement config patcher with a ruamel.yaml-based one.
 
 ## Project workspace structure
 
@@ -62,7 +62,7 @@ The setup script does six things in order:
 1. **Create workspace tree** — all directories above
 2. **Create profiles** — `qubit profile create <name> --clone`
 3. **Configure profiles** — patch each profile's
-   `$QUBIT_HOME/profiles/<name>/config.yaml` to set toolsets, always_load skills,
+   `~/.hermes/profiles/<name>/config.yaml` to set toolsets, always_load skills,
    and `cwd`
 4. **Write SOUL.md per profile** — the personality + role definition
 5. **Copy any provided assets + write `brief.md`, `TEAM.md`, and `taste/`**
@@ -82,7 +82,7 @@ the profile already exists.
 
 ### Profile config patching
 
-Each profile has a YAML config at `$QUBIT_HOME/profiles/<name>/config.yaml`. The
+Each profile has a YAML config at `~/.hermes/profiles/<name>/config.yaml`. The
 setup script edits exactly two keys:
 
 1. `toolsets:` — replace the default with the role's required toolsets
@@ -94,7 +94,7 @@ modify `terminal.cwd` — the kanban dispatcher overrides cwd per-task via
 `--workspace dir:<path>`, so the profile's cwd is irrelevant to the kanban
 work and changing it could break the user's interactive use of the profile.
 
-Use **PyYAML**, not string replacement, so the patch is robust against
+Use **ruamel.yaml**, not string replacement, so the patch is robust against
 default-config schema drift:
 
 ```bash
@@ -103,28 +103,33 @@ configure_profile() {
     local toolsets_json="$2"     # JSON array, e.g. '["kanban","terminal","file"]'
     local skills_json="$3"       # JSON array, e.g. '["ascii-video"]'
     python3 - "$profile" "$toolsets_json" "$skills_json" <<'PY'
-import json, os, sys, yaml
+import json, os, sys
+from ruamel.yaml import YAML
+yaml = YAML(typ="safe", pure=True)
+yaml.version = (1, 1)
+yaml.default_flow_style = False
+yaml.sort_base_mapping_type_on_output = False
 profile, ts_json, sk_json = sys.argv[1:4]
-p = os.path.expanduser(f"$QUBIT_HOME/profiles/{profile}/config.yaml")
+p = os.path.expanduser(f"~/.hermes/profiles/{profile}/config.yaml")
 with open(p) as f:
-    cfg = yaml.safe_load(f) or {}
+    cfg = yaml.load(f) or {}
 cfg["toolsets"] = json.loads(ts_json)
 cfg.setdefault("skills", {})["always_load"] = json.loads(sk_json)
 with open(p, "w") as f:
-    yaml.safe_dump(cfg, f, sort_keys=False)
+    yaml.dump(cfg, f)
 PY
 }
 ```
 
-PyYAML must be installed in the user's Python (it ships with most Qubit
-installs). If absent: `pip install pyyaml`.
+ruamel.yaml must be installed in the user's Python (it ships with Qubit).
+If absent: `pip install ruamel.yaml==0.18.17`.
 
 The setup script should also **validate** the patch by re-reading the file
 and comparing — see `assets/setup.sh.tmpl` for the validation pattern.
 
 ### SOUL.md per profile
 
-Each profile gets a `SOUL.md` at `$QUBIT_HOME/profiles/<name>/SOUL.md` that
+Each profile gets a `SOUL.md` at `~/.hermes/profiles/<name>/SOUL.md` that
 defines its role, voice, and rules. See `assets/soul.md.tmpl` for the
 template. Customize per role and per project.
 
@@ -218,7 +223,7 @@ The director turns this into actual `kanban_create` calls.
 ## API-key prerequisites check
 
 Before firing the kanban, verify required keys are available. Check both
-the Qubit `.env` (`$QUBIT_HOME/.env`) and macOS Keychain
+the Qubit `.env` (`${QUBIT_HOME:-$HOME/.hermes}/.env`) and macOS Keychain
 (if on macOS):
 
 ```bash
@@ -226,16 +231,16 @@ check_key() {
     local var="$1"
     local kc_account="$2"
     local kc_service="$3"
-    local _hermes_env="$QUBIT_HOME/.env"
-    if grep -q "^${var}=" "$_hermes_env" 2>/dev/null && \
-       [ -n "$(grep "^${var}=" "$_hermes_env" | cut -d= -f2-)" ]; then
+    local _qubit_env="${QUBIT_HOME:-$HOME/.hermes}/.env"
+    if grep -q "^${var}=" "$_qubit_env" 2>/dev/null && \
+       [ -n "$(grep "^${var}=" "$_qubit_env" | cut -d= -f2-)" ]; then
         return 0
     fi
     if command -v security >/dev/null 2>&1 && \
        security find-generic-password -a "${kc_account}" -s "${kc_service}" -w >/dev/null 2>&1; then
         return 0
     fi
-    echo "ERROR: ${var} not set in ${_hermes_env} or Keychain (${kc_account}/${kc_service})"
+    echo "ERROR: ${var} not set in ${_qubit_env} or Keychain (${kc_account}/${kc_service})"
     return 1
 }
 

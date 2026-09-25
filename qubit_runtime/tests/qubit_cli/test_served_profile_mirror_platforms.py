@@ -35,7 +35,7 @@ def served_root(tmp_path, monkeypatch):
     # Liveness is a verified identity; this pytest process passes as the default gateway only by
     # wearing a gateway command line.
     monkeypatch.setattr(status, "_read_process_cmdline", lambda pid: "hermes gateway run")
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
     return root
 
 

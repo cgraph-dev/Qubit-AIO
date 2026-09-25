@@ -1,6 +1,6 @@
 import type { McpCatalogResponse, McpServerSummary } from '@/types/hermes'
 
-import { capabilityScoped, qubitApi, type ProfileScope, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
 
 export interface McpTestResult {
   ok: boolean
@@ -25,7 +25,7 @@ export interface McpOAuthFlow {
 /** Connect to the server, list its tools, disconnect. Slow (spawns/handshakes
  *  for real) — well past the 15s default fetch timeout. */
 export function testMcpServer(name: string, profile?: ProfileScope): Promise<McpTestResult> {
-  return window.qubitDesktop.api<McpTestResult>({
+  return window.hermesDesktop.api<McpTestResult>({
     ...capabilityScoped(profile),
     path: `/api/mcp/servers/${encodeURIComponent(name)}/test`,
     method: 'POST',
@@ -40,7 +40,7 @@ export function saveMcpServers(
   servers: Record<string, Record<string, unknown>>,
   profile?: ProfileScope
 ): Promise<{ ok: boolean }> {
-  return window.qubitDesktop.api<{ ok: boolean }>({
+  return window.hermesDesktop.api<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/mcp/servers',
     method: 'PUT',
@@ -68,7 +68,7 @@ export function mcpOAuthRpc(scope?: ProfileScope) {
 // ---------------------------------------------------------------------------
 
 export function listMcpServers(): Promise<{ servers: McpServerSummary[] }> {
-  return qubitApi<{ servers: McpServerSummary[] }>({
+  return hermesApi<{ servers: McpServerSummary[] }>({
     ...profileScoped(),
     path: '/api/mcp/servers'
   })
@@ -87,7 +87,7 @@ export function addMcpServer(
   },
   profile?: ProfileScope
 ): Promise<McpServerSummary> {
-  return window.qubitDesktop.api<McpServerSummary>({
+  return window.hermesDesktop.api<McpServerSummary>({
     ...capabilityScoped(profile),
     path: '/api/mcp/servers',
     method: 'POST',
@@ -98,7 +98,7 @@ export function addMcpServer(
 /** Remove one server from `mcp_servers` (the inline setup card's rollback
  *  when a directory install is cancelled after the config write). */
 export function removeMcpServer(name: string, profile?: ProfileScope): Promise<{ ok: boolean }> {
-  return window.qubitDesktop.api<{ ok: boolean }>({
+  return window.hermesDesktop.api<{ ok: boolean }>({
     ...capabilityScoped(profile),
     path: `/api/mcp/servers/${encodeURIComponent(name)}`,
     method: 'DELETE'
@@ -106,7 +106,7 @@ export function removeMcpServer(name: string, profile?: ProfileScope): Promise<{
 }
 
 export function setMcpServerEnabled(name: string, enabled: boolean): Promise<{ ok: boolean }> {
-  return qubitApi<{ ok: boolean }>({
+  return hermesApi<{ ok: boolean }>({
     ...profileScoped(),
     path: `/api/mcp/servers/${encodeURIComponent(name)}/enabled`,
     method: 'PUT',
@@ -114,10 +114,11 @@ export function setMcpServerEnabled(name: string, enabled: boolean): Promise<{ o
   })
 }
 
-export function getMcpCatalog(profile?: ProfileScope): Promise<McpCatalogResponse> {
-  return window.qubitDesktop.api<McpCatalogResponse>({
+export function getMcpCatalog(profile?: ProfileScope, detectApps = false): Promise<McpCatalogResponse> {
+  return window.hermesDesktop.api<McpCatalogResponse>({
     ...capabilityScoped(profile),
-    path: '/api/mcp/catalog'
+    path: `/api/mcp/catalog${detectApps ? '?detect_apps=true' : ''}`,
+    ...(detectApps ? { timeoutMs: 5000 } : {})
   })
 }
 
@@ -126,7 +127,7 @@ export function installMcpCatalogEntry(
   env: Record<string, string> = {},
   profile?: ProfileScope
 ): Promise<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }> {
-  return window.qubitDesktop.api<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }>({
+  return window.hermesDesktop.api<{ ok: boolean; name?: string; pid?: number; action?: string; background?: boolean }>({
     ...capabilityScoped(profile),
     path: '/api/mcp/catalog/install',
     method: 'POST',

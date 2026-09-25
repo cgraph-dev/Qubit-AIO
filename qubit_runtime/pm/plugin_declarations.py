@@ -33,9 +33,9 @@ def read_native_manifest(path: Path) -> dict:
 
 
 def manifest_version_error(manifest: dict, name: str) -> str | None:
-    from qubit_cli.plugins_manifest import SUPPORTED_MANIFEST_VERSION, requires_hermes_error
+    from qubit_cli.plugins_manifest import SUPPORTED_MANIFEST_VERSION, requires_qubit_error
 
-    reason = requires_hermes_error(manifest)
+    reason = requires_qubit_error(manifest)
     if reason:
         return f"Plugin '{name}' {reason}"
     version = manifest.get("manifest_version")

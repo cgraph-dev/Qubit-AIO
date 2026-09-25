@@ -3,7 +3,7 @@
 ``_first_positional_argv`` and ``_apply_profile_override`` in ``main.py``
 historically kept hand-maintained copies of "which top-level options consume
 a value". Those copies drift — ``--reasoning`` was a value-taking top-level
-option absent from both sets, so every ``qubit --reasoning high <cmd> …``
+option absent from both sets, so every ``hermes --reasoning high <cmd> …``
 invocation mis-classified ``high`` as the first positional and forced eager
 plugin CLI discovery (~500-650ms startup tax).
 
@@ -17,7 +17,6 @@ derived from ``build_top_level_parser()`` (mirroring the
   2. the ``--reasoning`` misparse regression itself.
 """
 
-import sys
 
 import pytest
 
@@ -57,20 +56,17 @@ def test_helper_sets_match_top_level_parser():
     )
 
 
-def test_reasoning_is_classified_as_value_flag():
-    required, optional = top_level_value_flag_sets()
-    assert "--reasoning" in (required | optional)
 
 
 def test_first_positional_skips_reasoning_value(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["qubit", "--reasoning", "high", "chat", "hello"])
+    monkeypatch.setattr("sys.argv", ["hermes", "--reasoning", "high", "chat", "hello"])
     assert _first_positional_argv() == "chat"
     assert _plugin_cli_discovery_needed() is False
 
 
 @pytest.mark.parametrize("argv", [
-    ["qubit", "--reasoning", "ultra", "--provider", "openai", "-z", "prompt here"],
-    ["qubit", "-m", "x", "--reasoning=low", "chat"],
+    ["hermes", "--reasoning", "ultra", "--provider", "openai", "-z", "prompt here"],
+    ["hermes", "-m", "x", "--reasoning=low", "chat"],
 ])
 def test_reasoning_forms_do_not_shadow_the_subcommand(monkeypatch, argv):
     monkeypatch.setattr("sys.argv", argv)

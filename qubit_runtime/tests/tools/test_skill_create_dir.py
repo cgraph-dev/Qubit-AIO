@@ -20,7 +20,7 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(home))
 
     import qubit_constants
-    monkeypatch.setattr(qubit_constants, "_hermes_home_cache", None, raising=False)
+    monkeypatch.setattr(qubit_constants, "_qubit_home_cache", None, raising=False)
 
     from agent import skill_utils as su
     su._external_dirs_cache_clear()

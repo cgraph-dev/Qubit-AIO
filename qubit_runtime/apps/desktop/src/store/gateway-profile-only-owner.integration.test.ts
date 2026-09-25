@@ -13,7 +13,7 @@ const gatewayMocks = vi.hoisted(() => {
 vi.mock('@/hermes', async importActual => ({
   ...(await importActual<Record<string, unknown>>()),
   setApiRequestConnection: vi.fn(),
-  QubitGateway: class {
+  HermesGateway: class {
     connectionState = 'closed'
     private eventHandlers = new Set<
       (event: { payload?: Record<string, unknown>; session_id?: string; type: string }) => void
@@ -62,6 +62,7 @@ const { $profiles } = await import('./profile')
 
 const { $activeSessionId, _resetSessionOwnerHintsForTests, setSessionOwnerHint, setSessions } =
   await import('./session')
+
 const { $gateway } = await import('./gateway')
 const { clearAllPrompts } = await import('./prompts')
 
@@ -78,7 +79,7 @@ const {
 const { isSessionOwnerResolutionError } = await import('./session-owner-resolution')
 
 function installDesktop(): void {
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = {
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
     getConnection: vi.fn(async (profile: string) => ({
       authMode: 'token',
       mode: 'local',
@@ -124,11 +125,11 @@ afterEach(() => {
   clearAllPrompts()
   $activeSessionId.set(null)
   $gateway.set(null)
-  delete (window as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('profile-only secondary approval ownership', () => {
-  it('keeps a profile-only secondary event owner across a focus switch and dispatches approval on that secondary', async () => {
+  it('keeps a profile-only secondary event owner across a focus switch and dispatches the approval.respond fallback on that secondary', async () => {
     await expect(ensureGatewayForProfile('research')).resolves.toBeUndefined()
     const secondary = gatewayMocks.instances[0]
 
@@ -137,7 +138,10 @@ describe('profile-only secondary approval ownership', () => {
     expect($sessionTiles.get()).toEqual([])
     expect($sessionStates.get()).toEqual({})
 
-    secondary.emit({ session_id: 'rt-secondary', type: 'approval.request' })
+    // Prompts now arrive as server→client request frames, not events; owner
+    // scope is still learned from any session-stamped event the secondary
+    // socket emits (here the turn's status update).
+    secondary.emit({ session_id: 'rt-secondary', type: 'status.update' })
     await expect(ensureGatewayForProfile('default')).resolves.toBeUndefined()
 
     expect(knownOwnerForSession('rt-secondary')).toBe('research')
@@ -169,8 +173,8 @@ describe('profile-only secondary approval ownership', () => {
 
     await ensureGatewayForProfile('research')
     const secondary = gatewayMocks.instances[0]
-    secondary.emit({ session_id: 'rt-retired', type: 'approval.request' })
-    secondary.emit({ session_id: 'rt-durable', type: 'approval.request' })
+    secondary.emit({ session_id: 'rt-retired', type: 'status.update' })
+    secondary.emit({ session_id: 'rt-durable', type: 'status.update' })
     expect(knownOwnerForSession('rt-retired')).toBe('research')
     const exact = { connectionId: 'remote-same-name', profile: 'research' }
     setSessionOwnerHint('rt-durable', exact)
@@ -180,7 +184,7 @@ describe('profile-only secondary approval ownership', () => {
     expect(knownOwnerForSession('rt-retired')).toBeUndefined()
     expect(knownOwnerForSession('rt-durable')).toEqual(exact)
     expect(knownOwnerForSession('rt-remote')).toEqual(exact)
-    const getConnection = window.qubitDesktop!.getConnection
+    const getConnection = window.hermesDesktop!.getConnection
     vi.mocked(getConnection).mockClear()
     await expect(requestForOwnedSession('rt-retired', vi.fn() as never, 'approval.respond', {})).rejects.toSatisfy(
       isSessionOwnerResolutionError

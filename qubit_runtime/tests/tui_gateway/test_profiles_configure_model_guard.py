@@ -21,7 +21,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 import qubit_cli.model_selection_guards as guards
 import tui_gateway.server as srv
@@ -35,6 +35,13 @@ def home(tmp_path, monkeypatch):
     qubit_home = tmp_path / ".hermes"
     qubit_home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    # The profile write now validates through ``switch_model`` (catalog + credentials); these
+    # tests pin the guard handshake, so echo the pick back as an accepted route.
+    from qubit_cli.model_switch import ModelSwitchResult
+    monkeypatch.setattr(
+        "qubit_cli.model_switch.switch_model",
+        lambda *, raw_input, explicit_provider, **_kw: ModelSwitchResult(
+            success=True, new_model=raw_input, target_provider=explicit_provider))
     return qubit_home
 
 

@@ -4,7 +4,7 @@
 // optional error context → the modal host renders the privacy notice → the
 // user explicitly clicks Upload → diagnostics.share_nous runs backend-side
 // (collect + force-redact + Nous-S3 upload) → the modal shows the private
-// view link plus the support handoff (GitHub Issues · Qubit Labs Support ·
+// view link plus the support handoff (GitHub Issues · Nous Portal Support ·
 // Discord).
 //
 // Consent is per-upload and explicit — no "always allow", mirroring the CLI's
@@ -65,7 +65,7 @@ interface ShareNousResponse {
  *  IPC (browser dashboard, older shells) just omits the file. */
 async function collectLocalExtras(): Promise<Record<string, string>> {
   try {
-    const logs = await window.qubitDesktop?.getRecentLogs?.()
+    const logs = await window.hermesDesktop?.getRecentLogs?.()
     const lines = Array.isArray(logs?.lines) ? logs.lines : []
 
     return lines.length ? { 'desktop.log': lines.join('\n') } : {}
@@ -97,7 +97,7 @@ export async function confirmSendDiagnostics(): Promise<void> {
     const gateway = $gateway.get()
 
     if (!gateway) {
-      throw new Error('Qubit gateway unavailable')
+      throw new Error('Hermes gateway unavailable')
     }
 
     const extraFiles = await collectLocalExtras()

@@ -40,7 +40,7 @@ result = agent.run_conversation(
 
 ## API Modes
 
-Qubit supports three API execution modes, resolved from provider selection, explicit args, and base URL heuristics:
+Hermes supports three API execution modes, resolved from provider selection, explicit args, and base URL heuristics:
 
 | API mode | Used for | Client type |
 |----------|----------|-------------|
@@ -193,6 +193,7 @@ When the primary model fails (429 rate limit, 5xx server error, 401/403 auth err
 2. Try each fallback in order
 3. On success, continue the conversation with the new provider
 4. On 401/403, attempt credential refresh before failing over
+5. A Codex Responses turn that stalls on reasoning-only output (three consecutive continuations with no visible text or tool call) also fails over to the next fallback with reason `incomplete_response`; if the stall consumed the iteration budget, the fallback gets exactly one bounded grace call
 
 The fallback system also covers auxiliary tasks independently — vision, compression, and web extraction each have their own fallback chain configurable via the `auxiliary.*` config section.
 
@@ -214,9 +215,9 @@ The fallback system also covers auxiliary tasks independently — vision, compre
 ### Session Persistence
 
 After each turn:
-- Messages are saved to the session store (SQLite via `qubit_state.py`)
+- Messages are saved to the session store (SQLite via `hermes_state.py`)
 - Memory changes are flushed to `MEMORY.md` / `USER.md`
-- The session can be resumed later via `/resume` or `qubit chat --resume`
+- The session can be resumed later via `/resume` or `hermes chat --resume`
 
 ## Key Source Files
 

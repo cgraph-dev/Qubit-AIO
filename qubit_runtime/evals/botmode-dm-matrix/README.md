@@ -17,7 +17,7 @@ rm apps/desktop/e2e/probe-dm-matrix.spec.ts
 ```
 
 `BOT_DM_SERVICE_PATH=1` creates a disposable Python venv facade with an adjacent
-worktree-pinned `qubit`; PATH contains a different inert `qubit` that exits 2
+worktree-pinned `hermes`; PATH contains a different inert `hermes` that exits 2
 and records every invocation. This simulates the reported stale-launcher service
 shape without modifying the shared interpreter or the user's installed launcher.
 Omit that flag only on the baseline: a PATH shim then pins all children to this tree.

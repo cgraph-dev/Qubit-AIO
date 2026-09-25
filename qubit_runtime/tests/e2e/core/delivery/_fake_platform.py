@@ -490,14 +490,14 @@ class GatewayProcess:
 
     def __init__(self, root: Path, *, platforms: Dict[str, str], llm_base_url: str,
                  extra_config: str = "", ledger_backoff=(0.5, 1.0)) -> None:
-        from tests.fakes.fake_llm_provider import write_hermes_home
+        from tests.fakes.fake_llm_provider import write_qubit_home
 
         self.root = root
         self.home = root / "home"
-        self.hermes_home = self.home / ".hermes"
+        self.qubit_home = self.home / ".hermes"
         self.spool = root / "spool"
         self.spool.mkdir(parents=True, exist_ok=True)
-        write_hermes_home(self.hermes_home, llm_base_url, extra_config=extra_config)
+        write_qubit_home(self.qubit_home, llm_base_url, extra_config=extra_config)
         (self.spool / "config.json").write_text(json.dumps(
             {"platforms": platforms, "ledger_backoff": list(ledger_backoff)}))
         self.proc: Optional[subprocess.Popen] = None
@@ -508,7 +508,7 @@ class GatewayProcess:
 
     @property
     def db_path(self) -> Path:
-        return self.hermes_home / "state.db"
+        return self.qubit_home / "state.db"
 
     @property
     def log(self) -> Path:
@@ -517,7 +517,7 @@ class GatewayProcess:
     def env(self) -> Dict[str, str]:
         env = {k: os.environ[k] for k in _KEEP_ENV if k in os.environ}
         env.update({
-            "HOME": str(self.home), "QUBIT_HOME": str(self.hermes_home),
+            "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home),
             # The child's HOME is itself a throwaway tmp dir, so ~/.hermes IS the temp home here; the
             # live-system guard (armed by the inherited isolation marker) would refuse it.
             "HERMES_STATE_DB_GUARD_BYPASS": "1",

@@ -31,7 +31,7 @@ def _fleet_homes(monkeypatch, tmp_path, records: dict[str, dict]) -> None:
         (home / "gateway_state.json").write_text(json.dumps(record), encoding="utf-8")
     by_home = {str(home): rec["pid"] for profile, home in homes.items() for rec in [records[profile]]}
     monkeypatch.setattr("qubit_cli.version_info.get_code_identity", lambda refresh=False: {"sha": HEAD, "version": "1.0"})
-    monkeypatch.setattr("qubit_cli.profiles._get_default_hermes_home", lambda: root)
+    monkeypatch.setattr("qubit_cli.profiles._get_default_qubit_home", lambda: root)
     monkeypatch.setattr("qubit_cli.profiles._get_profiles_root", lambda: root / "profiles")
     monkeypatch.setattr("gateway.control_socket.identify_gateway", lambda h, **k: None)
     monkeypatch.setattr("gateway.status.live_gateway_pid_for_home", lambda h: by_home.get(str(h)))

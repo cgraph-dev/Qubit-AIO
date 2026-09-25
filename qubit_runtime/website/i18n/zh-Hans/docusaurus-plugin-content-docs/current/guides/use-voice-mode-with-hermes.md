@@ -1,12 +1,15 @@
 ---
 sidebar_position: 8
-title: "在 Qubit 中使用语音模式"
-description: "在 CLI、Telegram、Discord 及 Discord 语音频道中设置和使用 Qubit 语音模式的实用指南"
+title: "在 Hermes 中使用语音模式"
+description: "在 CLI、Telegram、Discord 及 Discord 语音频道中设置和使用 Hermes 语音模式的实用指南"
 ---
 
-# 在 Qubit 中使用语音模式
+# 在 Hermes 中使用语音模式
 
-本指南是[语音模式功能参考](/user-guide/features/voice-mode)的实用配套文档。
+本页的 Python 依赖命令使用 [PM 准备的源码环境](../reference/package-management.md#developer-workflow)。
+依赖变更后，请重新激活该 checkout 并重启 Hermes。
+
+本指南是[语音模式功能参考](../user-guide/features/voice-mode.md)的实用配套文档。
 
 功能页面介绍语音模式能做什么，本指南则说明如何真正用好它。
 
@@ -15,12 +18,12 @@ description: "在 CLI、Telegram、Discord 及 Discord 语音频道中设置和�
 语音模式在以下情况特别有用：
 - 需要免手持的 CLI 工作流
 - 希望在 Telegram 或 Discord 中获得语音回复
-- 希望 Qubit 加入 Discord 语音频道进行实时对话
+- 希望 Hermes 加入 Discord 语音频道进行实时对话
 - 边走动边快速记录想法、调试问题或来回交流，而不是打字
 
 ## 选择你的语音模式方案
 
-Qubit 中实际上有三种不同的语音体验。
+Hermes 中实际上有三种不同的语音体验。
 
 | 模式 | 最适合 | 平台 |
 |---|---|---|
@@ -33,15 +36,15 @@ Qubit 中实际上有三种不同的语音体验。
 2. 再启用语音回复
 3. 最后如需完整体验，再切换到 Discord 语音频道
 
-## 第一步：确保普通 Qubit 先正常运行
+## 第一步：确保普通 Hermes 先正常运行
 
 在接触语音模式之前，请确认：
-- Qubit 能正常启动
+- Hermes 能正常启动
 - 已配置好 provider（提供商）
 - Agent 能正常回答文本 prompt（提示词）
 
 ```bash
-qubit
+hermes
 ```
 
 问一个简单的问题：
@@ -57,32 +60,34 @@ What tools do you have available?
 ### CLI 麦克风 + 播放
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e ".[voice]"
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['voice'], explicit=True)"
 ```
 
 ### 消息平台
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e ".[messaging]"
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['messaging'], explicit=True)"
 ```
 
 ### 高级 ElevenLabs TTS
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e ".[tts-premium]"
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['tts-premium'], explicit=True)"
 ```
 
 ### 本地 NeuTTS（可选）
 
+声明的 `neutts` 依赖要求 Python 低于 3.14，而 Hermes 运行时要求 Python 3.14。
+因此该 extra 不会在 Hermes 运行时安装 NeuTTS。请选择兼容的提供商。
+独立的 NeuTTS 命令提供商需要自行管理兼容的 Python 环境。
+
+### 同时启用语音和消息平台
+
 ```bash
-python -m pip install -U neutts[all]
+python -c "import pm; pm.sync_venv(['voice', 'messaging', 'tts-premium', 'edge-tts'], explicit=True)"
 ```
 
-### 全部安装
-
-```bash
-cd ~/.hermes/hermes-agent && uv pip install -e ".[all]"
-```
+`all` extra 并不包含所有可选功能，也不包含上述语音和消息依赖。
 
 ## 第三步：安装系统依赖
 
@@ -108,7 +113,7 @@ sudo apt install espeak-ng
 
 ## 第四步：选择 STT 和 TTS 提供商
 
-Qubit 同时支持本地和云端语音处理方案。
+Hermes 同时支持本地和云端语音处理方案。
 
 ### 最简单 / 最低成本的方案
 
@@ -147,15 +152,15 @@ ELEVENLABS_API_KEY=***
 - `openai` → 良好的中间选项
 - `mistral` → 多语言，原生 Opus
 
-### 如果使用 `qubit setup`
+### 如果使用 `hermes setup`
 
-如果你在设置向导中选择了 NeuTTS，Qubit 会检查 `neutts` 是否已安装。如果缺失，向导会告知你 NeuTTS 需要 Python 包 `neutts` 和系统包 `espeak-ng`，并提供自动安装，使用平台包管理器安装 `espeak-ng`，然后运行：
+设置向导通过 PM 请求声明的 Python extras，不能绕过版本或平台限制：
 
-```bash
-python -m pip install -U neutts[all]
-```
+声明的 `neutts` 依赖要求 Python 低于 3.14，而 Hermes 运行时要求 Python 3.14。
+因此该 extra 不会在 Hermes 运行时安装 NeuTTS。请选择兼容的提供商。
+独立的 NeuTTS 命令提供商需要自行管理兼容的 Python 环境。
 
-如果跳过安装或安装失败，向导会回退到 Edge TTS。
+如果依赖不支持当前平台，请选择其他提供商。
 
 ## 第五步：推荐配置
 
@@ -210,10 +215,10 @@ tts:
 
 ## 开启方式
 
-启动 Qubit：
+启动 Hermes：
 
 ```bash
-qubit
+hermes
 ```
 
 在 CLI 内执行：
@@ -231,7 +236,7 @@ qubit
 1. 按下 `Ctrl+B`
 2. 说话
 3. 等待静音检测自动停止录音
-4. Qubit 转录并回复
+4. Hermes 转录并回复
 5. 如果开启了 TTS，它会朗读答案
 6. 循环可自动重启以持续使用
 
@@ -265,17 +270,17 @@ I keep getting a docker permission error. Help me debug it.
 非常适合：
 - 边走动边思考
 - 口述半成形的想法
-- 让 Qubit 实时整理你的思路
+- 让 Hermes 实时整理你的思路
 
 #### 无障碍 / 少打字场景
 
-如果打字不方便，语音模式是保持完整 Qubit 工作流的最快方式之一。
+如果打字不方便，语音模式是保持完整 Hermes 工作流的最快方式之一。
 
 ## 调整 CLI 行为
 
 ### 静音阈值
 
-如果 Qubit 开始/停止过于激进，调整：
+如果 Hermes 开始/停止过于激进，调整：
 
 ```yaml
 voice:
@@ -306,12 +311,12 @@ voice:
 
 此模式比完整语音频道更简单。
 
-Qubit 仍作为普通聊天机器人运行，但可以朗读回复。
+Hermes 仍作为普通聊天机器人运行，但可以朗读回复。
 
 ### 启动 gateway
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 ### 开启语音回复
@@ -348,7 +353,7 @@ qubit gateway
 适用于：
 - 离开电脑时
 - 发送语音备忘并获取快速语音回复
-- 希望 Qubit 充当便携式研究或运维助手
+- 希望 Hermes 充当便携式研究或运维助手
 
 #### Discord 私信中的语音输出
 
@@ -358,7 +363,7 @@ qubit gateway
 
 这是最高级的模式。
 
-Qubit 加入 Discord 语音频道（VC），监听用户语音，转录后运行正常的 agent 流水线，并将回复朗读回频道。
+Hermes 加入 Discord 语音频道（VC），监听用户语音，转录后运行正常的 agent 流水线，并将回复朗读回频道。
 
 ## 所需的 Discord 权限
 
@@ -385,9 +390,9 @@ Qubit 加入 Discord 语音频道（VC），监听用户语音，转录后运行
 ### 加入后的行为
 
 - 用户在语音频道中说话
-- Qubit 检测语音边界
+- Hermes 检测语音边界
 - 转录内容发布到关联的文本频道
-- Qubit 以文字和音频形式回复
+- Hermes 以文字和音频形式回复
 - 文本频道为执行 `/voice join` 的那个频道
 
 ### Discord 语音频道使用最佳实践
@@ -452,8 +457,8 @@ Qubit 加入 Discord 语音频道（VC），监听用户语音，转录后运行
 
 如果你想走最短的成功路径：
 
-1. 让文本 Qubit 正常工作
-2. 运行 `qubit setup voice` 以启用语音支持
+1. 让文本 Hermes 正常工作
+2. 运行 `hermes setup voice` 以启用语音支持
 3. 使用本地 STT + Edge TTS 的 CLI 语音模式
 4. 然后在 Telegram 或 Discord 中启用 `/voice on`
 5. 只有在此之后，再尝试 Discord 语音频道模式
@@ -462,8 +467,8 @@ Qubit 加入 Discord 语音频道（VC），监听用户语音，转录后运行
 
 ## 下一步阅读
 
-- [语音模式功能参考](/user-guide/features/voice-mode)
-- [消息 Gateway](/user-guide/messaging)
-- [Discord 设置](/user-guide/messaging/discord)
-- [Telegram 设置](/user-guide/messaging/telegram)
-- [配置](/user-guide/configuration)
+- [语音模式功能参考](../user-guide/features/voice-mode.md)
+- [消息 Gateway](../user-guide/messaging/index.md)
+- [Discord 设置](../user-guide/messaging/discord.md)
+- [Telegram 设置](../user-guide/messaging/telegram.md)
+- [配置](../user-guide/configuration.md)

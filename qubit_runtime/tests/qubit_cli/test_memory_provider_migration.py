@@ -60,7 +60,7 @@ def test_provider_unknown_to_catalog_is_reported_not_installed(home, monkeypatch
 
 def test_startup_recovery_attempts_each_profile_home(tmp_path, monkeypatch):
     """One multiplexed process can start agents for two homes missing the same provider."""
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
     from pm import install as pm_install
 
     homes = [tmp_path / "a", tmp_path / "b"]
@@ -85,11 +85,11 @@ def test_startup_recovery_attempts_each_profile_home(tmp_path, monkeypatch):
     monkeypatch.setattr(mig, "_install_into", fake_installer)
     outcomes = []
     for profile_home in (homes[0], homes[1], homes[0]):
-        token = set_hermes_home_override(profile_home)
+        token = set_qubit_home_override(profile_home)
         try:
             outcomes.append(mig.recover_at_startup("twin"))
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
 
     assert outcomes == [True, True, False]
     assert installed == homes

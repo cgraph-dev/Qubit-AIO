@@ -6,11 +6,11 @@ description: "Set up the Microsoft Teams meeting summary pipeline with Microsoft
 
 # Microsoft Teams Meetings
 
-Use the Teams meeting pipeline when you want Qubit to ingest Microsoft Graph meeting events, fetch transcripts first, fall back to recordings plus STT when needed, and deliver a structured summary to downstream sinks.
+Use the Teams meeting pipeline when you want Hermes to ingest Microsoft Graph meeting events, fetch transcripts first, fall back to recordings plus STT when needed, and deliver a structured summary to downstream sinks.
 
 Prerequisites: see [Microsoft Teams](./teams.md) for the underlying bot/credential setup.
 
-> Run `qubit gateway setup` and pick **Teams Meetings** for a guided walk-through.
+> Run `hermes gateway setup` and pick **Teams Meetings** for a guided walk-through.
 
 This page focuses on setup and enablement:
 - Graph credentials
@@ -18,7 +18,7 @@ This page focuses on setup and enablement:
 - Teams delivery modes
 - pipeline config shape
 
-For day-2 operations, go-live checks, and the operator worksheet, use the dedicated guide: [Operate the Teams Meeting Pipeline](/guides/operate-teams-meeting-pipeline).
+For day-2 operations, go-live checks, and the operator worksheet, use the dedicated guide: [Operate the Teams Meeting Pipeline](../../guides/operate-teams-meeting-pipeline.md).
 
 ## What This Feature Does
 
@@ -29,20 +29,20 @@ The pipeline:
 4. stores durable job state and sink records locally
 5. can write summaries to Notion, Linear, and Microsoft Teams
 
-Operator actions stay in the CLI (the `teams-pipeline` subcommand is registered by the `teams_pipeline` plugin — enable it via `qubit plugins enable teams_pipeline` or set `plugins.enabled: [teams_pipeline]` in `config.yaml`):
+Operator actions stay in the CLI (the `teams-pipeline` subcommand is registered by the `teams_pipeline` plugin — enable it via `hermes plugins enable teams_pipeline` or set `plugins.enabled: [teams_pipeline]` in `config.yaml`):
 
 ```bash
-qubit teams-pipeline validate
-qubit teams-pipeline list
-qubit teams-pipeline maintain-subscriptions
+hermes teams-pipeline validate
+hermes teams-pipeline list
+hermes teams-pipeline maintain-subscriptions
 ```
 
 ## Prerequisites
 
 Before enabling the meetings pipeline, make sure you have:
 
-- a working Qubit install
-- the existing [Microsoft Teams bot setup](/user-guide/messaging/teams) if you want Teams outbound delivery
+- a working Hermes install
+- the existing [Microsoft Teams bot setup](./teams.md) if you want Teams outbound delivery
 - Microsoft Graph application credentials with the permissions required for the meeting resources you plan to subscribe to
 - a public HTTPS URL that Microsoft Graph can call for webhook delivery
 - `ffmpeg` installed if you want recording-plus-STT fallback
@@ -150,7 +150,7 @@ platforms:
 
 ### `graph`
 
-Use this when you want Qubit to post the summary through Microsoft Graph into a Teams chat or channel.
+Use this when you want Hermes to post the summary through Microsoft Graph into a Teams chat or channel.
 
 Supported targets:
 - `chat_id`
@@ -171,13 +171,13 @@ platforms:
 
 ## Step 4: Start the Gateway
 
-Start Qubit normally after updating config:
+Start Hermes normally after updating config:
 
 ```bash
-qubit gateway run
+hermes gateway run
 ```
 
-Or, if you run Qubit in Docker, start the gateway the same way you already do for your deployment.
+Or, if you run Hermes in Docker, start the gateway the same way you already do for your deployment.
 
 Check the listener:
 
@@ -192,12 +192,12 @@ Use the plugin CLI to create and inspect subscriptions.
 Examples:
 
 ```bash
-qubit teams-pipeline subscribe \
+hermes teams-pipeline subscribe \
   --resource communications/onlineMeetings/getAllTranscripts \
   --notification-url https://ops.example.com/msgraph/webhook \
   --client-state "$MSGRAPH_WEBHOOK_CLIENT_STATE"
 
-qubit teams-pipeline subscribe \
+hermes teams-pipeline subscribe \
   --resource communications/onlineMeetings/getAllRecordings \
   --notification-url https://ops.example.com/msgraph/webhook \
   --client-state "$MSGRAPH_WEBHOOK_CLIENT_STATE"
@@ -205,25 +205,25 @@ qubit teams-pipeline subscribe \
 
 :::warning Graph subscriptions expire in 72 hours
 
-Microsoft Graph caps webhook subscriptions at 72 hours and will not auto-renew them. You MUST schedule `qubit teams-pipeline maintain-subscriptions` before going live, or notifications will silently stop three days after any manual subscription creation. See [Automating subscription renewal](/guides/operate-teams-meeting-pipeline#automating-subscription-renewal-required-for-production) in the operator runbook — three options (Qubit cron, systemd timer, plain crontab).
+Microsoft Graph caps webhook subscriptions at 72 hours and will not auto-renew them. You MUST schedule `hermes teams-pipeline maintain-subscriptions` before going live, or notifications will silently stop three days after any manual subscription creation. See [Automating subscription renewal](../../guides/operate-teams-meeting-pipeline.md#automating-subscription-renewal-required-for-production) in the operator runbook — three options (Hermes cron, systemd timer, plain crontab).
 
 :::
 
-For subscription maintenance and day-2 operator flows, continue with the guide: [Operate the Teams Meeting Pipeline](/guides/operate-teams-meeting-pipeline).
+For subscription maintenance and day-2 operator flows, continue with the guide: [Operate the Teams Meeting Pipeline](../../guides/operate-teams-meeting-pipeline.md).
 
 ## Validation
 
 Run the built-in validation snapshot:
 
 ```bash
-qubit teams-pipeline validate
+hermes teams-pipeline validate
 ```
 
 Useful companion checks:
 
 ```bash
-qubit teams-pipeline token-health
-qubit teams-pipeline subscriptions
+hermes teams-pipeline token-health
+hermes teams-pipeline subscriptions
 ```
 
 ## Troubleshooting
@@ -231,12 +231,12 @@ qubit teams-pipeline subscriptions
 | Problem | What to check |
 |---------|---------------|
 | Graph webhook validation fails | Confirm the public URL is correct and reachable, and that Graph is calling the exact `/msgraph/webhook` path |
-| Jobs do not appear in `qubit teams-pipeline list` | Confirm `msgraph_webhook` is enabled and that subscriptions point at the right notification URL |
+| Jobs do not appear in `hermes teams-pipeline list` | Confirm `msgraph_webhook` is enabled and that subscriptions point at the right notification URL |
 | Transcript-first never succeeds | Check Graph permissions for transcript resources and whether the transcript artifact exists for that meeting |
 | Recording fallback fails | Confirm `ffmpeg` is installed and the Graph app can access recording artifacts |
 | Teams summary delivery fails | Re-check `delivery_mode`, target IDs, and Teams auth config |
 
 ## Related Docs
 
-- [Microsoft Teams bot setup](/user-guide/messaging/teams)
-- [Operate the Teams Meeting Pipeline](/guides/operate-teams-meeting-pipeline)
+- [Microsoft Teams bot setup](./teams.md)
+- [Operate the Teams Meeting Pipeline](../../guides/operate-teams-meeting-pipeline.md)

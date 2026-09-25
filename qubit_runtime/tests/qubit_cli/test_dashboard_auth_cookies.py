@@ -324,7 +324,7 @@ def test_pkce_cookie_round_trip_preserves_all_segments():
         assert r1.status_code == 302
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "qubit_session_pkce" in c
+            if "hermes_session_pkce" in c
         )
         # Pull just the name=value portion so we can echo it back as
         # a Cookie header.
@@ -403,7 +403,7 @@ def test_pkce_callback_works_when_next_query_includes_encoded_path():
         assert r1.status_code == 302
         pkce_kv = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "qubit_session_pkce" in c
+            if "hermes_session_pkce" in c
         ).split(";", 1)[0]
         # Drive the callback — must succeed (302 to the post-login
         # target, NOT a 400 "Missing PKCE state cookie").
@@ -510,7 +510,7 @@ def test_clear_pkce_cookie_http_bare_deletion_is_insecure_lax():
 def test_clear_session_cookies_prefixed_deletions_carry_secure():
     """__Host-/__Secure- deletions must carry Secure (and __Host- Path=/):
     browsers reject a prefixed Set-Cookie that violates its prefix rules,
-    so an insecure deletion for __Host-qubit_session_at is silently
+    so an insecure deletion for __Host-hermes_session_at is silently
     ignored and the session cookie survives logout on HTTPS origins."""
     client = TestClient(_build_app(use_https=True, prefix=""))
     cookies = client.get("/clear").headers.get_list("set-cookie")

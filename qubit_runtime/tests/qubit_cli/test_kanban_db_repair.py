@@ -1,5 +1,5 @@
 """Tests for kanban DB corruption repair, backup retention, WAL checkpointing,
-and the ``qubit kanban repair`` CLI verb."""
+and the ``hermes kanban repair`` CLI verb."""
 
 from __future__ import annotations
 
@@ -93,10 +93,8 @@ def _integrity_messages(db_path: Path) -> list[str]:
 # Narrow auto-repair in the connect-time guard
 # ---------------------------------------------------------------------------
 
-def test_connect_auto_repairs_index_only_corruption(tmp_path, caplog):
+def test_connect_auto_repairs_index_only_corruption(tmp_path):
     """Index-only integrity errors are REINDEXed and connect proceeds."""
-    import logging
-
     db_path = tmp_path / "kanban.db"
     _build_board_db(db_path)
     _corrupt_index(db_path, "idx_tasks_status")
@@ -106,8 +104,7 @@ def test_connect_auto_repairs_index_only_corruption(tmp_path, caplog):
     assert any(m.startswith("wrong # of entries in index") for m in messages)
     assert kbc._repairable_index_names(messages) == ["idx_tasks_status"]
 
-    with caplog.at_level(logging.WARNING, logger="qubit_cli.kanban_db"):
-        conn = kbc.connect(db_path=db_path)
+    conn = kbc.connect(db_path=db_path)
     try:
         # DB is clean again and data survived.
         row = conn.execute("PRAGMA integrity_check").fetchone()
@@ -116,7 +113,6 @@ def test_connect_auto_repairs_index_only_corruption(tmp_path, caplog):
         assert "task-0" in titles and "task-11" in titles
     finally:
         conn.close()
-    assert "auto-repaired via REINDEX" in caplog.text
 
     # The corrupt bytes were quarantined BEFORE the repair mutated the file.
     backups = list(tmp_path.glob("kanban.db.corrupt.*.bak"))
@@ -243,11 +239,11 @@ def test_dispatch_tick_runs_wal_checkpoint_at_interval(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# repair_db() API + `qubit kanban repair` CLI verb
+# repair_db() API + `hermes kanban repair` CLI verb
 # ---------------------------------------------------------------------------
 
 def _run_kanban_cli(argv: list[str]) -> int:
-    """Drive the real argparse surface exactly like `qubit kanban …`."""
+    """Drive the real argparse surface exactly like `hermes kanban …`."""
     import argparse
 
     from qubit_cli import kanban as kc

@@ -1,6 +1,6 @@
 import type * as React from 'react'
 
-declare module '@qubit/ink' {
+declare module '@hermes/ink' {
   export type Key = {
     readonly ctrl: boolean
     readonly meta: boolean
@@ -27,8 +27,10 @@ declare module '@qubit/ink' {
 
   export type InputEvent = {
     readonly input: string
+    /** `input` is a ctrl chord's binding name, not typed text (#115284). */
+    readonly isControlChord: boolean
     readonly key: Key
-    readonly keypress: { readonly isPasted?: boolean; readonly raw?: string }
+    readonly keypress: { readonly isPasted?: boolean; readonly name?: string; readonly raw?: string }
   }
 
   export type InputHandler = (input: string, key: Key, event: InputEvent) => void

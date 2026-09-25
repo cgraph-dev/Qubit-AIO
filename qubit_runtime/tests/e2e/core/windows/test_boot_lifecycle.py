@@ -155,7 +155,7 @@ def test_serve_tree_kill_leaves_no_orphans_and_reboots(tmp_path: Path) -> None:
 
 
 def _gateway_state(home: WinHome) -> dict:
-    path = home.hermes_home / "gateway_state.json"
+    path = home.qubit_home / "gateway_state.json"
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -182,7 +182,7 @@ def test_gateway_stop_drains_gracefully(tmp_path: Path) -> None:
             assert state.get("gateway_state") == "stopped", (
                 f"gateway did not drain through its graceful path (rc={code}); last state {state}\n"
                 f"{log.read_text(errors='replace')[-3000:]}")
-            assert not (home.hermes_home / "gateway.pid").exists(), "gateway.pid left behind after stop"
+            assert not (home.qubit_home / "gateway.pid").exists(), "gateway.pid left behind after stop"
             left = owned_survivors(home, since=started, timeout=30)
             assert not left, f"processes of the gateway survived stop: {left}"
         finally:

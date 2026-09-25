@@ -23,7 +23,7 @@
     {
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
-          (pkgs.runCommand "qubit" { } ''
+          (pkgs.runCommand "hermes" { } ''
             mkdir -p $out/bin
             install -Dm755 ${../qubit} $out/bin/qubit
           '')
@@ -57,7 +57,7 @@
           export VIRTUAL_ENV="$(dirname "$(dirname "$(readlink -f "$(command -v python)")")")"
 
           echo "Qubit Agent dev shell in $HERMES_PYTHON_SRC_ROOT"
-          echo "Ready. Run 'qubit' or 'sandbox qubit' to start."
+          echo "Ready. Run 'hermes' or 'sandbox qubit' to start."
         '';
       };
     };

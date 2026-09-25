@@ -3,6 +3,7 @@ import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { IS_MAC } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
+import type { InterfaceMode } from '@/store/interface-mode'
 import { readableInk } from '@/themes/color'
 
 // Curated leaders for the first-run picker. Other enabled catalog entries
@@ -22,8 +23,8 @@ export const CONNECTOR_LEAD_ORDER = [
   'todoist'
 ]
 
-// Connectors are the apps Qubit reads and acts on for the user. Chat channels
-// (Discord, Telegram, WhatsApp) are how a user talks to Qubit; those live on
+// Connectors are the apps Hermes reads and acts on for the user. Chat channels
+// (Discord, Telegram, WhatsApp) are how a user talks to Hermes; those live on
 // the Messaging page, and offering them here as if they were data sources
 // taught users the wrong thing about what "connect" does. The catalog
 // carries them for the agent's sake; the first-run picker leaves them out.
@@ -45,7 +46,7 @@ export function orderConnectorPicks<T extends { connector: string; enabled?: boo
 }
 
 // Each swatch sets the accent override, which `retintTheme` uses to repaint
-// the active skin as soon as the swatch is clicked. Qubit blue is the default
+// the active skin as soon as the swatch is clicked. Nous blue is the default
 // and sets no override. Mono is black in light mode and white in dark mode.
 export const NOUS_ACCENT = '#0053fd'
 
@@ -53,7 +54,7 @@ export const accentsFor = (dark: boolean): Array<{ hex: string; name: string }> 
   { hex: dark ? '#ffffff' : '#000000', name: 'Mono' },
   { hex: '#2ea043', name: 'GitHub green' },
   { hex: '#00d5ff', name: 'Cyber cyan' },
-  { hex: NOUS_ACCENT, name: 'Qubit blue' },
+  { hex: NOUS_ACCENT, name: 'Nous blue' },
   { hex: '#8a2be2', name: 'Ultraviolet' },
   { hex: '#e0218a', name: 'Barbie pink' },
   { hex: '#ff073a', name: 'Electric red' },
@@ -120,10 +121,23 @@ export type MiniNode = 1 | { dir: 'column' | 'row'; children: MiniNode[]; weight
 
 export const ELITE_LAYOUT_ID = 'terminal-deck'
 
-export const LAYOUTS: Array<{ id: string; name: string; tree: MiniNode }> = [
-  { id: 'basic', name: 'Basic', tree: { children: [1, 1], dir: 'row', weights: [1, 4.6] } },
+// Each pick is an arrangement AND an interface mode. First launch is the one
+// place a single question can answer both: someone here to talk to Hermes
+// should not have to find Simple mode afterwards, and a developer who asked
+// for the terminal deck wants the tooling on. Basic applies Simple's own
+// preset so its shelf shows the pick as active.
+export const LAYOUTS: Array<{ description: string; id: string; mode: InterfaceMode; name: string; tree: MiniNode }> = [
   {
+    description: 'For talking to Hermes.',
+    id: 'sidebar-left',
+    mode: 'simple',
+    name: 'Basic',
+    tree: { children: [1, 1], dir: 'row', weights: [1, 4.6] }
+  },
+  {
+    description: 'For developers: terminal, files, diffs.',
     id: ELITE_LAYOUT_ID,
+    mode: 'advanced',
     name: 'Elite',
     tree: {
       children: [{ children: [1, 1, 1], dir: 'row', weights: [1, 3.2, 1.2] }, 1],
@@ -181,11 +195,13 @@ function MiniWindowButtons() {
 
 export function LayoutPreviewCard({
   active,
+  description,
   name,
   onSelect,
   tree
 }: {
   active: boolean
+  description?: string
   name: string
   onSelect: () => void
   tree: MiniNode
@@ -198,7 +214,10 @@ export function LayoutPreviewCard({
           <MiniTree node={tree} />
         </span>
       </span>
-      <span className={cn('text-xs', active ? 'text-foreground' : 'text-muted-foreground')}>{name}</span>
+      <span className="flex flex-col items-center gap-0.5">
+        <span className={cn('text-xs', active ? 'text-foreground' : 'text-muted-foreground')}>{name}</span>
+        {description && <span className="text-[0.68rem] text-muted-foreground/70">{description}</span>}
+      </span>
     </button>
   )
 }

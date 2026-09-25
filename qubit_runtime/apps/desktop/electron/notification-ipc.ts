@@ -4,7 +4,7 @@ import { createEventDeduper } from './event-dedupe'
 import { resolveNotificationAction } from './notification-actions'
 import { createLinuxNotifications } from './notification-linux'
 import { createNotificationRegistry } from './notification-registry'
-import type { QubitNotification } from './notification-types'
+import type { HermesNotification } from './notification-types'
 
 interface NotificationHost {
   getMainWindow: () => BrowserWindow | null
@@ -23,7 +23,7 @@ export function registerNativeNotifications({
   const linux = platform === 'linux' ? createLinuxNotifications() : undefined
   const notifications = createNotificationRegistry({ releaseOnClose: Boolean(linux) })
 
-  ipcMain.handle('hermes:notify', async (event, payload: QubitNotification) => {
+  ipcMain.handle('hermes:notify', async (event, payload: HermesNotification) => {
     // The source renderer owns runtime bindings and plugin callbacks.
     const sourceWindow = BrowserWindow.fromWebContents(event.sender)
     const targetWindow = () => (sourceWindow && !sourceWindow.isDestroyed() ? sourceWindow : getMainWindow())
@@ -43,7 +43,7 @@ export function registerNativeNotifications({
     const icon = typeof payload?.icon === 'string' && payload.icon.trim() ? payload.icon.trim() : undefined
 
     const options = {
-      title: payload?.title || 'Qubit',
+      title: payload?.title || 'Hermes',
       body: payload?.body || '',
       silent: Boolean(payload?.silent),
       ...(icon ? { icon } : {}),

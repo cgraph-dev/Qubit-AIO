@@ -54,7 +54,7 @@ def generate_bash(parser: argparse.ArgumentParser) -> str:
                 f"                    return\n"
                 f"                    ;;\n"
                 f"                {'|'.join(_PROFILE_NAME_ACTIONS)})\n"
-                f"                    COMPREPLY=($(compgen -W \"$(_hermes_profiles)\" -- \"$cur\"))\n"
+                f"                    COMPREPLY=($(compgen -W \"$(_qubit_profiles)\" -- \"$cur\"))\n"
                 f"                    return\n"
                 f"                    ;;\n"
                 f"            esac\n"
@@ -71,7 +71,7 @@ def generate_bash(parser: argparse.ArgumentParser) -> str:
 # Add to ~/.bashrc:
 #   eval "$(qubit completion bash)"
 
-_hermes_profiles() {{
+_qubit_profiles() {{
     local profiles_dir="$HOME/.hermes/profiles"
     local profiles="default"
     if [ -d "$profiles_dir" ]; then
@@ -82,7 +82,7 @@ _hermes_profiles() {{
     echo "$profiles"
 }}
 
-_hermes_completion() {{
+_qubit_completion() {{
     local cur prev
     COMPREPLY=()
     cur="${{COMP_WORDS[COMP_CWORD]}}"
@@ -90,7 +90,7 @@ _hermes_completion() {{
 
     # Complete profile names after -p / --profile
     if [[ "$prev" == "-p" || "$prev" == "--profile" ]]; then
-        COMPREPLY=($(compgen -W "$(_hermes_profiles)" -- "$cur"))
+        COMPREPLY=($(compgen -W "$(_qubit_profiles)" -- "$cur"))
         return
     fi
 
@@ -105,7 +105,7 @@ _hermes_completion() {{
     fi
 }}
 
-complete -F _hermes_completion qubit
+complete -F _qubit_completion qubit
 """
 
 
@@ -129,7 +129,7 @@ def generate_zsh(parser: argparse.ArgumentParser) -> str:
                 f"                profile)\n"
                 f"                    case ${{line[2]}} in\n"
                 f"                        {'|'.join(_PROFILE_NAME_ACTIONS)})\n"
-                f"                            _hermes_profiles\n"
+                f"                            _qubit_profiles\n"
                 f"                            ;;\n"
                 f"                        *)\n"
                 f"                            local -a profile_cmds\n"
@@ -157,7 +157,7 @@ def generate_zsh(parser: argparse.ArgumentParser) -> str:
 # Add to ~/.zshrc:
 #   eval "$(qubit completion zsh)"
 
-_hermes_profiles() {{
+_qubit_profiles() {{
     local -a profiles
     profiles=(default)
     if [[ -d "$HOME/.hermes/profiles" ]]; then
@@ -173,7 +173,7 @@ _hermes() {{
     _arguments -C \\
         '(-)'{{-h,--help}}'[Show help and exit]' \\
         '(-)'{{-V,--version}}'[Show version and exit]' \\
-        '(-)'{{-p,--profile}}'[Profile name]:profile:_hermes_profiles' \\
+        '(-)'{{-p,--profile}}'[Profile name]:profile:_qubit_profiles' \\
         '1:command:->commands' \\
         '*::arg:->args'
 

@@ -1,12 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { isGatewayReauthRequired } from '@hermes/shared'
+import { useStore } from '@nanostores/react'
+import { useEffect, useRef, useState } from 'react'
 
+import { RemoteSetupFields } from '@/components/remote-setup/fields'
+import { useRemoteSetup } from '@/components/remote-setup/use-remote-setup'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tip } from '@/components/ui/tooltip'
-import type { DesktopAuthProvider, DesktopCloudAgent, DesktopCloudOrg, DesktopConnectionProbeResult } from '@/global'
+import type {
+  DesktopCloudAgent,
+  DesktopCloudOrg,
+  DesktopConnectionConfigInput,
+  DesktopRegistryConnection
+} from '@/global'
 import { useI18n } from '@/i18n'
+import { reestablishCloudAgentSession } from '@/lib/cloud-agent-session'
+import { ExternalLink } from '@/lib/external-link'
 import {
   AlertCircle,
   Check,
@@ -23,18 +34,27 @@ import {
 import { coerceRemoteUrlScheme } from '@/lib/remote-url'
 import { selectableCardClass } from '@/lib/selectable-card'
 import { cn } from '@/lib/utils'
+import {
+  $activeConnectionId,
+  $connectionsRegistry,
+  refreshConnectionsRegistry,
+  selectConnection
+} from '@/store/connections'
+import { managedUpdatesSupported } from '@/store/managed-updates'
 import { notify, notifyError, readableError } from '@/store/notifications'
 
+import { cloudTeamChanged, reconnectMovedCloudAgent } from './cloud-team-change'
 import { ConnectionsRegistrySection } from './connections-registry'
 import { CONTROL_TEXT } from './constants'
 import { ManagedUpdatesSection } from './managed-updates-section'
 import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
+import { SETTING_IDS, settingElementId } from './settings-manifest'
 import { enrichSelectedSshHost, selectSshHost } from './ssh-host-selection'
+import { useSettingDeepLink } from './use-setting-deep-link'
 
 type Mode = 'local' | 'remote' | 'cloud' | 'ssh'
 type AuthMode = 'oauth' | 'token'
-type ProbeStatus = 'idle' | 'probing' | 'done' | 'error'
-// Qubit Cloud discovery lifecycle for the cloud-mode panel.
+// Hermes Cloud discovery lifecycle for the cloud-mode panel.
 type CloudDiscoverStatus = 'idle' | 'loading' | 'done' | 'error'
 
 export interface GatewaySettingsState {
@@ -56,7 +76,7 @@ export interface GatewaySettingsState {
   sshUser: string
   sshPort: number | null
   sshKeyPath: string
-  sshRemoteQubitPath: string
+  sshRemoteHermesPath: string
   sshRemoteProfile: string
 }
 
@@ -77,7 +97,7 @@ const EMPTY_STATE: GatewaySettingsState = {
   sshUser: '',
   sshPort: null,
   sshKeyPath: '',
-  sshRemoteQubitPath: '',
+  sshRemoteHermesPath: '',
   sshRemoteProfile: ''
 }
 
@@ -146,29 +166,125 @@ function ModeCard({
   )
 }
 
+interface GatewaySettingsProps {
+  embedded?: boolean
+  subpage?: string
+}
+
+export function GatewaySettings({ embedded = false, subpage }: GatewaySettingsProps = {}) {
+  useSettingDeepLink('gateway', page => subpage === undefined || page === subpage)
+
+  // Recovery always keeps the complete connection form, regardless of a
+  // settings destination. Other tasks never mount that form or its probes.
+  if (!embedded && subpage === 'devices') {
+    return (
+      <SettingsContent>
+        <ConnectionsRegistrySection />
+      </SettingsContent>
+    )
+  }
+
+  if (!embedded && subpage === 'managed-updates') {
+    return <GatewayManagedUpdates />
+  }
+
+  return <GatewayConnectionSettings embedded={embedded} standalone={subpage !== undefined} />
+}
+
+function GatewayManagedUpdates() {
+  const { t } = useI18n()
+  const registry = useStore($connectionsRegistry)
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const supported = managedUpdatesSupported()
+
+  useEffect(() => {
+    if (!supported) {
+      return
+    }
+
+    let active = true
+    void refreshConnectionsRegistry()
+      .catch(() => {
+        if (active) {
+          setFailed(true)
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [supported])
+
+  if (supported && loading) {
+    return <SettingsSkeleton sections={[{ heading: true, rows: 3 }]} />
+  }
+
+  const hasSsh = registry?.connections.some(connection => connection.kind === 'ssh')
+
+  return (
+    <SettingsContent>
+      {supported && !failed && hasSsh ? (
+        <ManagedUpdatesSection />
+      ) : (
+        <EmptyState
+          description={
+            !supported
+              ? t.settings.subpages.gatewayManagedUpdatesUnavailable
+              : failed
+                ? t.settings.gateway.failedLoad
+                : t.settings.subpages.gatewayManagedUpdatesEmpty
+          }
+          title={t.settings.managedUpdates.title}
+        />
+      )}
+    </SettingsContent>
+  )
+}
+
 // `embedded` trims the page chrome for reuse inside the boot-failure recovery
 // card: the outer title/intro, the "Save for next restart" action, and the
 // Diagnostics row are redundant there (the card owns its header + a single
 // reconnect action), so only the connection controls render.
-export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {}) {
+function GatewayConnectionSettings({ embedded, standalone }: { embedded: boolean; standalone: boolean }) {
   const { t } = useI18n()
   const g = t.settings.gateway
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [signingIn, setSigningIn] = useState(false)
   const [state, setState] = useState<GatewaySettingsState>(EMPTY_STATE)
-  const [remoteToken, setRemoteToken] = useState('')
+
+  const remote = useRemoteSetup({
+    host: 'settings',
+    enabled: !loading && state.mode === 'remote',
+    beforeOAuthLogin: async (payload: DesktopConnectionConfigInput): Promise<void> => {
+      await window.hermesDesktop.saveConnectionConfig(payload)
+    },
+    onNotice: notify
+  })
+
   const [lastTest, setLastTest] = useState<null | string>(null)
   const [sshHostSuggestions, setSshHostSuggestions] = useState<string[]>([])
   const [sshCustomHost, setSshCustomHost] = useState(false)
   const sshResolveSeq = useRef(0)
   const sshTestSeq = useRef(0)
   const saveSeq = useRef(0)
+  const saveOwner = useRef<number | null>(null)
   const signingSeq = useRef(0)
   const cloudConnectSeq = useRef(0)
   const contextSeq = useRef(0)
-  const [connectedCloudUrl, setConnectedCloudUrl] = useState('')
+  const registry = useStore($connectionsRegistry)
+  const activeConnectionId = useStore($activeConnectionId)
+  const savedCloudConnections = registry?.connections.filter(connection => connection.kind === 'cloud') ?? []
+
+  useEffect(() => {
+    void refreshConnectionsRegistry().catch(err => notifyError(err, g.failedLoad))
+  }, [g.failedLoad])
 
   // Opt-in OS-keychain encryption for stored gateway secrets. Read lazily via
   // IPC (never touches the keychain); flipping it re-encodes stored secrets
@@ -179,7 +295,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   useEffect(() => {
     let cancelled = false
 
-    void window.qubitDesktop
+    void window.hermesDesktop
       ?.getSecretStorageEncryption?.()
       .then(res => {
         if (!cancelled && res) {
@@ -199,7 +315,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     setKeychainEncryptionState(on)
 
     try {
-      const res = await window.qubitDesktop.setSecretStorageEncryption(on)
+      const res = await window.hermesDesktop.setSecretStorageEncryption(on)
 
       setKeychainEncryptionState(res?.on === true)
     } catch (err) {
@@ -210,11 +326,17 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     }
   }
 
-  const acceptSavedConfig = (config: GatewaySettingsState) => {
+  const acceptSavedConfig = (config: GatewaySettingsState): void => {
     const normalized = normalizeGatewaySettingsState(config)
 
     setState(normalized)
-    setConnectedCloudUrl(savedCloudConnectionUrl(normalized))
+    remote.reset({
+      url: normalized.remoteUrl,
+      authMode: normalized.remoteAuthMode,
+      oauthConnected: normalized.remoteOauthConnected,
+      tokenSet: normalized.remoteTokenSet,
+      tokenPreview: normalized.remoteTokenPreview
+    })
   }
 
   // When set, the plain-text opt-in dialog is open; `apply` remembers whether
@@ -222,7 +344,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   // so confirm resumes the right one.
   const [plainTextConfirm, setPlainTextConfirm] = useState<null | { apply: boolean }>(null)
 
-  // --- Qubit Cloud (cloud mode) state ---
+  // --- Hermes Cloud (cloud mode) state ---
   // One portal session powers discovery + the silent per-agent cascade. These
   // track the cloud panel: whether we're signed in, the discovered agent list,
   // and which agent is mid-connect.
@@ -248,16 +370,9 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     setCloudOrgState(value)
   }
 
-  // Auth-mode probe: as the user types a remote URL we ask the gateway (via
-  // its public /api/status) whether it gates with OAuth or a static session
-  // token, so we can show the right control (login button vs token box).
-  const [probeStatus, setProbeStatus] = useState<ProbeStatus>('idle')
-  const [probe, setProbe] = useState<DesktopConnectionProbeResult | null>(null)
-  const probeSeq = useRef(0)
-
   useEffect(() => {
     let cancelled = false
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
 
     if (!desktop?.getConnectionConfig) {
       setLoading(false)
@@ -293,118 +408,76 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   // prefers a fresh probe result over the saved value.
   const trimmedUrl = coerceRemoteUrlScheme(state.remoteUrl)
 
-  // The dashboardUrl of the currently-connected cloud instance (the saved
-  // cloud connection's remoteUrl), normalized for comparison against each
-  // discovered agent's dashboardUrl so we can highlight the active one and hide
-  // its Connect button. Empty unless the saved connection is a cloud one.
-  // The saved cloud URL was stored via the main-side normalizeRemoteBaseUrl
-  // (which lowercases the host through URL.toString()), but a discovered agent's
-  // dashboardUrl arrives raw from NAS — so normalize both sides the same way
-  // (trim, drop trailing slash, lowercase) or a host-casing difference would
-  // silently break the connected-highlight.
-  const normalizeCloudUrl = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase()
+  const savedAgent = (agent: DesktopCloudAgent) => {
+    const dashboardUrl = agent.dashboardUrl
+
+    if (!dashboardUrl) {
+      return undefined
+    }
+
+    const target = savedCloudConnectionUrl({ mode: 'cloud', remoteUrl: dashboardUrl })
+
+    return registry?.connections.find(
+      (connection): connection is DesktopRegistryConnection & { url: string } =>
+        (connection.kind === 'cloud' || connection.kind === 'remote') &&
+        typeof connection.url === 'string' &&
+        savedCloudConnectionUrl({ mode: 'cloud', remoteUrl: connection.url }) === target
+    )
+  }
 
   const isConnectedAgent = (agent: DesktopCloudAgent) =>
-    Boolean(connectedCloudUrl && agent.dashboardUrl && normalizeCloudUrl(agent.dashboardUrl) === connectedCloudUrl)
+    savedAgent(agent)?.id === activeConnectionId && !cloudTeamChanged(savedAgent(agent), cloudOrg)
 
-  useEffect(() => {
-    if (state.mode !== 'remote' || !trimmedUrl || !/^https?:\/\//i.test(trimmedUrl)) {
-      setProbeStatus('idle')
-      setProbe(null)
+  // A saved cloud connection's gateway session can lapse while the app sits
+  // on a local-primary device — the dial then rejects with a reauth-shaped
+  // error whose copy points here ("Open Settings → Gateway and sign in
+  // again"), yet nothing else in Settings re-authenticates a cloud row. Run
+  // the one recovery that exists for this state — drop the lapsed cookies,
+  // ensure the portal session, silent-cascade the agent — then retry the
+  // switch once. Everything else stays a plain failed switch.
+  const selectSavedCloudWithReauth = async (id: string, dashboardUrl?: string) => {
+    try {
+      await selectConnection(id)
+    } catch (error) {
+      if (!isGatewayReauthRequired(error)) {
+        throw error
+      }
 
-      return
-    }
+      const desktop = window.hermesDesktop
 
-    const desktop = window.qubitDesktop
+      // Cloud registry URLs are the persisted agent dashboardUrl. Keep saved
+      // rows usable without discovery, but never run the cascade against ''.
+      if (!desktop?.cloud || !dashboardUrl) {
+        throw error
+      }
 
-    if (!desktop?.probeConnectionConfig) {
-      return
-    }
+      const outcome = await reestablishCloudAgentSession(desktop, dashboardUrl)
 
-    const seq = ++probeSeq.current
-    setProbeStatus('probing')
-
-    const timer = setTimeout(() => {
-      desktop
-        .probeConnectionConfig(trimmedUrl)
-        .then(result => {
-          if (seq !== probeSeq.current) {
-            return
-          }
-
-          setProbe(result)
-          setProbeStatus(result.reachable ? 'done' : 'error')
+      if (outcome !== 'connected') {
+        notify({
+          kind: 'warning',
+          title: t.boot.failure.signInIncompleteTitle,
+          message: t.boot.failure.signInIncompleteMessage
         })
-        .catch(() => {
-          if (seq !== probeSeq.current) {
-            return
-          }
 
-          setProbe(null)
-          setProbeStatus('error')
-        })
-    }, 500)
+        throw error
+      }
 
-    return () => clearTimeout(timer)
-  }, [state.mode, trimmedUrl])
-
-  // Effective auth mode: a reachable probe wins; otherwise fall back to the
-  // saved config's mode so a re-open of settings doesn't flicker.
-  const authMode: AuthMode = useMemo(() => {
-    if (probeStatus === 'done' && probe && probe.authMode !== 'unknown') {
-      return probe.authMode
+      await selectConnection(id)
     }
+  }
 
-    return state.remoteAuthMode
-  }, [probe, probeStatus, state.remoteAuthMode])
+  const activateSavedCloud = async (id: string, dashboardUrl?: string) => {
+    setCloudConnectingId(id)
 
-  // Whether we actually KNOW how this gateway authenticates yet. Until we do,
-  // neither the OAuth button nor the session-token box should render —
-  // `authMode` defaults to 'token', so without this gate the token box flashes
-  // for every gateway (including OAuth ones) during the idle/probing window
-  // before the first probe lands. The scheme is known when either:
-  //   * the live probe finished (probeStatus 'done'), or
-  //   * we're idle but showing a previously-saved remote config (re-opening
-  //     settings for a gateway already signed-in or with a saved token), so
-  //     its control appears immediately with no flicker.
-  // While probing (or after a probe error), the scheme is unknown and we show
-  // the probe status row instead of a control.
-  const hasSavedRemote = state.remoteTokenSet || state.remoteOauthConnected
-
-  const authResolved = useMemo(() => {
-    if (probeStatus === 'done') {
-      return true
+    try {
+      await selectSavedCloudWithReauth(id, dashboardUrl)
+    } catch (err) {
+      notifyError(err, g.cloudConnectFailed)
+    } finally {
+      setCloudConnectingId(null)
     }
-
-    return probeStatus === 'idle' && hasSavedRemote
-  }, [probeStatus, hasSavedRemote])
-
-  const providerLabel = useMemo(() => {
-    const providers: DesktopAuthProvider[] = probe?.providers ?? []
-
-    if (providers.length === 1) {
-      return providers[0].displayName || providers[0].name
-    }
-
-    if (providers.length > 1) {
-      return providers.map(p => p.displayName || p.name).join(' / ')
-    }
-
-    return t.boot.failure.identityProvider
-  }, [probe, t.boot.failure.identityProvider])
-
-  // A username/password gateway authenticates through a credential form on the
-  // gateway's /login page (POST /auth/password-login) rather than an OAuth
-  // redirect. Everything downstream — the session cookie, the ws-ticket mint,
-  // the persistent partition — is identical, so the desktop drives it through
-  // the same sign-in window; only the button copy changes. We treat the
-  // gateway as password-style only when EVERY advertised provider supports
-  // password, so a mixed deployment keeps the generic OAuth copy.
-  const isPasswordProvider = useMemo(() => {
-    const providers: DesktopAuthProvider[] = probe?.providers ?? []
-
-    return providers.length > 0 && providers.every(p => p.supportsPassword)
-  }, [probe])
+  }
 
   useEffect(() => {
     // One-directional: a saved host that isn't in the suggestions must render
@@ -418,12 +491,12 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   }, [state.sshHost, sshHostSuggestions])
 
   useEffect(() => {
-    if (state.mode !== 'ssh' || !window.qubitDesktop?.sshConfigHosts) {
+    if (state.mode !== 'ssh' || !window.hermesDesktop?.sshConfigHosts) {
       return
     }
 
     let cancelled = false
-    void window.qubitDesktop
+    void window.hermesDesktop
       .sshConfigHosts()
       .then(result => {
         if (!cancelled) {
@@ -449,41 +522,32 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     setLastTest(null)
   }, [
     state.mode,
+    remote.credentials.url,
+    remote.credentials.token,
+    remote.credentials.authMode,
     state.sshHost,
     state.sshUser,
     state.sshPort,
     state.sshKeyPath,
-    state.sshRemoteQubitPath,
+    state.sshRemoteHermesPath,
     state.sshRemoteProfile
   ])
 
-  const oauthConnected = state.remoteOauthConnected
-
-  const canUseRemote = useMemo(() => {
-    if (!trimmedUrl) {
-      return false
-    }
-
-    if (authMode === 'oauth') {
-      return oauthConnected
-    }
-
-    return Boolean(remoteToken.trim()) || state.remoteTokenSet
-  }, [authMode, oauthConnected, remoteToken, state.remoteTokenSet, trimmedUrl])
-
-  const payload = (allowPlainTextToken?: boolean) => ({
-    mode: state.mode,
-    remoteAuthMode: authMode,
-    remoteToken: authMode === 'token' ? remoteToken.trim() || undefined : undefined,
-    remoteUrl: trimmedUrl,
-    sshHost: state.sshHost.trim(),
-    sshUser: state.sshUser.trim() || undefined,
-    sshPort: state.sshPort,
-    sshKeyPath: state.sshKeyPath.trim() || undefined,
-    sshRemoteQubitPath: state.sshRemoteQubitPath.trim(),
-    // Preserve an intentional blank so an existing remote-profile mapping can
-    // be cleared instead of being mistaken for an omitted field.
-    sshRemoteProfile: state.sshRemoteProfile.trim(),
+  const payload = (allowPlainTextToken?: boolean): DesktopConnectionConfigInput => ({
+    ...(state.mode === 'remote'
+      ? remote.payload
+      : {
+          mode: state.mode,
+          remoteAuthMode: state.remoteAuthMode,
+          remoteUrl: coerceRemoteUrlScheme(state.remoteUrl),
+          sshHost: state.sshHost.trim(),
+          sshUser: state.sshUser.trim() || undefined,
+          sshPort: state.sshPort,
+          sshKeyPath: state.sshKeyPath.trim() || undefined,
+          sshRemoteHermesPath: state.sshRemoteHermesPath.trim(),
+          // A blank clears an existing remote-profile mapping.
+          sshRemoteProfile: state.sshRemoteProfile.trim()
+        }),
     ...(allowPlainTextToken ? { allowPlainTextToken: true } : {})
   })
 
@@ -492,26 +556,26 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   // and this machine has no OS keyring (safeStorage unavailable). In that case
   // we must get an explicit opt-in before persisting.
   const wouldPersistPlainTextToken =
-    (state.mode === 'remote' || state.mode === 'cloud') &&
-    authMode !== 'oauth' &&
-    Boolean(remoteToken.trim()) &&
+    state.mode === 'remote' &&
+    remote.credentials.authMode === 'token' &&
+    Boolean(remote.credentials.token.trim()) &&
     state.secureTokenStorage === false
 
-  const performSave = async (apply: boolean, allowPlainTextToken: boolean) => {
+  const performSave = async (apply: boolean, allowPlainTextToken: boolean): Promise<void> => {
     const seq = ++saveSeq.current
+    saveOwner.current = seq
     setSaving(true)
 
     try {
       const next = apply
-        ? await window.qubitDesktop.applyConnectionConfig(payload(allowPlainTextToken))
-        : await window.qubitDesktop.saveConnectionConfig(payload(allowPlainTextToken))
+        ? await window.hermesDesktop.applyConnectionConfig(payload(allowPlainTextToken))
+        : await window.hermesDesktop.saveConnectionConfig(payload(allowPlainTextToken))
 
       if (seq !== saveSeq.current) {
         return
       }
 
       acceptSavedConfig(next)
-      setRemoteToken('')
       notify({
         kind: 'success',
         title: apply ? g.restartingTitle : g.savedTitle,
@@ -551,18 +615,20 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         notifyError(err, apply ? g.applyFailed : g.saveFailed)
       }
     } finally {
-      if (seq === saveSeq.current) {
+      // A stale response cannot replace the draft, but its request must release busy state.
+      if (seq === saveOwner.current) {
+        saveOwner.current = null
         setSaving(false)
       }
     }
   }
 
-  const save = async (apply: boolean) => {
-    if (state.mode === 'remote' && !canUseRemote) {
+  const save = async (apply: boolean): Promise<void> => {
+    if (state.mode === 'remote' && !remote.canCommit) {
       notify({
         kind: 'warning',
         title: g.incompleteTitle,
-        message: authMode === 'oauth' ? g.incompleteSignIn : g.incompleteToken
+        message: remote.credentials.authMode === 'oauth' ? g.incompleteSignIn : g.incompleteToken
       })
 
       return
@@ -578,100 +644,14 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     await performSave(apply, false)
   }
 
-  // OAuth sign-in: persist the URL + oauth mode first (so the saved config has
-  // the URL the login window needs), then open the gateway login window and
-  // refresh the connection status from the saved config once it completes.
-  const signIn = async () => {
-    const seq = ++signingSeq.current
-
-    if (!trimmedUrl) {
-      notify({ kind: 'warning', title: g.incompleteTitle, message: g.enterUrlFirst })
-
-      return
-    }
-
-    setSigningIn(true)
-
-    try {
-      // Save (don't apply/restart) so the login window has a URL to use and the
-      // oauth mode is persisted, without yet flipping the live connection.
-      const saved = await window.qubitDesktop.saveConnectionConfig({
-        mode: state.mode,
-        remoteAuthMode: 'oauth',
-        remoteUrl: trimmedUrl
-      })
-
-      if (seq !== signingSeq.current) {
-        return
-      }
-
-      acceptSavedConfig(saved)
-
-      const result = await window.qubitDesktop.oauthLoginConnectionConfig(trimmedUrl)
-
-      if (seq !== signingSeq.current) {
-        return
-      }
-
-      if (result.connected) {
-        const refreshed = await window.qubitDesktop.getConnectionConfig(null)
-        acceptSavedConfig(refreshed)
-        notify({ kind: 'success', title: g.signedIn, message: g.connectedTo(providerLabel) })
-      } else {
-        notify({
-          kind: 'warning',
-          title: t.boot.failure.signInIncompleteTitle,
-          message: t.boot.failure.signInIncompleteMessage
-        })
-      }
-    } catch (err) {
-      if (seq === signingSeq.current) {
-        notifyError(err, g.signInFailed)
-      }
-    } finally {
-      if (seq === signingSeq.current) {
-        setSigningIn(false)
-      }
-    }
-  }
-
-  const signOut = async () => {
-    if (!trimmedUrl) {
-      return
-    }
-
-    const seq = ++signingSeq.current
-    setSigningIn(true)
-
-    try {
-      await window.qubitDesktop.oauthLogoutConnectionConfig(trimmedUrl)
-      const refreshed = await window.qubitDesktop.getConnectionConfig(null)
-
-      if (seq !== signingSeq.current) {
-        return
-      }
-
-      acceptSavedConfig(refreshed)
-      notify({ kind: 'success', title: g.signedOutTitle, message: g.signedOutMessage })
-    } catch (err) {
-      if (seq === signingSeq.current) {
-        notifyError(err, g.signOutFailed)
-      }
-    } finally {
-      if (seq === signingSeq.current) {
-        setSigningIn(false)
-      }
-    }
-  }
-
-  // --- Qubit Cloud handlers ---
+  // --- Hermes Cloud handlers ---
 
   // Pull the discovered agent list over the shared portal session. Tolerant of
   // a lapsed session: a needsCloudLogin error flips us back to signed-out.
   // `org` scopes discovery for multi-org users; when discovery comes back with
   // needsOrgSelection we surface the org list and show a picker instead.
   const discoverCloud = async (org?: string) => {
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
     const seq = contextSeq.current
 
     if (!desktop?.cloud) {
@@ -691,6 +671,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         // Multi-org user with no org chosen yet: show the picker. Don't clear a
         // previously-chosen org list on a refresh.
         setCloudOrgs(result.orgs)
+        setCloudOrg(null)
         setCloudAgents([])
         setCloudDiscover('done')
 
@@ -755,7 +736,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       return
     }
 
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
 
     if (!desktop?.cloud) {
       return
@@ -801,7 +782,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   }, [state.mode])
 
   const cloudSignIn = async () => {
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
     const seq = ++signingSeq.current
 
     if (!desktop?.cloud) {
@@ -834,7 +815,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   }
 
   const cloudSignOut = async () => {
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
     const seq = ++signingSeq.current
 
     if (!desktop?.cloud) {
@@ -877,7 +858,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       return
     }
 
-    const desktop = window.qubitDesktop
+    const desktop = window.hermesDesktop
 
     if (!desktop?.cloud) {
       return
@@ -885,7 +866,42 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
 
     setCloudConnectingId(agent.id)
 
+    const warnSignInIncomplete = () =>
+      notify({
+        kind: 'warning',
+        title: t.boot.failure.signInIncompleteTitle,
+        message: t.boot.failure.signInIncompleteMessage
+      })
+
     try {
+      // Saved sources keep their identity, credentials and default gateway.
+      // The activation path reuses healthy sockets and validates auth on a new dial.
+      const saved = savedAgent(agent)
+
+      if (saved) {
+        const org = cloudOrgRef.current
+
+        if (org && cloudTeamChanged(saved, org)) {
+          const reconnected = await reconnectMovedCloudAgent(desktop, saved, org, () => seq === contextSeq.current)
+
+          if (seq !== contextSeq.current) {
+            return
+          }
+
+          if (!reconnected) {
+            warnSignInIncomplete()
+
+            return
+          }
+
+          await refreshConnectionsRegistry()
+        }
+
+        await selectSavedCloudWithReauth(saved.id, agent.dashboardUrl)
+
+        return
+      }
+
       const result = await desktop.cloud.agentSignIn(agent.dashboardUrl)
 
       if (seq !== contextSeq.current) {
@@ -893,11 +909,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       }
 
       if (!result.connected) {
-        notify({
-          kind: 'warning',
-          title: t.boot.failure.signInIncompleteTitle,
-          message: t.boot.failure.signInIncompleteMessage
-        })
+        warnSignInIncomplete()
 
         return
       }
@@ -910,7 +922,8 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         mode: 'cloud',
         remoteAuthMode: 'oauth',
         remoteUrl: agent.dashboardUrl,
-        cloudOrg: cloudOrgRef.current ?? undefined
+        cloudOrg: cloudOrgRef.current ?? undefined,
+        cloudName: agent.name
       })
 
       if (seq !== contextSeq.current) {
@@ -918,6 +931,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       }
 
       acceptSavedConfig(next)
+      await refreshConnectionsRegistry()
       notify({ kind: 'success', title: g.cloudConnectedTitle, message: g.cloudConnectedTo(agent.name) })
     } catch (err) {
       if (seq !== contextSeq.current) {
@@ -937,14 +951,14 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   }
 
   const resolveSshHost = async (host: string) => {
-    if (!host || !window.qubitDesktop?.sshResolveHost) {
+    if (!host || !window.hermesDesktop?.sshResolveHost) {
       return
     }
 
     const seq = ++sshResolveSeq.current
 
     try {
-      const resolved = await window.qubitDesktop.sshResolveHost(host)
+      const resolved = await window.hermesDesktop.sshResolveHost(host)
 
       if (seq !== sshResolveSeq.current) {
         return
@@ -982,7 +996,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     setLastTest(null)
 
     try {
-      const result = await window.qubitDesktop.testConnectionConfig(payload())
+      const result = await window.hermesDesktop.testConnectionConfig(payload())
 
       if (seq !== sshTestSeq.current) {
         return
@@ -1017,48 +1031,6 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     }
   }
 
-  const testRemote = async () => {
-    const seq = ++sshTestSeq.current
-
-    if (!canUseRemote) {
-      notify({
-        kind: 'warning',
-        title: g.incompleteTitle,
-        message: authMode === 'oauth' ? g.incompleteSignInTest : g.incompleteTokenTest
-      })
-
-      return
-    }
-
-    setTesting(true)
-    setLastTest(null)
-
-    try {
-      const result = await window.qubitDesktop.testConnectionConfig({
-        mode: 'remote',
-        remoteAuthMode: authMode,
-        remoteToken: authMode === 'token' ? remoteToken.trim() || undefined : undefined,
-        remoteUrl: trimmedUrl
-      })
-
-      if (seq !== sshTestSeq.current) {
-        return
-      }
-
-      const message = g.connectedTo(result.baseUrl || trimmedUrl, result.version ?? undefined)
-      setLastTest(message)
-      notify({ kind: 'success', title: g.reachableTitle, message })
-    } catch (err) {
-      if (seq === sshTestSeq.current) {
-        notifyError(err, g.testFailed)
-      }
-    } finally {
-      if (seq === sshTestSeq.current) {
-        setTesting(false)
-      }
-    }
-  }
-
   if (loading) {
     return (
       <SettingsSkeleton
@@ -1070,13 +1042,13 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
     )
   }
 
-  if (!window.qubitDesktop?.getConnectionConfig) {
+  if (!window.hermesDesktop?.getConnectionConfig) {
     return <EmptyState description={g.unavailableDesc} title={g.unavailableTitle} />
   }
 
   return (
     <SettingsContent bare={embedded}>
-      {embedded ? null : (
+      {embedded || standalone ? null : (
         <div className="mb-5">
           <div className="flex items-center gap-2 text-[length:var(--conversation-text-font-size)] font-medium">
             <Globe className="size-4 text-muted-foreground" />
@@ -1099,7 +1071,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         </div>
       ) : null}
 
-      <div className="mb-5 grid gap-2">
+      <div className="mb-5 grid gap-2" id={settingElementId(SETTING_IDS.gateway.connectionMode)}>
         <div className="text-[length:var(--conversation-caption-font-size)] font-medium text-(--ui-text-secondary)">
           {g.modeTitle}
         </div>
@@ -1141,11 +1113,45 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         </div>
       </div>
 
-      {/* Qubit Cloud panel: one portal sign-in, then a discovered-agent picker
+      {/* Hermes Cloud panel: one portal sign-in, then a discovered-agent picker
           whose selection drives the silent per-agent cascade + a cloud
           connection. Replaces the URL/token form while in cloud mode. */}
       {state.mode === 'cloud' && !state.envOverride ? (
         <div className="mt-5 grid gap-1">
+          {savedCloudConnections.length > 0 ? (
+            <div className="mb-4 grid gap-1">
+              <div className="text-[length:var(--conversation-caption-font-size)] font-medium text-(--ui-text-secondary)">
+                {g.cloudSavedTitle}
+              </div>
+              <p className="mb-2 text-xs text-muted-foreground">{g.cloudSavedDesc}</p>
+              {savedCloudConnections.map(connection => (
+                <div data-slot="saved-cloud-gateway" key={connection.id}>
+                  <ListRow
+                    action={
+                      activeConnectionId === connection.id ? (
+                        <Pill tone="primary">
+                          <Check className="size-3" />
+                          {g.cloudActive}
+                        </Pill>
+                      ) : (
+                        <Button
+                          disabled={cloudConnectingId !== null}
+                          onClick={() => void activateSavedCloud(connection.id, connection.url)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          {cloudConnectingId === connection.id ? <Loader2 className="animate-spin" /> : null}
+                          {g.cloudUseSaved}
+                        </Button>
+                      )
+                    }
+                    description={connection.url}
+                    title={connection.label}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
           <ListRow
             action={
               cloudSignedIn ? (
@@ -1234,7 +1240,9 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     <span>
                       {g.cloudNoAgents.before}
-                      <span className="font-medium text-(--ui-text-secondary)">{g.cloudNoAgents.linkText}</span>
+                      <ExternalLink href="https://portal.nousresearch.com/agents" showExternalIcon={false}>
+                        {g.cloudNoAgents.linkText}
+                      </ExternalLink>
                       {g.cloudNoAgents.after}
                     </span>
                   </div>
@@ -1253,7 +1261,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                               connected ? (
                                 <Pill tone="primary">
                                   <Check className="mr-1 inline size-3" />
-                                  {g.cloudConnectedPill}
+                                  {g.cloudActive}
                                 </Pill>
                               ) : (
                                 <Button
@@ -1265,13 +1273,15 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
                                   {agent.dashboardUrl
                                     ? cloudConnectingId === agent.id
                                       ? g.cloudConnecting
-                                      : g.cloudConnect
+                                      : savedAgent(agent)
+                                        ? g.cloudUseSaved
+                                        : g.cloudConnect
                                     : g.cloudAgentProvisioning}
                                 </Button>
                               )
                             }
                             description={g.cloudStatusLabel(agent.dashboardGatewayState)}
-                            title={agent.name}
+                            title={savedAgent(agent)?.label || agent.name}
                           />
                         </div>
                       )
@@ -1284,105 +1294,21 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         </div>
       ) : null}
 
-      {state.mode === 'remote' && !state.envOverride ? (
-        <div className="mt-5 grid gap-1">
-          <ListRow
-            action={
-              <Input
-                className={cn('h-8', CONTROL_TEXT)}
-                disabled={state.envOverride}
-                onChange={event => setState(current => ({ ...current, remoteUrl: event.target.value }))}
-                placeholder="https://gateway.example.com/hermes"
-                value={state.remoteUrl}
-              />
-            }
-            description={g.remoteUrlDesc}
-            title={g.remoteUrlTitle}
-          />
-
-          {state.mode === 'remote' && probeStatus === 'probing' ? (
-            <div className="flex items-center gap-2 py-3 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-              <Loader2 className="size-4 animate-spin" />
-              {g.probing}
+      {/* An env-pinned remote (HERMES_DESKTOP_REMOTE_URL) still renders this
+          block: the override pins the URL/mode, but the browser SESSION is not
+          env-owned — docs promise "you still sign in from the Gateway settings
+          panel" (user-guide/desktop.md). Hiding it left a lapsed session with
+          no sign-in anywhere in Settings, and the boot-recovery card routes
+          every remote failure here, so "Use local gateway" became the only way
+          back in (#114856). The URL input and Save/Test stay env-gated. */}
+      {state.mode === 'remote' ? (
+        <div className="mt-5">
+          <RemoteSetupFields disabled={saving} setup={remote} urlDisabled={state.envOverride} />
+          {remote.credentials.authMode === 'token' && state.remoteTokenPlainText ? (
+            <div className="mt-2 text-sm text-destructive">
+              <div className="font-medium">{g.plainTextStoredTitle}</div>
+              <div>{g.plainTextStoredDesc}</div>
             </div>
-          ) : null}
-
-          {state.mode === 'remote' && probeStatus === 'error' ? (
-            <div className="flex items-start gap-2 py-3 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              {g.probeError}
-            </div>
-          ) : null}
-
-          {/* OAuth / password gateways: present a sign-in button + connection status. */}
-          {state.mode === 'remote' && authResolved && authMode === 'oauth' ? (
-            <ListRow
-              action={
-                oauthConnected ? (
-                  <div className="flex items-center gap-2">
-                    <Pill tone="primary">
-                      <Check className="size-3" /> {g.signedIn}
-                    </Pill>
-                    <Button disabled={signingIn || state.envOverride} onClick={() => void signOut()} variant="outline">
-                      {signingIn ? <Loader2 className="animate-spin" /> : null}
-                      {g.signOut}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button disabled={signingIn || state.envOverride || !trimmedUrl} onClick={() => void signIn()}>
-                    {signingIn ? <Loader2 className="animate-spin" /> : <LogIn />}
-                    {isPasswordProvider ? g.signIn : g.signInWith(providerLabel)}
-                  </Button>
-                )
-              }
-              description={
-                oauthConnected
-                  ? isPasswordProvider
-                    ? g.authSignedInPassword
-                    : g.authSignedInOauth
-                  : isPasswordProvider
-                    ? g.authNeedsPassword
-                    : g.authNeedsOauth(providerLabel)
-              }
-              title={g.authTitle}
-            />
-          ) : null}
-
-          {/* Session-token gateways: keep the existing token entry box. */}
-          {state.mode === 'remote' && authResolved && authMode === 'token' ? (
-            <>
-              <ListRow
-                action={
-                  <Input
-                    autoComplete="off"
-                    className={cn('h-8 font-mono', CONTROL_TEXT)}
-                    disabled={state.envOverride}
-                    onChange={event => setRemoteToken(event.target.value)}
-                    placeholder={
-                      state.remoteTokenSet
-                        ? g.existingToken(state.remoteTokenPreview ?? g.savedToken)
-                        : g.pasteSessionToken
-                    }
-                    type="password"
-                    value={remoteToken}
-                  />
-                }
-                description={g.tokenDesc}
-                title={g.tokenTitle}
-              />
-
-              {/* The saved token is on disk in plain text (no OS keyring). Same
-                  banner idiom as envOverride so it reads as a real warning. */}
-              {state.remoteTokenPlainText ? (
-                <div className="mt-2 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[length:var(--conversation-caption-font-size)] text-destructive">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <div>
-                    <div className="font-medium">{g.plainTextStoredTitle}</div>
-                    <div className="mt-1 leading-5">{g.plainTextStoredDesc}</div>
-                  </div>
-                </div>
-              ) : null}
-            </>
           ) : null}
         </div>
       ) : null}
@@ -1479,13 +1405,13 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
             action={
               <Input
                 className={cn('h-8 font-mono', CONTROL_TEXT)}
-                onChange={event => setState(current => ({ ...current, sshRemoteQubitPath: event.target.value }))}
-                placeholder={g.sshQubitPathPlaceholder}
-                value={state.sshRemoteQubitPath}
+                onChange={event => setState(current => ({ ...current, sshRemoteHermesPath: event.target.value }))}
+                placeholder={g.sshHermesPathPlaceholder}
+                value={state.sshRemoteHermesPath}
               />
             }
-            description={g.sshQubitPathDesc}
-            title={g.sshQubitPathTitle}
+            description={g.sshHermesPathDesc}
+            title={g.sshHermesPathTitle}
           />
         </div>
       ) : null}
@@ -1500,12 +1426,12 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
           {state.mode === 'remote' ? (
             <Button
               className="mr-auto"
-              disabled={state.envOverride || testing || !canUseRemote}
-              onClick={() => void testRemote()}
+              disabled={state.envOverride || saving || remote.testing || !remote.canTest}
+              onClick={() => void remote.test()}
               size="sm"
               variant="text"
             >
-              {testing ? <Loader2 className="animate-spin" /> : null}
+              {remote.testing ? <Loader2 className="animate-spin" /> : null}
               {g.testRemote}
             </Button>
           ) : state.mode === 'ssh' ? (
@@ -1543,26 +1469,27 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
             checked={keychainEncryption}
             description={g.keychainEncryptionDesc}
             disabled={keychainEncryptionBusy}
+            id={settingElementId(SETTING_IDS.gateway.keychainEncryption)}
             label={g.keychainEncryptionTitle}
             onChange={on => void setKeychainEncryption(on)}
           />
           <ListRow
             action={
-              <Button onClick={() => void window.qubitDesktop?.revealLogs()} size="sm" variant="textStrong">
+              <Button onClick={() => void window.hermesDesktop?.revealLogs()} size="sm" variant="textStrong">
                 <FileText />
                 {g.openLogs}
               </Button>
             }
             description={g.diagnosticsDesc}
+            id={settingElementId(SETTING_IDS.gateway.diagnostics)}
             title={g.diagnostics}
           />
         </div>
       )}
 
-      {/* Unified Gateways page: the full connections registry (add/edit/delete
-          named agent sources) lives on this page now, below the window
-          connection controls. Hidden in the embedded (boot-recovery) form. */}
-      {embedded ? null : (
+      {/* Preserve the full legacy page outside subpage navigation, without
+          mounting registry editors in connection-only or recovery views. */}
+      {embedded || standalone ? null : (
         <>
           <ConnectionsRegistrySection />
           {/* Per-connection driver for the transactional managed SSH update

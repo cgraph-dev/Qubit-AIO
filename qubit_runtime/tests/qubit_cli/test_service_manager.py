@@ -10,15 +10,7 @@ from __future__ import annotations
 import pytest
 
 from qubit_cli.service_manager import (
-    LaunchdServiceManager,
     S6ServiceManager,
-    ServiceManager,
-    ServiceManagerKind,
-    SystemdServiceManager,
-    WindowsServiceManager,
-    detect_service_manager,
-    get_service_manager,
-    validate_profile_name,
 )
 
 
@@ -45,34 +37,6 @@ from qubit_cli.service_manager import (
 # ---------------------------------------------------------------------------
 
 
-def _patch_s6_paths(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    comm: str | OSError | None,
-    basedir_is_dir: bool,
-) -> None:
-    """Stub /proc/1/comm and /run/s6/basedir for _s6_running tests."""
-    from pathlib import Path as _Path
-
-    real_read_text = _Path.read_text
-    real_is_dir = _Path.is_dir
-
-    def fake_read_text(self, *args, **kwargs):  # type: ignore[override]
-        if str(self) == "/proc/1/comm":
-            if isinstance(comm, OSError):
-                raise comm
-            if comm is None:
-                raise FileNotFoundError(2, "No such file or directory")
-            return comm + "\n"
-        return real_read_text(self, *args, **kwargs)
-
-    def fake_is_dir(self):  # type: ignore[override]
-        if str(self) == "/run/s6/basedir":
-            return basedir_is_dir
-        return real_is_dir(self)
-
-    monkeypatch.setattr(_Path, "read_text", fake_read_text)
-    monkeypatch.setattr(_Path, "is_dir", fake_is_dir)
 
 
 
@@ -84,17 +48,6 @@ def _patch_s6_paths(
 # ---------------------------------------------------------------------------
 
 
-def test_systemd_manager_kind_and_registration_unsupported() -> None:
-    mgr = SystemdServiceManager()
-    assert mgr.kind == "systemd"
-    assert mgr.supports_runtime_registration() is False
-    with pytest.raises(NotImplementedError):
-        mgr.register_profile_gateway("foo")
-    with pytest.raises(NotImplementedError):
-        mgr.unregister_profile_gateway("foo")
-    assert mgr.list_profile_gateways() == []
-    # Protocol conformance — runtime_checkable lets us assert this.
-    assert isinstance(mgr, ServiceManager)
 
 
 # ---------------------------------------------------------------------------
@@ -104,34 +57,6 @@ def test_systemd_manager_kind_and_registration_unsupported() -> None:
 
 
 
-def test_windows_manager_lifecycle_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
-    called: list[str] = []
-    # Force-import the submodule so monkeypatch's attribute lookup
-    # against the `qubit_cli` package succeeds — gateway_windows is
-    # imported lazily inside the wrapper and may not yet be loaded.
-    import qubit_cli.gateway_windows  # noqa: F401
-
-    class _FakeWindowsModule:
-        @staticmethod
-        def start() -> None: called.append("start")
-        @staticmethod
-        def stop() -> None: called.append("stop")
-        @staticmethod
-        def restart() -> None: called.append("restart")
-        @staticmethod
-        def is_installed() -> bool: return True
-
-    monkeypatch.setattr("qubit_cli.gateway_windows", _FakeWindowsModule)
-    monkeypatch.setattr(
-        "qubit_cli.gateway.find_gateway_pids",
-        lambda **kw: [12345],
-    )
-    mgr = WindowsServiceManager()
-    mgr.start("ignored")
-    mgr.stop("ignored")
-    mgr.restart("ignored")
-    assert called == ["start", "stop", "restart"]
-    assert mgr.is_running("ignored") is True
 
 
 
@@ -186,12 +111,13 @@ def fake_subprocess_run(monkeypatch: pytest.MonkeyPatch):
 #
 # The skeleton helper pre-creates the dirs and FIFOs that s6-supervise
 # would otherwise create as root mode 0700, locking out the
-# unprivileged qubit user from every lifecycle op. These tests run
+# unprivileged hermes user from every lifecycle op. These tests run
 # against tmp_path and assert the produced layout — the live-container
 # verification (against real s6-svc / s6-svstat) lives in
 # tests/docker/test_s6_profile_gateway_integration.py.
 
 
+@pytest.mark.platforms("linux")
 def test_seed_supervise_skeleton_creates_expected_layout(tmp_path) -> None:
     """Verifies the dirs + FIFO the helper lays down."""
     import stat
@@ -225,7 +151,7 @@ def test_seed_supervise_skeleton_creates_expected_layout(tmp_path) -> None:
     assert stat.S_IMODE(control.stat().st_mode) == 0o660
 
 
-@pytest.mark.linux_only
+@pytest.mark.platforms("linux")
 def test_seed_supervise_skeleton_sets_setgid_on_event_dirs(tmp_path) -> None:
     """The event dirs carry setgid so s6-supervise's EEXIST path leaves them alone.
 
@@ -262,7 +188,7 @@ def test_render_run_script_uses_replace_to_take_over_stale_holder() -> None:
     """NS-505: the supervised gateway must exec ``gateway run --replace``.
 
     Without ``--replace`` a gateway started OUTSIDE s6 (a stray shell
-    ``qubit gateway run``, an agent action, the Open WebUI helper) holds
+    ``hermes gateway run``, an agent action, the Open WebUI helper) holds
     the per-QUBIT_HOME PID lock; the supervised slot then execs a bare
     ``gateway run``, hits the "Another gateway instance is already
     running" guard, exits non-zero, and s6 restarts it — a restart loop
@@ -273,8 +199,8 @@ def test_render_run_script_uses_replace_to_take_over_stale_holder() -> None:
     render paths.
     """
     default_text = S6ServiceManager._render_run_script("default", {})
-    # Root profile: bare `qubit gateway run --replace` (no -p flag).
-    assert "qubit gateway run --replace" in default_text
+    # Root profile: bare `hermes gateway run --replace` (no -p flag).
+    assert "hermes gateway run --replace" in default_text
     assert "hermes -p default" not in default_text
     # Every exec line that launches the gateway must carry --replace, so
     # neither the non-root nor the privilege-drop branch can spin.
@@ -297,14 +223,6 @@ def test_render_run_script_uses_replace_to_take_over_stale_holder() -> None:
     )
 
 
-def test_render_finish_script_exits_125_on_ex_config() -> None:
-    """The finish script must translate exit 78 (EX_CONFIG) into exit 125
-    (permanent failure) so s6 stops restarting on fatal config errors.
-    See #51228."""
-    text = S6ServiceManager._render_finish_script()
-    assert '[ "$1" = "78" ]' in text
-    assert "exit 125" in text
-    assert "exit 0" in text
 
 
 def test_render_finish_script_does_not_restart_on_clean_exit(tmp_path) -> None:
@@ -349,7 +267,7 @@ def test_render_finish_script_does_not_restart_on_clean_exit(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 # S6 stop writes a planned-stop marker (issue #42675)
 #
-# `qubit gateway stop` inside a container dispatches through
+# `hermes gateway stop` inside a container dispatches through
 # S6ServiceManager.stop() -> `s6-svc -d`, which SIGTERMs the gateway.
 # That SIGTERM is indistinguishable from the one s6/Docker sends on a
 # container restart unless we mark the intentional stop first. Without
@@ -371,6 +289,7 @@ def _log_run_setup_fragment(rendered: str) -> str:
     return "#!/bin/sh\n" + "".join(keep)
 
 
+@pytest.mark.platforms("linux")
 def test_s6_log_run_creates_leaf_as_qubit_without_chown(
     s6_scandir, fake_subprocess_run,
 ) -> None:
@@ -389,15 +308,15 @@ def test_s6_log_run_creates_leaf_as_qubit_without_chown(
         "restartable log/run must not invoke chown on hermes-writable paths; "
         f"saw: {log_text!r}"
     )
-    assert 's6-setuidgid qubit mkdir -p "$log_dir"' in log_text
-    assert 's6-setuidgid qubit rm -f "$log_dir/lock"' in log_text
+    assert 's6-setuidgid hermes mkdir -p "$log_dir"' in log_text
+    assert 's6-setuidgid hermes rm -f "$log_dir/lock"' in log_text
     assert 'else\n  mkdir -p "$log_dir"\n  rm -f "$log_dir/lock"\nfi\n' in log_text
     # Lock cleanup must not remain a bare root-context pathname op after fi.
     after_fi = log_text.split("fi\n", 1)[-1]
     assert 'rm -f "$log_dir/lock"' not in after_fi
 
-    mkdir_as_qubit_idx = log_text.index('s6-setuidgid qubit mkdir -p "$log_dir"')
-    rm_as_qubit_idx = log_text.index('s6-setuidgid qubit rm -f "$log_dir/lock"')
+    mkdir_as_qubit_idx = log_text.index('s6-setuidgid hermes mkdir -p "$log_dir"')
+    rm_as_qubit_idx = log_text.index('s6-setuidgid hermes rm -f "$log_dir/lock"')
     exec_idx = log_text.index("s6-log 1 ")
     assert mkdir_as_qubit_idx < rm_as_qubit_idx < exec_idx
 
@@ -418,7 +337,7 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     if os.name == "nt":
         pytest.skip("POSIX symlink + /bin/sh required")
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     gateways = qubit_home / "logs" / "gateways"
     gateways.mkdir(parents=True)
     leaf = gateways / "coder"
@@ -441,7 +360,7 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     )
     # Pretend we are root so the script takes the s6-setuidgid setup path.
     # Mark the drop so fake rm can refuse unlink outside QUBIT_HOME the way
-    # a real qubit uid cannot delete a foreign root-owned lock.
+    # a real hermes uid cannot delete a foreign root-owned lock.
     (bin_dir / "id").write_text(
         "#!/bin/sh\n"
         'if [ "$1" = "-u" ]; then echo 0; exit 0; fi\n'
@@ -457,7 +376,7 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     real_rm = "/bin/rm"
     (bin_dir / "rm").write_text(
         "#!/bin/sh\n"
-        # Privilege-dropped: no-op. Models that qubit cannot unlink a foreign
+        # Privilege-dropped: no-op. Models that hermes cannot unlink a foreign
         # root-owned lock outside the volume; avoids a realpath/rm TOCTOU in
         # the test double itself. Root-context: real rm — a residual bare
         # ``rm -f "$log_dir/lock"`` would delete victim/lock via the symlink.

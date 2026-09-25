@@ -33,7 +33,7 @@ _SECRET_SUBSTRINGS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "PASSW
 # imports may read at import time. HERMES_DELEGATED_CHILD_CONTEXT must ride
 # along or a child that imports Qubit code loses the Kanban mutation guard
 # while still inheriting QUBIT_HOME.
-_QUBIT_CHILD_ALLOWED = frozenset({
+_HERMES_CHILD_ALLOWED = frozenset({
     "QUBIT_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV", "HERMES_DELEGATED_CHILD_CONTEXT",
 })
 
@@ -59,10 +59,11 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     OS-essential allowlist passes by exact name.
     """
     try:
-        from tools.env_passthrough import is_env_passthrough, resolve_passthrough_value
+        from tools.env_passthrough import is_env_passthrough, resolve_passthrough_value, scoped_passthrough_additions
     except Exception:
         is_env_passthrough = lambda _: False  # noqa: E731
         resolve_passthrough_value = lambda _name, _fallback: None  # noqa: E731
+        scoped_passthrough_additions = lambda _present: {}  # noqa: E731
     if is_passthrough is None:
         is_passthrough = is_env_passthrough
     if is_windows is None:
@@ -70,7 +71,7 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     scrubbed = {}
     # Non-secret HERMES_* vars no allowlist admits are dropped on purpose; a script importing a
     # repo module that reads one would see it silently unset — log the drop, point at the opt-in.
-    _dropped_qubit = []
+    _dropped_hermes = []
     for k, v in source_env.items():
         if is_passthrough(k):
             resolved = resolve_passthrough_value(k, v)
@@ -80,18 +81,21 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
         if any(s in k.upper() for s in _SECRET_SUBSTRINGS):
             continue
         if (any(k.startswith(p) for p in _SAFE_ENV_PREFIXES)
-                or k in _QUBIT_CHILD_ALLOWED
+                or k in _HERMES_CHILD_ALLOWED
                 or (is_windows and k.upper() in _WINDOWS_ESSENTIAL_ENV_VARS)):
             scrubbed[k] = v
         elif k.startswith("HERMES_"):
-            _dropped_qubit.append(k)
-    if _dropped_qubit:
+            _dropped_hermes.append(k)
+    # Declared names only the bound profile scope holds (a routed profile's own .env / sources
+    # never enter the process env) — the loop above sees only names ``source_env`` carries.
+    scrubbed.update((k, v) for k, v in scoped_passthrough_additions(scrubbed).items() if is_passthrough(k))
+    if _dropped_hermes:
         logger.debug(
             "execute_code: dropped %d non-allowlisted HERMES_* var(s) from the "
             "sandbox child env (%s). This is intentional hardening (#27303); if "
             "a sandbox script legitimately needs one, declare it via "
             "env_passthrough in the skill/config so it passes by explicit opt-in.",
-            len(_dropped_qubit), ", ".join(sorted(_dropped_qubit)),
+            len(_dropped_hermes), ", ".join(sorted(_dropped_hermes)),
         )
     # delegate_task children are marked by a ContextVar, not os.environ, and the sandbox crosses
     # a process boundary: strip dispatcher-owned Kanban vars AFTER the scrub so an explicit
@@ -112,7 +116,7 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
 def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
                      child_python: str) -> Dict[str, str]:
     """Build the scrubbed child environment both execution paths share."""
-    from qubit_constants import apply_subprocess_home_env
+    from qubit_constants import apply_scratch_tmp_env, apply_subprocess_home_env, get_qubit_home_override
     child_env = _scrub_child_env(os.environ)
     child_env["HERMES_RPC_SOCKET"] = rpc_endpoint
     child_env["HERMES_RPC_TOKEN"] = rpc_token
@@ -121,12 +125,26 @@ def _build_child_env(*, rpc_endpoint: str, rpc_token: str, tmpdir: str,
     # code page (cp1252) and print("→") raises; harmless under a C/POSIX locale (containers).
     child_env["PYTHONIOENCODING"] = "utf-8"
     child_env["PYTHONUTF8"] = "1"
-    # Only TZ reaches the child; HERMES_TIMEZONE is an internal setting.
-    _tz_name = os.getenv("HERMES_TIMEZONE", "").strip()
-    if _tz_name:
+    # Only TZ reaches the child; HERMES_TIMEZONE is an internal setting (and under the multiplexed
+    # gateway holds only the default profile's value — qubit_time resolves the routed profile's).
+    from qubit_time import get_timezone_name
+
+    _tz_name = get_timezone_name()
+    # Windows CPython does not support IANA names in TZ.  Leaving TZ unset
+    # preserves the OS-configured local timezone for the child process.
+    if _tz_name and not _IS_WINDOWS:
         child_env["TZ"] = _tz_name
     child_env.pop("HERMES_TIMEZONE", None)
     apply_subprocess_home_env(child_env)
+    # Multiplexed gateway/Desktop (#110303): the server process env carries the machine-default
+    # QUBIT_HOME, but this turn runs under a per-profile override (ContextVar bound per turn).
+    # The scrub above passed the stale default through; rewrite it so skill scripts see the
+    # active profile's home — the same per-turn rewrite apply_subprocess_home_env does for HOME.
+    # No override (dedicated per-profile process) → leave the inherited value untouched.
+    _home_override = get_qubit_home_override()
+    if _home_override:
+        child_env["QUBIT_HOME"] = _home_override
+        apply_scratch_tmp_env(child_env)  # TMPDIR follows the routed home, like HOME does
     # PYTHONPATH: the staging dir (qubit_tools.py) must always be importable even when project
     # mode changes CWD. Qubit's root is added ONLY when the child runs in Qubit's Python env —
     # exposing Qubit's site-packages to an external interpreter can mix incompatible compiled

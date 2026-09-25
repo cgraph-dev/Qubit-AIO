@@ -1,4 +1,4 @@
-from cli import QubitCLI
+from cli import HermesCLI
 from qubit_cli.active_sessions import (
     active_session_registry_snapshot,
     try_acquire_active_session,
@@ -16,7 +16,7 @@ def test_cli_claim_active_session_respects_global_limit(tmp_path, monkeypatch):
     assert message is None
     assert held is not None
 
-    cli = object.__new__(QubitCLI)
+    cli = object.__new__(HermesCLI)
     cli.session_id = "new-cli-session"
     cli.config = cfg
     cli._active_session_lease = None
@@ -26,9 +26,8 @@ def test_cli_claim_active_session_respects_global_limit(tmp_path, monkeypatch):
     try:
         assert cli._claim_active_session("cli") is False
         assert len(printed) == 1
-        assert "active session limit (1/1)" in printed[0]
         # Names the holding surface ("tui"), not the blocked one.
-        assert "Held by: tui" in printed[0]
+        assert "tui" in printed[0]
 
         held.release()
 

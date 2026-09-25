@@ -9,21 +9,21 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
+import { writeEnvFile, writeMockProviderConfig } from '../../../tests-js/scripts/mock-provider-config'
+import {
+  MOCK_REPLY,
+  startMockServer,
+  VERIFICATION_STOP_TEXT,
+  VERIFICATION_STOP_TRIGGER,
+} from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
   launchDesktop,
   type MockBackendFixture,
   waitForAppReady,
-  writeEnvFile,
-  writeMockProviderConfig,
 } from './fixtures'
-import {
-  MOCK_REPLY,
-  startMockServer,
-  VERIFICATION_STOP_TEXT,
-  VERIFICATION_STOP_TRIGGER,
-} from './mock-server'
 import { RealSessionBuilder } from './real-session-builder'
 import { expect, test } from './test'
 
@@ -35,14 +35,14 @@ const COMPACTION_TRIGGER_PADDING = ' force real context compression'.repeat(600)
 async function setupSeededMockBackend(): Promise<MockBackendFixture> {
   const mock = await startMockServer()
   const sandbox = createSandbox('hidden-history')
-  writeMockProviderConfig(sandbox.qubitHome, mock.url)
+  writeMockProviderConfig(sandbox.hermesHome, mock.url)
   fs.appendFileSync(
-    path.join(sandbox.qubitHome, 'config.yaml'),
+    path.join(sandbox.hermesHome, 'config.yaml'),
     '\ncompression:\n  threshold_tokens: 1\n',
     'utf8',
   )
-  writeEnvFile(sandbox.qubitHome)
-  const builder = await RealSessionBuilder.start(sandbox.qubitHome)
+  writeEnvFile(sandbox.hermesHome)
+  const builder = await RealSessionBuilder.start(sandbox.hermesHome)
 
   try {
     await builder.createSession({
@@ -109,8 +109,8 @@ test('live verify-on-stop continuations stay out of the transcript', async ({}, 
   )
 
   const mock = await startMockServer({ verificationWritePath: changedFile })
-  writeMockProviderConfig(sandbox.qubitHome, mock.url)
-  fs.appendFileSync(path.join(sandbox.qubitHome, 'config.yaml'), '\nagent:\n  verify_on_stop: true\n', 'utf8')
+  writeMockProviderConfig(sandbox.hermesHome, mock.url)
+  fs.appendFileSync(path.join(sandbox.hermesHome, 'config.yaml'), '\nagent:\n  verify_on_stop: true\n', 'utf8')
   // Auto session titling (feat f726090d48) fires an auxiliary title_generation
   // LLM call whose user snippet CONTAINS the trigger keyword, so the mock's
   // isVerificationStopTrigger matches it and the title call steals a scripted
@@ -118,11 +118,11 @@ test('live verify-on-stop continuations stay out of the transcript', async ({}, 
   // complete.' instead of the exhausted-verifier final). Disable the
   // model-backed title upgrade so script indices track real chat turns.
   fs.appendFileSync(
-    path.join(sandbox.qubitHome, 'config.yaml'),
+    path.join(sandbox.hermesHome, 'config.yaml'),
     '\nauxiliary:\n  title_generation:\n    enabled: false\n',
     'utf8',
   )
-  writeEnvFile(sandbox.qubitHome)
+  writeEnvFile(sandbox.hermesHome)
   const { app, page } = await launchDesktop(buildAppEnv(sandbox))
 
   const fixture: MockBackendFixture = {

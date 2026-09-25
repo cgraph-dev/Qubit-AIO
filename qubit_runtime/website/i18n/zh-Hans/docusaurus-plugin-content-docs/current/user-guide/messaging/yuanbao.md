@@ -1,12 +1,12 @@
 ---
 sidebar_position: 16
 title: "Yuanbao"
-description: "通过 WebSocket gateway 将 Qubit Agent 连接到元宝企业消息平台"
+description: "通过 WebSocket gateway 将 Hermes Agent 连接到元宝企业消息平台"
 ---
 
 # Yuanbao
 
-将 Qubit 连接到腾讯企业消息平台 [元宝（Yuanbao）](https://yuanbao.tencent.com/)。该适配器使用 WebSocket gateway 实现实时消息传递，支持单聊（C2C）和群聊两种会话模式。
+将 Hermes 连接到腾讯企业消息平台 [元宝（Yuanbao）](https://yuanbao.tencent.com/)。该适配器使用 WebSocket gateway 实现实时消息传递，支持单聊（C2C）和群聊两种会话模式。
 
 :::info
 元宝是一个企业消息平台，主要用于腾讯内部及企业环境。它使用 WebSocket 进行实时通信，采用基于 HMAC 的认证方式，支持图片、文件和语音消息等富媒体内容。
@@ -17,12 +17,11 @@ description: "通过 WebSocket gateway 将 Qubit Agent 连接到元宝企业消�
 - 拥有机器人创建权限的元宝账号
 - 元宝 APP_ID 和 APP_SECRET（由平台管理员提供）
 - Python 包：`websockets` 和 `httpx`
-- 媒体支持需要：`aiofiles`
 
 安装所需依赖：
 
 ```bash
-pip install websockets httpx aiofiles
+hermes pm repair
 ```
 
 ## 配置
@@ -38,7 +37,7 @@ pip install websockets httpx aiofiles
 配置元宝最简便的方式是通过交互式向导：
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
 在提示时选择 **Yuanbao**。向导将：
@@ -79,7 +78,7 @@ YUANBAO_ALLOWED_USERS=user_account_1,user_account_2
 ### 4. 启动 Gateway
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 适配器将连接到元宝 WebSocket gateway，使用 HMAC 签名进行认证，并开始处理消息。
@@ -170,7 +169,7 @@ hello
 
 ### 可用命令
 
-所有标准 Qubit 命令均可在元宝上使用：
+所有标准 Hermes 命令均可在元宝上使用：
 
 | 命令 | 描述 |
 |------|------|
@@ -278,7 +277,7 @@ platforms:
 
 ### 消息分块
 
-元宝有最大消息大小限制。Qubit 自动对大响应进行分块，采用 Markdown 感知拆分（遵守代码围栏、表格和段落边界）。
+元宝有最大消息大小限制。Hermes 自动对大响应进行分块，采用 Markdown 感知拆分（遵守代码围栏、表格和段落边界）。
 
 ### 连接参数
 
@@ -302,7 +301,7 @@ platforms:
 启用 debug 日志以排查连接问题：
 
 ```bash
-HERMES_LOG_LEVEL=debug qubit gateway
+HERMES_LOG_LEVEL=debug hermes gateway
 ```
 
 ## 与其他功能集成
@@ -330,12 +329,12 @@ HERMES_LOG_LEVEL=debug qubit gateway
 从 CLI 向元宝发送消息：
 
 ```bash
-qubit chat -q "Send 'Hello from CLI' to yuanbao:group:group_code"
+hermes chat -q "Send 'Hello from CLI' to yuanbao:group:group_code"
 ```
 
 ## 相关文档
 
 - [消息 Gateway 概览](./index.md)
-- [斜杠命令参考](/reference/slash-commands)
-- [Cron Job](/user-guide/features/cron)
-- [后台会话](/user-guide/cli#background-sessions)
+- [斜杠命令参考](../../reference/slash-commands.md)
+- [Cron Job](../features/cron.md)
+- [后台会话](../cli.md#background-sessions)

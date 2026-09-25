@@ -13,13 +13,13 @@ vi.mock('@/app/open-session', () => ({
   openSession: (...args: unknown[]) => openSession(...args)
 }))
 
-const desktopWindow = window as unknown as { qubitDesktop?: Window['hermesDesktop'] }
+const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
 
 afterEach(() => {
   cleanup()
   closeRightRail()
   openSession.mockClear()
-  delete desktopWindow.qubitDesktop
+  delete desktopWindow.hermesDesktop
   __resetSessionLinkTitleCache()
 })
 
@@ -54,13 +54,15 @@ describe('url refs open in the browser pane', () => {
   it('opens a url chip in the user transcript', async () => {
     const openExternal = vi.fn().mockResolvedValue(undefined)
 
-    desktopWindow.qubitDesktop = { openExternal } as unknown as Window['hermesDesktop']
+    desktopWindow.hermesDesktop = { openExternal } as unknown as Window['hermesDesktop']
 
     render(<DirectiveContent text="see @url:`https://example.com/docs` when you can" />)
 
     const chip = screen.getByTitle('https://example.com/docs')
 
-    expect(chip.tagName).toBe('BUTTON')
+    // A real anchor now — that is what gives the chip the link gestures
+    // (⌘-click escape, right-click link menu) that a button never had.
+    expect(chip.tagName).toBe('A')
     fireEvent.click(chip)
 
     expect(openExternal).not.toHaveBeenCalled()

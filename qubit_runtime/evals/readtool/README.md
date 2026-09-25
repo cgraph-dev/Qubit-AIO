@@ -2,7 +2,7 @@
 
 A/B harness measuring how `read_file` engineering choices affect real agent
 runs. Motivated by Command Code's read-tool writeup (Aug 2026), which
-benchmarked ten harnesses on hostile-file handling — and whose Qubit column
+benchmarked ten harnesses on hostile-file handling — and whose Hermes column
 contained several errors (we already ship a per-line clamp, did-you-mean
 suggestions, notebook/docx/xlsx extraction, PDF conversion, and a device-path
 blocklist). This eval tests the failure shapes for real, through the real
@@ -10,7 +10,7 @@ blocklist). This eval tests the failure shapes for real, through the real
 
 ## What it measures
 
-Every task runs the full Qubit agent (file + terminal + search toolsets)
+Every task runs the full Hermes agent (file + terminal + search toolsets)
 against a deterministic hostile workspace:
 
 | fixture | shape | tasks |

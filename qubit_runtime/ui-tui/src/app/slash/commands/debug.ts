@@ -1,7 +1,7 @@
 // Importing the apps barrel registers the reference apps before launch.
 import '../../../sdk/apps/index.js'
 
-import { terminalBackgroundHex } from '@qubit/ink'
+import { terminalBackgroundHex } from '@hermes/ink'
 
 import { formatBytes, performHeapDump } from '../../../lib/memory.js'
 import { launchWidget } from '../../../sdk/host.js'
@@ -77,8 +77,8 @@ export const debugCommands: SlashCommand[] = [
         {
           rows: [
             ['OSC-11 background', terminalBackgroundHex() ?? '(no reply)'],
-            ['HERMES_TUI_BACKGROUND', process.env.QUBIT_TUI_BACKGROUND ?? '(unset)'],
-            ['HERMES_TUI_THEME', process.env.QUBIT_TUI_THEME ?? '(unset)'],
+            ['HERMES_TUI_BACKGROUND', process.env.HERMES_TUI_BACKGROUND ?? '(unset)'],
+            ['HERMES_TUI_THEME', process.env.HERMES_TUI_THEME ?? '(unset)'],
             ['COLORFGBG', process.env.COLORFGBG ?? '(unset)'],
             ['TERM_PROGRAM', process.env.TERM_PROGRAM ?? '(unset)'],
             ['detected mode', detectLightMode() ? 'light' : 'dark'],

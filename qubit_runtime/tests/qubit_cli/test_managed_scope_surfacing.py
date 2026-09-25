@@ -1,4 +1,4 @@
-"""Surfacing tests — managed scope shown in `config show` and `qubit doctor`."""
+"""Surfacing tests — managed scope shown in `config show` and `hermes doctor`."""
 import pytest
 from qubit_cli import doctor_config
 

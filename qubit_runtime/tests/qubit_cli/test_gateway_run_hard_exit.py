@@ -1,6 +1,6 @@
 """Regression tests for CLI gateway run exit behavior.
 
-``qubit gateway run`` enters through qubit_cli.gateway, not gateway.run.main().
+``hermes gateway run`` enters through qubit_cli.gateway, not gateway.run.main().
 After graceful teardown it must use the same hard-exit backstop as gateway.run.main()
 so Python finalization does not wait on non-daemon worker threads (for example
 in-flight cron ThreadPoolExecutor jobs) and delay service-managed restarts.
@@ -25,6 +25,7 @@ def _prepare(monkeypatch):
 
     monkeypatch.setattr(gateway_cli, "_guard_official_docker_root_gateway", lambda: None)
     monkeypatch.setattr(gateway_cli, "_guard_named_profile_under_multiplexer", lambda force=False: None)
+    monkeypatch.setattr(gateway_cli, "_attach_to_host_gateway_or_guard", lambda **kwargs: None)
     monkeypatch.setattr(gateway_cli, "_guard_supervised_gateway_conflict", lambda force=False: None)
     monkeypatch.setattr(gateway_cli, "_guard_existing_gateway_process_conflict", lambda replace=False: None)
     monkeypatch.setattr(gateway_cli, "supports_systemd_services", lambda: False)

@@ -55,7 +55,7 @@ print(json.dumps({{"prefix": sys.prefix, "yaml": importlib.util.find_spec("ruame
 
 def test_cold_worker_bootstrap_reuses_the_requests_cache(tmp_path, monkeypatch):
     import pm
-    from qubit_constants import get_default_hermes_root
+    from qubit_constants import get_default_qubit_root
     from pm import client, runtime
     from pm.runtime_stage import stage_runtime
 
@@ -96,7 +96,7 @@ def test_cold_worker_bootstrap_reuses_the_requests_cache(tmp_path, monkeypatch):
     before = dict(os.environ)
     pm.prune_cache(cache)
     assert cache.is_dir()
-    assert not (get_default_hermes_root() / "cache/uv").exists(), "bootstrap created an unshared private cache"
+    assert not (get_default_qubit_root() / "cache/uv").exists(), "bootstrap created an unshared private cache"
     assert dict(os.environ) == before
 
 

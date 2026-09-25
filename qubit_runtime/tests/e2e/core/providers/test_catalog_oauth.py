@@ -61,10 +61,10 @@ _SECRET_SUFFIXES = ("_API_KEY", "_TOKEN", "_SECRET", "_ACCESS_KEY")
 class Home:
     def __init__(self, root: Path, sentinel: CatalogFake, provider: str, model: str, base_url: str = "") -> None:
         self.home = root / "home"
-        self.hermes_home = self.home / ".hermes"
-        self.hermes_home.mkdir(parents=True)
+        self.qubit_home = self.home / ".hermes"
+        self.qubit_home.mkdir(parents=True)
         self.sentinel = sentinel
-        (self.hermes_home / "config.yaml").write_text(
+        (self.qubit_home / "config.yaml").write_text(
             f"model:\n  provider: {provider}\n  default: {model}\n"
             # The startup cost guard probes ``model.base_url``/models for pricing (credential-free),
             # else the provider's production host; point it at the fake so any production-host
@@ -75,7 +75,7 @@ class Home:
 
     @property
     def auth_path(self) -> Path:
-        return self.hermes_home / "auth.json"
+        return self.qubit_home / "auth.json"
 
     def seed_auth(self, store: dict[str, Any]) -> None:
         self.auth_path.write_text(json.dumps(store, indent=2), encoding="utf-8")
@@ -87,7 +87,7 @@ class Home:
         env = {k: v for k, v in os.environ.items()
                if (k in _PASSTHROUGH_ENV or k.startswith("LC_")) and not k.endswith(_SECRET_SUFFIXES)}
         env.update({
-            "HOME": str(self.home), "QUBIT_HOME": str(self.hermes_home), "PYTHONPATH": str(REPO_ROOT),
+            "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home), "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1", "NO_COLOR": "1", "TERM": "dumb",
             "TMPDIR": str(self.home), "HERMES_SHARED_AUTH_DIR": str(self.home / "shared"),
             "CODEX_HOME": str(self.home / ".codex"),

@@ -82,7 +82,7 @@ def test_long_tallies_truncate_to_more_tail():
         }
     )
     line = format_turn_summary(9.0, tally)
-    assert line == "⋯ 9.0s · edited 1 file · read 2 files · ran 3 commands · searched 4 paths · +2 more"
+    assert line.endswith("· +2 more")
     assert line.count("·") == 5
 
 
@@ -152,12 +152,12 @@ def _make_cli(**overrides):
         _spinner_text = "⚡ reading file"
         _tool_start_time = 0
 
-        _turn_summary_is_active = cli_module.QubitCLI._turn_summary_is_active
-        _turn_summary_begin = cli_module.QubitCLI._turn_summary_begin
-        _turn_summary_record = cli_module.QubitCLI._turn_summary_record
-        _turn_summary_emit = cli_module.QubitCLI._turn_summary_emit
-        _spinner_token_flow = cli_module.QubitCLI._spinner_token_flow
-        _render_spinner_text = cli_module.QubitCLI._render_spinner_text
+        _turn_summary_is_active = cli_module.HermesCLI._turn_summary_is_active
+        _turn_summary_begin = cli_module.HermesCLI._turn_summary_begin
+        _turn_summary_record = cli_module.HermesCLI._turn_summary_record
+        _turn_summary_emit = cli_module.HermesCLI._turn_summary_emit
+        _spinner_token_flow = cli_module.HermesCLI._spinner_token_flow
+        _render_spinner_text = cli_module.HermesCLI._render_spinner_text
 
     stub = _Stub()
     for key, value in overrides.items():

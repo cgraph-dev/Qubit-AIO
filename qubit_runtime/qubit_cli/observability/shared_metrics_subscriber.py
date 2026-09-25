@@ -47,13 +47,13 @@ class SharedMetricsSubscriber:
     def __init__(
         self,
         store: SharedMetricsStore,
-        qubit_version: str,
+        hermes_version: str,
         *,
         runtime_id: str | None = None,
     ) -> None:
         self.store = store
         self._client_resource = client_resource(
-            qubit_version,
+            hermes_version,
             os_name=platform.system(),
             architecture=platform.machine(),
             install_method=detect_install_method(),

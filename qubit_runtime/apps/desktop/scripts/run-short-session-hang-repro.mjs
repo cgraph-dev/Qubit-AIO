@@ -29,7 +29,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const DESKTOP_ROOT = resolve(HERE, '..')
 const REPO_ROOT = resolve(DESKTOP_ROOT, '..', '..')
 const HARNESS_SOURCE = resolve(DESKTOP_ROOT, 'src/app/chat/short-session-hang-repro.tsx')
-const UPSTREAM_URL = 'https://github.com/cgraph-dev/qubit-voicebridge.git'
+const UPSTREAM_URL = 'https://github.com/NousResearch/hermes-agent.git'
 const DEFAULT_BASELINE = '3651627d88858912e8460e6f949b7125725600c3'
 const DEFAULT_CANDIDATE = '3651627d88858912e8460e6f949b7125725600c3'
 const FREEZE_MS = 5_000
@@ -1254,9 +1254,9 @@ function promoteAttemptArtifacts(output, label, index, warmup, attempt) {
 
 async function executeRunInSandboxAttempt(target, index, warmup, mock, output, sandbox, attempt) {
   const runDir = runDirForAttempt(output, target.label, index, warmup, attempt)
-  const qubitHome = join(sandbox, 'hermes-home')
+  const hermesHome = join(sandbox, 'hermes-home')
   const userData = join(sandbox, 'electron-user-data')
-  const desktopLog = join(qubitHome, 'logs', 'desktop.log')
+  const desktopLog = join(hermesHome, 'logs', 'desktop.log')
   const stdoutPath = join(runDir, 'electron.stdout.log')
   const stderrPath = join(runDir, 'electron.stderr.log')
   const eventsPath = join(runDir, 'events.jsonl')
@@ -1264,7 +1264,7 @@ async function executeRunInSandboxAttempt(target, index, warmup, mock, output, s
 
   mkdirSync(runDir, { recursive: true })
   mkdirSync(userData, { recursive: true })
-  writeSandboxConfig(qubitHome, mock.url)
+  writeSandboxConfig(hermesHome, mock.url)
 
   const electron = require('electron')
   const stdoutLog = createWriteStream(stdoutPath)
@@ -1283,11 +1283,11 @@ async function executeRunInSandboxAttempt(target, index, warmup, mock, output, s
     {
       cwd: target.targetDesktop,
       env: sanitizedEnv({
-        QUBIT_DESKTOP_APP_NAME: `HermesShortSession-${target.label}-${process.pid}-${index}-${warmup ? 'w' : 'm'}-${attempt}`,
-        QUBIT_DESKTOP_QUBIT_ROOT: target.targetRoot,
-        QUBIT_DESKTOP_IGNORE_EXISTING: '1',
-        QUBIT_DESKTOP_USER_DATA_DIR: userData,
-        QUBIT_HOME: qubitHome,
+        HERMES_DESKTOP_APP_NAME: `HermesShortSession-${target.label}-${process.pid}-${index}-${warmup ? 'w' : 'm'}-${attempt}`,
+        HERMES_DESKTOP_HERMES_ROOT: target.targetRoot,
+        HERMES_DESKTOP_IGNORE_EXISTING: '1',
+        HERMES_DESKTOP_USER_DATA_DIR: userData,
+        QUBIT_HOME: hermesHome,
         SHORT_SESSION_API_KEY: 'local-diagnostic-only'
       }),
       stdio: ['ignore', 'pipe', 'pipe']

@@ -106,18 +106,18 @@ def test_sessions_export_cli_prompt_only_stdout(monkeypatch, capsys):
             captured["resolved_from"] = session_id
             return "sess-123"
 
-        def export_session(self, session_id):
+        def export_session(self, session_id, include_compacted=False):
             captured["exported"] = session_id
             return _sample_session()
 
         def close(self):
             captured["closed"] = True
 
-    monkeypatch.setattr(qubit_state, "SessionDB", lambda: FakeDB())
+    monkeypatch.setattr(qubit_state, "SessionDB", lambda *args, **kwargs: FakeDB())
     monkeypatch.setattr(
         sys,
         "argv",
-        ["qubit", "sessions", "export", "-", "--session-id", "sess", "--only", "user-prompts"],
+        ["hermes", "sessions", "export", "-", "--session-id", "sess", "--only", "user-prompts"],
     )
 
     main_mod.main()

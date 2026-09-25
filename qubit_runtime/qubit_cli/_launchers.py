@@ -37,7 +37,7 @@ def runtime_command(repo_root: Path, args=(), *, module: str = "qubit_cli.main",
     entry = f"exec({code!r})" if code is not None else (
         f"runpy.run_module({module!r}, run_name='__main__', alter_sys=True)")
     default_home = (f"{str(home)!r}" if home is not None else
-                    "str(__import__('qubit_constants').get_default_hermes_root())")
+                    "str(__import__('qubit_constants').get_default_qubit_root())")
     bootstrap = (
         "import os, sys, runpy; "
         "os.environ.pop('PYTHONHOME', None); os.environ.pop('PYTHONPATH', None); "
@@ -276,8 +276,8 @@ def _launcher_script(name: str, repo_root: Path, dependencies: Path | None) -> s
         "os.environ.pop('PYTHONPATH', None)\n"
         f"sys.path.insert(0, {str(repo_root.resolve())!r})\n"
         "if sys.argv[1:2] == ['--print-runtime-command']: sys.dont_write_bytecode = True\n"
-        "from qubit_constants import get_default_hermes_root\n"
-        "os.environ['QUBIT_HOME'] = os.environ.get('QUBIT_HOME') or str(get_default_hermes_root())\n"
+        "from qubit_constants import get_default_qubit_root\n"
+        "os.environ['QUBIT_HOME'] = os.environ.get('QUBIT_HOME') or str(get_default_qubit_root())\n"
         "if sys.argv[1:2] == ['--print-runtime-command']:\n"
         "    from pathlib import Path\n"
         "    from qubit_cli._launchers import print_runtime_command\n"
@@ -444,8 +444,8 @@ def expose_cli(project_root: Path | None = None, *, create: bool = True) -> dict
         dirs = [Path.home() / ".local" / "bin"]
         # Repair existing FHS/custom-home exposure, but never create new global
         # entries or reclaim a convenience that was repointed to another root.
-        from qubit_constants import get_default_hermes_root
-        for directory in (get_default_hermes_root() / "bin", Path("/usr/local/bin")):
+        from qubit_constants import get_default_qubit_root
+        for directory in (get_default_qubit_root() / "bin", Path("/usr/local/bin")):
             if directory not in dirs and (not create or _owns_launcher(directory / "hermes", root)):
                 dirs.append(directory)
         written = []
@@ -513,9 +513,9 @@ def _expose_windows_user_bin(root: Path, *, create: bool) -> dict:
     so an update converges a machine installed under the older venv\\Scripts
     convention instead of leaving it there forever.
     """
-    from qubit_constants import get_default_hermes_root
+    from qubit_constants import get_default_qubit_root
 
-    directory = get_default_hermes_root() / "bin"
+    directory = get_default_qubit_root() / "bin"
     try:
         if not create:
             # Bootstrap: repair only commands we already own, enable nothing new.

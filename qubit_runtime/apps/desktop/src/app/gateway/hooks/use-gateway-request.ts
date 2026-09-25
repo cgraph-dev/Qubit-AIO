@@ -1,11 +1,11 @@
-import { isGatewayReauthRequired, resolveGatewayWsUrl } from '@hermes/shared'
+import { isGatewayReauthRequired } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useRef } from 'react'
 
-import type { QubitGateway } from '@/hermes'
+import type { HermesGateway } from '@/hermes'
+import { resolveDesktopGatewayWsUrl } from '@/lib/gateway-ws-url'
 import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
 import { $gateway, ensureActiveGatewayOpen, isActivePrimary } from '@/store/gateway'
-import { $activeGatewayProfile } from '@/store/profile'
 import { $gatewayState, setConnection } from '@/store/session'
 
 export function useGatewayRequest() {
@@ -17,15 +17,15 @@ export function useGatewayRequest() {
   // null on mount, and if the connection state doesn't happen to flip
   // afterwards it never re-renders to pick the instance up. Anything that needs
   // the gateway as a render-time VALUE (props, memo deps) must use this.
-  const gateway = useStore($gateway) as QubitGateway | null
-  const gatewayRef = useRef<QubitGateway | null>(null)
+  const gateway = useStore($gateway) as HermesGateway | null
+  const gatewayRef = useRef<HermesGateway | null>(null)
 
-  const connectionRef = useRef<Awaited<ReturnType<NonNullable<typeof window.qubitDesktop>['getConnection']>> | null>(
+  const connectionRef = useRef<Awaited<ReturnType<NonNullable<typeof window.hermesDesktop>['getConnection']>> | null>(
     null
   )
 
   const gatewayStateRef = useRef(gatewayState)
-  const reconnectingRef = useRef<Promise<QubitGateway | null> | null>(null)
+  const reconnectingRef = useRef<Promise<HermesGateway | null> | null>(null)
   // Holds the reauth error from the most recent failed reconnect so
   // requestGateway can surface the gateway's "session expired, sign in again"
   // message instead of the opaque "connection closed" that triggered the retry.
@@ -41,7 +41,7 @@ export function useGatewayRequest() {
   useEffect(
     () =>
       $gateway.subscribe(gateway => {
-        gatewayRef.current = gateway as QubitGateway | null
+        gatewayRef.current = gateway as HermesGateway | null
       }),
     []
   )
@@ -62,7 +62,7 @@ export function useGatewayRequest() {
     }
 
     reconnectingRef.current = (async () => {
-      const desktop = window.qubitDesktop
+      const desktop = window.hermesDesktop
 
       if (!desktop) {
         return null
@@ -71,18 +71,21 @@ export function useGatewayRequest() {
       reauthErrorRef.current = null
 
       try {
-        // Reconnect to whichever profile the gateway is currently routed to (not
-        // always the primary), so a sleep/wake reconnect keeps the user on the
-        // profile they were chatting in. Both awaits below are IPC round-trips
-        // into the main process with no timeout of their own (#93454) — a
-        // wedged main-process round-trip otherwise hangs this await forever,
-        // latching reconnectingRef.current so every later requestGateway() call
-        // returns the same never-settling promise. Bound the same way
-        // use-gateway-boot.ts bounds the primary boot/soft-switch equivalents.
+        // This path recovers only the window primary (requestGateway routes
+        // secondaries to ensureActiveGatewayOpen). Call getConnection() with no
+        // profile so main resolves the sender's full route — passing the
+        // profile name would look it up in the LOCAL pool, which fails for a
+        // profile that exists only on a remote gateway (peer windows).
+        // Both awaits below are IPC round-trips into the main process with no
+        // timeout of their own (#93454) — a wedged main-process round-trip
+        // otherwise hangs this await forever, latching reconnectingRef.current
+        // so every later requestGateway() call returns the same never-settling
+        // promise. Bound the same way use-gateway-boot.ts bounds the primary
+        // boot/soft-switch equivalents.
         const conn = await withTimeout(
-          desktop.getConnection($activeGatewayProfile.get()),
+          desktop.getConnection(),
           RECONNECT_ATTEMPT_TIMEOUT_MS,
-          'Timed out reconnecting to Qubit backend'
+          'Timed out reconnecting to Hermes backend'
         )
 
         connectionRef.current = conn
@@ -95,7 +98,7 @@ export function useGatewayRequest() {
         // retryable. Stash only the former so requestGateway can show the
         // actionable "sign in again" message.
         const wsUrl = await withTimeout(
-          resolveGatewayWsUrl(desktop, conn),
+          resolveDesktopGatewayWsUrl(desktop, conn),
           RECONNECT_ATTEMPT_TIMEOUT_MS,
           'Timed out re-minting the gateway WebSocket URL'
         )
@@ -125,7 +128,7 @@ export function useGatewayRequest() {
       const gateway = gatewayRef.current
 
       if (!gateway) {
-        throw new Error('Qubit gateway unavailable')
+        throw new Error('Hermes gateway unavailable')
       }
 
       try {

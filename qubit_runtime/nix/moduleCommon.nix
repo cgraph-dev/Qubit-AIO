@@ -1,6 +1,6 @@
 # nix/moduleCommon.nix — the code that the NixOS and Home Manager modules share
 #
-# `services.qubit-runtime` is the same option set on both modules. Both modules
+# `services.hermes-agent` is the same option set on both modules. Both modules
 # get their options, their renderers for config.yaml, .env and documents, and
 # their state setup from this file. A NixOS example works on Home Manager
 # without a change. An option added here appears on both modules at once.
@@ -10,7 +10,7 @@
 #   nixosModules.nix        the service user and group, stateDir,
 #                           addToSystemPackages, container mode, tmpfiles,
 #                           system.activationScripts, system systemd units
-#   homeManagerModules.nix  hermesHome, programs.qubit-runtime (the CLI and
+#   homeManagerModules.nix  hermesHome, programs.hermes-agent (the CLI and
 #                           the desktop application), home.activation,
 #                           systemd.user.services, launchd.agents
 #
@@ -29,7 +29,7 @@ let
   # More than one module can set `settings = { ... }`. recursiveUpdate joins
   # all of the definitions. Without it, only the last definition applies.
   deepConfigType = types.mkOptionType {
-    name = "qubit-config-attrs";
+    name = "hermes-config-attrs";
     description = "Qubit YAML config (attrset), merged deeply via lib.recursiveUpdate.";
     check = builtins.isAttrs;
     merge = _loc: defs: lib.foldl' lib.recursiveUpdate { } (map (d: d.value) defs);
@@ -73,7 +73,7 @@ let
         default = null;
         description = ''
           Authentication method. Set to "oauth" for OAuth 2.1 PKCE flow
-          (remote MCP servers). Tokens are stored in $QUBIT_HOME/mcp-tokens/.
+          (remote MCP servers). Tokens are stored in $HERMES_HOME/mcp-tokens/.
         '';
       };
 
@@ -241,7 +241,7 @@ let
         type = types.package;
         default = defaultPackage;
         defaultText = defaultPackageText;
-        description = "The qubit-runtime package to use.";
+        description = "The hermes-agent package to use.";
       };
 
       workingDirectory = mkOption {
@@ -299,7 +299,7 @@ let
         description = ''
           The paths to environment files that contain secrets, for example
           API keys and tokens. Activation adds the contents of these files to
-          $QUBIT_HOME/.env. Qubit reads that file at each start, with
+          $HERMES_HOME/.env. Qubit reads that file at each start, with
           load_hermes_dotenv().
 
           Each activation writes .env again from the start. Thus a secret
@@ -313,7 +313,7 @@ let
         default = { };
         description = ''
           Environment variables that are not secret. Activation writes them
-          to $QUBIT_HOME/.env.
+          to $HERMES_HOME/.env.
 
           CAUTION: Do not put secrets in this option. All users can read the
           Nix store. Use environmentFiles for secrets.
@@ -348,7 +348,7 @@ let
 
           Use this option for the project context that the agent reads from
           its working directory, for example AGENTS.md, notes and checklists.
-          Qubit reads SOUL.md and memories/ from QUBIT_HOME, so put those
+          Qubit reads SOUL.md and memories/ from HERMES_HOME, so put those
           files in `hermesHomeFiles`.
 
           If you set this option, you must also set `workingDirectory`. The
@@ -367,11 +367,11 @@ let
         type = documentsType;
         default = { };
         description = ''
-          Files that the module installs into QUBIT_HOME. Each key is a path
+          Files that the module installs into HERMES_HOME. Each key is a path
           relative to that directory, and the module makes the necessary
           subdirectories. Each value is a string or a path.
 
-          Qubit reads SOUL.md and the memory files from QUBIT_HOME and not
+          Qubit reads SOUL.md and the memory files from HERMES_HOME and not
           from the working directory. Declare those files here, or Qubit
           does not load them.
         '';
@@ -428,8 +428,8 @@ let
           [
             (pkgs.fetchFromGitHub {
               owner = "stephenschoettler";
-              repo = "qubit-lcm";
-              name = "qubit-lcm";
+              repo = "hermes-lcm";
+              name = "hermes-lcm";
               rev = "v0.7.0";
               hash = "sha256-...";
             })
@@ -444,11 +444,14 @@ let
           Python packages to add to PYTHONPATH for entry-point plugin discovery.
           These are pip-packaged plugins that register via the
           hermes_agent.plugins entry-point group. Each package must be built
-          with the same Python interpreter as qubit (python312).
+          with the same Python interpreter as qubit. The interpreter
+          major.minor is derived from pm/lock.json by nix/pythonLock.nix —
+          take packages from config.services.hermes-agent.package.python.pkgs so the set always
+          matches the interpreter qubit was built with.
         '';
         example = literalExpression ''
           [
-            (pkgs.python312Packages.buildPythonPackage {
+            (config.services.hermes-agent.package.python.pkgs.buildPythonPackage {
               pname = "rtk-qubit";
               version = "1.0.0";
               src = pkgs.fetchFromGitHub {
@@ -470,11 +473,11 @@ let
           the sealed Python venv. These are resolved by uv alongside core
           dependencies — no PYTHONPATH patching or collision risk.
 
-          Use this for optional extras already declared in qubit-runtime's
-          pyproject.toml (e.g. "hindsight", "honcho", "voice").
+          Use this for optional extras already declared in hermes-agent's
+          pyproject.toml (e.g. "honcho", "voice").
           Use extraPythonPackages for external packages not in pyproject.toml.
         '';
-        example = [ "hindsight" ];
+        example = [ "honcho" ];
       };
 
       # ── Service behaviour ──────────────────────────────────────────────
@@ -498,7 +501,7 @@ let
 
       # ── The backend: `qubit serve` or `qubit dashboard` ──────────────
       # `qubit serve` and `qubit dashboard` are the same entry point,
-      # qubit_cli.main:cmd_dashboard, with one flag of difference. serve runs
+      # hermes_cli.main:cmd_dashboard, with one flag of difference. serve runs
       # without a user interface. dashboard also serves the web application.
       # Both give the /api/ws and /api/pty sockets that Qubit Desktop
       # connects to. They are one process, and you can run only one of them.
@@ -661,14 +664,14 @@ let
   installPackageRemovedMessage =
     value:
     ''
-      services.qubit-runtime.installPackage was removed. Qubit now
+      services.hermes-agent.installPackage was removed. Qubit now
       separates the installation from the services, which is the
       Home Manager convention:
 
-        programs.qubit-runtime.enable = ${lib.boolToString (value != false)};  # the qubit CLI, and QUBIT_HOME for your shells
-        programs.qubit-runtime.desktop.enable = true;  # the desktop application
+        programs.hermes-agent.enable = ${lib.boolToString (value != false)};  # the qubit CLI, and HERMES_HOME for your shells
+        programs.hermes-agent.desktop.enable = true;  # the desktop application
 
-      `services.qubit-runtime` keeps the state, the configuration and
+      `services.hermes-agent` keeps the state, the configuration and
       the daemons. Remove `installPackage` and add the line above.
     '';
 
@@ -692,7 +695,7 @@ let
       workingDirectory,
     }:
     let
-      generated = pkgs.writeText "qubit-config.yaml" (
+      generated = pkgs.writeText "hermes-config.yaml" (
         builtins.toJSON (lib.recursiveUpdate { terminal.cwd = workingDirectory; } cfg.settings)
       );
     in
@@ -707,7 +710,7 @@ let
   # install loop can copy each entry with `install -D`.
   mkDocumentTree =
     { pkgs, documents }:
-    pkgs.runCommand "qubit-documents" { } (
+    pkgs.runCommand "hermes-documents" { } (
       ''
         mkdir -p $out
       ''
@@ -734,12 +737,12 @@ let
   mkEnvScript =
     { pkgs, environment }:
     let
-      base = pkgs.writeText "qubit-env-base" (
+      base = pkgs.writeText "hermes-env-base" (
         lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "${k}=${v}") environment)
         + lib.optionalString (environment != { }) "\n"
       );
     in
-    pkgs.writeShellScript "qubit-env-merge" ''
+    pkgs.writeShellScript "hermes-env-merge" ''
       set -eu
 
       dest="$1"
@@ -752,7 +755,7 @@ let
           printf '\n' >> "$dest"
           cat "$file" >> "$dest"
         else
-          echo "qubit-runtime: WARNING cannot read environmentFile $file" >&2
+          echo "hermes-agent: WARNING cannot read environmentFile $file" >&2
         fi
       done
     '';
@@ -855,7 +858,7 @@ let
 
       # The managed-mode marker. It makes an interactive shell also refuse to
       # change the configuration that Nix owns.
-      ${inst} -m ${modes.managed} ${pkgs.writeText "qubit-managed" managedSystem} ${hermesHome}/.managed
+      ${inst} -m ${modes.managed} ${pkgs.writeText "hermes-managed" managedSystem} ${hermesHome}/.managed
 
       ${lib.optionalString (cfg.environment != { } || cfg.environmentFiles != [ ]) ''
         ${run}${envScript} ${hermesHome}/.env ${modes.env} ${lib.escapeShellArgs cfg.environmentFiles}
@@ -882,7 +885,7 @@ let
       ${run}find ${hermesHome}/plugins -maxdepth 1 -type l -name 'nix-managed-*' -delete 2>/dev/null || true
       ${lib.concatMapStringsSep "\n" (plugin: ''
         if [ ! -f ${plugin}/plugin.yaml ]; then
-          echo "qubit-runtime: ERROR extraPlugins entry '${plugin}' has no plugin.yaml" >&2
+          echo "hermes-agent: ERROR extraPlugins entry '${plugin}' has no plugin.yaml" >&2
           exit 1
         fi
         ${run}ln -sfn ${plugin} ${hermesHome}/plugins/nix-managed-${lib.getName plugin}
@@ -930,7 +933,7 @@ let
     # The bind address is known only at start time, but escapeShellArgs quotes
     # each argument. Thus the command line is built with a placeholder, and the
     # placeholder becomes the shell variable after the quoting.
-    pkgs.writeShellScript "qubit-backend-launch" (
+    pkgs.writeShellScript "hermes-backend-launch" (
       builtins.replaceStrings [ "@HOST@" ] [ ''"$_target"'' ] ''
         set -euo pipefail
 
@@ -943,8 +946,8 @@ let
           _token_file=${lib.escapeShellArg cfg.backend.sessionTokenFile}
 
           if [ ! -r "$_token_file" ]; then
-            echo "qubit-backend: cannot read the session token file '$_token_file'. The unit stops." >&2
-            echo "qubit-backend: backend.sessionTokenFile must name a runtime path that this user can read." >&2
+            echo "hermes-backend: cannot read the session token file '$_token_file'. The unit stops." >&2
+            echo "hermes-backend: backend.sessionTokenFile must name a runtime path that this user can read." >&2
             exit 1
           fi
 
@@ -952,7 +955,7 @@ let
           export HERMES_DASHBOARD_SESSION_TOKEN
 
           if [ -z "$HERMES_DASHBOARD_SESSION_TOKEN" ]; then
-            echo "qubit-backend: the session token file '$_token_file' is empty. The unit stops." >&2
+            echo "hermes-backend: the session token file '$_token_file' is empty. The unit stops." >&2
             exit 1
           fi
         ''}
@@ -973,12 +976,12 @@ let
                 fi
 
                 if [ "$_waited" -ge "$_timeout" ]; then
-                  echo "qubit-backend: '$_target' did not resolve after ''${_timeout}s. The unit stops." >&2
+                  echo "hermes-backend: '$_target' did not resolve after ''${_timeout}s. The unit stops." >&2
                   exit 1
                 fi
 
                 if [ "$_waited" = 0 ]; then
-                  echo "qubit-backend: waits for '$_target' to resolve..." >&2
+                  echo "hermes-backend: waits for '$_target' to resolve..." >&2
                 fi
                 ${pkgs.coreutils}/bin/sleep 2
                 _waited=$(( _waited + 2 ))
@@ -1000,13 +1003,13 @@ let
                 fi
 
                 if [ "$_waited" -ge "$_timeout" ]; then
-                  echo "qubit-backend: interface '$_iface' had no IPv4 address after ''${_timeout}s. The unit stops." >&2
-                  echo "qubit-backend: a fallback address can expose the backend more widely than you intend." >&2
+                  echo "hermes-backend: interface '$_iface' had no IPv4 address after ''${_timeout}s. The unit stops." >&2
+                  echo "hermes-backend: a fallback address can expose the backend more widely than you intend." >&2
                   exit 1
                 fi
 
                 if [ "$_waited" = 0 ]; then
-                  echo "qubit-backend: waits for an IPv4 address on '$_iface'..." >&2
+                  echo "hermes-backend: waits for an IPv4 address on '$_iface'..." >&2
                 fi
                 ${pkgs.coreutils}/bin/sleep 2
                 _waited=$(( _waited + 2 ))
@@ -1014,7 +1017,7 @@ let
             ''
         }
 
-        echo "qubit-backend: binds to $_target:${toString cfg.backend.port} (from $_how)" >&2
+        echo "hermes-backend: binds to $_target:${toString cfg.backend.port} (from $_how)" >&2
 
         exec ${lib.escapeShellArgs (backendCommand cfg "@HOST@")}
       ''
@@ -1049,7 +1052,7 @@ let
       managedSystem ? "true",
     }:
     {
-      QUBIT_HOME = hermesHome;
+      HERMES_HOME = hermesHome;
       HERMES_MANAGED = managedSystem;
     };
 
@@ -1097,7 +1100,7 @@ let
 
           To give Qubit an identity and a memory, use
           ${optionPath}.hermesHomeFiles instead. Those files go to
-          QUBIT_HOME. Qubit reads SOUL.md and memories/ only from there.
+          HERMES_HOME. Qubit reads SOUL.md and memories/ only from there.
         '';
       }
     ];
@@ -1131,7 +1134,7 @@ let
       }
     ];
 
-  # The subdirectories of QUBIT_HOME that both modules make.
+  # The subdirectories of HERMES_HOME that both modules make.
   stateSubdirs = [
     "cron"
     "sessions"

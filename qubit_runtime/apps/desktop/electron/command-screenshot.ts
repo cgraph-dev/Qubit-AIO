@@ -18,10 +18,12 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
   const expectedUrl = new URL(rendererUrl)
   const monitor = new CommandScreenshotMonitor({ appPath: app.getAppPath() })
   const hasScreenPermission = () => systemPreferences.getMediaAccessStatus('screen') === 'granted'
+
   const capture = createScreenshotCapture({
     hasScreenPermission,
     getSources: options => desktopCapturer.getSources(options)
   })
+
   const recipients = new Map<number, () => void>()
   let lastRecipient: BrowserWindow | null = null
   let enabled = false
@@ -80,7 +82,7 @@ export function installCommandScreenshot({ rendererUrl }: { rendererUrl: string 
           return
         }
 
-        // Retain the last Qubit chat window when another application takes focus.
+        // Retain the last Hermes chat window when another application takes focus.
         // Closing it cancels this destination; never silently pick another chat.
         const focused = BrowserWindow.getFocusedWindow()
         const recipient = focused && recipients.has(focused.webContents.id) ? focused : lastRecipient

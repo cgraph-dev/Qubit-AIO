@@ -9,7 +9,7 @@ description: "Agent ↔ NAS wire contract for the Chronos cron provider"
 **Audience:** the NAS-side implementer of the `agent-cron` endpoints
 (`nous-account-service`) and anyone debugging the managed-cron path.
 
-Chronos lets a hosted Qubit gateway **scale to zero** while idle and still
+Chronos lets a hosted Hermes gateway **scale to zero** while idle and still
 fire cron jobs. Instead of an in-process 60-second ticker, the agent asks NAS
 to arm exactly **one external one-shot per job at that job's real next-fire
 time**. NAS calls the agent back at fire time over an authenticated webhook;
@@ -26,7 +26,7 @@ create/update/pause/resume/remove a cron job (agent side)
   │
   ▼
 ChronosCronScheduler.reconcile()        ── agent computes next_run_at
-  │  POST {portal}/api/agent-cron/provision   (auth: agent's Qubit access token)
+  │  POST {portal}/api/agent-cron/provision   (auth: agent's Nous access token)
   ▼
 NAS arms a one-shot for fire_at         ── NAS owns the scheduler + its creds
   │
@@ -45,7 +45,7 @@ agent verifies the NAS JWT → store CAS claim → run_one_job → re-arm next o
 
 | Hop | Who calls whom | Auth mechanism | Verified by |
 |---|---|---|---|
-| 1 | agent → NAS (`provision`/`cancel`/`list`) | the agent's existing **Qubit Labs access token** (Bearer) — for a hosted agent this is the **bootstrap-session token** NAS planted in `auth.json` (client `hermes-cli-vps`), NOT an `agent:*` client token | NAS (its normal agent-token path) |
+| 1 | agent → NAS (`provision`/`cancel`/`list`) | the agent's existing **Nous Portal access token** (Bearer) — for a hosted agent this is the **bootstrap-session token** NAS planted in `auth.json` (client `hermes-cli-vps`), NOT an `agent:*` client token | NAS (its normal agent-token path) |
 | 2 | scheduler → NAS (`relay`) | the scheduler's request **signature** | NAS (the signature path it already has) |
 | 3 | NAS → agent (`/api/cron/fire`) | a **short-lived NAS-minted JWT** (`aud=agent:{instance_id}`, `purpose=cron_fire`) | agent (PyJWT against NAS JWKS) |
 
@@ -76,7 +76,7 @@ already performs.
 
 Arm (or re-arm, idempotently) exactly one one-shot for a job.
 
-- **Auth:** `Authorization: Bearer <agent Qubit access token>`. NAS validates via
+- **Auth:** `Authorization: Bearer <agent Nous access token>`. NAS validates via
   its normal agent-token path and scopes the row to the calling agent/org.
 - **Request body:**
   ```json
@@ -134,7 +134,7 @@ Arm (or re-arm, idempotently) exactly one one-shot for a job.
 This is the agent endpoint NAS calls in Endpoint 3 step 3. Two hops on hosted
 deployments:
 
-1. **Dashboard app** (`qubit_cli/web_server.py`) — the agent's only public
+1. **Dashboard app** (`hermes_cli/web_server.py`) — the agent's only public
    HTTP surface (the Fly proxy exposes exactly one port, the dashboard's). It
    is in `PUBLIC_API_PATHS` so the dashboard cookie gate lets the bearer-JWT
    callback through to the verifier. The dashboard verifies the JWT, resolves
@@ -188,7 +188,7 @@ There is deliberately no in-dashboard execution fallback. The verifier is
   `get_job` returns `None` after the final fire → the agent does **not** re-arm
   → the schedule stops cleanly with no orphaned one-shot.
 - **Multi-replica agents:** the store CAS makes the fire at-most-once across N
-  gateway replicas sharing one `QUBIT_HOME` — exactly one replica runs each
+  gateway replicas sharing one `HERMES_HOME` — exactly one replica runs each
   fire.
 
 ## Reconcile (self-healing)
@@ -215,17 +215,17 @@ credentials. For hosted agents NAS sets these at provision time:
 | `cron.chronos.expected_audience` | this agent's JWT `aud` (`agent:{instance_id}`) |
 | `cron.chronos.nas_jwks_url` | NAS JWKS for verifying the fire JWT |
 
-If `callback_url` / `portal_url` is blank or the agent has no Qubit login,
+If `callback_url` / `portal_url` is blank or the agent has no Nous login,
 `is_available()` returns False and the resolver falls back to the built-in
 in-process ticker — cron never loses its trigger.
 
 **Identity rejection at runtime (`403 invalid_client`).** `is_available()` is
-config-only, so it cannot tell whether the stored Qubit token is the identity NAS
+config-only, so it cannot tell whether the stored Nous token is the identity NAS
 maps to a provisioned instance (hop 1 above). When `provision` answers 403
 `invalid_client` — the token in `auth.json` is a plain `hermes-cli` user login
 rather than the `hermes-cli-vps` bootstrap session or an `agent:*` client — the
 rejection is deterministic for the life of that credential: every arm, re-arm
-and `list` would fail the same way, and a `qubit auth` re-login makes it
+and `list` would fail the same way, and a `hermes auth` re-login makes it
 permanent (it *replaces* the bootstrap session; only NAS can re-mint one). The
 provider therefore logs ONE warning naming that remedy, stops calling NAS, and
 starts the built-in ticker for the rest of the process so jobs keep firing on

@@ -61,7 +61,7 @@ def _rediscover() -> None:
     import providers as _pkg
 
     _pkg._discovered = False
-    for mod in [m for m in sys.modules if m.startswith("_hermes_user_provider")]:
+    for mod in [m for m in sys.modules if m.startswith("_qubit_user_provider")]:
         del sys.modules[mod]
 
 

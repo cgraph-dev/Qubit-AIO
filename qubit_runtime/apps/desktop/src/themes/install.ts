@@ -80,7 +80,7 @@ export async function installVscodeThemeFromMarketplace(id: string): Promise<Des
     throw new Error('Expected a Marketplace id like "publisher.extension".')
   }
 
-  const api = window.qubitDesktop?.themes
+  const api = window.hermesDesktop?.themes
 
   if (!api?.fetchMarketplace) {
     throw new Error('Marketplace install is only available in the desktop app.')

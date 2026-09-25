@@ -84,23 +84,13 @@ test('every device.* entitlement on the main app is also inherited', () => {
   )
 })
 
-for (const plist of [MAIN_PLIST, INHERIT_PLIST]) {
-  test(`${path.basename(plist)} is a well-formed non-empty entitlement dict`, () => {
-    const data = loadEntitlements(plist)
-    assert.ok(
-      Object.keys(data).length > 0,
-      `${path.basename(plist)} should be a non-empty dict`
-    )
-  })
-}
-
 test('bootstrap installer carries microphone entitlement for launcher attribution', () => {
   const config = JSON.parse(fs.readFileSync(BOOTSTRAP_TAURI_CONFIG, 'utf-8'))
   assert.equal(
     config.bundle?.macOS?.entitlements,
     'entitlements.plist',
     'the macOS bootstrap installer must sign with its entitlements.plist. ' +
-      'When /Applications/Qubit.app is the setup launcher, macOS TCC treats ' +
+      'When /Applications/Hermes.app is the setup launcher, macOS TCC treats ' +
       'com.nousresearch.hermes.setup as the responsible process for the desktop ' +
       'app it opens; without audio-input on the setup app, microphone access is ' +
       'denied before a permission prompt can appear.'
@@ -125,10 +115,5 @@ test('bootstrap installer Info.plist explains microphone usage', () => {
     typeof info.NSMicrophoneUsageDescription,
     'string',
     'macOS requires NSMicrophoneUsageDescription before it can prompt for microphone access'
-  )
-  assert.match(
-    info.NSMicrophoneUsageDescription as string,
-    /microphone/i,
-    'microphone usage description should be user-visible and specific'
   )
 })

@@ -34,18 +34,18 @@ _PASSTHROUGH_ENV = frozenset({"PATH", "LANG", "LANGUAGE", "USER", "LOGNAME", "SH
 class FakeHome:
     root: Path
     home: Path
-    hermes_home: Path
+    qubit_home: Path
     tag: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     @property
     def auth_path(self) -> Path:
-        return self.hermes_home / "auth.json"
+        return self.qubit_home / "auth.json"
 
     def env(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         import pwd  # POSIX-only; the suite is Linux-gated
 
         real_root = Path(pwd.getpwuid(os.getuid()).pw_dir, ".hermes").resolve()
-        fixture = self.hermes_home.resolve()
+        fixture = self.qubit_home.resolve()
         assert fixture != real_root and fixture.parent != real_root / "profiles", (
             f"fixture QUBIT_HOME {fixture} is the real install's live home")
         env = {
@@ -53,7 +53,7 @@ class FakeHome:
             if (k in _PASSTHROUGH_ENV or k.startswith("LC_")) and not k.endswith(_SECRET_ENV_SUFFIXES)
         }
         env.update({
-            "HOME": str(self.home), "QUBIT_HOME": str(self.hermes_home),
+            "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home),
             "PYTHONPATH": str(REPO_ROOT), "PYTHONUNBUFFERED": "1", "NO_COLOR": "1", "TERM": "dumb",
             TAG_VAR: self.tag,
             # The child's ~/.hermes/state.db IS the tmp home's db; see parity/_helpers.py.
@@ -65,7 +65,7 @@ class FakeHome:
     def write_config(self, cfg: dict[str, Any]) -> None:
         base = {"updates": {"check": False}, "display": {"compact": True}}
         base.update(cfg)
-        (self.hermes_home / "config.yaml").write_text(yaml.safe_dump(base, sort_keys=False), encoding="utf-8")
+        (self.qubit_home / "config.yaml").write_text(yaml.safe_dump(base, sort_keys=False), encoding="utf-8")
 
     def write_auth(self, store: dict[str, Any]) -> None:
         self.auth_path.write_text(json.dumps(store, indent=2), encoding="utf-8")
@@ -78,7 +78,7 @@ class FakeHome:
 def make_home(root: Path) -> FakeHome:
     home = root / "home"
     (home / ".hermes").mkdir(parents=True, exist_ok=True)
-    fh = FakeHome(root=root, home=home, hermes_home=home / ".hermes")
+    fh = FakeHome(root=root, home=home, qubit_home=home / ".hermes")
     fh.write_config({})
     return fh
 

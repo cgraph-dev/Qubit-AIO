@@ -1,4 +1,4 @@
-// Attach to the host's running Qubit backend (multiplex-only, Desktop half).
+// Attach to the host's running Hermes backend (multiplex-only, Desktop half).
 //
 // `backend-discovery.ts` owns the pure decision; this module performs the IO
 // ladder around it: read the machine-root ledger, validate a candidate at the
@@ -33,6 +33,11 @@ export interface HostBackendAttachDeps {
   readLedger: (path: string) => string | null
   /** Resolve the token the backend actually serves at `GET /`. */
   resolveServedToken: (baseUrl: string) => Promise<string | null>
+  /**
+   * Session token the backend published for this record when `GET /` withholds
+   * it. Absent readers keep the dashboard-HTML-only handshake.
+   */
+  publishedTokenFor?: (record: HostBackendRecord) => string | null
   /** Reject unless the backend answers its readiness probe. */
   waitForReady: (baseUrl: string, token: string) => Promise<unknown>
   /** Reject unless `/api/ws` accepts the token — the leg the renderer uses. */
@@ -40,12 +45,18 @@ export interface HostBackendAttachDeps {
   log: (message: string) => void
 }
 
-export function spawnLedgerPath(qubitHomeRoot: string, join: (...parts: string[]) => string): string {
-  return join(qubitHomeRoot, SPAWN_LEDGER_FILENAME)
+export function spawnLedgerPath(hermesHomeRoot: string, join: (...parts: string[]) => string): string {
+  return join(hermesHomeRoot, SPAWN_LEDGER_FILENAME)
 }
 
 function wsUrlFor(baseUrl: string, token: string): string {
   return `${baseUrl.replace(/^http/, 'ws')}/api/ws?token=${encodeURIComponent(token)}`
+}
+
+function nonemptyToken(value: string | null | undefined): string | null {
+  const token = String(value ?? '').trim()
+
+  return token || null
 }
 
 /**
@@ -57,8 +68,18 @@ function wsUrlFor(baseUrl: string, token: string): string {
  */
 async function validate(record: HostBackendRecord, deps: HostBackendAttachDeps): Promise<AttachedBackend | null> {
   const baseUrl = recordBaseUrl(record)
+  const servedToken = nonemptyToken(await deps.resolveServedToken(baseUrl).catch(() => null))
+  let publishedToken: string | null = null
 
-  const token = await deps.resolveServedToken(baseUrl).catch(() => null)
+  if (!servedToken && deps.publishedTokenFor) {
+    try {
+      publishedToken = nonemptyToken(deps.publishedTokenFor(record))
+    } catch {
+      publishedToken = null
+    }
+  }
+
+  const token = servedToken || publishedToken
 
   if (!token) {
     deps.log(`[attach] ${baseUrl} (pid ${record.pid}) did not publish a session token; not attaching`)
@@ -115,7 +136,7 @@ export async function attachToHostBackend(
 
     if (attached) {
       deps.log(
-        `[attach] attached to the running Qubit backend on ${attached.baseUrl} ` +
+        `[attach] attached to the running Hermes backend on ${attached.baseUrl} ` +
           `(pid ${attached.pid}, registered by profile "${record.profile || 'default'}"); spawning nothing`
       )
 

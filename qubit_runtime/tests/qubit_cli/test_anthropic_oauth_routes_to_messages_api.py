@@ -70,7 +70,7 @@ class TestExplicitRuntimeForAnthropic:
 
 class TestPoolEntryForAnthropic:
     """``_resolve_runtime_from_pool_entry`` is what runs when a user
-    has added an OAuth credential via ``qubit auth add anthropic
+    has added an OAuth credential via ``hermes auth add anthropic
     --type oauth`` (the exact flow from #32243).  Pin the contract
     alongside the URL-detector test so all three runtime branches
     stay aligned and a future refactor of one cannot diverge from
@@ -143,7 +143,7 @@ class TestCustomProviderUrlFallback:
             def has_credentials(self):
                 return True
 
-            def select(self):
+            def select(self, **_kwargs):
                 return _Entry()
 
         monkeypatch.setattr(rp, "custom_provider_pool_key_candidates", lambda *a, **k: ["custom:my-claude"])

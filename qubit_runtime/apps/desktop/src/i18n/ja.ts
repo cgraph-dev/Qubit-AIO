@@ -1,11 +1,19 @@
 import { defineFieldCopy } from '@/app/settings/field-copy'
 
 import { defineLocale } from './define-locale'
+import { introJa } from './intro-ja'
 
 export const ja = defineLocale({
+  externalOpenFailed: {
+    title: 'このリンクを開けませんでした',
+    message: 'このアドレスを開くブラウザが登録されていません。リンクをコピーして手動で開いてください。',
+    copyUrl: 'リンクをコピー',
+    close: '閉じる'
+  },
+  intro: introJa,
   sessionImport: {
     title: '別のアプリから続ける',
-    subtitle: '会話をQubitに取り込み、続きを始めましょう。',
+    subtitle: '会話をHermesに取り込み、続きを始めましょう。',
     action: 'セッションを取り込む',
     readingFrom: '読み込み元',
     connectedComputer: '接続先のコンピューター',
@@ -32,8 +40,8 @@ export const ja = defineLocale({
     snapshot: 'この会話は取り込み済みです。既存のコピーを開いて続けられます。',
     copyNotice: '会話のテキストをコピーします。元のファイルは変更されません。ツール出力と推論は含まれません。',
     importing: '取り込み中…',
-    open: 'Qubitで開く',
-    continue: 'Qubitで続ける',
+    open: 'Hermesで開く',
+    continue: 'Hermesで続ける',
     importError: '会話を取り込めませんでした。'
   },
   common: {
@@ -51,6 +59,7 @@ export const ja = defineLocale({
     connect: '接続',
     connecting: '接続中',
     continue: '続ける',
+    bots: 'ボット',
     copied: 'コピーしました',
     copy: 'コピー',
     copyFailed: 'コピーに失敗しました',
@@ -94,23 +103,24 @@ export const ja = defineLocale({
     renameLabel: '新しい名前',
     deleteTitle: name => `${name} を削除しますか？`,
     deleteBody: 'ゴミ箱に移動します。そこから復元できます。',
-    pathCopied: 'パスをコピーしました'
+    pathCopied: 'パスをコピーしました',
+    revealMissing: 'そのフォルダーはこのコンピューターにありません'
   },
 
   boot: {
-    ready: 'Qubit Desktop の準備ができました',
+    ready: 'Hermes Desktop の準備ができました',
     desktopBootFailedWithMessage: message => `デスクトップの起動に失敗しました: ${message}`,
     steps: {
       connectingGateway: 'ライブデスクトップゲートウェイに接続中',
-      loadingSettings: 'Qubit の設定を読み込み中',
+      loadingSettings: 'Hermes の設定を読み込み中',
       loadingSessions: '最近のセッションを読み込み中',
-      retryingRemoteBackend: 'リモート Qubit バックエンドに再接続中…',
+      retryingRemoteBackend: 'リモート Hermes バックエンドに再接続中…',
       startingDesktopConnection: 'デスクトップ接続を開始中',
-      startingQubitDesktop: 'Qubit Desktop を起動中…'
+      startingHermesDesktop: 'Hermes Desktop を起動中…'
     },
     errors: {
-      backgroundExited: 'Qubit バックグラウンドプロセスが終了しました。',
-      backgroundExitedDuringStartup: '起動中に Qubit バックグラウンドプロセスが終了しました。',
+      backgroundExited: 'Hermes バックグラウンドプロセスが終了しました。',
+      backgroundExitedDuringStartup: '起動中に Hermes バックグラウンドプロセスが終了しました。',
       backendStopped: 'バックエンドが停止しました',
       desktopBootFailed: 'デスクトップの起動に失敗しました',
       gatewayConnectionLost: 'ゲートウェイへの接続が切断されました',
@@ -120,7 +130,7 @@ export const ja = defineLocale({
       ipcBridgeUnavailable: 'デスクトップ IPC ブリッジが利用できません。'
     },
     failure: {
-      title: 'Qubit を起動できませんでした',
+      title: 'Hermes を起動できませんでした',
       description:
         'バックグラウンドゲートウェイが起動しませんでした。以下の回復手順をお試しください。チャットや設定は削除されません。',
       remoteTitle: 'リモートゲートウェイへのサインインが必要です',
@@ -138,11 +148,13 @@ export const ja = defineLocale({
       signOutAndSignIn: 'サインアウトして再サインイン',
       remoteFailureHint:
         '「ゲートウェイ設定」でゲートウェイの URL とサインインを確認するか、ローカルゲートウェイに切り替えてください。',
-      cloudDownTitle: 'Qubit Cloud エージェントが停止しています',
+      cloudDownTitle: 'Nous Cloud エージェントが停止しています',
       cloudDownDescription:
-        'このゲートウェイが接続している Qubit 管理のクラウドエージェントがサーバーエラーを返しています。ここから再起動することはできません。ステータスを確認するか、ローカルゲートウェイに切り替えるか、サポートに連絡してください。',
+        'このゲートウェイが接続している Nous 管理のクラウドエージェントがサーバーエラーを返しています。ここから再起動することはできません。ステータスを確認するか、ローカルゲートウェイに切り替えるか、サポートに連絡してください。',
       cloudDownHint:
-        '下のボタンからローカルゲートウェイへの切り替え、再試行、またはゲートウェイ設定を開けます。',
+        '下のボタンから Nous Portal（インスタンスの状態と操作）を開くか、Discord でサポートを受けられます。',
+      cloudDownCheckPortal: 'Portal のステータスを確認',
+      cloudDownDiscord: 'Discord でサポートを受ける',
       hideRecentLogs: '最近のログを非表示',
       showRecentLogs: '最近のログを表示',
       signedInTitle: 'サインインしました',
@@ -157,6 +169,8 @@ export const ja = defineLocale({
   },
 
   notifications: {
+    sharedProfileWarning:
+      '別の Hermes インストールがこのプロファイルを使用しています。両方が設定とデータを共有しているため、変更が競合する可能性があります。このまま続けるか、変更する前にもう一方を終了してください。',
     region: '通知',
     hide: '非表示',
     show: '表示',
@@ -168,9 +182,9 @@ export const ja = defineLocale({
     copyDetailFailed: '通知の詳細をコピーできませんでした',
     backendOutOfDateTitle: 'バックエンドが古いです',
     backendOutOfDateMessage:
-      'Qubit バックエンドがこのデスクトップビルドより古く、正常に動作しない場合があります。更新して揃えてください。',
+      'Hermes バックエンドがこのデスクトップビルドより古く、正常に動作しない場合があります。更新して揃えてください。',
     installMethodUnsupportedTitle: 'サポート対象外のインストール方法',
-    updateQubit: 'Qubit を更新',
+    updateHermes: 'Hermes を更新',
     updateReadyTitle: '更新の準備ができました',
     updateReadyMessage: count => `${count} 件の新しい変更が利用可能です。`,
     updateReadyMessageUnknown: '新しい更新が利用可能です。',
@@ -181,7 +195,10 @@ export const ja = defineLocale({
       errorTitle: 'MCP サーバーに接続できません',
       errorMessage: name => `${name} MCP のヘルスチェックに失敗しました。`,
       signIn: 'サインイン',
-      view: '表示'
+      view: '表示',
+      disable: '無効化',
+      disabledMessage: name => `${name} MCP を無効にしました。機能 → MCP からいつでも再有効化できます。`,
+      disableFailed: name => `${name} MCP を無効にできませんでした。`
     },
     errors: {
       elevenLabsNeedsKey: 'ElevenLabs STT には ELEVENLABS_API_KEY が必要です。',
@@ -189,10 +206,9 @@ export const ja = defineLocale({
       diskFull: 'ディスク容量不足です — 空きを作ってからもう一度お試しください。',
       gatewayAuthFailed: 'ゲートウェイ認証に失敗しました — API_SERVER_KEY を確認してください。',
       methodNotAllowed:
-        'デスクトップバックエンドがそのリクエストを拒否しました (405 Method Not Allowed)。Qubit Desktop を再起動してください。',
+        'デスクトップバックエンドがそのリクエストを拒否しました (405 Method Not Allowed)。Hermes Desktop を再起動してください。',
       microphonePermission: 'マイクのアクセス許可が拒否されました。',
       openaiRejectedApiKey: 'OpenAI が API キーを拒否しました。',
-      openaiRejectedApiKeyWithStatus: status => `OpenAI が API キーを拒否しました (${status} invalid_api_key)。`,
       openaiTtsNeedsKey: 'OpenAI TTS には VOICE_TOOLS_OPENAI_KEY または OPENAI_API_KEY が必要です。',
       codeSkewRestartRequired:
         'アップデート後、このバックエンドは古いコードのままです。再起動して新しいコードを読み込んでください。'
@@ -219,11 +235,13 @@ export const ja = defineLocale({
     },
     native: {
       approvalTitle: '承認が必要です',
+      approvalTitleNamed: session => `承認が必要です — ${session}`,
       approveAction: '承認',
       rejectAction: '拒否',
       inputTitle: '入力が必要です',
-      inputBody: 'Qubit が応答を待っています。',
-      turnDoneTitle: 'Qubit が完了しました',
+      inputTitleNamed: session => `入力が必要です — ${session}`,
+      inputBody: 'Hermes が応答を待っています。',
+      turnDoneTitle: 'Hermes が完了しました',
       turnDoneBody: '',
       turnErrorTitle: 'ターンが失敗しました',
       backgroundDoneTitle: 'バックグラウンドタスクが完了しました',
@@ -238,7 +256,7 @@ export const ja = defineLocale({
   },
 
   billingBlock: {
-    titleNous: 'Qubit クレジットが不足しています',
+    titleNous: 'Nous クレジットが不足しています',
     titleProvider: provider => `クレジット不足 — ${provider}`,
     fallbackMessage: 'アカウントのクレジットが不足しています。続行するにはクレジットを追加してください。',
     openBilling: '請求を開く',
@@ -247,9 +265,9 @@ export const ja = defineLocale({
   },
 
   sendDiagnostics: {
-    title: 'Qubit に診断情報を送信',
+    title: 'Nous に診断情報を送信',
     privacyNotice:
-      'デバッグバンドルを Qubit 内部ストレージにアップロードします（公開ペーストではありません）。システム情報（OS、バージョン、プロバイダー、設定済み API キーの種類 — キー自体は含まれません）と、エージェント/ゲートウェイ/デスクトップの完全なログ（各最大 512 KB。会話内容、ツール出力、ファイルパスを含む可能性が高い）が含まれます。シークレットはアップロード前にマスクされます。閲覧できるのは Qubit スタッフと許可された Discord モデレーターのみで、14 日後に自動削除されます。',
+      'デバッグバンドルを Nous 内部ストレージにアップロードします（公開ペーストではありません）。システム情報（OS、バージョン、プロバイダー、設定済み API キーの種類 — キー自体は含まれません）と、エージェント/ゲートウェイ/デスクトップの完全なログ（各最大 512 KB。会話内容、ツール出力、ファイルパスを含む可能性が高い）が含まれます。シークレットはアップロード前にマスクされます。閲覧できるのは Nous スタッフと許可された Discord モデレーターのみで、14 日後に自動削除されます。',
     upload: 'アップロード',
     uploading: 'アップロード中…',
     cancel: 'キャンセル',
@@ -261,10 +279,12 @@ export const ja = defineLocale({
       'バンドルは非公開でアップロードされました。サポートスレッドで以下のリンクを共有すると、チームがログを確認できます。',
     failedTitle: 'アップロードに失敗しました',
     failedHint:
-      'ターミナルから `qubit debug share --nous` を実行するか、`qubit debug share --local` でアップロードせずにレポートを表示することもできます。',
+      'ターミナルから `hermes debug share --nous` を実行するか、`hermes debug share --local` でアップロードせずにレポートを表示することもできます。',
     handoffLead: '続きは次の場所で:',
     links: {
-      github: 'GitHub Issues'
+      github: 'GitHub Issues',
+      portal: 'Nous Portal サポート',
+      discord: 'Discord'
     }
   },
 
@@ -295,11 +315,110 @@ export const ja = defineLocale({
   },
 
   settings: {
+    uninstallSection: {
+      dangerZone: '危険ゾーン',
+      checkingInstalled: 'インストール内容を確認中…',
+      uninstallHermes: 'Hermes をアンインストール',
+      chooseHowMuch:
+        '削除する範囲を選択してください。完了するためにアプリが閉じます。インストーラーを開き直せばいつでも戻れます。',
+      confirmUninstall: 'アンインストールの確認',
+      confirmBody: what => `${what} が削除されます。この操作は取り消せません。`,
+      appLabel: 'アプリ：',
+      couldNotStart: 'アンインストールを開始できませんでした。',
+      uninstalling: 'アンインストール中…',
+      yesUninstall: 'はい、アンインストール',
+      options: {
+        gui: {
+          title: 'Chat GUI のみアンインストール',
+          description: 'このデスクトップアプリを削除します。Hermes エージェント、設定、チャットはすべて残ります。',
+          consequence: 'デスクトップ Chat GUI（このアプリとそのデータ）'
+        },
+        lite: {
+          title: 'GUI とエージェントをアンインストール、データは保持',
+          description:
+            'アプリと Hermes エージェントを削除しますが、将来の再インストールに備えて設定・チャット・シークレットは保持します。',
+          consequence: 'Chat GUI と Hermes エージェント（設定・チャット・シークレットは保持）'
+        },
+        full: {
+          title: 'すべてアンインストール',
+          description:
+            'アプリ、エージェント、すべてのユーザーデータ（設定、チャット、定期ジョブ、シークレット、ログ）を削除します。',
+          consequence: 'すべて——Chat GUI、Hermes エージェント、およびすべての設定・チャット・シークレット・ログ'
+        }
+      }
+    },
+    subpages: {
+      appearanceTheme: 'テーマ',
+      appearanceTypography: 'フォントと表示倍率',
+      appearanceWindowLayout: 'ウィンドウとレイアウト',
+      appearanceChatDisplay: 'チャット表示',
+      appearancePet: 'ペット',
+      appearanceGeneral: '一般',
+      modelMain: 'メインモデル',
+      modelAuxiliary: '補助モデル',
+      modelMoa: 'エージェントの協調',
+      modelFallbacks: '代替モデル',
+      chatBehavior: '動作',
+      chatAttachments: '添付ファイル',
+      workspaceProjects: 'プロジェクトと検出',
+      workspaceShell: 'シェル環境',
+      workspaceFiles: 'ファイルと実行',
+      safetyApprovals: '承認',
+      safetyPrivacy: 'プライバシーとネットワーク',
+      safetyCheckpoints: 'チェックポイント',
+      browserProfile: 'ブラウザープロファイル',
+      browserNetwork: 'ローカル・プライベート URL',
+      memoryPersistent: '永続メモリ',
+      memoryContext: 'コンテキストと圧縮',
+      voiceConversation: '音声会話',
+      voiceTranscription: '音声認識',
+      voiceSpeech: '音声合成',
+      advancedRuntime: 'エージェントの制限',
+      advancedTools: 'ツールへのアクセス',
+      advancedTerminal: 'ターミナルのバックエンド',
+      advancedOutput: '出力の制限',
+      advancedDelegation: 'サブエージェント',
+      advancedDesktop: 'デスクトップと起動',
+      gatewayConnection: 'このウィンドウ',
+      gatewayDevices: '保存済みの接続',
+      gatewayManagedUpdates: 'リモート更新',
+      gatewayManagedUpdatesUnavailable: 'リモート更新には、管理対象 SSH の更新に対応したデスクトップ版が必要です。',
+      gatewayManagedUpdatesEmpty: '保存済みの接続に SSH 接続を追加すると、ここで更新を管理できます。',
+      keyboardShortcuts: 'キー割り当て',
+      hudGesture: 'HUDジェスチャー',
+      screenCapture: '画面キャプチャ',
+      notificationAlerts: 'デスクトップ通知',
+      notificationSounds: 'サウンド',
+      archivedSessions: 'アーカイブと保持',
+      defaultDirectory: '既定のプロジェクトフォルダー',
+      vaultCredentials: '保存済みの認証情報',
+      vaultSources: 'パスワードマネージャー',
+      appUpdates: 'バージョンと更新',
+      uninstall: 'アンインストール',
+      billingOverview: '概要',
+      billingPlans: 'プラン'
+    },
+    plugins: {
+      openFolder: 'デスクトッププラグインフォルダーを開く',
+      installModal: {
+        installUncertain:
+          'Hermes はインストール結果の待機を終了しましたが、プラグインのインストールはまだ進行中の可能性があります。この画面を閉じ、再インストールする前にプラグイン一覧を再スキャンしてください。',
+        installFromGit: 'Git からインストール',
+        reviewRepository: 'リポジトリを確認',
+        repoPlaceholder: 'https://github.com/owner/repo',
+        toolsConnected: n => `${n} 個のツールを接続しました`,
+        skillsReady: names =>
+          names.length === 1 ? `スキル ${names[0]} の準備ができました` : `${names.length} 個のスキルの準備ができました`,
+        nextChat: 'ほかのツールは次のチャットで使えます',
+        serverNotConnected: (server, reason) =>
+          `MCP サーバー ${server} は接続されていません${reason ? `: ${reason}` : '。'}`
+      }
+    },
     closeSettings: '設定を閉じる',
     exportConfig: '設定を書き出す',
     importConfig: '設定を読み込む',
     resetToDefaults: 'デフォルトに戻す',
-    resetConfirm: 'すべての設定を Qubit のデフォルトに戻しますか？',
+    resetConfirm: 'すべての設定を Hermes のデフォルトに戻しますか？',
     exportFailed: '書き出しに失敗しました',
     resetFailed: 'リセットに失敗しました',
     nav: {
@@ -315,16 +434,94 @@ export const ja = defineLocale({
       keysSettings: '設定',
       mcp: 'MCP',
       archivedChats: 'アーカイブ済みチャット',
+      sessions: 'セッション',
       about: '情報',
       billing: '請求',
-      notifications: '通知'
+      notifications: '通知',
+      vault: 'パスワードとログイン'
+    },
+    vault: {
+      title: 'パスワードとログイン',
+      blurb:
+        '「GitHub にログインして」と言えば、エージェントが代わりにサインインします。初めてサインインページに出会ったときにその場でログイン情報を尋ね、以降は自動で処理します。パスワードはこのマシン上で暗号化され、ページに直接入力されます。モデルは一切見ません。',
+      count: n => `${n} 件保存済み`,
+      loadFailed: 'ボールト項目を読み込めませんでした',
+      empty: 'まだ何も保存されていません',
+      emptyDesc:
+        'ここで何かを追加する必要はありません。エージェントにサイトへのサインインを頼むと、その場で一度だけログイン情報を尋ねます。事前に登録したい場合は「追加」を使ってください。',
+      add: '追加',
+      addTitle: 'ログイン情報・カード・住所を追加',
+      addDescription: 'このマシン上に暗号化して保存されます。エージェントがパスワードを見ることはありません。',
+      added: '保存しました。',
+      adding: '保存中…',
+      addConfirm: '保存',
+      kindField: '種類',
+      kinds: { login: 'ログイン', payment: '支払いカード', address: '住所' },
+      labelField: 'ラベル',
+      labelPlaceholder: '例: GitHub 仕事用アカウント',
+      labelRequired: 'ラベルは必須です。',
+      originField: 'サイトのオリジン',
+      originPlaceholder: 'https://github.com',
+      originPlaceholderCheckout: 'https://shop.example.com',
+      originInvalid: 'https://example.com のような有効な URL を入力してください。',
+      identifierTypeField: '識別子の種類',
+      identifierTypes: { email: 'メール', phone: '電話番号', username: 'ユーザー名' },
+      identifierField: '識別子',
+      identifierShown: identifier => identifier,
+      passwordField: 'パスワード',
+      loginFieldsRequired: '識別子とパスワードは必須です。',
+      cardNumberField: 'カード番号',
+      cardNameField: 'カード名義',
+      expMonthField: '有効期限（月）',
+      expYearField: '有効期限（年）',
+      cvcField: 'CVC',
+      postalField: '郵便番号',
+      addressLine1Field: '住所 1 行目',
+      addressLine2Field: '住所 2 行目',
+      cityField: '市区町村',
+      stateField: '都道府県 / 地域',
+      countryField: '国',
+      optional: '（任意）',
+      createdOn: date => `追加日 ${date}`,
+      deleteAction: '保存済み項目を削除',
+      otpField: '認証キー',
+      otpPlaceholder: 'Base32 シークレットまたは otpauth:// リンク',
+      otpHint: '2FA を有効にするときにサイトが表示する「セットアップキー」。保存すると Hermes がコードを生成します。',
+      twoFactorBadge: '2FA 自動',
+      deleteTitle: 'この項目を削除しますか？',
+      deleteDescription: label => `「${label}」は暗号化ボールトから削除されます。元に戻せません。`,
+      deleteConfirm: '削除',
+      sources: {
+        title: 'パスワードマネージャー',
+        blurb:
+          'インストール済みのパスワードマネージャーは自動的に検出されます。エージェントがそこからログイン情報を初めて必要とするときにロック解除を求めます（セッションごとに一度）。メモリに残るのはセッショントークンのみで、エージェントはマスターパスワードやログイン情報を一切見ません。',
+        toggleFailed: 'パスワードマネージャーの設定を更新できませんでした',
+        notInstalled: name =>
+          `未検出です。${name} のコマンドラインツールをインストールしてサインインすると、Hermes が自動的に検出します。`,
+        disabledDesc: '検出済みですが、Hermes では無効になっています。',
+        lockedDesc:
+          '検出済み。エージェントがログイン情報を必要とするときにロック解除を求めます。今すぐ解除することもできます。',
+        unlockedDesc: 'このセッションでロック解除済み。30分間操作がないか Hermes を閉じると自動的にロックされます。',
+        statusLocked: 'ロック中',
+        statusNotDetected: '未検出',
+        statusOff: 'オフ',
+        statusUnlocked: 'ロック解除済み',
+        unlock: 'ロック解除',
+        unlocking: 'ロック解除中…',
+        lock: 'ロック',
+        unlocked: name => `${name} をこのセッションでロック解除しました。`,
+        unlockTitle: name => `${name} のロックを解除`,
+        unlockDescription:
+          'マスターパスワードを入力してください。このマシン上のパスワードマネージャーに渡された後に破棄され、保存・記録されることも、エージェントに表示されることもありません。',
+        masterPasswordPlaceholder: 'マスターパスワード'
+      }
     },
     notifications: {
       title: '通知',
       intro: 'アプリ内トーストとは別の、ネイティブのデスクトップ通知です。設定は端末ごとに保存されます。',
       enableAll: '通知を有効にする',
       enableAllDesc: 'オフで以下の通知をすべて無効にします。',
-      focusedHint: '完了通知は Qubit がバックグラウンドにあるときのみ表示されます。',
+      focusedHint: '完了通知は Hermes がバックグラウンドにあるときのみ表示されます。',
       kinds: {
         approval: {
           label: '承認が必要',
@@ -332,11 +529,11 @@ export const ja = defineLocale({
         },
         input: {
           label: '入力が必要',
-          description: 'Qubit が質問したか、パスワードやシークレットを必要としています。'
+          description: 'Hermes が質問したか、パスワードやシークレットを必要としています。'
         },
         turnDone: {
           label: '応答完了',
-          description: 'Qubit がバックグラウンドのときにターンが完了しました。'
+          description: 'Hermes がバックグラウンドのときにターンが完了しました。'
         },
         turnError: {
           label: 'ターン失敗',
@@ -352,11 +549,11 @@ export const ja = defineLocale({
         },
         plugin: {
           label: 'プラグイン通知',
-          description: 'Qubit がバックグラウンドの間に、デスクトッププラグインが通知を送信しました。'
+          description: 'Hermes がバックグラウンドの間に、デスクトッププラグインが通知を送信しました。'
         }
       },
       test: 'テスト通知を送信',
-      testTitle: 'Qubit',
+      testTitle: 'Hermes',
       testBody: '通知は正常に動作しています。',
       testSent:
         'テストを送信しました。表示されない場合は、OS の通知許可と集中モード／おやすみモードを確認してください。',
@@ -376,7 +573,7 @@ export const ja = defineLocale({
       advanced: '詳細'
     },
     searchPlaceholder: {
-      about: 'Qubit Desktop について',
+      about: 'Hermes Desktop について',
       config: '設定を検索…',
       gateway: 'ゲートウェイ接続…',
       keys: 'API キーを検索…',
@@ -393,9 +590,13 @@ export const ja = defineLocale({
       intro:
         'デスクトップ専用の表示設定です。モードは明るさ、テーマはアクセントカラーとチャット面のスタイルを制御します。',
       colorMode: 'カラーモード',
-      colorModeDesc: '固定モードを選ぶか、Qubit をシステム設定に合わせます。',
+      colorModeDesc: '固定モードを選ぶか、Hermes をシステム設定に合わせます。',
       toolViewTitle: 'ツール呼び出しの表示',
       toolViewDesc: 'プロダクト表示は生のツールペイロードを隠し、テクニカル表示は入出力をすべて表示します。',
+      hideCodeDiffsTitle: 'コードの差分を非表示',
+      hideCodeDiffsDesc: 'ファイル編集は追加・削除行数付きのインラインツール行で表示し、コードは表示しません。',
+      hideThreadTimelineTitle: 'スレッドのタイムラインバーを非表示',
+      hideThreadTimelineDesc: '各会話の右端にあるナビゲーションバーを非表示にします。',
       reasoningCollapsedTitle: '思考ブロックをデフォルトで折りたたむ',
       reasoningCollapsedDesc: 'ストリーミング中の推論を、開くまで折りたたんだまま利用できるようにします。',
       uiScaleTitle: 'UI スケール',
@@ -407,16 +608,29 @@ export const ja = defineLocale({
       sessionDensityComfortable: '標準',
       sessionDensityDetailed: '詳細',
       tabStripTitle: 'タブバー',
-      tabStripDesc: 'ゾーンの上にタブを表示します。自動ではペインが1つのときに隠します。',
+      tabStripDesc:
+        'ゾーンの上にタブを表示します。自動では、他にチャットやタイルのゾーンがない限り、ペインが1つのときに隠します。',
       tabStripAuto: '自動',
       tabStripAlways: '常に表示',
       tabStripNever: '表示しない',
+      appActionsTitle: 'アプリ操作',
+      appActionsDesc:
+        '設定・レイアウト・HUD をタイトルバーの左右どちらに置くか。右にするとタブ用のスペースが左に残ります。',
+      appActionsLeft: '左',
+      appActionsRight: '右',
       terminalFontTitle: 'ターミナルフォント',
       terminalFontDesc:
         'Desktop のターミナルで使用するインストール済みフォントを選びます。Nerd Font は Powerlevel10k とシェルアイコンを表示できます。空欄では内蔵の JetBrains Mono を使用します。',
       terminalFontPlaceholder: 'MesloLGS NF または CSS フォントスタック',
       terminalFontPreview: 'グリフのプレビュー',
       terminalFontReset: '既定値を使用',
+      chatFontTitle: 'チャットフォント',
+      chatFontDesc:
+        'チャットとアプリ全体に使うインストール済みフォントを選択します。OpenDyslexic などの読みやすいフォントに便利です。空欄ならテーマのフォントを使います。',
+      chatFontPlaceholder: 'OpenDyslexic または CSS フォントスタック',
+      chatFontPreview: 'プレビュー',
+      chatFontSample: 'いろはにほへと ちりぬるを 0123456789',
+      chatFontReset: 'テーマのフォントを使用',
       translucencyTitle: 'ウィンドウの透過',
       translucencyDesc: 'テキストも含めウィンドウ全体を透過させてデスクトップを表示します。',
       translucencyGlassDesc: 'マットガラス: デスクトップが滑らかなぼかしとして透け、テキストは鮮明なまま。',
@@ -440,17 +654,22 @@ export const ja = defineLocale({
       backdropDesc: '会話の背後に表示される淡い彫像の画像。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
+      textDirectionTitle: 'テキストの方向',
+      textDirectionDesc:
+        'チャットのメッセージと入力欄の文字方向を設定します。「自動」は各段落の最初の文字で判断します。混在したテキストの並びがおかしいときは方向を選んでください。コードは常に左から右に表示されます。',
+      textDirection: { auto: '自動', rtl: '右から左', ltr: '左から右' },
       introSplashTitle: 'イントロ表示',
       introSplashDesc: '空のチャットに表示されるワードマークとプロンプト。',
       reactionsTitle: 'メッセージリアクション',
       reactionsDesc:
-        'iMessage風の絵文字タップバック — メッセージにリアクションでき、Qubitもあなたのメッセージにリアクションします。',
+        'iMessage風の絵文字タップバック — メッセージにリアクションでき、Hermesもあなたのメッセージにリアクションします。',
       tipsTitle: 'アプリ内ヒント',
       tipsDesc:
-        'アプリの一部を指す小さな吹き出し。待機中にときどき、また役に立つときは Qubit からも表示します。閉じたヒントは二度と表示されません。',
-      tipsReset: (count: number) => `閉じた${count}件のヒントを元に戻す`,
+        'アプリや Hermes からのヒントをときどき表示します。各ヒントは一度だけ表示されます。利用開始から30日後に自動でオフになりますが、再びオンにできます。',
+      tipsReset: (count: number) => `${count}件のヒントをもう一度表示`,
       toursTitle: 'ガイドツアー',
-      toursDesc: '画面を暗くして各ステップを強調しながら、Qubit がアプリを案内します。',
+      toursDesc:
+        '各ステップを強調しながら、Hermes がアプリを案内します。利用開始から30日後に自動でオフになりますが、再びオンにできます。',
       composerPopoutTitle: 'フローティング入力欄',
       composerPopoutDesc: '入力欄をドックからドラッグして外せるようにします。オフにすると画面下部に固定されます。',
       vibeHeartsTitle: 'バイブハート',
@@ -487,15 +706,13 @@ export const ja = defineLocale({
       pet: {
         title: 'ペット',
         intro:
-          'アプリ上に浮かぶ petdex のアニメーションマスコットを採用しましょう。ツール実行中は走り、成功すると喜び、エラーでしょんぼりと、Qubit の状態に反応します。',
+          'アプリ上に浮かぶ petdex のアニメーションマスコットを採用しましょう。ツール実行中は走り、成功すると喜び、エラーでしょんぼりと、Hermes の状態に反応します。',
         restartHint:
-          'ペット機能には再起動が必要です。この機能が追加される前に起動したアプリが動作中です。Qubit を終了して再度開き、このページに戻ってください。',
+          'ペット機能には再起動が必要です。この機能が追加される前に起動したアプリが動作中です。Hermes を終了して再度開き、このページに戻ってください。',
         scaleTitle: 'サイズ',
         scaleDesc: '浮遊マスコットの大きさを変更します。すべての画面に即時反映されます。',
         roamTitle: '散歩',
         roamDesc: 'アイドル中にペットがウィンドウ内を自由に歩き回ります。',
-        on: 'オン',
-        off: 'オフ',
         chooseTitle: 'ペットを選ぶ',
         chooseDesc: '選ぶと（必要に応じて）インストールされ、アクティブになります。',
         searchPlaceholder: 'ペットを検索…',
@@ -526,7 +743,8 @@ export const ja = defineLocale({
     },
     fieldLabels: defineFieldCopy({
       model: 'デフォルトモデル',
-      modelContextLength: 'コンテキストウィンドウ',
+      modelContextLength:
+        'メインのチャットモデルのみ、検出されたコンテキストウィンドウを上書きします（トークン数）。0 のままにすると、選択したモデルから検出された値を使用します。補助モデル/MoA モデルには影響しません。',
       fallbackProviders: 'フォールバックモデル',
       toolsets: '有効なツールセット',
       timezone: 'タイムゾーン',
@@ -585,7 +803,6 @@ export const ja = defineLocale({
         maxSnapshots: 'チェックポイント上限'
       },
       voice: {
-        recordKey: '音声ショートカット',
         maxRecordingSeconds: '最大録音時間',
         autoTts: '応答を読み上げる'
       },
@@ -671,8 +888,14 @@ export const ja = defineLocale({
       compression: {
         enabled: '自動圧縮',
         threshold: '圧縮しきい値',
+        codexGpt55Autoraise: 'Codex 圧縮の自動引き上げ',
         targetRatio: '圧縮目標',
         protectLastN: '保護する直近メッセージ'
+      },
+      auxiliary: {
+        compression: {
+          timeout: '圧縮モデルのタイムアウト（秒）'
+        }
       },
       delegation: {
         model: 'サブエージェントモデル',
@@ -700,10 +923,10 @@ export const ja = defineLocale({
         repoScanExcludePaths: 'リポジトリ検出時に除外するフォルダとその配下です。'
       },
       timezone:
-        'Qubit がローカル時刻のコンテキストを必要とするときに使用します。空欄ならシステムのタイムゾーンを使います。',
+        'Hermes がローカル時刻のコンテキストを必要とするときに使用します。空欄ならシステムのタイムゾーンを使います。',
       agent: {
         imageInputMode: '画像添付をモデルへ送る方法を制御します。',
-        maxTurns: 'Qubit が 1 回の実行を停止するまでのツール呼び出しターン上限です。'
+        maxTurns: 'Hermes が 1 回の実行を停止するまでのツール呼び出しターン上限です。'
       },
       terminal: {
         cwd: 'ツールとターミナル作業のデフォルトプロジェクトフォルダーです。',
@@ -713,9 +936,9 @@ export const ja = defineLocale({
       codeExecution: {
         mode: 'コード実行を現在のプロジェクトにどれだけ厳密に制限するかを設定します。'
       },
-      fileReadMaxChars: 'Qubit が 1 回のファイル読み取りで取得できる最大文字数です。',
+      fileReadMaxChars: 'Hermes が 1 回のファイル読み取りで取得できる最大文字数です。',
       approvals: {
-        mode: '明示的な承認が必要なコマンドを Qubit がどう扱うかを設定します。',
+        mode: '明示的な承認が必要なコマンドを Hermes がどう扱うかを設定します。',
         timeout: '承認プロンプトがタイムアウトするまで待つ時間です。'
       },
       security: {
@@ -732,7 +955,13 @@ export const ja = defineLocale({
         engine: '長い会話がコンテキスト上限に近づいたときの管理戦略です。'
       },
       compression: {
-        enabled: '会話が大きくなったとき、古いコンテキストを要約します。'
+        enabled: '会話が大きくなったとき、古いコンテキストを要約します。',
+        codexGpt55Autoraise: '対応する ChatGPT Codex OAuth モデルの圧縮しきい値を 85% に引き上げます。'
+      },
+      auxiliary: {
+        compression: {
+          timeout: '補助圧縮モデルの呼び出しごとに待機する秒数（既定 120）。遅いローカルモデルでは値を上げてください。'
+        }
       },
       voice: {
         autoTts: 'アシスタントの応答を自動で読み上げます。'
@@ -745,46 +974,18 @@ export const ja = defineLocale({
       },
       updates: {
         nonInteractiveLocalChanges:
-          'アプリから Qubit 自身を更新するとき、ローカルのソース変更を保持するか破棄するかを選びます。ターミナル更新では常に確認されます。'
+          'アプリから Hermes 自身を更新するとき、ローカルのソース変更を保持するか破棄するかを選びます。ターミナル更新では常に確認されます。'
       }
     }),
     about: {
-      heading: 'Qubit Desktop',
-      version: value => `バージョン ${value}`,
-      versionUnavailable: 'バージョンを取得できません',
-      bundleOutOfSync: 'アプリのビルドが古くなっています',
-      bundleOutOfSyncDesc:
-        'Qubit ランタイムは更新されましたが、デスクトップアプリ自体は古いビルドのままです。アプリを更新するまで、新しいインターフェース機能(Bot Mode など)は表示されません。下の更新を実行してアプリを再ビルドしてください。それでもこの警告が消えない場合は、最新のデスクトップインストーラーから再インストールしてください。',
-      bundleOutOfSyncAction: 'インストーラーを入手',
-      bundleSwapPending: '再起動して更新を完了',
-      bundleSwapPendingDesc:
-        '更新されたアプリはすでにインストール済みです。Qubit を再起動するだけで新しいビルドが読み込まれます。チャットや設定はそのまま保持されます。',
-      bundleSwapPendingAction: 'Qubit を再起動',
-      updates: '更新',
-      checkNow: '今すぐ確認',
-      checking: '確認中…',
-      seeWhatsNew: '新機能を見る',
-      updateNow: '今すぐ更新',
-      releaseNotes: 'リリースノート',
-      onLatest: '最新バージョンです。',
-      installing: '更新をインストール中です。',
-      cantUpdate: 'このビルドはアプリ内から更新できません。',
-      cantReach: '更新サーバーに接続できませんでした。',
-      tapCheck: '更新を探すには「今すぐ確認」を押してください。',
-      updateReady: count => `新しい更新の準備ができました (${count} 件の変更を含みます)。`,
-      updateReadyUnknown: '新しい更新の準備ができました。',
-      lastChecked: age => `前回確認: ${age}`,
-      justNowSuffix: ' · たった今',
-      automaticUpdates: '自動更新',
-      automaticUpdatesDesc: 'Qubit はバックグラウンドで自動的に更新を確認し、利用可能になったら通知します。',
-      branchCommit: (branch, commit) => `ブランチ ${branch} · コミット ${commit}`,
-      never: '未確認',
-      justNow: 'たった今',
-      minAgo: count => `${count} 分前`,
-      hoursAgo: count => `${count} 時間前`,
-      daysAgo: count => `${count} 日前`
+      updates: '更新'
     },
     config: {
+      minimizeToTrayTitle: 'トレイに最小化',
+      minimizeToTrayDesc:
+        'ウィンドウの最小化やメインウィンドウを閉じる操作でシステムトレイ（macOS ではメニューバー）に隠し、Hermes を実行し続けます。終了するにはトレイメニューの「Hermes を終了」または Cmd+Q を使います。初期設定はオフで、このデバイスにのみ適用されます。',
+      minimizeToTrayUnavailable:
+        'システムトレイを利用できないため、通常どおり最小化・終了します。再試行するには一度オフにしてからオンにしてください。',
       none: 'なし',
       noneParen: '(なし)',
       builtinOnly: '内蔵のみ',
@@ -793,7 +994,7 @@ export const ja = defineLocale({
       searchPlaceholder: '検索…',
       noResults: '結果が見つかりません',
       systemDefault: 'システムのデフォルト',
-      loading: 'Qubit の設定を読み込み中...',
+      loading: 'Hermes の設定を読み込み中...',
       emptyTitle: '設定項目がありません',
       emptyDesc: 'このセクションには調整できる設定がありません。',
       failedLoad: '設定の読み込みに失敗しました',
@@ -801,12 +1002,51 @@ export const ja = defineLocale({
       imported: '設定をインポートしました',
       invalidJson: '設定 JSON が無効です',
       keepAwakeTitle: 'コンピューターをスリープさせない',
-      keepAwakeDesc: '本体のスリープを防ぎ、長時間や夜通しの実行を継続します。画面は暗転できます。'
+      keepAwakeDesc: '本体のスリープを防ぎ、長時間や夜通しの実行を継続します。画面は暗転できます。',
+      voiceShortcutHintTitle: '音声録音ショートカット',
+      voiceShortcutHintDesc:
+        '「設定 → キーボードショートカット」で音声録音ショートカット（「Start / stop voice conversation」）を設定します。voice.record_key は CLI と TUI 専用です。'
+    },
+    hudModifier: {
+      title: 'キーをタップして HUD を呼び出す',
+      description:
+        'Mac では ⌘ + Option、Windows/Linux では Ctrl + Alt を押して離すと、どのアプリからでも HUD を前面に表示できます。初期設定はオフで、このデバイスにのみ適用されます。',
+      permission:
+        'システム設定 → プライバシーとセキュリティ → 入力監視で Hermes を許可し、再試行してください。このジェスチャーはキー入力の記録や画面の撮影を行いません。',
+      unavailable:
+        'HUD ジェスチャーヘルパーを起動できなかったか、予期せず停止しました。再試行するか Hermes を再起動してください。Hermes 内の既存の HUD ショートカットは引き続き使用できます。',
+      missingHelper:
+        'この Hermes には HUD ジェスチャーヘルパーが含まれていません。Hermes を更新または再インストールしてから再試行してください。',
+      unsupportedSession:
+        'このデスクトップセッションはグローバルな修飾キータップに対応していません。Linux では X11 が必要です。Wayland には対応していません。'
+    },
+    screenshot: {
+      enabledTitle: 'スクリーンショットのショートカット',
+      enabledDesc:
+        'どのアプリからでも左右の Command キーを同時に押すと、最前面のウインドウを撮影し、Hermes の現在の下書きに添付します。自動送信はしません。初期設定はオフで、この Mac にのみ適用されます。機密情報が写る可能性があるため、送信前に添付画像を確認してください。',
+      statusTitle: 'スクリーンショットのショートカットの状態',
+      checking: 'スクリーンショットのショートカットを確認中…',
+      disabled: 'スクリーンショットのショートカットはオフです。',
+      starting: 'ショートカットの検出を開始しています。まだ使用できません。',
+      ready: 'ショートカットを使用できます。撮影した画像は現在の下書きに添付され、送信はされません。',
+      inputPermission:
+        '入力監視の許可により、他のアプリがアクティブな間も両方の Command キーを検出できます。システム設定 → プライバシーとセキュリティ → 入力監視で Hermes を許可し、ここに戻って再試行してください。',
+      screenPermission:
+        '画面収録の許可により、このショートカットを使ったときに最前面のアプリのウインドウを撮影できます。システム設定 → プライバシーとセキュリティ → 画面収録で Hermes を許可し、ここに戻って再試行してください。macOS に求められた場合は Hermes を再起動してください。',
+      openSettings: 'システム設定を開く',
+      retry: '再試行',
+      unavailable: 'スクリーンショットのショートカットは使用できません。再試行するか、オフにしてください。',
+      errorTitle: 'スクリーンショットのショートカットのエラー',
+      loadFailed: 'ショートカットの状態を読み取れませんでした。再試行して現在の設定を確認してください。',
+      saveFailed: 'ショートカットの変更を確認できませんでした。再試行して現在の設定を確認してください。',
+      permissionFailed: 'システム設定を開けませんでした。プライバシーとセキュリティを手動で開き、再試行してください。',
+      captureFailed: '最前面のウインドウを撮影できませんでした。添付も送信もされていません。',
+      contextChanged: '撮影中に現在の下書きが変わりました。画像は添付も送信もされていません。'
     },
     quickEntry: {
       enabledTitle: 'クイック入力',
       enabledDesc:
-        'グローバルショートカットで小さな入力欄をどこからでも呼び出し、Qubit を開かずにプロンプトを送信します。',
+        'グローバルショートカットで小さな入力欄をどこからでも呼び出し、Hermes を開かずにプロンプトを送信します。',
       shortcutTitle: 'クイック入力のショートカット',
       shortcutDesc: '修飾キーが 1 つ以上必要です（例: CommandOrControl+Shift+Space）。',
       active: 'ショートカットは有効です。',
@@ -841,16 +1081,16 @@ export const ja = defineLocale({
       title: 'ゲートウェイ接続',
       envOverride: 'env オーバーライド',
       intro:
-        'Qubit Desktop はデフォルトで独自のローカルゲートウェイを起動します。別のマシンや信頼できるプロキシの背後で既に動作している Qubit バックエンドをこのアプリで制御する場合は、リモートゲートウェイを使用してください。ゲートウェイ接続はマシン単位の設定で、プロファイルは接続したゲートウェイから検出されます。',
+        'Hermes Desktop はデフォルトで独自のローカルゲートウェイを起動します。別のマシンや信頼できるプロキシの背後で既に動作している Hermes バックエンドをこのアプリで制御する場合は、リモートゲートウェイを使用してください。ゲートウェイ接続はマシン単位の設定で、プロファイルは接続したゲートウェイから検出されます。',
       envOverrideTitle: '環境変数がこのデスクトップセッションを制御しています。',
       envOverrideDesc:
         '保存された設定を使用するには HERMES_DESKTOP_REMOTE_URL と HERMES_DESKTOP_REMOTE_TOKEN の設定を解除してください。',
       localTitle: 'ローカルゲートウェイ',
       localDesc:
-        'ローカルホストでプライベートな Qubit バックエンドを起動します。これがデフォルトで、オフラインでも動作します。',
+        'ローカルホストでプライベートな Hermes バックエンドを起動します。これがデフォルトで、オフラインでも動作します。',
       remoteTitle: 'リモートゲートウェイ',
       remoteDesc:
-        'このデスクトップシェルをリモートの Qubit バックエンドに接続します。ホスト型ゲートウェイは OAuth またはユーザー名とパスワードを使用します。自己ホスト型はセッショントークンを使用する場合があります。',
+        'このデスクトップシェルをリモートの Hermes バックエンドに接続します。ホスト型ゲートウェイは OAuth またはユーザー名とパスワードを使用します。自己ホスト型はセッショントークンを使用する場合があります。',
       remoteUrlTitle: 'リモート URL',
       remoteUrlDesc:
         'リモートダッシュボードバックエンドのベース URL。/hermes などのパスプレフィックスもサポートしています。',
@@ -877,11 +1117,11 @@ export const ja = defineLocale({
       pasteSessionToken: 'セッショントークンを貼り付け',
       plainTextConfirmTitle: 'ゲートウェイトークンを平文で保存しますか？',
       plainTextConfirmDesc:
-        'このマシンで OS のキーリングサービスが見つからなかったため、トークンはアプリの接続設定ファイルに暗号化されずに保存され、このユーザーとして実行される任意のプロセスから読み取れる状態になります。暗号化して保存するには、GNOME Keyring または KWallet をインストールまたは有効化してください。',
+        'このマシンで OS のキーリングサービスが見つからなかったため、トークンはアプリの接続設定ファイルに暗号化されずに保存され、このユーザーとして実行される任意のプロセスから読み取れる状態になります。暗号化して保存するには、システムのキーチェーン（Linux では GNOME Keyring または KWallet）をインストールまたは有効化してください。',
       plainTextConfirmAction: '平文で保存',
       plainTextStoredTitle: 'トークンは平文で保存されています',
       plainTextStoredDesc:
-        'セキュアストレージが利用できないため、保存済みのトークンはこのマシンのアプリの接続設定ファイルに暗号化されずに保存されています。暗号化するには GNOME Keyring または KWallet をインストールまたは有効化してください。',
+        'セキュアストレージが利用できないため、保存済みのトークンはこのマシンのアプリの接続設定ファイルに暗号化されずに保存されています。暗号化するには、システムのキーチェーン（Linux では GNOME Keyring または KWallet）をインストールまたは有効化してください。',
       keychainEncryptionTitle: 'OS キーチェーンで保存済みのシークレットを暗号化',
       keychainEncryptionDesc:
         'デフォルトはオフです。オンにすると、ゲートウェイのトークンとサインイン資格情報がシステムのキーチェーン（Keychain Access、GNOME Keyring、Windows DPAPI）で暗号化されます。システムから許可やパスワードを求められる場合があります。オフの場合は、現在のユーザーのみが読める通常ファイルとして保存されます。',
@@ -900,9 +1140,9 @@ export const ja = defineLocale({
       enterUrlFirst: '最初にリモート URL を入力してください。',
       restartingTitle: 'ゲートウェイ接続を再起動中',
       savedTitle: 'ゲートウェイ設定を保存しました',
-      restartingMessage: 'Qubit Desktop は保存された設定を使用して再接続します。',
+      restartingMessage: 'Hermes Desktop は保存された設定を使用して再接続します。',
       savedMessage: '次回起動時に保存されます。',
-      connectedTo: (baseUrl, version) => `${baseUrl}${version ? ` · Qubit ${version}` : ''} に接続しました`,
+      connectedTo: (baseUrl, version) => `${baseUrl}${version ? ` · Hermes ${version}` : ''} に接続しました`,
       reachableTitle: 'リモートゲートウェイに到達可能',
       signedOutTitle: 'サインアウトしました',
       signedOutMessage: 'リモートゲートウェイセッションをクリアしました。',
@@ -914,7 +1154,7 @@ export const ja = defineLocale({
       saveFailed: 'ゲートウェイ設定を保存できませんでした',
       sshTitle: 'SSH で接続',
       sshDesc:
-        'Qubit は SSH 経由でリモート上に起動され、このアプリにトンネルされます。リモート側で何かを起動・公開する必要はありません。ホストへの鍵ベースの SSH アクセスが前提です。',
+        'Hermes は SSH 経由でリモート上に起動され、このアプリにトンネルされます。リモート側で何かを起動・公開する必要はありません。ホストへの鍵ベースの SSH アクセスが前提です。',
       sshTrustHint: '初回に提示されたホスト鍵を信頼して固定し、以後の変更は拒否します。',
       sshHostTitle: 'ホスト',
       sshHostDesc: 'user@host、または ~/.ssh/config の Host エイリアス。',
@@ -929,25 +1169,25 @@ export const ja = defineLocale({
       sshPortDesc: '空欄 = 22 または ~/.ssh/config のポート。',
       sshKeyTitle: '鍵ファイル',
       sshKeyDesc: '秘密鍵のパス。空欄 = ssh-agent または ~/.ssh/config。',
-      sshQubitPathTitle: 'Qubit パス（任意）',
-      sshQubitPathDesc: 'リモートの qubit バイナリへのフルパス。空欄 = 自動検出。',
-      sshQubitPathPlaceholder: '自動検出',
+      sshHermesPathTitle: 'Hermes パス（任意）',
+      sshHermesPathDesc: 'リモートの hermes バイナリへのフルパス。空欄 = 自動検出。',
+      sshHermesPathPlaceholder: '自動検出',
       sshTestConnection: 'SSH をテスト',
       sshConnect: '接続',
       sshButtonsHint: '「保存」は次回起動時に適用され、「接続」は今すぐ再接続します。',
-      sshReachable: (host, platform) => `接続可能: ${host}（${platform}）— Qubit を検出`,
+      sshReachable: (host, platform) => `接続可能: ${host}（${platform}）— Hermes を検出`,
       sshIncompleteHost: '接続する前に SSH ホストを入力してください。',
       sshErrUnreachable: 'SSH でそのホストに到達できませんでした。ホスト、ポート、ネットワークを確認してください。',
       sshErrAuth:
-        'SSH 認証に失敗しました。鍵を ssh-agent に読み込む（ssh-add）か、~/.ssh/config に IdentityFile を設定してください。Qubit は非対話的に ssh を実行します。',
+        'SSH 認証に失敗しました。鍵を ssh-agent に読み込む（ssh-add）か、~/.ssh/config に IdentityFile を設定してください。Hermes は非対話的に ssh を実行します。',
       sshErrHostKey:
         '前回の接続以降、ホスト鍵が変更されています。想定どおりか確認し、ssh-keygen -R <host> を実行してから再接続してください。',
       sshErrNotInstalled:
-        'リモートホストに Qubit がインストールされていません。リモートでインストールする（https://github.com/cgraph-dev/qubit-voicebridge を参照）か、Qubit パスを設定してください。',
+        'リモートホストに Hermes がインストールされていません。リモートでインストールする（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）か、Hermes パスを設定してください。',
       sshErrPlatform:
-        'サポートされていないリモートプラットフォームです。Qubit Desktop の SSH モードは Linux、macOS、Windows のリモートホストに対応しています。',
+        'サポートされていないリモートプラットフォームです。Hermes Desktop の SSH モードは Linux、macOS、Windows のリモートホストに対応しています。',
       sshErrTimeout: 'SSH 接続がタイムアウトしました。ホストが到達不能、またはスリープ中の可能性があります。',
-      sshErrUpdateRequired: 'Desktop SSH で接続する前に、リモートホストの Qubit を更新してください。',
+      sshErrUpdateRequired: 'Desktop SSH で接続する前に、リモートホストの Hermes を更新してください。',
       sshErrUnknown: 'SSH 接続に失敗しました。'
     },
     keys: {
@@ -965,36 +1205,20 @@ export const ja = defineLocale({
     },
     mcp: {
       loading: 'MCP サーバーを読み込み中...',
-      failedLoad: 'MCP 設定の読み込みに失敗しました',
-      nameRequiredTitle: '名前が必要です',
-      nameRequiredMessage: 'この MCP サーバーに設定キーを付けてください。',
-      objectRequired: 'サーバー設定は JSON オブジェクトである必要があります',
       invalidJson: '無効な MCP JSON',
       saveFailed: '保存に失敗しました',
       removeFailed: '削除に失敗しました',
-      gatewayUnavailableTitle: 'ゲートウェイが利用できません',
-      gatewayUnavailableMessage: 'MCP を再読み込みする前にゲートウェイを再接続してください。',
-      reloadedTitle: 'MCP ツールを再読み込みしました',
-      reloadedMessage: '新しいツールスキーマは新しいターンに適用されます。',
       reloadFailed: 'MCP の再読み込みに失敗しました',
       savedTitle: 'MCP サーバーを保存しました',
       savedMessage: name => `${name} は MCP の再読み込み後に適用されます。`,
-      newServer: '新しいサーバー',
-      reload: 'MCP を再読み込み',
-      reloading: '再読み込み中...',
-      emptyTitle: 'MCP サーバーがありません',
-      emptyDesc: 'MCP ツールを公開するには stdio または HTTP サーバーを追加してください。',
       disabled: '無効',
-      editServer: 'サーバーを編集',
       name: '名前',
       serverJson: 'サーバー JSON',
       remove: '削除',
-      saveServer: 'サーバーを保存',
       capabilitySummary: (tools, prompts, resources) =>
         `${[`ツール ${tools} 個`, ...(prompts ? [`プロンプト ${prompts} 個`] : []), ...(resources ? [`リソース ${resources} 個`] : [])].join('、')} を有効化`,
       costTokens: tokens => `1 呼び出しあたり約 ${tokens} トークン`,
       usage30d: uses => `過去 30 日で ${uses} 回使用`,
-      unusedPill: '未使用',
       statusConnecting: '接続中…',
       statusNeedsAuth: '認証が必要です',
       statusError: 'エラー',
@@ -1002,15 +1226,11 @@ export const ja = defineLocale({
       allServers: 'すべてのサーバー',
       authenticatedTitle: '認証済み',
       authenticatedMessage: (server, count) => `${server}: ツール ${count} 個`,
-      waitingForBrowser: 'ブラウザを待機中…',
       authenticate: '認証',
-      unsavedConnect: '未保存 — 接続するには mcp.json を保存してください。',
-      enableTool: tool => `${tool} を有効化`,
-      disableTool: tool => `${tool} を無効化`,
       noOutput: 'まだ出力がありません。',
       deepLinkTitle: 'MCP サーバーを追加しますか？',
       deepLinkDescription:
-        'リンクがこの MCP サーバーを Qubit に追加するよう要求しました。下の設定はリンク側から来たものです。内容を必ず確認してください。',
+        'リンクがこの MCP サーバーを Hermes に追加するよう要求しました。下の設定はリンク側から来たものです。内容を必ず確認してください。',
       deepLinkStdioWarning:
         'このサーバーは下記のコマンドでローカルプロセスを実行します。提供元を信頼できる場合のみ続行してください。',
       deepLinkConfirm: 'サーバーを追加',
@@ -1023,14 +1243,32 @@ export const ja = defineLocale({
       deepLinkErrorShape:
         '設定は文字列の `url` または `command` フィールドを持つ JSON オブジェクトである必要があります。',
       deepLinkErrorUrl: 'サーバー URL は http:// と https:// のみ許可されます。',
-      deepLinkErrorTooLarge: '設定ペイロードが 32KB の上限を超えています。',
-      importButton: 'インポート',
-      importPlaceholder: 'mcp.json スニペット、npx/docker コマンド、claude mcp add 行、URL、Cursor リンクを貼り付け…',
-      importNoMatch: '貼り付けたテキストからサーバー設定を認識できませんでした。',
-      importConfirm: 'mcp.json に追加',
-      importConfirmMany: count => `${count} 件のサーバーを mcp.json に追加`
+      deepLinkErrorTooLarge: '設定ペイロードが 32KB の上限を超えています。'
     },
     model: {
+      moaTitle: 'エージェント混合（Mixture of Agents）',
+      moaPreset: 'プリセット',
+      moaDescription:
+        '「Mixture of Agents」プロバイダーのモデルとして表示される名前付きプリセットを設定します。集約モデルが実行を担当し、ツールループのすべての処理を行うため、実行費用のほぼ全額がそのプロバイダーに請求されます。参照モデルは既定でユーザーの各ターンに一度だけ助言します。',
+      moaAggregator: '集約モデル',
+      moaAggregatorBilled: '実行モデル · 実行費用の請求先',
+      moaReferenceHint: '既定では各ターンに一度だけ助言',
+      setupProviderFallback: 'プロバイダー',
+      setUpProvider: name => `${name} を設定`,
+      staleAuxBefore: (count, names) => `${count} 件の補助タスク（${names}）は引き続き `,
+      staleAuxAfter: ' で実行され、メインモデルは使用されません。',
+      staleAuxOtherProviders: '別のプロバイダー',
+      moaEnabled: '有効',
+      moaSetDefault: 'デフォルトに設定',
+      moaNewPresetPlaceholder: '新しいプリセット',
+      moaAddPreset: 'プリセットを追加',
+      customModel: 'カスタムモデル…',
+      customModelPlaceholder: 'モデル ID',
+      chooseFromList: 'リストから選択',
+      moaDefault: 'デフォルト:',
+      moaReferenceToggle: (enabled, index) => `参照 ${index} を${enabled ? '無効化' : '有効化'}`,
+      moaReferenceTitle: index => `参照 ${index}`,
+      moaAddReference: '参照モデルを追加',
       loading: 'モデル設定を読み込み中...',
       appliesDesc:
         '新しいセッションに適用されます。コンポーザーのモデルピッカーを使ってアクティブなチャットをホットスワップできます。',
@@ -1050,6 +1288,7 @@ export const ja = defineLocale({
       setToMain: 'メインに設定',
       change: '変更',
       autoUseMain: '自動 · メインモデルを使用',
+      inheritMainEffort: '継承 · メインモデルの推論強度',
       providerDefault: '(プロバイダーのデフォルト)',
       tasks: {
         vision: { label: 'ビジョン', hint: '画像分析' },
@@ -1059,17 +1298,21 @@ export const ja = defineLocale({
         mcp: { label: 'MCP', hint: 'MCP ツールルーティング' },
         title_generation: { label: 'タイトル生成', hint: 'セッションタイトル' },
         review: { label: 'レビュー', hint: '/review レビューサブエージェント' },
+        triage_specifier: { label: 'トリアージ指定', hint: 'カンバン仕様の具体化' },
+        kanban_decomposer: { label: 'カンバン分解', hint: 'タスク分解' },
+        profile_describer: { label: 'プロファイル記述', hint: 'プロファイル概要の自動生成' },
         curator: { label: 'キュレーター', hint: 'スキル使用レビュー' }
       }
     },
     localModels: {
+      connectionChanged: 'ローカルモデルの接続が変更されました',
       title: 'ローカルモデル',
       runtimeTitle: 'ローカルランタイム',
       runtimeReady: backend => `準備完了 · ${backend}`,
       serverRunning: '実行中',
       runtimeInstalled: 'llama.cpp ランタイムをインストール済み',
       runtimeInstalledDetail: (tag, backend) =>
-        `ビルド ${tag}、${backend} バックエンド。サーバーは Qubit が起動・管理します。`,
+        `ビルド ${tag}、${backend} バックエンド。サーバーは Hermes が起動・管理します。`,
       installTitle: 'ローカルランタイムをインストール',
       installDetail:
         'llama.cpp 推論エンジン（数百 MB）をダウンロードします。ダウンロードしたモデルはすべてこのマシン上で動作します——アカウント不要、データが外部に送られることはありません。',
@@ -1089,13 +1332,22 @@ export const ja = defineLocale({
         'speed-gated-quality':
           'より高品質なモデルもこのマシンに載りますが、メモリ帯域の制約で応答が遅くなります — これは速度を保てる最良のモデルです。',
         'fastest-resident':
-          'このハードウェアでフルスピードに達するモデルはありません。GPU メモリ内で動くものの中で最速です。',
-        'least-painful-spilled':
-          'GPU メモリに完全に収まるモデルはありません — システム RAM からの実行で最も快適なモデルです。'
+          'このハードウェアでフルスピードに達するモデルはありません。GPU メモリ内で動くものの中で最速です。'
       } as Record<string, string>,
+      noRecommendationTitle: 'このマシン向けの自動推奨モデルはありません',
+      noRecommendationDetail:
+        '自動セットアップには、GPU メモリまたはユニファイドメモリに完全に収まる厳選モデルが必要です。下の一覧から選ぶか、ほかのモデルを探すこともできます。',
+      noRecommendationAction: 'モデルを探す',
+      quickstartConfigure: '自分で選ぶ',
       downloaded: 'ダウンロード済み',
       downloadAction: size => `ダウンロード · ${size}`,
-      downloadProgress: (done, total) => `ダウンロード中 ${done} / ${total}`,
+      downloadProgress: (done, total) => `${done} / ${total}`,
+      downloadStatusRunning: 'ダウンロード中',
+      downloadSpeed: rate => `${rate}`,
+      downloadEta: time => `残り約${time}`,
+      downloadPausedLabel: '一時停止中',
+      downloadPauseAction: '一時停止',
+      downloadResumeAction: '再開',
       downloadDoneToast: model => `${model} の準備ができました。`,
       installDoneToast: 'ローカルランタイムのインストールが完了しました。',
       useAction: '使用する',
@@ -1106,9 +1358,7 @@ export const ja = defineLocale({
       updateAction: 'エンジンを更新',
       updating: 'エンジンを更新中…',
       upToDateTitle: 'エンジンは最新です',
-      upToDateDetail: (tag, backend) => `llama.cpp ${tag}（${backend}）で動作中——Qubit が提供する最新ビルドです。`,
-      updateToast: next =>
-        `ローカルエンジンの新しいビルド（${next}）があります。設定 → ローカルモデル から更新できます。`,
+      upToDateDetail: (tag, backend) => `llama.cpp ${tag}（${backend}）で動作中。`,
       activeDetail: '新しいチャットはこのモデルを使用——最初のメッセージ送信時に読み込みます',
       activeNotLoaded: '最初のメッセージで読み込みます',
       loadedPill: '読み込み済み',
@@ -1171,7 +1421,7 @@ export const ja = defineLocale({
       connectAccount: 'アカウントを接続',
       haveApiKey: 'API キーをお持ちですか？',
       intro:
-        'サブスクリプションでサインインします。API キーのコピーは不要です。Qubit がアプリ内でブラウザーサインインを代行します。',
+        'サブスクリプションでサインインします。API キーのコピーは不要です。Hermes がアプリ内でブラウザーサインインを代行します。',
       connected: '接続済み',
       collapse: '折りたたむ',
       connectAnother: '別のプロバイダーを接続',
@@ -1194,7 +1444,7 @@ export const ja = defineLocale({
       loading: 'アーカイブ済みセッションを読み込み中…',
       archivedTitle: 'アーカイブ済みセッション',
       archivedIntro:
-        'アーカイブ済みチャットはサイドバーでは非表示になりますが、すべてのメッセージは保持されます。サイドバーのチャットを Ctrl/⌘ クリックするとアーカイブできます。',
+        'アーカイブ済みチャットはサイドバーでは非表示になりますが、すべてのメッセージは保持されます。サイドバーのチャットを Alt/⌥+Shift クリックするとアーカイブできます。',
       emptyArchivedTitle: 'アーカイブがありません',
       emptyArchivedDesc: 'チャットをアーカイブするとここに表示されます。',
       unarchive: 'アーカイブを解除',
@@ -1248,14 +1498,14 @@ export const ja = defineLocale({
       activeBackend: '使用中',
       activeBackendHint: 'これが現在アクティブなバックエンドです',
       useBackend: 'このバックエンドを使う',
-      nousIncluded: 'Qubit サブスクリプションに含まれています。有効にするには Qubit Portal にサインインしてください。',
-      nousAuthNeededTitle: 'Qubit Portal にサインイン',
+      nousIncluded: 'Nous サブスクリプションに含まれています。有効にするには Nous Portal にサインインしてください。',
+      nousAuthNeededTitle: 'Nous Portal にサインイン',
       nousAuthNeededMessage: provider =>
-        `${provider} は保存されましたが、Qubit Portal にサインインするまで有効になりません。`,
+        `${provider} は保存されましたが、Nous Portal にサインインするまで有効になりません。`,
       nousAuthSignIn: 'サインイン',
-      nousAuthDoneTitle: 'Qubit Portal に接続しました',
+      nousAuthDoneTitle: 'Nous Portal に接続しました',
       nousAuthDoneMessage: 'サブスクリプションのバックエンドが有効になりました。',
-      nousAuthFailed: 'Qubit Portal のサインインが完了しませんでした',
+      nousAuthFailed: 'Nous Portal のサインインが完了しませんでした',
       noApiKeyRequired: 'API キーは不要です。',
       postSetupHint: step =>
         `このバックエンドは一度だけインストールが必要です (${step})。このマシン上で実行され、数分かかる場合があります。`,
@@ -1291,7 +1541,13 @@ export const ja = defineLocale({
         selectedTitle: 'バックエンドを選択しました',
         selectedMessage: backend => `ターミナルコマンドは ${backend} で実行されます。新しいセッションに適用されます。`,
         failedSelect: backend => `${backend} の選択に失敗しました`,
-        needsSetupHint: 'このバックエンドは今すぐ選択できますが、セットアップが完了するまでコマンドは失敗します。'
+        needsSetupHint: 'このバックエンドは選択されていますが、セットアップが完了するまでコマンドは失敗します。',
+        needsSetupConfirmTitle: backend => `それでも ${backend} を選択しますか？`,
+        needsSetupConfirmDescription: detail =>
+          `${detail} この変更後に開始されるセッションは、セットアップが完了するまでターミナルとファイルツールを使用できません。`,
+        needsSetupConfirmDescriptionGeneric:
+          'このバックエンドはまだセットアップされていません。この変更後に開始されるセッションは、セットアップが完了するまでターミナルとファイルツールを使用できません。',
+        needsSetupConfirmAction: 'それでも選択する'
       },
       browserRealProfile: {
         label: '実際のブラウザプロファイルを使用',
@@ -1304,7 +1560,7 @@ export const ja = defineLocale({
         failedSave: '実プロファイル設定を保存できませんでした',
         prompt: {
           title: 'サイトにログインしたまま利用',
-          body: 'Qubit が既定ブラウザプロファイルのスナップショットでブラウジングできるようにすると、サイトはログイン済みの状態で開きます。',
+          body: 'Hermes が既定ブラウザプロファイルのスナップショットでブラウジングできるようにすると、サイトはログイン済みの状態で開きます。',
           bulletSnapshot: 'Cookie とログイン情報は管理されたスナップショットにコピーされます。',
           bulletLiveProfile: '実際のブラウザプロファイルが直接開かれることはありません。',
           bulletLocal: 'データがこのコンピュータの外に出ることはありません。',
@@ -1317,9 +1573,22 @@ export const ja = defineLocale({
   },
 
   skills: {
+    plugins: {
+      pageBlurb:
+        'プラグインはこのアプリ、エージェント、または両方を拡張できます。それぞれに独立したスイッチがあります。'
+    },
+    hub: {
+      search: '検索',
+      searching: '検索中…',
+      noResults: '一致するスキルがハブにありません。',
+      installed: 'インストール済み',
+      installStarted: name => `「${name}」をインストール中…`,
+      pickerBrowse: 'ハブ全体を見る',
+      pickerHide: 'ハブのブラウザーを隠す',
+      pickerHint: 'スキルの「+ Add to this Agent」を押すと、インストールされて上の一覧に表示されます。'
+    },
     tabSkills: 'スキル',
     tabToolsets: 'ツールセット',
-    tabMcp: 'MCP',
     all: 'すべて',
     searchSkills: 'スキルを検索...',
     searchToolsets: 'ツールセットを検索...',
@@ -1370,7 +1639,7 @@ export const ja = defineLocale({
     edit: '編集',
     archive: 'アーカイブ',
     skillArchivedTitle: 'スキルをアーカイブしました',
-    skillArchivedMessage: 'qubit curator restore で復元できます。',
+    skillArchivedMessage: 'hermes curator restore で復元できます。',
     officialCatalog: 'インストール可能',
     officialPill: '公式'
   },
@@ -1388,9 +1657,13 @@ export const ja = defineLocale({
     loadFailed: 'メモリグラフを読み込めませんでした',
     loading: '読み込み中…',
     emptyTitle: 'まだ学習はありません',
-    emptyDesc: 'Qubit がスキルやメモリを蓄積すると、ここに表示されます。'
+    emptyDesc: 'Hermes がスキルやメモリを蓄積すると、ここに表示されます。'
   },
   agents: {
+    extendedTranscript: '詳細な実行ログ',
+    transcriptTruncated: '最新の 16 KiB を表示',
+    transcriptUnavailable: 'ライブログは利用できません',
+
     close: 'エージェントを閉じる',
     title: 'スポーンツリー',
     subtitle: '現在のターンのライブサブエージェントのアクティビティ。',
@@ -1402,6 +1675,14 @@ export const ja = defineLocale({
     streaming: 'ストリーミング中',
     files: 'ファイル',
     moreFiles: count => `+${count} 件のファイル`,
+    moreAgents: count => `ほか ${count} 件のエージェント`,
+    queued: '待機中',
+    waitingActivity: 'アクティビティ待ち',
+    steer: '指示',
+    steerPlaceholder: 'このサブエージェントへの指示',
+    steerQueued: '次のチェックポイントで処理します',
+    stopRequested: '停止を要求しました',
+    requestRejected: 'サブエージェントが要求を受け付けませんでした',
     delegation: index => `委任 ${index}`,
     workers: count => `${count} ワーカー`,
     workersActive: count => `${count} アクティブ`,
@@ -1440,7 +1721,7 @@ export const ja = defineLocale({
       placeholder: 'ペットを検索…',
       loading: 'petdex ギャラリーを読み込み中…',
       error: 'petdex ギャラリーに接続できません。',
-      staleBackend: 'ペット機能を使うには Qubit を再起動してください。',
+      staleBackend: 'ペット機能を使うには Hermes を再起動してください。',
       empty: '一致するペットがありません。',
       turnOff: 'オフ',
       turnOn: 'オン',
@@ -1467,8 +1748,8 @@ export const ja = defineLocale({
       hatchComposing: 'まとめています…',
       hatchSaving: 'もうすぐです…',
       namePlaceholder: 'ペットに名前を付ける',
-      staleBackend: 'ペットを生成するには Qubit を更新してください。',
-      backgroundHint: 'このウィンドウは閉じても大丈夫です。完了したら Qubit が通知します。',
+      staleBackend: 'ペットを生成するには Hermes を更新してください。',
+      backgroundHint: 'このウィンドウは閉じても大丈夫です。完了したら Hermes が通知します。',
       slowProviderHint: '数分かかることがあります',
       remix: 'リミックス',
       remixConfirmTitle: 'この見た目でリミックスしますか？',
@@ -1502,8 +1783,8 @@ export const ja = defineLocale({
     },
     nav: {
       newChat: { title: '新しいセッション', detail: '新しいセッションを開始' },
-      settings: { title: '設定', detail: 'Qubit デスクトップを設定' },
-      skills: { title: 'スキルとツール', detail: 'スキル、ツールセット、プロバイダーを有効化' },
+      settings: { title: '設定', detail: 'Hermes デスクトップを設定' },
+      capabilities: { title: 'スキルとツール', detail: 'スキル、ツールセット、プロバイダーを有効化' },
       messaging: { title: 'メッセージング', detail: 'Telegram、Slack、Discord などを設定' },
       artifacts: { title: 'アーティファクト', detail: '生成された出力を閲覧' }
     },
@@ -1524,11 +1805,15 @@ export const ja = defineLocale({
     noSessions: 'セッションはまだありません。',
     gatewayRunning: 'メッセージングゲートウェイが実行中',
     gatewayStopped: 'メッセージングゲートウェイが停止中',
-    qubitActiveSessions: (version, count) => `Qubit ${version} · アクティブセッション ${count}`,
+    hermesActiveSessions: (version, count) => `Hermes ${version} · アクティブセッション ${count}`,
     restartGateway: 'ゲートウェイを再起動',
     openBrowser: 'ブラウザを開く',
     gatewayRestartFailed: 'ゲートウェイの再起動に失敗しました。',
-    updateQubit: 'Qubit を更新',
+    sharedGatewayRestartTitle: '共有ゲートウェイを再起動しますか？',
+    sharedGatewayRestartDescription: bots => `このデバイス上のすべてのボットが再接続します: ${bots}`,
+    sharedGatewayRestartConfirm: 'すべて再起動',
+    sharedGatewayRestarted: count => `共有ゲートウェイを再起動しました（${count} ボット）`,
+    updateHermes: 'Hermes を更新',
     reloadWindow: 'ウィンドウを再読み込み',
     actionRunning: '実行中',
     actionDone: '完了',
@@ -1574,7 +1859,42 @@ export const ja = defineLocale({
     },
     unknown: '不明',
     hintPendingRestart: 'この変更を適用するにはステータスバーからゲートウェイを再起動してください。',
+    sharedListenerUrl: '共有ゲートウェイのリスナーで提供中:',
     hintGatewayStopped: 'ステータスバーからゲートウェイを起動して接続してください。',
+    restartNeeded: '保存しました。新しい設定を反映するにはメッセージングゲートウェイを再起動してください。',
+    restartNow: '今すぐ再起動',
+    restarting: '再起動中…',
+    restartFailedManual: 'ゲートウェイの再起動に失敗しました。手動で再起動し、ゲートウェイのログを確認してください。',
+    telegramQr: {
+      title: 'Telegram ボットの接続方法を選択',
+      subtitle: 'どちらの方法でも、あなたが管理するボットを接続し、資格情報はこの Hermes にのみ保存されます。',
+      quickSetup: 'クイックセットアップ',
+      recommended: '推奨',
+      quickHelp:
+        'QR コードをスキャンして Telegram で確認します。Hermes がボットを作成し、あなたの Telegram ユーザー ID を自動検出します。',
+      createWithQr: 'QR で作成',
+      starting: '開始中…',
+      replaceWarning:
+        'Telegram の資格情報はすでに設定されています。保存すると新しい QR セットアップまたはトークンが現在のボットを置き換えます。',
+      scanHint: 'スマートフォンの Telegram アプリでスキャンするか、このコンピューターでリンクを開いてください。',
+      waiting: 'Telegram を待機中…',
+      expiresIn: remaining => `有効期限: ${remaining}`,
+      expired: '期限切れ',
+      openTelegram: 'Telegram を開く',
+      ready: 'ボットを作成しました',
+      allowedUsers: '許可ユーザー',
+      ownerDetected: '所有者を検出',
+      addAtLeastOne: 'Telegram ユーザー ID を 1 つ以上追加してください。',
+      userIdPlaceholder: 'Telegram ユーザー ID',
+      add: '追加',
+      numericOnly: 'Telegram ユーザー ID は数字で入力してください。',
+      saveAndRestart: '保存して再起動',
+      applying: '保存中…',
+      pairingExpired: 'Telegram のペアリングが期限切れです。新しい QR セットアップを開始してください。',
+      stillWaiting: detail => `Telegram を待機中。エラー後に再試行: ${detail}`,
+      savedRestarting: 'Telegram を保存しました。ゲートウェイを再起動中…',
+      savedRestartFailed: detail => `Telegram を保存しましたが、ゲートウェイの再起動に失敗しました${detail}`
+    },
     credentialsSet: '認証情報を設定しました',
     needsSetup: '設定が必要',
     gatewayStopped: 'メッセージングゲートウェイが停止中',
@@ -1601,6 +1921,8 @@ export const ja = defineLocale({
     restartToApply: 'この変更はゲートウェイの再起動後に有効になります。',
     setupSaved: name => `${name} の設定を保存しました`,
     restartToReconnect: '新しい認証情報はゲートウェイの再起動後に有効になります。',
+    appliedLive: '実行中のゲートウェイに適用されました。',
+    connectingLive: '実行中のゲートウェイが新しい認証情報で接続しています。',
     keyCleared: key => `${key} をクリアしました`,
     setupUpdated: name => `${name} の設定が更新されました。`,
     failedUpdate: name => `${name} の更新に失敗しました`,
@@ -1669,7 +1991,7 @@ export const ja = defineLocale({
       },
       MATRIX_HOMESERVER: { label: 'ホームサーバー URL', placeholder: 'https://matrix.org' },
       MATRIX_ACCESS_TOKEN: { label: 'アクセストークン' },
-      MATRIX_USER_ID: { label: 'ボットユーザー ID', placeholder: '@qubit:example.org' },
+      MATRIX_USER_ID: { label: 'ボットユーザー ID', placeholder: '@hermes:example.org' },
       MATRIX_ALLOWED_USERS: {
         label: '許可する Matrix ユーザー ID',
         help: '推奨。@user:server 形式のカンマ区切りユーザー ID。'
@@ -1721,9 +2043,9 @@ export const ja = defineLocale({
       menuItem: 'リモートホストに接続…',
       badge: (host: string) => `${host} で実行中`,
       title: (profile: string) => `${profile} をリモートホストに接続`,
-      description: 'このプロファイルのセッションは、このパソコンではなく指定したリモートの Qubit で実行されます。',
+      description: 'このプロファイルのセッションは、このパソコンではなく指定したリモートの Hermes で実行されます。',
       urlLabel: 'リモートアドレス',
-      urlPlaceholder: 'https://gateway.example.com',
+      urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: 'http:// または https:// で始まる完全なアドレスを入力してください',
       tokenLabel: 'アクセストークン',
       tokenPlaceholder: 'リモートのセッショントークンを貼り付け',
@@ -1753,6 +2075,12 @@ export const ja = defineLocale({
 
     color: 'カラー…',
     colorFor: 'カラー',
+    openInNewWindow: '新しいウィンドウで開く',
+    setAsDefault: 'デフォルトに設定',
+    defaultProfile: 'デフォルトのプロファイル',
+    defaultSet: name => `${name} をデフォルトに設定しました`,
+    defaultDescription: 'Hermes の起動時と新しいチャットに使用します。既存のセッションのプロファイルは変わりません。',
+    failedSetDefault: 'デフォルトのプロファイルを設定できませんでした',
     setColor: color => `カラー ${color} に設定`,
     autoColor: '自動',
     noProfiles: 'プロファイルが見つかりません。',
@@ -1788,7 +2116,7 @@ export const ja = defineLocale({
     deleteDescMid: ' が削除され、その ',
     deleteDescSuffix: ' ディレクトリが削除されます。この操作は元に戻せません。',
     deleting: '削除中...',
-    createDesc: 'プロファイルは独立した Qubit 環境です：設定、スキル、SOUL.md が別々になります。',
+    createDesc: 'プロファイルは独立した Hermes 環境です：設定、スキル、SOUL.md が別々になります。',
     nameLabel: '名前',
     cloneFrom: '複製元',
     cloneFromNone: 'なし（空）',
@@ -1818,21 +2146,18 @@ export const ja = defineLocale({
     failedRename: 'プロファイルの名前変更に失敗しました'
   },
 
+  modelAssignment: {
+    saveFailed: 'Hermes はモデルの変更を保存しませんでした。',
+    confirmTitle: 'モデル選択の警告',
+    confirmDetail: 'このトレードオフを受け入れる場合のみ確認してください。',
+    confirmAction: '確認',
+    declined: 'モデル変更をキャンセルしました — データ学習ティアの警告を拒否しました。'
+  },
+
   cron: {
     close: 'Cron を閉じる',
     title: 'スケジュール済みジョブ',
     count: count => `${count} 件のジョブ`,
-    modelImpact: {
-      title: 'スケジュール済みジョブの確認が必要です',
-      message: count => `モデル設定を確認するまで、${count} 件のスケジュール済みジョブがスキップされます。`,
-      detailMore: (names, remaining) => `${names}、ほか ${remaining} 件`,
-      review: 'スケジュール済みジョブを確認',
-      saveFailed: 'Qubit はモデルの変更を保存しませんでした。',
-      confirmTitle: 'モデル選択の警告',
-      confirmDetail: 'このトレードオフを受け入れる場合のみ確認してください。',
-      confirmAction: '確認',
-      declined: 'モデル変更をキャンセルしました — データ学習ティアの警告を拒否しました。'
-    },
     search: 'Cron ジョブを検索...',
     loading: 'Cron ジョブを読み込み中...',
     states: {
@@ -1888,7 +2213,7 @@ export const ja = defineLocale({
     everyHourAt: minute => `毎時 :${minute} に`,
     newCron: '新しい Cron',
     emptyDescNew:
-      'Cron 式でプロンプトを実行するスケジュールを設定します。Qubit が実行して、選択した宛先に結果を送信します。',
+      'Cron 式でプロンプトを実行するスケジュールを設定します。Hermes が実行して、選択した宛先に結果を送信します。',
     emptyDescSearch: '検索キーワードを広げてください。',
     emptyTitleNew: 'スケジュールされたジョブがまだありません',
     emptyTitleSearch: '一致なし',
@@ -2022,13 +2347,56 @@ export const ja = defineLocale({
   },
 
   sidebar: {
+    profileRail: 'プロファイルバー',
+    markAllRead: 'すべて既読にする',
+    filter: {
+      grouping: 'グループ化',
+      ordering: '並び替え',
+      show: '表示',
+      filters: 'フィルター',
+      status: 'ステータス',
+      pullRequest: 'プルリクエスト',
+      profile: 'プロファイル',
+      project: 'プロジェクト',
+      archived: 'アーカイブ',
+      resetToDefaults: 'デフォルトに戻す',
+      expandAll: 'すべて展開',
+      collapseAll: 'すべて折りたたむ',
+      inboxStyle: '受信トレイスタイル',
+      updated: '更新',
+      created: '作成',
+      tokens: 'トークン',
+      cost: 'コスト',
+      manual: '手動',
+      preview: 'プレビュー',
+      pr: 'PR',
+      needsInput: '入力待ち',
+      working: '実行中',
+      unread: '未読',
+      draft: '下書き',
+      idle: 'アイドル',
+      open: 'オープン',
+      merged: 'マージ済み',
+      closed: 'クローズ済み',
+      noPR: 'PRなし'
+    },
+    gatewayGroups: {
+      grouping: 'ゲートウェイとプロファイル',
+      rename: 'グループ名を変更',
+      aliasLabel: '表示名',
+      aliasHint: '表示名のみ変更します。ゲートウェイ名とプロファイル名は変わりません。',
+      resetName: '名前をリセット',
+      moveUp: '上に移動',
+      moveDown: '下に移動',
+      reorder: 'グループを並べ替え',
+      actions: 'グループの操作'
+    },
     nav: {
       'new-session': '新しいセッション',
-      skills: 'スキルとツール',
+      capabilities: 'スキルとツール',
       messaging: 'メッセージング',
       artifacts: 'アーティファクト',
-      cron: 'スケジュール済みジョブ',
-      'session-import': 'セッションを取り込む'
+      cron: 'スケジュール済みジョブ'
     },
     searchAria: 'セッションを検索',
     searchPlaceholder: 'セッションを検索…',
@@ -2037,6 +2405,10 @@ export const ja = defineLocale({
     results: '結果',
     pinned: 'ピン留め',
     sessions: 'セッション',
+    terminal: 'ターミナル',
+    files: 'ファイル',
+    review: 'レビュー',
+    logs: 'ログ',
     cronJobs: 'Cronジョブ',
     groupAriaGrouped: 'セッションを単一リストとして表示',
     groupAriaUngrouped: 'ワークスペースごとにセッションをグループ化',
@@ -2052,8 +2424,11 @@ export const ja = defineLocale({
     noSessions: 'セッションはまだありません',
     noFilterMatches: 'このフィルターに一致するセッションはありません',
     projects: {
+      showAllSessions: 'すべてのセッションを表示',
       sectionLabel: 'プロジェクト',
       home: 'ホーム',
+      autoDiscovered: '自動検出',
+      showAllCount: count => `${count} 件のセッションをすべて表示`,
       newButton: '新規プロジェクト',
       createTitle: '新規プロジェクト',
       createDesc: 'ワークスペースに名前を付け、1つ以上のフォルダを追加します。',
@@ -2083,9 +2458,9 @@ export const ja = defineLocale({
       removeFromSidebar: 'サイドバーから削除',
       createFailed: 'プロジェクトを作成できませんでした',
       staleBackend:
-        'プロジェクトを作成するには Qubit バックエンドを更新してください。バックエンドがこのデスクトップアプリより古いです（設定 → 更新 → バックエンド）。',
+        'プロジェクトを作成するには Hermes バックエンドを更新してください。バックエンドがこのデスクトップアプリより古いです（設定 → 更新 → バックエンド）。',
       deleteConfirm:
-        'Qubit から保存済みプロジェクトを削除します。ファイル・git リポジトリ・ワークツリーはそのまま残ります。',
+        'Hermes から保存済みプロジェクトを削除します。ファイル・git リポジトリ・ワークツリーはそのまま残ります。',
       startWork: '新しいワークツリー',
       newWorktreeTitle: '新しいワークツリー',
       newWorktreeDesc: 'このワークツリーのブランチ名を入力してください。',
@@ -2095,7 +2470,7 @@ export const ja = defineLocale({
       baseBranchNone: 'ブランチが見つかりません',
       startWorkFailed: 'ワークツリーを作成できませんでした',
       worktreeStaleBackend:
-        'このリモート接続でワークツリーを作成するには Qubit バックエンドを更新してください — git ワークツリー API 以前のバージョンです。',
+        'このリモート接続でワークツリーを作成するには Hermes バックエンドを更新してください — git ワークツリー API 以前のバージョンです。',
       worktreeProjectLabel: 'プロジェクト',
       worktreeProjectPlaceholder: 'プロジェクトを検索…',
       worktreeProjectNone: 'フォルダのあるプロジェクトがありません',
@@ -2181,12 +2556,12 @@ export const ja = defineLocale({
   composer: {
     message: 'メッセージ',
     wakingProfile: profile => `${profile} を起動中…`,
-    placeholderStarting: 'Qubit を起動中...',
-    placeholderReconnecting: 'Qubit に再接続中…',
+    placeholderStarting: 'Hermes を起動中...',
+    placeholderReconnecting: 'Hermes に再接続中…',
     placeholderFollowUp: 'フォローアップを送信',
     newSessionPlaceholders: [
       '何を作りますか？',
-      'Qubit にタスクを与える',
+      'Hermes にタスクを与える',
       '何か考えていることはありますか？',
       '必要なことを説明してください',
       '何に取り組みますか？',
@@ -2225,6 +2600,7 @@ export const ja = defineLocale({
     speakReplies: '返信を読み上げる',
     stopSpeakingReplies: '返信の読み上げを停止',
     wakeWordListening: phrase => `ウェイクワード:「${phrase}」— 待機中`,
+    wakeWord: phrase => `ウェイクワード「${phrase}」`,
     wakeWordOff: phrase => `ウェイクワード:「${phrase}」— オフ`,
     wakeWordPausedVoice: phrase => `ウェイクワード:「${phrase}」— 音声チャット中は一時停止`,
     lookupLoading: '検索中…',
@@ -2235,12 +2611,77 @@ export const ja = defineLocale({
     hotkeys: 'ホットキー',
     helpFooter: 'フルパネルを開く · Backspace で閉じる',
     commandDescs: {
-      '/help': 'コマンドとホットキーの全リスト',
+      '/help': 'デスクトップのスラッシュコマンドを表示',
       '/clear': '新しいセッションを開始',
       '/resume': '以前のセッションを再開',
       '/details': 'トランスクリプトの詳細レベルを制御',
       '/copy': '選択または最後のアシスタントメッセージをコピー',
-      '/quit': 'qubit を終了'
+      '/quit': 'hermes を終了',
+      '/start': '返信せずにプラットフォームの開始要求を確認',
+      '/new': '新しいデスクトップチャットを開始',
+      '/topic': 'Telegram の個人チャットのトピックを有効化または確認',
+      '/save': '現在の会話を JSON に保存',
+      '/retry': '最後のユーザーメッセージを再試行',
+      '/prompt': '$EDITOR で次のプロンプトを Markdown で作成して送信',
+      '/undo': 'ユーザーのターンを指定回数戻して再入力（既定は 1）',
+      '/title': '現在のセッション名を変更',
+      '/handoff': 'このセッションをメッセージプラットフォームへ引き継ぐ',
+      '/branch': '最新メッセージから新しいチャットを分岐',
+      '/worktree': '分離した Git ワークツリーを表示、一覧、作成、整理',
+      '/compress': '会話コンテキストを圧縮',
+      '/rollback': 'チェックポイントを一覧または復元',
+      '/export': 'プロファイルの設定、スキル、テーマを共有用アーカイブに書き出す',
+      '/import': '共有アーカイブを新しいプロファイルとして読み込む',
+      '/stop': '進行中のターンとバックグラウンドプロセスを停止',
+      '/pause': '新しい処理を全体で一時停止（緊急停止）；/pause off で再開',
+      '/bg': '別のバックグラウンドセッションでプロンプトを実行',
+      '/btw': '進行中の会話を中断せずに関連する質問をする',
+      '/agents': 'アクティブなセッションとタスクを表示',
+      '/journey': 'メモリグラフを開く',
+      '/queue': '次のターンのプロンプトを追加、一覧、編集、削除、移動、全消去',
+      '/steer': '現在の実行を誘導',
+      '/goal': 'このセッションの継続目標を管理',
+      '/heartbeat': 'アイドル時にこのセッションで繰り返すプロンプトを設定',
+      '/refine': 'この会話を見直し、学びをメモリやスキルに保存',
+      '/review': '独立したサブエージェントに作業のレビューを依頼',
+      '/loop': 'このセッションで一定間隔でプロンプトを繰り返す',
+      '/plan': '実行せずに .hermes/plans/ に Markdown の実装計画を作成',
+      '/moa': 'Mixture of Agents のプリセットで実行し、元のモデルに戻す',
+      '/subgoal': '進行中の目標の追加条件を管理',
+      '/status': '現在のセッション状態を表示',
+      '/egress': 'Docker の送信プロキシの状態を表示',
+      '/context': 'コンテキスト使用量、内訳、圧縮統計、処理速度を表示',
+      '/whoami': 'スラッシュコマンドのアクセス権を表示',
+      '/profile': 'アクティブな Hermes プロファイルを切り替え',
+      '/codex-runtime': 'OpenAI/Codex モデルの Codex app-server ランタイムを切り替え',
+      '/personality': 'このセッションの人格を切り替え',
+      '/battery': 'ステータスバーのバッテリー表示を切り替え',
+      '/timestamps': 'メッセージと /history の時刻表示を切り替え',
+      '/diff': '作業ディレクトリの Git 変更を表示',
+      '/focus': 'プロンプトと最終回答のみを表示するフォーカス表示を切り替え',
+      '/yolo': 'YOLO を切り替え — 危険なコマンドを自動承認',
+      '/approvals': '危険なコマンドの承認モードを表示または設定',
+      '/reasoning': '推論の強度と表示を管理',
+      '/skin': 'デスクトップテーマを切り替え',
+      '/wake': 'デスクトップのウェイクワード検出を制御 [on|off|status]',
+      '/tools': 'エージェントが使えるツールを切り替え',
+      '/memory': '保留中のメモリ書き込みを確認し、承認を切り替え',
+      '/bundles': 'スキルバンドルを一覧表示',
+      '/pet': 'petdex マスコットを切り替え',
+      '/hatch': '新しいペットを生成',
+      '/learn': 'ディレクトリ、URL、会話、メモから再利用可能なスキルを学ぶ',
+      '/init': 'リポジトリを調べて AGENTS.md の指示を作成または更新',
+      '/suggestions': '提案された自動化を確認し、採用または却下',
+      '/blueprint': 'ブループリントから自動化を設定',
+      '/browser': 'ローカルブラウザー接続を管理',
+      '/palette': 'コマンドパレットを開く',
+      '/usage': 'このセッションのトークン使用量を表示',
+      '/subscription': 'Nous のプランを確認し、ブラウザーで変更',
+      '/topup': 'Nous の残高を表示し、請求を管理',
+      '/platform': '問題のあるゲートウェイプラットフォームを一時停止、再開、一覧表示',
+      '/version': 'Hermes Agent のバージョンを表示',
+      '/debug': 'デバッグレポートを作成',
+      '/model': 'このセッションのモデルを切り替え'
     },
     hotkeyDescs: {
       'composer.mention': 'ファイル、フォルダー、URL、Git を参照',
@@ -2253,7 +2694,7 @@ export const ja = defineLocale({
       'composer.history': 'ポップオーバー / 履歴を切り替え'
     },
     attachUrlTitle: 'URL を添付',
-    attachUrlDesc: 'Qubit がページを取得し、このターンのコンテキストとして含めます。',
+    attachUrlDesc: 'Hermes がページを取得し、このターンのコンテキストとして含めます。',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: '完全な URL を入力してください。例: ',
     attach: '添付',
@@ -2264,6 +2705,8 @@ export const ja = defineLocale({
     attachments: count => `${count} 件の添付`,
     editingInComposer: 'コンポーザーで編集中',
     editingQueuedInComposer: 'コンポーザーでキュー済みターンを編集中',
+    restoredDraftNotice: '未送信のメッセージを復元しました',
+    restoredDraftUndo: '元に戻す',
     queueEdit: '編集',
     queueSendNext: '次に送信',
     queueSteer: 'ステア — 現在のターンを今すぐ修正',
@@ -2319,6 +2762,8 @@ export const ja = defineLocale({
   },
 
   statusStack: {
+    hideStack: 'ステータススタックを隠す',
+    showStack: 'ステータススタックを表示',
     agents: 'エージェント',
     background: count => `バックグラウンド ${count} 件`,
     goalActive: '目標進行中',
@@ -2457,7 +2902,7 @@ export const ja = defineLocale({
       createPr: 'PR を作成',
       openPr: 'PR を開く',
       ghMissing: 'PR を開くには GitHub CLI (gh) をインストールしてサインインしてください',
-      agentShip: 'Qubit にコミットと PR を任せる',
+      agentShip: 'Hermes にコミットと PR を任せる',
       agentShipUnavailable: 'この変更を持つチャットが画面にありません。',
       agentShipPrompt:
         '現在の変更を確認し、分かりやすい Conventional Commits 形式でコミットし、ブランチをプッシュして、プルリクエストを作成してください。',
@@ -2470,15 +2915,22 @@ export const ja = defineLocale({
   },
 
   updates: {
+    discontinuedTitle: 'このHermesビルドはサポートされていません',
+    discontinuedBody: 'このHermesビルドはサポートが終了し、動作しなくなる可能性があります。アンインストールしてください。データはディスクに残ります。',
+    channels: { stable: '安定版', canary: '先行版' },
+    bundleSwapPending: '再起動して更新を完了',
+    bundleSwapPendingDesc:
+      '更新されたアプリはすでにインストール済みです。Hermes を再起動するだけで新しいビルドが読み込まれます。チャットや設定はそのまま保持されます。',
+    bundleSwapPendingAction: 'Hermes を再起動',
     stages: {
       idle: '準備中…',
       prepare: '準備中…',
       fetch: 'ダウンロード中…',
       pull: 'もうすぐ完了…',
       pydeps: '仕上げ中…',
-      update: 'Qubit を更新中…',
+      update: 'Hermes を更新中…',
       rebuild: 'デスクトップアプリを再ビルド中…',
-      restart: 'Qubit を再起動中…',
+      restart: 'Hermes を再起動中…',
       done: '更新が完了しました',
       manual: 'ターミナルから更新',
       guiSkew: 'デスクトップアプリを更新してください',
@@ -2488,15 +2940,17 @@ export const ja = defineLocale({
     checkFailedTitle: '更新を確認できませんでした',
     tryAgain: '再試行',
     notAvailableTitle: '更新は利用できません',
-    unsupportedMessage: 'このバージョンの Qubit はアプリ内から自分を更新できません。',
+    unsupportedMessage: 'このバージョンの Hermes はアプリ内から自分を更新できません。',
     connectionRetry: '接続を確認してもう一度試してください。',
+    gitUnusable: 'このコンピューターで Git を実行できなかったため、更新を確認できませんでした。',
     latestBody: '最新バージョンを実行しています。',
+    versionDetailsDistributionStore: 'Microsoft Store',
     latestBodyBackend: 'バックエンドは最新バージョンを実行しています。',
     allSetTitle: '準備完了',
     availableTitle: '新しい更新が利用可能',
-    availableBody: '新しいバージョンの Qubit をインストールする準備ができています。',
+    availableBody: '新しいバージョンの Hermes をインストールする準備ができています。',
     availableTitleBackend: 'バックエンドの更新があります',
-    availableBodyBackend: '接続中の Qubit バックエンドの新しいバージョンをインストールできます。',
+    availableBodyBackend: '接続中の Hermes バックエンドの新しいバージョンをインストールできます。',
     availableBodyNoChangelog:
       '新しいバージョンを利用できます。このインストール形式ではリリースノートは表示できません。',
     updateNow: '今すぐ更新',
@@ -2504,28 +2958,28 @@ export const ja = defineLocale({
     moreChanges: count => `さらに ${count} 件の変更が含まれています。`,
     manualTitle: 'ターミナルから更新',
     manualBody:
-      'Qubit をコマンドラインからインストールしたため、更新もそこで実行されます。これをターミナルに貼り付けてください:',
-    manualPickedUp: 'Qubit は次回起動時に新しいバージョンを読み込みます。',
+      'Hermes をコマンドラインからインストールしたため、更新もそこで実行されます。これをターミナルに貼り付けてください:',
+    manualPickedUp: 'Hermes は次回起動時に新しいバージョンを読み込みます。',
     guiSkewTitle: 'デスクトップアプリを更新してください',
     guiSkewBody:
-      'バックエンドは更新されましたが、このデスクトップアプリのパッケージは変更されていません。一致させるために Qubit デスクトップアプリ（AppImage / .deb / .rpm）を更新または再インストールしてください。',
+      'バックエンドは更新されましたが、このデスクトップアプリのパッケージは変更されていません。一致させるために Hermes デスクトップアプリ（AppImage / .deb / .rpm）を更新または再インストールしてください。',
     copy: 'コピー',
     copied: 'コピーしました',
     done: '完了',
     applyingBody:
-      'Qubit アップデーターが独自のウィンドウで引き継ぎ、完了後に自動的に Qubit を再度開きます。更新中はご自分で Qubit を開き直さないでください。',
-    applyingBodyBackend: 'リモートバックエンドが更新を適用して再起動します。復帰すると Qubit が自動的に再接続します。',
-    applyingClose: 'このウィンドウは更新中に閉じ、その後 Qubit が自動的に再度開きます。',
+      'Hermes アップデーターが独自のウィンドウで引き継ぎ、完了後に自動的に Hermes を再度開きます。更新中はご自分で Hermes を開き直さないでください。',
+    applyingBodyBackend: 'リモートバックエンドが更新を適用して再起動します。復帰すると Hermes が自動的に再接続します。',
+    applyingClose: 'このウィンドウは更新中に閉じ、その後 Hermes が自動的に再度開きます。',
     errorTitle: '更新が完了しませんでした',
     errorBody: 'ご安心ください。何も失われていません。今すぐ再試行できます。',
-    blockerTitle: 'Qubit を更新するためにローカルプレビューを閉じますか？',
+    blockerTitle: 'Hermes を更新するためにローカルプレビューを閉じますか？',
     blockerBody:
       '更新する前に、これらのローカルプレビューを停止する必要があります。ファイルが変更または削除されることはありません。',
-    foreignBlockerTitle: '他のプロセスを閉じて Qubit を更新',
+    foreignBlockerTitle: '他のプロセスを閉じて Hermes を更新',
     foreignBlockerBody:
-      'Qubit はこれらのプロセスを安全に自動終了できません。各プロセスを所有するアプリ、ターミナル、またはサービスを閉じてから、もう一度更新してください。',
+      'Hermes はこれらのプロセスを安全に自動終了できません。各プロセスを所有するアプリ、ターミナル、またはサービスを閉じてから、もう一度更新してください。',
     mixedBlockerBody:
-      'Qubit は以下のローカルプレビューを閉じることができます。更新を続けるには、他のプロセスを手動で閉じる必要があります。',
+      'Hermes は以下のローカルプレビューを閉じることができます。更新を続けるには、他のプロセスを手動で閉じる必要があります。',
     closePreviewsAndUpdate: 'プレビューを閉じて更新',
     closePreviewsAndCheckAgain: 'プレビューを閉じて再確認',
     localPreview: 'ローカルプレビュー',
@@ -2541,6 +2995,13 @@ export const ja = defineLocale({
     everythingSkipped: 'スキップ',
     everythingRowFailed: '更新に失敗しました',
     everythingFanoutFailedTitle: '他のインスタンスを更新できませんでした',
+    changeLogNew: '新機能',
+    changeLogFixed: '修正',
+    changeLogFaster: '高速化',
+    changeLogImproved: '改善',
+    changeLogOther: 'その他の改善',
+    changeLogFallbackLabel: '今回の更新',
+    changeLogFallbackItem: '改善と修正',
     applyStatus: {
       preparing: 'バックエンドを更新しています…',
       pulling: 'バックエンドを更新中…',
@@ -2549,9 +3010,37 @@ export const ja = defineLocale({
       failed: 'バックエンドの更新に失敗しました。',
       noReturn:
         'バックエンドがオンラインに戻りませんでした。更新が完了していない可能性があります。バックエンドホストを確認してください。'
-    }
+    },
+    // Restored About-card strings (moved from `settings.about.*` to `updates.*`).
+    version: value => `バージョン ${value}`,
+    versionUnavailable: 'バージョンを取得できません',
+    checkNow: '今すぐ確認',
+    seeWhatsNew: '新機能を見る',
+    releaseNotes: 'リリースノート',
+    onLatest: '最新バージョンです。',
+    installing: '更新をインストール中です。',
+    cantReach: '更新サーバーに接続できませんでした。',
+    tapCheck: '更新を探すには「今すぐ確認」を押してください。',
+    updateReady: count => `新しい更新の準備ができました (${count} 件の変更を含みます)。`,
+    updateReadyUnknown: '新しい更新の準備ができました。',
+    lastChecked: age => `前回確認: ${age}`,
+    never: '未確認',
+    justNow: 'たった今',
+    minAgo: count => `${count} 分前`,
+    hoursAgo: count => `${count} 時間前`,
+    daysAgo: count => `${count} 日前`,
+    justNowSuffix: ' · たった今',
+    bundleOutOfSync: 'アプリのビルドが古くなっています',
+    bundleOutOfSyncDesc:
+      'Hermes ランタイムは更新されましたが、デスクトップアプリ自体は古いビルドのままです。アプリを更新するまで、新しいインターフェース機能(Bot Mode など)は表示されません。下の更新を実行してアプリを再ビルドしてください。それでもこの警告が消えない場合は、最新のデスクトップインストーラーから再インストールしてください。',
+    bundleOutOfSyncAction: 'インストーラーを入手',
+    checkingShort: '確認中…'
   },
 
+  guidedGreeting: {
+    line: 'やあ、どうぞ。Hermes です。二分だけください、あなたに合わせて整えます。それから、本当にやりたいことに取りかかりましょう。\n\nまずは、何とお呼びすればいいですか。',
+    nameSuggestion: (name: string) => `（よければ、${name} さんとお呼びします。）`
+  },
   install: {
     stageStates: {
       pending: '待機中',
@@ -2560,7 +3049,7 @@ export const ja = defineLocale({
       skipped: 'スキップ',
       failed: '失敗'
     },
-    oneTimeTitle: 'Qubit には一度限りのインストールが必要です',
+    oneTimeTitle: 'Hermes には一度限りのインストールが必要です',
     unsupportedDesc: platform =>
       `${platform} では自動の初回インストールはまだ利用できません。ターミナルを開いて以下のコマンドを実行し、このアプリを再起動してください。以降の起動ではこの手順はスキップされます。`,
     installCommand: 'インストールコマンド',
@@ -2568,25 +3057,25 @@ export const ja = defineLocale({
     viewDocs: 'インストールドキュメントを見る',
     installTo: 'インストール先',
     retryAfterRun: '実行しました — 再試行',
-    setupChoiceTitle: 'Qubit Desktop をセットアップ',
+    setupChoiceTitle: 'Hermes Desktop をセットアップ',
     setupChoiceDesc:
-      'すでに実行している Qubit ゲートウェイに接続するか、このコンピューターに Qubit をローカルインストールします。',
-    connectExistingTitle: '既存の Qubit に接続',
+      'すでに実行している Hermes ゲートウェイに接続するか、このコンピューターに Hermes をローカルインストールします。',
+    connectExistingTitle: '既存の Hermes に接続',
     connectExistingShort: '既存環境に接続',
     connectExistingDesc:
       'セッショントークンまたはブラウザーサインインでリモートバックエンドを使用します。ローカルインストールは開始されません。',
-    installLocalTitle: 'Qubit をローカルにインストール',
-    installLocalDesc: 'Qubit をダウンロードし、Python 環境を作成して、このコンピューターでバックエンドを実行します。',
+    installLocalTitle: 'Hermes をローカルにインストール',
+    installLocalDesc: 'Hermes をダウンロードし、Python 環境を作成して、このコンピューターでバックエンドを実行します。',
     localStartUnavailable:
-      'ローカルインストールを開始できません。Qubit Desktop を再起動して、もう一度お試しください。',
-    remoteSetupTitle: '既存の Qubit に接続',
+      'ローカルインストールを開始できません。Hermes Desktop を再起動して、もう一度お試しください。',
+    remoteSetupTitle: '既存の Hermes に接続',
     remoteSetupDesc:
-      'ゲートウェイ URL を入力してください。Qubit Desktop がトークンとブラウザーサインインのどちらが必要かを検出します。',
+      'ゲートウェイ URL を入力してください。Hermes Desktop がトークンとブラウザーサインインのどちらが必要かを検出します。',
     remoteUrlTitle: 'ゲートウェイ URL',
-    remoteUrlDesc: 'Qubit ゲートウェイのベース URL を使用します。リモートの場合は https:// を含めてください。',
+    remoteUrlDesc: 'Hermes ゲートウェイのベース URL を使用します。リモートの場合は https:// を含めてください。',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'ゲートウェイ認証方式を検出中...',
-    probeError: 'その Qubit ゲートウェイに到達できませんでした。',
+    probeError: 'その Hermes ゲートウェイに到達できませんでした。',
     identityProvider: 'ID プロバイダー',
     authTitle: '認証',
     authNeedsOauth: provider => `このゲートウェイをテストする前に ${provider} でサインインしてください。`,
@@ -2606,12 +3095,12 @@ export const ja = defineLocale({
     applyRemote: '適用して再接続',
     backToSetup: '戻る',
     failedTitle: 'インストールに失敗しました',
-    settingUpTitle: 'Qubit Agent を設定中',
+    settingUpTitle: 'Hermes Agent を設定中',
     finishingTitle: '仕上げ中',
     failedDesc:
-      'インストール手順のいずれかが失敗しました。Windows では、別の Qubit CLI またはデスクトップインスタンスが実行中の場合に発生することがあります。実行中の Qubit インスタンスをすべて停止してから再試行してください。詳細は以下またはデスクトップログで確認できます。',
+      'インストール手順のいずれかが失敗しました。Windows では、別の Hermes CLI またはデスクトップインスタンスが実行中の場合に発生することがあります。実行中の Hermes インスタンスをすべて停止してから再試行してください。詳細は以下またはデスクトップログで確認できます。',
     activeDesc:
-      'これは一回限りのセットアップです。Qubit インストーラーが依存関係をダウンロードしてマシンを設定しています。以降の起動ではこの手順はスキップされます。',
+      'これは一回限りのセットアップです。Hermes インストーラーが依存関係をダウンロードしてマシンを設定しています。以降の起動ではこの手順はスキップされます。',
     progress: (completed, total) => `${total} ステップ中 ${completed} 完了`,
     currentStage: stage => ` — 現在: ${stage}`,
     fetchingManifest: 'インストーラーマニフェストを取得中...',
@@ -2629,10 +3118,10 @@ export const ja = defineLocale({
   },
 
   onboarding: {
-    headerTitle: 'Qubit Agent のセットアップをしましょう',
+    headerTitle: 'Hermes Agent のセットアップをしましょう',
     headerDesc: 'チャットを始めるにはモデルプロバイダーを接続してください。ほとんどのオプションはワンクリックです。',
-    preparingInstall: 'Qubit はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
-    starting: 'Qubit を起動中…',
+    preparingInstall: 'Hermes はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
+    starting: 'Hermes を起動中…',
     lookingUpProviders: 'プロバイダーを検索中...',
     collapse: '折りたたむ',
     otherProviders: 'その他のプロバイダー',
@@ -2640,7 +3129,7 @@ export const ja = defineLocale({
     chooseLater: '後でプロバイダーを選択します',
     recommended: '推奨',
     connected: '接続済み',
-    featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Qubit を実行するための推奨方法',
+    featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Hermes を実行するための推奨方法',
     fireworksPitch: '直接モデル API — Fireworks がホストする最先端モデル',
     localModelsTitle: 'モデルをローカルで実行',
     localModelsPitch: 'アカウント不要——モデルをダウンロードしてこのマシンで実行',
@@ -2660,7 +3149,7 @@ export const ja = defineLocale({
       local: {
         short: 'セルフホスト',
         description:
-          'ローカルまたはセルフホストの OpenAI 互換エンドポイント（vLLM、llama.cpp、Ollama など）に Qubit を接続。'
+          'ローカルまたはセルフホストの OpenAI 互換エンドポイント（vLLM、llama.cpp、Ollama など）に Hermes を接続。'
       }
     },
     backToSignIn: 'サインインに戻る',
@@ -2672,7 +3161,7 @@ export const ja = defineLocale({
     update: '更新',
     flowSubtitles: {
       pkce: 'ブラウザーを開いてサインインし、ここに戻ります',
-      device_code: 'ブラウザーで確認ページを開きます — Qubit が自動接続します',
+      device_code: 'ブラウザーで確認ページを開きます — Hermes が自動接続します',
       external: 'ターミナルで一度サインインして、チャットに戻ります'
     },
     startingSignIn: provider => `${provider} のサインインを開始中...`,
@@ -2685,12 +3174,12 @@ export const ja = defineLocale({
     pickDifferentProvider: '別のプロバイダーを選択',
     signInWith: provider => `${provider} でサインイン`,
     openedBrowser: provider => `${provider} をブラウザーで開きました。`,
-    authorizeThere: 'そこで Qubit を承認してください。',
+    authorizeThere: 'そこで Hermes を承認してください。',
     copyAuthCode: '認証コードをコピーして以下に貼り付けてください。',
     pasteAuthCode: '認証コードを貼り付け',
     reopenAuthPage: '認証ページを再度開く',
     autoBrowser: provider =>
-      `${provider} をブラウザーで開きました。Qubit をそこで承認すれば自動接続されます。コピーや貼り付けは不要です。`,
+      `${provider} をブラウザーで開きました。Hermes をそこで承認すれば自動接続されます。コピーや貼り付けは不要です。`,
     reopenSignInPage: 'サインインページを再度開く',
     waitingAuthorize: '承認を待っています...',
     externalPending: provider =>
@@ -2721,18 +3210,23 @@ export const ja = defineLocale({
     localDownloadsHeading: 'ローカル',
     noAuthenticatedProviders: '認証済みプロバイダーがありません。',
     pro: 'Pro',
-    proNeedsSubscription: 'Pro モデルには有料の Qubit サブスクリプションが必要です。',
+    proNeedsSubscription: 'Pro モデルには有料の Nous サブスクリプションが必要です。',
     free: '無料',
     freeTier: '無料プラン',
     priceTitle: '100 万トークンあたりの入力/出力価格',
-    wasPrice: '旧価格'
+    wasPrice: '旧価格',
+    customModel: 'カスタムモデル',
+    addCustomModelAction: 'カスタムモデルを追加…',
+    customModelPlaceholder: 'モデル ID を入力（例: openai/gpt-5）'
   },
 
   modelVisibility: {
     title: 'モデル',
     search: 'モデルを検索',
     noAuthenticatedProviders: '認証済みプロバイダーがありません。',
-    addProvider: 'プロバイダーを追加…'
+    addProvider: 'プロバイダーを追加…',
+    addCustomModel: 'カスタムモデルを追加',
+    removeCustomModel: 'カスタムモデルを削除'
   },
 
   shell: {
@@ -2759,6 +3253,7 @@ export const ja = defineLocale({
       xhigh: '特高',
       max: '最大',
       ultra: 'ウルトラ',
+      sendsOnRoute: (level: string) => `このルートでは ${level} を送信`,
       updateFailed: 'モデルオプションの更新に失敗しました',
       fastFailed: '高速モードの更新に失敗しました'
     },
@@ -2794,13 +3289,13 @@ export const ja = defineLocale({
       update: '更新',
       updateInProgress: '更新中',
       commitsBehind: (count, branch) => `${branch} より ${count} コミット遅れています`,
-      desktopVersion: version => `Qubit Desktop v${version}`,
+      desktopVersion: version => `Hermes Desktop v${version}`,
       backendVersion: version => `バックエンド v${version}`,
       clientLabel: version => `クライアント v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `リモート: ${host}`,
       connectionCloud: host => `クラウド: ${host}`,
-      connectionCloudTooltip: host => `Qubit Cloud · ${host}`,
+      connectionCloudTooltip: host => `Hermes Cloud · ${host}`,
       connectionSshTooltip: host => `SSH · ${host}`,
       connectionRemoteTooltip: host => `Remote · ${host}`,
       backendLabel: version => `バックエンド v${version}`,
@@ -2880,10 +3375,17 @@ export const ja = defineLocale({
     remotePickerTitle: 'リモートフォルダーを選択',
     remotePickerDescription: '接続中のバックエンド上のフォルダーを参照します。',
     remotePickerSelect: 'フォルダーを選択',
+    remotePickerNewFolder: '新しいフォルダー',
+    remotePickerFolderName: 'フォルダー名',
+    remotePickerCreateFolder: 'フォルダーを作成',
+    remotePickerInvalidFolderName: 'スラッシュを含まない 1 つのフォルダー名を入力してください。',
+    remotePickerCreateFolderFailed: error => `フォルダーを作成できませんでした (${error})。`,
     folderTip: cwd => cwd,
     openFolder: 'フォルダーを開く',
     refreshTree: 'ツリーを更新',
     collapseAll: 'すべてのフォルダーを折りたたむ',
+    showIgnored: 'gitignore されたファイルを表示',
+    hideIgnored: 'gitignore されたファイルを非表示',
     previewUnavailable: 'プレビューは利用できません',
     couldNotPreview: path => `${path} をプレビューできませんでした`,
     noProjectTitle: 'プロジェクトなし',
@@ -2928,7 +3430,7 @@ export const ja = defineLocale({
     binaryTitle: 'これはバイナリファイルのようです',
     binaryBody: label => `${label} をプレビューすると読み取り不能なテキストが表示される場合があります。`,
     largeTitle: 'このファイルは大きいです',
-    largeBody: (label, size) => `${label} は ${size} です。Qubit は最初の 512 KB のみを表示します。`,
+    largeBody: (label, size) => `${label} は ${size} です。Hermes は最初の 512 KB のみを表示します。`,
     previewAnyway: 'とにかくプレビュー',
     truncated: '最初の 512 KB を表示しています。',
     noInlineTitle: 'インラインプレビューなし',
@@ -2969,11 +3471,11 @@ export const ja = defineLocale({
         'このアドレスはエージェントを実行しているマシンを指しており、このマシンではありません。ブラウザペインはページをローカルで読み込むため、リモートの開発サーバーにはポート転送か到達可能なホスト名が必要です。',
       failedToLoad: 'プレビューの読み込みに失敗しました',
       tryAgain: '再試行',
-      restarting: 'Qubit を再起動中...',
-      askRestart: 'Qubit にサーバーの再起動を依頼',
-      lookingRestart: taskId => `Qubit は再起動するプレビューサーバーを検索中です (${taskId})`,
+      restarting: 'Hermes を再起動中...',
+      askRestart: 'Hermes にサーバーの再起動を依頼',
+      lookingRestart: taskId => `Hermes は再起動するプレビューサーバーを検索中です (${taskId})`,
       restartingTitle: 'プレビューサーバーを再起動中',
-      restartingMessage: 'Qubit はバックグラウンドで作業中です。進捗はプレビューコンソールで確認してください。',
+      restartingMessage: 'Hermes はバックグラウンドで作業中です。進捗はプレビューコンソールで確認してください。',
       startRestartFailed: message => `サーバー再起動を開始できませんでした: ${message}`,
       restartFailed: 'サーバーの再起動に失敗しました',
       hideConsole: 'プレビューコンソールを非表示',
@@ -2985,17 +3487,17 @@ export const ja = defineLocale({
       reload: 'ページを再読み込み',
       address: 'アドレス',
       addressPlaceholder: 'アドレスを入力',
-      blankPageBody: '上のアドレス欄に入力するか、Qubit にページを開くよう頼んでください。',
+      blankPageBody: '上のアドレス欄に入力するか、Hermes にページを開くよう頼んでください。',
       finishedRestarting: message =>
-        `Qubit がプレビューサーバーの再起動を完了しました${message ? `: ${message}` : ''}`,
+        `Hermes がプレビューサーバーの再起動を完了しました${message ? `: ${message}` : ''}`,
       failedRestarting: message => `サーバーの再起動に失敗しました: ${message}`,
       unknownError: '不明なエラー',
       restartedTitle: 'プレビューサーバーが再起動しました',
       reloadingNow: 'プレビューを再読み込み中です。',
       restartFailedTitle: 'プレビューの再起動に失敗しました',
-      restartFailedMessage: 'Qubit がサーバーを再起動できませんでした。',
+      restartFailedMessage: 'Hermes がサーバーを再起動できませんでした。',
       stillWorking:
-        'Qubit はまだ作業中ですが、再起動の結果がまだ届いていません。サーバーコマンドがフォアグラウンドで実行されている可能性があります。',
+        'Hermes はまだ作業中ですが、再起動の結果がまだ届いていません。サーバーコマンドがフォアグラウンドで実行されている可能性があります。',
       workspaceReloading: 'ワークスペースが変更され、プレビューを再読み込み中',
       fileChanged: url => `ファイルが変更され、プレビューを再読み込み中: ${url}`,
       filesChanged: (count, url) => `${count} 件のファイルが変更され、プレビューを再読み込み中: ${url}`,
@@ -3006,6 +3508,22 @@ export const ja = defineLocale({
       unreachableDescription: 'プレビューページに到達できませんでした。',
       openTarget: url => `${url} を開く`,
       fallbackTitle: 'プレビュー'
+    }
+  },
+
+  interfaceMode: {
+    title: 'インターフェースモード',
+    hint: '表示される内容が変わるだけで、Hermes にできることは変わりません。',
+    sessionNote:
+      'シンプルモードで設定されています。ここでの変更はこのセッション中のみ有効です。自分の設定にするには詳細モードに切り替えてください。',
+    simple: {
+      label: 'シンプル',
+      description:
+        'Hermes と話すための表示。サイドバーとチャットのみ。ターミナル、ファイル、差分のペインは表示しません。'
+    },
+    advanced: {
+      label: '詳細',
+      description: '開発者向け。ターミナル、ファイル、差分、ステータスバー、レイアウトを設定したとおりに。'
     }
   },
 
@@ -3027,7 +3545,7 @@ export const ja = defineLocale({
     newSessionTab: '新しいセッションタブ',
     newTab: '新しいタブ',
     pluginDisabled: pluginId => `プラグイン「${pluginId}」を無効化しました`,
-    pluginDisabledBody: '設定 → プラグイン で再有効化するとペインが戻ります。',
+    pluginDisabledBody: 'スキルとツール → プラグイン で再有効化するとペインが戻ります。',
     missingPane: paneId => `ペインが見つかりません: ${paneId}`,
     editTitle: 'レイアウト',
     editHint: 'レイアウトを選ぶか、ペインをゾーン間へドラッグ。',
@@ -3080,10 +3598,33 @@ export const ja = defineLocale({
   },
 
   assistant: {
+    catalogInstall: {
+      preparing: 'インストールを準備中…',
+      install: 'インストール',
+      advanced: '詳細設定',
+      skip: 'スキップ',
+      installing: 'インストール中…',
+      installed: 'インストール済み',
+      notInstalled: '未インストール',
+      failed: '失敗',
+      showNames: '名前を表示',
+      hideNames: '名前を隠す',
+      skill: name => `スキル ${name}`,
+      kind: { plugin: 'プラグイン', skill: 'スキル' },
+      tier: { official: '公式', community: 'コミュニティ' },
+      targetProfile: profile => `${profile} プロファイルにインストールします`,
+      sendFailed: '回答を送信できませんでした。もう一度お試しください。',
+      commitLabel: 'コミット',
+      subdirLabel: 'フォルダー',
+      securityHeading: 'セキュリティ',
+      scan: { passed: 'スキャン合格', warnings: 'スキャンで警告あり', failed: 'スキャン不合格' },
+      requirementsLabel: '必要条件',
+      credentialsHeading: '認証情報'
+    },
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',
-      loadingResponse: 'Qubit が応答を読み込み中',
+      loadingResponse: 'Hermes が応答を読み込み中',
       resumeWhenBackgroundDone: count =>
         count === 1
           ? 'バックグラウンドタスクの完了後に再開します'
@@ -3101,6 +3642,67 @@ export const ja = defineLocale({
       branchNewChat: '新しいチャットでブランチ',
       react: 'リアクション',
       dismissError: 'エラーを閉じる',
+      errorGenericProvider: 'AI サービス',
+      errorLayerBodies: {
+        generic:
+          'Hermes の返信中に問題が発生しました。再試行してください。問題が続く場合はエラー詳細をコピーしてください。',
+        provider:
+          'AI サービスがリクエストを完了できませんでした。少し待って再試行するか、プロバイダーを切り替えてください。',
+        endpoint:
+          'カスタムモデルサーバーに接続できません。サーバーが起動しているか確認し、メッセージを再送してください。',
+        streaming: '返信が完了する前に接続が切れました。再試行してもう一度送信してください。'
+      },
+      errorCodes: {
+        provider_policy_blocked: {
+          title: 'アカウント設定によりこのモデルはブロックされています',
+          body: provider =>
+            `${provider} はアカウントのデータまたはプライバシー設定により、このリクエストを処理できません。別のモデルまたはプロバイダーを選んでください。`
+        },
+        content_policy_blocked: {
+          title: 'AI サービスが回答を拒否しました',
+          body: provider => `${provider} はこのメッセージへの回答を拒否しました。編集して再送してください。`
+        },
+        format_error: {
+          title: 'AI サービスがリクエストの形式を拒否しました',
+          body: provider =>
+            `${provider} はこのリクエストの形式を受け付けませんでした。プロバイダーを切り替えるか、調査のため診断情報を送信してください。`
+        },
+        invalid_response: {
+          title: 'AI サービスが読み取れない応答を返しました',
+          body: provider => `${provider} は Hermes が読み取れない内容を返しました。しばらくしてから再試行してください。`
+        },
+        empty_response: {
+          title: 'AI サービスが空の応答を返しました',
+          body: provider => `${provider} はこのメッセージに内容を返しませんでした。しばらくしてから再試行してください。`
+        },
+        rate_limit: {
+          title: 'AI サービスが混み合っています',
+          body: provider => `${provider} は現在リクエスト数を制限しています。少し待ってから再試行してください。`
+        },
+        upstream_rate_limit: {
+          title: 'AI サービスが混み合っています',
+          body: provider => `${provider} は現在リクエスト数を制限しています。少し待ってから再試行してください。`
+        },
+        overloaded: {
+          title: 'AI サービスの負荷が高すぎます',
+          body: provider =>
+            `${provider} で現在問題が発生しています。しばらくしてから再試行するか、プロバイダーを切り替えてください。`
+        },
+        server_error: {
+          title: 'AI サービスでエラーが発生しました',
+          body: provider =>
+            `${provider} がサーバーエラーを返しました。しばらくしてから再試行するか、プロバイダーを切り替えてください。`
+        },
+        timeout: {
+          title: '応答がタイムアウトしました',
+          body: provider => `${provider} から時間内に応答がありませんでした。再試行してもう一度送信してください。`
+        },
+        ssl_cert_verification: {
+          title: '安全な接続に失敗しました',
+          body: provider =>
+            `Hermes は ${provider} との安全な接続を検証できませんでした。ネットワークやプロキシの設定を確認するか、プロバイダーを切り替えて再送してください。`
+        }
+      },
       errorLayers: {
         auth: '認証エラー',
         billing: 'クレジット不足',
@@ -3113,7 +3715,15 @@ export const ja = defineLocale({
         streaming: 'ストリーミング接続のエラー'
       },
       errorRetry: '再試行',
+      errorLimitResets: time => `制限は ${time} にリセットされます`,
+      errorRetryAtReset: time => `制限のリセット時に再試行（${time}）`,
+      errorRetryScheduled: (time, wait) => `${time} に再試行 — 残り ${wait}`,
+      errorRetryScheduledCancel: 'キャンセル',
+      errorStartNewSession: '新しいセッションを開始',
       errorSwitchProvider: 'プロバイダーを切り替え',
+      errorSignInAgain: provider => `${provider} に再度サインイン`,
+      errorOauthExpired: provider =>
+        `${provider} のサインインが期限切れか取り消されました。続けるには再度サインインしてください。`,
       errorOpenLogs: 'ログを開く',
       errorOpenLogsFailed: 'ログフォルダを開けませんでした',
       errorOpenDesktopLogs: 'デスクトップのログを開く',
@@ -3139,7 +3749,7 @@ export const ja = defineLocale({
       attachingFile: '添付中…'
     },
     approval: {
-      gatewayDisconnected: 'Qubit ゲートウェイが接続されていません',
+      gatewayDisconnected: 'Hermes ゲートウェイが接続されていません',
       sendFailed: '承認応答を送信できませんでした',
       run: '実行',
       command: 'コマンド',
@@ -3150,12 +3760,12 @@ export const ja = defineLocale({
       reject: '拒否',
       alwaysTitle: 'このコマンドを常に許可しますか？',
       alwaysDescription: pattern =>
-        `これにより "${pattern}" パターンが永続的な許可リスト (~/.hermes/config.yaml) に追加されます。Qubit はこのセッションや将来のセッションで、このようなコマンドについて再度尋ねません。`,
+        `これにより "${pattern}" パターンが永続的な許可リスト (~/.hermes/config.yaml) に追加されます。Hermes はこのセッションや将来のセッションで、このようなコマンドについて再度尋ねません。`,
       alwaysAllow: '常に許可'
     },
     clarify: {
       notReady: '明確化リクエストはまだ準備できていません',
-      gatewayDisconnected: 'Qubit ゲートウェイが接続されていません',
+      gatewayDisconnected: 'Hermes ゲートウェイが接続されていません',
       sendFailed: '明確化応答を送信できませんでした',
       loadingQuestion: '質問を読み込み中…',
       other: 'その他（回答を入力）',
@@ -3181,6 +3791,19 @@ export const ja = defineLocale({
       copyQuery: 'クエリをコピー',
       copyFile: 'ファイルをコピー',
       copyPath: 'パスをコピー',
+      failedCalls: (count: number) => `失敗したツール呼び出し: ${count}`,
+      skillActivity: {
+        loading: 'スキルを読み込み中',
+        loaded: 'スキルを読み込みました',
+        loadFailed: 'スキルの読み込みに失敗しました',
+        readingResource: 'スキルのリソースを読み込み中',
+        readResource: 'スキルのリソースを読み込みました',
+        resourceFailed: 'スキルのリソースの読み込みに失敗しました',
+        listing: 'スキル一覧を取得中',
+        listed: 'スキル一覧を取得しました',
+        listFailed: 'スキル一覧の取得に失敗しました',
+        unavailable: 'スキルの結果を取得できません'
+      },
       outputAlt: 'ツール出力',
       rawResponse: '生の応答',
       copyActivity: 'アクティビティをコピー',
@@ -3192,6 +3815,8 @@ export const ja = defineLocale({
       statusError: 'エラー',
       statusRecovered: '回復しました',
       statusDone: '完了',
+      resultUnavailable: '結果を取得できません',
+      resultInterrupted: '中断されました',
       memoryWriteNoted: 'メモリへの書き込みを記録',
       actions: {
         read: '読み取り完了',
@@ -3279,16 +3904,46 @@ export const ja = defineLocale({
   },
 
   prompts: {
-    gatewayDisconnected: 'Qubit ゲートウェイが接続されていません',
+    gatewayDisconnected: 'Hermes ゲートウェイが接続されていません',
     sudoSendFailed: 'sudo パスワードを送信できませんでした',
     secretSendFailed: 'シークレットを送信できませんでした',
     sudoTitle: '管理者パスワード',
     sudoDesc:
-      'Qubit は特権コマンドを実行するために sudo パスワードが必要です。ローカルエージェントにのみ送信されます。',
+      'sudo パスワードを入力する前にコマンドを確認してください。パスワードは実行するエージェントに送信され、このセッション中キャッシュされます。',
+    sudoCommandUnavailable:
+      'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
+    sudoInstallDesc:
+      'Bot Screen のパッケージ（TigerVNC + Xfce）をゲートウェイホストにインストールするため、sudo パスワードが必要です。そのホストにのみ送信されます。',
     sudoPlaceholder: 'sudo パスワード',
     secretTitle: 'シークレットが必要です',
-    secretDesc: 'Qubit は続行するための認証情報が必要です。',
-    secretPlaceholder: 'シークレット値'
+    secretDesc: 'Hermes は続行するための認証情報が必要です。',
+    secretPlaceholder: 'シークレット値',
+    vaultUnlockSendFailed: 'マスターパスワードを送信できませんでした',
+    vaultUnlockTitle: name => `${name} のロックを解除`,
+    vaultUnlockDesc: name =>
+      `エージェントが ${name} に保存されたログインでサイトにサインインしようとしています。このセッションでロック解除するにはマスターパスワードを入力してください。パスワードはこのマシン上の ${name} に直接渡され、保存されることもエージェントに表示されることもありません。`,
+    vaultUnlockPlaceholder: 'マスターパスワード',
+    vaultUnlockKeepLocked: 'ロックしたまま',
+    vaultUnlockConfirm: 'ロック解除',
+    vaultSaveSendFailed: 'ログイン情報を保存できませんでした',
+    vaultSaveTitle: site => `${site} のログイン情報を保存しますか？`,
+    vaultSaveDesc: origin =>
+      `Hermes は ${origin} のサインインページに到達しましたが、保存されたログイン情報がありません。ここで一度入力すると、このマシン上で暗号化して保存され、ページに直接入力されます。モデルはパスワードを一切見ません。`,
+    vaultSaveIdentifierLabel: 'メールアドレスまたはユーザー名',
+    vaultSaveIdentifierPlaceholder: 'you@example.com',
+    vaultSavePasswordPlaceholder: 'パスワード',
+    vaultSaveFootnote: '保存したログイン情報は「設定 → パスワードとログイン」で管理できます。',
+    vaultSaveDecline: '保存しない',
+    vaultSaveConfirm: '保存してサインイン',
+    vaultCodeSendFailed: 'コードを送信できませんでした',
+    vaultCodeTitle: site => `${site} の確認コード`,
+    vaultCodeDesc: site =>
+      `${site} がワンタイムコード（SMS、メール、または認証アプリ）を求めています。ここに入力すると Hermes がページに入力します。モデルはコードを一切見ません。`,
+    vaultCodeLabel: 'コード',
+    vaultCodeFootnote:
+      'ヒント：「設定 → パスワードとログイン」でこのログインに認証キーを保存すると、Hermes がコードを自動入力します。',
+    vaultCodeSkip: 'スキップ',
+    vaultCodeConfirm: 'コードを入力'
   },
 
   desktop: {
@@ -3296,6 +3951,9 @@ export const ja = defineLocale({
     sessionUnavailable: 'セッションが利用できません',
     createSessionFailed: '新しいセッションを作成できませんでした',
     promptFailed: 'プロンプトに失敗しました',
+    staleSessionTitle: 'チャットが最新ではありません',
+    staleSessionBody:
+      'このウィンドウは同じチャットの別ビューより遅れています。最新のメッセージを読み込みました。送信する場合はもう一度送ってください。',
     providerCredentialRequired: '最初のメッセージを送信する前にプロバイダー認証情報を追加してください。',
     emptySlashCommand: '空のスラッシュコマンド',
     desktopCommands: 'デスクトップコマンド',
@@ -3325,6 +3983,9 @@ export const ja = defineLocale({
     resumeStrandedTitle: 'このセッションを読み込めませんでした',
     resumeStrandedBody:
       'このセッションへの接続に失敗し、自動再試行も停止しました。ゲートウェイが実行中か確認してから、もう一度お試しください。',
+    poolSlotTimeoutBody:
+      'すべてのローカルプロファイルバックエンドスロットが使用中です。「設定」→「詳細設定」で「Warm Bot Backends」を増やすか、アイドル状態のバックエンドが解放された後に再試行してください。',
+    poolSlotTimeoutOpenSettings: '詳細設定を開く',
     resumeRetry: '再試行',
     nothingToBranch: 'ブランチするものがありません',
     branchNeedsChat: 'ブランチする前にチャットを開始または再開してください。',
@@ -3340,14 +4001,20 @@ export const ja = defineLocale({
     cwdStagedTitle: '作業ディレクトリがステージングされました',
     cwdStagedMessage:
       'このアクティブなセッションへの cwd の変更を適用するにはデスクトップバックエンドを再起動してください。',
+    modelSwitchConfirmBody: 'このモデル切り替えには確認が必要です。',
+    modelSwitchConfirmLabel: 'それでも切り替える',
+    modelSwitchConfirmTitle: (model: string) => `${model} に切り替えますか？`,
+    modelSwitchConfirmTitleFallback: 'モデルを切り替えますか？',
     modelSwitchFailed: 'モデルの切り替えに失敗しました',
+    modelSwitchKeepLabel: '現在のモデルを維持',
+    modelSwitchStaleNotice: '選択が変更されたため、モデルの切り替えは適用されませんでした。',
     hydrationSyncing: (profile: string) => `${profile} を同期中\u2026`,
     sessionExported: 'セッションをエクスポートしました',
     sessionExportFailed: 'セッションをエクスポートできませんでした',
     imageSaved: '画像を保存しました',
     downloadStarted: 'ダウンロードを開始しました',
-    restartToUseSaveImage: '画像を保存するには Qubit Desktop を再起動してください。',
-    restartToSaveImages: '画像を保存するには Qubit Desktop を再起動してください',
+    restartToUseSaveImage: '画像を保存するには Hermes Desktop を再起動してください。',
+    restartToSaveImages: '画像を保存するには Hermes Desktop を再起動してください',
     imageDownloadFailed: '画像のダウンロードに失敗しました',
     openImage: '画像を開く',
     downloadImage: '画像をダウンロード',
@@ -3356,6 +4023,8 @@ export const ja = defineLocale({
     imageAttach: '画像を添付',
     imageWriteFailed: '画像のディスクへの書き込みに失敗しました。',
     imageAttachFailed: '画像の添付に失敗しました',
+    pastedContent: '貼り付けた内容',
+    pasteAttachFailed: '貼り付けたテキストを添付できませんでした',
     attachImages: '画像を添付',
     clipboard: 'クリップボード',
     noClipboardImage: 'クリップボードに画像が見つかりません',
@@ -3366,7 +4035,7 @@ export const ja = defineLocale({
       success: platform => `${platform} に引き継ぎました。いつでもここで再開できます。`,
       systemNote: platform => `↻ ${platform} に引き継ぎました — いつでもここで再開できます。`,
       failed: error => `引き継ぎに失敗しました: ${error}`,
-      timedOut: 'ゲートウェイの待機がタイムアウトしました。`qubit gateway` は起動していますか？'
+      timedOut: 'ゲートウェイの待機がタイムアウトしました。`hermes gateway` は起動していますか？'
     }
   },
 
@@ -3379,14 +4048,14 @@ export const ja = defineLocale({
       },
       skills: {
         title: '一度教えれば覚えます',
-        text: 'スキルは手順書のフォルダで、必要な場面で Qubit が自分で読み込みます。'
+        text: 'スキルは手順書のフォルダで、必要な場面で Hermes が自分で読み込みます。'
       },
       messaging: {
-        title: 'デスクを離れても Qubit',
+        title: 'デスクを離れても Hermes',
         text: 'Telegram、Discord、Slack などに接続。同じエージェント、同じ記憶のままです。'
       },
       artifacts: {
-        title: 'Qubit が作ったものすべて',
+        title: 'Hermes が作ったものすべて',
         text: '全セッションの画像・ファイル・リンクを一箇所にまとめています。'
       },
       cron: {
@@ -3399,11 +4068,16 @@ export const ja = defineLocale({
       },
       profiles: {
         title: 'プロファイルは独立しています',
-        text: 'それぞれが独自のキー・メモリ・セッションを持つ、別の Qubit です。'
+        text: 'それぞれが独自のキー・メモリ・セッションを持つ、別の Hermes です。'
       },
       'composer-mentions': {
         title: 'ファイルとコマンド',
         text: '@ でファイルを会話に取り込み、/ でコマンドを実行できます。'
+      },
+      'local-runtime-update': {
+        title: 'ローカルエンジンの更新があります',
+        text: 'ローカルモデルを実行するエンジンを更新します。実行中のローカルリクエストが中断される場合があります。',
+        action: '今すぐ更新'
       },
       'local-setup': {
         title: 'このマシンはローカルでモデルを実行できます',

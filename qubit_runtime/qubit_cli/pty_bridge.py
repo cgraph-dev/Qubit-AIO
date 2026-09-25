@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import errno
-import fcntl
+import fcntl  # windows-footgun: ok — POSIX-only module by design (see docstring)
 import os
 import select
 import signal
 import struct
 import sys
-import termios
+import termios  # windows-footgun: ok — POSIX-only module by design (see docstring)
 import time
 from typing import Optional, Sequence
 
@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - dev env without ptyprocess
 __all__ = ["PTY_HOST_DASHBOARD", "PTY_HOST_ENV", "PtyBridge", "PtyUnavailableError"]
 
 # Set on the spawned TUI so Ink knows which emulator is hosting it. Mirrored in
-# ui-tui/packages/qubit-ink/src/ink/termio/host.ts — keep the two in sync.
+# ui-tui/packages/hermes-ink/src/ink/termio/host.ts — keep the two in sync.
 PTY_HOST_ENV = "HERMES_PTY_HOST"
 PTY_HOST_DASHBOARD = "dashboard"
 
@@ -89,7 +89,7 @@ class PtyBridge:
                 raise PtyUnavailableError("Pseudo-terminals are unavailable on this platform. "
                                           "Qubit Agent supports Windows only via WSL.")
             raise PtyUnavailableError("The `ptyprocess` package is missing. "  # only other way _PTY_AVAILABLE is False
-                                      "Install with: pip install ptyprocess (or pip install -e '.[pty]').")
+                                      "Run qubit pm repair, then restart Qubit.")
         # env=None: callers own env policy (process_registry already sanitizes), so inherit via the
         # factory with exact preservation. Backfill TERM when missing/blank — CI often lacks it and
         # probes like `tput cols` then fail before winsize reads; explicit overrides are kept.

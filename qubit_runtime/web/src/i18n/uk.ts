@@ -120,8 +120,8 @@ export const uk: Translations = {
     starting: "Запускається",
     startedInBackground: "Запущено у фоні — перевірте журнали для прогресу",
     stopped: "Зупинено",
-    updateQubit: "Оновити Qubit",
-    updatingQubit: "Оновлення Qubit…",
+    updateHermes: "Оновити Qubit",
+    updatingHermes: "Оновлення Qubit…",
     waitingForOutput: "Очікування виводу…",
   },
 
@@ -165,6 +165,10 @@ export const uk: Translations = {
     failedToDeleteSelected: "Не вдалося видалити вибрані сесії",
     resumeInChat: "Продовжити в чаті",
     newChat: "Новий чат",
+    workspace: "робоча папка",
+    workspaceDefault: "За замовчуванням",
+    workspaceRescan: "Пересканувати репозиторії",
+    workspaceCustom: "Інший шлях…",
     previousPage: "Попередня сторінка",
     nextPage: "Наступна сторінка",
     roles: {
@@ -325,6 +329,8 @@ export const uk: Translations = {
     disableRuntime: "Вимкнути",
     enableAfterInstall: "Увімкнути після встановлення",
     enableRuntime: "Увімкнути",
+    toggleTakesEffectAfterRestart:
+      "Збережено — перезапустіть шлюз, щоб застосувати зміну.",
     forceReinstall: "Примусово перевстановити (спершу видалити наявну теку)",
     headline:
       "Знаходьте, встановлюйте, вмикайте та оновлюйте плагіни Qubit (паритет з `qubit plugins`).",
@@ -344,8 +350,8 @@ export const uk: Translations = {
     providersHint:
       "Записує memory.provider (порожньо = вбудований) та context.engine у config.yaml. Набуває чинності в наступній сесії.",
     refreshDashboard: "Перескан розширень панелі",
-    removeConfirm: "Видалити цей плагін з $QUBIT_HOME/plugins/?",
-    removeHint: "Видаляти можна лише плагіни, встановлені користувачем у $QUBIT_HOME/plugins.",
+    removeConfirm: "Видалити цей плагін з ~/.hermes/plugins/?",
+    removeHint: "Видаляти можна лише плагіни, встановлені користувачем у ~/.hermes/plugins.",
     rescanHeading: "Реєстр SPA-плагінів",
     rescanHint: "Скануйте після додавання файлів на диск, щоб бічна панель підхопила нові маніфести.",
     runtimeHeading: "Час виконання шлюзу (YAML-плагіни)",
@@ -367,7 +373,7 @@ export const uk: Translations = {
     all: "Усі",
     categories: "Категорії",
     filters: "Фільтри",
-    noSkills: "Навичок не знайдено. Навички завантажуються з ~/.qubit/skills/",
+    noSkills: "Навичок не знайдено. Навички завантажуються з ~/.hermes/skills/",
     noSkillsMatch: "Жодна навичка не відповідає вашому пошуку чи фільтру.",
     skillCount: "{count} навичок",
     resultCount: "{count} результатів",
@@ -381,7 +387,7 @@ export const uk: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Фільтри",
     sections: "Розділи",
     exportConfig: "Експортувати конфігурацію як JSON",

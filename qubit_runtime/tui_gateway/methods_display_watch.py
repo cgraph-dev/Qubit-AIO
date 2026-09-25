@@ -36,7 +36,7 @@ def _lease_event_payload(profile_key: str, lease) -> dict:
 
 
 def _watched_lease_homes() -> list[Path]:
-    return [Path(_hermes_home), *_served_profile_homes]
+    return [Path(_qubit_home), *_served_profile_homes]
 
 
 def _mtime(path: Path):
@@ -50,12 +50,12 @@ def _poll_runtime_files() -> None:
     """Broadcast ``display.status`` when a home's screen started/stopped outside this process — a
     file move (start/stop by the CLI or gateway) or the launcher dying without touching its files
     (Xvnc crash: env and launcher.pid stay put, only the pid stops being live)."""
-    from qubit_constants import qubit_home_key, reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import qubit_home_key, reset_qubit_home_override, set_qubit_home_override
     from tools.bot_desktop import runtime as _bd_runtime
     for home in _watched_lease_homes():
         key = qubit_home_key(home)
         sd = home / "bot-desktop"
-        token = set_hermes_home_override(home)
+        token = set_qubit_home_override(home)
         try:
             mark = (_mtime(sd / "env"), _mtime(sd / "launcher.pid"), _bd_runtime._launcher_pid() is not None)
             first = key not in _runtime_marks
@@ -66,7 +66,7 @@ def _poll_runtime_files() -> None:
                 continue
             payload = _display_snapshot()
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         _broadcast_global_event("display.status", payload)
 
 
@@ -81,14 +81,14 @@ def _poll_idle_screens() -> None:
     if time.monotonic() - _last_idle_check < _IDLE_CHECK_S:
         return
     _last_idle_check = time.monotonic()
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
     from tools.bot_desktop import runtime as _bd_runtime
     for home in _watched_lease_homes():
-        token = set_hermes_home_override(home)
+        token = set_qubit_home_override(home)
         try:
             _bd_runtime.stop_if_idle()
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
 
 
 def _poll_lease_files() -> None:

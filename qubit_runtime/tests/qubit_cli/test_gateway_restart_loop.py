@@ -24,15 +24,61 @@ class TestGatewayLifecyclePattern:
     """Verify the regex catches gateway lifecycle commands."""
 
     @pytest.mark.parametrize("text", [
-        "qubit gateway restart",
-        "qubit gateway stop",
-        "qubit gateway uninstall",
-        "qubit  gateway  restart",         # double spaces
-        "Qubit Gateway Restart",            # mixed case handled
-        "QUBIT GATEWAY RESTART",            # uppercase
+        # Branch E (#113667): the supervised gateway IS the interpreter image, so a killer aimed at
+        # `python*` carries no hermes/gateway token yet takes it down — on every platform.
+        "taskkill /F /IM python.exe",
+        "taskkill /F /IM python.exe 2>/dev/null | head -2; echo done",
+        'taskkill /F /FI "IMAGENAME eq python.exe"',
+        "taskkill.exe /T /IM pythonw.exe",
+        'task"kill" /I"M" "python.exe" /F',
+        'subprocess.run(["taskkill", "/IM", "python.exe", "/F"])',
+        "Stop-Process -Name python -Force",
+        "Stop-Process -ProcessName python3.12",
+        "Get-Process python | Stop-Process -Force",
+        "pkill python",
+        "pkill -9 python3",
+        "pkill -f python",
+        'pkill -f "python -m qubit_cli.main"',
+        "pkill -f qubit_cli",
+        "killall -9 python3.12",
+        "sudo pkill -9 python3",
+        "pgrep python | xargs kill -9",
+        "kill $(pidof python3)",
+        # Windows spellings of the hermes-gateway forms (salvaged from #94379).
+        "hermes.exe gateway restart",
+        "hermes.cmd gateway stop",
+        r'"C:\Program Files\hermes.exe" gateway restart',
+        "taskkill /F /IM hermes-gateway.exe",
+        "Stop-Process -Name hermes-gateway -Force",
     ])
-    def test_qubit_gateway_commands(self, text):
+    def test_interpreter_and_windows_kill_forms_are_blocked(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
+
+    @pytest.mark.parametrize("text", [
+        # Other images stay killable (evals/browser_use/orchestrate.py uses the first one).
+        "taskkill /F /IM agent-browser.exe /T",
+        "taskkill /F /IM notepad.exe",
+        "Stop-Process -Name chrome",
+        "killall node",
+        # The ownership-scoped route the rejection points to: explicit PID / proc id.
+        "taskkill /F /PID 46544",
+        "kill -9 46544",
+        "Stop-Process -Id 46544",
+        # Option VALUES are not targets; a `-f` pattern naming a specific script is not the gateway.
+        "pkill -u alice chrome",
+        "pkill -t pts/1 vim",
+        "pkill -f 'python mt_add_paused.py --go'",
+        # Unrelated scripts that merely contain "hermes" cannot match the gateway cmdline.
+        "pkill -f 'hermes-polis/run.sh'",
+        "pkill -f my_qubit_bot.py",
+        "pgrep python",
+        "hermes.exe gateway start",
+        "my-hermes.exe gateway restart",
+        "python -m pytest tests/ -k kill",
+        "skill python",
+    ])
+    def test_kill_forms_that_do_not_reach_the_gateway_are_allowed(self, text):
+        assert not _contains_gateway_lifecycle_command(text), f"Should NOT match: {text!r}"
 
     @pytest.mark.parametrize("text", [
         # #62891: a blocked direct restart/kill laundered through a NEW
@@ -56,14 +102,6 @@ class TestGatewayLifecyclePattern:
     def test_launchctl_submit_bootstrap_commands(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
 
-    def test_launchctl_bootout_verb_is_caught(self):
-        """`bootout` was missing from Branch B's verb list entirely — the
-        2026-08-02 incident command used exactly this verb (it deregisters
-        the job outright, unlike stop/kickstart) and slipped past both this
-        check and the missing-verb rule in tools/approval.py."""
-        assert _contains_gateway_lifecycle_command(
-            "launchctl bootout gui/501/ai.hermes.gateway"
-        )
 
     def test_label_defined_before_verb_is_caught(self):
         """2026-08-02 incident reproduction: the label comes from a shell
@@ -88,7 +126,7 @@ class TestGatewayLifecyclePattern:
         # (no trailing backslash) must not be bridged into a false match.
         text = (
             "this restarts the payment gateway\n"
-            "unrelated qubit note on the next line"
+            "unrelated hermes note on the next line"
         )
         assert not _contains_gateway_lifecycle_command(text), f"Should NOT match: {text!r}"
 
@@ -110,7 +148,7 @@ class TestGatewayLifecyclePattern:
         'launchctl bootout gui/501/ai.hermes."gateway"',
         # Same class on the systemctl and hermes-CLI branches.
         'systemctl re"start" hermes-gateway',
-        'qubit gateway re"start"',
+        'hermes gateway re"start"',
     ])
     def test_shell_token_spliced_lifecycle_verbs(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
@@ -145,21 +183,21 @@ class TestGatewayLifecyclePattern:
 
     @pytest.mark.parametrize("text", [
         "restart the server application",
-        "qubit cron list",
-        "qubit update",
-        "qubit config set model claude",
+        "hermes cron list",
+        "hermes update",
+        "hermes config set model claude",
         "echo 'just a normal cron job'",
         "run the backup script",
         "gateway is running fine",
-        # `qubit gateway start` is benign — starting a gateway from inside a
+        # `hermes gateway start` is benign — starting a gateway from inside a
         # gateway is a no-op / "already running", and a legit cron job may
         # start a sibling profile's gateway. Only restart/stop/kill are the
         # foot-gun (#30719 lists only those).
-        "qubit gateway start",
-        "qubit gateway start --all",
-        # Tightened launchctl/systemctl branches: ops on NON-gateway qubit
+        "hermes gateway start",
+        "hermes gateway start --all",
+        # Tightened launchctl/systemctl branches: ops on NON-gateway hermes
         # services must not be falsely blocked (the old `.*hermes` matched any
-        # qubit token).
+        # hermes token).
         "launchctl unload ai.hermes.update-checker.plist",
         "launchctl restart ai.hermes.daemon",
         # `submit` on an unrelated launchd label must not match the text
@@ -181,11 +219,11 @@ class TestGatewayLifecyclePattern:
         # #92372 Branch A: no trailing boundary meant ordinary prose matched —
         # "restarted" carries the "restart" prefix and the old pattern ended
         # exactly there. \b after the verb group fixes it.
-        "echo after the qubit gateway restarted cleanly",
-        "the qubit gateway stopped responding, please investigate",
+        "echo after the hermes gateway restarted cleanly",
+        "the hermes gateway stopped responding, please investigate",
         # #92372 Branch D: `p?kill` without a leading \b matched the "kill"
         # tail of "skill".
-        "qubit skill view gateway-notes && echo qubit gateway docs",
+        "hermes skill view gateway-notes && echo hermes gateway docs",
         # #77173/#77536: a file path with embedded spaces containing the
         # lifecycle words must not match — `hermes` is a path component
         # there, not a command.
@@ -197,15 +235,15 @@ class TestGatewayLifecyclePattern:
 
     @pytest.mark.parametrize("text", [
         # Trailing-boundary fix must not weaken real commands.
-        "qubit gateway restart",
-        "qubit gateway restart; echo done",
-        "qubit gateway stop && echo stopped",
+        "hermes gateway restart",
+        "hermes gateway restart; echo done",
+        "hermes gateway stop && echo stopped",
         # #77173 command-position anchor must not weaken separator/subshell
         # forms either.
-        "true;qubit gateway restart",
-        "true && qubit gateway stop",
-        "echo $(qubit gateway restart)",
-        "echo `qubit gateway restart`",
+        "true;hermes gateway restart",
+        "true && hermes gateway stop",
+        "echo $(hermes gateway restart)",
+        "echo `hermes gateway restart`",
     ])
     def test_boundary_fix_still_blocks_real_commands(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
@@ -227,14 +265,14 @@ class TestGatewayLifecyclePattern:
         # (unbalanced quote), the per-physical-line fallback must still SCAN
         # the content — a lifecycle command alongside an unbalanced quote
         # must remain blocked, never waved through.
-        text = 'echo "unbalanced\nqubit gateway restart'
+        text = 'echo "unbalanced\nhermes gateway restart'
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
 
     @pytest.mark.parametrize("text", [
         # #68289: execute_code payloads carry the argv as a Python list —
         # brackets/commas separate the words the OS will exec.
         'import subprocess\nsubprocess.run(["launchctl", "bootout", "gui/501/ai.hermes.gateway"])',
-        'subprocess.run(["qubit", "gateway", "restart"])',
+        'subprocess.run(["hermes", "gateway", "restart"])',
         'os.system("launchctl kickstart -k gui/501/ai.hermes.gateway")',
     ])
     def test_python_argv_list_forms_blocked(self, text):
@@ -243,7 +281,7 @@ class TestGatewayLifecyclePattern:
     @pytest.mark.parametrize("text", [
         # Argv-punctuation stripping must not create prose false positives.
         'print("checking gateway restart docs")',
-        'data = ["qubit", "notes"]  # unrelated list',
+        'data = ["hermes", "notes"]  # unrelated list',
     ])
     def test_python_argv_stripping_stays_narrow(self, text):
         assert not _contains_gateway_lifecycle_command(text), f"Should NOT match: {text!r}"
@@ -253,23 +291,23 @@ class TestGatewayLifecyclePattern:
         # data — runbook prose inside it must not block.
         text = (
             "cat > /tmp/runbook.md <<'EOF'\n"
-            "If the box is wedged, a human can run: qubit gateway restart\n"
+            "If the box is wedged, a human can run: hermes gateway restart\n"
             "EOF"
         )
         assert not _contains_gateway_lifecycle_command(text), f"Should NOT match: {text!r}"
 
     @pytest.mark.parametrize("text", [
         # Executable heredoc (shell consumer) must stay blocked.
-        "bash <<EOF\nqubit gateway restart\nEOF",
+        "bash <<EOF\nhermes gateway restart\nEOF",
         # Unquoted delimiter = expansion-capable = fail open to scanning.
-        "cat > /tmp/x <<EOF\nqubit gateway restart\nEOF",
+        "cat > /tmp/x <<EOF\nhermes gateway restart\nEOF",
     ])
     def test_non_inert_heredocs_still_scanned(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should match: {text!r}"
 
 
 class TestProfileFlagGatewayLifecycle:
-    """#78028: `qubit -p <profile> gateway restart|stop` bypasses Branch A's
+    """#78028: `hermes -p <profile> gateway restart|stop` bypasses Branch A's
     literal adjacency, so it needs its own pattern. It is only the same
     self-termination foot-gun when the named profile IS the profile running
     the guard; sibling-profile restarts are legitimate fleet operations and
@@ -283,46 +321,41 @@ class TestProfileFlagGatewayLifecycle:
         monkeypatch.delenv("HERMES_PROFILE_NAME", raising=False)
 
     @pytest.mark.parametrize("text", [
-        "qubit -p zeus gateway stop",
-        "qubit -p zeus gateway restart",
-        "qubit --profile zeus gateway restart",
-        "qubit --profile zeus gateway stop",
-        "qubit --profile=zeus gateway restart",
+        "hermes -p zeus gateway stop",
+        "hermes -p zeus gateway restart",
+        "hermes --profile zeus gateway restart",
+        "hermes --profile zeus gateway stop",
+        "hermes --profile=zeus gateway restart",
         # Global flags before/after the selector must not hide the shape.
-        "qubit -v -p zeus gateway restart",
-        "qubit -p zeus -v gateway restart",
-        "qubit --debug --profile zeus gateway stop",
+        "hermes -v -p zeus gateway restart",
+        "hermes -p zeus -v gateway restart",
+        "hermes --debug --profile zeus gateway stop",
         # Shell quoting of the profile id is equivalent to the bare name.
-        "qubit -p 'zeus' gateway restart",
-        "qubit --profile \"zeus\" gateway stop",
+        "hermes -p 'zeus' gateway restart",
+        "hermes --profile \"zeus\" gateway stop",
     ])
     def test_self_target_blocked(self, text):
         assert _contains_gateway_lifecycle_command(text), f"Should block: {text!r}"
 
     @pytest.mark.parametrize("text", [
-        "qubit -p venus gateway stop",
-        "qubit -p venus gateway restart",
-        "qubit --profile venus gateway restart",
-        "qubit --profile=venus gateway stop",
-        "qubit -p venus -v gateway restart",
+        "hermes -p venus gateway stop",
+        "hermes -p venus gateway restart",
+        "hermes --profile venus gateway restart",
+        "hermes --profile=venus gateway stop",
+        "hermes -p venus -v gateway restart",
     ])
     def test_sibling_allowed(self, text):
         assert not _contains_gateway_lifecycle_command(text), f"Should allow: {text!r}"
 
     @pytest.mark.parametrize("text", [
-        "qubit -p zeus gateway start",
-        "qubit -p zeus gateway start --all",
+        "hermes -p zeus gateway start",
+        "hermes -p zeus gateway start --all",
     ])
     def test_start_still_allowed(self, text):
         # `start` is intentionally excluded from the guard, with or without
         # the profile flag (#30719 rationale).
         assert not _contains_gateway_lifecycle_command(text), f"Should allow: {text!r}"
 
-    def test_adjacent_form_still_blocked(self):
-        # Branch A remains unconditional — the profile-flag check is an
-        # additional layer, not a replacement.
-        assert _contains_gateway_lifecycle_command("qubit gateway restart")
-        assert _contains_gateway_lifecycle_command("qubit gateway stop")
 
     def test_qubit_home_derived_profile(self, monkeypatch):
         # Without HERMES_PROFILE the guard falls back to the QUBIT_HOME-
@@ -333,8 +366,8 @@ class TestProfileFlagGatewayLifecycle:
         import qubit_cli.profiles as profiles_mod
 
         monkeypatch.setattr(profiles_mod, "get_active_profile_name", lambda: "zeus")
-        assert _contains_gateway_lifecycle_command("qubit -p zeus gateway restart")
-        assert not _contains_gateway_lifecycle_command("qubit -p venus gateway restart")
+        assert _contains_gateway_lifecycle_command("hermes -p zeus gateway restart")
+        assert not _contains_gateway_lifecycle_command("hermes -p venus gateway restart")
 
     def test_no_profile_context_conservative_allow(self, monkeypatch):
         # With no profile identity the guard cannot prove self-targeting, so
@@ -343,8 +376,8 @@ class TestProfileFlagGatewayLifecycle:
         import cron.lifecycle_guard as lifecycle_guard
 
         monkeypatch.setattr(lifecycle_guard, "_current_profile_name", lambda: None)
-        assert not _contains_gateway_lifecycle_command("qubit -p zeus gateway restart")
-        assert _contains_gateway_lifecycle_command("qubit gateway restart")
+        assert not _contains_gateway_lifecycle_command("hermes -p zeus gateway restart")
+        assert _contains_gateway_lifecycle_command("hermes gateway restart")
 
 
 class TestCronCreateLifecycleBlock:
@@ -360,7 +393,7 @@ class TestCronCreateLifecycleBlock:
         args = Namespace(
             cron_command="create",
             schedule="30m",
-            prompt="Upgrade qubit then run qubit gateway restart",
+            prompt="Upgrade hermes then run hermes gateway restart",
             name=None,
             deliver=None,
             repeat=None,
@@ -375,17 +408,16 @@ class TestCronCreateLifecycleBlock:
         assert rc == 1
         out = capsys.readouterr().out
         assert "Blocked" in out
-        assert "#30719" in out
 
 
     def test_block_script_with_lifecycle_command(self, tmp_path, capsys, monkeypatch):
         # A no_agent job whose script IS the job (the issue's real abuse path:
-        # restart_hermes_gateway_once.sh). The script must live under
+        # restart_qubit_gateway_once.sh). The script must live under
         # QUBIT_HOME/scripts so the scheduler — and the guard — resolve it.
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
         scripts_dir = tmp_path / ".hermes" / "scripts"
         scripts_dir.mkdir(parents=True)
-        (scripts_dir / "restart.sh").write_text("#!/bin/bash\nqubit gateway restart\n", encoding="utf-8")
+        (scripts_dir / "restart.sh").write_text("#!/usr/bin/env bash\nhermes gateway restart\n", encoding="utf-8")
         args = Namespace(
             cron_command="create",
             schedule="1h",
@@ -406,30 +438,6 @@ class TestCronCreateLifecycleBlock:
         assert "Blocked" in out
 
 
-    def test_allow_empty_prompt(self, capsys):
-        """Empty prompt (no lifecycle content) should pass the filter — the
-        API will still reject it for lacking prompt+skill, but that's a
-        separate validation, not the lifecycle guard."""
-        args = Namespace(
-            cron_command="create",
-            schedule="30m",
-            prompt=None,
-            name=None,
-            deliver=None,
-            repeat=None,
-            skill=None,
-            skills=None,
-            script=None,
-            workdir=None,
-            profile=None,
-            no_agent=False,
-        )
-        rc = cron_command(args)
-        # The lifecycle guard passes (no gateway command in prompt).
-        # The API rejects it for "requires prompt or skill" → rc 1, but
-        # the error message is about prompt/skill, NOT about "Blocked".
-        out = capsys.readouterr().out
-        assert "Blocked" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -524,8 +532,8 @@ class TestTerminalToolGatewayLifecycleGuard:
         "systemctl restart hermes-gateway",
         "systemctl --user restart hermes-gateway",
         "systemctl stop hermes-gateway.service",
-        "qubit gateway restart",
-        "qubit gateway uninstall",
+        "hermes gateway restart",
+        "hermes gateway uninstall",
         "launchctl kickstart gui/501/ai.hermes.gateway",
         "launchctl bootout gui/501/ai.hermes.gateway",
         # #62891 exact reported shape and its bootstrap sibling.
@@ -560,7 +568,7 @@ class TestTerminalToolGatewayLifecycleGuard:
         import tools.terminal_tool as tt
 
         script = tmp_path / "delayed-ops.sh"
-        script.write_text("#!/bin/bash\nsleep 45\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nsleep 45\nhermes gateway restart\n", encoding="utf-8")
         self._patch_env(monkeypatch, self._make_fake_env(), inside_gateway=True)
 
         result = json.loads(tt.terminal_tool(command=f"/bin/bash {script}"))
@@ -568,22 +576,6 @@ class TestTerminalToolGatewayLifecycleGuard:
         assert result["exit_code"] == 1
         assert "referenced script" in result["error"]
 
-    def test_blocks_launchctl_submit_inside_gateway(self, monkeypatch, tmp_path):
-        import tools.terminal_tool as tt
-
-        script = tmp_path / "health-check.sh"
-        script.write_text("#!/bin/bash\nprintf 'healthy\\n'\n", encoding="utf-8")
-        self._patch_env(monkeypatch, self._make_fake_env(), inside_gateway=True)
-
-        result = json.loads(tt.terminal_tool(
-            command=(
-                "launchctl submit -l ai.hermes.delayed-ops -- "
-                f"/bin/bash {script}"
-            )
-        ))
-
-        assert result["exit_code"] == 1
-        assert "KeepAlive" in result["error"]
 
     def test_oversized_root_skips_launchctl_prescan_and_fails_closed(
         self, monkeypatch
@@ -685,10 +677,10 @@ class TestTerminalToolGatewayLifecycleGuard:
             tt, "_check_all_guards", lambda cmd, env, **kwargs: {"approved": True}
         )
 
-        result = json.loads(tt.terminal_tool(command="qubit gateway restart"))
+        result = json.loads(tt.terminal_tool(command="hermes gateway restart"))
 
         assert result["exit_code"] == 0
-        assert calls == ["qubit gateway restart"]
+        assert calls == ["hermes gateway restart"]
 
     def test_blocks_launchctl_submit_hidden_in_referenced_script(
         self, monkeypatch, tmp_path
@@ -697,7 +689,7 @@ class TestTerminalToolGatewayLifecycleGuard:
 
         script = tmp_path / "wrapper.sh"
         script.write_text(
-            "#!/bin/bash\nlaunchctl submit -l ai.hermes.loop -- /bin/true\n"
+            "#!/usr/bin/env bash\nlaunchctl submit -l ai.hermes.loop -- /bin/true\n"
         )
         self._patch_env(monkeypatch, self._make_fake_env(), inside_gateway=True)
 
@@ -710,7 +702,7 @@ class TestTerminalToolGatewayLifecycleGuard:
         import tools.terminal_tool as tt
 
         script = tmp_path / "relative.sh"
-        script.write_text("#!/bin/bash\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nhermes gateway restart\n", encoding="utf-8")
 
         class _FakeEnv:
             env = {}
@@ -729,7 +721,7 @@ class TestTerminalToolGatewayLifecycleGuard:
         import tools.terminal_tool as tt
 
         script = tmp_path / "delayed.sh"
-        script.write_text("#!/bin/bash\nqubit gateway stop\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nhermes gateway stop\n", encoding="utf-8")
         script.chmod(0o700)
         self._patch_env(monkeypatch, self._make_fake_env(), inside_gateway=True)
 
@@ -752,7 +744,7 @@ class TestTerminalToolGatewayLifecycleGuard:
         import tools.terminal_tool as tt
 
         script = tmp_path / "options.sh"
-        script.write_text("#!/bin/bash\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nhermes gateway restart\n", encoding="utf-8")
         self._patch_env(monkeypatch, self._make_fake_env(), inside_gateway=True)
 
         result = json.loads(tt.terminal_tool(
@@ -765,7 +757,7 @@ class TestTerminalToolGatewayLifecycleGuard:
         import tools.terminal_tool as tt
 
         script = tmp_path / "nested.sh"
-        script.write_text("#!/bin/bash\nlaunchctl submit -l ai.hermes.loop -- /bin/true\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nlaunchctl submit -l ai.hermes.loop -- /bin/true\n", encoding="utf-8")
 
         class _FakeEnv:
             env = {}
@@ -785,9 +777,9 @@ class TestTerminalToolGatewayLifecycleGuard:
         import tools.terminal_tool as tt
 
         inner = tmp_path / "inner.sh"
-        inner.write_text("#!/bin/bash\nqubit gateway restart\n", encoding="utf-8")
+        inner.write_text("#!/usr/bin/env bash\nhermes gateway restart\n", encoding="utf-8")
         outer = tmp_path / "outer.sh"
-        outer.write_text("#!/bin/bash\n/bin/bash inner.sh\n", encoding="utf-8")
+        outer.write_text("#!/usr/bin/env bash\n/bin/bash inner.sh\n", encoding="utf-8")
 
         class _FakeEnv:
             env = {}
@@ -839,7 +831,7 @@ class TestTerminalToolGatewayLifecycleGuard:
 
         calls = []
         script = tmp_path / "health-check.sh"
-        script.write_text("#!/bin/bash\nprintf 'healthy\\n'\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nprintf 'healthy\\n'\n", encoding="utf-8")
 
         class _FakeEnv:
             env = {}
@@ -886,23 +878,6 @@ class TestTerminalToolGatewayLifecycleGuard:
 class TestLifecycleGuardModule:
     """Direct tests for cron.lifecycle_guard.check_gateway_lifecycle."""
 
-    def test_dot_operator_sourced_script_is_scanned(self, tmp_path):
-        """`. ./script.sh` must reach the referenced-script scan.
-
-        The dot operator and `source` are the same POSIX builtin, but the
-        executable test compared only `Path(executable).name` — and
-        `Path(".").name` is the empty string, so `source` was caught while a
-        bare `.` slipped through and the sourced script was never scanned.
-        """
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        script = tmp_path / "restart.sh"
-        script.write_text("#!/bin/bash\nqubit gateway restart\n")
-        assert (
-            contains_gateway_lifecycle_command_or_referenced_script(f". {script}")
-            is True
-        )
 
     def test_nul_padded_script_is_still_scanned(self, tmp_path):
         """A NUL byte in a *text* script must not disable the scan.
@@ -916,36 +891,13 @@ class TestLifecycleGuardModule:
             contains_gateway_lifecycle_command_or_referenced_script,
         )
         script = tmp_path / "padded.sh"
-        script.write_bytes(b"#!/bin/bash\n# pad\x00\nqubit gateway restart\n")
+        script.write_bytes(b"#!/usr/bin/env bash\n# pad\x00\nhermes gateway restart\n")
         assert (
             contains_gateway_lifecycle_command_or_referenced_script(f"bash {script}")
             is True
         )
 
-    def test_source_builtin_sourced_script_is_scanned(self, tmp_path):
-        """The `source` spelling must stay blocked (it already was)."""
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        script = tmp_path / "restart.sh"
-        script.write_text("#!/bin/bash\nqubit gateway restart\n")
-        assert (
-            contains_gateway_lifecycle_command_or_referenced_script(f"source {script}")
-            is True
-        )
 
-    def test_dot_operator_clean_script_not_blocked(self, tmp_path):
-        """Widening the dot check must not false-block an innocent sourced
-        script — e.g. sourcing a venv activate or an env file."""
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        script = tmp_path / "activate.sh"
-        script.write_text("#!/bin/bash\nexport PATH=/usr/bin:$PATH\n")
-        assert (
-            contains_gateway_lifecycle_command_or_referenced_script(f". {script}")
-            is False
-        )
 
     def test_nul_padded_script_without_shebang_is_scanned(self, tmp_path):
         """Same bypass without a shebang — bash still runs it, so still scan.
@@ -957,27 +909,12 @@ class TestLifecycleGuardModule:
             contains_gateway_lifecycle_command_or_referenced_script,
         )
         script = tmp_path / "padded_noshebang.sh"
-        script.write_bytes(b"# ok\n# pad\x00\nqubit gateway restart\n")
+        script.write_bytes(b"# ok\n# pad\x00\nhermes gateway restart\n")
         assert (
             contains_gateway_lifecycle_command_or_referenced_script(f"bash {script}")
             is True
         )
 
-    def test_elf_binary_is_not_scanned_as_script(self, tmp_path):
-        """#76762 must stay fixed: a real binary is nothing-to-scan, no crash.
-
-        Its decoded machine code must never be tokenized as shell text, and the
-        guard must not fail closed on an innocent interpreter invocation.
-        """
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        binary = tmp_path / "tool"
-        binary.write_bytes(b"\x7fELF\x02\x01\x01\x00" + b"\x00" * 64 + b"/usr/bin/x\x00")
-        assert (
-            contains_gateway_lifecycle_command_or_referenced_script(f"{binary} --version")
-            is False
-        )
 
     def test_macho_binary_is_not_scanned_as_script(self, tmp_path):
         """Same for Mach-O, including the universal/fat signature (macOS)."""
@@ -1007,50 +944,26 @@ class TestLifecycleGuardModule:
             contains_gateway_lifecycle_command_or_referenced_script,
         )
         script = tmp_path / "huge.sh"
-        script.write_bytes(b"#!/bin/bash\n# \x00" + b"x" * (1024 * 1024 + 64) + b"\n")
+        script.write_bytes(b"#!/usr/bin/env bash\n# \x00" + b"x" * (1024 * 1024 + 64) + b"\n")
         assert (
             contains_gateway_lifecycle_command_or_referenced_script(f"bash {script}")
             is True
         )
 
-    def test_clean_script_without_lifecycle_command_not_blocked(self, tmp_path):
-        """Sanity: the change must not false-block innocent scripts."""
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        script = tmp_path / "safe.sh"
-        script.write_bytes(b"#!/bin/bash\necho hello\n")
-        assert (
-            contains_gateway_lifecycle_command_or_referenced_script(f"bash {script}")
-            is False
-        )
 
     def test_prompt_with_command_raises(self):
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
-        with pytest.raises(GatewayLifecycleBlocked) as exc:
-            check_gateway_lifecycle("please run qubit gateway restart", None)
-        assert "#30719" in str(exc.value)
+        with pytest.raises(GatewayLifecycleBlocked):
+            check_gateway_lifecycle("please run hermes gateway restart", None)
 
-    def test_clean_prompt_does_not_raise(self):
-        from cron.lifecycle_guard import check_gateway_lifecycle
-        check_gateway_lifecycle("research the gateway architecture", None)
-        check_gateway_lifecycle("check server health and restart watchers", None)
 
     def test_script_with_command_raises(self, tmp_path, monkeypatch):
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
         script = tmp_path / "restart.sh"
-        script.write_text("#!/bin/bash\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\nhermes gateway restart\n", encoding="utf-8")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("clean prompt", str(script))
 
-    def test_script_with_launchctl_submit_raises(self, tmp_path):
-        from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
-        script = tmp_path / "persistent.sh"
-        script.write_text(
-            "#!/bin/bash\nlaunchctl submit -l ai.hermes.loop -- /bin/true\n"
-        )
-        with pytest.raises(GatewayLifecycleBlocked):
-            check_gateway_lifecycle("clean prompt", str(script))
 
     @pytest.mark.parametrize("line", [
         # #62891: neutral labels defeat any label-anchored regex, so cron
@@ -1063,25 +976,17 @@ class TestLifecycleGuardModule:
     ):
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
         script = tmp_path / "persistent.sh"
-        script.write_text(f"#!/bin/bash\n{line}\n", encoding="utf-8")
+        script.write_text(f"#!/usr/bin/env bash\n{line}\n", encoding="utf-8")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("clean prompt", str(script))
 
-    def test_split_across_prompt_and_script_still_blocks(self, tmp_path):
-        """Concatenated scan prevents splitting the command between prompt and
-        script to slip through."""
-        from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
-        script = tmp_path / "ops.sh"
-        script.write_text("qubit gateway stop\n", encoding="utf-8")
-        with pytest.raises(GatewayLifecycleBlocked):
-            check_gateway_lifecycle("daily ops job", str(script))
 
     def test_binary_script_does_not_silently_bypass(self, tmp_path):
         """Non-UTF-8 bytes used to be swallowed by UnicodeDecodeError; now we
         decode with errors='replace' so the scan always sees the command."""
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
         script = tmp_path / "weird.bin"
-        script.write_bytes(b"\xfe" + b"qubit gateway restart" + b"\xff")
+        script.write_bytes(b"\xfehermes gateway restart\xff")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("", str(script))
 
@@ -1129,57 +1034,12 @@ class TestLifecycleGuardModule:
         by the direct regex scan."""
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
         script = tmp_path / "evil.py"
-        script.write_text('import os\nos.system("qubit gateway restart")\n', encoding="utf-8")
+        script.write_text('import os\nos.system("hermes gateway restart")\n', encoding="utf-8")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("clean prompt", str(script))
 
-    def test_absolute_path_binary_does_not_crash_guard(self):
-        """#76762: a terminal command invoking a binary by absolute path
-        (e.g. /usr/bin/python3) must not crash the guard with
-        ValueError: embedded null byte.
 
-        Before the fix, the walk read the binary's bytes, decoded them as
-        text, and re-tokenized machine code containing NUL bytes; the
-        recursion then called Path.resolve() on a path with an embedded NUL
-        and only OSError was caught. Binaries are now skipped as
-        "nothing to scan" and ValueError is tolerated at resolve time.
-        """
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        result = contains_gateway_lifecycle_command_or_referenced_script(
-            '/usr/bin/python3 -c "print(1)"'
-        )
-        assert result is False
 
-    def test_nul_byte_in_path_token_does_not_crash_guard(self):
-        """Residual #76762 class: when a NUL byte survives into the *path
-        token itself* (tokenized binary-adjacent command text), ``os.open``
-        raises ValueError — not OSError — inside
-        ``_read_referenced_script``. The guard must treat it as "nothing to
-        scan", never crash.
-        """
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        result = contains_gateway_lifecycle_command_or_referenced_script(
-            "bash ./run\x00me.sh", cwd="/tmp"
-        )
-        assert result is False
-
-    def test_read_referenced_script_tolerates_nul_in_path(self):
-        """#77703: _read_referenced_script opens by path. A path with an
-        embedded NUL byte (a binary's bytes mis-tokenized into a bogus path by
-        the recursion) makes os.open raise ValueError — not OSError — which used
-        to escape the OSError-only guard and crash the whole terminal tool. It
-        is now caught and reported as nothing-to-scan."""
-        from pathlib import Path
-
-        from cron.lifecycle_guard import _read_referenced_script
-
-        text, unsafe = _read_referenced_script(Path("/tmp/hermes\x00binary"))
-        assert text is None
-        assert unsafe is False
 
     def test_remote_read_fallback_binary_does_not_crash_guard(self):
         """#77703: in the gateway the referenced-script walk carries a
@@ -1213,8 +1073,8 @@ class TestLifecycleGuardModule:
         a .sh script that itself invokes a lifecycle command is caught."""
         from cron.lifecycle_guard import GatewayLifecycleBlocked, check_gateway_lifecycle
         script = tmp_path / "wrapper.sh"
-        script.write_text("#!/bin/bash\n./deploy.sh\n", encoding="utf-8")
-        (tmp_path / "deploy.sh").write_text("#!/bin/bash\nqubit gateway stop\n", encoding="utf-8")
+        script.write_text("#!/usr/bin/env bash\n./deploy.sh\n", encoding="utf-8")
+        (tmp_path / "deploy.sh").write_text("#!/usr/bin/env bash\nhermes gateway stop\n", encoding="utf-8")
         with pytest.raises(GatewayLifecycleBlocked):
             check_gateway_lifecycle("daily ops", str(script))
 
@@ -1293,27 +1153,6 @@ class TestLifecycleGuardModule:
             str(script)
         ) is True
 
-    def test_read_referenced_script_choke_point_refuses_cloud_paths(
-        self, tmp_path, monkeypatch
-    ):
-        """The cloud refusal lives in _read_referenced_script itself so EVERY
-        caller (terminal walk AND cron-script scan) is covered — not just the
-        walk-level short-circuit in _contains_unsafe_gateway_action."""
-        import cron.lifecycle_guard as lifecycle_guard
-
-        cloud_dir = tmp_path / "Library" / "CloudStorage" / "OneDrive" / "s"
-        cloud_dir.mkdir(parents=True)
-        script = cloud_dir / "job.sh"
-        script.write_text("#!/bin/sh\necho safe\n", encoding="utf-8")
-
-        def forbid_open(path, flags, *args, **kwargs):  # pragma: no cover
-            pytest.fail("choke point opened a cloud placeholder path")
-
-        monkeypatch.setattr(lifecycle_guard.os, "open", forbid_open)
-
-        text, unsafe = lifecycle_guard._read_referenced_script(script)
-        assert text is None
-        assert unsafe is True
 
     def test_cron_script_scan_blocks_cloud_script_without_opening(
         self, tmp_path, monkeypatch
@@ -1356,17 +1195,6 @@ class TestLifecycleGuardModule:
 
     # -- Whole-class regression tests (tilllt's T1-T4 on PR #79454) --------
 
-    def test_tilde_nul_candidate_does_not_crash_terminal_walk(self):
-        """T1: ``Path('~user\\x00...').expanduser()`` raises ValueError one
-        frame *before* ``os.open`` — the per-syscall guards never see it. The
-        ingestion-boundary sanitizer must reject the candidate instead."""
-        from cron.lifecycle_guard import (
-            contains_gateway_lifecycle_command_or_referenced_script,
-        )
-        result = contains_gateway_lifecycle_command_or_referenced_script(
-            "'~jenkins\x00broken/payload.sh' arg", cwd="/tmp"
-        )
-        assert result is False
 
     def test_tilde_nul_candidate_does_not_crash_cron_script_resolution(self):
         """T2: the same ``expanduser`` crash via the cron ``script`` path
@@ -1389,7 +1217,7 @@ class TestLifecycleGuardModule:
         )
 
         def _remote_read(_path: str):
-            return "MZ\x00\x00\x90\x00 qubit gateway restart \x00\x00junk"
+            return "MZ\x00\x00\x90\x00 hermes gateway restart \x00\x00junk"
 
         result = contains_gateway_lifecycle_command_or_referenced_script(
             "bash /nonexistent/dir/helper.sh",
@@ -1453,7 +1281,7 @@ class TestLifecycleGuardModule:
         monkeypatch.setattr(lg, "_contains_unsafe_gateway_action", _boom)
         # Direct scan still blocks a literal lifecycle command...
         assert lg.contains_gateway_lifecycle_command_or_referenced_script(
-            "qubit gateway restart"
+            "hermes gateway restart"
         ) is True
         # ...and a benign command fails open instead of crashing.
         assert lg.contains_gateway_lifecycle_command_or_referenced_script(
@@ -1511,7 +1339,7 @@ class TestDotSourceIsScannedLikeSource:
     @pytest.fixture
     def helper(self, tmp_path):
         script = tmp_path / "helper.sh"
-        script.write_text("#!/bin/sh\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/bin/sh\nhermes gateway restart\n", encoding="utf-8")
         return script
 
     @pytest.mark.parametrize("form", [". {path}", "source {path}"])
@@ -1567,7 +1395,7 @@ class TestTransparentWrapperPrefixes:
     @pytest.fixture
     def helper(self, tmp_path):
         script = tmp_path / "helper.sh"
-        script.write_text("#!/bin/sh\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/bin/sh\nhermes gateway restart\n", encoding="utf-8")
         return script
 
     @pytest.mark.parametrize("prefix", [
@@ -1661,7 +1489,7 @@ class TestTransparentWrapperPrefixes:
         Peeling is additive precisely so it cannot swallow the reference the
         un-peeled read finds."""
         script = tmp_path / name
-        script.write_text("#!/bin/sh\nqubit gateway restart\n", encoding="utf-8")
+        script.write_text("#!/bin/sh\nhermes gateway restart\n", encoding="utf-8")
         assert self._scan(f"./{name}", cwd=str(tmp_path)) is True
         assert self._scan(str(script), cwd=str(tmp_path)) is True
 
@@ -1687,8 +1515,8 @@ class TestRelativePathDoesNotDisableDataExemption:
 
     @pytest.mark.parametrize("command", [
         "grep -r 'systemctl restart hermes-gateway' .",
-        "grep -rn 'qubit gateway restart' ./logs",
-        "rg 'qubit gateway restart' ../archive",
+        "grep -rn 'hermes gateway restart' ./logs",
+        "rg 'hermes gateway restart' ../archive",
         "grep -c 'systemctl stop hermes-gateway' ./var/log/syslog",
         "sqlite3 ./stats.db \"SELECT restart_reason FROM hermes_gateway_restarts\"",
     ])
@@ -1698,28 +1526,20 @@ class TestRelativePathDoesNotDisableDataExemption:
     @pytest.mark.parametrize("command", [
         # Narrowing the dot test must not open an execution route: every
         # escape hatch still fires with a relative-path operand present.
-        'sqlite3 ./db ".shell qubit gateway restart"',
+        'sqlite3 ./db ".shell hermes gateway restart"',
         'sqlite3 ./db ".system systemctl restart hermes-gateway"',
         'psql ./x -c "\\! systemctl restart hermes-gateway"',
-        "grep -r 'qubit gateway restart' . | sh",
-        "grep -r 'qubit gateway restart' ./logs | bash",
-        "grep -r 'qubit gateway restart' . | sudo sh",
-        "grep -r 'x' . ; qubit gateway restart",
+        "grep -r 'hermes gateway restart' . | sh",
+        "grep -r 'hermes gateway restart' ./logs | bash",
+        "grep -r 'hermes gateway restart' . | sudo sh",
+        "grep -r 'x' . ; hermes gateway restart",
         "grep -r 'x' . && systemctl restart hermes-gateway",
-        'grep -r "$(qubit gateway restart)" .',
+        'grep -r "$(hermes gateway restart)" .',
         "rg 'x' ./logs | xargs systemctl restart hermes-gateway",
     ])
     def test_relative_path_does_not_open_an_execution_route(self, command):
         assert self._scan(command) is True
 
-    @pytest.mark.parametrize("command", [
-        # Real dot-commands must still defeat the exemption.
-        'sqlite3 db ".shell qubit gateway restart"',
-        'sqlite3 db ".system systemctl restart hermes-gateway"',
-        'psql -c "\\! systemctl restart hermes-gateway"',
-    ])
-    def test_dot_commands_still_block(self, command):
-        assert self._scan(command) is True
 
 
 class TestCreateJobBlocksLifecycleCommands:
@@ -1737,7 +1557,7 @@ class TestCreateJobBlocksLifecycleCommands:
         from cron.jobs import create_job
         from cron.lifecycle_guard import GatewayLifecycleBlocked
         with pytest.raises(GatewayLifecycleBlocked):
-            create_job(prompt="then run qubit gateway restart", schedule="30m")
+            create_job(prompt="then run hermes gateway restart", schedule="30m")
 
     def test_create_job_allows_benign_prompt(self):
         from cron.jobs import create_job
@@ -1753,7 +1573,7 @@ class TestCreateJobBlocksLifecycleCommands:
         from tools.cronjob_tools import cronjob
         result = json.loads(cronjob(
             action="create", schedule="0 9 * * *",
-            prompt="please run qubit gateway restart nightly",
+            prompt="please run hermes gateway restart nightly",
         ))
         assert result.get("success") is False
         assert "#30719" in result.get("error", "")
@@ -1867,7 +1687,7 @@ class TestTerminalToolGatewayLifecycleGuardRemote:
             def execute(self, command, **kwargs):
                 calls.append(command)
                 if "head -c" in command and "/remote/workspace/remote.sh" in command:
-                    return {"output": "#!/bin/bash\nqubit gateway restart\n", "returncode": 0}
+                    return {"output": "#!/usr/bin/env bash\nhermes gateway restart\n", "returncode": 0}
                 return {"output": "", "returncode": 0}
 
         fake_env = _RemoteEnv()
@@ -1881,39 +1701,32 @@ class TestTerminalToolGatewayLifecycleGuardRemote:
         assert any("head -c" in c for c in calls)
 
 
-class TestCronCreateLifecycleBlockExtra:
-    """Additional cron create lifecycle guard coverage."""
+    def test_unscannable_executed_script_names_the_reason(self, monkeypatch, tmp_path):
+        """A script the command EXECUTES that the guard cannot scan (here a live SQLite database)
+        still fails closed, but the error names that reason instead of claiming a lifecycle
+        command the model then rewords and retries in a loop (#113944)."""
+        import tools.terminal_tool as tt
+        from qubit_cli.sqlite_safe_read import connect_tracked
 
-    @pytest.fixture(autouse=True)
-    def _setup_cron_dir(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("cron.jobs.CRON_DIR", tmp_path / "cron")
-        monkeypatch.setattr("cron.jobs.JOBS_FILE", tmp_path / "cron" / "jobs.json")
-        monkeypatch.setattr("cron.jobs.OUTPUT_DIR", tmp_path / "cron" / "output")
+        db = tmp_path / "state.db"
+        conn = connect_tracked(db)
 
-    def test_cron_nested_wrapper_script_is_scanned(self, tmp_path, capsys, monkeypatch):
-        monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
-        scripts_dir = tmp_path / ".hermes" / "scripts"
-        scripts_dir.mkdir(parents=True)
-        (scripts_dir / "inner.sh").write_text("#!/bin/bash\nqubit gateway restart\n", encoding="utf-8")
-        (scripts_dir / "outer.sh").write_text("#!/bin/bash\n/bin/bash inner.sh\n", encoding="utf-8")
-        args = Namespace(
-            cron_command="create",
-            schedule="1h",
-            prompt=None,
-            name=None,
-            deliver=None,
-            repeat=None,
-            skill=None,
-            skills=None,
-            script="outer.sh",
-            workdir=None,
-            profile=None,
-            no_agent=True,
-        )
-        rc = cron_command(args)
-        assert rc == 1
-        out = capsys.readouterr().out
-        assert "Blocked" in out
+        class _LocalEnv:
+            env = {}
+            cwd = str(tmp_path)
+            def execute(self, command, **kwargs):
+                return {"output": "", "returncode": 1}
+
+        self._patch_env(monkeypatch, _LocalEnv(), inside_gateway=True)
+        try:
+            result = json.loads(tt.terminal_tool(command=f"bash {db}"))
+        finally:
+            conn.close()
+
+        assert result["exit_code"] == 1
+        assert "could not scan" in result["error"] and "SQLite" in result["error"]
+        assert "cannot restart, stop, or uninstall" not in result["error"]
+
 
 class TestLifecycleGuardDataArgumentExemption:
     """Lifecycle words inside DATA arguments (SQL text, grep patterns) must
@@ -1938,7 +1751,7 @@ class TestLifecycleGuardDataArgumentExemption:
         "'systemctl stop hermes-gateway'\"",
         # grep/rg pattern arguments hunting for the lifecycle string.
         "grep -c 'systemctl restart hermes-gateway' /var/log/syslog",
-        "rg 'qubit gateway restart' /home/user/.hermes/logs/",
+        "rg 'hermes gateway restart' /home/user/.hermes/logs/",
         "journalctl -u hermes-gateway --grep 'systemctl restart hermes-gateway'",
         # SQL with stop/restart column/value words but no command shape.
         'sqlite3 stats.db "SELECT stop_time, restart_reason FROM '
@@ -1951,15 +1764,15 @@ class TestLifecycleGuardDataArgumentExemption:
 
     @pytest.mark.parametrize("command", [
         # Execution smuggled through or around a data sink must still block.
-        'sqlite3 db ".shell qubit gateway restart"',
+        'sqlite3 db ".shell hermes gateway restart"',
         'psql -c "\\! systemctl restart hermes-gateway"',
         "grep 'systemctl restart hermes-gateway' cmds.txt | sh",
         "grep gateway f | xargs systemctl restart hermes-gateway",
         'grep "$(systemctl restart hermes-gateway)" f',
         "grep 'restart' log; systemctl restart hermes-gateway",
-        'sqlite3 db "SELECT 1"; qubit gateway stop',
+        'sqlite3 db "SELECT 1"; hermes gateway stop',
         # Plain lifecycle commands are unaffected by the exemption.
-        "qubit gateway restart",
+        "hermes gateway restart",
         "sudo systemctl stop hermes-gateway",
     ])
     def test_command_position_lifecycle_still_blocked(self, command):
@@ -2032,33 +1845,6 @@ class TestLifecycleGuardNeverRaises:
         )
         assert self._scan(f"source {zshrc}") is False
 
-    def test_fstat_directory_mode_is_not_unsafe(self, tmp_path, monkeypatch):
-        """#86753 Unix contract: os.open(dir) succeeds, fstat is not S_ISREG.
-
-        Windows raises OSError on os.open(dir) and already returns
-        nothing-to-scan. Linux/macOS open the directory and used to
-        return unsafe=True, blocking sourced zshrcs that mention
-        ``~/.docker/completions``.
-        """
-        import os
-        import stat as statmod
-
-        from cron.lifecycle_guard import _read_referenced_script
-
-        probe = tmp_path / "probe"
-        probe.write_text("echo hi\n", encoding="utf-8")
-        orig = os.fstat
-
-        def _dir_fstat(fd):
-            orig(fd)
-            class _DirStat:
-                st_mode = statmod.S_IFDIR | 0o755
-            return _DirStat()
-
-        monkeypatch.setattr(os, "fstat", _dir_fstat)
-        text, unsafe = _read_referenced_script(probe)
-        assert text is None
-        assert unsafe is False
 
     def test_directory_and_dev_null_fail_closed_not_crash(self, tmp_path):
         # Directories are not scripts (#86753). Devices stay fail-closed

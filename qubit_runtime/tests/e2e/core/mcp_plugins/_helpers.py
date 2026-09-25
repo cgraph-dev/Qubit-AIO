@@ -27,7 +27,7 @@ import pytest
 import qubit_yaml as yaml
 
 from tests.e2e.core.parity._helpers import hermes_argv, kill_tagged, tagged_pids, wait_until
-from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_qubit_home
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_SERVER = Path(__file__).with_name("mcp_fixture_server.py")
@@ -78,7 +78,7 @@ def tool_names(body: dict[str, Any]) -> set[str]:
 class E2EHome:
     root: Path
     home: Path
-    hermes_home: Path
+    qubit_home: Path
     project: Path
     tag: str
     extra_env: dict[str, str] = field(default_factory=dict)
@@ -88,13 +88,13 @@ class E2EHome:
         import pwd  # the suite is Linux-gated
 
         real_root = Path(pwd.getpwuid(os.getuid()).pw_dir, ".hermes").resolve()  # windows-footgun: ok — module is skipif(not linux)
-        fixture = self.hermes_home.resolve()
+        fixture = self.qubit_home.resolve()
         assert fixture != real_root and fixture.parent != real_root / "profiles", fixture
         assert fixture == (self.home / ".hermes").resolve(), fixture
         env = {k: v for k, v in os.environ.items()
                if (k in _PASSTHROUGH_ENV or k.startswith("LC_")) and not k.endswith(_SECRET_ENV_SUFFIXES)}
         env.update({
-            "HOME": str(self.home), "QUBIT_HOME": str(self.hermes_home), "PYTHONPATH": str(REPO_ROOT),
+            "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home), "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1", "NO_COLOR": "1", "TERM": "dumb",
             "PARITY_TREE_TAG": self.tag,  # orphan-scan tag inherited by the whole tree
             "HERMES_STATE_DB_GUARD_BYPASS": "1",  # child HOME is tmp_path by construction
@@ -105,7 +105,7 @@ class E2EHome:
 
     @property
     def config_path(self) -> Path:
-        return self.hermes_home / "config.yaml"
+        return self.qubit_home / "config.yaml"
 
     def update_config(self, mutate: Callable[[dict], None]) -> None:
         cfg = yaml.safe_load(self.config_path.read_text(encoding="utf-8"))
@@ -116,18 +116,18 @@ class E2EHome:
 def _select_test_dependencies(eh: E2EHome) -> None:
     from tests.e2e.core._pm_dependencies import select_test_dependencies
 
-    select_test_dependencies(eh.hermes_home, REPO_ROOT)
+    select_test_dependencies(eh.qubit_home, REPO_ROOT)
 
 
 def build_home(root: Path, base_url: str, *, mcp_servers: dict[str, dict] | None = None,
                extra: dict[str, Any] | None = None) -> E2EHome:
     home = root / "home"
-    hermes_home = home / ".hermes"
+    qubit_home = home / ".hermes"
     project = root / "project"
-    for d in (hermes_home, project):
+    for d in (qubit_home, project):
         d.mkdir(parents=True, exist_ok=True)
-    eh = E2EHome(root=root, home=home, hermes_home=hermes_home, project=project, tag=uuid.uuid4().hex)
-    write_hermes_home(hermes_home, base_url)
+    eh = E2EHome(root=root, home=home, qubit_home=qubit_home, project=project, tag=uuid.uuid4().hex)
+    write_qubit_home(qubit_home, base_url)
     cfg = yaml.safe_load(eh.config_path.read_text(encoding="utf-8"))
     cfg["mcp_servers"] = dict(mcp_servers or {})
     # Discovery must be complete before the first agent build (interactive surfaces

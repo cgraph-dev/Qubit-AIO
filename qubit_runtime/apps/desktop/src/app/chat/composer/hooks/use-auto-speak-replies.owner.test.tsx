@@ -25,7 +25,7 @@ describe('useAutoSpeakReplies — owner-routed synthesis', () => {
     setApiRequestConnection(null)
     setApiRequestProfile(null)
     clearVoiceClientConfigCache()
-    Reflect.deleteProperty(window, 'qubitDesktop')
+    Reflect.deleteProperty(window, 'hermesDesktop')
   })
 
   it('synthesizes a Bot reply with the scope owner (connection, profile), not the active scope', async () => {
@@ -33,7 +33,7 @@ describe('useAutoSpeakReplies — owner-routed synthesis', () => {
       path.startsWith('/api/audio/voice-config') ? { ok: false } : { audio: '' }
     )
 
-    Object.defineProperty(window, 'qubitDesktop', { configurable: true, value: { api } })
+    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: { api } })
     setApiRequestConnection('gw-active')
     setApiRequestProfile('research')
     $autoSpeakReplies.set(true)

@@ -65,9 +65,9 @@ class Board:
 
     def __post_init__(self) -> None:
         self.home = self.root / "home"
-        self.hermes_home = self.home / ".hermes"
-        self.hermes_home.mkdir(parents=True, exist_ok=True)
-        (self.hermes_home / "config.yaml").write_text(
+        self.qubit_home = self.home / ".hermes"
+        self.qubit_home.mkdir(parents=True, exist_ok=True)
+        (self.qubit_home / "config.yaml").write_text(
             "model:\n"
             "  provider: custom\n"
             f"  base_url: {self.base_url}\n"
@@ -80,7 +80,7 @@ class Board:
             + self.extra_config,
             encoding="utf-8",
         )
-        (self.hermes_home / ".env").write_text("OPENAI_API_KEY=sk-fake-e2e\n", encoding="utf-8")
+        (self.qubit_home / ".env").write_text("OPENAI_API_KEY=sk-fake-e2e\n", encoding="utf-8")
         # Workers run with cwd=<task workspace>; the wrapper pins THIS checkout on the path.
         self.hermes_bin = self.root / "hermes-bin"
         self.hermes_bin.write_text(
@@ -94,7 +94,7 @@ class Board:
                if not k.startswith("HERMES_") and not k.endswith(("_API_KEY", "_TOKEN"))}
         env.pop("PYTEST_CURRENT_TEST", None)
         env.update({
-            "HOME": str(self.home), "QUBIT_HOME": str(self.hermes_home),
+            "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home),
             "HERMES_BIN": str(self.hermes_bin), "PYTHONPATH": str(REPO),
             "NO_COLOR": "1", "TERM": "dumb",
             # Children keep pytest's PYTEST_VERSION, which arms the live-DB guard against the scratch
@@ -140,7 +140,7 @@ class Board:
     # state readback --------------------------------------------------------
     @property
     def db_path(self) -> Path:
-        return self.hermes_home / "kanban.db"
+        return self.qubit_home / "kanban.db"
 
     def _q(self, sql: str, args: tuple = ()) -> list[dict]:
         conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, timeout=30)
@@ -171,7 +171,7 @@ class Board:
         return [r for r in rows if kind is None or r["kind"] == kind]
 
     def worker_log(self, tid: str) -> str:
-        hits = list(self.hermes_home.rglob(f"{tid}.log"))
+        hits = list(self.qubit_home.rglob(f"{tid}.log"))
         return hits[0].read_text(encoding="utf-8", errors="replace") if hits else ""
 
     def wait_worker_exit(self, tid: str, pid: int, timeout: float = 90.0) -> None:

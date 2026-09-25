@@ -120,8 +120,8 @@ export const ja: Translations = {
     starting: "起動中",
     startedInBackground: "バックグラウンドで起動しました — 進行状況はログをご確認ください",
     stopped: "停止",
-    updateQubit: "Qubit を更新",
-    updatingQubit: "Qubit を更新しています…",
+    updateHermes: "Qubit を更新",
+    updatingHermes: "Qubit を更新しています…",
     waitingForOutput: "出力を待機しています…",
   },
 
@@ -165,6 +165,10 @@ export const ja: Translations = {
     failedToDeleteSelected: "選択したセッションの削除に失敗しました",
     resumeInChat: "チャットで再開",
     newChat: "新しいチャット",
+    workspace: "ワークスペース",
+    workspaceDefault: "デフォルト",
+    workspaceRescan: "リポジトリを再スキャン",
+    workspaceCustom: "別のパス…",
     previousPage: "前のページ",
     nextPage: "次のページ",
     roles: {
@@ -323,6 +327,8 @@ export const ja: Translations = {
     disableRuntime: "無効化",
     enableAfterInstall: "インストール後に有効化",
     enableRuntime: "有効化",
+    toggleTakesEffectAfterRestart:
+      "保存しました — 変更を適用するにはゲートウェイを再起動してください。",
     forceReinstall: "強制再インストール (既存のフォルダを先に削除)",
     headline:
       "Qubit プラグインを発見、インストール、有効化、更新します (`qubit plugins` 相当)。",
@@ -342,8 +348,8 @@ export const ja: Translations = {
     providersHint:
       "memory.provider (空 = 組み込み) と context.engine を config.yaml に書き込みます。次のセッションで有効になります。",
     refreshDashboard: "ダッシュボード拡張を再スキャン",
-    removeConfirm: "このプラグインを $QUBIT_HOME/plugins/ から削除しますか？",
-    removeHint: "削除できるのは $QUBIT_HOME/plugins 配下のユーザーがインストールしたプラグインのみです。",
+    removeConfirm: "このプラグインを ~/.hermes/plugins/ から削除しますか？",
+    removeHint: "削除できるのは ~/.hermes/plugins 配下のユーザーがインストールしたプラグインのみです。",
     rescanHeading: "SPA プラグインレジストリ",
     rescanHint: "ディスクにファイルを追加した後に再スキャンすると、ダッシュボードのサイドバーが新しいマニフェストを認識します。",
     runtimeHeading: "ゲートウェイランタイム (YAML プラグイン)",
@@ -365,7 +371,7 @@ export const ja: Translations = {
     all: "すべて",
     categories: "カテゴリ",
     filters: "フィルター",
-    noSkills: "スキルが見つかりません。スキルは ~/.qubit/skills/ から読み込まれます",
+    noSkills: "スキルが見つかりません。スキルは ~/.hermes/skills/ から読み込まれます",
     noSkillsMatch: "検索またはフィルターに一致するスキルはありません。",
     skillCount: "{count} スキル{s}",
     resultCount: "{count} 件の結果{s}",
@@ -379,7 +385,7 @@ export const ja: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "フィルター",
     sections: "セクション",
     exportConfig: "設定を JSON としてエクスポート",

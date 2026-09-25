@@ -1,32 +1,21 @@
 import type { IconComponent } from '@/lib/icons'
 import { normalize } from '@/lib/text'
-import type { ConfigFieldSchema, EnvVarInfo, QubitConfigRecord } from '@/types/hermes'
+import type { ConfigFieldSchema, EnvVarInfo, HermesConfigRecord } from '@/types/hermes'
 
 import { FIELD_LABELS, SECTIONS } from './constants'
 import { credentialRowLabel } from './credential-key-ui'
 import { fieldCopyForSchemaKey } from './field-copy'
 import { prettyName, sectionFieldEntries, voiceFieldVisible } from './helpers'
+import { settingsSubpageForTarget } from './subpages'
 import type { DesktopConfigSection, SettingsView } from './types'
 
 export type CredentialSettingsView = 'settings' | 'tools'
 
-export const APPEARANCE_SETTING_IDS = {
-  backdrop: 'appearance.backdrop',
-  embeds: 'appearance.embeds',
-  introSplash: 'appearance.intro-splash',
-  language: 'appearance.language',
-  theme: 'appearance.theme',
-  toolView: 'appearance.tool-view',
-  translucency: 'appearance.translucency',
-  uiScale: 'appearance.ui-scale',
-  userBubble: 'appearance.user-bubble'
-} as const
-
 export interface SettingsSearchTarget {
+  subpage?: string
   field?: string
   key?: string
   keysView?: CredentialSettingsView
-  plugin?: string
   providerView?: 'accounts' | 'custom-endpoints' | 'keys'
   setting?: string
   view: SettingsView
@@ -83,7 +72,7 @@ function configFieldDescription(key: string, field: ConfigFieldSchema, copy: Con
 
 export function buildConfigSearchEntries(
   schema: Record<string, ConfigFieldSchema> | null | undefined,
-  config: QubitConfigRecord | null | undefined,
+  config: HermesConfigRecord | null | undefined,
   copy: ConfigSearchCopy,
   sections: DesktopConfigSection[] = SECTIONS
 ): SettingsSearchEntry[] {
@@ -200,6 +189,11 @@ export function filterSettingsSearchEntries(entries: SettingsSearchEntry[], quer
 export function settingsSearchTargetQuery(target: SettingsSearchTarget): string {
   const params = new URLSearchParams()
   params.set('tab', target.view)
+  const subpage = target.subpage ?? settingsSubpageForTarget(target.view, target.field, target.setting)
+
+  if (subpage) {
+    params.set('page', subpage)
+  }
 
   if (target.providerView) {
     params.set('pview', target.providerView)
@@ -219,10 +213,6 @@ export function settingsSearchTargetQuery(target: SettingsSearchTarget): string 
 
   if (target.key) {
     params.set('key', target.key)
-  }
-
-  if (target.plugin) {
-    params.set('plugin', target.plugin)
   }
 
   return params.toString()

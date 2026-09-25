@@ -24,14 +24,14 @@ describe('cron helpers are profile-scoped', () => {
   const api = vi.fn(async (_req: { path: string; profile?: string }) => ({}) as never)
 
   beforeEach(() => {
-    ;(window as { qubitDesktop?: unknown }).qubitDesktop = { api }
+    ;(window as { hermesDesktop?: unknown }).hermesDesktop = { api }
     api.mockClear()
   })
 
   afterEach(() => {
     setApiRequestProfile(null)
     setApiRequestConnection(null)
-    delete (window as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as { hermesDesktop?: unknown }).hermesDesktop
   })
 
   const lastProfile = () => api.mock.calls.at(-1)?.[0].profile

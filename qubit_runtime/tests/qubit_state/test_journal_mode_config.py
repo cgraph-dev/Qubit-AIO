@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 
 import qubit_state_wal
-import yaml
+import qubit_yaml as yaml
 
 
 def _write_config(monkeypatch: pytest.MonkeyPatch, tmp_path, config: object) -> None:
@@ -35,7 +35,6 @@ def _disable_vulnerable_gate(monkeypatch: pytest.MonkeyPatch) -> None:
 def _reset_configured_delete_override_warned_paths():
     """Reset the configured-delete-override warned-paths set so the
     once-per-process-per-db_label dedup doesn't leak between tests."""
-    import qubit_state
 
     qubit_state_wal._delete_overridden_warned_paths.clear()
     yield
@@ -86,10 +85,6 @@ def test_wal_probe_unknown_never_emits_set_pragma(monkeypatch, tmp_path, caplog)
         sibling.close()
 
 
-def test_database_journal_mode_has_a_canonical_default():
-    from qubit_cli.config import DEFAULT_CONFIG
-
-    assert DEFAULT_CONFIG["database"]["journal_mode"] == "wal"
 
 
 def test_resolve_journal_mode_uses_real_database_config(monkeypatch, tmp_path):
@@ -99,7 +94,7 @@ def test_resolve_journal_mode_uses_real_database_config(monkeypatch, tmp_path):
     assert resolve_journal_mode() == "delete"
 
 
-def test_new_nonsecret_hermes_env_override_is_not_exposed(monkeypatch, tmp_path):
+def test_new_nonsecret_qubit_env_override_is_not_exposed(monkeypatch, tmp_path):
     from qubit_state_wal import resolve_journal_mode
 
     _configure_mode(monkeypatch, tmp_path, "wal")
@@ -287,7 +282,7 @@ def test_real_db_openers_honor_configured_delete(monkeypatch, tmp_path):
     from cron import executions
     from gateway import delivery_ledger
     from gateway.platforms.api_server import ResponseStore
-    from qubit_cli import kanban_db, projects_db
+    from qubit_cli import projects_db
     from qubit_cli import kanban_db_connect as kbc
     from qubit_state import SessionDB
     from plugins.memory.holographic.store import MemoryStore

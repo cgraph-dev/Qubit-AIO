@@ -1,7 +1,7 @@
 """Mark a supervisor-ordered stop as planned so SIGTERM exits cleanly.
 
 Runs as systemd ``ExecStop=`` before ``KillSignal=SIGTERM``. A raw
-``systemctl restart/stop qubit-gateway`` bypasses the ``qubit gateway``
+``systemctl restart/stop hermes-gateway`` bypasses the ``qubit gateway``
 CLI, so no takeover (``--replace``) or planned-stop marker exists when the
 SIGTERM lands; the gateway classifies it as an unexpected kill, exits
 non-zero, and the journal records ``Failed with result exit-code`` even

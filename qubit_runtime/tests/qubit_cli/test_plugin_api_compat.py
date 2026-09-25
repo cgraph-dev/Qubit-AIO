@@ -3,7 +3,7 @@
 from pathlib import Path
 import shutil
 
-import yaml
+import qubit_yaml as yaml
 
 from qubit_cli.plugins import PluginManager
 

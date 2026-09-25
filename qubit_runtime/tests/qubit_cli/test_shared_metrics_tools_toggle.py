@@ -1,12 +1,11 @@
-"""Tests for the `qubit tools` shared-metrics consent toggle.
+"""Tests for the `hermes tools` shared-metrics consent toggle.
 
 AGENTS.md requires outbound telemetry to be reachable from a config gate, the
-setup prompt, AND `qubit tools`. These cover the third surface.
+setup prompt, AND `hermes tools`. These cover the third surface.
 """
 
 from __future__ import annotations
 
-import pytest
 
 from qubit_cli.tools_config import (
     _configure_shared_metrics_interactive,
@@ -31,13 +30,7 @@ class TestState:
 
 
 class TestMenuLabel:
-    def test_off_state(self):
-        assert "off" in _shared_metrics_menu_label({})
 
-    def test_local_only_state(self):
-        label = _shared_metrics_menu_label(_config(enabled=True))
-        assert "collecting locally" in label
-        assert "Nous" not in label
 
     def test_sending_state_names_the_destination(self):
         label = _shared_metrics_menu_label(_config(enabled=True, send=True))

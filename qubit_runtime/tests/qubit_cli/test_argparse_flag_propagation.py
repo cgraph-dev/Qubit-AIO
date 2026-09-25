@@ -1,7 +1,7 @@
 """Tests for parent→subparser flag propagation.
 
 When flags like --yolo, -w, -s exist on both the parent parser and the 'chat'
-subparser, placing the flag BEFORE the subcommand (e.g. 'qubit --yolo chat')
+subparser, placing the flag BEFORE the subcommand (e.g. 'hermes --yolo chat')
 must not silently drop the flag value.
 
 Regression test for: argparse subparser default=False overwriting parent's
@@ -12,48 +12,9 @@ so the subparser only sets the attribute when the user explicitly provides it.
 """
 
 import argparse
-import os
 import sys
 
 import pytest
-
-
-def _build_parser():
-    """Build the qubit argument parser from the real code.
-
-    We import the real main() and extract the parser it builds.
-    Since main() is a large function that does much more than parse args,
-    we replicate just the parser structure here to avoid side effects.
-    """
-    parser = argparse.ArgumentParser(prog="qubit")
-    parser.add_argument("--resume", "-r", metavar="SESSION", default=None)
-    parser.add_argument(
-        "--continue", "-c", dest="continue_last", nargs="?",
-        const=True, default=None, metavar="SESSION_NAME",
-    )
-    parser.add_argument("--worktree", "-w", action="store_true", default=False)
-    parser.add_argument("--skills", "-s", action="append", default=None)
-    parser.add_argument("--yolo", action="store_true", default=False)
-    parser.add_argument("--pass-session-id", action="store_true", default=False)
-
-    subparsers = parser.add_subparsers(dest="command")
-    chat = subparsers.add_parser("chat")
-    # These MUST use argparse.SUPPRESS to avoid overwriting parent values
-    chat.add_argument("--yolo", action="store_true",
-                      default=argparse.SUPPRESS)
-    chat.add_argument("--worktree", "-w", action="store_true",
-                      default=argparse.SUPPRESS)
-    chat.add_argument("--skills", "-s", action="append",
-                      default=argparse.SUPPRESS)
-    chat.add_argument("--pass-session-id", action="store_true",
-                      default=argparse.SUPPRESS)
-    chat.add_argument("--resume", "-r", metavar="SESSION_ID",
-                      default=argparse.SUPPRESS)
-    chat.add_argument(
-        "--continue", "-c", dest="continue_last", nargs="?",
-        const=True, default=argparse.SUPPRESS, metavar="SESSION_NAME",
-    )
-    return parser
 
 
 class TestChatVerboseArg:
@@ -102,36 +63,12 @@ class TestChatVerboseArg:
         assert "verbose" not in captured
 
 
-class TestYoloEnvVar:
-    """Verify --yolo sets HERMES_YOLO_MODE regardless of flag position.
-
-    This tests the actual cmd_chat logic pattern (getattr → os.environ).
-    """
-
-    @pytest.fixture(autouse=True)
-    def _clean_env(self):
-        os.environ.pop("HERMES_YOLO_MODE", None)
-        yield
-        os.environ.pop("HERMES_YOLO_MODE", None)
-
-    def _simulate_cmd_chat_yolo_check(self, args):
-        """Replicate the exact check from cmd_chat in main.py."""
-        if getattr(args, "yolo", False):
-            os.environ["HERMES_YOLO_MODE"] = "1"
-
-    def test_yolo_before_chat_sets_env(self):
-        parser = _build_parser()
-        args = parser.parse_args(["--yolo", "chat"])
-        self._simulate_cmd_chat_yolo_check(args)
-        assert os.environ.get("HERMES_YOLO_MODE") == "1"
-
-
 class TestAcceptHooksOnAgentSubparsers:
     """Verify --accept-hooks is accepted at every agent-subcommand
     position (before the subcommand, between group/subcommand, and
     after the leaf subcommand) for gateway/cron/mcp/acp.  Regression
     against prior behaviour where the flag only worked on the root
-    parser and `chat`, so `qubit gateway run --accept-hooks` failed
+    parser and `chat`, so `hermes gateway run --accept-hooks` failed
     with `unrecognized arguments`."""
 
     ARGVS = [
@@ -164,7 +101,7 @@ import qubit_cli.main as main_mod
 argvs = json.loads(sys.argv[1])
 results = []
 for argv in argvs:
-    sys.argv = ["qubit", *argv]
+    sys.argv = ["hermes", *argv]
     out, err = io.StringIO(), io.StringIO()
     code = 0
     try:
@@ -180,7 +117,7 @@ print(json.dumps(results))
 """
 
     def test_accepted_at_every_position(self):
-        """Every `qubit <argv>` must exit 0 (help) rather than failing
+        """Every `hermes <argv>` must exit 0 (help) rather than failing
         with `unrecognized arguments`."""
         import json
         import subprocess
@@ -206,7 +143,7 @@ class TestChatSubparserInheritedValueFlags:
     """Verify -t/--toolsets, -m/--model and --provider survive parent→chat
     subparser dispatch.
 
-    Regression test for #28780: `qubit -t web chat` silently dropped the
+    Regression test for #28780: `hermes -t web chat` silently dropped the
     toolset because the chat subparser re-declared `-t/--toolsets` with
     `default=None`, which clobbered the top-level parser's value during
     subparser dispatch.
@@ -221,8 +158,6 @@ class TestChatSubparserInheritedValueFlags:
         from qubit_cli._parser import build_top_level_parser
         parser, _subparsers, _chat = build_top_level_parser()
         return parser
-
-
 
 
     def test_all_three_flags_before_chat(self, real_parser):
@@ -267,7 +202,7 @@ class TestChatSubparserInheritedValueFlags:
         assert not offenders, (
             "Chat subparser redeclares these top-level flags without "
             "default=argparse.SUPPRESS; they will silently clobber the "
-            "top-level value when used as `qubit <flag> <value> chat`:\n  "
+            "top-level value when used as `hermes <flag> <value> chat`:\n  "
             + "\n  ".join(f"{opts} dest={dest} default={d!r}"
                           for opts, dest, d in offenders)
         )

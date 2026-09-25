@@ -10,7 +10,7 @@ import contextlib
 
 import pytest
 
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 from plugins.memory import find_provider_dir, load_memory_provider
 
 _PROVIDER = """
@@ -33,8 +33,8 @@ def register(ctx):
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
     enabled, disabled = tmp_path / "enabled", tmp_path / "disabled"
-    for hermes_home in (enabled, disabled):
-        provider_dir = hermes_home / "plugins" / "fakemem"
+    for qubit_home in (enabled, disabled):
+        provider_dir = qubit_home / "plugins" / "fakemem"
         provider_dir.mkdir(parents=True)
         (provider_dir / "plugin.yaml").write_text(
             "name: fakemem-manifest\nkind: exclusive\n", encoding="utf-8"
@@ -46,11 +46,11 @@ def homes(tmp_path, monkeypatch):
 
 @contextlib.contextmanager
 def _scoped_home(home):
-    token = set_hermes_home_override(home)
+    token = set_qubit_home_override(home)
     try:
         yield
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
 
 def test_disabled_user_provider_is_found_but_never_loaded(homes):

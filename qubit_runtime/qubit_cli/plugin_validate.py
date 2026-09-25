@@ -9,24 +9,6 @@ scratch child process (with a throwaway ``QUBIT_HOME``), so a crashing or
 malicious plugin cannot take down the CLI, and the *actually registered*
 tools/hooks/middleware are compared against the manifest's declared
 ``provides_*`` lists.
-
-Ported from the read-only reference ``hermes_cli/plugin_validate.py`` onto the
-vendored 0.21.1 model: the manifest contract, kinds, requires/dep handling and
-the probe stub all come from :mod:`qubit_cli.plugins_manifest` /
-:mod:`qubit_cli.plugins` — no catalog model is invented here.
-
-Two deliberate CGraph-model adaptations, documented as such:
-
-* ``requires_hermes`` is validated through the vendored manifest key
-  (``requires_hermes`` is an accepted alias of the ``hermes`` manifest field)
-  with the ``packaging`` version parser, instead of a reference-only
-  ``hermes_cli.plugins_manifest._VERSION_COMPARATOR_RE`` that does not exist in
-  0.21.1.
-* ``--install-deps`` never installs: the vendored invariant is that
-  ``python_dependencies`` are validated and surfaced ONLY, never
-  auto-installed (``qubit_cli/plugins_manifest.py``: "VALIDATED AND SURFACED
-  ONLY — Qubit never auto-installs these"). The flag surfaces missing declared
-  deps with the exact manual ``pip install`` command.
 """
 
 from __future__ import annotations
@@ -42,22 +24,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from qubit_cli.plugin_validate_desktop import check_desktop_surface
+from qubit_cli.plugins_manifest import _CONFIG_SCHEMA_TYPES
 
 _UPPER_SNAKE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
-# The vendored manifest model owns the accepted config-schema types; import it lazily so a broken
-# yaml/import never blocks the CLI from loading and reporting a clean error.
+# Admission accepts exactly the ``config_schema`` types the loader type-checks at load time (and the
+# Desktop settings renderer keys its field table on) — a private copy drifted and rejected ``secret``.
+_CONFIG_TYPES = frozenset(_CONFIG_SCHEMA_TYPES)
 _PROBE_TIMEOUT = 30
-# Sentinel printed by the probe subprocess; must be distinctive enough not to collide with plugin
-# stdout. Renamed from the reference's ``HERMES_VALIDATE_JSON:`` along with the rebrand.
-_PROBE_SENTINEL = "QUBIT_VALIDATE_JSON:"
-# The distribution Qubit itself installs as; a plugin depending on it is always satisfied by the
-# running checkout (installing a second copy from an index would clobber the runtime).
-try:
-    from importlib.metadata import distribution as _distribution
-
-    _QUBIT_DIST_NAME = (_distribution("qubit-voicebridge").metadata["Name"] or "").strip()
-except Exception:  # pragma: no cover - metadata always present in a real install
-    _QUBIT_DIST_NAME = "qubit-voicebridge"
+_PROBE_SENTINEL = "HERMES_VALIDATE_JSON:"
 
 
 @dataclass
@@ -99,35 +73,22 @@ class ValidationReport:
 # ─── Static checks ───────────────────────────────────────────────────────────
 
 
-def _manifest_requires_spec(manifest: dict) -> str:
-    """The declared Qubit-version spec: ``requires_hermes`` (catalog/CI spelling) or the vendored
-    manifest field ``hermes`` (``_KNOWN_MANIFEST_FIELDS``), whichever is present."""
-    return str(manifest.get("requires_hermes") or manifest.get("hermes") or "").strip()
+def _requires_qubit_spec_valid(spec: str) -> bool:
+    """Strictly validate a ``requires_hermes`` spec.
 
-
-def _requires_spec_valid(spec: str) -> bool:
-    """Strictly validate a ``requires_hermes``/``hermes`` spec.
-
-    Unlike the loader (permissive at load time), validation REJECTS clauses whose
-    version segment doesn't parse — a typo'd spec should fail admission, not
-    silently gate nothing.
+    Unlike :func:`qubit_cli.plugins_manifest.version_satisfies` (permissive at load
+    time), validation REJECTS clauses whose version segment doesn't parse —
+    a typo'd spec should fail admission, not silently gate nothing.
     """
-    from packaging.specifiers import InvalidSpecifier, SpecifierSet
-    from packaging.version import InvalidVersion, Version
+    from qubit_cli.plugins_manifest import _VERSION_COMPARATOR_RE, _version_tuple
 
     for clause in spec.split(","):
         clause = clause.strip()
         if not clause:
             continue
-        try:
-            SpecifierSet(clause)
-            continue
-        except InvalidSpecifier:
-            pass
-        # Not a valid specifier clause: still reject outright unless it is a bare version.
-        try:
-            Version(clause.lstrip("=<>!~ "))
-        except InvalidVersion:
+        m = _VERSION_COMPARATOR_RE.match(clause)
+        target = m.group(2) if m else clause
+        if _version_tuple(target) is None:
             return False
     return True
 
@@ -146,57 +107,12 @@ def _check_manifest_fields(report: ValidationReport, manifest: dict) -> None:
         report.add("manifest fields", True, "name, version, description present")
 
 
-def _check_manifest_version(report: ValidationReport, manifest: dict) -> None:
-    """``manifest_version`` / ``api_version`` sanity, matching the vendored loader's numeric contract."""
-    from qubit_cli.plugins_manifest import SUPPORTED_MANIFEST_VERSION
-
-    raw = manifest.get("manifest_version")
-    if raw is None:
-        report.add("manifest version", True, "not declared (v1)")
-        return
-    try:
-        mv = int(raw)
-    except (TypeError, ValueError):
-        report.add(
-            "manifest version", False,
-            f"manifest_version must be an integer (got {raw!r})",
-        )
-        return
-    if mv > SUPPORTED_MANIFEST_VERSION:
-        report.warn(
-            f"manifest_version {mv} is newer than this Qubit supports "
-            f"({SUPPORTED_MANIFEST_VERSION}); unknown fields are ignored at load"
-        )
-        report.add("manifest version", True, f"v{mv} (newer; forward-compatible)")
-        return
-    report.add("manifest version", True, f"v{mv}")
-
-
-def _check_kind(report: ValidationReport, manifest: dict) -> None:
-    """``kind`` must be one of the vendored ``_VALID_PLUGIN_KINDS`` (or absent = standalone)."""
-    from qubit_cli.plugins_manifest import _VALID_PLUGIN_KINDS
-
-    raw = manifest.get("kind")
-    if raw is None:
-        report.add("kind", True, "not declared (standalone)")
-        return
-    kind = str(raw).strip().lower()
-    if kind not in _VALID_PLUGIN_KINDS:
-        report.add(
-            "kind",
-            False,
-            f"unknown kind {raw!r} (valid: {', '.join(sorted(_VALID_PLUGIN_KINDS))})",
-        )
-        return
-    report.add("kind", True, kind)
-
-
-def _check_requires_qubit(report: ValidationReport, manifest: dict) -> None:
-    spec = _manifest_requires_spec(manifest)
+def _check_requires_hermes(report: ValidationReport, manifest: dict) -> None:
+    spec = str(manifest.get("requires_hermes") or "").strip()
     if not spec:
         report.add("requires_hermes", True, "not declared")
         return
-    if _requires_spec_valid(spec):
+    if _requires_qubit_spec_valid(spec):
         report.add("requires_hermes", True, f"spec {spec!r} parses")
     else:
         report.add(
@@ -208,9 +124,7 @@ def _check_requires_qubit(report: ValidationReport, manifest: dict) -> None:
 
 
 def _check_config_spec(report: ValidationReport, manifest: dict) -> None:
-    """Validate the manifest ``config_schema`` mapping against the vendored accepted types."""
-    from qubit_cli.plugins_manifest import _CONFIG_SCHEMA_TYPES
-
+    """Validate the manifest ``config_schema`` mapping (#64165 format)."""
     raw = manifest.get("config_schema")
     if raw in (None, [], {}):
         report.add("config schema", True, "not declared")
@@ -226,10 +140,10 @@ def _check_config_spec(report: ValidationReport, manifest: dict) -> None:
                 )
                 continue
             typ = spec.get("type")
-            if typ is not None and str(typ).lower() not in _CONFIG_SCHEMA_TYPES:
+            if typ is not None and str(typ).lower() not in _CONFIG_TYPES:
                 problems.append(
                     f"config_schema.{skey}: type must be one of "
-                    f"{'/'.join(sorted(_CONFIG_SCHEMA_TYPES))}"
+                    f"{'/'.join(sorted(_CONFIG_TYPES))}"
                 )
             required = spec.get("required")
             if required is not None and not isinstance(required, bool):
@@ -266,45 +180,13 @@ def _check_requires_env(report: ValidationReport, manifest: dict) -> None:
         report.add("requires_env", True, "all entries UPPER_SNAKE")
 
 
-def _check_requires_plugins(report: ValidationReport, manifest: dict) -> None:
-    """Declared plugin dependencies must be plugin-id strings or ``{id, version_range}`` mappings —
-    the shape ``plugins_manifest._dependency_entry`` accepts at load time."""
-    raw = manifest.get("requires_plugins")
-    if raw in (None, [], {}):
-        report.add("requires_plugins", True, "not declared")
-        return
-    problems: List[str] = []
-    if not isinstance(raw, list):
-        report.add("requires_plugins", False, "requires_plugins: must be a list")
-        return
-    for i, entry in enumerate(raw):
-        if isinstance(entry, str):
-            if not entry.strip():
-                problems.append(f"requires_plugins[{i}]: id must be non-empty")
-            continue
-        if isinstance(entry, dict):
-            if not (isinstance(entry.get("id"), str) and entry["id"].strip()):
-                problems.append(
-                    f"requires_plugins[{i}]: mapping must carry a non-empty 'id'"
-                )
-            continue
-        problems.append(
-            f"requires_plugins[{i}]: must be a plugin id string or "
-            "{id, version_range} mapping"
-        )
-    if problems:
-        report.add("requires_plugins", False, "; ".join(problems))
-    else:
-        report.add("requires_plugins", True, "all entries valid")
-
-
 # ─── Capability probe (subprocess-isolated) ──────────────────────────────────
 
 # Self-contained harness run in a scratch child process. Imports the plugin
 # module using the same file-location mechanics PluginManager uses, calls
 # register() against a recording stub ctx, and prints a sentinel-prefixed
 # JSON line of what was actually registered. Deliberately imports NOTHING
-# from Qubit so a hostile plugin only sees a bare interpreter — the one
+# from qubit so a hostile plugin only sees a bare interpreter — the one
 # exception is `providers` for `kind: model-provider`, whose contract IS
 # calling providers.register_provider at import.
 _PROBE_SCRIPT = r"""
@@ -326,7 +208,7 @@ recorded = {"tools": [], "hooks": [], "middleware": [], "commands": [], "provide
 class RecordingContext:
     plugin_config = {}
     profile_name = "default"
-    plugin_id = "qubit_validate_probe_plugin"
+    plugin_id = "hermes_validate_probe_plugin"
 
     def register_tool(self, name, *args, **kwargs):
         recorded["tools"].append(str(name))
@@ -388,7 +270,7 @@ if provider_kind:
 
 try:
     spec = importlib.util.spec_from_file_location(
-        "qubit_validate_probe_plugin",
+        "hermes_validate_probe_plugin",
         plugin_dir + "/__init__.py",
         submodule_search_locations=[plugin_dir],
     )
@@ -441,16 +323,9 @@ def _run_capability_probe(plugin_dir: Path, manifest: dict) -> Tuple[Optional[di
     is the ``{tools, hooks, middleware, commands, providers}`` dict on
     success, and *error* is a human-readable failure description otherwise.
     """
-    with tempfile.TemporaryDirectory(prefix="qubit-validate-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="hermes-validate-") as scratch:
         env = dict(os.environ)
         env["QUBIT_HOME"] = scratch
-        # The probe is a bare interpreter (`python -c`): it inherits no sys.path
-        # from the running CLI. `kind: model-provider` plugins import the
-        # top-level `providers` package (the vendored fork root), so put the fork
-        # root on PYTHONPATH — the same root the launcher's `ensure_path` uses.
-        fork_root = str(Path(__file__).resolve().parent.parent)
-        existing = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = fork_root + (os.pathsep + existing if existing else "")
         try:
             result = subprocess.run(
                 [
@@ -552,7 +427,8 @@ def _builtin_tool_names() -> List[str]:
     """Return the built-in tool registry names (discovery-timing safe).
 
     ``tools.registry`` starts empty — built-in tool modules self-register on
-    import, so we must run ``discover_builtin_tools()`` first (idempotent).
+    import, so we must run ``discover_builtin_tools()`` first (idempotent;
+    see the AGENTS.md discover_plugins timing pitfall).
     """
     try:
         from tools.registry import discover_builtin_tools, registry
@@ -588,14 +464,8 @@ def _check_builtin_collisions(
 # ─── Entry point ─────────────────────────────────────────────────────────────
 
 
-def validate_plugin_dir(plugin_dir: Path, *, install_deps: bool = False) -> ValidationReport:
-    """Run every admission check against *plugin_dir* and return the report.
-
-    ``install_deps`` is accepted for surface parity with the reference CLI; the
-    vendored model never auto-installs plugin dependencies, so it only affects
-    the ``python dependencies`` detail (missing deps are surfaced with the
-    exact manual command). See the module docstring.
-    """
+def validate_plugin_dir(plugin_dir: Path) -> ValidationReport:
+    """Run every admission check against *plugin_dir* and return the report."""
     report = ValidationReport()
     plugin_dir = Path(plugin_dir)
 
@@ -609,10 +479,10 @@ def validate_plugin_dir(plugin_dir: Path, *, install_deps: bool = False) -> Vali
     if not manifest_file.is_file():
         manifest_file = plugin_dir / "plugin.yml"
     if not manifest_file.is_file():
-        # Portable Agent Plugins v1: a plugin.json-only package is admissible —
-        # validated through the portable manifest reader. When a package carries
-        # both manifests the native plugin.yaml always wins (this branch is only
-        # reached when no native manifest exists).
+        # Portable Agent Plugins v1 (#81196): a plugin.json-only package is
+        # admissible — validated through the portable manifest reader. When a
+        # package carries both manifests the native plugin.yaml always wins
+        # (this branch is only reached when no native manifest exists).
         portable_file = plugin_dir / "plugin.json"
         if portable_file.is_file():
             return _validate_portable_plugin(report, plugin_dir)
@@ -622,11 +492,11 @@ def validate_plugin_dir(plugin_dir: Path, *, install_deps: bool = False) -> Vali
         )
         return report
 
-    import yaml
+    import qubit_yaml as yaml
 
     try:
         manifest = yaml.safe_load(
-            manifest_file.read_text(encoding="utf-8")
+            manifest_file.read_text(encoding="utf-8-sig")
         )
     except Exception as exc:
         report.add("manifest", False, f"plugin.yaml failed to parse: {exc}")
@@ -637,14 +507,11 @@ def validate_plugin_dir(plugin_dir: Path, *, install_deps: bool = False) -> Vali
     report.add("manifest", True, "plugin.yaml parses")
 
     _check_manifest_fields(report, manifest)
-    _check_manifest_version(report, manifest)
-    _check_kind(report, manifest)
-    _check_requires_qubit(report, manifest)
+    _check_requires_hermes(report, manifest)
     _check_config_spec(report, manifest)
     _check_requires_env(report, manifest)
-    _check_requires_plugins(report, manifest)
     _check_loadable(report, plugin_dir)
-    _check_python_dependencies(report, plugin_dir, install_deps=install_deps)
+    _check_python_dependencies(report, plugin_dir)
     recorded = _check_capabilities(report, manifest, plugin_dir)
     _check_builtin_collisions(report, manifest, recorded)
     _check_security_scan(report, plugin_dir)
@@ -668,123 +535,29 @@ def _check_loadable(report: ValidationReport, plugin_dir: Path) -> None:
     )
 
 
-def _declared_python_specs(plugin_dir: Path, manifest: dict) -> Tuple[List[str], str, bool]:
-    """``(specs, source, external)`` from ``pyproject [project].dependencies`` (preferred) or the
-    manifest ``python_dependencies`` / ``pip_dependencies`` — never installs anything."""
-    specs: List[str] = []
-    source = ""
-    pyproject = plugin_dir / "pyproject.toml"
-    if pyproject.is_file():
-        try:
-            import tomllib
+def _check_python_dependencies(report: ValidationReport, plugin_dir: Path) -> None:
+    """Declared deps (pyproject ``[project].dependencies`` or manifest ``python_dependencies``) must be
+    well-formed PEP 508 specs the installer will accept; a plugin opting out with
+    ``python_runtime: external`` declares none."""
+    from pm.plugin_declarations import read_python_declaration, unsupported_requirements
 
-            document = tomllib.loads(pyproject.read_text(encoding="utf-8-sig"))
-        except Exception as exc:
-            raise ValueError(f"{pyproject}: could not parse pyproject.toml: {exc}") from exc
-        raw = document.get("project", {}).get("dependencies", [])
-        if not isinstance(raw, list) or any(not isinstance(s, str) for s in raw):
-            raise ValueError(f"{pyproject}: [project].dependencies must be a list of strings")
-        specs = [s.strip() for s in raw if s.strip()]
-        source = "pyproject"
-    if not specs:
-        for key in ("python_dependencies", "pip_dependencies"):
-            raw = manifest.get(key) or []
-            if not isinstance(raw, list) or any(not isinstance(v, str) for v in raw):
-                raise ValueError(f"{key} must be a list of requirement strings")
-            specs.extend(v.strip() for v in raw if v.strip())
-        if specs:
-            source = "manifest"
-    specs = list(dict.fromkeys(specs))
-    external = str(manifest.get("python_runtime") or "").strip().lower() == "external"
-    return specs, source, external
-
-
-def _check_python_dependencies(
-    report: ValidationReport, plugin_dir: Path, *, install_deps: bool = False
-) -> None:
-    """Declared deps must be well-formed PEP 508 specs the installer would accept. A plugin opting
-    out with ``python_runtime: external`` declares none. Qubit never auto-installs them."""
     try:
-        specs, source, external = _declared_python_specs(plugin_dir, _read_manifest_dict(plugin_dir))
-    except ValueError as exc:
+        decl = read_python_declaration(plugin_dir)
+        if decl.external:
+            report.add("python dependencies", True, "external runtime (plugin manages its own)")
+            return
+        urls = unsupported_requirements(decl.requirements)
+        installable = decl.install_requirements
+    except (ValueError, OSError) as exc:
         report.add("python dependencies", False, f"declaration invalid: {exc}")
         return
-    if external:
-        report.add("python dependencies", True, "external runtime (plugin manages its own)")
-        return
-    if not specs:
-        report.add("python dependencies", True, "none declared")
-        return
-    rejected = [s for s in specs if not _spec_is_safe(s)]
-    detail = f"{len(specs)} declared from {source}"
-    report.add(
-        "python dependencies",
-        not rejected,
-        f"unsafe spec(s): {', '.join(rejected)}" if rejected else detail,
-    )
-    if install_deps:
-        missing = _missing_requirements(specs)
-        if missing:
-            report.warn(
-                "python dependencies not installed: " + ", ".join(missing)
-                + " — Qubit never auto-installs plugin dependencies; install manually: "
-                + " ".join(f"'{m}'" for m in missing)
-            )
-    else:
-        report.warn(
-            "python dependencies are declared only (never auto-installed); "
-            f"review and install manually if needed: {' '.join(f'{s!r}' for s in specs)}"
-        )
+    if urls:
+        report.warn("python dependencies: direct URL requirement(s) are not managed by PM; "
+                    f"use a plugin-owned external runtime: {', '.join(urls)}")
+    source = "pyproject" if decl.pyproject is not None else "manifest"
+    detail = f"{len(installable)} requirements from {source}" if decl.requirements else "none declared"
+    report.add("python dependencies", True, detail)
 
-
-def _read_manifest_dict(plugin_dir: Path) -> dict:
-    """Read the native manifest as a plain dict (the validator already parsed it, but dep checks run
-    for the portable path too). Missing/broken → ``{}``."""
-    for name in ("plugin.yaml", "plugin.yml"):
-        path = plugin_dir / name
-        if path.is_file():
-            try:
-                import yaml
-
-                data = yaml.safe_load(path.read_text(encoding="utf-8"))
-                return data if isinstance(data, dict) else {}
-            except Exception:
-                return {}
-    return {}
-
-
-def _spec_is_safe(spec: str) -> bool:
-    """Reject pip specs that contain URLs, paths, or shell metacharacters (the install seam's own
-    predicate, reused so admission and install agree)."""
-    from tools.lazy_deps import _spec_is_safe as safe
-    return safe(spec)
-
-
-def _missing_requirements(specs: List[str]) -> List[str]:
-    """Declared specs whose distribution is not importable by name here (best effort)."""
-    from importlib.metadata import PackageNotFoundError, version
-    from packaging.requirements import InvalidRequirement, Requirement
-    from packaging.utils import canonicalize_name
-
-    missing: List[str] = []
-    for spec in specs:
-        try:
-            req = Requirement(spec)
-        except InvalidRequirement:
-            missing.append(spec)
-            continue
-        if req.url or canonicalize_name(req.name) == canonicalize_name(_QUBIT_DIST_NAME):
-            continue
-        try:
-            have = version(req.name)
-        except PackageNotFoundError:
-            missing.append(spec)
-            continue
-        except Exception:
-            continue
-        if req.specifier and have not in req.specifier:
-            missing.append(f"{spec} (installed {have})")
-    return missing
 
 
 def _check_security_scan(report: ValidationReport, plugin_dir: Path) -> None:
@@ -812,9 +585,13 @@ def _validate_portable_plugin(report: ValidationReport, plugin_dir: Path) -> Val
     diagnostics (schema shape, name, supported subset).
     """
     try:
-        from qubit_cli.agent_plugins import read_agent_plugin_manifest
+        from qubit_cli.agent_plugins import load_agent_plugin
+        from qubit_platform.resolver.availability import availability
 
-        manifest, diagnostics = read_agent_plugin_manifest(plugin_dir)
+        with tempfile.TemporaryDirectory() as data_root:
+            package = load_agent_plugin(plugin_dir, Path(data_root))
+        manifest = package.manifest
+        diagnostics = package.diagnostics
     except Exception as exc:
         report.add("portable manifest", False, f"plugin.json failed validation: {exc}")
         return report
@@ -831,8 +608,14 @@ def _validate_portable_plugin(report: ValidationReport, plugin_dir: Path) -> Val
         bool(name),
         "name present" if name else "plugin.json missing required 'name'",
     )
-    _check_loadable(report, plugin_dir)
-    _check_python_dependencies(report, plugin_dir)
+    for server_name, server_decl in package.server_declarations.items():
+        result = availability(server_decl.declaration)
+        detail = result.state
+        if result.version:
+            detail += f", version {result.version}"
+        if result.path:
+            detail += f", path {result.path}"
+        report.add(f"server availability: {server_name}", True, detail)
     _check_security_scan(report, plugin_dir)
     check_desktop_surface(report, plugin_dir)
     return report

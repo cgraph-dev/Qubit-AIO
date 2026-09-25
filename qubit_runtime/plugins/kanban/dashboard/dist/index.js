@@ -1,11 +1,9 @@
 /**
- * Qubit Kanban — Dashboard Plugin
+ * Hermes Kanban — Dashboard Plugin
  *
  * Board view for the multi-agent collaboration board backed by
- * ~/.qubit/kanban.db. Calls the plugin's backend at /api/plugins/kanban/
- * and polls GET /api/plugins/kanban/events for live updates — the Qubit-safe
- * read route on the single event path (WebSocket upgrades are refused with
- * the typed WS_SINGLE_PATH gate).
+ * ~/.hermes/kanban.db. Calls the plugin's backend at /api/plugins/kanban/
+ * and tails task_events over a WebSocket for live updates.
  *
  * Plain IIFE, no build step. Uses window.__HERMES_PLUGIN_SDK__ for React +
  * shadcn primitives; HTML5 drag-and-drop for card movement on desktop and
@@ -266,12 +264,11 @@
   const API = "/api/plugins/kanban";
   const MIME_TASK = "text/x-hermes-task";
 
-  // Upstream vendor documentation. The real URLs are kept for provenance; the
-  // in-product affordance labels them as upstream/vendor docs, not as Qubit's
-  // own documentation.
-  const DOCS_URL = "/kanban";
-  const DOCS_TUTORIAL_URL = "/kanban";
-  const DOCS_UPSTREAM_LABEL = "Kanban documentation";
+  // Docs link — surfaced as a `?` icon next to the board switcher and as
+  // `title=` hints on unlabelled controls. Kept in one place so rebrands or
+  // path changes are a single edit.
+  const DOCS_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban";
+  const DOCS_TUTORIAL_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban-tutorial";
 
   // localStorage key for the user's selected board. Independent of the
   // CLI's on-disk ``<root>/kanban/current`` pointer so browser users
@@ -471,15 +468,44 @@
 
   function attachTouchDrag(el, taskId) {
     if (!el) return;
+    // A finger drifts a few px on every real tap; without a movement threshold ANY touch
+    // pointerdown armed a drag and called preventDefault(), which suppresses the synthesized
+    // click the card relies on to open (#115568). Defer the drag proxy + preventDefault until
+    // the pointer has actually moved past DRAG_THRESHOLD_PX; a tap that never crosses it falls
+    // through to the native click, same as it already does for a mouse.
+    const DRAG_THRESHOLD_PX = 8;
     function onDown(e) {
       if (e.pointerType !== "touch") return;
-      e.preventDefault();
-      const proxy = el.cloneNode(true);
-      proxy.classList.add("hermes-kanban-touch-proxy");
-      document.body.appendChild(proxy);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let proxy = null;
       let lastTarget = null;
+      let dragging = false;
+
+      function startDrag() {
+        dragging = true;
+        proxy = el.cloneNode(true);
+        proxy.classList.add("hermes-kanban-touch-proxy");
+        document.body.appendChild(proxy);
+        proxy.style.position = "fixed";
+        proxy.style.pointerEvents = "none";
+        proxy.style.opacity = "0.85";
+        proxy.style.zIndex = "9999";
+        proxy.style.width = `${el.offsetWidth}px`;
+        proxy.style.left = `${startX - el.offsetWidth / 2}px`;
+        proxy.style.top = `${startY - 24}px`;
+      }
 
       function move(ev) {
+        if (!dragging) {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+          startDrag();
+        }
+        // Only now, once a drag is actually underway, does it claim the gesture — a stationary
+        // tap never reaches preventDefault() and its click event fires normally.
+        ev.preventDefault();
         proxy.style.left = `${ev.clientX - proxy.offsetWidth / 2}px`;
         proxy.style.top = `${ev.clientY - 24}px`;
         proxy.style.display = "none";
@@ -498,6 +524,7 @@
         document.removeEventListener("pointermove", move);
         document.removeEventListener("pointerup", up);
         document.removeEventListener("pointercancel", up);
+        if (!dragging) return;
         if (lastTarget) {
           lastTarget.classList.remove("hermes-kanban-column--drop");
           const status = lastTarget.getAttribute("data-kanban-column");
@@ -516,14 +543,6 @@
         }
         proxy.remove();
       }
-      // Kick off proxy at the pointer origin.
-      proxy.style.position = "fixed";
-      proxy.style.pointerEvents = "none";
-      proxy.style.opacity = "0.85";
-      proxy.style.zIndex = "9999";
-      proxy.style.width = `${el.offsetWidth}px`;
-      proxy.style.left = `${e.clientX - el.offsetWidth / 2}px`;
-      proxy.style.top = `${e.clientY - 24}px`;
       document.addEventListener("pointermove", move);
       document.addEventListener("pointerup", up);
       document.addEventListener("pointercancel", up);
@@ -649,8 +668,6 @@
     const wsRef = useRef(null);
     const wsBackoffRef = useRef(1000);
     const wsClosedRef = useRef(false);
-    // Qubit single-event-path live poll: last-seen newest event marker.
-    const lastEventMarkerRef = useRef(null);
 
     // --- load config once ---------------------------------------------------
     useEffect(function () {
@@ -727,45 +744,73 @@
       };
     }, [loadBoard]);
 
-    // --- Live updates (Qubit single event path) ----------------------------
-    // Upstream tailed task events over a WebSocket. Qubit serves ONE event
-    // path and refuses every WebSocket dialect with the typed gate
-    // ``WS_SINGLE_PATH`` (see voicebridge.webui:HERMES_WS_GATE_CODES). That
-    // gate is correct and is NOT weakened here: live updates poll the real
-    // Qubit read route ``GET /api/plugins/kanban/events`` (backed by the
-    // shared ``kanban_log`` op), the same broker as CLI/voice. No raw shell,
-    // no bypass, no second listener.
+    // --- WebSocket ---------------------------------------------------------
     useEffect(function () {
       if (!boardData) return undefined;
-      let alive = true;
-      let timer = null;
-      function poll() {
-        SDK.fetchJSON(withBoard(`${API}/events`, board))
-          .then(function (msg) {
-            if (!alive) return;
-            const events = (msg && msg.events) || [];
-            if (!Array.isArray(events) || events.length === 0) return;
-            const newest = events[0] || {};
-            const marker = `${newest.created_at || 0}:${newest.task_id || 0}:${newest.kind || ""}`;
-            if (marker === lastEventMarkerRef.current) return;
-            lastEventMarkerRef.current = marker;
-            // Stamp per-task signal so the TaskDrawer can reload itself.
-            setTaskEventTick(function (prev) {
-              const next = Object.assign({}, prev);
-              for (const e of events) {
-                if (e && e.task_id) next[e.task_id] = (next[e.task_id] || 0) + 1;
+      wsClosedRef.current = false;
+      function openWs() {
+        if (wsClosedRef.current) return;
+        // Build the WS URL via the host SDK so the correct auth param is used
+        // in BOTH modes: single-use ?ticket= in gated OAuth mode, ?token= in
+        // loopback. Reading window.__HERMES_SESSION_TOKEN__ directly (the old
+        // path) sends an empty token and is rejected in gated mode. buildWsUrl
+        // also applies the dashboard base-path prefix for reverse-proxied
+        // deployments, which the old inline URL did not. It's async (gated
+        // mode mints a fresh ticket per connect), so resolve then open.
+        const wsParams = { since: String(cursorRef.current || 0) };
+        // Pin the WS stream to the currently-selected board so events
+        // from other boards don't bleed in. Includes "default" so the
+        // dashboard's own board pin always wins over the server-side
+        // ``current`` file — same rationale as ``withBoard()`` above.
+        // Regression: #20879.
+        if (board) wsParams.board = board;
+        SDK.buildWsUrl(`${API}/events`, wsParams).then(function (url) {
+          if (wsClosedRef.current) return;
+          let ws;
+          try { ws = new WebSocket(url); } catch (_e) { return; }
+          wsRef.current = ws;
+          ws.onopen = function () { wsBackoffRef.current = 1000; };
+          ws.onmessage = function (ev) {
+            try {
+              const msg = JSON.parse(ev.data);
+              if (msg && Array.isArray(msg.events) && msg.events.length > 0) {
+                cursorRef.current = msg.cursor || cursorRef.current;
+                // Stamp per-task signal so the TaskDrawer can reload itself.
+                setTaskEventTick(function (prev) {
+                  const next = Object.assign({}, prev);
+                  for (const e of msg.events) {
+                    if (e && e.task_id) next[e.task_id] = (next[e.task_id] || 0) + 1;
+                  }
+                  return next;
+                });
+                scheduleReload();
               }
-              return next;
-            });
-            scheduleReload();
-          })
-          .catch(function () { /* non-fatal; the next poll retries */ });
+            } catch (_e) { /* ignore */ }
+          };
+          ws.onclose = function (ev) {
+            if (wsClosedRef.current) return;
+            if (ev && ev.code === 1008) {
+              setError(tx(t, "wsAuthFailed",
+                "WebSocket auth failed — reload the page to refresh the session token."));
+              return;
+            }
+            const delay = Math.min(wsBackoffRef.current, 30000);
+            wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
+            setTimeout(openWs, delay);
+          };
+        }).catch(function () {
+          // Ticket mint / URL build failed (e.g. session expired). Back off
+          // and retry; a hard auth failure surfaces via the 1008 close path.
+          if (wsClosedRef.current) return;
+          const delay = Math.min(wsBackoffRef.current, 30000);
+          wsBackoffRef.current = Math.min(wsBackoffRef.current * 2, 30000);
+          setTimeout(openWs, delay);
+        });
       }
-      poll();
-      timer = setInterval(poll, 5000);
+      openWs();
       return function () {
-        alive = false;
-        if (timer) clearInterval(timer);
+        wsClosedRef.current = true;
+        try { wsRef.current && wsRef.current.close(); } catch (_e) { /* noop */ }
       };
     }, [!!boardData, board, scheduleReload]);
 
@@ -1240,6 +1285,10 @@
           onSwitch: switchBoard,
           onNewClick: function () { setShowNewBoard(true); },
           onSettingsClick: function () { setShowBoardSettings(true); },
+          onUnbindProject: function () {
+            updateBoard(board, { project_id: "" })
+              .catch(function (e) { setError(String(e.message || e)); });
+          },
           onDeleteBoard: deleteBoard,
           requestDialog: function (req) { return kanbanDialogs.request(req); },
         }),
@@ -1756,8 +1805,8 @@
       target: "_blank",
       rel: "noopener noreferrer",
       className: "hermes-kanban-docs-link",
-      title: "Open " + DOCS_UPSTREAM_LABEL + " in a new tab",
-      "aria-label": DOCS_UPSTREAM_LABEL,
+      title: "Open Hermes Kanban docs in a new tab",
+      "aria-label": "Hermes Kanban documentation",
     }, "?");
   }
 
@@ -2042,6 +2091,30 @@
     );
   }
 
+  // Readout of the board's project binding (GET /boards annotates every
+  // board with project_id + project_name). The × sends PATCH
+  // {project_id: ""} — the same clear the settings dialog uses — so the
+  // binding is visible and removable without opening Settings.
+  function BoardProjectBadge(props) {
+    const { t } = useI18n();
+    const b = props.board;
+    if (!b || !b.project_id) return null;
+    return h(Badge, {
+      variant: "outline",
+      className: "hermes-kanban-board-project text-xs font-normal gap-1",
+      title: tx(t, "boardProjectBadgeTitle", "New tasks on this board inherit this project"),
+    },
+      tx(t, "boardProjectBadge", "Project: {name}", { name: b.project_name || b.project_id }),
+      h("button", {
+        type: "button",
+        className: "hermes-kanban-board-project-unbind",
+        "aria-label": tx(t, "unbindProject", "Unbind project"),
+        title: tx(t, "unbindProject", "Unbind project"),
+        onClick: props.onUnbind,
+      }, "×"),
+    );
+  }
+
   function BoardSwitcher(props) {
     const { t } = useI18n();
     const list = props.boardList || [];
@@ -2074,6 +2147,7 @@
           title: tx(t, "boardSettingsTitle",
             "Board settings — name, description, and the default project directory new tasks inherit"),
         }, tx(t, "boardSettings", "Settings")),
+        h(BoardProjectBadge, { board: current, onUnbind: props.onUnbindProject }),
         h(DocsLink, null),
       );
     }
@@ -2099,6 +2173,7 @@
             ),
             h("span", { className: "text-xs text-muted-foreground" },
               `${currentTotal || 0} task${currentTotal === 1 ? "" : "s"}`),
+            h(BoardProjectBadge, { board: current, onUnbind: props.onUnbindProject }),
           ),
         ),
         h("div", { className: "flex-1" }),
@@ -2146,6 +2221,24 @@
     );
   }
 
+  // Live (non-archived) Hermes projects available for board scoping,
+  // fetched from GET /projects on mount. On failure the list stays empty
+  // and both dialogs omit the project_id field from their payloads, so a
+  // projects-store hiccup can never clear an existing binding.
+  function useBoardProjects() {
+    const [projects, setProjects] = useState([]);
+    useEffect(function () {
+      let cancelled = false;
+      SDK.fetchJSON(`${API}/projects`)
+        .then(function (res) {
+          if (!cancelled) setProjects((res && res.projects) || []);
+        })
+        .catch(function () { /* optional field; keep the list empty */ });
+      return function () { cancelled = true; };
+    }, []);
+    return projects;
+  }
+
   function NewBoardDialog(props) {
     const { t } = useI18n();
     const [slug, setSlug] = useState("");
@@ -2153,6 +2246,8 @@
     const [description, setDescription] = useState("");
     const [icon, setIcon] = useState("");
     const [projectDirectory, setProjectDirectory] = useState("");
+    const projects = useBoardProjects();
+    const [projectId, setProjectId] = useState("");
     const [switchTo, setSwitchTo] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [err, setErr] = useState(null);
@@ -2178,6 +2273,9 @@
         description: description.trim() || undefined,
         icon: icon.trim() || undefined,
         default_workdir: projectDirectory.trim() || undefined,
+        // Only send the binding when the selector was actually rendered
+        // (projects loaded) and one was picked.
+        project_id: (projects.length && projectId) || undefined,
         switch: switchTo,
       }).catch(function (e) {
         setErr(String(e && e.message ? e.message : e));
@@ -2254,6 +2352,25 @@
               tx(t, "projectDirectoryExplanation",
                 "Sets the default location for task files so project output is preserved.")),
           ),
+          projects.length ? h("div", { className: "flex flex-col gap-1" },
+            h(Label, { className: "text-xs" }, tx(t, "boardProject", "Project"), " ",
+              h("span", { className: "text-muted-foreground" },
+                tx(t, "boardProjectHint", "(optional)"))),
+            h(Select, Object.assign({
+              value: projectId,
+              className: "h-8",
+            }, selectChangeHandler(setProjectId)),
+              h(SelectOption, { value: "" },
+                tx(t, "boardProjectNone", "No project binding")),
+              projects.map(function (p) {
+                return h(SelectOption, { key: p.id, value: p.id },
+                  p.name || p.slug || p.id);
+              }),
+            ),
+            h("div", { className: "text-xs text-muted-foreground" },
+              tx(t, "boardProjectExplanation",
+                "Tasks created on this board inherit the bound project.")),
+          ) : null,
           h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs" }, tx(t, "icon", "Icon"), " ",
               h("span", { className: "text-muted-foreground" },
@@ -2291,16 +2408,19 @@
     );
   }
 
-  // Board settings dialog — edit display name, description, and the
-  // board-level default project directory (default_workdir). The workdir
-  // is the board-level setting every new task's workspace kind/path is
-  // seeded from; task-level values in the create dialog override it.
+  // Board settings dialog — edit display name, description, the
+  // board-level default project directory (default_workdir), and the
+  // board's project binding (project_id). The workdir is the board-level
+  // setting every new task's workspace kind/path is seeded from;
+  // task-level values in the create dialog override it.
   function BoardSettingsDialog(props) {
     const { t } = useI18n();
     const b = props.board || {};
     const [name, setName] = useState(b.name || "");
     const [description, setDescription] = useState(b.description || "");
     const [projectDirectory, setProjectDirectory] = useState(b.default_workdir || "");
+    const projects = useBoardProjects();
+    const [projectId, setProjectId] = useState(b.project_id || "");
     const [submitting, setSubmitting] = useState(false);
     const [err, setErr] = useState(null);
 
@@ -2310,10 +2430,19 @@
       setErr(null);
       // Send default_workdir unconditionally: "" clears it on the server,
       // a path sets it (validated server-side: absolute + existing dir).
+      // Exception: a blank directory next to a chosen project is omitted
+      // so the server mirrors the project's primary folder into
+      // default_workdir — the same seeding the create dialog gets.
+      // project_id mirrors that only when the selector was rendered
+      // (projects loaded): "" clears the binding, an id scopes the board.
+      // When the projects store is unreachable the field is omitted so
+      // saving unrelated settings never wipes an existing binding.
+      const boundProject = projects.length ? projectId : undefined;
       props.onSave({
         name: name.trim() || undefined,
         description: description.trim() || undefined,
-        default_workdir: projectDirectory.trim(),
+        default_workdir: projectDirectory.trim() || (boundProject ? undefined : ""),
+        project_id: boundProject,
       }).catch(function (e) {
         setErr(parseApiErrorMessage(e));
         setSubmitting(false);
@@ -2368,6 +2497,26 @@
               tx(t, "projectDirectoryOverrideHint",
                 "New tasks inherit this as their workspace default; each task can still override it in the create dialog.")),
           ),
+          projects.length ? h("div", { className: "flex flex-col gap-1" },
+            h(Label, { className: "text-xs" },
+              tx(t, "boardProject", "Project")),
+            h(Select, Object.assign({
+              value: projectId,
+              className: "h-8",
+            }, selectChangeHandler(setProjectId)),
+              h(SelectOption, { value: "" },
+                tx(t, "boardProjectClear", "No binding (clears on save)")),
+              projects.map(function (p) {
+                return h(SelectOption, {
+                  key: p.id,
+                  value: p.id,
+                }, p.name || p.slug || p.id);
+              }),
+            ),
+            h("div", { className: "text-xs text-muted-foreground" },
+              tx(t, "boardProjectSettingsExplanation",
+                "Bound project tasks inherit the project. Select “No binding” to clear it.")),
+          ) : null,
         ),
         err ? h("div", { className: "text-xs text-destructive mt-2" }, err) : null,
         h("div", { className: "hermes-kanban-dialog-actions" },
@@ -2420,7 +2569,7 @@
         ),
       ),
       h("div", { className: "flex flex-col gap-1",
-                 title: "Filter by assigned Qubit profile. Profiles are the named agent identities that claim and work on tasks." },
+                 title: "Filter by assigned Hermes profile. Profiles are the named agent identities that claim and work on tasks." },
         h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "assignee", "Assignee")),
         h(Select, Object.assign({
           value: props.assigneeFilter,
@@ -2550,7 +2699,7 @@
         }, tx(t, "setPriority", "Set priority")),
       ),
       h("div", { className: "hermes-kanban-bulk-reassign",
-                 title: "Reassign selected tasks to a different Qubit profile. Pick a profile (or unassign) and click Apply." },
+                 title: "Reassign selected tasks to a different Hermes profile. Pick a profile (or unassign) and click Apply." },
         h(Select, Object.assign({
           value: assignee,
           className: "h-7 text-xs",
@@ -3059,7 +3208,7 @@
               }),
             ),
             h("span", { className: "hermes-kanban-card-id",
-                        title: `Task id: ${t.id}. Use this id with kanban_show, /kanban show, or qubit kanban show.` }, t.id),
+                        title: `Task id: ${t.id}. Use this id with kanban_show, /kanban show, or hermes kanban show.` }, t.id),
             t.warnings && t.warnings.count > 0
               ? h("span", {
                   className: cn(
@@ -3105,7 +3254,7 @@
           h("div", { className: "hermes-kanban-card-row hermes-kanban-card-meta" },
             t.assignee
               ? h("span", { className: "hermes-kanban-assignee",
-                            title: `Assigned to Qubit profile @${t.assignee}` }, "@", t.assignee)
+                            title: `Assigned to Hermes profile @${t.assignee}` }, "@", t.assignee)
               : h("span", { className: "hermes-kanban-unassigned",
                             title: needsAssignee
                               ? tx(i18n, "needsAssigneeHint", "Dependencies are satisfied, but the dispatcher skips this task until you assign a profile.")
@@ -3252,8 +3401,8 @@
                   : tx(t, "assigneePlaceholder", "assignee"),
                 className: "h-8 text-sm",
                 title: props.columnName === "triage"
-                  ? "Qubit profile that will spec this task (default: the dispatcher's configured specifier). Leave blank to let the dispatcher pick."
-                  : "Qubit profile to assign. Leave blank and the dispatcher will pick from available profiles when the task is Ready.",
+                  ? "Hermes profile that will spec this task (default: the dispatcher's configured specifier). Leave blank to let the dispatcher pick."
+                  : "Hermes profile to assign. Leave blank and the dispatcher will pick from available profiles when the task is Ready.",
                 style: { textTransform: "none" },
                 autoCapitalize: "none",
                 autoCorrect: "off",
@@ -3754,27 +3903,9 @@
       setDlErr(null);
       SDK.authedFetch(url)
         .then(function (resp) {
-          var ctype = (resp.headers.get("content-type") || "").toLowerCase();
           if (!resp.ok) {
             return resp.text().then(function (txt) {
               throw new Error(parseApiErrorMessage(new Error(resp.status + ": " + txt)));
-            });
-          }
-          // The Qubit compat backend serves the attachment as JSON with the
-          // real bytes base64-encoded (the JSON dispatcher has no binary
-          // channel); decode that into a Blob. A binary stream response is
-          // still accepted for forward compatibility.
-          if (ctype.indexOf("application/json") !== -1) {
-            return resp.json().then(function (payload) {
-              if (!payload || !payload.data_base64) {
-                throw new Error((payload && payload.detail) || "attachment data unavailable");
-              }
-              var bin = atob(payload.data_base64);
-              var bytes = new Uint8Array(bin.length);
-              for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-              return new Blob([bytes], {
-                type: payload.content_type || a.content_type || "application/octet-stream",
-              });
             });
           }
           return resp.blob();

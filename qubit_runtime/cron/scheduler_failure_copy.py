@@ -78,6 +78,10 @@ _PROVIDER_FAILURE_ACTION["content_policy_blocked"] = (
     "Reword the job's prompt with `qubit cron edit {job_id} --prompt <text>`, or pick another "
     "model with `qubit cron edit {job_id} --model <name>`."
 )
+_PROVIDER_FAILURE_ACTION["provider_policy_blocked"] = (
+    "Retrying won't help: check the account's status and data/privacy settings with the provider, "
+    "or pin another model with `qubit cron edit {job_id} --model <name>`."
+)
 _DEFAULT_FAILURE_ACTION = "Run it again with `qubit cron run {job_id}`, or edit it with `qubit cron edit {job_id}`."
 
 

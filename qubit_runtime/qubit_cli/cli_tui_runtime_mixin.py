@@ -1,6 +1,6 @@
 """Classic-TUI run loop phases: input processing, after-turn bookkeeping, startup banner/prewarm/maintenance, prompt_toolkit application build, signal handlers and shutdown.
 
-Mixin split out of ``cli.py``; bound onto ``QubitCLI`` via the MRO.
+Mixin split out of ``cli.py``; bound onto ``HermesCLI`` via the MRO.
 """
 
 from __future__ import annotations
@@ -108,7 +108,7 @@ class CLITuiRuntimeMixin:
 
         if isinstance(user_input, str) and _PASTE_REF_RE.search(user_input):
             user_input = self._expand_paste_references(user_input)
-        print()
+        _cprint("")
         self._print_user_message_preview(notification_preview or user_input)
 
         if submit_images:

@@ -12,8 +12,13 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useProfileScope } from "@/contexts/useProfileScope";
 import { api } from "@/lib/api";
 import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
+import {
+  refitWhenTerminalFontLoads,
+  TERMINAL_FONT_FAMILY,
+} from "@/lib/terminal-font-refit";
 import { cn, themedBody } from "@/lib/utils";
 import { useTheme } from "@/themes";
+import { errorMessage } from "@/lib/api-error";
 
 type ConsoleFrame =
   | {
@@ -50,7 +55,7 @@ type ConsoleFrame =
 
 type ConnectionState = "connecting" | "ready" | "running" | "closed" | "error";
 
-interface QubitConsoleModalProps {
+interface HermesConsoleModalProps {
   open: boolean;
   onClose: () => void;
 }
@@ -98,7 +103,7 @@ function isPrintable(data: string): boolean {
   return data >= " " || data === "\t";
 }
 
-export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
+export function HermesConsoleModal({ open, onClose }: HermesConsoleModalProps) {
   const modalRef = useModalBehavior({ open, onClose });
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XtermTerminal | null>(null);
@@ -113,6 +118,9 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
   const hasReadyFrameRef = useRef(false);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("connecting");
+  // Bumped by the Reconnect button; a dependency of the connect effect so the
+  // console redials the same /api/console socket without closing the modal.
+  const [connectNonce, setConnectNonce] = useState(0);
   const [consoleProfile, setConsoleProfile] = useState("current");
   const { profile } = useProfileScope();
   const { theme } = useTheme();
@@ -347,8 +355,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
     const term = new XtermTerminal({
       allowProposedApi: true,
       cursorBlink: true,
-      fontFamily:
-        "'JetBrains Mono', 'Cascadia Mono', 'Fira Code', 'MesloLGS NF', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace",
+      fontFamily: TERMINAL_FONT_FAMILY,
       fontSize: 13,
       lineHeight: 1.25,
       letterSpacing: 0,
@@ -390,6 +397,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
     const ro = new ResizeObserver(scheduleFit);
     ro.observe(host);
     scheduleFit();
+    const stopFontRefit = refitWhenTerminalFontLoads(term, fitTerminal);
 
     const dataDisposable = term.onData(handleInputData);
     setConnectionState("connecting");
@@ -432,17 +440,24 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
           pendingCommandRef.current = null;
           if (cancelled) return;
           setConnectionState(ev.code === 1000 ? "closed" : "error");
-          const reason = ev.reason ? ` ${ev.reason}` : "";
+          // Close code and server reason are diagnostics, not user copy.
+          console.warn(`[console] websocket closed code=${ev.code}${ev.reason ? ` reason=${ev.reason}` : ""}`);
           const message =
             ev.code === 1006 && !hasReadyFrameRef.current
-              ? "Console connection failed before the server handshake. Check that this dashboard is connected to a backend with /api/console."
-              : `Console closed (${ev.code}).${reason}`;
+              ? "Console could not connect to the dashboard server. Check that `qubit dashboard` is running, then click Reconnect."
+              : ev.code === 1000
+                ? "Console closed."
+                : "Console disconnected from the dashboard server. Click Reconnect to try again.";
           writeLine(term, `\x1b[31m${message}\x1b[0m`);
         };
       } catch (err) {
         if (cancelled) return;
         setConnectionState("error");
-        writeLine(term, `\x1b[31mConsole unavailable: ${err}\x1b[0m`);
+        console.warn(`[console] connect failed: ${errorMessage(err)}`);
+        writeLine(
+          term,
+          "\x1b[31mConsole could not connect to the dashboard server. Check that `qubit dashboard` is running, then click Reconnect.\x1b[0m",
+        );
       }
     })();
 
@@ -451,6 +466,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
       dataDisposable.dispose();
       ro.disconnect();
       if (resizeFrame) cancelAnimationFrame(resizeFrame);
+      stopFontRefit();
       wsRef.current?.close();
       wsRef.current = null;
       term.dispose();
@@ -460,7 +476,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
       activeCommandRef.current = false;
       hasReadyFrameRef.current = false;
     };
-  }, [handleFrame, handleInputData, open, profile, theme]);
+  }, [connectNonce, handleFrame, handleInputData, open, profile, theme]);
 
   useEffect(() => {
     if (!open) return;
@@ -490,7 +506,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
       onClick={(event) => event.target === event.currentTarget && onClose()}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="qubit-console-title"
+      aria-labelledby="hermes-console-title"
     >
       <div
         className={cn(
@@ -504,7 +520,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
           </div>
           <div className="min-w-0 flex-1">
             <h2
-              id="qubit-console-title"
+              id="hermes-console-title"
               className="font-mondwest text-display text-base tracking-wider"
             >
               Qubit Console
@@ -512,6 +528,19 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge tone={statusTone}>{connectionState}</Badge>
               <span className="font-mono">{consoleProfile}</span>
+              {(connectionState === "closed" || connectionState === "error") && (
+                <Button
+                  size="sm"
+                  outlined
+                  onClick={() => {
+                    setConnectionState("connecting");
+                    setConnectNonce((n) => n + 1);
+                  }}
+                  aria-label="Reconnect console"
+                >
+                  Reconnect
+                </Button>
+              )}
             </div>
           </div>
           <Button

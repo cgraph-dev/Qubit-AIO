@@ -16,8 +16,8 @@ from __future__ import annotations
 import cron.scheduler as sched
 from qubit_constants import (
     qubit_home_key,
-    reset_hermes_home_override,
-    set_hermes_home_override,
+    reset_qubit_home_override,
+    set_qubit_home_override,
 )
 
 
@@ -28,11 +28,11 @@ class _Scope:
         self._home = str(home)
 
     def __enter__(self):
-        self._token = set_hermes_home_override(self._home)
+        self._token = set_qubit_home_override(self._home)
         return self
 
     def __exit__(self, *_exc):
-        reset_hermes_home_override(self._token)
+        reset_qubit_home_override(self._token)
         return False
 
 

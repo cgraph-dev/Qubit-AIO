@@ -17,7 +17,7 @@ function publish(route: DesktopProfileRoute | null): void {
 }
 
 export async function refreshDefaultProfile(): Promise<DesktopProfileRoute | null> {
-  const getDefault = window.qubitDesktop?.profile?.getDefault
+  const getDefault = window.hermesDesktop?.profile?.getDefault
 
   if (!getDefault) {
     return $defaultProfileRoute.get()
@@ -34,7 +34,7 @@ export async function refreshDefaultProfile(): Promise<DesktopProfileRoute | nul
 }
 
 export async function setDefaultProfile(route: DesktopProfileRoute): Promise<DesktopProfileRoute> {
-  const setDefault = window.qubitDesktop?.profile?.setDefault
+  const setDefault = window.hermesDesktop?.profile?.setDefault
 
   if (!setDefault) {
     throw new Error('This Desktop version cannot save a default profile.')
@@ -51,7 +51,7 @@ export async function setDefaultProfile(route: DesktopProfileRoute): Promise<Des
 }
 
 export function subscribeDefaultProfile(): (() => void) | undefined {
-  return window.qubitDesktop?.profile?.onDefaultChanged?.(route => {
+  return window.hermesDesktop?.profile?.onDefaultChanged?.(route => {
     revision += 1
     publish(route)
   })

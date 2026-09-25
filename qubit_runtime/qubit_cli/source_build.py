@@ -30,7 +30,7 @@ def source_build_env(base_env: dict | None = None, *, explicit: bool = False) ->
     from pm import ensure
     from pm.environments import project_python, running_from_selected_environment
     from pm.paths import repo_root
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
     # The historical update runs on store Python with the selected environment
     # activated in-process. Icon generation starts an isolated child, which needs
@@ -40,7 +40,7 @@ def source_build_env(base_env: dict | None = None, *, explicit: bool = False) ->
     env = {**os.environ, **(base_env or {}), "CI": "1", "HERMES_PYTHON": python,
            "PYTHON": python}
     env.pop("ESBUILD_BINARY_PATH", None)
-    npmrc = get_hermes_home() / "npmrc"
+    npmrc = get_qubit_home() / "npmrc"
     if npmrc.is_file():
         env.setdefault("NPM_CONFIG_USERCONFIG", str(npmrc))
     return ensure("npm", base_env=env, explicit=explicit).env

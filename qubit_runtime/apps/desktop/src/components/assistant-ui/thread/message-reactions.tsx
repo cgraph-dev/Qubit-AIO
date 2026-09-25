@@ -197,7 +197,7 @@ export const ReactionBadge: FC<{
           <span
             className="reaction-pop leading-none"
             key={`${reaction.author}-${reaction.emoji}`}
-            title="Reacted by Qubit"
+            title="Reacted by Hermes"
           >
             {reaction.emoji}
           </span>

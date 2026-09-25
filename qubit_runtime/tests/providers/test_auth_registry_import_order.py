@@ -13,8 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_tui_import_exposes_auth_registry_to_provider_plugins(tmp_path):
     """Provider discovery must not see a partially initialized auth module."""
-    hermes_home = tmp_path / ".hermes"
-    plugin_dir = hermes_home / "plugins" / "model-providers" / "import-order-probe"
+    qubit_home = tmp_path / ".hermes"
+    plugin_dir = qubit_home / "plugins" / "model-providers" / "import-order-probe"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "__init__.py").write_text(
         "from providers import register_provider\n"
@@ -41,7 +41,7 @@ def test_tui_import_exposes_auth_registry_to_provider_plugins(tmp_path):
     )
 
     env = os.environ.copy()
-    env["QUBIT_HOME"] = str(hermes_home)
+    env["QUBIT_HOME"] = str(qubit_home)
     env.pop("HERMES_PROFILE", None)
     env["PYTHONPATH"] = os.pathsep.join([
         str(REPO_ROOT),
@@ -51,12 +51,12 @@ def test_tui_import_exposes_auth_registry_to_provider_plugins(tmp_path):
         [
             sys.executable,
             "-c",
-            "from tools.environments.local import _HERMES_PROVIDER_ENV_BLOCKLIST; "
+            "from tools.environments.local import _QUBIT_PROVIDER_ENV_BLOCKLIST; "
             "from qubit_cli.auth import PROVIDER_REGISTRY; "
             "cfg = PROVIDER_REGISTRY['import-order-probe']; "
             "assert cfg.name == 'Plugin injection', cfg; "
             "assert cfg.inference_base_url == 'https://plugin.example/v1', cfg; "
-            "assert 'IMPORT_ORDER_PROBE_KEY' in _HERMES_PROVIDER_ENV_BLOCKLIST",
+            "assert 'IMPORT_ORDER_PROBE_KEY' in _QUBIT_PROVIDER_ENV_BLOCKLIST",
         ],
         cwd=REPO_ROOT,
         env=env,

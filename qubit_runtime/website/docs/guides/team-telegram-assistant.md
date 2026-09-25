@@ -6,7 +6,7 @@ description: "Step-by-step guide to setting up a Telegram bot that your whole te
 
 # Set Up a Team Telegram Assistant
 
-This tutorial walks you through setting up a Telegram bot powered by Qubit Agent that multiple team members can use. By the end, your team will have a shared AI assistant they can message for help with code, research, system administration, and anything else — secured with per-user authorization.
+This tutorial walks you through setting up a Telegram bot powered by Hermes Agent that multiple team members can use. By the end, your team will have a shared AI assistant they can message for help with code, research, system administration, and anything else — secured with per-user authorization.
 
 ## What We're Building
 
@@ -24,12 +24,12 @@ A Telegram bot that:
 
 Before starting, make sure you have:
 
-- **Qubit Agent installed** on a server or VPS (not your laptop — the bot needs to stay running). Follow the [installation guide](/getting-started/installation) if you haven't yet.
+- **Hermes Agent installed** on a server or VPS (not your laptop — the bot needs to stay running). Follow the [installation guide](../getting-started/installation.md) if you haven't yet.
 - **A Telegram account** for yourself (the bot owner)
 - **An LLM provider configured** — at minimum, an API key for OpenAI, Anthropic, or another supported provider in `~/.hermes/.env`
 
 :::tip
-A $5/month VPS is plenty for running the gateway. Qubit itself is lightweight — the LLM API calls are what cost money, and those happen remotely.
+A $5/month VPS is plenty for running the gateway. Hermes itself is lightweight — the LLM API calls are what cost money, and those happen remotely.
 :::
 
 ---
@@ -41,7 +41,7 @@ Every Telegram bot starts with **@BotFather** — Telegram's official bot for cr
 1. **Open Telegram** and search for `@BotFather`, or go to [t.me/BotFather](https://t.me/BotFather)
 
 2. **Send `/newbot`** — BotFather will ask you two things:
-   - **Display name** — what users see (e.g., `Team Qubit Assistant`)
+   - **Display name** — what users see (e.g., `Team Hermes Assistant`)
    - **Username** — must end in `bot` (e.g., `myteam_hermes_bot`)
 
 3. **Copy the bot token** — BotFather replies with something like:
@@ -57,7 +57,7 @@ Every Telegram bot starts with **@BotFather** — Telegram's official bot for cr
    ```
    Choose your bot, then enter something like:
    ```
-   Team AI assistant powered by Qubit Agent. DM me for help with code, research, debugging, and more.
+   Team AI assistant powered by Hermes Agent. DM me for help with code, research, debugging, and more.
    ```
 
 5. **Set bot commands** (optional — gives users a command menu):
@@ -86,7 +86,7 @@ You have two options: the interactive setup wizard (recommended) or manual confi
 ### Option A: Interactive Setup (Recommended)
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
 This walks you through everything with arrow-key selection. Pick **Telegram**, paste your bot token, and enter your user ID when prompted.
@@ -124,13 +124,13 @@ Telegram user IDs are permanent numbers like `123456789`. They're different from
 Run the gateway in the foreground first to make sure everything works:
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 You should see output like:
 
 ```
-[Gateway] Starting Qubit Gateway...
+[Gateway] Starting Hermes Gateway...
 [Gateway] Telegram adapter connected
 [Gateway] Cron scheduler started (tick every 60s)
 ```
@@ -142,17 +142,17 @@ Open Telegram, find your bot, and send it a message. If it replies, you're in bu
 For a persistent deployment that survives reboots:
 
 ```bash
-qubit gateway install
-sudo qubit gateway install --system   # Linux only: boot-time system service
+hermes gateway install
+sudo hermes gateway install --system   # Linux only: boot-time system service
 ```
 
 This creates a background service: a user-level **systemd** service on Linux by default, a **launchd** service on macOS, or a boot-time Linux system service if you pass `--system`.
 
 ```bash
 # Linux — manage the default user service
-qubit gateway start
-qubit gateway stop
-qubit gateway status
+hermes gateway start
+hermes gateway stop
+hermes gateway status
 
 # View live logs
 journalctl --user -u hermes-gateway -f
@@ -161,26 +161,26 @@ journalctl --user -u hermes-gateway -f
 sudo loginctl enable-linger $USER
 
 # Linux servers — explicit system-service commands
-sudo qubit gateway start --system
-sudo qubit gateway status --system
+sudo hermes gateway start --system
+sudo hermes gateway status --system
 journalctl -u hermes-gateway -f
 ```
 
 ```bash
 # macOS — manage the service
-qubit gateway start
-qubit gateway stop
+hermes gateway start
+hermes gateway stop
 tail -f ~/.hermes/logs/gateway.log
 ```
 
 :::tip macOS PATH
-The launchd plist captures your shell PATH at install time so gateway subprocesses can find tools like Node.js and ffmpeg. If you install new tools later, re-run `qubit gateway install` to update the plist.
+The launchd plist captures your shell PATH at install time so gateway subprocesses can find tools like Node.js and ffmpeg. If you install new tools later, re-run `hermes gateway install` to update the plist.
 :::
 
 ### Verify It's Running
 
 ```bash
-qubit gateway status
+hermes gateway status
 ```
 
 Then send a test message to your bot on Telegram. You should get a response within a few seconds.
@@ -203,7 +203,7 @@ TELEGRAM_ALLOWED_USERS=123456789,987654321,555555555
 Restart the gateway after changes:
 
 ```bash
-qubit gateway stop && qubit gateway start
+hermes gateway stop && hermes gateway start
 ```
 
 ### Approach B: DM Pairing (Recommended for Teams)
@@ -220,7 +220,7 @@ DM pairing is more flexible — you don't need to collect user IDs upfront. Here
 
 3. **You approve it** on the server:
    ```bash
-   qubit pairing approve telegram XKGH5N7P
+   hermes pairing approve telegram XKGH5N7P
    ```
 
 4. **They're in** — the bot immediately starts responding to their messages
@@ -229,13 +229,13 @@ DM pairing is more flexible — you don't need to collect user IDs upfront. Here
 
 ```bash
 # See all pending and approved users
-qubit pairing list
+hermes pairing list
 
 # Revoke someone's access
-qubit pairing revoke telegram 987654321
+hermes pairing revoke telegram 987654321
 
 # Clear expired pending codes
-qubit pairing clear-pending
+hermes pairing clear-pending
 ```
 
 :::tip
@@ -291,7 +291,7 @@ Users can also change this per-session with the `/verbose` command in chat.
 
 Customize how the bot communicates by editing `~/.hermes/SOUL.md`:
 
-For a full guide, see [Use SOUL.md with Qubit](/guides/use-soul-with-qubit).
+For a full guide, see [Use SOUL.md with Hermes](./use-soul-with-hermes.md).
 
 ```markdown
 # Soul
@@ -352,8 +352,8 @@ partitions above 80%, containers that have restarted, or high memory usage.
 
 ```bash
 # From the CLI
-qubit cron list          # View all scheduled jobs
-qubit cron status        # Check if scheduler is running
+hermes cron list          # View all scheduled jobs
+hermes cron status        # Check if scheduler is running
 
 # From Telegram chat
 /cron list                # View jobs
@@ -394,7 +394,7 @@ This way, even if someone asks the bot to run something destructive, your host s
 
 ```bash
 # Check if the gateway is running
-qubit gateway status
+hermes gateway status
 
 # Watch live logs (Linux)
 journalctl --user -u hermes-gateway -f
@@ -403,13 +403,13 @@ journalctl --user -u hermes-gateway -f
 tail -f ~/.hermes/logs/gateway.log
 ```
 
-### Keep Qubit Updated
+### Keep Hermes Updated
 
 From Telegram, send `/update` to the bot — it will pull the latest version and restart. Or from the server:
 
 ```bash
-qubit update
-qubit gateway stop && qubit gateway start
+hermes update
+hermes gateway stop && hermes gateway start
 ```
 
 ### Log Locations
@@ -428,13 +428,13 @@ qubit gateway stop && qubit gateway start
 
 You've got a working team Telegram assistant. Here are some next steps:
 
-- **[Security Guide](/user-guide/security)** — deep dive into authorization, container isolation, and command approval
-- **[Messaging Gateway](/user-guide/messaging)** — full reference for gateway architecture, session management, and chat commands
-- **[Telegram Setup](/user-guide/messaging/telegram)** — platform-specific details including voice messages and TTS
-- **[Scheduled Tasks](/user-guide/features/cron)** — advanced cron scheduling with delivery options and cron expressions
-- **[Context Files](/user-guide/features/context-files)** — AGENTS.md, SOUL.md, and .cursorrules for project knowledge
-- **[Personality](/user-guide/features/personality)** — built-in personality presets and custom persona definitions
-- **Add more platforms** — the same gateway can simultaneously run [Discord](/user-guide/messaging/discord), [Slack](/user-guide/messaging/slack), and [WhatsApp](/user-guide/messaging/whatsapp)
+- **[Security Guide](../user-guide/security.md)** — deep dive into authorization, container isolation, and command approval
+- **[Messaging Gateway](../user-guide/messaging/index.md)** — full reference for gateway architecture, session management, and chat commands
+- **[Telegram Setup](../user-guide/messaging/telegram.md)** — platform-specific details including voice messages and TTS
+- **[Scheduled Tasks](../user-guide/features/cron.md)** — advanced cron scheduling with delivery options and cron expressions
+- **[Context Files](../user-guide/features/context-files.md)** — AGENTS.md, SOUL.md, and .cursorrules for project knowledge
+- **[Personality](../user-guide/features/personality.md)** — built-in personality presets and custom persona definitions
+- **Add more platforms** — the same gateway can simultaneously run [Discord](../user-guide/messaging/discord.md), [Slack](../user-guide/messaging/slack.md), and [WhatsApp](../user-guide/messaging/whatsapp.md)
 
 ---
 

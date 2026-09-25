@@ -37,8 +37,8 @@ def _process_home() -> Path:
     """The marker and the shim's log live in the PROCESS home (update_lock.update_marker_path):
     the shim resolved ``$QUBIT_HOME`` or the platform default, never a profile override, and
     the platform default (sudo invoker, data-dir suffix) is not ``~/.hermes`` everywhere."""
-    from qubit_constants import get_process_hermes_home
-    return get_process_hermes_home()
+    from qubit_constants import get_process_qubit_home
+    return get_process_qubit_home()
 
 
 def status_file() -> Path | None:

@@ -59,7 +59,7 @@ test('environment URL without its token keeps the existing error', () => {
         env: { url: 'https://env.test' },
         registry: registry('local', [])
       }),
-    /QUBIT_DESKTOP_REMOTE_TOKEN is not/
+    /HERMES_DESKTOP_REMOTE_TOKEN is not/
   )
 })
 
@@ -95,7 +95,7 @@ test('profile SSH identity includes port, key, paths, and remote profile', () =>
     user: 'hermes',
     port: 2222,
     keyPath: '/keys/a',
-    remoteQubitPath: '/srv/hermes',
+    remoteHermesPath: '/srv/hermes',
     remoteProfile: 'worker'
   }
 
@@ -119,14 +119,14 @@ test('profile SSH route fails closed when any dial field differs', () => {
     user: 'hermes',
     port: 2222,
     keyPath: '/keys/a',
-    remoteQubitPath: '/srv/hermes',
+    remoteHermesPath: '/srv/hermes',
     remoteProfile: 'worker'
   }
 
   const variants = [
     { ...ssh, port: 2200 },
     { ...ssh, keyPath: '/keys/b' },
-    { ...ssh, remoteQubitPath: '/opt/hermes' },
+    { ...ssh, remoteHermesPath: '/opt/hermes' },
     { ...ssh, remoteProfile: 'default' },
     { ...ssh, user: 'other' }
   ]
@@ -177,7 +177,7 @@ test('v1 profile SSH pool key is the profile, not conn:id::profile', () => {
     user: 'hermes',
     port: 2222,
     keyPath: '/keys/a',
-    remoteQubitPath: '/srv/hermes',
+    remoteHermesPath: '/srv/hermes',
     remoteProfile: 'worker'
   }
 
@@ -351,7 +351,7 @@ test('local config without overrides returns null', () => {
 //
 // "Make primary" on a registered remote gateway only writes connections.json;
 // the v1 config.mode stays 'local'. The route resolver must still expose that
-// remote transport, or startHermes() spawns a loopback `qubit serve` the
+// remote transport, or startHermes() spawns a loopback `hermes serve` the
 // desktop never uses (duplicated MCP sets, port squat, respawn-on-poll).
 
 test('falls back to a REMOTE registry primary when the v1 mode is local (#91564/#90316)', () => {
@@ -378,7 +378,7 @@ test('falls back to a CLOUD registry primary when the v1 mode is local', () => {
       {
         id: 'cloud-1',
         kind: 'cloud',
-        label: 'Qubit Cloud',
+        label: 'Hermes Cloud',
         url: 'https://agent.hermes.cloud',
         authMode: 'oauth',
         org: 'nous'

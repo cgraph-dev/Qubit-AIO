@@ -3,8 +3,9 @@
 // nudges chalk / supports-color before either package is initialized.
 import './lib/forceTruecolor.js'
 
-import type { FrameEvent } from '@qubit/ink'
+import type { FrameEvent } from '@hermes/ink'
 
+import { setRpcErrorLogSink } from './app/userMessages.js'
 import { DASHBOARD_TUI_MODE, TERMUX_TUI_MODE } from './config/env.js'
 import { GatewayClient } from './gatewayClient.js'
 import { setupGracefulExit } from './lib/gracefulExit.js'
@@ -50,6 +51,8 @@ if (TERMUX_TUI_MODE) {
 
 const gw = new GatewayClient()
 
+// describeRpcError replaces raw wire errors with plain copy; keep the original in /logs.
+setRpcErrorLogSink(line => gw.recordLog(line))
 gw.start()
 
 const dumpNotice = (snap: MemorySnapshot, dump: HeapDumpResult | null) =>
@@ -141,14 +144,14 @@ const stopMemoryMonitor = startMemoryMonitor({
   }
 })
 
-if (process.env.QUBIT_HEAPDUMP_ON_START === '1') {
+if (process.env.HERMES_HEAPDUMP_ON_START === '1') {
   void performHeapDump('manual')
 }
 
 process.on('beforeExit', () => stopMemoryMonitor())
 
 const [ink, { App }, { logFrameEvent }, { trackFrame }] = await Promise.all([
-  import('@qubit/ink'),
+  import('@hermes/ink'),
   import('./app.js'),
   import('./lib/perfPane.js'),
   import('./lib/fpsStore.js')

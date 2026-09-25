@@ -282,8 +282,8 @@ def _run_case(case: Case, root: Path) -> tuple[Fleet, list[LegOutcome]]:
         outcomes = []
         for leg in case.legs:
             marks, egress_mark = fleet.marks(), len(trap.attempts)
-            hermes_home = home / ".hermes" / "profiles" / leg.profile if leg.profile else None
-            run = run_hermes(leg.argv, home, hermes_home=hermes_home, proxy=trap.url, timeout=leg.timeout)
+            qubit_home = home / ".hermes" / "profiles" / leg.profile if leg.profile else None
+            run = run_hermes(leg.argv, home, qubit_home=qubit_home, proxy=trap.url, timeout=leg.timeout)
             outcomes.append(LegOutcome(leg, run, fleet.since(marks), trap.attempts[egress_mark:]))
         return fleet, outcomes
     finally:

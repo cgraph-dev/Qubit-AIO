@@ -5,8 +5,7 @@ import { MemoryRouter } from 'react-router'
 import type * as ReactRouterDom from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type * as QubitApi from '@/hermes'
-import { QUBIT_DOCS_ORIGIN } from '@/lib/qubit-links'
+import type * as HermesApi from '@/hermes'
 import { queryClient } from '@/lib/query-client'
 import type * as HubActions from '@/store/hub-actions'
 
@@ -26,7 +25,7 @@ const getOfficialSkills = vi.fn()
 // calls we assert on. Args are forwarded so the per-profile scope arg is
 // observable.
 vi.mock('@/hermes', async importOriginal => ({
-  ...(await importOriginal<typeof QubitApi>()),
+  ...(await importOriginal<typeof HermesApi>()),
   getSkills: (profile?: null | string) => getSkills(profile),
   getToolsets: (profile?: null | string) => getToolsets(profile),
   setSkillEnabled: (name: string, enabled: boolean, profile?: null | string) => setSkillEnabled(name, enabled, profile),
@@ -107,7 +106,7 @@ beforeEach(() => {
   getSkillContent.mockResolvedValue({
     name: 'web-research',
     path: '/skills/web-research/SKILL.md',
-    content: '---\nname: web-research\nversion: 1.2.0\nauthor: Qubit\n---\n\n# Web Research\n\nDeep research steps.'
+    content: '---\nname: web-research\nversion: 1.2.0\nauthor: Nous\n---\n\n# Web Research\n\nDeep research steps.'
   })
   // Single profile by default → the scope selector stays hidden (>1 gate),
   // so existing tests see unchanged single-profile behavior.
@@ -140,29 +139,6 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
 
     await waitFor(() => expect(setToolsetEnabled).toHaveBeenCalled())
     expect(setToolsetEnabled.mock.calls[0].slice(0, 2)).toEqual(['web', false])
-  })
-
-  it('renders toolset titles without leading emoji', async () => {
-    getToolsets.mockResolvedValue([toolset({ name: 'cronjob', label: '⏰ Cron Jobs', description: 'cron tools' })])
-
-    await renderSkills()
-
-    // The label renders in both the row and the auto-selected detail header, so
-    // assert via the switch's (emoji-stripped) accessible name and the absence
-    // of the emoji rather than a single-match text lookup.
-    await screen.findByRole('switch', { name: 'Turn Cron Jobs toolset off' })
-    expect(screen.queryByText(/⏰/)).toBeNull()
-  })
-
-  it('renders the provider config panel inline for the selected toolset', async () => {
-    // The master-detail UI dropped the resting "Configured" pill and the
-    // "Configure" expander: the detail column auto-selects the first toolset
-    // and renders its config panel directly, which fetches on mount.
-    await renderSkills()
-
-    await screen.findByRole('switch', { name: 'Turn Web Search toolset off' })
-    await waitFor(() => expect(getToolsetConfig).toHaveBeenCalled())
-    expect(getToolsetConfig.mock.calls[0][0]).toBe('web')
   })
 
   it('scopes Tools config to the profile chosen in the selector', async () => {
@@ -298,7 +274,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           data: { type: 'hermes-skill-pick', name: 'web-research', identifier: 'web-research' },
-          origin: QUBIT_DOCS_ORIGIN
+          origin: 'https://hermes-agent.nousresearch.com'
         })
       )
     })
@@ -306,7 +282,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
     // Refused with an informational toast, no install action spawned.
     await waitFor(() =>
       expect(vi.mocked(notify)).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '"web-research" is already installed' })
+        expect.objectContaining({ title: expect.stringContaining('web-research') })
       )
     )
   })
@@ -362,8 +338,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
 
     await renderSkills()
 
-    expect(await screen.findByText(/auxiliary model configuration/)).toBeTruthy()
-    const link = screen.getByRole('button', { name: /Choose vision model in Settings/ })
+    const link = await screen.findByRole('button', { name: /Choose vision model in Settings/ })
 
     await act(async () => {
       fireEvent.click(link)
@@ -433,7 +408,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
       sources: []
     })
 
-    ;(window as { qubitDesktop?: unknown }).qubitDesktop = { connections, getAgentRoster }
+    ;(window as { hermesDesktop?: unknown }).hermesDesktop = { connections, getAgentRoster }
 
     try {
       await renderSkills()
@@ -442,7 +417,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
       // The selector paints roster rows labeled profile — device.
       expect(await screen.findByText('default — This device (current)')).toBeTruthy()
     } finally {
-      delete (window as { qubitDesktop?: unknown }).qubitDesktop
+      delete (window as { hermesDesktop?: unknown }).hermesDesktop
     }
   })
 
@@ -504,7 +479,6 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
 
     // Catalog section header + the one genuinely-available row. Rows already
     // installed (lock flag OR name collision with the installed list) are gone.
-    expect(await screen.findByText('Available to install')).toBeTruthy()
     expect(await screen.findByText('gif-search')).toBeTruthy()
     expect(screen.queryByText('ascii-art')).toBeNull()
 

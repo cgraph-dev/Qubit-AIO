@@ -45,10 +45,12 @@ def test_update_via_zip_rejects_symlink_member(tmp_path, monkeypatch):
     fake_root = tmp_path / "install_dir"
     fake_root.mkdir()
 
-    from qubit_cli import main as qubit_main
+    from qubit_cli import main as hermes_main
     from qubit_cli.update_cmd import _update_via_zip
 
-    monkeypatch.setattr(qubit_main, "PROJECT_ROOT", fake_root)
+    monkeypatch.setattr(hermes_main, "PROJECT_ROOT", fake_root)
+    monkeypatch.setattr(update_cmd, "_complete_source_update", lambda request: None)
+    monkeypatch.setattr("pm.sync_venv", lambda *a, **k: None)
 
     args = type("Args", (), {})()
 
@@ -75,11 +77,12 @@ def test_update_via_zip_rejects_symlink_member(tmp_path, monkeypatch):
         # That's the contract: a malicious ZIP must fail the update, not
         # silently materialize a symlink.
         with pytest.raises(SystemExit) as exc_info:
-            _update_via_zip(args)
+            _update_via_zip(args, completion_request={})
         assert exc_info.value.code == 1
 
     # Belt: confirm extractall never produced the link.
     tmp_dir = captured.get("tmp_dir")
+    assert tmp_dir is not None, "ZIP validation must run before refusal"
     if tmp_dir:
         evil_path = os.path.join(tmp_dir, "hermes-agent-main", "evil-link")
         assert not os.path.lexists(evil_path), (
@@ -105,9 +108,11 @@ def test_update_via_zip_accepts_normal_member(tmp_path, monkeypatch, capsys):
     fake_root = tmp_path / "install_dir"
     fake_root.mkdir()
 
-    from qubit_cli import main as qubit_main
+    from qubit_cli import main as hermes_main
 
-    monkeypatch.setattr(qubit_main, "PROJECT_ROOT", fake_root)
+    monkeypatch.setattr(hermes_main, "PROJECT_ROOT", fake_root)
+    monkeypatch.setattr(update_cmd, "_complete_source_update", lambda request: None)
+    monkeypatch.setattr("pm.sync_venv", lambda *a, **k: None)
 
     args = type("Args", (), {})()
 
@@ -125,7 +130,7 @@ def test_update_via_zip_accepts_normal_member(tmp_path, monkeypatch, capsys):
          patch("subprocess.check_call"):
         fake_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         try:
-            update_cmd._update_via_zip(args)
+            update_cmd._update_via_zip(args, completion_request={})
         except SystemExit:
             pass
 

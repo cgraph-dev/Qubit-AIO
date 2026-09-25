@@ -1,4 +1,4 @@
-"""Tests for the Linux XDG desktop entry installed by ``qubit desktop``."""
+"""Tests for the Linux XDG desktop entry installed by ``hermes desktop``."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import os
 import stat
 import struct
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -44,11 +45,11 @@ def _png_ihdr(width: int, height: int) -> bytes:
 
 
 def _stub_install(tmp_path, monkeypatch) -> None:
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir(exist_ok=True)
-    qubit_bin.write_text("", encoding="utf-8")
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir(exist_ok=True)
+    hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -66,11 +67,11 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     tmp_path, xdg_home, monkeypatch
 ):
     root = _make_project(tmp_path)
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
-    qubit_bin.write_text("", encoding="utf-8")
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
+    hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
     # Keep the icon install out of the way: this test pins the
@@ -79,12 +80,12 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
 
     entry = lde.install_desktop_entry(root)
 
-    assert entry == xdg_home / "applications" / "qubit.desktop"
+    assert entry == xdg_home / "applications" / "hermes.desktop"
     values = _parse(entry.read_text(encoding="utf-8"))
 
     # Exec must be the absolute path of the resolved binary. The launcher
     # runs with a minimal PATH, so a bare `hermes` would not resolve.
-    assert values["Exec"] == f"{qubit_bin} desktop"
+    assert values["Exec"] == f"{hermes_bin} desktop"
     assert Path(values["Exec"].split(" ")[0]).is_absolute()
 
     # Icon must be an absolute path to the real icon in the checkout.
@@ -101,23 +102,23 @@ def test_install_prefers_themed_icon_from_hicolor(tmp_path, xdg_home, monkeypatc
     fixed for).
     """
     root = _make_project(tmp_path)
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
-    qubit_bin.write_text("", encoding="utf-8")
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
+    hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     values = _parse(entry.read_text(encoding="utf-8"))
-    assert values["Icon"] == "qubit"
+    assert values["Icon"] == "hermes"
 
     # And the icon really landed in the hicolor tree: the fixture icon is
     # a fake PNG (no valid IHDR), so the size is unknown and the icon
     # lands under 256x256/ (indexed; never scalable, which is SVG-only).
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
     assert dest.is_file()
     assert dest.read_bytes() == lde.icon_path(root).read_bytes()
 
@@ -127,11 +128,11 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
 ):
     """An impossible icon copy keeps the absolute path (never breaks)."""
     root = _make_project(tmp_path)
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
-    qubit_bin.write_text("", encoding="utf-8")
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
+    hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -147,14 +148,14 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
     assert values["Icon"] == str(lde.icon_path(root))
 
     assert values["Type"] == "Application"
-    assert values["Name"] == "Qubit"
+    assert values["Name"] == "Hermes"
     assert values["Terminal"] == "false"
 
 
 def test_installed_entry_is_executable(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/hermes"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -165,7 +166,7 @@ def test_installed_entry_is_executable(tmp_path, xdg_home, monkeypatch):
 
 def test_exec_falls_back_to_interpreter_module(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", lambda: None)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", lambda: None)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -186,14 +187,14 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
     import sys
 
     root = _make_project(tmp_path)
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
-    qubit_bin.write_text(
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
+    hermes_bin.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
-    qubit_bin.chmod(0o755)
+    hermes_bin.chmod(0o755)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -202,20 +203,20 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
 
     interpreter = os.path.abspath(sys.executable)
     assert exec_line.split(" ")[0].strip('"') == interpreter
-    assert str(qubit_bin) in exec_line
+    assert str(hermes_bin) in exec_line
     assert exec_line.endswith("desktop")
 
 
 def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
-    qubit_bin.write_text(
-        '#!/bin/bash\nexec /opt/hermes/venv/bin/python "$@"\n', encoding="utf-8"
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
+    hermes_bin.write_text(
+        '#!/usr/bin/env bash\nexec /opt/hermes/venv/bin/python "$@"\n', encoding="utf-8"
     )
-    qubit_bin.chmod(0o755)
+    hermes_bin.chmod(0o755)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -223,20 +224,20 @@ def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypat
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
 
     # A bash wrapper execs the venv python itself — no interpreter prefix.
-    assert exec_line == f"{qubit_bin} desktop"
+    assert exec_line == f"{hermes_bin} desktop"
 
 
 def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch):
     import sys
 
     root = _make_project(tmp_path)
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
     interpreter = os.path.abspath(sys.executable)
-    qubit_bin.write_text(f"#!{interpreter}\nimport qubit_cli\n", encoding="utf-8")
-    qubit_bin.chmod(0o755)
+    hermes_bin.write_text(f"#!{interpreter}\nimport qubit_cli\n", encoding="utf-8")
+    hermes_bin.chmod(0o755)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -245,7 +246,7 @@ def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch)
 
     # Console-script with the venv's own interpreter in the shebang: correct
     # as-is, prefixing would only add noise.
-    assert exec_line == f"{qubit_bin} desktop"
+    assert exec_line == f"{hermes_bin} desktop"
 
 
 # The persisted entry must be launch-context independent: whatever process
@@ -271,20 +272,20 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "qubit"  # checkout-internal launcher candidate
+    repo_script = root / "hermes"  # checkout-internal launcher candidate
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
-    wrapper = tmp_path / "installed" / "bin" / "qubit"
+    wrapper = tmp_path / "installed" / "bin" / "hermes"
     wrapper.parent.mkdir(parents=True)
-    wrapper.write_text(f'#!/bin/bash\nexec {sys.executable} "$@"\n', encoding="utf-8")
+    wrapper.write_text(f'#!/usr/bin/env bash\nexec {sys.executable} "$@"\n', encoding="utf-8")
     wrapper.chmod(0o755)
 
     # argv[0] = repo script; PATH lookup finds the installed wrapper.
     _argv0_context(monkeypatch, str(repo_script))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "qubit" else None
+        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -301,12 +302,11 @@ def test_exec_never_persists_a_bare_interpreter_command(
 ):
     """The `python -m qubit_cli.main` relaunch context must not write
     `Exec=<python> desktop` — a command line no DE can run."""
-    import sys
 
     root = _make_project(tmp_path)
-    wrapper = tmp_path / "installed" / "bin" / "qubit"
+    wrapper = tmp_path / "installed" / "bin" / "hermes"
     wrapper.parent.mkdir(parents=True)
-    wrapper.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    wrapper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     wrapper.chmod(0o755)
 
     interpreter = tmp_path / "uv" / "cpython-3.11.15" / "bin" / "python3.11"
@@ -317,7 +317,7 @@ def test_exec_never_persists_a_bare_interpreter_command(
     # argv[0] IS the interpreter (python -m context); PATH has the wrapper.
     _argv0_context(monkeypatch, str(interpreter))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "qubit" else None
+        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -347,7 +347,7 @@ def test_exec_keeps_resolver_fallback_when_no_wrapper_on_path(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "qubit"
+    repo_script = root / "hermes"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
@@ -358,10 +358,10 @@ def test_exec_keeps_resolver_fallback_when_no_wrapper_on_path(
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     def fake_resolve():
-        # Mirror resolve_hermes_bin's chain: argv[0] → relative → PATH → None.
+        # Mirror resolve_qubit_bin's chain: argv[0] → relative → PATH → None.
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
 
     entry = lde.install_desktop_entry(root)
     exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
@@ -386,7 +386,7 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "qubit"
+    repo_script = root / "hermes"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
@@ -394,12 +394,12 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
 
     # The wrapper exists at the known location but is NOT on PATH.
     # Realistic installer shim: execs this checkout's venv python on the
-    # checkout's qubit script (the aidiyet check requires it to target
+    # checkout's hermes script (the aidiyet check requires it to target
     # the writing checkout).
-    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "qubit"
+    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
-        f'#!/bin/bash\nexec {root / "venv" / "bin" / "python"} {root / "qubit"} "$@"\n',
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
         encoding="utf-8",
     )
     known_wrapper.chmod(0o755)
@@ -411,7 +411,7 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -419,6 +419,109 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
 
     # The probe found the wrapper despite the PATH miss.
     assert exec_line == f"{known_wrapper} desktop"
+
+
+def test_exec_never_persists_a_checkout_internal_path_hit(tmp_path, xdg_home, monkeypatch):
+    """A PATH hit inside THIS checkout is a launch-context artifact, like argv[0].
+
+    The desktop-update hand-off hands the updater <checkout>/venv/bin at the
+    FRONT of PATH (apps/desktop/electron/main.ts), so argv[0] is the venv
+    console script — checkout-internal, correctly skipped as a durable
+    answer — and the reroute that hides argv[0] re-resolves over PATH and
+    hits THE SAME SCRIPT. The rerouted branch returned that hit outright,
+    persisting the venv form; the next DE launch re-resolves to the durable
+    wrapper and flips the bytes back. Alternating writers alternate the
+    file content (captured: wrapper -> venv -> wrapper inside one update
+    cycle), and every flip rewrites hermes.desktop. A rewrite landing
+    inside a grid launch's STARTING window is the arm for the gnome-shell
+    50.x crash this module already guards against. A PATH hit inside the
+    checkout must fall through to the durable probe.
+    """
+    root = _make_project(tmp_path)
+    venv_script = root / "venv" / "bin" / "hermes"
+    venv_script.parent.mkdir(parents=True)
+    venv_script.write_text("#!/usr/bin/env bash\nexec true\n", encoding="utf-8")
+    venv_script.chmod(0o755)
+
+    known_wrapper = tmp_path / "path-home" / ".local" / "bin" / "hermes"
+    known_wrapper.parent.mkdir(parents=True)
+    known_wrapper.write_text(
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        encoding="utf-8",
+    )
+    known_wrapper.chmod(0o755)
+    monkeypatch.setenv("HOME", str(tmp_path / "path-home"))
+
+    # The hand-off's resolver chain: argv[0] = venv console script; with
+    # argv[0] hidden, the PATH rerun yields the SAME script.
+    def fake_resolve():
+        return sys.argv[0] or str(venv_script)
+
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
+    _argv0_context(monkeypatch, str(venv_script))
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    entry = lde.install_desktop_entry(root)
+    assert entry is not None
+    exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
+
+    assert exec_line == f"{known_wrapper} desktop"
+    assert str(venv_script) not in exec_line
+
+    # …and the same context a second time re-renders byte-identical content:
+    # the no-op guard then skips the rewrite entirely (no write, no rescan).
+    lde._probe_cache.clear()
+    entry2 = lde.install_desktop_entry(root)
+    assert entry2 is not None
+    assert entry2.read_text(encoding="utf-8") == entry.read_text(encoding="utf-8")
+
+
+def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
+    tmp_path, xdg_home, monkeypatch
+):
+    """`None` from the resolver must still probe known wrapper locations.
+
+    A cold relaunch (argv[0] is not an executable file, e.g. `-c` under
+    `python -m`, and PATH has no `hermes`) makes resolve_qubit_bin return
+    None outright. The early `return primary` that used to fire here skipped
+    the durable-wrapper probe, so the persisted Exec flipped to the bare
+    `<python> -m qubit_cli.main desktop` module form. Each flip between the
+    wrapper and module forms rewrites hermes.desktop on the next launch; any
+    rewrite that lands while gnome-shell's ShellApp for the entry is still
+    STARTING crashes the shell (shell_app_dispose `state == STOPPED`
+    assertion, gnome-shell 50.4). The entry must converge on the durable
+    wrapper wherever it exists.
+    """
+    root = _make_project(tmp_path)
+
+    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "hermes"
+    known_wrapper.parent.mkdir(parents=True)
+    known_wrapper.write_text(
+        f'#!/usr/bin/env bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
+        encoding="utf-8",
+    )
+    known_wrapper.chmod(0o755)
+    monkeypatch.setenv("HOME", str(tmp_path / "cold-home"))
+
+    # argv[0] is not an executable path at all — the resolver's own chain
+    # yields None with or without argv[0].
+    _argv0_context(monkeypatch, "-c")
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", lambda: None)
+    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
+
+    entry = lde.install_desktop_entry(root)
+    assert entry is not None
+    exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
+
+    assert exec_line == f"{known_wrapper} desktop"
+
+    # …and the SAME context a second time re-renders byte-identical content:
+    # the no-op guard in install_desktop_entry then skips the rewrite.
+    lde._probe_cache.clear()
+    entry2 = lde.install_desktop_entry(root)
+    assert entry2 is not None
+    assert entry2.read_text(encoding="utf-8") == entry.read_text(encoding="utf-8")
 
 
 def test_exec_rejects_known_wrapper_from_another_checkout(
@@ -435,7 +538,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     import sys
 
     root = _make_project(tmp_path)
-    repo_script = root / "qubit"
+    repo_script = root / "hermes"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
@@ -444,11 +547,11 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     # A shim belonging to a DIFFERENT checkout.
     other_root = tmp_path / "other-install"
     other_root.mkdir()
-    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "qubit"
+    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
     foreign_wrapper.parent.mkdir(parents=True)
     foreign_wrapper.write_text(
-        f"#!/bin/bash\nexec {other_root / 'venv' / 'bin' / 'python'} "
-        f'{other_root / "qubit"} "$@"\n',
+        f"#!/usr/bin/env bash\nexec {other_root / 'venv' / 'bin' / 'python'} "
+        f'{other_root / "hermes"} "$@"\n',
         encoding="utf-8",
     )
     foreign_wrapper.chmod(0o755)
@@ -460,7 +563,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -477,25 +580,25 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
         pytest.param(
             "user",
             {},
-            "HOME-SET-BY-TEST/.local/bin/qubit",
+            "HOME-SET-BY-TEST/.local/bin/hermes",
             id="user-layout",
         ),
         pytest.param(
             "termux",
             {"PREFIX": "PREFIX-SET-BY-TEST"},
-            "PREFIX-SET-BY-TEST/bin/qubit",
+            "PREFIX-SET-BY-TEST/bin/hermes",
             id="termux-prefix-first",
         ),
         pytest.param(
             "root-fhs",
             {"__EUID0__": "1"},
-            "/usr/local/bin/qubit",
+            "/usr/local/bin/hermes",
             id="root-fhs",
         ),
         pytest.param(
             "non-root-no-fhs",
             {"__EUID0__": "0"},
-            "HOME-SET-BY-TEST/.local/bin/qubit",
+            "HOME-SET-BY-TEST/.local/bin/hermes",
             id="non-root-excludes-fhs",
         ),
     ],
@@ -510,7 +613,6 @@ def test_known_wrapper_candidates_cover_installer_layouts(
     candidate. Locking these in protects against silent regressions in
     the stripped-PATH probe path.
     """
-    import os
 
     sentinel_home = "/home/__sentinel_home__"
     monkeypatch.setenv("HOME", sentinel_home)
@@ -529,18 +631,18 @@ def test_known_wrapper_candidates_cover_installer_layouts(
         assert candidates[0] == expected_resolved
     if layout == "root-fhs":
         # Root FHS outranks the user layout.
-        assert candidates.index("/usr/local/bin/qubit") < candidates.index(
+        assert candidates.index("/usr/local/bin/hermes") < candidates.index(
             f"{sentinel_home}/.local/bin/hermes"
         )
     if layout == "non-root-no-fhs":
         # Non-root euid: /usr/local/bin must be excluded outright.
-        assert "/usr/local/bin/qubit" not in candidates
+        assert "/usr/local/bin/hermes" not in candidates
 
 
 def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/hermes"
     )
     calls: list[Path] = []
     monkeypatch.setattr(
@@ -559,7 +661,7 @@ def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkey
     root = tmp_path / "hermes-agent"
     root.mkdir()
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: "/usr/bin/hermes"
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/hermes"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -567,17 +669,17 @@ def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkey
 
     # A broken absolute path renders as no icon. The themed name resolves
     # when Hermes is installed some other way.
-    assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "qubit"
+    assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "hermes"
 
 
-@pytest.mark.macos_only
+@pytest.mark.platforms("macos")
 def test_install_is_a_noop_on_macos(tmp_path):
     """Faking darwin only renamed the host — the real macOS runner is the
     only place the `sys.platform` guard is exercised against a real host."""
     assert lde.install_desktop_entry(_make_project(tmp_path)) is None
 
 
-@pytest.mark.windows_only
+@pytest.mark.platforms("windows")
 def test_install_is_a_noop_on_windows(tmp_path):
     """As above for Windows: a fake left POSIX paths and a POSIX XDG layout
     in place, so the no-op was never proven against a real one."""
@@ -600,16 +702,6 @@ def _stub_tools(monkeypatch, available: "set[str]") -> "list[list[str]]":
     return ran
 
 
-def test_refresh_runs_kbuildsycoca6_when_present(monkeypatch, tmp_path):
-    ran = _stub_tools(monkeypatch, {"update-desktop-database", "kbuildsycoca6"})
-
-    tools = lde.refresh_desktop_databases(tmp_path)
-
-    assert tools == ["update-desktop-database", "kbuildsycoca6"]
-    assert ran == [
-        ["/usr/bin/update-desktop-database", str(tmp_path)],
-        ["/usr/bin/kbuildsycoca6", "--noincremental"],
-    ]
 
 
 def test_refresh_falls_back_to_kbuildsycoca5(monkeypatch, tmp_path):
@@ -648,18 +740,6 @@ def test_run_quiet_swallows_missing_binary(tmp_path):
     assert lde._run_quiet([str(tmp_path / "definitely-not-a-binary")]) is False
 
 
-def test_exec_arg_quoting_handles_spaces(tmp_path, xdg_home, monkeypatch):
-    root = _make_project(tmp_path)
-    spaced = tmp_path / "my apps" / "qubit"
-    spaced.parent.mkdir()
-    spaced.write_text("", encoding="utf-8")
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", lambda: str(spaced))
-    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
-
-    entry = lde.install_desktop_entry(root)
-    exec_line = _parse(entry.read_text(encoding="utf-8"))["Exec"]
-
-    assert exec_line == f'"{spaced}" desktop'
 
 
 @pytest.mark.skipif(
@@ -697,32 +777,6 @@ def test_running_interpreter_resolves_plain_interpreter(monkeypatch):
     assert Path(out).is_absolute()
 
 
-def test_can_import_probe_runs_and_caches(tmp_path):
-    """The probe executes the real interpreter and memoizes the answer.
-
-    Asserts the two things that hold on ANY host: the probe returns a
-    definite boolean for a real interpreter (not None, not an exception
-    path), and the per-path cache is populated so the second call pays
-    no subprocess. Host-dependent capability itself (True vs False) is
-    deliberately NOT asserted - a CI host with qubit pip-installed
-    system-wide would legitimately answer True.
-    """
-    import time
-
-    real = Path("/usr/bin/python3")
-    if not real.exists():
-        pytest.skip("no system python to probe")
-    lde._probe_cache.pop(str(real), None)
-    try:
-        first = lde._can_import_qubit_cli(real)
-        assert isinstance(first, bool)
-        assert str(real) in lde._probe_cache
-        t0 = time.monotonic()
-        second = lde._can_import_qubit_cli(real)
-        assert second is first
-        assert time.monotonic() - t0 < 0.05  # cache hit: no subprocess
-    finally:
-        lde._probe_cache.pop(str(real), None)
 
 
 def test_exec_falls_back_to_running_interpreter_when_probe_fails(
@@ -744,7 +798,7 @@ def test_exec_falls_back_to_running_interpreter_when_probe_fails(
     def fake_resolve():
         return _s.argv[0] if _s.argv[0] else None
 
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
     # Force the probe to fail for whatever interpreter gets chosen first.
     monkeypatch.setattr(lde, "_can_import_qubit_cli", lambda p: False)
     # And the fallback interpreter must itself pass (it always should).
@@ -780,7 +834,7 @@ def test_wrapper_ownership_rejects_sibling_extensions(suffix, tmp_path):
     checkout.mkdir()
     evil = tmp_path / "evil-shim"
     evil.write_text(
-        f"#!/bin/bash\n"
+        f"#!/usr/bin/env bash\n"
         f"exec {checkout}{suffix}/venv/bin/python "
         f'{checkout}{suffix}/hermes "$@"\n',
         encoding="utf-8",
@@ -805,10 +859,10 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     lexical_checkout = home_link / "hermes-agent"
     (home_real / "hermes-agent").mkdir()
 
-    shim = home_link / ".local" / "bin" / "qubit"
+    shim = home_link / ".local" / "bin" / "hermes"
     shim.parent.mkdir(parents=True)
     shim.write_text(
-        f"#!/bin/bash\n"
+        f"#!/usr/bin/env bash\n"
         f"exec {lexical_checkout}/venv/bin/python "
         f'{lexical_checkout}/hermes "$@"\n',
         encoding="utf-8",
@@ -821,7 +875,7 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     shim.chmod(0o755)
     monkeypatch.setenv("HOME", str(home_link))
     monkeypatch.setattr("shutil.which", lambda name: None)
-    repo_script = lexical_checkout / "qubit"
+    repo_script = lexical_checkout / "hermes"
     repo_script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     monkeypatch.setattr(sys, "argv", [str(repo_script), "desktop"])
     assert lde._resolve_qubit_bin_for_desktop_entry(
@@ -843,7 +897,7 @@ def test_needs_interpreter_case_insensitive_match(tmp_path, monkeypatch):
     interpreter = venv_bin / "python"
     interpreter.write_text("", encoding="utf-8")
 
-    console_script = venv_bin / "qubit"
+    console_script = venv_bin / "hermes"
     console_script.write_text(f"#!{interpreter}\nimport qubit_cli\n", encoding="utf-8")
     monkeypatch.setattr(lde.sys, "executable", str(interpreter))
 
@@ -919,17 +973,16 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
     The shebang-safety gate skips it; the module fallback wins. Idea
     credited to autumn8's #92122 rung-2 check.
     """
-    import sys as _s
 
     root = _make_project(tmp_path)
-    repo_script = root / "qubit"
+    repo_script = root / "hermes"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
     # A wrapper that targets this checkout but cannot run itself.
-    broken_wrapper = xdg_home / ".local" / "bin" / "qubit"
+    broken_wrapper = xdg_home / ".local" / "bin" / "hermes"
     broken_wrapper.parent.mkdir(parents=True)
     broken_wrapper.write_text(
         f"#!/usr/bin/env python3\n# launcher for {root}\nimport qubit_cli\n",
@@ -943,7 +996,7 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -956,17 +1009,17 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
 def test_probe_accepts_shell_launcher_wrapper(tmp_path, xdg_home, monkeypatch):
     """A bash launcher is safe by construction and still wins the probe."""
     root = _make_project(tmp_path)
-    repo_script = root / "qubit"
+    repo_script = root / "hermes"
     repo_script.write_text(
         "#!/usr/bin/env python3\nimport qubit_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
 
-    good_wrapper = xdg_home / ".local" / "bin" / "qubit"
+    good_wrapper = xdg_home / ".local" / "bin" / "hermes"
     good_wrapper.parent.mkdir(parents=True)
     good_wrapper.write_text(
-        f"#!/bin/bash\nexec {root / 'venv' / 'bin' / 'python'} "
-        f'{root / "qubit"} "$@"\n',
+        f"#!/usr/bin/env bash\nexec {root / 'venv' / 'bin' / 'python'} "
+        f'{root / "hermes"} "$@"\n',
         encoding="utf-8",
     )
     good_wrapper.chmod(0o755)
@@ -977,7 +1030,7 @@ def test_probe_accepts_shell_launcher_wrapper(tmp_path, xdg_home, monkeypatch):
     def fake_resolve():
         return sys.argv[0] if sys.argv[0] else None
 
-    monkeypatch.setattr("qubit_cli.relaunch.resolve_hermes_bin", fake_resolve)
+    monkeypatch.setattr("qubit_cli.relaunch.resolve_qubit_bin", fake_resolve)
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
@@ -994,19 +1047,19 @@ def test_install_icon_handles_truncated_png_header(tmp_path, xdg_home, monkeypat
     icon.write_bytes(
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00"  # 22 bytes
     )
-    qubit_bin = tmp_path / "bin" / "qubit"
-    qubit_bin.parent.mkdir()
-    qubit_bin.write_text("", encoding="utf-8")
+    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin.parent.mkdir()
+    hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_hermes_bin", lambda: str(qubit_bin)
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: str(hermes_bin)
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     values = _parse(entry.read_text(encoding="utf-8"))
-    assert values["Icon"] == "qubit"
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
+    assert values["Icon"] == "hermes"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
     assert dest.is_file()
 
 
@@ -1033,28 +1086,28 @@ def test_install_places_1024_png_in_256x256_not_scalable(
     entry = lde.install_desktop_entry(root)
     values = _parse(entry.read_text(encoding="utf-8"))
 
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
-    assert values["Icon"] == "qubit"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
+    assert values["Icon"] == "hermes"
     assert dest.is_file()
     assert dest.read_bytes() == lde.icon_path(root).read_bytes()
     assert not stale.exists()
 
 
 def test_install_removes_stale_scalable_png(tmp_path, xdg_home, monkeypatch):
-    """v2026.8.31 wrote the PNG into scalable/. A later qubit desktop
+    """v2026.8.31 wrote the PNG into scalable/. A later hermes desktop
     must delete that leftover so Cinnamon does not keep using it."""
     root = _make_project(tmp_path)
     lde.icon_path(root).write_bytes(_png_ihdr(1024, 1024))
     _stub_install(tmp_path, monkeypatch)
 
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"old scalable png")
 
     lde.install_desktop_entry(root)
 
-    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
+    dest = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
     assert dest.is_file()
     assert not stale.exists()
 
@@ -1066,10 +1119,10 @@ def test_install_exact_48_png_uses_48x48_dir(tmp_path, xdg_home, monkeypatch):
 
     lde.install_desktop_entry(root)
 
-    dest = xdg_home / "icons" / "hicolor" / "48x48" / "apps" / "qubit.png"
+    dest = xdg_home / "icons" / "hicolor" / "48x48" / "apps" / "hermes.png"
     assert dest.is_file()
     assert not (
-        xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
+        xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
     ).exists()
 
 
@@ -1091,11 +1144,29 @@ def test_install_resizes_decodable_png_to_panel_sizes(
 
     lde.install_desktop_entry(root)
 
-    dest_24 = xdg_home / "icons" / "hicolor" / "24x24" / "apps" / "qubit.png"
-    dest_256 = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "qubit.png"
-    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "qubit.png"
+    dest_24 = xdg_home / "icons" / "hicolor" / "24x24" / "apps" / "hermes.png"
+    dest_256 = xdg_home / "icons" / "hicolor" / "256x256" / "apps" / "hermes.png"
+    stale = xdg_home / "icons" / "hicolor" / "scalable" / "apps" / "hermes.png"
     assert dest_24.is_file()
     assert dest_256.is_file()
     assert not stale.exists()
     assert struct.unpack(">II", dest_24.read_bytes()[16:24]) == (24, 24)
     assert struct.unpack(">II", dest_256.read_bytes()[16:24]) == (256, 256)
+
+
+def test_deferred_install_skips_heal_after_exit_without_reveal():
+    """Electron exiting without ever revealing a window (boot crash, --version, early quit) must
+    NOT heal the entry: gnome-shell keeps the ShellApp in STARTING until the startup-notification
+    sequence completes or times out, not until the process dies, so a write right after the exit
+    is exactly the #111906 arming condition. The next terminal/updater or revealed launch heals."""
+    calls: list[Path] = []
+    deferred = lde.DeferredDesktopEntryInstall(
+        Path("/proj"), install=lambda root: calls.append(root) or Path("/entry"), settle_seconds=0
+    )
+    deferred.start()
+    time.sleep(0.05)
+    assert calls == []  # nothing is written while the app may still be STARTING
+
+    deferred.finish()
+    assert calls == []
+    assert not deferred._thread.is_alive()

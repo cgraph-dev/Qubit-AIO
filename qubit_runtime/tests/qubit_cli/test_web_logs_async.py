@@ -8,7 +8,7 @@ def test_get_logs_yields_while_reading_and_filtering(tmp_path, monkeypatch):
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
     (logs_dir / "agent.log").write_text("fixture\n", encoding="utf-8")
-    monkeypatch.setattr(status, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(status, "get_qubit_home", lambda: tmp_path)
 
     loop_ran = threading.Event()
 

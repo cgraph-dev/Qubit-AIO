@@ -273,11 +273,11 @@ def register_lookup_tool() -> Callable[[], None]:
 
 # QUBIT_HOME wiring -------------------------------------------------------------
 
-def write_live_home(hermes_home: Path, provider: str, model: str) -> None:
+def write_live_home(qubit_home: Path, provider: str, model: str) -> None:
     """Minimal real config: the provider under test, eager tools (no tool_search
     bridge), bounded retries. No credential is ever written to disk."""
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "config.yaml").write_text(
+    qubit_home.mkdir(parents=True, exist_ok=True)
+    (qubit_home / "config.yaml").write_text(
         "model:\n"
         f"  provider: {provider}\n"
         f"  default: {model}\n"

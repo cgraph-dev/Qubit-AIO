@@ -2,7 +2,9 @@
 
 import json
 
-import yaml
+import pytest
+
+import qubit_yaml as yaml
 
 
 def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
@@ -12,10 +14,10 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
 
     Regression: `_run_xai_oauth_login_from_setup` used to call
     `_update_config_for_provider("xai-oauth")` (and token save flipped
-    `active_provider`), so `qubit setup tts` OAuth login hijacked the main
+    `active_provider`), so `hermes setup tts` OAuth login hijacked the main
     chat provider.
     """
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -82,3 +84,20 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
     assert config["model"]["provider"] == "openrouter"
     assert config["model"]["base_url"] == "https://openrouter.ai/api/v1"
     assert config["model"]["default"] == "anthropic/claude-sonnet-4"
+
+
+def test_tts_xai_step_prefers_existing_api_key_over_oauth(monkeypatch):
+    """Wizard copy must match runtime: an explicit XAI_API_KEY wins over stored OAuth
+    tokens (the subscription bearer 403s on metered /v1/tts — #87045, #113727)."""
+    import qubit_cli.setup_tts as setup_tts
+
+    messages = []
+    monkeypatch.setattr(setup_tts, "_xai_oauth_logged_in_for_setup", lambda: True)
+    monkeypatch.setattr(setup_tts._setup, "get_env_value", lambda key: "xai-key" if key == "XAI_API_KEY" else "")
+    monkeypatch.setattr(setup_tts._setup, "print_success", lambda msg: messages.append(msg))
+    monkeypatch.setattr(setup_tts._setup, "prompt", lambda *a, **k: "")
+    monkeypatch.setattr(setup_tts._setup, "prompt_choice", lambda *a, **k: pytest.fail("no prompt expected"))
+
+    config = {}
+    assert setup_tts._tts_xai_step(config) == "xai"
+    assert len(messages) == 1 and "XAI_API_KEY" in messages[0]

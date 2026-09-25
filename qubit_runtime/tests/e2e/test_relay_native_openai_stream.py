@@ -150,8 +150,8 @@ def test_openai_stream_final_tool_call_delta_reaches_relay_parent_event(tmp_path
     result, llm_end = _stream_through_relay(
         tmp_path, monkeypatch, body,
         finalize_before=lambda chunk: bool(chunk.choices) and chunk.choices[0].finish_reason == "tool_calls")
-    qubit_call = result.choices[0].message.tool_calls[0]
-    assert (qubit_call.function.name, qubit_call.function.arguments) == ("read_file", '{"path": "/tmp/x"}')
+    hermes_call = result.choices[0].message.tool_calls[0]
+    assert (hermes_call.function.name, hermes_call.function.arguments) == ("read_file", '{"path": "/tmp/x"}')
     assert result.choices[0].finish_reason == "tool_calls"
     assert llm_end.annotated_response.message is None
     (relay_call,) = llm_end.annotated_response.tool_calls

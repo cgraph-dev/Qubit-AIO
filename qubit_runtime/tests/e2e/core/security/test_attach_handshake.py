@@ -78,7 +78,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 from qubit_state import SessionDB
 from qubit_cli.active_sessions import try_acquire_active_session
 
@@ -86,7 +86,7 @@ sid, advertise, token = sys.argv[1], sys.argv[2], sys.argv[3]
 db = SessionDB()
 db.create_session(session_id=sid, source="cli")
 db.close()
-home = str(Path(get_hermes_home()).resolve())
+home = str(Path(get_qubit_home()).resolve())
 state = {}
 
 
@@ -144,9 +144,9 @@ fs.writeFileSync(process.env.ATTACH_PROBE_OUT, JSON.stringify({
 
 SNAPSHOT_CODE = r"""
 import json, sys
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 from qubit_cli.active_sessions import active_session_registry_snapshot
-rows = [e for e in active_session_registry_snapshot(get_hermes_home(), strict=True)
+rows = [e for e in active_session_registry_snapshot(get_qubit_home(), strict=True)
         if e.get("session_id") == sys.argv[1]]
 print(json.dumps([{"pid": e.get("pid"), "url": (e.get("metadata") or {}).get("shared_runtime_url")}
                   for e in rows]))

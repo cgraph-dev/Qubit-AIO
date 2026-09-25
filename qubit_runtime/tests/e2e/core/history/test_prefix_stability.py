@@ -41,7 +41,7 @@ from tests.e2e.core.history._helpers import (
     tools_breaks,
     views,
 )
-from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_qubit_home
 
 # A hop is (surface, cwd, turns); a turn is its prompt, "TOOLS:<prompt>" (parallel tool batch
 # first) or "/compress" (gateway only). Every hop is a FRESH process.
@@ -88,15 +88,15 @@ class ToolsArrayDrift(Exception):
 def world(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
-    hermes_home = Path(os.environ["QUBIT_HOME"])  # hermetic per-test tmp dir from the conftest
+    qubit_home = Path(os.environ["QUBIT_HOME"])  # hermetic per-test tmp dir from the conftest
     cwds = {"a": tmp_path / "work-a", "b": tmp_path / "work-b"}
     for d in cwds.values():
         d.mkdir()
     script = Script()
     spawned = Spawned()
     with FakeLLMServer(script) as srv:
-        write_hermes_home(hermes_home, srv.base_url, extra_config=OFFLINE_CONFIG + NO_BACKGROUND_REVIEW)
-        yield {"srv": srv, "script": script, "home": home, "hermes_home": hermes_home,
+        write_qubit_home(qubit_home, srv.base_url, extra_config=OFFLINE_CONFIG + NO_BACKGROUND_REVIEW)
+        yield {"srv": srv, "script": script, "home": home, "hermes_home": qubit_home,
                "cwds": cwds, "spawned": spawned}
         leaked = spawned.reap()
         assert not leaked, f"subprocesses outlived the test: {leaked}"

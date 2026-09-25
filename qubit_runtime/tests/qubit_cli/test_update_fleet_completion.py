@@ -6,7 +6,7 @@ import json
 import pytest
 
 from qubit_cli import update_cmd, update_cmd_fleet, update_cmd_maint, update_receipt
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def test_fleet_completion_preserves_runtime_verdict_and_restart_obligation(
         if not healthy:
             assert exc.value.code == 1
 
-    receipt = json.loads((get_hermes_home() / "logs/update_receipts/latest.json").read_text())
+    receipt = json.loads((get_qubit_home() / "logs/update_receipts/latest.json").read_text())
     assert receipt["outcome"] == ("success" if healthy else "partial")
     assert receipt["fleet"] == snapshot
     assert restart.incomplete is (state != "current")

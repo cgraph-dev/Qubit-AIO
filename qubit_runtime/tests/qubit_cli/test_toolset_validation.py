@@ -28,9 +28,9 @@ def _is_valid(name):
 
 
 def test_38798_corruption_warns_and_suggests_correct_name():
-    # The exact reported shape: cli holds 'qubit' instead of 'hermes-cli'.
-    warnings = validate_platform_toolsets({"cli": ["qubit"]}, _is_valid)
-    unknown = [w for w in warnings if "unknown toolset 'qubit'" in w]
+    # The exact reported shape: cli holds 'hermes' instead of 'hermes-cli'.
+    warnings = validate_platform_toolsets({"cli": ["hermes"]}, _is_valid)
+    unknown = [w for w in warnings if "unknown toolset 'hermes'" in w]
     assert len(unknown) == 1
     # Actionable: points at the valid name the entry should have been.
     assert "did you mean 'hermes-cli'?" in unknown[0]
@@ -139,6 +139,17 @@ def test_scalar_platform_value_warns_but_uses_platform_default():
         for w in warnings
     )
     assert not any("zero valid toolsets" in w for w in warnings)
+
+
+def test_list_literal_string_is_validated_as_the_list_it_encodes():
+    """A ``'["web", "terminal"]'`` string (older ``hermes config set``) is the user's real selection:
+    the runtime resolves it, so ``hermes doctor`` must validate its names instead of reporting a
+    fallback to the platform default that never happens (follow-up to #115866)."""
+    assert validate_platform_toolsets({"cli": '["web", "terminal"]'}, _is_valid) == []
+
+    warnings = validate_platform_toolsets({"cli": '["web", "nope"]'}, _is_valid)
+    assert any("platform 'cli' references unknown toolset 'nope'" in w for w in warnings)
+    assert not any("falling back" in w for w in warnings)
 
 
 def test_platform_restricted_toolset_warns_when_other_platform_is_valid():

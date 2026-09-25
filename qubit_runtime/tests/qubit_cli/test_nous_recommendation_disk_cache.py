@@ -111,13 +111,13 @@ def test_disk_cache_is_scoped_to_home_and_portal(tmp_path, portal):
 
     # The same process can switch profiles under the multiplex gateway too.
     from qubit_cli.models import fetch_nous_recommended_models, _nous_recommended_cache
-    from qubit_constants import set_hermes_home_override, reset_hermes_home_override
+    from qubit_constants import set_qubit_home_override, reset_qubit_home_override
     _nous_recommended_cache.clear()
     for home, expected in [(a, first), (b, {"paidRecommendedModels": [{"modelName": "model-2"}]}), (a, first)]:
-        token = set_hermes_home_override(home)
+        token = set_qubit_home_override(home)
         try:
             assert fetch_nous_recommended_models(base) == expected
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
     assert len(requests) == 3
     _nous_recommended_cache.clear()

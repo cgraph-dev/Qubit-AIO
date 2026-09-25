@@ -37,7 +37,7 @@ describe('direct vs delegated execution', () => {
   it('keeps the delegation wrapper for a different active profile', () => {
     const prompt = routinePrompt('research', 'Digest', 'Summarize findings', 'default')
 
-    expect(prompt).toMatch(/qubit -p 'research' chat/)
+    expect(prompt).toMatch(/hermes -p 'research' chat/)
     expect(prompt).toMatch(/\[Scheduled routine\] Summarize findings/)
   })
 

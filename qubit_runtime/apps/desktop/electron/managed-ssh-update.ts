@@ -5,7 +5,7 @@
  * maps, while this file owns the security-sensitive ordering and the remote
  * wire protocol:
  *
- *   gate dials -> drain every captured scope -> detached `qubit update`
+ *   gate dials -> drain every captured scope -> detached `hermes update`
  *   -> correlated terminal marker + durable receipt -> restore every scope
  *   -> lift the gate
  *
@@ -68,8 +68,8 @@ interface RemoteUpdateTarget {
     exec: (command: string, options?: { timeoutMs?: number; stdinData?: string }) => Promise<string>
   }
   platform: 'Darwin' | 'Linux' | 'Windows'
-  qubitPath: string
-  qubitHome: string
+  hermesPath: string
+  hermesHome: string
   pythonPath?: string
 }
 
@@ -210,8 +210,8 @@ function windowsChildPath(home: string, name: string): string {
  */
 function buildPosixManagedUpdateLaunch(target: RemoteUpdateTarget, correlationId: string): string {
   const correlation = validateCorrelationId(correlationId)
-  const home = validateRemoteValue(target.qubitHome, 'Qubit home')
-  const qubitPath = validateRemoteValue(target.qubitPath, 'launcher path')
+  const home = validateRemoteValue(target.hermesHome, 'Hermes home')
+  const hermesPath = validateRemoteValue(target.hermesPath, 'launcher path')
   const statusPath = posixChildPath(home, `.update_exit_code.${correlation}`)
   const intentPath = posixChildPath(home, `.update_launch_intent.${correlation}`)
   const outputPath = posixChildPath(home, `logs/desktop-update-${correlation}.log`)
@@ -219,7 +219,7 @@ function buildPosixManagedUpdateLaunch(target: RemoteUpdateTarget, correlationId
   const statusWord = expandRemotePath(statusPath)
   const intentWord = expandRemotePath(intentPath)
   const outputWord = expandRemotePath(outputPath)
-  const launcherWord = expandRemotePath(qubitPath)
+  const launcherWord = expandRemotePath(hermesPath)
 
   const updateCommand =
     `env QUBIT_HOME=${homeWord} ` +
@@ -255,8 +255,8 @@ function buildPosixManagedUpdateLaunch(target: RemoteUpdateTarget, correlationId
 /** Windows equivalent of buildPosixManagedUpdateLaunch. */
 function buildWindowsManagedUpdateLaunch(target: RemoteUpdateTarget, correlationId: string): string {
   const correlation = validateCorrelationId(correlationId)
-  const home = validateRemoteValue(target.qubitHome, 'Qubit home')
-  const qubitPath = validateRemoteValue(target.qubitPath, 'launcher path')
+  const home = validateRemoteValue(target.hermesHome, 'Hermes home')
+  const hermesPath = validateRemoteValue(target.hermesPath, 'launcher path')
   const statusPath = windowsChildPath(home, `.update_exit_code.${correlation}`)
   const readyPath = windowsChildPath(home, `.update_coordinator_ready.${correlation}`)
   const intentPath = windowsChildPath(home, `.update_launch_intent.${correlation}`)
@@ -455,7 +455,7 @@ print(json.dumps({'marker':state['state'],'markerPid':state.get('pid'),'launchIn
 
 function buildRemoteUpdateObservationCommand(target: RemoteUpdateTarget, correlationId: string): string {
   const correlation = validateCorrelationId(correlationId)
-  const home = validateRemoteValue(target.qubitHome, 'Qubit home')
+  const home = validateRemoteValue(target.hermesHome, 'Hermes home')
 
   if (target.platform === 'Windows') {
     const python = validateRemoteValue(target.pythonPath || '', 'Python path')
@@ -888,7 +888,7 @@ async function runManagedSshUpdate<TScope extends ManagedSshScope>(
     ...(error ? { error } : {}),
     message:
       outcome === 'updated'
-        ? 'Remote Qubit updated and every managed SSH profile is ready.'
+        ? 'Remote Hermes updated and every managed SSH profile is ready.'
         : restoreOk
           ? 'The remote update failed, but every managed SSH profile was restored.'
           : 'The remote update transaction could not restore every managed SSH profile.'

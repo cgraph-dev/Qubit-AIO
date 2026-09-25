@@ -29,8 +29,8 @@ def _processes_under(home: Path) -> list[int]:
 desktop, expected = sys.argv[1:]
 with tempfile.TemporaryDirectory(prefix="hermes-desktop-backend-") as temporary:
     home = Path(temporary)
-    hermes_home = home / ".hermes"
-    legacy = hermes_home / "hermes-agent"
+    qubit_home = home / ".hermes"
+    legacy = qubit_home / "hermes-agent"
     (legacy / "qubit_cli").mkdir(parents=True)
     (legacy / "qubit_cli" / "main.py").touch()
     launcher = legacy / "venv" / "bin" / "hermes"
@@ -52,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix="hermes-desktop-backend-") as temporary:
     env = {
         "PATH": os.environ["PATH"],
         "HOME": str(home),
-        "QUBIT_HOME": str(hermes_home),
+        "QUBIT_HOME": str(qubit_home),
         "HERMES_DESKTOP_USER_DATA_DIR": str(home / "electron"),
         "XDG_RUNTIME_DIR": str(runtime),
         "XDG_CONFIG_HOME": str(home / ".config"),
@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix="hermes-desktop-backend-") as temporary:
             deadline = time.monotonic() + 90
             while time.monotonic() < deadline:
                 output = log_path.read_text()
-                desktop_log = hermes_home / "logs" / "desktop.log"
+                desktop_log = qubit_home / "logs" / "desktop.log"
                 if desktop_log.exists():
                     output += desktop_log.read_text()
                 assert "WRONG_BACKEND_SELECTED" not in output, output

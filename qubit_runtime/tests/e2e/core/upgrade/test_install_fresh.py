@@ -64,7 +64,7 @@ def _login_shell_hermes(sb: I.Sandbox) -> str:
 
 
 def _state(sb: I.Sandbox) -> dict:
-    hh = sb.hermes_home
+    hh = sb.qubit_home
     return {
         "config": (hh / "config.yaml").read_bytes(),
         "env": (hh / ".env").read_bytes(),
@@ -105,10 +105,10 @@ def _configure(sb: I.Sandbox, provider: FakeLLMServer) -> None:
     ver = sb.run([py, "-c", "from qubit_cli.config_defaults import DEFAULT_CONFIG as D; print(D['_config_version'])"])
     assert ver.returncode == 0, I.describe(ver)
     version = int(ver.stdout.strip().splitlines()[-1])
-    (sb.hermes_home / "config.yaml").write_text(I.provider_config(provider.base_url, version), encoding="utf-8")
-    (sb.hermes_home / ".env").write_text(f"OPENAI_API_KEY={I.FAKE_KEY}\n# my note\n", encoding="utf-8")
-    (sb.hermes_home / "SOUL.md").write_text("You are my own customised agent.\n", encoding="utf-8")
-    skill = sb.hermes_home / "skills" / "my-own-skill"
+    (sb.qubit_home / "config.yaml").write_text(I.provider_config(provider.base_url, version), encoding="utf-8")
+    (sb.qubit_home / ".env").write_text(f"OPENAI_API_KEY={I.FAKE_KEY}\n# my note\n", encoding="utf-8")
+    (sb.qubit_home / "SOUL.md").write_text("You are my own customised agent.\n", encoding="utf-8")
+    skill = sb.qubit_home / "skills" / "my-own-skill"
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text("---\nname: my-own-skill\ndescription: mine\n---\nDo my thing.\n", encoding="utf-8")
 
@@ -129,10 +129,10 @@ def test_fresh_install_serves_head_and_runs_a_turn(installed, provider):
         assert imported.read_bytes() == (sb.checkout / imported.relative_to(workspace)).read_bytes(), (
             f"installed PM workspace does not match the checkout: {line}")
     for rel in ("config.yaml", ".env", "SOUL.md"):
-        assert (sb.hermes_home / rel).is_file(), f"installer did not seed ~/.hermes/{rel}"
+        assert (sb.qubit_home / rel).is_file(), f"installer did not seed ~/.hermes/{rel}"
     _configure(sb, provider)
     _turn(sb, provider, "first turn on a fresh install")
-    db = I.db_state(sb.hermes_home / "state.db")
+    db = I.db_state(sb.qubit_home / "state.db")
     assert db["integrity"] == [("ok",)] and len(db["sessions"]) == 1 and db["n_messages"] >= 2, db
     # A new login shell finds the command through the rc files the installer edited.
     assert all(n >= 1 for n in _path_lines(sb).values()), f"PATH not wired into the shell rc: {_path_lines(sb)}"
@@ -155,7 +155,7 @@ def test_rerunning_the_installer_is_idempotent(installed, provider):
     for key in before:
         assert after[key] == before[key], f"re-running the installer changed the user's {key}"
     _turn(sb, provider, "turn after re-running the installer")
-    db = I.db_state(sb.hermes_home / "state.db")
+    db = I.db_state(sb.qubit_home / "state.db")
     assert set(before["db"]["sessions"]) < set(db["sessions"]), "earlier session lost or new turn not persisted"
     assert _path_lines(sb) == rc_before, f"PATH line appended again: {rc_before} -> {_path_lines(sb)}"
     assert _login_shell_hermes(sb) == sb.hermes

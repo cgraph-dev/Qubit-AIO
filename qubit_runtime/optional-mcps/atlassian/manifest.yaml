@@ -1,15 +1,16 @@
-# Qubit-approved MCP catalog entry.
+# Nous-approved MCP catalog entry.
 # Presence in this directory = approval. Merged via PR review.
 manifest_version: 1
 
 name: atlassian
+connector_slug: jira
 description: >-
   Jira issues and Confluence pages via Atlassian's hosted remote MCP.
 source: https://support.atlassian.com/rovo/docs/getting-started-with-the-atlassian-remote-mcp-server/
 
-# Official vendor-hosted remote MCP (URL-only — Qubit never spawns a local
+# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
 # process for this entry). Native OAuth 2.1 + Dynamic Client Registration;
-# Qubit's MCP client + mcp_oauth_manager handle discovery, PKCE, token
+# Hermes's MCP client + mcp_oauth_manager handle discovery, PKCE, token
 # exchange, and refresh.
 transport:
   type: http
@@ -35,6 +36,6 @@ suggest:
     - jira.com
 
 post_install: |
-  On first connection Qubit opens a browser to authorize with
-  Atlassian (or run `qubit mcp login atlassian`). Approve access,
+  On first connection Hermes opens a browser to authorize with
+  Atlassian (or run `hermes mcp login atlassian`). Approve access,
   then restart the session so tools load.

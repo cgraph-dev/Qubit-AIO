@@ -2,7 +2,7 @@
 
 ``main._apply_profile_override`` builds the parser (``top_level_value_flag_sets``) before it
 re-homes the process to the sticky ``active_profile``; a help string that resolved the home through
-``get_hermes_home()`` printed ``[QUBIT_HOME fallback] ... wrong profile`` on every ``hermes``
+``get_qubit_home()`` printed ``[QUBIT_HOME fallback] ... wrong profile`` on every ``hermes``
 command for users of ``hermes profile use`` (#112319, also reported in #112839).
 """
 

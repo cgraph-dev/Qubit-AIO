@@ -125,6 +125,18 @@ export function isPeerInstanceWindow(search = typeof window === 'undefined' ? ''
   }
 }
 
+// Set by Electron only for an explicit "Open profile in new window". An
+// ordinary ⌘⇧N peer also carries profile/connectionId (its boot seed) but not
+// this marker, so a later device/profile selection stays the New-session
+// default there (#115102).
+export function isProfilePinnedWindow(search = typeof window === 'undefined' ? '' : window.location.search): boolean {
+  try {
+    return new URLSearchParams(search).get('profileWindow') === '1'
+  } catch {
+    return false
+  }
+}
+
 // The profile a helper window (the HUD) was asked to boot against, carried in
 // the query string by the main process (see hudUrl). The HUD is a full app
 // renderer that otherwise adopts the PRIMARY backend's profile — wrong the
@@ -141,27 +153,38 @@ export function windowProfileOverride(): null | string {
   }
 }
 
+// The registry connection a peer was launched against, paired with
+// windowProfileOverride(). Electron writes `connectionId=` (empty) for a
+// registry-local route, which reads back as null here.
+export function windowConnectionOverride(): null | string {
+  try {
+    return new URLSearchParams(window.location.search).get('connectionId') || null
+  } catch {
+    return null
+  }
+}
+
 // True when running inside the Electron desktop shell (the preload bridge is
 // present). The "open in new window" affordance is desktop-only.
 export function canOpenSessionWindow(): boolean {
-  return typeof window !== 'undefined' && typeof window.qubitDesktop?.openSessionWindow === 'function'
+  return typeof window !== 'undefined' && typeof window.hermesDesktop?.openSessionWindow === 'function'
 }
 
 // True when the shell can open a full peer app window (⌘⇧N / "New Window").
 export function canOpenNewWindow(): boolean {
-  return typeof window !== 'undefined' && typeof window.qubitDesktop?.openWindow === 'function'
+  return typeof window !== 'undefined' && typeof window.hermesDesktop?.openWindow === 'function'
 }
 
 // True when the shell can pop the in-app Browser into its own OS window.
 export function canOpenBrowserWindow(): boolean {
-  return typeof window !== 'undefined' && typeof window.qubitDesktop?.openBrowserWindow === 'function'
+  return typeof window !== 'undefined' && typeof window.hermesDesktop?.openBrowserWindow === 'function'
 }
 
 // True when the shell can hand a session to the user's own terminal emulator.
 // Desktop-only, and a REMOTE connection is excluded by the caller: the terminal
 // we'd open is on this machine, but the session lives on the remote host.
 export function canOpenSessionInTerminal(): boolean {
-  return typeof window !== 'undefined' && typeof window.qubitDesktop?.openSessionInTerminal === 'function'
+  return typeof window !== 'undefined' && typeof window.hermesDesktop?.openSessionInTerminal === 'function'
 }
 
 type WindowOpenResult = { ok: boolean; error?: string } | undefined
@@ -209,19 +232,19 @@ export async function openSessionInNewWindow(sessionId: string, opts?: { watch?:
   const profile = normalizeProfileKey(rememberedSessionProfile($sessions.get(), sessionId, $activeGatewayProfile.get()))
 
   await runWindowOpen(
-    () => window.qubitDesktop.openSessionWindow(sessionId, { ...opts, profile }),
+    () => window.hermesDesktop.openSessionWindow(sessionId, { ...opts, profile }),
     'Could not open chat in a new window'
   )
 }
 
 // Open a new full-chrome app window — a peer instance of the primary that
 // renders the complete app against the shared backend. No-ops outside Electron.
-export async function openNewWindow(): Promise<void> {
+export async function openNewWindow(route?: { connectionId: null | string; profile: string }): Promise<void> {
   if (!canOpenNewWindow()) {
     return
   }
 
-  await runWindowOpen(() => window.qubitDesktop.openWindow(), 'Could not open a new window')
+  await runWindowOpen(() => window.hermesDesktop.openWindow(route), 'Could not open a new window')
 }
 
 /** Pop the in-app Browser into its own OS window. Returns whether the
@@ -231,7 +254,7 @@ export async function openBrowserInNewWindow(tabId: string): Promise<boolean> {
     return false
   }
 
-  return runWindowOpen(() => window.qubitDesktop.openBrowserWindow(tabId), 'Could not pop out browser')
+  return runWindowOpen(() => window.hermesDesktop.openBrowserWindow(tabId), 'Could not pop out browser')
 }
 
 // Resume a session in the user's own terminal emulator, running the TUI there.
@@ -246,7 +269,7 @@ export async function openSessionInTerminal(
   }
 
   await runWindowOpen(
-    () => window.qubitDesktop.openSessionInTerminal(sessionId, opts),
+    () => window.hermesDesktop.openSessionInTerminal(sessionId, opts),
     'Could not open chat in a terminal'
   )
 }

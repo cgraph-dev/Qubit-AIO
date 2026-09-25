@@ -208,7 +208,7 @@ function createPlayer(ctx) {
     bus.postMessage({ type: 'play', sender: windowId })
     const element = new Audio()
     audio = element
-    element.dataset.qubitRadioAudio = 'true'
+    element.dataset.hermesRadioAudio = 'true'
     element.hidden = true
     element.preload = 'none'
     // Try real analysis for every station, not a host allowlist. If CORS or
@@ -416,7 +416,7 @@ async function artistRequest(path, signal, ctx) {
     ctx.storage.set('local.artistRequestAt', Date.now())
     const response = await fetch(`https://musicbrainz.org/ws/2/${path}`, {
       signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]), credentials: 'omit',
-      headers: { 'User-Agent': 'QubitRadio/1.0 (https://github.com/cgraph-dev/qubit-voicebridge)' }
+      headers: { 'User-Agent': 'HermesRadio/1.0 (https://github.com/NousResearch/hermes-agent)' }
     })
     if (!response.ok) throw new Error(`Artist lookup: HTTP ${response.status}`)
     return response.json()

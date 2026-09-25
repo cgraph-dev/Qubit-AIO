@@ -131,10 +131,10 @@ def step_state_db_guard() -> dict:
     surfaced loudly in the log instead of the user silently losing session
     search. Read-only, idempotent.
     """
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from qubit_cli.backup import verify_sqlite_integrity
 
-    state_path = get_hermes_home() / "state.db"
+    state_path = get_qubit_home() / "state.db"
     if not state_path.exists():
         return {"ok": True, "skipped": "no-state-db"}
     result = verify_sqlite_integrity(state_path, check_header=True, run_pragma=True)
@@ -174,13 +174,13 @@ def step_adopt_blessed_checkout(project_root: Path | None = None) -> dict:
     import json
     import tempfile
 
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
     root = install_root() if project_root is None else Path(project_root)
 
     # The blessed roots: the canonical locations installers create.
     blessed = (
-        get_hermes_home() / "hermes-agent",
+        get_qubit_home() / "hermes-agent",
         Path("/usr/local/lib/hermes-agent"),
     )
 

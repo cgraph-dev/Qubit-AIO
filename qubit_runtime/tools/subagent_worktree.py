@@ -2,7 +2,7 @@
 
 Git-only (outside a repo children share the parent's cwd); local terminal backend only (on
 docker/ssh/modal the host worktree is invisible in the sandbox, so isolation is skipped). One
-worktree per child under ``<repo>/.worktrees/subagent-<id>``, branch ``qubit-subagent/<id>``;
+worktree per child under ``<repo>/.worktrees/subagent-<id>``, branch ``hermes-subagent/<id>``;
 pruned only on proof (zero commits AND clean, both probes ok), else kept + ``inspection_failed``.
 """
 
@@ -78,7 +78,7 @@ def create_subagent_worktree(parent_cwd: Optional[str], subagent_id: Optional[st
     if not repo_root:
         return None
     wt_name = f"subagent-{(subagent_id or uuid.uuid4().hex[:8]).replace('/', '-')}"
-    branch = f"qubit-subagent/{wt_name}"
+    branch = f"hermes-subagent/{wt_name}"
     wt_path = Path(repo_root) / ".worktrees" / wt_name
     try:
         wt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +168,8 @@ def finalize_subagent_worktree(info: Dict[str, str], *, prune: bool = True) -> D
     if prune and payload["commits"] == 0 and not payload["dirty"]:
         cwd = info.get("repo_root", "") or path
         try:
+            from qubit_cli.worktree_ops import release_lsp_clients
+            release_lsp_clients(path)  # the child ran in-process: its language servers are ours
             removed = _run_git(["worktree", "remove", "--force", path], cwd=cwd)
             if removed.returncode == 0:
                 _run_git(["branch", "-D", branch], cwd=cwd)

@@ -270,7 +270,12 @@ def _ws_auth_reason(ws: "WebSocket") -> tuple[Optional[str], str]:
             return "no_credential", "none"
 
         try:
-            _stamp_identity(consume_ticket(ticket))
+            info = consume_ticket(ticket)
+            if info.get("provider") == "bot-desktop":
+                # A display ticket admits one RFB bridge on /api/display/ws (a watch-only
+                # capability handed to a screen viewer); it must not double as a login here.
+                raise TicketInvalid("display ticket presented as a gateway login")
+            _stamp_identity(info)
             if protocol_ticket:
                 # Select only the stable public protocol during accept. The
                 # ticket-bearing protocol is a credential and must never be
@@ -297,7 +302,8 @@ def _ws_auth_ok(ws: "WebSocket") -> bool:
 
 def _resolve_chat_argv(
     resume: Optional[str] = None, sidecar_url: Optional[str] = None, profile: Optional[str] = None,
-    active_session_file: Optional[str] = None) -> tuple[list[str], Optional[str], Optional[dict]]:
+    active_session_file: Optional[str] = None,
+    workspace_cwd: Optional[str] = None) -> tuple[list[str], Optional[str], Optional[dict]]:
     """Resolve the argv + cwd + env for the chat PTY (what ``qubit --tui`` runs).
 
     Tests monkeypatch this with a tiny fake command.  Env contract: resume goes
@@ -306,7 +312,12 @@ def _resolve_chat_argv(
     in-memory gateway but is SKIPPED for profile-scoped chats (that gateway runs
     under the dashboard's own profile, so a scoped chat spawns its own);
     ``profile`` scopes the ENTIRE chat by pointing ``QUBIT_HOME`` at the profile
-    dir, the same propagation ``qubit -p <name>`` performs.
+    dir, the same propagation ``qubit -p <name>`` performs. ``workspace_cwd``
+    (an already-validated host directory, ``chat_workspaces.resolve_chat_cwd``)
+    is the workspace the user picked for a FRESH chat: it becomes ``HERMES_CWD``
+    (where a self-spawned gateway starts) and ``HERMES_TUI_CWD`` (what the TUI
+    passes as the explicit ``cwd`` of ``session.create`` when attached to the
+    in-memory gateway, whose own cwd is the dashboard's launch dir).
     """
     from qubit_cli.web_server_profiles import _config_profile_scope, _resolve_profile_dir
     from qubit_cli.web_server_sessions import _open_session_db_for_profile, _session_latest_descendant
@@ -341,6 +352,9 @@ def _resolve_chat_argv(
             apply_terminal_config_to_env(env=env)
     except Exception:
         _log.warning("Failed to apply terminal config bridge for dashboard chat", exc_info=True)
+    if workspace_cwd:
+        env["HERMES_CWD"] = workspace_cwd
+        env["HERMES_TUI_CWD"] = workspace_cwd
     _apply_tui_python_env(env)
     env.setdefault("NODE_ENV", "production")
     # Mouse tracking would swallow wheel events the browser needs for
@@ -352,22 +366,6 @@ def _resolve_chat_argv(
     env.setdefault("COLORTERM", "truecolor")
     env["HERMES_TUI_DASHBOARD"] = "1"
 
-    def _mirror_tui(name: str) -> None:
-        """Publish the QUBIT_TUI_* name the rebranded TUI reads.
-
-        The vendored launch path sets the HERMES_TUI_* names; the deep-rebranded
-        ui-tui reads QUBIT_TUI_*. Without the mirror, dashboard mode, inline
-        mode, mouse suppression, resume, and sidecar/gateway attach are silently
-        off in the Qubit terminal.
-        """
-        qubit_name = "QUBIT_TUI_" + name[len("HERMES_TUI_"):]
-        if name in env:
-            env[qubit_name] = env[name]
-
-    for _name in ("HERMES_TUI_DISABLE_MOUSE", "HERMES_TUI_INLINE",
-                  "HERMES_TUI_DASHBOARD"):
-        _mirror_tui(_name)
-
     if resume:
         _resume_db = _open_session_db_for_profile(
             requested if profile_dir is not None else None, read_only=True)
@@ -378,21 +376,17 @@ def _resolve_chat_argv(
         if latest_resume:
             resume = latest_resume
         env["HERMES_TUI_RESUME"] = resume
-        env["QUBIT_TUI_RESUME"] = resume
 
     if sidecar_url:
         env["HERMES_TUI_SIDECAR_URL"] = sidecar_url
-        env["QUBIT_TUI_SIDECAR_URL"] = sidecar_url
 
     if active_session_file:
         env["HERMES_TUI_ACTIVE_SESSION_FILE"] = active_session_file
-        env["QUBIT_TUI_ACTIVE_SESSION_FILE"] = active_session_file
 
     # Without the attach URL, gatewayClient spawns its own `tui_gateway.entry`,
     # which inherits the profile QUBIT_HOME set above.
     if profile_dir is None and (gateway_ws_url := _build_gateway_ws_url()):
         env["HERMES_TUI_GATEWAY_URL"] = gateway_ws_url
-        env["QUBIT_TUI_GATEWAY_URL"] = gateway_ws_url
 
     return list(argv), str(cwd) if cwd else None, env
 
@@ -450,13 +444,16 @@ def _build_sidecar_url(channel: str) -> Optional[str]:
 
 async def _resolve_chat_argv_async(
     resume: Optional[str] = None, sidecar_url: Optional[str] = None, profile: Optional[str] = None,
-    active_session_file: Optional[str] = None) -> tuple[list[str], Optional[str], Optional[dict]]:
+    active_session_file: Optional[str] = None,
+    workspace_cwd: Optional[str] = None) -> tuple[list[str], Optional[str], Optional[dict]]:
     """Resolve chat argv off the event loop (it may run ``npm run build``); the
     async lock keeps one-build-at-a-time without parking worker threads."""
     from qubit_cli.web_server import _get_chat_argv_lock, app
     kwargs = {"resume": resume, "sidecar_url": sidecar_url, "profile": profile}
     if active_session_file is not None:
         kwargs["active_session_file"] = active_session_file
+    if workspace_cwd is not None:
+        kwargs["workspace_cwd"] = workspace_cwd
 
     async with _get_chat_argv_lock(app):
         return await asyncio.to_thread(_resolve_chat_argv, **kwargs)
@@ -467,7 +464,7 @@ def _active_session_file_for_channel(app: "FastAPI", channel: str) -> Path:
     from qubit_cli.web_server import _get_pty_active_session_files
     files = _get_pty_active_session_files(app)
     if files.get(channel) is None:
-        fd, raw_path = tempfile.mkstemp(prefix="qubit-pty-active-", suffix=".json")
+        fd, raw_path = tempfile.mkstemp(prefix="hermes-pty-active-", suffix=".json")
         os.close(fd)
         files[channel] = Path(raw_path)
     return files[channel]
@@ -487,7 +484,7 @@ def _get_console_executor() -> concurrent.futures.ThreadPoolExecutor:
         with _console_executor_lock:
             if _console_executor is None:
                 _console_executor = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=_CONSOLE_EXECUTOR_MAX_WORKERS, thread_name_prefix="qubit-console")
+                    max_workers=_CONSOLE_EXECUTOR_MAX_WORKERS, thread_name_prefix="hermes-console")
                 # Tear down on interpreter exit without waiting on in-flight
                 # workers: a stuck 60s console command must not block shutdown.
                 atexit.register(

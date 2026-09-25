@@ -7,18 +7,18 @@ programmatic callers use :func:`build_trace_jsonl` + :func:`_do_upload`."""
 
 from __future__ import annotations
 
+from pm import install_hint
 import json
 import logging
 import os
 import uuid
-from contextlib import suppress
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_DATASET_NAME = "hermes-traces"
-_QUBIT_VERSION = "hermes-agent"
+_HERMES_VERSION = "hermes-agent"
 _REDACTION_BLOCKED_MESSAGE = (
     "Trace upload blocked: secret redaction failed, so the transcript may "
     "still contain credentials or other sensitive data. Fix the redactor or "
@@ -157,7 +157,7 @@ def build_trace_jsonl(messages: List[Dict[str, Any]], *, session_id: str, model:
         line_type, render = _ROLE_RENDERERS.get(role, ("user", _user_message))
         entry = {  # key order is the wire order
             "parentUuid": parent, "isSidechain": False, "userType": "external", "cwd": cwd or os.getcwd(),
-            "sessionId": session_id, "version": _QUBIT_VERSION, "gitBranch": git_branch, "uuid": turn_uuid,
+            "sessionId": session_id, "version": _HERMES_VERSION, "gitBranch": git_branch, "uuid": turn_uuid,
             "timestamp": base_ts, "type": line_type, "message": render(msg, model, redact),
         }
         lines.append(json.dumps(entry, ensure_ascii=False))
@@ -172,15 +172,31 @@ def _resolve_hf_token() -> Optional[str]:
     return next((val for var in _TOKEN_ENV_VARS if (val := (os.getenv(var) or "").strip())), None)
 
 
-def _do_upload(jsonl: str, *, token: str, session_id: str, dataset_name: str = DEFAULT_DATASET_NAME, private: bool = True) -> str:
-    """Create the dataset (idempotent) and push the trace file; user-facing status string, never raises."""
-    with suppress(Exception):  # lazy-install unavailable/declined — the import below surfaces the hint
-        from tools import lazy_deps
-        lazy_deps.ensure("tool.trace_upload", prompt=False)
+
+def _do_upload(
+    jsonl: str,
+    *,
+    token: str,
+    session_id: str,
+    dataset_name: str = DEFAULT_DATASET_NAME,
+    private: bool = True,
+) -> str:
+    """Create (idempotently) the private dataset and push the trace file.
+
+    Returns a user-facing status string. Never raises.
+    """
+    try:
+        import pm
+        pm.ensure_import("trace-upload")
+    except Exception:
+        # lazy-install unavailable — fall through to the import, which
+        # surfaces the install hint below if the package is missing.
+        pass
     try:
         from huggingface_hub import HfApi
     except ImportError:
-        return "Hugging Face upload needs the `huggingface_hub` package (`pip install huggingface_hub`)."
+        return ("Hugging Face upload needs the `huggingface_hub` package. Run: "
+                f"{install_hint('trace-upload')}")
     api = HfApi(token=token)
     try:
         who = api.whoami()

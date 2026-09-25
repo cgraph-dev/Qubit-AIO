@@ -1,22 +1,26 @@
 ---
 sidebar_position: 10
 title: "DingTalk"
-description: "Set up Qubit Agent as a DingTalk chatbot"
+description: "Set up Hermes Agent as a DingTalk chatbot"
 ---
 
 # DingTalk Setup
 
-Qubit Agent integrates with DingTalk (钉钉) as a chatbot, letting you chat with your AI assistant through direct messages or group chats. The bot connects via DingTalk's Stream Mode — a long-lived WebSocket connection that requires no public URL or webhook server — and replies using markdown-formatted messages through DingTalk's session webhook API.
+Python dependency commands on this page use a
+[PM-prepared source checkout](../../reference/package-management.md#developer-workflow).
+After a dependency change, reactivate the checkout and restart Hermes.
 
-Before setup, here's the part most people want to know: how Qubit behaves once it's in your DingTalk workspace.
+Hermes Agent integrates with DingTalk (钉钉) as a chatbot, letting you chat with your AI assistant through direct messages or group chats. The bot connects via DingTalk's Stream Mode — a long-lived WebSocket connection that requires no public URL or webhook server — and replies using markdown-formatted messages through DingTalk's session webhook API.
 
-## How Qubit Behaves
+Before setup, here's the part most people want to know: how Hermes behaves once it's in your DingTalk workspace.
+
+## How Hermes Behaves
 
 | Context | Behavior |
 |---------|----------|
-| **DMs (1:1 chat)** | Qubit responds to every message. No `@mention` needed. Each DM has its own session. |
-| **Group chats** | Qubit responds when you `@mention` it. Without a mention, Qubit ignores the message. |
-| **Shared groups with multiple users** | By default, Qubit isolates session history per user inside the group. Two people talking in the same group do not share one transcript unless you explicitly disable that. |
+| **DMs (1:1 chat)** | Hermes responds to every message. No `@mention` needed. Each DM has its own session. |
+| **Group chats** | Hermes responds when you `@mention` it. Without a mention, Hermes ignores the message. |
+| **Shared groups with multiple users** | By default, Hermes isolates session history per user inside the group. Two people talking in the same group do not share one transcript unless you explicitly disable that. |
 
 ### Session Model in DingTalk
 
@@ -44,14 +48,10 @@ This guide walks you through the full setup process — from creating your DingT
 Install the required Python packages:
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e ".[dingtalk]"
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['dingtalk'], explicit=True)"
 ```
 
-Or individually:
-
-```bash
-pip install dingtalk-stream httpx alibabacloud-dingtalk
-```
+This extra supplies the SDKs alongside core Hermes dependencies:
 
 - `dingtalk-stream` — DingTalk's official SDK for Stream Mode (WebSocket-based real-time messaging)
 - `httpx` — async HTTP client used for sending replies via session webhooks
@@ -63,7 +63,7 @@ pip install dingtalk-stream httpx alibabacloud-dingtalk
 2. Log in with your DingTalk admin account.
 3. Click **Application Development** → **Custom Apps** → **Create App via H5 Micro-App** (or **Robot** depending on your console version).
 4. Fill in:
-   - **App Name**: e.g., `Qubit Agent`
+   - **App Name**: e.g., `Hermes Agent`
    - **Description**: optional
 5. After creating, navigate to **Credentials & Basic Info** to find your **Client ID** (AppKey) and **Client Secret** (AppSecret). Copy both.
 
@@ -83,21 +83,21 @@ Stream Mode is the recommended setup. It uses a long-lived WebSocket connection 
 
 ## Step 3: Find Your DingTalk User ID
 
-Qubit Agent uses your DingTalk User ID to control who can interact with the bot. DingTalk User IDs are alphanumeric strings set by your organization's admin.
+Hermes Agent uses your DingTalk User ID to control who can interact with the bot. DingTalk User IDs are alphanumeric strings set by your organization's admin.
 
 To find yours:
 
 1. Ask your DingTalk organization admin — User IDs are configured in the DingTalk admin console under **Contacts** → **Members**.
 2. Alternatively, the bot logs the `sender_id` for each incoming message. Start the gateway, send the bot a message, then check the logs for your ID.
 
-## Step 4: Configure Qubit Agent
+## Step 4: Configure Hermes Agent
 
 ### Option A: Interactive Setup (Recommended)
 
 Run the guided setup command:
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
 Select **DingTalk** when prompted. The setup wizard can authorize via one of two paths:
@@ -106,7 +106,7 @@ Select **DingTalk** when prompted. The setup wizard can authorize via one of two
 - **Manual paste.** If you already have credentials (or QR scanning isn't convenient), paste your Client ID, Client Secret, and allowed user IDs when prompted.
 
 :::note openClaw branding disclosure
-Because DingTalk's `verification_uri_complete` is hardcoded to the openClaw identity at the API layer, the QR currently authorizes under an `openClaw` source string until Alibaba / DingTalk-Real-AI registers a Qubit-specific template server-side. This is purely how DingTalk presents the consent screen — the bot you create is fully yours and private to your tenant.
+Because DingTalk's `verification_uri_complete` is hardcoded to the openClaw identity at the API layer, the QR currently authorizes under an `openClaw` source string until Alibaba / DingTalk-Real-AI registers a Hermes-specific template server-side. This is purely how DingTalk presents the consent screen — the bot you create is fully yours and private to your tenant.
 :::
 
 ### Option B: Manual Configuration
@@ -161,20 +161,20 @@ gateway:
 Once configured, start the DingTalk gateway:
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 The bot should connect to DingTalk's Stream Mode within a few seconds. Send it a message — either a DM or in a group where it's been added — to test.
 
 :::tip
-You can run `qubit gateway` in the background or as a systemd service for persistent operation. See the deployment docs for details.
+You can run `hermes gateway` in the background or as a systemd service for persistent operation. See the deployment docs for details.
 :::
 
 ## Features
 
 ### AI Cards
 
-Qubit can reply using DingTalk AI Cards instead of plain markdown messages. Cards provide a richer, more structured display and support streaming updates as the agent generates its response.
+Hermes can reply using DingTalk AI Cards instead of plain markdown messages. Cards provide a richer, more structured display and support streaming updates as the agent generates its response.
 
 To enable AI Cards, configure a card template ID in `config.yaml`:
 
@@ -190,7 +190,7 @@ You can find your card template ID in the DingTalk Developer Console under your 
 
 ### Emoji Reactions
 
-Qubit automatically adds emoji reactions to your messages to show processing status:
+Hermes automatically adds emoji reactions to your messages to show processing status:
 
 - 🤔Thinking — added when the bot starts processing your message
 - 🥳Done — added when the response is complete (replaces the Thinking reaction)
@@ -236,7 +236,7 @@ display:
 **Fix**: Install it:
 
 ```bash
-pip install dingtalk-stream httpx
+python -c "import pm; pm.sync_venv(['dingtalk'], explicit=True)"
 ```
 
 ### "DINGTALK_CLIENT_ID and DINGTALK_CLIENT_SECRET required"
@@ -253,9 +253,9 @@ pip install dingtalk-stream httpx
 
 ### Bot is offline
 
-**Cause**: The Qubit gateway isn't running, or it failed to connect.
+**Cause**: The Hermes gateway isn't running, or it failed to connect.
 
-**Fix**: Check that `qubit gateway` is running. Look at the terminal output for error messages. Common issues: wrong credentials, app deactivated, `dingtalk-stream` or `httpx` not installed.
+**Fix**: Check that `hermes gateway` is running. Look at the terminal output for error messages. Common issues: wrong credentials, app deactivated, `dingtalk-stream` or `httpx` not installed.
 
 ### "No session_webhook available"
 
@@ -269,7 +269,7 @@ pip install dingtalk-stream httpx
 Always set `DINGTALK_ALLOWED_USERS` to restrict who can interact with the bot. Without it, the gateway denies all users by default as a safety measure. Only add User IDs of people you trust — authorized users have full access to the agent's capabilities, including tool use and system access.
 :::
 
-For more information on securing your Qubit Agent deployment, see the [Security Guide](../security.md).
+For more information on securing your Hermes Agent deployment, see the [Security Guide](../security.md).
 
 ## Notes
 

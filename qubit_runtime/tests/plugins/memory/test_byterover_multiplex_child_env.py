@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from agent import secret_scope
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 from plugins.memory import byterover
 
 
@@ -41,7 +41,7 @@ def two_profiles(tmp_path, monkeypatch):
 
 def _served_turn(prof_home: Path, scope: dict):
     secret_scope.set_multiplex_active(True)
-    home_tok = set_hermes_home_override(str(prof_home))
+    home_tok = set_qubit_home_override(str(prof_home))
     scope_tok = secret_scope.set_secret_scope(scope)
     return home_tok, scope_tok
 
@@ -49,7 +49,7 @@ def _served_turn(prof_home: Path, scope: dict):
 def _end_turn(tokens):
     home_tok, scope_tok = tokens
     secret_scope.reset_secret_scope(scope_tok)
-    reset_hermes_home_override(home_tok)
+    reset_qubit_home_override(home_tok)
     secret_scope.set_multiplex_active(False)
 
 

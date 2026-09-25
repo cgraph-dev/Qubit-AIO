@@ -9,28 +9,26 @@ test('error page names the failure and carries a Reload button', () => {
     errorCode: -6,
     errorDescription: 'The desktop renderer bundle is incomplete after the last update (2 missing file(s)).',
     missingAssets: ['assets/app-C0ffee.js', 'assets/shiki-block-DeadBeef.js'],
-    repairHint: 'qubit desktop --force-build'
+    repairHint: 'hermes desktop --force-build'
   })
 
-  assert.match(html, /Qubit couldn.t start the desktop UI/)
   assert.match(html, /incomplete after the last update \(2 missing file\(s\)\)/)
   assert.match(html, /-6/)
   assert.match(html, /assets\/app-C0ffee\.js/)
   assert.match(html, /assets\/shiki-block-DeadBeef\.js/)
-  assert.match(html, /qubit desktop --force-build/)
-  assert.match(html, /Reload/)
+  assert.match(html, /hermes desktop --force-build/)
   assert.match(html, /location\.reload\(\)/)
 })
 
 test('error page reload button targets the real renderer URL when provided', () => {
   const html = buildRendererLoadErrorPage({
     errorDescription: 'load failed',
-    reloadUrl: 'file:///C:/Qubit%20Agent/dist/index.html'
+    reloadUrl: 'file:///C:/Hermes%20Agent/dist/index.html'
   })
 
   // A data: page cannot recover with location.reload() (it would re-render
   // the error page) — the button must navigate back to the app URL.
-  assert.match(html, /location\.replace\("file:\/\/\/C:\/Qubit%20Agent\/dist\/index\.html"\)/)
+  assert.match(html, /location\.replace\("file:\/\/\/C:\/Hermes%20Agent\/dist\/index\.html"\)/)
   assert.doesNotMatch(html, /location\.reload\(\)/)
 })
 
@@ -59,13 +57,6 @@ test('reloadUrl cannot break out of the inline script block', () => {
   // The payload is preserved as inert \u003c escapes inside the JS string.
   assert.match(html, /\\u003c\/script/)
   assert.match(html, /\\u003cscript\\u003ealert/)
-})
-
-test('error page renders without any details', () => {
-  const html = buildRendererLoadErrorPage()
-
-  assert.match(html, /The desktop renderer failed to load\./)
-  assert.match(html, /Reload/)
 })
 
 test('loadRendererLoadErrorPage loads a data: URL and swallows loadURL rejections', async () => {

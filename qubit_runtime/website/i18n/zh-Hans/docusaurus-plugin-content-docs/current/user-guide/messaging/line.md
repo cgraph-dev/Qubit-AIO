@@ -1,12 +1,12 @@
 ---
 sidebar_position: 17
 title: "LINE"
-description: "将 Qubit Agent 设置为 LINE Messaging API 机器人"
+description: "将 Hermes Agent 设置为 LINE Messaging API 机器人"
 ---
 
 # LINE 配置
 
-通过官方 LINE Messaging API 将 Qubit Agent 作为 [LINE](https://line.me/) 机器人运行。适配器以捆绑平台插件的形式存放于 `plugins/platforms/line/` — 无需修改核心代码，像其他平台一样启用即可。
+通过官方 LINE Messaging API 将 Hermes Agent 作为 [LINE](https://line.me/) 机器人运行。适配器以捆绑平台插件的形式存放于 `plugins/platforms/line/` — 无需修改核心代码，像其他平台一样启用即可。
 
 LINE 是日本、台湾和泰国的主流即时通讯应用。如果你的用户在这些地区，这就是他们与你沟通的方式。
 
@@ -53,7 +53,7 @@ devtunnel host hermes-line
 
 ---
 
-## 第三步：配置 Qubit
+## 第三步：配置 Hermes
 
 在 `~/.hermes/.env` 中添加：
 
@@ -98,7 +98,7 @@ gateway:
 ## 第五步：运行 gateway
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 Agent 日志显示：
@@ -173,6 +173,7 @@ LINE_HOME_CHANNEL=Uxxxxxxxxxxxxxxxxxxxx     # 默认推送目标
 | `LINE_BUTTON_LABEL` | 否 | "Get answer" | 按钮标签 |
 | `LINE_DELIVERED_TEXT` | 否 | "Already replied ✅" | 再次点击已送达按钮时的回复 |
 | `LINE_INTERRUPTED_TEXT` | 否 | "Run was interrupted before completion." | 点击 `/stop` 孤立按钮时的回复 |
+| `LINE_EXPIRED_TEXT` | 否 | "That request has expired — send your message again." | 点击缓存答案已失效的按钮时的回复 |
 
 ---
 
@@ -186,7 +187,7 @@ LINE_HOME_CHANNEL=Uxxxxxxxxxxxxxxxxxxxx     # 默认推送目标
 
 **postback 按钮始终不出现。** 要么 LLM 的响应速度快于 `LINE_SLOW_RESPONSE_THRESHOLD`，要么其他气泡（工具进度、流式输出）已提前消耗了 reply token。参见"LLM 响应缓慢"中的抑制配置。
 
-**"already in use by another profile"。** 同一个频道访问 token 已被另一个运行中的 Qubit profile 占用。请停止另一个 gateway，或使用独立的频道。
+**"already in use by another profile"。** 同一个频道访问 token 已被另一个运行中的 Hermes profile 占用。请停止另一个 gateway，或使用独立的频道。
 
 ---
 

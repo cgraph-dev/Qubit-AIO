@@ -1,3 +1,4 @@
+import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Profile-door activation failure surfacing (#81094): when a secondary's
@@ -19,7 +20,7 @@ const gatewayMocks = vi.hoisted(() => {
 vi.mock('@/hermes', () => ({
   setApiRequestProfile: vi.fn(),
   getProfiles: vi.fn(async () => ({ profiles: [] })),
-  QubitGateway: class {
+  HermesGateway: class {
     connectionState = 'closed'
     close = vi.fn(() => {
       this.connectionState = 'closed'
@@ -36,6 +37,7 @@ vi.mock('@/hermes', () => ({
   }
 }))
 vi.mock('@/store/session', () => ({
+  $connection: atom(null),
   setConnection: vi.fn(),
   setGatewayState: vi.fn()
 }))
@@ -45,7 +47,7 @@ vi.mock('@/lib/query-client', () => ({ invalidateProfileScopedQueries: vi.fn() }
 const { ensureGatewayProfile } = await import('./profile')
 
 function installDesktop(stub: Record<string, unknown>): void {
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = stub
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
 }
 
 function descriptorFor(profile: string) {
@@ -66,7 +68,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks()
   vi.useRealTimers()
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('ensureGatewayProfile — switch failure surfaces instead of silent fallback (#81094)', () => {

@@ -24,8 +24,6 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 import qubit_state
 import qubit_state_repair
 from qubit_state_repair import _MAX_MALFORMED_BACKUPS, _MAX_PERSISTENT_REPAIR_ATTEMPTS, _backup_db_file, _existing_malformed_backups, _persistent_repair_attempts_exhausted, _prune_malformed_backups, _record_repair_outcome, _repair_ledger_path, repair_state_db_schema
@@ -53,12 +51,6 @@ def _make_healthy_db(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-_F2 = pytest.mark.skip(
-    reason="W9-tests2-F2: fork qubit_constants lacks profile_cli_selector "
-    "(dropped in W9 slice-0; 5 lazy call sites) — product follow-up, then unskip"
-)
-
-
 class TestPersistentAttemptCap:
     def test_failed_repairs_accumulate_in_ledger(self, tmp_path):
         db = _make_unrepairable_db(tmp_path)
@@ -67,7 +59,6 @@ class TestPersistentAttemptCap:
         ledger = json.loads(_repair_ledger_path(db).read_text())
         assert ledger["failed_attempts"] == 1
 
-    @_F2
     def test_repair_refuses_after_cap_with_terminal_error(self, tmp_path):
         db = _make_unrepairable_db(tmp_path)
         for _ in range(_MAX_PERSISTENT_REPAIR_ATTEMPTS):

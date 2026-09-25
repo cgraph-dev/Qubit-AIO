@@ -63,7 +63,7 @@ test.skipIf(process.env.HERMES_TEST_REAL_SERVE !== '1' || process.platform === '
   'native retirement preserves backend-only cron and hands both waiters capacity only after real child exit',
   async () => {
     const python = process.env.HERMES_TEST_PYTHON
-    assert.ok(python && existsSync(python), 'Set HERMES_TEST_PYTHON to an installed Qubit Python environment')
+    assert.ok(python && existsSync(python), 'Set HERMES_TEST_PYTHON to an installed Hermes Python environment')
     const electron = process.env.HERMES_TEST_ELECTRON || (require('electron') as string)
     assert.ok(existsSync(electron), 'HERMES_TEST_ELECTRON must name a real native Electron executable')
     const root = mkdtempSync(join(tmpdir(), 'hermes-pool-retirement-live-'))

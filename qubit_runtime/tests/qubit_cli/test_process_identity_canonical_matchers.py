@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from qubit_cli.dashboard_procs import _is_desktop_local_serve_cmdline
-from qubit_cli.update_cmd_windows import _hermes_holder_subcommand, _is_backend_argv
+from qubit_cli.update_cmd_windows import _qubit_holder_subcommand, _is_backend_argv
 
 LOOPBACK = "--host 127.0.0.1 --port 0"
 
@@ -34,7 +34,7 @@ CMDLINES = [
 @pytest.mark.parametrize("cmdline,subcommand,reapable,desktop_backend", CMDLINES)
 def test_kill_and_relaunch_predicates_agree_with_the_canonical_holder_matcher(
         cmdline, subcommand, reapable, desktop_backend):
-    assert _hermes_holder_subcommand(cmdline) == subcommand
+    assert _qubit_holder_subcommand(cmdline) == subcommand
     # Desktop-local reap (a KILL path): serve + loopback + ephemeral port, decided by tokens.
     assert _is_desktop_local_serve_cmdline(cmdline) is reapable
     # Windows updater backend classifier (taskkill /T on orphans): canonical subcommand AND Desktop spawn shape.

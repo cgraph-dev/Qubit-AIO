@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 
-// Qubit Setup — Tauri-targeted Vite config.
+// Hermes Setup — Tauri-targeted Vite config.
 //
 // Port 5175 keeps us out of the way of:
 //   web       (vite default 5173)

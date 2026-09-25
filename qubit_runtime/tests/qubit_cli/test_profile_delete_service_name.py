@@ -3,7 +3,7 @@
 A multi-profile dashboard/tui-gateway process has ``set_multiplex_active(True)`` and the launch
 home pinned for routed-profile decisions. ``DELETE /api/profiles/<name>`` then runs
 ``profiles._cleanup_gateway_service`` in that same process, which switches the home to the victim
-to resolve ``get_service_name()``. If that switch were invisible to ``get_hermes_home()`` the name
+to resolve ``get_service_name()``. If that switch were invisible to ``get_qubit_home()`` the name
 would resolve to the launch home's bare ``hermes-gateway`` and the cleanup would disable, stop and
 unlink the HOST multiplexer's own unit.
 """

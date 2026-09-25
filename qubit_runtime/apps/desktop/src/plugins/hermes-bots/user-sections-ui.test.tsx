@@ -7,7 +7,7 @@
  * identical guard (#93528) for the same class in a sibling hermes-bots surface.
  */
 
-import type * as QubitSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@hermes/plugin-sdk'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -21,7 +21,7 @@ beforeAll(() => {
 })
 
 vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof QubitSdk>()
+  const sdk = await importOriginal<typeof HermesSdk>()
 
   return {
     ...sdk,

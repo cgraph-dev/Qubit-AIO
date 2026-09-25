@@ -15,7 +15,7 @@ os.environ.update(HOME=str(home), QUBIT_HOME=str(home/'hermes'), XDG_CONFIG_HOME
 for k in list(os.environ):
     if any(x in k for x in ('API_KEY','TOKEN','NOUS_','SECRET')): os.environ.pop(k, None)
 (home/'hermes').mkdir()
-(home/'hermes'/'config.yaml').write_text('qubit:\n  keepalive_interval_seconds: 0\nmemory:\n  memory_enabled: false\n', encoding='utf-8')
+(home/'hermes'/'config.yaml').write_text('nous:\n  keepalive_interval_seconds: 0\nmemory:\n  memory_enabled: false\n', encoding='utf-8')
 def guard(event,args):
     if event == 'socket.connect' and isinstance(args[1], tuple) and args[1][0] not in ('127.0.0.1','::1'):
         raise RuntimeError('External network forbidden by review probe')

@@ -36,7 +36,7 @@ def _watching(server, home: Path, monkeypatch) -> list:
     from qubit_constants import qubit_home_key
     events: list = []
     monkeypatch.setattr(server, "_broadcast_global_event", lambda ev, payload=None: events.append((ev, payload)))
-    monkeypatch.setattr(server, "_hermes_home", str(home))
+    monkeypatch.setattr(server, "_qubit_home", str(home))
     server._ensure_lease_watcher()
     assert _wait_for(lambda: qubit_home_key(home) in server._lease_epochs), "watcher never seeded the home"
     return events

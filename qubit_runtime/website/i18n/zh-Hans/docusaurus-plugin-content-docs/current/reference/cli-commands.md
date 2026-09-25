@@ -1,10 +1,13 @@
 ---
 sidebar_position: 1
 title: "CLI 命令参考"
-description: "Qubit 终端命令及命令族的权威参考"
+description: "Hermes 终端命令及命令族的权威参考"
 ---
 
 # CLI 命令参考
+
+本页的 Python 依赖命令使用 [PM 准备的源码环境](./package-management.md#developer-workflow)。
+依赖变更后，请重新激活该 checkout 并重启 Hermes。
 
 本页介绍从 shell 运行的**终端命令**。
 
@@ -13,7 +16,7 @@ description: "Qubit 终端命令及命令族的权威参考"
 ## 全局入口
 
 ```bash
-qubit [global-options] <command> [subcommand/options]
+hermes [global-options] <command> [subcommand/options]
 ```
 
 ### 全局选项
@@ -21,7 +24,7 @@ qubit [global-options] <command> [subcommand/options]
 | 选项 | 说明 |
 |--------|-------------|
 | `--version`, `-V` | 显示版本并退出。 |
-| `--profile <name>`, `-p <name>` | 选择本次调用使用的 Qubit profile（配置文件）。覆盖 `qubit profile use` 设置的粘性默认值。 |
+| `--profile <name>`, `-p <name>` | 选择本次调用使用的 Hermes profile（配置文件）。覆盖 `hermes profile use` 设置的粘性默认值。 |
 | `--resume <session>`, `-r <session>` | 通过 ID 或标题恢复之前的会话。 |
 | `--continue [name]`, `-c [name]` | 恢复最近的会话，或恢复最近一个匹配标题的会话。 |
 | `--worktree`, `-w` | 在隔离的 git worktree 中启动，用于并行 agent 工作流。 |
@@ -36,56 +39,56 @@ qubit [global-options] <command> [subcommand/options]
 
 | 命令 | 用途 |
 |---------|---------|
-| `qubit chat` | 与 agent 进行交互式或单次聊天。 |
-| `qubit model` | 交互式选择默认 provider 和模型。 |
-| `qubit fallback` | 管理主模型出错时依次尝试的 fallback provider。 |
-| `qubit gateway` | 运行或管理消息 gateway 服务。 |
-| `qubit proxy` | 本地 OpenAI 兼容代理，附加 OAuth provider 凭据。参见 [订阅代理](../user-guide/features/subscription-proxy.md)。 |
-| `qubit lsp` | 管理 Language Server Protocol 集成（为 write_file/patch 提供语义诊断）。 |
-| `qubit setup` | 全部或部分配置的交互式设置向导。 |
-| `qubit whatsapp` | 配置并配对 WhatsApp 桥接。 |
-| `qubit slack` | Slack 辅助工具（当前功能：生成将每条命令注册为原生斜杠命令的 app manifest）。 |
-| `qubit auth` | 管理凭据——添加、列出、删除、重置、设置策略。处理 Codex/Qubit/Anthropic 的 OAuth 流程。 |
-| `qubit login` / `logout` | **已弃用** — 请改用 `qubit auth`。 |
-| `qubit status` | 显示 agent、auth 和平台状态。 |
-| `qubit cron` | 检查并触发 cron 调度器。 |
-| `qubit kanban` | 多 profile 协作看板（任务、链接、调度器）。 |
-| `qubit webhook` | 管理用于事件驱动激活的动态 webhook 订阅。 |
-| `qubit hooks` | 检查、审批或删除 `config.yaml` 中声明的 shell 脚本 hook。 |
-| `qubit doctor` | 诊断配置和依赖问题。 |
-| `qubit security audit` | 对 venv、plugin 依赖和固定 MCP 服务器进行按需供应链审计（OSV.dev）。 |
-| `qubit dump` | 可直接复制粘贴的设置摘要，用于支持/调试。 |
-| `qubit debug` | 调试工具——上传日志和系统信息以获取支持。 |
-| `qubit backup` | 将 Qubit 主目录备份为 zip 文件。 |
-| `qubit checkpoints` | 检查/修剪/清除 `~/.hermes/checkpoints/`（`/rollback` 使用的影子存储）。不带参数运行可查看状态概览。 |
-| `qubit import` | 从 zip 文件恢复 Qubit 备份。 |
-| `qubit logs` | 查看、跟踪和过滤 agent/gateway/错误日志文件。 |
-| `qubit config` | 显示、编辑、迁移和查询配置文件。 |
-| `qubit pairing` | 审批或撤销消息配对码。 |
-| `qubit skills` | 浏览、安装、发布、审计和配置 skill。 |
-| `qubit bundles` | 将多个 skill 归组到单个 `/<name>` 斜杠命令下。参见 [Skill Bundles](../user-guide/features/skills.md#skill-bundles)。 |
-| `qubit curator` | 后台 skill 维护——状态、运行、暂停、固定。参见 [Curator](../user-guide/features/curator.md)。 |
-| `qubit memory` | 配置外部 memory provider。当对应 provider 激活时，特定于 plugin 的子命令（如 `qubit honcho`）会自动注册。 |
-| `qubit acp` | 将 Qubit 作为 ACP 服务器运行，用于编辑器集成。 |
-| `qubit mcp` | 管理 MCP 服务器配置，并将 Qubit 作为 MCP 服务器运行。 |
-| `qubit plugins` | 管理 Qubit Agent plugin（安装、启用、禁用、删除）。 |
-| `qubit portal` | Qubit Labs 状态、订阅链接和 Tool Gateway 路由。参见 [Tool Gateway](../user-guide/features/tool-gateway.md)。 |
-| `qubit tools` | 按平台配置已启用的工具。 |
-| `qubit computer-use` | 安装或检查 cua-driver 后端（macOS Computer Use）。 |
-| `qubit sessions` | 浏览、导出、修剪、重命名和删除会话。 |
-| `qubit insights` | 显示 token/费用/活动分析。 |
-| `qubit claw` | Qubit 迁移辅助工具。 |
-| `qubit dashboard` | 启动用于管理配置、API 密钥和会话的 Web 控制台。 |
-| `qubit profile` | 管理 profile——多个隔离的 Qubit 实例。 |
-| `qubit completion` | 打印 shell 补全脚本（bash/zsh/fish）。 |
-| `qubit --version` | 显示版本信息。 |
-| `qubit update` | 拉取最新代码并重新安装依赖。`--check` 预览而不安装；`--backup` 在拉取前对 `QUBIT_HOME` 进行快照。 |
-| `qubit uninstall` | 从系统中删除 Qubit。 |
+| `hermes chat` | 与 agent 进行交互式或单次聊天。 |
+| `hermes model` | 交互式选择默认 provider 和模型。 |
+| `hermes fallback` | 管理主模型出错时依次尝试的 fallback provider。 |
+| `hermes gateway` | 运行或管理消息 gateway 服务。 |
+| `hermes proxy` | 本地 OpenAI 兼容代理，附加 OAuth provider 凭据。参见 [订阅代理](../user-guide/features/subscription-proxy.md)。 |
+| `hermes lsp` | 管理 Language Server Protocol 集成（为 write_file/patch 提供语义诊断）。 |
+| `hermes setup` | 全部或部分配置的交互式设置向导。 |
+| `hermes whatsapp` | 配置并配对 WhatsApp 桥接。 |
+| `hermes slack` | Slack 辅助工具（当前功能：生成将每条命令注册为原生斜杠命令的 app manifest）。 |
+| `hermes auth` | 管理凭据——添加、列出、删除、重置、设置策略。处理 Codex/Nous/Anthropic 的 OAuth 流程。 |
+| `hermes login` / `logout` | **已弃用** — 请改用 `hermes auth`。 |
+| `hermes status` | 显示 agent、auth 和平台状态。 |
+| `hermes cron` | 检查并触发 cron 调度器。 |
+| `hermes kanban` | 多 profile 协作看板（任务、链接、调度器）。 |
+| `hermes webhook` | 管理用于事件驱动激活的动态 webhook 订阅。 |
+| `hermes hooks` | 检查、审批或删除 `config.yaml` 中声明的 shell 脚本 hook。 |
+| `hermes doctor` | 诊断配置和依赖问题。 |
+| `hermes security audit` | 对 venv、plugin 依赖和固定 MCP 服务器进行按需供应链审计（OSV.dev）。 |
+| `hermes dump` | 可直接复制粘贴的设置摘要，用于支持/调试。 |
+| `hermes debug` | 调试工具——上传日志和系统信息以获取支持。 |
+| `hermes backup` | 将 Hermes 主目录备份为 zip 文件。 |
+| `hermes checkpoints` | 检查/修剪/清除 `~/.hermes/checkpoints/`（`/rollback` 使用的影子存储）。不带参数运行可查看状态概览。 |
+| `hermes import` | 从 zip 文件恢复 Hermes 备份。 |
+| `hermes logs` | 查看、跟踪和过滤 agent/gateway/错误日志文件。 |
+| `hermes config` | 显示、编辑、迁移和查询配置文件。 |
+| `hermes pairing` | 审批或撤销消息配对码。 |
+| `hermes skills` | 浏览、安装、发布、审计和配置 skill。 |
+| `hermes bundles` | 将多个 skill 归组到单个 `/<name>` 斜杠命令下。参见 [Skill Bundles](../user-guide/features/skills.md#skill-捆绑包)。 |
+| `hermes curator` | 后台 skill 维护——状态、运行、暂停、固定。参见 [Curator](../user-guide/features/curator.md)。 |
+| `hermes memory` | 配置外部 memory provider。当对应 provider 激活时，特定于 plugin 的子命令（如 `hermes honcho`）会自动注册。 |
+| `hermes acp` | 将 Hermes 作为 ACP 服务器运行，用于编辑器集成。 |
+| `hermes mcp` | 管理 MCP 服务器配置，并将 Hermes 作为 MCP 服务器运行。 |
+| `hermes plugins` | 管理 Hermes Agent plugin（安装、启用、禁用、删除）。 |
+| `hermes portal` | Nous Portal 状态、订阅链接和 Tool Gateway 路由。参见 [Tool Gateway](../user-guide/features/tool-gateway.md)。 |
+| `hermes tools` | 按平台配置已启用的工具。 |
+| `hermes computer-use` | 安装或检查 cua-driver 后端（macOS Computer Use）。 |
+| `hermes sessions` | 浏览、导出、修剪、重命名和删除会话。 |
+| `hermes insights` | 显示 token/费用/活动分析。 |
+| `hermes claw` | OpenClaw 迁移辅助工具。 |
+| `hermes dashboard` | 启动用于管理配置、API 密钥和会话的 Web 控制台。 |
+| `hermes profile` | 管理 profile——多个隔离的 Hermes 实例。 |
+| `hermes completion` | 打印 shell 补全脚本（bash/zsh/fish）。 |
+| `hermes --version` | 显示版本信息。 |
+| `hermes update` | 拉取最新代码并重新安装依赖。`--check` 预览而不安装；`--backup` 在拉取前对 `HERMES_HOME` 进行快照。 |
+| `hermes uninstall` | 从系统中删除 Hermes。 |
 
-## `qubit chat`
+## `hermes chat`
 
 ```bash
-qubit chat [options]
+hermes chat [options]
 ```
 
 常用选项：
@@ -95,7 +98,7 @@ qubit chat [options]
 | `-q`, `--query "..."` | 单次非交互式 prompt。 |
 | `-m`, `--model <model>` | 覆盖本次运行的模型。 |
 | `-t`, `--toolsets <csv>` | 启用逗号分隔的 toolset 集合。 |
-| `--provider <provider>` | 强制指定 provider：`auto`、`openrouter`、`qubit`、`openai-codex`、`copilot-acp`、`copilot`、`anthropic`、`gemini`、`huggingface`、`novita`（别名 `novita-ai`、`novitaai`）、`openai-api`、`zai`、`kimi-coding`、`kimi-coding-cn`、`minimax`、`minimax-cn`、`minimax-oauth`、`kilocode`、`xiaomi`、`arcee`、`gmi`、`alibaba`、`alibaba-coding-plan`（别名 `alibaba_coding`）、`deepseek`、`nvidia`、`ollama-cloud`、`xai`（别名 `grok`）、`xai-oauth`（别名 `grok-oauth`）、`qwen-oauth`、`bedrock`、`opencode-zen`、`opencode-go`、`ai-gateway`、`azure-foundry`、`lmstudio`、`stepfun`、`tencent-tokenhub`（别名 `tencent`、`tokenhub`）。 |
+| `--provider <provider>` | 强制指定 provider：`auto`、`openrouter`、`nous`、`openai-codex`、`copilot-acp`、`copilot`、`anthropic`、`gemini`、`huggingface`、`novita`（别名 `novita-ai`、`novitaai`）、`openai-api`、`zai`、`kimi-coding`、`kimi-coding-cn`、`minimax`、`minimax-cn`、`minimax-oauth`、`kilocode`、`xiaomi`、`arcee`、`gmi`、`alibaba`、`alibaba-coding-plan`（别名 `alibaba_coding`）、`deepseek`、`nvidia`、`ollama-cloud`、`xai`（别名 `grok`）、`xai-oauth`（别名 `grok-oauth`）、`qwen-oauth`、`bedrock`、`opencode-zen`、`opencode-go`、`ai-gateway`、`azure-foundry`、`lmstudio`、`stepfun`、`tencent-tokenhub`（别名 `tencent`、`tokenhub`）。 |
 | `-s`, `--skills <name>` | 为会话预加载一个或多个 skill（可重复或逗号分隔）。 |
 | `-v`, `--verbose` | 详细输出。 |
 | `-Q`, `--quiet` | 程序化模式：抑制横幅/spinner/工具预览。 |
@@ -113,25 +116,25 @@ qubit chat [options]
 示例：
 
 ```bash
-qubit
-qubit chat -q "Summarize the latest PRs"
-qubit chat --provider openrouter --model anthropic/claude-sonnet-4.6
-qubit chat --toolsets web,terminal,skills
-qubit chat --quiet -q "Return only JSON"
-qubit chat --worktree -q "Review this repo and open a PR"
-qubit chat --ignore-user-config --ignore-rules -q "Repro without my personal setup"
+hermes
+hermes chat -q "Summarize the latest PRs"
+hermes chat --provider openrouter --model anthropic/claude-sonnet-4.6
+hermes chat --toolsets web,terminal,skills
+hermes chat --quiet -q "Return only JSON"
+hermes chat --worktree -q "Review this repo and open a PR"
+hermes chat --ignore-user-config --ignore-rules -q "Repro without my personal setup"
 ```
 
-### `qubit -z <prompt>` — 脚本化单次调用
+### `hermes -z <prompt>` — 脚本化单次调用
 
-对于程序化调用方（shell 脚本、CI、cron、通过管道传入 prompt 的父进程），`qubit -z` 是最纯粹的单次入口：**单个 prompt 输入，最终响应文本输出，stdout 和 stderr 上不输出任何其他内容。** 无横幅、无 spinner、无工具预览、无 `Session:` 行——只有 agent 的最终回复纯文本。
+对于程序化调用方（shell 脚本、CI、cron、通过管道传入 prompt 的父进程），`hermes -z` 是最纯粹的单次入口：**单个 prompt 输入，最终响应文本输出，stdout 和 stderr 上不输出任何其他内容。** 无横幅、无 spinner、无工具预览、无 `Session:` 行——只有 agent 的最终回复纯文本。
 
 ```bash
-qubit -z "What's the capital of France?"
+hermes -z "What's the capital of France?"
 # → Paris.
 
 # 父脚本可以干净地捕获响应：
-answer=$(qubit -z "summarize this" < /path/to/file.txt)
+answer=$(hermes -z "summarize this" < /path/to/file.txt)
 ```
 
 单次运行覆盖（不修改 `~/.hermes/config.yaml`）：
@@ -142,35 +145,35 @@ answer=$(qubit -z "summarize this" < /path/to/file.txt)
 | `--provider <provider>` | _(无)_ | 覆盖本次运行的 provider |
 
 ```bash
-qubit -z "…" --provider openrouter --model openai/gpt-5.5
+hermes -z "…" --provider openrouter --model openai/gpt-5.5
 # 或：
-HERMES_INFERENCE_MODEL=anthropic/claude-sonnet-4.6 qubit -z "…"
+HERMES_INFERENCE_MODEL=anthropic/claude-sonnet-4.6 hermes -z "…"
 ```
 
-相同的 agent、相同的工具、相同的 skill——只是剥离了所有交互式/装饰性层。如果你还需要在记录中包含工具输出，请改用 `qubit chat -q`；`-z` 专门用于"我只需要最终答案"的场景。
+相同的 agent、相同的工具、相同的 skill——只是剥离了所有交互式/装饰性层。如果你还需要在记录中包含工具输出，请改用 `hermes chat -q`；`-z` 专门用于"我只需要最终答案"的场景。
 
-## `qubit model`
+## `hermes model`
 
-交互式 provider + 模型选择器。**这是添加新 provider、设置 API 密钥和运行 OAuth 流程的命令。** 从终端运行——不要在活跃的 Qubit 聊天会话内部运行。
+交互式 provider + 模型选择器。**这是添加新 provider、设置 API 密钥和运行 OAuth 流程的命令。** 从终端运行——不要在活跃的 Hermes 聊天会话内部运行。
 
 ```bash
-qubit model
+hermes model
 ```
 
 在以下情况使用此命令：
 - **添加新 provider**（OpenRouter、Anthropic、Copilot、DeepSeek、自定义等）
-- 登录基于 OAuth 的 provider（Anthropic、Copilot、Codex、Qubit Labs）
+- 登录基于 OAuth 的 provider（Anthropic、Copilot、Codex、Nous Portal）
 - 输入或更新 API 密钥
 - 从 provider 特定的模型列表中选择
 - 配置自定义/自托管端点
 - 将新默认值保存到 config
 
-:::warning qubit model 与 /model——了解区别
-**`qubit model`**（从终端运行，在任何 Qubit 会话外部）是**完整的 provider 设置向导**。它可以添加新 provider、运行 OAuth 流程、提示输入 API 密钥并配置端点。
+:::warning hermes model 与 /model——了解区别
+**`hermes model`**（从终端运行，在任何 Hermes 会话外部）是**完整的 provider 设置向导**。它可以添加新 provider、运行 OAuth 流程、提示输入 API 密钥并配置端点。
 
-**`/model`**（在活跃的 Qubit 聊天会话中输入）只能**在已设置好的 provider 和模型之间切换**。它无法添加新 provider、运行 OAuth 或提示输入 API 密钥。
+**`/model`**（在活跃的 Hermes 聊天会话中输入）只能**在已设置好的 provider 和模型之间切换**。它无法添加新 provider、运行 OAuth 或提示输入 API 密钥。
 
-**如果需要添加新 provider：** 先退出 Qubit 会话（`Ctrl+C` 或 `/quit`），然后从终端提示符运行 `qubit model`。
+**如果需要添加新 provider：** 先退出 Hermes 会话（`Ctrl+C` 或 `/quit`），然后从终端提示符运行 `hermes model`。
 :::
 
 ### `/model` 斜杠命令（会话中途）
@@ -194,15 +197,15 @@ qubit model
 ```
 
 :::info 如果我只看到 OpenRouter 模型怎么办？
-如果你只配置了 OpenRouter，`/model` 将只显示 OpenRouter 模型。要添加其他 provider（Anthropic、DeepSeek、Copilot 等），请退出会话并从终端运行 `qubit model`。
+如果你只配置了 OpenRouter，`/model` 将只显示 OpenRouter 模型。要添加其他 provider（Anthropic、DeepSeek、Copilot 等），请退出会话并从终端运行 `hermes model`。
 :::
 
 Provider 和 base URL 的更改会自动持久化到 `config.yaml`。从自定义端点切换走时，过时的 base URL 会被清除，以防止其泄漏到其他 provider。
 
-## `qubit gateway`
+## `hermes gateway`
 
 ```bash
-qubit gateway <subcommand>
+hermes gateway <subcommand>
 ```
 
 子命令：
@@ -223,17 +226,17 @@ qubit gateway <subcommand>
 
 | 选项 | 说明 |
 |--------|-------------|
-| `--all` | 在 `start` / `restart` / `stop` 时：对**每个 profile** 的 gateway 执行操作，而不仅限于活跃的 `QUBIT_HOME`。当你并行运行多个 profile 并希望在 `qubit update` 后全部重启时很有用。 |
+| `--all` | 在 `start` / `restart` / `stop` 时：对**每个 profile** 的 gateway 执行操作，而不仅限于活跃的 `HERMES_HOME`。当你并行运行多个 profile 并希望在 `hermes update` 后全部重启时很有用。 |
 | `--no-supervise` | 在 `run` 时：在 s6-overlay Docker 镜像内部，跳过 s6 自动监管，退回到 pre-s6 前台语义——gateway 作为容器主进程运行，无自动重启。在 s6 镜像之外为空操作。等同于设置 `HERMES_GATEWAY_NO_SUPERVISE=1`。 |
 
 :::tip WSL 用户
-使用 `qubit gateway run` 而非 `qubit gateway start`——WSL 的 systemd 支持不稳定。用 tmux 包裹以保持持久运行：`tmux new -s qubit 'qubit gateway run'`。详见 [WSL FAQ](/reference/faq#wsl-gateway-keeps-disconnecting-or-hermes-gateway-start-fails)。
+使用 `hermes gateway run` 而非 `hermes gateway start`——WSL 的 systemd 支持不稳定。用 tmux 包裹以保持持久运行：`tmux new -s hermes 'hermes gateway run'`。详见 [WSL FAQ](./faq.md#wsl网关持续断开连接或-hermes-gateway-start-失败)。
 :::
 
-## `qubit lsp`
+## `hermes lsp`
 
 ```bash
-qubit lsp <subcommand>
+hermes lsp <subcommand>
 ```
 
 管理 Language Server Protocol 集成。LSP 在后台运行真实的语言服务器（pyright、gopls、rust-analyzer 等），并将其诊断信息输入 `write_file` 和 `patch` 使用的写后检查。受 git 工作区检测限制——仅当 cwd 或编辑的文件位于 git worktree 内时，LSP 才会运行。
@@ -249,12 +252,12 @@ qubit lsp <subcommand>
 | `restart` | 关闭正在运行的客户端，以便下次编辑时重新启动。 |
 | `which <id>` | 打印某个服务器的已解析二进制路径。 |
 
-完整指南、支持的语言和配置项，请参阅 [LSP — 语义诊断](/user-guide/features/lsp)。
+完整指南、支持的语言和配置项，请参阅 [LSP — 语义诊断](../user-guide/features/lsp.md)。
 
-## `qubit setup`
+## `hermes setup`
 
 ```bash
-qubit setup [model|tts|terminal|gateway|tools|agent] [--non-interactive] [--reset] [--quick] [--reconfigure] [--portal]
+hermes setup [model|tts|terminal|gateway|tools|agent] [--non-interactive] [--reset] [--quick] [--reconfigure] [--portal]
 ```
 
 **首次运行：** 启动首次使用向导。
@@ -278,82 +281,82 @@ qubit setup [model|tts|terminal|gateway|tools|agent] [--non-interactive] [--rese
 | `--quick` | 在已配置用户运行时：仅提示缺失或未设置的项目，跳过已配置的项目。 |
 | `--non-interactive` | 使用默认值/环境变量，不显示提示。 |
 | `--reset` | 在设置前将配置重置为默认值。 |
-| `--reconfigure` | 向后兼容别名——在已有安装上裸运行 `qubit setup` 现在默认执行此操作。 |
-| `--portal` | 一键 Qubit Labs 设置：通过 OAuth 登录，将 Qubit 设为推理 provider，并选择加入 [Tool Gateway](../user-guide/features/tool-gateway.md)。跳过向导其余部分。 |
+| `--reconfigure` | 向后兼容别名——在已有安装上裸运行 `hermes setup` 现在默认执行此操作。 |
+| `--portal` | 一键 Nous Portal 设置：通过 OAuth 登录，将 Nous 设为推理 provider，并选择加入 [Tool Gateway](../user-guide/features/tool-gateway.md)。跳过向导其余部分。 |
 
-## `qubit portal`
+## `hermes portal`
 
 ```bash
-qubit portal [status|open|tools]
+hermes portal [status|open|tools]
 ```
 
-检查 Qubit Labs 认证、Tool Gateway 路由，并访问订阅页面。不带子命令时运行 `status`。
+检查 Nous Portal 认证、Tool Gateway 路由，并访问订阅页面。不带子命令时运行 `status`。
 
 | 子命令 | 说明 |
 |------------|-------------|
 | `status`（默认） | Portal 认证状态 + 每个工具的 Tool Gateway 路由摘要。不带子命令时也会显示。 |
 | `open` | 在默认浏览器中打开 `portal.nousresearch.com/manage-subscription`。 |
-| `tools` | 列出每个 Tool Gateway 合作伙伴（Firecrawl、FAL、OpenAI TTS、Browser Use、Modal）及哪些通过 Qubit 路由。 |
+| `tools` | 列出每个 Tool Gateway 合作伙伴（Firecrawl、FAL、OpenAI TTS、Browser Use、Modal）及哪些通过 Nous 路由。 |
 
-关于 gateway 本身的配置，请参阅 [Tool Gateway](../user-guide/features/tool-gateway.md)。关于一键设置路径，请参阅上方的 `qubit setup --portal`。
+关于 gateway 本身的配置，请参阅 [Tool Gateway](../user-guide/features/tool-gateway.md)。关于一键设置路径，请参阅上方的 `hermes setup --portal`。
 
-## `qubit whatsapp`
+## `hermes whatsapp`
 
 ```bash
-qubit whatsapp
+hermes whatsapp
 ```
 
 运行 WhatsApp 配对/设置流程，包括模式选择和二维码配对。
 
-## `qubit slack`
+## `hermes slack`
 
 ```bash
-qubit slack manifest              # 将 manifest 打印到 stdout
-qubit slack manifest --write      # 写入 ~/.hermes/slack-manifest.json
-qubit slack manifest --slashes-only  # 仅输出 features.slash_commands 数组
+hermes slack manifest              # 将 manifest 打印到 stdout
+hermes slack manifest --write      # 写入 ~/.hermes/slack-manifest.json
+hermes slack manifest --slashes-only  # 仅输出 features.slash_commands 数组
 ```
 
 生成一个 Slack app manifest，将 `COMMAND_REGISTRY` 中的每条 gateway 命令（`/btw`、`/stop`、`/model` 等）注册为一等公民 Slack 斜杠命令——与 Discord 和 Telegram 保持一致。将输出粘贴到你的 Slack app 配置中：[https://api.slack.com/apps](https://api.slack.com/apps) → 你的 app → **Features → App Manifest → Edit**，然后点击 **Save**。如果 scope 或斜杠命令有变化，Slack 会提示重新安装。
 
 | 标志 | 默认值 | 用途 |
 |------|---------|---------|
-| `--write [PATH]` | stdout | 写入文件而非 stdout。裸 `--write` 写入 `$QUBIT_HOME/slack-manifest.json`。 |
-| `--name NAME` | `Qubit` | Slack 中的机器人显示名称。 |
+| `--write [PATH]` | stdout | 写入文件而非 stdout。裸 `--write` 写入 `$HERMES_HOME/slack-manifest.json`。 |
+| `--name NAME` | `Hermes` | Slack 中的机器人显示名称。 |
 | `--description DESC` | 默认简介 | Slack app 目录中显示的机器人描述。 |
 | `--slashes-only` | 关闭 | 仅输出 `features.slash_commands`，用于合并到手动维护的 manifest 中。 |
 
-`qubit update` 后重新运行 `qubit slack manifest --write` 以获取新增命令。
+`hermes update` 后重新运行 `hermes slack manifest --write` 以获取新增命令。
 
 
-## `qubit login` / `qubit logout` *（已弃用）*
+## `hermes login` / `hermes logout` *（已弃用）*
 
 :::caution
-`qubit login` 已被移除。请使用 `qubit auth` 管理 OAuth 凭据，使用 `qubit model` 选择 provider，或使用 `qubit setup` 进行完整的交互式设置。
+`hermes login` 已被移除。请使用 `hermes auth` 管理 OAuth 凭据，使用 `hermes model` 选择 provider，或使用 `hermes setup` 进行完整的交互式设置。
 :::
 
-## `qubit auth`
+## `hermes auth`
 
-管理同一 provider 的密钥轮换凭据池。完整文档请参阅 [凭据池](/user-guide/features/credential-pools)。
+管理同一 provider 的密钥轮换凭据池。完整文档请参阅 [凭据池](../user-guide/features/credential-pools.md)。
 
 ```bash
-qubit auth                                              # 交互式向导
-qubit auth list                                         # 显示所有池
-qubit auth list openrouter                              # 显示特定 provider
-qubit auth add openrouter --api-key sk-or-v1-xxx        # 添加 API 密钥
-qubit auth add anthropic --type oauth                   # 添加 OAuth 凭据
-qubit auth remove openrouter 2                          # 按索引删除
-qubit auth reset openrouter                             # 清除冷却时间
-qubit auth status anthropic                             # 显示某 provider 的认证状态
-qubit auth logout anthropic                             # 登出并清除已存储的认证状态
-qubit auth spotify                                      # 通过 PKCE 将 Qubit 与 Spotify 认证
+hermes auth                                              # 交互式向导
+hermes auth list                                         # 显示所有池
+hermes auth list openrouter                              # 显示特定 provider
+hermes auth add openrouter --api-key sk-or-v1-xxx        # 添加 API 密钥
+hermes auth add anthropic --type oauth                   # 添加 OAuth 凭据
+hermes auth remove openrouter 2                          # 按索引删除
+hermes auth reset openrouter                             # 清除冷却时间
+hermes auth status anthropic                             # 显示某 provider 的认证状态
+hermes auth logout anthropic                             # 登出并清除已存储的认证状态
+hermes auth spotify                                      # 通过 PKCE 将 Hermes 与 Spotify 认证
 ```
 
 子命令：`add`、`list`、`remove`、`reset`、`status`、`logout`、`spotify`。不带子命令调用时，启动交互式管理向导。
 
-## `qubit status`
+## `hermes status`
 
 ```bash
-qubit status [--all] [--deep]
+hermes status [--all] [--deep]
 ```
 
 | 选项 | 说明 |
@@ -361,10 +364,10 @@ qubit status [--all] [--deep]
 | `--all` | 以可分享的脱敏格式显示所有详情。 |
 | `--deep` | 运行可能耗时更长的深度检查。 |
 
-## `qubit cron`
+## `hermes cron`
 
 ```bash
-qubit cron <list|create|edit|pause|resume|run|remove|status|tick>
+hermes cron <list|create|edit|pause|resume|run|remove|status|tick>
 ```
 
 | 子命令 | 说明 |
@@ -379,10 +382,10 @@ qubit cron <list|create|edit|pause|resume|run|remove|status|tick>
 | `status` | 检查 cron 调度器是否正在运行。 |
 | `tick` | 运行到期任务一次后退出。 |
 
-## `qubit kanban`
+## `hermes kanban`
 
 ```bash
-qubit kanban [--board <slug>] <action> [options]
+hermes kanban [--board <slug>] <action> [options]
 ```
 
 多 profile、多项目协作看板。每个安装可托管多个看板（每个项目、仓库或领域一个）；每个看板是独立的队列，拥有自己的 SQLite 数据库和调度器作用域。新安装从名为 `default` 的单个看板开始，其数据库为 `~/.hermes/kanban.db`（向后兼容）；其他看板位于 `~/.hermes/kanban/boards/<slug>/kanban.db`。嵌入在 gateway 中的调度器每次 tick 扫描所有看板。
@@ -391,9 +394,9 @@ qubit kanban [--board <slug>] <action> [options]
 
 | 标志 | 用途 |
 |------|---------|
-| `--board <slug>` | 操作特定看板。默认为当前看板（通过 `qubit kanban boards switch`、`HERMES_KANBAN_BOARD` 环境变量或 `default` 设置）。 |
+| `--board <slug>` | 操作特定看板。默认为当前看板（通过 `hermes kanban boards switch`、`HERMES_KANBAN_BOARD` 环境变量或 `default` 设置）。 |
 
-**这是人工/脚本操作界面。** 调度器生成的 agent worker 通过专用的 `kanban_*` [toolset](/user-guide/features/kanban#how-workers-interact-with-the-board)（`kanban_show`、`kanban_complete`、`kanban_block`、`kanban_create`、`kanban_link`、`kanban_comment`、`kanban_heartbeat`；编排器 profile 还可使用 `kanban_list` 和 `kanban_unblock`）驱动看板，而非调用 `qubit kanban`。Worker 的环境中固定了 `HERMES_KANBAN_BOARD`，因此物理上无法看到其他看板。
+**这是人工/脚本操作界面。** 调度器生成的 agent worker 通过专用的 `kanban_*` [toolset](../user-guide/features/kanban.md#how-workers-interact-with-the-board)（`kanban_show`、`kanban_complete`、`kanban_block`、`kanban_create`、`kanban_link`、`kanban_comment`、`kanban_heartbeat`；编排器 profile 还可使用 `kanban_list` 和 `kanban_unblock`）驱动看板，而非调用 `hermes kanban`。Worker 的环境中固定了 `HERMES_KANBAN_BOARD`，因此物理上无法看到其他看板。
 
 | 操作 | 用途 |
 |--------|---------|
@@ -421,35 +424,35 @@ qubit kanban [--board <slug>] <action> [options]
 | `dispatch` | 对活跃看板执行一次调度器扫描。标志：`--dry-run`、`--max N`、`--failure-limit N`、`--json`。 |
 | `context <id>` | 打印 worker 将看到的完整上下文（标题 + 正文 + 父任务结果 + 评论）。 |
 | `specify <id>` / `specify --all` | 通过辅助 LLM 将 triage 列中的任务细化为具体规格（标题 + 包含目标、方案、验收标准的正文），然后将其提升到 `todo`。标志：`--tenant`（将 `--all` 限定到一个 tenant）、`--author`、`--json`。在 `config.yaml` 的 `auxiliary.triage_specifier` 下配置模型。 |
-| `decompose <id>` / `decompose --all` | 将 triage 列中的任务按描述拆分为子任务图，路由到专业 profile（编排器驱动路径）。当 LLM 判断任务不适合拆分时，回退到 specify 风格的单任务提升。与 `specify` 相同的标志。在 `config.yaml` 的 `auxiliary.kanban_decomposer` 下配置模型。当 `kanban.auto_decompose: true`（默认）时，每次调度器 tick 也会自动运行。参见 [自动与手动编排](/user-guide/features/kanban#auto-vs-manual-orchestration)。 |
+| `decompose <id>` / `decompose --all` | 将 triage 列中的任务按描述拆分为子任务图，路由到专业 profile（编排器驱动路径）。当 LLM 判断任务不适合拆分时，回退到 specify 风格的单任务提升。与 `specify` 相同的标志。在 `config.yaml` 的 `auxiliary.kanban_decomposer` 下配置模型。当 `kanban.auto_decompose: true`（默认）时，每次调度器 tick 也会自动运行。参见 [自动与手动编排](../user-guide/features/kanban.md#auto-vs-manual-orchestration)。 |
 | `gc` | 删除已归档任务的 scratch 工作区。 |
 
 示例：
 
 ```bash
 # 创建第二个看板并在不切换的情况下向其添加任务。
-qubit kanban boards create atm10-server --name "ATM10 Server" --icon 🎮
-qubit kanban --board atm10-server create "Restart server" --assignee ops
+hermes kanban boards create atm10-server --name "ATM10 Server" --icon 🎮
+hermes kanban --board atm10-server create "Restart server" --assignee ops
 
 # 切换活跃看板以供后续调用使用。
-qubit kanban boards switch atm10-server
-qubit kanban list                  # 显示 atm10-server 的任务
+hermes kanban boards switch atm10-server
+hermes kanban list                  # 显示 atm10-server 的任务
 
 # 归档看板（可恢复）或硬删除。
-qubit kanban boards rm atm10-server
-qubit kanban boards rm atm10-server --delete
+hermes kanban boards rm atm10-server
+hermes kanban boards rm atm10-server --delete
 ```
 
 看板解析顺序（优先级从高到低）：`--board <slug>` 标志 → `HERMES_KANBAN_BOARD` 环境变量 → `~/.hermes/kanban/current` 文件 → `default`。
 
 所有操作也可作为 gateway 中的斜杠命令使用（`/kanban …`），参数界面相同——包括 `boards` 子命令和 `--board` 标志。
 
-完整设计——与 Cline Kanban / Paperclip / NanoClaw / Gemini Enterprise 的对比、八种协作模式、四个用户故事、并发正确性证明——请参阅仓库中的 `docs/hermes-kanban-v1-spec.pdf` 或 [Kanban 用户指南](/user-guide/features/kanban)。
+完整设计——与 Cline Kanban / Paperclip / NanoClaw / Gemini Enterprise 的对比、八种协作模式、四个用户故事、并发正确性证明——请参阅 [Kanban 用户指南](../user-guide/features/kanban.md)。
 
-## `qubit webhook`
+## `hermes webhook`
 
 ```bash
-qubit webhook <subscribe|list|remove|test>
+hermes webhook <subscribe|list|remove|test>
 ```
 
 管理用于事件驱动 agent 激活的动态 webhook 订阅。需要在 config 中启用 webhook 平台——如未配置，将打印设置说明。
@@ -461,10 +464,10 @@ qubit webhook <subscribe|list|remove|test>
 | `remove` / `rm` | 删除动态订阅。不影响 config.yaml 中的静态路由。 |
 | `test` | 发送测试 POST 以验证订阅是否正常工作。 |
 
-### `qubit webhook subscribe`
+### `hermes webhook subscribe`
 
 ```bash
-qubit webhook subscribe <name> [options]
+hermes webhook subscribe <name> [options]
 ```
 
 | 选项 | 说明 |
@@ -481,23 +484,23 @@ qubit webhook subscribe <name> [options]
 
 订阅持久化到 `~/.hermes/webhook_subscriptions.json`，webhook 适配器无需重启 gateway 即可热重载。
 
-## `qubit doctor`
+## `hermes doctor`
 
 ```bash
-qubit doctor [--fix]
+hermes doctor [--fix]
 ```
 
 | 选项 | 说明 |
 |--------|-------------|
 | `--fix` | 尽可能尝试自动修复。 |
 
-## `qubit dump`
+## `hermes dump`
 
 ```bash
-qubit dump [--show-keys]
+hermes dump [--show-keys]
 ```
 
-输出整个 Qubit 设置的紧凑纯文本摘要。专为复制粘贴到 Discord、GitHub issue 或 Telegram 寻求支持而设计——无 ANSI 颜色、无特殊格式，只有数据。
+输出整个 Hermes 设置的紧凑纯文本摘要。专为复制粘贴到 Discord、GitHub issue 或 Telegram 寻求支持而设计——无 ANSI 颜色、无特殊格式，只有数据。
 
 | 选项 | 说明 |
 |--------|-------------|
@@ -507,9 +510,9 @@ qubit dump [--show-keys]
 
 | 部分 | 详情 |
 |---------|---------|
-| **Header** | Qubit 版本、发布日期、git commit hash |
+| **Header** | Hermes 版本、发布日期、git commit hash |
 | **Environment** | 操作系统、Python 版本、OpenAI SDK 版本 |
-| **Identity** | 活跃 profile 名称、QUBIT_HOME 路径 |
+| **Identity** | 活跃 profile 名称、HERMES_HOME 路径 |
 | **Model** | 已配置的默认模型和 provider |
 | **Terminal** | 后端类型（local、docker、ssh 等） |
 | **API keys** | 所有 22 个 provider/工具 API 密钥的存在性检查 |
@@ -521,7 +524,7 @@ qubit dump [--show-keys]
 ### 示例输出
 
 ```
---- qubit dump ---
+--- hermes dump ---
 version:          0.8.0 (2026.4.8) [af4abd2f]
 os:               Linux 6.14.0-37-generic x86_64
 python:           3.11.14
@@ -536,7 +539,7 @@ api_keys:
   openrouter           set
   openai               not set
   anthropic            set
-  qubit                 not set
+  nous                 not set
   firecrawl            set
   ...
 
@@ -564,13 +567,13 @@ config_overrides:
 - 出现问题时快速进行健全性检查
 
 :::tip
-`qubit dump` 专为分享而设计。交互式诊断请使用 `qubit doctor`。可视化概览请使用 `qubit status`。
+`hermes dump` 专为分享而设计。交互式诊断请使用 `hermes doctor`。可视化概览请使用 `hermes status`。
 :::
 
-## `qubit debug`
+## `hermes debug`
 
 ```bash
-qubit debug share [options]
+hermes debug share [options]
 ```
 
 将调试报告（系统信息 + 近期日志）上传到粘贴服务并获取可分享的 URL。适用于快速支持请求——包含帮助者诊断问题所需的一切信息。
@@ -581,26 +584,26 @@ qubit debug share [options]
 | `--expire <days>` | 粘贴过期天数（默认：7）。 |
 | `--local` | 在本地打印报告而非上传。 |
 
-报告包含系统信息（操作系统、Python 版本、Qubit 版本）、近期 agent 和 gateway 日志（每文件 512 KB 限制）以及脱敏的 API 密钥状态。密钥始终脱敏——不会上传任何密钥。
+报告包含系统信息（操作系统、Python 版本、Hermes 版本）、近期 agent 和 gateway 日志（每文件 512 KB 限制）以及脱敏的 API 密钥状态。密钥始终脱敏——不会上传任何密钥。
 
 依次尝试的粘贴服务：paste.rs、dpaste.com。
 
 ### 示例
 
 ```bash
-qubit debug share              # 上传调试报告，打印 URL
-qubit debug share --lines 500  # 包含更多日志行
-qubit debug share --expire 30  # 粘贴保留 30 天
-qubit debug share --local      # 在终端打印报告（不上传）
+hermes debug share              # 上传调试报告，打印 URL
+hermes debug share --lines 500  # 包含更多日志行
+hermes debug share --expire 30  # 粘贴保留 30 天
+hermes debug share --local      # 在终端打印报告（不上传）
 ```
 
-## `qubit backup`
+## `hermes backup`
 
 ```bash
-qubit backup [options]
+hermes backup [options]
 ```
 
-创建 Qubit 配置、skill、会话和数据的 zip 归档。备份不包含 hermes-agent 代码库本身。
+创建 Hermes 配置、skill、会话和数据的 zip 归档。备份不包含 hermes-agent 代码库本身。
 
 | 选项 | 说明 |
 |--------|-------------|
@@ -608,7 +611,7 @@ qubit backup [options]
 | `-q`, `--quick` | 快速快照：仅包含关键状态文件（config.yaml、state.db、.env、auth、cron 任务）。比完整备份快得多。 |
 | `-l`, `--label <name>` | 快照标签（仅与 `--quick` 配合使用）。 |
 
-备份使用 SQLite 的 `backup()` API 进行安全复制，因此即使 Qubit 正在运行也能正确工作（WAL 模式安全）。
+备份使用 SQLite 的 `backup()` API 进行安全复制，因此即使 Hermes 正在运行也能正确工作（WAL 模式安全）。
 
 **zip 中排除的内容：**
 
@@ -619,23 +622,23 @@ qubit backup [options]
 ### 示例
 
 ```bash
-qubit backup                           # 完整备份到 ~/hermes-backup-*.zip
-qubit backup -o /tmp/hermes.zip        # 完整备份到指定路径
-qubit backup --quick                   # 仅状态快速快照
-qubit backup --quick --label "pre-upgrade"  # 带标签的快速快照
+hermes backup                           # 完整备份到 ~/hermes-backup-*.zip
+hermes backup -o /tmp/hermes.zip        # 完整备份到指定路径
+hermes backup --quick                   # 仅状态快速快照
+hermes backup --quick --label "pre-upgrade"  # 带标签的快速快照
 ```
 
-## `qubit checkpoints`
+## `hermes checkpoints`
 
 ```bash
-qubit checkpoints [COMMAND]
+hermes checkpoints [COMMAND]
 ```
 
 检查和管理 `~/.hermes/checkpoints/` 处的影子 git 存储——会话内 `/rollback` 命令的存储层。可随时安全运行；不需要 agent 正在运行。
 
 | 子命令 | 说明 |
 |------------|-------------|
-| `status`（默认） | 显示总大小、项目数量和每个项目的详情。裸 `qubit checkpoints` 等同于此。 |
+| `status`（默认） | 显示总大小、项目数量和每个项目的详情。裸 `hermes checkpoints` 等同于此。 |
 | `list` | `status` 的别名。 |
 | `prune` | 强制执行清理——删除孤立和过期项目，GC 存储，强制执行大小上限。忽略 24 小时幂等性标记。 |
 | `clear` | 删除整个 checkpoint 基础存储。不可逆；除非使用 `-f` 否则要求确认。 |
@@ -654,22 +657,22 @@ qubit checkpoints [COMMAND]
 ### 示例
 
 ```bash
-qubit checkpoints                                  # 状态概览
-qubit checkpoints prune --retention-days 3         # 激进清理
-qubit checkpoints prune --max-size-mb 200          # 一次性收紧大小上限
-qubit checkpoints clear-legacy -f                  # 删除 v1 归档目录
-qubit checkpoints clear -f                         # 清除所有内容
+hermes checkpoints                                  # 状态概览
+hermes checkpoints prune --retention-days 3         # 激进清理
+hermes checkpoints prune --max-size-mb 200          # 一次性收紧大小上限
+hermes checkpoints clear-legacy -f                  # 删除 v1 归档目录
+hermes checkpoints clear -f                         # 清除所有内容
 ```
 
 完整架构和会话内命令，请参阅 [Checkpoints 与 `/rollback`](../user-guide/checkpoints-and-rollback.md)。
 
-## `qubit import`
+## `hermes import`
 
 ```bash
-qubit import <zipfile> [options]
+hermes import <zipfile> [options]
 ```
 
-将之前创建的 Qubit 备份恢复到 Qubit 主目录。归档中的所有文件会覆盖 Qubit 主目录中的现有文件；`--force` 仅跳过当目标已有 Qubit 安装时触发的确认提示。
+将之前创建的 Hermes 备份恢复到 Hermes 主目录。归档中的所有文件会覆盖 Hermes 主目录中的现有文件；`--force` 仅跳过当目标已有 Hermes 安装时触发的确认提示。
 
 | 选项 | 说明 |
 |--------|-------------|
@@ -681,17 +684,17 @@ qubit import <zipfile> [options]
 
 ### 示例
 ```bash
-qubit import ~/hermes-backup-20260423.zip           # 覆盖现有配置前提示确认
-qubit import ~/hermes-backup-20260423.zip --force   # 不提示直接覆盖
+hermes import ~/hermes-backup-20260423.zip           # 覆盖现有配置前提示确认
+hermes import ~/hermes-backup-20260423.zip --force   # 不提示直接覆盖
 ```
 
-## `qubit logs`
+## `hermes logs`
 
 ```bash
-qubit logs [log_name] [options]
+hermes logs [log_name] [options]
 ```
 
-查看、跟踪和过滤 Qubit 日志文件。所有日志存储在 `~/.hermes/logs/`（非默认 profile 存储在 `<profile>/logs/`）。
+查看、跟踪和过滤 Hermes 日志文件。所有日志存储在 `~/.hermes/logs/`（非默认 profile 存储在 `<profile>/logs/`）。
 
 ### 日志文件
 
@@ -717,25 +720,25 @@ qubit logs [log_name] [options]
 
 ```bash
 # 查看 agent.log 的最后 50 行（默认）
-qubit logs
+hermes logs
 
 # 实时跟踪 agent.log
-qubit logs -f
+hermes logs -f
 
 # 查看 gateway.log 的最后 100 行
-qubit logs gateway -n 100
+hermes logs gateway -n 100
 
 # 仅显示最近一小时的警告和错误
-qubit logs --level WARNING --since 1h
+hermes logs --level WARNING --since 1h
 
 # 按特定会话过滤
-qubit logs --session abc123
+hermes logs --session abc123
 
 # 从 30 分钟前开始跟踪 errors.log
-qubit logs errors --since 30m -f
+hermes logs errors --since 30m -f
 
 # 列出所有日志文件及其大小
-qubit logs list
+hermes logs list
 ```
 
 ### 过滤
@@ -744,19 +747,19 @@ qubit logs list
 
 ```bash
 # 最近 2 小时内包含会话 "tg-12345" 的 WARNING+ 行
-qubit logs --level WARNING --since 2h --session tg-12345
+hermes logs --level WARNING --since 2h --session tg-12345
 ```
 
 当 `--since` 激活时，没有可解析时间戳的行会被包含（它们可能是多行日志条目的续行）。当 `--level` 激活时，没有可检测级别的行会被包含。
 
 ### 日志轮转
 
-Qubit 使用 Python 的 `RotatingFileHandler`。旧日志会自动轮转——查找 `agent.log.1`、`agent.log.2` 等。`qubit logs list` 子命令显示所有日志文件，包括已轮转的。
+Hermes 使用 Python 的 `RotatingFileHandler`。旧日志会自动轮转——查找 `agent.log.1`、`agent.log.2` 等。`hermes logs list` 子命令显示所有日志文件，包括已轮转的。
 
-## `qubit config`
+## `hermes config`
 
 ```bash
-qubit config <subcommand>
+hermes config <subcommand>
 ```
 
 子命令：
@@ -771,10 +774,10 @@ qubit config <subcommand>
 | `check` | 检查缺失或过期的 config。 |
 | `migrate` | 交互式添加新引入的选项。 |
 
-## `qubit pairing`
+## `hermes pairing`
 
 ```bash
-qubit pairing <list|approve|revoke|clear-pending>
+hermes pairing <list|approve|revoke|clear-pending>
 ```
 
 | 子命令 | 说明 |
@@ -784,10 +787,10 @@ qubit pairing <list|approve|revoke|clear-pending>
 | `revoke <platform> <user-id>` | 撤销用户的访问权限。 |
 | `clear-pending` | 清除待处理的配对码。 |
 
-## `qubit skills`
+## `hermes skills`
 
 ```bash
-qubit skills <subcommand>
+hermes skills <subcommand>
 ```
 
 子命令：
@@ -812,38 +815,38 @@ qubit skills <subcommand>
 常用示例：
 
 ```bash
-qubit skills browse
-qubit skills browse --source official
-qubit skills search react --source skills-sh
-qubit skills search https://mintlify.com/docs --source well-known
-qubit skills inspect official/security/1password
-qubit skills inspect skills-sh/vercel-labs/json-render/json-render-react
-qubit skills install official/migration/openclaw-migration
-qubit skills install skills-sh/anthropics/skills/pdf --force
-qubit skills install https://sharethis.chat/SKILL.md                     # 直接 URL（含引用的支持文件）
-qubit skills install https://example.com/SKILL.md --name my-skill        # frontmatter 无名称时覆盖名称
-qubit skills check
-qubit skills update
-qubit skills config
-qubit skills reset google-workspace
-qubit skills reset google-workspace --restore --yes
+hermes skills browse
+hermes skills browse --source official
+hermes skills search react --source skills-sh
+hermes skills search https://mintlify.com/docs --source well-known
+hermes skills inspect official/security/1password
+hermes skills inspect skills-sh/vercel-labs/json-render/json-render-react
+hermes skills install official/migration/openclaw-migration
+hermes skills install skills-sh/anthropics/skills/pdf --force
+hermes skills install https://sharethis.chat/SKILL.md                     # 直接 URL（含引用的支持文件）
+hermes skills install https://example.com/SKILL.md --name my-skill        # frontmatter 无名称时覆盖名称
+hermes skills check
+hermes skills update
+hermes skills config
+hermes skills reset google-workspace
+hermes skills reset google-workspace --restore --yes
 ```
 
 注意：
 - `--force` 可以覆盖第三方/社区 skill 的非危险性策略阻止。
 - `--force` 不覆盖 `dangerous` 扫描结论。
 - `--source skills-sh` 搜索公共 `skills.sh` 目录。
-- `--source well-known` 允许你将 Qubit 指向暴露 `/.well-known/skills/index.json` 的站点。
+- `--source well-known` 允许你将 Hermes 指向暴露 `/.well-known/skills/index.json` 的站点。
 - `--source browse-sh` 搜索 [browse.sh](https://browse.sh) 包含 200+ 站点特定浏览器自动化 skill 的目录。标识符形如 `browse-sh/airbnb.com/search-listings-ddgioa`。
 - 传入 `http(s)://…/*.md` URL 可安装 `SKILL.md`，以及其中明确引用且位于 `references/`、`templates/`、`scripts/`、`assets/` 和 `examples/` 下的文件。当 frontmatter 没有 `name:` 且 URL slug 不是有效标识符时，交互式终端会提示输入名称；非交互式界面（TUI 内的 `/skills install`、gateway 平台）需要改用 `--name <x>`。
 
-## `qubit bundles`
+## `hermes bundles`
 
 ```bash
-qubit bundles <subcommand>
+hermes bundles <subcommand>
 ```
 
-Skill bundle 将多个 skill 归组到一个 `/<bundle-name>` 斜杠命令下。调用 bundle 会将每个引用的 skill 加载到单个合并的用户消息中。存储位置：`~/.hermes/skill-bundles/<slug>.yaml`。YAML schema 和行为请参阅 [Skill Bundles](../user-guide/features/skills.md#skill-bundles)。
+Skill bundle 将多个 skill 归组到一个 `/<bundle-name>` 斜杠命令下。调用 bundle 会将每个引用的 skill 加载到单个合并的用户消息中。存储位置：`~/.hermes/skill-bundles/<slug>.yaml`。YAML schema 和行为请参阅 [Skill Bundles](../user-guide/features/skills.md#skill-捆绑包)。
 
 子命令：
 
@@ -858,23 +861,23 @@ Skill bundle 将多个 skill 归组到一个 `/<bundle-name>` 斜杠命令下。
 示例：
 
 ```bash
-qubit bundles create backend-dev \
+hermes bundles create backend-dev \
   --skill github-code-review \
   --skill test-driven-development \
   --skill github-pr-workflow \
   -d "Backend feature work"
 
-qubit bundles list
-qubit bundles show backend-dev
-qubit bundles delete backend-dev
+hermes bundles list
+hermes bundles show backend-dev
+hermes bundles delete backend-dev
 ```
 
 在聊天会话中，`/bundles` 列出已安装的 bundle，`/<bundle-name>` 加载某个 bundle。
 
-## `qubit curator`
+## `hermes curator`
 
 ```bash
-qubit curator <subcommand>
+hermes curator <subcommand>
 ```
 
 Curator 是一个辅助模型后台任务，定期审查 agent 创建的 skill，修剪过期的，合并重叠的，并归档过时的。捆绑和通过 hub 安装的 skill 不会被触及。归档可恢复；不会发生自动删除。
@@ -899,14 +902,14 @@ Curator 是一个辅助模型后台任务，定期审查 agent 创建的 skill�
 | `prune` | 手动修剪 curator 通常会清理的 skill |
 | `list-archived` | 列出已归档的 skill（可通过 `restore` 恢复） |
 
-在全新安装时，第一次计划运行会延迟一个完整的 `interval_hours`（默认 7 天）——gateway 不会在 `qubit update` 后的第一次 tick 时立即执行 curator。使用 `qubit curator run --dry-run` 在此之前预览。
+在全新安装时，第一次计划运行会延迟一个完整的 `interval_hours`（默认 7 天）——gateway 不会在 `hermes update` 后的第一次 tick 时立即执行 curator。使用 `hermes curator run --dry-run` 在此之前预览。
 
 行为和配置请参阅 [Curator](../user-guide/features/curator.md)。
 
-## `qubit fallback`
+## `hermes fallback`
 
 ```bash
-qubit fallback <subcommand>
+hermes fallback <subcommand>
 ```
 
 管理 fallback provider 链。当主模型因速率限制、过载或连接错误而失败时，按顺序尝试 fallback provider。
@@ -914,16 +917,16 @@ qubit fallback <subcommand>
 | 子命令 | 说明 |
 |------------|-------------|
 | `list`（别名：`ls`） | 显示当前 fallback 链（不带子命令时的默认行为） |
-| `add` | 选择 provider + 模型（与 `qubit model` 相同的选择器）并追加到链末尾 |
+| `add` | 选择 provider + 模型（与 `hermes model` 相同的选择器）并追加到链末尾 |
 | `remove`（别名：`rm`） | 选择要从链中删除的条目 |
 | `clear` | 删除所有 fallback 条目 |
 
 参见 [Fallback Providers](../user-guide/features/fallback-providers.md)。
 
-## `qubit hooks`
+## `hermes hooks`
 
 ```bash
-qubit hooks <subcommand>
+hermes hooks <subcommand>
 ```
 
 检查 `~/.hermes/config.yaml` 中声明的 shell 脚本 hook，针对合成 payload 测试它们，并管理 `~/.hermes/shell-hooks-allowlist.json` 处的首次使用同意许可名单。
@@ -937,10 +940,10 @@ qubit hooks <subcommand>
 
 事件签名和 payload 格式请参阅 [Hooks](../user-guide/features/hooks.md)。
 
-## `qubit memory`
+## `hermes memory`
 
 ```bash
-qubit memory <subcommand>
+hermes memory <subcommand>
 ```
 
 设置和管理外部 memory provider plugin。可用 provider：honcho、openviking、mem0、hindsight、holographic、retaindb、byterover、supermemory。同一时间只能有一个外部 provider 处于活跃状态。内置 memory（MEMORY.md/USER.md）始终处于活跃状态。
@@ -954,16 +957,16 @@ qubit memory <subcommand>
 | `off` | 禁用外部 provider（仅使用内置）。 |
 
 :::info Provider 特定子命令
-当外部 memory provider 处于活跃状态时，它可能会注册自己的顶级 `qubit <provider>` 命令用于 provider 特定管理（例如 Honcho 激活时的 `qubit honcho`）。未激活的 provider 不暴露其子命令。运行 `qubit --help` 查看当前已连接的命令。
+当外部 memory provider 处于活跃状态时，它可能会注册自己的顶级 `hermes <provider>` 命令用于 provider 特定管理（例如 Honcho 激活时的 `hermes honcho`）。未激活的 provider 不暴露其子命令。运行 `hermes --help` 查看当前已连接的命令。
 :::
 
-## `qubit acp`
+## `hermes acp`
 
 ```bash
-qubit acp
+hermes acp
 ```
 
-将 Qubit 作为 ACP（Agent Client Protocol）stdio 服务器启动，用于编辑器集成。
+将 Hermes 作为 ACP（Agent Client Protocol）stdio 服务器启动，用于编辑器集成。
 
 相关入口：
 
@@ -975,22 +978,22 @@ python -m acp_adapter
 首先安装支持：
 
 ```bash
-cd ~/.hermes/hermes-agent && uv pip install -e '.[acp]'
+cd ~/.hermes/hermes-agent && python -c "import pm; pm.sync_venv(['acp'], explicit=True)"
 ```
 
 参见 [ACP 编辑器集成](../user-guide/features/acp.md) 和 [ACP 内部原理](../developer-guide/acp-internals.md)。
 
-## `qubit mcp`
+## `hermes mcp`
 
 ```bash
-qubit mcp <subcommand>
+hermes mcp <subcommand>
 ```
 
-管理 MCP（Model Context Protocol）服务器配置，并将 Qubit 作为 MCP 服务器运行。
+管理 MCP（Model Context Protocol）服务器配置，并将 Hermes 作为 MCP 服务器运行。
 
 | 子命令 | 说明 |
 |------------|-------------|
-| `serve [-v\|--verbose]` | 将 Qubit 作为 MCP 服务器运行——向其他 agent 暴露对话。 |
+| `serve [-v\|--verbose]` | 将 Hermes 作为 MCP 服务器运行——向其他 agent 暴露对话。 |
 | `add <name> [--url URL] [--command CMD] [--args ...] [--auth oauth\|header]` | 添加 MCP 服务器并自动发现工具。 |
 | `remove <name>`（别名：`rm`） | 从 config 中删除 MCP 服务器。 |
 | `list`（别名：`ls`） | 列出已配置的 MCP 服务器。 |
@@ -998,15 +1001,15 @@ qubit mcp <subcommand>
 | `configure <name>`（别名：`config`） | 切换服务器的工具选择。 |
 | `login <name>` | 强制重新认证基于 OAuth 的 MCP 服务器。 |
 
-参见 [MCP 配置参考](./mcp-config-reference.md)、[在 Qubit 中使用 MCP](../guides/use-mcp-with-hermes.md) 和 [MCP 服务器模式](../user-guide/features/mcp.md#running-hermes-as-an-mcp-server)。
+参见 [MCP 配置参考](./mcp-config-reference.md)、[在 Hermes 中使用 MCP](../guides/use-mcp-with-hermes.md) 和 [MCP 服务器模式](../user-guide/features/mcp.md#将-hermes-作为-mcp-服务器运行)。
 
-## `qubit plugins`
+## `hermes plugins`
 
 ```bash
-qubit plugins [subcommand]
+hermes plugins [subcommand]
 ```
 
-统一的 plugin 管理——通用 plugin、memory provider 和 context engine 集于一处。不带子命令运行 `qubit plugins` 会打开包含两个部分的复合交互界面：
+统一的 plugin 管理——通用 plugin、memory provider 和 context engine 集于一处。不带子命令运行 `hermes plugins` 会打开包含两个部分的复合交互界面：
 
 - **General Plugins** — 多选复选框，用于启用/禁用已安装的 plugin
 - **Provider Plugins** — 单选配置，用于 Memory Provider 和 Context Engine。在某个类别上按 ENTER 打开单选选择器。
@@ -1027,12 +1030,12 @@ Provider plugin 选择保存到 `config.yaml`：
 
 通用 plugin 禁用列表存储在 `config.yaml` 的 `plugins.disabled` 下。
 
-参见 [Plugins](../user-guide/features/plugins.md) 和 [构建 Qubit Plugin](../developer-guide/plugins/index.md)。
+参见 [Plugins](../user-guide/features/plugins.md) 和 [构建 Hermes Plugin](../developer-guide/plugins/index.md)。
 
-## `qubit tools`
+## `hermes tools`
 
 ```bash
-qubit tools [--summary]
+hermes tools [--summary]
 ```
 
 | 选项 | 说明 |
@@ -1041,10 +1044,10 @@ qubit tools [--summary]
 
 不带 `--summary` 时，启动交互式按平台工具配置界面。
 
-## `qubit computer-use`
+## `hermes computer-use`
 
 ```bash
-qubit computer-use <subcommand>
+hermes computer-use <subcommand>
 ```
 
 子命令：
@@ -1055,14 +1058,14 @@ qubit computer-use <subcommand>
 | `install --upgrade` | 即使 cua-driver 已在 PATH 中也重新运行安装程序。上游脚本始终拉取最新版本，因此这会执行原地升级。 |
 | `status` | 打印 `cua-driver` 是否在 `$PATH` 中以及已安装的版本。 |
 
-`qubit computer-use install` 是安装 `computer_use` toolset 使用的 [cua-driver](https://github.com/trycua/cua) 二进制文件的稳定入口。它运行与首次启用 Computer Use 时 `qubit tools` 调用的相同上游安装程序，因此如果 toolset 切换未触发安装（例如在已配置用户的设置中），可以安全地用于重新运行安装。
+`hermes computer-use install` 是安装 `computer_use` toolset 使用的 [cua-driver](https://github.com/trycua/cua) 二进制文件的稳定入口。它运行与首次启用 Computer Use 时 `hermes tools` 调用的相同上游安装程序，因此如果 toolset 切换未触发安装（例如在已配置用户的设置中），可以安全地用于重新运行安装。
 
-`qubit update` 在更新结束时，如果 cua-driver 在 PATH 中，会自动重新运行上游安装程序，因此大多数用户不需要手动调用 `--upgrade`。当上游发布了你现在就想要的修复，而不想等待下次 Qubit 更新时，使用此选项。
+`hermes update` 在更新结束时，如果 cua-driver 在 PATH 中，会自动重新运行上游安装程序，因此大多数用户不需要手动调用 `--upgrade`。当上游发布了你现在就想要的修复，而不想等待下次 Hermes 更新时，使用此选项。
 
-## `qubit sessions`
+## `hermes sessions`
 
 ```bash
-qubit sessions <subcommand>
+hermes sessions <subcommand>
 ```
 
 子命令：
@@ -1077,10 +1080,10 @@ qubit sessions <subcommand>
 | `stats` | 显示会话存储统计信息。 |
 | `rename <session-id> <title>` | 设置或更改会话标题。 |
 
-## `qubit insights`
+## `hermes insights`
 
 ```bash
-qubit insights [--days N] [--source platform]
+hermes insights [--days N] [--source platform]
 ```
 
 | 选项 | 说明 |
@@ -1088,35 +1091,35 @@ qubit insights [--days N] [--source platform]
 | `--days <n>` | 分析最近 `n` 天（默认：30）。 |
 | `--source <platform>` | 按来源过滤，如 `cli`、`telegram` 或 `discord`。 |
 
-## `qubit claw`
+## `hermes claw`
 
 ```bash
-qubit claw migrate [options]
+hermes claw migrate [options]
 ```
 
-将 Qubit 设置迁移到 Qubit。从 `~/.qubit`（或自定义路径）读取并写入 `~/.hermes`。自动检测旧版目录名（`~/.clawdbot`、`~/.moltbot`）和配置文件名（`clawdbot.json`、`moltbot.json`）。
+将 OpenClaw 设置迁移到 Hermes。从 `~/.openclaw`（或自定义路径）读取并写入 `~/.hermes`。自动检测旧版目录名（`~/.clawdbot`、`~/.moltbot`）和配置文件名（`clawdbot.json`、`moltbot.json`）。
 
 | 选项 | 说明 |
 |--------|-------------|
 | `--dry-run` | 预览将迁移的内容而不写入任何内容。 |
 | `--preset <name>` | 迁移预设：`full`（所有兼容设置）或 `user-data`（排除基础设施配置）。两种预设都不导入密钥——需要显式传入 `--migrate-secrets`。 |
-| `--overwrite` | 在冲突时覆盖现有 Qubit 文件（默认：当计划有冲突时拒绝应用）。 |
+| `--overwrite` | 在冲突时覆盖现有 Hermes 文件（默认：当计划有冲突时拒绝应用）。 |
 | `--migrate-secrets` | 在迁移中包含 API 密钥。即使在 `--preset full` 下也需要显式指定。 |
-| `--no-backup` | 跳过迁移前对 `~/.hermes/` 的 zip 快照（默认情况下，在应用前会将单个还原点归档写入 `~/.hermes/backups/pre-migration-*.zip`；可用 `qubit import` 恢复）。 |
-| `--source <path>` | 自定义 Qubit 目录（默认：`~/.qubit`）。 |
+| `--no-backup` | 跳过迁移前对 `~/.hermes/` 的 zip 快照（默认情况下，在应用前会将单个还原点归档写入 `~/.hermes/backups/pre-migration-*.zip`；可用 `hermes import` 恢复）。 |
+| `--source <path>` | 自定义 OpenClaw 目录（默认：`~/.openclaw`）。 |
 | `--workspace-target <path>` | 工作区说明（AGENTS.md）的目标目录。 |
 | `--skill-conflict <mode>` | 处理 skill 名称冲突：`skip`（默认）、`overwrite` 或 `rename`。 |
 | `--yes` | 跳过确认提示。 |
 
 ### 迁移内容
 
-迁移涵盖 30+ 个类别，包括 persona、memory、skill、模型 provider、消息平台、agent 行为、会话策略、MCP 服务器、TTS 等。条目要么**直接导入**到 Qubit 等效项，要么**归档**以供手动审查。
+迁移涵盖 30+ 个类别，包括 persona、memory、skill、模型 provider、消息平台、agent 行为、会话策略、MCP 服务器、TTS 等。条目要么**直接导入**到 Hermes 等效项，要么**归档**以供手动审查。
 
 **直接导入：** SOUL.md、MEMORY.md、USER.md、AGENTS.md、skill（4 个源目录）、默认模型、自定义 provider、MCP 服务器、消息平台 token 和许可名单（Telegram、Discord、Slack、WhatsApp、Signal、Matrix、Mattermost）、agent 默认值（推理努力程度、压缩、人工延迟、时区、沙箱）、审批规则、TTS 配置、浏览器设置、工具设置、执行超时、命令许可名单、gateway 配置以及来自 3 个来源的 API 密钥。
 
 **归档以供手动审查：** Cron 任务、plugin、hook/webhook、memory 后端（QMD）、skill 注册表配置、UI/身份、日志、多 agent 设置、频道绑定、IDENTITY.md、TOOLS.md、HEARTBEAT.md、BOOTSTRAP.md。
 
-**API 密钥解析**按优先级顺序检查三个来源：config 值 → `~/.qubit/.env` → `auth-profiles.json`。所有 token 字段处理纯字符串、环境变量模板（`${VAR}`）和 SecretRef 对象。
+**API 密钥解析**按优先级顺序检查三个来源：config 值 → `~/.openclaw/.env` → `auth-profiles.json`。所有 token 字段处理纯字符串、环境变量模板（`${VAR}`）和 SecretRef 对象。
 
 完整的 config 键映射、SecretRef 处理详情和迁移后检查清单，请参阅**[完整迁移指南](../guides/migrate-from-openclaw.md)**。
 
@@ -1124,28 +1127,28 @@ qubit claw migrate [options]
 
 ```bash
 # 预览将迁移的内容
-qubit claw migrate --dry-run
+hermes claw migrate --dry-run
 
 # 完整迁移（所有兼容设置，不含密钥）
-qubit claw migrate --preset full
+hermes claw migrate --preset full
 
 # 包含 API 密钥的完整迁移
-qubit claw migrate --preset full --migrate-secrets
+hermes claw migrate --preset full --migrate-secrets
 
 # 仅迁移用户数据（不含密钥），覆盖冲突
-qubit claw migrate --preset user-data --overwrite
+hermes claw migrate --preset user-data --overwrite
 
-# 从自定义 Qubit 路径迁移
-qubit claw migrate --source /home/user/old-qubit
+# 从自定义 OpenClaw 路径迁移
+hermes claw migrate --source /home/user/old-openclaw
 ```
 
-## `qubit dashboard`
+## `hermes dashboard`
 
 ```bash
-qubit dashboard [options]
+hermes dashboard [options]
 ```
 
-启动 Web 控制台——基于浏览器的界面，用于管理配置、API 密钥和监控会话。需要 `cd ~/.hermes/hermes-agent && uv pip install -e ".[web]"`（FastAPI + Uvicorn）。内嵌浏览器 Chat 标签页始终可用，但额外需要 `pty` extra（`cd ~/.hermes/hermes-agent && uv pip install -e ".[web,pty]"`）以及 POSIX PTY 环境（如 Linux、macOS 或 WSL2）。完整文档请参阅 [Web 控制台](/user-guide/features/web-dashboard)。
+启动 Web 控制台，用于管理配置、API 密钥和会话。FastAPI、Uvicorn 和平台 PTY 辅助库是核心依赖。`web` extra 提供 HTTP 栈的精确约束，标准 PM 安装通过 `all` 选择它。如依赖损坏，请运行 `hermes pm repair`。内嵌 Chat 标签页需要 POSIX PTY 环境，例如 Linux、macOS 或 WSL2。请参阅 [Web 控制台](../user-guide/features/web-dashboard.md)。
 
 | 选项 | 默认值 | 说明 |
 |--------|---------|-------------|
@@ -1153,24 +1156,24 @@ qubit dashboard [options]
 | `--host` | `127.0.0.1` | 绑定地址 |
 | `--no-open` | — | 不自动打开浏览器 |
 | `--insecure` | 关闭 | **已弃用 / 无实际作用。** 此参数曾用于在非回环绑定上绕过鉴权；自 2026 年 6 月安全加固后，公网绑定始终需要用户名/密码或 OAuth 鉴权提供方。若需保持仅本地访问，请绑定 `127.0.0.1` 并通过隧道连接。 |
-| `--stop` | — | 停止正在运行的 `qubit dashboard` 进程并退出。 |
-| `--status` | — | 列出正在运行的 `qubit dashboard` 进程并退出。 |
+| `--stop` | — | 停止正在运行的 `hermes dashboard` 进程并退出。 |
+| `--status` | — | 列出正在运行的 `hermes dashboard` 进程并退出。 |
 
 ```bash
 # 默认——在浏览器中打开 http://127.0.0.1:9119
-qubit dashboard
+hermes dashboard
 
 # 自定义端口，不打开浏览器
-qubit dashboard --port 8080 --no-open
+hermes dashboard --port 8080 --no-open
 ```
 
-## `qubit profile`
+## `hermes profile`
 
 ```bash
-qubit profile <subcommand>
+hermes profile <subcommand>
 ```
 
-管理 profile——多个隔离的 Qubit 实例，每个实例拥有自己的 config、会话、skill 和主目录。
+管理 profile——多个隔离的 Hermes 实例，每个实例拥有自己的 config、会话、skill 和主目录。
 
 | 子命令 | 说明 |
 |------------|-------------|
@@ -1190,42 +1193,49 @@ qubit profile <subcommand>
 示例：
 
 ```bash
-qubit profile list
-qubit profile create work --clone
-qubit profile use work
-qubit profile alias work --name h-work
-qubit profile export work -o work-backup.tar.gz
-qubit profile import work-backup.tar.gz --name restored
-qubit profile install github.com/user/my-distro --alias
-qubit profile update work
-qubit -p work chat -q "Hello from work profile"
+hermes profile list
+hermes profile create work --clone
+hermes profile use work
+hermes profile alias work --name h-work
+hermes profile export work -o work-backup.tar.gz
+hermes profile import work-backup.tar.gz --name restored
+hermes profile install github.com/user/my-distro --alias
+hermes profile update work
+hermes -p work chat -q "Hello from work profile"
 ```
 
-## `qubit completion`
+## `hermes completion`
 
 ```bash
-qubit completion [bash|zsh|fish]
+hermes completion [bash|zsh|fish]
 ```
 
-将 shell 补全脚本打印到 stdout。在 shell profile 中 source 输出内容，即可对 Qubit 命令、子命令和 profile 名称进行 Tab 补全。
+将 shell 补全脚本打印到 stdout。在 shell profile 中 source 输出内容，即可对 Hermes 命令、子命令和 profile 名称进行 Tab 补全。
 
 示例：
 
 ```bash
 # Bash
-qubit completion bash >> ~/.bashrc
+hermes completion bash >> ~/.bashrc
 
 # Zsh
-qubit completion zsh >> ~/.zshrc
+hermes completion zsh >> ~/.zshrc
 
 # Fish
-qubit completion fish > ~/.config/fish/completions/hermes.fish
+hermes completion fish > ~/.config/fish/completions/hermes.fish
 ```
 
-## `qubit update`
+## `hermes pm`
+
+PM 管理工具和 Python 依赖，不负责替换应用发布包。
+源码开发先运行一次 setup 脚本，然后用 Bash `source ./activate` 或 PowerShell `. .\activate.ps1` 激活已有环境。
+使用 `deactivate` 恢复激活前的环境。
+详见[PM 开发工作流](./package-management.md#developer-workflow)，包括依赖更新和测试环境。
+
+## `hermes update`
 
 ```bash
-qubit update [--check] [--backup] [--restart-gateway]
+hermes update [--check] [--backup] [--restart-gateway]
 ```
 
 拉取最新的 `hermes-agent` 代码并在受管理的 venv 中重新安装依赖，然后重新运行安装后 hook（MCP 服务器、skill 同步、补全安装）。可在运行中的安装上安全执行。使用 `--check` 查看你的检出是否落后于 `origin/main`，而不安装。
@@ -1233,22 +1243,22 @@ qubit update [--check] [--backup] [--restart-gateway]
 | 选项 | 说明 |
 |--------|-------------|
 | `--check` | 并排打印当前 commit 和最新 `origin/main` commit，同步时退出码为 0，落后时为 1。不拉取、不安装、不重启任何内容。 |
-| `--backup` | 在拉取前创建 `QUBIT_HOME` 的带标签预更新快照（config、auth、会话、skill、配对数据）。默认**关闭**——之前的始终备份行为在大型主目录上每次更新会增加数分钟。通过 `config.yaml` 中的 `update.backup: true` 永久开启。 |
+| `--backup` | 在拉取前创建 `HERMES_HOME` 的带标签预更新快照（config、auth、会话、skill、配对数据）。默认**关闭**——之前的始终备份行为在大型主目录上每次更新会增加数分钟。通过 `config.yaml` 中的 `update.backup: true` 永久开启。 |
 | `--restart-gateway` | 成功更新后重启正在运行的 gateway 服务。如果安装了多个 profile，隐含 `--all` 语义。 |
 
 附加行为：
 
-- **配对数据快照。** 即使 `--backup` 关闭，`qubit update` 也会在 `git pull` 前对 `~/.hermes/pairing/` 和 Feishu 评论规则进行轻量快照。如果拉取覆盖了你正在编辑的文件，可以用 `qubit backup restore --state pre-update` 回滚。
-- **旧版 `hermes.service` 警告。** 如果 Qubit 检测到预重命名的 `hermes.service` systemd 单元（而非当前的 `hermes-gateway.service`），会打印一次性迁移提示，帮助你避免循环重启问题。
+- **配对数据快照。** 即使 `--backup` 关闭，`hermes update` 也会在 `git pull` 前对 `~/.hermes/pairing/` 和 Feishu 评论规则进行轻量快照。如果拉取覆盖了你正在编辑的文件，可以用 `hermes backup restore --state pre-update` 回滚。
+- **旧版 `hermes.service` 警告。** 如果 Hermes 检测到预重命名的 `hermes.service` systemd 单元（而非当前的 `hermes-gateway.service`），会打印一次性迁移提示，帮助你避免循环重启问题。
 - **退出码。** 成功时为 `0`，拉取/安装/安装后错误时为 `1`，阻止 `git pull` 的意外工作树变更时为 `2`。
 
 ## 维护命令
 
 | 命令 | 说明 |
 |---------|-------------|
-| `qubit --version` | 打印版本信息。 |
-| `qubit update` | 拉取最新变更并重新安装依赖。 |
-| `qubit uninstall [--full] [--yes]` | 删除 Qubit，可选择删除所有 config/数据。 |
+| `hermes --version` | 打印版本信息。 |
+| `hermes update` | 拉取最新变更并重新安装依赖。 |
+| `hermes uninstall [--full] [--yes]` | 删除 Hermes，可选择删除所有 config/数据。 |
 
 ## 另请参阅
 

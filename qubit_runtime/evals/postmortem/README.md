@@ -3,7 +3,7 @@
 The scripts that produced every number in tracking issue #103563 and the "Independent review
 (round 2)" sections of its 13 PRs. Two halves:
 
-- **`forensics/`** reads a *copy* of a Qubit `state.db` (plus rotated `agent.log*` and git) and
+- **`forensics/`** reads a *copy* of a Hermes `state.db` (plus rotated `agent.log*` and git) and
   recomputes the *observed* figures for any run: where the money went, per-call cache behaviour,
   nested-delegate timeouts, batch-join delivery delay, tool friction, `/goal` loop behaviour, and the
   post-open rework inventory. It needs no model calls and no network.
@@ -18,10 +18,10 @@ replay). Do not add the modeled figures to the observed ones; see §5 of #103563
 
 ## Requirements
 
-- A Qubit checkout with its venv (`.venv/bin/python`). NeMo Relay is not required for the forensics;
+- A Hermes checkout with its venv (`.venv/bin/python`). NeMo Relay is not required for the forensics;
   it is what the run itself used for the wire captures in `live_ab/cache_prefix_wire.py`.
 - For forensics: a **copy** of `~/.hermes/state.db` (never point at the live file; `sqlite3 state.db ".backup copy.db"`
-  or `cp` while Qubit is idle) and, optionally, the rotated `~/.hermes/logs/agent.log*`.
+  or `cp` while Hermes is idle) and, optionally, the rotated `~/.hermes/logs/agent.log*`.
 - For `--live` probes: real credentials in `QUBIT_HOME` (they spend cents per run).
 
 ## Forensics: recompute the observed numbers for YOUR run
@@ -46,7 +46,7 @@ $P -m evals.postmortem.forensics.rework     --repo . --base <merge-base> --open 
 Each writes `postmortem_out/<lane>.json` and prints a summary. `--root` defaults to the top-level
 session with the most descendants; compression-rollover children are excluded from the population so
 cost buckets are disjoint. Pricing is fitted from `estimated_cost_usd`, so dollars match what that
-Qubit recorded (an estimator, not an invoice).
+Hermes recorded (an estimator, not an invoice).
 
 ### Reference output (the #102117 run, `state_copy.db` of 2026-09-04)
 
@@ -103,13 +103,13 @@ response id, upstream provider and prefix shas are logged, and consecutive pairs
 
 ```bash
 # ~$50 per 20x6 arm on Fable 5.1 at the 5m tier
-python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider qubit --workers 20 --calls 6 --out /tmp/p.jsonl
-python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider qubit --wire native --workers 20 --calls 6 --out /tmp/p.jsonl
+python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider nous --workers 20 --calls 6 --out /tmp/p.jsonl
+python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider nous --wire native --workers 20 --calls 6 --out /tmp/p.jsonl
 python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider openrouter --pin anthropic --workers 20 --calls 6 --out /tmp/p.jsonl
 ```
 
-Reference results (2026-09-05/06): Qubit native wire 13.9% stuck (14–20% over 4 runs, unchanged by the
-portal's provider pin or a 2 s settle); Qubit chat wire 0/320; OpenRouter pinned 0/161; OpenRouter
+Reference results (2026-09-05/06): Nous native wire 13.9% stuck (14–20% over 4 runs, unchanged by the
+portal's provider pin or a 2 s settle); Nous chat wire 0/320; OpenRouter pinned 0/161; OpenRouter
 unpinned 9.8% collapse. Use this to clear a new upstream before flipping
 `agent/nous_wire.py::GMI_NATIVE_WIRE_CLEARED`. `--ttl 1h` reproduces the 2× write price
 (#104168). The `.summary.json` carries the bad pairs with both response ids for the provider's logs.
@@ -131,7 +131,7 @@ are in a secret gist linked from #103563 (no trajectories; see "What is NOT here
 
 ## Provenance
 
-Forensic lanes: five parallel Qubit subagents (2026-09-04), rewritten here to take `--db`/`--root`
+Forensic lanes: five parallel Hermes subagents (2026-09-04), rewritten here to take `--db`/`--root`
 instead of hard-coded paths. `live_ab/`: the primary agent's per-PR A/Bs. `review_probes/`: the
 independent `/review` subagent's probes (2026-09-05), adapted to take paths from the command line;
 their findings and the fixes are in each PR's "Independent review (round 2)" section.

@@ -59,7 +59,7 @@ async function openBot(name: string) {
 test('ordinary cron pins an unowned named target under a custom root', async () => {
   test.setTimeout(240_000)
   const page = fixture.page
-  const composer = await openBot('Qubit')
+  const composer = await openBot('Hermes')
   await expect(page.getByText('Say something to get started.').filter({ visible: true })).toBeVisible({ timeout: 120_000 })
   await composer.fill('initialize default Desktop owner')
   await page.keyboard.press('Enter')

@@ -6,19 +6,19 @@ description: "Programmatic Python execution with RPC tool access — collapse mu
 
 # Code Execution (Programmatic Tool Calling)
 
-The `execute_code` tool lets the agent write Python scripts that call Qubit tools programmatically, collapsing multi-step workflows into a single LLM turn. The script runs in a child process on the agent host, communicating with Qubit over a Unix domain socket RPC.
+The `execute_code` tool lets the agent write Python scripts that call Hermes tools programmatically, collapsing multi-step workflows into a single LLM turn. The script runs in a child process on the agent host, communicating with Hermes over a Unix domain socket RPC.
 
 ## How It Works
 
-1. The agent writes a Python script using `from qubit_tools import ...`
-2. Qubit generates a `qubit_tools.py` stub module with RPC functions
-3. Qubit opens a Unix domain socket and starts an RPC listener thread
-4. The script runs in a child process — tool calls travel over the socket back to Qubit
+1. The agent writes a Python script using `from hermes_tools import ...`
+2. Hermes generates a `hermes_tools.py` stub module with RPC functions
+3. Hermes opens a Unix domain socket and starts an RPC listener thread
+4. The script runs in a child process — tool calls travel over the socket back to Hermes
 5. Only the script's `print()` output is returned to the LLM; intermediate tool results never enter the context window
 
 ```python
 # The agent can write scripts like:
-from qubit_tools import web_search, web_extract
+from hermes_tools import web_search, web_extract
 
 results = web_search("Python 3.13 features", limit=5)
 for r in results["data"]["web"]:
@@ -44,7 +44,7 @@ The key benefit: intermediate tool results never enter the context window — on
 ### Data Processing Pipeline
 
 ```python
-from qubit_tools import search_files, read_file
+from hermes_tools import search_files, read_file
 import json
 
 # Find all config files and extract database settings
@@ -60,7 +60,7 @@ print(json.dumps(configs, indent=2))
 ### Multi-Step Web Research
 
 ```python
-from qubit_tools import web_search, web_extract
+from hermes_tools import web_search, web_extract
 import json
 
 # Search, extract, and summarize in one turn
@@ -82,7 +82,7 @@ print(json.dumps(summaries, indent=2))
 ### Bulk File Refactoring
 
 ```python
-from qubit_tools import search_files, read_file, patch
+from hermes_tools import search_files, read_file, patch
 
 # Find all Python files using deprecated API and fix them
 matches = search_files("old_api_call", path="src/", file_glob="*.py")
@@ -103,7 +103,7 @@ print(f"Fixed {fixed} files out of {len(matches.get('matches', []))} matches")
 ### Build and Test Pipeline
 
 ```python
-from qubit_tools import terminal, read_file
+from hermes_tools import terminal, read_file
 import json
 
 # Run tests, parse results, and report
@@ -132,8 +132,8 @@ print(json.dumps(report, indent=2))
 
 | Mode | Working directory | Python interpreter |
 |------|-------------------|--------------------|
-| **`project`** (default) | The session's working directory (same as `terminal()`) | Active `VIRTUAL_ENV` / `CONDA_PREFIX` python, falling back to Qubit's own python |
-| `strict` | A temp staging directory isolated from the user's project | `sys.executable` (Qubit's own python) |
+| **`project`** (default) | The session's working directory (same as `terminal()`) | Active `VIRTUAL_ENV` / `CONDA_PREFIX` python, falling back to Hermes's own python |
+| `strict` | A temp staging directory isolated from the user's project | `sys.executable` (Hermes's own python) |
 
 **When to leave it on `project`:** you want `import pandas`, `from my_project import foo`, or relative paths like `open(".env")` to work the same way they do in `terminal()`. This is almost always what you want.
 
@@ -155,12 +155,23 @@ Security-critical invariants are identical across both modes:
 
 Switching mode changes where scripts run and which interpreter runs them, not what credentials they can see or which tools they can call.
 
+## Persistent session kernel
+
+Calls reuse a Python child for the same session, execution mode, interpreter,
+working directory, and tool set. Imports, variables, and loaded data can persist
+between cells. The child environment is fixed when the kernel starts.
+
+Pass `reset: true` to discard that kernel state. A timeout or interrupted kernel
+can also lose it. Do not assume that a later terminal environment change is
+already visible inside an existing kernel. The old `code_execution.kernel_mode`
+setting is no longer a separate switch.
+
 ## Resource Limits
 
 | Resource | Limit | Notes |
 |----------|-------|-------|
 | **Timeout** | 5 minutes (300s) | Script is killed with SIGTERM, then SIGKILL after 5s grace |
-| **Stdout** | 50 KB | Output truncated with `[output truncated at 50KB]` notice |
+| **Stdout** | 50 KB | Shown head-and-tail inline; the full output is saved to `~/.hermes/cache/exec/` and the path is included in the result |
 | **Stderr** | 10 KB | Included in output on non-zero exit for debugging |
 | **Tool calls** | 50 per execution | Error returned when limit reached |
 
@@ -173,6 +184,29 @@ code_execution:
   timeout: 300       # Max seconds per script (default: 300)
   max_tool_calls: 50 # Max tool calls per execution (default: 50)
 ```
+
+## State Between Calls (the session kernel)
+
+On the local terminal backend, `execute_code` does not start a fresh interpreter for every call. Each session owns a persistent Python kernel, so variables, imports, and loaded data from one call are available in the next. The agent can load a dataset once and query it across several turns instead of re-reading it every time. Subagents get their own kernel; kernels are never shared across sessions. A subagent's kernel lives exactly as long as the subagent: it is exempt from the live-kernel cap while the subagent runs (a wide fan-out no longer evicts a sibling's kernel mid-task) and is disposed when the subagent finishes.
+
+What ends a kernel:
+
+- **Timeout or interrupt.** A cell that hits the timeout (or is interrupted) kills the kernel process and its state is lost on purpose; the result says so and the next call starts a fresh kernel.
+- **`reset=true`.** The agent can pass `reset: true` to discard the kernel's state and start clean. This is also the way to pick up environment changes: a kernel's environment is frozen when it spawns, so a newly allowlisted passthrough variable is invisible until the kernel is reset.
+- **Idle timeout and eviction.** Kernels die with the session, after `code_execution.kernel_idle_timeout` idle seconds (default 1800), or when more than `code_execution.max_session_kernels` (default 4) top-level sessions' kernels are alive and the oldest is evicted (running subagents' kernels do not count against the cap).
+
+The security envelope is the same as a one-shot script: environment scrubbing, the tool whitelist, and the per-call tool budget all apply to every cell, and tool-call authority (approvals, session, allow-list) is rebound on each cell.
+
+```yaml
+# ~/.hermes/config.yaml
+code_execution:
+  kernel_idle_timeout: 1800   # seconds a kernel may sit idle before it is reaped
+  max_session_kernels: 4      # kernels kept alive at once; oldest is evicted past this
+```
+
+**Remote backends** (Docker, SSH, Modal) run a remote session kernel with the same contract. If the kernel cannot be spawned on the backend, Hermes falls back to running each call as a standalone script and says so in the result.
+
+**Large output.** Stdout over 50 KB is shown head-and-tail inline, and the full text is saved under `~/.hermes/cache/exec/` with the path included in the result, so the agent can page through it with `read_file` instead of re-running the script.
 
 ## How Tool Calls Work Inside Scripts
 
@@ -217,19 +251,19 @@ terminal:
     - ANOTHER_TOKEN
 ```
 
-See the [Security guide](/user-guide/security#environment-variable-passthrough) for full details.
+See the [Security guide](../security.md#environment-variable-passthrough) for full details.
 
 ### `HERMES_*` variables in the child
 
 The child process receives only a small, fixed set of operational `HERMES_*`
 variables by exact name:
 
-- `QUBIT_HOME`
+- `HERMES_HOME`
 - `HERMES_PROFILE`
 - `HERMES_CONFIG`
 - `HERMES_ENV`
 
-(plus `HERMES_RPC_DIR` / `HERMES_RPC_SOCKET` / `TZ` / `HOME`, which Qubit
+(plus `HERMES_RPC_DIR` / `HERMES_RPC_SOCKET` / `TZ` / `HOME`, which Hermes
 injects explicitly so the RPC channel works).
 
 :::note Behavior change
@@ -247,7 +281,7 @@ not a bug.
 
 **Workaround — opt the variable back in explicitly.** Both routes pass the
 variable through `execute_code` *and* `terminal` children, and neither weakens
-the secret-stripping guarantee (Qubit-managed provider credentials can never
+the secret-stripping guarantee (Hermes-managed provider credentials can never
 be re-allowed this way):
 
 1. **Per-machine, in `config.yaml`** — add the exact variable name to the
@@ -269,13 +303,13 @@ be re-allowed this way):
    ```
 
 **Diagnosing it.** When the child drops one or more non-allowlisted `HERMES_*`
-variables, Qubit emits a one-line `debug` log naming them and pointing at the
-`env_passthrough` escape hatch. Run with debug logging (`qubit logs --level
+variables, Hermes emits a one-line `debug` log naming them and pointing at the
+`env_passthrough` escape hatch. Run with debug logging (`hermes logs --level
 DEBUG`, or check `~/.hermes/logs/agent.log`) and look for
 `execute_code: dropped N non-allowlisted HERMES_* var(s)` if a script behaves
 as though a `HERMES_*` variable is missing.
 
-Qubit always writes the script and the auto-generated `qubit_tools.py` RPC stub into a temp staging directory that is cleaned up after execution. In `strict` mode the script also *runs* there; in `project` mode it runs in the session's working directory (the staging directory stays on `PYTHONPATH` so imports still resolve). The child process runs in its own process group so it can be cleanly killed on timeout or interruption.
+Hermes always writes the script and the auto-generated `hermes_tools.py` RPC stub into a temp staging directory that is cleaned up after execution. In `strict` mode the script also *runs* there; in `project` mode it runs in the session's working directory (the staging directory stays on `PYTHONPATH` so imports still resolve). The child process runs in its own process group so it can be cleanly killed on timeout or interruption.
 
 ## execute_code vs terminal
 
@@ -287,10 +321,10 @@ Qubit always writes the script and the auto-generated `qubit_tools.py` RPC stub 
 | Running a build or test suite | ❌ | ✅ |
 | Looping over search results | ✅ | ❌ |
 | Interactive/background processes | ❌ | ✅ |
-| Needs API keys in environment | ⚠️ Only via [passthrough](/user-guide/security#environment-variable-passthrough) | ✅ (most pass through) |
+| Needs API keys in environment | ⚠️ Only via [passthrough](../security.md#environment-variable-passthrough) | ✅ (most pass through) |
 
-**Rule of thumb:** Use `execute_code` when you need to call Qubit tools programmatically with logic between calls. Use `terminal` for running shell commands, builds, and processes.
+**Rule of thumb:** Use `execute_code` when you need to call Hermes tools programmatically with logic between calls. Use `terminal` for running shell commands, builds, and processes.
 
 ## Platform Support
 
-Code execution is available on **Linux, macOS, and Windows**. On Linux and macOS the RPC channel uses a Unix domain socket; on Windows, where `AF_UNIX` is unreliable, Qubit automatically falls back to a loopback TCP socket for the sandbox RPC transport. Remote terminal backends (Docker/SSH/Modal/etc.) use a file-based RPC transport instead and additionally require Python 3 inside the backend.
+Code execution is available on **Linux, macOS, and Windows**. On Linux and macOS the RPC channel uses a Unix domain socket; on Windows, where `AF_UNIX` is unreliable, Hermes automatically falls back to a loopback TCP socket for the sandbox RPC transport. Remote terminal backends (Docker/SSH/Modal/etc.) use a file-based RPC transport instead and additionally require Python 3 inside the backend.

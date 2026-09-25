@@ -1,6 +1,6 @@
 """Dead-owner cron claim reclaim + one-shot CLI `cron run` sync gate (#86721).
 
-A one-shot ``qubit cron run <job_id>`` used to background-dispatch the run
+A one-shot ``hermes cron run <job_id>`` used to background-dispatch the run
 onto a daemon thread of the calling process when the CLI inherited a
 gateway/desktop session env. The process exited immediately, the runner died
 mid-LLM-call, and the job's execution row stayed ``claimed`` forever —
@@ -27,6 +27,7 @@ from unittest.mock import patch
 import pytest
 
 import cron.scheduler as scheduler_mod
+from qubit_constants import qubit_home_key
 
 
 @pytest.fixture()
@@ -42,7 +43,7 @@ def executions(monkeypatch, tmp_path):
 @pytest.fixture(autouse=True)
 def _fresh_reap_window(monkeypatch):
     """Each test starts with the reap throttle open."""
-    monkeypatch.setattr(scheduler_mod, "_last_dead_owner_reap_at", None)
+    monkeypatch.setattr(scheduler_mod, "_last_dead_owner_reap_at", {})
 
 
 def _dead_pid() -> int:
@@ -59,7 +60,7 @@ def _dead_pid() -> int:
 def _orphan_claimed_row(executions, job_id: str) -> str:
     """Persist a claimed execution owned by a process that no longer exists.
 
-    Mirrors what a one-shot ``qubit cron run`` leaves behind: a row stuck in
+    Mirrors what a one-shot ``hermes cron run`` leaves behind: a row stuck in
     ``claimed`` whose owner pid is dead.
     """
     record = executions.create_execution(job_id, source="direct")
@@ -129,7 +130,8 @@ class TestTickReapsDeadOwnerClaims:
         monkeypatch.setattr(
             scheduler_mod,
             "_last_dead_owner_reap_at",
-            time.monotonic() - scheduler_mod._DEAD_OWNER_REAP_INTERVAL_SECONDS - 1,
+            {qubit_home_key(scheduler_mod._get_qubit_home()):
+             time.monotonic() - scheduler_mod._DEAD_OWNER_REAP_INTERVAL_SECONDS - 1},
         )
         _run_tick()
         assert len(calls) == 2, "an expired throttle window must reap again"
@@ -155,7 +157,7 @@ class TestOneShotCliRunIsSynchronous:
         _SESSION_ASYNC_DELIVERY.reset(token)
 
     def test_cli_run_declares_stateless_channel_before_dispatch(self, monkeypatch):
-        """`qubit cron run` must gate off async delivery so the run executes
+        """`hermes cron run` must gate off async delivery so the run executes
         synchronously in the CLI process instead of on a doomed daemon thread."""
         from gateway.session_context import async_delivery_supported
         from qubit_cli import cron as cron_cli
@@ -203,3 +205,28 @@ class TestOneShotCliRunIsSynchronous:
             {"id": "job-x", "name": "job-x"}, session_id="sess-1"
         )
         assert result is None
+
+
+def test_reap_throttle_is_profile_scoped(monkeypatch, tmp_path):
+    """In multiplex mode each profile's tick must get its own reap scan: the
+    first profile in a cycle must not consume a process-global throttle slot
+    that starves every other profile."""
+    import cron.executions as executions_mod
+
+    calls = []
+    monkeypatch.setattr(
+        executions_mod, "recover_interrupted_executions", lambda: calls.append(1) or 0
+    )
+    home_a = tmp_path / "profile-a"
+    home_b = tmp_path / "profile-b"
+    home_a.mkdir()
+    home_b.mkdir()
+    monkeypatch.setattr(scheduler_mod, "_last_dead_owner_reap_at", {})
+    monkeypatch.setattr(scheduler_mod, "_get_qubit_home", lambda: home_a)
+    scheduler_mod._maybe_reap_dead_owners()
+    monkeypatch.setattr(scheduler_mod, "_get_qubit_home", lambda: home_b)
+    scheduler_mod._maybe_reap_dead_owners()
+    assert len(calls) == 2, (
+        "each profile must get its own dead-owner scan per cycle, "
+        f"got {len(calls)} scan(s) for 2 profiles"
+    )

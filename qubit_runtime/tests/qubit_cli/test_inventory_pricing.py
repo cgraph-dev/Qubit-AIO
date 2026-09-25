@@ -2,7 +2,7 @@
 
 feeds the desktop GUI model picker (and onboarding) so it can show $/Mtok
 columns + Free/Pro badges and gate paid models on free Nous accounts, the
-same way the `qubit model` CLI picker does.
+same way the `hermes model` CLI picker does.
 """
 
 from threading import Event
@@ -132,8 +132,8 @@ def test_model_options_cold_pricing_fetch_runs_off_the_request_path(monkeypatch)
         lambda **_kwargs: [row],
     )
     monkeypatch.setattr(inv, "_moa_provider_row", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(inv, "_apply_capabilities", lambda _rows: None)
-    monkeypatch.setattr(inv, "_apply_featured", lambda _rows: None)
+    monkeypatch.setattr(inv, "_apply_capabilities", lambda _rows, **_kwargs: None)
+    monkeypatch.setattr(inv, "_apply_featured", lambda _rows, **_kwargs: None)
     monkeypatch.setattr(inv, "_pricing_prewarm_threads", {})
 
     try:

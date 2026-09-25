@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Optional
 
 from utils import is_truthy_value
 from qubit_constants import INDICATOR_STYLES
@@ -71,8 +73,8 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("title", "Set a title for the current session", "Session", args_hint="[name]"),
     CommandDef("handoff", "Hand off this session to a messaging platform (Telegram, Discord, etc.)", "Session",
                args_hint="<platform>", cli_only=True, argument_mode="options"),
-    CommandDef("branch", "Branch the current session (explore a different path)", "Session",
-               aliases=("fork",), args_hint="[name]"),
+    CommandDef("branch", "Branch the current session (new thread on Discord/Telegram/Slack/Matrix; --here stays here)",
+               "Session", aliases=("fork",), args_hint="[--here] [name]"),
     CommandDef("worktree", "Show, list, create, or prune isolated git worktrees", "Session",
                cli_only=True, args_hint="[new [name]|list|prune [--dry-run]]",
                subcommands=("new", "list", "prune")),
@@ -106,8 +108,10 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("journey", "Open the learning journey timeline",
                "Session", aliases=("learning", "memory-graph"), cli_only=True,
                args_hint="[list|delete <id>|edit <id>]", subcommands=("list", "delete", "edit")),
-    CommandDef("queue", "Queue a prompt for the next turn (doesn't interrupt)", "Session",
-               aliases=("q",), args_hint="<prompt>", busy_policy="dispatch", busy_handler="queue"),
+    CommandDef("queue", "Queue a prompt for the next turn, or list/edit/rm/move/clear queued prompts", "Session",
+               aliases=("q",), args_hint="[<prompt>|list|edit N <prompt>|rm N|move A B|clear]",
+               subcommands=("list", "edit", "rm", "move", "clear", "add"),
+               busy_policy="dispatch", busy_handler="queue"),
     CommandDef("steer", "Inject a message after the next tool call without interrupting", "Session",
                args_hint="<prompt>", busy_policy="dispatch", busy_handler="steer"),
     CommandDef("goal", "Set a standing goal Qubit works on across turns until achieved", "Session",
@@ -125,7 +129,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                aliases=("proactive",),
                args_hint="[interval] <prompt> [--times N] [--until <condition>] | status | pause | resume | stop",
                argument_mode="mixed", busy_policy="dispatch", busy_handler="loop"),
-    CommandDef("plan", "Write a markdown implementation plan to the Qubit home plans directory without executing anything", "Session",
+    CommandDef("plan", "Write a markdown implementation plan to .hermes/plans/ without executing anything", "Session",
                args_hint="[task]"),
     CommandDef("moa", "Run one prompt through the default Mixture of Agents preset, then restore your model", "Session",
                args_hint="<prompt>", busy_policy="reject", busy_handler="moa"),
@@ -151,7 +155,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("config", "Show current configuration", "Configuration",
                cli_only=True, desktop="terminal"),
     CommandDef("model", "Switch model (session-scoped; --global to persist)", "Configuration",
-               args_hint="[model] [--provider name] [--global|--session] [--refresh]",
+               args_hint="[model] [--provider name] [--reasoning level] [--global|--session] [--refresh]",
                busy_policy="reject", busy_handler="model", desktop="hidden"),
     CommandDef("codex-runtime", "Toggle codex app-server runtime for OpenAI/Codex models",
                "Configuration", aliases=("codex_runtime",), args_hint="[auto|codex_app_server]",
@@ -185,8 +189,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                subcommands=("manual", "smart", "off")),
     CommandDef("reasoning", "Manage reasoning effort and display", "Configuration",
                args_hint="[level|show|hide|full|clamp] [--global]",
-               subcommands=("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "show", "hide", "on", "off", "full", "clamp", "--global"),
-               desktop="advanced"),
+               subcommands=("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra", "show", "hide", "on", "off", "full", "clamp", "--global")),
     CommandDef("fast", "Fast mode — OpenAI Priority Processing / Anthropic Fast Mode (normal/fast/auto/cold)", "Configuration",
                args_hint="[normal|fast|auto|cold|status] [--global]",
                subcommands=("normal", "fast", "auto", "cold", "status", "on", "off", "--global"),
@@ -256,7 +259,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
                cli_only=True, desktop="terminal"),
     CommandDef("reload-mcp", "Reload MCP servers from config", "Tools & Skills",
                aliases=("reload_mcp",), desktop="advanced"),
-    CommandDef("reload-skills", "Re-scan the Qubit home skills directory for newly installed or removed skills",
+    CommandDef("reload-skills", "Re-scan ~/.hermes/skills/ for newly installed or removed skills",
                "Tools & Skills", aliases=("reload_skills",), desktop="advanced"),
     CommandDef("browser", "Connect browser tools to your live Chromium-family browser via CDP, or switch to Browser Use mode", "Tools & Skills",
                cli_only=True, args_hint="[connect|disconnect|status|use]",
@@ -278,6 +281,8 @@ COMMAND_REGISTRY: list[CommandDef] = [
                args_hint="[reset [--force]]"),
     CommandDef("subscription", "View your Qubit plan and change it in the browser", "Info",
                cli_only=True, aliases=("upgrade",)),
+    CommandDef("login", "Sign in with a Qubit account (keeps your connectors)", "Info",
+               busy_policy="dispatch", desktop="settings"),
     CommandDef("topup", "Show your Qubit balance and manage billing on the portal", "Info"),
     CommandDef("insights", "Show usage insights and analytics", "Info",
                args_hint="[days]", desktop="advanced"),
@@ -291,12 +296,12 @@ COMMAND_REGISTRY: list[CommandDef] = [
                cli_only=True, desktop="terminal"),
     CommandDef("image", "Attach a local image file for your next prompt", "Info",
                cli_only=True, args_hint="<path>", desktop="terminal"),
-    CommandDef("update", "Update Qubit to the latest version", "Info",
+    CommandDef("update", "Update Qubit Agent to the latest version", "Info",
                busy_policy="dispatch", desktop="terminal"),
-    CommandDef("version", "Show Qubit version", "Info", aliases=("v",),
+    CommandDef("version", "Show Qubit Agent version", "Info", aliases=("v",),
                busy_policy="dispatch", execute="version"),
     CommandDef("debug", "Upload debug report (system info + logs) and get shareable links", "Info",
-               args_hint="[remote|local]"),
+               args_hint="[qubit|local]"),
 
     # Exit
     CommandDef("quit", "Exit the CLI (use --delete to also remove session history)", "Exit",
@@ -459,12 +464,20 @@ def _is_gateway_available(cmd: CommandDef, config_overrides: set[str] | None = N
     return cmd.name in overrides
 
 
-def gateway_help_lines() -> list[str]:
-    """Generate gateway help text lines from the registry."""
+def gateway_help_lines(allowed: Optional[Iterable[str]] = None) -> list[str]:
+    """Generate gateway help text lines from the registry.
+
+    ``allowed`` (canonical names) restricts the catalog to what the caller may run -- the
+    gateway passes a non-admin's slash-access floor + ``user_allowed_commands`` so /help never
+    advertises admin-only commands the dispatcher would then refuse.
+    """
     overrides = _resolve_config_gates()
+    allowed_set = None if allowed is None else set(allowed)
     lines: list[str] = []
     for cmd in COMMAND_REGISTRY:
         if not _is_gateway_available(cmd, overrides):
+            continue
+        if allowed_set is not None and cmd.name not in allowed_set:
             continue
         args = f" {cmd.args_hint}" if cmd.args_hint else ""
         # Skip internal aliases like reload_mcp (underscore variant of the name).

@@ -1,9 +1,10 @@
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import relativeDocLinks from './src/remark/relativeDocLinks';
 
 const config: Config = {
-  title: 'Qubit Agent',
+  title: 'Hermes Agent',
   tagline: 'The self-improving AI agent',
   favicon: 'img/favicon.ico',
 
@@ -41,6 +42,8 @@ const config: Config = {
   ],
 
   plugins: [
+    // Static /plugins/<name> and /plugins/by/<author> pages generated from the catalog JSON.
+    './plugins/plugin-catalog-pages',
     [
       '@docusaurus/plugin-client-redirects',
       {
@@ -81,6 +84,9 @@ const config: Config = {
           routeBasePath: '/',  // Docs at the root of /docs/
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/NousResearch/hermes-agent/edit/main/website/',
+          // Relative `.md` links (readable on GitHub, #114428) must also resolve
+          // across the zh-Hans fallback boundary; see src/remark/relativeDocLinks.js.
+          beforeDefaultRemarkPlugins: [[relativeDocLinks, {siteDir: __dirname}]],
         },
         blog: false,
         theme: {
@@ -102,8 +108,8 @@ const config: Config = {
     // locale via the docusaurus_tag/lang facets the crawler records carry.
     algolia: {
       appId: '2JLBVEYZN5',
-      apiKey: '8fda2a49223ce185ac30c2dbf6898a07',
-      indexName: 'qubit docs',
+      apiKey: '9629ec26628d1a126535fd5ef408990d',
+      indexName: 'hermes docs',
       contextualSearch: true,
     },
     colorMode: {
@@ -117,10 +123,11 @@ const config: Config = {
       },
     },
     navbar: {
-      title: 'Qubit Agent',
+      title: 'Hermes Agent',
       logo: {
-        alt: 'Qubit Agent',
+        alt: 'Hermes Agent',
         src: 'img/logo.png',
+        srcDark: 'img/logo-dark.png',
       },
       items: [
         {
@@ -132,6 +139,11 @@ const config: Config = {
         {
           to: '/skills',
           label: 'Skills',
+          position: 'left',
+        },
+        {
+          to: '/plugins',
+          label: 'Plugins',
           position: 'left',
         },
         {
@@ -185,11 +197,11 @@ const config: Config = {
           items: [
             { label: 'Desktop Download', href: 'https://hermes-agent.nousresearch.com/' },
             { label: 'GitHub', href: 'https://github.com/NousResearch/hermes-agent' },
-            { label: 'Qubit Labs', href: 'https://nousresearch.com' },
+            { label: 'Nous Research', href: 'https://nousresearch.com' },
           ],
         },
       ],
-      copyright: `Built by <a href="https://nousresearch.com">Qubit Labs</a> · MIT License · ${new Date().getFullYear()}`,
+      copyright: `Built by <a href="https://nousresearch.com">Nous Research</a> · MIT License · ${new Date().getFullYear()}`,
     },
     prism: {
       theme: prismThemes.github,

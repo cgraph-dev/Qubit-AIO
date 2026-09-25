@@ -16,7 +16,7 @@ from agent.secret_scope import (
     UnscopedSecretError, build_profile_secret_scope, get_secret, reset_secret_scope, set_multiplex_active,
     set_secret_scope,
 )
-from qubit_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import get_qubit_home, reset_qubit_home_override, set_qubit_home_override
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def served_home(tmp_path, monkeypatch):
 
 
 def _observe_scope(seen: dict, done: threading.Event) -> None:
-    seen["home"] = str(get_hermes_home())
+    seen["home"] = str(get_qubit_home())
     try:
         seen["key"] = get_secret("TITLE_KEY")
     except UnscopedSecretError as exc:
@@ -54,13 +54,13 @@ def test_auto_title_thread_runs_in_the_turns_profile_scope(served_home, monkeypa
     monkeypatch.setattr(tg, "apply_instant_title", lambda *args, **kwargs: None)
     db = MagicMock()
     db.get_session_title.return_value = None
-    home_token = set_hermes_home_override(str(b))
+    home_token = set_qubit_home_override(str(b))
     secret_token = set_secret_scope(build_profile_secret_scope(b))
     try:
         tg.maybe_auto_title(db, "sess-1", "hello there", [{"role": "user", "content": "hello there"}])
     finally:
         reset_secret_scope(secret_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
     assert done.wait(timeout=10), "auto-title thread never ran"
     assert seen == {"home": str(b), "key": "b-key"}
 
@@ -96,4 +96,4 @@ def test_ws_orphan_reap_tears_down_under_the_sessions_profile(served_home, monke
             server._sessions.pop(sid, None)
     assert seen_commit == {"home": str(b), "key": "b-key"}
     assert seen_close == {"home": str(b), "key": "b-key"}
-    assert Path(get_hermes_home()) == a  # the test thread's own context is untouched
+    assert Path(get_qubit_home()) == a  # the test thread's own context is untouched

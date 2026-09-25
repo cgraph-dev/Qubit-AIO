@@ -23,10 +23,10 @@ def test_opencode_zen_lists_all_models_while_other_providers_remain_capped(monke
         "agent.models_dev.fetch_models_dev",
         lambda: {"opencode": {}, "deepseek": {}},
     )
-    monkeypatch.setattr(providers_mod, "QUBIT_OVERLAYS", {})
+    monkeypatch.setattr(providers_mod, "HERMES_OVERLAYS", {})
     monkeypatch.setattr(
         "qubit_cli.models.cached_provider_model_ids",
-        lambda provider: {
+        lambda provider, **_: {
             "opencode-zen": zen_models,
             "deepseek": deepseek_models,
         }.get(provider, []),

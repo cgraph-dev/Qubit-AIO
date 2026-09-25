@@ -28,7 +28,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from qubit_constants import get_hermes_home, qubit_home_key, secure_parent_dir
+from qubit_constants import get_qubit_home, qubit_home_key, secure_parent_dir
 
 try:
     import fcntl
@@ -75,7 +75,7 @@ _listeners: List[Callable[[str, Lease], None]] = []
 def _path(profile_key: Optional[str]) -> Path:
     """``profile_key`` is the QUBIT_HOME path of the profile whose lease is meant (the RFB bridge
     serves several profiles from one process); ``None`` means the current profile."""
-    home = Path(profile_key) if profile_key else get_hermes_home()
+    home = Path(profile_key) if profile_key else get_qubit_home()
     return home / "bot-desktop" / "lease.json"
 
 
@@ -244,7 +244,7 @@ def assert_agent_may_act(profile_key: Optional[str] = None) -> Lease:
 def _reset_for_tests() -> None:
     with _lock:
         _listeners.clear()
-    p = get_hermes_home() / "bot-desktop" / "lease.json"
+    p = get_qubit_home() / "bot-desktop" / "lease.json"
     for f in (p, p.with_suffix(".lock"), p.with_suffix(".json.tmp")):
         try:
             f.unlink()

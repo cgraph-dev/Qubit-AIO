@@ -187,7 +187,7 @@ def test_lease_files_are_private_even_when_the_lease_is_written_before_the_scree
     home = tmp_path / "deep" / "home"
     home.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setattr(lease, "get_hermes_home", lambda: home)
+    monkeypatch.setattr(lease, "get_qubit_home", lambda: home)
     old = os.umask(0o022)
     try:
         lease.acquire("v1")

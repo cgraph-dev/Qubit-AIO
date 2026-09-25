@@ -37,8 +37,8 @@ function mount(target: string, surfaceId: string, key = 'draft-a') {
 }
 
 function bridge() {
-  window.qubitDesktop = {
-    ...window.qubitDesktop,
+  window.hermesDesktop = {
+    ...window.hermesDesktop,
     screenshot: {
       getSettings: vi.fn(),
       setEnabled: vi.fn(),
@@ -58,7 +58,7 @@ afterEach(() => {
   cleanup()
   listeners.clear()
   vi.clearAllMocks()
-  delete window.qubitDesktop.screenshot
+  delete window.hermesDesktop.screenshot
   markActiveComposer('main')
 })
 

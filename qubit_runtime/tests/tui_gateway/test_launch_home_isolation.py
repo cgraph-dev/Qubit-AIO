@@ -3,14 +3,14 @@ import os
 from pathlib import Path
 
 # Imported at collection on purpose: that is when real test modules import the server,
-# before any per-test fixture redirects QUBIT_HOME, so ``_hermes_home`` freezes to the
+# before any per-test fixture redirects QUBIT_HOME, so ``_qubit_home`` freezes to the
 # pre-fixture home exactly as it does for the rest of the suite.
 from tui_gateway import server
 from tui_gateway.launch_profile_policy import launch_secret_scope
 
 
 def test_launch_home_follows_the_process_home_redirected_after_import():
-    """``server._hermes_home`` is get_hermes_home() at import — under a developer shell the
+    """``server._qubit_home`` is get_qubit_home() at import — under a developer shell the
     honored custom QUBIT_HOME, a guarded root. Launch-profile turns read ``<launch home>/.env``
     (``launch_secret_scope``), so the home they bind must be resolved at call time from the
     process env, like the launch ``state.db`` handle (#112692), never the import-time value."""

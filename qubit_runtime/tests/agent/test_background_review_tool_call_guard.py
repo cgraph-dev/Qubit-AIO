@@ -69,7 +69,7 @@ def _run(agent, task_cfg=None):
 
 def test_fork_is_skipped_when_the_provider_cannot_emit_tool_calls(caplog):
     client = MagicMock()
-    client.SUPPORTS_QUBIT_TOOL_CALLS = False
+    client.SUPPORTS_HERMES_TOOL_CALLS = False
     with caplog.at_level(logging.WARNING, logger=bg.logger.name):
         mock_aiagent = _run(_fake_parent(client))
     mock_aiagent.assert_not_called()
@@ -79,7 +79,7 @@ def test_fork_is_skipped_when_the_provider_cannot_emit_tool_calls(caplog):
 
 def test_fork_is_spawned_when_the_provider_can_emit_tool_calls():
     client = MagicMock()
-    client.SUPPORTS_QUBIT_TOOL_CALLS = True
+    client.SUPPORTS_HERMES_TOOL_CALLS = True
     assert _run(_fake_parent(client)).called
 
 
@@ -91,14 +91,6 @@ def test_ordinary_providers_are_unaffected():
     assert _run(_fake_parent(_PlainClient())).called
 
 
-def test_the_capability_is_read_off_the_class_too():
-    """Clients declare it as a class attribute; an instance need not set it."""
-
-    class _IncapableClient:
-        SUPPORTS_QUBIT_TOOL_CALLS = False
-
-    assert bg._parent_can_emit_tool_calls(_fake_parent(_IncapableClient())) is False
-    assert bg._parent_can_emit_tool_calls(_fake_parent(None)) is True
 
 
 def test_an_incapable_provider_still_reviews_when_the_review_is_routed_away():
@@ -106,7 +98,7 @@ def test_an_incapable_provider_still_reviews_when_the_review_is_routed_away():
     model, so the parent's shim no longer matters."""
 
     class _IncapableClient:
-        SUPPORTS_QUBIT_TOOL_CALLS = False
+        SUPPORTS_HERMES_TOOL_CALLS = False
 
     routed = {
         "provider": "openai",

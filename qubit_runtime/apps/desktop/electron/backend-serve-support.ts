@@ -26,7 +26,7 @@ interface ServeCandidate {
 // rather than pinning a cold-AV false negative for the process lifetime.
 //
 // One cache per desktop runtime context; source inspection precedes a CLI probe.
-export function createBackendServeSupportResolver(qubitHome: string, rememberLog: (message: string) => void) {
+export function createBackendServeSupportResolver(hermesHome: string, rememberLog: (message: string) => void) {
   const cache = new Map<string, Promise<boolean>>()
 
   return async function backendSupportsServe(backend: ServeCandidate): Promise<boolean> {
@@ -67,7 +67,7 @@ export function createBackendServeSupportResolver(qubitHome: string, rememberLog
           // and its timeout-only retry instead of a thinner local bound.
           await execProbe(backend.command, [...prefix, 'serve', '--help'], {
             cwd: backend.root || undefined,
-            env: { ...process.env, QUBIT_HOME: qubitHome, ...(backend.env || {}) },
+            env: { ...process.env, QUBIT_HOME: hermesHome, ...(backend.env || {}) },
             timeout: PROBE_TIMEOUT_MS,
             stdio: 'ignore',
             // `.cmd`/`.bat` shim backends carry shell: true in their descriptor

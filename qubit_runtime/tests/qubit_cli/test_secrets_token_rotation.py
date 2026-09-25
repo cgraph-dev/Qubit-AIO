@@ -1,4 +1,4 @@
-"""Tests for `qubit secrets bitwarden token` / `qubit secrets onepassword token`.
+"""Tests for `hermes secrets bitwarden token` / `hermes secrets onepassword token`.
 
 The rotation command must: verify the candidate token BEFORE persisting,
 never touch .env on a rejected token, store + clear caches on success,

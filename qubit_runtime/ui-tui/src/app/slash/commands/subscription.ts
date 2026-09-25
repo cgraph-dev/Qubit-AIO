@@ -156,7 +156,7 @@ export const subscriptionCommands: SlashCommand[] = [
         .then(
           ctx.guarded<SubscriptionStateResponse>(s => {
             if (!s.logged_in) {
-              sys('Not logged into Qubit Portal — run /portal to log in, then /subscription.')
+              sys('Not logged into Qubit Labs — run /portal to log in, then /subscription.')
 
               return
             }

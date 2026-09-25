@@ -170,10 +170,10 @@ def _responder(t: Tenant) -> Callable[[dict[str, Any]], Response]:
 
 def make_tenants(root: Path, names: Iterable[str], launch: str = "default") -> dict[str, Tenant]:
     """Build tenant homes on disk: launch profile at HOME/.hermes, the rest under profiles/<name>."""
-    hermes_home = root / "home" / ".hermes"
+    qubit_home = root / "home" / ".hermes"
     tenants: dict[str, Tenant] = {}
     for name in names:
-        home = hermes_home if name == launch else hermes_home / "profiles" / name
+        home = qubit_home if name == launch else qubit_home / "profiles" / name
         t = Tenant(name=name, home=home, workdir=root / "work")
         t.workdir = root / f"work-{name}-{t.tag}"
         t.workdir.mkdir(parents=True)

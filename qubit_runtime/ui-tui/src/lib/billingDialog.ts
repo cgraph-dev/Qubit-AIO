@@ -1,4 +1,4 @@
-import type { BillingBlock } from '@qubit/shared/billing'
+import type { BillingBlock } from '@hermes/shared/billing'
 
 export interface BillingDialogCopy {
   cancelLabel: string

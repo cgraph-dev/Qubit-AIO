@@ -1,4 +1,4 @@
-import { Box, Text, useInput } from '@qubit/ink'
+import { Box, Text, useInput } from '@hermes/ink'
 import { useEffect, useState } from 'react'
 
 import type { GatewayClient } from '../gatewayClient.js'

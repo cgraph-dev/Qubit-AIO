@@ -5,6 +5,9 @@
 
 import { pathToFileURL } from 'node:url'
 
+import type { DesktopWindowLaunch } from './desktop-profile'
+import { computeWindowOptions } from './window-state'
+
 // Secondary windows open at the minimum usable size — a compact side panel for
 // subagent watch / cmd-click session pop-out, not a second full desktop.
 const SESSION_WINDOW_MIN_WIDTH = 420
@@ -25,13 +28,13 @@ const SESSION_WINDOW_MIN_HEIGHT = 620
 // so an idle hidden window costs ~nothing. A static `backgroundThrottling:
 // false` here would pin `document.visibilityState` to 'visible' forever,
 // turning every visibility-gated poll in the renderer into an always-on timer
-// (the "Qubit idles at 20% CPU while minimized" bug). The preload path is
+// (the "Hermes idles at 20% CPU while minimized" bug). The preload path is
 // injected because it depends on the Electron entry's __dirname.
 //
 // `autoplayPolicy: 'no-user-gesture-required'` is load-bearing for voice:
 // Chromium's default autoplay policy suspends audio (HTMLAudioElement.play()
 // and AudioContext) until the user has interacted with the frame. A voice
-// conversation started by the "Hey Qubit" wake word has NO preceding click,
+// conversation started by the "Hey Hermes" wake word has NO preceding click,
 // so the FIRST reply's audio playback was rejected (NotAllowedError, silently
 // swallowed) and only turn 2+ spoke — the very "first message in a new voice
 // session is silent" bug. Manual voice-start worked only because the button
@@ -87,8 +90,19 @@ function buildSessionWindowUrl(sessionId: string, { devServer, profile, renderer
 // separate marker lets the renderer distinguish a peer from the one primary
 // app window: app-launch source restoration belongs to the primary only, while
 // a peer keeps the already-running backend it joined during boot.
-function buildInstanceWindowUrl({ devServer, rendererIndexPath }: any = {}) {
-  const query = '?peer=1'
+interface InstanceWindowUrlOptions extends Partial<DesktopWindowLaunch> {
+  devServer?: string
+  rendererIndexPath?: string
+}
+
+function buildInstanceWindowUrl({
+  connectionId,
+  devServer,
+  profile,
+  profileWindow,
+  rendererIndexPath
+}: InstanceWindowUrlOptions = {}) {
+  const query = `?peer=1${profile ? `&profile=${encodeURIComponent(profile)}&connectionId=${encodeURIComponent(connectionId ?? '')}${profileWindow ? '&profileWindow=1' : ''}` : ''}`
 
   if (devServer) {
     const base = devServer.endsWith('/') ? devServer.slice(0, -1) : devServer
@@ -105,20 +119,29 @@ function buildInstanceWindowUrl({ devServer, rendererIndexPath }: any = {}) {
 // it's unit-testable; the Electron glue (reading the focused window's bounds,
 // constructing the BrowserWindow) stays in main.ts. `base` is the source
 // window's current bounds, or null when there's no live source window — then the
-// persisted primary geometry (`fallback`) is used as-is.
+// persisted primary geometry (`fallback`) is used as-is. The cascaded rect is
+// clamped to the work area it lands on (a source docked at the bottom/right edge
+// would otherwise push the new window past the screen); with no matching
+// display it is kept as computed.
 const INSTANCE_CASCADE_OFFSET = 32
 
-function instanceWindowBounds(base: { x: number; y: number; width: number; height: number } | null, fallback: any) {
+function instanceWindowBounds(
+  base: { x: number; y: number; width: number; height: number } | null,
+  fallback: any,
+  displays: any[] = []
+) {
   if (!base) {
     return fallback
   }
 
-  return {
+  const bounds = {
     width: base.width,
     height: base.height,
     x: base.x + INSTANCE_CASCADE_OFFSET,
     y: base.y + INSTANCE_CASCADE_OFFSET
   }
+
+  return { ...bounds, ...computeWindowOptions(bounds, displays) }
 }
 
 // A small registry keyed by sessionId that guarantees one window per chat:

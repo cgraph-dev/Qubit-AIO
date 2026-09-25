@@ -57,16 +57,19 @@ def _run_nous_flow(config: dict, *, context: str, cancel_exc: tuple, cancel_line
 def _run_portal_one_shot(config: dict) -> None:
     """One-shot Qubit Labs setup (``qubit setup --portal`` / ``qubit portal``)."""
     from qubit_cli.setup import _info, _print_banner, print_error, print_info, print_success
-    _print_banner("│     ⚕ Qubit Setup — Qubit Labs (one-shot)             │")
+    _print_banner("│     ☤ Qubit Setup — Qubit Labs (one-shot)             │")
     _info(None, "  One subscription, 300+ models, plus the Tool Gateway:",
           "    web search, image generation, TTS, browser automation",
           "    — all routed through your Qubit Labs sub.", None,
           "  Sign up: https://portal.nousresearch.com/manage-subscription", None)
 
     def _on_error(exc: Exception) -> None:
+        from qubit_cli.auth_error_copy import provider_setup_failure_lines
         print()
-        print_error(f"  Qubit Labs setup encountered an error: {exc}")
-        print_info("  You can retry later with `qubit portal`.")
+        lead, *rest = provider_setup_failure_lines(exc, retry_command="qubit portal")
+        print_error(f"  {lead}")
+        for line in rest:
+            print_info(f"  {line}")
 
     if not _run_nous_flow(config, context="`qubit portal`", cancel_exc=(KeyboardInterrupt, EOFError, SystemExit),
                           cancel_lines=(None, "  Setup cancelled.", "  You can retry later with `qubit portal`."),
@@ -95,8 +98,11 @@ def _run_first_time_quick_setup(config: dict, qubit_home, is_existing: bool):
           "Sign up: https://portal.nousresearch.com/manage-subscription", None)
 
     def _on_error(exc: Exception) -> None:
-        print_warning(f"Qubit Labs setup encountered an error: {exc}")
-        print_info("You can try again later with: qubit model")
+        from qubit_cli.auth_error_copy import provider_setup_failure_lines
+        lead, *rest = provider_setup_failure_lines(exc, retry_command="qubit model")
+        print_warning(lead)
+        for line in rest:
+            print_info(line)
 
     _run_nous_flow(config, context="quick setup", cancel_exc=(KeyboardInterrupt, EOFError),
                    cancel_lines=(None, "Qubit Labs setup cancelled."), print_error=_on_error)
@@ -150,7 +156,7 @@ def _print_macos_fda_tip() -> None:
         return  # indeterminate — don't nag
     _info(None, "  macOS tip: silence ALL folder permission prompts with one switch —",
           "  System Settings → Privacy & Security → Full Disk Access → enable",
-          "  your terminal (and Qubit.app if you use Desktop), or run:",
+          "  your terminal (and Hermes.app if you use Desktop), or run:",
           "    open \"x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles\"",
           "  The grant is permanent — it survives every Qubit update.")
 
@@ -194,7 +200,6 @@ def _blank_slate_minimize_config(config: dict):
     mem["user_profile_enabled"] = False
     config.setdefault("checkpoints", {})["enabled"] = False
     config.setdefault("smart_model_routing", {})["enabled"] = False
-    config.setdefault("display", {})["tool_progress"] = "all"
 
 
 def _set_bundled_skills_opt_out(opt_out: bool, log_label: str, on_success=None, on_error=None) -> None:

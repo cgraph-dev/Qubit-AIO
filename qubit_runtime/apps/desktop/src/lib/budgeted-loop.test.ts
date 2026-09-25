@@ -48,7 +48,7 @@ describe('createBudgetedLoop', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
 
   it('enforces the fps budget: frames inside the interval reschedule without drawing', () => {
@@ -71,7 +71,7 @@ describe('createBudgetedLoop', () => {
     loop.dispose()
   })
 
-  it('pauses while the window is not observable and resumes when it is', () => {
+  it('keeps drawing while unfocused but pauses while minimized', () => {
     const raf = installRaf()
     const draw = vi.fn()
     const loop = createBudgetedLoop(draw)
@@ -79,7 +79,9 @@ describe('createBudgetedLoop', () => {
     expect(raf.pending()).toBe(1)
 
     window.dispatchEvent(new Event('blur'))
-    expect(raf.pending()).toBe(0)
+    expect(raf.pending()).toBe(1)
+    raf.runNext(1000)
+    expect(draw).toHaveBeenCalledTimes(1)
 
     window.dispatchEvent(new Event('focus'))
     expect(raf.pending()).toBe(1)

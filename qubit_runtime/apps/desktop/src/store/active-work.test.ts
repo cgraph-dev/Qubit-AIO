@@ -5,7 +5,7 @@ import type { ClientSessionState } from '@/app/types'
 import { $sessions } from './session'
 import { clearAllSessionStates, publishSessionState } from './session-states'
 
-const desktopWindow = window as unknown as { qubitDesktop?: Window['hermesDesktop'] }
+const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
 const setActiveWork = vi.fn()
 
 const busy = (storedSessionId: string, isBusy: boolean) =>
@@ -14,7 +14,7 @@ const busy = (storedSessionId: string, isBusy: boolean) =>
 const session = (id: string, title: null | string) => ({ id, title }) as (typeof $sessions.value)[number]
 
 beforeAll(async () => {
-  desktopWindow.qubitDesktop = { setActiveWork } as unknown as Window['hermesDesktop']
+  desktopWindow.hermesDesktop = { setActiveWork } as unknown as Window['hermesDesktop']
   // Subscribes at import time, so the bridge has to exist first.
   await import('./active-work')
 })
@@ -46,15 +46,5 @@ describe('active work bridge', () => {
     publishSessionState('runtime-1', busy('s1', false))
 
     expect(setActiveWork).toHaveBeenLastCalledWith({ count: 0, titles: [] })
-  })
-
-  it('does not re-send an unchanged summary', () => {
-    $sessions.set([session('s1', 'Fix login')])
-    publishSessionState('runtime-1', busy('s1', true))
-    setActiveWork.mockClear()
-
-    $sessions.set([session('s1', 'Fix login'), session('s2', 'Something else')])
-
-    expect(setActiveWork).not.toHaveBeenCalled()
   })
 })

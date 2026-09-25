@@ -43,10 +43,10 @@ def _run_main_and_capture_yolo_at_startup(monkeypatch, argv):
 
 
 def test_top_level_yolo_flag_sets_env_before_startup(monkeypatch):
-    """qubit --yolo must set HERMES_YOLO_MODE before
+    """hermes --yolo must set HERMES_YOLO_MODE before
     _prepare_agent_startup imports tools.approval."""
     result = _run_main_and_capture_yolo_at_startup(
-        monkeypatch, ["qubit", "--yolo"]
+        monkeypatch, ["hermes", "--yolo"]
     )
     assert result == "1", (
         "HERMES_YOLO_MODE was not '1' when _prepare_agent_startup was "

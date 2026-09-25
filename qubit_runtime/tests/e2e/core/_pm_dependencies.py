@@ -66,14 +66,14 @@ def _prepare_test_tools() -> tuple[Path, dict] | None:
 _PREPARED_TOOLS = _prepare_test_tools()
 
 
-def select_test_dependencies(hermes_home: Path, checkout: Path) -> None:
+def select_test_dependencies(qubit_home: Path, checkout: Path) -> None:
     """Point sandbox PM facts at the real test venv instead of bootstrapping a second one."""
     test_venv = Path(sys.prefix)
     if not (test_venv / "pyvenv.cfg").is_file():
         return  # Nix/system Python has no prepared venv to select.
     selected = site_packages(test_venv)
     assert selected.is_dir(), f"test interpreter lacks site-packages: {test_venv}"
-    state = hermes_home / "installs" / install_key(checkout)
+    state = qubit_home / "installs" / install_key(checkout)
     environment = state / "environments" / "e2e-test" / "venv"
     environment.mkdir(parents=True)
     shutil.copyfile(test_venv / "pyvenv.cfg", environment / "pyvenv.cfg")
@@ -87,7 +87,7 @@ def select_test_dependencies(hermes_home: Path, checkout: Path) -> None:
     if _PREPARED_TOOLS is None:
         return
     source, records = _PREPARED_TOOLS
-    tools = hermes_home / "tools"
+    tools = qubit_home / "tools"
     tools.mkdir()
     for record in records.values():
         assert record is not None

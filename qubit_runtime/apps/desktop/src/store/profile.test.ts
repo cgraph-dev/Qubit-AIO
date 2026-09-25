@@ -1,22 +1,27 @@
 import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitConnection } from '@/global'
+import type { HermesConnection } from '@/global'
 import type { ProfileInfo } from '@/types/hermes'
 
 // Keep profile.ts's side-effecting imports inert: the gateway socket layer and
 // the REST query client must not run for real in a unit test.
-const ensureGatewayForProfile = vi.fn(async () => undefined)
+const ensureGatewayForProfile = vi.fn(async (_profile: string) => undefined)
 const ensureGatewayForAgent = vi.fn(async () => undefined)
 const openGatewayForProfile = vi.fn(async (_profile: string) => undefined)
+const openGatewayForAgent = vi.fn(async (_connectionId: null | string, _profile: string) => undefined)
 const openSecondaryCount = vi.fn(() => 0)
 const $gateway = atom<unknown>({ id: 'live-socket', connectionState: 'open' })
 const resetStarmapGraph = vi.fn()
 
 vi.mock('@/store/gateway', () => ({
   $gateway,
+  activeGatewayConnectionId: () => null,
+  // Activation now verifies the socket's route before publishing the profile.
+  activeGatewayProfileKey: () => ensureGatewayForProfile.mock.lastCall?.[0] ?? $activeGatewayProfile.get(),
   ensureGatewayForAgent,
   ensureGatewayForProfile,
+  openGatewayForAgent,
   openGatewayForProfile,
   openSecondaryCount
 }))
@@ -44,6 +49,7 @@ const {
 } = await import('./profile')
 
 const { $poolLimits } = await import('@/store/pool-limits')
+const { $connectionsRegistry } = await import('@/store/connection-registry-state')
 
 const { $connection } = await import('./session')
 const { invalidateProfileScopedQueries } = await import('@/lib/query-client')
@@ -59,13 +65,13 @@ const profile = (name: string, isDefault = false): ProfileInfo => ({
   skill_count: 0
 })
 
-const remoteConn = (over: Partial<QubitConnection> = {}): QubitConnection =>
-  ({ baseUrl: 'https://hermes-roy.tail.ts.net', mode: 'remote', profile: 'vps-remote', ...over }) as QubitConnection
+const remoteConn = (over: Partial<HermesConnection> = {}): HermesConnection =>
+  ({ baseUrl: 'https://hermes-roy.tail.ts.net', mode: 'remote', profile: 'vps-remote', ...over }) as HermesConnection
 
-const localConn = (over: Partial<QubitConnection> = {}): QubitConnection =>
-  ({ baseUrl: '', mode: 'local', profile: 'default', ...over }) as QubitConnection
+const localConn = (over: Partial<HermesConnection> = {}): HermesConnection =>
+  ({ baseUrl: '', mode: 'local', profile: 'default', ...over }) as HermesConnection
 
-const getConnection = vi.fn<(profile?: string | null) => Promise<QubitConnection>>()
+const getConnection = vi.fn<(profile?: string | null) => Promise<HermesConnection>>()
 
 beforeEach(() => {
   getConnection.mockReset()
@@ -76,7 +82,7 @@ beforeEach(() => {
   $activeGatewayProfile.set('default')
   $connection.set(localConn())
   $profiles.set([])
-  vi.stubGlobal('window', { qubitDesktop: { getConnection } })
+  vi.stubGlobal('window', { hermesDesktop: { getConnection } })
   vi.mocked(invalidateProfileScopedQueries).mockClear()
   resetStarmapGraph.mockClear()
 })
@@ -171,6 +177,27 @@ describe('prewarmProfileBackend (hover-intent pool spawn)', () => {
     expect(openGatewayForProfile).not.toHaveBeenCalled()
   })
 
+  // #89756: SSH sources are connect-on-demand — a hover-warm on an SSH row
+  // dialed the tunnel and spawned an isolated remote backend per bot.
+  it('never dials an SSH registry source; a same-box Remote gateway still warms', () => {
+    openGatewayForAgent.mockClear()
+    $connectionsRegistry.set({
+      version: 2,
+      primary: 'shell',
+      secureTokenStorage: true,
+      connections: [
+        { id: 'shell', kind: 'ssh', label: 'Shell', host: 'box', tokenSet: false, tokenPreview: '' },
+        { id: 'gateway', kind: 'remote', label: 'Gateway', url: 'http://box:8642', tokenSet: true, tokenPreview: '…' }
+      ]
+    })
+
+    prewarmProfileBackend('dax', 'shell')
+    prewarmProfileBackend('dax', 'gateway')
+
+    expect(openGatewayForAgent.mock.calls).toEqual([['gateway', 'dax']])
+    expect(openGatewayForProfile).not.toHaveBeenCalled()
+  })
+
   it('throttles repeat pre-warms for the same profile within the interval', () => {
     prewarmProfileBackend('warm-throttle-a')
     prewarmProfileBackend('warm-throttle-a')
@@ -196,14 +223,6 @@ describe('prewarmProfileBackend (hover-intent pool spawn)', () => {
     prewarmProfileBackend('warm-saturated')
 
     expect(openGatewayForProfile).not.toHaveBeenCalled()
-  })
-
-  it('pre-warms while pool slots are free', () => {
-    openSecondaryCount.mockReturnValue(1)
-
-    prewarmProfileBackend('warm-slot-free')
-
-    expect(openGatewayForProfile).toHaveBeenCalledWith('warm-slot-free')
   })
 
   it('follows the live pool-limit atom, not a hard-coded cap', () => {

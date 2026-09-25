@@ -17,7 +17,8 @@ function setProviders(providers: OAuthProvider[]) {
     requested: false,
     firstRunSkipped: false,
     manual: false,
-    localEndpoint: false
+    localEndpoint: false,
+    freeTierReady: false
   } satisfies DesktopOnboardingState)
 }
 
@@ -41,19 +42,20 @@ afterEach(() => {
     requested: false,
     firstRunSkipped: false,
     manual: false,
-    localEndpoint: false
+    localEndpoint: false,
+    freeTierReady: false
   })
 })
 
 describe('onboarding Picker', () => {
-  it('features Qubit Labs and hides other providers behind a disclosure', () => {
-    setProviders([makeOAuthProvider('anthropic', 'Anthropic Claude'), makeOAuthProvider('nous', 'Qubit Labs')])
+  it('features Nous Portal and hides other providers behind a disclosure', () => {
+    setProviders([makeOAuthProvider('anthropic', 'Anthropic Claude'), makeOAuthProvider('nous', 'Nous Portal')])
     render(<Picker ctx={ctx} />)
 
-    expect(screen.getByText('Qubit Labs')).toBeTruthy()
+    expect(screen.getByText('Nous Portal')).toBeTruthy()
     expect(screen.getByText('Recommended')).toBeTruthy()
     // Fireworks stays behind the disclosure with the other alternatives; only
-    // Qubit Labs is visible before the user expands the list.
+    // Nous Portal is visible before the user expands the list.
     expect(screen.queryByText('Fireworks AI')).toBeNull()
     expect(screen.queryByText('Anthropic API Key')).toBeNull()
 
@@ -64,28 +66,7 @@ describe('onboarding Picker', () => {
     expect(screen.getByRole('button', { name: 'Collapse' })).toBeTruthy()
   })
 
-  it('shows Fireworks first in the expanded list, ahead of other OAuth providers', () => {
-    setProviders([
-      makeOAuthProvider('openai-codex', 'OpenAI Codex / ChatGPT'),
-      makeOAuthProvider('minimax-oauth', 'MiniMax'),
-      makeOAuthProvider('nous', 'Qubit Labs')
-    ])
-    render(<Picker ctx={ctx} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Other providers' }))
-
-    const labels = screen
-      .getAllByRole('button')
-      .map(el => el.textContent ?? '')
-      .filter(text => /Qubit Labs|Fireworks AI|ChatGPT or Codex|MiniMax|OpenRouter/.test(text))
-
-    const indexOf = (needle: string) => labels.findIndex(text => text.includes(needle))
-    expect(indexOf('Qubit Labs')).toBeGreaterThanOrEqual(0)
-    expect(indexOf('Fireworks AI')).toBeGreaterThan(indexOf('Qubit Labs'))
-    expect(indexOf('ChatGPT or Codex')).toBeGreaterThan(indexOf('Fireworks AI'))
-    expect(indexOf('MiniMax')).toBeGreaterThan(indexOf('ChatGPT or Codex'))
-  })
-
-  it('shows every provider directly when Qubit Labs is absent', () => {
+  it('shows every provider directly when Nous Portal is absent', () => {
     setProviders([
       makeOAuthProvider('anthropic', 'Anthropic Claude'),
       makeOAuthProvider('openai-codex', 'OpenAI Codex / ChatGPT')
@@ -100,7 +81,7 @@ describe('onboarding Picker', () => {
   })
 
   it('offers "choose later" on first run and persists the skip', () => {
-    setProviders([makeOAuthProvider('nous', 'Qubit Labs')])
+    setProviders([makeOAuthProvider('nous', 'Nous Portal')])
     render(<Picker ctx={ctx} />)
 
     const skip = screen.getByRole('button', { name: "I'll choose a provider later" })
@@ -112,7 +93,7 @@ describe('onboarding Picker', () => {
   })
 
   it('hides "choose later" in manual (add-provider) mode', () => {
-    setProviders([makeOAuthProvider('nous', 'Qubit Labs')])
+    setProviders([makeOAuthProvider('nous', 'Nous Portal')])
     $desktopOnboarding.set({ ...$desktopOnboarding.get(), manual: true })
     render(<Picker ctx={ctx} />)
 

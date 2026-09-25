@@ -23,11 +23,13 @@ export const isActionMod = (key: { ctrl: boolean; meta: boolean; super?: boolean
  *   - Ctrl+K (kill-to-end) and Ctrl+W (delete-word-back) are standard readline
  *     bindings that users expect to work regardless of platform, even though
  *     no terminal rewrites Cmd into them.
+ *   - Ctrl+D is the terminal EOF convention (exit on an empty line); Cmd+D is
+ *     taken by the terminal itself in Ghostty (split pane), so it is no substitute.
  */
 export const isMacActionFallback = (
   key: { ctrl: boolean; meta: boolean; super?: boolean },
   ch: string,
-  target: 'a' | 'e' | 'u' | 'k' | 'w'
+  target: 'a' | 'd' | 'e' | 'u' | 'k' | 'w'
 ): boolean => isMac && key.ctrl && !key.meta && key.super !== true && ch.toLowerCase() === target
 
 /** Match action-modifier + a single character (case-insensitive). */
@@ -88,7 +90,7 @@ export const DEFAULT_VOICE_RECORD_KEY: ParsedVoiceRecordKey = {
 /** Modifier aliases.
  *
  * ``meta`` / ``cmd`` / ``command`` are intentionally absent.
- * qubit-ink sets ``key.meta`` for plain Alt/Option on every platform
+ * hermes-ink sets ``key.meta`` for plain Alt/Option on every platform
  * AND for Cmd on some legacy macOS terminals (Terminal.app without
  * kitty-protocol passthrough). Accepting any of those as a literal
  * modifier would produce a display/binding mismatch — a config like
@@ -141,7 +143,8 @@ const _NAMED_KEY_ALIASES: Record<string, VoiceRecordKeyNamed> = {
 
 /** ``useInputHandlers()`` intercepts these unconditionally before the
  * voice check runs, so a binding like ``ctrl+c`` (interrupt),
- * ``ctrl+d`` (quit), or ``ctrl+l`` (clear screen) would be advertised
+ * ``ctrl+d`` (quit), ``ctrl+l`` (clear screen), or ``ctrl+r`` (dock toggle)
+ * would be advertised
  * in /voice status but never fire push-to-talk. Reject at parse time
  * so the user gets the documented Ctrl+B instead of a dead shortcut
  * (Copilot round-4 review on #19835).
@@ -150,7 +153,7 @@ const _NAMED_KEY_ALIASES: Record<string, VoiceRecordKeyNamed> = {
  * queue-edit (``queueEditIdx !== null``), so the voice binding works
  * for most of the session and matches CLI parity for ``ctrl+<letter>``
  * bindings (Copilot round-8 review on #19835). */
-const _RESERVED_CTRL_CHARS = new Set(['c', 'd', 'l'])
+const _RESERVED_CTRL_CHARS = new Set(['c', 'd', 'l', 'r'])
 
 /** On macOS the action-modifier intercepts these editor chords via
  * ``isCopyShortcut`` / ``isAction`` in ``useInputHandlers()``:
@@ -165,7 +168,7 @@ const _RESERVED_CTRL_CHARS = new Set(['c', 'd', 'l'])
 const _RESERVED_SUPER_CHARS = new Set(['c', 'd', 'l', 'v'])
 
 /** On macOS ``isActionMod`` accepts ``key.meta`` as the action
- * modifier — but qubit-ink reports Alt as ``key.meta`` on many
+ * modifier — but hermes-ink reports Alt as ``key.meta`` on many
  * terminals. So on darwin a configured ``alt+c`` / ``alt+d`` / ``alt+l``
  * gets swallowed by ``isCopyShortcut`` / ``isAction`` before the voice
  * check runs. Block at parse time so /voice status doesn't advertise
@@ -296,7 +299,7 @@ export const parseVoiceRecordKey = (raw: unknown): ParsedVoiceRecordKey => {
     return DEFAULT_VOICE_RECORD_KEY
   }
 
-  // On macOS qubit-ink reports Alt as ``key.meta``, which ``isActionMod``
+  // On macOS hermes-ink reports Alt as ``key.meta``, which ``isActionMod``
   // accepts as the mac action modifier. So ``alt+c`` / ``alt+d`` / ``alt+l``
   // collide with copy / exit / clear in ``useInputHandlers()`` before the
   // voice check. Reject at parse time on darwin only — non-mac ``alt+<letter>``
@@ -380,7 +383,7 @@ export const isVoiceToggleKey = (
       // Ctrl+Alt+<key> or Cmd+Alt+<key> doesn't spuriously fire the
       // alt binding.
       //
-      // Bare Escape on qubit-ink can arrive as ``key.meta=true`` on some
+      // Bare Escape on hermes-ink can arrive as ``key.meta=true`` on some
       // terminals, so a configured ``alt+escape`` must not match that shape;
       // require an explicit alt bit for escape chords (Copilot round-7
       // follow-up on #19835).
@@ -394,7 +397,7 @@ export const isVoiceToggleKey = (
       // The documented default (``ctrl+b``) additionally accepts the
       // explicit ``key.super`` bit on macOS for Cmd+B muscle memory —
       // but ONLY ``key.super`` (kitty-style), never ``key.meta``, since
-      // ``key.meta`` is qubit-ink's Alt signal and accepting it would
+      // ``key.meta`` is hermes-ink's Alt signal and accepting it would
       // fire the binding on Alt+B.
       if (key.ctrl) {
         return !key.alt && !key.meta && key.super !== true

@@ -1,7 +1,7 @@
 # Native pool retirement integration
 
 From `apps/desktop`, after installing the repository-pinned Node dependencies and a
-Qubit Python environment (including the serve dependencies):
+Hermes Python environment (including the serve dependencies):
 
 ```sh
 HERMES_TEST_REAL_SERVE=1 \
@@ -36,7 +36,7 @@ fixture entry points and their production imports into a fresh temporary directo
   The event receipt asserts commit → park → signal → held shutdown → actual exit →
   lease release → acquisition → successor spawn, and OS liveness is false at release.
 - A hidden, sandboxed native renderer imports the real `src/store/gateway.ts` and
-  `QubitGateway`. It opens four actual WebSockets (legacy and registry-local scopes
+  `HermesGateway`. It opens four actual WebSockets (legacy and registry-local scopes
   for both idle children). Main sends retirement over fixture IPC before signalling.
   Both scopes stay parked after socket closure and ordinary/forced wake sweeps;
   no new descriptor request is made. Renderer Node integration is disabled.

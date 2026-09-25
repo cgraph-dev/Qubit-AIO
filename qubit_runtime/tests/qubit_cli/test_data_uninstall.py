@@ -33,7 +33,7 @@ def layout(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_RUNTIME_DIR", str(store))
     monkeypatch.setattr(uninstall, "get_project_root", lambda: source)
-    monkeypatch.setattr(uninstall, "get_hermes_home", lambda: home)
+    monkeypatch.setattr(uninstall, "get_qubit_home", lambda: home)
     monkeypatch.setattr("qubit_cli.gui_uninstall.desktop_userdata_dir", lambda: userdata)
     return home, witnesses, data
 
@@ -87,7 +87,7 @@ def test_named_home_does_not_erase_siblings_or_desktop_data(layout, monkeypatch)
     userdata.mkdir()
     (userdata / "preferences.json").write_text("keep", encoding="utf-8")
     monkeypatch.setenv("QUBIT_HOME", str(active))
-    monkeypatch.setattr(uninstall, "get_hermes_home", lambda: active)
+    monkeypatch.setattr(uninstall, "get_qubit_home", lambda: active)
     uninstall.run_data_uninstall(SimpleNamespace(yes=True))
     assert not config.exists()
     assert all(path.exists() for path in witnesses)

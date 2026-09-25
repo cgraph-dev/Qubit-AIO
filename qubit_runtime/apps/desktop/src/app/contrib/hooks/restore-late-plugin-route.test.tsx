@@ -23,13 +23,13 @@ import { useDesktopIntegrations } from './use-desktop-integrations'
 
 vi.mock('@/store/windows', async importOriginal => ({ ...(await importOriginal<object>()), isHudWindow: () => false }))
 
-const desktopWindow = window as unknown as { qubitDesktop: unknown }
-const originalBridge = desktopWindow.qubitDesktop
+const desktopWindow = window as unknown as { hermesDesktop: unknown }
+const originalBridge = desktopWindow.hermesDesktop
 
 beforeEach(() => {
   window.localStorage.clear()
   _resetLegacyDiscardForTests()
-  desktopWindow.qubitDesktop = {
+  desktopWindow.hermesDesktop = {
     setPreviewShortcutActive: vi.fn(),
     onOpenUpdatesRequested: vi.fn(),
     onFocusSession: vi.fn(),
@@ -44,7 +44,7 @@ beforeEach(() => {
 
 afterEach(() => {
   $diskPluginsScanPending.set(false)
-  desktopWindow.qubitDesktop = originalBridge
+  desktopWindow.hermesDesktop = originalBridge
 })
 
 function mountRestore() {
@@ -87,6 +87,7 @@ it('restores a remembered plugin page whose route registers after the session li
     data: { path: '/html-gallery' },
     render: () => null
   })
+
   act(() => $diskPluginsScanPending.set(false))
 
   expect(navigate).toHaveBeenCalledWith('/html-gallery', { replace: true })

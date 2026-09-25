@@ -23,7 +23,7 @@ def pool(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("QUBIT_HOME", str(root))
     import qubit_constants
-    qubit_constants._default_hermes_root_memo = None  # type: ignore[attr-defined]
+    qubit_constants._default_qubit_root_memo = None  # type: ignore[attr-defined]
     (root / "auth.json").write_text(json.dumps({"credential_pool": {"anthropic": [{
         "id": "seat", "label": "seat", "auth_type": "api_key", "priority": 0,
         "source": "manual", "access_token": KEY,

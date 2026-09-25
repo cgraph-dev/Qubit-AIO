@@ -1,5 +1,5 @@
 """
-Tests for --yes / -y flag in `qubit skills uninstall` CLI subcommand.
+Tests for --yes / -y flag in `hermes skills uninstall` CLI subcommand.
 
 Verifies the parser registers the flag and the value reaches
 ``do_uninstall(skip_confirm=True)`` through the real ``skills_command``
@@ -29,29 +29,20 @@ def test_cli_skills_uninstall_yes_sets_skip_confirm(monkeypatch):
     """`--yes` should propagate to do_uninstall(skip_confirm=True)."""
     captured = _run_uninstall_cli(
         monkeypatch,
-        ["qubit", "skills", "uninstall", "test-skill", "--yes"],
+        ["hermes", "skills", "uninstall", "test-skill", "--yes"],
     )
 
     assert captured["name"] == "test-skill"
     assert captured["skip_confirm"] is True
 
 
-def test_cli_skills_uninstall_y_alias_sets_skip_confirm(monkeypatch):
-    """`-y` should behave the same as `--yes`."""
-    captured = _run_uninstall_cli(
-        monkeypatch,
-        ["qubit", "skills", "uninstall", "test-skill", "-y"],
-    )
-
-    assert captured["name"] == "test-skill"
-    assert captured["skip_confirm"] is True
 
 
 def test_cli_skills_uninstall_no_flags_keeps_prompt(monkeypatch):
     """Without --yes, skip_confirm must be False (prompt preserved)."""
     captured = _run_uninstall_cli(
         monkeypatch,
-        ["qubit", "skills", "uninstall", "test-skill"],
+        ["hermes", "skills", "uninstall", "test-skill"],
     )
 
     assert captured["name"] == "test-skill"

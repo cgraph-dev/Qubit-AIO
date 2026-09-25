@@ -44,7 +44,7 @@ def _job(next_run_at):
 
 
 def _due_at(monkeypatch, now, scheduled):
-    monkeypatch.setattr(jobs, "_hermes_now", lambda: now)
+    monkeypatch.setattr(jobs, "_qubit_now", lambda: now)
     jobs.save_jobs([_job(scheduled)])
     return [row["id"] for row in jobs.get_due_jobs()]
 
@@ -67,7 +67,7 @@ def test_fold_hour_timers_measure_real_elapsed_time(dst_cron_store, monkeypatch)
     claimed = _instant(5, 58)  # 01:58 EDT, fold=0: four real minutes earlier
     assert jobs._claim_is_live({"at": claimed.isoformat(), "by": "peer-host:1"}, now, 300)
 
-    monkeypatch.setattr(unreachable_retry, "_hermes_now", lambda: now)
+    monkeypatch.setattr(unreachable_retry, "_qubit_now", lambda: now)
     job = _job(_instant(9, 0))  # natural next run 04:00 EST, well past the ladder
     assert unreachable_retry.plan_retry(job) is True
     retry_at = datetime.fromisoformat(job["next_run_at"])

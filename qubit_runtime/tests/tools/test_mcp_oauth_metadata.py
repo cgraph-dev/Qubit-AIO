@@ -1,7 +1,7 @@
 """Tests for OAuth server metadata persistence across process restarts.
 
 Covers:
-- :class:`HermesTokenStorage` ``.meta.json`` roundtrip (save / load / remove)
+- :class:`QubitTokenStorage` ``.meta.json`` roundtrip (save / load / remove)
 - The production manager provider
   (:class:`tools.mcp_oauth_manager.HermesMCPOAuthProvider`) restoring metadata
   on cold-load init and persisting metadata at the end of ``async_auth_flow``.
@@ -24,10 +24,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp.shared.auth import OAuthMetadata
+pytest.importorskip("mcp.shared.auth", reason="MCP SDK not installed")
+
+from mcp.shared.auth import OAuthMetadata  # noqa: E402
 
 from tools.mcp_oauth import QubitTokenStorage
-from tools.mcp_oauth_manager import _QUBIT_PROVIDER_CLS
+from tools.mcp_oauth_manager import _HERMES_PROVIDER_CLS
 
 
 def _make_metadata(token_endpoint: str = "https://auth.example.com/oauth/token") -> OAuthMetadata:
@@ -42,7 +44,7 @@ def _make_metadata(token_endpoint: str = "https://auth.example.com/oauth/token")
 
 
 # ---------------------------------------------------------------------------
-# HermesTokenStorage metadata roundtrip
+# QubitTokenStorage metadata roundtrip
 # ---------------------------------------------------------------------------
 
 
@@ -85,9 +87,9 @@ def _manager_provider_with_context(storage: QubitTokenStorage, **context_attrs):
     Bypasses the full OAuthClientProvider init so we can exercise the
     override logic in isolation.
     """
-    if _QUBIT_PROVIDER_CLS is None:
+    if _HERMES_PROVIDER_CLS is None:
         pytest.skip("MCP SDK auth not available")
-    provider = _QUBIT_PROVIDER_CLS.__new__(_QUBIT_PROVIDER_CLS)
+    provider = _HERMES_PROVIDER_CLS.__new__(_HERMES_PROVIDER_CLS)
     provider._qubit_server_name = context_attrs.get("server_name", "srv")
     context = MagicMock()
     context.storage = storage
@@ -108,7 +110,7 @@ class TestManagerOAuthProviderMetadata:
         provider = _manager_provider_with_context(storage, oauth_metadata=None)
 
         with patch.object(
-            _QUBIT_PROVIDER_CLS.__bases__[-1], "_initialize", new=AsyncMock()
+            _HERMES_PROVIDER_CLS.__bases__[-1], "_initialize", new=AsyncMock()
         ):
             asyncio.run(provider._initialize())
 
@@ -136,7 +138,7 @@ class TestManagerOAuthProviderMetadata:
         manager.invalidate_if_disk_changed = AsyncMock(return_value=False)
 
         with patch.object(
-            _QUBIT_PROVIDER_CLS.__bases__[-1],
+            _HERMES_PROVIDER_CLS.__bases__[-1],
             "async_auth_flow",
             new=fake_parent_flow,
         ), patch("tools.mcp_oauth_manager.get_manager", return_value=manager):

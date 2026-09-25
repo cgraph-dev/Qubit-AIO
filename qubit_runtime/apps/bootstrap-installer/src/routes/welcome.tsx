@@ -31,9 +31,9 @@ export default function Welcome() {
           }
         >
           <span>
-            <span>QUBIT AGENT</span>
+            <span>HERMES AGENT</span>
           </span>
-          <span aria-hidden="true">QUBIT AGENT</span>
+          <span aria-hidden="true">HERMES AGENT</span>
         </p>
 
         <p className="m-0 text-center text-base leading-normal tracking-tight text-muted-foreground">

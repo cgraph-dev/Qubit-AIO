@@ -61,16 +61,16 @@ def _run_script_job(home: WinHome, script: str, env_extra: dict[str, str] | None
     job_id = match.group(1)
     ran = hermes(home, "cron", "run", job_id, cwd=home.profile, env_extra=env_extra)
     assert ran.returncode == 0 and "Ran now:" in ran.stdout, f"job did not run synchronously:\n{ran.tail()}"
-    jobs = json.loads((home.hermes_home / "cron" / "jobs.json").read_text(encoding="utf-8"))["jobs"]
+    jobs = json.loads((home.qubit_home / "cron" / "jobs.json").read_text(encoding="utf-8"))["jobs"]
     job = next(j for j in jobs if j["id"] == job_id)
-    outputs = sorted((home.hermes_home / "cron" / "output" / job_id).glob("*.md"))
+    outputs = sorted((home.qubit_home / "cron" / "output" / job_id).glob("*.md"))
     return job, outputs[-1].read_text(encoding="utf-8") if outputs else ""
 
 
 def test_python_script_job_delivers_stdout(tmp_path: Path) -> None:
     marker = nonce("PYJOB")
     home = make_home(tmp_path, "http://127.0.0.1:9/v1")  # no-agent: the model is never called
-    scripts = home.hermes_home / "scripts"
+    scripts = home.qubit_home / "scripts"
     scripts.mkdir(parents=True)
     (scripts / "report.py").write_text(f"import sys\nprint('{marker}', sys.platform)\n", encoding="utf-8")
     job, output = _run_script_job(home, "report.py")
@@ -83,7 +83,7 @@ def test_sh_script_job_runs_under_git_bash(tmp_path: Path) -> None:
     assert git_bash.is_file(), f"precondition: Git for Windows installed at {git_bash}"
     marker = nonce("SHJOB")
     home = make_home(tmp_path, "http://127.0.0.1:9/v1")
-    scripts = home.hermes_home / "scripts"
+    scripts = home.qubit_home / "scripts"
     scripts.mkdir(parents=True)
     (scripts / "report.sh").write_bytes(f'#!/usr/bin/env bash\necho "{marker}" "$(uname -s)"\n'.encode())
     native_path = _native_process_path()

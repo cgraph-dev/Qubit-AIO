@@ -24,7 +24,7 @@ from agent.skill_utils import (
 
 
 @pytest.fixture
-def qubit_home_with_config(tmp_path, monkeypatch):
+def hermes_home_with_config(tmp_path, monkeypatch):
     """Isolated ``~/.hermes/`` with a config.yaml referencing one external dir."""
     home = tmp_path / ".hermes"
     home.mkdir()
@@ -50,9 +50,9 @@ def qubit_home_with_config(tmp_path, monkeypatch):
 
 
 
-def test_cache_invalidates_on_mtime_change(qubit_home_with_config):
+def test_cache_invalidates_on_mtime_change(hermes_home_with_config):
     """A config.yaml edit invalidates the cache on the next call."""
-    _home, external, config = qubit_home_with_config
+    _home, external, config = hermes_home_with_config
     other = external.parent / "other_skills"
     other.mkdir()
 

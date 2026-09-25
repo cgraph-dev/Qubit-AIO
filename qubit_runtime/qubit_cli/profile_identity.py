@@ -5,7 +5,7 @@ directory, but several identities are derived from the old name or absolute path
 ``agent:<old>:*`` session-key namespaces (routing index + the profile's own ``sessions`` rows),
 ``sessions.profile_name``, ``gateway_heartbeats.profile``, ``delivery_obligations``, and checkpoint
 project refs/metadata/ledgers keyed by the absolute workdir path. Left alone, routing resolves to a
-profile that no longer exists and profile-local ``/rollback`` history disappears under the new path.
+profile that no longer exists and profile-local `/rollback` history disappears under the new path.
 
 The same identity has to be *purged* when a profile is deleted — the mirror image of the rekey,
 and ``delete_profile`` calls :func:`purge_profile_identity` for it.

@@ -52,7 +52,7 @@ def test_cron_storage_anchors_at_profile_home(tmp_path, monkeypatch):
 
     importlib.reload(jobs)
     try:
-        assert jobs.QUBIT_DIR.resolve() == profile_home.resolve()
+        assert jobs.HERMES_DIR.resolve() == profile_home.resolve()
         assert (
             jobs.JOBS_FILE.resolve()
             == (profile_home / "cron" / "jobs.json").resolve()

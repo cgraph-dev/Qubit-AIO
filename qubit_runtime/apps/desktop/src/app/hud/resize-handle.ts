@@ -155,7 +155,7 @@ export function useHudResizeHandle(): {
       const dx = event.screenX - state.startX
       const dy = event.screenY - state.startY
 
-      window.qubitDesktop?.hud?.setBounds?.(
+      window.hermesDesktop?.hud?.setBounds?.(
         hudResizeBounds(
           { x: state.originX, y: state.originY, width: state.originW, height: state.originH },
           state.direction,

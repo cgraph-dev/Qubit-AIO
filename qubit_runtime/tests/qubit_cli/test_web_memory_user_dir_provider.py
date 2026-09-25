@@ -45,20 +45,20 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
 
 @pytest.fixture
-def user_dir_honcho(monkeypatch, tmp_path, _isolate_hermes_home):
+def user_dir_honcho(monkeypatch, tmp_path, _isolate_qubit_home):
     """A user-dir ``honcho`` with the bundled copy gone: empty bundled root and the bundled
     module path blocked, the way a post-removal core + a catalog install look."""
     import plugins.memory as memory_pkg
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
 
-    plugin_dir = get_hermes_home() / "plugins" / "honcho"
+    plugin_dir = get_qubit_home() / "plugins" / "honcho"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "__init__.py").write_text(
         '"""fake provider: register_memory_provider"""\nfrom .client import resolve_active_host\n', encoding="utf-8"
     )
     for stem, source in (("client", _CLIENT), ("oauth_flow", _OAUTH_FLOW), ("config_schema", _CONFIG_SCHEMA)):
         (plugin_dir / f"{stem}.py").write_text(textwrap.dedent(source), encoding="utf-8")
-    (get_hermes_home() / "honcho.json").write_text(
+    (get_qubit_home() / "honcho.json").write_text(
         json.dumps({"hosts": {"hermes": {"workspace": "from-user-dir"}}}), encoding="utf-8"
     )
 

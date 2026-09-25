@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@qubit/ink": ["src/types/qubit-ink.d.ts"]
+      "@hermes/ink": ["src/types/hermes-ink.d.ts"]
     }
   }
 }

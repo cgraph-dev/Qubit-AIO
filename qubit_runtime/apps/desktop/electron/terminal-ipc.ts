@@ -31,6 +31,21 @@ export interface TerminalIpcApi {
   disposeAllTerminalSessions: () => void
 }
 
+// macOS accepts the bare charset name "UTF-8" as a locale; glibc does not, so
+// every Linux pane would print `bash: warning: setlocale: LC_CTYPE: cannot
+// change locale (UTF-8)`. Reuse the user's LANG there, else the glibc-guaranteed
+// C.UTF-8. Pure: the platform arrives as data so tests need not fake the host.
+export function terminalLcCtype(
+  env: { LANG?: string; LC_CTYPE?: string },
+  platform: NodeJS.Platform = process.platform
+): string {
+  if (env.LC_CTYPE) {
+    return env.LC_CTYPE
+  }
+
+  return platform === 'darwin' ? 'UTF-8' : env.LANG || 'C.UTF-8'
+}
+
 export function registerTerminalIpc({
   isWindows,
   findOnPath,
@@ -105,7 +120,7 @@ export function registerTerminalIpc({
     // name on PATH); $SHELL is honored on POSIX, where it's the user's canonical
     // choice, but ignored on Windows, where it's usually a stray MSYS/Git path
     // node-pty can't spawn natively.
-    const override = (process.env.QUBIT_DESKTOP_SHELL || (isWindows ? '' : process.env.SHELL) || '').trim()
+    const override = (process.env.HERMES_DESKTOP_SHELL || (isWindows ? '' : process.env.SHELL) || '').trim()
 
     if (override) {
       const resolved = isExecutableFile(override) ? override : findOnPath(override)
@@ -149,22 +164,22 @@ export function registerTerminalIpc({
 
     // Strip color/theme-detection vars that ride along when Electron is launched
     // from a non-tty agent shell (Cursor's runner sets NO_COLOR/FORCE_COLOR=0
-    // /TERM=dumb; some terminals set COLORFGBG which would flip Qubit' TUI into
+    // /TERM=dumb; some terminals set COLORFGBG which would flip Hermes' TUI into
     // light-mode). Our PTY is a real xterm-compat terminal — force truecolor.
     delete env.NO_COLOR
     delete env.FORCE_COLOR
     delete env.COLORFGBG
 
     env.COLORTERM = 'truecolor'
-    env.LC_CTYPE = env.LC_CTYPE || 'UTF-8'
+    env.LC_CTYPE = terminalLcCtype(env)
     env.TERM = 'xterm-256color'
-    env.TERM_PROGRAM = 'Qubit'
+    env.TERM_PROGRAM = 'Hermes'
     env.TERM_PROGRAM_VERSION = app.getVersion()
 
-    // Let a qubit/--tui launched in this pane know it's embedded in the desktop
+    // Let a hermes/--tui launched in this pane know it's embedded in the desktop
     // GUI (build_environment_hints surfaces this). Distinct from HERMES_DESKTOP,
     // which marks the agent *backend* and gates cron/gateway behavior.
-    env.QUBIT_DESKTOP_TERMINAL = '1'
+    env.HERMES_DESKTOP_TERMINAL = '1'
 
     return env
   }

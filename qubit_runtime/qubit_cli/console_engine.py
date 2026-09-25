@@ -39,7 +39,7 @@ class ConsoleCommand:
     path: tuple[str, ...]
     usage: str
     summary: str
-    handler: Callable[["QubitConsoleEngine", list[str]], str]
+    handler: Callable[["HermesConsoleEngine", list[str]], str]
     mutating: bool = False
     confirmation: str = ""
 
@@ -200,7 +200,7 @@ class _CliSurface:
 
     def build(self, root: str, *, live: bool) -> _ArgumentParser:
         """Build a throwaway parser; ``live=False`` wires no-op handlers (summary extraction)."""
-        parser = _ArgumentParser(prog="qubit", add_help=False)
+        parser = _ArgumentParser(prog="hermes", add_help=False)
         subparsers = parser.add_subparsers(dest="_console_command")
         module = importlib.import_module(self.module)
         entry = getattr(module, self.builder)
@@ -335,14 +335,14 @@ _SEND_SURFACE = _CliSurface("adder", "qubit_cli.send_cmd", "register_send_subpar
 
 
 def _register_command_family(
-    engine: "QubitConsoleEngine", root: str, surface: _CliSurface, paths: str) -> None:
+    engine: "HermesConsoleEngine", root: str, surface: _CliSurface, paths: str) -> None:
     summaries = _surface_summaries(surface, root)
     namespace_update = _apply_confirmed_defaults if surface.kind in _CONFIRMED_KINDS else None
     for child_path, mutating in _paths(paths):
         full_path = (root, *child_path)
         usage = " ".join(full_path)
 
-        def handler(_engine: QubitConsoleEngine, args: list[str], fixed=child_path) -> str:
+        def handler(_engine: HermesConsoleEngine, args: list[str], fixed=child_path) -> str:
             return _dispatch(surface, root, fixed, args, namespace_update)
 
         engine.register(
@@ -375,7 +375,7 @@ _BLOCKED_PAIRS = {
 }
 
 
-class QubitConsoleEngine:
+class HermesConsoleEngine:
     """Curated line-command executor for Qubit Console."""
 
     def __init__(self, *, output_limit: int = 20000):
@@ -441,7 +441,7 @@ class QubitConsoleEngine:
 
     def register(
         self, path: Iterable[str], usage: str, summary: str,
-        handler: Callable[["QubitConsoleEngine", list[str]], str], *,
+        handler: Callable[["HermesConsoleEngine", list[str]], str], *,
         mutating: bool = False, confirmation: str = "") -> None:
         key = tuple(path)
         self.commands[key] = ConsoleCommand(key, usage, summary, handler, mutating, confirmation)
@@ -507,14 +507,14 @@ def _parse(prog: str, args: Sequence[str], *specs) -> argparse.Namespace:
 def _captured(fn):
     """Handler decorator: run ``fn(engine, args)`` under ``_capture_output`` and return its text."""
     @functools.wraps(fn)
-    def wrapper(engine: QubitConsoleEngine, args: list[str]) -> str:
+    def wrapper(engine: HermesConsoleEngine, args: list[str]) -> str:
         return _capture_output(lambda: fn(engine, args))
     return wrapper
 
 
 def _simple_command(usage: str, module: str, name: str, make_args=lambda: (), **kwargs):
     """Handler for no-arg commands that capture ``module.name(*make_args(), **kwargs)``."""
-    def handler(_engine: QubitConsoleEngine, args: list[str]) -> str:
+    def handler(_engine: HermesConsoleEngine, args: list[str]) -> str:
         _expect_no_args(args, usage)
         fn = getattr(importlib.import_module(module), name)
         return _capture_output(lambda: fn(*make_args(), **kwargs))
@@ -553,7 +553,7 @@ _version = _simple_command(
     "version", "qubit_cli._startup_fast", "print_fast_version_info", check_updates=True)
 
 
-def _status(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _status(_engine: HermesConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "status")
     from qubit_cli.status import show_status
     output = _capture_output(lambda: show_status(SimpleNamespace(all=False, deep=False)))
@@ -566,7 +566,7 @@ _config_show = _simple_command("config show", "qubit_cli.config", "show_config")
 _cron_status = _simple_command("cron status", "qubit_cli.cron", "cron_status")
 
 
-def _logs(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _logs(_engine: HermesConsoleEngine, args: list[str]) -> str:
     if "-f" in args or "--follow" in args:
         raise ConsoleCommandError("`logs -f` is not available in Qubit Console.")
     ns = _parse(
@@ -584,27 +584,34 @@ def _logs(_engine: QubitConsoleEngine, args: list[str]) -> str:
             session=ns.session, since=ns.since, component=ns.component))
 
 
-def _session_db():
-    """``with _session_db() as db:`` — SessionDB closed on exit."""
+def _session_db(*, read_only: bool = True):
+    """``with _session_db() as db:`` — SessionDB closed on exit.
+
+    The console runs inside the dashboard process, which already owns a handle on state.db;
+    reads attach ``read_only`` so they never add a writer connection beside it (#100896).
+    Mutating commands pass ``read_only=False``.
+    """
     from qubit_state import SessionDB
-    return closing(SessionDB())
+    return closing(SessionDB(read_only=read_only))
 
 
-def _sessions_list(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _sessions_list(_engine: HermesConsoleEngine, args: list[str]) -> str:
     ns = _parse("sessions list", args, (("--limit",), dict(type=int, default=20)))
     if ns.limit < 1 or ns.limit > 200:
         raise ConsoleCommandError("sessions list --limit must be between 1 and 200")
+    from qubit_state_sessions import INTERNAL_LISTING_SOURCES
     with _session_db() as db:
         sessions = db.list_sessions_rich(
-            exclude_sources=["kanban", "tool"], limit=ns.limit, order_by_last_active=True)
+            exclude_sources=list(INTERNAL_LISTING_SOURCES), limit=ns.limit, order_by_last_active=True)
     return _format_sessions(sessions)
 
 
-def _sessions_stats(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _sessions_stats(_engine: HermesConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "sessions stats")
+    from qubit_state_sessions import INTERNAL_LISTING_SOURCES
     with _session_db() as db:
         total = db.session_count()
-        listable = db.session_count(exclude_children=True, exclude_sources=["kanban", "tool"])
+        listable = db.session_count(exclude_children=True, exclude_sources=list(INTERNAL_LISTING_SOURCES))
         lines = [
             f"Total sessions: {total}",
             f"Listable sessions: {listable}",
@@ -616,13 +623,13 @@ def _sessions_stats(_engine: QubitConsoleEngine, args: list[str]) -> str:
         return "\n".join(lines)
 
 
-def _config_path(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _config_path(_engine: HermesConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "config path")
     from qubit_cli.config import get_config_path
     return str(get_config_path())
 
 
-def _config_set(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _config_set(_engine: HermesConsoleEngine, args: list[str]) -> str:
     if len(args) < 2:
         raise ConsoleCommandError("Usage: config set <key> <value>")
     from qubit_cli.config import set_config_value
@@ -630,7 +637,7 @@ def _config_set(_engine: QubitConsoleEngine, args: list[str]) -> str:
 
 
 @_captured
-def _config_migrate(_engine: QubitConsoleEngine, args: list[str]) -> None:
+def _config_migrate(_engine: HermesConsoleEngine, args: list[str]) -> None:
     _expect_no_args(args, "config migrate")
     from qubit_cli.config import migrate_config
     results = migrate_config(interactive=False, quiet=False)
@@ -661,7 +668,7 @@ def _guard_exports(db, session_ids: list[str]) -> None:
 
 
 @_captured
-def _sessions_export(_engine: QubitConsoleEngine, args: list[str]) -> None:
+def _sessions_export(_engine: HermesConsoleEngine, args: list[str]) -> None:
     ns = _parse("sessions export", args, "output", "--source", "--session-id")
     with _session_db() as db:
         if ns.session_id:
@@ -687,9 +694,9 @@ def _sessions_export(_engine: QubitConsoleEngine, args: list[str]) -> None:
 
 
 @_captured
-def _sessions_rename(_engine: QubitConsoleEngine, args: list[str]) -> None:
+def _sessions_rename(_engine: HermesConsoleEngine, args: list[str]) -> None:
     ns = _parse("sessions rename", args, "session_id", (("title",), dict(nargs="+")))
-    with _session_db() as db:
+    with _session_db(read_only=False) as db:
         resolved_session_id = db.resolve_session_id(ns.session_id)
         title = " ".join(ns.title)
         if not resolved_session_id or not db.set_session_title(resolved_session_id, title):
@@ -698,14 +705,21 @@ def _sessions_rename(_engine: QubitConsoleEngine, args: list[str]) -> None:
 
 
 @_captured
-def _sessions_optimize(_engine: QubitConsoleEngine, args: list[str]) -> None:
-    _expect_no_args(args, "sessions optimize")
-    with _session_db() as db:
+def _sessions_optimize(_engine: HermesConsoleEngine, args: list[str]) -> None:
+    # --force is parsed HERE: the refusal below points at it, and a hint the surface cannot
+    # accept would make this command refuse forever whenever a gateway is running.
+    ns = _parse("sessions optimize", args, (("--force",), dict(action="store_true")))
+    with _session_db(read_only=False) as db:
+        from qubit_state_holders import held_store_refusal
+        refusal = None if ns.force else held_store_refusal(
+            db.db_path, command="optimize", force_hint="`sessions optimize --force`")
+        if refusal:
+            raise ConsoleCommandError(refusal)
         print(f"Optimized {db.vacuum()} FTS index(es).")
 
 
 @_captured
-def _sessions_repair(_engine: QubitConsoleEngine, args: list[str]) -> None:
+def _sessions_repair(_engine: HermesConsoleEngine, args: list[str]) -> int | None:
     ns = _parse(
         "sessions repair", args, (("--check-only",), dict(action="store_true")),
         (("--no-backup",), dict(action="store_true")))
@@ -721,7 +735,7 @@ def _sessions_repair(_engine: QubitConsoleEngine, args: list[str]) -> None:
         return
     print(f"{db_path} does not open cleanly: {reason}")
     if ns.check_only:
-        return
+        return 1  # _capture_output turns a non-zero status into a ConsoleCommandError carrying the printed reason
     report = repair_state_db_schema(db_path, backup=not ns.no_backup)
     if not report.get("repaired"):
         raise ConsoleCommandError(f"Repair failed: {report.get('error')}")
@@ -731,12 +745,12 @@ def _sessions_repair(_engine: QubitConsoleEngine, args: list[str]) -> None:
     print("Repaired session database.")
 
 
-def _profile_status(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _profile_status(_engine: HermesConsoleEngine, args: list[str]) -> str:
     _expect_no_args(args, "profile")
     return _dispatch(_CLI_FAMILIES["profile"][0], "profile", (), ())
 
 
-def _cron_list(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _cron_list(_engine: HermesConsoleEngine, args: list[str]) -> str:
     ns = _parse("cron list", args, (("--all",), dict(action="store_true")))
     from qubit_cli.cron import cron_list
     return _capture_output(lambda: cron_list(show_all=ns.all))
@@ -756,14 +770,14 @@ def _cron_job_action(args: list[str], usage: str, action: str, run) -> str:
     return _format_job(job, action)
 
 
-def _cron_pause(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _cron_pause(_engine: HermesConsoleEngine, args: list[str]) -> str:
     from cron.jobs import pause_job
     return _cron_job_action(
         args, "cron pause <job>", "Paused",
         lambda ref: pause_job(ref, reason="paused from qubit console"))
 
 
-def _cron_resume(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _cron_resume(_engine: HermesConsoleEngine, args: list[str]) -> str:
     ns = _parse("cron resume", args, "job", "--at", (("--run-now",), dict(action="store_true")))
     if ns.at and ns.run_now:
         raise ConsoleCommandError("Use exactly one of --at or --run-now.")
@@ -779,7 +793,7 @@ def _cron_resume(_engine: QubitConsoleEngine, args: list[str]) -> str:
     return _format_job(job, "Resumed")
 
 
-def _cron_run(_engine: QubitConsoleEngine, args: list[str]) -> str:
+def _cron_run(_engine: HermesConsoleEngine, args: list[str]) -> str:
     from cron.jobs import trigger_job
     return _cron_job_action(args, "cron run <job>", "Triggered", trigger_job)
 
@@ -813,7 +827,7 @@ _BUILTIN_COMMANDS = (
      "Export sessions to JSONL.", _sessions_export, "Export session data?"),
     (("sessions", "rename"), "sessions rename <session> <title>", "Rename a session.",
      _sessions_rename, "Rename this session?"),
-    (("sessions", "optimize"), "sessions optimize", "Optimize the session store.",
+    (("sessions", "optimize"), "sessions optimize [--force]", "Optimize the session store.",
      _sessions_optimize, "Optimize the session database?"),
     (("sessions", "repair"), "sessions repair [--check-only] [--no-backup]",
      "Repair a malformed session database schema.", _sessions_repair,
@@ -826,7 +840,7 @@ def run_console_repl(
     stdin, stdout, stderr = stdin or sys.stdin, stdout or sys.stdout, stderr or sys.stderr
     if interactive is None:
         interactive = bool(getattr(stdin, "isatty", lambda: False)())
-    engine = QubitConsoleEngine()
+    engine = HermesConsoleEngine()
 
     def say(text: str, **kw) -> None:
         if interactive:

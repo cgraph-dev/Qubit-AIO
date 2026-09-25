@@ -14,8 +14,8 @@ Pixel art w/ era palettes (NES, Game Boy, PICO-8).
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/creative/pixel-art` |
-| Path | `optional-skills/creative\pixel-art` |
+| Source | Optional — install with `hermes skills install official/creative/pixel-art` |
+| Path | `optional-skills/creative/pixel-art` |
 | Version | `2.0.0` |
 | Author | dodo-reach |
 | License | MIT |
@@ -25,7 +25,7 @@ Pixel art w/ era palettes (NES, Game Boy, PICO-8).
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Pixel Art
@@ -157,12 +157,13 @@ from pixel_art import pixel_art
 from pixel_art_video import pixel_art_video
 
 # 1. Convert to pixel art
-pixel_art("/path/to/photo.jpg", "/tmp/pixel.png", preset="nes")
+out = os.path.expanduser("~/.hermes/cache/scratch")
+pixel_art("/path/to/photo.jpg", f"{out}/pixel.png", preset="nes")
 
 # 2. Animate (optional)
 pixel_art_video(
-    "/tmp/pixel.png",
-    "/tmp/pixel.mp4",
+    f"{out}/pixel.png",
+    f"{out}/pixel.mp4",
     scene="night",
     duration=6,
     fps=15,
@@ -205,7 +206,7 @@ Quantizing before would waste error-diffusion on detail that disappears.
 
 - Python 3.9+
 - Pillow (`pip install Pillow`)
-- ffmpeg on PATH (only needed for video — Qubit installs package this)
+- ffmpeg on PATH (only needed for video — Hermes installs package this)
 
 ## Pitfalls
 

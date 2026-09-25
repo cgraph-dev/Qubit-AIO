@@ -15,13 +15,13 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import type { FrameEvent } from '@qubit/ink'
-import { scrollFastPathStats } from '@qubit/ink'
+import type { FrameEvent } from '@hermes/ink'
+import { scrollFastPathStats } from '@hermes/ink'
 import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 
-const ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.QUBIT_DEV_PERF ?? '').trim())
-const THRESHOLD_MS = Number(process.env.QUBIT_DEV_PERF_MS ?? '2') || 0
-const LOG_PATH = process.env.QUBIT_DEV_PERF_LOG?.trim() || join(homedir(), '.hermes', 'perf.log')
+const ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.HERMES_DEV_PERF ?? '').trim())
+const THRESHOLD_MS = Number(process.env.HERMES_DEV_PERF_MS ?? '2') || 0
+const LOG_PATH = process.env.HERMES_DEV_PERF_LOG?.trim() || join(homedir(), '.hermes', 'perf.log')
 
 let logReady = false
 

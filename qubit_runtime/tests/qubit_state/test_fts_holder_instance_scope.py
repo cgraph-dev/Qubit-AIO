@@ -5,7 +5,7 @@ Hermes instances: a main gateway (user ``ubuntu``,
 QUBIT_HOME=/home/ubuntu/.hermes) and a demo gateway (user ``demo``,
 QUBIT_HOME=/home/demo/.hermes).  The demo gateway runs as another user, so
 its ``/proc/<pid>/fd`` table is unreadable from the main instance and the
-holder scan falls back to ``/proc/<pid>/cmdline`` + ``_looks_like_qubit``.
+holder scan falls back to ``/proc/<pid>/cmdline`` + ``_looks_like_hermes``.
 The demo process's argv matches the Hermes patterns exactly, so the fallback
 flagged it as an uninspectable holder of the MAIN instance's state.db even
 though ``lsof`` proved zero open handles on it.  Consequence: the stale-FTS
@@ -107,7 +107,7 @@ def _install_fake_argv(monkeypatch, argv_by_pid):
     )
 
 
-@pytest.mark.linux_only
+@pytest.mark.platforms("linux")
 class TestUninspectableHolderInstanceScope:
     def test_other_instance_argv_is_not_a_holder_of_our_db(self, tmp_path, monkeypatch):
         """RED: fd dir unreadable + argv proves the process belongs to a
@@ -132,7 +132,7 @@ class TestUninspectableHolderInstanceScope:
             ["hermes", "checkpoint", f"{db_path}-wal"],
             ["hermes", "--home", our_home, "gateway"],
         ):
-            assert qubit_state_holders._looks_like_qubit(argv) or argv[0] == "hermes"
+            assert qubit_state_holders._looks_like_hermes(argv) or argv[0] == "hermes"
             _install_fake_proc(monkeypatch, tmp_path, unreadable_pids=(222,))
             _install_fake_argv(monkeypatch, {222: argv})
 
@@ -203,7 +203,7 @@ class TestUninspectableHolderInstanceScope:
             _install_fake_argv(monkeypatch, {222: argv})
             assert qubit_state_holders.foreign_state_db_holders(db_path) == [], argv
 
-    def test_unrelated_install_under_a_non_hermes_profiles_tree_stays_dismissed(
+    def test_unrelated_install_under_a_non_qubit_profiles_tree_stays_dismissed(
         self, tmp_path, monkeypatch
     ):
         """``<X>/profiles/<n>/state.db`` does not make all of ``<X>`` ours.

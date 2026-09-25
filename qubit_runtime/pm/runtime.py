@@ -20,13 +20,13 @@ from pm.package import InstallError
 
 def runtime_environment() -> dict[str, str]:
     """Do not let an activated application or a uv caller select PM's imports."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from pm.paths import store_root
 
     from pm.environment import _base_environment
 
     env = _base_environment()
-    env["QUBIT_HOME"] = str(get_hermes_home())
+    env["QUBIT_HOME"] = str(get_qubit_home())
     env["HERMES_RUNTIME_DIR"] = str(store_root())
     return env
 

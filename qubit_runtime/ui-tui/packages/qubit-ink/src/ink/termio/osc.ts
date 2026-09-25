@@ -85,9 +85,9 @@ export function getClipboardPath(): ClipboardPath {
 
 export function shouldEmitClipboardSequence(env: NodeJS.ProcessEnv = process.env): boolean {
   const override = (
-    env.QUBIT_TUI_FORCE_OSC52 ??
-    env.QUBIT_TUI_CLIPBOARD_OSC52 ??
-    env.QUBIT_TUI_COPY_OSC52 ??
+    env.HERMES_TUI_FORCE_OSC52 ??
+    env.HERMES_TUI_CLIPBOARD_OSC52 ??
+    env.HERMES_TUI_COPY_OSC52 ??
     ''
   ).trim()
 

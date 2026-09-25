@@ -2,7 +2,7 @@
 versioned JSON verbs (``identify``, ``status``). A connectable socket with a well-formed ``identify``
 answer IS liveness — no PID-reuse heuristics. Never a TCP port: filesystem/pipe ACLs are the auth
 boundary. POSIX: ``$QUBIT_HOME/gateway.sock`` (or a temp-dir socket + ``gateway.sock.path`` pointer
-file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\qubit-gateway-<hash>``.
+file when the home path exceeds ``sun_path``); Windows: named pipe ``\\\\.\\pipe\\hermes-gateway-<hash>``.
 Wire contract: ONE request per connection — one JSON line in, one out, then the server closes.
 Consumers PREFER the socket and fall back to the state-file/scan layer when it doesn't answer.
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -25,11 +26,6 @@ from typing import Any, Callable, Optional
 logger = logging.getLogger(__name__)
 
 CONTROL_PROTOCOL_VERSION = 1
-# N26: the Qubit-owned Windows pipe prefix. ``_LEGACY_PIPE_PREFIX`` is the
-# pre-de-brand name; clients still try it so a daemon started before the rename
-# remains reachable (read-old/write-new).
-_PIPE_PREFIX = "qubit-gateway"
-_LEGACY_PIPE_PREFIX = "hermes-gateway"
 _SOCKET_FILENAME = "gateway.sock"
 _POINTER_FILENAME = "gateway.sock.path"
 _IS_WINDOWS = sys.platform == "win32"
@@ -46,12 +42,7 @@ def _home_hash(home: Path) -> str:
 
 def windows_pipe_name(home: Path) -> str:
     """Per-QUBIT_HOME named pipe path (Windows transport)."""
-    return rf"\\.\pipe\{_PIPE_PREFIX}-{_home_hash(home)}"
-
-
-def _legacy_windows_pipe_name(home: Path) -> str:
-    """Pre-de-brand pipe name, tried only as a fallback for an older daemon."""
-    return rf"\\.\pipe\{_LEGACY_PIPE_PREFIX}-{_home_hash(home)}"
+    return rf"\\.\pipe\hermes-gateway-{_home_hash(home)}"
 
 
 def _fits_sun_path(path: Path) -> bool:
@@ -63,7 +54,7 @@ def _fallback_socket_path(home: Path) -> Path:
     then ``/tmp`` (POSIX); if nothing fits the tempdir candidate is returned anyway — bind fails
     non-fatally and consumers use the scan layer."""
     name = f"hermes-gw-{_home_hash(home)}.sock"
-    candidates = [Path(tempfile.gettempdir()) / name] + ([] if _IS_WINDOWS else [Path("/tmp") / name])
+    candidates = [Path(tempfile.gettempdir()) / name] + ([] if _IS_WINDOWS else [Path("/tmp") / name])  # no-tmp: ok — AF_UNIX 104-byte path limit needs the short /tmp candidate
     return next((c for c in candidates if _fits_sun_path(c)), candidates[0])
 
 
@@ -80,7 +71,7 @@ def resolve_client_socket_path(home: Path) -> Optional[Path]:
         return direct
     with contextlib.suppress(OSError):
         pointer = Path(home) / _POINTER_FILENAME
-        target = pointer.read_text(encoding="utf-8").strip() if pointer.is_file() else ""
+        target = pointer.read_text(encoding="utf-8-sig").strip() if pointer.is_file() else ""
         if target and Path(target).exists():
             return Path(target)
     return None
@@ -96,8 +87,8 @@ def _detect_supervisor() -> str:
     env = os.environ
     if env.get("INVOCATION_ID"):
         return "systemd"
-    if sys.platform == "darwin" and (env.get("XPC_SERVICE_NAME", "").startswith("ai.hermes")
-                                     or env.get("LAUNCHD_SOCKET")):
+    from gateway.restart import launchd_job_label
+    if sys.platform == "darwin" and (launchd_job_label(env) or env.get("LAUNCHD_SOCKET")):
         return "launchd"
     if env.get("HERMES_DESKTOP_MANAGED"):
         return "desktop"
@@ -106,16 +97,12 @@ def _detect_supervisor() -> str:
 
 def build_identify_payload() -> dict[str, Any]:
     """Default ``identify`` answer, built from gateway.status primitives."""
-    from gateway.status import (_build_pid_record, _get_code_identity_fields,
-                                _profile_label_for_home, read_runtime_status,
-                                record_home)
+    from gateway.status import _build_pid_record, _get_code_identity_fields, _profile_label_for_home, read_runtime_status
     record = _build_pid_record()
-    home = record_home(record)
     payload: dict[str, Any] = {
         "protocol": CONTROL_PROTOCOL_VERSION,
-        **{k: record.get(k) for k in ("kind", "pid", "start_time")},
-        "qubit_home": home,
-        "profile": _profile_label_for_home(home or ""),
+        **{k: record.get(k) for k in ("kind", "pid", "start_time", "hermes_home")},
+        "profile": _profile_label_for_home(record.get("hermes_home") or ""),
         "supervisor": _detect_supervisor(), **_get_code_identity_fields()}
     with contextlib.suppress(Exception):
         # served_profiles (multiplex mode) is stamped into runtime status by the runner.
@@ -138,7 +125,7 @@ class GatewayControlServer:
     because its control socket couldn't bind; consumers fall back to the scan layer."""
 
     def __init__(self, home: Optional[Path] = None, *,
-                 verb_handlers: Optional[dict[str, Callable[[], dict[str, Any]]]] = None) -> None:
+                 verb_handlers: Optional[dict[str, Callable[..., dict[str, Any]]]] = None) -> None:
         if home is None:
             from gateway.status import _get_process_qubit_home
             home = _get_process_qubit_home()
@@ -147,7 +134,7 @@ class GatewayControlServer:
         self._pipe_server: Any = None  # Windows proactor pipe server
         self._bind_path: Optional[Path] = None
         self._pointer_file: Optional[Path] = None
-        self._handlers: dict[str, Callable[[], dict[str, Any]]] = {
+        self._handlers: dict[str, Callable[..., dict[str, Any]]] = {
             "identify": build_identify_payload, "status": build_status_payload, **(verb_handlers or {})}
 
     async def start(self) -> bool:
@@ -224,7 +211,12 @@ class GatewayControlServer:
                 response: dict[str, Any] = {"ok": False, "error": f"unknown verb: {verb!r}",
                                             "protocol": CONTROL_PROTOCOL_VERSION, "supported_verbs": sorted(self._handlers)}
             else:
-                response = {"ok": True, "protocol": CONTROL_PROTOCOL_VERSION, "result": handler()}
+                # Verbs that carry arguments (e.g. migrate-profile-identity) declare a ``params``
+                # parameter; argument-less verbs (identify/status/rescan) keep their bare signature.
+                params = request.get("params") if isinstance(request.get("params"), dict) else {}
+                wants_params = "params" in inspect.signature(handler).parameters
+                response = {"ok": True, "protocol": CONTROL_PROTOCOL_VERSION,
+                            "result": handler(params) if wants_params else handler()}
         except Exception as exc:
             response = {"ok": False, "error": f"{type(exc).__name__}: {exc}", "protocol": CONTROL_PROTOCOL_VERSION}
         if request_id is not None:
@@ -278,11 +270,15 @@ class _PipeControlProtocol(asyncio.Protocol):
                 self._transport.close()
 
 
-def query_gateway_control(home: Path, verb: str, *, timeout: float = _DEFAULT_CLIENT_TIMEOUT) -> Optional[dict[str, Any]]:
+def query_gateway_control(home: Path, verb: str, *, params: Optional[dict[str, Any]] = None,
+                          timeout: float = _DEFAULT_CLIENT_TIMEOUT) -> Optional[dict[str, Any]]:
     """Ask the gateway serving ``home`` a control verb; returns its ``result`` payload. Any failure (no/stale
     socket, timeout, malformed answer, ``ok: false``) returns None so callers fall back to the scan layer.
-    Never raises."""
-    request = json.dumps({"verb": verb, "id": 1, "protocol": CONTROL_PROTOCOL_VERSION}).encode("utf-8") + b"\n"
+    ``params`` carries verb arguments (e.g. ``{"old": ..., "new": ...}``). Never raises."""
+    payload: dict[str, Any] = {"verb": verb, "id": 1, "protocol": CONTROL_PROTOCOL_VERSION}
+    if params:
+        payload["params"] = params
+    request = json.dumps(payload).encode("utf-8") + b"\n"
     query = _query_windows_pipe if _IS_WINDOWS else _query_unix_socket
     try:
         raw = query(Path(home), request, timeout)
@@ -320,18 +316,8 @@ def _query_unix_socket(home: Path, request: bytes, timeout: float) -> Optional[b
 
 
 def _query_windows_pipe(home: Path, request: bytes, timeout: float) -> Optional[bytes]:  # pragma: no cover - wine2e lane
-    # New pipe name first; fall back to the pre-de-brand prefix so a client can
-    # still reach a daemon started before the rename.
+    pipe_name = windows_pipe_name(home)
     deadline = time.monotonic() + timeout
-    for pipe_name in (windows_pipe_name(home), _legacy_windows_pipe_name(home)):
-        raw = _query_windows_pipe_named(pipe_name, request, deadline)
-        if raw is not None:
-            return raw
-    return None
-
-
-def _query_windows_pipe_named(pipe_name: str, request: bytes,
-                              deadline: float) -> Optional[bytes]:  # pragma: no cover - wine2e lane
     handle = None
     while handle is None:
         try:
@@ -364,3 +350,50 @@ def pause_gateway_for_update(home: Path, *, timeout: float = _DEFAULT_CLIENT_TIM
     Step 2 of the socket migration (#92091).
     """
     return query_gateway_control(home, "pause-for-update", timeout=timeout)
+
+
+def rescan_gateway_profiles(home: Path, *, timeout: float = 8.0) -> Optional[dict[str, Any]]:
+    """Ask the multiplexer serving ``home`` to reconcile ``profiles/`` now (hot-serve a created profile,
+    unroute a deleted one). Returns its ``{"served_profiles", "added", "removed", ...}`` answer, or None
+    when no gateway answers / the gateway predates the verb — callers then rely on the periodic rescan
+    (or the restart reminder)."""
+    return query_gateway_control(home, "rescan-profiles", timeout=timeout)
+
+
+def request_unserve_profile(home: Path, name: str) -> Optional[dict[str, Any]]:
+    return query_gateway_control(home, "unserve-profile", params={"name": name}, timeout=8.0)
+
+
+def request_serve_profile_hot(home: Path, name: str) -> Optional[dict[str, Any]]:
+    return query_gateway_control(home, "serve-profile", params={"name": name}, timeout=8.0)
+
+
+def migrate_gateway_profile_identity(home: Path, old_name: str, new_name: str, *,
+                                     timeout: float = 8.0) -> Optional[dict[str, Any]]:
+    """Ask the multiplexer serving ``home`` to rekey a renamed profile's in-memory + on-disk routing
+    from ``agent:<old>:`` to ``agent:<new>:`` now. Returns its ``{"rekeyed": N, ...}`` answer, or None
+    when no gateway answers / the gateway predates the verb — the CLI's durable DB rewrite still lands,
+    and a restart reconciles the in-memory copy."""
+    return query_gateway_control(home, "migrate-profile-identity",
+                                 params={"old": old_name, "new": new_name}, timeout=timeout)
+
+
+def purge_gateway_profile_identity(home: Path, name: str, *,
+                                   timeout: float = 8.0) -> Optional[dict[str, Any]]:
+    """Ask the multiplexer serving ``home`` to drop a deleted profile's routing identity now — the
+    in-memory index AND the durable rows, neither of which a CLI-side delete can settle: this process
+    writes its in-memory copy back, so it re-creates what the CLI removed. Returns its
+    ``{"ok": True, "dropped": N, ...}`` answer, or None when no gateway answers / the gateway predates
+    the verb."""
+    return query_gateway_control(home, "purge-profile-identity", params={"name": name}, timeout=timeout)
+
+
+def reload_gateway_plugins(home: Path, *, profile_home: Optional[Path] = None,
+                           timeout: float = 30.0) -> Optional[dict[str, Any]]:
+    """Ask the gateway serving ``home`` to force plugin re-discovery for ``profile_home`` (default: ``home``)
+    and re-wire its live adapters' plugin handlers now (#87770). Returns ``{"reloaded", "plugins",
+    "adapters_rewired", ...}`` or None when no gateway answers / it predates the verb — callers then
+    fall back to the restart hint. Tools and prompt sections of the reloaded plugin still apply next
+    session; only handlers go live."""
+    params = {"home": str(profile_home or home)}
+    return query_gateway_control(home, "reload-plugins", params=params, timeout=timeout)

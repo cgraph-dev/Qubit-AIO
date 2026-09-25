@@ -18,7 +18,7 @@ from qubit_cli import kanban_db as kb
 from qubit_cli import kanban_db_connect as kbc
 from qubit_cli import kanban_db_dispatch as kbd
 from qubit_cli import kanban_db_notify as kbn
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def served(tmp_path, monkeypatch):
     monkeypatch.setenv("TERMINAL_ENV", "docker")
     monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "board.db"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr("qubit_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
     set_multiplex_active(True)
     try:
         yield SimpleNamespace(root=root, alpha=alpha)
@@ -62,7 +62,7 @@ def test_worker_for_served_profile_gets_its_own_env_and_toolset_pin(served, monk
 
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     monkeypatch.setattr(kbd, "_open_worker_log", lambda task, board: open("/dev/null", "w"))
-    monkeypatch.setattr(kbd, "_hermes_argv", lambda: ["hermes"], raising=False)
+    monkeypatch.setattr(kbd, "_qubit_argv", lambda: ["hermes"], raising=False)
     kbd._default_spawn(task, str(served.alpha), board=None)
 
     env = spawned["env"]
@@ -77,7 +77,7 @@ class RecordingAdapter:
 
     async def send(self, chat_id, text, metadata=None):
         from gateway.media_policy import media_delivery_strict
-        self.sent.append({"text": text, "home": str(get_hermes_home()), "strict": media_delivery_strict()})
+        self.sent.append({"text": text, "home": str(get_qubit_home()), "strict": media_delivery_strict()})
         return SimpleNamespace(success=True, error=None)
 
     async def handle_message(self, event):

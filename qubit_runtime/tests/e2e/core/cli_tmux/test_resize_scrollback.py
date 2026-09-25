@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fakes.fake_llm_provider import FakeLLMServer, Text, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, Text, write_qubit_home
 
 pytestmark = pytest.mark.skipif(shutil.which("tmux") is None, reason="needs tmux")
 
@@ -97,7 +97,7 @@ def test_resizes_keep_each_transcript_line_once_in_tmux_scrollback(tmp_path: Pat
         time.sleep(2.0)
 
     with llm:
-        write_hermes_home(home / ".hermes", llm.base_url)
+        write_qubit_home(home / ".hermes", llm.base_url)
         env = {k: v for k, v in os.environ.items() if not k.startswith(("HERMES_", "TMUX"))}
         env.update(HOME=str(home), QUBIT_HOME=str(home / ".hermes"), PYTHONPATH=str(REPO_ROOT),
                    TERM="xterm-256color", PYTHONFAULTHANDLER="1")

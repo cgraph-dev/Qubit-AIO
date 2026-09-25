@@ -150,9 +150,9 @@ export function signInFailureKind(reason: null | string | undefined): FreeTierSi
 // when the bridge isn't there (dev preview, tests) so the flow never strands in
 // a waiting state. Same contract as the onboarding store's opener.
 async function openSignInUrl(url: string) {
-  if (window.qubitDesktop?.openExternal) {
+  if (window.hermesDesktop?.openExternal) {
     try {
-      await window.qubitDesktop.openExternal(url)
+      await window.hermesDesktop.openExternal(url)
 
       return
     } catch {
@@ -164,7 +164,7 @@ async function openSignInUrl(url: string) {
 }
 
 /**
- * Drive one sign-in attempt end to end: resolve what identity this Qubit is
+ * Drive one sign-in attempt end to end: resolve what identity this Hermes is
  * on, start the transfer, open the consent page, then poll until it resolves.
  * Safe to call again from a "Try again" button — it clears any previous timers
  * first.
@@ -182,7 +182,7 @@ export async function beginFreeTierSignIn(requestGateway: FreeTierRequester) {
 
   const minting = !status?.has_guest
 
-  // No free-tier identity AND a real Qubit account already connected: there is
+  // No free-tier identity AND a real Nous account already connected: there is
   // nothing to transfer. Say so instead of minting a guest the user does not
   // need. A failed provider read is not proof either way — fall through and let
   // the start call be the authority.

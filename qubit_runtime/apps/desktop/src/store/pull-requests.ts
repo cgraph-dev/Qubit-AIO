@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import type { QubitBranchPullRequest } from '@/global'
+import type { HermesBranchPullRequest } from '@/global'
 import { scanSessionPullRequests, type SessionInfo } from '@/hermes'
 import { desktopGit } from '@/lib/desktop-git'
 import { Codecs, persistentAtom } from '@/lib/persisted'
@@ -16,7 +16,7 @@ const PR_STALE_MS = 60_000
 
 /** Every known PR keyed by `${repoRoot}\n${branch}` — the join a session row
  *  makes with its own `git_repo_root` + `git_branch`. */
-export const $pullRequestsByBranch = atom<Record<string, QubitBranchPullRequest>>({})
+export const $pullRequestsByBranch = atom<Record<string, HermesBranchPullRequest>>({})
 
 /** Sessions whose PR isn't on the branch they recorded at start — the checkout
  *  moved mid-conversation, or the work went off to a worktree. Written when the
@@ -115,7 +115,7 @@ export async function recoverSessionPullRequests(sessions: SessionInfo[]): Promi
   }
 }
 
-export function pullRequestBucket(pr: QubitBranchPullRequest | undefined): PullRequestBucket {
+export function pullRequestBucket(pr: HermesBranchPullRequest | undefined): PullRequestBucket {
   if (!pr) {
     return 'none'
   }

@@ -15,18 +15,18 @@ Inspect codebases w/ pygount: LOC, languages, ratios.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/software-development\codebase-inspection` |
+| Path | `skills/software-development/codebase-inspection` |
 | Version | `1.0.0` |
-| Author | Qubit Agent |
+| Author | Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `LOC`, `Code Analysis`, `pygount`, `Codebase`, `Metrics`, `Repository` |
-| Related skills | [`github`](/docs/user-guide/skills/bundled/software-development/software-development-github) |
+| Related skills | [`github`](../../bundled/software-development/software-development-github.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Codebase Inspection with pygount

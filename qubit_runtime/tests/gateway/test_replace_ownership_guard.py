@@ -2,7 +2,7 @@
 cannot prove belongs to this QUBIT_HOME.
 
 Design contract (v3, after andrexibiza's second review): ownership is decided
-by the persisted identity record ALONE — exact ``_same_hermes_home`` equality
+by the persisted identity record ALONE — exact ``_same_qubit_home`` equality
 bound to the live target by exact PID + start-time. A readable live argv
 carries no QUBIT_HOME, so it can never prove home ownership; it only feeds a
 token-exact CONSISTENCY check that refuses explicit contradictions.
@@ -68,7 +68,7 @@ class TestRecordAuthority:
             ),
             patch("gateway.status._read_process_cmdline", return_value=None),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes",
             ),
         ):
@@ -96,7 +96,7 @@ class TestRecordAuthority:
             ),
             patch("gateway.status._read_process_cmdline", return_value=None),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes" / "profiles" / "tim",
             ),
         ):
@@ -113,14 +113,14 @@ class TestRecordAuthority:
                 return_value=profile_env / ".hermes" / "gateway.pid",
             ),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes",
             ),
         ):
             assert _replace_target_belongs_to_other_profile(424242) is True
 
     def test_legacy_record_without_home_refuses(self, profile_env):
-        """A pre-hermes_home-stamping record cannot prove ownership."""
+        """A pre-qubit_home-stamping record cannot prove ownership."""
         from gateway.run import _replace_target_belongs_to_other_profile
 
         legacy = _record(home=None)
@@ -140,7 +140,7 @@ class TestRecordAuthority:
                 return_value=111222333,
             ),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes",
             ),
         ):
@@ -164,7 +164,7 @@ class TestRecordAuthority:
                 return_value=111222333,
             ),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes",
             ),
         ):
@@ -189,7 +189,7 @@ class TestRecordAuthority:
                 return_value=42,
             ),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes",
             ),
         ):
@@ -288,7 +288,7 @@ class TestArgvConsistencyCheck:
                 return_value="python -m qubit_cli.main --profile other-profile gateway run",
             ),
             patch(
-                "gateway.status._get_process_hermes_home",
+                "gateway.status._get_process_qubit_home",
                 return_value=profile_env / ".hermes",
             ),
         ):

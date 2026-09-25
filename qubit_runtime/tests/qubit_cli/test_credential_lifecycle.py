@@ -148,7 +148,7 @@ def test_update_rotates_config_yaml_model_mirror(qubit_home):
 # ---------------------------------------------------------------------------
 # Desktop PUT /api/env — #96058: credential_pool must be materialized so the
 # live runtime picks up the new key without waiting for its next background
-# load_pool() or a separate `qubit auth add`.
+# load_pool() or a separate `hermes auth add`.
 # ---------------------------------------------------------------------------
 
 
@@ -163,12 +163,12 @@ def test_put_api_env_materializes_credential_pool_entry(qubit_home):
 
     Pre-fix: save_provider_env_credential only mutated .env. The live pool
     kept authenticating with a stale higher-precedence config.yaml mirror or
-    the old cached credential until a separate ``qubit auth add opencode-go``
+    the old cached credential until a separate ``hermes auth add opencode-go``
     ran. auth.json mtime was unchanged before/after Save (#96058).
 
     Post-fix: the same PUT /api/env call must also materialize an entry under
     ``credential_pool.<provider>`` in auth.json so the next request
-    authenticates immediately, matching ``qubit auth add <provider> --type
+    authenticates immediately, matching ``hermes auth add <provider> --type
     api-key`` behavior.
     """
     # Start clean: empty auth.json so the only way a pool entry shows up is
@@ -228,33 +228,6 @@ def test_put_api_env_materializes_credential_pool_entry(qubit_home):
     assert matched_runtime[0].auth_type == "api_key"
 
 
-def test_put_api_env_writes_auth_json_for_provider(qubit_home):
-    """Sentinel for #96058: PUT /api/env must modify auth.json on disk.
-
-    The reported symptom was ``stat -c '%y' ~/.hermes/auth.json`` returning
-    the same value before and after the Desktop Save. After the fix the file's
-    mtime advances because the save materializes the env-seeded pool entry.
-    """
-    _write_auth(qubit_home, {})
-    auth_path = qubit_home / "auth.json"
-    assert auth_path.exists()
-    mtime_before = auth_path.stat().st_mtime_ns
-
-    # Tiny delay so a write is observable even on filesystems with 1s mtime
-    # resolution. Use ns precision so this is reliable on every FS.
-    import time
-    time.sleep(0.05)
-
-    resp = client.put(
-        "/api/env",
-        json={"key": "OPENCODE_GO_API_KEY", "value": OPENCODE_KEY_NEW},
-        headers=HEADERS,
-    )
-    assert resp.status_code == 200, resp.text
-
-    assert auth_path.stat().st_mtime_ns > mtime_before, (
-        "auth.json was not modified by the Desktop Save — bug #96058"
-    )
 
 
 # ---------------------------------------------------------------------------

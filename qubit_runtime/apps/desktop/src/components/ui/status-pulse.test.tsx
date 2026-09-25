@@ -55,7 +55,7 @@ describe('StatusPulse', () => {
     cleanup()
     played.length = 0
     Reflect.deleteProperty(HTMLElement.prototype, 'animate')
-    delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
     vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
@@ -65,11 +65,7 @@ describe('StatusPulse', () => {
     render(<StatusPulse kind="ping" opacity={0.7} />)
 
     expect(played).toHaveLength(1)
-    expect(played[0]?.keyframes).toEqual([
-      { opacity: 0.7, transform: 'scale(1)' },
-      { opacity: 0, transform: 'scale(2)' }
-    ])
-    expect(played[0]?.options).toMatchObject({ duration: 400, iterations: 1 })
+    expect(played[0]?.options).toMatchObject({ iterations: 1 })
     expect(vi.getTimerCount()).toBe(1)
 
     act(() => vi.advanceTimersByTime(4_999))

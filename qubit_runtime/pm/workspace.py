@@ -216,10 +216,10 @@ def enabled_member_dirs(*, proposed_home=None, enabled=None, disabled=None) -> l
     members = []
     for path in selected:
         # Per plugin: with none selected, PM must not import the application's manifest module.
-        from qubit_cli.plugins_manifest import requires_hermes_error
+        from qubit_cli.plugins_manifest import requires_qubit_error
 
         declaration = read_python_declaration(path)
-        if requires_hermes_error(declaration.manifest):
+        if requires_qubit_error(declaration.manifest):
             continue
         reason = manifest_version_error(declaration.manifest, path.name)
         if reason:

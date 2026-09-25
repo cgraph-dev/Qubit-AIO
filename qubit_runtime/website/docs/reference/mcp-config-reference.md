@@ -1,7 +1,7 @@
 ---
 sidebar_position: 8
 title: "MCP Config Reference"
-description: "Reference for Qubit Agent MCP configuration keys, filtering semantics, and utility-tool policy"
+description: "Reference for Hermes Agent MCP configuration keys, filtering semantics, and utility-tool policy"
 ---
 
 # MCP Config Reference
@@ -9,8 +9,8 @@ description: "Reference for Qubit Agent MCP configuration keys, filtering semant
 This page is the compact reference companion to the main MCP docs.
 
 For conceptual guidance, see:
-- [MCP (Model Context Protocol)](/user-guide/features/mcp)
-- [Use MCP with Qubit](/guides/use-mcp-with-qubit)
+- [MCP (Model Context Protocol)](../user-guide/features/mcp.md)
+- [Use MCP with Hermes](../guides/use-mcp-with-hermes.md)
 
 ## Root config shape
 
@@ -60,14 +60,15 @@ mcp_servers:
 | `supports_parallel_tool_calls` | bool | both | Allow tools from this server to run concurrently |
 | `skip_preflight` | bool | HTTP | Bypass the fail-fast content-type probe for valid Streamable HTTP endpoints whose HEAD/GET answers a non-MCP content type (default: `false`) |
 | `transport` | string | HTTP | Set to `sse` to use the SSE transport instead of Streamable HTTP |
-| `keepalive_interval` | number | both | Liveness ping cadence in seconds (default: `180`, floored at 5s). Set below the server's session TTL for servers that GC idle sessions quickly |
+| `keepalive_interval` | number | both | Liveness ping cadence in seconds (floored at 5s). HTTP defaults to `180`; set it below the server's session TTL when the server GC's idle sessions quickly. Stdio disables keepalive when omitted; set a value to opt in explicitly |
+| `lazy` | bool | both | Register the server's tools from the on-disk schema cache at startup and only spawn/connect it on the first tool call (default: `false`). Needs one prior live connect to fill the cache; a missing or stale entry falls back to the normal eager connect. Status surfaces show the server as `lazy` with its cached tool count until first use |
 | `idle_timeout_seconds` | number | stdio | Optional stdio server recycle after idle time (`0` disables). May also live under a `lifecycle:` mapping |
 | `max_lifetime_seconds` | number | stdio | Optional stdio server recycle after age (`0` disables). May also live under a `lifecycle:` mapping |
 | `tools` | mapping | both | Filtering and utility-tool policy |
 | `auth` | string | HTTP | Authentication method. Set to `oauth` to enable OAuth 2.1 with PKCE |
 | `sampling` | mapping | both | Server-initiated LLM request policy (see MCP guide) |
 | `elicitation` | mapping | both | Server-initiated user-input requests. `enabled` (default `true`) and `timeout` in seconds (default `300`). Form-mode requests route through the approval surface; URL-mode is declined (see MCP guide) |
-| `trust` | string | both | Trust tier: `full` (default) or `untrusted`. On an `untrusted` server, every write-capable tool call (any tool without a `readOnlyHint: true` annotation) requires user approval through the standard approval surface before it runs. `readOnlyHint` is a server-supplied *hint* — a lying server can at most skip approval for tools it claims are read-only, never gain extra access — so mark any server you don't fully control as `untrusted`. Unrecognized values are treated as `untrusted` (fail-closed) |
+| `trust` | string | both | Trust tier: `full` (default) or `untrusted`. On an `untrusted` server, every write-capable tool call (any tool without a `readOnlyHint: true` annotation) requires user approval through the standard approval surface before it runs. `readOnlyHint` is a server-supplied *hint* — a lying server can at most skip approval for tools it claims are read-only, never gain extra access — so mark any server you don't fully control as `untrusted`. The same hint decides whether a call is transparently retried after the transport session expires mid-call: only `readOnlyHint: true` tools are replayed, while unannotated (write-capable) tools return an `outcome_uncertain` error — on a Streamable-HTTP server that expires idle sessions this means the first unannotated call after an idle period may fail and must be verified before re-invoking. Unrecognized values are treated as `untrusted` (fail-closed) |
 
 ## Environment variable references
 
@@ -151,7 +152,7 @@ Result:
 
 ## Utility-tool policy
 
-Qubit may register these utility wrappers per MCP server:
+Hermes may register these utility wrappers per MCP server:
 
 Resources:
 - `list_resources`
@@ -177,7 +178,7 @@ tools:
 
 ### Capability-aware registration
 
-Even when `resources: true` or `prompts: true`, Qubit only registers those utility tools if the MCP session actually exposes the corresponding capability.
+Even when `resources: true` or `prompts: true`, Hermes only registers those utility tools if the MCP session actually exposes the corresponding capability.
 
 So this is normal:
 - you enable prompts
@@ -201,7 +202,7 @@ Behavior:
 
 ## Empty result behavior
 
-If filtering removes all server-native tools and no utility tools are registered, Qubit does not create an empty MCP runtime toolset for that server.
+If filtering removes all server-native tools and no utility tools are registered, Hermes does not create an empty MCP runtime toolset for that server.
 
 ## Example configs
 
@@ -331,27 +332,34 @@ mcp_servers:
 ```
 
 Behavior:
-- Qubit uses the MCP SDK's OAuth 2.1 PKCE flow (metadata discovery, client identification, token exchange, and refresh)
+- Hermes uses the MCP SDK's OAuth 2.1 PKCE flow (metadata discovery, client identification, token exchange, and refresh)
 - On first connect, a browser window opens for authorization
-- Tokens are persisted to `~/.hermes/mcp-tokens/<server>.json` and reused across sessions
+- Tokens are persisted to `~/.hermes/mcp-tokens/<server>.json` (a named profile uses `~/.hermes/profiles/<name>/mcp-tokens/`) and reused across sessions
 - Token refresh is automatic; re-authorization only happens when refresh fails
 - Only applies to HTTP/StreamableHTTP transport (`url`-based servers)
+- Under a [multiplexed gateway](../user-guide/multi-profile-gateways.md), an OAuth connection is never shared across profiles: each profile authenticates with its own token and opens its own connection, even when the `mcp_servers` entries are identical
 
 ### Device-code login (RFC 8628)
 
 For an authorization server advertising `device_authorization_endpoint`, explicitly choose
-device authorization from a terminal on the machine running Qubit:
+device authorization from a terminal on the machine running Hermes:
 
 ```bash
-qubit mcp login protected_api --flow device
+hermes mcp login protected_api --flow device
 ```
 
 Open the printed verification URL on any device and enter the displayed user code.
-Qubit polls for approval, respects `authorization_pending` and `slow_down`, and stops
+Hermes polls for approval, respects `authorization_pending` and `slow_down`, and stops
 on denial or expiry. No browser is launched and no callback listener is needed.
 `oauth.timeout` bounds the approval wait (default 300 seconds), also limited by the code's lifetime.
+When the server's protected-resource metadata lists several authorization servers, device
+login scans them in order and uses the first one whose metadata issuer matches its advertised
+URL and that offers the `device_code` grant (a browser-only server listed first is skipped);
+the only accepted difference is the path-scoped shape described under "OAuth-authenticated HTTP servers"
+in the MCP feature guide (a server advertised as `https://host/path` whose document at
+`/.well-known/oauth-authorization-server/path` names `https://host`).
 
-Set `oauth.flow: device` on the server to make `qubit mcp login` and `qubit mcp reauth`
+Set `oauth.flow: device` on the server to make `hermes mcp login` and `hermes mcp reauth`
 (including `reauth --all`) use device authorization. `login --flow browser` overrides that
 setting for one login; browser PKCE remains the default. Unsupported metadata produces
 an actionable error rather than silently falling back to a different flow.
@@ -371,28 +379,28 @@ another explicit login.
 
 ### Client identification: CIMD and DCR
 
-Qubit identifies itself to authorization servers with a **Client ID Metadata Document** (CIMD), the mechanism the MCP `2026-07-28` spec adopted in place of Dynamic Client Registration. The document is published at
-`https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json`, and that URL *is* the `client_id` — the authorization server fetches it to learn Qubit' name, logo, and permitted redirect URIs. Nothing is registered per install, and nothing is user-specific.
+Hermes identifies itself to authorization servers with a **Client ID Metadata Document** (CIMD), the mechanism the MCP `2026-07-28` spec adopted in place of Dynamic Client Registration. The document is published at
+`https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json`, and that URL *is* the `client_id` — the authorization server fetches it to learn Hermes' name, logo, and permitted redirect URIs. Nothing is registered per install, and nothing is user-specific.
 
 The final choice belongs to the authorization server: the SDK sends the document URL as the `client_id` only when the server advertises `client_id_metadata_document_supported: true` in its metadata, and otherwise registers via DCR exactly as before. DCR is deprecated in the MCP spec but still what almost every deployed server uses today.
 
 #### Callback ports
 
-The document declares a fixed set of loopback redirect URIs, and the spec requires the redirect URI in an authorization request to be an *exact string match* against one of them — so a CIMD flow cannot use the random high port Qubit normally picks. Qubit therefore pins the callback to one of ports `27890`–`27894`.
+The document declares a fixed set of loopback redirect URIs, and the spec requires the redirect URI in an authorization request to be an *exact string match* against one of them — so a CIMD flow cannot use the random high port Hermes normally picks. Hermes therefore pins the callback to one of ports `27890`–`27894`.
 
-That pin has to be chosen before the server's capabilities are known, because the redirect URI is fixed at the start of the flow while the server's metadata only arrives partway through. So Qubit pins the port for any flow that *could* end up using CIMD, and reverts to a random port for the rest:
+That pin has to be chosen before the server's capabilities are known, because the redirect URI is fixed at the start of the flow while the server's metadata only arrives partway through. So Hermes pins the port for any flow that *could* end up using CIMD, and reverts to a random port for the rest:
 
-- A server Qubit has connected to before, whose cached metadata does not advertise CIMD, keeps the random port it has always used.
-- A server Qubit has never reached gets a pinned port on that first login, since guessing is the only way CIMD can ever be used.
+- A server Hermes has connected to before, whose cached metadata does not advertise CIMD, keeps the random port it has always used.
+- A server Hermes has never reached gets a pinned port on that first login, since guessing is the only way CIMD can ever be used.
 - Anything that would move the callback elsewhere reverts too: a pre-registered `oauth.client_id`, an `oauth.client_secret`, a custom `oauth.client_name` or `oauth.token_endpoint_auth_method`, an `oauth.redirect_uri` or `oauth.redirect_port` override, a dashboard- or desktop-driven login, an existing client registration on disk, or all five ports being held by other processes.
 
 Each pinned port is bound as soon as it is chosen and held until the browser redirect arrives, so two concurrent logins — a second profile, or another server in the same process — cannot land on the same listener.
 
 #### When a server rejects the document
 
-If a server fetches the document and refuses it at the *token* endpoint (`invalid_client`), Qubit logs the rejection, records it under `~/.hermes/mcp-tokens/<server>.cimd-off`, and uses DCR for that server from then on.
+If a server fetches the document and refuses it at the *token* endpoint (`invalid_client`), Hermes logs the rejection, records it under `~/.hermes/mcp-tokens/<server>.cimd-off`, and uses DCR for that server from then on.
 
-A server that cannot fetch or validate the document at all aborts at the *authorization* endpoint instead, before any redirect happens. There is no signal Qubit can observe there, so the browser shows an invalid-client error and the login times out after five minutes. The timeout message names the document and points at `cimd: false`. Running `qubit mcp login <server>` clears the recorded rejection, so a corrected document gets another chance.
+A server that cannot fetch or validate the document at all aborts at the *authorization* endpoint instead, before any redirect happens. There is no signal Hermes can observe there, so the browser shows an invalid-client error and the login times out after five minutes. The timeout message names the document and points at `cimd: false`. Running `hermes mcp login <server>` clears the recorded rejection, so a corrected document gets another chance.
 
 #### Optional per-server keys
 
@@ -407,16 +415,18 @@ mcp_servers:
       user_agent: "My-MCP-Client/1.0"                          # token-request User-Agent
 ```
 
-`client_metadata_url` must be an HTTPS URL with a path (no bare origin, no fragment, no userinfo, no `.`/`..` segments) that returns `200` and `Content-Type: application/json` with **no redirect** — authorization servers are forbidden from following redirects when fetching it. Qubit still pins its callback to the same `27890`–`27894` range, so a self-hosted document must declare all ten loopback URIs (`http://127.0.0.1:<port>/callback` and `http://localhost:<port>/callback` for each port), and its `client_id` must be its own URL.
+`client_metadata_url` must be an HTTPS URL with a path (no bare origin, no fragment, no userinfo, no `.`/`..` segments) that returns `200` and `Content-Type: application/json` with **no redirect** — authorization servers are forbidden from following redirects when fetching it. Hermes still pins its callback to the same `27890`–`27894` range, so a self-hosted document must declare all ten loopback URIs (`http://127.0.0.1:<port>/callback` and `http://localhost:<port>/callback` for each port), and its `client_id` must be its own URL.
 
-`user_agent` replaces the HTTP library's default `User-Agent` on **token-endpoint requests only** (authorization-code exchange and refresh) — some authorization servers and WAFs reject the default `python-httpx/...` value there. It never applies to MCP traffic or OAuth discovery, and no other token-request headers are configurable. Empty or null values are ignored.
+`user_agent` replaces the default `User-Agent` on **token-endpoint requests only** (authorization-code exchange, refresh and the device-flow token poll). Without it Hermes sends `Hermes-Agent/<version>` — never a header-less request, which WAF-fronted authorization servers answer with `403`. It never applies to MCP traffic, and no other token-request headers are configurable. Empty or null values are ignored. A failed exchange reports the status plus a short, redacted excerpt of the error body (a WAF's "Request blocked" page vs the issuer's `invalid_grant`), so the cause is visible without packet captures. `hermes mcp login` clears the stale grant and client registration before re-authorizing but keeps the cached authorization-server metadata, so the announced authorize URL stays the discovered one even when the metadata document cannot be re-fetched.
 
-## Add to Qubit link
+OAuth discovery and dynamic-client-registration requests (the `/.well-known/...` metadata documents and the `registration_endpoint` POST) always carry `User-Agent: Hermes-Agent/<version>`. The MCP SDK builds those requests without any client default headers, and WAF-fronted authorization servers answer a header-less request with `403` — the metadata document then looks unreadable, registration falls back to a guessed `/register` on the MCP host, and the login fails with `Registration failed: 404`. When every metadata fetch does fail, the error now leads with those statuses (`Could not read authorization-server metadata (403 from https://…/.well-known/oauth-authorization-server; …)`) before the registration fallback's own error.
 
-MCP vendors and docs can offer a one-click **"Add to Qubit"** button that opens the Qubit desktop app with a pre-filled server config, mirroring Cursor's `cursor://anysphere.cursor-deeplink/mcp/install` scheme:
+## Add to Hermes link
+
+MCP vendors and docs can offer a one-click **"Add to Hermes"** button that opens the Hermes desktop app with a pre-filled server config, mirroring Cursor's `cursor://anysphere.cursor-deeplink/mcp/install` scheme:
 
 ```text
-qubit://mcp/install?name=NAME&config=BASE64
+hermes://mcp/install?name=NAME&config=BASE64
 ```
 
 - `name` — the server name. Must match `^[A-Za-z0-9._-]{1,64}$`.
@@ -426,7 +436,7 @@ Example (JavaScript):
 
 ```js
 const config = { url: 'https://mcp.example.com/mcp' }
-const link = `qubit://mcp/install?name=example&config=${btoa(JSON.stringify(config))
+const link = `hermes://mcp/install?name=example&config=${btoa(JSON.stringify(config))
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`
 ```
 

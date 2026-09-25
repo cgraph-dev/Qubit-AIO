@@ -92,15 +92,15 @@ def isolated_env(
 ) -> dict[str, str]:
     """Allowlisted environment with HOME/QUBIT_HOME under ``root``."""
     home = root / "home"
-    hermes_home = home / ".hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
+    qubit_home = home / ".hermes"
+    qubit_home.mkdir(parents=True, exist_ok=True)
     shim_dir = root / "shims"
     write_shims(shim_dir)
     env = {k: os.environ[k] for k in _ENV_ALLOW if k in os.environ}
     env.setdefault("LANG", "C.UTF-8")
     env.update(
         HOME=str(home),
-        QUBIT_HOME=str(hermes_home),
+        QUBIT_HOME=str(qubit_home),
         # The pytest ancestor marks this child as guarded; its HOME is already the sandbox.
         HERMES_STATE_DB_GUARD_BYPASS="1",
         XDG_RUNTIME_DIR=str(root / "run"),

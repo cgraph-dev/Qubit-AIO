@@ -15,7 +15,7 @@ import os
 import time
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 
 @pytest.fixture()

@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Ensure sibling modules (_hermes_home) are importable when run standalone.
+# Ensure sibling modules (_qubit_home) are importable when run standalone.
 _SCRIPTS_DIR = str(Path(__file__).resolve().parent)
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)

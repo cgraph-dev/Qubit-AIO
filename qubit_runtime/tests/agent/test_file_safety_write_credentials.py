@@ -28,8 +28,8 @@ def hermes_layout(tmp_path, monkeypatch):
     root = tmp_path / "hermes_root"
     profile = root / "profiles" / "coder"
     profile.mkdir(parents=True)
-    monkeypatch.setattr(fs, "_hermes_home_path", lambda: profile)
-    monkeypatch.setattr(fs, "_hermes_root_path", lambda: root)
+    monkeypatch.setattr(fs, "_qubit_home_path", lambda: profile)
+    monkeypatch.setattr(fs, "_qubit_root_path", lambda: root)
     return root, profile
 
 
@@ -69,8 +69,8 @@ class TestProfileHomeProcessHome:
         (profile / "home").mkdir(parents=True)
         monkeypatch.setenv("QUBIT_HOME", str(profile))
         monkeypatch.setenv("HOME", str(profile / "home"))
-        monkeypatch.setattr(fs, "_hermes_home_path", lambda: profile)
-        monkeypatch.setattr(fs, "_hermes_root_path", lambda: profile.parent)
+        monkeypatch.setattr(fs, "_qubit_home_path", lambda: profile)
+        monkeypatch.setattr(fs, "_qubit_root_path", lambda: profile.parent)
         return profile
 
     def test_every_home_is_guarded(self, profile_home_env):

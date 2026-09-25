@@ -16,12 +16,12 @@ afterEach(() => {
 
 describe('writeComposerPaste', () => {
   it('lands the paste directly under <QUBIT_HOME>/composer-pastes so the backend admits it', async () => {
-    const qubitHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-home-'))
-    scratch.push(qubitHome)
+    const hermesHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-home-'))
+    scratch.push(hermesHome)
 
-    const filePath = await writeComposerPaste(qubitHome, 'pasted body')
+    const filePath = await writeComposerPaste(hermesHome, 'pasted body')
 
-    expect(path.dirname(filePath)).toBe(path.join(qubitHome, COMPOSER_PASTES_DIRNAME))
+    expect(path.dirname(filePath)).toBe(path.join(hermesHome, COMPOSER_PASTES_DIRNAME))
     expect(fs.readFileSync(filePath, 'utf8')).toBe('pasted body')
   })
 })

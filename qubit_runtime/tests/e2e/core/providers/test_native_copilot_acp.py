@@ -196,7 +196,7 @@ def _calls(fake: acp.AcpFake) -> dict[int, list[dict[str, Any]]]:
 # ── tests ──────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_hermes_tool_call_round_trips_through_acp_and_persists(outcomes):
+def test_qubit_tool_call_round_trips_through_acp_and_persists(outcomes):
     """A ``<tool_call>`` in the agent's message runs Hermes' real read_file; the result reaches the
     NEXT call's prompt; the CLI prints the answer; state.db pairs the call and result by id."""
     sc = _flow_ok(outcomes)

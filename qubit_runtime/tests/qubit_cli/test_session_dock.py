@@ -7,7 +7,7 @@ from prompt_toolkit.utils import get_cwidth
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     from pathlib import Path
 
     from qubit_cli import goals
@@ -21,7 +21,7 @@ def hermes_home(tmp_path, monkeypatch):
     goals._DB_CACHE.clear()
 
 
-def test_dock_paints_goal_on_top_and_queue_last_and_follows_their_lifecycle(hermes_home):
+def test_dock_paints_goal_on_top_and_queue_last_and_follows_their_lifecycle(qubit_home):
     from cli import _VoiceInputMessage
     from qubit_cli.cli_subagent_monitor import SubagentMonitor
     from qubit_cli.goals import GoalManager
@@ -59,7 +59,7 @@ def test_dock_paints_goal_on_top_and_queue_last_and_follows_their_lifecycle(herm
     assert dock.refresh() and not dock.has_rows and dock.dock_text(columns=80, rows=40) == ""
 
 
-def test_dock_ignores_a_goal_manager_left_over_from_another_session(hermes_home):
+def test_dock_ignores_a_goal_manager_left_over_from_another_session(qubit_home):
     """After /new the cached manager still names the old session until it is rebuilt; the dock
     must not paint the previous session's goal (and never opens state.db itself)."""
     from qubit_cli.cli_session_dock import goal_line

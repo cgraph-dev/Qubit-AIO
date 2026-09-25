@@ -17,7 +17,7 @@ from tests.compat.old_updater_support import fresh_child as fresh_child, no_exte
     "module,name,args,kwargs",
     [
         (main, "_filter_non_gateway_concurrent_instances", ([(123, "hermes.exe")],), {}),
-        (main, "_detect_concurrent_hermes_instances", (Path("Scripts"),), {"exclude_pid": 123}),
+        (main, "_detect_concurrent_qubit_instances", (Path("Scripts"),), {"exclude_pid": 123}),
         (main, "_leftover_pausable_gateway_pids", ([(123, "python.exe", "hermes serve")],), {}),
         (main, "_ledger_manual_serve_holders", ([(123, "python.exe", "hermes serve")],), {}),
         (main, "_ledger_reapable_backend_pids", ([(123, "python.exe", "hermes serve")],), {}),
@@ -94,7 +94,7 @@ def test_command_reaches_checkout_preparation_without_holder_gates(monkeypatch, 
 
     # Recreate the former call-site names as tripwires, not host-OS fakes.
     # The scan remains live for lifecycle ownership, but must not gate updates.
-    monkeypatch.setattr(main, "_detect_concurrent_hermes_instances", forbidden, raising=False)
+    monkeypatch.setattr(main, "_detect_concurrent_qubit_instances", forbidden, raising=False)
     monkeypatch.setattr(update_cmd_windows, "_detect_venv_python_processes", forbidden)
     monkeypatch.setattr(update_cmd, "_refuse_gateway_ancestor_tree_kill", forbidden)
     monkeypatch.setattr(main, "_is_windows", forbidden)

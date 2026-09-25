@@ -21,7 +21,7 @@ export { clampDataUrlReadMaxMb, DATA_URL_READ_DEFAULT_MAX_MB, DATA_URL_READ_MAX_
 export const $dataUrlReadMaxMb = atom<number>(DATA_URL_READ_DEFAULT_MAX_MB)
 
 export async function refreshDataUrlReadMaxMb(): Promise<number> {
-  const api = window.qubitDesktop?.dataUrlReadMax
+  const api = window.hermesDesktop?.dataUrlReadMax
 
   if (!api) {
     return $dataUrlReadMaxMb.get()
@@ -40,7 +40,7 @@ export async function refreshDataUrlReadMaxMb(): Promise<number> {
 
 export async function setDataUrlReadMaxMb(maxMb: number): Promise<number> {
   const next = clampDataUrlReadMaxMb(maxMb)
-  const api = window.qubitDesktop?.dataUrlReadMax
+  const api = window.hermesDesktop?.dataUrlReadMax
 
   if (!api) {
     $dataUrlReadMaxMb.set(next)
@@ -64,6 +64,6 @@ export async function setDataUrlReadMaxMb(maxMb: number): Promise<number> {
   }
 }
 
-if (typeof window !== 'undefined' && window.qubitDesktop?.dataUrlReadMax) {
+if (typeof window !== 'undefined' && window.hermesDesktop?.dataUrlReadMax) {
   void refreshDataUrlReadMaxMb()
 }

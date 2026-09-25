@@ -42,7 +42,7 @@ frames=[]
 try:
     for _ in range(120):
         try:
-            req=urllib.request.Request(f'http://127.0.0.1:{args.port}/api/status',headers={'X-Qubit-Token':'history-fixture-token'})
+            req=urllib.request.Request(f'http://127.0.0.1:{args.port}/api/status',headers={'X-Hermes-Token':'history-fixture-token'})
             status=json.load(urllib.request.urlopen(req,timeout=2));break
         except Exception:
             if p.poll() is not None: raise RuntimeError('serve exited')

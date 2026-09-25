@@ -73,7 +73,7 @@ def test_marker_fallback_uses_the_platform_home_without_env_var(status_file, tmp
     import qubit_constants
 
     monkeypatch.delenv("QUBIT_HOME", raising=False)
-    monkeypatch.setattr(qubit_constants, "_get_platform_default_hermes_home", lambda: tmp_path / "platform")
+    monkeypatch.setattr(qubit_constants, "_get_platform_default_qubit_home", lambda: tmp_path / "platform")
     (tmp_path / "platform").mkdir()
     (tmp_path / "platform" / update_stage.MARKER_NAME).write_text(
         f"80335\n{int(time.time())}\n", encoding="utf-8")

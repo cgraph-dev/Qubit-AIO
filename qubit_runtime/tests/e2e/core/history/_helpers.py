@@ -98,51 +98,51 @@ def first_divergence(a: str, b: str) -> str:
 # state.db views
 
 
-def db_connect(hermes_home: Path) -> sqlite3.Connection:
-    con = sqlite3.connect(f"file:{hermes_home / 'state.db'}?mode=ro", uri=True, timeout=30)
+def db_connect(qubit_home: Path) -> sqlite3.Connection:
+    con = sqlite3.connect(f"file:{qubit_home / 'state.db'}?mode=ro", uri=True, timeout=30)
     con.row_factory = sqlite3.Row
     return con
 
 
-def views(hermes_home: Path, sid: str) -> tuple[list[dict], list[dict]]:
+def views(qubit_home: Path, sid: str) -> tuple[list[dict], list[dict]]:
     """(model_history, display_history) exactly as a resuming surface loads them."""
     from qubit_state import SessionDB
 
-    db = SessionDB(db_path=hermes_home / "state.db")
+    db = SessionDB(db_path=qubit_home / "state.db")
     try:
         return db.get_resume_conversations(sid)
     finally:
         db.close()
 
 
-def model_only_identities(hermes_home: Path, model: list[dict]) -> set[tuple]:
+def model_only_identities(qubit_home: Path, model: list[dict]) -> set[tuple]:
     """Identities of model-view rows stored as model-only (never part of the display projection)."""
     ids = [m["_row_id"] for m in model if m.get("_row_id") is not None]
     if not ids:
         return set()
-    with db_connect(hermes_home) as con:
+    with db_connect(qubit_home) as con:
         hidden = {r[0] for r in con.execute(
             f"SELECT id FROM messages WHERE id IN ({','.join('?' * len(ids))}) "
             "AND COALESCE(json_extract(display_metadata, '$.model_only'), 0) != 0", ids)}
     return {identity(m) for m in model if m.get("_row_id") in hidden}
 
 
-def row_counts(hermes_home: Path, sid: str) -> dict[str, int]:
-    with db_connect(hermes_home) as con:
+def row_counts(qubit_home: Path, sid: str) -> dict[str, int]:
+    with db_connect(qubit_home) as con:
         total, active = con.execute(
             "SELECT count(*), coalesce(sum(active), 0) FROM messages WHERE session_id=?", (sid,)).fetchone()
         return {"total": total, "active": active}
 
 
-def integrity_ok(hermes_home: Path) -> None:
-    with db_connect(hermes_home) as con:
+def integrity_ok(qubit_home: Path) -> None:
+    with db_connect(qubit_home) as con:
         assert con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 
 
-def lineage(hermes_home: Path, sid: str) -> list[str]:
+def lineage(qubit_home: Path, sid: str) -> list[str]:
     """Root→tip chain of session ids ending at ``sid`` (compaction rotation may create children)."""
     chain = [sid]
-    with db_connect(hermes_home) as con:
+    with db_connect(qubit_home) as con:
         while True:
             row = con.execute("SELECT parent_session_id FROM sessions WHERE id=?", (chain[0],)).fetchone()
             if not row or not row[0]:
@@ -158,10 +158,10 @@ def is_summary(msg: dict[str, Any]) -> bool:
     return SUMMARY_TEXT in _text(msg.get("content") or "") or bool(msg.get("_compressed_summary"))
 
 
-def assert_rows_exactly_once(hermes_home: Path, sid: str, where: str) -> None:
+def assert_rows_exactly_once(qubit_home: Path, sid: str, where: str) -> None:
     """(a) at the storage layer: no two ACTIVE rows of a session are the same logical message.
     Readers dedupe defensively, so a double write can hide behind them; the rows cannot."""
-    con = db_connect(hermes_home)
+    con = db_connect(qubit_home)
     try:
         rows = con.execute(
             "SELECT id, role, content, tool_call_id, tool_calls FROM messages "
@@ -296,12 +296,12 @@ def billed_usage(records: list[dict[str, Any]], kind: str = "main") -> dict[str,
     return tot
 
 
-def assert_usage_matches(hermes_home: Path, sids: list[str], records: list[dict[str, Any]], where: str) -> None:
+def assert_usage_matches(qubit_home: Path, sids: list[str], records: list[dict[str, Any]], where: str) -> None:
     """(f) state.db usage equals what the provider billed: main-loop totals on ``sessions`` and in
     the per-model ledger, no double count, no drop; cache reads are split out of input tokens."""
     want = billed_usage(records, "main")
     marks = ",".join("?" * len(sids))
-    with db_connect(hermes_home) as con:
+    with db_connect(qubit_home) as con:
         s = con.execute(
             f"SELECT sum(input_tokens), sum(output_tokens), sum(cache_read_tokens), sum(api_call_count) "
             f"FROM sessions WHERE id IN ({marks})", sids).fetchone()
@@ -320,11 +320,11 @@ def assert_usage_matches(hermes_home: Path, sids: list[str], records: list[dict[
 # subprocess surfaces
 
 
-def child_env(home: Path, hermes_home: Path, workdir: Path) -> dict[str, str]:
+def child_env(home: Path, qubit_home: Path, workdir: Path) -> dict[str, str]:
     env = {k: os.environ[k] for k in _ENV_ALLOW if k in os.environ}
     env.update(
-        HOME=str(home), QUBIT_HOME=str(hermes_home), PWD=str(workdir),
-        HERMES_TEST_ISOLATION=str(hermes_home),
+        HOME=str(home), QUBIT_HOME=str(qubit_home), PWD=str(workdir),
+        HERMES_TEST_ISOLATION=str(qubit_home),
         # The child's state.db IS this test's sandbox db; the live-DB guard would refuse it
         # because a pytest ancestor is present.
         HERMES_STATE_DB_GUARD_BYPASS="1",
@@ -574,13 +574,13 @@ class InProcessSession:
     """A real ``AIAgent`` + ``SessionDB`` driven the way the classic CLI drives it: the surface
     owns ``history`` and hands it back each turn; ``/compress`` goes through ``compress_now``."""
 
-    def __init__(self, base_url: str, hermes_home: Path, sid: str, *, platform: str = "cli") -> None:
+    def __init__(self, base_url: str, qubit_home: Path, sid: str, *, platform: str = "cli") -> None:
         from qubit_cli.config import load_config
         from qubit_cli.tools_config import _get_platform_tools
         from qubit_state import SessionDB
         from run_agent import AIAgent
 
-        self.db = SessionDB(db_path=hermes_home / "state.db")
+        self.db = SessionDB(db_path=qubit_home / "state.db")
         # The CLI entrypoints enable the platform's configured toolsets; a bare AIAgent would
         # advertise a different tools array than every real surface resuming this session.
         toolsets = sorted(_get_platform_tools(load_config(), platform))
@@ -624,8 +624,8 @@ class InProcessSession:
 class Ledger:
     """Cross-checks request stream, model view, display view, row counts and usage after each step."""
 
-    def __init__(self, srv: Any, hermes_home: Path, *, check_inputs: bool = True) -> None:
-        self.srv, self.home, self.check_inputs = srv, hermes_home, check_inputs
+    def __init__(self, srv: Any, qubit_home: Path, *, check_inputs: bool = True) -> None:
+        self.srv, self.home, self.check_inputs = srv, qubit_home, check_inputs
         self.ever: dict[tuple, str] = {}
         self.inputs: list[str] = []
         self.model_only: set[tuple] = set()

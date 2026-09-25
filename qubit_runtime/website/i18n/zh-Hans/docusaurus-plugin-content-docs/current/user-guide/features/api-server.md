@@ -11,7 +11,7 @@ API 服务器将 hermes-agent 作为 OpenAI 兼容的 HTTP 端点暴露出来。
 你的 agent 使用完整工具集（终端、文件操作、网络搜索、记忆、技能）处理请求，并返回最终响应。在流式传输时，工具进度指示器会内联显示，让前端能够展示 agent 正在执行的操作。
 
 :::tip 一个后端同时覆盖模型与工具
-Qubit 本身需要配置好 provider（提供商）和工具后端，API 服务器才能发挥作用。[Qubit Labs](/user-guide/features/tool-gateway) 订阅同时处理两者——300+ 个模型，以及通过 Tool Gateway 提供的网络/图像/TTS/浏览器功能。在启动 API 服务器之前运行一次 `qubit setup --portal`，Open WebUI 或 LobeChat 等前端即可获得一个完整配备工具的后端。
+Hermes 本身需要配置好 provider（提供商）和工具后端，API 服务器才能发挥作用。[Nous Portal](./tool-gateway.md) 订阅同时处理两者——300+ 个模型，以及通过 Tool Gateway 提供的网络/图像/TTS/浏览器功能。在启动 API 服务器之前运行一次 `hermes setup --portal`，Open WebUI 或 LobeChat 等前端即可获得一个完整配备工具的后端。
 :::
 
 ## 快速开始
@@ -23,14 +23,14 @@ Qubit 本身需要配置好 provider（提供商）和工具后端，API 服务�
 ```bash
 API_SERVER_ENABLED=true
 API_SERVER_KEY=change-me-local-dev
-# 可选：仅当浏览器需要直接调用 Qubit 时
+# 可选：仅当浏览器需要直接调用 Hermes 时
 # API_SERVER_CORS_ORIGINS=http://localhost:3000
 ```
 
 ### 2. 启动 gateway
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 你将看到：
@@ -51,7 +51,7 @@ curl http://localhost:8642/v1/chat/completions \
   -d '{"model": "hermes-agent", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
-或连接 Open WebUI、LobeChat 或其他任意前端——参见 [Open WebUI 集成指南](/user-guide/messaging/open-webui)获取分步说明。
+或连接 Open WebUI、LobeChat 或其他任意前端——参见 [Open WebUI 集成指南](../messaging/open-webui.md)获取分步说明。
 
 ## 端点
 
@@ -106,11 +106,17 @@ curl http://localhost:8642/v1/chat/completions \
 
 上传的文件（`file` / `input_file` / `file_id`）和非图像 `data:` URL 将返回 `400 unsupported_content_type`。
 
-**流式传输**（`"stream": true`）：返回逐 token 响应块的 Server-Sent Events（SSE）。对于 **Chat Completions**，流使用标准 `chat.completion.chunk` 事件，以及 Qubit 自定义的 `hermes.tool.progress` 事件用于工具启动的 UX 展示。对于 **Responses**，流使用 OpenAI Responses 事件类型，如 `response.created`、`response.output_text.delta`、`response.output_item.added`、`response.output_item.done` 和 `response.completed`。
+**流式传输**（`"stream": true`）：返回逐 token 响应块的 Server-Sent Events（SSE）。对于 **Chat Completions**，流使用标准 `chat.completion.chunk` 事件，以及 Hermes 自定义的 `hermes.tool.progress` 事件用于工具启动的 UX 展示。对于 **Responses**，流使用 OpenAI Responses 事件类型，如 `response.created`、`response.output_text.delta`、`response.output_item.added`、`response.output_item.done` 和 `response.completed`。
 
 **流中的工具进度：**
-- **Chat Completions**：Qubit 发出 `event: hermes.tool.progress` 以提供工具启动可见性，同时不污染持久化的 assistant 文本。
-- **Responses**：Qubit 在 SSE 流期间发出符合规范的 `function_call` 和 `function_call_output` 输出项，让客户端能够实时渲染结构化工具 UI。
+- **Chat Completions**：Hermes 发出 `event: hermes.tool.progress` 以提供工具启动可见性，同时不污染持久化的 assistant 文本。
+- **Responses**：Hermes 在 SSE 流期间发出符合规范的 `function_call` 和 `function_call_output` 输出项，让客户端能够实时渲染结构化工具 UI。
+**模型推理**（仅当模型确实产生了推理内容且解析后的 `reasoning` 配置允许时才会发出；输入侧的关闭方式是 `model_options.reasoning.enabled: false`）：
+- **Chat Completions**：推理增量以 `choices[0].delta.reasoning_content` 块的形式到达（DeepSeek 风格的字段，Open WebUI、opencode 和 Vercel AI SDK 会将其渲染为思考块）；回答文本仍留在 `delta.content` 中。
+- **Responses**：每一段思考都是一个符合规范的 `reasoning` 输出项——`response.output_item.added`（`item.type: "reasoning"`）、`response.reasoning_summary_part.added`、`response.reasoning_summary_text.delta` … `response.reasoning_summary_text.done`、`response.reasoning_summary_part.done`、`response.output_item.done`——在下一个 message 或 `function_call` 项打开之前关闭，并在 `response.completed` 的 output 中以 `{"id": "rs_…", "type": "reasoning", "status": "completed", "summary": [{"type": "summary_text", "text": "…"}]}` 的形式回显。`sequence_number` 在推理、文本和工具事件之间保持单调递增。
+- **非流式**：`/v1/chat/completions` 在 `choices[0].message.reasoning_content` 上返回本轮的推理内容；`/v1/responses` 在 message（以及该步骤的 `function_call` 项）之前返回同样的 `reasoning` 输出项，`GET /v1/responses/{id}` 回放时亦然。
+- 将上一个响应的 `output` 列表原样作为下一次的 `input` 回传（Responses SDK 客户端的做法）没有问题：输入中的 `reasoning` 项会被忽略，而不会被解析为空的 user 轮次。
+- 支持情况通过 `GET /v1/capabilities` 上的 `features.reasoning_streaming: true` 公布。
 
 ### POST /v1/responses
 
@@ -196,7 +202,7 @@ OpenAI Responses API 格式。通过 `previous_response_id` 支持服务端对�
 
 ### GET /v1/models
 
-将 agent 列为可用模型。广播的模型名称默认为 [profile](/user-guide/profiles) 名称（默认 profile 则为 `hermes-agent`）。大多数前端进行模型发现时需要此端点。
+将 agent 列为可用模型。广播的模型名称默认为 [profile](../profiles.md) 名称（默认 profile 则为 `hermes-agent`）。大多数前端进行模型发现时需要此端点。
 
 ### GET /v1/capabilities
 
@@ -214,12 +220,13 @@ OpenAI Responses API 格式。通过 `previous_response_id` 支持服务端对�
     "run_submission": true,
     "run_status": true,
     "run_events_sse": true,
-    "run_stop": true
+    "run_stop": true,
+    "reasoning_streaming": true
   }
 }
 ```
 
-在集成仪表板、浏览器 UI 或控制平面时使用此端点，以便它们能够发现当前运行的 Qubit 版本是否支持 runs、流式传输、取消和 session 连续性，而无需依赖私有 Python 内部实现。
+在集成仪表板、浏览器 UI 或控制平面时使用此端点，以便它们能够发现当前运行的 Hermes 版本是否支持 runs、流式传输、取消和 session 连续性，而无需依赖私有 Python 内部实现。
 
 ### GET /health
 
@@ -246,7 +253,7 @@ OpenAI Responses API 格式。通过 `previous_response_id` 支持服务端对�
 }
 ```
 
-Runs 接受简单的 `input` 字符串，以及可选的 `session_id`、`instructions`、`conversation_history` 或 `previous_response_id`。当提供 `session_id` 时，Qubit 会在 run 状态中暴露它，以便外部 UI 将 run 与自己的对话 ID 关联。
+Runs 接受简单的 `input` 字符串，以及可选的 `session_id`、`instructions`、`conversation_history` 或 `previous_response_id`。当提供 `session_id` 时，Hermes 会在 run 状态中暴露它，以便外部 UI 将 run 与自己的对话 ID 关联。
 
 ### GET /v1/runs/\{run_id\}
 
@@ -274,7 +281,7 @@ run 的工具调用进度、token 增量和生命周期事件的 Server-Sent Eve
 
 ### POST /v1/runs/\{run_id\}/stop
 
-中断正在运行的 agent 轮次。端点立即返回 `{"status": "stopping"}`，同时 Qubit 要求活跃 agent 在下一个安全中断点停止。
+中断正在运行的 agent 轮次。端点立即返回 `{"status": "stopping"}`，同时 Hermes 要求活跃 agent 在下一个安全中断点停止。
 run 会保持 `stopping` 并继续被跟踪，直到 executor 支持的工作退出，然后进入 `cancelled`；停止请求不会隐藏仍在运行的 worker。
 
 ## Jobs API（后台计划任务）
@@ -287,7 +294,7 @@ run 会保持 `stopping` 并继续被跟踪，直到 executor 支持的工作退
 
 ### POST /api/jobs
 
-创建新的计划任务。请求体接受与 `qubit cron` 相同的结构——prompt（提示词）、schedule（计划）、skills（技能）、provider 覆盖、投递目标。
+创建新的计划任务。请求体接受与 `hermes cron` 相同的结构——prompt（提示词）、schedule（计划）、skills（技能）、provider 覆盖、投递目标。
 
 ### GET /api/jobs/\{job_id\}
 
@@ -329,7 +336,7 @@ run 会保持 `stopping` 并继续被跟踪，直到 executor 支持的工作退
 Authorization: Bearer ***
 ```
 
-通过 `API_SERVER_KEY` 环境变量配置密钥。如果需要浏览器直接调用 Qubit，还需将 `API_SERVER_CORS_ORIGINS` 设置为明确的允许列表。
+通过 `API_SERVER_KEY` 环境变量配置密钥。如果需要浏览器直接调用 Hermes，还需将 `API_SERVER_CORS_ORIGINS` 设置为明确的允许列表。
 
 :::warning 安全
 API 服务器提供对 hermes-agent 工具集的完整访问权限，**包括终端命令**。当绑定到非回环地址（如 `0.0.0.0`）时，**必须**设置 `API_SERVER_KEY`。同时保持 `API_SERVER_CORS_ORIGINS` 范围尽量小，以控制浏览器访问。
@@ -362,7 +369,7 @@ gateway:
     host: 127.0.0.1
     key: your-secret-key
     cors_origins: http://localhost:3000
-    model_name: my-qubit
+    model_name: my-hermes
 ```
 
 `port`、`key`、`host`、`cors_origins` 和 `model_name` 会自动桥接到该平台的 `extra` 设置中，行为与对应的 `API_SERVER_*` 环境变量完全一致。环境变量优先于 `config.yaml` 中的值。该配置块同样可以放在 `gateway.platforms.api_server:` 或顶层 `platforms.api_server:` 小节下。
@@ -396,7 +403,7 @@ API_SERVER_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 | 前端 | Stars | 连接方式 |
 |----------|-------|------------|
-| [Open WebUI](/user-guide/messaging/open-webui) | 126k | 提供完整指南 |
+| [Open WebUI](../messaging/open-webui.md) | 126k | 提供完整指南 |
 | LobeChat | 73k | 自定义 provider 端点 |
 | LibreChat | 34k | librechat.yaml 中的自定义端点 |
 | AnythingLLM | 56k | 通用 OpenAI provider |
@@ -410,12 +417,12 @@ API_SERVER_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
 ## 使用 Profiles 的多用户设置
 
-要为多个用户提供各自隔离的 Qubit 实例（独立的配置、记忆、技能），请使用 [profiles](/user-guide/profiles)：
+要为多个用户提供各自隔离的 Hermes 实例（独立的配置、记忆、技能），请使用 [profiles](../profiles.md)：
 
 ```bash
 # 为每个用户创建 profile
-qubit profile create alice
-qubit profile create bob
+hermes profile create alice
+hermes profile create bob
 
 # 在不同端口上配置每个 profile 的 API 服务器。API_SERVER_* 是环境变量
 # （不是 config.yaml 键），因此将它们写入每个 profile 的 .env：
@@ -432,8 +439,8 @@ API_SERVER_KEY=bob-secret
 EOF
 
 # 启动每个 profile 的 gateway
-qubit -p alice gateway &
-qubit -p bob gateway &
+hermes -p alice gateway &
+hermes -p bob gateway &
 ```
 
 每个 profile 的 API 服务器自动将 profile 名称作为模型 ID 广播：
@@ -441,7 +448,7 @@ qubit -p bob gateway &
 - `http://localhost:8643/v1/models` → 模型 `alice`
 - `http://localhost:8644/v1/models` → 模型 `bob`
 
-在 Open WebUI 中，将每个添加为单独的连接。模型下拉列表显示 `alice` 和 `bob` 作为不同模型，每个均由完全隔离的 Qubit 实例支持。详见 [Open WebUI 指南](/user-guide/messaging/open-webui#multi-user-setup-with-profiles)。
+在 Open WebUI 中，将每个添加为单独的连接。模型下拉列表显示 `alice` 和 `bob` 作为不同模型，每个均由完全隔离的 Hermes 实例支持。详见 [Open WebUI 指南](../messaging/open-webui.md#multi-user-setup-with-profiles)。
 
 ## 限制
 
@@ -451,6 +458,6 @@ qubit -p bob gateway &
 
 ## 代理模式
 
-API 服务器还作为 **gateway 代理模式**的后端。当另一个 Qubit gateway 实例配置了指向此 API 服务器的 `GATEWAY_PROXY_URL` 时，它会将所有消息转发到这里，而不是运行自己的 agent。这支持分离部署——例如，一个处理 Matrix E2EE 的 Docker 容器将请求中继到宿主机侧的 agent。
+API 服务器还作为 **gateway 代理模式**的后端。当另一个 Hermes gateway 实例配置了指向此 API 服务器的 `GATEWAY_PROXY_URL` 时，它会将所有消息转发到这里，而不是运行自己的 agent。这支持分离部署——例如，一个处理 Matrix E2EE 的 Docker 容器将请求中继到宿主机侧的 agent。
 
-完整设置指南参见 [Matrix 代理模式](/user-guide/messaging/matrix#proxy-mode-e2ee-on-macos)。
+完整设置指南参见 [Matrix 代理模式](../messaging/matrix.md#proxy-mode-e2ee-on-macos)。

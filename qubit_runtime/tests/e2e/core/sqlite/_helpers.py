@@ -71,12 +71,12 @@ def episode_seed(label: str) -> int:
     return base_seed() + zlib.crc32(label.encode())
 
 
-def child_env(home: Path, hermes_home: Path) -> dict:
+def child_env(home: Path, qubit_home: Path) -> dict:
     """Probe hygiene: private HOME/QUBIT_HOME, no provider credentials, repo importable."""
     env = {k: v for k, v in os.environ.items() if not k.endswith("_API_KEY")}
     env.update({
         "HOME": str(home),
-        "QUBIT_HOME": str(hermes_home),
+        "QUBIT_HOME": str(qubit_home),
         "PYTHONUNBUFFERED": "1",
         # The child's QUBIT_HOME *is* this chamber's private home, which the live-DB guard reads as
         # "the real Hermes root"; HOME/QUBIT_HOME above already keep it off the production install.
@@ -94,14 +94,14 @@ class Chamber:
         self.root = root
         self.mode = journal
         self.home = root / "home"
-        self.hermes_home = self.home / ".hermes"
-        self.hermes_home.mkdir(parents=True, exist_ok=True)
+        self.qubit_home = self.home / ".hermes"
+        self.qubit_home.mkdir(parents=True, exist_ok=True)
         # The config default in BOTH arms: the delete arm is a default-config user on a vulnerable SQLite.
-        (self.hermes_home / "config.yaml").write_text("database:\n  journal_mode: wal\n", encoding="utf-8")
-        self.db = self.hermes_home / "state.db"
+        (self.qubit_home / "config.yaml").write_text("database:\n  journal_mode: wal\n", encoding="utf-8")
+        self.db = self.qubit_home / "state.db"
         self.work = root / "work"
         self.work.mkdir(exist_ok=True)
-        self.env = child_env(self.home, self.hermes_home)
+        self.env = child_env(self.home, self.qubit_home)
         if journal == "delete" and linked_sqlite_is_wal_capable():
             self.env[SQLITE_PIN_ENV] = VULNERABLE_SQLITE
         self.writer_pace = DELETE_WRITER_PACE if journal == "delete" else 0.0

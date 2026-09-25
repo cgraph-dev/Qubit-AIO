@@ -1,4 +1,4 @@
-"""`qubit debug` must report the EFFECTIVE terminal backend.
+"""`hermes debug` must report the EFFECTIVE terminal backend.
 
 ``terminal.backend`` in config.yaml is bridged to the ``TERMINAL_ENV`` env var,
 but a ``TERMINAL_ENV`` set in .env / the shell overrides config and is what

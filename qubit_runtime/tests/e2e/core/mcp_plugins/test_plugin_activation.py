@@ -84,7 +84,7 @@ KNOWN: dict[str, tuple[str, str]] = {
 
 def build_home(root: Path, base_url: str, *, extra: dict[str, Any] | None = None) -> E2EHome:
     eh = _build_home(root, base_url, extra=extra)
-    select_test_dependencies(eh.hermes_home, REPO_ROOT)
+    select_test_dependencies(eh.qubit_home, REPO_ROOT)
     eh.extra_env["HERMES_DISABLE_LAZY_INSTALLS"] = "1"
     return eh
 
@@ -220,7 +220,7 @@ def env_echo_results(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]
         eh.update_config(lambda cfg: cfg["mcp_servers"].update(nat=stdio_server(
             "nat", root / "nat.jsonl", eh.tag, MCPE2E_ECHO_ENV="E2E_NATIVE_KEY",
             E2E_NATIVE_KEY="${E2E_NATIVE_KEY}")))
-        with open(eh.hermes_home / ".env", "a", encoding="utf-8") as fh:
+        with open(eh.qubit_home / ".env", "a", encoding="utf-8") as fh:
             fh.write("\nE2E_PORTABLE_KEY=portable-dotenv-value\nE2E_NATIVE_KEY=native-dotenv-value\n")
         write_portable_plugin(eh, PLUGIN, {SERVER: portable_stdio(
             root / "plug.jsonl", eh.tag, MCPE2E_ECHO_ENV="E2E_PORTABLE_KEY",
@@ -293,7 +293,7 @@ def name_collision(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
         assert turn.returncode == 0 and FINAL in turn.stdout, (turn.stdout[-800:], turn.stderr[-2000:])
         results = tool_results(srv)
     logs = "\n".join(p.read_text(encoding="utf-8", errors="replace")
-                     for p in sorted((eh.hermes_home / "logs").glob("*.log")))
+                     for p in sorted((eh.qubit_home / "logs").glob("*.log")))
     return {"live": live, "backup": backup, "listing": listing.stdout + listing.stderr,
             "results": results, "logs": logs}
 

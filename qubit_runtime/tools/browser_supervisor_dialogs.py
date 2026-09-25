@@ -67,8 +67,8 @@ DIALOG_BRIDGE_URL_PATTERN = f"http://{DIALOG_BRIDGE_HOST}/*"
 # prompted synchronously without racing navigation); the native path still records it.
 _DIALOG_BRIDGE_SCRIPT = r"""
 (() => {
-  if (window.__qubitDialogBridgeInstalled) return;
-  window.__qubitDialogBridgeInstalled = true;
+  if (window.__hermesDialogBridgeInstalled) return;
+  window.__hermesDialogBridgeInstalled = true;
   const ENDPOINT = "http://hermes-dialog-bridge.invalid/";
   function ask(kind, message, defaultPrompt) {
     try {

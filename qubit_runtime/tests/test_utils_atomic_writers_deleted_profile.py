@@ -22,7 +22,7 @@ import pytest
 from qubit_constants import (
     mark_named_profile_deleted,
     named_profile_home,
-    set_hermes_home_override,
+    set_qubit_home_override,
 )
 from utils import atomic_json_write, atomic_write_text
 
@@ -54,7 +54,7 @@ class TestAtomicWritersRefuseDeletedProfileHome:
         from qubit_cli.models import _write_json_cache
 
         profile = _tombstoned_profile(tmp_path)
-        token = set_hermes_home_override(profile)
+        token = set_qubit_home_override(profile)
         try:
             with pytest.raises(
                 FileNotFoundError, match="Named profile home does not exist"
@@ -66,9 +66,9 @@ class TestAtomicWritersRefuseDeletedProfileHome:
                     separators=(",", ":"),
                 )
         finally:
-            from qubit_constants import reset_hermes_home_override
+            from qubit_constants import reset_qubit_home_override
 
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         assert not profile.exists()
 
     def test_lifecycle_sentinel_write_after_delete(self, tmp_path):
@@ -92,7 +92,7 @@ class TestAtomicWritersRefuseDeletedProfileHome:
         from tools.memory_tool_store import MemoryStore
 
         profile = _tombstoned_profile(tmp_path)
-        token = set_hermes_home_override(profile)
+        token = set_qubit_home_override(profile)
         try:
             store = MemoryStore(memory_char_limit=100, user_char_limit=100)
             with pytest.raises(
@@ -100,9 +100,9 @@ class TestAtomicWritersRefuseDeletedProfileHome:
             ):
                 store.add("memory", "entry")
         finally:
-            from qubit_constants import reset_hermes_home_override
+            from qubit_constants import reset_qubit_home_override
 
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         assert not profile.exists()
 
     def test_roundtrip_yaml_update_does_not_recreate_home(self, tmp_path):

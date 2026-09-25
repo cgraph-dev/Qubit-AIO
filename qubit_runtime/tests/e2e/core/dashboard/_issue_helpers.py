@@ -160,10 +160,10 @@ def http_json(method: str, url: str, *, key: str | None = None, body: Any = None
 class GatewayApiServer:
     """``python -m gateway.run`` serving the API-server platform on 127.0.0.1:<port>."""
 
-    def __init__(self, sb: Sandbox, hermes_home: Path, log_path: Path, ready_timeout: float = 120.0) -> None:
-        self.sb, self.hermes_home, self.log_path = sb, hermes_home, log_path
+    def __init__(self, sb: Sandbox, qubit_home: Path, log_path: Path, ready_timeout: float = 120.0) -> None:
+        self.sb, self.qubit_home, self.log_path = sb, qubit_home, log_path
         self.key = secrets.token_hex(32)
-        env_path = hermes_home / ".env"
+        env_path = qubit_home / ".env"
         env_before = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
         for _ in range(PORT_ATTEMPTS):
             port = _free_port()
@@ -172,7 +172,7 @@ class GatewayApiServer:
                 "API_SERVER_HOST": "127.0.0.1", "API_SERVER_PORT": str(port)}.items()), encoding="utf-8")
             self._log = open(log_path, "a", encoding="utf-8")  # noqa: SIM115 - closed in stop()
             self.proc = subprocess.Popen(
-                [sys.executable, "-m", "gateway.run"], cwd=str(sb.home), env=sb.env({"QUBIT_HOME": str(hermes_home)}),
+                [sys.executable, "-m", "gateway.run"], cwd=str(sb.home), env=sb.env({"QUBIT_HOME": str(qubit_home)}),
                 stdin=subprocess.DEVNULL, stdout=self._log, stderr=subprocess.STDOUT, start_new_session=True,
             )
             self.base = f"http://127.0.0.1:{port}"

@@ -1,21 +1,21 @@
 # A2A (Agent-to-Agent)
 
-[A2A](https://a2a-protocol.org) is the open Agent2Agent protocol (v1.0, stewarded by the Linux Foundation) for communication between independent AI agents. The Qubit A2A plugin works in **both directions**: your agent can call other A2A agents as tools, and other agents can send tasks to your Qubit over HTTP.
+[A2A](https://a2a-protocol.org) is the open Agent2Agent protocol (v1.0, stewarded by the Linux Foundation) for communication between independent AI agents. The Hermes A2A plugin works in **both directions**: your agent can call other A2A agents as tools, and other agents can send tasks to your Hermes over HTTP.
 
-It interoperates with any A2A-compliant peer — another Qubit, LangChain, CrewAI, Google ADK agents, or anything built on the official `a2a-sdk`.
+It interoperates with any A2A-compliant peer — another Hermes, LangChain, CrewAI, Google ADK agents, or anything built on the official `a2a-sdk`.
 
 ## When to use A2A
 
-- **Qubit ↔ Qubit across machines** — let your desktop agent hand tasks to a Qubit on a server, or vice versa, each with its own memory, tools, and credentials.
+- **Hermes ↔ Hermes across machines** — let your desktop agent hand tasks to a Hermes on a server, or vice versa, each with its own memory, tools, and credentials.
 - **Delegating to specialist agents** — a peer that advertises `web_search`/`research`/`coding` skills on its Agent Card can be discovered and called mid-conversation.
-- **Being a callable service** — expose your Qubit so other frameworks' agents can send it tasks.
+- **Being a callable service** — expose your Hermes so other frameworks' agents can send it tasks.
 
 When you want multiple agents on the **same machine**, prefer [delegation](../features/delegation.md) (in-process subagents) or the [kanban board](../features/kanban.md) (durable multi-profile work queue) — A2A is for crossing process/machine/framework boundaries.
 
 ## Enable
 
 ```bash
-qubit gateway setup      # pick A2A
+hermes gateway setup      # pick A2A
 ```
 
 Or in `~/.hermes/config.yaml`:
@@ -32,9 +32,9 @@ gateway:
 The outbound client tools ship as the `a2a` toolset, **off by default** — enable it per platform:
 
 ```bash
-qubit tools enable a2a --platform cli        # CLI/TUI sessions
-qubit tools enable a2a --platform telegram   # or any messaging platform
-qubit tools enable a2a --platform a2a        # let inbound A2A tasks call peers (agent chaining)
+hermes tools enable a2a --platform cli        # CLI/TUI sessions
+hermes tools enable a2a --platform telegram   # or any messaging platform
+hermes tools enable a2a --platform a2a        # let inbound A2A tasks call peers (agent chaining)
 ```
 
 The tools are available in every process type — CLI, TUI, gateway, and cron — without the inbound platform needing to be enabled.
@@ -66,7 +66,7 @@ Then just ask: *"Ask the researcher agent to summarize today's arXiv postings."*
 
 ## Inbound: being callable
 
-With the platform enabled, Qubit serves:
+With the platform enabled, Hermes serves:
 
 - **Agent Card** at `GET /.well-known/agent-card.json` (canonical v1.0 path; the legacy `agent.json` also answers) — advertises your agent's name, skills (derived from enabled toolsets), and auth requirements.
 - **JSON-RPC 2.0** at `POST /` — canonical v1.0 methods (`SendMessage`, `SendStreamingMessage`, `GetTask`, `ListTasks`, `CancelTask`, `SubscribeToTask`, push-notification config CRUD) plus the pre-1.0 path-style aliases (`message/send`, …).
@@ -102,7 +102,7 @@ Secure by default; every widening step is explicit:
 | `A2A_ALLOW_ALL_USERS` | `false` | Allow any authenticated peer (dev only) |
 | `A2A_RATE_LIMIT` | `60` | Requests/minute per identity |
 | `A2A_MAX_PINGPONG_TURNS` | `5` | Anti-loop turn cap per context (max 20) |
-| `A2A_REPLY_TIMEOUT` | `300` | Seconds to wait for the agent's reply |
+| `A2A_REPLY_TIMEOUT` | `300` | Seconds to wait for the agent's reply. The orphan-task sweep never fails a task before this window elapses (floor 300s), and never while a request is still waiting on it |
 | `A2A_PUSH_SECRET` | bearer token | HMAC secret for push-notification signing |
 | `A2A_ADVERTISED_TOOLSETS` | all registered | Restrict which skills appear on the Agent Card |
 
@@ -127,4 +127,4 @@ curl -X POST http://your-host:9900/ \
 - **Peers can't reach the card URL** — the card was advertising your bind address; set `A2A_PUBLIC_URL` to the externally routable URL.
 - **`401 Unauthorized`** — token mismatch; check `A2A_PEER_TOKENS`/`A2A_BEARER_TOKEN` on the server and the peer's `auth:` block.
 - **Server won't bind non-localhost** — by design: set a bearer token first, then `A2A_HOST=0.0.0.0`.
-- **Replies time out on long tasks** — raise `A2A_REPLY_TIMEOUT`, or have the caller register a push-notification config and poll `GetTask`.
+- **Replies time out on long tasks** — raise `A2A_REPLY_TIMEOUT` (the orphan sweep follows it, so a late reply is stored, not discarded), or have the caller register a push-notification config and poll `GetTask`.

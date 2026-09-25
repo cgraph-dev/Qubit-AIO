@@ -16,7 +16,7 @@ class DataRemovalPlan:
 
 
 def plan_data_removal(home: Path, project: Path, userdata: Path | None = None) -> DataRemovalPlan:
-    from qubit_constants import get_default_hermes_root
+    from qubit_constants import get_default_qubit_root
     from pm.environments import base_venv, installs_root, store_root
     from qubit_cli.steward import is_bundled_payload
     from tools.checkpoint_pruning import store_lock_path
@@ -24,7 +24,7 @@ def plan_data_removal(home: Path, project: Path, userdata: Path | None = None) -
     home = home.resolve()
     if home == Path(home.anchor) or home == Path.home().resolve():
         raise ValueError(f"refusing to erase an entire filesystem or user home: {home}")
-    machine = get_default_hermes_root(home=home).resolve()
+    machine = get_default_qubit_root(home=home).resolve()
     protected = {
         project.resolve(), base_venv(project).resolve(), store_root(project).resolve(),
         installs_root().resolve(), machine / "tools", machine / "bin", machine / "cache",

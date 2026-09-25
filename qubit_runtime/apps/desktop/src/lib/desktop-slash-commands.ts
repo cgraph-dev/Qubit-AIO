@@ -1,4 +1,7 @@
+import { translateNow } from '@/i18n/runtime'
 import { peekCachedSlashCompletion } from '@/lib/slash-completion-cache'
+
+import desktopSlashRegistry from './desktop-slash-registry.json'
 
 export interface CommandsCatalogSection {
   name: string
@@ -64,6 +67,7 @@ export type DesktopActionId =
   | 'new'
   | 'pet'
   | 'profile'
+  | 'reasoning'
   | 'skin'
   | 'stop'
   | 'title'
@@ -73,7 +77,7 @@ export type DesktopActionId =
 /** A command fulfilled by opening a desktop overlay picker. */
 export type DesktopPickerId = 'model' | 'session'
 
-/** Why a known Qubit command has no desktop UI surface. */
+/** Why a known Hermes command has no desktop UI surface. */
 export type DesktopUnavailableReason = 'advanced' | 'composer-voice' | 'messaging' | 'settings' | 'terminal'
 
 /**
@@ -187,6 +191,12 @@ const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
   },
   { name: '/yolo', description: 'Toggle YOLO — auto-approve dangerous commands', surface: action('yolo') },
   {
+    name: '/reasoning',
+    description: 'Reasoning effort or display [<level> [--global]|show|hide|full|clamp]',
+    surface: action('reasoning'),
+    argumentMode: 'options'
+  },
+  {
     name: '/wake',
     description: 'Control the desktop wake-word listener [on|off|status]',
     surface: action('wake'),
@@ -198,7 +208,7 @@ const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
     surface: action('handoff'),
     argumentMode: 'options'
   },
-  { name: '/profile', description: 'Switch the active Qubit profile', surface: action('profile') },
+  { name: '/profile', description: 'Switch the active Hermes profile', surface: action('profile') },
   {
     name: '/skin',
     description: 'Switch desktop theme or cycle to the next one',
@@ -280,70 +290,79 @@ const DESKTOP_COMMAND_SPECS: readonly DesktopCommandSpec[] = [
   }
 ]
 
-// Known commands with no desktop surface (and no alias) — a flat name list
-// per reason beats 40 identical object literals.
-const NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readonly string[]> = {
-  terminal: [
-    '/busy',
-    '/clear',
-    '/config',
-    '/copy',
-    '/cron',
-    '/density',
-    '/details',
-    '/exit',
-    '/footer',
-    '/gateway',
-    '/history',
-    '/image',
-    '/indicator',
-    '/logs',
-    '/mouse',
-    '/paste',
-    '/platforms',
-    '/plugins',
-    '/quit',
-    '/redraw',
-    '/reload',
-    '/restart',
-    '/sb',
-    '/set-home',
-    '/sethome',
-    '/snap',
-    '/snapshot',
-    '/statusbar',
-    '/toolsets',
-    '/update',
-    '/verbose'
-  ],
-  messaging: ['/approve', '/deny'],
-  settings: ['/skills', '/pets'],
-  advanced: [
-    '/curator',
-    '/fast',
-    '/insights',
-    '/kanban',
-    '/reasoning',
-    '/reload-mcp',
-    '/reload_mcp',
-    '/reload-skills',
-    '/reload_skills'
-  ],
-  // /voice arms SERVER-side capture (voice.record → PortAudio on the backend
-  // host) — meaningless on desktop, which has its own composer-native voice
-  // conversation (mic menu / Ctrl+B) with client-side capture and playback.
-  // Point the user at the button instead of a generic "advanced" shrug.
-  'composer-voice': ['/voice']
+/**
+ * Offline fallback for the registry's `desktop=` metadata, dumped from
+ * `qubit_cli/commands.py::desktop_surface_registry` by
+ * `scripts/dump_desktop_slash_registry.py`. The live `commands.catalog` answers
+ * first (`specFromCatalog`); this copy only covers the gap before the backend
+ * replies. A Python test and `desktop-slash-commands.test.ts` both fail when
+ * the JSON drifts from either side, so the Python registry stays the single
+ * place a command's desktop disposition is authored.
+ */
+const REGISTRY_DESKTOP_SURFACE: Readonly<Record<string, string | null>> = desktopSlashRegistry
+
+/**
+ * Commands the Python registry has never heard of, so they cannot ride the
+ * dump above. `/density`, `/details`, `/logs`, `/mouse` are Ink-process-local
+ * display toggles handled inside `ui-tui/src/app/slash/commands/core.ts`
+ * (three are advertised through `tui_gateway/server.py::_TUI_EXTRA`); `/pets`
+ * is the plural typo of the desktop's own `/pet` action and points at the
+ * sidebar instead of falling through as an unknown skill.
+ */
+export const TS_ONLY_NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readonly string[]> = {
+  advanced: [],
+  'composer-voice': [],
+  messaging: [],
+  settings: ['/pets'],
+  terminal: ['/density', '/details', '/logs', '/mouse']
+}
+
+const LOCAL_SPEC_NAMES = new Set(DESKTOP_COMMAND_SPECS.flatMap(spec => [spec.name, ...(spec.aliases ?? [])]))
+
+/** Registry rows the local table doesn't already curate. A row with a real
+ *  unavailability reason blocks the command; a `null` row is an OFFERED
+ *  built-in (`/context`, `/usage`, …) and becomes a plain `exec` spec, so the
+ *  desktop recognizes every registry command offline — otherwise, before the
+ *  first `commands.catalog` round-trip (or against an older gateway whose
+ *  `complete.slash` rows carry no `kind`), `/context` read as a skill: Skills
+ *  group in the popover, skill chip on paste, extension dispatch (#116159).
+ *  `hidden` (e.g. `/model`) is a popover flag on an executable command and is
+ *  read from the live catalog by `specFromCatalog`; a local spec always wins
+ *  over the dump. */
+function registryDerivedSpecs(): DesktopCommandSpec[] {
+  return Object.entries(REGISTRY_DESKTOP_SURFACE).flatMap(([name, value]) => {
+    if (LOCAL_SPEC_NAMES.has(name)) {
+      return []
+    }
+
+    if (value === null) {
+      return [{ name, surface: exec() }]
+    }
+
+    const reason = asUnavailableReason(value)
+
+    return reason ? [{ name, surface: unavailable(reason) }] : []
+  })
 }
 
 const ALL_SPECS: readonly DesktopCommandSpec[] = [
   ...DESKTOP_COMMAND_SPECS,
-  ...(Object.entries(NO_DESKTOP_SURFACE) as [DesktopUnavailableReason, readonly string[]][]).flatMap(
+  ...registryDerivedSpecs(),
+  ...(Object.entries(TS_ONLY_NO_DESKTOP_SURFACE) as [DesktopUnavailableReason, readonly string[]][]).flatMap(
     ([reason, names]) => names.map(name => ({ name, surface: unavailable(reason) }))
   )
 ]
 
 const SPEC_BY_NAME = new Map<string, DesktopCommandSpec>(ALL_SPECS.map(spec => [spec.name, spec]))
+
+/** Names whose only local spec is the dump's offline `exec` placeholder. The
+ *  live catalog knows more about these (argument mode, `hidden`), so it wins
+ *  once it has answered; the placeholder only covers the cold gap. */
+const REGISTRY_OFFERED_NAMES = new Set(
+  Object.entries(REGISTRY_DESKTOP_SURFACE).flatMap(([name, value]) =>
+    value === null && !LOCAL_SPEC_NAMES.has(name) ? [name] : []
+  )
+)
 
 const ALIAS_TO_CANONICAL = new Map<string, string>(
   ALL_SPECS.flatMap(spec => (spec.aliases ?? []).map(alias => [alias, spec.name] as const))
@@ -444,7 +463,7 @@ const UNAVAILABLE_MESSAGE: Record<DesktopUnavailableReason, (command: string) =>
   advanced: command =>
     `${command} is not shown in the desktop slash palette. Use the relevant desktop control or terminal interface instead.`,
   'composer-voice': () =>
-    'Voice chat lives in the composer here: click the microphone button and choose "Start voice chat" (or press Ctrl+B).',
+    'Voice chat lives in the composer here: click the microphone button and choose "Start voice chat", or use the voice shortcut from Settings → Keyboard Shortcuts.',
   messaging: command => `${command} is only used from messaging platforms.`,
   settings: command => `${command} is managed from the desktop sidebar.`,
   terminal: command => `${command} is only available in the terminal interface.`
@@ -470,10 +489,17 @@ export function canonicalDesktopSlashCommand(command: string): string {
 
 /** Resolve a command (or alias) to its desktop spec, or null for unknown/extension commands. */
 export function resolveDesktopCommand(command: string): DesktopCommandSpec | null {
-  return SPEC_BY_NAME.get(canonicalDesktopSlashCommand(command)) ?? specFromCatalog(command)
+  const canonical = canonicalDesktopSlashCommand(command)
+  const local = SPEC_BY_NAME.get(canonical)
+
+  if (local && REGISTRY_OFFERED_NAMES.has(canonical)) {
+    return specFromCatalog(command) ?? local
+  }
+
+  return local ?? specFromCatalog(command)
 }
 
-function isKnownQubitSlashCommand(command: string): boolean {
+function isKnownHermesSlashCommand(command: string): boolean {
   const normalized = normalizeCommand(command)
 
   if (SPEC_BY_NAME.has(normalized) || ALIAS_TO_CANONICAL.has(normalized)) {
@@ -485,7 +511,7 @@ function isKnownQubitSlashCommand(command: string): boolean {
 
 /**
  * An "extension" command is anything the backend surfaces that is NOT one of
- * Qubit' built-in slash commands — i.e. skill commands (`/gif-search`,
+ * Hermes' built-in slash commands — i.e. skill commands (`/gif-search`,
  * `/codex`, …) and user-defined quick commands. These are user-activated, so
  * they appear in the desktop slash palette and execute when typed.
  */
@@ -496,7 +522,7 @@ export function isDesktopSlashExtensionCommand(command: string): boolean {
     return false
   }
 
-  return !isKnownQubitSlashCommand(normalized)
+  return !isKnownHermesSlashCommand(normalized)
 }
 
 /**
@@ -586,7 +612,19 @@ export function desktopSlashUnavailableMessage(command: string): string | null {
 }
 
 export function desktopSlashDescription(command: string, fallback = ''): string {
-  return SPEC_BY_NAME.get(canonicalDesktopSlashCommand(command))?.description || fallback
+  const canonical = canonicalDesktopSlashCommand(command)
+  const key = `composer.commandDescs.${canonical}`
+  const translated = translateNow(key)
+  const description = translated !== key ? translated : SPEC_BY_NAME.get(canonical)?.description
+
+  if (!description) {
+    return fallback
+  }
+
+  // Keep backend-owned flags and placeholders verbatim when replacing prose.
+  const usage = fallback.match(/\s+\(usage:\s+(.+)\)$/s)?.[0] ?? ''
+
+  return `${description}${usage}`
 }
 
 export function desktopSlashCommandArgumentMode(command: string): DesktopSlashArgumentMode | null {
@@ -631,7 +669,7 @@ export function desktopSkinSlashCompletions(
  * skills someone reaches for daily under a hundred they have never opened.
  *
  * `pruneUnusedBuiltins` additionally drops bundled skills with no recorded
- * activity — the ones that ship with Qubit and were never asked for. It is
+ * activity — the ones that ship with Hermes and were never asked for. It is
  * for BROWSING (a bare `/`) only: typing a query is a search, and a search
  * must never hide a match.
  *

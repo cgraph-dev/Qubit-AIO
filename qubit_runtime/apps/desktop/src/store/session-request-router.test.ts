@@ -23,7 +23,7 @@ const secondaryGateways: Array<{
 let promptAckStatus: null | string = null
 
 vi.mock('@/hermes', () => ({
-  QubitGateway: class {
+  HermesGateway: class {
     connectionState = 'closed'
     eventHandler: ((event: { payload?: Record<string, unknown>; session_id?: string; type: string }) => void) | null =
       null
@@ -76,14 +76,15 @@ const {
   ensureGatewayForProfile,
   pruneSecondaryGateways,
   retireLocalProfileGateways,
-  setPrimaryGateway
+  setPrimaryGateway,
+  SECONDARY_MIN_LIFETIME_MS
 } = await import('./gateway')
 
 const { requestForSessionProfile, sessionRpcNeedsProfileRoute } = await import('./session-request-router')
 const { $connectionsRegistry } = await import('./connection-registry-state')
 
 function installDesktop(): void {
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = {
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
     getConnection: vi.fn(async (profile: null | string) =>
       profile ? { port: 5151, profile, token: 'secondary-token' } : { port: 4242, token: 'primary-token' }
     ),
@@ -116,7 +117,7 @@ afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
   resetBackgroundPollingGuard()
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('$activeGatewayRoute (registry-owned active profile)', () => {
@@ -253,7 +254,7 @@ describe('requestForSessionProfile', () => {
     await expect(
       requestForSessionProfile('loki', ambient as never, 'session.resume', { session_id: 'stored-a' })
     ).resolves.toEqual({ method: 'session.resume', params: { session_id: 'stored-a' } })
-    expect(window.qubitDesktop!.getConnection).toHaveBeenCalledWith('loki')
+    expect(window.hermesDesktop!.getConnection).toHaveBeenCalledWith('loki')
     expect(secondaryGateways).toHaveLength(1)
     expect(primary.request).not.toHaveBeenCalled()
     expect(ambient).not.toHaveBeenCalled()
@@ -267,9 +268,9 @@ describe('requestForSessionProfile', () => {
 
     const desktop = (
       window as unknown as {
-        qubitDesktop: { getConnectionFor: ReturnType<typeof vi.fn> }
+        hermesDesktop: { getConnectionFor: ReturnType<typeof vi.fn> }
       }
-    ).qubitDesktop
+    ).hermesDesktop
 
     const ambient = vi.fn(async () => ({ ambient: true }))
 
@@ -507,7 +508,11 @@ describe('requestForSessionProfile', () => {
     })
     expect(secondaryGateways[0].close).not.toHaveBeenCalled()
 
+    // Age the socket past the min-lifetime grace (#94769) so this prune
+    // asserts the turn-lease release, not the freshly-opened spare.
+    vi.useFakeTimers({ now: Date.now() + SECONDARY_MIN_LIFETIME_MS + 1_000 })
     pruneSecondaryGateways(new Set())
+    vi.useRealTimers()
     expect(secondaryGateways[0].close).toHaveBeenCalledOnce()
 
     await requestForSessionProfile(route, ambient as never, 'session.resume', { session_id: 'rt-pruned' })

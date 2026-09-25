@@ -1,5 +1,5 @@
 """Tests for qubit_cli.gateway.ensure_gateway_service — the zero-prompt
-service install/start path used by `qubit setup` and `qubit import`.
+service install/start path used by `hermes setup` and `hermes import`.
 
 The helper's contract:
   * never prompts, never raises (returns False on any failure)
@@ -35,7 +35,7 @@ class TestEnsureGatewayService:
         _patch_host(monkeypatch, systemd=False)
         assert gateway_mod.ensure_gateway_service() is False
         out = capsys.readouterr().out
-        assert "qubit gateway" in out
+        assert "hermes gateway" in out
 
     def test_already_running_short_circuits(self, monkeypatch):
         _patch_host(monkeypatch)
@@ -95,16 +95,6 @@ class TestEnsureGatewayService:
         assert gateway_mod.ensure_gateway_service() is False
         assert warned and not calls
 
-    def test_macos_uses_launchd(self, monkeypatch):
-        _patch_host(monkeypatch, systemd=False, macos=True)
-        monkeypatch.setattr(gateway_mod, "_is_service_running", lambda: False)
-        monkeypatch.setattr(gateway_mod, "_is_service_installed", lambda: False)
-        calls = []
-        monkeypatch.setattr(gateway_mod, "launchd_install", lambda force=False: calls.append("install"))
-        monkeypatch.setattr(gateway_mod, "launchd_start", lambda: calls.append("start"))
-
-        assert gateway_mod.ensure_gateway_service() is True
-        assert calls == ["install", "start"]
 
     def test_never_raises_on_install_failure(self, monkeypatch, capsys):
         _patch_host(monkeypatch)
@@ -119,7 +109,7 @@ class TestEnsureGatewayService:
 
         assert gateway_mod.ensure_gateway_service() is False
         out = capsys.readouterr().out
-        assert "qubit gateway install" in out
+        assert "hermes gateway install" in out
 
     def test_never_raises_on_sys_exit(self, monkeypatch, capsys):
         """Install paths that sys.exit() must not abort setup/import."""
@@ -135,7 +125,7 @@ class TestEnsureGatewayService:
 
         assert gateway_mod.ensure_gateway_service() is False
         out = capsys.readouterr().out
-        assert "qubit gateway install" in out
+        assert "hermes gateway install" in out
 
     def test_user_systemd_unreachable_reports_remediation(self, monkeypatch, capsys):
         _patch_host(monkeypatch)

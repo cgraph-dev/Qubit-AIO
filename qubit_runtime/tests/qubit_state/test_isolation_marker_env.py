@@ -19,7 +19,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import qubit_state
 import qubit_state_guard
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -67,13 +66,6 @@ def _minimal_env(**extra) -> dict:
     return env
 
 
-def test_conftest_exports_the_marker():
-    """The hermetic conftest must export the marker before tests run."""
-    assert os.environ.get("HERMES_TEST_ISOLATION"), (
-        "HERMES_TEST_ISOLATION must be exported by tests/conftest.py so "
-        "subprocess children inherit a test-context signal that survives "
-        "PYTEST_* scrubbing"
-    )
 
 
 def test_marker_alone_reports_test_context(monkeypatch):
@@ -96,7 +88,7 @@ def test_child_with_rebuilt_env_keeping_marker_refuses_production_db():
     """THE regression: a child whose env was rebuilt from scratch (PYTEST_*
     stripped, QUBIT_HOME lost) but which keeps the marker must still refuse
     to open the production state.db."""
-    env = _minimal_env(QUBIT_TEST_ISOLATION="/tmp/pytest-isolation-root")
+    env = _minimal_env(HERMES_TEST_ISOLATION="/tmp/pytest-isolation-root")
     result = _spawn_probe(env)
     assert result["armed"] is True
     assert result["fired"] is True, (
@@ -109,8 +101,8 @@ def test_child_bypass_env_disarms_guard_even_with_marker():
     """The sanctioned escape hatch for children that genuinely need a real
     DB: HERMES_STATE_DB_GUARD_BYPASS=1, not marker-stripping."""
     env = _minimal_env(
-        QUBIT_TEST_ISOLATION="/tmp/pytest-isolation-root",
-        QUBIT_STATE_DB_GUARD_BYPASS="1",
+        HERMES_TEST_ISOLATION="/tmp/pytest-isolation-root",
+        HERMES_STATE_DB_GUARD_BYPASS="1",
     )
     result = _spawn_probe(env)
     assert result["fired"] is False

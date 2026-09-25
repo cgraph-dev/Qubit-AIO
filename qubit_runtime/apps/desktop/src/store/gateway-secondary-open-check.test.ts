@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // publish the closed gateway as the active route. entry.connection is set
 // BEFORE the dial completes in openSecondary(), so checking only its
 // truthiness previously let a failed activation still "succeed" and
-// publish -- the next chat RPC then failed with "Qubit gateway is not
+// publish -- the next chat RPC then failed with "Hermes gateway is not
 // connected" even though the UI had already switched to that route.
 
 const gatewayMocks = vi.hoisted(() => ({
@@ -16,7 +16,7 @@ const gatewayMocks = vi.hoisted(() => ({
 
 vi.mock('@/hermes', () => ({
   setApiRequestConnection: vi.fn(),
-  QubitGateway: class {
+  HermesGateway: class {
     connectionState = 'closed'
     connect = async (wsUrl: string): Promise<void> => {
       // Unlike gateway-agent-scope.test.ts's always-succeeds mock, this
@@ -56,7 +56,7 @@ interface DesktopStub {
 }
 
 function installDesktop(stub: DesktopStub): void {
-  ;(window as unknown as { qubitDesktop: unknown }).qubitDesktop = stub
+  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
 }
 
 function makePrimary(): { connectionState: string } {
@@ -90,7 +90,7 @@ beforeEach(() => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('secondary activation requires an open socket, not just a connection descriptor (issue #92265)', () => {

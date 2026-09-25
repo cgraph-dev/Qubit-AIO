@@ -7,7 +7,7 @@ Covers:
 
 Note: auto-import from ~/.codex/auth.json was removed in #12360 — Hermes
 now owns its own openai-codex auth state, and users explicitly adopt
-existing Codex CLI tokens via `qubit auth openai-codex`. The old
+existing Codex CLI tokens via `hermes auth openai-codex`. The old
 "Codex CLI shared file" discovery tests were removed with that change.
 """
 
@@ -29,7 +29,7 @@ def _make_fake_jwt(expiry_offset: int = 3600) -> str:
 
 
 @pytest.fixture()
-def qubit_auth_only_env(tmp_path, monkeypatch):
+def hermes_auth_only_env(tmp_path, monkeypatch):
     """Tokens already in Hermes auth store (no Codex CLI needed)."""
     qubit_home = tmp_path / ".hermes"
     qubit_home.mkdir()
@@ -60,7 +60,7 @@ def qubit_auth_only_env(tmp_path, monkeypatch):
     return qubit_home
 
 
-def test_normal_path_still_works(qubit_auth_only_env):
+def test_normal_path_still_works(hermes_auth_only_env):
     """openai-codex appears when tokens are already in Hermes auth store."""
     from qubit_cli.model_switch import list_authenticated_providers
 

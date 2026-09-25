@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger("qubit.security_audit")
+logger = logging.getLogger("hermes.security_audit")
 
 # The audit runs once per process even if both the CLI and gateway startup paths call it.
 _AUDIT_RAN = False
@@ -44,7 +44,7 @@ def _iter_sshd_config_lines() -> list[str]:
         pass
     for p in paths:
         try:
-            raw_lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+            raw_lines = p.read_text(encoding="utf-8-sig", errors="replace").splitlines()
         except Exception:
             continue
         lines.extend(s for s in map(str.strip, raw_lines) if s and not s.startswith("#"))

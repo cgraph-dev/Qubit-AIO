@@ -120,8 +120,8 @@ export const ga: Translations = {
     starting: "Ag tosú",
     startedInBackground: "Tosaithe sa chúlra — seiceáil na logaí le haghaidh dul chun cinn",
     stopped: "Stoptha",
-    updateQubit: "Nuashonraigh Qubit",
-    updatingQubit: "Ag nuashonrú Qubit…",
+    updateHermes: "Nuashonraigh Qubit",
+    updatingHermes: "Ag nuashonrú Qubit…",
     waitingForOutput: "Ag fanacht le haschur…",
   },
 
@@ -165,6 +165,10 @@ export const ga: Translations = {
     failedToDeleteSelected: "Theip ar scriosadh na seisiún roghnaithe",
     resumeInChat: "Lean ar aghaidh sa chomhrá",
     newChat: "Comhrá nua",
+    workspace: "spás oibre",
+    workspaceDefault: "Réamhshocrú",
+    workspaceRescan: "Athscan na stórtha",
+    workspaceCustom: "Cosán eile…",
     previousPage: "Leathanach roimhe seo",
     nextPage: "An chéad leathanach eile",
     roles: {
@@ -332,6 +336,8 @@ export const ga: Translations = {
     disableRuntime: "Díchumasaigh",
     enableAfterInstall: "Cumasaigh tar éis suiteála",
     enableRuntime: "Cumasaigh",
+    toggleTakesEffectAfterRestart:
+      "Sábháilte — atosaigh an gateway chun an t-athrú a chur i bhfeidhm.",
     forceReinstall: "Cuir iallach ar athshuiteáil (scrios an fillteán atá ann ar dtús)",
     headline:
       "Faigh, suiteáil, cumasaigh agus nuashonraigh plugins Qubit (paireacht le `qubit plugins`).",
@@ -351,8 +357,8 @@ export const ga: Translations = {
     providersHint:
       "Scríobhann memory.provider (folamh = ionsuite) agus context.engine chuig config.yaml. Beidh éifeacht aige sa chéad seisiún eile.",
     refreshDashboard: "Athscan síntí an dashboard",
-    removeConfirm: "Bain an plugin seo ó $QUBIT_HOME/plugins/?",
-    removeHint: "Ní féidir ach plugins atá suiteáilte ag an úsáideoir faoi $QUBIT_HOME/plugins a bhaint.",
+    removeConfirm: "Bain an plugin seo ó ~/.hermes/plugins/?",
+    removeHint: "Ní féidir ach plugins atá suiteáilte ag an úsáideoir faoi ~/.hermes/plugins a bhaint.",
     rescanHeading: "Clár plugin SPA",
     rescanHint: "Athscan tar éis comhaid a chur leis an diosca ionas go n-aimseoidh barra taoibh an dashboard manifests nua.",
     runtimeHeading: "Runtime gateway (plugins YAML)",
@@ -374,7 +380,7 @@ export const ga: Translations = {
     all: "Gach ceann",
     categories: "Catagóirí",
     filters: "Scagairí",
-    noSkills: "Níor aimsíodh scileanna. Luchtaítear scileanna ó ~/.qubit/skills/",
+    noSkills: "Níor aimsíodh scileanna. Luchtaítear scileanna ó ~/.hermes/skills/",
     noSkillsMatch: "Níl scil ar bith ag teacht le do chuardach nó scagaire.",
     skillCount: "{count} scil{s}",
     resultCount: "{count} torad{s}",
@@ -388,7 +394,7 @@ export const ga: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Scagairí",
     sections: "Ranna",
     exportConfig: "Easpórtáil cumraíocht mar JSON",

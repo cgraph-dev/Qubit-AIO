@@ -28,19 +28,19 @@ def test_suffix_scopes_default_home_and_profiles(tmp_path, suffix):
 import json
 import os
 from pathlib import Path
-from qubit_constants import get_hermes_home, get_process_hermes_home, get_default_hermes_root
+from qubit_constants import get_qubit_home, get_process_qubit_home, get_default_qubit_root
 from qubit_cli.profiles import _get_profiles_root, _get_active_profile_path, resolve_profile_env
-root = get_default_hermes_root()
+root = get_default_qubit_root()
 profile = root / 'profiles' / 'coder'
 profile.mkdir(parents=True)
 (profile / 'config.yaml').write_text('', encoding='utf-8')
-result = [str(get_hermes_home()), str(get_process_hermes_home()), str(root),
+result = [str(get_qubit_home()), str(get_process_qubit_home()), str(root),
           str(_get_profiles_root()), str(_get_active_profile_path()), resolve_profile_env('coder')]
 os.environ['QUBIT_HOME'] = str(profile)
-result.extend([str(get_hermes_home()), str(get_default_hermes_root())])
+result.extend([str(get_qubit_home()), str(get_default_qubit_root())])
 os.environ.pop('QUBIT_HOME')
 os.environ['HERMES_DATA_DIR_SUFFIX'] += '-changed'
-result.append(str(get_default_hermes_root()))
+result.append(str(get_default_qubit_root()))
 print(json.dumps(result))
 """
     result = subprocess.run(
@@ -60,9 +60,9 @@ print(json.dumps(result))
 
 @pytest.mark.platforms("linux", "macos", "windows")
 def test_startup_readers_use_the_suffixed_home(tmp_path, monkeypatch):
-    from qubit_constants import get_process_hermes_home
-    from qubit_cli.dashboard_procs import _hermes_home_dir
-    from qubit_cli.env_loader import load_hermes_dotenv
+    from qubit_constants import get_process_qubit_home
+    from qubit_cli.dashboard_procs import _qubit_home_dir
+    from qubit_cli.env_loader import load_qubit_dotenv
     from qubit_startup_watchdog import get_startup_watchdog_dump_path
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -70,20 +70,20 @@ def test_startup_readers_use_the_suffixed_home(tmp_path, monkeypatch):
     monkeypatch.delenv("QUBIT_HOME", raising=False)
     monkeypatch.setenv("HERMES_DATA_DIR_SUFFIX", "magic-test")
     monkeypatch.delenv("SUFFIX_TEST_CREDENTIAL", raising=False)
-    home = get_process_hermes_home()
+    home = get_process_qubit_home()
     home.mkdir(parents=True)
     (home / ".env").write_text("SUFFIX_TEST_CREDENTIAL=suffixed\n", encoding="utf-8")
 
-    load_hermes_dotenv(project_env=tmp_path / "absent.env", load_external_secrets=False)
+    load_qubit_dotenv(project_env=tmp_path / "absent.env", load_external_secrets=False)
     assert os.environ.get("SUFFIX_TEST_CREDENTIAL") == "suffixed"
-    assert _hermes_home_dir() == home
+    assert _qubit_home_dir() == home
     assert get_startup_watchdog_dump_path() == home / "logs" / "gateway-startup-watchdog.log"
 
 
 def test_suffix_does_not_change_explicit_or_context_home(tmp_path, monkeypatch):
     from qubit_constants import (
-        get_default_hermes_root, get_hermes_home, get_process_hermes_home,
-        reset_hermes_home_override, set_hermes_home_override,
+        get_default_qubit_root, get_qubit_home, get_process_qubit_home,
+        reset_qubit_home_override, set_qubit_home_override,
     )
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -92,10 +92,10 @@ def test_suffix_does_not_change_explicit_or_context_home(tmp_path, monkeypatch):
     scoped = tmp_path / "scoped"
     monkeypatch.setenv("QUBIT_HOME", str(explicit))
     monkeypatch.setenv("HERMES_DATA_DIR_SUFFIX", "magic-test")
-    assert get_hermes_home() == get_process_hermes_home() == get_default_hermes_root() == explicit
-    token = set_hermes_home_override(scoped)
+    assert get_qubit_home() == get_process_qubit_home() == get_default_qubit_root() == explicit
+    token = set_qubit_home_override(scoped)
     try:
-        assert get_hermes_home() == scoped
-        assert get_process_hermes_home() == get_default_hermes_root() == explicit
+        assert get_qubit_home() == scoped
+        assert get_process_qubit_home() == get_default_qubit_root() == explicit
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)

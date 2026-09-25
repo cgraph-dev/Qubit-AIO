@@ -1,4 +1,5 @@
-import type { QubitSkin } from '@hermes/shared/skin'
+import type { GatewayEvent } from '@hermes/shared'
+import type { HermesSkin } from '@hermes/shared/skin'
 
 import {
   notifyCronChanged,
@@ -6,6 +7,7 @@ import {
   notifyPetChanged,
   notifyPlatformsChanged,
   notifySessionsChanged,
+  notifySetupReady,
   type PetChangeMeta,
   setChangeEventsAvailable
 } from '@/store/live-sync'
@@ -17,26 +19,41 @@ import { ingestBackendSkin } from '@/themes/backend-sync'
 
 import type { GatewayEventContext } from './types'
 
-/** gateway.ready / skin.changed / change-watcher broadcasts / session.reclaimed. */
+/** gateway.ready / setup.ready / skin.changed / change-watcher broadcasts / session.reclaimed. */
 export function handleLifecycleEvent(ctx: GatewayEventContext): boolean {
   const { deps, event, payload, fromActiveSource } = ctx
 
   if (event.type === 'gateway.ready') {
+    const ready = (event as GatewayEvent<'gateway.ready'>).payload
     // Seed the active skin into the desktop theme registry without applying,
     // so a fresh connect never overrides the user's persisted desktop theme.
-    ingestBackendSkin((payload as { skin?: QubitSkin } | undefined)?.skin, { apply: false })
+    ingestBackendSkin(ready?.skin, { apply: false })
     // Backends with the change watcher broadcast pet/cron/sessions change
     // events; consumers demote their legacy polls to slow backstops.
-    setChangeEventsAvailable(Boolean((payload as { change_events?: boolean } | undefined)?.change_events))
+    setChangeEventsAvailable(Boolean(ready?.change_events))
+
+    return true
+  }
+
+  if (event.type === 'setup.ready') {
+    // The boot bootstrap (qubit_cli/free_tier_bootstrap.py) resolved the
+    // free-tier identity and the inference route, and broadcast once. The
+    // payload is only a hint — the status snapshot re-reads `setup.status` /
+    // `setup.runtime_check` / `free_tier.status` through its own scoped
+    // requester so the chip, strip and onboarding react now rather than on
+    // the next ambient tick. Only the active source's boot matters here.
+    if (fromActiveSource()) {
+      notifySetupReady()
+    }
 
     return true
   }
 
   if (event.type === 'skin.changed') {
-    // A runtime skin switch (Qubit activating an authored skin, or `/skin`
+    // A runtime skin switch (Hermes activating an authored skin, or `/skin`
     // on another surface). Only the active source+profile's change repaints.
     if (fromActiveSource()) {
-      ingestBackendSkin(payload as QubitSkin | undefined, { apply: true })
+      ingestBackendSkin(payload as HermesSkin | undefined, { apply: true })
     }
 
     return true

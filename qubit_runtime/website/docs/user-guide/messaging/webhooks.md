@@ -1,12 +1,12 @@
 ---
 sidebar_position: 13
 title: "Webhooks"
-description: "Receive events from GitHub, GitLab, and other services to trigger Qubit agent runs"
+description: "Receive events from GitHub, GitLab, and other services to trigger Hermes agent runs"
 ---
 
 # Webhooks
 
-Receive events from external services (GitHub, GitLab, JIRA, Stripe, etc.) and trigger Qubit agent runs automatically. The webhook adapter runs an HTTP server that accepts POST requests, validates HMAC signatures, transforms payloads into agent prompts, and routes responses back to the source or to another configured platform.
+Receive events from external services (GitHub, GitLab, JIRA, Stripe, etc.) and trigger Hermes agent runs automatically. The webhook adapter runs an HTTP server that accepts POST requests, validates HMAC signatures, transforms payloads into agent prompts, and routes responses back to the source or to another configured platform.
 
 The agent processes the event and can respond by posting comments on PRs, sending messages to Telegram/Discord, or logging the result.
 
@@ -15,7 +15,7 @@ The agent processes the event and can respond by posting comments on PRs, sendin
 <div style={{position: 'relative', width: '100%', aspectRatio: '16 / 9', marginBottom: '1.5rem'}}>
   <iframe
     src="https://www.youtube.com/embed/WNYe5mD4fY8"
-    title="Qubit Agent — Webhooks Tutorial"
+    title="Hermes Agent — Webhooks Tutorial"
     style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0}}
     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
     allowFullScreen
@@ -26,8 +26,8 @@ The agent processes the event and can respond by posting comments on PRs, sendin
 
 ## Quick Start
 
-1. Enable via `qubit gateway setup` or environment variables
-2. Define routes in `config.yaml` **or** create them dynamically with `qubit webhook subscribe`
+1. Enable via `hermes gateway setup` or environment variables
+2. Define routes in `config.yaml` **or** create them dynamically with `hermes webhook subscribe`
 3. Point your service at `http://your-server:8644/webhooks/<route-name>`
 
 ---
@@ -39,7 +39,7 @@ There are two ways to enable the webhook adapter.
 ### Via setup wizard
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
 Follow the prompts to enable webhooks, set the port, and set a global HMAC secret.
@@ -72,7 +72,7 @@ Expected response:
 
 ## Configuring Routes {#configuring-routes}
 
-Routes define how different webhook sources are handled. Each route is a named entry under `platforms.webhook.extra.routes` in your `config.yaml`.
+Routes define how different webhook sources are handled. Each route is a named entry under `platforms.webhook.extra.routes` in your `config.yaml`. Adapter settings (`port`, `host`, `secret`, `routes`) may also be written directly under `platforms.webhook:` — both spellings reach the adapter; a value nested under `extra:` wins if the same key appears in both places.
 
 ### Route properties
 
@@ -80,15 +80,18 @@ Routes define how different webhook sources are handled. Each route is a named e
 |----------|----------|-------------|
 | `events` | No | List of event types to accept (e.g. `["pull_request"]`). If empty, all events are accepted. Event type is read from `X-GitHub-Event`, `X-GitLab-Event`, or `event_type` in the payload. |
 | `secret` | **Yes** | HMAC secret for signature validation. Falls back to the global `secret` if not set on the route. Set to `"INSECURE_NO_AUTH"` for testing only (skips validation). |
-| `profile` | No | Profile authorized to execute this route when `gateway.multiplex_profiles` is enabled. Omit it for a default-profile-only route; set a profile name (for example `coder`) to bind the route and its secret to `/p/coder/webhooks/<route>`. |
+| `profile` | No | Profile authorized to execute this route when `gateway.multiplex_profiles` is enabled. Omit it for a default-profile-only route; set a profile name (for example `coder`) to bind the route and its secret to `/p/coder/webhooks/<route>`. Dynamic subscriptions set it with `hermes webhook subscribe <name> --route-profile coder`. |
 | `prompt` | No | Template string with dot-notation payload access (e.g. `{pull_request.title}`). If omitted, the full JSON payload is dumped into the prompt. Payload fields are untrusted — see [Authenticated does not mean trusted](#authenticated-does-not-mean-trusted). |
 | `filters` | No | Declarative payload filters evaluated after auth/body/event filtering and before agent or direct delivery work. Non-matches return `{"status":"ignored","reason":"filter"}` with HTTP 200. |
 | `script` | No | Filter/transform script under `~/.hermes/scripts/`. The webhook payload is passed as JSON on stdin. JSON object stdout replaces the payload before templating; text stdout is exposed as `script_output`; empty stdout, `[SILENT]`, or a nonzero exit code ignores the webhook. |
 | `skills` | No | List of skill names to load for the agent run. |
-| `toolsets` | No | List of toolset keys (e.g. `["terminal", "file", "web"]`) that **replaces** the platform-level webhook toolset for runs triggered by this route only. Manual config edit only — not settable via `qubit webhook subscribe`, so agent-created subscriptions cannot self-grant elevated tools. Names are validated the same way as `platform_toolsets` entries (unknown or platform-restricted names are dropped). See [Per-route toolsets](#per-route-toolsets). |
+| `toolsets` | No | List of toolset keys (e.g. `["terminal", "file", "web"]`) that **replaces** the platform-level webhook toolset for runs triggered by this route only. Manual config edit only — not settable via `hermes webhook subscribe`, so agent-created subscriptions cannot self-grant elevated tools. Names are validated the same way as `platform_toolsets` entries (unknown or platform-restricted names are dropped). See [Per-route toolsets](#per-route-toolsets). |
 | `deliver` | No | Where to send the response: `github_comment`, `telegram`, `discord`, `slack`, `signal`, `sms`, `whatsapp`, `matrix`, `mattermost`, `homeassistant`, `email`, `dingtalk`, `feishu`, `wecom`, `weixin`, `bluebubbles`, `qqbot`, or `log` (default). |
 | `deliver_extra` | No | Additional delivery config — keys depend on `deliver` type (e.g. `repo`, `pr_number`, `chat_id`). Values support the same `{dot.notation}` templates as `prompt`. |
 | `deliver_only` | No | If `true`, skip the agent entirely — the rendered `prompt` template becomes the literal message that gets delivered. Zero LLM cost, sub-second delivery. See [Direct Delivery Mode](#direct-delivery-mode) for use cases. Requires `deliver` to be a real target (not `log`). |
+| `cron_job` | No | Fire an existing cron job (by ID or name) on each event instead of starting a fresh webhook agent session. The rendered `prompt` becomes transient per-run context; the job's own prompt, skills, model, and delivery settings apply. Mutually exclusive with `deliver_only`. See [Event-Triggered Cron Jobs](#event-triggered-cron-jobs). |
+| `coalesce` | No | Debounce rapid distinct events on the same logical entity into one agent run. Block with a required `key` (payload field or template identifying the entity, e.g. `pull_request.number`), optional `window_seconds` (quiet window, default 30) and `max_wait_seconds` (dispatch cap, default 300). See [Event Coalescing](#event-coalescing). Mutually exclusive with `deliver_only` and `cron_job`. |
+| `mirror_to_session` | No | Default `false`. When `true`, after a successful delivery to a chat platform the delivered message is also written into that chat's session transcript (as a labelled user turn, the same way continuable cron briefs are), so when you reply in that chat the agent knows what it just sent you. See [Replying to a delivery](#replying-to-a-delivery). |
 
 ### Full example
 
@@ -161,6 +164,42 @@ Supported operators:
 - `all`, `any`, and `not` groups
 
 Field paths use dot notation. `payload.foo` reads from a top-level `payload` object when one exists, or from the root webhook body for flat payloads. `event` / `event_type` match the resolved event type, and `headers.<Name>` reads request headers.
+
+### Event Coalescing {#event-coalescing}
+
+Providers often fire several distinct events for the same logical entity in quick succession — five rapid pushes to one pull request, a burst of edits to one ticket, a flapping monitoring alert. Each event carries a fresh delivery ID, so the idempotency cache cannot suppress them and every event wakes a separate agent run.
+
+Set `coalesce` on a route to debounce these into a single run per entity:
+
+```yaml
+platforms:
+  webhook:
+    extra:
+      routes:
+        github-pr:
+          events: ["pull_request"]
+          secret: "github-webhook-secret"
+          coalesce:
+            key: "{repository.full_name}#{pull_request.number}"
+            window_seconds: 30      # quiet window (default 30)
+            max_wait_seconds: 300   # dispatch cap (default 300)
+          prompt: "Review PR #{pull_request.number}: {pull_request.title}"
+          deliver: "github_comment"
+          deliver_extra:
+            repo: "{repository.full_name}"
+            pr_number: "{pull_request.number}"
+```
+
+How it works:
+
+- Events are grouped per route by the rendered `key`. A bare dotted field (`pull_request.number`) or a full template (`{repository.full_name}#{pull_request.number}`) both work.
+- Each new event **replaces** the pending one and pushes the quiet-window timer back. When `window_seconds` pass with no new event, the group dispatches **one** agent run using the latest event's payload, prompt, and delivery templates.
+- `max_wait_seconds` caps total buffering from the group's first event, so a steady event stream cannot postpone dispatch forever.
+- When more than one event was coalesced, the prompt gets a short note telling the agent how many earlier events were superseded.
+- If the `key` does not resolve for an event (the payload lacks the field — e.g. an `issue_comment` event on a route keyed by `pull_request.number`), that event is **dispatched immediately** instead of being coalesced, so unrelated entities never collapse into one group. Pick a key present on every event type the route accepts.
+- Coalesced requests return HTTP 202 with `{"status": "coalesced"}`. Delivery-ID idempotency still runs first, so provider retries of the same delivery are dropped rather than counted.
+- Pending groups are flushed (dispatched immediately) when the adapter disconnects — a gateway reconnect or `hermes gateway stop` — not dropped. Buffered events live in memory, so a hard process kill loses at most the current window's buffered burst.
+- `coalesce` applies to agent-mode routes only; combining it with `deliver_only` or `cron_job` is rejected at startup.
 
 ### Script Filters and Transforms
 
@@ -256,7 +295,7 @@ gh auth login
 
 ### 4. Test it
 
-Open a pull request on the repository. The webhook fires, Qubit processes the event, and posts a review comment on the PR.
+Open a pull request on the repository. The webhook fires, Hermes processes the event, and posts a review comment on the PR.
 
 ---
 
@@ -321,6 +360,14 @@ The `deliver` field controls where the agent's response goes after processing th
 
 For cross-platform delivery, the target platform must also be enabled and connected in the gateway. If no `chat_id` is provided in `deliver_extra`, the response is sent to that platform's configured home channel.
 
+### Replying to a delivery {#replying-to-a-delivery}
+
+By default a delivery is fire-and-forget: each webhook event runs in its own session, so if you reply to the delivered message in that chat, the agent there has no record of what was sent. Set `mirror_to_session: true` on the route (or pass `--mirror-to-session` to `hermes webhook subscribe`) and the delivered text is also appended to the target chat's session as `[Webhook delivery: <route>]` followed by the message, so a follow-up ("so he's out?") has the context.
+
+- The mirror is best-effort: it never fails the delivery, and it is skipped when the chat has no gateway session yet (nobody has talked to the agent there).
+- On a `/p/<profile>/` route it is written into that profile's session for the chat, never another profile's.
+- The mirrored text enters the chat's history as if you had sent it. On a [`deliver_only`](#direct-delivery-mode) route it is the raw rendered payload, so only enable it for sources whose content you trust to sit in your conversation (your own services, not a public issue tracker).
+
 ---
 
 ## Direct Delivery Mode {#direct-delivery-mode}
@@ -367,7 +414,7 @@ Your Supabase edge function signs the payload with HMAC-SHA256 and POSTs to `htt
 ### Example: Dynamic subscription via CLI
 
 ```bash
-qubit webhook subscribe antenna-matches \
+hermes webhook subscribe antenna-matches \
   --deliver telegram \
   --deliver-chat-id "123456789" \
   --deliver-only \
@@ -397,14 +444,61 @@ qubit webhook subscribe antenna-matches \
 
 ---
 
+## Event-Triggered Cron Jobs {#event-triggered-cron-jobs}
+
+Set `cron_job` on a route to fire an **existing cron job** whenever an event arrives — instead of polling on a fixed cadence or starting a fresh webhook agent session. This turns any scheduled job into an event-driven task: keep the schedule as a fallback sweep (or make it a rarely-firing one) and let the webhook fire it the moment something actually changes.
+
+How it works:
+
+1. The event passes the same HMAC auth, rate limiting, `events`/`filters`/`script` filtering, and idempotency as any other route.
+2. The route's `prompt` template is rendered from the payload and injected into the job as **transient per-run context** (the same rail as `cronjob(action='run', prompt=...)` — the job's stored prompt is never mutated).
+3. The job fires through the same at-most-once claim the scheduler uses, so a webhook burst cannot double-fire a job that is already running, and the job's own delivery target receives the output.
+
+### Example: fire a PR-review job on review feedback
+
+```yaml
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      routes:
+        pr-feedback:
+          events: ["pull_request_review"]
+          secret: "github-webhook-secret"
+          cron_job: "pr-review-sweeper"        # existing job ID or name
+          prompt: |
+            PR #{number} in {repository.full_name} received new review feedback
+            from {review.user.login}: {review.body}
+```
+
+### Via the CLI
+
+```bash
+hermes webhook subscribe pr-feedback \
+  --events "pull_request_review" \
+  --cron-job "pr-review-sweeper" \
+  --prompt "PR #{number} received feedback: {review.body}"
+```
+
+The job reference is validated when you create the subscription, so typos surface immediately.
+
+### Notes
+
+- `cron_job` and `deliver_only` are mutually exclusive (the adapter refuses to start if a route sets both). A cron job handles its own delivery.
+- The route-level `deliver`, `deliver_extra`, and `skills` fields are ignored on `cron_job` routes — the job's own settings apply.
+- Paused/disabled jobs are not fired; the event is logged and dropped.
+- The POST returns `202 Accepted` immediately; the job runs in the background.
+
+---
+
 ## Dynamic Subscriptions (CLI) {#dynamic-subscriptions}
 
-In addition to static routes in `config.yaml`, you can create webhook subscriptions dynamically using the `qubit webhook` CLI command. This is especially useful when the agent itself needs to set up event-driven triggers.
+In addition to static routes in `config.yaml`, you can create webhook subscriptions dynamically using the `hermes webhook` CLI command. This is especially useful when the agent itself needs to set up event-driven triggers.
 
 ### Create a subscription
 
 ```bash
-qubit webhook subscribe github-issues \
+hermes webhook subscribe github-issues \
   --events "issues" \
   --prompt "New issue #{issue.number}: {issue.title}\nBy: {issue.user.login}\n\n{issue.body}" \
   --deliver telegram \
@@ -417,20 +511,20 @@ This returns the webhook URL and an auto-generated HMAC secret. Configure your s
 ### List subscriptions
 
 ```bash
-qubit webhook list
+hermes webhook list
 ```
 
 ### Remove a subscription
 
 ```bash
-qubit webhook remove github-issues
+hermes webhook remove github-issues
 ```
 
 ### Test a subscription
 
 ```bash
-qubit webhook test github-issues
-qubit webhook test github-issues --payload '{"issue": {"number": 42, "title": "Test"}}'
+hermes webhook test github-issues
+hermes webhook test github-issues --payload '{"issue": {"number": 42, "title": "Test"}}'
 ```
 
 ### How dynamic subscriptions work
@@ -443,7 +537,7 @@ qubit webhook test github-issues --payload '{"issue": {"number": 42, "title": "T
 
 ### Agent-driven subscriptions
 
-The agent can create subscriptions via the terminal tool when guided by the `webhook-subscriptions` skill. Ask the agent to "set up a webhook for GitHub issues" and it will run the appropriate `qubit webhook subscribe` command.
+The agent can create subscriptions via the terminal tool when guided by the `webhook-subscriptions` skill. Ask the agent to "set up a webhook for GitHub issues" and it will run the appropriate `hermes webhook subscribe` command.
 
 ---
 
@@ -483,7 +577,7 @@ Behavior and safety properties:
 
 - The route list **replaces** the platform-level webhook toolset resolution for that route's runs (it is not merged).
 - Names are validated through the same path as `platform_toolsets` config — unknown names and platform-restricted toolsets are dropped.
-- `qubit webhook subscribe` deliberately does **not** accept a toolsets flag. Granting elevated tools is a manual config-file edit, so an agent creating its own subscription at runtime cannot self-grant `terminal`.
+- `hermes webhook subscribe` deliberately does **not** accept a toolsets flag. Granting elevated tools is a manual config-file edit, so an agent creating its own subscription at runtime cannot self-grant `terminal`.
 - Only grant elevated toolsets to routes whose senders you fully control, with a real HMAC secret. Anyone who can POST a validly-signed payload to that route is effectively running an agent with those tools.
 
 ---
@@ -548,7 +642,7 @@ platforms:
 :::warning
 **HMAC validation authenticates the _sender_, not the _content_.** A valid signature only proves the request came from a party holding the route's secret (e.g. GitHub). It says nothing about who wrote the _business fields_ inside the payload — PR titles, commit messages, issue descriptions, and any other upstream text are authored by arbitrary third parties and must be treated as untrusted.
 
-This is the same trust model that applies to everything the agent reads: web pages, files, and tool output are all untrusted input. Qubit does not — and cannot reliably — sanitize untrusted text with a blocklist; phrasing, encoding, and translation make that trivially bypassable. **The trust boundary is the agent's capability surface, not the input channel.** Harden there:
+This is the same trust model that applies to everything the agent reads: web pages, files, and tool output are all untrusted input. Hermes does not — and cannot reliably — sanitize untrusted text with a blocklist; phrasing, encoding, and translation make that trivially bypassable. **The trust boundary is the agent's capability surface, not the input channel.** Harden there:
 
 - **Sandbox the runtime.** Run the gateway with the Docker or SSH terminal backend (or in a VM) when exposed to the internet, so a hijacked turn cannot touch the host.
 - **Scope the toolset.** Disable `terminal`, `file`, and outbound-action tools on webhook-triggered sessions if the route only needs to read and summarize. Fewer capabilities means a smaller blast radius if a payload field carries injected instructions.
@@ -583,7 +677,7 @@ This is the same trust model that applies to everything the agent reads: web pag
 
 ### Agent not responding
 
-- Run the gateway in foreground to see logs: `qubit gateway run`
+- Run the gateway in foreground to see logs: `hermes gateway run`
 - Check that the prompt template is rendering correctly
 - Verify the delivery target is configured and connected
 

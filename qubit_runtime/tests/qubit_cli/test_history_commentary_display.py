@@ -3,7 +3,7 @@
 from qubit_cli.web_routers.sessions import _project_for_display
 from tui_gateway.server import _history_to_messages
 from agent.history_commentary import visible_commentary
-from qubit_constants import get_hermes_home_override
+from qubit_constants import get_qubit_home_override
 
 import asyncio
 import pytest
@@ -93,7 +93,7 @@ def test_owner_profile_settings_apply_to_rest_and_rpc(monkeypatch, tmp_path, dis
     observed = []
 
     def config():
-        home = get_hermes_home_override()
+        home = get_qubit_home_override()
         observed.append(str(home))
         return {"display": {} if str(home) == str(enabled_home) else disabled}
 
@@ -131,7 +131,7 @@ def test_rest_pages_bind_the_history_owner_for_messages_and_around(
         "load_config",
         lambda: {
             "display": {
-                "show_commentary": str(get_hermes_home_override())
+                "show_commentary": str(get_qubit_home_override())
                 == str(homes["visible"])
             }
         },
@@ -183,7 +183,7 @@ def test_rest_pages_bind_the_history_owner_for_messages_and_around(
 def test_unscoped_rest_history_uses_custom_home_of_its_database(monkeypatch, tmp_path):
     from qubit_cli import config as config_mod
     from qubit_cli.web_routers import sessions
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
     import qubit_state_timeline
 
     custom, default = tmp_path / "custom", tmp_path / "default"
@@ -195,7 +195,7 @@ def test_unscoped_rest_history_uses_custom_home_of_its_database(monkeypatch, tmp
         "load_config",
         lambda: {
             "display": {
-                "show_commentary": str(get_hermes_home_override()) != str(custom)
+                "show_commentary": str(get_qubit_home_override()) != str(custom)
             }
         },
     )
@@ -239,11 +239,11 @@ def test_unscoped_rest_history_uses_custom_home_of_its_database(monkeypatch, tmp
         assert page["messages"][0]["display_commentary"] == []
         assert around["messages"][0]["display_commentary"] == []
 
-    token = set_hermes_home_override(str(custom))
+    token = set_qubit_home_override(str(custom))
     try:
         asyncio.run(exercise())
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
 
 def test_cold_resume_uses_the_resumed_session_home(monkeypatch, tmp_path):
@@ -255,7 +255,7 @@ def test_cold_resume_uses_the_resumed_session_home(monkeypatch, tmp_path):
         config_mod,
         "load_config",
         lambda: {
-            "display": {"show_commentary": str(get_hermes_home_override()) != str(home)}
+            "display": {"show_commentary": str(get_qubit_home_override()) != str(home)}
         },
     )
     resume = _Resume.__new__(_Resume)

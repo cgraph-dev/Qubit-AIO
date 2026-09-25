@@ -1,4 +1,4 @@
-"""Tests for qubit_cli/bundles.py — the `qubit bundles` CLI subcommand."""
+"""Tests for qubit_cli/bundles.py — the `hermes bundles` CLI subcommand."""
 
 import argparse
 

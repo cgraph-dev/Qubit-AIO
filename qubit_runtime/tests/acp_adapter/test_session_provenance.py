@@ -27,9 +27,9 @@ def test_root_session_no_compression(db):
     _mk(db, "root1")
     prov = build_session_provenance(db, "acp-1", "root1")
     assert prov["acpSessionId"] == "acp-1"
-    assert prov["currentQubitSessionId"] == "root1"
-    assert prov["rootQubitSessionId"] == "root1"
-    assert prov["parentQubitSessionId"] is None
+    assert prov["currentHermesSessionId"] == "root1"
+    assert prov["rootHermesSessionId"] == "root1"
+    assert prov["parentHermesSessionId"] is None
     assert prov["sessionKind"] == "root"
     assert prov["compressionDepth"] == 0
     assert "reason" not in prov  # no rotation signalled
@@ -46,10 +46,10 @@ def test_compression_split_continuation(db):
         db, "acp-1", "new", previous_qubit_session_id="old"
     )
     assert prov["sessionKind"] == "continuation"
-    assert prov["parentQubitSessionId"] == "old"
-    assert prov["rootQubitSessionId"] == "old"
+    assert prov["parentHermesSessionId"] == "old"
+    assert prov["rootHermesSessionId"] == "old"
     assert prov["compressionDepth"] == 1
-    assert prov["previousQubitSessionId"] == "old"
+    assert prov["previousHermesSessionId"] == "old"
     # Head rotated this turn → reason/creatorKind flagged.
     assert prov["reason"] == "compression"
     assert prov["creatorKind"] == "compression"
@@ -65,7 +65,7 @@ def test_non_compression_parent_is_root_not_continuation(db):
     prov = build_session_provenance(db, "acp-1", "c")
     assert prov["sessionKind"] == "root"
     assert prov["compressionDepth"] == 0
-    assert prov["rootQubitSessionId"] == "p"  # lineage root still walked
+    assert prov["rootHermesSessionId"] == "p"  # lineage root still walked
 
 
 
@@ -77,4 +77,4 @@ def test_meta_wrapper_shape(db):
     meta = session_provenance_meta(db, "acp-1", "root1")
     assert set(meta.keys()) == {"hermes"}
     assert "sessionProvenance" in meta["hermes"]
-    assert meta["hermes"]["sessionProvenance"]["currentQubitSessionId"] == "root1"
+    assert meta["hermes"]["sessionProvenance"]["currentHermesSessionId"] == "root1"

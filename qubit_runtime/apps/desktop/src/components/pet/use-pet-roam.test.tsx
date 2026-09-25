@@ -68,7 +68,7 @@ describe('usePetRoam RAF scheduling', () => {
     vi.useRealTimers()
     vi.restoreAllMocks()
     setDocumentHidden(false)
-    delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
 
   it('uses a pause timer, not RAF, while dwelling at idle', () => {
@@ -98,14 +98,14 @@ describe('usePetRoam RAF scheduling', () => {
     expect(vi.getTimerCount()).toBe(1)
   })
 
-  it('suspends idle movement while unfocused and cleans up its wake timer on unmount', () => {
+  it('keeps idle movement scheduled while unfocused and cleans up on unmount', () => {
     const raf = installRaf()
 
     mount.render(<RoamHarness />)
     expect(vi.getTimerCount()).toBe(1)
 
     act(() => window.dispatchEvent(new Event('blur')))
-    expect(vi.getTimerCount()).toBe(0)
+    expect(vi.getTimerCount()).toBe(1)
 
     act(() => window.dispatchEvent(new Event('focus')))
     expect(vi.getTimerCount()).toBe(1)

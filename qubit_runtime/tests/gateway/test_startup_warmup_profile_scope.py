@@ -58,9 +58,9 @@ def _run_warmup(monkeypatch, *, multiplex: bool) -> dict:
     async def drive() -> None:
         await _Runner(multiplex=multiplex)._warm_turn_prerequisites()
         # Same task as the warm-up (asyncio.run copies the context, so the caller's view proves nothing).
-        from qubit_constants import get_hermes_home_override
+        from qubit_constants import get_qubit_home_override
         seen["scope_after"] = secret_scope._SECRET_SCOPE.get()
-        seen["home_override_after"] = get_hermes_home_override()
+        seen["home_override_after"] = get_qubit_home_override()
 
     asyncio.run(drive())
     return seen

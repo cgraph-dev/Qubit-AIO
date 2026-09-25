@@ -36,10 +36,15 @@ Gmail, Calendar, Drive, Contacts, Sheets, and Docs — through Qubit-managed OAu
 The setup is fully non-interactive — you drive it step by step so it works
 on CLI, Telegram, Discord, or any platform.
 
+Run the setup script with Python from the Qubit environment, not an unrelated
+system Python. `--install-deps` syncs Qubit' declared Google extra through PM;
+after syncing, restart Qubit and rerun the OAuth command. If Qubit is not
+importable, use `qubit setup` first rather than installing packages with pip.
+
 Define a shorthand first:
 
 ```bash
-GSETUP="python $QUBIT_HOME/skills/productivity/google-workspace/scripts/setup.py"
+GSETUP="python ${QUBIT_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/setup.py"
 ```
 
 ### Step 0: Check if already set up
@@ -126,7 +131,7 @@ $GSETUP --auth-url --services all --format json
 ```
 
 This returns JSON with an `auth_url` field and also saves the exact URL to
-`$QUBIT_HOME/google_oauth_last_url.txt`.
+`~/.hermes/google_oauth_last_url.txt`.
 
 Agent rules for this step:
 - Extract the `auth_url` field and send that exact URL to the user as a single line.
@@ -160,9 +165,9 @@ Should print `AUTHENTICATED`. Setup is complete — token refreshes automaticall
 
 ### Notes
 
-- Token is stored at `$QUBIT_HOME/google_token.json` and auto-refreshes.
-- Pending OAuth session state/verifier are stored temporarily at `$QUBIT_HOME/google_oauth_pending.json` until exchange completes.
-- If `gws` is installed, `google_api.py` points it at the same `$QUBIT_HOME/google_token.json` credentials file. Users do not need to run a separate `gws auth login` flow.
+- Token is stored at `~/.hermes/google_token.json` and auto-refreshes.
+- Pending OAuth session state/verifier are stored temporarily at `~/.hermes/google_oauth_pending.json` until exchange completes.
+- If `gws` is installed, `google_api.py` points it at the same `~/.hermes/google_token.json` credentials file. Users do not need to run a separate `gws auth login` flow.
 - To revoke: `$GSETUP --revoke`
 
 ## Usage
@@ -170,7 +175,7 @@ Should print `AUTHENTICATED`. Setup is complete — token refreshes automaticall
 All commands go through the API script. Set `GAPI` as a shorthand:
 
 ```bash
-GAPI="python $QUBIT_HOME/skills/productivity/google-workspace/scripts/google_api.py"
+GAPI="python ${QUBIT_HOME:-$HOME/.hermes}/skills/productivity/google-workspace/scripts/google_api.py"
 ```
 
 ### Gmail
@@ -276,8 +281,9 @@ $GAPI sheets append SHEET_ID "Sheet1!A:C" --values '[["new","row","data"]]'
 ### Docs
 
 ```bash
-# Read
+# Read (a tabbed Doc returns a "tabs" array; single-tab and legacy Docs also return "body")
 $GAPI docs get DOC_ID
+$GAPI docs get DOC_ID --tab TAB_ID     # read one tab of a tabbed Doc
 
 # Create a new Doc (optionally seeded with body text)
 $GAPI docs create --title "Meeting Notes"
@@ -285,6 +291,7 @@ $GAPI docs create --title "Draft" --body "First paragraph..."
 
 # Append text to the end of an existing Doc
 $GAPI docs append DOC_ID --text "Additional content to append"
+$GAPI docs append DOC_ID --tab TAB_ID --text "..."   # --tab required when the Doc has multiple tabs
 ```
 
 ## Output Format

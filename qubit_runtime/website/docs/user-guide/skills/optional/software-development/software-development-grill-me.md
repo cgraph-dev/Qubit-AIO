@@ -14,19 +14,19 @@ Adversarial plan interview before implementation.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/software-development/grill-me` |
-| Path | `optional-skills/software-development\grill-me` |
+| Source | Optional — install with `hermes skills install official/software-development/grill-me` |
+| Path | `optional-skills/software-development/grill-me` |
 | Version | `2.0.0` |
-| Author | Rafael Zendron (rafaumeu) + Matt Pocock (mattpocock/skills, grilling) + Qubit Agent |
+| Author | Rafael Zendron (rafaumeu) + Matt Pocock (mattpocock/skills, grilling) + Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `planning`, `adversarial`, `interview`, `decision-tree`, `pre-implementation`, `review`, `alignment` |
-| Related skills | [`requesting-code-review`](/docs/user-guide/skills/bundled/software-development/software-development-requesting-code-review), [`subagent-driven-development`](/docs/user-guide/skills/optional/software-development/software-development-subagent-driven-development), [`test-driven-development`](/docs/user-guide/skills/bundled/software-development/software-development-test-driven-development) |
+| Related skills | [`requesting-code-review`](../../bundled/software-development/software-development-requesting-code-review.md), [`subagent-driven-development`](../../optional/software-development/software-development-subagent-driven-development.md), [`test-driven-development`](../../bundled/software-development/software-development-test-driven-development.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Grill Me
@@ -114,7 +114,7 @@ Do not act on the plan until the user confirms shared understanding.
 1. **Asking questions out of dependency order.** A question that depends on
    an unanswered question is a guess wearing a question mark. Keep it for a
    later round.
-2. **Skipping the codebase.** Find facts in code with Qubit tools instead of
+2. **Skipping the codebase.** Find facts in code with Hermes tools instead of
    asking the user.
 3. **Accepting "I don't know" as final.** Suggest options, explain
    trade-offs, make a recommendation.

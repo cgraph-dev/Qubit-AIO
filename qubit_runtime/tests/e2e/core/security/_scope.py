@@ -59,11 +59,11 @@ server.run(transport="stdio")
 '''
 
 
-def install_plugin(hermes_home: Path) -> None:
+def install_plugin(qubit_home: Path) -> None:
     """A user plugin with a backend API under the launch home's plugins dir."""
-    dash = hermes_home / "plugins" / PLUGIN_ID / "dashboard"
+    dash = qubit_home / "plugins" / PLUGIN_ID / "dashboard"
     dash.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "plugins" / PLUGIN_ID / "plugin.yaml").write_text(
+    (qubit_home / "plugins" / PLUGIN_ID / "plugin.yaml").write_text(
         f"name: {PLUGIN_ID}\nversion: 0.0.1\ndescription: secret-scope canary\n", encoding="utf-8")
     (dash / "manifest.json").write_text(json.dumps({
         "name": PLUGIN_ID, "label": "Scope canary", "version": "0.0.1",

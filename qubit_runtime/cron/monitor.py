@@ -68,7 +68,7 @@ def _read_last_output(job_id: str) -> str:
     try:
         path = _snapshot_path(job_id)
         if path.exists():
-            return path.read_text(encoding="utf-8")
+            return path.read_text(encoding="utf-8-sig")
     except Exception as exc:
         logger.warning("Monitor: failed to read last output for %r: %s", job_id, exc)
     return ""
@@ -92,7 +92,7 @@ def _fetch_monitor_url(url: str) -> tuple[bool, str]:
     if not str(url).lower().startswith(("http://", "https://")):
         return False, f"monitor_url must be http(s): {url!r}"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "qubit-cron-monitor"})
+        req = urllib.request.Request(url, headers={"User-Agent": "hermes-cron-monitor"})
         with urllib.request.urlopen(req, timeout=URL_TIMEOUT_SECONDS) as resp:  # nosec B310 — scheme checked above
             body = resp.read(MAX_URL_BYTES + 1)
         return True, body[:MAX_URL_BYTES].decode("utf-8", errors="replace")

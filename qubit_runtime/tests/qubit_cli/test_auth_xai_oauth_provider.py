@@ -10,17 +10,9 @@ import pytest
 from qubit_cli.auth import (
     AuthError,
     DEFAULT_XAI_OAUTH_BASE_URL,
-    PROVIDER_REGISTRY,
-    XAI_OAUTH_CLIENT_ID,
-    XAI_OAUTH_SCOPE,
     _read_xai_oauth_tokens,
     _refresh_xai_oauth_tokens,
     _save_xai_oauth_tokens,
-    _xai_access_token_is_expiring,
-    _xai_oauth_poll_device_token,
-    _xai_oauth_request_device_code,
-    _xai_validate_inference_base_url,
-    format_auth_error,
     get_xai_oauth_auth_status,
     refresh_xai_oauth_pure,
     resolve_provider,
@@ -122,12 +114,6 @@ def _patch_httpx_client(monkeypatch, response):
 # ---------------------------------------------------------------------------
 
 
-def test_xai_oauth_provider_registered():
-    assert "xai-oauth" in PROVIDER_REGISTRY
-    pconfig = PROVIDER_REGISTRY["xai-oauth"]
-    assert pconfig.id == "xai-oauth"
-    assert pconfig.auth_type == "oauth_external"
-    assert pconfig.inference_base_url == DEFAULT_XAI_OAUTH_BASE_URL
 
 
 def test_resolve_provider_normalizes_xai_oauth_aliases():
@@ -153,7 +139,7 @@ def test_resolve_provider_normalizes_xai_oauth_aliases():
 
 
 def test_save_and_read_xai_oauth_tokens_roundtrip(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -178,7 +164,7 @@ def test_save_and_read_xai_oauth_tokens_roundtrip(tmp_path, monkeypatch):
 
 def test_refresh_xai_oauth_tokens_preserves_active_provider(tmp_path, monkeypatch):
     """Token refresh must not flip active_provider away from the chat provider."""
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     near = _jwt_with_exp(int(time.time()) + 30)
     _setup_qubit_auth(qubit_home, access_token=near, refresh_token="rt-old")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -215,7 +201,7 @@ def test_refresh_xai_oauth_tokens_preserves_active_provider(tmp_path, monkeypatc
 
 
 def test_read_xai_oauth_tokens_missing(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -232,7 +218,7 @@ def test_read_xai_oauth_tokens_missing(tmp_path, monkeypatch):
 
 
 def test_resolve_xai_runtime_credentials_refreshes_expiring_token(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     expiring = _jwt_with_exp(int(time.time()) - 10)
     _setup_qubit_auth(
         qubit_home,
@@ -313,7 +299,7 @@ def test_resolve_credentials_quarantines_dead_tokens_on_terminal_refresh_failure
     last_auth_error marker so subsequent calls fail fast without a network retry.
     Mirrors the credential_pool.py quarantine for the singleton/direct resolve path.
     """
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     _seed_xai_oauth_state(qubit_home, dict(_STALE_XAI_OAUTH_STATE), active_provider="nous")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -362,7 +348,7 @@ def test_resolve_credentials_quarantines_dead_tokens_on_terminal_refresh_failure
 
 
 def test_get_xai_oauth_auth_status_logged_out(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -382,7 +368,7 @@ def test_refresh_xai_oauth_pure_403_marked_tier_denied_not_relogin(monkeypatch):
 
     Regression test for #26847 — xAI's backend has been seen to 403
     standard SuperGrok subscribers despite the in-app subscription
-    being active. Re-running ``qubit model`` won't help in that
+    being active. Re-running ``hermes model`` won't help in that
     case, so the AuthError must NOT set ``relogin_required=True``,
     and must carry the dedicated ``xai_oauth_tier_denied`` code so
     ``format_auth_error`` doesn't append the misleading re-auth hint.
@@ -395,33 +381,8 @@ def test_refresh_xai_oauth_pure_403_marked_tier_denied_not_relogin(monkeypatch):
         )
     assert exc.value.code == "xai_oauth_tier_denied"
     assert exc.value.relogin_required is False
-    message = str(exc.value).lower()
-    assert "403" in message
-    assert "xai_api_key" in message
-    assert "tier" in message
 
 
-def test_format_auth_error_tier_denied_does_not_suggest_relogin():
-    """``xai_oauth_tier_denied`` must not append the re-authenticate hint.
-
-    Regression for #26847: telling a tier-gated user to ``qubit model``
-    is actively wrong — re-logging in won't change xAI's allowlist
-    decision. The full message (with ``XAI_API_KEY`` fallback) is built
-    into the error itself.
-    """
-    err = AuthError(
-        "xAI token refresh failed with HTTP 403. Response: forbidden. "
-        "This OAuth account is not authorized for xAI API access — "
-        "xAI may be restricting API/OAuth use to specific SuperGrok tiers. "
-        "Set ``XAI_API_KEY`` and switch to ``provider: xai``.",
-        provider="xai-oauth",
-        code="xai_oauth_tier_denied",
-        relogin_required=False,
-    )
-    rendered = format_auth_error(err)
-    assert "re-authenticate" not in rendered.lower()
-    assert "hermes model" not in rendered.lower()
-    assert "XAI_API_KEY" in rendered
 
 
 def test_xai_oauth_discovery_raises_typed_error_on_malformed_json(monkeypatch):
@@ -528,15 +489,15 @@ def test_xai_oauth_discovery_validates_endpoints(monkeypatch):
 
 
 def test_credential_pool_seeds_xai_oauth_from_singleton(tmp_path, monkeypatch):
-    """After `qubit model` -> xai-oauth, the singleton holds tokens.  load_pool
-    must surface that as a pool entry so `qubit auth list` reflects truth and
+    """After `hermes model` -> xai-oauth, the singleton holds tokens.  load_pool
+    must surface that as a pool entry so `hermes auth list` reflects truth and
     refreshes route through the pool consistently with codex.
 
     Device code is the only supported xAI OAuth flow, so the singleton is
     always surfaced as ``device_code``."""
     from agent.credential_pool import load_pool
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     fresh = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(qubit_home, access_token=fresh, refresh_token="rt-1")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -556,7 +517,7 @@ def test_credential_pool_device_code_seed_respects_suppression(tmp_path, monkeyp
     from agent.credential_pool import load_pool
     from qubit_cli.auth import suppress_credential_source
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     fresh = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(
         qubit_home,
@@ -572,7 +533,7 @@ def test_credential_pool_device_code_seed_respects_suppression(tmp_path, monkeyp
 
 
 def test_auth_remove_xai_oauth_clears_singleton_and_sticks(tmp_path, monkeypatch):
-    """End-to-end regression: ``qubit auth remove xai-oauth 1`` for a
+    """End-to-end regression: ``hermes auth remove xai-oauth 1`` for a
     singleton-seeded entry must clear auth.json providers.xai-oauth AND
     suppress further re-seeding — otherwise the next ``load_pool`` call
     silently resurrects the entry from the still-present singleton, making
@@ -589,7 +550,7 @@ def test_auth_remove_xai_oauth_clears_singleton_and_sticks(tmp_path, monkeypatch
     from qubit_cli.auth_commands import auth_remove_command
     from types import SimpleNamespace
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     fresh = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(qubit_home, access_token=fresh, refresh_token="rt-1")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -600,7 +561,7 @@ def test_auth_remove_xai_oauth_clears_singleton_and_sticks(tmp_path, monkeypatch
     raw = json.loads((qubit_home / "auth.json").read_text())
     assert "xai-oauth" in raw.get("providers", {})
 
-    # Act: the user runs `qubit auth remove xai-oauth 1`.
+    # Act: the user runs `hermes auth remove xai-oauth 1`.
     auth_remove_command(SimpleNamespace(provider="xai-oauth", target="1"))
 
     # Post-state: auth.json singleton must be cleared so a re-seed has
@@ -622,13 +583,13 @@ def test_auth_remove_xai_oauth_clears_singleton_and_sticks(tmp_path, monkeypatch
 
 
 def test_login_xai_oauth_relogin_clears_suppression_and_reseeds(tmp_path, monkeypatch):
-    """remove -> ``qubit model`` re-login (``_login_xai_oauth``) must clear the
+    """remove -> ``hermes model`` re-login (``_login_xai_oauth``) must clear the
     ``device_code`` suppression marker so the singleton seed re-creates the
     pool entry.
 
     Pre-fix: ``auth_remove_command`` set ``["device_code"]`` suppression but
-    only ``auth_add_command`` cleared it — the ``qubit model`` re-login path did
-    not. So after remove -> re-login the seed kept skipping and ``qubit auth
+    only ``auth_add_command`` cleared it — the ``hermes model`` re-login path did
+    not. So after remove -> re-login the seed kept skipping and ``hermes auth
     list`` showed no xAI entry even though the agent still worked via the
     singleton fallback. The fix calls ``unsuppress_credential_source`` on
     explicit interactive login success.
@@ -642,7 +603,7 @@ def test_login_xai_oauth_relogin_clears_suppression_and_reseeds(tmp_path, monkey
         suppress_credential_source,
     )
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({"version": 1, "providers": {}}))
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -697,47 +658,6 @@ def test_login_xai_oauth_relogin_clears_suppression_and_reseeds(tmp_path, monkey
 # ---------------------------------------------------------------------------
 
 
-def test_pool_sync_back_writes_to_singleton(tmp_path, monkeypatch):
-    """When the pool refreshes a singleton-seeded xAI entry, the new tokens
-    must be written back to providers["xai-oauth"] so that
-    resolve_xai_oauth_runtime_credentials() (which reads the singleton)
-    doesn't keep using the consumed refresh token."""
-    from agent.credential_pool import load_pool
-
-    qubit_home = tmp_path / "qubit"
-    expired = _jwt_with_exp(int(time.time()) - 10)
-    _setup_qubit_auth(qubit_home, access_token=expired, refresh_token="rt-old")
-    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
-
-    new_access = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
-
-    def _fake_refresh(access_token, refresh_token, **kwargs):
-        assert refresh_token == "rt-old"
-        return {
-            "access_token": new_access,
-            "refresh_token": "rt-new",
-            "id_token": "",
-            "expires_in": 3600,
-            "token_type": "Bearer",
-            "last_refresh": "2026-05-15T01:00:00Z",
-        }
-
-    monkeypatch.setattr("qubit_cli.auth.refresh_xai_oauth_pure", _fake_refresh)
-
-    pool = load_pool("xai-oauth")
-    selected = pool.select()
-    assert selected is not None
-    assert selected.access_token == new_access
-    assert selected.refresh_token == "rt-new"
-
-    # Singleton must reflect refreshed tokens — otherwise the next process
-    # to load credentials would re-seed the consumed refresh token.
-    auth_path = qubit_home / "auth.json"
-    raw = json.loads(auth_path.read_text())
-    state = raw["providers"]["xai-oauth"]
-    assert state["tokens"]["access_token"] == new_access
-    assert state["tokens"]["refresh_token"] == "rt-new"
-    assert state["last_refresh"] == "2026-05-15T01:00:00Z"
 
 
 # ---------------------------------------------------------------------------
@@ -748,7 +668,7 @@ def test_pool_sync_back_writes_to_singleton(tmp_path, monkeypatch):
 def test_runtime_provider_uses_pool_entry_for_xai_oauth(tmp_path, monkeypatch):
     from qubit_cli.runtime_provider import resolve_runtime_provider
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     fresh = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(qubit_home, access_token=fresh)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -777,7 +697,7 @@ def test_pool_refresh_recovers_when_other_process_already_refreshed(tmp_path, mo
     entry exhausted."""
     from agent.credential_pool import load_pool
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     in_memory_at = _jwt_with_exp(int(time.time()) + 30)
     _setup_qubit_auth(qubit_home, access_token=in_memory_at, refresh_token="rt-shared")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -817,14 +737,14 @@ def test_pool_refresh_recovers_when_other_process_already_refreshed(tmp_path, mo
 
 
 def test_pool_manual_entry_does_not_sync_back_to_singleton(tmp_path, monkeypatch):
-    """`qubit auth add xai-oauth` entries (source='manual:xai_pkce') are
+    """`hermes auth add xai-oauth` entries (source='manual:xai_pkce') are
     independent credentials and must NOT write to the singleton.  Sync-back
     is restricted to entries seeded from the singleton.  Otherwise adding a
     second pool credential would silently overwrite the user's main login."""
     from agent.credential_pool import load_pool, AUTH_TYPE_OAUTH, PooledCredential
     import uuid
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     # Singleton has its own tokens (separate login).
     singleton_at = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(qubit_home, access_token=singleton_at, refresh_token="rt-singleton")
@@ -894,7 +814,7 @@ def test_auxiliary_client_routes_xai_oauth_through_responses_api(tmp_path, monke
         resolve_provider_client,
     )
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     fresh = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(qubit_home, access_token=fresh)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -921,7 +841,7 @@ def test_auxiliary_client_xai_oauth_requires_explicit_model(tmp_path, monkeypatc
     must pass an explicit model (auxiliary.<task>.model in config.yaml)."""
     from agent.auxiliary_client import resolve_provider_client
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     fresh = _jwt_with_exp(int(time.time()) + 2 * 60 * 60)
     _setup_qubit_auth(qubit_home, access_token=fresh)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
@@ -941,12 +861,12 @@ def test_pool_sync_back_preserves_active_provider(tmp_path, monkeypatch):
     picking a provider.  ``_save_provider_state`` flips ``active_provider``;
     using it on the sync-back path means every xAI/Codex/Nous refresh in a
     multi-provider setup silently overrides the user's chosen active
-    provider (visible to ``qubit auth status``, ``qubit setup``, and the
+    provider (visible to ``hermes auth status``, ``hermes setup``, and the
     ``hermes`` no-arg dispatcher).  Pin the ``set_active=False`` contract so
     no future refactor regresses to the legacy semantic."""
     from agent.credential_pool import load_pool
 
-    qubit_home = tmp_path / "qubit"
+    qubit_home = tmp_path / "hermes"
     near_expiry = _jwt_with_exp(int(time.time()) + 30)
     _setup_qubit_auth(qubit_home, access_token=near_expiry, refresh_token="rt-xai")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))

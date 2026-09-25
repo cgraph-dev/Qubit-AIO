@@ -19,7 +19,7 @@ def test_uv_cache_dir_seeds_from_payload(monkeypatch, tmp_path):
 
     import qubit_constants
 
-    monkeypatch.setattr(qubit_constants, "get_default_hermes_root", lambda: home)
+    monkeypatch.setattr(qubit_constants, "get_default_qubit_root", lambda: home)
     import pm.paths as paths_mod
 
     monkeypatch.setattr(paths_mod, "store_root", lambda: payload / "tools")
@@ -40,7 +40,7 @@ def test_uv_cache_dir_cold_machine_no_payload(monkeypatch, tmp_path):
     home.mkdir()
     import qubit_constants
 
-    monkeypatch.setattr(qubit_constants, "get_default_hermes_root", lambda: home)
+    monkeypatch.setattr(qubit_constants, "get_default_qubit_root", lambda: home)
     import pm.paths as paths_mod
 
     monkeypatch.setattr(paths_mod, "store_root", lambda: tmp_path / "nowhere" / "tools")

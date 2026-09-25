@@ -15,18 +15,18 @@ Author/validate/export Google's DESIGN.md token spec files.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/creative\design-md` |
+| Path | `skills/creative/design-md` |
 | Version | `1.1.0` |
-| Author | Qubit Agent |
+| Author | Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `design`, `design-system`, `tokens`, `ui`, `accessibility`, `wcag`, `tailwind`, `dtcg`, `google` |
-| Related skills | [`popular-web-designs`](/docs/user-guide/skills/bundled/creative/creative-popular-web-designs), [`claude-design`](/docs/user-guide/skills/bundled/creative/creative-claude-design), [`excalidraw`](/docs/user-guide/skills/optional/creative/creative-excalidraw), [`architecture-diagram`](/docs/user-guide/skills/bundled/creative/creative-architecture-diagram) |
+| Related skills | [`popular-web-designs`](../../bundled/creative/creative-popular-web-designs.md), [`claude-design`](../../bundled/creative/creative-claude-design.md), [`excalidraw`](../../optional/creative/creative-excalidraw.md), [`architecture-diagram`](../../bundled/creative/creative-architecture-diagram.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # DESIGN.md Skill

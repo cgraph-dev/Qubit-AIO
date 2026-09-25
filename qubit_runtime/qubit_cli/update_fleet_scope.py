@@ -8,7 +8,7 @@ account's real ``hermes-gateway.service`` when a scratch home ran ``qubit update
 
 The fleet an update owns is the set of homes its plan inventories: the updating root plus every
 ``<root>/profiles/<name>``. Ownership is judged from what a runtime actually runs on — the live
-process environment (``QUBIT_HOME``/``HOME``, via ``_hermes_home_for_pid``), the unit's declared
+process environment (``QUBIT_HOME``/``HOME``, via ``_qubit_home_for_pid``), the unit's declared
 ``Environment=`` or the plist's pinned ``QUBIT_HOME`` — never from a unit label or an argv
 substring. Unknown ownership is left alone: a restart we cannot prove is ours is somebody else's
 outage.
@@ -32,8 +32,8 @@ def update_scope_homes() -> set[Path]:
     """Resolved homes the running update owns: the invoking home, the install root and its profiles."""
     homes: set[Path] = set()
     with suppress(Exception):
-        from qubit_constants import get_hermes_home
-        if (home := _resolved(get_hermes_home())) is not None:
+        from qubit_constants import get_qubit_home
+        if (home := _resolved(get_qubit_home())) is not None:
             homes.add(home)
     with suppress(Exception):
         from qubit_cli.update_receipt import _profile_homes
@@ -55,9 +55,9 @@ def home_in_update_scope(home, scope: set[Path] | None = None) -> bool:
 
 def gateway_pid_in_update_scope(pid: int, scope: set[Path] | None = None) -> bool | None:
     """Does gateway *pid* run on a home this update owns? ``None`` when its home cannot be read."""
-    from qubit_cli.dashboard_procs import _hermes_home_for_pid
+    from qubit_cli.dashboard_procs import _qubit_home_for_pid
     try:
-        home = _hermes_home_for_pid(pid)
+        home = _qubit_home_for_pid(pid)
     except Exception:
         return None
     if home is None:
@@ -78,13 +78,13 @@ def partition_gateway_pids_by_scope(pids, scope: set[Path] | None = None) -> tup
             home = None
             if verdict is False:
                 with suppress(Exception):
-                    from qubit_cli.dashboard_procs import _hermes_home_for_pid
-                    home = _hermes_home_for_pid(pid)
+                    from qubit_cli.dashboard_procs import _qubit_home_for_pid
+                    home = _qubit_home_for_pid(pid)
             foreign.append((pid, home))
     return owned, foreign
 
 
-def systemd_unit_hermes_home(scope_cmd: list, svc_name: str) -> str | None:
+def systemd_unit_qubit_home(scope_cmd: list, svc_name: str) -> str | None:
     """Home the systemd unit *svc_name* runs on: its live MainPID's environment first, then the
     unit's declared ``Environment=QUBIT_HOME``; for a user-scope unit that declares none, the
     user's own default home. ``None`` when nothing readable names a home."""
@@ -93,8 +93,8 @@ def systemd_unit_hermes_home(scope_cmd: list, svc_name: str) -> str | None:
     pid = _unit_main_pid(scope_cmd, svc_name)
     if pid > 0:
         with suppress(Exception):
-            from qubit_cli.dashboard_procs import _hermes_home_for_pid
-            if (home := _hermes_home_for_pid(pid)) is not None:
+            from qubit_cli.dashboard_procs import _qubit_home_for_pid
+            if (home := _qubit_home_for_pid(pid)) is not None:
                 return home
     try:
         shown = _systemctl(list(scope_cmd) + ["show", svc_name, "--property=Environment", "--value"], timeout=10)
@@ -118,7 +118,7 @@ def systemd_unit_hermes_home(scope_cmd: list, svc_name: str) -> str | None:
 
 def systemd_unit_in_update_scope(scope_cmd: list, svc_name: str, scope: set[Path] | None = None) -> bool | None:
     """Does unit *svc_name* belong to this update? ``None`` = ownership unreadable (leave it alone)."""
-    home = systemd_unit_hermes_home(scope_cmd, svc_name)
+    home = systemd_unit_qubit_home(scope_cmd, svc_name)
     if home is None:
         return None
     return home_in_update_scope(home, scope)

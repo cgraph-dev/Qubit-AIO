@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { useI18n } from '@/i18n'
 import { capitalize, normalize } from '@/lib/text'
 
 import introCopyJsonl from './intro-copy.jsonl?raw'
@@ -31,7 +32,7 @@ const FALLBACK_COPY: IntroCopy[] = [
     body: "Bring the code, question, or stuck part. I'll read the room before making changes."
   },
   {
-    headline: 'What should Qubit look at?',
+    headline: 'What should Hermes look at?',
     body: "Send the task, failing path, or half-formed plan. I'll help turn it into action."
   },
   {
@@ -123,7 +124,7 @@ function fallbackCopyForPersonality(personalityKey: string): IntroCopy[] {
       body: "Send the task, file, or rough idea. I'll use your configured voice and keep the work grounded in this repo."
     },
     {
-      headline: `What does ${label} Qubit need to see?`,
+      headline: `What does ${label} Hermes need to see?`,
       body: "Bring the context or the stuck part. I'll adapt to your configured personality."
     },
     {
@@ -131,7 +132,7 @@ function fallbackCopyForPersonality(personalityKey: string): IntroCopy[] {
       body: "Send the problem, file, or idea. I'll follow the personality you've configured."
     },
     {
-      headline: `What should ${label} Qubit tackle?`,
+      headline: `What should ${label} Hermes tackle?`,
       body: "Drop the task here. I'll keep the work grounded in the repo."
     },
     {
@@ -145,7 +146,7 @@ function pickCopy(copies: IntroCopy[], seed = 0): IntroCopy {
   return copies[Math.abs(seed) % copies.length] || FALLBACK_COPY[0]
 }
 
-const WORDMARK = 'QUBIT AGENT'
+const WORDMARK = 'HERMES AGENT'
 
 function resolveCopy(personality?: string, seed?: number): IntroCopy {
   const personalityKey = normalizeKey(personality)
@@ -159,7 +160,15 @@ function resolveCopy(personality?: string, seed?: number): IntroCopy {
 
 export function Intro({ personality, seed }: IntroProps) {
   const [mountSeed] = useState(() => Math.floor(Math.random() * 100000))
-  const copy = resolveCopy(personality, mountSeed + (seed ?? 0))
+  const { t } = useI18n()
+  const rotationSeed = mountSeed + (seed ?? 0)
+  const copy = resolveCopy(personality, rotationSeed)
+  const key = normalizeKey(personality)
+
+  const bodies =
+    t.intro.stock[key] ?? (NEUTRAL_PERSONALITIES.has(key) ? t.intro.stock.none : t.intro.custom(personality || ''))
+
+  const body = bodies?.[Math.abs(rotationSeed) % bodies.length] ?? copy.body
 
   return (
     <div
@@ -169,7 +178,7 @@ export function Intro({ personality, seed }: IntroProps) {
       <div className="w-full min-w-0">
         <Wordmark className="mb-1" text={WORDMARK} />
 
-        <p className="m-0 text-center leading-normal tracking-tight">{copy.body}</p>
+        <p className="m-0 text-center leading-normal tracking-tight">{body}</p>
       </div>
     </div>
   )

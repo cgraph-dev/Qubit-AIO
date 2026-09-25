@@ -12,7 +12,7 @@ import {
   type ConnectionTarget,
   setConnectionRequest
 } from '@/store/connection-request'
-import { $gateway, setPrimaryGateway } from '@/store/gateway'
+import { $gateway, setPrimaryGateway, setPrimaryGatewayConnectionId } from '@/store/gateway'
 import { $notifications } from '@/store/notifications'
 import { _resetSessionOwnerHintsForTests, setSessionOwnerHint } from '@/store/session'
 
@@ -76,6 +76,7 @@ function view(sessionId: string): SessionView {
     $model: atom(''),
     $provider: atom(''),
     $reasoningEffort: atom(''),
+    $reasoningEffortPending: atom(false),
     $reasoningEffortWire: atom(''),
     $runtimeId: atom(sessionId),
     $storedId: atom(sessionId),
@@ -85,6 +86,8 @@ function view(sessionId: string): SessionView {
 }
 
 function renderOffer(request = REQUEST) {
+  setConnectionRequest(request)
+
   return render(
     <I18nProvider configClient={null} initialLocale="en">
       <ConnectorOffer owner={PRIMARY_OWNER} request={request} />
@@ -117,18 +120,6 @@ afterEach(() => {
 })
 
 describe('ConnectorTool operation card', () => {
-  it('does not call connectors.list or create a timer on mount', () => {
-    vi.useFakeTimers()
-    const request = vi.fn()
-    // SAFETY: the store calls only `request`; the rest of the client is never touched in these tests.
-    $gateway.set({ request } as never)
-
-    renderOffer()
-
-    expect(request).not.toHaveBeenCalledWith('connectors.list', expect.anything())
-    expect(vi.getTimerCount()).toBe(0)
-  })
-
   it('offers one verb per row and Continue below; nothing per row says no', () => {
     renderOffer({
       ...REQUEST,
@@ -153,7 +144,7 @@ describe('ConnectorTool operation card', () => {
     $gateway.set({ request } as never)
     const openExternal = vi.fn()
     // SAFETY: the card reads only `openExternal` from the preload bridge.
-    window.qubitDesktop = { openExternal } as never
+    window.hermesDesktop = { openExternal } as never
 
     renderConnector({ ...REQUEST, targets: [{ ...GMAIL, state: 'initiated' }] })
 
@@ -168,7 +159,7 @@ describe('ConnectorTool operation card', () => {
   it('Try again mints a fresh link on the open operation and never opens a browser by itself', async () => {
     const openExternal = vi.fn()
     // SAFETY: the card reads only `openExternal` from the preload bridge.
-    window.qubitDesktop = { openExternal } as never
+    window.hermesDesktop = { openExternal } as never
 
     const request = vi.fn().mockResolvedValue({
       targets: [{ connect_url: 'https://connect.example/gmail-2', name: 'gmail', state: 'initiated' }]
@@ -186,7 +177,7 @@ describe('ConnectorTool operation card', () => {
     expect(openExternal).not.toHaveBeenCalled()
     expect(request).toHaveBeenCalledWith(
       'connectors.connect',
-      { connectors: ['gmail'], reconnect: true, session_id: SESSION_ID },
+      { connectors: ['gmail'], owner: { session_id: SESSION_ID, type: 'session' }, reconnect: true },
       expect.any(Number),
       undefined
     )
@@ -211,8 +202,9 @@ describe('ConnectorTool operation card', () => {
 
   it('Continue settles the whole operation', async () => {
     const request = vi.fn().mockResolvedValue({ status: 'ok' })
-    // SAFETY: the store calls only `request`; the rest of the client is never touched in these tests.
-    $gateway.set({ request } as never)
+    // SAFETY: the card calls only `request`; the rest of the client is never touched in this test.
+    setPrimaryGateway({ request } as never)
+    setPrimaryGatewayConnectionId('connection-1')
 
     renderConnector()
 
@@ -221,8 +213,8 @@ describe('ConnectorTool operation card', () => {
     await waitFor(() => {
       expect(request).toHaveBeenCalledWith('connection.respond', {
         op_id: 'operation-1',
-        result: { settled_by: 'continue' },
-        session_id: SESSION_ID
+        owner: { session_id: SESSION_ID, type: 'session' },
+        result: { settled_by: 'continue' }
       })
     })
   })

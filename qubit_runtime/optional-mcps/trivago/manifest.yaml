@@ -1,4 +1,4 @@
-# Qubit-approved MCP catalog entry.
+# Nous-approved MCP catalog entry.
 # Presence in this directory = approval. Merged via PR review.
 manifest_version: 1
 
@@ -6,7 +6,7 @@ name: trivago
 description: 'trivago hotel search: compare prices by city and dates.'
 source: https://mcp.trivago.com/mcp
 
-# Official vendor-hosted remote MCP (URL-only — Qubit never spawns a local
+# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
 # process for this entry). No authentication required (verified live:
 # initialize succeeds anonymously).
 

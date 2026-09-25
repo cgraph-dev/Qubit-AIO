@@ -1,8 +1,8 @@
 """Profile-local durable audit ledger for cron execution attempts.
 
 The ledger records what is known about each attempt; it is not a retry queue. Interrupted attempts
-become ``unknown`` only after their exact owner process is proved gone. Terminal states are
-immutable.
+become ``unknown`` only after their owner process is proved gone — a start-time reading that fails
+to match the claim-time fingerprint is not proof of death. Terminal states are immutable.
 """
 
 from __future__ import annotations
@@ -18,10 +18,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
-from cron.constants import CLAIM_TTL_INACTIVITY_HEADROOM
-from cron.ledger import ledger_transaction, open_ledger, prepare_ledger
 from qubit_constants import get_qubit_home
 from qubit_time import now as _qubit_now
+from cron.constants import CLAIM_TTL_INACTIVITY_HEADROOM
 
 # Optional test override. Production resolves the path at transaction time so dashboard operations
 # that temporarily enter another profile cannot leak that profile's records into the import-time
@@ -39,11 +38,20 @@ _PROCESS_ID = uuid.uuid4().hex
 # --- executions ledger --------------------------------------------------------------------------
 
 def _connect() -> sqlite3.Connection:
-    return open_ledger(EXECUTIONS_FILE or (get_qubit_home().resolve() / "cron" / "executions.db"))
+    # Late imports: a scheduler daemon that outlives an on-disk upgrade already has the OLD
+    # ``qubit_cli.sqlite_util`` / ``cron.jobs`` cached, so new names must be resolved at call time,
+    # not at import time (the guarantee cron/ledger.py used to carry, see e24c8499).
+    from cron.jobs import _ensure_cron_dir
+    from qubit_cli.sqlite_util import open_db
+
+    path = EXECUTIONS_FILE or (get_qubit_home().resolve() / "cron" / "executions.db")
+    _ensure_cron_dir(path.parent)
+    return open_db(path, db_label="cron/executions.db", synchronous_full=True, initialize=_initialize_schema)
 
 
 def _initialize_schema(conn: sqlite3.Connection) -> None:
-    prepare_ledger(conn, db_label="cron/executions.db")
+    from qubit_cli.sqlite_util import add_column_if_missing
+
     conn.execute(
         """CREATE TABLE IF NOT EXISTS executions (
              id TEXT PRIMARY KEY,
@@ -62,8 +70,6 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
              error TEXT
            )"""
     )
-    from qubit_cli.sqlite_util import add_column_if_missing
-
     add_column_if_missing(
         conn, "executions", "handoff_pending",
         "handoff_pending INTEGER NOT NULL DEFAULT 0",
@@ -71,7 +77,6 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
     add_column_if_missing(
         conn, "executions", "handoff_started_at", "handoff_started_at REAL"
     )
-    add_column_if_missing(conn, "executions", "delivery_outcome", "delivery_outcome TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_executions_job_claimed "
         "ON executions(job_id, claimed_at DESC, id DESC)"
@@ -80,6 +85,7 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_executions_status_claimed "
         "ON executions(status, claimed_at DESC, id DESC)"
     )
+    add_column_if_missing(conn, "executions", "delivery_outcome", "delivery_outcome TEXT")
     add_column_if_missing(conn, "executions", "scheduled_instant", "scheduled_instant TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_executions_occurrence "
@@ -89,7 +95,9 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
 
 @contextmanager
 def _transaction() -> Iterator[sqlite3.Connection]:
-    with ledger_transaction(_lock, _connect, _initialize_schema) as conn:
+    from qubit_cli.sqlite_util import transaction
+
+    with _lock, transaction(_connect()) as conn:
         yield conn
 
 
@@ -130,16 +138,17 @@ def _owner_is_live(pid: int, started_at: Optional[int]) -> bool:
     current = _process_start_time(pid)
     if current is None:
         return True  # cannot compare -> cannot prove death; a misread must not rewrite state
-    # NOTE: upstream compares via ``gateway.status.start_time_fingerprints_match`` (drift-tolerant,
-    # #117505); that helper is not present in this tree, so the exact-match comparison is retained.
-    return current == started_at
+    # Drifted same-host readings (#117505) are not proof of death; a live misread is still
+    # bounded by the stale-claim sweep below.
+    from gateway.status import start_time_fingerprints_match
+    return start_time_fingerprints_match(started_at, current)
 
 
 def _live_owner_stale_after_seconds() -> Optional[float]:
     """Age past which a claimed/running row with a LIVE owner is treated as wedged.
 
     Derived from the existing knobs, never a bare wall-clock constant:
-    ``max(3 × QUBIT_CRON_TIMEOUT, cron script timeout, 7200)``. Returns ``None`` (never reclaim
+    ``max(3 × HERMES_CRON_TIMEOUT, cron script timeout, 7200)``. Returns ``None`` (never reclaim
     live owners — today's behaviour) when the inactivity timeout is 0/unlimited or not a finite
     positive number: with no bound to derive from, fail closed.
     """
@@ -359,8 +368,7 @@ def recover_interrupted_executions() -> int:
                    WHERE id=? AND status=? AND process_id=? AND pid=?
                      AND handoff_pending=?
                      AND handoff_started_at IS ?""",
-                (now, reason,
-                 row["id"], row["status"], row["process_id"], row["pid"],
+                (now, reason, row["id"], row["status"], row["process_id"], row["pid"],
                  row["handoff_pending"], row["handoff_started_at"]),
             )
             changed += cur.rowcount

@@ -17,7 +17,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from acp_adapter.server import QubitACPAgent
+from acp_adapter.server import HermesACPAgent
 from acp_adapter.session import SessionManager, SessionState
 from qubit_cli import mcp_startup
 
@@ -64,10 +64,10 @@ def _reset_mcp_startup_state():
     """Ensure each test starts with a clean discovery thread state."""
     saved_started = mcp_startup._mcp_discovery_started
     saved_thread = mcp_startup._mcp_discovery_thread
-    mcp_startup._mcp_discovery_started = False
-    mcp_startup._mcp_discovery_thread = None
+    mcp_startup._mcp_discovery_started = set()
+    mcp_startup._mcp_discovery_thread = {}
     yield
-    thread = mcp_startup._mcp_discovery_thread
+    thread = mcp_startup._current_home_thread()
     if thread is not None and thread.is_alive():
         thread.join(timeout=2.0)
     mcp_startup._mcp_discovery_started = saved_started
@@ -113,10 +113,11 @@ def test_acp_background_discovery_does_not_block_startup(monkeypatch):
     elapsed = time.monotonic() - start
 
     assert elapsed < 0.2, "start_background_mcp_discovery blocked for {:.3f}s".format(elapsed)
-    assert mcp_startup._mcp_discovery_thread is not None
-    assert mcp_startup._mcp_discovery_thread.is_alive()
+    thread = mcp_startup._current_home_thread()
+    assert thread is not None
+    assert thread.is_alive()
     block.set()
-    mcp_startup._mcp_discovery_thread.join(timeout=2.0)
+    thread.join(timeout=2.0)
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +162,7 @@ def test_acp_late_refresh_adds_tools_when_discovery_lands_after_build(monkeypatc
     # Build the session immediately — discovery is still in flight.
     fake = FakeAgent()
     manager = SessionManager(agent_factory=lambda **_k: fake, db=NoopDb())
-    acp_agent = QubitACPAgent(session_manager=manager)
+    acp_agent = HermesACPAgent(session_manager=manager)
     state = manager.create_session(cwd=".")
 
     # Discovery is blocked, so it must still be in flight.
@@ -238,7 +239,7 @@ def test_acp_late_refresh_skips_after_first_turn(monkeypatch):
     fake = FakeAgent()
     fake._api_call_count = 1  # simulate: user already sent a message
     manager = SessionManager(agent_factory=lambda **_k: fake, db=NoopDb())
-    acp_agent = QubitACPAgent(session_manager=manager)
+    acp_agent = HermesACPAgent(session_manager=manager)
     state = manager.create_session(cwd=".")
 
     refreshed = []
@@ -304,7 +305,7 @@ def test_acp_late_refresh_skips_while_turn_running(monkeypatch):
 
     fake = FakeAgent()  # counters are 0 — only is_running blocks the refresh
     manager = SessionManager(agent_factory=lambda **_k: fake, db=NoopDb())
-    acp_agent = QubitACPAgent(session_manager=manager)
+    acp_agent = HermesACPAgent(session_manager=manager)
     state = manager.create_session(cwd=".")
     state.is_running = True  # simulate: first prompt dispatched concurrently
 

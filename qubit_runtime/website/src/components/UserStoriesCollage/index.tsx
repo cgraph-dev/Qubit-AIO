@@ -145,7 +145,7 @@ function sourceColor(source: string): string {
   }
 }
 
-export default function UserStoriesCollage(): JSX.Element {
+export default function UserStoriesCollage(): React.JSX.Element {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeSource, setActiveSource] = useState<string>('all');
 
@@ -174,9 +174,9 @@ export default function UserStoriesCollage(): JSX.Element {
       <div className={styles.hero}>
         <h1>User Stories &amp; Use Cases</h1>
         <p>
-          What the Qubit Agent community is actually building. Every tile
+          What the Hermes Agent community is actually building. Every tile
           below links to a real post, issue, video, or gist where someone
-          describes how they use Qubit &mdash; scraped from X, GitHub, Reddit,
+          describes how they use Hermes &mdash; scraped from X, GitHub, Reddit,
           Hacker News, YouTube, blogs, and podcasts.
         </p>
         <div className={styles.meta}>
@@ -293,7 +293,7 @@ export default function UserStoriesCollage(): JSX.Element {
       )}
 
       <div className={styles.footer}>
-        Built something with Qubit?{' '}
+        Built something with Hermes?{' '}
         <a
           href="https://github.com/NousResearch/hermes-agent/edit/main/website/src/data/userStories.json"
           target="_blank"
@@ -303,7 +303,7 @@ export default function UserStoriesCollage(): JSX.Element {
         </a>{' '}
         by editing <code>userStories.json</code>, or post it in the{' '}
         <a href="https://discord.gg/NousResearch" target="_blank" rel="noopener noreferrer">
-          Qubit Labs Discord
+          Nous Research Discord
         </a>{' '}
         and we&apos;ll pick it up.
       </div>

@@ -29,7 +29,9 @@ export function GenerateUnavailable({ onSetup }: GenerateUnavailableProps) {
       </Button>
       <p className="flex flex-wrap items-center justify-center gap-x-1.5 text-[0.6875rem] text-(--ui-text-tertiary)">
         <span>Grab a key from</span>
-        <span className="text-(--ui-text-secondary)">Qubit Labs</span>
+        <ExternalLink href="https://portal.nousresearch.com" showExternalIcon={false}>
+          Nous Portal
+        </ExternalLink>
         <span>·</span>
         <ExternalLink
           className="opacity-40 transition-opacity hover:opacity-100"

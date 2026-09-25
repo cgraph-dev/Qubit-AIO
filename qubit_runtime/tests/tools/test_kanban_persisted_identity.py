@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def test_a_served_profiles_tick_authors_board_records_as_that_profile(board_env,
     monkeypatch.setenv("HERMES_PROFILE", "launch-host")  # the launch process's own pin
 
     for name in ("alpha", "beta", "alpha"):
-        token = set_hermes_home_override(root / "profiles" / name)
+        token = set_qubit_home_override(root / "profiles" / name)
         try:
             out = json.loads(kt._handle_comment({"task_id": tid, "body": f"from {name}"}))
             assert out["ok"], out
@@ -80,7 +80,7 @@ def test_a_served_profiles_tick_authors_board_records_as_that_profile(board_env,
             assert child["ok"], child
             assert _created_by(child["task_id"]) == name
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
 
 
 def test_a_dispatched_worker_keeps_its_pinned_identity_and_an_unnamed_caller_stays_generic(

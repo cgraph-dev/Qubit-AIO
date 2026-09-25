@@ -28,7 +28,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
 })
 
 describe('read-only stored-transcript resume (#94724 no-owner recovery)', () => {

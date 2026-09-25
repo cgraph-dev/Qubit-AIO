@@ -57,7 +57,7 @@ def test_historical_payload_maps_to_takeover_request_schema(tmp_path, desktop, r
     # sys.path (CI has no editable finder), so give it the one name the hand-off reads.
     (root / "qubit_constants.py").write_text(
         "import os\nfrom pathlib import Path\n"
-        "def get_hermes_home():\n    return Path(os.environ['QUBIT_HOME'])\n", encoding="utf-8",
+        "def get_qubit_home():\n    return Path(os.environ['QUBIT_HOME'])\n", encoding="utf-8",
     )
     program = root / "historical.py"
     program.write_text(

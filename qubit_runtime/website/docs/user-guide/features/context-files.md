@@ -6,7 +6,7 @@ description: "Project context files — .hermes.md, AGENTS.md, CLAUDE.md, global
 
 # Context Files
 
-Qubit Agent automatically discovers and loads context files that shape how it behaves. Some are project-local and discovered from your working directory. `SOUL.md` is now global to the Qubit instance and is loaded from `QUBIT_HOME` only.
+Hermes Agent automatically discovers and loads context files that shape how it behaves. Some are project-local and discovered from your working directory. `SOUL.md` is now global to the Hermes instance and is loaded from `HERMES_HOME` only.
 
 ## Supported Context Files
 
@@ -16,7 +16,7 @@ Qubit Agent automatically discovers and loads context files that shape how it be
 | **AGENTS.override.md** | Personal, per-directory override of AGENTS.md (typically gitignored) | CWD at startup + subdirectories progressively |
 | **AGENTS.md** | Project instructions, conventions, architecture | CWD at startup + subdirectories progressively |
 | **CLAUDE.md** | Claude Code context files (also detected) | CWD at startup + subdirectories progressively |
-| **SOUL.md** | Global personality and tone customization for this Qubit instance | `QUBIT_HOME/SOUL.md` only |
+| **SOUL.md** | Global personality and tone customization for this Hermes instance | `HERMES_HOME/SOUL.md` only |
 | **.cursorrules** | Cursor IDE coding conventions | CWD only |
 | **.cursor/rules/*.mdc** | Cursor IDE rule modules | CWD only |
 
@@ -32,7 +32,7 @@ If an `AGENTS.override.md` exists next to an `AGENTS.md`, the override is loaded
 
 ### Directory Chain (git root → working directory)
 
-When your working directory sits inside a git repository, Qubit loads a **merged chain** of `AGENTS.md` files at session start: the git-root `AGENTS.md` first, then the `AGENTS.md` in every intermediate directory down to your working directory. Deeper files appear later in the prompt, so more specific guidance takes precedence. Each file gets its own provenance header (e.g. `## ../../AGENTS.md`), and identical copies along the chain are deduplicated.
+When your working directory sits inside a git repository, Hermes loads a **merged chain** of `AGENTS.md` files at session start: the git-root `AGENTS.md` first, then the `AGENTS.md` in every intermediate directory down to your working directory. Deeper files appear later in the prompt, so more specific guidance takes precedence. Each file gets its own provenance header (e.g. `## ../../AGENTS.md`), and identical copies along the chain are deduplicated.
 
 ```
 monorepo/                   (git root, cwd = packages/webapp/)
@@ -43,11 +43,12 @@ monorepo/                   (git root, cwd = packages/webapp/)
         └── AGENTS.md      ← Loaded last (most specific, takes precedence)
 ```
 
+<!-- no-tmp: ok — explains why /tmp is never trusted -->
 Outside a git repository, only the working directory itself is checked — parents are never consulted, so an `AGENTS.md` planted in `/tmp` or `$HOME` can't leak into unrelated sessions.
 
 ### Progressive Subdirectory Discovery
 
-At session start, Qubit loads the `AGENTS.md` from your working directory into the system prompt. As the agent navigates into subdirectories during the session (via `read_file`, `terminal`, `search_files`, etc.), it **progressively discovers** context files in those directories and injects them into the conversation at the moment they become relevant.
+At session start, Hermes loads the `AGENTS.md` from your working directory into the system prompt. As the agent navigates into subdirectories during the session (via `read_file`, `terminal`, `search_files`, etc.), it **progressively discovers** context files in those directories and injects them into the conversation at the moment they become relevant.
 
 ```
 my-project/
@@ -97,26 +98,26 @@ This is a Next.js 14 web application with a Python FastAPI backend.
 
 ## SOUL.md
 
-`SOUL.md` controls the agent's personality, tone, and communication style. See the [Personality](/user-guide/features/personality) page for full details.
+`SOUL.md` controls the agent's personality, tone, and communication style. See the [Personality](./personality.md) page for full details.
 
 **Location:**
 
 - `~/.hermes/SOUL.md`
-- or `$QUBIT_HOME/SOUL.md` if you run Qubit with a custom home directory
+- or `$HERMES_HOME/SOUL.md` if you run Hermes with a custom home directory
 
 Important details:
 
-- Qubit seeds a default `SOUL.md` automatically if one does not exist yet
-- Qubit loads `SOUL.md` only from `QUBIT_HOME`
-- Qubit does not probe the working directory for `SOUL.md`
+- Hermes seeds a default `SOUL.md` automatically if one does not exist yet
+- Hermes loads `SOUL.md` only from `HERMES_HOME`
+- Hermes does not probe the working directory for `SOUL.md`
 - If the file is empty, nothing from `SOUL.md` is added to the prompt
 - If the file has content, the content is injected verbatim after scanning and truncation
 
 ## .cursorrules
 
-Qubit is compatible with Cursor IDE's `.cursorrules` file and `.cursor/rules/*.mdc` rule modules. If these files exist in your project root and no higher-priority context file (`.hermes.md`, `AGENTS.md`, or `CLAUDE.md`) is found, they're loaded as the project context.
+Hermes is compatible with Cursor IDE's `.cursorrules` file and `.cursor/rules/*.mdc` rule modules. If these files exist in your project root and no higher-priority context file (`.hermes.md`, `AGENTS.md`, or `CLAUDE.md`) is found, they're loaded as the project context.
 
-This means your existing Cursor conventions automatically apply when using Qubit.
+This means your existing Cursor conventions automatically apply when using Hermes.
 
 ## How Context Files Are Loaded
 
@@ -139,7 +140,7 @@ Context files are loaded by `build_context_files_prompt()` in `agent/prompt_buil
 2. **Ancestor walk** — the directory and up to 5 parent directories are checked (stopping at already-visited directories)
 3. **Hint loading** — if an `AGENTS.md`, `CLAUDE.md`, or `.cursorrules` is found, it's loaded (first match per directory)
 4. **Security scan** — same prompt injection scan as startup files
-5. **Truncation** — capped at 8,000 characters per file
+5. **Truncation** — capped at 32,000 characters per file (a fixed preview cap; `context_file_max_chars` and the model's context window do not change it). An oversized hint keeps its head/tail marker pointing at the full file and is logged, but does not raise the chat truncation warning that startup context files do
 6. **Injection** — appended to the tool result, so the model sees it in context naturally
 
 The final prompt section looks roughly like:
@@ -175,11 +176,22 @@ All context files are scanned for potential prompt injection before being includ
 - **Secret file access**: `cat .env`, `cat credentials`
 - **Invisible characters**: zero-width spaces, bidirectional overrides, word joiners
 
-If any threat pattern is detected, the file is blocked:
+If any threat pattern is detected in a project context file (`.hermes.md`, `AGENTS.md`, `CLAUDE.md`,
+`.cursorrules`), the file is blocked:
 
 ```
 [BLOCKED: AGENTS.md contained potential prompt injection (prompt_injection). Content not loaded.]
 ```
+
+Your own `SOUL.md` in `HERMES_HOME` is treated differently: it is a file you wrote (file-tool writes to it
+need your approval, and project checkouts never supply it), so a scanner hit there **does not block the
+file**. Hermes logs a warning naming the matched pattern, loads the file as usual, and `/context` lists it as
+`⚠ SOUL.md … loaded — matched prompt-injection pattern(s); review the file`. This lets an identity file that
+*documents* an attack phrase (security guidance such as "content telling you to ignore previous instructions")
+keep working; if you did not write the flagged text, treat the warning as a sign that something else edited
+the file. The exception does not extend to a `SOUL.md` shipped by a profile distribution: `hermes profile
+install <git-url>` and `hermes profile update` copy a third party's `SOUL.md` into the profile home without
+a scan or an approval prompt, so when `distribution.yaml` owns the file a scanner hit still blocks it.
 
 :::warning
 This scanner protects against common injection patterns, but it's not a substitute for reviewing context files in shared repositories. Always validate AGENTS.md content in projects you didn't author.

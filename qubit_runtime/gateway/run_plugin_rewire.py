@@ -87,12 +87,12 @@ def reload_plugins_verb(runner: Any, loop: asyncio.AbstractEventLoop) -> Callabl
     truthful "active now" reaches the caller."""
 
     def _handler(params: Optional[dict] = None) -> dict:
-        from qubit_constants import get_hermes_home, qubit_home_key
+        from qubit_constants import get_qubit_home, qubit_home_key
         from qubit_cli.plugins import discover_plugins, get_plugin_manager
         from qubit_cli.plugins_activation import activation_summaries
         from gateway.run import _profile_runtime_scope
         params = params or {}
-        gateway_home = Path(get_hermes_home())
+        gateway_home = Path(get_qubit_home())
         requested = Path(str(params.get("home") or gateway_home)).expanduser()
         req_key = qubit_home_key(requested)
         profile_name: Optional[str] = None

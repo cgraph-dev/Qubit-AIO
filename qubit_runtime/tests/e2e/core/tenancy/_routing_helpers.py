@@ -51,7 +51,7 @@ _STRIP_PREFIXES = ("HERMES_", "OPENAI", "ANTHROPIC", "OPENROUTER", "AWS_", "AZUR
                    "GEMINI", "PYTEST_", "NOUS_", "XAI_", "LLM_", "CUSTOM_")
 
 
-def hermetic_env(home: Path, hermes_home: Path | None = None, proxy: str | None = None) -> dict[str, str]:
+def hermetic_env(home: Path, qubit_home: Path | None = None, proxy: str | None = None) -> dict[str, str]:
     real_home = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve()
     fake = home.resolve()
     # The state-db guard is bypassed below, so prove first that this child can never reach the
@@ -61,7 +61,7 @@ def hermetic_env(home: Path, hermes_home: Path | None = None, proxy: str | None 
            if not (k.endswith(_STRIP_SUFFIXES) or k.startswith(_STRIP_PREFIXES))}
     env.update(
         HOME=str(home),
-        QUBIT_HOME=str(hermes_home or home / ".hermes"),
+        QUBIT_HOME=str(qubit_home or home / ".hermes"),
         PYTHONPATH=str(REPO_ROOT),
         NO_COLOR="1",
         TERM="dumb",
@@ -256,14 +256,14 @@ def inference_hosts() -> frozenset[str]:
 # QUBIT_HOME writing ------------------------------------------------------------
 
 
-def write_home(hermes_home: Path, config: dict[str, Any], env: dict[str, str],
+def write_home(qubit_home: Path, config: dict[str, Any], env: dict[str, str],
                auth: dict[str, Any] | None = None) -> Path:
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-    (hermes_home / ".env").write_text("".join(f"{k}={v}\n" for k, v in env.items()), encoding="utf-8")
+    qubit_home.mkdir(parents=True, exist_ok=True)
+    (qubit_home / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    (qubit_home / ".env").write_text("".join(f"{k}={v}\n" for k, v in env.items()), encoding="utf-8")
     if auth is not None:
-        (hermes_home / "auth.json").write_text(json.dumps(auth), encoding="utf-8")
-    return hermes_home
+        (qubit_home / "auth.json").write_text(json.dumps(auth), encoding="utf-8")
+    return qubit_home
 
 
 def pool_auth(provider: str, keys: Iterable[str]) -> dict[str, Any]:
@@ -286,13 +286,13 @@ class RunResult:
     seconds: float
 
 
-def run_hermes(argv: list[str], home: Path, *, hermes_home: Path | None = None, proxy: str | None = None,
+def run_hermes(argv: list[str], home: Path, *, qubit_home: Path | None = None, proxy: str | None = None,
                timeout: float = 240.0) -> RunResult:
     """Run the real ``hermes`` entry point in its own process group; kill only that group."""
     start = time.monotonic()
     proc = subprocess.Popen(
         [sys.executable, "-m", "qubit_cli.main", *argv],
-        cwd=str(home), env=hermetic_env(home, hermes_home, proxy), stdin=subprocess.DEVNULL,
+        cwd=str(home), env=hermetic_env(home, qubit_home, proxy), stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
     )
     try:

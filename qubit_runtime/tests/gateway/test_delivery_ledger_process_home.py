@@ -4,7 +4,7 @@ A multiplexed gateway connects each served profile's adapter inside that profile
 (``_profile_runtime_scope``), and the receive loop the adapter starts while connecting inherits it,
 so every final reply that bot sends is recorded from that context. The boot sweep that redelivers a
 reply cut off by a crash runs in the launch context. The ledger used to resolve its path through
-``get_hermes_home()``, which follows the override: the row landed in ``profiles/<name>/state.db``,
+``get_qubit_home()``, which follows the override: the row landed in ``profiles/<name>/state.db``,
 the sweep opened the launch ``state.db``, and the reply was never redelivered.
 
 Every other ledger test replaces ``_db_path``; these leave it alone, since the path is what is
@@ -60,7 +60,7 @@ def launch_home(request, tmp_path, monkeypatch):
     else:
         # A default gateway run in the foreground has no QUBIT_HOME at all.
         monkeypatch.delenv("QUBIT_HOME", raising=False)
-        monkeypatch.setattr(qubit_constants, "_get_platform_default_hermes_home", lambda: root)
+        monkeypatch.setattr(qubit_constants, "_get_platform_default_qubit_home", lambda: root)
     return root
 
 

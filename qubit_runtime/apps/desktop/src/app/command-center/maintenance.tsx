@@ -237,7 +237,7 @@ export function MaintenancePanel() {
                 </span>
                 <Button
                   onClick={() => {
-                    void window.qubitDesktop.writeClipboard(url)
+                    void window.hermesDesktop.writeClipboard(url)
                     notify({ durationMs: 1500, kind: 'success', message: mm.linkCopied })
                   }}
                   size="xs"

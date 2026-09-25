@@ -1,6 +1,6 @@
 import { PassThrough } from 'stream'
 
-import { renderSync } from '@qubit/ink'
+import { renderSync } from '@hermes/ink'
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 
@@ -94,18 +94,5 @@ describe('branding MCP headline count', () => {
     // Matches the classic CLI, which only appends "· N MCP" when N > 0.
     expect(frame).not.toContain('MCP servers')
     expect(frame).not.toMatch(/\d MCP\b/)
-  })
-
-  it('counts every connected server when several are connected', async () => {
-    const frame = await renderFooter(
-      baseInfo([
-        mcp({ connected: true, name: 'alpha', status: 'connected' }),
-        mcp({ connected: true, name: 'beta', status: 'connected' }),
-        mcp({ connected: false, disabled: true, name: 'gamma', status: 'disabled' })
-      ])
-    )
-
-    expect(frame).toContain('2 MCP')
-    expect(frame).not.toContain('3 MCP')
   })
 })

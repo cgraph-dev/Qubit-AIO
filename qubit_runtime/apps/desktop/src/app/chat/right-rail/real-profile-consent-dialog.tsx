@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { saveQubitConfigRecord } from '@/hermes'
+import { saveHermesConfigRecord } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Check, Globe } from '@/lib/icons'
 import { notify, notifyError } from '@/store/notifications'
@@ -23,7 +23,7 @@ import {
   releaseRealProfilePrompt
 } from '@/store/real-profile-consent'
 
-import { qubitConfigCacheWriter, useQubitConfigRecord } from '../../hooks/use-config-record'
+import { hermesConfigCacheWriter, useHermesConfigRecord } from '../../hooks/use-config-record'
 
 interface RealProfileConsentDialogProps {
   /** The Browser tab this pane renders — used only to claim the prompt so
@@ -50,8 +50,8 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
   const dismissed = useStore($realProfilePromptDismissed)
   const muted = useStore($realProfilePromptMuted)
   const claim = useStore($realProfilePromptClaim)
-  const { data: config } = useQubitConfigRecord()
-  const setConfig = qubitConfigCacheWriter()
+  const { data: config, writeScope } = useHermesConfigRecord()
+  const setConfig = hermesConfigCacheWriter()
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -78,7 +78,10 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
     setConfig(next)
 
     try {
-      await saveQubitConfigRecord(next)
+      // Sparse patch: PUT /api/config deep-merges, and echoing the cached
+      // snapshot would overwrite keys other surfaces changed since it loaded.
+      await saveHermesConfigRecord({ browser: { use_real_profile: true } }, writeScope)
+
       notify({ kind: 'info', title: copy.enabledTitle, message: copy.enabledMessage })
     } catch (err) {
       setConfig(config)
@@ -86,7 +89,7 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
     } finally {
       setBusy(false)
     }
-  }, [busy, config, copy, setConfig])
+  }, [busy, config, copy, setConfig, writeScope])
 
   // Config not loaded yet, feature already on, opted out, or another pane
   // owns the prompt — render nothing. `enabled` flipping true after a

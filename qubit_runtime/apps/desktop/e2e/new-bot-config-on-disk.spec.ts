@@ -37,7 +37,7 @@ test.afterEach(async ({}, info) => {
   }
 
   await info.attach('native-window', { body: await fixture.page.screenshot(), contentType: 'image/png' })
-  const cfg = join(fixture.sandbox.qubitHome, 'profiles', 'fresh-scout', 'config.yaml')
+  const cfg = join(fixture.sandbox.hermesHome, 'profiles', 'fresh-scout', 'config.yaml')
   await info.attach('created-config', {
     body: existsSync(cfg) ? readFileSync(cfg) : Buffer.from('<missing>'),
     contentType: 'text/plain'
@@ -69,7 +69,7 @@ test('a fresh (non-clone) bot gets a runnable model block on disk', async () => 
   await expect(dialog).toBeHidden({ timeout: 60_000 })
 
   // Storage truth: the created profile's own config.yaml carries the model block.
-  const cfgPath = join(fixture!.sandbox.qubitHome, 'profiles', 'fresh-scout', 'config.yaml')
+  const cfgPath = join(fixture!.sandbox.hermesHome, 'profiles', 'fresh-scout', 'config.yaml')
   await expect.poll(() => existsSync(cfgPath), { timeout: 30_000 }).toBe(true)
   const cfg = readFileSync(cfgPath, 'utf8')
   expect(cfg).toMatch(/^model:/m)

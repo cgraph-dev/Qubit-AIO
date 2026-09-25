@@ -1,10 +1,10 @@
-"""Regression: ``qubit update`` should take a managed checkout off autocrlf=true.
+"""Regression: ``hermes update`` should take a managed checkout off autocrlf=true.
 
 Git for Windows ships ``core.autocrlf=true`` in its system config, which
 renormalizes this repo's LF text files to CRLF in the working tree and breaks
 ``git checkout`` on update. ``install.ps1`` pins ``core.autocrlf=false`` on new
 installs, but checkouts created before that landed cannot receive the fix, so
-``qubit update`` has to repair them.
+``hermes update`` has to repair them.
 
 The pin and the cleanup are one operation: under ``autocrlf=true`` git compares
 normalized content, so the CRLF tree reads clean and pinning alone would expose
@@ -150,7 +150,7 @@ def test_pin_alone_is_written_when_there_is_no_churn(tmp_path: Path) -> None:
     assert _autocrlf(repo) == "false"
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="shim needs a POSIX shell")
+@pytest.mark.platforms("posix")  # shim needs a POSIX shell
 def test_pin_is_withheld_when_the_churn_cannot_be_cleared(tmp_path: Path) -> None:
     """If normalization can't finish, the checkout is left as found — pinning
     anyway would surface churn we failed to clear."""

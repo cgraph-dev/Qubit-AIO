@@ -7,7 +7,7 @@ import logging
 
 from agent.chat_completion_helpers import _log_fallback_activated
 from agent.error_classifier import FailoverReason, classify_api_error
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 
 class _StatusError(Exception):
@@ -38,13 +38,13 @@ def test_billing_fallback_warning_names_failing_profile_and_remedy(tmp_path, cap
     never the launch profile; a non-billing switch stays INFO."""
     seen = {}
     for name in ("alpha", "beta"):
-        token = set_hermes_home_override(tmp_path / ".hermes" / "profiles" / name)
+        token = set_qubit_home_override(tmp_path / ".hermes" / "profiles" / name)
         try:
             caplog.clear()
             with caplog.at_level(logging.INFO, logger="agent.chat_completion_helpers"):
                 _log_fallback_activated(None, FailoverReason.billing, "z-ai/glm-5.2", "nous", "free/model", "nous")
         finally:
-            reset_hermes_home_override(token)
+            reset_qubit_home_override(token)
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 1
         seen[name] = warnings[0].getMessage()

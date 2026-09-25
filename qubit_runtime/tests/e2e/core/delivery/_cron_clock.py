@@ -3,7 +3,7 @@
 What is virtual and what stays real:
 
 * ``VirtualClock`` is ONE epoch value in a file shared by every process of a scenario. It is
-  installed at the single wall-clock seam — ``qubit_time.datetime`` (every ``_hermes_now``
+  installed at the single wall-clock seam — ``qubit_time.datetime`` (every ``_qubit_now``
   binding in cron/jobs.py, scheduler.py, executions.py, occurrences via jobs, ... resolves
   ``qubit_time.now()`` -> ``datetime.now(tz)`` at call time) — plus the ``time.time()`` reads of
   cron.jobs / cron.scheduler / cron.executions (in-flight ages, ledger handoff grace, ticker

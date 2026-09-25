@@ -1,22 +1,22 @@
 ---
 sidebar_position: 11
 title: "Automate Anything with Cron"
-description: "Real-world automation patterns using Qubit cron — monitoring, reports, pipelines, and multi-skill workflows"
+description: "Real-world automation patterns using Hermes cron — monitoring, reports, pipelines, and multi-skill workflows"
 ---
 
 # Automate Anything with Cron
 
-The [daily briefing bot tutorial](/guides/daily-briefing-bot) covers the basics. This guide goes further — five real-world automation patterns you can adapt for your own workflows.
+The [daily briefing bot tutorial](./daily-briefing-bot.md) covers the basics. This guide goes further — five real-world automation patterns you can adapt for your own workflows.
 
-For the full feature reference, see [Scheduled Tasks (Cron)](/user-guide/features/cron).
+For the full feature reference, see [Scheduled Tasks (Cron)](../user-guide/features/cron.md).
 
 :::info Key Concept
 Cron jobs run in fresh agent sessions with no memory of your current chat. Prompts must be **completely self-contained** — include everything the agent needs to know.
 :::
 
 :::tip Don't need the LLM? You have two zero-token options.
-- **Recurring watchdog** where the script already produces the exact message (memory alerts, disk alerts, heartbeats): use [script-only cron jobs](/guides/cron-script-only). Same scheduler, no LLM. You can ask Qubit to set one up for you in chat — the `cronjob` tool knows when to pick `no_agent=True` and writes the script for you.
-- **One-shot from a script that's already running** (CI step, post-commit hook, deploy script, externally-scheduled monitor): use [`qubit send`](/guides/pipe-script-output) to pipe stdout or a file straight to Telegram / Discord / Slack / etc. without setting up a cron entry.
+- **Recurring watchdog** where the script already produces the exact message (memory alerts, disk alerts, heartbeats): use [script-only cron jobs](./cron-script-only.md). Same scheduler, no LLM. You can ask Hermes to set one up for you in chat — the `cronjob_manage` tool knows when to pick `no_agent=True` and writes the script for you.
+- **One-shot from a script that's already running** (CI step, post-commit hook, deploy script, externally-scheduled monitor): use [`hermes send`](./pipe-script-output.md) to pipe stdout or a file straight to Telegram / Discord / Slack / etc. without setting up a cron entry.
 :::
 
 ---
@@ -40,7 +40,7 @@ URL = "https://example.com/pricing"
 STATE_FILE = os.path.expanduser("~/.hermes/scripts/.watch-site-state.json")
 
 # Fetch current content
-req = urllib.request.Request(URL, headers={"User-Agent": "Qubit-Monitor/1.0"})
+req = urllib.request.Request(URL, headers={"User-Agent": "Hermes-Monitor/1.0"})
 content = urllib.request.urlopen(req, timeout=30).read().decode()
 current_hash = hashlib.sha256(content.encode()).hexdigest()
 
@@ -75,7 +75,7 @@ For cron monitoring jobs, instruct the agent to respond with only `[SILENT]` whe
 :::
 
 :::tip Keeping failure notices out of shared channels
-`[SILENT]` only applies to successful runs — when a job hard-fails, the engine posts a `⚠️ Cron 'X' failed…` notice to the job's delivery target. For jobs that deliver into busy shared channels, set `--failure-deliver local` to suppress those notices entirely (run state stays visible in `qubit cron list` and run history), or point failures at an ops channel with `--failure-deliver slack:C_OPS`. Same grammar as `--deliver`; omit it and failures follow `--deliver` as before.
+`[SILENT]` only applies to successful runs — when a job hard-fails, the engine posts a `⚠️ Cron 'X' failed…` notice to the job's delivery target. For jobs that deliver into busy shared channels, set `--failure-deliver local` to suppress those notices entirely (run state stays visible in `hermes cron list` and run history), or point failures at an ops channel with `--failure-deliver slack:C_OPS`. Same grammar as `--deliver`; omit it and failures follow `--deliver` as before.
 :::
 
 ---
@@ -98,7 +98,7 @@ Keep it under 500 words — highlight only what matters." --name "Weekly AI dige
 From the CLI:
 
 ```bash
-qubit cron create "0 9 * * 1" \
+hermes cron create "0 9 * * 1" \
   "Generate a weekly report covering the top AI news, trending ML GitHub repos, and most-discussed HN posts. Format with sections, include links, keep under 500 words." \
   --name "Weekly AI digest" \
   --deliver telegram
@@ -264,7 +264,7 @@ instead of just having it archived in Run history.
 Things to know:
 
 - **Machine-local.** The profile must exist on the machine running the
-  scheduler (`qubit profile list`). Names are validated at create time;
+  scheduler (`hermes profile list`). Names are validated at create time;
   profiles on other gateways/machines cannot be targeted.
 - **Costs a bot turn.** Each delivery runs a full agent turn in the target
   bot's Bot Chat — budget accordingly for high-frequency jobs.
@@ -289,4 +289,4 @@ Things to know:
 
 ---
 
-*For the complete cron reference — all parameters, edge cases, and internals — see [Scheduled Tasks (Cron)](/user-guide/features/cron).*
+*For the complete cron reference — all parameters, edge cases, and internals — see [Scheduled Tasks (Cron)](../user-guide/features/cron.md).*

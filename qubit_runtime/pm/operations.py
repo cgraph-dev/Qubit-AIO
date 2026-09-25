@@ -120,8 +120,8 @@ def _environment_root(name: str, root: Path | None) -> Path:
         raise ValueError("environment name must be a simple package name")
     if root is not None:
         return Path(root).absolute()
-    from qubit_constants import get_hermes_home
-    return get_hermes_home() / "environments" / name
+    from qubit_constants import get_qubit_home
+    return get_qubit_home() / "environments" / name
 
 
 def _python(environment: Path) -> Path:

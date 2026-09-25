@@ -15,7 +15,7 @@ import pytest
 
 
 @pytest.fixture
-def hermes_home(tmp_path, monkeypatch):
+def qubit_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -30,9 +30,9 @@ def _write(home: Path, config: str, env: str) -> None:
     (home / ".env").write_text(env, encoding="utf-8")
 
 
-def test_model_key_env_pointer_is_honored_for_registry_provider(hermes_home):
+def test_model_key_env_pointer_is_honored_for_registry_provider(qubit_home):
     _write(
-        hermes_home,
+        qubit_home,
         "model:\n  default: some-model\n  provider: lmstudio\n"
         "  base_url: http://127.0.0.1:1234/v1\n"
         "  key_env: HERMES_CUSTOM_LMSTUDIO_API_KEY\n",
@@ -45,11 +45,11 @@ def test_model_key_env_pointer_is_honored_for_registry_provider(hermes_home):
     assert creds["source"] == "HERMES_CUSTOM_LMSTUDIO_API_KEY"
 
 
-def test_model_key_env_does_not_leak_across_providers(hermes_home):
+def test_model_key_env_does_not_leak_across_providers(qubit_home):
     # model targets a DIFFERENT provider: its key_env must not be consulted for
     # lmstudio, which falls back to its documented no-auth placeholder.
     _write(
-        hermes_home,
+        qubit_home,
         "model:\n  default: gpt-x\n  provider: openai\n"
         "  key_env: HERMES_CUSTOM_LMSTUDIO_API_KEY\n",
         "HERMES_CUSTOM_LMSTUDIO_API_KEY=sk-lm-should-not-leak\n",

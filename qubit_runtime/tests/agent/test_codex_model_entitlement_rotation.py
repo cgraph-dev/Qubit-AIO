@@ -41,7 +41,7 @@ def pool(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(root))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     import qubit_constants
-    qubit_constants._default_hermes_root_memo = None  # type: ignore[attr-defined]
+    qubit_constants._default_qubit_root_memo = None  # type: ignore[attr-defined]
     (root / "auth.json").write_text(json.dumps({"credential_pool": {"openai-codex": [
         {"id": f"cred-{i}", "label": f"acct-{i}", "auth_type": "oauth", "priority": i, "source": "manual",
          "access_token": tok, "refresh_token": f"rt-{i}", "expires_at_ms": 4_000_000_000_000}

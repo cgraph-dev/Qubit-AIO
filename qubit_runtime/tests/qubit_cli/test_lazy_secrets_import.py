@@ -1,4 +1,4 @@
-"""Regression test: qubit update must not load cryptography eagerly."""
+"""Regression test: hermes update must not load cryptography eagerly."""
 
 import sys
 import subprocess
@@ -75,7 +75,7 @@ sys.exit(0)
         )
 
     def test_update_check_no_cryptography(self) -> None:
-        """Running qubit update --check should NOT load cryptography._rust."""
+        """Running hermes update --check should NOT load cryptography._rust."""
         # Write a small script in the repo root so qubit_cli is importable,
         # and use a filename that doesn't trigger the live-system guard.
         repo_root = Path(__file__).parent.parent.parent
@@ -83,7 +83,7 @@ sys.exit(0)
         script.write_text(
             """
 import sys
-sys.argv = ['qubit', 'update', '--check']
+sys.argv = ['hermes', 'update', '--check']
 
 import qubit_cli.main
 from qubit_cli.update_cmd import _cmd_update_check

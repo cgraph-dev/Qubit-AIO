@@ -55,7 +55,7 @@ from tests.e2e.core.upgrade._helpers import (
     sandbox_required_reason,
     wait_for,
 )
-from tests.fakes.fake_llm_provider import FakeLLMServer, Text, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, Text, write_qubit_home
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "linux", reason="fork()-based import isolation and bwrap sandbox are Linux-only"),
@@ -160,7 +160,7 @@ def _tracked(prefix: str = "") -> set[str] | None:
 
 def _root_py_modules() -> list[str]:
     """``setup.py::_root_py_modules()`` — the list the wheel build ships."""
-    spec = importlib.util.spec_from_file_location("_hermes_setup_py_c6", WORKTREE / "setup.py")
+    spec = importlib.util.spec_from_file_location("_qubit_setup_py_c6", WORKTREE / "setup.py")
     mod = importlib.util.module_from_spec(spec)
     saved = sys.argv
     sys.argv = ["setup.py", "--name"]  # setup() must not build anything on import
@@ -356,7 +356,7 @@ os.rename(checkout, checkout + ".pre-pull")
 os.rename(spec["new_tree"], checkout)
 
 # The OLD updater's own post-pull steps, called the way it calls them (``_m()._...``).
-for step in ("_reload_updated_runtime_modules", "_purge_stale_hermes_modules"):
+for step in ("_reload_updated_runtime_modules", "_purge_stale_qubit_modules"):
     fn = getattr(main, step, None)
     if fn is not None:
         fn()
@@ -541,7 +541,7 @@ def _pre_handoff_tag() -> tuple[str, str] | None:
     for tag in cp.stdout.split()[:15] if cp.returncode == 0 else []:
         if _git("cat-file", "-e", f"{tag}:qubit_cli/update_handoff.py").returncode == 0:
             continue
-        grep = _git("grep", "-l", "def _purge_stale_hermes_modules", tag, "--", "qubit_cli")
+        grep = _git("grep", "-l", "def _purge_stale_qubit_modules", tag, "--", "qubit_cli")
         return (tag, grep.stdout.strip()) if grep.returncode == 0 and grep.stdout.strip() else None
     return None
 
@@ -718,10 +718,10 @@ def test_entrypoint_in_a_fresh_process(case, tmp_path):
     reply = f"FAKE-REPLY-{uuid.uuid4().hex[:12]}"
     env = isolated_env(tmp_path, pythonpath=WORKTREE,
                        extra={"TERM": "xterm-256color", "COLUMNS": "120", "LINES": "40"} if entry.tty else None)
-    hermes_home = Path(env["QUBIT_HOME"])
+    qubit_home = Path(env["QUBIT_HOME"])
     with FakeLLMServer([Text(reply)]) as srv:
-        write_hermes_home(hermes_home, srv.base_url)
-        config_before = (hermes_home / "config.yaml").read_bytes()
+        write_qubit_home(qubit_home, srv.base_url)
+        config_before = (qubit_home / "config.yaml").read_bytes()
         args = [*entry.args, canary] if entry.turn else list(entry.args)
         if entry.via == "module":
             argv = [PY, "-m", "qubit_cli.main", *args]
@@ -741,12 +741,12 @@ def test_entrypoint_in_a_fresh_process(case, tmp_path):
         from qubit_cli.version_info import get_version_info
         commit = get_version_info().commit
         assert commit and commit[:7] in cp.stdout, describe(cp)
-    db = hermes_home / "state.db"
+    db = qubit_home / "state.db"
     if db.exists():
         assert _db_rows(db, "PRAGMA integrity_check") == [("ok",)], f"{case} left a corrupt state.db"
     if case == "module-doctor":
         assert cp.stdout.strip(), describe(cp)
-        assert (hermes_home / "config.yaml").read_bytes() == config_before, "doctor without --fix rewrote config.yaml"
+        assert (qubit_home / "config.yaml").read_bytes() == config_before, "doctor without --fix rewrote config.yaml"
     if not entry.turn:
         assert main_requests == [], f"{case} made {len(main_requests)} model call(s)"
         return
@@ -772,7 +772,7 @@ def test_serve_announces_ready_and_stops_cleanly_on_sigterm(tmp_path):
     report_path = tmp_path / "reaper.json"
     stdout_path, stderr_path = tmp_path / "serve.out", tmp_path / "serve.err"
     with FakeLLMServer() as srv, open(stdout_path, "w", encoding="utf-8") as out, open(stderr_path, "w", encoding="utf-8") as err:
-        write_hermes_home(Path(env["QUBIT_HOME"]), srv.base_url)
+        write_qubit_home(Path(env["QUBIT_HOME"]), srv.base_url)
         argv = [PY, str(reaper), str(report_path),
                 PY, "-m", "qubit_cli.main", "serve", "--host", "127.0.0.1", "--port", "0"]
         proc = subprocess.Popen(sandbox_argv(argv, writable=[tmp_path]), env=env, cwd=str(WORKTREE),

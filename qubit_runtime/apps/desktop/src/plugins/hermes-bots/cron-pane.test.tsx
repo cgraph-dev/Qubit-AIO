@@ -15,7 +15,7 @@
  *      fails closed — the subscription fix must not loosen identity matching.
  */
 
-import type * as QubitSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@hermes/plugin-sdk'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { atom } from 'nanostores'
@@ -34,7 +34,7 @@ beforeAll(() => {
 const { request } = vi.hoisted(() => ({ request: vi.fn() }))
 
 vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof QubitSdk>()
+  const sdk = await importOriginal<typeof HermesSdk>()
   const { atom: nanoAtom } = await import('nanostores')
 
   return {

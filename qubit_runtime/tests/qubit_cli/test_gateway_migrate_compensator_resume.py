@@ -43,8 +43,8 @@ def stranded(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_GATEWAY_LOCK_DIR", str(tmp_path / "locks"))
     for name in ("TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "GATEWAY_MULTIPLEX_PROFILES"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
-    assert str(qubit_constants.get_default_hermes_root()).startswith(str(tmp_path))
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
+    assert str(qubit_constants.get_default_qubit_root()).startswith(str(tmp_path))
 
     (root / gm.MANIFEST_NAME).write_text(json.dumps({
         "version": 1, "flag_was": False,

@@ -94,14 +94,14 @@ class TestWabaIdValidator:
 def isolated_home(tmp_path, monkeypatch):
     """Redirect QUBIT_HOME so save_env_value writes into a temp .env."""
     home = tmp_path / "home"
-    qubit = home / ".hermes"
-    qubit.mkdir(parents=True)
+    hermes = home / ".hermes"
+    hermes.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: home)
-    monkeypatch.setenv("QUBIT_HOME", str(qubit))
+    monkeypatch.setenv("QUBIT_HOME", str(hermes))
     for key in list(os.environ):
         if key.startswith("WHATSAPP_CLOUD_"):
             monkeypatch.delenv(key, raising=False)
-    return qubit
+    return hermes
 
 
 def _env_value(qubit_home: Path, key: str) -> str | None:

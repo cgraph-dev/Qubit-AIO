@@ -125,7 +125,7 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `base_url_hostname` | moved-lazy | `utils` |
 | `claude_code_credentials_path` | moved-lazy | `agent.anthropic_credentials` |
 | `copy` | import | `copy` |
-| `get_hermes_home` | moved-lazy | `qubit_constants` |
+| `get_qubit_home` | moved-lazy | `qubit_constants` |
 | `is_claude_code_token_valid` | moved-lazy | `agent.anthropic_credentials` |
 | `is_rotation_consumed_uncommitted` | moved-lazy | `agent.anthropic_credentials` |
 | `json` | import | `json` |
@@ -133,10 +133,10 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `os` | import | `os` |
 | `platform` | import | `platform` |
 | `read_claude_code_credentials` | moved-lazy | `agent.anthropic_credentials` |
-| `read_hermes_oauth_credentials` | moved-lazy | `agent.anthropic_credentials` |
+| `read_qubit_oauth_credentials` | moved-lazy | `agent.anthropic_credentials` |
 | `refresh_anthropic_oauth_pure` | moved-lazy | `agent.anthropic_credentials` |
 | `resolve_anthropic_token` | moved-lazy | `agent.anthropic_credentials` |
-| `run_hermes_oauth_login_pure` | moved-lazy | `agent.anthropic_credentials` |
+| `run_qubit_oauth_login_pure` | moved-lazy | `agent.anthropic_credentials` |
 | `run_oauth_setup_token` | moved-lazy | `agent.anthropic_credentials` |
 | `secrets` | import | `secrets` |
 | `stat` | import | `stat` |
@@ -668,7 +668,7 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `build_welcome_banner` | moved-lazy | `qubit_cli.banner` |
 | `concurrent` | import | `concurrent.futures` |
 | `copy` | import | `copy` |
-| `display_hermes_home` | moved-lazy | `qubit_constants` |
+| `display_qubit_home` | moved-lazy | `qubit_constants` |
 | `estimate_usage_cost` | moved-lazy | `agent.usage_pricing` |
 | `get_all_toolsets` | moved-lazy | `toolsets` |
 | `get_job` | moved-lazy | `cron.jobs` |
@@ -1373,13 +1373,13 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 
 | name | kind | new location |
 |---|---|---|
-| `get_hermes_home` | moved-lazy | `qubit_constants` |
+| `get_qubit_home` | moved-lazy | `qubit_constants` |
 
 ### `qubit_cli.local_runtime.bootstrap`
 
 | name | kind | new location |
 |---|---|---|
-| `get_hermes_home` | moved-lazy | `qubit_constants` |
+| `get_qubit_home` | moved-lazy | `qubit_constants` |
 
 ### `qubit_cli.local_runtime.capabilities`
 
@@ -1475,7 +1475,6 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `NamedTuple` | import | `typing` |
 | `PROVIDER_GROUPS` | moved-lazy | `qubit_cli.models_catalog_static` |
 | `ProviderEntry` | moved-lazy | `qubit_cli.models_catalog_static` |
-| `_OPENCODE_KEYLESS_EXTRA_SLUGS` | restored-helper | `(deleted; restored as a dependency of is_opencode_zen_free_model)` |
 | `atomic_json_write` | moved-lazy | `utils` |
 | `base_url_host_matches` | moved-lazy | `utils` |
 | `compute_sale_discount` | moved-lazy | `qubit_cli.models_pricing` |
@@ -1490,7 +1489,6 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `group_providers` | moved-lazy | `qubit_cli.models_catalog_static` |
 | `http` | import | `http.client` |
 | `is_nous_free_tier` | restored-def | `(deleted; BASE body restored)` |
-| `is_opencode_zen_free_model` | restored-def | `(deleted; BASE body restored)` |
 | `lmstudio_model_reasoning_options` | moved-lazy | `qubit_cli.models_local` |
 | `nous_catalog_url` | moved-lazy | `qubit_cli.models_reasoning_caps` |
 | `nous_model_reasoning_capabilities` | moved-lazy | `qubit_cli.models_reasoning_caps` |
@@ -1586,8 +1584,8 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `format_system_prompt_section` | moved-lazy | `qubit_cli.plugins_dispatch` |
 | `get_plugin_subscriptions` | restored-def | `(deleted; BASE body restored)` |
 | `hashlib` | import | `hashlib` |
-| `reset_hermes_home_override` | moved-lazy | `qubit_constants` |
-| `set_hermes_home_override` | moved-lazy | `qubit_constants` |
+| `reset_qubit_home_override` | moved-lazy | `qubit_constants` |
+| `set_qubit_home_override` | moved-lazy | `qubit_constants` |
 | `time` | import | `time` |
 | `unload_plugins` | restored-def | `(deleted; BASE body restored)` |
 | `wraps` | import | `functools` |
@@ -1884,14 +1882,13 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `auth_mcp_server` | moved-lazy | `qubit_cli.web_routers.mcp` |
 | `base64` | import | `base64` |
 | `binascii` | import | `binascii` |
-| `build_cron_model_impact` | moved-lazy | `qubit_cli.config` |
 | `bulk_delete_sessions_endpoint` | moved-lazy | `qubit_cli.web_routers.sessions` |
 | `cancel_oauth_session` | moved-lazy | `qubit_cli.web_routers.oauth` |
 | `cancel_telegram_onboarding` | moved-lazy | `qubit_cli.web_routers.messaging` |
 | `cancel_whatsapp_onboarding` | moved-lazy | `qubit_cli.web_routers.messaging` |
 | `cfg_get` | moved-lazy | `qubit_cli.config` |
 | `check_config_version` | moved-lazy | `qubit_cli.config` |
-| `check_hermes_update` | moved-lazy | `qubit_cli.web_routers.actions` |
+| `check_qubit_update` | moved-lazy | `qubit_cli.web_routers.actions` |
 | `clear_model_endpoint_credentials` | moved-lazy | `qubit_cli.config` |
 | `clear_pending_pairing` | moved-lazy | `qubit_cli.web_routers.ops` |
 | `coerce_provider_id` | moved-lazy | `qubit_cli.config` |
@@ -1964,7 +1961,7 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `get_env_path` | moved-lazy | `qubit_cli.config` |
 | `get_env_vars` | moved-lazy | `qubit_cli.web_routers.config_env` |
 | `get_health` | moved-lazy | `qubit_cli.web_routers.status` |
-| `get_hermes_home` | moved-lazy | `qubit_cli.config` |
+| `get_qubit_home` | moved-lazy | `qubit_cli.config` |
 | `get_learning_graph` | moved-lazy | `qubit_cli.web_routers.status` |
 | `get_learning_node` | moved-lazy | `qubit_cli.web_routers.status` |
 | `get_logs` | moved-lazy | `qubit_cli.web_routers.status` |
@@ -1978,7 +1975,7 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `get_models_analytics` | moved-lazy | `qubit_cli.web_routers.analytics` |
 | `get_plugins_hub` | moved-lazy | `qubit_cli.web_routers.dashboard_ui` |
 | `get_portal_status` | moved-lazy | `qubit_cli.web_routers.status` |
-| `get_process_hermes_home` | moved-lazy | `qubit_cli.config` |
+| `get_process_qubit_home` | moved-lazy | `qubit_cli.config` |
 | `get_profile_setup_command` | moved-lazy | `qubit_cli.web_routers.profiles` |
 | `get_profile_soul` | moved-lazy | `qubit_cli.web_routers.profiles` |
 | `get_profiles_sessions` | moved-lazy | `qubit_cli.web_routers.profiles` |
@@ -2088,7 +2085,6 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `replace_mcp_servers` | moved-lazy | `qubit_cli.web_routers.mcp` |
 | `rescan_dashboard_plugins` | moved-lazy | `qubit_cli.web_routers.dashboard_ui` |
 | `reset_memory` | moved-lazy | `qubit_cli.web_routers.ops` |
-| `resolve_cron_model_drift_defaults` | moved-lazy | `qubit_cli.config` |
 | `resolve_gateway_liveness` | moved-lazy | `gateway.status` |
 | `restart_gateway` | moved-lazy | `qubit_cli.web_routers.actions` |
 | `resume_cron_job` | moved-lazy | `qubit_cli.web_routers.cron` |
@@ -2428,13 +2424,6 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `normalize_reference_images` | moved-lazy | `agent.image_gen_provider` |
 | `save_b64_image` | moved-lazy | `agent.image_gen_provider` |
 | `save_url_image` | moved-lazy | `agent.image_gen_provider` |
-
-### `plugins.memory.hindsight`
-
-| name | kind | new location |
-|---|---|---|
-| `dataclass` | import | `dataclasses` |
-| `importlib` | import | `importlib` |
 
 ### `plugins.memory.honcho`
 
@@ -2888,10 +2877,10 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `request_elicitation_consent` | moved-lazy | `tools.approval_prompt` |
 | `reset_current_observability_context` | moved-lazy | `tools.approval_context` |
 | `reset_current_session_key` | moved-lazy | `tools.approval_context` |
-| `reset_hermes_interactive_context` | moved-lazy | `tools.approval_context` |
+| `reset_qubit_interactive_context` | moved-lazy | `tools.approval_context` |
 | `set_current_observability_context` | moved-lazy | `tools.approval_context` |
 | `set_current_session_key` | moved-lazy | `tools.approval_context` |
-| `set_hermes_interactive_context` | moved-lazy | `tools.approval_context` |
+| `set_qubit_interactive_context` | moved-lazy | `tools.approval_context` |
 | `shlex` | import | `shlex` |
 | `sys` | import | `sys` |
 | `tempfile` | import | `tempfile` |
@@ -2952,19 +2941,18 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `contextlib` | import | `contextlib` |
 | `datetime` | import | `datetime` |
 | `functools` | import | `functools` |
-| `get_hermes_home_override` | moved-lazy | `qubit_constants` |
+| `get_qubit_home_override` | moved-lazy | `qubit_constants` |
 | `qubit_home_key` | moved-lazy | `qubit_constants` |
 | `is_truthy_value` | moved-lazy | `utils` |
 | `lightpanda_engine_status` | moved-lazy | `tools.browser_tool_lightpanda_fallback` |
 | `node_tool_runnable` | moved-lazy | `qubit_constants` |
 | `normalize_browser_cloud_provider` | moved-lazy | `tools.tool_backend_helpers` |
 | `re` | import | `re` |
-| `reset_hermes_home_override` | moved-lazy | `qubit_constants` |
-| `set_hermes_home_override` | moved-lazy | `qubit_constants` |
+| `reset_qubit_home_override` | moved-lazy | `qubit_constants` |
+| `set_qubit_home_override` | moved-lazy | `qubit_constants` |
 | `shutil` | import | `shutil` |
 | `signal` | import | `signal` |
 | `timezone` | import | `datetime` |
-| `warm_agent_browser_npx_cache` | moved-lazy | `tools.browser_tool_install` |
 | `windows_hide_flags` | moved-lazy | `qubit_cli._subprocess_compat` |
 
 ### `tools.clarify_gateway`
@@ -3461,9 +3449,9 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 | `GITHUB_TAP_PROVIDERS` | moved-lazy | `tools.skills_hub_github` |
 | `GitHubAuth` | moved-lazy | `tools.skills_hub_github` |
 | `GitHubSource` | moved-lazy | `tools.skills_hub_github` |
-| `HERMES_INDEX_TTL` | moved-lazy | `tools.skills_hub_search` |
-| `HERMES_INDEX_URL` | moved-lazy | `tools.skills_hub_search` |
-| `HermesIndexSource` | moved-lazy | `tools.skills_hub_official` |
+| `QUBIT_INDEX_TTL` | moved-lazy | `tools.skills_hub_search` |
+| `QUBIT_INDEX_URL` | moved-lazy | `tools.skills_hub_search` |
+| `QubitIndexSource` | moved-lazy | `tools.skills_hub_official` |
 | `LobeHubSource` | moved-lazy | `tools.skills_hub_sources` |
 | `OptionalSkillSource` | moved-lazy | `tools.skills_hub_official` |
 | `PurePosixPath` | import | `pathlib` |
@@ -3558,7 +3546,7 @@ to the public equivalent or the new module. Test monkeypatch seams are likewise 
 |---|---|---|
 | `Enum` | import | `enum` |
 | `Set` | import | `typing` |
-| `display_hermes_home` | moved-lazy | `qubit_constants` |
+| `display_qubit_home` | moved-lazy | `qubit_constants` |
 | `env_var_enabled` | moved-lazy | `utils` |
 | `re` | import | `re` |
 | `threading` | import | `threading` |

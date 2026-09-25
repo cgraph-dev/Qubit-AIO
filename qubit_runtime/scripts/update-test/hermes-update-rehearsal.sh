@@ -223,7 +223,7 @@ swap_tree() {
 }
 
 # The install's own qubit: pre-branch installs keep it in the venv.
-resolve_hermes_exe() {
+resolve_qubit_exe() {
   local c
   for c in "$INSTALL_DIR/venv/bin/qubit" "$INSTALL_DIR/.hermes/bin/qubit" \
            "$INSTALL_DIR/venv/Scripts/hermes.exe" "$QUBIT_HOME/bin/qubit"; do
@@ -246,7 +246,7 @@ cmd_pre() {
   [ -d "$QUBIT_HOME" ] || die "no QUBIT_HOME at $QUBIT_HOME"
   [ -d "$INSTALL_DIR/.git" ] || die "no git checkout at $INSTALL_DIR — this tool covers source installs"
   local hermes_exe
-  hermes_exe="$(resolve_hermes_exe)" || die "no qubit executable found in $INSTALL_DIR (venv/bin, .hermes/bin) or $QUBIT_HOME/bin"
+  hermes_exe="$(resolve_qubit_exe)" || die "no qubit executable found in $INSTALL_DIR (venv/bin, .hermes/bin) or $QUBIT_HOME/bin"
 
   step "before we start (nothing here is a pass/fail, just read it)"
   if command -v pgrep >/dev/null 2>&1; then
@@ -428,7 +428,7 @@ cmd_post() {
 
   step "stopping this home's gateway"
   local hermes_exe
-  hermes_exe="$(resolve_hermes_exe)" || die "no Qubit launcher for $INSTALL_DIR; stop this home's gateway before restoring"
+  hermes_exe="$(resolve_qubit_exe)" || die "no Qubit launcher for $INSTALL_DIR; stop this home's gateway before restoring"
   QUBIT_HOME="$QUBIT_HOME" "$hermes_exe" gateway stop \
     || die "could not stop this home's gateway; restore has not started"
   ok "stopped this home's gateway (close the desktop app before restoring its data)"

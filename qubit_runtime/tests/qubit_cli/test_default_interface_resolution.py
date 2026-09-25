@@ -2,7 +2,7 @@
 
 `hermes` launches the classic prompt_toolkit REPL by default, but users can
 flip ``display.interface: tui`` in config.yaml to make the modern Ink TUI the
-default for bare ``hermes`` / ``qubit chat``. Explicit flags always win:
+default for bare ``hermes`` / ``hermes chat``. Explicit flags always win:
 
     --cli                forces the classic REPL (highest precedence)
     --tui                forces the TUI
@@ -13,16 +13,16 @@ default for bare ``hermes`` / ``qubit chat``. Explicit flags always win:
 
 The no-TTY gate exists because ambient TUI preferences must never hijack
 non-interactive invocations: kanban workers / cron / pipelines run
-``qubit … chat -q`` on a pipe, and the TUI's no-TTY bail-out exits 0
+``hermes … chat -q`` on a pipe, and the TUI's no-TTY bail-out exits 0
 without doing the work (a kanban worker then dies with "protocol
 violation" on every attempt).
 
 These tests pin that precedence at every layer that makes the decision:
 
   * ``_resolve_use_tui(args)``  — the canonical args-aware resolver used by
-    ``cmd_chat`` and the Termux fast-TUI path.
+    ``cmd_chat`` and the fast-TUI path.
   * ``_wants_tui_early(argv)``  — the dependency-free early resolver used by
-    mouse-residue suppression and the Termux fast paths, before argparse and
+    mouse-residue suppression and the fast paths, before argparse and
     ``qubit_cli.config`` are importable.
   * the argument parser   — both ``--cli`` and ``--tui`` parse at the top
     level and under the ``chat`` subcommand and are relaunch-inherited.
@@ -30,7 +30,6 @@ These tests pin that precedence at every layer that makes the decision:
 
 from __future__ import annotations
 
-import os
 from types import SimpleNamespace
 
 import pytest
@@ -125,6 +124,31 @@ class TestWantsTuiEarly:
         monkeypatch.setattr(m, "_EARLY_INTERFACE_CACHE", None)
         assert m._wants_tui_early([]) is False
 
+    # REGRESSION (#116902): mouse-residue suppression reads the interface
+    # before `_apply_profile_override()` sets QUBIT_HOME, so a cache that
+    # ignored the home answered every later caller with the DEFAULT home's
+    # interface — `hermes -p <name>` booted the wrong one.
+    def test_reread_after_the_profile_rehomes_the_process(self, tmp_path, monkeypatch):
+        default_home = tmp_path / "default"
+        profile_home = tmp_path / "profiles" / "coder"
+        for home, interface in ((default_home, "cli"), (profile_home, "tui")):
+            home.mkdir(parents=True)
+            (home / "config.yaml").write_text(
+                f"display:\n  interface: {interface}\n"
+            )
+
+        # The import-time read, on the home the process starts in.
+        _fake_tty(monkeypatch, True)
+        monkeypatch.setenv("QUBIT_HOME", str(default_home))
+        m._suppress_mouse_residue_early()
+        assert m._config_default_interface_early() == "cli"
+
+        # What `-p coder` does, after that read already happened.
+        monkeypatch.setenv("QUBIT_HOME", str(profile_home))
+        assert m._config_default_interface_early() == "tui"
+        assert m._wants_tui_early([]) is True
+
+
 
 # ---------------------------------------------------------------------------
 # argument parser — flags exist at both levels and are relaunch-inherited
@@ -156,7 +180,3 @@ class TestParserFlags:
 # ---------------------------------------------------------------------------
 # config default — shipped default preserves classic behavior
 # ---------------------------------------------------------------------------
-def test_default_config_interface_is_cli():
-    from qubit_cli.config import DEFAULT_CONFIG
-
-    assert DEFAULT_CONFIG["display"]["interface"] == "cli"

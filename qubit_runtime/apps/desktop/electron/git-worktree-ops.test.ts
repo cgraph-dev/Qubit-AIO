@@ -41,7 +41,7 @@ test('parseWorktrees: main checkout + linked worktree', () => {
   assert.equal(trees[0].path, '/repo')
   assert.equal(trees[0].branch, 'main')
   assert.equal(trees[1].path, '/repo/.worktrees/feat')
-  assert.equal(trees[1].branch, 'qubit/feat')
+  assert.equal(trees[1].branch, 'hermes/feat')
 })
 
 test('parseWorktrees: detached + locked flags', () => {
@@ -285,9 +285,9 @@ test('addWorktree: base origin/main does not set up upstream tracking', async ()
       '-C',
       remoteDir,
       '-c',
-      'user.email=qubit@localhost',
+      'user.email=hermes@localhost',
       '-c',
-      'user.name=Qubit',
+      'user.name=Hermes',
       'commit',
       '--allow-empty',
       '-m',
@@ -326,8 +326,8 @@ test('addWorktree: base origin/main does not set up upstream tracking', async ()
 // `branches`, plus a clone of it. Returns both paths. The caller must remove
 // them.
 function seedRemoteAndClone(label, branches) {
-  const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), `qubit-${label}-remote-`))
-  const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), `qubit-${label}-clone-`))
+  const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), `hermes-${label}-remote-`))
+  const cloneDir = fs.mkdtempSync(path.join(os.tmpdir(), `hermes-${label}-clone-`))
 
   const remoteGit = (...args) =>
     execFileSync('git', ['-C', remoteDir, ...args])
@@ -335,7 +335,7 @@ function seedRemoteAndClone(label, branches) {
       .trim()
 
   execFileSync('git', ['init', '-b', 'main', remoteDir])
-  remoteGit('-c', 'user.email=qubit@localhost', '-c', 'user.name=Qubit', 'commit', '--allow-empty', '-m', 'root')
+  remoteGit('-c', 'user.email=hermes@localhost', '-c', 'user.name=Hermes', 'commit', '--allow-empty', '-m', 'root')
 
   for (const branch of branches) {
     remoteGit('branch', branch)

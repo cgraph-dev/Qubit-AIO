@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from agent.secret_scope import UnscopedSecretError, set_multiplex_active
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 from tools.environments.local import served_profile_child_env
 
 
@@ -66,7 +66,7 @@ def test_routed_home_with_multiplex_flag_off_gets_no_launch_residue(homes, monke
     from tools.browser_tool import _build_browser_env
 
     a, b = homes
-    token = set_hermes_home_override(str(b))
+    token = set_qubit_home_override(str(b))
     try:
         env = served_profile_child_env(inherit_credentials=True)
         assert env["QUBIT_HOME"] == str(b) and env["B_MARKER"] == "b"
@@ -74,7 +74,7 @@ def test_routed_home_with_multiplex_flag_off_gets_no_launch_residue(homes, monke
         browser_env = _build_browser_env()
         assert "FIRECRAWL_API_KEY" not in browser_env and browser_env["QUBIT_HOME"] == str(b)
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
     # Control: the launch profile's own browser keeps its key and its settings.
     assert _build_browser_env()["FIRECRAWL_API_KEY"] == "a-fc"
     assert served_profile_child_env(inherit_credentials=True)["HERMES_MODEL"] == "a-model"
@@ -86,11 +86,11 @@ def test_real_child_observes_only_the_routed_profile(homes):
     import subprocess
 
     a, b = homes
-    token = set_hermes_home_override(str(b))
+    token = set_qubit_home_override(str(b))
     try:
         env = served_profile_child_env(inherit_credentials=True)
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
     probe = "import json,os;print(json.dumps({k:os.environ.get(k) for k in ('QUBIT_HOME','A_MARKER','B_MARKER','OPENAI_API_KEY')}))"
     out = subprocess.run([sys.executable, "-c", probe], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
     seen = json.loads(out.stdout.strip().splitlines()[-1])

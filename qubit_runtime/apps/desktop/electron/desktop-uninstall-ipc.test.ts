@@ -5,7 +5,7 @@ import type { DesktopUninstallIpcDeps, DesktopUninstallSummary } from './desktop
 import type { InstallStamp } from './install-stamp'
 
 const fallbackSummary: Omit<DesktopUninstallSummary, 'code_removal_allowed'> = {
-  hermes_home: '/test/.hermes',
+  qubit_home: '/test/.hermes',
   agent_installed: true,
   gui_installed: true,
   source_built_artifacts: [],

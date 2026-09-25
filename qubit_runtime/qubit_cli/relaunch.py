@@ -2,6 +2,7 @@
 across process replacement so ``qubit sessions browse`` / post-setup relaunch keep the user's mode."""
 
 import os
+import pathlib
 import shutil
 import sys
 from typing import Optional, Sequence
@@ -60,24 +61,42 @@ def _extract_inherited_flags(argv: Sequence[str]) -> list[str]:
 
 def resolve_qubit_bin() -> Optional[str]:
     """Qubit entry point: ``sys.argv[0]`` if a real executable, else ``which qubit``, else ``None``
-    (caller falls back to ``python -m qubit_cli.main``)."""
+    (caller falls back to ``python -m qubit_cli.main``).
+
+    Python launchers are never returned: on Windows a ``.py`` can't be exec'd directly, and on
+    POSIX the git installer runs the extensionless source launcher under the managed venv
+    interpreter while its ``#!/usr/bin/env python3`` shebang would pick the system Python and
+    lose the venv. Falling through to ``sys.executable -m qubit_cli.main`` keeps the venv.
+    """
     argv0 = sys.argv[0]
     _is_windows = sys.platform == "win32"
 
     def _is_python_script(p: str) -> bool:
         return p.lower().endswith((".py", ".pyc"))
 
+    def _is_unsafe_python_launcher(p: str) -> bool:
+        if _is_windows:
+            return _is_python_script(p)
+        # A console script pinned to the running venv (``#!<venv>/bin/python``) keeps the venv and
+        # stays exec-able; a shebang that resolves elsewhere (``env python3``) loses it.
+        from qubit_cli.linux_desktop_entry import _needs_interpreter
+
+        return _needs_interpreter(pathlib.Path(p))
+
     # Absolute executable (nix store, venv wrappers, …), then relative-to-CWD, then PATH.
     if (
         os.path.isabs(argv0) and os.path.isfile(argv0) and os.access(argv0, os.X_OK)
-        and not (_is_windows and _is_python_script(argv0))
+        and not _is_unsafe_python_launcher(argv0)
     ):
         return argv0
     if not argv0.startswith("-") and os.path.isfile(argv0):
         abs_path = os.path.abspath(argv0)
-        if os.access(abs_path, os.X_OK) and not (_is_windows and _is_python_script(abs_path)):
+        if os.access(abs_path, os.X_OK) and not _is_unsafe_python_launcher(abs_path):
             return abs_path
-    return shutil.which("qubit") or None
+    path_bin = shutil.which("hermes")
+    if path_bin and not _is_unsafe_python_launcher(path_bin):
+        return path_bin
+    return None
 
 
 def build_relaunch_argv(
@@ -113,7 +132,7 @@ def relaunch(
             # Raw ``[Errno 8] Exec format error`` is cryptic; usual causes are ``qubit`` not on
             # PATH yet (install hasn't propagated User PATH into this shell) or a stale shim.
             print(
-                f"\nQubit relaunch failed: {exc}\n"
+                f"\nHermes relaunch failed: {exc}\n"
                 f"Command: {' '.join(new_argv)}\n"
                 f"Fix: open a new terminal so PATH picks up, then re-run qubit.",
                 file=sys.stderr,

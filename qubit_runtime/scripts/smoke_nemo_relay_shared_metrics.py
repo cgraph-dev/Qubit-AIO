@@ -27,12 +27,12 @@ SKILL_CANARY = "relay-smoke-private-agent-skill"
 INSTALLED_SKILL_CANARY = "relay-smoke-private-installed-skill"
 
 
-def _resolve_qubit_executable(qubit_repo: Path) -> Path:
+def _resolve_qubit_executable(hermes_repo: Path) -> Path:
     for relative_path in (
         Path(".venv") / "bin" / "hermes",
         Path(".venv") / "Scripts" / "hermes.exe",
     ):
-        candidate = qubit_repo / relative_path
+        candidate = hermes_repo / relative_path
         if candidate.is_file():
             return candidate
     discovered = shutil.which("hermes")
@@ -434,9 +434,9 @@ def _validate_packages(
         raise RuntimeError(
             "The Qubit development environment requires jsonschema"
         ) from exc
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema = json.loads(schema_path.read_text(encoding="utf-8-sig"))
     packages = [
-        json.loads(package_path.read_text(encoding="utf-8"))
+        json.loads(package_path.read_text(encoding="utf-8-sig"))
         for package_path in package_paths
     ]
     for package in packages:
@@ -553,9 +553,9 @@ def _validate_packages(
 
 def main() -> int:
     args = _arguments()
-    qubit_repo = args.qubit_repo.resolve()
+    hermes_repo = args.hermes_repo.resolve()
     relay_python = args.relay_python.resolve() if args.relay_python else None
-    qubit = _resolve_qubit_executable(qubit_repo)
+    qubit = _resolve_qubit_executable(hermes_repo)
     if relay_python is not None and not any(
         (relay_python / "nemo_relay").glob("_native.*")
     ):
@@ -609,7 +609,7 @@ def main() -> int:
         _write_config(home, server.server_port)
         env = os.environ.copy()
         env["QUBIT_HOME"] = str(home)
-        python_paths = [str(qubit_repo)]
+        python_paths = [str(hermes_repo)]
         if relay_python is not None:
             python_paths.append(str(relay_python))
         python_paths.append(env.get("PYTHONPATH", ""))
@@ -719,7 +719,7 @@ def main() -> int:
     counters = _validate_store(telemetry / "metrics.sqlite3")
     package_paths, packages = _validate_packages(
         telemetry / "outbox",
-        qubit_repo
+        hermes_repo
         / "qubit_cli"
         / "observability"
         / "schemas"

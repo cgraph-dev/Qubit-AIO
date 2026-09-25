@@ -20,7 +20,7 @@ import qubit_cli.update_receipt as ur
 def homed(tmp_path, monkeypatch):
     import qubit_constants
 
-    monkeypatch.setattr(qubit_constants, "get_hermes_home", lambda: tmp_path)
+    monkeypatch.setattr(qubit_constants, "get_qubit_home", lambda: tmp_path)
     import pm.receipt as pm_receipt_mod
 
     monkeypatch.setattr(pm_receipt_mod, "_receipt_dir", lambda: tmp_path / "logs" / "update_receipts")

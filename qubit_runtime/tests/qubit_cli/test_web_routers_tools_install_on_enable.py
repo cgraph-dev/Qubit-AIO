@@ -3,7 +3,7 @@
 When a toolset is toggled ON via ``PUT /api/tools/toolsets/{name}`` and its
 provider carries a post_setup hook with a registered, UNSATISFIED
 install-state predicate (``_POST_SETUP_INSTALLED`` — today: cua-driver),
-the endpoint spawns the same background ``qubit tools post-setup <key>``
+the endpoint spawns the same background ``hermes tools post-setup <key>``
 action the interactive CLI flow runs. Without this, a GUI toggle "saves"
 but the tool never appears in the schema because its check_fn can't find
 the binary.
@@ -43,7 +43,7 @@ class TestToggleToolsetInstallOnEnable:
             calls.append((tuple(subcommand), name))
             return _FakeProc()
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _fake_spawn)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_qubit_action", _fake_spawn)
         return calls
 
     def test_enable_computer_use_spawns_cua_install_when_binary_missing(
@@ -132,7 +132,7 @@ class TestToggleToolsetInstallOnEnable:
         def _boom(subcommand, name, **kwargs):
             raise RuntimeError("spawn exploded")
 
-        monkeypatch.setattr(_web_server_gateway, "_spawn_hermes_action", _boom)
+        monkeypatch.setattr(_web_server_gateway, "_spawn_qubit_action", _boom)
 
         resp = self.client.put(
             "/api/tools/toolsets/computer_use", json={"enabled": True}

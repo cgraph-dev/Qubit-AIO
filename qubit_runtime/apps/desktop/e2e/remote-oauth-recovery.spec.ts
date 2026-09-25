@@ -7,7 +7,7 @@ import { buildAppEnv, createSandbox, launchDesktop } from './fixtures'
 import { allowErrorBanners, expect, test } from './test'
 
 type DesktopWindow = Window & {
-  qubitDesktop: {
+  hermesDesktop: {
     getBootProgress: () => Promise<{ running: boolean; retryable?: boolean; statusCode?: number; error?: string }>
     getConnection: () => Promise<unknown>
   }
@@ -69,7 +69,7 @@ for (const status of [401, 403]) {
       app = launched.app
       const page = launched.page
       await expect(page.getByRole('button', { name: /gateway settings/i })).toBeVisible({ timeout: 60_000 })
-      const snapshot = await page.evaluate(() => (window as unknown as DesktopWindow).qubitDesktop.getBootProgress())
+      const snapshot = await page.evaluate(() => (window as unknown as DesktopWindow).hermesDesktop.getBootProgress())
       expect(snapshot).toMatchObject({ running: false, retryable: false, statusCode: status })
       expect(snapshot.error).toMatch(/not signed in/)
       expect(mints).toBeGreaterThan(0)
@@ -82,7 +82,7 @@ for (const status of [401, 403]) {
       // Concurrent IPC readers must reuse the terminal failure, not republish
       // startup progress and unmount the settings form.
       await page.evaluate(async () => {
-        await Promise.allSettled(Array.from({ length: 20 }, () => (window as unknown as DesktopWindow).qubitDesktop.getConnection()))
+        await Promise.allSettled(Array.from({ length: 20 }, () => (window as unknown as DesktopWindow).hermesDesktop.getConnection()))
       })
       await expect(back).toBeVisible()
       await expect(gatewayUrl).toHaveValue(url)
@@ -95,7 +95,7 @@ for (const status of [401, 403]) {
       await expect.poll(() => signedIn).toBe(true)
       await expect.poll(async () => {
         try {
-          return await page.evaluate(() => (window as unknown as DesktopWindow).qubitDesktop.getConnection())
+          return await page.evaluate(() => (window as unknown as DesktopWindow).hermesDesktop.getConnection())
         } catch {
           return null
         }

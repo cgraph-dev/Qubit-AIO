@@ -13,7 +13,7 @@
  * manual:true results are exempt from the freshness window. They are the
  * durable action-required channel — on a browserless Linux box with no
  * working notifier, the boot dialog is the FIRST and ONLY place the message
- * ever surfaces, and the user may not reopen Qubit within 30 minutes.
+ * ever surfaces, and the user may not reopen Hermes within 30 minutes.
  * Dropping it as stale strands exactly the machine it exists to serve. It is
  * still consumed once (the file is unlinked before any age check), so it
  * cannot resurface on a later boot.
@@ -36,15 +36,15 @@ export interface HandoffResult {
   branch: string
 }
 
-export function handoffResultPath(qubitHome: string): string {
-  return path.join(qubitHome, '.hermes-update-result.json')
+export function handoffResultPath(hermesHome: string): string {
+  return path.join(hermesHome, '.hermes-update-result.json')
 }
 
 export function readAndConsumeHandoffResult(
-  qubitHome: string,
+  hermesHome: string,
   { now = Date.now, maxAgeMs = HANDOFF_RESULT_MAX_AGE_MS }: { now?: () => number; maxAgeMs?: number } = {}
 ): HandoffResult | null {
-  const file = handoffResultPath(qubitHome)
+  const file = handoffResultPath(hermesHome)
   let raw: string
 
   try {

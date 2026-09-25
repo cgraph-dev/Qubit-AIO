@@ -23,7 +23,7 @@ import { $selectedStoredSessionId } from '@/store/session'
 import { focusOpenSession, sessionTileDelegate } from '@/store/session-states'
 import { isHudWindow } from '@/store/windows'
 
-import { getActiveComposer } from '../chat/composer/focus'
+import { getActiveComposer, requestComposerFocus } from '../chat/composer/focus'
 import { openSession, type OpenSessionNavigate } from '../open-session'
 import { sessionRoute } from '../routes'
 
@@ -70,6 +70,11 @@ export function useHudHandoff({ navigate, resumeSession }: HudHandoffParams): vo
       // The HUD may have typed or sent since this window last read the stash.
       reloadPersistedDrafts()
 
+      // The user was typing in the HUD; they are now looking at the app. Put
+      // the caret where they left it. Main re-keys the OS window, but a key
+      // window with no focused element still eats the first keystrokes.
+      requestComposerFocus()
+
       const selected = $selectedStoredSessionId.get()
       const target = hudSessionId ?? selected
 
@@ -111,7 +116,7 @@ export function useHudGoto(navigate: OpenSessionNavigate): void {
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
 
-  useEffect(() => window.qubitDesktop?.hud?.onGoto?.(id => navigateRef.current(sessionRoute(id))), [])
+  useEffect(() => window.hermesDesktop?.hud?.onGoto?.(id => navigateRef.current(sessionRoute(id))), [])
 }
 
 /** HUD side: keep main told which session this window is on. */

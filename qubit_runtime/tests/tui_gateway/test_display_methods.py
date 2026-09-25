@@ -12,7 +12,7 @@ from qubit_cli.dashboard_auth import ws_tickets
 
 
 def test_install_worker_keeps_the_requested_profile_scope(tmp_path, monkeypatch):
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from tools.bot_desktop import install, runtime
     import tui_gateway.server as server
 
@@ -25,7 +25,7 @@ def test_install_worker_keeps_the_requested_profile_scope(tmp_path, monkeypatch)
     done = threading.Event()
 
     def fake_install(*, ask_password, on_line, timeout_seconds=900.0, claimed=False):
-        seen["home"] = str(get_hermes_home())
+        seen["home"] = str(get_qubit_home())
         done.set()
         return 0
 

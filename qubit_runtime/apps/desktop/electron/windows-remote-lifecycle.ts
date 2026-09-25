@@ -4,7 +4,7 @@ import { assertBootstrapNotSuperseded, redactSecrets, SSH_ERROR } from './ssh-co
 
 const LOCKFILE_SCHEMA_VERSION = 2
 const PROTOCOL_VERSION = 1
-const READY_RE = /^QUBIT_(?:BACKEND|DASHBOARD)_READY port=(\d+)/gm
+const READY_RE = /^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/gm
 const READY_POLL_INTERVAL_MS = 750
 
 function psLiteral(value) {
@@ -19,8 +19,8 @@ function powerShellCommand(script) {
   return `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encodedPowerShell(script)}`
 }
 
-async function probeWindowsRemote(ssh, explicitQubitPath = '') {
-  const explicit = psLiteral(explicitQubitPath)
+async function probeWindowsRemote(ssh, explicitHermesPath = '') {
+  const explicit = psLiteral(explicitHermesPath)
 
   const script = [
     '$ErrorActionPreference="Stop"',
@@ -28,8 +28,7 @@ async function probeWindowsRemote(ssh, explicitQubitPath = '') {
     'if([string]::IsNullOrWhiteSpace($candidate)){return}',
     '$current=[IO.Path]::GetFullPath($candidate);$first=$true',
     'while($true){',
-    'try{$item=Get-Item -LiteralPath $current -Force -ErrorAction Stop}',
-    'catch [Management.Automation.ItemNotFoundException]{if(-not $allowMissing -and $first){throw "Path was not found: $candidate"};$parent=[IO.Path]::GetDirectoryName($current);if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false;continue}',
+    'try{$item=Get-Item -LiteralPath $current -Force -ErrorAction Stop}catch [Management.Automation.ItemNotFoundException]{if(-not $allowMissing -and $first){throw "Path was not found: $candidate"};$parent=[IO.Path]::GetDirectoryName($current);if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false;continue}',
     'if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw "Path contains a link or reparse point: $current"}',
     '$parent=$item.Parent.FullName;if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false',
     '}',
@@ -57,9 +56,9 @@ async function probeWindowsRemote(ssh, explicitQubitPath = '') {
     '$candidates+=$fallbackProfileCandidate',
     '$hermes=$null',
     'foreach($candidate in $candidates){Assert-NoReparse $candidate $true;$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe");Assert-NoReparse $candidatePython $true;try{$item=Get-Item -LiteralPath $candidate -Force -ErrorAction Stop;if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $item.PSIsContainer){$hermes=$item.FullName;break}}catch [Management.Automation.ItemNotFoundException]{continue}}',
-    'if(-not $hermes){throw "Qubit is not installed on the remote Windows host."}',
+    'if(-not $hermes){throw "Hermes is not installed on the remote Windows host."}',
     'Assert-NoReparse $hermes $false',
-    'if($explicit -and $hermes -ne $explicit){throw "The configured Qubit path is not an executable file."}',
+    'if($explicit -and $hermes -ne $explicit){throw "The configured Hermes path is not an executable file."}',
     '$python=[IO.Path]::Combine([IO.Path]::GetDirectoryName($hermes), "python.exe")',
     'Assert-NoReparse $python $false',
     '[ordered]@{os="Windows";arch=$env:PROCESSOR_ARCHITECTURE;hermesHome=$hermesHome;hermesPath=$hermes;python=$python}|ConvertTo-Json -Compress'
@@ -68,7 +67,7 @@ async function probeWindowsRemote(ssh, explicitQubitPath = '') {
   return JSON.parse((await ssh.exec(powerShellCommand(script))).trim())
 }
 
-function windowsUpdateMarkerProbeCommand(qubitHome) {
+function windowsUpdateMarkerProbeCommand(hermesHome) {
   const script = [
     '$ErrorActionPreference="Stop"',
     `Add-Type -TypeDefinition @'
@@ -91,15 +90,14 @@ public static class HermesMarkerNoFollow {
     'if([string]::IsNullOrWhiteSpace($candidate)){return}',
     '$current=[IO.Path]::GetFullPath($candidate);$first=$true',
     'while($true){',
-    'try{$item=Get-Item -LiteralPath $current -Force -ErrorAction Stop}',
-    'catch [Management.Automation.ItemNotFoundException]{if(-not $allowMissing -and $first){throw "Path was not found: $candidate"};$parent=[IO.Path]::GetDirectoryName($current);if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false;continue}',
+    'try{$item=Get-Item -LiteralPath $current -Force -ErrorAction Stop}catch [Management.Automation.ItemNotFoundException]{if(-not $allowMissing -and $first){throw "Path was not found: $candidate"};$parent=[IO.Path]::GetDirectoryName($current);if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false;continue}',
     'if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw "Path contains a link or reparse point: $current"}',
     '$parent=$item.Parent.FullName;if(-not $parent -or $parent -eq $current){break};$current=$parent;$first=$false',
     '}',
     '}',
-    `$home=${psLiteral(hermesHome)}`,
-    '$installRoot=$home',
-    '$parent=Split-Path -Parent $home',
+    `$hermesHome=${psLiteral(hermesHome)}`,
+    '$installRoot=$hermesHome',
+    '$parent=Split-Path -Parent $hermesHome',
     'if((Split-Path -Leaf $parent) -ieq "profiles"){$installRoot=Split-Path -Parent $parent}',
     '$marker=Join-Path $installRoot ".hermes-update-in-progress"',
     '$result="UNCERTAIN"',
@@ -137,18 +135,18 @@ public static class HermesMarkerNoFollow {
  * This uses only PowerShell/.NET and therefore never imports the remote
  * checkout while an updater may be replacing it.
  */
-async function assertWindowsRemoteInstallUpdateClear(ssh, qubitHome) {
+async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome) {
   let observation = ''
 
   try {
     observation =
-      String(await ssh.exec(windowsUpdateMarkerProbeCommand(qubitHome)))
+      String(await ssh.exec(windowsUpdateMarkerProbeCommand(hermesHome)))
         .replace(/^\uFEFF/, '')
         .trim()
         .split(/\r?\n/)
         .pop() || ''
   } catch (cause) {
-    const error: any = new Error('Could not prove that the remote Qubit install is clear for SSH startup.')
+    const error: any = new Error('Could not prove that the remote Hermes install is clear for SSH startup.')
     error.kind = 'update-in-progress'
     error.cause = cause
     throw error
@@ -162,8 +160,8 @@ async function assertWindowsRemoteInstallUpdateClear(ssh, qubitHome) {
 
   const error: any = new Error(
     live
-      ? `Remote Qubit update process ${live[1]} is still running; SSH startup is paused.`
-      : 'The remote Qubit update marker is unreadable or malformed; refusing SSH startup.'
+      ? `Remote Hermes update process ${live[1]} is still running; SSH startup is paused.`
+      : 'The remote Hermes update marker is unreadable or malformed; refusing SSH startup.'
   )
 
   error.kind = 'update-in-progress'
@@ -177,7 +175,7 @@ const TRANSPORT_KINDS = new Set([
   SSH_ERROR.UNREACHABLE
 ])
 
-async function detectRemotePlatform(ssh, explicitQubitPath = '') {
+async function detectRemotePlatform(ssh, explicitHermesPath = '') {
   try {
     const output = (await ssh.exec('uname -s; uname -m')).trim().split('\n')
 
@@ -194,7 +192,7 @@ async function detectRemotePlatform(ssh, explicitQubitPath = '') {
   }
 
   try {
-    return await probeWindowsRemote(ssh, explicitQubitPath)
+    return await probeWindowsRemote(ssh, explicitHermesPath)
   } catch (cause: any) {
     if (TRANSPORT_KINDS.has(cause?.kind)) {
       throw cause
@@ -252,9 +250,9 @@ function atomicWindowsSpawnCommand(runtime, reservation: any = {}) {
 
   const script = [
     '$ErrorActionPreference="Stop"',
-    `$home=${psLiteral(runtime.hermesHome)}`,
-    '$installRoot=$home',
-    '$parent=Split-Path -Parent $home',
+    `$hermesHome=${psLiteral(runtime.hermesHome)}`,
+    '$installRoot=$hermesHome',
+    '$parent=Split-Path -Parent $hermesHome',
     'if((Split-Path -Leaf $parent) -ieq "profiles"){$installRoot=Split-Path -Parent $parent}',
     '$marker=Join-Path $installRoot ".hermes-update-in-progress"',
     '$mutexPath=$marker+".mutex"',
@@ -332,8 +330,8 @@ function validLock(lock, ownershipId) {
     lock.port >= 0 &&
     lock.port <= 65535 &&
     /^[0-9a-f]{32}$/.test(lock.tokenFingerprint || '') &&
-    typeof lock.qubitPath === 'string' &&
-    typeof lock.qubitHome === 'string'
+    typeof lock.hermesPath === 'string' &&
+    typeof lock.hermesHome === 'string'
   )
 }
 
@@ -345,8 +343,8 @@ function reusableWindowsLock(lock, state, profile, reuseToken, runtime) {
     lock.profile === profile &&
     reuseToken &&
     lock.tokenFingerprint === fingerprintToken(reuseToken) &&
-    lock.qubitPath === runtime.qubitPath &&
-    lock.qubitHome === runtime.qubitHome
+    lock.hermesPath === runtime.hermesPath &&
+    lock.hermesHome === runtime.hermesHome
   )
 }
 
@@ -354,7 +352,7 @@ async function processState(ssh, runtime, lock) {
   return helper(ssh, runtime, 'process-state', [
     String(lock.pid),
     String(lock.creationTimeNs),
-    lock.qubitPath,
+    lock.hermesPath,
     lock.spawnNonce
   ])
 }
@@ -377,7 +375,7 @@ async function cleanupOwned(ssh, runtime, ownershipId, lock) {
       await helper(ssh, runtime, 'terminate', [
         String(lock.pid),
         String(lock.creationTimeNs),
-        lock.qubitPath,
+        lock.hermesPath,
         lock.spawnNonce
       ])
     }
@@ -400,8 +398,8 @@ function windowsLockMatchesManagedUpdateScope(lock, expected) {
     lock.spawnNonce === expected.spawnNonce &&
     lock.creationTimeNs === expected.creationTimeNs &&
     lock.profile === expected.profile &&
-    lock.qubitPath === expected.qubitPath &&
-    lock.qubitHome === expected.qubitHome
+    lock.hermesPath === expected.hermesPath &&
+    lock.hermesHome === expected.hermesHome
   )
 }
 
@@ -458,7 +456,7 @@ async function terminateOwnedWindowsDashboardForUpdate(ssh, runtime, expected) {
   await helper(ssh, runtime, 'terminate', [
     String(lock.pid),
     String(lock.creationTimeNs),
-    lock.qubitPath,
+    lock.hermesPath,
     lock.spawnNonce
   ])
 
@@ -550,35 +548,35 @@ async function connectWindowsRemote(deps) {
     ssh,
     ownershipId,
     profile = '',
-    remoteQubitPath = '',
+    remoteHermesPath = '',
     reuseToken = '',
     signal,
     pickLocalPort,
     forward,
     cancelForward,
-    waitForQubit,
+    waitForHermes,
     probeReuseProof,
     rememberLog = () => {},
     readyTimeoutMs = 45_000
   } = deps
 
   assertBootstrapNotSuperseded(signal)
-  const runtime = await probeWindowsRemote(ssh, remoteQubitPath)
-  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
-  const inspection = await helper(ssh, runtime, 'inspect', [runtime.qubitPath])
+  const runtime = await probeWindowsRemote(ssh, remoteHermesPath)
+  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
+  const inspection = await helper(ssh, runtime, 'inspect', [runtime.hermesPath])
 
   if (!inspection.supported) {
-    const error: any = new Error('Update Qubit on the remote Windows host before connecting with Desktop SSH.')
+    const error: any = new Error('Update Hermes on the remote Windows host before connecting with Desktop SSH.')
     error.kind = 'update-required'
     throw error
   }
 
-  runtime.qubitPath = inspection.path
-  const qubitVersion = inspection.version || ''
+  runtime.hermesPath = inspection.path
+  const hermesVersion = inspection.version || ''
   rememberLog(`[ssh-lifecycle] remote platform Windows/${runtime.arch}`)
-  rememberLog(`[ssh-lifecycle] located qubit at ${runtime.hermesPath}`)
+  rememberLog(`[ssh-lifecycle] located hermes at ${runtime.hermesPath}`)
 
-  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
   const lock = await helper(ssh, runtime, 'read-lock', [ownershipId])
 
   if (validLock(lock, ownershipId)) {
@@ -593,7 +591,7 @@ async function connectWindowsRemote(deps) {
     const reusable = reusableWindowsLock(lock, state, profile, reuseToken, runtime)
 
     if (reusable) {
-      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
       const localPort = await pickLocalPort()
       await forward(localPort, lock.port)
 
@@ -610,12 +608,12 @@ async function connectWindowsRemote(deps) {
             pid: lock.pid,
             reused: true,
             platform: { os: 'Windows', arch: runtime.arch },
-            qubitPath: runtime.qubitPath,
-            qubitVersion,
+            hermesPath: runtime.hermesPath,
+            hermesVersion,
             ownershipId,
             spawnNonce: lock.spawnNonce,
             creationTimeNs: lock.creationTimeNs,
-            qubitHome: runtime.qubitHome,
+            hermesHome: runtime.hermesHome,
             pythonPath: runtime.python
           }
         }
@@ -625,23 +623,23 @@ async function connectWindowsRemote(deps) {
         }
 
         await cancelForward(localPort, lock.port)
-        await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+        await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
         await cleanupOwned(ssh, runtime, ownershipId, lock)
       } catch (error) {
         await cancelForward(localPort, lock.port)
         throw error
       }
     } else {
-      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+      await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
       await cleanupOwned(ssh, runtime, ownershipId, lock)
     }
   } else if (lock) {
-    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
     await helper(ssh, runtime, 'remove-lock', [ownershipId])
   }
 
   assertBootstrapNotSuperseded(signal)
-  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+  await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
   const token = crypto.randomBytes(32).toString('hex')
   const spawnNonce = crypto.randomBytes(8).toString('hex')
   await helper(ssh, runtime, 'upload-token', [ownershipId, spawnNonce], token)
@@ -650,17 +648,17 @@ async function connectWindowsRemote(deps) {
   let spawned
 
   try {
-    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.qubitHome)
+    await assertWindowsRemoteInstallUpdateClear(ssh, runtime.hermesHome)
     spawned = await atomicWindowsSpawn(
       ssh,
       runtime,
-      JSON.stringify({ ownershipId, spawnNonce, profile, qubitPath: runtime.qubitPath }),
+      JSON.stringify({ ownershipId, spawnNonce, profile, hermesPath: runtime.hermesPath }),
       {
         ownershipId,
         spawnNonce,
         profile,
-        qubitPath: runtime.qubitPath,
-        qubitHome: runtime.qubitHome,
+        hermesPath: runtime.hermesPath,
+        hermesHome: runtime.hermesHome,
         tokenFingerprint,
         startedAt
       }
@@ -700,8 +698,8 @@ async function connectWindowsRemote(deps) {
     creationTimeNs: spawned.creationTimeNs,
     port: 0,
     profile,
-    qubitPath: runtime.qubitPath,
-    qubitHome: runtime.qubitHome,
+    hermesPath: runtime.hermesPath,
+    hermesHome: runtime.hermesHome,
     tokenFingerprint,
     startedAt
   }
@@ -720,7 +718,7 @@ async function connectWindowsRemote(deps) {
     localPort = await pickLocalPort()
     await forward(localPort, remotePort)
     const baseUrl = `http://127.0.0.1:${localPort}`
-    await waitForQubit(baseUrl, token)
+    await waitForHermes(baseUrl, token)
     assertBootstrapNotSuperseded(signal)
     await helper(ssh, runtime, 'write-lock', [ownershipId], JSON.stringify({ ...owned, port: remotePort }))
 
@@ -732,12 +730,12 @@ async function connectWindowsRemote(deps) {
       pid: spawned.pid,
       reused: false,
       platform: { os: 'Windows', arch: runtime.arch },
-      qubitPath: runtime.qubitPath,
-      qubitVersion,
+      hermesPath: runtime.hermesPath,
+      hermesVersion,
       ownershipId,
       spawnNonce,
       creationTimeNs: spawned.creationTimeNs,
-      qubitHome: runtime.qubitHome,
+      hermesHome: runtime.hermesHome,
       pythonPath: runtime.python
     }
   } catch (error) {
@@ -760,7 +758,7 @@ function buildWindowsInteractiveCommand(remoteCwd = '') {
     )
   }
 
-  script.push('$host.UI.RawUI.WindowTitle="Qubit SSH"', 'powershell.exe -NoLogo')
+  script.push('$host.UI.RawUI.WindowTitle="Hermes SSH"', 'powershell.exe -NoLogo')
 
   return powerShellCommand(script.join(';'))
 }

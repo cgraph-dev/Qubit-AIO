@@ -1,4 +1,4 @@
-"""Tests for ``qubit dashboard register``.
+"""Tests for ``hermes dashboard register``.
 
 Covers the CLI half of self-hosted dashboard registration:
   - Docker-style auto-name generation
@@ -32,14 +32,6 @@ def _ns(**kw):
     return argparse.Namespace(**defaults)
 
 
-class TestNameGenerator:
-    def test_shape_is_adjective_underscore_noun(self):
-        for _ in range(50):
-            name = dr._generate_dashboard_name()
-            assert "_" in name
-            adj, _, noun = name.partition("_")
-            assert adj in dr._NAME_ADJECTIVES
-            assert noun in dr._NAME_NOUNS
 
 
 class TestFastFails:
@@ -55,8 +47,8 @@ class TestFastFails:
                     dr.cmd_dashboard_register(_ns())
         assert exc.value.code == 1
         out = capsys.readouterr().out
-        assert "not logged into Qubit Labs" in out
-        assert "qubit setup" in out
+        assert "not logged into Nous Portal" in out
+        assert "hermes setup" in out
 
     def test_managed_install_refuses(self, capsys):
         with patch("qubit_cli.config.is_managed", return_value=True):

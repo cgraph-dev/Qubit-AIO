@@ -13,11 +13,12 @@
  *    — the agent's/user's doors, watched + hot-reloaded by the runtime loader.
  */
 
-import { createPluginContext, type QubitPlugin } from './plugin'
+import { trackGatewayEventDisposers } from './events'
+import { createPluginContext, type HermesPlugin } from './plugin'
 import { pluginActive, publishPlugin } from './plugins-store'
 import { watchRuntimePlugins } from './runtime-loader'
 
-const modules = import.meta.glob<{ default: QubitPlugin }>('../plugins/*/plugin.{js,ts,tsx}', { eager: true })
+const modules = import.meta.glob<{ default: HermesPlugin }>('../plugins/*/plugin.{js,ts,tsx}', { eager: true })
 
 // One-shot init guard. Contributions themselves register by id (re-registering
 // is idempotent), but the disk-door watcher setup below (watchRuntimePlugins)
@@ -58,7 +59,10 @@ export function discoverBundledPlugins(): void {
       disposers = []
 
       try {
-        plugin.register(createPluginContext(plugin.id, dispose => disposers.push(dispose)))
+        trackGatewayEventDisposers(
+          dispose => disposers.push(dispose),
+          () => plugin.register(createPluginContext(plugin.id, dispose => disposers.push(dispose)))
+        )
         publishPlugin({ ...record, status: 'loaded' })
       } catch (error) {
         console.error(`[plugins] ${plugin.id} failed to register`, error)

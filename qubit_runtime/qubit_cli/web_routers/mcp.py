@@ -7,6 +7,7 @@ web_server — reached via the late-binding seam so tests that mutate
 
 import asyncio
 import hashlib
+from contextlib import contextmanager
 import re
 import secrets
 import threading
@@ -16,7 +17,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from qubit_cli.web_deps import LateState, late
+from qubit_cli.web_deps import late
 from qubit_cli.web_server_mcp import _mcp_oauth_flows, _mcp_server_summary, _normalize_mcp_server_create
 from qubit_cli.web_models import MCPCatalogInstall, MCPEnabledToggle, MCPServerCreate, MCPServersReplace
 from qubit_cli.web_routers._common import (
@@ -36,6 +37,23 @@ save_env_value = late("save_env_value", "qubit_cli.config")
 _mcp_oauth_flows_lock = threading.Lock()
 _MCP_DASHBOARD_OAUTH_TTL = 15 * 60
 _MAX_PENDING_MCP_OAUTH_FLOWS = 8
+
+
+@contextmanager
+def _profile_secret_scope(profile: Optional[str]):
+    """Home + secret scope for a probe-class request (#109901). ``_config_profile_scope`` now binds
+    the secret scope itself; this stays the probe/OAuth callers' name. Home-only, NOT
+    ``_profile_scope``: the body can block for seconds and the latter holds the process-global
+    skills lock."""
+    with _config_profile_scope(profile):
+        yield
+
+
+def _secret_scoped(profile: Optional[str], fn):
+    def _run():
+        with _profile_secret_scope(profile):
+            return fn()
+    return _run
 
 
 def _gc_mcp_oauth_flows() -> None:
@@ -77,8 +95,16 @@ def _mcp_install_action_name(name: str) -> str:
 async def list_mcp_servers(profile: Optional[str] = None):
     from qubit_cli.mcp_config import _get_mcp_servers
 
-    servers = await scoped_to_thread(profile, _get_mcp_servers)
-    return {"servers": [_mcp_server_summary(name, cfg) for name, cfg in sorted(servers.items())]}
+    def _read():
+        config_servers = _get_mcp_servers()
+        from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+        return server_configs_with_sources(config_servers)
+
+    servers, plugins = await asyncio.to_thread(_secret_scoped(profile, _read))
+    return {"servers": [
+        _mcp_server_summary(name, cfg, plugins[name]) for name, cfg in sorted(servers.items())
+    ]}
 
 
 @router.post("/api/mcp/servers")
@@ -95,7 +121,15 @@ async def add_mcp_server(body: MCPServerCreate, profile: Optional[str] = None):
         # check sits under the same lock span so a concurrent add can't slip
         # between check and save.
         with config_write_scope(body.profile or profile):
-            if name in _get_mcp_servers():
+            config_servers = _get_mcp_servers()
+            from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+            servers, plugins = server_configs_with_sources(config_servers)
+            if plugin := plugins.get(name):
+                raise HTTPException(
+                    status_code=409, detail=f"Server '{name}' is provided by plugin '{plugin}' and cannot be modified",
+                )
+            if name in servers:
                 raise HTTPException(status_code=409, detail=f"Server '{name}' already exists")
             if bearer_token is not None:
                 server_config["headers"] = _save_bearer_auth_token(name, bearer_token)
@@ -123,6 +157,12 @@ async def replace_mcp_servers(body: MCPServersReplace, profile: Optional[str] = 
 
     def _run():
         with config_write_scope(body.profile or profile):
+            from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+            _servers, plugins = server_configs_with_sources({})
+            for name in body.servers:
+                if plugin := plugins.get(name):
+                    return False, [f"Server '{name}' is provided by plugin '{plugin}' and cannot be modified"]
             return _replace_mcp_servers(body.servers)
 
     ok, issues = await asyncio.to_thread(_run)
@@ -133,10 +173,18 @@ async def replace_mcp_servers(body: MCPServersReplace, profile: Optional[str] = 
 
 @router.delete("/api/mcp/servers/{name}")
 async def remove_mcp_server(name: str, profile: Optional[str] = None):
-    from qubit_cli.mcp_config import _remove_mcp_server
+    from qubit_cli.mcp_config import _get_mcp_servers, _remove_mcp_server
 
     def _run():
         with config_write_scope(profile):
+            config_servers = _get_mcp_servers()
+            from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+            _servers, plugins = server_configs_with_sources(config_servers)
+            if plugin := plugins.get(name):
+                raise HTTPException(
+                    status_code=409, detail=f"Server '{name}' is provided by plugin '{plugin}' and cannot be modified",
+                )
             return _remove_mcp_server(name)
 
     if not await asyncio.to_thread(_run):
@@ -149,7 +197,13 @@ async def test_mcp_server(name: str, profile: Optional[str] = None):
     """Connect to the server, list its tools, disconnect."""
     from qubit_cli.mcp_config import _get_mcp_servers, _oauth_tokens_present, _probe_single_server
 
-    servers = await scoped_to_thread(profile, _get_mcp_servers)
+    def _read():
+        config_servers = _get_mcp_servers()
+        from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+        return server_configs_with_sources(config_servers)[0]
+
+    servers = await asyncio.to_thread(_secret_scoped(profile, _read))
     if name not in servers:
         raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
 
@@ -158,19 +212,16 @@ async def test_mcp_server(name: str, profile: Optional[str] = None):
     # with no token — a false green. Require a token on disk, matching /auth.
     needs_oauth_token = servers[name].get("auth") == "oauth"
 
-    def _probe_scoped():
-        # Home-only scope (contextvar), NOT _profile_scope: a probe can block for
-        # seconds (stdio `npx` cold start) and _profile_scope holds the
-        # process-global skills lock for its whole body, serializing every other
-        # endpoint. The probe only needs QUBIT_HOME for .env + token resolution.
-        with _config_profile_scope(profile):
-            tools = _probe_single_server(name, servers[name], details=details)
-            return tools, (_oauth_tokens_present(name) if needs_oauth_token else True)
+    def _probe():
+        tools = _probe_single_server(name, servers[name], details=details)
+        return tools, (_oauth_tokens_present(name) if needs_oauth_token else True)
 
     try:  # probe blocks on a dedicated MCP event loop — keep it off the FastAPI loop
-        tools, token_present = await asyncio.to_thread(_probe_scoped)
+        tools, token_present = await asyncio.to_thread(_secret_scoped(profile, _probe))
     except Exception as exc:
-        return {"ok": False, "error": str(exc), "tools": []}
+        from qubit_cli.mcp_config import redact_mcp_probe_text
+
+        return {"ok": False, "error": redact_mcp_probe_text(exc), "tools": []}
     if not token_present:
         return {"ok": False, "error": "OAuth authentication required — no token found.", "tools": []}
     # Optional per-tool schema size (chars) for the desktop's cost overlay;
@@ -191,169 +242,12 @@ async def test_mcp_server(name: str, profile: Optional[str] = None):
     }
 
 
-def _list_server_capability(name: str, config: dict, capability: str) -> Dict[str, Any]:
-    """Connect to one MCP server, drain its ``resources``/``prompts`` list, disconnect.
-
-    Read-only, adapted from ``qubit_cli/mcp_config.py::_probe_single_server``
-    (the same vendored transport path the ``/test`` probe uses); the drain and
-    rendering reuse the agent's own list utility handlers
-    (``tools/mcp_tool_handlers.py::_render_resource_list`` / ``_render_prompt_list``).
-    Resource templates ride the SDK session's ``list_resource_templates`` via the
-    separate ``/resource-templates`` route below.
-    """
-    from qubit_cli.mcp_config import _resolve_mcp_server_config
-    from tools.mcp_tool import _paginate_full_list
-    from tools.mcp_tool_discovery import _connect_server
-    from tools.mcp_tool_handlers import _render_prompt_list, _render_resource_list
-    from tools.mcp_tool_lifecycle import _stop_mcp_loop_if_idle
-    from tools.mcp_tool_loop import _ensure_mcp_loop, _run_on_mcp_loop
-
-    resolved = _resolve_mcp_server_config(config)
-    try:
-        connect_timeout = max(1.0, float(resolved.get("connect_timeout", 30)))
-    except (TypeError, ValueError):
-        connect_timeout = 30.0
-
-    _ensure_mcp_loop()
-    payload: Dict[str, Any] = {}
-
-    async def _list():
-        server = await asyncio.wait_for(_connect_server(name, resolved), timeout=connect_timeout)
-        try:
-            if capability == "resources":
-                items = await _paginate_full_list(server.session.list_resources, "resources", name)
-                payload.update(_render_resource_list(items, name))
-            else:
-                items = await _paginate_full_list(server.session.list_prompts, "prompts", name)
-                payload.update(_render_prompt_list(items, name))
-        finally:
-            await server.shutdown()
-
-    try:
-        _run_on_mcp_loop(_list(), timeout=connect_timeout + 10)
-    finally:
-        _stop_mcp_loop_if_idle()
-    return payload
-
-
-async def _list_mcp_capability(name: str, profile: Optional[str], capability: str) -> Dict[str, Any]:
-    from qubit_cli.mcp_config import _get_mcp_servers
-
-    servers = await scoped_to_thread(profile, _get_mcp_servers)
-    if name not in servers:
-        raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
-
-    def _scoped():
-        with _config_profile_scope(profile):
-            return _list_server_capability(name, servers[name], capability)
-
-    try:  # connecting blocks on the dedicated MCP loop — keep it off the FastAPI loop
-        return await asyncio.to_thread(_scoped)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.get("/api/mcp/servers/{name}/resources")
-async def list_mcp_server_resources(name: str, profile: Optional[str] = None):
-    """List an MCP server's resources (read-only: connect, list, disconnect)."""
-    return await _list_mcp_capability(name, profile, "resources")
-
-
-@router.get("/api/mcp/servers/{name}/prompts")
-async def list_mcp_server_prompts(name: str, profile: Optional[str] = None):
-    """List an MCP server's prompts (read-only: connect, list, disconnect)."""
-    return await _list_mcp_capability(name, profile, "prompts")
-
-
-def _render_resource_templates(templates: Any, server_name: str) -> Dict[str, Any]:
-    """Resource-template entries in the same camelCase wire shape the resource
-    list uses (``tools/mcp_tool_handlers.py::_render_resource_list``)."""
-    from tools.mcp_tool_common import mcp_field
-
-    out = []
-    for t in templates:
-        entry: Dict[str, Any] = {}
-        uri = mcp_field(t, "uri_template", "uriTemplate")
-        if uri is not None:
-            entry["uriTemplate"] = str(uri)
-        name = getattr(t, "name", None)
-        if name:
-            entry["name"] = name
-        description = getattr(t, "description", None)
-        if description:
-            entry["description"] = description
-        mime = mcp_field(t, "mime_type", "mimeType")
-        if mime:
-            entry["mimeType"] = mime
-        out.append(entry)
-    return {"resource_templates": out}
-
-
-def _list_server_templates(name: str, config: dict) -> Dict[str, Any]:
-    """Drain an MCP server's ``resources/templates/list``, disconnect.
-
-    The vendored tool handlers wrap only ``list_resources``/``list_prompts``
-    (``tools/mcp_tool_handlers.py:534-542``); the SDK session method
-    ``list_resource_templates`` rides the same transport, so this reuses the
-    vendored ``_paginate_full_list`` drain (``tools/mcp_tool.py:255``) instead of
-    a second MCP client.
-    """
-    from qubit_cli.mcp_config import _resolve_mcp_server_config
-    from tools.mcp_tool import _paginate_full_list
-    from tools.mcp_tool_discovery import _connect_server
-    from tools.mcp_tool_lifecycle import _stop_mcp_loop_if_idle
-    from tools.mcp_tool_loop import _ensure_mcp_loop, _run_on_mcp_loop
-
-    resolved = _resolve_mcp_server_config(config)
-    try:
-        connect_timeout = max(1.0, float(resolved.get("connect_timeout", 30)))
-    except (TypeError, ValueError):
-        connect_timeout = 30.0
-
-    _ensure_mcp_loop()
-    payload: Dict[str, Any] = {}
-
-    async def _list():
-        server = await asyncio.wait_for(_connect_server(name, resolved), timeout=connect_timeout)
-        try:
-            items = await _paginate_full_list(
-                server.session.list_resource_templates, "resource_templates", name)
-            payload.update(_render_resource_templates(items, name))
-        finally:
-            await server.shutdown()
-
-    try:
-        _run_on_mcp_loop(_list(), timeout=connect_timeout + 10)
-    finally:
-        _stop_mcp_loop_if_idle()
-    return payload
-
-
-@router.get("/api/mcp/servers/{name}/resource-templates")
-async def list_mcp_server_resource_templates(name: str, profile: Optional[str] = None):
-    """List an MCP server's resource templates (read-only: connect, list, disconnect)."""
-    from qubit_cli.mcp_config import _get_mcp_servers
-
-    servers = await scoped_to_thread(profile, _get_mcp_servers)
-    if name not in servers:
-        raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
-
-    def _scoped():
-        with _config_profile_scope(profile):
-            return _list_server_templates(name, servers[name])
-
-    try:
-        return await asyncio.to_thread(_scoped)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
 @router.post("/api/mcp/servers/{name}/auth")
 async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = None):
     """Start MCP OAuth and hand the authorization URL to the dashboard browser."""
     from qubit_cli.mcp_config import _get_mcp_servers
     from qubit_constants import get_qubit_home
-    from tools.mcp_dashboard_oauth import DashboardOAuthFlow
+    from tools.mcp_dashboard_oauth import DashboardOAuthFlow, exception_message
 
     _require_token(request)
     _gc_mcp_oauth_flows()
@@ -364,12 +258,18 @@ async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = 
     process_home = _home()
 
     def _read():
-        with _profile_scope(profile):
-            return _get_mcp_servers(), _home()
+        with _profile_secret_scope(profile):
+            config_servers = _get_mcp_servers()
+            from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
 
-    servers, flow_home = await asyncio.to_thread(_read)
+            servers, plugins = server_configs_with_sources(config_servers)
+            return servers, plugins, _home()
+
+    servers, plugins, flow_home = await asyncio.to_thread(_read)
     if name not in servers:
         raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
+    if plugin := plugins.get(name):
+        raise HTTPException(status_code=409, detail=f"Server '{name}' is provided by plugin '{plugin}' and cannot be modified")
     cfg = dict(servers[name])
     if not cfg.get("url"):
         raise HTTPException(status_code=400, detail="stdio servers authenticate via env keys, not OAuth")
@@ -397,7 +297,7 @@ async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = 
     try:
         await flow.wait_for_authorization_url(timeout=30)
     except Exception as exc:
-        flow.mark_error(str(exc))
+        flow.mark_error(exception_message(exc))
     return flow.snapshot()
 
 
@@ -423,7 +323,7 @@ async def cancel_mcp_oauth_flow(flow_id: str, request: Request):
     flow = _mcp_oauth_flows.get(flow_id)
     if flow is None:  # expired/GC'd is the goal state of a cancel — not an error
         return {"ok": True, "status": "expired"}
-    flow.mark_error("Cancelled by user")
+    flow.mark_error("Cancelled by user", cancelled=True)
     return {"ok": True, "status": flow.snapshot()["status"]}
 
 
@@ -433,6 +333,7 @@ async def mcp_oauth_callback(
     code: Optional[str] = None,
     state: Optional[str] = None,
     error: Optional[str] = None,
+    iss: Optional[str] = None,
 ):
     _gc_mcp_oauth_flows()
     with _mcp_oauth_flows_lock:
@@ -448,7 +349,7 @@ async def mcp_oauth_callback(
     if flow is None:
         return HTMLResponse("<h1>OAuth flow expired</h1><p>Return to Qubit and try again.</p>", status_code=404)
     try:
-        flow.deliver_callback(code=code, state=state, error=error)
+        flow.deliver_callback(code=code, state=state, error=error, iss=iss)
     except ValueError as exc:
         return HTMLResponse(
             "<h1>OAuth callback rejected</h1><p>The callback was invalid or already used.</p>",
@@ -466,6 +367,13 @@ async def set_mcp_server_enabled(name: str, body: MCPEnabledToggle, profile: Opt
     def _run():
         with config_write_scope(body.profile or profile):
             cfg = load_config()
+            from tui_gateway.mcp_rpc_helpers import server_configs_with_sources
+
+            _servers, plugins = server_configs_with_sources(cfg.get("mcp_servers") or {})
+            if plugin := plugins.get(name):
+                raise HTTPException(
+                    status_code=409, detail=f"Server '{name}' is provided by plugin '{plugin}' and cannot be modified",
+                )
             servers = cfg.get("mcp_servers")
             if not isinstance(servers, dict) or name not in servers:
                 raise HTTPException(status_code=404, detail=f"Server '{name}' not found")
@@ -485,6 +393,7 @@ def _catalog_entry_json(entry: Any, installed: bool, enabled: bool) -> Dict[str,
     return {
         "name": entry.name,
         "description": entry.description,
+        "connector_slug": entry.connector_slug,
         "source": entry.source,
         "transport": transport.type,
         "auth_type": getattr(auth, "type", "none"),
@@ -506,7 +415,12 @@ def _catalog_entry_json(entry: Any, installed: bool, enabled: bool) -> Dict[str,
         "post_install": entry.post_install or "",
         # Composer-suggestion triggers (desktop brand pills), only when the
         # manifest declares a `suggest` block.
-        "suggest": {"keywords": list(entry.suggest.keywords), "hosts": list(entry.suggest.hosts)} if entry.suggest else None,
+        "suggest": {
+            "keywords": list(entry.suggest.keywords), "hosts": list(entry.suggest.hosts),
+            "applications": list(getattr(entry.suggest, "applications", [])),
+            "examples": list(getattr(entry.suggest, "examples", [])),
+            "requires_app": getattr(entry.suggest, "requires_app", False),
+        } if entry.suggest else None,
         "needs_install": install is not None,
         "installed": installed,
         "enabled": enabled,
@@ -514,9 +428,10 @@ def _catalog_entry_json(entry: Any, installed: bool, enabled: bool) -> Dict[str,
 
 
 @router.get("/api/mcp/catalog")
-async def list_mcp_catalog(profile: Optional[str] = None):
+async def list_mcp_catalog(profile: Optional[str] = None, detect_apps: bool = False):
     """Browse the Qubit-approved MCP catalog (optional-mcps/ manifests), each
-    entry annotated with installed/enabled state for ``profile``."""
+    entry annotated with installed/enabled state for ``profile``. Opt-in app
+    signals describe this backend machine, never the client or terminal sandbox."""
     with http_failure("mcp_catalog import failed", 500, "Catalog unavailable"):
         from qubit_cli import mcp_catalog
 
@@ -542,7 +457,36 @@ async def list_mcp_catalog(profile: Optional[str] = None):
         diagnostics = [{"name": n, "kind": k, "message": m} for (n, k, m) in mcp_catalog.catalog_diagnostics()]
     except Exception:
         pass
-    return {"entries": entries, "diagnostics": diagnostics}
+    result = {"entries": entries, "diagnostics": diagnostics}
+    if detect_apps:
+        import sys
+
+        try:
+            from qubit_cli.mcp_app_detection import discover_catalog_apps, validate_applications
+
+            applications = {}
+            for entry in entries:
+                labels = (entry["suggest"] or {}).get("applications") or [
+                    entry["name"].replace("-", " ").replace("_", " ")
+                ]
+                try:
+                    applications[entry["name"]] = validate_applications(labels)
+                except ValueError:
+                    # Catalog identifiers allow more than app labels; one unusable
+                    # inference must not suppress valid observations for other entries.
+                    applications[entry["name"]] = []
+
+            # Keep backend-local filesystem work off the event loop and profile lock.
+            detected = await asyncio.to_thread(discover_catalog_apps, applications)
+        except Exception:
+            _log.warning("Backend application discovery unavailable")
+            detected = {"matches": {}, "discovery": {
+                "scope": "backend", "status": "unavailable", "platform": sys.platform,
+            }}
+        for entry in entries:
+            entry["detected_apps"] = detected["matches"].get(entry["name"], [])
+        result["discovery"] = detected["discovery"]
+    return result
 
 
 @router.post("/api/mcp/catalog/install")
@@ -575,12 +519,16 @@ async def install_mcp_catalog_entry(body: MCPCatalogInstall, profile: Optional[s
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     effective_profile = body.profile or profile
+    # Secrets are persisted to .env here (before install_entry runs); non-secret
+    # values ride preloaded_env into install_entry → config.yaml, so .env stays
+    # secrets-only and nothing re-prompts on a non-TTY server.
     if body.env:
         def _write_env():
             with _profile_scope(effective_profile):
-                for k, v in body.env.items():
-                    if v:
-                        save_env_value(k, v)
+                for spec in entry.auth.env or []:
+                    value = (body.env or {}).get(spec.name)
+                    if spec.secret and value:
+                        save_env_value(spec.name, value)
 
         await asyncio.to_thread(_write_env)
 
@@ -599,7 +547,10 @@ async def install_mcp_catalog_entry(body: MCPCatalogInstall, profile: Optional[s
     # No git step — install synchronously; install_entry goes through the
     # call-time config/env resolvers so the profile scope covers it.
     try:
-        await scoped_to_thread(effective_profile, lambda: mcp_catalog.install_entry(entry, enable=body.enable))
+        await scoped_to_thread(
+            effective_profile,
+            lambda: mcp_catalog.install_entry(entry, enable=body.enable, preloaded_env=body.env or None),
+        )
     except HTTPException:
         raise
     except Exception as exc:

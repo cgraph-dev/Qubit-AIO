@@ -11,7 +11,7 @@ runtime resolver then makes of it.
 
 import os
 
-import yaml
+import qubit_yaml as yaml
 
 import qubit_cli.runtime_provider as rp
 from qubit_cli.model_setup_flows_bedrock import _model_flow_bedrock_api_key

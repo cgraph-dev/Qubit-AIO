@@ -31,7 +31,7 @@ pytestmark = [pytest.mark.platforms("windows"), pytest.mark.integration, pytest.
 
 def _running(home) -> bool:
     try:
-        state = json.loads((home.hermes_home / "gateway_state.json").read_text(encoding="utf-8"))
+        state = json.loads((home.qubit_home / "gateway_state.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
     return state.get("gateway_state") == "running"

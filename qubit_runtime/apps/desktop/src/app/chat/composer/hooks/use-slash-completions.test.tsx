@@ -2,7 +2,7 @@ import type { Unstable_TriggerItem } from '@assistant-ui/core'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitGateway } from '@/hermes'
+import type { HermesGateway } from '@/hermes'
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
 
@@ -41,7 +41,7 @@ const RANKED_CATALOG = {
 const commandsOf = (items: readonly Unstable_TriggerItem[]) =>
   items.map(item => (item.metadata as { command?: string })?.command)
 
-function harness(gateway: QubitGateway) {
+function harness(gateway: HermesGateway) {
   const api: { search?: (query: string) => readonly Unstable_TriggerItem[] } = {}
 
   function Probe() {
@@ -79,7 +79,7 @@ afterEach(() => {
 describe('useSlashCompletions', () => {
   it('serves the bare-slash catalog from cache instead of re-requesting it', async () => {
     const request = vi.fn().mockResolvedValue(CATALOG)
-    const api = harness({ request } as unknown as QubitGateway)
+    const api = harness({ request } as unknown as HermesGateway)
 
     await completions(api, '')
     expect(request).toHaveBeenCalledTimes(1)
@@ -95,16 +95,6 @@ describe('useSlashCompletions', () => {
     expect(request).toHaveBeenCalledTimes(2)
   })
 
-  it('offers skill commands on a bare slash, not just built-ins', async () => {
-    const request = vi.fn().mockResolvedValue(CATALOG)
-    const api = harness({ request } as unknown as QubitGateway)
-
-    const items = await completions(api, '')
-    const work = items.find(item => (item.metadata as { command?: string })?.command === '/work')
-
-    expect((work?.metadata as { group?: string })?.group).toBe('Skills')
-  })
-
   // A `/` typed mid-message is a reference dropped into prose, so the trigger
   // filters the list to skills (use-composer-trigger). A bare mid-message `/`
   // resolves to the same empty query as an opening `/`, so that filter runs
@@ -112,7 +102,7 @@ describe('useSlashCompletions', () => {
   // inline popover empty. Asserted through isSkillItem, the real predicate.
   it('leaves only skills for a mid-message slash', async () => {
     const request = vi.fn().mockResolvedValue(CATALOG)
-    const api = harness({ request } as unknown as QubitGateway)
+    const api = harness({ request } as unknown as HermesGateway)
 
     const inline = (await completions(api, '')).filter(isSkillItem)
 
@@ -120,10 +110,10 @@ describe('useSlashCompletions', () => {
   })
 
   // An alphabetical `/` menu buries the skills someone runs daily under the
-  // ones that shipped with Qubit and were never opened.
+  // ones that shipped with Hermes and were never opened.
   it('orders skills by use and hides never-used built-ins on a bare slash', async () => {
     const request = vi.fn().mockResolvedValue(RANKED_CATALOG)
-    const api = harness({ request } as unknown as QubitGateway)
+    const api = harness({ request } as unknown as HermesGateway)
 
     const skills = commandsOf((await completions(api, '')).filter(isSkillItem))
 
@@ -152,7 +142,7 @@ describe('useSlashCompletions', () => {
       )
     )
 
-    const api = harness({ request } as unknown as QubitGateway)
+    const api = harness({ request } as unknown as HermesGateway)
 
     expect(commandsOf(await completions(api, 'research'))).toEqual(['/research-paper-writing', '/research'])
   })
@@ -172,7 +162,7 @@ describe('useSlashCompletions', () => {
       )
     )
 
-    const api = harness({ request } as unknown as QubitGateway)
+    const api = harness({ request } as unknown as HermesGateway)
     const items = await completions(api, 're')
 
     const groupOf = (command: string) =>

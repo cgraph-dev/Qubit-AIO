@@ -75,7 +75,7 @@ export const $route = atom<Route>('welcome')
 export const $mode = atom<AppMode>('install')
 export const $bootstrap = atom<BootstrapStateModel>(INITIAL)
 export const $logPath = atom<string | null>(null)
-export const $qubitHome = atom<string | null>(null)
+export const $hermesHome = atom<string | null>(null)
 
 export const $progress = computed($bootstrap, (b) => {
   const total = b.stageOrder.length
@@ -178,7 +178,7 @@ export async function initialize(): Promise<void> {
   if (fake) {
     unlisten = () => {}
     $logPath.set('~/.hermes/logs/bootstrap-installer.log')
-    $qubitHome.set('~/.hermes')
+    $hermesHome.set('~/.hermes')
     $mode.set(fake === 'update' ? 'update' : 'install')
 
     // Update auto-runs (it's a hand-off); install/failure wait for the welcome click.
@@ -189,14 +189,14 @@ export async function initialize(): Promise<void> {
 
   // Pull static info on mount for the diagnostics footer.
   try {
-    const [logPath, qubitHome, mode] = await Promise.all([
+    const [logPath, hermesHome, mode] = await Promise.all([
       invoke<string>('get_log_path'),
-      invoke<string>('get_hermes_home'),
+      invoke<string>('get_qubit_home'),
       invoke<AppMode>('get_mode')
     ])
 
     $logPath.set(logPath)
-    $qubitHome.set(qubitHome)
+    $hermesHome.set(hermesHome)
     $mode.set(mode)
   } catch (err) {
     console.warn('failed to fetch installer paths', err)
@@ -264,7 +264,7 @@ export async function initialize(): Promise<void> {
           currentStage: null
         })
 
-        // Install: show the "launch Qubit" success screen. Update: this is a
+        // Install: show the "launch Hermes" success screen. Update: this is a
         // hand-off — the installer relaunches the desktop and exits within a
         // few hundred ms, so routing to success just flashes that screen
         // before the window closes. Stay on progress until we exit.
@@ -347,12 +347,12 @@ export async function cancelInstall(): Promise<void> {
   await invoke('cancel_bootstrap')
 }
 
-export async function launchQubitDesktop(): Promise<void> {
+export async function launchHermesDesktop(): Promise<void> {
   if (fakeMode()) {throw new Error('Preview mode — launching is disabled.')}
   const installRoot = $bootstrap.get().installRoot
 
   if (!installRoot) {throw new Error('no install root')}
-  await invoke('launch_hermes_desktop', { installRoot })
+  await invoke('launch_qubit_desktop', { installRoot })
 }
 
 export async function openLogDir(): Promise<void> {
@@ -389,7 +389,7 @@ const FAKE_INSTALL_STAGES: FakeStage[] = [
   { name: 'system-packages', title: 'System packages' },
   { name: 'uv', title: 'uv' },
   { name: 'python', title: 'Python environment' },
-  { name: 'repo', title: 'Qubit repository' },
+  { name: 'repo', title: 'Hermes repository' },
   { name: 'dependencies', title: 'Python dependencies' },
   { name: 'node', title: 'Node runtime' },
   { name: 'desktop', title: 'Desktop app' }

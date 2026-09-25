@@ -5,7 +5,7 @@
 malformed plists are skipped, but ``plistlib.load`` propagates
 ``xml.parsers.expat.ExpatError`` (which is NOT a ``ValueError`` subclass) for
 XML that is not well-formed, so one hand-edited LaunchAgent plist aborted the
-whole ``qubit update`` post-pull cleanup instead of being skipped.
+whole ``hermes update`` post-pull cleanup instead of being skipped.
 """
 import os
 from unittest import mock
@@ -16,7 +16,7 @@ from qubit_cli import main_dashboard
 
 # ``_loaded_launchd_backend_jobs`` reads ``sys.platform`` directly (no host seam), so
 # the scan runs only on a real macOS host — never by faking the platform.
-pytestmark = pytest.mark.macos_only
+pytestmark = pytest.mark.platforms("macos")
 
 
 # A plist that is not well-formed XML yet launchd itself tolerates: a raw `&&`
@@ -59,7 +59,7 @@ def test_malformed_sibling_does_not_hide_the_good_job(tmp_path):
         jobs = main_dashboard._loaded_launchd_backend_jobs([("agent", tmp_path)])
     assert jobs == [
         (
-            f"gui/{os.getuid()}",  # windows-footgun: ok — macos_only file
+            f"gui/{os.getuid()}",  # windows-footgun: ok — platforms("macos") file
             "ai.hermes.dashboard.test",
             ["/usr/local/bin/hermes", "dashboard", "--port", "9119"],
             4321,

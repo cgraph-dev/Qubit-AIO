@@ -35,7 +35,9 @@ _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     # while every real command position (text start, whitespace, `;`/`&`/`|`, `$(`, backtick,
     # U+FFFD) still matches.
     # See #77173.
-    r"(?:(?<![/\w.\-])qubit\s+gateway\s+(?:restart|stop|uninstall)\b)"
+    # Windows spells the CLI with a launcher suffix (`hermes.exe`, npm-style `hermes.cmd`/`.ps1`);
+    # same command, so the suffix is optional here.
+    r"(?:(?<![/\w.\-])qubit(?:\.(?:exe|cmd|bat|com|ps1))?\s+gateway\s+(?:restart|stop|uninstall)\b)"
     # Branch B: launchctl ops anchored on a hermes-gateway label so unrelated qubit services stay
     # unblocked. `submit`/`bootstrap` register a NEW keepalive job wrapping an arbitrary helper (a
     # laundered restart); neutral-label submissions are caught by
@@ -57,13 +59,16 @@ _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     r"|(?:systemctl\s+(?:-\S+\s+)*(?:restart|stop|start)\b[^\n]*\bhermes[.\-]?gateway)"
     # Branch D: pkill/kill of the gateway process, both token orders. Leading \b keeps "skill" from
     # matching as "kill".
-    r"|(?:\bp?kill\b[^\n]*\bhermes\b[^\n]*\bgateway)"
-    r"|(?:\bp?kill\b[^\n]*\bgateway\b[^\n]*\bhermes)"
+    # `taskkill` / `Stop-Process` are the Windows spellings of the same operation; `\bp?kill\b`
+    # cannot reach inside `taskkill`, so they are named outright. Service-control forms (`net stop`,
+    # `sc stop`) presuppose a service install this guard has no evidence of and stay uncovered.
+    r"|(?:\b(?:p?kill|taskkill|stop-process)\b[^\n]*\bhermes\b[^\n]*\bgateway)"
+    r"|(?:\b(?:p?kill|taskkill|stop-process)\b[^\n]*\bgateway\b[^\n]*\bhermes)"
 )
 
 # Branch E: process killers whose TARGET is the interpreter image hosting the gateway. A supervised
 # gateway is literally `python.exe` / `python3.12` (`python -m qubit_cli.main gateway run`), so
-# `taskkill /F /IM python.exe`, `pkill -9 python3` or `killall python` carry no hermes/gateway token
+# `taskkill /F /IM python.exe`, `pkill -9 python3` or `killall python` carry no qubit/gateway token
 # yet terminate it (#113667). Token-aware rather than a line regex: option VALUES are never read as
 # targets (`pkill -u <user> chrome`), `-f` cmdline patterns are judged as patterns, and other image
 # names (`taskkill /F /IM agent-browser.exe`) stay available. Numeric-PID kills are out of scope:
@@ -90,8 +95,8 @@ _NAME_ENUMERATORS = frozenset({"pgrep", "pidof", "get-process"})
 _KILL_VERB_RE = re.compile(r"(?i)\b(?:kill|taskkill|stop-process)\b")
 # A `-f` pattern that does not start with the interpreter reaches the gateway cmdline
 # (`python -m qubit_cli.main gateway run` / `qubit gateway run`) only through its own tokens;
-# an unrelated script that merely contains "hermes" (`hermes-polis/run.sh`, `my_hermes_bot.py`)
-# cannot match it. Same hermes+gateway pairing as Branch D, plus the module path.
+# an unrelated script that merely contains "hermes" (`hermes-polis/run.sh`, `my_qubit_bot.py`)
+# cannot match it. Same qubit+gateway pairing as Branch D, plus the module path.
 _GATEWAY_CMDLINE_TOKEN_RE = re.compile(r"(?i)qubit_cli|\bhermes\b[^\n]*\bgateway\b|\bgateway\b[^\n]*\bhermes\b")
 # Rejection text for Branch E, shared by every tool surface that runs the guard so the agent is
 # pointed at the ownership-scoped route (proc_* id / explicit PID) rather than the shell.
@@ -101,248 +106,6 @@ HOST_INTERPRETER_KILL_REJECTION = (
     "Stop only the process you own instead: process(action=\"kill\", session_id=\"proc_…\") "
     "for a background job Qubit started, or kill/taskkill by its explicit PID."
 )
-
-# Every branch uses `[^\n]*` between verb and label so matches cannot span unrelated lines. A POSIX
-# backslash-newline continuation is therefore collapsed to a space before matching (as the shell
-# does) rather than loosening `[^\n]*`.
-# Every branch above uses `[^\n]*` between its verb and the gateway identifier so the match can't span
-# unrelated lines of a longer cron prompt/script, but that also means a real multi-line shell invocation
-# split across continuation lines (e.g. `launchctl submit \` / `  -l ai.hermes.gateway-... \` / `  -- ...`,
-# the exact reported shape in #62891) would otherwise slip past. Collapse continuations to a single space
-# before matching, mirroring what the shell itself does, rather than loosening `[^\n]*` and risking false
-# positives across genuinely separate lines.
-_SHELL_LINE_CONTINUATION = re.compile(r"\\\r?\n[ \t]*")
-
-# Python argv-list punctuation (`subprocess.run(["launchctl", "bootout", ...])`) separates exec'd
-# words with brackets/commas. Stripped only for the token-join re-scan, never from raw text.
-# See #68289.
-_ARGV_LIST_PUNCTUATION = re.compile(r"[\[\],]+")
-
-# Branch A2: `qubit -p <profile> gateway restart|stop` (also `--profile <name>` /
-# `--profile=<name>`). The selector breaks Branch A's adjacency. A sibling-profile restart is a
-# legitimate fleet operation, so the profile name is captured and blocked only when it equals the
-# profile running the guard. `start` stays excluded as in Branch A.
-# Unlike Branch A this form is NOT unconditionally self-targeting: issued from inside gateway `zeus`,
-# `qubit -p venus gateway restart` operates on a sibling profile's gateway and is a legitimate fleet
-# operation. The pattern captures the named profile so `contains_gateway_lifecycle_command` can block only
-# the self-targeting shape (named profile == the profile running the guard). See #78028.
-_PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
-    r"(?i)"
-    r"qubit\s+"
-    # Any global flags before the profile selector (each may carry a value).
-    r"(?:-{1,2}\S+(?:\s+\S+)?\s+)*"
-    # The selector: exactly the shapes the CLI's `_apply_profile_override` accepts.
-    r"(?:--profile=([^\s]+)|(?:-p|--profile)\s+([^\s]+))"
-    # Any global flags between the selector and the subcommand.
-    r"(?:\s+-{1,2}\S+(?:\s+\S+)?)*"
-    r"\s+gateway\s+(?:restart|stop)"
-)
-
-# Branch B needs the label AFTER the verb in one `[^\n]*` span; a loop that builds the label in an
-# EARLIER `;`-segment (`label=${item%%:*}; launchctl bootout "gui/$uid/$label"`) leaves only
-# `$label` next to the verb. These verbs act on an EXISTING job, so the hermes-gateway label anchor
-# stays correct, but the check is "verb anywhere AND label anywhere".
-# No profile identity available: cannot prove self-targeting, so do not block — sibling restarts must stay
-# allowed (#78028).
-_LAUNCHCTL_LIFECYCLE_VERBS_RE = re.compile(
-    r"(?i)\blaunchctl\s+(?:kickstart|unload|load|stop|restart|bootout|kill|disable|remove)\b"
-)
-_QUBIT_GATEWAY_LABEL_RE = re.compile(r"(?i)\bhermes[.\-]?gateway\b")
-
-_SHELL_EXECUTABLES = frozenset({"sh", "bash", "dash", "ksh", "zsh"})
-_SHELL_OPTIONS_WITH_VALUES = frozenset({"-O", "+O", "-o", "+o"})
-_SHELL_COMMAND_FLAGS = {"-c", "--command"}
-_MAX_REFERENCED_SCRIPT_BYTES = 1024 * 1024
-_MAX_REFERENCED_SCRIPT_DEPTH = 8
-_CONTROL_CHARS = frozenset(";&|()")
-
-# Directory names directly under `Library` that mark a FileProvider-backed subtree: `Mobile
-# Documents` is iCloud Drive; `CloudStorage` hosts third-party providers (Dropbox, OneDrive, Google
-# Drive, ...).
-_CLOUD_PLACEHOLDER_MARKERS = frozenset({"Mobile Documents", "CloudStorage"})
-
-# Executables whose arguments are DATA (search patterns, SQL, log filters) and cannot execute their
-# argument text. Deliberately conservative: no `awk` (system()), no `sed` (`s///e`), no
-# `echo`/`printf` (routinely piped into a shell), no `mysql` (`\\!` and `system` escapes).
-_DATA_SINK_EXECUTABLES = frozenset(
-    {"grep", "egrep", "fgrep", "rg", "ag", "ack", "journalctl", "sqlite3", "psql"}
-)
-# Argument shapes that smuggle execution back INTO a data sink (command/process substitution, psql
-# `\!`). Any hit disables masking for the whole segment — fail closed to the plain regex verdict.
-_UNSAFE_DATA_ARG_MARKERS = ("`", "$(", "<(", ">(", "\\!")
-# sqlite3 dot-commands (`.shell`, `.system`) also disable masking. Dot must be followed by a NAME
-# character so relative paths (`.`, `./x`) stay paths.
-_DOT_COMMAND_ARGUMENT = re.compile(r"^\.[A-Za-z]")
-# A data sink piped into a shell/interpreter can feed matched lines to execution; never mask it.
-_PIPE_TO_INTERPRETER = re.compile(
-    r"\|\s*&?\s*(?:sudo\s+)?(?:sh|bash|dash|ksh|zsh|xargs|eval|source)\b"
-)
-
-# Bytes sniffed before reading a referenced file in full (see _BINARY_MAGICS).
-_BINARY_SNIFF_BYTES = 4096
-
-_ReadRemoteScriptFn = Callable[[str], Optional[str]]
-
-# Wrappers that hand execution to their argument tail: the real command sits further right, so a
-# first-token-only guard would let `sudo bash ~/restart.sh` / `sudo launchctl submit ...` walk past.
-# A guard that reads only the first token sees `sudo`/`env`/`nohup` and never inspects what they run, so
-# `sudo bash ~/restart.sh` walked past the same walk that stops `bash ~/restart.sh`, and `sudo launchctl
-# submit ...` past the label-independent submit block (#62891). `_PIPE_TO_INTERPRETER` above already reads
-# `sudo ` this way for the pipe case; this generalises that reading to the command position.
-_TRANSPARENT_COMMAND_PREFIXES = frozenset({
-    "sudo", "doas", "env", "nohup", "setsid", "nice", "ionice", "stdbuf",
-    "timeout", "exec", "command", "builtin", "eatmydata",
-    # Privilege and namespace wrappers: options, then the command they run.
-    "pkexec", "su", "runuser", "setpriv", "systemd-run", "nsenter", "unshare",
-})
-
-# Wrapper options that consume the NEXT token, so a value is never mistaken for the command.
-_TRANSPARENT_PREFIX_VALUE_OPTIONS = {
-    "sudo": {"-u", "-g", "-U", "-C", "-p", "-r", "-t", "-T", "--user", "--group", "--prompt"},
-    "doas": {"-u", "-C"},
-    "env": {"-u", "--unset", "-S", "--split-string", "-C", "--chdir"},
-    "nice": {"-n", "--adjustment"},
-    "ionice": {"-c", "-n", "-p", "--class", "--classdata"},
-    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
-    "timeout": {"-s", "-k", "--signal", "--kill-after"},
-    "pkexec": {"--user"},
-    "su": {"-s", "--shell", "-g", "--group", "-G", "--supp-group"},
-    "runuser": {"-u", "--user", "-s", "--shell", "-g", "--group", "-G", "--supp-group"},
-    "setpriv": {"--reuid", "--regid", "--groups", "--inh-caps", "--ambient-caps", "--bounding-set",
-                "--selinux-label", "--apparmor-profile"},
-    "systemd-run": {"-u", "--unit", "-p", "--property", "-E", "--setenv", "--slice",
-                    "--description", "--uid", "--gid", "--on-calendar", "--service-type"},
-    "nsenter": {"-t", "--target", "-S", "--setuid", "-G", "--setgid", "-r", "--root", "-w", "--wd"},
-    "unshare": {"--map-user", "--map-group", "--setgroups", "-R", "--root", "-w", "--wd"},
-}
-
-# Wrapper options carrying a COMMAND STRING (shell source, re-scanned like `sh -c`); treating it as
-# an opaque value would hide whatever it runs (`env -S 'bash ~/restart.sh'`).
-_STRING_COMMAND_OPTIONS = {
-    "env": ("-S", "--split-string"),
-    "su": ("-c", "--command"),
-    "runuser": ("-c", "--command"),
-}
-
-# Wrappers whose first non-option operand is a VALUE, not the command (`timeout 60 bash x.sh`).
-_TRANSPARENT_PREFIX_OPERANDS = {"timeout": 1}
-
-_ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-
-# Bound the walk: a pathological token run must not spin here.
-_MAX_PREFIX_PEELS = 8
-
-_BINARY_MAGICS = (
-    b"\x7fELF",              # ELF — Linux/BSD executables and shared objects
-    b"\xfe\xed\xfa\xce",     # Mach-O 32-bit
-    b"\xfe\xed\xfa\xcf",     # Mach-O 64-bit
-    b"\xce\xfa\xed\xfe",     # Mach-O 32-bit, byte-swapped
-    b"\xcf\xfa\xed\xfe",     # Mach-O 64-bit, byte-swapped
-    b"\xca\xfe\xba\xbe",     # Mach-O universal ("fat") binary
-    b"MZ",                   # PE/COFF — Windows .exe/.dll
-    b"!<arch>",              # static archive (.a)
-    b"\x1f\x8b",             # gzip
-    b"PK\x03\x04",           # zip (also .jar/.whl/.egg)
-)
-
-
-# --- profile identity -------------------------------------------------------------------------
-
-def _current_profile_name() -> Optional[str]:
-    """Profile running the guard: ``HERMES_PROFILE_NAME``/``HERMES_PROFILE`` env first, then
-    ``qubit_cli.profiles.get_active_profile_name`` (from ``QUBIT_HOME``); ``None`` if neither."""
-    for env_name in ("HERMES_PROFILE_NAME", "HERMES_PROFILE"):
-        value = os.environ.get(env_name)
-        if value and value.strip():
-            return value.strip()
-    try:
-        from qubit_cli.profiles import get_active_profile_name
-
-        return get_active_profile_name() or None
-    except Exception:
-        return None
-
-
-def _named_profile_is_current(named: str) -> bool:
-    """True when *named* is the profile executing the guard. Without a profile identity
-    self-targeting cannot be proven, so nothing is blocked (sibling restarts stay allowed)."""
-    current = _current_profile_name()
-    return bool(current) and named.strip().casefold() == current.strip().casefold()
-
-
-# --- direct string scans ----------------------------------------------------------------------
-
-def _contains_launchctl_gateway_lifecycle(normalized_text: str) -> bool:
-    """Order-independent companion to Branch B — see the verbs regex comment."""
-    return bool(_LAUNCHCTL_LIFECYCLE_VERBS_RE.search(normalized_text)) and bool(
-        _QUBIT_GATEWAY_LABEL_RE.search(normalized_text)
-    )
-
-
-def contains_gateway_lifecycle_command(text: str) -> bool:
-    """Return True if *text* contains a gateway lifecycle command pattern.
-
-    Passes, in order: raw-text regex (the only pass that fires on inputs shlex cannot tokenize, e.g.
-    Python source); profile-flag form; the same regex on each shell-tokenized segment with quotes/
-    escapes resolved (closes splice bypasses like ``kick"start"`` / ``kick\\start``);
-    order-independent launchctl pass. Single choke point for every recursion level of
-    ``_contains_unsafe_gateway_action``.
-
-    That second pass exists because a real shell resolves quote-splicing (``kick"start"``) and
-    backslash-escaping (``kick\\start``) into one literal word — ``kickstart`` — before the command ever
-    runs. The raw text still has the quote or backslash sitting between the verb's two halves, so the first
-    pass alone lets a spliced verb reach ``launchctl``/``systemctl`` untouched while still executing as the
-    blocked lifecycle command (#80269, reported against #80260's bootout parity fix). Tokenizing closes that
-    gap while keeping the same gateway-label anchoring (``_GATEWAY_LIFECYCLE_PATTERN`` still requires a
-    ``qubit``/``gateway`` token) — this function is the single choke point
-    ``_contains_unsafe_gateway_action`` calls at every recursion level, so referenced-script and ``sh -c``
-    payload scanning inherit the fix automatically.
-    """
-    if not text:
-        return False
-    # Provably inert heredoc bodies (quoted delimiter, data-sink consumer like `cat > f <<'EOF'`)
-    # are documentation, not commands. The stripper fails open on ANY ambiguity (unquoted delimiter,
-    # shell consumer, unterminated body), so executable heredocs are still scanned.
-    # Heredoc bodies that are provably inert data (quoted delimiter, data-sink consumer like `cat > file
-    # <<'EOF'`) are masked before scanning (#88336): a runbook line "a human can run: qubit gateway
-    # restart" inside such a body is documentation, not a command this shell will execute.
-    from tools.shell_heredoc import strip_inert_heredoc_bodies
-
-    text = strip_inert_heredoc_bodies(text)
-    normalized = _SHELL_LINE_CONTINUATION.sub(" ", text)
-    if _GATEWAY_LIFECYCLE_PATTERN.search(normalized):
-        return True
-    # Profile-flag form: blocked only when the named profile IS the one running the guard.
-    # Profile-flag form (#78028): `qubit -p <profile> gateway restart|stop` bypasses Branch A because the
-    # selector sits between `qubit` and `gateway`. It is only the same foot-gun when the named profile IS
-    # the profile running the guard — sibling-profile restarts are legitimate fleet operations and stay
-    # allowed.
-    profile_match = _PROFILE_FLAG_LIFECYCLE_PATTERN.search(normalized)
-    if profile_match:
-        named = profile_match.group(1) or profile_match.group(2)
-        # Profile ids cannot contain quotes (`^[a-z0-9][a-z0-9_-]{0,63}$`), so a shell-quoted
-        # `-p 'zeus'` compares equal to the bare name.
-        if named and _named_profile_is_current(named.strip().strip("\"'")):
-            return True
-    # Token-aware pass. Tokens are also re-joined with Python argv-list punctuation stripped, since
-    # `subprocess.run(["launchctl", "bootout", ...])` separates argv words with commas/brackets.
-    # Token-aware second pass (#80269): re-run the pattern on shell-tokenized segments where quotes/escapes
-    # are resolved, closing splice bypasses like `kick"start"`. Runs after the profile-flag check so both
-    # passes apply independently.
-    for segment in _iter_command_segments(normalized):
-        joined = " ".join(segment)
-        if joined and _GATEWAY_LIFECYCLE_PATTERN.search(joined):
-            return True
-        stripped = _ARGV_LIST_PUNCTUATION.sub(" ", joined)
-        if stripped != joined and _GATEWAY_LIFECYCLE_PATTERN.search(stripped):
-            return True
-    # The label may be built in an earlier `;`-segment, so no pass above sees verb + label together.
-    # Order-independent launchctl pass (#77083): a shell loop can build the gateway label from a variable
-    # defined in an earlier `;`-separated segment (`label=${item%%:*}; launchctl bootout
-    # "gui/$uid/$label"`), so neither the same-span regex nor same-segment tokenization sees verb and label
-    # together. Check "verb anywhere AND label anywhere" instead.
-    # Branch E (#113667): killers aimed at the interpreter image itself carry no hermes/gateway token.
-    return _contains_launchctl_gateway_lifecycle(normalized) or contains_host_interpreter_kill(normalized)
 
 
 def _is_interpreter_image(value: str, *, substring: bool = False) -> bool:
@@ -456,6 +219,240 @@ def contains_host_interpreter_kill(text: str) -> bool:
                 return True
     return False
 
+# Every branch uses `[^\n]*` between verb and label so matches cannot span unrelated lines. A POSIX
+# backslash-newline continuation is therefore collapsed to a space before matching (as the shell
+# does) rather than loosening `[^\n]*`.
+# Every branch above uses `[^\n]*` between its verb and the gateway identifier so the match can't span
+# unrelated lines of a longer cron prompt/script, but that also means a real multi-line shell invocation
+# split across continuation lines (e.g. `launchctl submit \` / `  -l ai.hermes.gateway-... \` / `  -- ...`,
+# the exact reported shape in #62891) would otherwise slip past. Collapse continuations to a single space
+# before matching, mirroring what the shell itself does, rather than loosening `[^\n]*` and risking false
+# positives across genuinely separate lines.
+_SHELL_LINE_CONTINUATION = re.compile(r"\\\r?\n[ \t]*")
+
+# Python argv-list punctuation (`subprocess.run(["launchctl", "bootout", ...])`) separates exec'd
+# words with brackets/commas. Stripped only for the token-join re-scan, never from raw text.
+# See #68289.
+_ARGV_LIST_PUNCTUATION = re.compile(r"[\[\],]+")
+
+# Branch A2: `qubit -p <profile> gateway restart|stop` (also `--profile <name>` /
+# `--profile=<name>`). The selector breaks Branch A's adjacency. A sibling-profile restart is a
+# legitimate fleet operation, so the profile name is captured and blocked only when it equals the
+# profile running the guard. `start` stays excluded as in Branch A.
+# Unlike Branch A this form is NOT unconditionally self-targeting: issued from inside gateway `zeus`,
+# `qubit -p venus gateway restart` operates on a sibling profile's gateway and is a legitimate fleet
+# operation. The pattern captures the named profile so `contains_gateway_lifecycle_command` can block only
+# the self-targeting shape (named profile == the profile running the guard). See #78028.
+_PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
+    r"(?i)"
+    r"qubit\s+"
+    # Any global flags before the profile selector (each may carry a value).
+    r"(?:-{1,2}\S+(?:\s+\S+)?\s+)*"
+    # The selector: exactly the shapes the CLI's `_apply_profile_override` accepts.
+    r"(?:--profile=([^\s]+)|(?:-p|--profile)\s+([^\s]+))"
+    # Any global flags between the selector and the subcommand.
+    r"(?:\s+-{1,2}\S+(?:\s+\S+)?)*"
+    r"\s+gateway\s+(?:restart|stop)"
+)
+
+# Branch B needs the label AFTER the verb in one `[^\n]*` span; a loop that builds the label in an
+# EARLIER `;`-segment (`label=${item%%:*}; launchctl bootout "gui/$uid/$label"`) leaves only
+# `$label` next to the verb. These verbs act on an EXISTING job, so the hermes-gateway label anchor
+# stays correct, but the check is "verb anywhere AND label anywhere".
+# No profile identity available: cannot prove self-targeting, so do not block — sibling restarts must stay
+# allowed (#78028).
+_LAUNCHCTL_LIFECYCLE_VERBS_RE = re.compile(
+    r"(?i)\blaunchctl\s+(?:kickstart|unload|load|stop|restart|bootout|kill|disable|remove)\b"
+)
+_HERMES_GATEWAY_LABEL_RE = re.compile(r"(?i)\bhermes[.\-]?gateway\b")
+
+_SHELL_EXECUTABLES = frozenset({"sh", "bash", "dash", "ksh", "zsh"})
+_SHELL_OPTIONS_WITH_VALUES = frozenset({"-O", "+O", "-o", "+o"})
+_SHELL_COMMAND_FLAGS = {"-c", "--command"}
+_MAX_REFERENCED_SCRIPT_BYTES = 1024 * 1024
+_MAX_REFERENCED_SCRIPT_DEPTH = 8
+_CONTROL_CHARS = frozenset(";&|()")
+
+# Directory names directly under `Library` that mark a FileProvider-backed subtree: `Mobile
+# Documents` is iCloud Drive; `CloudStorage` hosts third-party providers (Dropbox, OneDrive, Google
+# Drive, ...).
+_CLOUD_PLACEHOLDER_MARKERS = frozenset({"Mobile Documents", "CloudStorage"})
+
+# Executables whose arguments are DATA (search patterns, SQL, log filters) and cannot execute their
+# argument text. Deliberately conservative: no `awk` (system()), no `sed` (`s///e`), no
+# `echo`/`printf` (routinely piped into a shell), no `mysql` (`\\!` and `system` escapes).
+_DATA_SINK_EXECUTABLES = frozenset(
+    {"grep", "egrep", "fgrep", "rg", "ag", "ack", "journalctl", "sqlite3", "psql"}
+)
+# Argument shapes that smuggle execution back INTO a data sink (command/process substitution, psql
+# `\!`). Any hit disables masking for the whole segment — fail closed to the plain regex verdict.
+_UNSAFE_DATA_ARG_MARKERS = ("`", "$(", "<(", ">(", "\\!")
+# sqlite3 dot-commands (`.shell`, `.system`) also disable masking. Dot must be followed by a NAME
+# character so relative paths (`.`, `./x`) stay paths.
+_DOT_COMMAND_ARGUMENT = re.compile(r"^\.[A-Za-z]")
+# A data sink piped into a shell/interpreter can feed matched lines to execution; never mask it.
+_PIPE_TO_INTERPRETER = re.compile(
+    r"\|\s*&?\s*(?:sudo\s+)?(?:sh|bash|dash|ksh|zsh|xargs|eval|source)\b"
+)
+
+# Bytes sniffed before reading a referenced file in full (see _BINARY_MAGICS).
+_BINARY_SNIFF_BYTES = 4096
+
+_ReadRemoteScriptFn = Callable[[str], Optional[str]]
+
+# Wrappers that hand execution to their argument tail: the real command sits further right, so a
+# first-token-only guard would let `sudo bash ~/restart.sh` / `sudo launchctl submit ...` walk past.
+# A guard that reads only the first token sees `sudo`/`env`/`nohup` and never inspects what they run, so
+# `sudo bash ~/restart.sh` walked past the same walk that stops `bash ~/restart.sh`, and `sudo launchctl
+# submit ...` past the label-independent submit block (#62891). `_PIPE_TO_INTERPRETER` above already reads
+# `sudo ` this way for the pipe case; this generalises that reading to the command position.
+_TRANSPARENT_COMMAND_PREFIXES = frozenset({
+    "sudo", "doas", "env", "nohup", "setsid", "nice", "ionice", "stdbuf",
+    "timeout", "exec", "command", "builtin", "eatmydata",
+    # Privilege and namespace wrappers: options, then the command they run.
+    "pkexec", "su", "runuser", "setpriv", "systemd-run", "nsenter", "unshare",
+})
+
+# Wrapper options that consume the NEXT token, so a value is never mistaken for the command.
+_TRANSPARENT_PREFIX_VALUE_OPTIONS = {
+    "sudo": {"-u", "-g", "-U", "-C", "-p", "-r", "-t", "-T", "--user", "--group", "--prompt"},
+    "doas": {"-u", "-C"},
+    "env": {"-u", "--unset", "-S", "--split-string", "-C", "--chdir"},
+    "nice": {"-n", "--adjustment"},
+    "ionice": {"-c", "-n", "-p", "--class", "--classdata"},
+    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
+    "timeout": {"-s", "-k", "--signal", "--kill-after"},
+    "pkexec": {"--user"},
+    "su": {"-s", "--shell", "-g", "--group", "-G", "--supp-group"},
+    "runuser": {"-u", "--user", "-s", "--shell", "-g", "--group", "-G", "--supp-group"},
+    "setpriv": {"--reuid", "--regid", "--groups", "--inh-caps", "--ambient-caps", "--bounding-set",
+                "--selinux-label", "--apparmor-profile"},
+    "systemd-run": {"-u", "--unit", "-p", "--property", "-E", "--setenv", "--slice",
+                    "--description", "--uid", "--gid", "--on-calendar", "--service-type"},
+    "nsenter": {"-t", "--target", "-S", "--setuid", "-G", "--setgid", "-r", "--root", "-w", "--wd"},
+    "unshare": {"--map-user", "--map-group", "--setgroups", "-R", "--root", "-w", "--wd"},
+}
+
+# Wrapper options carrying a COMMAND STRING (shell source, re-scanned like `sh -c`); treating it as
+# an opaque value would hide whatever it runs (`env -S 'bash ~/restart.sh'`).
+_STRING_COMMAND_OPTIONS = {
+    "env": ("-S", "--split-string"),
+    "su": ("-c", "--command"),
+    "runuser": ("-c", "--command"),
+}
+
+# Wrappers whose first non-option operand is a VALUE, not the command (`timeout 60 bash x.sh`).
+_TRANSPARENT_PREFIX_OPERANDS = {"timeout": 1}
+
+_ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+# Bound the walk: a pathological token run must not spin here.
+_MAX_PREFIX_PEELS = 8
+
+_BINARY_MAGICS = (
+    b"\x7fELF",              # ELF — Linux/BSD executables and shared objects
+    b"\xfe\xed\xfa\xce",     # Mach-O 32-bit
+    b"\xfe\xed\xfa\xcf",     # Mach-O 64-bit
+    b"\xce\xfa\xed\xfe",     # Mach-O 32-bit, byte-swapped
+    b"\xcf\xfa\xed\xfe",     # Mach-O 64-bit, byte-swapped
+    b"\xca\xfe\xba\xbe",     # Mach-O universal ("fat") binary
+    b"MZ",                   # PE/COFF — Windows .exe/.dll
+    b"!<arch>",              # static archive (.a)
+    b"\x1f\x8b",             # gzip
+    b"PK\x03\x04",           # zip (also .jar/.whl/.egg)
+)
+
+
+# --- profile identity -------------------------------------------------------------------------
+
+def _current_profile_name() -> Optional[str]:
+    """Profile running the guard (``qubit_cli.profiles.current_profile_name``); ``None`` if none."""
+    from qubit_cli.profiles import current_profile_name
+
+    return current_profile_name()
+
+
+def _named_profile_is_current(named: str) -> bool:
+    """True when *named* is the profile executing the guard. Without a profile identity
+    self-targeting cannot be proven, so nothing is blocked (sibling restarts stay allowed)."""
+    current = _current_profile_name()
+    return bool(current) and named.strip().casefold() == current.strip().casefold()
+
+
+# --- direct string scans ----------------------------------------------------------------------
+
+def _contains_launchctl_gateway_lifecycle(normalized_text: str) -> bool:
+    """Order-independent companion to Branch B — see the verbs regex comment."""
+    return bool(_LAUNCHCTL_LIFECYCLE_VERBS_RE.search(normalized_text)) and bool(
+        _HERMES_GATEWAY_LABEL_RE.search(normalized_text)
+    )
+
+
+def contains_gateway_lifecycle_command(text: str) -> bool:
+    """Return True if *text* contains a gateway lifecycle command pattern.
+
+    Passes, in order: raw-text regex (the only pass that fires on inputs shlex cannot tokenize, e.g.
+    Python source); profile-flag form; the same regex on each shell-tokenized segment with quotes/
+    escapes resolved (closes splice bypasses like ``kick"start"`` / ``kick\\start``);
+    order-independent launchctl pass. Single choke point for every recursion level of
+    ``_contains_unsafe_gateway_action``.
+
+    That second pass exists because a real shell resolves quote-splicing (``kick"start"``) and
+    backslash-escaping (``kick\\start``) into one literal word — ``kickstart`` — before the command ever
+    runs. The raw text still has the quote or backslash sitting between the verb's two halves, so the first
+    pass alone lets a spliced verb reach ``launchctl``/``systemctl`` untouched while still executing as the
+    blocked lifecycle command (#80269, reported against #80260's bootout parity fix). Tokenizing closes that
+    gap while keeping the same gateway-label anchoring (``_GATEWAY_LIFECYCLE_PATTERN`` still requires a
+    ``qubit``/``gateway`` token) — this function is the single choke point
+    ``_contains_unsafe_gateway_action`` calls at every recursion level, so referenced-script and ``sh -c``
+    payload scanning inherit the fix automatically.
+    """
+    if not text:
+        return False
+    # Provably inert heredoc bodies (quoted delimiter, data-sink consumer like `cat > f <<'EOF'`)
+    # are documentation, not commands. The stripper fails open on ANY ambiguity (unquoted delimiter,
+    # shell consumer, unterminated body), so executable heredocs are still scanned.
+    # Heredoc bodies that are provably inert data (quoted delimiter, data-sink consumer like `cat > file
+    # <<'EOF'`) are masked before scanning (#88336): a runbook line "a human can run: qubit gateway
+    # restart" inside such a body is documentation, not a command this shell will execute.
+    from tools.shell_heredoc import strip_inert_heredoc_bodies
+
+    text = strip_inert_heredoc_bodies(text)
+    normalized = _SHELL_LINE_CONTINUATION.sub(" ", text)
+    if _GATEWAY_LIFECYCLE_PATTERN.search(normalized):
+        return True
+    # Profile-flag form: blocked only when the named profile IS the one running the guard.
+    # Profile-flag form (#78028): `qubit -p <profile> gateway restart|stop` bypasses Branch A because the
+    # selector sits between `qubit` and `gateway`. It is only the same foot-gun when the named profile IS
+    # the profile running the guard — sibling-profile restarts are legitimate fleet operations and stay
+    # allowed.
+    profile_match = _PROFILE_FLAG_LIFECYCLE_PATTERN.search(normalized)
+    if profile_match:
+        named = profile_match.group(1) or profile_match.group(2)
+        # Profile ids cannot contain quotes (`^[a-z0-9][a-z0-9_-]{0,63}$`), so a shell-quoted
+        # `-p 'zeus'` compares equal to the bare name.
+        if named and _named_profile_is_current(named.strip().strip("\"'")):
+            return True
+    # Token-aware pass. Tokens are also re-joined with Python argv-list punctuation stripped, since
+    # `subprocess.run(["launchctl", "bootout", ...])` separates argv words with commas/brackets.
+    # Token-aware second pass (#80269): re-run the pattern on shell-tokenized segments where quotes/escapes
+    # are resolved, closing splice bypasses like `kick"start"`. Runs after the profile-flag check so both
+    # passes apply independently.
+    for segment in _iter_command_segments(normalized):
+        joined = " ".join(segment)
+        if joined and _GATEWAY_LIFECYCLE_PATTERN.search(joined):
+            return True
+        stripped = _ARGV_LIST_PUNCTUATION.sub(" ", joined)
+        if stripped != joined and _GATEWAY_LIFECYCLE_PATTERN.search(stripped):
+            return True
+    # The label may be built in an earlier `;`-segment, so no pass above sees verb + label together.
+    # Order-independent launchctl pass (#77083): a shell loop can build the gateway label from a variable
+    # defined in an earlier `;`-separated segment (`label=${item%%:*}; launchctl bootout
+    # "gui/$uid/$label"`), so neither the same-span regex nor same-segment tokenization sees verb and label
+    # together. Check "verb anywhere AND label anywhere" instead.
+    # Branch E (#113667): killers aimed at the interpreter image itself carry no qubit/gateway token.
+    return _contains_launchctl_gateway_lifecycle(normalized) or contains_host_interpreter_kill(normalized)
+
 
 # Whole-walk work limits. The per-file cap and depth bound above limit one read, not the walk: a
 # command can reference arbitrarily many scripts, and the pure-Python shlex pass (quadratic on a
@@ -473,9 +470,12 @@ _MAX_LIFECYCLE_SCAN_REMOTE_READS = 64
 
 
 class _LifecycleScanBudget:
-    """Shared work budget for one complete referenced-script walk."""
+    """Shared work budget for one complete referenced-script walk. ``refusal`` records why the walk
+    failed closed for a reason other than a lifecycle command (budget, size, device, live SQLite,
+    cloud placeholder) so the caller can tell the model the real reason (#113944)."""
 
-    __slots__ = ("bytes_remaining", "lines_remaining", "paths_remaining", "remote_reads_remaining")
+    __slots__ = ("bytes_remaining", "lines_remaining", "paths_remaining", "remote_reads_remaining",
+                 "refusal")
 
     def __init__(self) -> None:
         # Read the module constants at construction so tests/operators can lower them at runtime.
@@ -483,6 +483,7 @@ class _LifecycleScanBudget:
         self.lines_remaining = _MAX_LIFECYCLE_SCAN_LINES
         self.paths_remaining = _MAX_LIFECYCLE_SCAN_PATHS
         self.remote_reads_remaining = _MAX_LIFECYCLE_SCAN_REMOTE_READS
+        self.refusal: Optional[str] = None
 
     def charge_text(self, text: str) -> bool:
         """Charge *text* before tokenization; False when it does not fit."""
@@ -541,12 +542,35 @@ def lifecycle_scan_root_within_budget(text: str) -> bool:
         return False
 
 
-def _budget_exhausted(what: str, depth: int) -> bool:
+def _budget_exhausted(budget: _LifecycleScanBudget, what: str, depth: int) -> bool:
     logger.warning(
         "lifecycle guard scan budget exhausted (%s at depth %d); "
         "failing closed — see _MAX_LIFECYCLE_SCAN_* in cron/lifecycle_guard.py",
         what, depth,
     )
+    budget.refusal = f"the scan budget was exhausted ({what} at depth {depth})"
+    return True
+
+
+def _unreadable_reason(path: Path) -> str:
+    """Name why an *executed* script failed closed without being scanned (live SQLite, device,
+    oversized). Message-only: the fail-closed verdict itself came from the bounded reader."""
+    from qubit_cli.sqlite_safe_read import has_live_connection
+
+    if has_live_connection(path):
+        return f"`{path}` is a SQLite database open in this gateway process"
+    try:
+        metadata = os.stat(path)
+    except OSError:
+        return f"`{path}` could not be read"
+    if not stat.S_ISREG(metadata.st_mode):
+        return f"`{path}` is not a regular file"
+    return f"`{path}` is larger than the scan cap ({_MAX_REFERENCED_SCRIPT_BYTES} bytes) or the remaining walk budget"
+
+
+def _refuse_unreadable(budget: _LifecycleScanBudget, path: Path, reason: str) -> bool:
+    logger.warning("lifecycle guard cannot scan referenced script %s: %s; failing closed", path, reason)
+    budget.refusal = reason
     return True
 
 
@@ -935,6 +959,28 @@ def _has_binary_magic(data: bytes) -> bool:
 def _read_referenced_script(
     path: Path, *, max_bytes: Optional[int] = None
 ) -> tuple[Optional[str], bool]:
+    """Read a referenced script without racing SQLite connection lifecycle.
+
+    The registry check must cover the complete ``open``/``read``/``close``
+    sequence. A separate ``has_live_connection`` check would leave a race in
+    which another thread opens SQLite after the check but before this function
+    closes its descriptor, cancelling that connection's POSIX locks.
+    """
+    from qubit_cli.sqlite_safe_read import LiveConnectionError, offline_file_access
+
+    try:
+        with offline_file_access(path, what="read referenced script"):
+            return _read_referenced_script_unlocked(path, max_bytes=max_bytes)
+    except LiveConnectionError:
+        return None, True
+    except (OSError, ValueError):
+        # Invalid path values, including embedded NULs, are not scripts.
+        return None, False
+
+
+def _read_referenced_script_unlocked(
+    path: Path, *, max_bytes: Optional[int] = None
+) -> tuple[Optional[str], bool]:
     """Return ``(text, unsafe)`` using bounded, regular-file-only reads.
 
     Shared choke point for every local script read, so the cloud-placeholder refusal lives here: a
@@ -1021,81 +1067,119 @@ def _sanitize_remote_script_text(
     return text, False
 
 
-def _read_script_for_scanning(script_path: str) -> str:
-    """Read a cron script with the bounded scanner. Non-regular/oversized inputs fail closed via a
-    lifecycle-shaped sentinel; missing/unreadable paths stay empty so scheduler validation reports
-    them."""
+def _read_script_for_scanning(script_path: str) -> tuple[str, Optional[str]]:
+    """``(text, refusal)``: read a cron script with the bounded scanner. Non-regular/oversized/live
+    SQLite inputs fail closed with a NAMED *refusal* (never a lifecycle-shaped verdict); missing or
+    unreadable paths stay empty so scheduler validation reports them."""
     resolved = _resolve_script_path(script_path)
     if resolved is None:
-        return ""
+        return "", None
     script_text, unsafe = _read_referenced_script(resolved)
     if unsafe:
-        return "qubit gateway restart"
-    return script_text or ""
+        return "", _unreadable_reason(resolved)
+    return script_text or "", None
 
 
 # --- recursive walk ---------------------------------------------------------------------------
 
 def _contains_unsafe_gateway_action(
     command: str, *, cwd: Optional[str], depth: int, visited: set[Path], budget: _LifecycleScanBudget,
-    read_remote_script: Optional[_ReadRemoteScriptFn] = None,
+    read_remote_script: Optional[_ReadRemoteScriptFn] = None, executed: bool = True,
 ) -> bool:
+    """``executed=False`` means *command* is the content of a file that is only MENTIONED in inert
+    (masked) text: it is still scanned for a literal lifecycle command, but "could not scan" (budget,
+    depth, size, device, live SQLite, cloud) is "nothing to scan" there, never a block (#113944)."""
     # Charge BEFORE _direct_lifecycle_scan: every scan in it tokenizes with shlex.
     if not budget.charge_text(command):
-        return _budget_exhausted("text", depth)
+        return _budget_exhausted(budget, "text", depth) if executed else False
     if _direct_lifecycle_scan(command):
         return True
     if depth >= _MAX_REFERENCED_SCRIPT_DEPTH:
-        return True
+        return executed
 
-    def recurse(text: str, cwd: Optional[str]) -> bool:
+    def recurse(text: str, cwd: Optional[str], executed: bool) -> bool:
         return _contains_unsafe_gateway_action(
             text, cwd=cwd, depth=depth + 1, visited=visited, budget=budget,
-            read_remote_script=read_remote_script,
+            read_remote_script=read_remote_script, executed=executed,
         )
 
-    for payload in _iter_shell_command_payloads(command):
-        if recurse(payload, cwd):
+    # The walks below must see the same masked view `_direct_lifecycle_scan` sees (#110422): a
+    # path or `sh -c` payload inside a provably-inert heredoc body is never shell-executed, and an
+    # oversized data file mentioned there otherwise fails closed as a "script".
+    from tools.shell_heredoc import strip_inert_heredoc_bodies
+
+    walk_command = strip_inert_heredoc_bodies(command)
+
+    for payload in _iter_shell_command_payloads(walk_command):
+        if recurse(payload, cwd, executed):
             return True
 
-    for script_path in _iter_referenced_shell_scripts(command, cwd=cwd):
+    # Paths named only inside a masked body are still READ: an interpreter body that hands
+    # `/x/restart.sh` to os.system() executes it. Only the fail-closed verdicts (cloud placeholder,
+    # oversized/binary, budget) stay restricted to the executed view — a mere data mention must not
+    # trip them. Executed candidates come first so a mention never starves a real script's budget.
+    candidates = [(path, executed) for path in _iter_referenced_shell_scripts(walk_command, cwd=cwd)]
+    if walk_command != command:
+        candidates += [(path, False) for path in _iter_referenced_shell_scripts(command, cwd=cwd)]
+
+    for script_path, candidate_executed in candidates:
         # Do not touch a FileProvider path even to discover whether the file is hydrated.
         if _on_cloud_path(script_path):
-            return True
+            if candidate_executed:
+                return _refuse_unreadable(
+                    budget, script_path,
+                    f"`{script_path}` lives on a cloud-synced path (iCloud Drive / "
+                    "~/Library/CloudStorage) that the guard refuses to open",
+                )
+            continue
         resolved = _resolve_lenient(script_path)
         if resolved in visited:
             continue
         if not budget.charge_path():
-            return _budget_exhausted("paths", depth)
+            if candidate_executed:
+                return _budget_exhausted(budget, "paths", depth)
+            break  # remaining candidates are all mentions
         visited.add(resolved)
         # Never read more than the walk can still afford to tokenize; a file larger than the
         # remainder fails closed exactly like an oversized one.
         script_text, unsafe = _read_referenced_script(script_path, max_bytes=budget.bytes_remaining)
         if unsafe:
-            return True
+            if candidate_executed:
+                return _refuse_unreadable(budget, script_path, _unreadable_reason(script_path))
+            continue
         if script_text is None and read_remote_script is not None:
             # Local path missing; the remote backend's output crosses the same trust boundary as a
             # local read — sanitize identically (binary skip + size fail-closed).
             if not budget.charge_remote_read():
-                return _budget_exhausted("remote reads", depth)
+                if candidate_executed:
+                    return _budget_exhausted(budget, "remote reads", depth)
+                break
             script_text, unsafe = _sanitize_remote_script_text(
                 read_remote_script(str(script_path)), max_bytes=budget.bytes_remaining
             )
             if unsafe:
-                return True
+                if candidate_executed:
+                    return _refuse_unreadable(
+                        budget, script_path,
+                        f"`{script_path}` read from the backend exceeds the scan cap "
+                        f"({_MAX_REFERENCED_SCRIPT_BYTES} bytes) or the remaining walk budget",
+                    )
+                continue
         if not script_text:
             continue
         # Relative references inside a script resolve against that script's directory, not the cwd.
-        if recurse(script_text, _resolve_script_directory(str(resolved)) or cwd):
+        if recurse(script_text, _resolve_script_directory(str(resolved)) or cwd, candidate_executed):
             return True
     return False
 
 
-def contains_gateway_lifecycle_command_or_referenced_script(
+def scan_gateway_lifecycle(
     command: str, *, cwd: Optional[str] = None,
     read_remote_script: Optional[_ReadRemoteScriptFn] = None,
-) -> bool:
-    """Detect lifecycle/submit commands, including bounded nested scripts.
+) -> tuple[bool, Optional[str]]:
+    """``(unsafe, refusal)``: *refusal* names a non-lifecycle reason the walk failed closed (budget,
+    size, device, live SQLite, cloud) so callers can tell the model; ``None`` when the verdict is a
+    real lifecycle command or the command is allowed.
 
     Total by construction: never raises. Direct scans are pure string ops; the referenced-script
     walk (filesystem, remote backends, shlex on decoded bytes) is best-effort defense-in-depth — an
@@ -1106,11 +1190,13 @@ def contains_gateway_lifecycle_command_or_referenced_script(
     every terminal command until the gateway restarts (#77780, #78256), which is strictly worse than either
     verdict.
     """
+    budget = _LifecycleScanBudget()
     try:
-        return _contains_unsafe_gateway_action(
-            command, cwd=cwd, depth=0, visited=set(), budget=_LifecycleScanBudget(),
+        unsafe = _contains_unsafe_gateway_action(
+            command, cwd=cwd, depth=0, visited=set(), budget=budget,
             read_remote_script=read_remote_script,
         )
+        return unsafe, budget.refusal if unsafe else None
     except Exception:
         logger.warning(
             "lifecycle guard referenced-script walk failed; "
@@ -1118,10 +1204,20 @@ def contains_gateway_lifecycle_command_or_referenced_script(
             exc_info=True,
         )
         try:
-            return _direct_lifecycle_scan(command)
+            return _direct_lifecycle_scan(command), None
         except Exception:
             # If even the data-argument masker fails, fall to raw regex + submit scan: stay total.
-            return contains_gateway_lifecycle_command(command) or contains_launchctl_submit_command(command)
+            return (contains_gateway_lifecycle_command(command)
+                    or contains_launchctl_submit_command(command)), None
+
+
+def contains_gateway_lifecycle_command_or_referenced_script(
+    command: str, *, cwd: Optional[str] = None,
+    read_remote_script: Optional[_ReadRemoteScriptFn] = None,
+) -> bool:
+    """Detect lifecycle/submit commands, including bounded nested scripts (see
+    ``scan_gateway_lifecycle`` for the contract)."""
+    return scan_gateway_lifecycle(command, cwd=cwd, read_remote_script=read_remote_script)[0]
 
 
 def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None) -> None:
@@ -1131,6 +1227,7 @@ def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None)
     propagate."""
     combined = prompt or ""
     python_script = False
+    refusal: Optional[str] = None
     if script:
         resolved_script = _resolve_script_path(script)
         # Attribute the refusal correctly: not a lifecycle command, but a cloud path never opened.
@@ -1149,24 +1246,34 @@ def check_gateway_lifecycle(prompt: Optional[str], script: Optional[str] = None)
                 "(e.g. ~/.hermes/scripts/) and recreate the job."
             )
         python_script = resolved_script is not None and resolved_script.suffix == ".py"
-        script_text = _read_script_for_scanning(script)
+        script_text, refusal = _read_script_for_scanning(script)
         if script_text:
             combined = f"{combined}\n{script_text}"
 
-    if python_script:
+    if refusal:
+        unsafe = True
+    elif python_script:
         # Python runs via the interpreter, never a POSIX shell, and the shell reference walk is a
         # false-positive generator on Python sources (pathlib "/" resolves to the filesystem root).
-        # The regex still scans the full text; non-regular/oversized files fail closed (sentinel).
+        # The regex still scans the full text; non-regular/oversized files fail closed above (named refusal).
         # The data-exemption masker tokenizes with shlex, so it is charged against the walk budget.
         # The direct command regex below still scans the full text, so a literal `qubit gateway restart`
         # embedded in a .py script is still blocked. See #77131, #78398.
-        if not _LifecycleScanBudget().charge_text(combined):
-            unsafe = _budget_exhausted("text", 0)
+        budget = _LifecycleScanBudget()
+        if not budget.charge_text(combined):
+            unsafe = _budget_exhausted(budget, "text", 0)
+            refusal = budget.refusal
         else:
             unsafe = _lifecycle_command_scan_with_data_exemption(combined)
     else:
-        unsafe = contains_gateway_lifecycle_command_or_referenced_script(
+        unsafe, refusal = scan_gateway_lifecycle(
             combined, cwd=_resolve_script_directory(script) if script else None
+        )
+    if unsafe and refusal:
+        raise GatewayLifecycleBlocked(
+            f"Blocked: the lifecycle guard could not scan this cron job or referenced script: {refusal}. "
+            "Nothing in the job is known to contain a gateway lifecycle command, but a script "
+            "the job executes must be scannable (a regular text file under 1 MiB) before it can run."
         )
     if unsafe:
         raise GatewayLifecycleBlocked(

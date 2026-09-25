@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -9,7 +10,7 @@ from pathlib import Path
 
 
 def test_oneshot_replaces_lone_surrogate_and_exits_zero():
-    """qubit -z must print U+FFFD and exit 0 when the model returns U+D800."""
+    """hermes -z must print U+FFFD and exit 0 when the model returns U+D800."""
     program = textwrap.dedent(
         """
         import qubit_cli.oneshot as oneshot
@@ -35,5 +36,5 @@ def test_oneshot_replaces_lone_surrogate_and_exits_zero():
     # U+FFFD as UTF-8; no raw surrogate bytes
     assert "\ufffd".encode("utf-8") in result.stdout
     assert b"answer " in result.stdout
-    assert b" here\n" in result.stdout
+    assert (" here" + os.linesep).encode("ascii") in result.stdout
     assert b"Traceback" not in result.stderr

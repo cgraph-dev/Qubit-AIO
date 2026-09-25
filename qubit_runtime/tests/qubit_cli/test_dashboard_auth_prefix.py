@@ -431,7 +431,7 @@ class TestCookiePathRespectsPrefix:
         # The PKCE cookie name carries the __Secure- prefix.
         pkce_candidates = [
             c for c in cookies
-            if c.startswith("__Secure-qubit_session_pkce=")
+            if c.startswith("__Secure-hermes_session_pkce=")
         ]
         assert pkce_candidates, (
             f"PKCE cookie missing __Secure- prefix: {cookies!r}"
@@ -458,7 +458,7 @@ class TestCookiePathRespectsPrefix:
         r = client.get("/set")
         cookies = r.headers.get_list("set-cookie")
         # Bare cookie name, no prefix.
-        assert any(c.startswith("qubit_session_pkce=") for c in cookies), (
+        assert any(c.startswith("hermes_session_pkce=") for c in cookies), (
             f"Loopback cookie should be bare-named: {cookies!r}"
         )
         # And no __Host- / __Secure- variant accidentally emitted.
@@ -496,10 +496,10 @@ class TestCookiePathRespectsPrefix:
         )
         pkce_set = next(
             c for c in r1.headers.get_list("set-cookie")
-            if "qubit_session_pkce" in c
+            if "hermes_session_pkce" in c
         )
-        # Parse "__Secure-qubit_session_pkce=...; HttpOnly; ...".
-        pkce_kv = pkce_set.split(";", 1)[0]  # "__Secure-qubit_session_pkce=value"
+        # Parse "__Secure-hermes_session_pkce=...; HttpOnly; ...".
+        pkce_kv = pkce_set.split(";", 1)[0]  # "__Secure-hermes_session_pkce=value"
         state = r1.headers["location"].split("state=")[1]
 
         # Round-trip the cookie by hand because TestClient's jar won't
@@ -517,7 +517,7 @@ class TestCookiePathRespectsPrefix:
         cookies = r2.headers.get_list("set-cookie")
         at_cookies = [
             c for c in cookies
-            if c.startswith("__Secure-qubit_session_at=")
+            if c.startswith("__Secure-hermes_session_at=")
         ]
         assert at_cookies, (
             f"session_at missing __Secure- prefix: {cookies!r}"

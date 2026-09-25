@@ -52,9 +52,9 @@ def _write_plugin(root: Path, name: str, body: str) -> None:
     )
 
 
-def _run_probe(hermes_home: Path, code: str) -> subprocess.CompletedProcess:
+def _run_probe(qubit_home: Path, code: str) -> subprocess.CompletedProcess:
     env = os.environ.copy()
-    env["QUBIT_HOME"] = str(hermes_home)
+    env["QUBIT_HOME"] = str(qubit_home)
     env.pop("HERMES_PROFILE", None)
     env["PYTHONPATH"] = os.pathsep.join(
         [str(REPO_ROOT), env.get("PYTHONPATH", "")]
@@ -71,11 +71,11 @@ def _run_probe(hermes_home: Path, code: str) -> subprocess.CompletedProcess:
 
 
 def test_plugins_discovered_after_auth_import_resolve(tmp_path):
-    hermes_home = tmp_path / ".hermes"
+    qubit_home = tmp_path / ".hermes"
     # Sorted first: a plugin whose imports drag qubit_cli.auth in mid-discovery
     # (any plugin importing agent.credential_pool or similar does this).
     _write_plugin(
-        hermes_home,
+        qubit_home,
         "aaa-early-probe",
         "import qubit_cli.auth  # noqa: F401 — simulate a core-importing plugin\n"
         + _PLAIN_PROFILE.format(
@@ -84,7 +84,7 @@ def test_plugins_discovered_after_auth_import_resolve(tmp_path):
     )
     # Sorted last: an ordinary plugin discovered after that import.
     _write_plugin(
-        hermes_home,
+        qubit_home,
         "zzz-late-probe",
         _PLAIN_PROFILE.format(
             name="zzz-late-probe", alias="zzz-alias", env="ZZZ_LATE_PROBE_KEY"
@@ -92,7 +92,7 @@ def test_plugins_discovered_after_auth_import_resolve(tmp_path):
     )
 
     probe = _run_probe(
-        hermes_home,
+        qubit_home,
         "import providers\n"
         "names = {p.name for p in providers.list_providers()}\n"
         "assert {'aaa-early-probe', 'zzz-late-probe'} <= names, names\n"

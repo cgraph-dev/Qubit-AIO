@@ -80,7 +80,7 @@ _EDIT_FORMAT_GUIDANCE: dict[str, tuple[tuple[str, ...], str]] = {
     ),
 }
 
-# Operating brief. Tool names referenced here are in the coding toolset and _HERMES_CORE_TOOLS.
+# Operating brief. Tool names referenced here are in the coding toolset and _QUBIT_CORE_TOOLS.
 CODING_AGENT_GUIDANCE = (
     "You are a coding agent pairing with the user inside their codebase. "
     "Operate like a careful senior engineer.\n"

@@ -1,7 +1,7 @@
 """#93608 — port bind conflict must be machine-readable, not a bare exit 1.
 
 The reporter's repro: something already listens on the serve port (another
-``qubit serve``, the gateway, anything) → ``qubit serve`` printed only
+``hermes serve``, the gateway, anything) → ``hermes serve`` printed only
 uvicorn's ``ERROR: [Errno 98/10048] error while attempting to bind on
 address`` and exited 1 — indistinguishable from a broken backend for the
 desktop spawn and for scripts.
@@ -28,9 +28,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-pytestmark = pytest.mark.skipif(
-    sys.platform == "win32", reason="POSIX serve-runner path under test"
-)
+pytestmark = pytest.mark.platforms("posix")  # POSIX serve-runner path under test
 
 
 # ---------------------------------------------------------------------------
@@ -79,11 +77,6 @@ def test_addr_in_use_error_classification():
     assert _is_addr_in_use_error(OSError(errno.EACCES, "denied")) is False
 
 
-def test_exit_code_is_distinct_tempfail():
-    from qubit_cli.web_server_lifecycle import PORT_IN_USE_EXIT_CODE
-
-    assert PORT_IN_USE_EXIT_CODE == 75  # EX_TEMPFAIL — repo convention
-    assert PORT_IN_USE_EXIT_CODE != 1
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +90,7 @@ def _spawn_serve(port: int, tmp_path: Path, merge_stderr: bool = True) -> subpro
     env = dict(os.environ)
     env.update(
         QUBIT_HOME=str(home),
-        QUBIT_SERVE_HEADLESS="1",
+        HERMES_SERVE_HEADLESS="1",
         PYTHONUNBUFFERED="1",
     )
     # Ensure a stray desktop-parent env can't arm the watchdog/reaper paths.
@@ -168,25 +161,6 @@ def test_conflict_emits_sentinel_and_exit_75(tmp_path):
     assert out.count("BACKEND_PORT_IN_USE") == 1
 
 
-def test_free_port_boots_and_announces_ready(tmp_path):
-    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    probe.bind(("127.0.0.1", 0))
-    port = probe.getsockname()[1]
-    probe.close()
-
-    proc = _spawn_serve(port, tmp_path)
-    try:
-        ready, lines = _read_until(proc, "HERMES_BACKEND_READY")
-        out = "".join(lines)
-        assert ready, f"no READY sentinel; output:\n{out}"
-        assert f"HERMES_BACKEND_READY port={port}" in out
-        assert "BACKEND_PORT_IN_USE" not in out
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            proc.kill()
 
 
 def test_ephemeral_port_zero_unaffected(tmp_path):

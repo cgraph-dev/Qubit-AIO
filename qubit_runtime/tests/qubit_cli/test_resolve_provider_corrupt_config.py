@@ -39,7 +39,7 @@ VALID_YAML = "gateway:\n  enabled: false\n"
 
 
 def _setup_home(tmp_path, monkeypatch, config_text):
-    home = tmp_path / "qubit"
+    home = tmp_path / "hermes"
     home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
     cfg = home / "config.yaml"
@@ -59,7 +59,7 @@ class TestParseFailureProbe:
         _home, _cfg = _setup_home(tmp_path, monkeypatch, CORRUPT_YAML)
         _load_config_fresh()
 
-        from qubit_cli.config import get_active_config_parse_failure
+        from qubit_cli.config_read_errors import get_active_config_parse_failure
 
         err = get_active_config_parse_failure()
         assert err, "expected an active parse failure to be reported"
@@ -68,7 +68,7 @@ class TestParseFailureProbe:
         _home, cfg = _setup_home(tmp_path, monkeypatch, CORRUPT_YAML)
         _load_config_fresh()
 
-        from qubit_cli.config import get_active_config_parse_failure
+        from qubit_cli.config_read_errors import get_active_config_parse_failure
 
         assert get_active_config_parse_failure()
         cfg.write_text(VALID_YAML)  # user fixes the YAML — different size/mtime
@@ -78,7 +78,7 @@ class TestParseFailureProbe:
         _setup_home(tmp_path, monkeypatch, VALID_YAML)
         _load_config_fresh()
 
-        from qubit_cli.config import get_active_config_parse_failure
+        from qubit_cli.config_read_errors import get_active_config_parse_failure
 
         assert get_active_config_parse_failure() is None
 

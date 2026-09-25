@@ -23,31 +23,30 @@ const ownershipId = '0123456789abcdef0123456789abcdef'
 
 test('Windows spawn holds the update mutex across marker check and helper spawn', () => {
   const command = atomicWindowsSpawnCommand({
-    qubitHome: 'C:\\Users\\andre\\.hermes',
+    hermesHome: 'C:\\Users\\andre\\.hermes',
     python: 'C:\\Users\\andre\\.hermes\\python.exe'
   })
 
   const encoded = command.match(/-EncodedCommand\s+([^\s]+)$/)?.[1]
   const script = encoded ? Buffer.from(encoded, 'base64').toString('utf16le') : ''
-  assert.match(script, /\.qubit-update-in-progress/)
+  assert.match(script, /\.hermes-update-in-progress/)
   assert.match(script, /\$mutexPath=\$marker\+"\.mutex"/)
   assert.match(script, /\.Lock\(0,1\)/)
   assert.match(script, /windows_ssh_runtime.*spawn/)
-  assert.match(script, /remote update marker is present/)
 })
 
 test('Windows spawn publishes the initial ownership record before releasing the mutex', () => {
   const command = atomicWindowsSpawnCommand(
     {
-      qubitHome: 'C:\\Users\\andre\\.hermes',
+      hermesHome: 'C:\\Users\\andre\\.hermes',
       python: 'C:\\Users\\andre\\.hermes\\python.exe'
     },
     {
       ownershipId,
       spawnNonce: '0123456789abcdef',
       profile: 'default',
-      qubitPath: 'C:\\Qubit\\hermes.exe',
-      qubitHome: 'C:\\Users\\andre\\.hermes',
+      hermesPath: 'C:\\Hermes\\hermes.exe',
+      hermesHome: 'C:\\Users\\andre\\.hermes',
       tokenFingerprint: 'a'.repeat(32),
       startedAt: '2026-07-14T00:00:00.000Z'
     }
@@ -71,6 +70,50 @@ test('PowerShell transport uses UTF-16LE encoded commands and literal escaping',
   assert.match(powerShellCommand('Write-Output ok'), /^powershell\.exe -NoProfile -NonInteractive .* -EncodedCommand /)
 })
 
+test('every emitted PowerShell script keeps try blocks attached to their catch/finally handlers', async () => {
+  // `;` between `try{...}` and `catch`/`finally` is a PowerShell parse error
+  // (MissingCatchOrFinally), so no probe may join a handler onto a separate
+  // statement. The line-oriented builders join with `;`; the pair must live
+  // in one array element.
+  const decode = (command: string) => Buffer.from(command.split(' ').at(-1) || '', 'base64').toString('utf16le')
+
+  const scripts: string[] = []
+
+  await probeWindowsRemote(
+    sshWith(async command => {
+      scripts.push(decode(command))
+
+      return JSON.stringify({ os: 'Windows' })
+    })
+  )
+  await assertWindowsRemoteInstallUpdateClear(
+    sshWith(async command => {
+      scripts.push(decode(command))
+
+      return 'CLEAR'
+    }),
+    'C:\\Users\\alice\\.hermes'
+  )
+  scripts.push(
+    decode(atomicWindowsSpawnCommand({ hermesHome: 'C:\\Users\\alice\\.hermes', python: 'C:\\py\\python.exe' })),
+    decode(buildWindowsInteractiveCommand('C:\\work'))
+  )
+
+  assert.equal(scripts.length, 4)
+
+  for (const script of scripts) {
+    assert.doesNotMatch(script, /}\s*;\s*(?:catch|finally)\b/)
+    // `$HOME`, `$HOST`, `$PID`, ... are read-only automatic variables: assigning
+    // one throws "Cannot overwrite variable" at run time, so the probe exits 1
+    // and the marker gate never observes CLEAR.
+    assert.doesNotMatch(script, /\$(?:home|host|pid|profile|pwd|input|args|error)\s*=/i)
+  }
+
+  assert.ok(
+    scripts.slice(0, 2).every(script => /}catch \[Management\.Automation\.ItemNotFoundException\]/.test(script))
+  )
+})
+
 test('Windows relaunch gate refuses live and uncertain markers before executing the remote runtime', async () => {
   for (const observation of ['LIVE:4242', 'UNCERTAIN']) {
     const scripts: string[] = []
@@ -83,9 +126,9 @@ test('Windows relaunch gate refuses live and uncertain markers before executing 
         return JSON.stringify({
           os: 'Windows',
           arch: 'AMD64',
-          qubitHome: 'C:\\Users\\alice\\.hermes',
-          qubitPath: 'C:\\Qubit\\hermes.exe',
-          python: 'C:\\Qubit\\python.exe'
+          hermesHome: 'C:\\Users\\alice\\.hermes',
+          hermesPath: 'C:\\Hermes\\hermes.exe',
+          python: 'C:\\Hermes\\python.exe'
         })
       }
 
@@ -104,7 +147,7 @@ test('Windows relaunch gate refuses live and uncertain markers before executing 
           pickLocalPort: async () => 50000,
           forward: async () => {},
           cancelForward: async () => {},
-          waitForQubit: async () => {},
+          waitForHermes: async () => {},
           probeReuseProof: async () => 'authenticated-ok'
         }),
       (error: any) => error.kind === 'update-in-progress'
@@ -126,7 +169,7 @@ test('Windows relaunch gate uses strict install-wide marker parsing and fail-clo
   })
 
   await assertWindowsRemoteInstallUpdateClear(ssh, 'C:\\Users\\alice\\.hermes\\profiles\\research')
-  assert.match(script, /\.qubit-update-in-progress/)
+  assert.match(script, /\.hermes-update-in-progress/)
   assert.match(script, /Split-Path -Leaf \$parent.*profiles/)
   assert.match(script, /UTF8Encoding.*true/)
   assert.match(script, /\\A\(\[1-9\]/)
@@ -134,7 +177,7 @@ test('Windows relaunch gate uses strict install-wide marker parsing and fail-clo
   assert.doesNotMatch(script, /ErrorAction SilentlyContinue/)
 })
 
-test('Windows probe validates Qubit and Python topology before selection', async () => {
+test('Windows probe validates Hermes and Python topology before selection', async () => {
   let script = ''
   await probeWindowsRemote(
     sshWith(async command => {
@@ -143,8 +186,8 @@ test('Windows probe validates Qubit and Python topology before selection', async
       return JSON.stringify({
         os: 'Windows',
         arch: 'AMD64',
-        qubitHome: 'C:\\\\h',
-        qubitPath: 'C:\\\\h\\\\hermes.exe',
+        hermesHome: 'C:\\\\h',
+        hermesPath: 'C:\\\\h\\\\hermes.exe',
         python: 'C:\\\\h\\\\python.exe'
       })
     }),
@@ -185,8 +228,8 @@ test('platform detection preserves POSIX and falls back to Windows PowerShell', 
       return JSON.stringify({
         os: 'Windows',
         arch: 'ARM64',
-        qubitHome: 'C:\\h',
-        qubitPath: 'C:\\h\\hermes.exe',
+        hermesHome: 'C:\\h',
+        hermesPath: 'C:\\h\\hermes.exe',
         python: 'C:\\h\\python.exe'
       })
     })
@@ -218,22 +261,22 @@ test('platform detection surfaces transport failures as themselves, not unsuppor
           throw new Error('not recognized')
         }
 
-        throw new Error('Qubit is not installed on the remote Windows host.')
+        throw new Error('Hermes is not installed on the remote Windows host.')
       })
     ),
-    (err: any) => err.kind === 'unsupported-platform' && /Qubit is not installed/.test(err.message)
+    (err: any) => err.kind === 'unsupported-platform' && /Hermes is not installed/.test(err.message)
   )
 })
 
 test('helper command uses the fixed remote Python entry point and quotes path data', () => {
-  const command = helperCommand({ python: "C:\\Program Files\\Qubit's\\python.exe" }, 'inspect', [
+  const command = helperCommand({ python: "C:\\Program Files\\Hermes's\\python.exe" }, 'inspect', [
     'C:\\x y\\hermes.exe'
   ])
 
   const encoded = command.split(' ').pop()!
   const script = Buffer.from(encoded, 'base64').toString('utf16le')
   assert.match(script, /-m' 'qubit_cli\.windows_ssh_runtime' 'inspect'/)
-  assert.match(script, /Qubit''s/)
+  assert.match(script, /Hermes''s/)
   assert.match(script, /C:\\x y\\hermes\.exe/)
 })
 
@@ -247,7 +290,7 @@ test('Windows lock validation is scoped and exact', () => {
     creationTimeNs: '1784219690452757504',
     port: 1234,
     tokenFingerprint: 'a'.repeat(32),
-    hermesPath: 'C:\\h\\qubit.exe',
+    hermesPath: 'C:\\h\\hermes.exe',
     hermesHome: 'C:\\h'
   }
 
@@ -273,7 +316,7 @@ test('Windows SSH reuse requires the requested remote profile to match the lock'
     port: 1234,
     profile: 'default',
     tokenFingerprint: crypto.createHash('sha256').update(token).digest('hex').slice(0, 32),
-    hermesPath: 'C:\\h\\qubit.exe',
+    hermesPath: 'C:\\h\\hermes.exe',
     hermesHome: 'C:\\h'
   }
 

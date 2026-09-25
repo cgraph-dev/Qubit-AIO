@@ -1,7 +1,13 @@
 import type { GatewayWsUrlResult } from '@hermes/shared'
+import type { HermesSkin } from '@hermes/shared/skin'
 import type { TranslucencyState } from '@hermes/shared/translucency'
 
+import type { ScreenshotApi } from '../electron/command-screenshot-types'
+import type { HudModifierApi } from '../electron/hud-modifier-types'
+import type { MachineProfile } from '../electron/machine-profile'
+import type { HermesNotification } from '../electron/notification-types'
 import type { PoolLimits } from '../electron/pool-limits'
+import type { GrowRequest } from '../electron/window-growth'
 
 import type { WakeIndicatorState } from './lib/wake-indicator'
 import type {
@@ -14,23 +20,25 @@ import type { QuickEntryStatePush, QuickEntryStatus, QuickEntrySubmitPayload } f
 
 export {}
 
+export type DesktopMachineProfile = MachineProfile
+
 declare global {
   interface Window {
-    qubitDesktop: {
+    hermesDesktop: {
       // Resolve a backend connection. Omit `profile` (or pass the primary) for
       // the window's backend; pass a named profile to lazily spawn/reuse that
       // profile's backend from the pool.
       getConnection: (
         profile?: string | null,
         opts?: { priority?: 'foreground' | 'background' }
-      ) => Promise<QubitConnection>
+      ) => Promise<HermesConnection>
       // Registry-scoped backend resolution: dial (connectionId, profile). An
       // empty/local connectionId delegates to the legacy getConnection path.
       getConnectionFor?: (payload: {
         connectionId?: null | string
         profile?: null | string
         priority?: 'foreground' | 'background'
-      }) => Promise<QubitConnection>
+      }) => Promise<HermesConnection>
       // Registry-scoped fresh WS URL (same result contract as getGatewayWsUrl).
       getGatewayWsUrlFor?: (payload: {
         connectionId?: null | string
@@ -50,8 +58,10 @@ declare global {
       // remote cache was dropped.
       revalidateConnection: () => Promise<{ ok: boolean; rebuilt: boolean }>
       // Keepalive: mark a pool profile backend as recently used so the idle
-      // reaper spares it while its chat is active.
-      touchBackend: (profile?: string | null) => Promise<{ ok: boolean }>
+      // reaper spares it while its chat is active. `activeTurn` reports whether
+      // a prompt turn leases the backend (early skip for cooperative
+      // retirement; the backend probe is the proof).
+      touchBackend: (profile?: string | null, options?: { activeTurn?: boolean }) => Promise<{ ok: boolean }>
       // Pool sizing (Settings → Advanced): device-local, live-applied by the
       // main process. get resolves the limits currently in force; set applies
       // (and persists) new ones, evicting/reaping to converge immediately.
@@ -77,9 +87,9 @@ declare global {
         opts?: { cwd?: string; profile?: string }
       ) => Promise<{ ok: boolean; error?: string }>
       // Open a new full-chrome app window — a peer instance of the primary that
-      // renders the complete app against the shared backend, so the user can run
-      // multiple GUI windows at once.
-      openWindow: () => Promise<{ ok: boolean; error?: string }>
+      // renders the complete app on an explicit connection/profile, or inherits
+      // the calling window's route when no options are supplied.
+      openWindow: (options?: DesktopProfileRoute) => Promise<{ ok: boolean; error?: string }>
       // Pop the in-app Browser (webview + address bar) into its own OS window.
       // `tabId` is the `$previewTabs` id; closing the window fires
       // `onBrowserPopoutClosed` so the caller can dock the tab again.
@@ -89,10 +99,30 @@ declare global {
       // reply). Resolves true for the first window to claim a key, false for
       // peers — so N open windows don't all fire the same cue.
       claimAmbientCue: (key: string) => Promise<boolean>
+      // Renderer-drawn min/max/close for WSLg (`custom` true there only), sent
+      // over hermes:window-control; Electron/OS chrome owns them elsewhere.
+      windowControls: {
+        custom: boolean
+        minimize: () => void
+        toggleMaximize: () => void
+        close: () => void
+      }
       wakeIndicator?: {
         getState: () => Promise<WakeIndicatorState>
         setState: (state: WakeIndicatorState) => void
         onState: (callback: (state: WakeIndicatorState) => void) => () => void
+      }
+      chatOnboarding?: {
+        grow: (request: GrowRequest) => void
+        soloBoot: () => void
+      }
+      introReveal?: {
+        open: (payload?: { hideMain?: boolean }) => Promise<{ ok: boolean }>
+        close: (payload?: { showMain?: boolean }) => Promise<{ ok: boolean }>
+        skip: () => void
+        ready: () => void
+        onSkip: (callback: () => void) => () => void
+        onClosed: (callback: () => void) => () => void
       }
       // The pop-out pet overlay: a transparent always-on-top window hosting only
       // the mascot. The main renderer drives it (open/close/drag + state push);
@@ -137,6 +167,9 @@ declare global {
         onCursor: (callback: (point: { x: number; y: number } | null) => void) => () => void
         onGameOverlay: (callback: (state: { active: boolean; app: string }) => void) => () => void
       }
+      // macOS native screenshot gesture; absent on other platforms.
+      screenshot?: ScreenshotApi
+      hudModifier?: HudModifierApi
       // Quick Entry: a global-hotkey mini composer window. Main owns the OS
       // shortcut registration + the persisted preference (it must restore the
       // shortcut on a cold launch without the renderer visiting Settings), so
@@ -192,7 +225,7 @@ declare global {
         // Drain/update/restore one Desktop-managed SSH install. External URL
         // and cloud sources are refused without touching their processes.
         updateManaged?: (id: string) => Promise<DesktopManagedConnectionUpdateResult>
-        // Fan out `qubit update` to every eligible registered connection;
+        // Fan out `hermes update` to every eligible registered connection;
         // cloud entries are skipped (platform-managed), each row independent.
         // excludeIds skips connections the caller updates through another
         // path (the everything-update flow's active backend + local client).
@@ -212,7 +245,7 @@ declare global {
       probeConnectionConfig: (remoteUrl: string) => Promise<DesktopConnectionProbeResult>
       oauthLoginConnectionConfig: (remoteUrl: string) => Promise<DesktopOauthLoginResult>
       oauthLogoutConnectionConfig: (remoteUrl: string) => Promise<DesktopOauthLogoutResult>
-      // Qubit Cloud: one portal login powers discovery + silent per-agent
+      // Hermes Cloud: one portal login powers discovery + silent per-agent
       // sign-in (cloud-auto-discovery Phase 3).
       cloud: {
         status: () => Promise<DesktopCloudStatus>
@@ -222,17 +255,20 @@ declare global {
         agentSignIn: (dashboardUrl: string) => Promise<DesktopCloudAgentSignInResult>
       }
       profile: {
+        getDefault: () => Promise<DesktopProfileRoute | null>
+        setDefault: (route: DesktopProfileRoute) => Promise<DesktopProfileRoute>
+        onDefaultChanged: (callback: (route: DesktopProfileRoute | null) => void) => () => void
         get: () => Promise<DesktopActiveProfile>
-        // Persists the profile used on the next Desktop launch without
-        // interrupting the live gateway workspace switch.
+        // Remembers last use without interrupting a live workspace switch or
+        // replacing an explicit default route.
         remember: (name: string | null) => Promise<DesktopActiveProfile>
         // Persists the desktop's profile choice and relaunches the local
         // backend under the new QUBIT_HOME (reloads the window). Pass null to
         // clear the preference.
         set: (name: string | null) => Promise<DesktopActiveProfile>
       }
-      api: <T>(request: QubitApiRequest) => Promise<T>
-      notify: (payload: QubitNotification) => Promise<boolean>
+      api: <T>(request: HermesApiRequest) => Promise<T>
+      notify: (payload: HermesNotification) => Promise<boolean>
       requestMicrophoneAccess: () => Promise<boolean>
       /** read_window_below tool: metadata for the OS window directly underneath this one (never pixels). */
       readWindowBelow?: () => Promise<{
@@ -254,12 +290,12 @@ declare global {
         get: () => Promise<{ defaultMaxMb: number; maxBytes: number; maxMb: number }>
         set: (maxMb: number) => Promise<{ defaultMaxMb: number; maxBytes: number; maxMb: number }>
       }
-      readFileText: (filePath: string) => Promise<QubitReadFileTextResult>
+      readFileText: (filePath: string) => Promise<HermesReadFileTextResult>
       /** Full-source read for runtime desktop plugins (readFileText truncates
        *  at the 512 KiB preview cap). Absent on older shells — callers fall
        *  back to readFileText and must reject a `truncated` result. */
-      readPluginSource?: (filePath: string) => Promise<QubitReadFileTextResult>
-      selectPaths: (options?: QubitSelectPathsOptions) => Promise<string[]>
+      readPluginSource?: (filePath: string) => Promise<HermesReadFileTextResult>
+      selectPaths: (options?: HermesSelectPathsOptions) => Promise<string[]>
       /** Native save dialog; returns the chosen path or null on cancel. */
       selectSavePath?: (options?: {
         defaultPath?: string
@@ -303,40 +339,65 @@ declare global {
         viewport?: { height: number; width: number }
         webContentsId: number
       }) => Promise<string>
+      savePastedText: (text: string) => Promise<string>
       saveClipboardImage: () => Promise<string>
       getPathForFile: (file: File) => string
-      normalizePreviewTarget: (target: string, baseDir?: string) => Promise<QubitPreviewTarget | null>
-      watchPreviewFile: (url: string) => Promise<QubitPreviewWatch>
+      normalizePreviewTarget: (target: string, baseDir?: string) => Promise<HermesPreviewTarget | null>
+      watchPreviewFile: (url: string) => Promise<HermesPreviewWatch>
       /** Watch a directory for entry churn (disk-plugin door); same watcher
        *  registry + onPreviewFileChanged channel as watchPreviewFile. Optional:
        *  older Electron shells predate it and fall back to the readdir poll. */
-      watchDirectory?: (dir: string) => Promise<QubitPreviewWatch>
+      watchDirectory?: (dir: string) => Promise<HermesPreviewWatch>
       stopPreviewFileWatch: (id: string) => Promise<boolean>
-      setActiveWork?: (payload: QubitActiveWork) => void
-      setTitleBarTheme?: (payload: QubitTitleBarTheme) => void
+      setActiveWork?: (payload: HermesActiveWork) => void
+      setTitleBarTheme?: (payload: HermesTitleBarTheme) => void
       setNativeTheme?: (mode: 'dark' | 'light' | 'system') => void
       /** Main-process fact: this OS can back glass with a native material. */
       glassSupported?: boolean
       /** Main-process fact: this OS can do any translucency at all (not Linux). */
       translucencySupported?: boolean
-      /** Launch flag: the app was started with --local, enabling the
-       *  local-models GUI surfaces. Absent/false = every local surface hides. */
+      /** Feature flag: the local-models UI is enabled. */
       localModelsEnabled?: boolean
+      /** Launch flag shared with every backend the app starts. */
+      guestOnboardingEnabled?: boolean
+      /** Sanitized local `display.skin`, available before any gateway connects. */
+      localSkin?: { profile: string; skin: HermesSkin } | null
+      /** Launch flag: skip the first-run film (HERMES_SKIP_INTRO=1 or
+       *  --skip-intro) so a fresh QUBIT_HOME lands on the guided chat. */
+      skipIntro?: boolean
       setTranslucency?: (payload: TranslucencyState) => void
       setKeepAwake?: (on: boolean) => void
+      minimizeToTray?: {
+        get: () => Promise<{ enabled: boolean; available: boolean }>
+        set: (on: boolean) => Promise<{ enabled: boolean; available: boolean }>
+        onChanged: (callback: (status: { enabled: boolean; available: boolean }) => void) => () => void
+      }
       setDisableF12?: (blocked: boolean) => void
+      setF12ShortcutActive?: (active: boolean) => void
+      onF12Shortcut?: (
+        callback: (input: {
+          alt?: boolean
+          code?: string
+          control?: boolean
+          key: string
+          meta?: boolean
+          repeat?: boolean
+          shift?: boolean
+        }) => void
+      ) => () => void
       setPreviewShortcutActive?: (active: boolean) => void
       openExternal: (url: string) => Promise<void>
+      onExternalOpenFailed?: (callback: (payload: ExternalOpenFailedPayload) => void) => () => void
       /** One-shot loopback callback listener for MCP OAuth against remote
        *  backends (electron/mcp-oauth-callback-ipc.ts): bind on THIS machine,
        *  pass redirectUri as client_redirect_uri to mcp.servers.oauth.start,
-       *  await the provider redirect, relay code/state via oauth.callback. */
+       *  await the provider redirect, relay code/state/iss via oauth.callback. */
       mcpOauth?: {
         listen: () => Promise<{ id: string; redirectUri: string }>
         wait: (
           id: string,
           timeoutMs?: number
-        ) => Promise<{ code: null | string; error: null | string; state: null | string }>
+        ) => Promise<{ code: null | string; error: null | string; iss: null | string; state: null | string }>
         cancel: (id: string) => Promise<boolean>
       }
       openPreviewInBrowser?: (url: string) => Promise<void>
@@ -366,7 +427,9 @@ declare global {
         message: string
         componentStack: string
       }) => void
-      readDir: (path: string) => Promise<QubitReadDirResult>
+      /** Append one raw line to desktop.log (fire-and-forget, notifyError path). */
+      logLine?: (line: string) => void
+      readDir: (path: string) => Promise<HermesReadDirResult>
       gitRoot?: (path: string) => Promise<string | null>
       // Reveal a path in the OS file manager (Finder / Explorer).
       revealPath?: (path: string) => Promise<boolean>
@@ -376,6 +439,8 @@ declare global {
       // resolved by Electron independently of the connected backend (#66899).
       // Created on demand; returns the normalized absolute path.
       desktopPluginsRoot?: () => Promise<string>
+      /** Refresh unified packages' desktop halves and return the touched paths. */
+      reconcileDesktopPlugins?: () => Promise<string[]>
       /** LOCAL `<QUBIT_HOME>/logs` (profile-aware) — error card "Open Logs". */
       logsRoot?: () => Promise<string>
       // Local AGENT-plugin root (<QUBIT_HOME>/plugins), same Electron-local
@@ -391,7 +456,7 @@ declare global {
       trashPath?: (path: string) => Promise<boolean>
       // Git-driven worktree management for the "Start work" flow.
       git?: {
-        worktreeList: (repoPath: string) => Promise<QubitGitWorktree[]>
+        worktreeList: (repoPath: string) => Promise<HermesGitWorktree[]>
         worktreeAdd: (
           repoPath: string,
           options?: { name?: string; branch?: string; base?: string; existingBranch?: string }
@@ -404,25 +469,25 @@ declare global {
         branchSwitch: (repoPath: string, branch: string) => Promise<{ branch: string }>
         // The local branches, plus the remote-tracking refs that have no local
         // branch, for the "convert a branch into a worktree" picker.
-        branchList: (repoPath: string) => Promise<QubitGitBranch[]>
+        branchList: (repoPath: string) => Promise<HermesGitBranch[]>
         // Local + remote-tracking branches for the "base branch" picker in the
         // new-worktree dialog. The remote default (origin/HEAD) is flagged so
         // the UI can preselect it.
-        baseBranchList: (repoPath: string) => Promise<QubitGitBaseBranch[]>
+        baseBranchList: (repoPath: string) => Promise<HermesGitBaseBranch[]>
         // Compact working-tree status for the composer coding rail. Null on a
         // non-repo / remote backend (where the Electron probe can't run).
-        repoStatus: (repoPath: string) => Promise<QubitRepoStatus | null>
+        repoStatus: (repoPath: string) => Promise<HermesRepoStatus | null>
         // Working-tree-vs-HEAD unified diff for one file (the preview's diff
         // view). Empty string when the file is unchanged or not in a repo.
         fileDiff: (repoPath: string, filePath: string) => Promise<string>
         // Codex-style review pane: changed files per scope, per-file diff, and
         // stage / unstage / revert.
         review: {
-          list: (repoPath: string, scope: QubitReviewScope, baseRef?: null | string) => Promise<QubitReviewList>
+          list: (repoPath: string, scope: HermesReviewScope, baseRef?: null | string) => Promise<HermesReviewList>
           diff: (
             repoPath: string,
             filePath: string,
-            scope: QubitReviewScope,
+            scope: HermesReviewScope,
             baseRef?: null | string,
             staged?: boolean
           ) => Promise<string>
@@ -435,15 +500,11 @@ declare global {
           // commit message. Reads only; empty strings off-repo.
           commitContext: (repoPath: string) => Promise<{ diff: string; recent: string }>
           push: (repoPath: string) => Promise<{ ok: boolean }>
-          shipInfo: (repoPath: string) => Promise<QubitReviewShipInfo>
+          shipInfo: (repoPath: string) => Promise<HermesReviewShipInfo>
           // The PR on each of the given branches — plus any known only by
           // number — for badging a list of sessions in one request instead of
           // one `pr view` per checkout.
-          prList: (repoPath: string, branches: string[], numbers?: number[]) => Promise<QubitRepoPullRequests>
-          // A pasted PR review/issue comment URL resolved to its structured
-          // context (author, body, file + line anchor, diff hunk). Null when
-          // gh can't answer — the paste stays a plain URL.
-          fetchPrComment: (repoPath: string, url: string) => Promise<QubitPrComment | null>
+          prList: (repoPath: string, branches: string[], numbers?: number[]) => Promise<HermesRepoPullRequests>
           createPr: (repoPath: string) => Promise<{ url: string }>
         }
         // Repo-first discovery: scan bounded roots for git repos (depth-capped).
@@ -460,9 +521,9 @@ declare global {
         cwd: (id: string) => Promise<string | null>
         dispose: (id: string) => Promise<boolean>
         onData: (id: string, callback: (payload: string) => void) => () => void
-        onExit: (id: string, callback: (payload: QubitTerminalExit) => void) => () => void
+        onExit: (id: string, callback: (payload: HermesTerminalExit) => void) => () => void
         resize: (id: string, size: { cols: number; rows: number }) => Promise<boolean>
-        start: (options?: { cols?: number; cwd?: string; rows?: number }) => Promise<QubitTerminalSession>
+        start: (options?: { cols?: number; cwd?: string; rows?: number }) => Promise<HermesTerminalSession>
         write: (id: string, data: string) => Promise<boolean>
       }
       reachPreviewUrl?: (url: string) => Promise<string>
@@ -496,15 +557,21 @@ declare global {
         repo?: string
         force?: boolean
       }) => Promise<{ ok: boolean; pluginName?: string; path?: string; error?: string }>
-      onWindowStateChanged?: (callback: (payload: QubitWindowState) => void) => () => void
+      /** Delete a STANDALONE desktop plugin folder (`<desktop-plugins root>/<name>`);
+       *  Electron re-checks containment and refuses unified-package halves. */
+      removeDesktopPlugin?: (payload: { name: string }) => Promise<{ ok: boolean; path?: string; error?: string }>
+      onWindowStateChanged?: (callback: (payload: HermesWindowState) => void) => () => void
       onFocusSession?: (callback: (sessionId: string) => void) => () => void
       onNotificationAction?: (callback: (payload: { actionId: string; sessionId?: string }) => void) => () => void
       /** Plugin (and other session-less) notification body/action activation. */
       onNotificationActivate?: (
         callback: (payload: { actionId?: string; activate?: string; notifyId?: string; tag?: string }) => void
       ) => () => void
-      onPreviewFileChanged: (callback: (payload: QubitPreviewFileChanged) => void) => () => void
+      onPreviewFileChanged: (callback: (payload: HermesPreviewFileChanged) => void) => () => void
       onBackendExit: (callback: (payload: BackendExit) => void) => () => void
+      // Cooperative pool retirement: main is stopping the pooled backend under
+      // `poolKey` for a foreground open. The renderer parks that scope.
+      onPoolBackendRetiring?: (callback: (payload: { poolKey: string }) => void) => () => void
       // Soft gateway-mode apply: primary backend was torn down without a window
       // reload. Wipe session lists (skeletons) and re-dial.
       onConnectionApplied?: (callback: () => void) => () => void
@@ -516,15 +583,20 @@ declare global {
       continueBootstrapLocal: () => Promise<{ ok: boolean }>
       recycleBackend?: (profile?: null | string) => Promise<{ ok: boolean }>
       resetBootstrap: () => Promise<{ ok: boolean }>
-      repairBootstrap: () => Promise<{ ok: boolean }>
+      repairBootstrap: () => Promise<{ ok: boolean; error?: string }>
       cancelBootstrap: () => Promise<{ ok: boolean; cancelled: boolean }>
       onBootstrapEvent: (callback: (payload: DesktopBootstrapEvent) => void) => () => void
-      getVersion: () => Promise<DesktopVersionInfo>
+      getVersion: (scope?: { connectionId?: string; profile?: string }) => Promise<DesktopVersionInfo>
+      getMachineProfile?: () => Promise<DesktopMachineProfile>
+      /** The latest pm/venv/plugin-operation receipt (machine-readable):
+       *  bisect disables, failed rebuilds, update-check results. null when
+       *  no venv operation has run yet. */
+      getSyncStatus: () => Promise<DesktopSyncReceipt | null>
       /** Restart the app in place — loads the swapped bundle when bundleSwapPending. */
       relaunchApp?: () => Promise<void>
       getRemoteDisplayReason?: () => Promise<string | null>
       updates: {
-        check: () => Promise<DesktopUpdateStatus>
+        check: (opts?: { force?: boolean }) => Promise<DesktopUpdateStatus>
         apply: (opts?: DesktopUpdateApplyOptions) => Promise<DesktopUpdateApplyResult>
         getBranch: () => Promise<{ branch: string }>
         setBranch: (name: string) => Promise<{ branch: string }>
@@ -580,36 +652,118 @@ export interface DesktopMarketplaceThemeResult {
   themes: DesktopMarketplaceThemeFile[]
 }
 
-export interface QubitTerminalSession {
+export interface HermesTerminalSession {
   cwd: string
   id: string
   shell: string
 }
 
-export interface QubitTerminalExit {
+export interface HermesTerminalExit {
   code: number | null
   signal: string | null
 }
 
+/** The pm receipt shape (pm/receipt.py schema 1) — one machine-readable
+ *  surface for venv rebuilds, plugin bisects, and update checks. Fields
+ *  are optional-typed: older/newer receipts may lack sections; readers
+ *  must degrade gracefully (the derive-* module does). */
+export interface DesktopSyncReceipt {
+  schema?: number
+  kind?: string
+  outcome?: string
+  exit_code?: number
+  started_at?: string
+  finished_at?: string
+  steps?: Array<{ name: string; ok: boolean; detail?: string; at?: string }>
+  venv_rebuild?: { ok: boolean; reason?: string } | null
+  pm_sync_outcome?: string
+  pm_steps?: DesktopSyncReceipt['steps']
+  pm_venv_rebuild?: DesktopSyncReceipt['venv_rebuild']
+  pm_plugin_bisect?: DesktopSyncReceipt['plugin_bisect']
+  plugin_bisect?: Array<{ plugin: string; action: string; reason: string }>
+  plugin_checks?: Array<{
+    name: string
+    class?: string
+    current?: string | null
+    latest?: string | null
+    update_available?: boolean | null
+    needs_fixing?: string | null
+    reason?: string
+  }>
+  feature_list?: string[] | null
+}
+
 export interface DesktopVersionInfo {
+  /** Packaged client version, or the runtime version for source installs. */
   appVersion: string
+  /** Fixed release identity. Commit builds have no update channel. */
+  channel?: string | null
   electronVersion: string
   nodeVersion: string
   platform: string
-  qubitRoot: string
+  hermesRoot: string
   /** True when the running renderer bundle predates desktop changes in the
    *  installed source tree (runtime updated, app binary not rebuilt/swapped). */
   bundleOutOfSync?: boolean
   /** Commits under apps/desktop/ the running bundle is missing (null unknown). */
   bundleCommitsBehind?: null | number
+  /** Build provenance from the install stamp (empty for packaged builds with
+   *  no stamp / a bare `app.getVersion()` fallback). */
+  baseVersion?: string
+  branch?: string | null
+  commit?: string | null
+  distance?: number
+  dirty?: boolean
+  source?: 'build' | 'commit-build' | 'ci' | 'docker' | 'fallback' | 'git' | 'local' | 'nix' | 'unknown'
+  distribution?: 'desktop-app' | 'docker' | 'nix'
+  /** Who applies the next update (from the stamp). Names the Store on a
+   *  Store-identity build — the Settings label keys off this, never
+   *  process.windowsStore (which also matches sideloaded MSIX). */
+  updateMechanism?: 'self' | 'app-installer' | 'electron-updater' | 'external' | 'microsoft-store'
+  /** The artifact kind of the desktop app carrying this info ('bootstrap' |
+   *  'bundled' | 'light'). 'bootstrap' is the old-style installer shell over
+   *  a managed checkout; the Distribution label keys on it. */
+  payload?: 'bootstrap' | 'bundled' | 'light'
+  /** True when the runtime checkout carries the bootstrap installers'
+   *  `.hermes-bootstrap-complete` receipt — install.sh / install.ps1 (or the
+   *  desktop first-launch bootstrap) created it, a manual clone did not. */
+  installedByScript?: boolean
+  /** sha16 of the canonical install-root path — the per-install channel key and
+   *  the shape `hermes update --install-id` prints. */
+  installId?: string
+  /** What this build carries (embedded / light / external) and where an
+   *  external backend resolved from. Bundled artifacts run their payload; light
+   *  artifacts have no runtime and only reach remote backends. */
+  hermesRuntime?: { type: 'embedded' } | { type: 'light' } | { type: 'external'; source?: RuntimeSource }
   /** True when the bundle on disk is newer than the running process — a plain
    *  app restart (no rebuild, no installer) is enough to load it. */
   bundleSwapPending?: boolean
 }
 
+/** Where an external build's backend came from. Mirrors the resolution ladder
+ *  in `resolveHermesBackend()`: `git` / `source` / sealed stewards are the
+ *  Python install methods from `installation.tree.install_method()`; the
+ *  Electron-only rungs (`hermes-root`, `path`, `system-python`, `bootstrap`)
+ *  are resolution facts the backend cannot see. Each variant carries the
+ *  location it resolved from, when there is one. */
+export type RuntimeSource =
+  | { type: 'hermes-root'; root: string } // HERMES_DESKTOP_HERMES_ROOT — explicit developer override
+  | { type: 'git'; root: string } // checkout at a managed install root, $QUBIT_HOME/hermes-agent
+  | { type: 'source'; root: string } // a git checkout anywhere else
+  | { type: 'docker'; root: string | null } // sealed tree stewarded by Docker
+  | { type: 'nix'; root: string | null } // sealed tree stewarded by Nix
+  | { type: 'desktop-app'; root: string | null } // sealed tree stewarded by the desktop bundle
+  | { type: 'desktop-bootstrap'; root: string } // canonical install created by the desktop first-launch bootstrap
+  | { type: 'unknown' } // no stamp, no .git — provenance cannot be told
+  | { type: 'path'; command: string } // an existing `hermes` CLI found on PATH
+  | { type: 'system-python'; command: string } // pip-installed qubit_cli on system Python
+  | { type: 'bootstrap' } // nothing usable yet; the first-launch installer runs
+
 export type DesktopUninstallMode = 'full' | 'gui' | 'lite'
 
 export interface DesktopUninstallSummary {
+  /** Local package ownership, resolved by Electron before offering removal. */
+  code_removal_allowed: boolean
   qubit_home: string
   agent_installed: boolean
   gui_installed: boolean
@@ -638,8 +792,19 @@ export interface DesktopUpdateCommit {
   at: number
 }
 
+export type UpdaterMechanismClient =
+  'app-installer' | 'electron-updater' | 'external' | 'microsoft-store' | 'windows-handoff' | 'posix-handoff' | 'manual'
+
 export interface DesktopUpdateStatus {
   supported: boolean
+  retirement?: {
+    state: 'discontinued'
+    destination: string
+    version: string
+    message?: string
+  }
+  /** Which mechanism owns updates for this install (see electron/updater). */
+  mechanism?: UpdaterMechanismClient
   updateAvailable?: boolean
   branch?: string
   currentBranch?: string
@@ -653,6 +818,10 @@ export interface DesktopUpdateStatus {
   currentSha?: string
   /** Backend only: the version string the backend reports for itself. */
   currentVersion?: string
+  /** The R2 channel name; independent of source branch and package version. */
+  channel?: string
+  /** The latest release tag on a release-feed channel, e.g. `v0.18.0`. */
+  latestTag?: string | null
   targetSha?: string
   commits?: DesktopUpdateCommit[]
   dirty?: boolean
@@ -661,34 +830,23 @@ export interface DesktopUpdateStatus {
 
 export type DesktopUpdateDirtyStrategy = 'abort' | 'stash' | 'force'
 
-export interface DesktopUpdateBlocker {
-  pid: number
-  name: string
-  cmdline: string
-  kind: 'local-preview' | 'other'
-  safeToStop: boolean
-  label?: string
-  port?: number
-  createTime?: number
-}
-
 export interface DesktopUpdateApplyOptions {
   dirtyStrategy?: DesktopUpdateDirtyStrategy
-  /** User confirmed that Desktop may stop freshly re-scanned safe local preview servers. */
-  stopSafeBlockers?: boolean
 }
 
 export interface DesktopUpdateApplyResult {
   ok: boolean
+  /** False when the apply-time check found nothing to install. */
+  updateAvailable?: boolean
   branch?: string
   error?: string
   message?: string
-  blockers?: DesktopUpdateBlocker[]
+
   /** True when no staged updater exists (CLI install) and the user should run
-   *  `qubit update` themselves. `command` is the exact line to run. */
+   *  `hermes update` themselves. `command` is the exact line to run. */
   manual?: boolean
   command?: string
-  qubitRoot?: string
+  hermesRoot?: string
   /** True when the backend was updated but the GUI couldn't be relaunched in
    *  place (AppImage / dev run): the new version loads on next launch. */
   backendUpdated?: boolean
@@ -746,10 +904,12 @@ export interface DesktopPluginProfileRoute {
   targetProfile: string
 }
 
-export interface QubitConnection {
+export interface HermesConnection {
   baseUrl: string
+  customWindowControls?: boolean
   darwinMajor?: number
   isFullscreen: boolean
+  isMaximized?: boolean
   // The live, RESOLVED connection mode. Only ever 'local' or 'remote' — a
   // 'cloud' saved-config entry resolves to a 'remote' connection under the hood
   // (cloud-auto-discovery Q3/Q6), so this never carries 'cloud'.
@@ -758,7 +918,7 @@ export interface QubitConnection {
   remoteHost?: string
   remoteIdentity?: string
   remoteKind?: 'cloud' | 'ssh' | 'url'
-  remoteQubitVersion?: string
+  remoteHermesVersion?: string
   nativeOverlayWidth: number
   source?: 'env' | 'local' | 'settings'
   token: string
@@ -785,24 +945,31 @@ export interface QubitConnection {
   windowButtonPosition: { x: number; y: number } | null
 }
 
-export interface QubitTitleBarTheme {
+export interface HermesTitleBarTheme {
   background: string
   foreground: string
 }
 
 /** Turns in flight, so the main process can confirm before a quit kills them. */
-export interface QubitActiveWork {
+export interface HermesActiveWork {
   count: number
   titles: string[]
 }
 
-export interface QubitWindowState {
+export interface HermesWindowState {
+  customWindowControls?: boolean
   darwinMajor?: number
   isFullscreen: boolean
+  isMaximized?: boolean
   isMinimized?: boolean
   isVisible?: boolean
   nativeOverlayWidth: number
   windowButtonPosition: { x: number; y: number } | null
+}
+
+export interface DesktopProfileRoute {
+  connectionId: null | string
+  profile: string
 }
 
 export interface DesktopActiveProfile {
@@ -813,7 +980,7 @@ export interface DesktopActiveProfile {
 
 export interface DesktopConnectionConfig {
   envOverride: boolean
-  // The saved connection mode. 'cloud' is a Qubit Cloud connection: it carries
+  // The saved connection mode. 'cloud' is a Hermes Cloud connection: it carries
   // a remote-shaped block (remoteUrl = the selected agent's dashboardUrl,
   // remoteAuthMode 'oauth') but is remembered as cloud so settings reopens into
   // the cloud picker. Resolution treats cloud exactly as remote
@@ -831,11 +998,12 @@ export interface DesktopConnectionConfig {
   // stored as plain text on disk (with an explicit opt-in).
   secureTokenStorage: boolean
   // Whether the currently-persisted remote token is stored with encoding
-  // 'plain' (i.e. plain text on disk in connection.json), which happens when
-  // the user opted in on a machine without secure storage.
+  // 'plain' AND this machine cannot secure it (plain text on disk in
+  // connection.json on a keyring-less machine). Stays false while keychain
+  // encryption is opted out — plain text is the chosen mode there.
   remoteTokenPlainText: boolean
   remoteUrl: string
-  // For a 'cloud' connection: the persisted Qubit Cloud org (slug or id) the
+  // For a 'cloud' connection: the persisted Hermes Cloud org (slug or id) the
   // connected instance was discovered under, so Settings → Gateway can reopen
   // into that org. Empty string for remote/local.
   cloudOrg: string
@@ -843,7 +1011,7 @@ export interface DesktopConnectionConfig {
   sshUser: string
   sshPort: number | null
   sshKeyPath: string
-  sshRemoteQubitPath: string
+  sshRemoteHermesPath: string
   sshRemoteProfile: string
 }
 
@@ -859,14 +1027,15 @@ export interface DesktopConnectionConfigInput {
   // user opt-in from the renderer.
   allowPlainTextToken?: boolean
   remoteUrl?: string
-  // For a 'cloud' connection: the selected Qubit Cloud org (slug or id) to
+  // For a 'cloud' connection: the selected Hermes Cloud org (slug or id) to
   // persist so Settings can reopen into it. Ignored for remote/local modes.
   cloudOrg?: string
+  cloudName?: string
   sshHost?: string
   sshUser?: string
   sshPort?: number | null
   sshKeyPath?: string
-  sshRemoteQubitPath?: string
+  sshRemoteHermesPath?: string
   sshRemoteProfile?: string
 }
 
@@ -887,8 +1056,8 @@ export interface DesktopConnectionTestResult {
     | null
   error?: string | null
   host?: string
-  remoteQubitPath?: string
-  remoteQubitVersion?: string
+  remoteHermesPath?: string
+  remoteHermesVersion?: string
   remotePlatform?: string
 }
 
@@ -910,7 +1079,7 @@ export interface DesktopRegistryConnection {
   user?: string
   port?: number
   keyPath?: string
-  remoteQubitPath?: string
+  remoteHermesPath?: string
   remoteProfile?: string
   tokenSet: boolean
   tokenPreview: null | string
@@ -961,7 +1130,7 @@ export interface DesktopRegistryConnectionInput {
   user?: string
   port?: null | number
   keyPath?: string
-  remoteQubitPath?: string
+  remoteHermesPath?: string
   remoteProfile?: string
 }
 
@@ -1062,10 +1231,16 @@ export interface DesktopConnectionProbeResult {
   error: string | null
 }
 
+export interface ExternalOpenFailedPayload {
+  url: string
+  message?: string
+}
+
 export interface DesktopOauthLoginResult {
   ok: boolean
   baseUrl: string
   connected: boolean
+  error?: string
 }
 
 export interface DesktopOauthLogoutResult {
@@ -1073,18 +1248,17 @@ export interface DesktopOauthLogoutResult {
   connected: boolean
 }
 
-// --- Qubit Cloud (cloud-auto-discovery Phase 3) ---
+// --- Hermes Cloud (cloud-auto-discovery Phase 3) ---
 
 export interface DesktopCloudStatus {
   // The portal base URL the desktop talks to (default or env-overridden).
   portalBaseUrl: string
-  // Whether the OAuth partition holds a live Qubit portal (Privy) session — the
-  // portal authenticates via Privy, so this reflects the privy-token cookie, NOT
-  // the hermes gateway session cookies. See cookiesHavePrivySession.
+  // Whether the OAuth partition holds portal access or renewal credentials
+  // (Privy or NAS). Discovery validates them with the portal.
   signedIn: boolean
 }
 
-// A discovered Qubit Cloud agent — the trimmed DTO from NAS GET /api/agents.
+// A discovered Hermes Cloud agent — the trimmed DTO from NAS GET /api/agents.
 export interface DesktopCloudAgent {
   id: string
   name: string
@@ -1125,7 +1299,7 @@ export interface DesktopCloudAgentSignInResult {
 export interface DesktopBootProgress {
   error: string | null
   fakeMode: boolean
-  /** True when the boot failure is a Qubit Cloud agent that is down (HTTP 502/503/504). */
+  /** True when the boot failure is a Nous Cloud agent that is down (HTTP 502/503/504). */
   isCloudBackendDown?: boolean
   message: string
   phase: string
@@ -1174,6 +1348,10 @@ export interface DesktopBootstrapUnsupportedPlatform {
 export interface DesktopBootstrapSetupChoice {
   platform: string
   activeRoot: string
+  /** What the local card represents: 'none' = installer offer; the rest = use existing. */
+  local: 'none' | 'installed' | 'bundled'
+  /** This artifact is a bundled install (payload ships in-app). */
+  bundled: boolean
 }
 
 export interface DesktopBootstrapState {
@@ -1186,6 +1364,8 @@ export interface DesktopBootstrapState {
   completedAt: number | null
   setupChoice: DesktopBootstrapSetupChoice | null
   unsupportedPlatform: DesktopBootstrapUnsupportedPlatform | null
+  /** This artifact is a bundled install (payload ships in-app). */
+  bundled: boolean
 }
 
 export type DesktopBootstrapEvent =
@@ -1195,6 +1375,8 @@ export type DesktopBootstrapEvent =
       active: boolean
       platform?: string
       activeRoot?: string
+      local?: DesktopBootstrapSetupChoice['local']
+      bundled?: boolean
     }
   | { type: 'manifest'; stages: DesktopBootstrapStageDescriptor[]; protocolVersion: number | null }
   | {
@@ -1216,7 +1398,7 @@ export type DesktopBootstrapEvent =
       docsUrl: string
     }
 
-export interface QubitApiRequest {
+export interface HermesApiRequest {
   path: string
   method?: string
   body?: unknown
@@ -1235,26 +1417,18 @@ export interface QubitApiRequest {
   // through the owning connection, not the local profile pool. Omit / '' to
   // keep the legacy profile-routed path; explicit 'local' forces this device.
   connectionId?: string | null
+  // Passive background read that must never cold-start a pooled backend (#103375).
+  // When true and the target profile has no warm pool entry, the main process
+  // fails fast without spawning a child or consuming a pool slot, so background
+  // tile reconciles cannot starve interactive opens.
+  passive?: boolean
+  // An interactive Settings scope selection may cold-start a profile backend.
+  // Keep that intent separate from passive hydration so the pool can reserve a
+  // slot for the user's visible request.
+  priority?: 'foreground'
 }
 
-export interface QubitNotification {
-  title?: string
-  body?: string
-  silent?: boolean
-  kind?: string
-  sessionId?: string
-  /** Dedupe discriminator for session-less notifications (e.g. plugin id). */
-  tag?: string
-  /** Absolute icon path for Electron `Notification`. */
-  icon?: string
-  /** Resolved hash-router path opened on body click (plugin / deeplink-compatible). */
-  activate?: string
-  /** Renderer handle for onActivate / onAction callbacks. */
-  notifyId?: string
-  actions?: { id: string; text: string; activate?: string }[]
-}
-
-export interface QubitPreviewTarget {
+export interface HermesPreviewTarget {
   binary?: boolean
   byteSize?: number
   kind: 'file' | 'url'
@@ -1269,7 +1443,7 @@ export interface QubitPreviewTarget {
   url: string
 }
 
-export interface QubitReadFileTextResult {
+export interface HermesReadFileTextResult {
   binary?: boolean
   byteSize?: number
   language?: string
@@ -1279,14 +1453,14 @@ export interface QubitReadFileTextResult {
   truncated?: boolean
 }
 
-export interface QubitPreviewWatch {
+export interface HermesPreviewWatch {
   id: string
   path: string
 }
 
 // A real git worktree as reported by `git worktree list` (source of truth for
 // the "Start work" flow), as opposed to the session-cwd-derived grouping above.
-export interface QubitGitWorktree {
+export interface HermesGitWorktree {
   path: string
   branch: null | string
   isMain: boolean
@@ -1300,7 +1474,7 @@ export interface QubitGitWorktree {
 // that a selection switches the main checkout, and does not make
 // `.worktrees/main`. `isRemote` means that a selection first makes a local
 // branch that tracks the remote one.
-export interface QubitGitBranch {
+export interface HermesGitBranch {
   name: string
   checkedOut: boolean
   isDefault: boolean
@@ -1312,7 +1486,7 @@ export interface QubitGitBranch {
 // refs. `isRemote` distinguishes `origin/main` from a local `main` (the UI
 // may show a remote glyph); `isDefault` flags origin/HEAD so the dialog can
 // preselect it.
-export interface QubitGitBaseBranch {
+export interface HermesGitBaseBranch {
   name: string
   isRemote: boolean
   isDefault: boolean
@@ -1320,7 +1494,7 @@ export interface QubitGitBaseBranch {
 
 // A single changed path from `git status --porcelain=v2`, classified by state
 // so the coding rail / switcher can group + open the right diff.
-export interface QubitRepoStatusFile {
+export interface HermesRepoStatusFile {
   path: string
   staged: boolean
   unstaged: boolean
@@ -1330,7 +1504,7 @@ export interface QubitRepoStatusFile {
 
 // Compact working-tree status for the composer coding rail (parsed from
 // `git status --porcelain=v2 --branch`).
-export interface QubitRepoStatus {
+export interface HermesRepoStatus {
   branch: null | string
   // The repo's trunk ("main" / "master" / …), so the UI can offer "branch off
   // the default" from anywhere. Null when no trunk is detected.
@@ -1349,16 +1523,16 @@ export interface QubitRepoStatus {
   added: number
   removed: number
   // Capped changed-file list (REPO_STATUS_FILE_CAP) for the diff/open actions.
-  files: QubitRepoStatusFile[]
+  files: HermesRepoStatusFile[]
 }
 
 // Diff scope for the review pane, mirroring Codex: uncommitted working-tree
 // changes, all changes vs the branch base, or everything since the current
 // turn began.
-export type QubitReviewScope = 'branch' | 'lastTurn' | 'uncommitted'
+export type HermesReviewScope = 'branch' | 'lastTurn' | 'uncommitted'
 
 // One changed file in the review pane (status letter, +/- lines, staged flag).
-export interface QubitReviewFile {
+export interface HermesReviewFile {
   path: string
   added: number
   removed: number
@@ -1367,15 +1541,15 @@ export interface QubitReviewFile {
   staged: boolean
 }
 
-export interface QubitReviewList {
-  files: QubitReviewFile[]
+export interface HermesReviewList {
+  files: HermesReviewFile[]
   // The resolved base ref the scope diffed against (branch merge-base / turn
   // baseline), or null for the uncommitted scope.
   base: null | string
 }
 
 // The branch's PR (if any) as reported by `gh pr view`.
-export interface QubitReviewPr {
+export interface HermesReviewPr {
   url: string
   state: string
   number: number
@@ -1383,7 +1557,7 @@ export interface QubitReviewPr {
 
 // One repo's PRs as reported by `gh pr list`, each tied to the branch it was
 // opened from — how a session row finds its own PR.
-export interface QubitBranchPullRequest {
+export interface HermesBranchPullRequest {
   branch: string
   draft: boolean
   number: number
@@ -1393,51 +1567,36 @@ export interface QubitBranchPullRequest {
   url: string
 }
 
-export interface QubitRepoPullRequests {
+export interface HermesRepoPullRequests {
   ghReady: boolean
-  prs: QubitBranchPullRequest[]
+  prs: HermesBranchPullRequest[]
 }
 
-// A PR review/issue comment resolved from a pasted GitHub URL — the composer's
-// review-comment attachment context. `path`/`line`/`diffHunk` are empty for
-// conversation-tab (issue) comments; `line` is null when the comment is
-// outdated and only `original_line` remained.
-export interface QubitPrComment {
-  author: string
-  body: string
-  diffHunk: string
-  kind: 'issue' | 'review'
-  line: null | number
-  path: string
-  prNumber: number
-  startLine: null | number
-  url: string
-}
 // gh availability/auth + the current branch's PR — drives the review pane's PR
 // button (disabled when gh isn't ready, "Open PR" vs "Create PR" otherwise).
-export interface QubitReviewShipInfo {
+export interface HermesReviewShipInfo {
   ghReady: boolean
-  pr: QubitReviewPr | null
+  pr: HermesReviewPr | null
 }
 
-export interface QubitReadDirEntry {
+export interface HermesReadDirEntry {
   name: string
   path: string
   isDirectory: boolean
 }
 
-export interface QubitReadDirResult {
-  entries: QubitReadDirEntry[]
+export interface HermesReadDirResult {
+  entries: HermesReadDirEntry[]
   error?: string
 }
 
-export interface QubitPreviewFileChanged {
+export interface HermesPreviewFileChanged {
   id: string
   path: string
   url: string
 }
 
-export interface QubitSelectPathsOptions {
+export interface HermesSelectPathsOptions {
   title?: string
   defaultPath?: string
   directories?: boolean

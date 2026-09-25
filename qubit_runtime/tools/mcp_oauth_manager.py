@@ -11,6 +11,7 @@ import asyncio
 import logging
 import re
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -40,7 +41,7 @@ class _ProviderEntry:
     pending_401: dict[str, "asyncio.Future[bool]"] = field(default_factory=dict)
 
 
-class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
+class HermesMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
     """OAuthClientProvider with pre-flow disk-mtime reload (external refreshes become visible to
     a running session), expiry seeding on cold load, pre-flight metadata discovery, dead-client
     registration detection and the bidirectional ``async_auth_flow`` bridge. Token-endpoint
@@ -78,22 +79,24 @@ class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
         ``expires_at``) makes the SDK refresh first. Metadata is restored from disk, else discovered
         pre-flight when we hold tokens but no metadata: otherwise ``_refresh_token`` guesses
         ``{server_url}/token`` (wrong for split-origin providers), 404s, and we fall to browser reauth."""
-        await super()._initialize()
+        await super()._initialize()  # QubitProviderMixin: restores metadata from disk, enforces issuer binding
         tokens = self.context.current_tokens
         if tokens is not None and tokens.expires_in is not None:
-            self.context.update_token_expiry(tokens)
-        storage = self._qubit_storage()
-        if storage is not None and self.context.oauth_metadata is None:
-            meta = storage.load_oauth_metadata()
-            if meta is not None:
-                self.context.oauth_metadata = meta
-                logger.debug("MCP OAuth '%s': restored metadata from disk (token_endpoint=%s)",
-                             self._qubit_server_name, meta.token_endpoint)
+            # The SDK maps a zero TTL to ``time.time()`` and accepts equality
+            # in ``is_token_valid()``.  On a cold load that same-tick boundary
+            # can send an already-expired access token instead of refreshing it.
+            if tokens.expires_in <= 0:
+                self.context.token_expiry_time = time.time() - 1
+            else:
+                self.context.update_token_expiry(tokens)
         if tokens is not None and self.context.oauth_metadata is None:
             try:
                 await self._prefetch_oauth_metadata()
             except Exception as exc:  # pragma: no cover — the SDK's 401-branch discovery runs next request
                 self._log_nonfatal("pre-flight metadata discovery", exc)
+            else:
+                from tools.mcp_oauth_provider import enforce_refresh_token_issuer
+                enforce_refresh_token_issuer(self.context)  # metadata (issuer) only just became known
 
     async def _prefetch_oauth_metadata(self) -> None:
         """Fetch PRM + ASM from the well-known endpoints before the first request, via the SDK's own URL
@@ -107,11 +110,12 @@ class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
             build_oauth_authorization_server_metadata_discovery_urls,
             build_protected_resource_metadata_discovery_urls, create_oauth_metadata_request,
             handle_auth_metadata_response, handle_protected_resource_response)
+        from tools.mcp_oauth_provider import stamp_default_user_agent
         server_url = self.context.server_url
 
         async def _send(client, url: str, label: str):
             try:
-                return await client.send(create_oauth_metadata_request(url))
+                return await client.send(stamp_default_user_agent(create_oauth_metadata_request(url)))
             except httpx.HTTPError as exc:
                 logger.debug("MCP OAuth '%s': %s discovery to %s failed: %s", self._qubit_server_name, label, url, exc)
                 return None
@@ -262,7 +266,7 @@ class QubitMCPOAuthProvider(QubitProviderMixin, *_SDK_BASES):
 
 
 # Cached at import time; None when the SDK's OAuth module is unavailable.
-_QUBIT_PROVIDER_CLS: Optional[type] = QubitMCPOAuthProvider if _SDK_BASES else None
+_HERMES_PROVIDER_CLS: Optional[type] = HermesMCPOAuthProvider if _SDK_BASES else None
 
 
 class MCPOAuthManager:
@@ -299,8 +303,8 @@ class MCPOAuthManager:
         return (str(home.expanduser().resolve(strict=False)), server_name)
 
     def _build_provider(self, server_name: str, entry: _ProviderEntry) -> Optional[Any]:
-        """Build a ``QubitMCPOAuthProvider``; None if the SDK's OAuth support is unavailable."""
-        if _QUBIT_PROVIDER_CLS is None:
+        """Build a ``HermesMCPOAuthProvider``; None if the SDK's OAuth support is unavailable."""
+        if _HERMES_PROVIDER_CLS is None:
             logger.warning("MCP OAuth '%s': SDK auth module unavailable", server_name)
             return None
         from tools.mcp_dashboard_oauth import get_dashboard_oauth_flow  # lazy: circular at import time
@@ -313,7 +317,7 @@ class MCPOAuthManager:
             raise OAuthNonInteractiveError(
                 f"MCP OAuth for '{server_name}': non-interactive environment and no cached tokens found. "
                 f"Run `qubit mcp login {server_name}` interactively first to complete initial authorization.")
-        return _QUBIT_PROVIDER_CLS(
+        return _HERMES_PROVIDER_CLS(
             server_name=server_name, preregistered=bool(cfg.get("client_id")), server_url=entry.server_url,
             **build_provider_kwargs(cfg, storage, ssh_proxy_hint=False))
 

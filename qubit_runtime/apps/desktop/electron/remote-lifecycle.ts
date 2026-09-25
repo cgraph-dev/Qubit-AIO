@@ -1,12 +1,12 @@
 /**
  * remote-lifecycle.ts
  *
- * Pure, electron-free remote Qubit dashboard lifecycle over SSH for Desktop
+ * Pure, electron-free remote Hermes dashboard lifecycle over SSH for Desktop
  * SSH remote mode. Composes an SshConnection (injected) with HTTP probes
  * through the established tunnel (injected fetch) and the served-token adoption
  * step (injected). Knows how to:
  *
- *   - locate the Qubit install on the remote (login-shell probe),
+ *   - locate the Hermes install on the remote (login-shell probe),
  *   - gate the remote platform to Linux/macOS via `uname`,
  *   - reuse an existing desktop-dedicated dashboard via a lockfile + an
  *     AUTHENTICATED /api/status probe (pid liveness alone is insufficient),
@@ -29,14 +29,14 @@ import crypto from 'node:crypto'
 
 import { READY_IN_MERGED_OUTPUT_RE } from './backend-ready'
 import { parseRemoteProfileListing } from './connection-registry'
-import { assertBootstrapNotSuperseded } from './ssh-connection'
+import { assertBootstrapNotSuperseded, withRemoteTimeout } from './ssh-connection'
 
 const LOCKFILE_SCHEMA_VERSION = 2
 // Bumped when the desktop<->dashboard reuse contract changes in a way that makes
 // an old running dashboard unsafe to reattach to (token handling, readiness/spawn
 // args, served-token reconciliation). A mismatch forces a clean respawn.
 const PROTOCOL_VERSION = 1
-const READY_RE = READY_IN_MERGED_OUTPUT_RE  // the remote log is `>> log 2>&1`: merged, not line-accurate
+const READY_RE = READY_IN_MERGED_OUTPUT_RE // the remote log is `>> log 2>&1`: merged, not line-accurate
 const REMOTE_LOCK_DIR = '~/.hermes/desktop-ssh'
 const SUPPORTED_REMOTE_OS = new Set(['Linux', 'Darwin'])
 const DEFAULT_READY_TIMEOUT_MS = 45_000
@@ -164,19 +164,20 @@ function expandRemotePath(p) {
   return shq(p)
 }
 
-// Resolve the remote qubit executable. An EXPLICIT path is honored strictly
+// Resolve the remote hermes executable. An EXPLICIT path is honored strictly
 // (throws a path-naming error if not executable — never silently falls back to a
 // different install). A BLANK path auto-detects: login-shell `command -v` (a
 // non-login `ssh host cmd` PATH misses user installs), then known install paths.
-async function locateQubit(ssh, remoteQubitPath) {
+async function locateHermes(ssh, remoteHermesPath) {
   const resolveLauncher = async (candidate: string) => {
-    // Return the candidate path directly. The qubit binary or wrapper script
+    // Return the candidate path directly. The hermes binary or wrapper script
     // is executable and handles argument forwarding (e.g. `exec <python> <script> "$@"`)
     // correctly on its own. Previously, this function followed `exec` wrappers and
     // returned only the python interpreter, which broke:
     //   - version checking: `<python> --version` printed "Python x.y.z" instead of
-    //     the Qubit version, and
+    //     the Hermes version, and
     //   - capability probing: `<python> serve --help` failed entirely.
+    // See https://github.com/NousResearch/hermes-agent/issues/74411
     return candidate
   }
 
@@ -191,13 +192,13 @@ async function locateQubit(ssh, remoteQubitPath) {
     }
   }
 
-  if (remoteQubitPath) {
-    if (await isExecutable(remoteQubitPath)) {
-      return resolveLauncher(remoteQubitPath)
+  if (remoteHermesPath) {
+    if (await isExecutable(remoteHermesPath)) {
+      return resolveLauncher(remoteHermesPath)
     }
 
     const err: any = new Error(
-      `The Qubit path you set is not an executable on the remote host: "${remoteHermesPath}". ` +
+      `The Hermes path you set is not an executable on the remote host: "${remoteHermesPath}". ` +
         'Check the path (it must be the full path to the `hermes` binary on the remote, e.g. ' +
         '~/hermes-agent/.venv/bin/hermes), or clear it to auto-detect.'
     )
@@ -235,21 +236,23 @@ async function locateQubit(ssh, remoteQubitPath) {
   }
 
   const err: any = new Error(
-    'Qubit is not installed on the remote host (could not find a `hermes` executable). ' +
-      'Install it on the remote (see https://github.com/cgraph-dev/qubit-voicebridge) ' +
-      '— or set the Qubit path explicitly in the SSH connection settings.'
+    'Hermes is not installed on the remote host (could not find a `hermes` executable). ' +
+      'Install it on the remote with:  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh  ' +
+      '— or set the Hermes path explicitly in the SSH connection settings.'
   )
 
   err.kind = 'hermes-not-found'
   throw err
 }
 
-// Probe the resolved binary's version string (first line of `<qubit> --version`,
-// e.g. "Qubit Agent v0.18.2 ..."), or '' on failure. Surfaces WHICH qubit a
+// Probe the resolved binary's version string (first line of `<hermes> --version`,
+// e.g. "Hermes Agent v0.18.2 ..."), or '' on failure. Surfaces WHICH hermes a
 // connection uses, so a stale/unexpected install is visible.
-async function probeQubitVersion(ssh, qubitPath) {
+async function probeHermesVersion(ssh, hermesPath) {
   try {
-    const out = (await ssh.exec(`${expandRemotePath(hermesPath)} --version 2>&1`)).trim()
+    // Watchdogged: a hung remote CLI must die remotely instead of orphaning
+    // when the local ssh child is SIGKILLed (#110478).
+    const out = (await ssh.exec(withRemoteTimeout(`${expandRemotePath(hermesPath)} --version 2>&1`))).trim()
 
     return (out.split('\n')[0] || '').trim()
   } catch {
@@ -264,7 +267,7 @@ async function probeRemotePlatform(ssh) {
 
   if (!SUPPORTED_REMOTE_OS.has(osName)) {
     const err: any = new Error(
-      `Unsupported remote platform "${osName || 'unknown'}". Qubit Desktop SSH mode supports Linux, macOS, and Windows remote hosts.`
+      `Unsupported remote platform "${osName || 'unknown'}". Hermes Desktop SSH mode supports Linux, macOS, and Windows remote hosts.`
     )
 
     err.kind = 'unsupported-platform'
@@ -277,13 +280,13 @@ async function probeRemotePlatform(ssh) {
 // The QUBIT_HOME the remote dashboard will use (explicit env wins, else
 // ~/.hermes). Recorded in the lockfile so a future reuse can tell it's the same
 // state store; best-effort.
-async function probeRemoteQubitHome(ssh) {
+async function probeRemoteHermesHome(ssh) {
   try {
     const out = (await ssh.exec('echo "${QUBIT_HOME:-$HOME/.hermes}"')).trim().split('\n').pop()
 
     return out || '~/.hermes'
   } catch (cause) {
-    const error: any = new Error('Could not resolve the remote Qubit home.')
+    const error: any = new Error('Could not resolve the remote Hermes home.')
     error.kind = 'transient-transport-error'
     error.cause = cause
     throw error
@@ -331,13 +334,13 @@ else:
  * Refuse normal SSH reuse/spawn while the remote install is being mutated.
  *
  * This probe intentionally uses only the host's system Python and raw marker
- * bytes; it never imports or executes code from the changing Qubit checkout.
+ * bytes; it never imports or executes code from the changing Hermes checkout.
  * Absence or a well-formed, confirmed-dead owner is clear. Every parse, read,
  * probe, or transport uncertainty fails closed so a Desktop relaunch cannot
  * start `serve` beside an updater that survived the old app process.
  */
-async function assertRemoteInstallUpdateClear(ssh, qubitHome) {
-  const home = assertSafeRemoteHome(qubitHome)
+async function assertRemoteInstallUpdateClear(ssh, hermesHome) {
+  const home = assertSafeRemoteHome(hermesHome)
   let observation = ''
 
   try {
@@ -347,7 +350,7 @@ async function assertRemoteInstallUpdateClear(ssh, qubitHome) {
         .split(/\r?\n/)
         .pop() || ''
   } catch (cause) {
-    const error: any = new Error('Could not prove that the remote Qubit install is clear for SSH startup.')
+    const error: any = new Error('Could not prove that the remote Hermes install is clear for SSH startup.')
     error.kind = 'update-in-progress'
     error.cause = cause
     throw error
@@ -361,23 +364,23 @@ async function assertRemoteInstallUpdateClear(ssh, qubitHome) {
 
   const error: any = new Error(
     live
-      ? `Remote Qubit update process ${live[1]} is still running; SSH startup is paused.`
-      : 'The remote Qubit update marker is unreadable or malformed; refusing SSH startup.'
+      ? `Remote Hermes update process ${live[1]} is still running; SSH startup is paused.`
+      : 'The remote Hermes update marker is unreadable or malformed; refusing SSH startup.'
   )
 
   error.kind = 'update-in-progress'
   throw error
 }
 
-async function listRemoteQubitProfiles(ssh) {
-  const home = assertSafeRemoteHome(await probeRemoteQubitHome(ssh))
+async function listRemoteHermesProfiles(ssh) {
+  const home = assertSafeRemoteHome(await probeRemoteHermesHome(ssh))
   const dir = expandRemotePath(`${home}/profiles`)
   let listing = ''
 
   try {
     listing = await ssh.exec(`if [ -d ${dir} ]; then ls -1 ${dir}; fi`)
   } catch (cause) {
-    const error: any = new Error('Could not list remote Qubit profiles.')
+    const error: any = new Error('Could not list remote Hermes profiles.')
     error.kind = 'transient-transport-error'
     error.cause = cause
     throw error
@@ -386,11 +389,42 @@ async function listRemoteQubitProfiles(ssh) {
   return parseRemoteProfileListing(listing)
 }
 
+async function readRemoteInstallId(ssh) {
+  // The stable backend identity the roster collapses on (`qubit_cli/install_identity.py`:
+  // `<install root>/install_id`, opaque hex). Read from the INSTALL root, so an ssh connection
+  // pinned to `<root>/profiles/<name>` reports the same id as one pointed at the root — they are
+  // one backend. Read-only: a missing file is left missing (minting identity is the install's job,
+  // never a visiting client's) and simply means "no id", exactly as an older backend reports.
+  const root = remoteInstallRoot(assertSafeRemoteHome(await probeRemoteHermesHome(ssh)))
+  const file = expandRemotePath(`${root}/install_id`)
+  let out = ''
+
+  try {
+    out = await ssh.exec(`if [ -f ${file} ]; then cat ${file}; fi`)
+  } catch (cause) {
+    const error: any = new Error('Could not read the remote Hermes install id.')
+    error.kind = 'transient-transport-error'
+    error.cause = cause
+    throw error
+  }
+
+  const id =
+    String(out || '')
+      .trim()
+      .split('\n')
+      .pop()
+      ?.trim()
+      .toLowerCase() ?? ''
+
+  // Same shape check the minting side guarantees; anything else is not an identity.
+  return /^[0-9a-f]{32}$/.test(id) ? id : undefined
+}
+
 function assertSafeRemoteHome(home) {
   const value = String(home || '').trim()
 
   if (!/^(\/|~\/)[A-Za-z0-9._/+-]+$/.test(value) || value.includes('..')) {
-    const error: any = new Error('Unsafe remote Qubit home.')
+    const error: any = new Error('Unsafe remote Hermes home.')
     error.kind = 'unsafe-path'
     throw error
   }
@@ -513,21 +547,58 @@ async function removeLockfile(ssh, ownershipId) {
   }
 }
 
+const PROBE_VERDICT_ATTEMPTS = 3
+const PROBE_VERDICT_RETRY_MS = 500
+
+// Liveness and ownership probes print exactly one of two sentinels. An exec
+// that resolves with neither — the channel died before the remote shell ran,
+// which is exactly the state of an SSH session mid-teardown right after the
+// served token was resolved — is indeterminate, not the negative verdict:
+// reading it as DEAD tore down a live backend as "exited while its served
+// token was being resolved", and reading it as FOREIGN skipped the reap while
+// still removing the lockfile, leaving one orphaned `serve --isolated` per
+// attempt (#111810). Retry over a short window; with no definite answer fail
+// closed with a transient error so callers keep the ownership record.
+async function execProbeVerdict(ssh, command, sentinels, failureMessage) {
+  for (let attempt = 0; attempt < PROBE_VERDICT_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, PROBE_VERDICT_RETRY_MS))
+    }
+
+    let out
+
+    try {
+      out = String((await ssh.exec(command)) || '').trim()
+    } catch (cause) {
+      const error: any = new Error(failureMessage)
+      error.kind = 'transient-transport-error'
+      error.cause = cause
+      throw error
+    }
+
+    if (sentinels.includes(out)) {
+      return out
+    }
+  }
+
+  const error: any = new Error(failureMessage)
+  error.kind = 'transient-transport-error'
+  throw error
+}
+
 async function remotePidAlive(ssh, pid) {
   if (!pid || !Number.isInteger(Number(pid))) {
     return false
   }
 
-  try {
-    const out = (await ssh.exec(`kill -0 ${Number(pid)} 2>/dev/null && echo ALIVE || echo DEAD`)).trim()
+  const verdict = await execProbeVerdict(
+    ssh,
+    `kill -0 ${Number(pid)} 2>/dev/null && echo ALIVE || echo DEAD`,
+    ['ALIVE', 'DEAD'],
+    'Could not verify the SSH backend process.'
+  )
 
-    return out === 'ALIVE'
-  } catch (cause) {
-    const error: any = new Error('Could not verify the SSH backend process.')
-    error.kind = 'transient-transport-error'
-    error.cause = cause
-    throw error
-  }
+  return verdict === 'ALIVE'
 }
 
 // Stable kernel process-start identity used to fence a later managed-update
@@ -575,72 +646,70 @@ async function pidIsOurDashboard(
   ssh,
   pid,
   spawnNonce,
-  qubitPath = '',
-  qubitHome = '',
+  hermesPath = '',
+  hermesHome = '',
   ownershipId = '',
   profile = ''
 ) {
-  if (!pid || !/^[0-9a-f]{16}$/.test(String(spawnNonce || '')) || !qubitPath) {
+  if (!pid || !/^[0-9a-f]{16}$/.test(String(spawnNonce || '')) || !hermesPath) {
     return false
   }
 
-  try {
-    const script =
-      'import os,shlex,subprocess,sys\n' +
-      `pid=${Number(pid)}\n` +
-      `expected=os.path.expanduser(${shq(hermesPath)})\n` +
-      // The installer-facing launcher is intentionally preserved for invocation
-      // (#74411), but it may `exec python <install-dir>/hermes`, leaving neither
-      // launcher nor QUBIT_HOME-derived entrypoint in argv. The ownership-scoped
-      // token path + random nonce + exact profile below are the alternative proof.
-      `hermes_home=os.path.expanduser(${shq(hermesHome)}) if ${shq(hermesHome)} else ""\n` +
-      'expected_entries={expected}\n' +
-      'if hermes_home:\n' +
-      ' expected_entries.add(os.path.join(hermes_home,"hermes-agent","venv","bin","hermes"))\n' +
-      `expected_token=os.path.expanduser(${shq(ownershipId ? spawnTokenPath(ownershipId, spawnNonce) : '')})\n` +
-      `expected_profile=${shq(profile)}\n` +
-      `nonce=${shq(spawnNonce)}\n` +
-      'try:\n' +
-      ' raw=open(f"/proc/{pid}/cmdline","rb").read()\n' +
-      ' args=[x.decode("utf-8","surrogateescape") for x in raw.split(b"\\0") if x]\n' +
-      'except OSError:\n' +
-      ' try:\n' +
-      '  line=subprocess.check_output(["ps","-ww","-o","command=","-p",str(pid)],text=True).strip()\n' +
-      ' except subprocess.CalledProcessError:\n' +
-      '  # pid already gone — a dead process is FOREIGN, not a transport error\n' +
-      '  print("FOREIGN");sys.exit(0)\n' +
-      ' args=shlex.split(line)\n' +
-      'ok=False\n' +
-      'try:\n' +
-      ' serve=args.index("serve")\n' +
-      ' owner=args.index("--ssh-owner-nonce",serve+1)\n' +
-      ' token=args.index("--ssh-session-token-file",serve+1) if expected_token else -1\n' +
-      ' isolated=args.index("--isolated",serve+1)\n' +
-      ' profile_arg=args.index("--profile") if expected_profile else -1\n' +
-      ' serve_count=args.count("serve")\n' +
-      ' owner_count=args.count("--ssh-owner-nonce")\n' +
-      ' token_count=args.count("--ssh-session-token-file")\n' +
-      ' isolated_count=args.count("--isolated")\n' +
-      ' profile_count=args.count("--profile")\n' +
-      ' direct=args[0] in expected_entries\n' +
-      ' python_entry=len(args)>1 and args[1] in expected_entries and os.path.basename(args[0]).startswith("python")\n' +
-      ' token_ok=not expected_token or args[token+1]==expected_token\n' +
-      ' isolated_ok=isolated_count==1 and isolated>serve\n' +
-      ' profile_ok=(profile_count==1 and profile_arg<serve and args[profile_arg+1]==expected_profile) if expected_profile else profile_count==0\n' +
-      ' spawn_proof=bool(expected_token) and owner_count==1 and token_count==1 and token_ok and profile_ok\n' +
-      ' ok=(direct or python_entry or spawn_proof) and serve_count==1 and isolated_ok and owner_count==1 and args[owner+1]==nonce and token_ok and profile_ok\n' +
-      'except (ValueError,IndexError):pass\n' +
-      'print("OWNED" if ok else "FOREIGN")'
+  const script =
+    'import os,shlex,subprocess,sys\n' +
+    `pid=${Number(pid)}\n` +
+    `expected=os.path.expanduser(${shq(hermesPath)})\n` +
+    // The installer-facing launcher is intentionally preserved for invocation
+    // (#74411), but it may `exec python <install-dir>/hermes`, leaving neither
+    // launcher nor QUBIT_HOME-derived entrypoint in argv. The ownership-scoped
+    // token path + random nonce + exact profile below are the alternative proof.
+    `qubit_home=os.path.expanduser(${shq(hermesHome)}) if ${shq(hermesHome)} else ""\n` +
+    'expected_entries={expected}\n' +
+    'if qubit_home:\n' +
+    ' expected_entries.add(os.path.join(qubit_home,"hermes-agent","venv","bin","hermes"))\n' +
+    `expected_token=os.path.expanduser(${shq(ownershipId ? spawnTokenPath(ownershipId, spawnNonce) : '')})\n` +
+    `expected_profile=${shq(profile)}\n` +
+    `nonce=${shq(spawnNonce)}\n` +
+    'try:\n' +
+    ' raw=open(f"/proc/{pid}/cmdline","rb").read()\n' +
+    ' args=[x.decode("utf-8","surrogateescape") for x in raw.split(b"\\0") if x]\n' +
+    'except OSError:\n' +
+    ' try:\n' +
+    '  line=subprocess.check_output(["ps","-ww","-o","command=","-p",str(pid)],text=True).strip()\n' +
+    ' except subprocess.CalledProcessError:\n' +
+    '  # pid already gone — a dead process is FOREIGN, not a transport error\n' +
+    '  print("FOREIGN");sys.exit(0)\n' +
+    ' args=shlex.split(line)\n' +
+    'ok=False\n' +
+    'try:\n' +
+    ' serve=args.index("serve")\n' +
+    ' owner=args.index("--ssh-owner-nonce",serve+1)\n' +
+    ' token=args.index("--ssh-session-token-file",serve+1) if expected_token else -1\n' +
+    ' isolated=args.index("--isolated",serve+1)\n' +
+    ' profile_arg=args.index("--profile") if expected_profile else -1\n' +
+    ' serve_count=args.count("serve")\n' +
+    ' owner_count=args.count("--ssh-owner-nonce")\n' +
+    ' token_count=args.count("--ssh-session-token-file")\n' +
+    ' isolated_count=args.count("--isolated")\n' +
+    ' profile_count=args.count("--profile")\n' +
+    ' direct=args[0] in expected_entries\n' +
+    ' python_entry=len(args)>1 and args[1] in expected_entries and os.path.basename(args[0]).startswith("python")\n' +
+    ' token_ok=not expected_token or args[token+1]==expected_token\n' +
+    ' isolated_ok=isolated_count==1 and isolated>serve\n' +
+    ' profile_ok=(profile_count==1 and profile_arg<serve and args[profile_arg+1]==expected_profile) if expected_profile else profile_count==0\n' +
+    ' spawn_proof=bool(expected_token) and owner_count==1 and token_count==1 and token_ok and profile_ok\n' +
+    ' ok=(direct or python_entry or spawn_proof) and serve_count==1 and isolated_ok and owner_count==1 and args[owner+1]==nonce and token_ok and profile_ok\n' +
+    'except (ValueError,IndexError):pass\n' +
+    'print("OWNED" if ok else "FOREIGN")'
 
-    const out = await ssh.exec(`python3 -c ${shq(script)}`)
+  const verdict = await execProbeVerdict(
+    ssh,
+    `python3 -c ${shq(script)}`,
+    ['OWNED', 'FOREIGN'],
+    'Could not verify SSH backend process ownership.'
+  )
 
-    return String(out || '').trim() === 'OWNED'
-  } catch (cause) {
-    const error: any = new Error('Could not verify SSH backend process ownership.')
-    error.kind = 'transient-transport-error'
-    error.cause = cause
-    throw error
-  }
+  return verdict === 'OWNED'
 }
 
 // Kill the stale dashboard ONLY if provably ours, then drop the lockfile.
@@ -658,8 +727,8 @@ async function cleanupStale(ssh, ownershipId, lock, pidAlive = true) {
       ssh,
       lock.pid,
       lock.spawnNonce,
-      lock.qubitPath,
-      lock.qubitHome,
+      lock.hermesPath,
+      lock.hermesHome,
       ownershipId,
       lock.profile
     ))
@@ -738,14 +807,14 @@ function buildOwnedStaleTerminationCommand(lock, ownershipId) {
   // expandRemotePath() output is already a shell-quoted fragment; embed it
   // raw so $HOME expands at assignment. Double-quoting stores the quote
   // characters in the variable and every identity match below REFUSEs.
-  const expectedPath = expandRemotePath(lock.qubitPath)
-  const expectedHome = lock.qubitHome ? expandRemotePath(lock.qubitHome) : "''"
+  const expectedPath = expandRemotePath(lock.hermesPath)
+  const expectedHome = lock.hermesHome ? expandRemotePath(lock.hermesHome) : "''"
   const expectedToken = expandRemotePath(spawnTokenPath(ownershipId, lock.spawnNonce))
   const nonce = shq(lock.spawnNonce)
   const profile = shq(lock.profile || '')
   const command = `$(ps -ww -o command= -p ${pid} 2>/dev/null || true)`
 
-  const executableMatch = lock.qubitHome
+  const executableMatch = lock.hermesHome
     ? `case "$cmd" in *"$path"*|*"$home"*) ;; *) printf REFUSED; exit 0;; esac; `
     : `case "$cmd" in *"$path"*) ;; *) printf REFUSED; exit 0;; esac; `
 
@@ -778,8 +847,8 @@ function lockMatchesManagedUpdateScope(lock, expected) {
     lock.startedAt === expected.startedAt &&
     lock.creationTime === expected.creationTime &&
     lock.profile === expected.profile &&
-    lock.qubitPath === expected.qubitPath &&
-    lock.qubitHome === expected.qubitHome
+    lock.hermesPath === expected.hermesPath &&
+    lock.hermesHome === expected.hermesHome
   )
 }
 
@@ -793,8 +862,8 @@ import os,select,shlex,signal,subprocess,sys,time
 pid=${pid}
 expected_creation=${py(lock.creationTime)}
 expected_path=os.path.expanduser(${py(lock.hermesPath)})
-hermes_home=os.path.expanduser(${py(lock.hermesHome)})
-expected_entries={expected_path,os.path.join(hermes_home,"hermes-agent","venv","bin","hermes")}
+qubit_home=os.path.expanduser(${py(lock.hermesHome)})
+expected_entries={expected_path,os.path.join(qubit_home,"hermes-agent","venv","bin","hermes")}
 expected_token=os.path.expanduser(${py(expectedToken)})
 expected_profile=${py(lock.profile)}
 nonce=${py(lock.spawnNonce)}
@@ -895,7 +964,7 @@ finally:
 // the marker check, spawns the backend, and publishes its initial lockfile.
 // Python keeps the descriptor close-on-exec by default and passes it explicitly
 // only to the intended outer shell; each detached child closes it before
-// execing Qubit. mutexPath is expandRemotePath() output — a complete shell
+// execing Hermes. mutexPath is expandRemotePath() output — a complete shell
 // word ("$HOME"'/…' or '/abs/…') embedded raw so $HOME expands remotely; a
 // second shq() would hand python the quote characters as part of the path.
 function withRemoteUpdateMutex(command, mutexPath) {
@@ -962,8 +1031,8 @@ async function terminateOwnedDashboardForUpdate(ssh, expected) {
       ssh,
       lock.pid,
       lock.spawnNonce,
-      lock.qubitPath,
-      lock.qubitHome,
+      lock.hermesPath,
+      lock.hermesHome,
       ownershipId,
       lock.profile
     ))
@@ -989,8 +1058,8 @@ async function terminateOwnedDashboardForUpdate(ssh, expected) {
       ssh,
       lock.pid,
       lock.spawnNonce,
-      lock.qubitPath,
-      lock.qubitHome,
+      lock.hermesPath,
+      lock.hermesHome,
       ownershipId,
       lock.profile
     ))
@@ -1037,8 +1106,8 @@ async function terminateOwnedDashboardForUpdate(ssh, expected) {
 // Detach so the backend survives the SSH channel closing: setsid (Linux)
 // starts a new session; macOS has no setsid, so fall back to nohup (HUP-immune;
 // fd-detachment is already handled by </dev/null + redirect + &).
-function buildSpawnCommand(qubitPath, profile, opts: any = {}) {
-  const qubit = expandRemotePath(qubitPath)
+function buildSpawnCommand(hermesPath, profile, opts: any = {}) {
+  const hermes = expandRemotePath(hermesPath)
   const profileArgs = profile ? `--profile ${shq(profile)} ` : ''
   const logPath = expandRemotePath(opts.logPath)
   const tokenFilePath = opts.tokenFilePath
@@ -1064,10 +1133,12 @@ function buildSpawnCommand(qubitPath, profile, opts: any = {}) {
 
   const dashCmd =
     `ulimit -n ${REMOTE_NOFILE_SOFT_LIMIT} 2>/dev/null || true; ` +
-    `exec env HERMES_DESKTOP=1 ${hermes} ${profileArgs}${subCmd}`
+    `exec env HERMES_DESKTOP=1${opts.guestOnboarding === true ? ' HERMES_GUEST_ONBOARDING=1' : ''} ${hermes} ${profileArgs}${subCmd}`
 
-  const detachedShell = `eval "exec $1>&-"; ${dashCmd} </dev/null >> ${logPath} 2>&1 & echo $!`
-  const detachedSpawn = `child=$("$(command -v setsid || echo nohup)" sh -c ${shq(detachedShell)} hermes-update-child "$1" & echo $!)`
+  const detachedShell: string = `eval "exec $1>&-"; ${dashCmd} </dev/null >> ${logPath} 2>&1 & echo $!`
+  // The inner shell backgrounds Hermes and reports its PID; backgrounding the
+  // launcher too adds its unrelated PID to the value published in the lock.
+  const detachedSpawn: string = `child=$("$(command -v setsid || echo nohup)" sh -c ${shq(detachedShell)} hermes-update-child "$1")`
 
   if (!opts.ownershipId || !opts.lockMetadata) {
     return withRemoteUpdateMutex(
@@ -1087,7 +1158,7 @@ function buildSpawnCommand(qubitPath, profile, opts: any = {}) {
   const reservationNonce = validateSpawnNonce(opts.reservationNonce || crypto.randomBytes(8).toString('hex'))
 
   return withRemoteUpdateMutex(
-    `umask 077 && mkdir -p "$(dirname ${reservation})"; ` +
+    `(umask 077 && mkdir -p "$(dirname ${reservation})"); ` +
       // reservation/lockPath/ownerPath are expandRemotePath() output — already
       // shell-quoted fragments ("$HOME"'/…'). Embed raw so the assignment
       // expands $HOME; shq() here would store the quote characters literally
@@ -1110,8 +1181,9 @@ function buildSpawnCommand(qubitPath, profile, opts: any = {}) {
       // ${var//pat/rep} is a bashism — this payload runs under plain sh (dash
       // on Ubuntu), which aborts the whole script on it with "Bad
       // substitution" AFTER the child was spawned, orphaning the backend and
-      // skipping the lockfile publication. Substitute with sed instead.
-      `lock_json=$(printf '%s' ${shq(metadata)} | sed "s/__PID__/\${child}/"); ` +
+      // skipping the lockfile publication. Replace the quoted PID field with
+      // a JSON number so readLockfile and concurrent spawns accept the record.
+      `lock_json=$(printf '%s' ${shq(metadata)} | sed "s/\\"pid\\":\\"__PID__\\"/\\"pid\\":\${child}/"); ` +
       `temporary_lock="\${lock}.${reservationNonce}.tmp"; ` +
       `printf '%s' "$lock_json" > "$temporary_lock" && mv -f "$temporary_lock" "$lock" || { kill "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; exit 76; }; ` +
       `echo "$child"`,
@@ -1119,11 +1191,14 @@ function buildSpawnCommand(qubitPath, profile, opts: any = {}) {
   )
 }
 
-async function remoteSupportsSshOwnership(ssh, qubitPath) {
-  const qubit = expandRemotePath(qubitPath)
+async function remoteSupportsSshOwnership(ssh, hermesPath) {
+  const hermes = expandRemotePath(hermesPath)
 
+  // The watchdog wraps the inner `serve --help` so the hung CLI is its direct
+  // child and dies remotely instead of orphaning (#110478). The `$( (` space
+  // is load-bearing: without it the shell parses `$((` as arithmetic expansion.
   const out = await ssh.exec(
-    `help="$(${hermes} serve --help 2>&1)"; ` +
+    `help="$( ${withRemoteTimeout(`${hermes} serve --help 2>&1`)} )"; ` +
       `printf '%s' "$help" | grep -q ssh-session-token-file && ` +
       `printf '%s' "$help" | grep -q ssh-owner-nonce && echo YES || echo NO`
   )
@@ -1170,12 +1245,20 @@ async function scrapeReadyPort(ssh, logPath, { timeoutMs = DEFAULT_READY_TIMEOUT
 
 async function spawnRemoteDashboard(
   ssh,
-  { qubitPath, profile, token, ownershipId, qubitHome = '~/.hermes', assertInstallClear = async () => {} }
+  {
+    hermesPath,
+    profile,
+    token,
+    ownershipId,
+    hermesHome = '~/.hermes',
+    guestOnboarding = false,
+    assertInstallClear = async () => {}
+  }
 ) {
-  if (!(await remoteSupportsSshOwnership(ssh, qubitPath))) {
+  if (!(await remoteSupportsSshOwnership(ssh, hermesPath))) {
     const err: any = new Error(
-      'The remote Qubit install does not support --ssh-session-token-file and --ssh-owner-nonce. ' +
-        'Update Qubit on the remote host to continue using Desktop SSH mode.'
+      'The remote Hermes install does not support --ssh-session-token-file and --ssh-owner-nonce. ' +
+        'Update Hermes on the remote host to continue using Desktop SSH mode.'
     )
 
     err.kind = 'update-required'
@@ -1235,11 +1318,12 @@ async function spawnRemoteDashboard(
     // process creation. The caller's probe imports no changing checkout code.
     await assertInstallClear()
     out = await ssh.exec(
-      buildSpawnCommand(qubitPath, profile, {
+      buildSpawnCommand(hermesPath, profile, {
         spawnNonce,
         tokenFilePath,
         logPath,
-        qubitHome,
+        hermesHome,
+        guestOnboarding,
         ownershipId,
         reservationNonce: spawnNonce,
         lockMetadata: {
@@ -1247,8 +1331,8 @@ async function spawnRemoteDashboard(
           spawnNonce,
           port: 0,
           profile,
-          qubitPath,
-          qubitHome,
+          hermesPath,
+          hermesHome,
           logPath,
           tokenFingerprint: fingerprintToken(token),
           protocolVersion: PROTOCOL_VERSION,
@@ -1380,31 +1464,32 @@ async function connect(deps) {
   const {
     ssh,
     profile = '',
-    remoteQubitPath = '',
+    remoteHermesPath = '',
     ownershipId,
     forward,
     pickLocalPort,
-    waitForQubit,
+    waitForHermes,
     probeReuseProof,
     adoptServedToken,
     rememberLog = () => {},
     readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS,
+    guestOnboarding = false,
     signal
   } = deps
 
   const log = msg => rememberLog(`[ssh-lifecycle] ${msg}`)
 
   assertBootstrapNotSuperseded(signal)
-  const platform = await probeRemotePlatform(ssh)
+  const platform = deps.platform ?? (await probeRemotePlatform(ssh))
   log(`remote platform ${platform.os}/${platform.arch}`)
-  const qubitHome = await probeRemoteQubitHome(ssh)
-  await assertRemoteInstallUpdateClear(ssh, qubitHome)
-  const qubitPath = await locateQubit(ssh, remoteQubitPath)
-  log(`located qubit at ${hermesPath}`)
-  const qubitVersion = await probeQubitVersion(ssh, qubitPath)
+  const hermesHome = await probeRemoteHermesHome(ssh)
+  await assertRemoteInstallUpdateClear(ssh, hermesHome)
+  const hermesPath = await locateHermes(ssh, remoteHermesPath)
+  log(`located hermes at ${hermesPath}`)
+  const hermesVersion = await probeHermesVersion(ssh, hermesPath)
 
-  if (qubitVersion) {
-    log(`remote qubit version: ${hermesVersion}`)
+  if (hermesVersion) {
+    log(`remote hermes version: ${hermesVersion}`)
   }
 
   const reuseToken = deps.reuseToken || ''
@@ -1420,7 +1505,7 @@ async function connect(deps) {
     )
 
     const error: any = new Error(
-      `The remote ownership record ${lpath} does not match this Qubit Desktop build (${lock.reason}). ` +
+      `The remote ownership record ${lpath} does not match this Hermes Desktop build (${lock.reason}). ` +
         'It was probably written by a different or modified desktop build sharing this remote, or the file is corrupt. ' +
         'Refusing to reap or overwrite it — that could kill a live SSH backend owned by another build. ' +
         'If nothing else uses this remote, delete that file on the remote host and reconnect.'
@@ -1439,8 +1524,8 @@ async function connect(deps) {
         ssh,
         lock.pid,
         lock.spawnNonce,
-        lock.qubitPath,
-        lock.qubitHome,
+        lock.hermesPath,
+        lock.hermesHome,
         ownershipId,
         lock.profile
       ))
@@ -1452,8 +1537,8 @@ async function connect(deps) {
       lock.profile === profile &&
       Boolean(reuseToken) &&
       lock.tokenFingerprint === fingerprintToken(reuseToken) &&
-      lock.qubitPath === qubitPath &&
-      lock.qubitHome === qubitHome
+      lock.hermesPath === hermesPath &&
+      lock.hermesHome === hermesHome
 
     if (reusable) {
       const creationTime = lock.creationTime || (await remoteProcessCreationTime(ssh, lock.pid))
@@ -1464,7 +1549,7 @@ async function connect(deps) {
       }
 
       assertBootstrapNotSuperseded(signal)
-      await assertRemoteInstallUpdateClear(ssh, qubitHome)
+      await assertRemoteInstallUpdateClear(ssh, hermesHome)
       const localPort = await openForward(deps, lock.port)
 
       try {
@@ -1483,7 +1568,7 @@ async function connect(deps) {
         if (reuseClassification === 'authenticated-stale') {
           assertBootstrapNotSuperseded(signal)
           await cancelForwardSafe(deps, localPort, lock.port)
-          await assertRemoteInstallUpdateClear(ssh, qubitHome)
+          await assertRemoteInstallUpdateClear(ssh, hermesHome)
           await cleanupStale(ssh, ownershipId, lock)
         } else if (reuseClassification === 'authenticated-ok') {
           const token = await adoptOwnedServedToken(
@@ -1507,12 +1592,12 @@ async function connect(deps) {
             pid: lock.pid,
             reused: true,
             platform,
-            qubitPath,
-            qubitVersion,
+            hermesPath,
+            hermesVersion,
             ownershipId,
             spawnNonce: lock.spawnNonce,
             logPath: lock.logPath,
-            qubitHome,
+            hermesHome,
             startedAt: lock.startedAt,
             creationTime: lock.creationTime || ''
           }
@@ -1527,22 +1612,23 @@ async function connect(deps) {
       }
     } else {
       assertBootstrapNotSuperseded(signal)
-      await assertRemoteInstallUpdateClear(ssh, qubitHome)
+      await assertRemoteInstallUpdateClear(ssh, hermesHome)
       await cleanupStale(ssh, ownershipId, lock, pidAlive)
     }
   }
 
   assertBootstrapNotSuperseded(signal)
-  await assertRemoteInstallUpdateClear(ssh, qubitHome)
+  await assertRemoteInstallUpdateClear(ssh, hermesHome)
   const spawnToken = mintToken()
 
   const spawned = await spawnRemoteDashboard(ssh, {
-    qubitPath,
+    hermesPath,
     profile,
     token: spawnToken,
     ownershipId,
-    qubitHome,
-    assertInstallClear: () => assertRemoteInstallUpdateClear(ssh, qubitHome)
+    hermesHome,
+    guestOnboarding,
+    assertInstallClear: () => assertRemoteInstallUpdateClear(ssh, hermesHome)
   })
 
   if (spawned.existing) {
@@ -1574,8 +1660,8 @@ async function connect(deps) {
     pid,
     port: 0,
     profile,
-    qubitPath,
-    qubitHome,
+    hermesPath,
+    hermesHome,
     logPath,
     tokenFingerprint: fingerprintToken(spawnToken),
     protocolVersion: PROTOCOL_VERSION,
@@ -1604,7 +1690,7 @@ async function connect(deps) {
     localPort = await openForward(deps, remotePort)
     assertBootstrapNotSuperseded(signal)
     const baseUrl = `http://127.0.0.1:${localPort}`
-    await waitForQubit(baseUrl, spawnToken)
+    await waitForHermes(baseUrl, spawnToken)
     assertBootstrapNotSuperseded(signal)
 
     const token = await adoptOwnedServedToken(adoptServedToken, baseUrl, spawnToken, ssh, pid, 'remote dashboard')
@@ -1623,12 +1709,12 @@ async function connect(deps) {
       pid,
       reused: false,
       platform,
-      qubitPath,
-      qubitVersion,
+      hermesPath,
+      hermesVersion,
       ownershipId,
       spawnNonce,
       logPath,
-      qubitHome,
+      hermesHome,
       startedAt: ownedSpawn.startedAt,
       creationTime: ownedSpawn.creationTime || ''
     }
@@ -1643,7 +1729,20 @@ async function connect(deps) {
       void 0
     }
 
-    await cleanupStale(ssh, ownershipId, ownedSpawn)
+    // This record IS the child this attempt spawned. A liveness probe that
+    // cannot be settled must not become "leave it running": assume alive so
+    // cleanupStale re-runs the ownership proof, which keeps the record when
+    // nothing can be proven and lets the next connect reap by exact ownership.
+    const pidAlive = await remotePidAlive(ssh, pid).catch(() => true)
+
+    try {
+      await cleanupStale(ssh, ownershipId, ownedSpawn, pidAlive)
+    } catch (cleanupError) {
+      // An unsettled ownership proof must not replace the boot failure the
+      // user needs to see; keep it reachable for diagnostics instead.
+      error.cleanupCause = cleanupError
+    }
+
     throw error
   }
 }
@@ -1662,19 +1761,20 @@ export {
   fingerprintToken,
   isForwardBindCollision,
   isLockfileSkew,
-  listRemoteQubitProfiles,
-  locateQubit,
+  listRemoteHermesProfiles,
+  locateHermes,
   LOCKFILE_SCHEMA_VERSION,
   lockfilePath,
   mintToken,
   openForward,
   ownershipDirectory,
   pidIsOurDashboard,
-  probeQubitVersion,
-  probeRemoteQubitHome,
+  probeHermesVersion,
+  probeRemoteHermesHome,
   probeRemotePlatform,
   PROTOCOL_VERSION,
   readLockfile,
+  readRemoteInstallId,
   READY_RE,
   REMOTE_LOCK_DIR,
   remotePidAlive,

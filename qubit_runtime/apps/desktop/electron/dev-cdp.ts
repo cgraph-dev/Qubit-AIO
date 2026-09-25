@@ -64,7 +64,7 @@ function resolveDevCdpPort({ env, isPackaged, devServer }: DevCdpInput): DevCdpD
     return { port: null, reason: 'no-dev-server' }
   }
 
-  const requested = (env.QUBIT_DESKTOP_CDP_PORT ?? '').trim()
+  const requested = (env.HERMES_DESKTOP_CDP_PORT ?? '').trim()
 
   if (!requested) {
     return { port: DEFAULT_PORT, reason: null }

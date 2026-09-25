@@ -15,18 +15,18 @@ TDD: enforce RED-GREEN-REFACTOR, tests before code.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/software-development\test-driven-development` |
+| Path | `skills/software-development/test-driven-development` |
 | Version | `1.1.0` |
-| Author | Qubit Agent (adapted from obra/superpowers) |
+| Author | Hermes Agent (adapted from obra/superpowers) |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `testing`, `tdd`, `development`, `quality`, `red-green-refactor` |
-| Related skills | [`systematic-debugging`](/docs/user-guide/skills/bundled/software-development/software-development-systematic-debugging), [`subagent-driven-development`](/docs/user-guide/skills/optional/software-development/software-development-subagent-driven-development) |
+| Related skills | [`systematic-debugging`](../../bundled/software-development/software-development-systematic-debugging.md), [`subagent-driven-development`](../../optional/software-development/software-development-subagent-driven-development.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Test-Driven Development (TDD)
@@ -317,7 +317,7 @@ Can't check all boxes? You skipped TDD. Start over.
 | Must mock everything | Code too coupled. Use dependency injection. |
 | Test setup huge | Extract helpers. Still complex? Simplify the design. |
 
-## Qubit Agent Integration
+## Hermes Agent Integration
 
 ### Running Tests
 

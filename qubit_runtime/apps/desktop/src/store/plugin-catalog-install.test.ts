@@ -45,8 +45,8 @@ describe('requestPluginCatalogInstallFromDeepLink', () => {
   })
 
   it.each([
-    ['unknown', 'not in the Qubit plugin catalog'],
-    ['unavailable', 'Could not load the Qubit plugin catalog'],
+    ['unknown', 'not in the Hermes plugin catalog'],
+    ['unavailable', 'Could not load the Hermes plugin catalog'],
     ['invalid_name', 'missing or invalid']
   ] as const)('%s → error toast, no dialog, no git fallback', async (error, fragment) => {
     await requestPluginCatalogInstallFromDeepLink('not-a-real-plugin', lookupFor({ ok: false, error }))
@@ -62,13 +62,14 @@ describe('requestPluginCatalogInstallFromDeepLink', () => {
     const feed = JSON.stringify([
       { name: 'weather', repo: 'https://github.com/x/weather', sha: 'a'.repeat(40), subdir: '' }
     ])
+
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(feed, { status: 200 }))
 
     await requestPluginCatalogInstallFromDeepLink('weather-evil')
 
     expect(fetchSpy).toHaveBeenCalledWith(PLUGIN_CATALOG_URL, expect.anything())
     expect($pluginInstallRequest.get()).toBeNull()
-    expect($notifications.get()[0]?.message).toContain('\u201Cweather-evil\u201D is not in the Qubit plugin catalog')
+    expect($notifications.get()[0]?.message).toContain('\u201Cweather-evil\u201D is not in the Hermes plugin catalog')
 
     await requestPluginCatalogInstallFromDeepLink('weather')
 

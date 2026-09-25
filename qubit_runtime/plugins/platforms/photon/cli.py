@@ -16,7 +16,7 @@ from qubit_cli.colors import Colors, color
 
 from . import auth as photon_auth
 from .adapter import sidecar_deps_installed
-from qubit_constants import find_node_executable, with_hermes_node_path
+from qubit_constants import find_node_executable, with_qubit_node_path
 from .sidecar_paths import _NPM_ERROR_LOG_MAX_CHARS, _npm_error_log, _sidecar_dir
 import contextlib
 
@@ -295,7 +295,7 @@ def _install_sidecar() -> int:
 
     try:
         npm = find_node_executable("npm")
-        env = with_hermes_node_path()
+        env = with_qubit_node_path()
         if npm is None:
             env = pm.ensure("npm", explicit=True).env
             installed = pm.installed_package("npm")

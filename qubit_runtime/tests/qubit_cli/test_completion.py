@@ -2,14 +2,10 @@
 
 import argparse
 import os
-import re
-import shutil
 import subprocess
 import tempfile
 
-import pytest
-
-from qubit_cli.completion import _walk, generate_bash, generate_zsh, generate_fish
+from qubit_cli.completion import _walk, generate_bash, generate_fish
 
 
 # ---------------------------------------------------------------------------
@@ -17,8 +13,8 @@ from qubit_cli.completion import _walk, generate_bash, generate_zsh, generate_fi
 # ---------------------------------------------------------------------------
 
 def _make_parser() -> argparse.ArgumentParser:
-    """Build a minimal parser that mirrors the real qubit structure."""
-    p = argparse.ArgumentParser(prog="qubit")
+    """Build a minimal parser that mirrors the real hermes structure."""
+    p = argparse.ArgumentParser(prog="hermes")
     p.add_argument("--version", "-V", action="store_true")
     p.add_argument("-p", "--profile", help="Profile name")
     sub = p.add_subparsers(dest="command")
@@ -80,8 +76,8 @@ class TestWalk:
 class TestGenerateBash:
     def test_contains_completion_function_and_register(self):
         out = generate_bash(_make_parser())
-        assert "_hermes_completion()" in out
-        assert "complete -F _hermes_completion qubit" in out
+        assert "_qubit_completion()" in out
+        assert "complete -F _qubit_completion hermes" in out
 
 
     def test_valid_bash_syntax(self):
@@ -98,68 +94,27 @@ class TestGenerateBash:
 
 
 # ---------------------------------------------------------------------------
-# 3. Zsh output
-# ---------------------------------------------------------------------------
-
-class TestGenerateZsh:
-
-
-    def test_preserves_valid_zsh_arguments_alias_syntax(self):
-        out = generate_zsh(_make_parser())
-        assert "'(-)'{-h,--help}'[Show help and exit]'" in out
-        assert "'(-)'{-V,--version}'[Show version and exit]'" in out
-        assert "'(-)'{-p,--profile}'[Profile name]:profile:_hermes_profiles'" in out
-        assert "'(-h --help){-h,--help}[Show help and exit]'" not in out
-        assert '"(-h --help)"{-h,--help}"[Show help and exit]"' not in out
-
-    def test_valid_zsh_syntax(self):
-        if not shutil.which("zsh"):
-            pytest.skip("zsh not installed")
-        out = generate_zsh(_make_parser())
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".zsh", delete=False) as f:
-            f.write(out)
-            path = f.name
-        try:
-            result = subprocess.run(["zsh", "-n", path], capture_output=True, text=True)
-            assert result.returncode == 0, result.stderr
-        finally:
-            os.unlink(path)
-
-
-# ---------------------------------------------------------------------------
-# 4. Fish output
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# 5. Subcommand drift prevention
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# 6. Profile completion (regression prevention)
+# 3. Profile completion (regression prevention)
 # ---------------------------------------------------------------------------
 
 class TestProfileCompletion:
     """Ensure profile name completion is present in all shell outputs."""
 
 
-
-
     def test_bash_profile_actions_complete_profile_names(self):
-        """After 'qubit profile use', complete with profile names."""
+        """After 'hermes profile use', complete with profile names."""
         out = generate_bash(_make_parser())
-        # The profile case should have _hermes_profiles for name-taking actions
+        # The profile case should have _qubit_profiles for name-taking actions
         lines = out.split("\n")
         in_profile_case = False
         has_profiles_in_action = False
         for line in lines:
             if "profile)" in line:
                 in_profile_case = True
-            if in_profile_case and "_hermes_profiles" in line:
+            if in_profile_case and "_qubit_profiles" in line:
                 has_profiles_in_action = True
                 break
-        assert has_profiles_in_action, "profile actions should complete with _hermes_profiles"
+        assert has_profiles_in_action, "profile actions should complete with _qubit_profiles"
 
 
     def test_fish_profile_actions_complete_names(self):

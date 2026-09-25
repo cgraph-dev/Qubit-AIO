@@ -1,24 +1,18 @@
 /**
- * The curated Qubit plugin catalog as the Desktop sees it.
+ * The curated Hermes plugin catalog as the Desktop sees it.
  *
- * The Capabilities → Plugins tab embeds the configured docs-site catalog page
+ * The Capabilities → Plugins tab embeds the docs-site catalog page
  * (`CATALOG_PICKER_URL`) as a one-click picker; that page renders
  * `PLUGIN_CATALOG_URL` (`/docs/api/plugins.json`, generated from the repo's
- * `plugin-catalog/` directory at site build). A
- * `hermes://plugin/install?catalog=<name>` deep link resolves against the SAME
- * document so a link and an in-app pick always agree on the repo, subdir and
- * reviewed pin for a name.
- *
- * The origin is deployment-configurable (`VITE_QUBIT_DOCS_ORIGIN`, see
- * `@/lib/qubit-links`); it never points at a legacy upstream service.
+ * `plugin-catalog/` directory at site build). A `hermes://plugin/install?catalog=<name>`
+ * deep link resolves against the SAME document so a link and an in-app pick
+ * always agree on the repo, subdir and reviewed pin for a name.
  *
  * Everything here only classifies — nothing installs. Callers open the Install
  * Plugin dialog, which still requires the user's explicit confirmation.
  */
 
-import { QUBIT_DOCS_ORIGIN } from './qubit-links'
-
-export const CATALOG_ORIGIN = QUBIT_DOCS_ORIGIN
+export const CATALOG_ORIGIN = 'https://hermes-agent.nousresearch.com'
 export const CATALOG_PICKER_URL = `${CATALOG_ORIGIN}/docs/plugins?embed=picker`
 export const PLUGIN_CATALOG_URL = `${CATALOG_ORIGIN}/docs/api/plugins.json`
 

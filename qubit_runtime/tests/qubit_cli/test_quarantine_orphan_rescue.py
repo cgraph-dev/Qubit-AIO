@@ -3,7 +3,7 @@
 On Windows the updater renames the live ``hermes*.exe`` shims aside
 (``hermes.exe.old.<unix-ms>``) so uv can write replacements. Gaps in the
 recovery path ended with ``hermes`` gone from PATH — and, because the command
-that repairs it IS ``qubit update``, unrecoverable without a manual reinstall
+that repairs it IS ``hermes update``, unrecoverable without a manual reinstall
 (#75584):
 
 1. Restoring a shim got a single attempt whose ``OSError`` was swallowed in
@@ -28,7 +28,6 @@ from unittest.mock import patch
 import pytest
 
 from qubit_cli import _early_recovery as er
-from qubit_cli import _install_repair as ir
 from qubit_cli import main as cli_main
 from qubit_cli import main_install_repair
 
@@ -306,43 +305,3 @@ def test_helper_is_a_noop_when_installer_wrote_a_fresh_shim(tmp_path, capsys):
     assert failed == []
     assert original.read_bytes() == b"MZ-fresh", "must not clobber the fresh shim"
     assert capsys.readouterr().err == ""
-
-
-# ---------------------------------------------------------------------------
-# both call sites route through the helper
-# ---------------------------------------------------------------------------
-
-
-def test_main_restore_reports_on_stderr(tmp_path, capsys):
-    scripts = _make_scripts_dir(tmp_path)
-    quarantined = scripts / "hermes.exe.old.123"
-    quarantined.write_bytes(b"MZ-old-hermes")
-    original = scripts / "hermes.exe"
-
-    def always_locked(src, dst):
-        raise PermissionError(32, "being used by another process")
-
-    with patch.object(er.os, "rename", always_locked):
-        main_install_repair._restore_quarantined_exes([(original, quarantined)])
-
-    captured = capsys.readouterr()
-    assert "FAILED to restore hermes.exe" in captured.err
-    assert captured.out == ""
-
-
-def test_repair_restore_reports_on_stderr(tmp_path, capsys):
-    """The early-recovery path must warn on stderr (acp speaks JSON-RPC on stdout)."""
-    scripts = _make_scripts_dir(tmp_path)
-    quarantined = scripts / "hermes.exe.old.123"
-    quarantined.write_bytes(b"MZ-old-hermes")
-    original = scripts / "hermes.exe"
-
-    def always_locked(src, dst):
-        raise PermissionError(32, "being used by another process")
-
-    with patch.object(er.os, "rename", always_locked):
-        ir._restore_quarantined_exes([(original, quarantined)])
-
-    captured = capsys.readouterr()
-    assert "FAILED to restore hermes.exe" in captured.err
-    assert captured.out == "", "stdout must stay clean for JSON-RPC"

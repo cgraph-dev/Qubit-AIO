@@ -20,6 +20,8 @@ def isolated_kanban_home_with_profiles(monkeypatch):
     test_home = tempfile.mkdtemp(prefix="kanban_per_profile_cap_test_")
     for prof in ("alpha", "beta", "default"):
         os.makedirs(os.path.join(test_home, "profiles", prof), exist_ok=True)
+        with open(os.path.join(test_home, "profiles", prof, "config.yaml"), "w") as fh:
+            fh.write("{}\n")  # identity marker: a bare dir is not a profile
     monkeypatch.setenv("QUBIT_HOME", test_home)
     for mod in list(sys.modules.keys()):
         if mod.startswith("qubit_cli") or mod.startswith("qubit_state") or mod == "qubit_constants":

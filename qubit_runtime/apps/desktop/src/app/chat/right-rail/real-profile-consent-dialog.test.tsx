@@ -19,12 +19,12 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/hermes', () => ({
-  saveQubitConfigRecord: (config: Record<string, unknown>, profile?: unknown) => mocks.save(config, profile)
+  saveHermesConfigRecord: (config: Record<string, unknown>, profile?: unknown) => mocks.save(config, profile)
 }))
 
 const promptCopy = {
   title: 'Stay signed in to your sites',
-  body: 'Let Qubit browse with a snapshot of your default browser profile.',
+  body: 'Let Hermes browse with a snapshot of your default browser profile.',
   bulletSnapshot: 'Cookies and logins are copied into a managed snapshot.',
   bulletLiveProfile: 'Your live browser profile is never opened directly.',
   bulletLocal: 'Nothing leaves this computer.',
@@ -57,8 +57,8 @@ vi.mock('@/store/notifications', () => ({
 }))
 
 vi.mock('../../hooks/use-config-record', () => ({
-  qubitConfigCacheWriter: () => (config: Record<string, unknown>) => mocks.cache(config),
-  useQubitConfigRecord: () => ({ data: mocks.loadedConfig })
+  hermesConfigCacheWriter: () => (config: Record<string, unknown>) => mocks.cache(config),
+  useHermesConfigRecord: () => ({ data: mocks.loadedConfig })
 }))
 
 describe('RealProfileConsentDialog', () => {
@@ -84,17 +84,14 @@ describe('RealProfileConsentDialog', () => {
       fireEvent.click(screen.getByRole('button', { name: promptCopy.enable }))
     })
 
-    // Saves the WHOLE merged record with only use_real_profile added — the
-    // same shape the Capabilities toggle writes, through the same cache, so
-    // the existing toggle flips on without a refetch.
-    expect(mocks.save).toHaveBeenCalledWith(
-      {
-        browser: { allow_private_urls: false, use_real_profile: true },
-        model: { provider: 'nous' }
-      },
-      undefined
-    )
-    expect(mocks.cache).toHaveBeenCalledWith(mocks.save.mock.calls[0][0])
+    // Saves ONLY the toggled key (PUT deep-merges) — the same shape the
+    // Capabilities toggle writes — while the shared cache gets the merged
+    // record so the existing toggle flips on without a refetch.
+    expect(mocks.save).toHaveBeenCalledWith({ browser: { use_real_profile: true } }, undefined)
+    expect(mocks.cache).toHaveBeenCalledWith({
+      browser: { allow_private_urls: false, use_real_profile: true },
+      model: { provider: 'nous' }
+    })
     expect(mocks.notify).toHaveBeenCalled()
   })
 

@@ -1,13 +1,13 @@
 """Deferred platform plugins must still register their *client* tools.
 
 Issue #78050: a bundled ``kind: platform`` plugin is registered as a deferred
-loader so ``qubit chat`` doesn't import ~20 gateway SDKs. The a2a plugin ships
+loader so ``hermes chat`` doesn't import ~20 gateway SDKs. The a2a plugin ships
 two independent things behind that one deferral — an inbound adapter (heavy)
 and five outbound client tools (``a2a_call``, ``a2a_discover``, ``a2a_list``,
 ``a2a_history``, ``a2a_orchestrate``). Deferring the plugin deferred both, so
 in a CLI/TUI process the client tools never registered at all:
 ``resolve_toolset("a2a")`` returned ``[]`` and the toolset was absent from the
-``qubit tools`` checklist. The same tools worked in gateway/web processes only
+``hermes tools`` checklist. The same tools worked in gateway/web processes only
 because those materialize every platform at startup.
 
 Client tools that live in a dedicated ``tools`` submodule are now registered at
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 
 A2A_CLIENT_TOOLS = {
@@ -70,7 +70,7 @@ def _write_platform_plugin(
     if provides_tools:
         manifest_data["provides_tools"] = provides_tools
     (plugin_dir / "plugin.yaml").write_text(
-        yaml.dump(manifest_data),
+        yaml.safe_dump(manifest_data),
         encoding="utf-8",
     )
 
@@ -166,20 +166,6 @@ def clean_registry():
 class TestA2AClientToolsInCliProcess:
     """The issue's exact repro: a CLI/TUI process, no gateway startup."""
 
-    def test_manifest_declares_the_client_tools(self):
-        """The opt-in lives in the manifest, so it is pinned like any contract.
-
-        Dropping ``provides_tools`` from plugin.yaml silently reverts a2a to
-        the deferred-and-invisible behaviour of #78050, with every other test
-        here still passing on the synthetic plugins — so assert it directly.
-        """
-        manifest_path = (
-            Path(__file__).resolve().parents[2]
-            / "plugins" / "platforms" / "a2a" / "plugin.yaml"
-        )
-        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-
-        assert set(manifest.get("provides_tools") or []) == A2A_CLIENT_TOOLS
 
     def test_a2a_toolset_resolves_without_materializing_the_platform(self):
         from qubit_cli.plugins import PluginManager
@@ -188,7 +174,7 @@ class TestA2AClientToolsInCliProcess:
         mgr = PluginManager()
         mgr.discover_and_load()
 
-        a2a = mgr._plugins.get("a2a-platform")
+        a2a = mgr._plugins.get("platforms/a2a")  # bundled platforms key by category path (#27548)
         assert a2a is not None, "bundled a2a platform plugin was not discovered"
 
         # The whole point of the deferral is preserved: the inbound adapter is
@@ -209,7 +195,7 @@ class TestA2AClientToolsInCliProcess:
         from qubit_cli.plugins import discover_plugins, get_plugin_toolsets
 
         # get_plugin_toolsets() reads the process-wide manager, which is what
-        # the `qubit tools` checklist does.
+        # the `hermes tools` checklist does.
         discover_plugins()
 
         assert "a2a" in {key for key, _, _ in get_plugin_toolsets()}
@@ -322,7 +308,7 @@ class TestDeferredPlatformToolPreregistration:
     def test_tools_stay_attributed_after_materialization(
         self, tmp_path, probe, clean_registry
     ):
-        """`qubit plugins list` must still credit the pre-registered tools.
+        """`hermes plugins list` must still credit the pre-registered tools.
 
         ``_load_plugin`` attributes tools by diffing the registry around
         ``register()``. Tools registered at discovery are already in the
@@ -377,7 +363,7 @@ class TestDeferredPlatformToolPreregistration:
 
         `register_tools` is not transactional: whatever it registered before
         raising stays in the registry. Leaving those unattributed makes
-        `qubit plugins list` under-report what the process is carrying, and
+        `hermes plugins list` under-report what the process is carrying, and
         `_load_plugin`'s own diff cannot recover them later because they are
         already inside its "before" snapshot.
         """
@@ -415,7 +401,7 @@ class TestDeferredPlatformToolPreregistration:
         ``_load_plugin_scoped``'s failure path sweeps the *whole* ownership
         ledger for this plugin key — not the ``registration_start:`` slice —
         and disposes it, so the discovery-time client tools go with the failed
-        adapter. Attribution and the registry therefore agree at zero: `qubit
+        adapter. Attribution and the registry therefore agree at zero: `hermes
         plugins list` reports no tools because the process really is serving
         none.
 

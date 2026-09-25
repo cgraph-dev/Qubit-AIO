@@ -6,7 +6,7 @@ description: "How the ACP adapter works: lifecycle, sessions, event bridge, appr
 
 # ACP Internals
 
-The ACP adapter wraps Qubit' synchronous `AIAgent` in an async JSON-RPC stdio server.
+The ACP adapter wraps Hermes' synchronous `AIAgent` in an async JSON-RPC stdio server.
 
 Key implementation files:
 
@@ -21,7 +21,7 @@ Key implementation files:
 ## Boot flow
 
 ```text
-qubit acp / hermes-acp / python -m acp_adapter
+hermes acp / hermes-acp / python -m acp_adapter
   -> acp_adapter.entry.main()
   -> parse --version / --check / --setup before server startup
   -> load ~/.hermes/.env
@@ -79,6 +79,12 @@ Bridged callbacks:
 - `thinking_callback` (currently set to `None` in the ACP bridge — reasoning is forwarded through `step_callback` instead)
 - `step_callback`
 
+Every ACP tool call reaches a terminal status: `tool.completed` closes the call with its own
+result (`completed` / `failed`), the `step_callback` `prev_tools` pass is only a fallback for
+runtimes that never project a completion, and anything still open when the turn ends —
+a denied or blocked call, an interrupted one — is marked `failed` before the response is
+returned.
+
 Because `AIAgent` runs in a worker thread while ACP I/O lives on the main event loop, the bridge uses:
 
 ```python
@@ -91,15 +97,15 @@ asyncio.run_coroutine_threadsafe(...)
 
 Mapping:
 
-- `allow_once` -> Qubit `once`
-- `allow_always` -> Qubit `always`
-- reject options -> Qubit `deny`
+- `allow_once` -> Hermes `once`
+- `allow_always` -> Hermes `always`
+- reject options -> Hermes `deny`
 
 Timeouts and bridge failures deny by default.
 
 ### Tool rendering helpers
 
-`acp_adapter/tools.py` maps Qubit tools to ACP tool kinds and builds editor-facing content.
+`acp_adapter/tools.py` maps Hermes tools to ACP tool kinds and builds editor-facing content.
 
 Examples:
 
@@ -113,7 +119,10 @@ Examples:
 ```text
 new_session(cwd)
   -> create SessionState
-  -> create AIAgent(platform="acp", enabled_toolsets=["hermes-acp"])
+  -> create AIAgent(platform="acp", enabled_toolsets=<_get_platform_tools(config, "acp"), as on the
+                   gateway: platform_toolsets.acp (default hermes-acp) plus the resolver's extras
+                   such as plugin toolsets, with its admitted MCP servers keyed mcp-<server>>,
+                   disabled_toolsets=<agent.disabled_toolsets>)
   -> bind task_id/session_id to cwd override
 
 prompt(..., session_id)
@@ -124,6 +133,13 @@ prompt(..., session_id)
   -> update session history
   -> emit final agent message chunk
 ```
+
+A turn that ends in a terminal failure (provider refusal, non-retryable error, exhausted
+retries, interrupt before any reply) is closed by the core loop with a Hermes-authored
+assistant row ("Your request was not processed…" / "This turn did not complete…") so the
+durable transcript never ends on an open `user` row. Without it the next prompt would be
+merged into the failed request and replayed. Context-overflow failures are exempt: their
+repair is session rotation, not another row.
 
 ### Cancelation
 
@@ -141,12 +157,12 @@ prompt(..., session_id)
 
 ACP does not implement its own auth store.
 
-Instead it reuses Qubit' runtime resolver:
+Instead it reuses Hermes' runtime resolver:
 
 - `acp_adapter/auth.py`
-- `qubit_cli/runtime_provider.py`
+- `hermes_cli/runtime_provider.py`
 
-So ACP advertises and uses the currently configured Qubit provider/credentials. It also always advertises a terminal setup auth method (`hermes-setup`, args `--setup`) so first-run ACP clients can open Qubit' interactive model/provider configuration before starting a normal ACP session.
+So ACP advertises and uses the currently configured Hermes provider/credentials. It also always advertises a terminal setup auth method (`hermes-setup`, args `--setup`) so first-run ACP clients can open Hermes' interactive model/provider configuration before starting a normal ACP session.
 
 ## Working directory binding
 
@@ -175,7 +191,7 @@ ACP temporarily installs an approval callback on the terminal tool during prompt
 
 ## Related files
 
-- `tests/acp/` — ACP test suite
+- `tests/acp_adapter/` — ACP test suite
 - `toolsets.py` — `hermes-acp` toolset definition
-- `qubit_cli/main.py` — `qubit acp` CLI subcommand
+- `hermes_cli/main.py` — `hermes acp` CLI subcommand
 - `pyproject.toml` — `[acp]` optional dependency + `hermes-acp` script

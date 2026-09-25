@@ -40,7 +40,7 @@ def _sync_block(text: str) -> str:
 
 def _path_guard_functions(text: str) -> str:
     start = text.index("path_has_symlink_component() {")
-    end = text.index("\n\nchown_hermes_tree() {", start)
+    end = text.index("\n\nchown_qubit_tree() {", start)
     return text[start:end]
 
 

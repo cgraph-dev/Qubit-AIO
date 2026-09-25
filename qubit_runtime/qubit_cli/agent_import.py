@@ -15,9 +15,9 @@ import sys
 import time
 import tomllib
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-import yaml
+import qubit_yaml as yaml
 
 from utils import atomic_write_text, atomic_yaml_write
 
@@ -47,7 +47,7 @@ def normalize_text(text: str) -> str:
 
 
 def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8", errors="replace")
+    return path.read_text(encoding="utf-8-sig", errors="replace")
 
 
 class ConfigReadError(RuntimeError):
@@ -206,28 +206,28 @@ def sanitize_mcp_env(env: Any) -> Tuple[Dict[str, str], List[str]]:
 
 def _translate_mcp_server(name: str, srv: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     """Map one Claude/Codex MCP server entry to Qubit shape; returns (server, stripped secret paths)."""
-    qubit_srv: Dict[str, Any] = {}
+    hermes_srv: Dict[str, Any] = {}
     stripped: List[str] = []
     if srv.get("command"):
-        qubit_srv["command"] = srv["command"]
+        hermes_srv["command"] = srv["command"]
         if srv.get("args"):
-            qubit_srv["args"] = srv["args"]
+            hermes_srv["args"] = srv["args"]
         env_kept, env_stripped = sanitize_mcp_env(srv.get("env"))
         if env_kept:
-            qubit_srv["env"] = env_kept
+            hermes_srv["env"] = env_kept
         stripped.extend(f"mcp_servers.{name}.env.{k}" for k in env_stripped)
         if srv.get("cwd"):
-            qubit_srv["cwd"] = srv["cwd"]
+            hermes_srv["cwd"] = srv["cwd"]
     if srv.get("url"):
-        qubit_srv["url"] = srv["url"]
+        hermes_srv["url"] = srv["url"]
         headers = srv.get("headers")
         if isinstance(headers, dict):
             kept_headers = {k: v for k, v in headers.items()
                             if not is_secret_key(str(k)) and "authorization" not in str(k).lower()}
             if kept_headers:
-                qubit_srv["headers"] = kept_headers
+                hermes_srv["headers"] = kept_headers
             stripped.extend(f"mcp_servers.{name}.headers.{k}" for k in headers if k not in kept_headers)
-    return qubit_srv, stripped
+    return hermes_srv, stripped
 
 
 class AgentImporter:
@@ -235,7 +235,8 @@ class AgentImporter:
     plan without touching disk; every item is recorded as imported/skipped/conflict/error."""
 
     def __init__(self, agent: str, source_root: Path, target_root: Path,
-                 execute: bool = False, overwrite: bool = False) -> None:
+                 execute: bool = False, overwrite: bool = False,
+                 sync_skills: Mapping[str, Optional[str]] | Sequence[str] = ()) -> None:
         if agent not in SUPPORTED_AGENTS:
             raise ValueError(f"Unsupported agent: {agent!r}")
         self.agent = agent
@@ -243,6 +244,11 @@ class AgentImporter:
         self.target_root = Path(target_root)
         self.execute = execute
         self.overwrite = overwrite
+        # Skills a previous import-agent run copied (from the sync manifest), name → digest of the copy
+        # it wrote (None = pre-digest manifest, trusted). --sync refreshes a destination in place only
+        # while it still matches that digest; a locally edited copy keeps conflict semantics.
+        self.sync_skills: Dict[str, Optional[str]] = (dict(sync_skills) if isinstance(sync_skills, Mapping)
+                                                       else {name: None for name in sync_skills})
         self.items: List[Dict[str, Any]] = []
         self.stripped_secrets: List[str] = []
 
@@ -469,12 +475,12 @@ class AgentImporter:
                 self.record(kind, name, f"mcp_servers.{name}", "conflict",
                             "MCP server already exists in Qubit config")
                 continue
-            qubit_srv, stripped = _translate_mcp_server(name, srv)
+            hermes_srv, stripped = _translate_mcp_server(name, srv)
             self.stripped_secrets.extend(stripped)
-            if not qubit_srv:
+            if not hermes_srv:
                 self.record(kind, name, None, "skipped", "Server has neither a command nor a url")
                 continue
-            existing[name] = qubit_srv
+            existing[name] = hermes_srv
             added += 1
             self.record(kind, name, f"config.yaml mcp_servers.{name}", "imported")
         if added > 0 and self.execute:
@@ -493,12 +499,18 @@ class AgentImporter:
             self.record("skills", source_root, destination_root, "skipped",
                         "No skills with SKILL.md found")
             return
+        from qubit_cli.agent_import_sync import skill_tree_digest
         for skill_dir in skill_dirs:
             destination = destination_root / skill_dir.name
             if destination.exists() and not self.overwrite:
-                self.record("skill", skill_dir, destination, "conflict",
-                            "Destination skill already exists")
-                continue
+                if skill_dir.name not in self.sync_skills:
+                    self.record("skill", skill_dir, destination, "conflict", "Destination skill already exists")
+                    continue
+                expected = self.sync_skills[skill_dir.name]
+                if expected is not None and skill_tree_digest(destination) != expected:
+                    self.record("skill", skill_dir, destination, "conflict",
+                                "Imported skill was modified locally — not refreshed")
+                    continue
 
             def copy(skill_dir=skill_dir, destination=destination) -> None:
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -515,6 +527,11 @@ def import_agent_command(args) -> None:
     from qubit_constants import get_qubit_home
     from qubit_cli.setup import (Colors, color, print_header, print_info, print_success,
                                   print_error, prompt_yes_no)
+
+    if getattr(args, "sync", False):
+        from qubit_cli.agent_import_sync import sync_imported_agents
+        sync_imported_agents(args)
+        return
 
     agent, explicit_source, overwrite = args.agent, args.source, args.overwrite
 
@@ -535,7 +552,7 @@ def import_agent_command(args) -> None:
 
     print()
     print(color("┌─────────────────────────────────────────────────────────┐", Colors.MAGENTA))
-    print(color("│          ⚕ Qubit — Import From Another Agent          │", Colors.MAGENTA))
+    print(color("│          ☤ Qubit — Import From Another Agent          │", Colors.MAGENTA))
     print(color("└─────────────────────────────────────────────────────────┘", Colors.MAGENTA))
     if not source_dir.is_dir():
         print()
@@ -596,10 +613,17 @@ def import_agent_command(args) -> None:
     if report is None:
         return
     print_import_report(report, dry_run=False)
+    from qubit_cli.agent_import_sync import update_sync_manifest
+    try:
+        update_sync_manifest(agent, source_dir.resolve(), qubit_home.resolve(), overwrite, report)
+        print_info("Source registered for sync — re-run 'qubit import-agent --sync' "
+                   "any time to pull in changes.")
+    except OSError as exc:
+        logger.warning("Could not update import sync manifest: %s", exc)
     print()
     print_success("Import complete.")
     print_info("API keys and credentials were NOT imported — run 'qubit setup' "
-               "to configure providers, or add them to $QUBIT_HOME/.env.")
+               "to configure providers, or add them to ~/.hermes/.env.")
 
 
 def print_import_report(report: Dict[str, Any], dry_run: bool) -> None:
@@ -633,7 +657,7 @@ def print_import_report(report: Dict[str, Any], dry_run: bool) -> None:
         print(color("  ⚷ Secrets stripped (never imported):", Colors.YELLOW))
         for name in stripped:
             print(f"      {name}")
-        print_info("Re-add credentials deliberately via 'qubit setup' or $QUBIT_HOME/.env.")
+        print_info("Re-add credentials deliberately via 'qubit setup' or ~/.hermes/.env.")
         print()
     summary = report.get("summary", {})
     parts = [f"{summary[k]} {label}" for k, _, _, label in groups if summary.get(k)]

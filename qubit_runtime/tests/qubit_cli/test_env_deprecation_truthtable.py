@@ -126,14 +126,14 @@ def test_deprecated_env_warning_truth_table(
     """Warning fires only for genuine .env-file entries — never for
     inherited process environment or config.yaml (#88829 #89016 #89389 #90299).
     """
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+    qubit_home = tmp_path / ".hermes"
+    qubit_home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
     if env_file is not None:
-        (hermes_home / ".env").write_bytes(env_file.encode("utf-8"))
+        (qubit_home / ".env").write_bytes(env_file.encode("utf-8"))
     if config_yaml is not None:
-        (hermes_home / "config.yaml").write_text(config_yaml, encoding="utf-8")
+        (qubit_home / "config.yaml").write_text(config_yaml, encoding="utf-8")
 
     # Baseline: deprecated keys absent from process env unless the row says so.
     for key in ("TERMINAL_CWD", "MESSAGING_CWD", "HERMES_QUIET"):

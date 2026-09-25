@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router'
 import { terminalMenuHandleFor } from '@/app/right-sidebar/terminal/terminal-context-menu'
 import { toggleTargetZoneTabStrip } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
-import { QUBIT_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
+import { HERMES_CONTEXT_MENU_TRIGGER_ATTR } from '@/components/ui/context-menu'
 import { writeClipboardText } from '@/components/ui/copy-button'
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import { isRemoteGateway } from '@/lib/media'
 import { reachablePreviewUrl } from '@/lib/preview-reach'
 import { openCommandPalette } from '@/store/command-palette'
 import { openPreview } from '@/store/preview'
+import { toggleProfileRailVisible } from '@/store/profile-rail-prefs'
 import { toggleStatusbarVisible } from '@/store/statusbar-prefs'
 import { requestActiveUpdate } from '@/store/updates'
 import { canOpenNewWindow, openNewWindow } from '@/store/windows'
@@ -116,7 +117,7 @@ function terminalSections(open: Extract<OpenContextMenu, { kind: 'terminal' }>, 
           key="terminal-paste"
           label={t.contextMenu.edit.paste}
           onSelect={() =>
-            void window.qubitDesktop?.readClipboard().then(text => (text ? terminal.paste?.(text) : undefined))
+            void window.hermesDesktop?.readClipboard().then(text => (text ? terminal.paste?.(text) : undefined))
           }
         />
       ) : null,
@@ -157,7 +158,7 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
   }
 
   const editableCommand = (command: 'copy' | 'cut' | 'paste') => {
-    withEditableFocus(() => void window.qubitDesktop?.contextMenuEdit?.(command))
+    withEditableFocus(() => void window.hermesDesktop?.contextMenuEdit?.(command))
   }
 
   // Select all runs entirely in the renderer, scoped to the editable itself.
@@ -189,7 +190,7 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
   }
 
   const spellcheckAction = (action: { kind: 'add' | 'replace'; word: string }) => {
-    withEditableFocus(() => void window.qubitDesktop?.contextMenuSpellcheck?.(action))
+    withEditableFocus(() => void window.hermesDesktop?.contextMenuSpellcheck?.(action))
   }
 
   if (linkUrl) {
@@ -200,12 +201,7 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
             icon="globe"
             key="link-open-app"
             label={copy.link.openInApp}
-            onSelect={() =>
-              openPreview(
-                { kind: 'url', label: hostPathLabel(linkUrl), source: linkUrl, url: linkUrl },
-                'explicit-link'
-              )
-            }
+            onSelect={() => openPreview({ kind: 'url', label: hostPathLabel(linkUrl), source: linkUrl, url: linkUrl })}
           />
         ) : null,
         <Item
@@ -241,10 +237,12 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
             key="image-open-app"
             label={copy.link.openInApp}
             onSelect={() =>
-              openPreview(
-                { kind: 'url', label: hostPathLabel(target.imageUrl), source: target.imageUrl, url: target.imageUrl },
-                'explicit-link'
-              )
+              openPreview({
+                kind: 'url',
+                label: hostPathLabel(target.imageUrl),
+                source: target.imageUrl,
+                url: target.imageUrl
+              })
             }
           />
         ) : null,
@@ -260,7 +258,7 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
           icon="file-media"
           key="image-copy"
           label={copy.image.copyImage}
-          onSelect={() => void window.qubitDesktop?.contextMenuCopyImage?.()}
+          onSelect={() => void window.hermesDesktop?.contextMenuCopyImage?.()}
         />,
         target.imageUrl ? (
           <Item
@@ -275,7 +273,7 @@ function domSections(open: Extract<OpenContextMenu, { kind: 'dom' }>, t: Transla
             icon="save"
             key="image-save"
             label={copy.image.saveImageAs}
-            onSelect={() => void window.qubitDesktop?.saveImageFromUrl?.(target.imageUrl)}
+            onSelect={() => void window.hermesDesktop?.saveImageFromUrl?.(target.imageUrl)}
           />
         ) : null
       ].filter(Boolean)
@@ -400,12 +398,7 @@ function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>, t: Tra
             icon="globe"
             key="guest-link-open-app"
             label={copy.link.openInApp}
-            onSelect={() =>
-              openPreview(
-                { kind: 'url', label: hostPathLabel(linkUrl), source: linkUrl, url: linkUrl },
-                'explicit-link'
-              )
-            }
+            onSelect={() => openPreview({ kind: 'url', label: hostPathLabel(linkUrl), source: linkUrl, url: linkUrl })}
           />
         ) : null,
         <Item
@@ -451,7 +444,7 @@ function guestSections(open: Extract<OpenContextMenu, { kind: 'guest' }>, t: Tra
             icon="save"
             key="guest-image-save"
             label={copy.image.saveImageAs}
-            onSelect={() => void window.qubitDesktop?.saveImageFromUrl?.(imageUrl)}
+            onSelect={() => void window.hermesDesktop?.saveImageFromUrl?.(imageUrl)}
           />
         ) : null
       ].filter(Boolean)
@@ -573,6 +566,12 @@ function shellSections({ navigate, t }: ShellVerbs): ReactNode[][] {
         label={t.keybinds.actions['view.toggleStatusbar']}
         onSelect={toggleStatusbarVisible}
       />,
+      <Item
+        icon="organization"
+        key="shell-profile-rail"
+        label={t.keybinds.actions['view.toggleProfileRail']}
+        onSelect={toggleProfileRailVisible}
+      />,
       // The pointer-only way back to a hidden tab strip: right-clicking the
       // shell reaches this menu from anywhere, including a zone that has no
       // chrome left to right-click.
@@ -593,7 +592,7 @@ function shellSections({ navigate, t }: ShellVerbs): ReactNode[][] {
       <Item
         icon="cloud-download"
         key="shell-update"
-        label={t.commandCenter.updateQubit}
+        label={t.commandCenter.updateHermes}
         onSelect={requestActiveUpdate}
       />
     ]
@@ -665,7 +664,7 @@ export function AppContextMenu() {
 
   // Spell-check facts arrive from main after the menu opens (Chromium reports
   // them on its own context-menu event); attach them to the open menu.
-  useEffect(() => window.qubitDesktop?.onContextMenuSpellcheck?.(augmentSpellcheck), [])
+  useEffect(() => window.hermesDesktop?.onContextMenuSpellcheck?.(augmentSpellcheck), [])
 
   if (!open) {
     return null

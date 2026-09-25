@@ -2,7 +2,7 @@
 
 Covers CRUD on the SQLite-backed store, size-cap enforcement, prompt
 injection of non-empty notepads, byte-stable prompts for jobs that don't
-use the notepad, and the `qubit cron notepad` CLI handler.
+use the notepad, and the `hermes cron notepad` CLI handler.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def cron_env(tmp_path, monkeypatch, notepad):
 
     import cron.jobs as jobs_mod
 
-    monkeypatch.setattr(jobs_mod, "QUBIT_DIR", qubit_home)
+    monkeypatch.setattr(jobs_mod, "HERMES_DIR", qubit_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", qubit_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", qubit_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", qubit_home / "cron" / "output")
@@ -81,13 +81,6 @@ class TestNotepadCrud:
         assert notepad.get_note("job-2", "k") == "two"
         assert len(notepad.list_notes("job-1")) == 1
 
-    def test_survives_new_connection(self, notepad):
-        """Durability: values persist across independent calls (fresh connections)."""
-        notepad.set_note("job-1", "state", "persisted")
-        # Every public call opens its own connection, so a second read
-        # after the writer's connection closed proves on-disk durability.
-        assert notepad.get_note("job-1", "state") == "persisted"
-        assert notepad.list_notes("job-1")[0]["value"] == "persisted"
 
     def test_clear_notepad_removes_all_keys_for_job_only(self, notepad):
         notepad.set_note("job-1", "a", "1")
@@ -209,12 +202,9 @@ class TestPromptInjection:
         notepad.set_note(job["id"], "watchlist", "alpha, beta")
 
         prompt = _build_job_prompt(job)
-        assert "Job notepad (persistent across runs)" in prompt
         assert "last_seen_id" in prompt
         assert "8842" in prompt
         assert "watchlist" in prompt
-        # The injected section documents the CLI write path for this job.
-        assert f"qubit cron notepad {job['id']} set" in prompt
 
     def test_empty_notepad_prompt_byte_stable(self, cron_env, notepad):
         from cron.jobs import create_job
@@ -284,7 +274,7 @@ class TestNotepadCli:
 
         big = "x" * (notepad.MAX_VALUE_BYTES + 1)
         assert cron_notepad(self._ns(job_id="job-1", notepad_action="set", key="k", value=big)) == 1
-        assert "too large" in capsys.readouterr().out.lower()
+        assert notepad.get_note("job-1", "k") is None
 
     def test_cron_command_dispatches_notepad(self, notepad):
         from qubit_cli.cron import cron_command

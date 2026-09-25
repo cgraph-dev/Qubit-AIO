@@ -7,8 +7,8 @@ import { expandWindowsEnvRefs, parseRegQueryValue, readWindowsUserEnvVar } from 
 // ── parseRegQueryValue ─────────────────────────────────────────────────────
 
 test('parseRegQueryValue extracts a REG_SZ value', () => {
-  const out = ['', 'HKEY_CURRENT_USER\\Environment', '    QUBIT_HOME    REG_SZ    F:\\Qubit\\data', ''].join('\r\n')
-  assert.equal(parseRegQueryValue(out, 'QUBIT_HOME'), 'F:\\Qubit\\data')
+  const out = ['', 'HKEY_CURRENT_USER\\Environment', '    QUBIT_HOME    REG_SZ    F:\\Hermes\\data', ''].join('\r\n')
+  assert.equal(parseRegQueryValue(out, 'QUBIT_HOME'), 'F:\\Hermes\\data')
 })
 
 test('parseRegQueryValue matches the name case-insensitively', () => {
@@ -17,8 +17,8 @@ test('parseRegQueryValue matches the name case-insensitively', () => {
 })
 
 test('parseRegQueryValue preserves spaces inside the value', () => {
-  const out = '    QUBIT_HOME    REG_SZ    C:\\Program Files\\Qubit\r\n'
-  assert.equal(parseRegQueryValue(out, 'QUBIT_HOME'), 'C:\\Program Files\\Qubit')
+  const out = '    QUBIT_HOME    REG_SZ    C:\\Program Files\\Hermes\r\n'
+  assert.equal(parseRegQueryValue(out, 'QUBIT_HOME'), 'C:\\Program Files\\Hermes')
 })
 
 test('parseRegQueryValue returns null when the value line is absent', () => {
@@ -35,7 +35,7 @@ test('expandWindowsEnvRefs expands %VAR% case-insensitively', () => {
 })
 
 test('expandWindowsEnvRefs leaves literal paths and unknown refs intact', () => {
-  assert.equal(expandWindowsEnvRefs('F:\\Qubit\\data', {}), 'F:\\Qubit\\data')
+  assert.equal(expandWindowsEnvRefs('F:\\Hermes\\data', {}), 'F:\\Hermes\\data')
   assert.equal(expandWindowsEnvRefs('%NOPE%\\x', {}), '%NOPE%\\x')
 })
 
@@ -60,7 +60,7 @@ test('readWindowsUserEnvVar queries HKCU\\Environment and expands the value', ()
   const exec = (cmd, args) => {
     calls.push([cmd, args])
 
-    return 'HKEY_CURRENT_USER\\Environment\r\n    QUBIT_HOME    REG_EXPAND_SZ    %DRIVE%\\Qubit\r\n'
+    return 'HKEY_CURRENT_USER\\Environment\r\n    QUBIT_HOME    REG_EXPAND_SZ    %DRIVE%\\Hermes\r\n'
   }
 
   const value = readWindowsUserEnvVar('QUBIT_HOME', {
@@ -69,7 +69,7 @@ test('readWindowsUserEnvVar queries HKCU\\Environment and expands the value', ()
     exec
   })
 
-  assert.equal(value, 'F:\\Qubit')
+  assert.equal(value, 'F:\\Hermes')
   assert.deepEqual(calls, [['reg', ['query', 'HKCU\\Environment', '/v', 'QUBIT_HOME']]])
 })
 

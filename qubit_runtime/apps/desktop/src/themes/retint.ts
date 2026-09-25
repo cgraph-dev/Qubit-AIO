@@ -16,7 +16,7 @@
  * no-op.
  *
  * ONE color in, both modes out. A single hex can't serve both appearances
- * literally — Qubit blue `#0053FD` is 5.4:1 on GitHub's light sidebar but only
+ * literally — Nous blue `#0053FD` is 5.4:1 on GitHub's light sidebar but only
  * 3.6:1 on its dark one, i.e. unreadable section headers. Dark therefore gets
  * the same hue and chroma at whatever lightness clears AA, which keeps the
  * brand color recognizably itself instead of washing it toward white.
@@ -34,7 +34,7 @@ import {
   normalizeHex,
   type Oklch,
   oklchToHex,
-  readableOn
+  readableInk
 } from './color'
 import type { DesktopTheme, DesktopThemeColors } from './types'
 
@@ -117,8 +117,8 @@ function retintColors(colors: DesktopThemeColors, seed: string, isDark: boolean)
 
   // Foregrounds that sit ON the accent have to be re-picked: a new seed can
   // cross the light/dark readability boundary.
-  next.primaryForeground = readableOn(seed)
-  next.midgroundForeground = readableOn(seed)
+  next.primaryForeground = readableInk(seed)
+  next.midgroundForeground = readableInk(seed)
 
   return next
 }

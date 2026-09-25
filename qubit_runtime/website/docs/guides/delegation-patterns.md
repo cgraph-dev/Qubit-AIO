@@ -6,9 +6,9 @@ description: "When and how to use subagent delegation — patterns for parallel 
 
 # Delegation & Parallel Work
 
-Qubit can spawn isolated child agents to work on tasks in parallel. Each subagent gets its own conversation, terminal session, and toolset. Only the final summary comes back — intermediate tool calls never enter your context window.
+Hermes can spawn isolated child agents to work on tasks in parallel. Each subagent gets its own conversation, terminal session, and toolset. Only the final summary comes back — intermediate tool calls never enter your context window.
 
-For the full feature reference, see [Subagent Delegation](/user-guide/features/delegation).
+For the full feature reference, see [Subagent Delegation](../user-guide/features/delegation.md).
 
 ---
 
@@ -25,7 +25,7 @@ For the full feature reference, see [Subagent Delegation](/user-guide/features/d
 - Mechanical multi-step work with logic between steps → `execute_code`
 - Tasks needing user interaction → subagents can't use `clarify`
 - Quick file edits → do them directly
-- Durable long-running work that must survive session closure or process restart → `cronjob` or `terminal(background=True, notify_on_complete=True)`. Top-level delegation is asynchronous but still process-local.
+- Durable long-running work that must survive session closure or process restart → `cronjob_manage` or `terminal(background=True, notify_on_complete=True)`. Top-level delegation is asynchronous but still process-local.
 
 ---
 
@@ -42,7 +42,7 @@ Research these three topics in parallel:
 Focus on recent developments and key players.
 ```
 
-Behind the scenes, Qubit uses:
+Behind the scenes, Hermes uses:
 
 ```python
 delegate_task(tasks=[
@@ -159,7 +159,7 @@ Use `execute_code` for mechanical data gathering, then delegate the reasoning-he
 ```python
 # Step 1: Mechanical gathering (execute_code is better here — no reasoning needed)
 execute_code("""
-from qubit_tools import web_search, web_extract
+from hermes_tools import web_search, web_extract
 
 results = []
 for query in ["AI funding Q1 2026", "AI startup acquisitions 2026", "AI IPOs 2026"]:
@@ -172,8 +172,8 @@ urls = [r["url"] for r in results[:5]]
 content = web_extract(urls)
 
 # Save for the analysis step
-import json
-with open("/tmp/ai-funding-data.json", "w") as f:
+import json, os
+with open(os.path.expanduser("~/.hermes/cache/scratch/ai-funding-data.json"), "w") as f:
     json.dump({"search_results": results, "extracted": content["results"]}, f)
 print(f"Collected {len(results)} results, extracted {len(content['results'])} pages")
 """)
@@ -181,7 +181,7 @@ print(f"Collected {len(results)} results, extracted {len(content['results'])} pa
 # Step 2: Reasoning-heavy analysis (delegation is better here)
 delegate_task(
     goal="Analyze AI funding data and write a market report",
-    context="""Raw data at /tmp/ai-funding-data.json contains search results and
+    context="""Raw data at ~/.hermes/cache/scratch/ai-funding-data.json contains search results and
     extracted web pages about AI funding, acquisitions, and IPOs in Q1 2026.
     Write a structured market report: key deals, trends, notable players,
     and outlook. Focus on deals over $100M."""
@@ -194,20 +194,20 @@ This is often the most efficient pattern: `execute_code` handles the 10+ sequent
 
 ## Inherited Tool Access
 
-Subagents inherit the parent's enabled toolsets. `delegate_task` does not accept a model-facing `toolsets` parameter, so delegated work cannot grant itself capabilities that the parent does not have. Configure the parent's tools before starting the conversation when a delegated task needs web, terminal, file, or other access. Qubit still strips child-blocked tools such as `clarify`, `memory`, and `send_message`; children keep `execute_code` for programmatic tool calling.
+Subagents inherit the parent's enabled toolsets. `delegate_task` does not accept a model-facing `toolsets` parameter, so delegated work cannot grant itself capabilities that the parent does not have. Configure the parent's tools before starting the conversation when a delegated task needs web, terminal, file, or other access. Hermes still strips child-blocked tools such as `clarify`, `memory`, and `send_message`; children keep `execute_code` for programmatic tool calling.
 
 ---
 
 ## Constraints
 
-- **Default 3 parallel tasks**: batches default to 3 concurrent subagents (configurable via `delegation.max_concurrent_children` in config.yaml, no hard ceiling, only a floor of 1)
+- **Default 10 parallel tasks**: batches default to 10 concurrent subagents (configurable via `delegation.max_concurrent_children` in config.yaml, no hard ceiling, only a floor of 1)
 - **Nested delegation is opt-in**: leaf subagents (default) cannot call `delegate_task`, `clarify`, `memory`, or `execute_code`. Orchestrator subagents (`role="orchestrator"`) retain `delegate_task` for further delegation, but only when `delegation.max_spawn_depth` is raised above the default of 1 (floor 1, no ceiling); the other three remain blocked. Disable globally via `delegation.orchestrator_enabled: false`.
 
 ### Tuning Concurrency and Depth
 
 | Config | Default | Range | Effect |
 |--------|---------|-------|--------|
-| `max_concurrent_children` | 3 | >=1 | Parallel batch size per `delegate_task` call |
+| `max_concurrent_children` | 10 | >=1 | Parallel batch size per `delegate_task` call |
 | `max_spawn_depth` | 1 | >=1 | How many delegation levels can spawn further |
 
 Example: running 30 parallel workers with nested subagents:
@@ -220,8 +220,8 @@ delegation:
 
 - **Separate terminals** — each subagent gets its own terminal session with separate working directory and state
 - **No conversation history** — subagents see only the `goal` and `context` the parent agent passes when calling `delegate_task`
-- **Default 50 iterations** — set `max_iterations` lower for simple tasks to save cost
-- **Not durable** — top-level delegation runs in the background and posts its result back later, but it remains tied to the owning session and Qubit process. Session closure, `/stop`, `/new`, or a process restart can cancel or strand in-progress work. Use `cronjob` or `terminal(background=True, notify_on_complete=True)` for work that must survive those boundaries.
+- **Default 250 iterations** — set `delegation.max_iterations` lower in `config.yaml` for fleets of simple tasks to save cost
+- **Not durable** — top-level delegation runs in the background and posts its result back later, but it remains tied to the owning session and Hermes process. Session closure, `/stop`, `/new`, or a process restart can cancel or strand in-progress work. Use `cronjob_manage` or `terminal(background=True, notify_on_complete=True)` for work that must survive those boundaries.
 
 ---
 
@@ -239,4 +239,4 @@ delegation:
 
 ---
 
-*For the complete delegation reference — all parameters, ACP integration, and advanced configuration — see [Subagent Delegation](/user-guide/features/delegation).*
+*For the complete delegation reference — all parameters, ACP integration, and advanced configuration — see [Subagent Delegation](../user-guide/features/delegation.md).*

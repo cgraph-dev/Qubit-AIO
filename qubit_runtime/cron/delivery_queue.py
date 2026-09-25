@@ -22,7 +22,6 @@ from typing import Any, Callable, Iterator, Optional
 
 from agent.redact import redact_sensitive_text
 from cron.executions import _owner_is_live, _process_start_time
-from qubit_cli.sqlite_util import add_column_if_missing
 from qubit_constants import get_qubit_home
 from qubit_time import now as _qubit_now
 
@@ -86,6 +85,8 @@ def _path() -> Path:
 
 
 def _initialize_schema(conn: sqlite3.Connection) -> None:
+    from qubit_cli.sqlite_util import add_column_if_missing
+
     # SQLite cannot widen a CHECK in place. Preserve all old rows atomically,
     # including claimed sends, while admitting a distinct never-sent disposition.
     for table in ("deliveries", "delivery_tombstones"):
@@ -134,20 +135,17 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
 
 
 def _connect() -> sqlite3.Connection:
+    # Late imports: a scheduler daemon that outlives an on-disk upgrade already has the OLD
+    # ``qubit_cli.sqlite_util`` / ``cron.jobs`` cached, so new names must be resolved at call time,
+    # not at import time (the guarantee cron/ledger.py used to carry, see e24c8499).
+    from qubit_cli.sqlite_util import open_db
+
     path = _path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, timeout=5)
+    conn = open_db(path, db_label="cron/deliveries.db", synchronous_full=True, initialize=_initialize_schema)
     try:
         path.chmod(0o600)
     except OSError:
         pass
-    conn.row_factory = sqlite3.Row
-    from qubit_state_wal import apply_wal_with_fallback
-
-    conn.execute("PRAGMA busy_timeout=5000")
-    apply_wal_with_fallback(conn, db_label="cron/deliveries.db")
-    conn.execute("PRAGMA synchronous=FULL")
-    _initialize_schema(conn)
     return conn
 
 
@@ -156,13 +154,10 @@ def _transaction() -> Iterator[sqlite3.Connection]:
     # Pruning is done explicitly by the paths that create terminal
     # rows (_finish / recover_abandoned / _terminalize_wait_timeout);
     # read-only polls must not pay for a full-table UPDATE + COUNT.
-    with _lock:
-        conn = _connect()
-        try:
-            with conn:
-                yield conn
-        finally:
-            conn.close()
+    from qubit_cli.sqlite_util import transaction
+
+    with _lock, transaction(_connect()) as conn:
+        yield conn
 
 
 def enqueue(

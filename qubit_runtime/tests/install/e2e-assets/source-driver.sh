@@ -47,7 +47,7 @@ accept_installer_marker() {
 # Deliberately NOT used for `--version` probes: those stay under
 # HERMES_DISABLE_LAZY_INSTALLS so a probe can never complete an unfinished
 # update. Only a real startup may heal.
-source_hermes_for_startup() {
+source_qubit_for_startup() {
   local root="$1" command="$1/.hermes/bin/hermes"
   if [ -f "$command" ] && [ -x "$command" ]; then
     printf '%s\n' "$command"; return 0

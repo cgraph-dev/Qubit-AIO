@@ -6,7 +6,7 @@
 # (b) imports it at module level from qubit_cli/config.py (re-imported by the old updater's
 #     config-migration step → stale-symbol ImportError class, #111271/#112604), and
 # (c) tags the completion line from update_cmd_maint.py with which code printed it,
-# then runs `qubit update` from the installed clone and reads the receipt + output.
+# then runs `hermes update` from the installed clone and reads the receipt + output.
 #
 #   evals/update_pipeline/post_swap_handoff_ab.sh <repo> <installed-sha> <label>
 #

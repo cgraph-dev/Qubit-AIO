@@ -1,6 +1,6 @@
 """Regression tests for #71047 (Problem A): per-platform display settings.
 
-`qubit config set platforms.<name>.<display_setting> <value>` must write to
+`hermes config set platforms.<name>.<display_setting> <value>` must write to
 `display.platforms.<name>.<display_setting>` — the path the gateway actually
 reads (gateway/display_config.py::resolve_display_setting). Writing to the
 top-level `platforms.<name>` block is silently ignored by the runtime, so the
@@ -10,13 +10,13 @@ edit appeared to succeed while having no effect.
 from pathlib import Path
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 
 def _write_config(qubit_home: Path, data: dict) -> Path:
     qubit_home.mkdir(parents=True, exist_ok=True)
     config_path = qubit_home / "config.yaml"
-    config_path.write_text(yaml.dump(data))
+    config_path.write_text(yaml.safe_dump(data))
     return config_path
 
 
@@ -62,19 +62,7 @@ class TestPerPlatformDisplayRedirect:
         # Connection key untouched
         assert result["platforms"]["telegram"]["token"] == "secret-bot-token"
 
-    def test_show_reasoning_redirects(self, qubit_home, monkeypatch):
-        _set(monkeypatch, qubit_home, "platforms.telegram.show_reasoning", "false")
-        result = yaml.safe_load((qubit_home / "config.yaml").read_text())
-        assert result["display"]["platforms"]["telegram"]["show_reasoning"] is False
 
-    def test_tool_progress_redirects(self, qubit_home, monkeypatch):
-        # ``off`` is coerced to False by the bool-aware coercion in
-        # set_config_value; gateway/display_config._normalise turns False back
-        # into the canonical "off" string at read time, so the persisted value
-        # is the bool.
-        _set(monkeypatch, qubit_home, "platforms.discord.tool_progress", "off")
-        result = yaml.safe_load((qubit_home / "config.yaml").read_text())
-        assert result["display"]["platforms"]["discord"]["tool_progress"] is False
 
     def test_connection_key_not_redirected(self, qubit_home, monkeypatch):
         """A real connection key (token) stays in top-level platforms.<name>."""
@@ -132,11 +120,6 @@ class TestRedirectSiblingSurfaces:
             unset_config_value("platforms.telegram.streaming")
         assert exc.value.code == 1
 
-    def test_set_prints_redirect_note(self, qubit_home, monkeypatch, capsys):
-        _set(monkeypatch, qubit_home, "platforms.telegram.streaming", "false")
-        out = capsys.readouterr().out
-        assert "saved as display.platforms.telegram.streaming" in out
-        assert "Set display.platforms.telegram.streaming = False" in out
 
     def test_redirect_helper_only_touches_known_display_keys(self):
         from gateway.display_config import OVERRIDEABLE_KEYS

@@ -1,17 +1,17 @@
 ---
 sidebar_position: 30
-title: "Qubit Relay"
-description: "Connect Qubit to messaging platforms through a relay connector that owns the platform credentials — enrollment, capabilities, config, and troubleshooting"
+title: "Hermes Relay"
+description: "Connect Hermes to messaging platforms through a relay connector that owns the platform credentials — enrollment, capabilities, config, and troubleshooting"
 ---
 
-# Qubit Relay (Connector)
+# Hermes Relay (Connector)
 
 :::warning Experimental
 Relay is **experimental**. The wire contract, auth scheme, and configuration
 may change without a deprecation cycle while the system is being validated.
 :::
 
-Qubit Relay is not a chat platform itself — it is a **connector system** that
+Hermes Relay is not a chat platform itself — it is a **connector system** that
 lets your gateway front one or more real messaging platforms (Discord,
 Telegram, Slack, WhatsApp, …) **without holding any platform credentials**. A
 separate service, the *connector*, owns the platform bot tokens and sockets.
@@ -41,28 +41,28 @@ Relay is for deployments where a hosted or shared connector service manages
 the platform side — for example multi-tenant hosting where one shared bot
 fronts many users' agents, or setups where you don't want bot tokens on the
 gateway machine. If you run your own bots directly, use the native platform
-adapters ([Telegram](/user-guide/messaging/telegram),
-[Discord](/user-guide/messaging/discord), etc.) instead.
+adapters ([Telegram](./telegram.md),
+[Discord](./discord.md), etc.) instead.
 
 ## Enrollment
 
 A self-hosted gateway authenticates to the connector with a per-gateway
-secret. `qubit gateway enroll` redeems a **single-use enrollment token**
+secret. `hermes gateway enroll` redeems a **single-use enrollment token**
 (minted by the connector when your tenant's route is provisioned and delivered
 with your gateway config) for that secret:
 
 ```bash
-qubit gateway enroll \
+hermes gateway enroll \
   --token <enrollment-token> \
   --connector-url wss://connector.example.com/relay
 ```
 
 What it does:
 
-1. Resolves a fresh Qubit Labs access token from your existing login
-   (`~/.hermes/auth.json`) — this proves which Qubit org (tenant) you own. If
+1. Resolves a fresh Nous Portal access token from your existing login
+   (`~/.hermes/auth.json`) — this proves which Nous org (tenant) you own. If
    `gateway.idp.token_url` is configured, your own IdP is used instead (the
-   air-gapped / self-hosted-IdP path, no Qubit Labs involved): with
+   air-gapped / self-hosted-IdP path, no Nous Portal involved): with
    `client_id`/`client_secret` configured it performs a generic OAuth2
    client-credentials grant; with neither configured the URL is treated as an
    ambient token endpoint (plain GET whose response body is the token — the
@@ -89,19 +89,40 @@ Flags:
 | `--wake-url` | Optional reachable URL the connector pokes (payload-free GET) to wake this gateway when buffered work arrives while it is idle. Persisted as `GATEWAY_RELAY_WAKE_URL`. Without it the gateway still drains buffered messages whenever it next reconnects. |
 
 :::note Managed installs
-`qubit gateway enroll` refuses to run in managed/hosted installs — there the
+`hermes gateway enroll` refuses to run in managed/hosted installs — there the
 hosting platform provisions the relay secret directly into the container
 environment.
 :::
 
 ## Configuration
 
-Relay activates when a connector relay URL is configured — there is no
-separate feature flag. Deployments that don't set it are unaffected.
+Relay activates when a connector relay URL is configured. To keep a profile off
+the relay even when the deployment injects a URL, disable the platform in
+`config.yaml`:
+
+```yaml
+platforms:
+  relay:
+    enabled: false
+```
+
+- **Explicit disable wins.** With `enabled: false` the gateway does not resolve
+  an identity token, provision or rewrite `GATEWAY_RELAY_*` credentials, register
+  the relay adapter or send the relevance policy — even with `gateway.relay_url`
+  or `GATEWAY_RELAY_URL` set. Native messaging adapters connect as if no relay
+  URL were present, and cron delivery treats no platform as relay-fronted.
+- **Omitting `enabled` keeps URL-based activation.** `enabled: true` still needs
+  a connector URL. A `gateway.json` `enabled: false` is advisory, as for every
+  other platform; put the opt-out in `config.yaml` (user or managed).
+
+The verdict comes from the same files and merge the gateway loader uses (top-level
+or `gateway.platforms` block, managed overlay) and is applied at activation time.
+Restart the gateway after changing it; an open relay socket is not torn down.
+`hermes gateway enroll` remains available while runtime relay is disabled.
 
 | Setting | Where | Meaning |
 |---------|-------|---------|
-| `GATEWAY_RELAY_URL` | env (`~/.hermes/.env`) | Connector relay WebSocket URL. Presence enables the relay platform. |
+| `GATEWAY_RELAY_URL` | env (`~/.hermes/.env`) | Connector relay WebSocket URL. Enables relay unless explicitly disabled in platform configuration. |
 | `gateway.relay_url` | `config.yaml` | Same as above, config-file form (env takes precedence). |
 | `GATEWAY_RELAY_ID` | env | This gateway instance's id (written by `enroll`). |
 | `GATEWAY_RELAY_SECRET` | env | Per-gateway secret authenticating the WebSocket upgrade (written by `enroll`). |
@@ -109,7 +130,7 @@ separate feature flag. Deployments that don't set it are unaffected.
 | `GATEWAY_RELAY_WAKE_URL` / `gateway.relay_wake_url` | env / `config.yaml` | Optional wake-poke target for idle/suspended gateways. |
 | `GATEWAY_RELAY_PLATFORMS` | env | Comma-separated list of platforms this gateway fronts over one connection (e.g. `discord,telegram`). Usually stamped by the deployment/orchestrator. |
 | `GATEWAY_RELAY_BOT_IDS` | env | JSON map of per-platform bot identities, e.g. `{"discord": {"botId": "…"}}`. Paired with `GATEWAY_RELAY_PLATFORMS`. |
-| `gateway.idp.token_url` | `config.yaml` | When set, enrollment/provisioning authenticates against your own IdP instead of Qubit Labs: OAuth2 client-credentials when `gateway.idp.client_id`/`client_secret` are also set; otherwise an ambient token endpoint (plain GET returning the token, raw or `{"access_token": …}`). |
+| `gateway.idp.token_url` | `config.yaml` | When set, enrollment/provisioning authenticates against your own IdP instead of Nous Portal: OAuth2 client-credentials when `gateway.idp.client_id`/`client_secret` are also set; otherwise an ambient token endpoint (plain GET returning the token, raw or `{"access_token": …}`). |
 
 ## Supported capabilities
 
@@ -161,7 +182,7 @@ outbound message tagged for the platform it targets.
 ## Troubleshooting
 
 **Enrollment fails with 401** — the connector could not verify your identity
-token. Re-login with `qubit auth add qubit` (or `qubit setup`) and retry.
+token. Re-login with `hermes auth add nous` (or `hermes setup`) and retry.
 
 **Enrollment fails with 403** — the enrollment token is invalid, expired,
 already used, or belongs to a different tenant. Enrollment tokens are
@@ -183,7 +204,7 @@ stops reconnecting and reports relay as disabled rather than retrying. A 4401
 not-yet-provisioned race and retried normally.
 
 **Nothing changed after enrolling** — the gateway reads `GATEWAY_RELAY_*` at
-startup. Restart it (`qubit gateway restart`).
+startup. Restart it (`hermes gateway restart`).
 
 **A feature (buttons, media, threads…) silently degrades to plain text** — the
 connector for your platform did not advertise that operation in its handshake

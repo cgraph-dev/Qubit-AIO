@@ -50,7 +50,7 @@ def drive_cron(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult:
     # worker this driver cannot observe — a harness problem, not a parity result.
     assert "Ran now:" in ran.stdout, f"hermes cron run did not execute synchronously: {ran.stdout[-1000:]}"
 
-    outputs = sorted((ph.hermes_home / "cron" / "output" / job_id).glob("*.md"))
+    outputs = sorted((ph.qubit_home / "cron" / "output" / job_id).glob("*.md"))
     final_text = None
     if outputs:
         body = outputs[-1].read_text(encoding="utf-8")

@@ -120,8 +120,8 @@ export const es: Translations = {
     starting: "Iniciando",
     startedInBackground: "Iniciado en segundo plano — revisa los registros para ver el progreso",
     stopped: "Detenido",
-    updateQubit: "Actualizar Qubit",
-    updatingQubit: "Actualizando Qubit…",
+    updateHermes: "Actualizar Qubit",
+    updatingHermes: "Actualizando Qubit…",
     waitingForOutput: "Esperando salida…",
   },
 
@@ -165,6 +165,10 @@ export const es: Translations = {
     failedToDeleteSelected: "No se pudieron eliminar las sesiones seleccionadas",
     resumeInChat: "Reanudar en el chat",
     newChat: "Nuevo chat",
+    workspace: "espacio de trabajo",
+    workspaceDefault: "Predeterminado",
+    workspaceRescan: "Volver a buscar repositorios",
+    workspaceCustom: "Otra ruta…",
     previousPage: "Página anterior",
     nextPage: "Página siguiente",
     roles: {
@@ -325,6 +329,8 @@ export const es: Translations = {
     disableRuntime: "Deshabilitar",
     enableAfterInstall: "Habilitar tras instalar",
     enableRuntime: "Habilitar",
+    toggleTakesEffectAfterRestart:
+      "Guardado: reinicia el gateway para aplicar el cambio.",
     forceReinstall: "Forzar reinstalación (eliminar carpeta existente primero)",
     headline:
       "Descubre, instala, habilita y actualiza complementos de Qubit (equivalente a `qubit plugins`).",
@@ -344,8 +350,8 @@ export const es: Translations = {
     providersHint:
       "Escribe memory.provider (vacío = incorporado) y context.engine en config.yaml. Surte efecto en la próxima sesión.",
     refreshDashboard: "Volver a escanear extensiones del panel",
-    removeConfirm: "¿Eliminar este complemento de $QUBIT_HOME/plugins/?",
-    removeHint: "Solo se pueden eliminar complementos instalados por el usuario en $QUBIT_HOME/plugins.",
+    removeConfirm: "¿Eliminar este complemento de ~/.hermes/plugins/?",
+    removeHint: "Solo se pueden eliminar complementos instalados por el usuario en ~/.hermes/plugins.",
     rescanHeading: "Registro de complementos SPA",
     rescanHint: "Vuelve a escanear tras añadir archivos en disco para que la barra lateral del panel detecte nuevos manifiestos.",
     runtimeHeading: "Tiempo de ejecución del Gateway (complementos YAML)",
@@ -367,7 +373,7 @@ export const es: Translations = {
     all: "Todas",
     categories: "Categorías",
     filters: "Filtros",
-    noSkills: "No se encontraron habilidades. Las habilidades se cargan desde ~/.qubit/skills/",
+    noSkills: "No se encontraron habilidades. Las habilidades se cargan desde ~/.hermes/skills/",
     noSkillsMatch: "Ninguna habilidad coincide con tu búsqueda o filtro.",
     skillCount: "{count} habilidad{s}",
     resultCount: "{count} resultado{s}",
@@ -381,7 +387,7 @@ export const es: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "Filtros",
     sections: "Secciones",
     exportConfig: "Exportar configuración como JSON",

@@ -1,4 +1,4 @@
-# nix/nixosModules.nix — the NixOS module for qubit-runtime
+# nix/nixosModules.nix — the NixOS module for hermes-agent
 #
 # This module shares its options, its renderers for config.yaml, .env and
 # documents, and its state setup with the Home Manager module
@@ -13,7 +13,7 @@
 # Container mode: qubit runs from /nix/store bind-mounted read-only into a
 # plain Ubuntu container. The writable layer (apt/pip/npm installs) persists
 # across restarts and agent updates. Only image/volume/options changes trigger
-# container recreation. Environment variables are written to $QUBIT_HOME/.env
+# container recreation. Environment variables are written to $HERMES_HOME/.env
 # and read by qubit at startup — no container recreation needed for env changes.
 #
 # Tool resolution: the qubit wrapper uses --suffix PATH for nix store tools,
@@ -23,7 +23,7 @@
 # writable tool prefixes for npm i -g, pip install, uv tool install, etc.
 #
 # Usage:
-#   services.qubit-runtime = {
+#   services.hermes-agent = {
 #     enable = true;
 #     settings.model.default = "anthropic/claude-sonnet-4";
 #     environmentFiles = [ config.sops.secrets."qubit/env".path ];
@@ -41,24 +41,24 @@
     }:
 
     let
-      cfg = config.services.qubit-runtime;
+      cfg = config.services.hermes-agent;
       common = import ./moduleCommon.nix { inherit lib; };
 
       effectivePackage = common.effectivePackage cfg;
-      qubit-runtime = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      hermes-agent = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
-      hermesHome = "${cfg.stateDir}/.qubit";
+      hermesHome = "${cfg.stateDir}/.hermes";
 
       # In container mode, the agent uses the mount path in the container.
       effectiveWorkDir = if cfg.container.enable then containerWorkDir else cfg.workingDirectory;
 
       # config.yaml mode: group-writable (0660) when interactive users share this
-      # QUBIT_HOME via addToSystemPackages, so they can save settings through the
+      # HERMES_HOME via addToSystemPackages, so they can save settings through the
       # CLI/TUI without hitting EACCES; otherwise group-read-only (0640). Secrets
       # (.env) stay 0640 regardless.
       configYamlMode = if cfg.addToSystemPackages then "0660" else "0640";
 
-      containerName = "qubit-runtime";
+      containerName = "hermes-agent";
       containerDataDir = "/data"; # stateDir mount point inside container
       containerHomeDir = "/home/qubit";
 
@@ -72,7 +72,7 @@
       # Runs as root inside the container on every start. Provisions the
       # qubit user + sudo on first boot (writable layer persists), then
       # drops privileges. Supports arbitrary base images (Debian, Alpine, etc).
-      containerEntrypoint = pkgs.writeShellScript "qubit-container-entrypoint" ''
+      containerEntrypoint = pkgs.writeShellScript "hermes-container-entrypoint" ''
         set -eu
 
         HERMES_UID="''${HERMES_UID:?HERMES_UID must be set}"
@@ -85,7 +85,7 @@
         if [ -n "$EXISTING_GROUP" ]; then
           GROUP_NAME="$EXISTING_GROUP"
         else
-          GROUP_NAME="qubit"
+          GROUP_NAME="hermes"
           if command -v groupadd >/dev/null 2>&1; then
             groupadd -g "$HERMES_GID" "$GROUP_NAME"
           elif command -v addgroup >/dev/null 2>&1; then
@@ -99,7 +99,7 @@
           TARGET_USER=$(echo "$PASSWD_ENTRY" | cut -d: -f1)
           TARGET_HOME=$(echo "$PASSWD_ENTRY" | cut -d: -f6)
         else
-          TARGET_USER="qubit"
+          TARGET_USER="hermes"
           TARGET_HOME="/home/qubit"
           if command -v useradd >/dev/null 2>&1; then
             useradd -u "$HERMES_UID" -g "$HERMES_GID" -m -d "$TARGET_HOME" -s /bin/bash "$TARGET_USER"
@@ -111,13 +111,13 @@
         chown "$HERMES_UID:$HERMES_GID" "$TARGET_HOME"
         chmod 0750 "$TARGET_HOME"
 
-        # Ensure QUBIT_HOME is owned by the target user.
+        # Ensure HERMES_HOME is owned by the target user.
         # Use find instead of chown -R: chown strips the setgid bit (kernel
         # behavior), destroying the 2770 permissions the NixOS activation
         # script sets for group access by hostUsers.  Only touch files with
         # wrong ownership so correctly-owned dirs keep their permission bits.
-        if [ -n "''${QUBIT_HOME:-}" ] && [ -d "$QUBIT_HOME" ]; then
-          find "$QUBIT_HOME" \! -user "$HERMES_UID" -exec chown "$HERMES_UID:$HERMES_GID" {} +
+        if [ -n "''${HERMES_HOME:-}" ] && [ -d "$HERMES_HOME" ]; then
+          find "$HERMES_HOME" \! -user "$HERMES_UID" -exec chown "$HERMES_UID:$HERMES_GID" {} +
         fi
 
         # ── Provision apt packages (first boot only, cached in writable layer) ──
@@ -125,7 +125,7 @@
         # nodejs/npm: writable node so npm i -g works (nix store copies are read-only)
         #   Node 22 via NodeSource — Ubuntu 24.04 ships Node 18 which is EOL.
         # curl: needed for uv installer + NodeSource setup
-        if [ ! -f /var/lib/qubit-tools-provisioned ] && command -v apt-get >/dev/null 2>&1; then
+        if [ ! -f /var/lib/hermes-tools-provisioned ] && command -v apt-get >/dev/null 2>&1; then
           echo "First boot: provisioning agent tools..."
           apt-get update -qq
           apt-get install -y -qq sudo curl ca-certificates gnupg
@@ -136,7 +136,7 @@
             > /etc/apt/sources.list.d/nodesource.list
           apt-get update -qq
           apt-get install -y -qq nodejs
-          touch /var/lib/qubit-tools-provisioned
+          touch /var/lib/hermes-tools-provisioned
         fi
 
         if command -v sudo >/dev/null 2>&1 && [ ! -f /etc/sudoers.d/qubit ]; then
@@ -178,7 +178,7 @@
 
       # Identity hash — only recreate container when structural config changes.
       # Package and entrypoint use stable symlinks (current-package, current-entrypoint)
-      # so they can update without recreation. Env vars go through $QUBIT_HOME/.env.
+      # so they can update without recreation. Env vars go through $HERMES_HOME/.env.
       containerIdentity = builtins.hashString "sha256" (
         builtins.toJSON {
           schema = 4; # bump when identity inputs change (4: Node 18→22 via NodeSource)
@@ -192,7 +192,7 @@
 
       # The CLI on the host reads this file, in get_container_exec_info. The
       # file tells the CLI to run in the container and not on the host.
-      containerModeFile = pkgs.writeText "qubit-container-mode" ''
+      containerModeFile = pkgs.writeText "hermes-container-mode" ''
         # Written by the NixOS activation script. Do not edit manually.
         backend=${cfg.container.backend}
         container_name=${containerName}
@@ -240,12 +240,19 @@
 
       unitPath = common.processPath { inherit pkgs cfg; };
 
+      # Whether the service uid gets a systemd user manager, and with it the
+      # user bus that restart-safe cron workers need (see the `linger` attribute
+      # under createUser). Read back off `config` rather than assumed, so an
+      # operator who declares the user themselves — or who turns the default off
+      # — does not pay for a bus that will never arrive.
+      lingerEnabled = ((config.users.users.${cfg.user} or { }).linger or false) == true;
+
     in
     {
-      options.services.qubit-runtime =
+      options.services.hermes-agent =
         common.sharedOptions {
-          defaultPackage = qubit-runtime;
-          defaultPackageText = lib.literalExpression "qubit-runtime.packages.\${system}.default";
+          defaultPackage = hermes-agent;
+          defaultPackageText = lib.literalExpression "hermes-agent.packages.\${system}.default";
           defaultWorkingDirectory = "${cfg.stateDir}/workspace";
           defaultWorkingDirectoryText = lib.literalExpression ''"''${cfg.stateDir}/workspace"'';
         }
@@ -255,13 +262,13 @@
             # ── Service identity ───────────────────────────────────────────
             user = mkOption {
               type = types.str;
-              default = "qubit";
+              default = "hermes";
               description = "System user running the gateway.";
             };
 
             group = mkOption {
               type = types.str;
-              default = "qubit";
+              default = "hermes";
               description = "System group running the gateway.";
             };
 
@@ -275,7 +282,7 @@
             stateDir = mkOption {
               type = types.str;
               default = "/var/lib/qubit";
-              description = "State directory. Contains .qubit/ subdir (QUBIT_HOME).";
+              description = "State directory. Contains .hermes/ subdir (HERMES_HOME).";
             };
 
             addToSystemPackages = mkOption {
@@ -283,7 +290,7 @@
               default = false;
               description = ''
                 Add the qubit CLI to environment.systemPackages and export
-                QUBIT_HOME system-wide (via environment.variables) so interactive
+                HERMES_HOME system-wide (via environment.variables) so interactive
                 shells share state with the gateway service.
               '';
             };
@@ -324,7 +331,7 @@
                 type = types.listOf types.str;
                 default = [ ];
                 description = ''
-                  Interactive users who get a ~/.qubit symlink to the service
+                  Interactive users who get a ~/.hermes symlink to the service
                   stateDir. These users are automatically added to the qubit group.
                 '';
                 example = [ "sidbin" ];
@@ -338,7 +345,7 @@
 
           # ── Merge MCP servers into settings ────────────────────────────────
           (lib.mkIf (cfg.mcpServers != { }) {
-            services.qubit-runtime.settings.mcp_servers = common.mcpServersToConfig cfg.mcpServers;
+            services.hermes-agent.settings.mcp_servers = common.mcpServersToConfig cfg.mcpServers;
           })
 
           # ── User / group ──────────────────────────────────────────────────
@@ -350,16 +357,26 @@
               home = cfg.stateDir;
               createHome = true;
               shell = pkgs.bashInteractive;
+
+              # The cron scheduler launches every job in a transient `systemd-run
+              # --user --scope` so a gateway restart cannot kill a running job,
+              # and that needs a systemd user manager for this uid. A system
+              # service has no /run/user/<uid> unless the uid lingers, and the
+              # dispatch fails closed — without this, no cron job runs at all.
+              #
+              # Needs nixpkgs >= 25.05 (users.manageLingering). In container mode cron
+              # runs inside the container, so the host uid needs no user manager.
+              linger = lib.mkDefault (!cfg.container.enable);
             };
           })
 
           # ── Host CLI ──────────────────────────────────────────────────────
-          # Add the qubit CLI to system PATH and export QUBIT_HOME system-wide
+          # Add the qubit CLI to system PATH and export HERMES_HOME system-wide
           # so interactive shells share state (sessions, skills, cron) with the
-          # gateway service instead of creating a separate ~/.qubit/.
+          # gateway service instead of creating a separate ~/.hermes/.
           (lib.mkIf cfg.addToSystemPackages {
             environment.systemPackages = [ effectivePackage ];
-            environment.variables.QUBIT_HOME = hermesHome;
+            environment.variables.HERMES_HOME = hermesHome;
           })
 
           # ── Host user group membership ─────────────────────────────────────
@@ -374,16 +391,16 @@
             assertions =
               common.pluginNameAssertions {
                 inherit cfg;
-                optionPath = "services.qubit-runtime";
+                optionPath = "services.hermes-agent";
               }
               ++ common.workspaceFilesAssertions {
                 inherit cfg;
-                opt = options.services.qubit-runtime.workingDirectory;
-                optionPath = "services.qubit-runtime";
+                opt = options.services.hermes-agent.workingDirectory;
+                optionPath = "services.hermes-agent";
               }
               ++ common.backendBindAssertions {
                 inherit cfg;
-                optionPath = "services.qubit-runtime";
+                optionPath = "services.hermes-agent";
               }
               ++ [
                 {
@@ -391,7 +408,7 @@
                   # process needs its own container and its own ports. This
                   # module does not do that.
                   assertion = !(cfg.container.enable && cfg.backend.mode != "none");
-                  message = "services.qubit-runtime: backend.mode is not supported together with container.enable — the container runs the gateway only.";
+                  message = "services.hermes-agent: backend.mode is not supported together with container.enable — the container runs the gateway only.";
                 }
               ];
           }
@@ -413,7 +430,7 @@
             {
               warnings = [
                 ''
-                  services.qubit-runtime: container.enable is true and container.hostUsers
+                  services.hermes-agent: container.enable is true and container.hostUsers
                   is set, but addToSystemPackages is false. Without a host-installed qubit
                   binary, container routing will not work for interactive users.
                   Set addToSystemPackages = true or ensure qubit is on PATH.
@@ -435,7 +452,7 @@
 
           # ── Activation: link config + auth + documents ────────────────────
           {
-            system.activationScripts."qubit-runtime-setup" =
+            system.activationScripts."hermes-agent-setup" =
               lib.stringAfter
                 (
                   [ "users" ] ++ lib.optional (config.system.activationScripts ? setupSecrets) "setupSecrets"
@@ -498,12 +515,12 @@
                             user:
                             let
                               userHome = config.users.users.${user}.home;
-                              symlinkPath = "${userHome}/.qubit";
+                              symlinkPath = "${userHome}/.hermes";
                             in
                             ''
                               if [ -L "${symlinkPath}" ] && [ "$(readlink "${symlinkPath}")" = "${hermesHome}" ]; then
                                 rm -f "${symlinkPath}"
-                                echo "qubit-runtime: removed symlink ${symlinkPath}"
+                                echo "hermes-agent: removed symlink ${symlinkPath}"
                               fi
                             ''
                           ) cfg.container.hostUsers
@@ -512,7 +529,7 @@
                   }
 
                   # ── Symlink bridge for interactive users ───────────────────────
-                  # Create ~/.qubit -> stateDir/.qubit for each hostUser so the
+                  # Create ~/.hermes -> stateDir/.hermes for each hostUser so the
                   # host CLI shares state with the container service.
                   # Only runs when container mode is enabled.
                   ${lib.optionalString cfg.container.enable (
@@ -521,14 +538,14 @@
                         user:
                         let
                           userHome = config.users.users.${user}.home;
-                          symlinkPath = "${userHome}/.qubit";
+                          symlinkPath = "${userHome}/.hermes";
                         in
                         ''
                           if [ -d "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
                             # Real directory — back it up, then create symlink.
                             # (ln -sfn cannot atomically replace a directory.)
                             _backup="${symlinkPath}.bak.$(date +%s)"
-                            echo "qubit-runtime: backing up existing ${symlinkPath} to $_backup"
+                            echo "hermes-agent: backing up existing ${symlinkPath} to $_backup"
                             mv "${symlinkPath}" "$_backup"
                           fi
                           # For everything else (existing symlink, doesn't exist, etc.)
@@ -546,16 +563,44 @@
           # MODE A: Native systemd service (default)
           # ══════════════════════════════════════════════════════════════════
           (lib.mkIf (!cfg.container.enable) {
-            systemd.services.qubit-runtime = {
+            systemd.services.hermes-agent = {
               description = "Qubit Agent Gateway";
               wantedBy = [ "multi-user.target" ];
-              after = [ "network-online.target" ];
-              wants = [ "network-online.target" ];
+              # linger-users.service is the unit that runs `loginctl
+              # enable-linger` for a declared `users.users.<name>.linger`.
+              after = [
+                "network-online.target"
+              ]
+              ++ lib.optional lingerEnabled "linger-users.service";
+              wants = [
+                "network-online.target"
+              ]
+              ++ lib.optional lingerEnabled "linger-users.service";
 
               # cfg.environment and cfg.environmentFiles are written to
-              # $QUBIT_HOME/.env by the activation script. load_hermes_dotenv()
+              # $HERMES_HOME/.env by the activation script. load_hermes_dotenv()
               # reads them at Python startup — no systemd EnvironmentFile needed.
               environment = commonUnitEnvironment;
+
+              # Wait for the user bus that `systemd-run --user --scope` connects
+              # to. Ordering after linger-users.service is not enough on its own:
+              # `loginctl enable-linger` returns before logind has finished
+              # starting user@<uid>.service, and run_gateway() resolves
+              # XDG_RUNTIME_DIR / DBUS_SESSION_BUS_ADDRESS exactly once at
+              # startup — so a bus that appears after ExecStart is a bus this
+              # process never sees, for its whole lifetime.
+              #
+              # Bounded and non-fatal: a gateway without cron beats no gateway.
+              preStart = lib.mkIf lingerEnabled ''
+                for _ in $(seq 1 50); do
+                  [ -S "/run/user/$(id -u)/bus" ] && break
+                  sleep 0.2
+                done
+                if [ ! -S "/run/user/$(id -u)/bus" ]; then
+                  echo "hermes-agent: no user bus at /run/user/$(id -u)/bus after 10s;" \
+                       "restart-safe cron dispatch will fail for the life of this process" >&2
+                fi
+              '';
 
               serviceConfig = commonServiceConfig // {
                 ExecStart = lib.escapeShellArgs (common.gatewayArgv cfg);
@@ -567,9 +612,9 @@
 
           # ── The backend: qubit serve or qubit dashboard ─────────────────
           # This is a different process from the gateway. Both use one
-          # QUBIT_HOME.
+          # HERMES_HOME.
           (lib.mkIf (!cfg.container.enable && cfg.backend.mode != "none") {
-            systemd.services.qubit-backend = {
+            systemd.services.hermes-backend = {
               description = common.backendDescription cfg;
               wantedBy = [ "multi-user.target" ];
               after = [ "network-online.target" ];
@@ -592,7 +637,7 @@
             # Ensure the container runtime is available
             virtualisation.docker.enable = lib.mkDefault (cfg.container.backend == "docker");
 
-            systemd.services.qubit-runtime = {
+            systemd.services.hermes-agent = {
               description = "Qubit Agent Gateway (container)";
               wantedBy = [ "multi-user.target" ];
               after = [
@@ -637,7 +682,7 @@
                     ${lib.concatStringsSep " " (map (v: "--volume ${v}") cfg.container.extraVolumes)} \
                     --env HERMES_UID="$HERMES_UID" \
                     --env HERMES_GID="$HERMES_GID" \
-                    --env QUBIT_HOME=${containerDataDir}/.qubit \
+                    --env HERMES_HOME=${containerDataDir}/.hermes \
                     --env HERMES_MANAGED=true \
                     --env HOME=${containerHomeDir} \
                     ${lib.concatStringsSep " " cfg.container.extraOptions} \

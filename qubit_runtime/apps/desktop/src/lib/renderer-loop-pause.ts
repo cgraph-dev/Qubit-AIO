@@ -5,7 +5,7 @@ interface WindowStatePayload {
 
 export const RENDERER_ANIMATIONS_PAUSED_ATTRIBUTE = 'data-renderer-animations-paused'
 
-export function createRendererLoopPauseController(onChange: () => void, { pauseWhenUnfocused = true } = {}) {
+export function createRendererLoopPauseController(onChange: () => void, { pauseWhenUnfocused = false } = {}) {
   let windowPaused = false
   let windowFocused = document.hasFocus()
 
@@ -25,7 +25,7 @@ export function createRendererLoopPauseController(onChange: () => void, { pauseW
     }
   }
 
-  const offWindowState = window.qubitDesktop?.onWindowStateChanged?.((payload: WindowStatePayload) => {
+  const offWindowState = window.hermesDesktop?.onWindowStateChanged?.((payload: WindowStatePayload) => {
     const next = payload?.isMinimized === true || payload?.isVisible === false
 
     if (windowPaused === next) {
@@ -37,8 +37,11 @@ export function createRendererLoopPauseController(onChange: () => void, { pauseW
   })
 
   document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('blur', onBlur)
-  window.addEventListener('focus', onFocus)
+
+  if (pauseWhenUnfocused) {
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
+  }
 
   return {
     dispose: () => {

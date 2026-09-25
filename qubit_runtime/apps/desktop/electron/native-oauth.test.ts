@@ -103,7 +103,7 @@ test('resolveLoginStrategy returns embedded for all-password even without native
 
 test('resolveLoginStrategy returns native for native_pkce gateway with non-password provider', () => {
   const statusBody = { auth_required: true, auth_flows: ['cookie', 'native_pkce'] }
-  const providers = [{ name: 'nous', displayName: 'Qubit Labs', supportsPassword: false }]
+  const providers = [{ name: 'nous', displayName: 'Nous Research', supportsPassword: false }]
 
   assert.equal(resolveLoginStrategy(statusBody, { providers }), 'native')
 })

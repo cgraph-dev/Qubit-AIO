@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { type CSSProperties } from 'react'
 
 import { HackeryButton } from '../components/hackery-button'
-import { launchQubitDesktop } from '../store'
+import { launchHermesDesktop } from '../store'
 
 /*
  * Success screen. HERMES AGENT wordmark stays as the visual anchor
@@ -11,7 +11,7 @@ import { launchQubitDesktop } from '../store'
  * with a status line below.
  *
  * Launching the desktop can fail (e.g. Stage-Desktop was skipped and
- * Qubit.exe doesn't exist). We catch the Tauri error and surface it
+ * Hermes.exe doesn't exist). We catch the Tauri error and surface it
  * inline rather than silently doing nothing — the previous version
  * had `onClick={() => void launchHermesDesktop()}` which swallowed
  * the rejection and left the user staring at an unresponsive button.
@@ -25,7 +25,7 @@ export default function Success() {
     setLaunching(true)
 
     try {
-      await launchQubitDesktop()
+      await launchHermesDesktop()
       // On success the installer exits — control never returns here.
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -48,14 +48,14 @@ export default function Success() {
           }
         >
           <span>
-            <span>Qubit is ready</span>
+            <span>Hermes is ready</span>
           </span>
-          <span aria-hidden="true">Qubit is ready</span>
+          <span aria-hidden="true">Hermes is ready</span>
         </p>
 
         <p className="m-0 text-center text-base leading-normal tracking-tight text-muted-foreground">
           You can launch from here, or any time from your terminal with{' '}
-          <code className="font-mono text-sm text-foreground/80">qubit desktop</code>.
+          <code className="font-mono text-sm text-foreground/80">hermes desktop</code>.
         </p>
       </div>
 

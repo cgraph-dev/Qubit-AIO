@@ -11,14 +11,12 @@ from typing import Any
 MOA_MARKER_PREFIX = "__HERMES_MOA_TURN_V1__"
 DEFAULT_MOA_PRESET_NAME = "default"
 
-# Qubit ships no MoA provider. Upstream hardcoded reference/aggregator defaults,
-# which made an unconfigured MoA render as enabled with provider/models Qubit
-# does not have. Keep the defaults empty: an unconfigured MoA normalizes to no
-# slots (honest "unconfigured"), and the write path refuses to save fabricated
-# providers rather than silently substituting them.
-DEFAULT_MOA_REFERENCE_MODELS: list[dict[str, str]] = []
+DEFAULT_MOA_REFERENCE_MODELS: list[dict[str, str]] = [
+    {"provider": "openai-codex", "model": "gpt-5.5"},
+    {"provider": "openrouter", "model": "deepseek/deepseek-v4-pro"}]
 
-DEFAULT_MOA_AGGREGATOR: dict[str, str] = {}
+DEFAULT_MOA_AGGREGATOR: dict[str, str] = {
+    "provider": "openrouter", "model": "anthropic/claude-opus-4.8"}
 
 DEFAULT_MOA_REFERENCE_TIMEOUT: float | None = None
 
@@ -31,19 +29,19 @@ def _coerce_number(value: Any, cast, default=None, *, positive: bool = False):
     """Coerce ``value`` with ``cast`` (float/int); ``default`` when unset/blank/invalid.
 
     ``int`` also accepts float-looking strings ("3.0"). With ``positive`` the result must be > 0
-    (and finite for floats) or ``default`` is returned."""
+    or ``default`` is returned. Non-finite floats always fall back to ``default``."""
     if value is None or value == "":
         return default
     try:
         number = cast(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         if cast is not int:
             return default
         try:
             number = int(float(value))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return default
-    if positive and (number <= 0 or (cast is float and not math.isfinite(number))):
+    if (cast is float and not math.isfinite(number)) or (positive and number <= 0):
         return default
     return number
 

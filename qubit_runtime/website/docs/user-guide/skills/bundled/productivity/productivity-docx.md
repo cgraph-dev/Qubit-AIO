@@ -15,18 +15,18 @@ Create, read, edit, template, and review Word .docx files.
 | | |
 |---|---|
 | Source | Bundled (installed by default) |
-| Path | `skills/productivity\docx` |
+| Path | `skills/productivity/docx` |
 | Version | `1.1.0` |
-| Author | Qubit Labs |
+| Author | Nous Research |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `word`, `docx`, `documents`, `office`, `templates`, `revisions`, `comments` |
-| Related skills | [`pdf`](/docs/user-guide/skills/bundled/productivity/productivity-pdf), [`xlsx`](/docs/user-guide/skills/bundled/productivity/productivity-xlsx), [`powerpoint`](/docs/user-guide/skills/bundled/productivity/productivity-powerpoint) |
+| Related skills | [`pdf`](../../bundled/productivity/productivity-pdf.md), [`xlsx`](../../bundled/productivity/productivity-xlsx.md), [`powerpoint`](../../bundled/productivity/productivity-powerpoint.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Docx Skill

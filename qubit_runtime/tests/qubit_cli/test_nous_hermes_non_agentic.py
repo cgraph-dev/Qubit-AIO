@@ -1,11 +1,11 @@
 """Tests for the Nous-Hermes-3/4 non-agentic warning detector.
 
 Prior to this check, the warning fired on any model whose name contained
-``"qubit"`` anywhere (case-insensitive). That false-positived on unrelated
+``"hermes"`` anywhere (case-insensitive). That false-positived on unrelated
 local Modelfiles such as ``hermes-brain:qwen3-14b-ctx16k`` — a tool-capable
-Qwen3 wrapper that happens to live under the "qubit" tag namespace.
+Qwen3 wrapper that happens to live under the "hermes" tag namespace.
 
-``is_nous_hermes_non_agentic`` should only match the actual Nous Research
+``is_nous_qubit_non_agentic`` should only match the actual Nous Research
 Hermes-3 / Hermes-4 chat family.
 """
 
@@ -14,9 +14,9 @@ from __future__ import annotations
 import pytest
 
 from qubit_cli.model_switch import (
-    _QUBIT_MODEL_WARNING,
+    _HERMES_MODEL_WARNING,
     _check_qubit_model_warning,
-    is_nous_hermes_non_agentic,
+    is_nous_qubit_non_agentic,
 )
 
 
@@ -36,10 +36,10 @@ from qubit_cli.model_switch import (
         "hermes-3.1",
     ],
 )
-def test_matches_real_nous_hermes_chat_models(model_name: str) -> None:
-    assert is_nous_hermes_non_agentic(model_name), (
+def test_matches_real_nous_qubit_chat_models(model_name: str) -> None:
+    assert is_nous_qubit_non_agentic(model_name), (
         f"expected {model_name!r} to be flagged as Nous Hermes 3/4"
     )
-    assert _check_qubit_model_warning(model_name) == _QUBIT_MODEL_WARNING
+    assert _check_qubit_model_warning(model_name) == _HERMES_MODEL_WARNING
 
 

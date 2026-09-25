@@ -63,12 +63,12 @@ def live_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # HOME too (a sibling, not the parent: state.db's live-system guard treats
     # $HOME/.hermes as production), so nothing can resolve the developer's real home.
     home = tmp_path / "home"
-    hermes_home = tmp_path / "hermes_home"
+    qubit_home = tmp_path / "hermes_home"
     home.mkdir()
-    hermes_home.mkdir()
+    qubit_home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
-    return hermes_home
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    return qubit_home
 
 
 def _resolve(provider: str, model: str | None) -> dict:

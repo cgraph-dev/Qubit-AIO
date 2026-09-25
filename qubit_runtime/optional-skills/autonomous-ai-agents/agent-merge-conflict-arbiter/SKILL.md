@@ -8,7 +8,7 @@ platforms: [linux, macos, windows]
 metadata:
   qubit:
     tags: [Multi-Agent, Git, Merge-Conflict, Kanban, Arbitration]
-    related_skills: [qubit-agent]
+    related_skills: [hermes-agent]
 ---
 
 # Agent Merge-Conflict Arbiter

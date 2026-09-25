@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Sessions
 
-Qubit Agent automatically saves every conversation as a session. Sessions enable conversation resume, cross-session search, and full conversation history management.
+Hermes Agent automatically saves every conversation as a session. Sessions enable conversation resume, cross-session search, and full conversation history management.
 
 ## How Sessions Work
 
@@ -28,10 +28,10 @@ The SQLite database stores:
 
 ### What Counts Toward Context
 
-Qubit stores session history so it can resume conversations, but it does not
+Hermes stores session history so it can resume conversations, but it does not
 keep re-sending every byte it has ever handled. On each turn, the model sees
 the selected system prompt, the current conversation window, and any content
-Qubit explicitly injects for that turn.
+Hermes explicitly injects for that turn.
 
 Media attachments are handled as turn-scoped inputs:
 
@@ -44,8 +44,8 @@ Media attachments are handled as turn-scoped inputs:
   the raw image, audio, or binary file bytes are not repeatedly copied into
   future prompts.
 
-For example, if a user sends an image and asks Qubit to make a meme from it,
-Qubit may inspect that image once with vision and run an image-processing
+For example, if a user sends an image and asks Hermes to make a meme from it,
+Hermes may inspect that image once with vision and run an image-processing
 script. Future turns do not automatically carry the original JPEG in context.
 They carry only whatever was written into the conversation, such as the user's
 request, a short image description, a local cache path, or the final assistant
@@ -59,10 +59,13 @@ into chat.
 
 :::tip
 Use `/compress` when a session gets long, `/new` for a fresh thread, and
-`qubit sessions prune` only when you want to delete old ended sessions from
+`hermes sessions prune` only when you want to delete old ended sessions from
 storage. If `state.db` has simply grown large, start with the non-destructive
-option first: `qubit sessions optimize` merges FTS5 index segments and
-VACUUMs the database without touching any session data. Compression reduces the active context; it is not a privacy delete.
+option first: `hermes sessions optimize` merges FTS5 index segments and
+VACUUMs the database without touching any session data. Both `optimize` and `prune` refuse
+while another Hermes process (gateway, Desktop, dashboard, cron) holds `state.db` — stop it
+first, or pass `--force`; see [Session storage recovery](session-storage-recovery.md).
+Compression reduces the active context; it is not a privacy delete.
 Pass a name to `/new` (e.g. `/new payments-refactor`) to set the new session's
 initial title up front — useful for finding it later with `/resume <name>` or
 in the `/sessions` picker.
@@ -74,7 +77,8 @@ Each session is tagged with its source platform:
 
 | Source | Description |
 |--------|-------------|
-| `cli` | Interactive CLI (`qubit` or `qubit chat`) |
+| `cli` | Interactive CLI (`hermes` or `hermes chat`) |
+| `oneshot` | Finite non-interactive runs: `hermes chat --oneshot -q`, `-Q`, `hermes -z`, and `-q` on non-TTY stdio. Hidden from the TUI, Desktop and dashboard session pickers (like `kanban` and `tool`), even when launched from inside a TUI or Desktop session — the run inherits that transport's environment but is not that conversation. Still counts as CLI history: `hermes -c` / `--resume latest` continue the last one-shot, and `hermes sessions list` shows it. An explicit `--source <tag>` always wins (`hermes chat -q --source tui` is stored as `tui`). |
 | `telegram` | Telegram messenger |
 | `discord` | Discord server/DM |
 | `slack` | Slack workspace |
@@ -96,6 +100,10 @@ Each session is tagged with its source platform:
 | `acp` | ACP editor integration |
 | `cron` | Scheduled cron jobs |
 | `batch` | Batch processing runs |
+| `kanban` | Kanban dispatcher workers (read on the board, hidden from session pickers) |
+| `tool` | Third-party integrations (`--source tool`), hidden from session pickers |
+
+A session compressed mid-conversation continues under the same source: the compression child of a `--source tool` or `oneshot` run is tagged the same way, so it inherits the same picker visibility.
 
 ## CLI Session Resume
 
@@ -105,19 +113,19 @@ Resume previous conversations from the CLI using `--continue` or `--resume`:
 
 ```bash
 # Resume the most recent CLI session
-qubit --continue
-qubit -c
+hermes --continue
+hermes -c
 
 # Or with the chat subcommand
-qubit chat --continue
-qubit chat -c
+hermes chat --continue
+hermes chat -c
 ```
 
 This looks up the most recent `cli` session from the SQLite database and loads its full conversation history.
 
 #### Per-Terminal Continue
 
-A bare `-c` is terminal-aware: each CLI session drops a small breadcrumb file under `~/.hermes/terminal-sessions/` keyed by the terminal it runs in (tty device, tmux pane, kitty window, wezterm pane, Zellij pane, Windows Terminal session, ...). When you run `qubit -c` again in the *same* terminal, Qubit resumes that terminal's own session — so two panes side by side each continue their own conversation instead of both grabbing the globally most-recent one. If there's no breadcrumb for the terminal (first use, deleted session, or a stale breadcrumb older than 30 days), `-c` falls back to the most-recent-session behavior. `-c "name"` and `--resume` are unaffected. Disable with `session.terminal_continue: false` in `config.yaml`.
+A bare `-c` is terminal-aware: each CLI session drops a small breadcrumb file under `~/.hermes/terminal-sessions/` keyed by the terminal it runs in (tty device, tmux pane, kitty window, wezterm pane, Zellij pane, Windows Terminal session, ...). When you run `hermes -c` again in the *same* terminal, Hermes resumes that terminal's own session — so two panes side by side each continue their own conversation instead of both grabbing the globally most-recent one. If there's no breadcrumb for the terminal (first use, deleted session, or a stale breadcrumb older than 30 days), `-c` falls back to the most-recent-session behavior. `-c "name"` and `--resume` are unaffected. Disable with `session.terminal_continue: false` in `config.yaml`.
 
 ### Resume by Name
 
@@ -125,31 +133,31 @@ If you've given a session a title (see [Session Naming](#session-naming) below),
 
 ```bash
 # Resume a named session
-qubit -c "my project"
+hermes -c "my project"
 
 # If there are lineage variants (my project, my project #2, my project #3),
 # this automatically resumes the most recent one
-qubit -c "my project"   # → resumes "my project #3"
+hermes -c "my project"   # → resumes "my project #3"
 ```
 
 ### Resume Specific Session
 
 ```bash
 # Resume a specific session by ID
-qubit --resume 20250305_091523_a1b2c3d4
-qubit -r 20250305_091523_a1b2c3d4
+hermes --resume 20250305_091523_a1b2c3d4
+hermes -r 20250305_091523_a1b2c3d4
 
 # Resume by title
-qubit --resume "refactoring auth"
+hermes --resume "refactoring auth"
 
 # Resume the most recent session — same lookup as -c
-qubit --resume latest
+hermes --resume latest
 
 # Or with the chat subcommand
-qubit chat --resume 20250305_091523_a1b2c3d4
+hermes chat --resume 20250305_091523_a1b2c3d4
 ```
 
-Session IDs are shown when you exit a CLI session, and can be found with `qubit sessions list`.
+Session IDs are shown when you exit a CLI session, and can be found with `hermes sessions list`.
 
 :::note
 `latest` is a reserved keyword for `--resume`. A session literally titled "latest" is still reachable by its ID or via `-c latest` (title match).
@@ -161,10 +169,10 @@ Pass `--in <dir>` to change into a directory before starting or resuming. Combin
 
 ```bash
 # Resume the latest session that belongs to ./my-project
-qubit --resume latest --in ./my-project
+hermes --resume latest --in ./my-project
 
 # Works with the TUI too
-qubit --tui --resume latest --in ./my-project
+hermes --tui --resume latest --in ./my-project
 ```
 
 `--in` also pins the session to that directory: the resumed session's recorded working directory is not restored (as if `--no-restore-cwd` were passed).
@@ -174,25 +182,25 @@ qubit --tui --resume latest --in ./my-project
 Resuming a CLI session also `cd`s back into the session's recorded working directory (its git repo root or project dir), so the conversation picks up in the workspace it belonged to. If you'd rather stay where you are, pass `--no-restore-cwd`:
 
 ```bash
-qubit --resume 20250305_091523_a1b2c3 --no-restore-cwd
+hermes --resume 20250305_091523_a1b2c3 --no-restore-cwd
 ```
 
 A `↪ restored workspace dir: …` line confirms the switch. Restore failures never break the resume itself.
 
 ### Filtering Sessions by Workspace
 
-`qubit sessions list` accepts `--workspace <needle>` to show only sessions whose workspace key (git repo root, else cwd) matches — by path substring or exact directory basename:
+`hermes sessions list` accepts `--workspace <needle>` to show only sessions whose workspace key (git repo root, else cwd) matches — by path substring or exact directory basename:
 
 ```bash
-qubit sessions list --workspace my-project
-qubit sessions list --workspace ~/code/hermes-agent
+hermes sessions list --workspace my-project
+hermes sessions list --workspace ~/code/hermes-agent
 ```
 
 ### Conversation Recap on Resume
 
-When you resume a session, Qubit displays a compact recap of the previous conversation in a styled panel before the input prompt:
+When you resume a session, Hermes displays a compact recap of the previous conversation in a styled panel before the input prompt:
 
-<img className="docs-terminal-figure" src={useBaseUrl('/img/docs/session-recap.svg')} alt="Stylized preview of the Previous Conversation recap panel shown when resuming a Qubit session." />
+<img className="docs-terminal-figure" src={useBaseUrl('/img/docs/session-recap.svg')} alt="Stylized preview of the Previous Conversation recap panel shown when resuming a Hermes session." />
 <p className="docs-figure-caption">Resume mode shows a compact recap panel with recent user and assistant turns before returning you to the live prompt.</p>
 
 The recap:
@@ -228,10 +236,11 @@ What happens:
 1. The CLI validates that `<platform>` is enabled and has a home channel set (run `/sethome` from the destination chat once to configure it).
 2. The CLI marks the session pending and **block-polls the gateway**. It refuses if the agent is mid-turn — wait for the current response to finish first.
 3. The gateway watcher claims the handoff and asks the destination adapter for a fresh thread:
-   - **Telegram** — opens a new forum topic (DM topics if Bot API 9.4+ Topics mode is enabled in the chat, or a forum supergroup topic).
+   - **Telegram** — opens a new forum topic (DM topics if the bot owner has enabled Threaded Mode via BotFather, or a forum supergroup topic).
    - **Discord** — creates a 1440-min auto-archive thread under the home text channel.
    - **Slack** — posts a seed message and uses its `ts` as the thread anchor.
-   - **WhatsApp / Signal / Matrix / SMS** — no native threads, falls back to the home channel directly.
+   - **Matrix** — posts a seed message and uses its event id as the thread root (`m.thread` relation).
+   - **WhatsApp / Signal / SMS** — no native threads, falls back to the home channel directly.
 4. The gateway re-binds the destination key to your existing CLI session id, then forges a synthetic user turn asking the agent to confirm and summarize. The reply lands in the new thread.
 5. When the gateway acknowledges success, the CLI prints a `/resume` hint and exits cleanly:
 
@@ -242,7 +251,7 @@ What happens:
 
 6. From that point, the conversation lives on the platform. Reply in the new thread — anyone authorized in that channel shares the same session, and any later real user message in the thread joins seamlessly because thread sessions key without `user_id`.
 
-**Resume back to CLI:** when you want to come back to a desktop, just run `/resume <title>` (or `qubit -r "<title>"` from the shell) and pick up where the platform left off.
+**Resume back to CLI:** when you want to come back to a desktop, just run `/resume <title>` (or `hermes -r "<title>"` from the shell) and pick up where the platform left off.
 
 **Failure modes:**
 - No home channel configured → CLI refuses with a `/sethome` hint.
@@ -251,7 +260,7 @@ What happens:
 - Thread creation fails (permissions, topics-mode off) → falls back to the home channel directly and still completes; no thread isolation but the handoff itself works.
 - `adapter.send` fails (rate limit, transient API error) → handoff marked failed with the reason; the row clears so you can retry.
 
-**Limitation worth knowing:** for non-thread-capable platforms with multi-user group home channels, the synthetic turn keys as a DM-style session. This works for self-DM home channels (the typical setup) but isn't ideal for genuinely shared group chats. Threading covers Telegram / Discord / Slack — by far the common case — so most setups never hit this.
+**Limitation worth knowing:** for non-thread-capable platforms with multi-user group home channels, the synthetic turn keys as a DM-style session. This works for self-DM home channels (the typical setup) but isn't ideal for genuinely shared group chats. Threading covers Telegram / Discord / Slack / Matrix — by far the common case — so most setups never hit this.
 
 ## Session Naming
 
@@ -259,7 +268,7 @@ Give sessions human-readable titles so you can find and resume them easily.
 
 ### Auto-Generated Titles
 
-Qubit automatically generates a short descriptive title (3–7 words) for each session after the first exchange. This runs in a background thread using a fast auxiliary model, so it adds no latency. You'll see auto-generated titles when browsing sessions with `qubit sessions list` or `qubit sessions browse`.
+Hermes automatically generates a short descriptive title (3–7 words) for each session after the first exchange. This runs in a background thread using a fast auxiliary model, so it adds no latency. You'll see auto-generated titles when browsing sessions with `hermes sessions list` or `hermes sessions browse`.
 
 Auto-titling only fires once per session and is skipped if you've already set a title manually.
 
@@ -276,7 +285,7 @@ The title is applied immediately. If the session hasn't been created in the data
 You can also rename existing sessions from the command line:
 
 ```bash
-qubit sessions rename 20250305_091523_a1b2c3d4 "refactoring auth module"
+hermes sessions rename 20250305_091523_a1b2c3d4 "refactoring auth module"
 ```
 
 ### Title Rules
@@ -288,13 +297,13 @@ qubit sessions rename 20250305_091523_a1b2c3d4 "refactoring auth module"
 
 ### Auto-Lineage on Compression
 
-When a session's context is compressed (manually via `/compress` or automatically), Qubit creates a new continuation session. If the original had a title, the new session automatically gets a numbered title:
+When a session's context is compressed (manually via `/compress` or automatically), Hermes creates a new continuation session. If the original had a title, the new session automatically gets a numbered title:
 
 ```
 "my project" → "my project #2" → "my project #3"
 ```
 
-When you resume by name (`qubit -c "my project"`), it automatically picks the most recent session in the lineage.
+When you resume by name (`hermes -c "my project"`), it automatically picks the most recent session in the lineage.
 
 ### /title in Messaging Platforms
 
@@ -305,20 +314,22 @@ The `/title` command works in all gateway platforms (Telegram, Discord, Slack, W
 
 ## Session Management Commands
 
-Qubit provides a full set of session management commands via `qubit sessions`:
+Hermes provides a full set of session management commands via `hermes sessions`:
 
 ### List Sessions
 
 ```bash
 # List recent sessions (default: last 20)
-qubit sessions list
+hermes sessions list
 
 # Filter by platform
-qubit sessions list --source telegram
+hermes sessions list --source telegram
 
 # Show more sessions
-qubit sessions list --limit 50
+hermes sessions list --limit 50
 ```
+
+When more sessions exist than `--limit` allows, the listing ends with a `… more not shown (use --limit N to see more)` footer, so a capped page is never mistaken for the full list.
 
 When sessions have titles, the output shows titles, previews, and relative timestamps:
 
@@ -341,7 +352,7 @@ What's the weather in Las Vegas?                    3d ago        tele   2025030
 
 ### Export Sessions
 
-`qubit sessions export` is one surface for every export format, selected with `--format`:
+`hermes sessions export` is one surface for every export format, selected with `--format`:
 
 | Format | Output | Use it for |
 |--------|--------|------------|
@@ -358,19 +369,25 @@ All formats share the same selection knobs: `--session-id` for one session, or t
 
 ```bash
 # Export all sessions to a JSONL file
-qubit sessions export backup.jsonl
+hermes sessions export backup.jsonl
 
 # Export sessions from a specific platform
-qubit sessions export telegram-history.jsonl --source telegram
+hermes sessions export telegram-history.jsonl --source telegram
 
 # Export a single session
-qubit sessions export session.jsonl --session-id 20250305_091523_a1b2c3d4
+hermes sessions export session.jsonl --session-id 20250305_091523_a1b2c3d4
+
+# Point at a directory (existing, or ending in /) and the file is named for you:
+# ~/exports/hermes_session_20250305_091523_a1b2c3d4.jsonl
+hermes sessions export ~/exports/ --session-id 20250305_091523_a1b2c3d4
 
 # Redact API keys/tokens/credentials from the exported content
-qubit sessions export backup.jsonl --redact
+hermes sessions export backup.jsonl --redact
 ```
 
 Exported files contain one JSON object per line with full session metadata and all messages.
+
+Each record also carries a `timings` block derived from the message timestamps, so a reader of an export attached to a bug report can tell a single long model gap from many small tool round-trips without reconstructing it by hand. It holds only ids, roles, counts and durations — `wall_clock_ms`, `largest_gap_ms`, `role_counts`, `tool_calls_emitted` and per-message `intervals` — never prompt text, tool arguments or results, so it survives `--redact` unchanged. Hermes does not persist a model/tool stopwatch, so `complete` is always `false`; when a session has no timestamped messages, `available` is `false` and `unavailable_reason` says why. The block is rebuilt on every export and ignored (and not counted toward size limits) on import.
 
 #### HTML
 
@@ -378,10 +395,10 @@ Exported files contain one JSON object per line with full session metadata and a
 
 ```bash
 # One session as a standalone HTML page
-qubit sessions export --format html --session-id 20250305_091523_a1b2c3d4 transcript.html
+hermes sessions export --format html --session-id 20250305_091523_a1b2c3d4 transcript.html
 
 # All Telegram sessions from the last week in one file, secrets redacted
-qubit sessions export --format html --newer-than 1w --source telegram --redact archive.html
+hermes sessions export --format html --newer-than 1w --source telegram --redact archive.html
 ```
 
 #### Prompts Only
@@ -390,10 +407,10 @@ qubit sessions export --format html --newer-than 1w --source telegram --redact a
 
 ```bash
 # One JSONL record per prompt (session id, index, timestamp, text)
-qubit sessions export prompts.jsonl --session-id 20250305_091523_a1b2c3d4 --only user-prompts
+hermes sessions export prompts.jsonl --session-id 20250305_091523_a1b2c3d4 --only user-prompts
 
 # Markdown, straight to stdout
-qubit sessions export - --session-id 20250305_091523_a1b2c3d4 --only user-prompts --format md
+hermes sessions export - --session-id 20250305_091523_a1b2c3d4 --only user-prompts --format md
 ```
 
 Works with `--format jsonl` (default) or `md`, honors the same filters for bulk export, and combines with `--redact`.
@@ -404,13 +421,13 @@ Works with `--format jsonl` (default) or `md`, honors the same filters for bulk 
 
 ```bash
 # Trace of the most recent session, to stdout
-qubit sessions export --format trace
+hermes sessions export --format trace
 
 # One session to a local trace file
-qubit sessions export --format trace --session-id 20250305_091523_a1b2c3d4 trace.jsonl
+hermes sessions export --format trace --session-id 20250305_091523_a1b2c3d4 trace.jsonl
 
 # Upload straight to your private HF traces dataset
-qubit sessions export --format trace --session-id 20250305_091523_a1b2c3d4 --upload
+hermes sessions export --format trace --session-id 20250305_091523_a1b2c3d4 --upload
 ```
 
 Trace exports are secret-redacted by default (they're meant to leave the machine); `--no-redact` opts out after manual review. `--upload` is private unless `--public`. Bulk trace export with filters writes one `<id>.trace.jsonl` per session.
@@ -421,44 +438,44 @@ Pass `--format md` or `--format qmd` when you want a readable, file-based archiv
 
 ```bash
 # Export one session to Markdown
-qubit sessions export --format md --session-id 20250305_091523_a1b2c3d4
+hermes sessions export --format md --session-id 20250305_091523_a1b2c3d4
 
 # Export a compression lineage as one logical document
-qubit sessions export --format md --session-id 20250305_091523_a1b2c3d4 --lineage logical
+hermes sessions export --format md --session-id 20250305_091523_a1b2c3d4 --lineage logical
 
 # Preview ended sessions older than 90 days without writing files
-qubit sessions export --format md --older-than 90 --dry-run
+hermes sessions export --format md --older-than 90 --dry-run
 
 # Export ended Telegram sessions older than 2 weeks to QMD files
-qubit sessions export --format qmd --older-than 2w --source telegram
+hermes sessions export --format qmd --older-than 2w --source telegram
 
 # Export long Claude sessions, secrets redacted
-qubit sessions export --format md --model sonnet --min-messages 50 --redact
+hermes sessions export --format md --model sonnet --min-messages 50 --redact
 
 # Only after verification, export and delete one explicitly named session
-qubit sessions export --format md --session-id 20250305_091523_a1b2c3d4 --delete-after-verified --yes
+hermes sessions export --format md --session-id 20250305_091523_a1b2c3d4 --delete-after-verified --yes
 ```
 
-Markdown/QMD export writes one `.md` or `.qmd` file per exported session plus a `manifest.jsonl` with the file path, message count, lineage ids, and SHA-256. Bulk export requires at least one filter; a bare bulk export is refused. `--delete-after-verified` is intentionally limited to `--session-id` and requires `--yes`. Because deleting a parent session also removes its delegate/subagent sessions, this mode exports and verifies each delegate in a separate file before deleting anything. If the delegate set changes during export, deletion is refused. `--redact` scrubs secrets (API keys, tokens, credentials) from message content and tool output before writing — recommended for any export you plan to share.
+Markdown/QMD export writes one `.md` or `.qmd` file per exported session plus a `manifest.jsonl` with the file path, message count, lineage ids, and SHA-256. Bulk export requires at least one filter; a bare bulk export is refused. `--delete-after-verified` is intentionally limited to `--session-id` and requires `--yes`. Because deleting a parent session also removes its delegate/subagent sessions, this mode exports and verifies each delegate in a separate file before deleting anything. Markdown/QMD files hold the full history shown by the session, including turns archived by in-place compaction. Deletion compares that exact display transcript and the delegate set again inside the same database transaction that performs the delete; any intervening append, rewrite, rewind, compaction, or delegate change refuses deletion. The same display-history rule applies to `--format html`, `--only user-prompts` (with either Markdown or JSONL output), and `/save md|html`. Full-session JSON/JSONL exports and `/save json` remain live-only because importing archived turns would restore them as live model context. `--redact` scrubs secrets (API keys, tokens, credentials) from message content and tool output before writing — recommended for any export you plan to share.
 
 ### Delete a Session
 
 ```bash
 # Delete a specific session (with confirmation)
-qubit sessions delete 20250305_091523_a1b2c3d4
+hermes sessions delete 20250305_091523_a1b2c3d4
 
 # Delete without confirmation
-qubit sessions delete 20250305_091523_a1b2c3d4 --yes
+hermes sessions delete 20250305_091523_a1b2c3d4 --yes
 ```
 
 ### Rename a Session
 
 ```bash
 # Set or change a session's title
-qubit sessions rename 20250305_091523_a1b2c3d4 "debugging auth flow"
+hermes sessions rename 20250305_091523_a1b2c3d4 "debugging auth flow"
 
 # Multi-word titles don't need quotes in the CLI
-qubit sessions rename 20250305_091523_a1b2c3d4 debugging auth flow
+hermes sessions rename 20250305_091523_a1b2c3d4 debugging auth flow
 ```
 
 If the title is already in use by another session, an error is shown.
@@ -472,68 +489,68 @@ and both see it.
 
 ```bash
 # Pin one or more sessions (unique ID prefixes work)
-qubit sessions pin 20250305_091523_a1b2c3d4
-qubit sessions pin 20250305 20250306
+hermes sessions pin 20250305_091523_a1b2c3d4
+hermes sessions pin 20250305 20250306
 
 # Remove the pin
-qubit sessions unpin 20250305_091523_a1b2c3d4
+hermes sessions unpin 20250305_091523_a1b2c3d4
 
 # List pinned sessions
-qubit sessions pinned
+hermes sessions pinned
 
 # Machine-readable output, e.g. for a nightly backup of your pin set
-qubit sessions pinned --json > pinned-sessions.json
+hermes sessions pinned --json > pinned-sessions.json
 ```
 
 ### Prune Old Sessions
 
 ```bash
 # Delete ended sessions inactive for 90 days (default)
-qubit sessions prune
+hermes sessions prune
 
 # Custom age threshold — bare numbers are days
-qubit sessions prune --older-than 30
+hermes sessions prune --older-than 30
 
 # Durations work too: 5h, 30m, 2d, 1w
-qubit sessions prune --older-than 12h
+hermes sessions prune --older-than 12h
 
 # Delete only a specific time window (e.g. a batch of test sessions
 # created in the last 5 hours)
-qubit sessions prune --newer-than 5h
+hermes sessions prune --newer-than 5h
 
 # Explicit window with absolute timestamps
-qubit sessions prune --after "2026-07-05 09:00" --before "2026-07-05 14:30"
+hermes sessions prune --after "2026-07-05 09:00" --before "2026-07-05 14:30"
 
 # Only prune sessions from a specific platform (all ages — any filter
 # disables the implicit 90-day default)
-qubit sessions prune --source telegram
-qubit sessions prune --source cron --older-than 60   # add a time flag to narrow
+hermes sessions prune --source telegram
+hermes sessions prune --source cron --older-than 60   # add a time flag to narrow
 
 # More filters — all AND together
-qubit sessions prune --newer-than 5h --title "smoke test"   # title substring
-qubit sessions prune --older-than 30 --max-messages 3        # tiny sessions
-qubit sessions prune --cwd ~/scratch --end-reason done       # by cwd / end reason
-qubit sessions prune --model gpt-5 --older-than 1w           # by model (substring)
-qubit sessions prune --provider openrouter --older-than 60   # by billing provider
-qubit sessions prune --branch feature/old-experiment         # by git branch
-qubit sessions prune --user 12345678 --chat-type group       # by messaging origin
-qubit sessions prune --max-tokens 500 --older-than 7         # by token usage
-qubit sessions prune --max-cost 0.01 --max-tool-calls 0      # cheap, tool-less runs
+hermes sessions prune --newer-than 5h --title "smoke test"   # title substring
+hermes sessions prune --older-than 30 --max-messages 3        # tiny sessions
+hermes sessions prune --cwd ~/scratch --end-reason done       # by cwd / end reason
+hermes sessions prune --model gpt-5 --older-than 1w           # by model (substring)
+hermes sessions prune --provider openrouter --older-than 60   # by billing provider
+hermes sessions prune --branch feature/old-experiment         # by git branch
+hermes sessions prune --user 12345678 --chat-type group       # by messaging origin
+hermes sessions prune --max-tokens 500 --older-than 7         # by token usage
+hermes sessions prune --max-cost 0.01 --max-tool-calls 0      # cheap, tool-less runs
 
 # Preview what would be deleted, without deleting anything
-qubit sessions prune --newer-than 5h --dry-run
+hermes sessions prune --newer-than 5h --dry-run
 
 # Skip confirmation
-qubit sessions prune --older-than 30 --yes
+hermes sessions prune --older-than 30 --yes
 ```
 
 Time values (`--older-than`, `--newer-than`, `--before`, `--after`) accept a
 duration (`5h`, `30m`, `2d`, `1w`), a bare number of days, or an ISO
 timestamp (`2026-07-05`, `2026-07-05 14:30`). `--older-than`/`--before` set
 the upper bound; `--newer-than`/`--after` set the lower bound. The
-`--older-than`/`--newer-than` pair uses latest message activity (falling back
-to session start for empty sessions); `--before`/`--after` explicitly uses
-session start time. Combine either pair for a window.
+`--older-than`/`--newer-than` pair uses last activity — the freshest of live
+activity, latest message, or session start — while `--before`/`--after`
+explicitly use session start time. Combine either pair for a window.
 
 Attribute filters: `--source` (platform, exact), `--title` / `--model` /
 `--branch` (case-insensitive substring), `--provider` (billing provider,
@@ -541,9 +558,9 @@ exact), `--end-reason`, `--user`, `--chat-id`, `--chat-type` (exact),
 `--cwd` (path prefix), plus numeric bounds `--min/--max-messages`,
 `--min/--max-tokens` (input+output), `--min/--max-cost` (USD, actual falling
 back to estimated), and `--min/--max-tool-calls`. Using any filter disables
-the implicit 90-day default, so `qubit sessions prune --source cron` or
+the implicit 90-day default, so `hermes sessions prune --source cron` or
 `--model gpt-4o` matches all ages — add a time flag to narrow it. Only a
-completely bare `qubit sessions prune` keeps the 90-day cutoff. Every
+completely bare `hermes sessions prune` keeps the 90-day cutoff. Every
 non-`--yes` run shows the match count plus the oldest and newest matching
 session before asking for confirmation.
 
@@ -557,28 +574,31 @@ Pruning only deletes **ended** sessions (sessions that have been explicitly ende
 ### Bulk-Archive Sessions
 
 If you want sessions out of your listings without deleting anything,
-`qubit sessions archive` takes the same filters as `prune` but soft-hides
+`hermes sessions archive` takes the same filters as `prune` but soft-hides
 matching sessions instead (sets the same archived flag as archiving a single
 session from the Desktop/Dashboard UI — messages and search stay intact):
 
 ```bash
 # Archive everything from the last 5 hours (e.g. 75 CI smoke-test sessions)
-qubit sessions archive --newer-than 5h
+hermes sessions archive --newer-than 5h
 
 # Archive by title substring, preview first
-qubit sessions archive --title "dry run" --dry-run
-qubit sessions archive --title "dry run" --yes
+hermes sessions archive --title "dry run" --dry-run
+hermes sessions archive --title "dry run" --yes
 ```
 
-At least one filter is required — a bare `qubit sessions archive` refuses to
-archive your entire history. Archived sessions are hidden from
-`qubit sessions list` and `/resume` but remain in the database and can be
+At least one filter is required — a bare `hermes sessions archive` refuses to
+archive your entire history. A compacted conversation is archived as a unit
+through its live tip: an old compression segment never matches on its own age,
+so a chat that is still active is never hidden because its history is long.
+Archived sessions are hidden from
+`hermes sessions list` and `/resume` but remain in the database and can be
 unarchived from the Desktop/Dashboard session list.
 
 ### Session Statistics
 
 ```bash
-qubit sessions stats
+hermes sessions stats
 ```
 
 Output:
@@ -592,7 +612,7 @@ Total messages: 3847
 Database size: 12.4 MB
 ```
 
-For deeper analytics — token usage, cost estimates, tool breakdown, and activity patterns — use [`qubit insights`](/reference/cli-commands#hermes-insights).
+For deeper analytics — token usage, cost estimates, tool breakdown, and activity patterns — use [`hermes insights`](../reference/cli-commands.md#hermes-insights).
 
 ### Repair Stranded Gateway Sessions
 
@@ -602,20 +622,20 @@ conversation may be stranded in a session row that lost its routing identity
 (the damage class fixed in the v0.21 session-continuity work; current versions
 prevent it by construction and self-heal at runtime).
 
-`qubit sessions repair-routing` finds message-bearing session rows with no
+`hermes sessions repair-routing` finds message-bearing session rows with no
 routing identity and re-attaches each one to the conversation it continues —
 but only when the evidence is unambiguous:
 
 ```bash
 # Report only — shows each orphan, the proposed adoption, and the evidence
-qubit sessions repair-routing
+hermes sessions repair-routing
 
 # Perform the adoptions (stop the gateway first — a running gateway holds
 # the old routing in memory and would write it back over the repair)
-qubit sessions repair-routing --apply
+hermes sessions repair-routing --apply
 
 # Widen/narrow the contiguity window (default 900 seconds)
-qubit sessions repair-routing --max-gap-seconds 300
+hermes sessions repair-routing --max-gap-seconds 300
 ```
 
 Evidence rules:
@@ -636,37 +656,115 @@ conversation stays readable via `/resume` and session search either way —
 routing is the only thing the repair changes. Back up first
 (`cp ~/.hermes/state.db ~/.hermes/state.db.bak`).
 
+### Repair State Crossed Between Profiles
+
+Every profile owns one `state.db`, and every gateway session key names the
+profile that owns the conversation (`agent:main:…` for the default profile,
+`agent:<name>:…` for a named one). Older releases could leave the two
+disagreeing — a named profile's rows written into the default store, a child
+session inheriting from another profile's row, a routing row copied into the
+wrong store, a Telegram topic or `/voice` setting saved without the bot's
+profile. Current versions put new state in the right place; `hermes sessions
+repair-profiles` settles what is already crossed.
+
+```bash
+# Report only — every store is scanned, nothing is written
+hermes sessions repair-profiles
+
+# Perform the repairs (stop the gateway first; a snapshot of every store is taken)
+hermes sessions repair-profiles --apply
+
+# Machine-readable report
+hermes sessions repair-profiles --json
+```
+
+What it finds and does:
+
+| Finding | Repair |
+|---|---|
+| `profile_name` disagrees with the row's own session key | relabel from the key |
+| rows sitting in another profile's store | move (with all messages) to the owning profile's store |
+| `parent_session_id` pointing at another profile's row | sever the link; the row's own identity is kept |
+| routing rows outside the default store (under multiplexing) | move to the default store; an existing row there wins |
+| routing rows / `sessions.json` entries for a profile that no longer exists | delete |
+| Telegram topic bindings and voice-mode entries missing their bot's profile | relabel from the sessions that hold the chat |
+
+Two cases are reported but never repaired without being told what they are:
+rows keyed to a profile that does not exist (create the profile, or
+`hermes profile migrate-identity <old> <new>`), and `agent:main:…` rows inside
+a named profile's store. The latter are either the history of a gateway that
+used to run standalone for that profile (`--legacy-main rekey` gives them the
+profile's namespace) or default-profile chats that leaked in under a scoped
+write (`--legacy-main move` sends them to the default store) — the rows
+themselves cannot tell the two apart.
+
+`--apply` refuses while a gateway owns any of the stores (it holds the routing
+index in memory and would write it back), and is safe to re-run: a second run
+finds nothing.
+
+
+### Convert the Store Between WAL and DELETE Journal Mode
+
+`database.journal_mode: delete` only applies to databases Hermes creates. An
+existing `state.db` that is already in WAL mode is **never** live-downgraded at
+open — other gateway, dashboard or cron processes may hold uncheckpointed WAL
+commits, and a downgrade underneath them destroys those commits — so Hermes
+keeps WAL and logs one `ERROR` per process telling you the configured `delete`
+did not apply. The self-service conversion is:
+
+```bash
+# stop every process using the profile's store first (gateway, dashboard, CLIs, cron)
+hermes sessions set-journal-mode delete     # WAL -> rollback journal
+hermes sessions set-journal-mode wal        # back to WAL
+hermes sessions set-journal-mode delete --db ~/.hermes/kanban.db   # another Hermes store
+```
+
+The command refuses — naming each PID and command — while any process still
+holds the file or its `-wal`/`-shm` sidecars, switches the mode without
+waiting out openers (a holder that appears mid-way makes SQLite refuse instead
+of racing it), and verifies the file header reports the new mode. It reminds
+you to set `database.journal_mode` to the same value when the config disagrees,
+because the next open re-applies the configured mode. The holder scan is local
+(open-file tables on Linux/macOS, the Restart Manager on Windows), so it
+cannot see a process in another container or VM sharing the volume. If the
+scan itself fails the command refuses because it cannot prove the store is
+quiet; `--force` waives only that case after you have stopped every Hermes
+process yourself — a process the scan does find is always refused. Enabling
+WAL is also refused when the store sits on a cross-VM filesystem (virtiofs/9p),
+where WAL shared memory corrupts silently.
+
 
 ## Importing Sessions from Claude Code and Codex CLI
 
-Started a conversation in another agent CLI? You can pull it into Qubit and
-continue it here. Qubit reads Claude Code's session logs
-(`~/.claude/projects/`) and Codex CLI's rollouts (`~/.codex/sessions/`) —
-the foreign files are only read, never modified.
+Started a conversation in another agent CLI? You can pull it into Hermes and
+continue it here. Hermes reads Claude Code's session logs
+(`~/.claude/projects/`, or `$CLAUDE_CONFIG_DIR/projects/` when Claude Code's
+config dir is relocated) and Codex CLI's rollouts (`~/.codex/sessions/`, or
+`$CODEX_HOME/sessions/`) — the foreign files are only read, never modified.
 
 ```bash
 # Interactive picker across both tools, newest first
-qubit sessions import
+hermes sessions import
 
 # Limit to one tool, or point at a specific file
-qubit sessions import --from claude
-qubit sessions import --from codex ~/.codex/sessions/2026/08/15/rollout-....jsonl
+hermes sessions import --from claude
+hermes sessions import --from codex ~/.codex/sessions/2026/08/15/rollout-....jsonl
 
 # Import-and-resume in one step
-qubit --resume @claude
-qubit --resume @codex
+hermes --resume @claude
+hermes --resume @codex
 ```
 
-`qubit sessions import` creates a new Qubit session titled
+`hermes sessions import` creates a new Hermes session titled
 `Imported from Claude Code: <first user message>` (or Codex CLI) and prints
-the id plus a ready-to-paste `qubit --resume <id>` command.
+the id plus a ready-to-paste `hermes --resume <id>` command.
 `--resume @claude` / `--resume @codex` show the same picker and drop you
 straight into the imported conversation.
 
-**Qubit Desktop** has the same importer under **Import session** in the
-sidebar (also in the command palette). It lists the logs on the machine the
+**Hermes Desktop** has the same importer in the command palette (**Import
+session**). It lists the logs on the machine the
 connected backend runs on — not the computer running the app — shows a
-read-only preview, and **Continue in Qubit** copies the conversation into the
+read-only preview, and **Continue in Hermes** copies the conversation into the
 selected profile. Browsing never writes to your session store, importing never
 touches the source file, and importing the same log twice opens the existing
 copy instead of making another.
@@ -773,15 +871,23 @@ On messaging platforms, sessions are keyed by a deterministic session key built 
 | Group thread/topic | `agent:main:<platform>:group:<chat_id>:<thread_id>` | Shared session for all thread participants (default). Per-user with `thread_sessions_per_user: true`. |
 | Channel | `agent:main:<platform>:channel:<chat_id>:<user_id>` | Per-user inside the channel when the platform exposes a user ID |
 
-When Qubit cannot get a participant identifier for a shared chat, it falls back to one shared session for that room.
+When Hermes cannot get a participant identifier for a shared chat, it falls back to one shared session for that room.
 
 ### Shared vs Isolated Group Sessions
 
-By default, Qubit uses `group_sessions_per_user: true` in `config.yaml`. That means:
+By default, Hermes uses `group_sessions_per_user: true` in `config.yaml`. That means:
 
-- Alice and Bob can both talk to Qubit in the same Discord channel without sharing transcript history
+- Alice and Bob can both talk to Hermes in the same Discord channel without sharing transcript history
 - one user's long tool-heavy task does not pollute another user's context window
-- interrupt handling also stays per-user because the running-agent key matches the isolated session key
+- a running turn is keyed to the sender that started it, but `/stop` still reaches it — see below
+
+`/stop` means "stop what is running in this chat": it first tries the caller's own session key,
+then any live turn in this chat — other participants' runs in the caller's own thread included —
+authorization-gated, and never another room, workspace or profile. So an idle Alice's `/stop` can
+end a turn Bob (or a bot) started in the room she is in. A `/stop` sent from *inside* a thread is
+narrower: it reaches runs belonging to that thread and a room-wide run that carries no thread slot
+(the rolling-DM shape), but never another thread of the same channel and never a peer's per-sender
+top-level run.
 
 If you want one shared "room brain" instead, set:
 
@@ -799,6 +905,32 @@ Legacy `session_reset` settings, reset-policy overrides and reset-timer environm
 variables are ignored. Cached agents may be released to reclaim resources without
 replacing the durable conversation. Restart-recovery freshness limits automatic
 continuation, not the history loaded when you send a message.
+
+### Session hygiene: why you should still run `/new`
+
+Because gateway conversations never expire on their own, it is easy to run one
+session for weeks. That works, but it quietly defeats the learning loop and
+inflates costs:
+
+- **Memory only pays off at boundaries.** `MEMORY.md` / `USER.md` are injected
+  at session start, and `session_search` exists to recall what fell out of
+  context. In a never-ending session everything is still *in* context, so the
+  agent has no reason to consult memory — the "self-learning" machinery barely
+  runs. Memory distillation (the save before reset) also only happens when a
+  session actually ends.
+- **Cost grows with history.** Compression keeps a long session functional,
+  but every turn still carries a large (compacted) prefix. A fresh session
+  with distilled memory is almost always cheaper than a month-old thread.
+
+Practical rule: end a session when you finish a task or topic. Run `/new`
+(optionally named, e.g. `/new payments-refactor`) at natural stopping points —
+daily or per-project both work. Before the reset, ask the agent to "remember
+anything worth keeping" if the work surfaced durable preferences or
+procedures; it saves memories and skills from the expiring session
+automatically, but an explicit nudge helps. Restarting the machine or the
+gateway is **not** a boundary — the same session resumes.
+
+See [Memory](features/memory.md) for what gets carried across boundaries.
 
 
 ### Continuity After Crashes and Restarts
@@ -841,12 +973,12 @@ It only ever contains gateway/messaging entries, so if you run a messaging
 platform you'll see only those (e.g. `agent:main:whatsapp:dm:...`).
 
 This is **expected** and does **not** mean your CLI sessions are missing.
-`qubit sessions list`, `/sessions`, and the dashboard all read `state.db`,
+`hermes sessions list`, `/sessions`, and the dashboard all read `state.db`,
 which holds **every** session (CLI, TUI, and gateway). The `/save` snapshots
 under `~/.hermes/sessions/saved/*.json` are convenience exports, not the index.
 
-If CLI sessions genuinely don't appear in `qubit sessions list`, the cause is
-`state.db` not receiving them — run `qubit sessions repair` and watch for a
+If CLI sessions genuinely don't appear in `hermes sessions list`, the cause is
+`state.db` not receiving them — run `hermes sessions repair` and watch for a
 `⚠ Session store unavailable` warning at CLI startup, which means SQLite
 persistence failed for that run.
 :::
@@ -854,7 +986,7 @@ persistence failed for that run.
 :::note Legacy JSONL transcripts
 Sessions created before state.db became canonical may have leftover
 `*.jsonl` files in `~/.hermes/sessions/`. They are no longer written or
-read by Qubit. Safe to delete after verifying the corresponding session
+read by Hermes. Safe to delete after verifying the corresponding session
 exists in state.db.
 :::
 
@@ -873,8 +1005,9 @@ Key tables in `state.db`:
 - Gateway conversations persist across inactivity; use `/new` or `/reset` for an explicit boundary
 - Before reset, the agent saves memories and skills from the expiring session
 - Auto-pruning (**on by default** since #54189): when `sessions.auto_prune` is `true`, ended sessions inactive for `sessions.retention_days` (default 90) are pruned at CLI/gateway/cron startup
+- `sessions.retention_days` must be a whole number of days `>= 0`. A negative value (or a missing one) is rejected: startup maintenance logs a warning naming the allowed range and skips the sweep instead of treating the future cutoff as "everything" — `sessions.auto_prune: false` is the switch that disables pruning
 - After a prune that actually removed rows, `state.db` is `VACUUM`ed to reclaim disk space only when **both** gates pass: at least `sessions.min_vacuum_interval_days` (default 30) have elapsed since the last successful `VACUUM`, **and** more than 25% of the file's pages are reclaimable (`PRAGMA freelist_count / page_count`). A dense database never pays for a full rewrite to reclaim a few MB (SQLite does not shrink the file on plain DELETE)
-- Pruning runs at most once per `sessions.min_interval_hours` (default 24); the last-run timestamp is tracked inside `state.db` itself so it's shared across every Qubit process in the same `QUBIT_HOME`
+- Pruning runs at most once per `sessions.min_interval_hours` (default 24); the last-run timestamp is tracked inside `state.db` itself so it's shared across every Hermes process in the same `HERMES_HOME`
 
 Without pruning, `state.db` grows without bound — multi-GB files within weeks were reported on gateway + cron installs. If you would rather keep every ended session forever (the pre-#54189 behavior), turn it off in `~/.hermes/config.yaml`:
 
@@ -891,16 +1024,19 @@ Existing installs that already set any of these keys explicitly keep their
 values; only unset keys pick up the new defaults.
 
 Only **ended** sessions are ever deleted. Active sessions are never auto-pruned,
-regardless of age. Ended sessions are aged from their latest message, so a
-long-lived conversation used recently is not deleted merely because it began
-before the retention window.
+regardless of age. Ended sessions are aged from their last activity — the
+freshest of live activity, latest message, or session start — so a long-lived
+conversation used recently is not deleted merely because it began before the
+retention window.
 
 **Stale open sessions from automation.** Some producers — cron jobs, kanban
 workers, subagents, one-shot CLI runs — can die without ever marking their
 session ended, and pruning only deletes *ended* rows. To keep those from
 accumulating forever, each auto-prune pass also *closes* open sessions from
 those state-owned sources (`cli`, `cron`, `kanban`, `acp`, `api_server`,
-`subagent`, `tool`) whose last activity is older than `retention_days`
+`subagent`, `tool`, plus the `recovered` placeholders that
+`hermes sessions recover` synthesizes for orphaned messages) whose last
+activity is older than `retention_days`
 (`end_reason: startup_orphan_reap`). Closing is non-destructive — the
 session stays resumable — and the row is aged from its close, so it is only
 deleted by a *later* pass after a further full retention window. Messaging
@@ -934,22 +1070,22 @@ history of the conversation:
 
 When a resume is refused the client receives error code `4130` with the count
 and the scope it was measured against (`across its lineage` or
-`in its tip segment`). `qubit sessions export` still works for such sessions.
+`in its tip segment`). `hermes sessions export` still works for such sessions.
 
 ### Manual Cleanup
 
 ```bash
 # Prune sessions older than 90 days
-qubit sessions prune
+hermes sessions prune
 
 # Delete a specific session
-qubit sessions delete <session_id>
+hermes sessions delete <session_id>
 
 # Export before pruning (backup)
-qubit sessions export backup.jsonl
-qubit sessions prune --older-than 30 --yes
+hermes sessions export backup.jsonl
+hermes sessions prune --older-than 30 --yes
 ```
 
 :::tip
-The database grows slowly (typical: 10-15 MB for hundreds of sessions) and session history powers `session_search` recall across past conversations, so auto-prune ships disabled. Enable it if you're running a heavy gateway/cron workload where `state.db` is meaningfully affecting performance (observed failure mode: 384 MB state.db with ~1000 sessions slowing down FTS5 inserts and `/resume` listing). Use `qubit sessions prune` for one-off cleanup without turning on the automatic sweep.
+Auto-prune is **on by default**: ended sessions that have been inactive for `sessions.retention_days` (default 90) are removed at startup, and active sessions are never touched (see [Automatic Cleanup](#automatic-cleanup) above). Session history powers `session_search` recall across past conversations, so if you want to keep every ended session forever, set `sessions.auto_prune: false` in `config.yaml`, or raise `retention_days`. With auto-prune off, `hermes sessions prune` remains available for one-off cleanup (observed failure mode without any pruning: a 384 MB `state.db` with ~1000 sessions slowing down FTS5 inserts and `/resume` listing).
 :::

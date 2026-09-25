@@ -1,10 +1,11 @@
 import { type MutableRefObject, useCallback, useRef, useState } from 'react'
 
 import { setTerminalFontFamilyFromConfig } from '@/app/right-sidebar/terminal/terminal-font'
-import { getQubitConfig, getQubitConfigDefaults } from '@/hermes'
+import { getHermesConfig, getHermesConfigDefaults } from '@/hermes'
 import { BUILTIN_PERSONALITIES, normalizePersonalityValue, personalityNamesFromConfig } from '@/lib/chat-runtime'
 import { normalize } from '@/lib/text'
 import { setDisplayTimestampsFromConfig } from '@/store/display-timestamps'
+import { setShowReasoningFromConfig } from '@/store/reasoning-disclosure'
 import {
   getComposerSelectionGeneration,
   getCurrentModelSource,
@@ -16,11 +17,14 @@ import {
   setDefaultReasoningEffort,
   setIntroPersonality
 } from '@/store/session'
+import { refreshVoiceLiveStatus } from '@/store/voice-live'
 import {
   applyAutoSpeakFromConfig,
+  applyBargeInThresholdFromConfig,
   applyThinkingSoundFromConfig,
   applyVoiceStopPhraseFromConfig
 } from '@/store/voice-prefs'
+import { setChatFontFamilyFromConfig } from '@/themes/chat-font'
 
 const DEFAULT_VOICE_SECONDS = 120
 const FAST_TIERS = new Set(['fast', 'priority', 'on'])
@@ -46,16 +50,16 @@ function normalizeConfigEffort(value: unknown): string {
   return effort === 'false' || effort === 'disabled' ? 'none' : effort
 }
 
-interface QubitConfigOptions {
+interface HermesConfigOptions {
   activeSessionIdRef: MutableRefObject<string | null>
 }
 
-export function useQubitConfig({ activeSessionIdRef }: QubitConfigOptions) {
+export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
   const [voiceMaxRecordingSeconds, setVoiceMaxRecordingSeconds] = useState(DEFAULT_VOICE_SECONDS)
   const [sttEnabled, setSttEnabled] = useState(true)
   const profileRefreshEpochRef = useRef(0)
 
-  const refreshQubitConfig = useCallback(
+  const refreshHermesConfig = useCallback(
     async (force = false, shouldPublish: () => boolean = () => true) => {
       if (force) {
         profileRefreshEpochRef.current += 1
@@ -65,7 +69,7 @@ export function useQubitConfig({ activeSessionIdRef }: QubitConfigOptions) {
       const selectionGeneration = getComposerSelectionGeneration()
 
       try {
-        const [config, defaults] = await Promise.all([getQubitConfig(), getQubitConfigDefaults().catch(() => ({}))])
+        const [config, defaults] = await Promise.all([getHermesConfig(), getHermesConfigDefaults().catch(() => ({}))])
 
         const canPublish = () => profileRefreshEpochRef.current === profileRefreshEpoch && shouldPublish()
 
@@ -99,7 +103,7 @@ export function useQubitConfig({ activeSessionIdRef }: QubitConfigOptions) {
         // Publish the profile default regardless of whether the composer is
         // reseeded below: picker rows and preset application resolve "the
         // default" from here, so a manual model pick must not leave them
-        // rendering/applying Qubit' built-in medium over the user's config.
+        // rendering/applying Hermes' built-in medium over the user's config.
         if (!canPublish()) {
           return
         }
@@ -138,15 +142,20 @@ export function useQubitConfig({ activeSessionIdRef }: QubitConfigOptions) {
         }
 
         setDisplayTimestampsFromConfig(config.display?.timestamps)
+        setShowReasoningFromConfig(config.display?.show_reasoning)
         setTerminalFontFamilyFromConfig(config.terminal?.font_family)
+        setChatFontFamilyFromConfig(config.desktop?.font_family)
 
         if (!canPublish()) {
           return
         }
 
         applyAutoSpeakFromConfig(config)
-        applyVoiceStopPhraseFromConfig(config)
+        applyVoiceStopPhraseFromConfig(config, defaults)
+        applyBargeInThresholdFromConfig(config)
         applyThinkingSoundFromConfig(config)
+        // Resolved server-side (mode + whether a key resolves); non-critical.
+        void refreshVoiceLiveStatus().catch(() => undefined)
       } catch {
         // Config is nice-to-have; chat still works without it.
       }
@@ -154,5 +163,5 @@ export function useQubitConfig({ activeSessionIdRef }: QubitConfigOptions) {
     [activeSessionIdRef]
   )
 
-  return { refreshQubitConfig, sttEnabled, voiceMaxRecordingSeconds }
+  return { refreshHermesConfig, sttEnabled, voiceMaxRecordingSeconds }
 }

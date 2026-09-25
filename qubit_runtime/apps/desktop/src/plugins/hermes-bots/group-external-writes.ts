@@ -1,7 +1,7 @@
 /**
  * Mirror of what a member said and heard OUTSIDE the room engine. (#93813)
  *
- * A member's hidden per-group session is an ordinary Qubit session, so other
+ * A member's hidden per-group session is an ordinary Hermes session, so other
  * writers legitimately append to it: the user resuming it from the CLI
  * (`hermes -p <bot> chat --resume "Group: <room> · <thread>"`), a cron job, the
  * agent's own tools. Those rows reach the transcript but never the room log,
@@ -74,6 +74,15 @@ export const SYNTHETIC_USER_ROW_PREFIXES = [
   'Cronjob Response:'
 ]
 
+/** The Hermes-authored assistant row that closes a turn which failed before
+ *  the model answered (a provider 401, retry exhaustion, a refusal), typed
+ *  `display_kind: failed_turn` by `agent/turn_failure_copy.py`. A transcript
+ *  boundary, never the member's reply: read as one, the room posts it as the
+ *  bot speaking and loses the failure (#92760). */
+export function failedTurnBoundaryRow(row: GroupTranscriptRow): boolean {
+  return row.role === 'assistant' && row.display_kind === 'failed_turn'
+}
+
 /** A user row that carries no user words: typed scaffolding (auto-continue
  *  notes, steer markers, model-switch notices — anything but a skill
  *  invocation, which is the user's own `/command`) or an untyped row opening
@@ -100,7 +109,7 @@ export function externalGroupTranscriptRows(rows: GroupTranscriptRow[]): string[
   for (const row of rows) {
     const text = groupTranscriptRowText(row)
 
-    if (!text || (row.role !== 'user' && row.role !== 'assistant')) {
+    if (!text || (row.role !== 'user' && row.role !== 'assistant') || failedTurnBoundaryRow(row)) {
       continue
     }
 

@@ -7,7 +7,7 @@ sidebar_position: 7
 
 # Provider Routing
 
-使用 [OpenRouter](https://openrouter.ai) 作为 LLM provider 时，Qubit Agent 支持 **provider routing**（提供商路由）——对哪些底层 AI provider 处理你的请求以及如何排列优先级进行精细控制。
+使用 [OpenRouter](https://openrouter.ai) 作为 LLM provider 时，Hermes Agent 支持 **provider routing**（提供商路由）——对哪些底层 AI provider 处理你的请求以及如何排列优先级进行精细控制。
 
 OpenRouter 将请求路由到多个 provider（例如 Anthropic、Google、AWS Bedrock、Together AI）。Provider routing 让你可以针对成本、速度、质量进行优化，或强制指定特定 provider。
 
@@ -196,5 +196,5 @@ provider_routing:
 未配置 `provider_routing` 部分时（默认情况），OpenRouter 使用其自身的默认路由逻辑，通常会自动在成本和可用性之间取得平衡。
 
 :::tip Provider Routing 与 Fallback Models
-Provider routing 控制 OpenRouter **内部的子 provider** 如何处理你的请求。若需要在主模型失败时自动故障转移到完全不同的 provider，请参阅 [Fallback Providers](/user-guide/features/fallback-providers)。
+Provider routing 控制 OpenRouter **内部的子 provider** 如何处理你的请求。若需要在主模型失败时自动故障转移到完全不同的 provider，请参阅 [Fallback Providers](./fallback-providers.md)。
 :::

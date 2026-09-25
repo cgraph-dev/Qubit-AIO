@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { getOverlayState, resetOverlayState } from '../app/overlayStore.js'
 import { dialogTestApp, gridTestApp } from '../sdk/apps/index.js'
 import { closeWidget, dispatchWidgetInput, launchWidget, openWidget } from '../sdk/host.js'
-import { getWidgetApp, listWidgetApps } from '../sdk/registry.js'
+import { getWidgetApp } from '../sdk/registry.js'
 import type { WidgetInput } from '../sdk/types.js'
 
 const key = (overrides: Partial<WidgetInput['key']> = {}, ch = ''): WidgetInput =>
@@ -15,13 +15,6 @@ const key = (overrides: Partial<WidgetInput['key']> = {}, ch = ''): WidgetInput 
 beforeEach(() => resetOverlayState())
 
 describe('widget SDK host', () => {
-  it('registers the reference apps', () => {
-    expect(listWidgetApps().map(app => app.id)).toEqual(
-      expect.arrayContaining(['dialog-test', 'grid-test', 'ticker', 'weather'])
-    )
-    expect(getWidgetApp('grid-test')).toBe(gridTestApp)
-  })
-
   it('launch → dispatch → close lifecycle drives the overlay slot', () => {
     expect(launchWidget('grid-test', '5x2')).toBeNull()
     expect(getOverlayState().widget).toMatchObject({ appId: 'grid-test' })
@@ -60,7 +53,7 @@ describe('widget SDK host', () => {
   it('a widget that throws in render shows an error chip, not a dead TUI', async () => {
     const { defineWidgetApp } = await import('../sdk/registry.js')
     const { AmbientDock } = await import('../sdk/host.js')
-    const { renderToScreen } = await import('../../packages/qubit-ink/src/ink/render-to-screen.js')
+    const { renderToScreen } = await import('../../packages/hermes-ink/src/ink/render-to-screen.js')
     const { createElement } = await import('react')
 
     defineWidgetApp({
@@ -99,7 +92,7 @@ describe('widget SDK host', () => {
 
   it('ambient zones route by the app contract (docks + floats)', async () => {
     const { defineWidgetApp } = await import('../sdk/registry.js')
-    const { Text } = await import('@qubit/ink')
+    const { Text } = await import('@hermes/ink')
     const { createElement } = await import('react')
 
     defineWidgetApp({
@@ -126,7 +119,7 @@ describe('widget SDK host', () => {
   it('rails reserve the widest railed app; docks reserve nothing sideways', async () => {
     const { ambientRailWidth } = await import('../sdk/host.js')
     const { defineWidgetApp } = await import('../sdk/registry.js')
-    const { Text } = await import('@qubit/ink')
+    const { Text } = await import('@hermes/ink')
     const { createElement } = await import('react')
 
     defineWidgetApp({

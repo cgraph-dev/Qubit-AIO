@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import { beforeEach, expect, it, vi } from 'vitest'
 
-import type { QubitNotification } from './notification-types'
+import type { HermesNotification } from './notification-types'
 
 const host = vi.hoisted(() => ({
   handle: vi.fn(),
@@ -50,9 +50,10 @@ it('returns native clicks and approval actions to the emitting window, not the p
     focusWindow,
     platform: 'darwin'
   })
+
   const notify = host.handle.mock.calls[0][1] as (
     event: IpcMainInvokeEvent,
-    payload: QubitNotification
+    payload: HermesNotification
   ) => Promise<boolean>
 
   const payload = {
@@ -97,10 +98,12 @@ it('delivers plugin callbacks to their source and falls back only for navigation
     focusWindow,
     platform: 'darwin'
   })
+
   const notify = host.handle.mock.calls[0][1] as (
     event: IpcMainInvokeEvent,
-    payload: QubitNotification
+    payload: HermesNotification
   ) => Promise<boolean>
+
   await notify({ sender: source.webContents } as unknown as IpcMainInvokeEvent, {
     kind: 'plugin',
     notifyId: 'source-callback',

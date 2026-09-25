@@ -79,7 +79,7 @@ class TestCacheFileReadBlocking:
         cache.parent.mkdir(parents=True)
         cache.write_text("{}")
 
-        with patch("agent.file_safety._hermes_home_path", return_value=qubit_home):
+        with patch("agent.file_safety._qubit_home_path", return_value=qubit_home):
             error = get_read_block_error(str(cache))
             assert error is not None
             assert "internal Hermes cache" in error
@@ -91,7 +91,7 @@ class TestCacheFileReadBlocking:
         hub.parent.mkdir(parents=True)
         hub.write_text("{}")
 
-        with patch("agent.file_safety._hermes_home_path", return_value=qubit_home):
+        with patch("agent.file_safety._qubit_home_path", return_value=qubit_home):
             error = get_read_block_error(str(hub))
             assert error is not None
 
@@ -109,7 +109,7 @@ class TestCombinedGuards:
         qubit_home = tmp_path / ".hermes"
         qubit_home.mkdir()
 
-        with patch("agent.file_safety._hermes_home_path", return_value=qubit_home):
+        with patch("agent.file_safety._qubit_home_path", return_value=qubit_home):
             # Regular project .env should still be blocked
             error = get_read_block_error("/workspace/.env")
             assert error is not None
@@ -125,7 +125,7 @@ class TestCombinedGuards:
         cache.parent.mkdir(parents=True)
         cache.write_text("")
 
-        with patch("agent.file_safety._hermes_home_path", return_value=qubit_home):
+        with patch("agent.file_safety._qubit_home_path", return_value=qubit_home):
             error = get_read_block_error(str(cache))
             assert error is not None
             assert "internal Hermes cache" in error

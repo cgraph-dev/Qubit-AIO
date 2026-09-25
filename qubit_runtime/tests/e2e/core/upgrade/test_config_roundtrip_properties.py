@@ -362,7 +362,7 @@ def home(monkeypatch):
     _reset_config_caches()
     with contextlib.suppress(Exception):
         from tui_gateway import server
-        monkeypatch.setattr(server, "_hermes_home", hh)
+        monkeypatch.setattr(server, "_qubit_home", hh)
     yield hh
     _reset_config_caches()
 
@@ -1024,15 +1024,15 @@ def env_restore(monkeypatch):
 
 
 @pytest.mark.parametrize("seed", P4_SEEDS)
-def test_p4_load_hermes_dotenv_is_idempotent(seed, home, env_restore, monkeypatch):
-    from qubit_cli.env_loader import load_hermes_dotenv
+def test_p4_load_qubit_dotenv_is_idempotent(seed, home, env_restore, monkeypatch):
+    from qubit_cli.env_loader import load_qubit_dotenv
     text, keys, shell = gen_dotenv(seed)
     for k, v in shell.items():
         monkeypatch.setenv(k, v)
     (home / ".env").write_text(text, encoding="utf-8")
     snaps = []
     for _ in range(4):
-        load_hermes_dotenv(hermes_home=home, load_external_secrets=False)
+        load_qubit_dotenv(qubit_home=home, load_external_secrets=False)
         snaps.append({k: os.environ.get(k) for k in keys})
     assert all(s == snaps[0] for s in snaps), f"[seed={seed}] env drifted across reloads:\n" + "\n".join(
         f"{k}: {[s[k] for s in snaps]}" for k in keys if len({s[k] for s in snaps}) > 1)

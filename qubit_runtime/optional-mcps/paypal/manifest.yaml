@@ -1,4 +1,4 @@
-# Qubit-approved MCP catalog entry.
+# Nous-approved MCP catalog entry.
 # Presence in this directory = approval. Merged via PR review.
 manifest_version: 1
 
@@ -7,9 +7,9 @@ description: >-
   Payments, invoices, and subscriptions via PayPal's hosted MCP.
 source: https://developer.paypal.com/tools/mcp-server/
 
-# Official vendor-hosted remote MCP (URL-only — Qubit never spawns a local
+# Official vendor-hosted remote MCP (URL-only — Hermes never spawns a local
 # process for this entry). Native OAuth 2.1 + Dynamic Client Registration;
-# Qubit's MCP client + mcp_oauth_manager handle discovery, PKCE, token
+# Hermes's MCP client + mcp_oauth_manager handle discovery, PKCE, token
 # exchange, and refresh.
 transport:
   type: http
@@ -26,6 +26,6 @@ suggest:
     - developer.paypal.com
 
 post_install: |
-  On first connection Qubit opens a browser to authorize with
-  Paypal (or run `qubit mcp login paypal`). Approve access,
+  On first connection Hermes opens a browser to authorize with
+  Paypal (or run `hermes mcp login paypal`). Approve access,
   then restart the session so tools load.

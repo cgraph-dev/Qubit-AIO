@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 
-from qubit_constants import get_default_hermes_root, project_venv_dir
+from qubit_constants import get_default_qubit_root, project_venv_dir
 
 
 def install_key(project_root: Path) -> str:
@@ -21,10 +21,10 @@ def install_key(project_root: Path) -> str:
 
 def dependency_home_root() -> Path:
     """Scope dependency state like a process launched in the active home."""
-    from qubit_constants import get_default_hermes_root, get_hermes_home_override
+    from qubit_constants import get_default_qubit_root, get_qubit_home_override
 
-    override = get_hermes_home_override()
-    return get_default_hermes_root(home=override) if override else get_default_hermes_root()
+    override = get_qubit_home_override()
+    return get_default_qubit_root(home=override) if override else get_default_qubit_root()
 
 
 def installs_root() -> Path:
@@ -120,10 +120,10 @@ def store_root(project_root: Path) -> Path:
             try:
                 data = json.loads(stamp.read_text(encoding="utf-8-sig"))
             except (OSError, ValueError):
-                return get_default_hermes_root() / "tools"
+                return get_default_qubit_root() / "tools"
             value = data.get("runtimeDir") if isinstance(data, dict) else None
-            return Path(value).resolve() if value else get_default_hermes_root() / "tools"
-    return get_default_hermes_root() / "tools"
+            return Path(value).resolve() if value else get_default_qubit_root() / "tools"
+    return get_default_qubit_root() / "tools"
 
 
 def flush_before_selecting() -> None:

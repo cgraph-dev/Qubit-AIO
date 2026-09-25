@@ -68,7 +68,7 @@ for tgt in IMPORT_TARGETS:
                 "err": next((x["err"] for x in rows if x["err"]), None)}
 results["import"] = imp
 
-# 2. CLI end-to-end startup: `qubit --version`, `qubit --help`, `qubit doctor --help`, `qubit config get model` (no network)
+# 2. CLI end-to-end startup: `hermes --version`, `hermes --help`, `hermes doctor --help`, `hermes config get model` (no network)
 CLI = {"version": ["qubit_cli/main.py", "--version"], "help": ["qubit_cli/main.py", "--help"], "config_get": ["qubit_cli/main.py", "config", "get", "model"], "tools_list": ["qubit_cli/main.py", "tools", "--help"], "skills_help": ["qubit_cli/main.py", "skills", "--help"]}
 cli = {}
 for name, argv in CLI.items():
@@ -93,7 +93,7 @@ try:
 except Exception as e: out["tool_definitions_err"]=repr(e)[:160]
 try:
     from toolsets import get_all_toolsets, resolve_toolset
-    T("resolve_toolset_hermes_default_ms", lambda: resolve_toolset("hermes-default"), 200)
+    T("resolve_toolset_qubit_default_ms", lambda: resolve_toolset("hermes-default"), 200)
 except Exception as e: out["toolsets_err"]=repr(e)[:160]
 try:
     from agent.prompt_builder import build_skills_system_prompt

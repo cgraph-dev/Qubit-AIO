@@ -1,6 +1,6 @@
 """Regression tests for _apply_profile_override QUBIT_HOME guard (issue #22502).
 
-When QUBIT_HOME is set to the qubit root (e.g. systemd hardcodes
+When QUBIT_HOME is set to the hermes root (e.g. systemd hardcodes
 QUBIT_HOME=/root/.hermes), _apply_profile_override must still read
 active_profile and update QUBIT_HOME to the profile directory.
 
@@ -15,6 +15,12 @@ import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _platform_home(tmp_path, monkeypatch):
+    monkeypatch.setattr("qubit_constants._get_platform_default_qubit_home", lambda: tmp_path / ".hermes")
 
 
 def _run_apply_profile_override(
@@ -26,14 +32,15 @@ def _run_apply_profile_override(
     Returns the value of os.environ["QUBIT_HOME"] after the call,
     or None if unset.
     """
-    qubit_root = tmp_path / ".hermes"
-    qubit_root.mkdir(parents=True, exist_ok=True)
+    hermes_root = tmp_path / ".hermes"
+    hermes_root.mkdir(parents=True, exist_ok=True)
 
     if active_profile is not None:
-        (qubit_root / "active_profile").write_text(active_profile)
+        (hermes_root / "active_profile").write_text(active_profile)
 
     if active_profile and active_profile != "default":
-        (qubit_root / "profiles" / active_profile).mkdir(parents=True, exist_ok=True)
+        (hermes_root / "profiles" / active_profile).mkdir(parents=True, exist_ok=True)
+        (hermes_root / "profiles" / active_profile / "config.yaml").write_text("{}\n")  # identity marker
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     if qubit_home is not None:
@@ -41,7 +48,7 @@ def _run_apply_profile_override(
     else:
         monkeypatch.delenv("QUBIT_HOME", raising=False)
 
-    monkeypatch.setattr(sys, "argv", argv or ["qubit", "gateway", "start"])
+    monkeypatch.setattr(sys, "argv", argv or ["hermes", "gateway", "start"])
 
     # Scrub supervisor markers the host environment may carry (systemd-run
     # CI runners export INVOCATION_ID) so each test controls them explicitly.
@@ -62,10 +69,10 @@ def _run_apply_profile_override(
     return os.environ.get("QUBIT_HOME")
 
 
-class TestApplyProfileOverrideQubitHomeGuard:
+class TestApplyProfileOverrideHermesHomeGuard:
     """Regression guard for issue #22502.
 
-    Verifies that QUBIT_HOME pointing to the qubit root does NOT suppress
+    Verifies that QUBIT_HOME pointing to the hermes root does NOT suppress
     the active_profile check, while QUBIT_HOME already pointing to a
     profile directory IS trusted as-is.
     """
@@ -76,17 +83,17 @@ class TestApplyProfileOverrideQubitHomeGuard:
         """QUBIT_HOME=/root/.hermes + active_profile=coder must redirect
         QUBIT_HOME to .../profiles/coder.
 
-        Bug scenario from #22502: systemd sets QUBIT_HOME to the qubit root
-        and the user switches to a profile via `qubit profile use`.
+        Bug scenario from #22502: systemd sets QUBIT_HOME to the hermes root
+        and the user switches to a profile via `hermes profile use`.
         Before the fix, the guard returned early and active_profile was ignored.
         """
-        qubit_root = tmp_path / ".hermes"
-        qubit_root.mkdir(parents=True, exist_ok=True)
+        hermes_root = tmp_path / ".hermes"
+        hermes_root.mkdir(parents=True, exist_ok=True)
 
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
-            qubit_home=str(qubit_root),
+            qubit_home=str(hermes_root),
             active_profile="coder",
         )
 
@@ -99,29 +106,34 @@ class TestApplyProfileOverrideQubitHomeGuard:
         )
 
 
+    @pytest.mark.platforms("posix")
     def test_sudo_explicit_profile_resolves_invoking_users_profile(self, tmp_path, monkeypatch):
         """sudo elias ... should resolve `-p elias` under SUDO_USER, not root."""
         root_home = tmp_path / "root"
-        user_home = tmp_path / "home" / "qubit"
+        user_home = tmp_path / "home" / "hermes"
         profile_dir = user_home / ".hermes" / "profiles" / "elias"
         profile_dir.mkdir(parents=True, exist_ok=True)
+        (profile_dir / "config.yaml").write_text("{}\n")  # identity marker: a bare dir does not resolve
         (root_home / ".hermes").mkdir(parents=True, exist_ok=True)
 
         monkeypatch.setattr(Path, "home", lambda: root_home)
-        monkeypatch.setenv("SUDO_USER", "qubit")
+        monkeypatch.setenv("SUDO_USER", "hermes")
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setattr(os, "geteuid", lambda: 0, raising=False)
-        monkeypatch.setattr(sys, "argv", ["qubit", "-p", "elias", "gateway", "install", "--system"])
+        monkeypatch.setattr(sys, "argv", ["hermes", "-p", "elias", "gateway", "install", "--system"])
 
         import pwd
 
         monkeypatch.setattr(pwd, "getpwnam", lambda name: SimpleNamespace(pw_dir=str(user_home)))
 
-        from qubit_cli.main import _apply_profile_override
+        from qubit_cli.main import _apply_profile_override, _resolve_sudo_user_profile_env
         _apply_profile_override()
 
         assert os.environ.get("QUBIT_HOME") == str(profile_dir)
-        assert sys.argv == ["qubit", "gateway", "install", "--system"]
+        assert sys.argv == ["hermes", "gateway", "install", "--system"]
+        # Same identity gate as ``-p`` without sudo: a marker-less shell is not a profile.
+        (user_home / ".hermes" / "profiles" / "ghost" / "cron").mkdir(parents=True)
+        assert _resolve_sudo_user_profile_env("ghost") is None
 
 
 
@@ -130,7 +142,7 @@ class TestSupervisedChildIgnoresStickyProfile:
     """The reserved default gateway s6 slot must not follow active_profile.
 
     Inside the Docker s6 image the ``gateway-default`` service slot runs a
-    bare ``qubit gateway run`` (no ``-p``) to mean "the root QUBIT_HOME
+    bare ``hermes gateway run`` (no ``-p``) to mean "the root QUBIT_HOME
     profile". The run-script exports ``HERMES_S6_SUPERVISED_CHILD=1``.
     Without a guard, ``_apply_profile_override`` would read the sticky
     ``active_profile`` file (set by e.g. the dashboard profile switcher) and
@@ -142,14 +154,14 @@ class TestSupervisedChildIgnoresStickyProfile:
     def test_non_supervised_run_still_follows_active_profile(
         self, tmp_path, monkeypatch
     ):
-        """Without the sentinel, a normal `qubit gateway run` still honors
+        """Without the sentinel, a normal `hermes gateway run` still honors
         active_profile — the guard is scoped strictly to supervised children."""
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
             qubit_home=None,
             active_profile="briefer",
-            argv=["qubit", "gateway", "run"],
+            argv=["hermes", "gateway", "run"],
         )
 
         assert result is not None
@@ -159,16 +171,17 @@ class TestSupervisedChildIgnoresStickyProfile:
         """A supervised named-profile slot passes ``-p <name>`` explicitly;
         that must still resolve (the sentinel guard only skips the sticky
         active_profile fallback, never an explicit flag)."""
-        qubit_root = tmp_path / ".hermes"
-        qubit_root.mkdir(parents=True, exist_ok=True)
-        (qubit_root / "active_profile").write_text("briefer")
-        (qubit_root / "profiles" / "briefer").mkdir(parents=True, exist_ok=True)
-        (qubit_root / "profiles" / "coder").mkdir(parents=True, exist_ok=True)
+        hermes_root = tmp_path / ".hermes"
+        hermes_root.mkdir(parents=True, exist_ok=True)
+        (hermes_root / "active_profile").write_text("briefer")
+        for name in ("briefer", "coder"):
+            (hermes_root / "profiles" / name).mkdir(parents=True, exist_ok=True)
+            (hermes_root / "profiles" / name / "config.yaml").write_text("{}\n")  # identity marker
 
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         monkeypatch.delenv("QUBIT_HOME", raising=False)
         monkeypatch.setenv("HERMES_S6_SUPERVISED_CHILD", "1")
-        monkeypatch.setattr(sys, "argv", ["qubit", "-p", "coder", "gateway", "run"])
+        monkeypatch.setattr(sys, "argv", ["hermes", "-p", "coder", "gateway", "run"])
 
         from qubit_cli.main import _apply_profile_override
         _apply_profile_override()
@@ -193,9 +206,9 @@ class TestGeneralizedSupervisorMarkers:
     """
 
     def _root_home(self, tmp_path):
-        qubit_root = tmp_path / ".hermes"
-        qubit_root.mkdir(parents=True, exist_ok=True)
-        return qubit_root
+        hermes_root = tmp_path / ".hermes"
+        hermes_root.mkdir(parents=True, exist_ok=True)
+        return hermes_root
 
     def test_supervised_child_marker_skips_active_profile(
         self, tmp_path, monkeypatch
@@ -203,16 +216,16 @@ class TestGeneralizedSupervisorMarkers:
         """HERMES_SUPERVISED_CHILD=1 + root QUBIT_HOME must keep the
         default profile's home even when active_profile names another
         profile (the #74872 identity-assumption vector)."""
-        qubit_root = self._root_home(tmp_path)
+        hermes_root = self._root_home(tmp_path)
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
-            qubit_home=str(qubit_root),
+            qubit_home=str(hermes_root),
             active_profile="telegram_nick",
-            argv=["qubit", "gateway", "run"],
+            argv=["hermes", "gateway", "run"],
             extra_env={"HERMES_SUPERVISED_CHILD": "1"},
         )
-        assert result == str(qubit_root), (
+        assert result == str(hermes_root), (
             f"supervised default gateway was redirected to {result!r}"
         )
 
@@ -222,16 +235,16 @@ class TestGeneralizedSupervisorMarkers:
         """INVOCATION_ID (systemd service child) must suppress the sticky
         redirect for gateway commands — covers units installed before the
         HERMES_SUPERVISED_CHILD marker existed."""
-        qubit_root = self._root_home(tmp_path)
+        hermes_root = self._root_home(tmp_path)
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
-            qubit_home=str(qubit_root),
+            qubit_home=str(hermes_root),
             active_profile="telegram_nick",
-            argv=["qubit", "gateway", "run"],
+            argv=["hermes", "gateway", "run"],
             extra_env={"INVOCATION_ID": "deadbeef" * 4},
         )
-        assert result == str(qubit_root)
+        assert result == str(hermes_root)
 
     def test_invocation_id_does_not_affect_non_gateway_commands(
         self, tmp_path, monkeypatch
@@ -239,13 +252,13 @@ class TestGeneralizedSupervisorMarkers:
         """INVOCATION_ID leaks into every descendant of a systemd-launched
         process (CI runners, user services). Non-gateway commands must keep
         honoring the sticky active_profile."""
-        qubit_root = self._root_home(tmp_path)
+        hermes_root = self._root_home(tmp_path)
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
-            qubit_home=str(qubit_root),
+            qubit_home=str(hermes_root),
             active_profile="coder",
-            argv=["qubit", "chat"],
+            argv=["hermes", "chat"],
             extra_env={"INVOCATION_ID": "deadbeef" * 4},
         )
         assert result is not None
@@ -254,16 +267,31 @@ class TestGeneralizedSupervisorMarkers:
     def test_external_supervisor_marker_skips_active_profile(
         self, tmp_path, monkeypatch
     ):
-        qubit_root = self._root_home(tmp_path)
+        hermes_root = self._root_home(tmp_path)
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
-            qubit_home=str(qubit_root),
+            qubit_home=str(hermes_root),
             active_profile="telegram_nick",
-            argv=["qubit", "gateway", "run"],
+            argv=["hermes", "gateway", "run"],
             extra_env={"HERMES_GATEWAY_EXTERNAL_SUPERVISOR": "1"},
         )
-        assert result == str(qubit_root)
+        assert result == str(hermes_root)
+
+    def test_desktop_ssh_serve_child_skips_active_profile(self, tmp_path, monkeypatch):
+        """A Desktop-owned `serve --ssh-session-token-file` child names its profile explicitly
+        (or none for the root home); the remote host's sticky active_profile must not re-home
+        it, or Settings read one profile's config.yaml while the user edits another."""
+        hermes_root = self._root_home(tmp_path)
+        result = _run_apply_profile_override(
+            tmp_path,
+            monkeypatch,
+            qubit_home=str(hermes_root),
+            active_profile="telegram_nick",
+            argv=["hermes", "serve", "--isolated", "--host", "127.0.0.1", "--port", "0",
+                  "--ssh-session-token-file", "/tmp/x/y.token"],
+        )
+        assert result == str(hermes_root)
 
     def test_generated_systemd_unit_exports_supervised_marker(
         self, tmp_path, monkeypatch
@@ -286,3 +314,31 @@ class TestGeneralizedSupervisorMarkers:
 
         plist = generate_launchd_plist()
         assert "<key>HERMES_SUPERVISED_CHILD</key>" in plist
+
+
+class TestS6ContainerGatewayRun:
+    """Inside the s6 image a bare ``gateway run`` (the image's CMD) redirects to the supervised
+    ``gateway-default`` slot. It must keep that root identity whatever ``active_profile`` says;
+    otherwise every container boot starts the named slot the reconciler registered down."""
+
+    def test_the_redirected_run_keeps_the_root_home_despite_the_active_profile(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr("qubit_cli.service_manager._s6_running", lambda: True)
+        root = tmp_path / ".hermes"
+        result = _run_apply_profile_override(
+            tmp_path, monkeypatch, qubit_home=str(root), active_profile="coder",
+            argv=["hermes", "gateway", "run"],
+        )
+        assert result == str(root)
+
+    def test_a_foreground_run_and_other_verbs_still_follow_the_active_profile(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr("qubit_cli.service_manager._s6_running", lambda: True)
+        root = tmp_path / ".hermes"
+        for argv in (["hermes", "gateway", "run", "--no-supervise"], ["hermes", "chat"]):
+            result = _run_apply_profile_override(
+                tmp_path, monkeypatch, qubit_home=str(root), active_profile="coder", argv=argv,
+            )
+            assert result == str(root / "profiles" / "coder"), argv

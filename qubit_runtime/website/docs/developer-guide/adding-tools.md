@@ -1,7 +1,7 @@
 ---
 sidebar_position: 2
 title: "Adding Tools"
-description: "How to add a new tool to Qubit Agent — schemas, handlers, registration, and toolsets"
+description: "How to add a new tool to Hermes Agent — schemas, handlers, registration, and toolsets"
 ---
 
 # Adding Tools
@@ -9,12 +9,12 @@ description: "How to add a new tool to Qubit Agent — schemas, handlers, regist
 Before writing a tool, ask yourself: **should this be a [skill](creating-skills.md) instead?**
 
 :::warning Built-in Core Tools Only
-This page is for adding a **built-in Qubit tool** to the repository itself.
+This page is for adding a **built-in Hermes tool** to the repository itself.
 If you want a personal, project-local, or otherwise custom tool without
-modifying Qubit core, use the plugin route instead:
+modifying Hermes core, use the plugin route instead:
 
-- [Plugins](/user-guide/features/plugins)
-- [Build a Qubit Plugin](/developer-guide/plugins)
+- [Plugins](../user-guide/features/plugins.md)
+- [Build a Hermes Plugin](./plugins/index.md)
 
 Default to plugins for most custom tool creation. Only follow this page when
 you explicitly want to ship a new built-in tool in `tools/` and `toolsets.py`.
@@ -181,11 +181,11 @@ registry.register(
 
 ## Agent-Loop Intercepted Tools
 
-Some tools (`todo`, `memory`, `session_search`, `delegate_task`) need access to per-session agent state. These are intercepted by the agent loop (`agent/tool_executor.py`, called from `agent/conversation_loop.py`) before reaching the registry. The registry still holds their schemas, but `dispatch()` returns a fallback error if the intercept is bypassed.
+Some tools (`todo_list`, `memory`, `session_search`, `delegate_task`) need access to per-session agent state. These are intercepted by the agent loop (`agent/tool_executor.py`, called from `agent/conversation_loop.py`) before reaching the registry. The registry still holds their schemas, but `dispatch()` returns a fallback error if the intercept is bypassed.
 
 ## Optional: Setup Wizard Integration
 
-If your tool requires an API key, add it to `qubit_cli/config.py`:
+If your tool requires an API key, add it to `hermes_cli/config.py`:
 
 ```python
 OPTIONAL_ENV_VARS = {
@@ -206,6 +206,6 @@ OPTIONAL_ENV_VARS = {
 - [ ] Added to appropriate toolset in `toolsets.py`
 - [ ] Confirmed this really should be a built-in/core tool and not a plugin
 - [ ] Handler returns JSON strings, errors returned as `{"error": "..."}`
-- [ ] Optional: API key added to `OPTIONAL_ENV_VARS` in `qubit_cli/config.py`
+- [ ] Optional: API key added to `OPTIONAL_ENV_VARS` in `hermes_cli/config.py`
 - [ ] Optional: Added to `toolset_distributions.py` for batch processing
-- [ ] Tested with `qubit chat -q "Use the weather tool for London"`
+- [ ] Tested with `hermes chat -q "Use the weather tool for London"`

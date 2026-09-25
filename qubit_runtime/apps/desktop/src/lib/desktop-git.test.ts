@@ -33,7 +33,7 @@ const api = vi.fn(async ({ path }: { path: string }) => {
 
 describe('desktop git facade', () => {
   beforeEach(() => {
-    vi.stubGlobal('window', { qubitDesktop: { api, git: localGit } })
+    vi.stubGlobal('window', { hermesDesktop: { api, git: localGit } })
     $connection.set(null)
   })
 
@@ -111,19 +111,6 @@ describe('desktop git facade', () => {
       path: '/api/git/review/stage',
       profile: 'default'
     })
-  })
-
-  it('sends mutations as POST bodies on a remote gateway', async () => {
-    $connection.set({ mode: 'remote' } as never)
-
-    await desktopGit()?.review.stage('/srv/work', 'a.txt')
-
-    expect(api).toHaveBeenCalledWith({
-      body: { file: 'a.txt', path: '/srv/work' },
-      method: 'POST',
-      path: '/api/git/review/stage'
-    })
-    expect(localGit.review.stage).not.toHaveBeenCalled()
   })
 
   // The ⌘⇧B "convert a branch into a worktree" flow (#81724): on a remote

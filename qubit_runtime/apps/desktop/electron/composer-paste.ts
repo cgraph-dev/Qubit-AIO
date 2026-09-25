@@ -10,13 +10,13 @@ export const COMPOSER_PASTES_DIRNAME = 'composer-pastes'
  * path: the file lands in a Desktop-managed directory with a generated name,
  * mirroring how `writeComposerImage` handles pasted images.
  *
- * `qubitHome` must be the QUBIT_HOME root, not Electron's userData dir: the
+ * `hermesHome` must be the QUBIT_HOME root, not Electron's userData dir: the
  * backend admits `@file:` attachments outside the chat's cwd only from
  * `<QUBIT_HOME>/composer-pastes` (agent/context_references.py::_resolve_path),
  * and on Linux/macOS userData is a different tree (#117149).
  */
-export async function writeComposerPaste(qubitHome: string, text: string): Promise<string> {
-  const dir = path.join(qubitHome, COMPOSER_PASTES_DIRNAME)
+export async function writeComposerPaste(hermesHome: string, text: string): Promise<string> {
+  const dir = path.join(hermesHome, COMPOSER_PASTES_DIRNAME)
   await fs.promises.mkdir(dir, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '')
   const random = crypto.randomBytes(3).toString('hex')

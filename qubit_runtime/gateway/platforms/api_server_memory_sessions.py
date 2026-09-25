@@ -56,8 +56,8 @@ class ApiServerMemorySessions:
     def _owner_home() -> Tuple[str, Optional[Path]]:
         """(registry key, profile home to re-enter on eviction) for the CURRENT scope. Callers run
         inside ``_profile_scope`` (or a single-profile gateway), so the ambient home is the owner's."""
-        from qubit_constants import get_hermes_home, qubit_home_key
-        home = Path(get_hermes_home())
+        from qubit_constants import get_qubit_home, qubit_home_key
+        home = Path(get_qubit_home())
         return qubit_home_key(home), home
 
     # -- check-out / check-in ----------------------------------------------------------------

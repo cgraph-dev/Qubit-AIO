@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 
-import type { QubitGateway } from '@/hermes'
+import type { HermesGateway } from '@/hermes'
 import type { IconComponent } from '@/lib/icons'
 import type { EnvVarInfo } from '@/types/hermes'
 
@@ -12,14 +12,14 @@ export type SettingsView =
   | 'keybinds'
   | 'keys'
   | 'notifications'
-  | 'plugins'
   | 'providers'
   | 'sessions'
+  | 'vault'
   | `config:${string}`
 export type EnvPatch = Partial<Pick<EnvVarInfo, 'is_set' | 'redacted_value'>>
 
 export interface SettingsPageProps {
-  gateway?: QubitGateway | null
+  gateway?: HermesGateway | null
   onClose: () => void
   onConfigSaved?: () => void
   onMainModelChanged?: (provider: string, model: string) => void

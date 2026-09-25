@@ -59,10 +59,10 @@ async def probe():
             for explicit in (False, True):
                 headers = {"Authorization": "Bearer fixture-api-key"}
                 if explicit:
-                    headers["X-Qubit-Session-Id"] = "parent"
+                    headers["X-Hermes-Session-Id"] = "parent"
                 response = await client.post("/v1/chat/completions", headers=headers, json={"messages": [{"role": "user", "content": "continue"}], "stream": stream})
                 body = await response.text()
-                records.append({"stream": stream, "explicit": explicit, "status": response.status, "header": response.headers.get("X-Qubit-Session-Id"), "runtime": captured[-1] if captured else None, "body": body[:120]})
+                records.append({"stream": stream, "explicit": explicit, "status": response.status, "header": response.headers.get("X-Hermes-Session-Id"), "runtime": captured[-1] if captured else None, "body": body[:120]})
         calls_before = len(captured)
         evt = {"type": "async_delegation", "delegation_id": "unit-http"}
         delivery_error = None
@@ -71,7 +71,7 @@ async def probe():
         except Exception as exc:
             delivery_error = type(exc).__name__
         calls_after = len(captured)
-        response = await client.post("/v1/chat/completions", headers={"Authorization": "Bearer fixture-api-key", "X-Qubit-Session-Id": "parent"}, json={"messages": [{"role": "user", "content": "read result"}]})
+        response = await client.post("/v1/chat/completions", headers={"Authorization": "Bearer fixture-api-key", "X-Hermes-Session-Id": "parent"}, json={"messages": [{"role": "user", "content": "read result"}]})
         await response.read()
         resumed_history = captured[-1]["history"]
         snapshot = [{"role": "user", "content": "caller snapshot"}]
@@ -82,7 +82,7 @@ async def probe():
             ("session", {"session_id": "parent"}, {}),
             ("caller_history", {"session_id": "parent", "conversation_history": snapshot}, {}),
             ("response_chain", {"previous_response_id": "resp-seed"}, {}),
-            ("declared_key", {}, {"X-Qubit-Session-Key": "fixture-key"}),
+            ("declared_key", {}, {"X-Hermes-Session-Key": "fixture-key"}),
         ):
             count = len(captured)
             response = await client.post("/v1/runs", headers={"Authorization": "Bearer fixture-api-key", **extra_headers}, json={"input": "continue", **body})

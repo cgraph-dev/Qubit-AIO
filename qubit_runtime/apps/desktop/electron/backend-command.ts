@@ -1,6 +1,6 @@
-// Backend subcommand routing for the desktop-managed Qubit process.
+// Backend subcommand routing for the desktop-managed Hermes process.
 //
-// The desktop app launches its own headless backend via `qubit serve` — it
+// The desktop app launches its own headless backend via `hermes serve` — it
 // must NEVER depend on or launch the browser `dashboard`. But `serve` is a
 // newer subcommand: a runtime that predates it (an older managed install the
 // app hasn't updated yet, or an older `hermes` resolved from PATH) only knows
@@ -13,7 +13,7 @@
 
 /**
  * Build the canonical headless backend argv (always `serve`).
- * @param {string} [profile] optional Qubit profile to pin via `--profile`.
+ * @param {string} [profile] optional Hermes profile to pin via `--profile`.
  */
 export function serveBackendArgs(profile?: string) {
   const head = profile ? ['--profile', profile] : []

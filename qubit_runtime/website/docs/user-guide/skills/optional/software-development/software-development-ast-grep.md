@@ -14,19 +14,19 @@ AST-aware structural code search and rewrite via ast-grep.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/software-development/ast-grep` |
-| Path | `optional-skills/software-development\ast-grep` |
+| Source | Optional — install with `hermes skills install official/software-development/ast-grep` |
+| Path | `optional-skills/software-development/ast-grep` |
 | Version | `1.0.0` |
-| Author | Yeongyu Kim (code-yeongyu), adapted by Qubit Agent |
+| Author | Yeongyu Kim (code-yeongyu), adapted by Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `ast`, `codemod`, `refactoring`, `structural-search`, `code-search`, `rewrite`, `tree-sitter` |
-| Related skills | [`simplify-code`](/docs/user-guide/skills/bundled/software-development/software-development-simplify-code), [`systematic-debugging`](/docs/user-guide/skills/bundled/software-development/software-development-systematic-debugging) |
+| Related skills | [`simplify-code`](../../bundled/software-development/software-development-simplify-code.md), [`systematic-debugging`](../../bundled/software-development/software-development-systematic-debugging.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # ast-grep
@@ -54,10 +54,10 @@ Use it whenever the question is about **code structure**, not bytes:
 
 Switch to `search_files` (or plain `rg`) when the question is text-shaped (string literal contents, comments, license headers, file names, cross-language regex). When in doubt, ask: "does the answer depend on the language's syntax tree, or just on the file's bytes?" If the former, ast-grep. If the latter, search_files.
 
-Qubit integration notes:
+Hermes integration notes:
 - Run the helper and `sg` through the `terminal` tool. Single-quote every pattern so the shell never expands `$VAR`.
 - For find→read chains around matches, use `--json-out` and process with `execute_code` rather than piping through interpreters.
-- This complements (does not replace) Qubit's `patch` tool: `patch` is for targeted edits you author; ast-grep is for pattern-driven bulk rewrites across many sites.
+- This complements (does not replace) Hermes's `patch` tool: `patch` is for targeted edits you author; ast-grep is for pattern-driven bulk rewrites across many sites.
 
 ---
 

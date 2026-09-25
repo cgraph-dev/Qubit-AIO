@@ -6,7 +6,7 @@ description: "Adopt an animated mascot that reacts to agent activity across the 
 
 # Pets
 
-Qubit can show an animated **pet** — a small mascot sprite that reacts to what
+Hermes can show an animated **pet** — a small mascot sprite that reacts to what
 the agent is doing (idle, running a tool, thinking, finishing, failing) across
 the **CLI**, **TUI**, and **desktop app**. Pets come from the public
 [petdex](https://github.com/crafter-station/petdex) gallery.
@@ -18,7 +18,7 @@ the agent's behavior** — the sprite is a display concern only. The feature is
 ## How it works
 
 - Pets are installed into your profile's `pets/` directory
-  (`<QUBIT_HOME>/pets/<slug>/`), so each [profile](../profiles.md) keeps its
+  (`<HERMES_HOME>/pets/<slug>/`), so each [profile](../profiles.md) keeps its
   own set.
 - Selecting a pet writes `display.pet.slug` and `display.pet.enabled` to
   `config.yaml` — nothing is stored as a secret or env var.
@@ -39,7 +39,7 @@ the agent's behavior** — the sprite is a display concern only. The feature is
 
 ## Rendering
 
-In the terminal (CLI/TUI), Qubit renders the sprite at full fidelity when your
+In the terminal (CLI/TUI), Hermes renders the sprite at full fidelity when your
 terminal supports a graphics protocol (**kitty**, **Ghostty**, **WezTerm**,
 **iTerm2**, or **sixel**). Otherwise it falls back automatically to a truecolor
 Unicode **half-block** rendering. Inside a pipe or redirect (no TTY), terminal
@@ -52,34 +52,34 @@ from **Settings → Appearance**.
 
 ```bash
 # Browse the gallery (filter by substring)
-qubit pets list
-qubit pets list cat
+hermes pets list
+hermes pets list cat
 
 # Install a pet and make it active in one step
-qubit pets install boba --select
+hermes pets install boba --select
 
 # Preview / animate it in your terminal (Ctrl+C to stop)
-qubit pets show
+hermes pets show
 
 # Check your setup
-qubit pets doctor
+hermes pets doctor
 ```
 
-## `qubit pets` commands
+## `hermes pets` commands
 
 | Goal | Command |
 | --- | --- |
-| Browse the gallery | `qubit pets list [query] [--limit N]` |
-| List installed pets | `qubit pets list --installed` |
-| Install a pet | `qubit pets install <slug> [--select] [--force]` |
-| Set the active pet | `qubit pets select [slug]` (omit slug for a picker) |
-| Resize the pet everywhere | `qubit pets scale <factor>` (e.g. `0.5`, clamped 0.1–3.0) |
-| Preview/animate | `qubit pets show [slug] [--state <s>] [--cycle] [--once] [--mode <m>] [--scale <f>]` |
-| Disable the pet | `qubit pets off` |
-| Remove an installed pet | `qubit pets remove <slug>` |
-| Diagnose setup | `qubit pets doctor` |
+| Browse the gallery | `hermes pets list [query] [--limit N]` |
+| List installed pets | `hermes pets list --installed` |
+| Install a pet | `hermes pets install <slug> [--select] [--force]` |
+| Set the active pet | `hermes pets select [slug]` (omit slug for a picker) |
+| Resize the pet everywhere | `hermes pets scale <factor>` (e.g. `0.5`, clamped 0.1–3.0) |
+| Preview/animate | `hermes pets show [slug] [--state <s>] [--cycle] [--once] [--mode <m>] [--scale <f>]` |
+| Disable the pet | `hermes pets off` |
+| Remove an installed pet | `hermes pets remove <slug>` |
+| Diagnose setup | `hermes pets doctor` |
 
-`qubit pets show` flags:
+`hermes pets show` flags:
 
 - `--state` — play a single state (`idle`, `wave`, `run`, `failed`, `review`,
   `jump`).
@@ -105,22 +105,22 @@ it opens the Cmd+K pet palette.
 
 ## Generating a pet (`/hatch`)
 
-Beyond installing pre-made pets from the gallery, Qubit can **generate a brand-new pet** from a text description — its own AI sprite-generation pipeline.
+Beyond installing pre-made pets from the gallery, Hermes can **generate a brand-new pet** from a text description — its own AI sprite-generation pipeline.
 
-- CLI/TUI: `/hatch <description>` (alias `/generate-pet`), or `qubit pets` → the generate flow.
+- CLI/TUI: `/hatch <description>` (alias `/generate-pet`), or `hermes pets` → the generate flow.
 - Desktop app: the Pokédex-style **generate** UI — an animated egg, hatch FX, and a draft picker.
 
 How generation works (a two-step, cost-bounded flow):
 
 1. **Base drafts** — a handful of cheap, prompt-only "what should this pet look like" variants are generated. You pick one, or remix/retry for a fresh round.
-2. **Hatch** — the chosen base is used as a reference image to generate one grounded animation row per Qubit state (idle, thinking, tool use, etc.), which are deterministically sliced into frames and packed into a standard petdex/Codex atlas (8×9 grid of 192×208 cells). The result is a valid spritesheet you keep — and could `petdex submit`.
+2. **Hatch** — the chosen base is used as a reference image to generate one grounded animation row per Hermes state (idle, thinking, tool use, etc.), which are deterministically sliced into frames and packed into a standard petdex/Codex atlas (8×9 grid of 192×208 cells). The result is a valid spritesheet you keep — and could `petdex submit`.
 
 ### Image backend
 
-Generation uses the active [image-generation provider](/user-guide/features/image-generation), but it requires **reference-image grounding** so each animation row stays the same character as the base. Reference-capable backends: **Qubit Labs**, **OpenRouter**, **OpenAI** (`gpt-image-2`), and **Krea**. OpenRouter/Qubit run a quality-first model chain by default.
+Generation uses the active [image-generation provider](./image-generation.md), but it requires **reference-image grounding** so each animation row stays the same character as the base. Reference-capable backends: **Nous Portal**, **OpenRouter**, **OpenAI** (`gpt-image-2`), and **Krea**. OpenRouter/Nous run a quality-first model chain by default.
 
-- Resolution order prefers Qubit Labs → OpenAI → OpenRouter.
-- If no reference-capable backend is configured, generation surfaces an actionable error pointing you to `qubit tools` → Image Generation. (Installing/adopting existing gallery pets needs no image backend.)
+- Resolution order prefers Nous Portal → OpenAI → OpenRouter.
+- If no reference-capable backend is configured, generation surfaces an actionable error pointing you to `hermes tools` → Image Generation. (Installing/adopting existing gallery pets needs no image backend.)
 - Override the backend with the `HERMES_PET_IMAGE_PROVIDER` env var (e.g. `HERMES_PET_IMAGE_PROVIDER=openrouter`).
 
 ## Desktop app
@@ -163,7 +163,7 @@ floating pet, and the pop-out overlay — react off the same signal.
 ### Pop-out overlay
 
 **Shift-click** the floating pet to pop it out into its own transparent,
-always-on-top desktop window. Out there it stays visible while Qubit is
+always-on-top desktop window. Out there it stays visible while Hermes is
 minimized (Codex-style), so a glance tells you what the agent is doing.
 
 Gestures once it's popped out:
@@ -211,7 +211,7 @@ display:
 
 ## Troubleshooting
 
-Run `qubit pets doctor` — it reports:
+Run `hermes pets doctor` — it reports:
 
 - the pets directory and which pets are installed,
 - `display.pet.enabled`, `display.pet.slug`, and the resolved active pet,
@@ -226,8 +226,8 @@ Common gotchas:
 
 - A pet only shows once one is **installed AND selected** (`enabled: true`).
 - Inside a pipe/redirect (no TTY), terminal rendering is disabled by design.
-- The petdex npm CLI installs to `~/.codex/pets`; Qubit uses its own
-  profile-scoped `<QUBIT_HOME>/pets/` instead — install through `qubit pets`.
+- The petdex npm CLI installs to `~/.codex/pets`; Hermes uses its own
+  profile-scoped `<HERMES_HOME>/pets/` instead — install through `hermes pets`.
 
 ## See also
 

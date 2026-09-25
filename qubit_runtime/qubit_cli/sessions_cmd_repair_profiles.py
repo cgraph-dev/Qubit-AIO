@@ -2,8 +2,6 @@
 
 Runs pre-DB (``_PRE_DB_HANDLERS``): it opens every profile's store itself rather than the one
 ambient ``SessionDB()``. Report-only unless ``--apply``; ``--json`` for automation.
-
-Provenance: reference ``hermes_cli/sessions_cmd_repair_profiles.py`` (``hermes`` 0.21.4).
 """
 from __future__ import annotations
 

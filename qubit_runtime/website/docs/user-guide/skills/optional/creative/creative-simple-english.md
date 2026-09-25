@@ -14,19 +14,19 @@ Rewrite text to ASD-STE100 Simplified Technical English.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/creative/simple-english` |
-| Path | `optional-skills/creative\simple-english` |
+| Source | Optional — install with `hermes skills install official/creative/simple-english` |
+| Path | `optional-skills/creative/simple-english` |
 | Version | `1.2.0` |
-| Author | AminBlg (https://github.com/AminBlg/SimpleEnglish), ported by Qubit Agent |
+| Author | AminBlg (https://github.com/AminBlg/SimpleEnglish), ported by Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `writing`, `documentation`, `ste`, `asd-ste100`, `technical-writing`, `editing`, `anti-ai-slop` |
-| Related skills | [`humanizer`](/docs/user-guide/skills/bundled/creative/creative-humanizer) |
+| Related skills | [`humanizer`](../../bundled/creative/creative-humanizer.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # Simple English: Write Like an Aerospace Manual
@@ -35,7 +35,7 @@ Write technical text with the rules of ASD-STE100 Simplified Technical English. 
 
 Write for that tired reader. Each sentence must survive one read.
 
-## How to use it in Qubit
+## How to use it in Hermes
 
 The text usually arrives one of three ways:
 

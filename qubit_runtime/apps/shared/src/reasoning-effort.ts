@@ -1,4 +1,4 @@
-/** Qubit' reasoning levels, in ascending order — mirrors the backend's
+/** Hermes' reasoning levels, in ascending order — mirrors the backend's
  *  VALID_REASONING_EFFORTS (qubit_constants.py). `none` is not a level: it's
  *  thinking disabled. */
 export const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const
@@ -10,7 +10,7 @@ export const REASONING_EFFORT_VALUES = ['none', ...REASONING_EFFORTS] as const
 
 export type ReasoningEffortValue = (typeof REASONING_EFFORT_VALUES)[number]
 
-/** Qubit' built-in level when neither the surface nor the profile config
+/** Hermes' built-in level when neither the surface nor the profile config
  *  specifies one (mirrors the backend's own fallback). */
 export const DEFAULT_REASONING_EFFORT: ReasoningEffort = 'medium'
 

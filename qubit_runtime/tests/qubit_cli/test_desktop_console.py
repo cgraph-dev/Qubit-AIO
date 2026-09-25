@@ -65,7 +65,7 @@ def test_complete_records_reach_redacted_logs(tmp_path, monkeypatch, caplog, str
     payload_path = tmp_path / "child-output.bin"
     payload_path.write_bytes(payload)
     try:
-        log_dir = qubit_logging.setup_logging(hermes_home=tmp_path, log_level="INFO", mode="gui")
+        log_dir = qubit_logging.setup_logging(qubit_home=tmp_path, log_level="INFO", mode="gui")
         with desktop_console_output(source_mode=False) as streams:
             result = subprocess.run(
                 [sys.executable, "-c", "import pathlib, sys; "

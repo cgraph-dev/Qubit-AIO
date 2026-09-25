@@ -15,7 +15,7 @@
  * under `vm`.
  */
 
-import type * as QubitSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@hermes/plugin-sdk'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RosterRow } from './types'
@@ -27,7 +27,7 @@ const { markSessionUnreadFinished, notify, request } = vi.hoisted(() => ({
 }))
 
 vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof QubitSdk>()
+  const sdk = await importOriginal<typeof HermesSdk>()
 
   return {
     ...sdk,

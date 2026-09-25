@@ -3,6 +3,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { ErrorState } from '@/components/ui/error-state'
 import { useI18n } from '@/i18n'
+import { requestSendDiagnostics } from '@/store/send-diagnostics'
 
 export interface ErrorBoundaryFallbackProps {
   error: Error
@@ -58,7 +59,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // the main process for windows with a console hook, is minified, and loses
     // the component stack. This survives the window and names the component.
     try {
-      window.qubitDesktop?.reportRendererError?.({
+      window.hermesDesktop?.reportRendererError?.({
         label: new URLSearchParams(window.location.search).get('win') ?? 'main',
         boundary: label || 'unlabeled',
         message: error.message,
@@ -151,7 +152,19 @@ function RootErrorFallback({ error, reset }: ErrorBoundaryFallbackProps) {
     >
       <ErrorState
         className="w-full max-w-[28rem]"
-        description={error.message || t.errors.boundaryDesc}
+        description={
+          <>
+            {t.errors.boundaryDesc}
+            {error.message ? (
+              <details className="mt-2 text-left text-xs text-muted-foreground">
+                <summary className="cursor-pointer select-none text-center">{t.errors.boundaryDetails}</summary>
+                <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap wrap-break-word font-mono text-[0.6875rem]">
+                  {error.message}
+                </pre>
+              </details>
+            ) : null}
+          </>
+        }
         title={t.errors.boundaryTitle}
       >
         <Button className="font-semibold" onClick={reset} size="lg">
@@ -160,8 +173,11 @@ function RootErrorFallback({ error, reset }: ErrorBoundaryFallbackProps) {
         <Button onClick={() => window.location.reload()} variant="text">
           {t.errors.reloadWindow}
         </Button>
-        <Button onClick={() => void window.qubitDesktop?.revealLogs()?.catch(() => undefined)} variant="text">
+        <Button onClick={() => void window.hermesDesktop?.revealLogs()?.catch(() => undefined)} variant="text">
           {t.errors.openLogs}
+        </Button>
+        <Button onClick={() => requestSendDiagnostics(error.stack || error.message)} variant="text">
+          {t.errors.sendDiagnostics}
         </Button>
       </ErrorState>
     </div>

@@ -1,6 +1,6 @@
 """Keyed ``providers.<key>`` entries must use the durable pool slug.
 
-``qubit auth add b-ai`` stores keys under ``credential_pool.b-ai``. Runtime
+``hermes auth add b-ai`` stores keys under ``credential_pool.b-ai``. Runtime
 used to look up ``custom:<display-name>`` (e.g. ``custom:b.ai`` from
 ``name: B.AI``), miss the pool, and send the ``no-key-required`` placeholder
 to an auth-required endpoint (HTTP 401 Invalid api_key format).
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-import yaml
+import qubit_yaml as yaml
 
 
 POOL_KEY = "sk-real-b-ai-pool-key-12345"

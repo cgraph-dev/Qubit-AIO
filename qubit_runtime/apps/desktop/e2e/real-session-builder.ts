@@ -70,12 +70,12 @@ export class RealSessionBuilder {
   private readonly stderr: string[] = []
   private closed = false
 
-  private constructor(qubitHome: string) {
+  private constructor(hermesHome: string) {
     this.child = spawn('uv', ['run', '--active', '--no-sync', 'python', '-m', 'tui_gateway.entry'], {
       cwd: REPO_ROOT,
       env: {
         ...process.env,
-        QUBIT_HOME: qubitHome,
+        QUBIT_HOME: hermesHome,
         PYTHONPATH: REPO_ROOT,
       },
       stdio: 'pipe',
@@ -94,8 +94,8 @@ export class RealSessionBuilder {
     })
   }
 
-  static async start(qubitHome: string): Promise<RealSessionBuilder> {
-    const builder = new RealSessionBuilder(qubitHome)
+  static async start(hermesHome: string): Promise<RealSessionBuilder> {
+    const builder = new RealSessionBuilder(hermesHome)
     await builder.waitForEvent(frame => frame.params?.type === 'gateway.ready')
     return builder
   }

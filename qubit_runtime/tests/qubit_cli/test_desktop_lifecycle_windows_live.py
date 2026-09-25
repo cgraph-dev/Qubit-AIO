@@ -26,11 +26,28 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    sys.platform != "win32", reason="live Windows lifecycle E2E"
-)
+pytestmark = pytest.mark.platforms("windows")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _wait_until(predicate, timeout: float = 15.0, interval: float = 0.05) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return bool(predicate())
+
+
+def _argv_visible(pid: int, marker: str) -> bool:
+    """True once the process table shows *pid* with *marker* in its argv."""
+    import psutil
+
+    try:
+        return marker in " ".join(psutil.Process(pid).cmdline())
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return False
 
 
 @pytest.fixture()
@@ -44,8 +61,7 @@ def sleeper():
             stderr=subprocess.DEVNULL,
         )
         procs.append(p)
-        time.sleep(0.5)
-        assert p.poll() is None
+        assert _wait_until(lambda: _argv_visible(p.pid, "time.sleep(120)")), "sleeper argv never visible"
         return p
 
     yield _spawn
@@ -79,7 +95,7 @@ def _entry(proc: subprocess.Popen, purpose: str = "serve") -> dict:
 
 
 def test_live_supervised_serve_suppresses_cold_start(sleeper, monkeypatch, tmp_path):
-    from qubit_cli import gateway as qubit_gateway
+    from qubit_cli import gateway as hermes_gateway
     from qubit_cli import gateway_windows
     from qubit_cli import update_cmd
 
@@ -93,15 +109,14 @@ def test_live_supervised_serve_suppresses_cold_start(sleeper, monkeypatch, tmp_p
 
     # Autostart artifact present + no gateway running: WITHOUT ownership the
     # pause phase would plan a cold start; WITH it, no plan.
-    monkeypatch.setattr(qubit_gateway, "find_gateway_pids", lambda **_k: [])
+    monkeypatch.setattr(hermes_gateway, "find_gateway_pids", lambda **_k: [])
     monkeypatch.setattr(gateway_windows, "is_installed", lambda: True)
     assert update_cmd._pause_windows_gateways_for_update() is None
 
     # Dead serve → ownership drops → plan returns.
     serve.kill()
     serve.wait()
-    time.sleep(0.5)
-    assert update_cmd._desktop_owns_gateway_lifecycle() is False
+    assert _wait_until(lambda: update_cmd._desktop_owns_gateway_lifecycle() is False)
     token = update_cmd._pause_windows_gateways_for_update()
     assert token is not None and token.get("cold_start_if_installed") is True
 
@@ -118,27 +133,29 @@ def test_holder_scan_fallback_respects_token_classifier(sleeper, monkeypatch, tm
     # Lookalike from the #90778 class — must NOT confer ownership.
     kanban_like = sleeper("-m", "qubit_cli.main", "kanban", "--preserve-cache")
 
-    def fake_holders():
-        import psutil
+    import psutil
 
-        out = []
-        for p in (serve_like, kanban_like):
-            proc = psutil.Process(p.pid)
-            out.append((p.pid, proc.name(), " ".join(proc.cmdline())))
-        return out
+    # Snapshot both holder rows while both processes are alive. Building the
+    # kanban row later (after the serve kill) would re-read the dead serve pid,
+    # raise NoSuchProcess and hand the fallback an empty scan, which returns
+    # False without ever reaching the token classifier.
+    serve_row, kanban_row = (
+        (p.pid, psutil.Process(p.pid).name(), " ".join(psutil.Process(p.pid).cmdline()))
+        for p in (serve_like, kanban_like)
+    )
+    assert "--preserve-cache" in kanban_row[2]
 
     monkeypatch.setattr(
-        "qubit_cli.main._detect_venv_python_processes", fake_holders
+        "qubit_cli.main._detect_venv_python_processes", lambda: [serve_row, kanban_row]
     )
-
     # serve-shaped holder with a live parent (us) → owns
     assert update_cmd._desktop_owns_gateway_lifecycle() is True
 
-    # Only the kanban lookalike left → classifier rejects → does not own
+    # Only the (still live) kanban lookalike left → classifier rejects → does not own
     serve_like.kill()
     serve_like.wait()
+    assert kanban_like.poll() is None
     monkeypatch.setattr(
-        "qubit_cli.main._detect_venv_python_processes",
-        lambda: [fake_holders()[1]],
+        "qubit_cli.main._detect_venv_python_processes", lambda: [kanban_row]
     )
     assert update_cmd._desktop_owns_gateway_lifecycle() is False

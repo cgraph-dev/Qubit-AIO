@@ -120,8 +120,8 @@ export const zhHant: Translations = {
     starting: "啟動中",
     startedInBackground: "已於背景啟動 — 請查看日誌以取得進度",
     stopped: "已停止",
-    updateQubit: "更新 Qubit",
-    updatingQubit: "正在更新 Qubit…",
+    updateHermes: "更新 Qubit",
+    updatingHermes: "正在更新 Qubit…",
     waitingForOutput: "等待輸出…",
   },
 
@@ -165,6 +165,10 @@ export const zhHant: Translations = {
     failedToDeleteSelected: "刪除所選工作階段失敗",
     resumeInChat: "在對話中繼續",
     newChat: "新對話",
+    workspace: "工作區",
+    workspaceDefault: "預設",
+    workspaceRescan: "重新掃描儲存庫",
+    workspaceCustom: "其他路徑…",
     previousPage: "上一頁",
     nextPage: "下一頁",
     roles: {
@@ -323,6 +327,8 @@ export const zhHant: Translations = {
     disableRuntime: "停用",
     enableAfterInstall: "安裝後啟用",
     enableRuntime: "啟用",
+    toggleTakesEffectAfterRestart:
+      "已儲存 — 重新啟動閘道以套用變更。",
     forceReinstall: "強制重新安裝（先刪除既有資料夾）",
     headline:
       "探索、安裝、啟用並更新 Qubit 外掛（對齊 `qubit plugins` CLI）。",
@@ -342,8 +348,8 @@ export const zhHant: Translations = {
     providersHint:
       "會寫入 config.yaml：memory.provider（留空為內建）與 context.engine。下一個工作階段生效。",
     refreshDashboard: "重新掃描儀表板擴充功能",
-    removeConfirm: "從 $QUBIT_HOME/plugins/ 移除此外掛？",
-    removeHint: "僅可移除位於 $QUBIT_HOME/plugins 下使用者安裝的外掛。",
+    removeConfirm: "從 ~/.hermes/plugins/ 移除此外掛？",
+    removeHint: "僅可移除位於 ~/.hermes/plugins 下使用者安裝的外掛。",
     rescanHeading: "SPA 外掛註冊表",
     rescanHint: "在磁碟新增檔案後重新掃描，使儀表板側邊欄載入新的 manifest。",
     runtimeHeading: "閘道執行階段（YAML 外掛）",
@@ -365,7 +371,7 @@ export const zhHant: Translations = {
     all: "全部",
     categories: "分類",
     filters: "篩選",
-    noSkills: "找不到技能。技能由 ~/.qubit/skills/ 載入",
+    noSkills: "找不到技能。技能由 ~/.hermes/skills/ 載入",
     noSkillsMatch: "沒有符合搜尋或篩選條件的技能。",
     skillCount: "{count} 個技能",
     resultCount: "{count} 個結果",
@@ -379,7 +385,7 @@ export const zhHant: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "篩選",
     sections: "分類",
     exportConfig: "匯出設定為 JSON",

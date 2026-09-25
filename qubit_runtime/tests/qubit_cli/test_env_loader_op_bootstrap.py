@@ -2,7 +2,7 @@
 
 Two behaviours are covered:
 
-1. ``load_hermes_dotenv()`` auto-loads ``~/.hermes/.op.env`` so the
+1. ``load_qubit_dotenv()`` auto-loads ``~/.hermes/.op.env`` so the
    ``OP_SERVICE_ACCOUNT_TOKEN`` bootstrap token is available to
    ``apply_onepassword_secrets()`` in cron / subprocess / macOS / Docker
    contexts that inherit no shell state (no systemd EnvironmentFile, no
@@ -64,7 +64,7 @@ def test_op_env_autoloads_bootstrap_token_in_cron_context(tmp_path, monkeypatch)
 
     assert os.environ.get("OP_SERVICE_ACCOUNT_TOKEN") is None
 
-    env_loader.load_hermes_dotenv(hermes_home=home)
+    env_loader.load_qubit_dotenv(qubit_home=home)
 
     assert os.environ["OP_SERVICE_ACCOUNT_TOKEN"] == "test-token"
 

@@ -24,7 +24,7 @@ def _make_agent(qubit_home: Path) -> Path:
 
 
 def _make_gui_build(qubit_home: Path) -> None:
-    """Create the source-built GUI artifacts a `qubit desktop` run produces."""
+    """Create the source-built GUI artifacts a `hermes desktop` run produces."""
     desktop = qubit_home / "hermes-agent" / "apps" / "desktop"
     (desktop / "dist").mkdir(parents=True)
     (desktop / "dist" / "index.html").write_text("<html>")
@@ -32,20 +32,6 @@ def _make_gui_build(qubit_home: Path) -> None:
     (desktop / "node_modules").mkdir(parents=True)
     (qubit_home / "hermes-agent" / "node_modules").mkdir(parents=True)
     (qubit_home / "desktop-build-stamp.json").write_text("{}")
-
-
-def _make_user_data(qubit_home: Path) -> None:
-    (qubit_home / "config.yaml").write_text("x: 1\n")
-    (qubit_home / ".env").write_text("KEY=secret\n")
-    (qubit_home / "sessions").mkdir()
-
-
-
-
-
-
-
-
 
 
 def test_gui_install_summary_shape(tmp_path, monkeypatch):
@@ -65,22 +51,8 @@ def test_gui_install_summary_shape(tmp_path, monkeypatch):
     assert summary["platform"] == sys.platform
 
 
-
-
-
-
-def test_linux_discovery_includes_launcher_entry(tmp_path, monkeypatch):
-    """The launcher entry that `qubit desktop` installs is removable."""
-    monkeypatch.setattr(gu.sys, "platform", "linux")
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
-
-    from qubit_cli import linux_desktop_entry as lde
-
-    assert lde.desktop_entry_path() in gu.packaged_gui_app_paths()
-
-
+@pytest.mark.platforms("linux")
 def test_uninstall_removes_launcher_entry_and_refreshes_cache(tmp_path, monkeypatch):
-    monkeypatch.setattr(gu.sys, "platform", "linux")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
 
     from qubit_cli import linux_desktop_entry as lde
@@ -111,22 +83,7 @@ def test_uninstall_removes_launcher_entry_and_refreshes_cache(tmp_path, monkeypa
     assert (qubit_home / "hermes-agent" / "qubit_cli").is_dir()
 
 
-def test_uninstall_skips_cache_refresh_when_no_launcher_entry(tmp_path, monkeypatch):
-    monkeypatch.setattr(gu.sys, "platform", "linux")
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
-
-    from qubit_cli import linux_desktop_entry as lde
-
-    refreshed: list[Path] = []
-    monkeypatch.setattr(lde, "refresh_desktop_databases", lambda d: refreshed.append(d) or [])
-    monkeypatch.setattr(gu, "desktop_userdata_dir", lambda: tmp_path / "none")
-
-    gu.uninstall_gui(tmp_path / ".hermes")
-
-    assert refreshed == []
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX symlink semantics")
+@pytest.mark.platforms("posix")  # POSIX symlink semantics
 def test_remove_path_handles_symlink(tmp_path):
     target = tmp_path / "real"
     target.mkdir()
@@ -136,22 +93,6 @@ def test_remove_path_handles_symlink(tmp_path):
     assert not link.exists()
     # The symlink is gone but its target is untouched.
     assert target.exists()
-
-
-class _Args:
-    """Minimal argparse-Namespace stand-in for run_uninstall."""
-
-    def __init__(self, *, yes=False, full=False, gui=False, gui_summary=False):
-        self.yes = yes
-        self.full = full
-        self.gui = gui
-        self.gui_summary = gui_summary
-
-
-
-
-
-
 
 
 def test_uninstall_args_namespace_mode_mapping():

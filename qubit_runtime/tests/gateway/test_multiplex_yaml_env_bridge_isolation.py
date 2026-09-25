@@ -16,7 +16,7 @@ from agent.secret_scope import (
     set_multiplex_active,
     set_secret_scope,
 )
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 _SECONDARY_YAML = """\
 require_mention: false
@@ -73,13 +73,13 @@ def secondary_scope(tmp_path, monkeypatch):
     for name in _BRIDGED_ENV:
         monkeypatch.delenv(name, raising=False)
     set_multiplex_active(True)
-    home_token = set_hermes_home_override(str(secondary))
+    home_token = set_qubit_home_override(str(secondary))
     secret_token = set_secret_scope({"TELEGRAM_BOT_TOKEN": "222:b2"})
     try:
         yield
     finally:
         reset_secret_scope(secret_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
         set_multiplex_active(False)
 
 

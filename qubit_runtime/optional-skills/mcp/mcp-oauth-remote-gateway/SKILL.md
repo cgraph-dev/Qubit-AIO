@@ -8,7 +8,7 @@ platforms: [linux, macos]
 metadata:
   qubit:
     tags: [MCP, OAuth, PKCE, Remote-Deployment]
-    related_skills: [qubit-agent, mcporter, fastmcp]
+    related_skills: [hermes-agent, mcporter, fastmcp]
 ---
 
 # MCP OAuth on a Remote Qubit Gateway
@@ -117,7 +117,7 @@ are out of the dashboard's scope regardless.
 ## The Workaround
 
 Do the OAuth dance manually, then write the resulting tokens into the exact files
-Qubit' `HermesTokenStorage` would have written, so on `/reload-mcp` Qubit finds
+Qubit' `QubitTokenStorage` would have written, so on `/reload-mcp` Qubit finds
 cached tokens and skips the browser flow entirely.
 
 Run the shell commands below through the `terminal` tool on the gateway host and
@@ -139,7 +139,7 @@ built-in flow won't work.
 ### 2. Find QUBIT_HOME and the config path
 
 ```bash
-QUBIT_HOME=$(python3 -c 'from qubit_constants import get_hermes_home; print(get_hermes_home())')
+QUBIT_HOME=$(python3 -c 'from qubit_constants import get_qubit_home; print(get_qubit_home())')
 echo "config: $QUBIT_HOME/config.yaml"
 echo "tokens: $QUBIT_HOME/mcp-tokens/"
 ```
@@ -211,7 +211,7 @@ non-empty array AND/OR the resource metadata declares specific scopes. If
 default set on its own. Fabricating scope strings against an empty
 `scopes_supported` can cause `invalid_scope` errors on some ASes.
 
-**Stash `code_verifier` and `state` to disk** (e.g. `/tmp/.mcp-oauth-work/<server>.json`,
+**Stash `code_verifier` and `state` to disk** (e.g. `~/.hermes/cache/scratch/.mcp-oauth-work/<server>.json`,
 0600 perms). You need them for step 7, possibly across multiple chat turns.
 
 ### 6. Give the user the authorize URL
@@ -242,7 +242,7 @@ When the user pastes the callback URL:
 
 ### 8. Write tokens in Qubit' exact schema
 
-`tools/mcp_oauth.py::HermesTokenStorage` expects two files under
+`tools/mcp_oauth.py::QubitTokenStorage` expects two files under
 `$QUBIT_HOME/mcp-tokens/` (create dir with `0o700`, files with `0o600`):
 
 **`<server_name>.json`** — the `OAuthToken` pydantic model:
@@ -314,7 +314,7 @@ UA** — Cloudflare will 403 you even though Qubit (which uses httpx) will succe
 
 ### 11. Tell the user to run `/reload-mcp`
 
-On reload, Qubit sees `auth: oauth`, calls `HermesTokenStorage.get_tokens()`,
+On reload, Qubit sees `auth: oauth`, calls `QubitTokenStorage.get_tokens()`,
 finds your cached tokens, skips the browser flow, and registers `mcp_<name>_*`
 tools. Refresh happens automatically before `expires_in` elapses.
 
@@ -344,7 +344,7 @@ tools. Refresh happens automatically before `expires_in` elapses.
 
 12. **Never hand-type the redirect URL for the user to open.** Generate the authorize URL programmatically with `urllib.parse.urlencode()`. Spaces in scopes and special chars in `state` break string-concatenated URLs.
 
-13. **Security: the stash file contains the `code_verifier`.** Delete `/tmp/.mcp-oauth-work/<server>.json` immediately after successful token exchange. There's no reason to keep a proof-of-identity secret around once it's consumed.
+13. **Security: the stash file contains the `code_verifier`.** Delete `~/.hermes/cache/scratch/.mcp-oauth-work/<server>.json` immediately after successful token exchange. There's no reason to keep a proof-of-identity secret around once it's consumed.
 
 14. **Write what the token endpoint actually returned.** The AS may grant a narrower (or wider) scope than requested. Write the `scope` from the token-exchange response to `<server>.json`, not what you asked for in step 5. When `scopes_supported: []`, the explicit scope list you send IS authoritative both ways: some servers grant exactly what you list (pass narrow scopes for least-privilege, or enumerate the full set if the user needs everything), and some won't echo the granted scope back at registration time — only the token-exchange response is authoritative.
 

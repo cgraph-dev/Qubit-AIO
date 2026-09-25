@@ -40,13 +40,13 @@ const api = vi.fn(async ({ path }: { path: string }) => {
 
 const readFileDataUrl = vi.fn(async () => DATA_URL)
 
-let originalDesktop: typeof window.qubitDesktop
+let originalDesktop: typeof window.hermesDesktop
 
 beforeEach(() => {
   api.mockClear()
   readFileDataUrl.mockClear()
-  originalDesktop = window.qubitDesktop
-  Object.defineProperty(window, 'qubitDesktop', {
+  originalDesktop = window.hermesDesktop
+  Object.defineProperty(window, 'hermesDesktop', {
     configurable: true,
     value: { api, readFileDataUrl }
   })
@@ -56,7 +56,7 @@ afterEach(() => {
   cleanup()
   $connection.set(null)
   $toolDisclosureStates.set({})
-  Object.defineProperty(window, 'qubitDesktop', {
+  Object.defineProperty(window, 'hermesDesktop', {
     configurable: true,
     value: originalDesktop
   })

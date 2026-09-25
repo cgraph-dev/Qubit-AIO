@@ -54,7 +54,7 @@ from tests.fakes.fake_llm_provider import (
     Hang,
     Text,
     ToolCall,
-    write_hermes_home,
+    write_qubit_home,
 )
 
 # ---------------------------------------------------------------------------------------------
@@ -176,7 +176,7 @@ def world(tmp_path, monkeypatch):
     home.mkdir()
     # The hermetic conftest's per-test QUBIT_HOME (a tmp dir): the in-process live-system guard
     # refuses a <HOME>/.hermes layout, and the children must share this very state.db.
-    hermes_home = Path(os.environ["QUBIT_HOME"])
+    qubit_home = Path(os.environ["QUBIT_HOME"])
     workdir = tmp_path / "work"
     workdir.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -184,9 +184,9 @@ def world(tmp_path, monkeypatch):
     script = Script()
     spawned = Spawned()
     with FakeLLMServer(script) as srv:
-        write_hermes_home(hermes_home, srv.base_url, extra_config=OFFLINE_CONFIG + NO_BACKGROUND_REVIEW)
+        write_qubit_home(qubit_home, srv.base_url, extra_config=OFFLINE_CONFIG + NO_BACKGROUND_REVIEW)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-e2e")
-        yield {"srv": srv, "script": script, "home": home, "hermes_home": hermes_home,
+        yield {"srv": srv, "script": script, "home": home, "hermes_home": qubit_home,
                "workdir": workdir, "spawned": spawned}
         leaked = spawned.reap()
         assert not leaked, f"subprocesses outlived the test: {leaked}"
@@ -194,15 +194,15 @@ def world(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("name", SCENARIOS)
 def test_transcript_ledger(world, name):
-    srv, script, hermes_home = world["srv"], world["script"], world["hermes_home"]
+    srv, script, qubit_home = world["srv"], world["script"], world["hermes_home"]
     if name in SCENARIO_CONFIG:
-        write_hermes_home(hermes_home, srv.base_url,
+        write_qubit_home(qubit_home, srv.base_url,
                           extra_config=OFFLINE_CONFIG + NO_BACKGROUND_REVIEW + SCENARIO_CONFIG[name])
     typed = [arg for kind, arg in scenario(name, Script()) if kind == "turn"]
     assert not [(a, b) for a in typed for b in typed if a != b and a in b], "scenario inputs must be unique"
-    session = InProcessSession(srv.base_url, hermes_home, f"ledger-{name}")
+    session = InProcessSession(srv.base_url, qubit_home, f"ledger-{name}")
     script.session = session
-    ledger = Ledger(srv, hermes_home)
+    ledger = Ledger(srv, qubit_home)
     try:
         for i, (kind, arg) in enumerate(scenario(name, script)):
             label = f"{i}:{kind}:{str(arg)[:24]}"
@@ -251,20 +251,20 @@ def test_transcript_ledger(world, name):
         assert len(breaks) == (len(breaks) if name == "micro_compaction" else 1) and breaks, (
             f"expected the compaction boundary to break the prefix (exactly once for one-shot compaction), "
             f"got {breaks} (declared at {sorted(allowed)})")
-        model, _ = views(hermes_home, sid)
+        model, _ = views(qubit_home, sid)
         assert any(is_summary(m) for m in model), "compaction left no summary in the model view"
 
     # (f) usage: what the provider billed == what state.db accounts for the whole lineage.
-    assert_usage_matches(hermes_home, lineage(hermes_home, sid), srv.requests, f"scenario {name}")
-    integrity_ok(hermes_home)
+    assert_usage_matches(qubit_home, lineage(qubit_home, sid), srv.requests, f"scenario {name}")
+    integrity_ok(qubit_home)
 
     # (d) resume in a FRESH `hermes chat --resume` process: its first request replays the persisted
     # model view and is a byte-identical extension of the last in-process request. Messages only:
     # the tools array of an in-process AIAgent is a harness construction choice; the cross-surface
     # tools comparison lives in test_prefix_stability.py (real surfaces only).
-    persisted, _ = views(hermes_home, sid)
+    persisted, _ = views(qubit_home, sid)
     n_before = len(main)
-    env = child_env(world["home"], hermes_home, world["workdir"])
+    env = child_env(world["home"], qubit_home, world["workdir"])
     _out, resumed_sid = run_oneshot(env, world["workdir"], f"resume check for {name}", world["spawned"], resume=sid)
     assert resumed_sid == sid, f"--resume {sid} continued a different session {resumed_sid}"
     after = srv.main_requests()
@@ -278,14 +278,14 @@ def test_transcript_ledger(world, name):
                 f"{first_divergence(canon(a), canon(b))}")
         assert len(first["messages"]) > len(last["messages"])
     ledger.step(sid, "fresh-process resume", compaction=name == "micro_compaction")
-    assert_usage_matches(hermes_home, lineage(hermes_home, sid), srv.requests, f"scenario {name} after resume")
+    assert_usage_matches(qubit_home, lineage(qubit_home, sid), srv.requests, f"scenario {name} after resume")
 
 
 def test_micro_compaction_resumed_display_shows_each_input_once(world):
-    srv, script, hermes_home = world["srv"], world["script"], world["hermes_home"]
-    write_hermes_home(hermes_home, srv.base_url,
+    srv, script, qubit_home = world["srv"], world["script"], world["hermes_home"]
+    write_qubit_home(qubit_home, srv.base_url,
                       extra_config=OFFLINE_CONFIG + NO_BACKGROUND_REVIEW + SCENARIO_CONFIG["micro_compaction"])
-    session = InProcessSession(srv.base_url, hermes_home, "ledger-micro-display")
+    session = InProcessSession(srv.base_url, qubit_home, "ledger-micro-display")
     inputs: list[str] = []
     try:
         for kind, arg in scenario("micro_compaction", script):
@@ -297,5 +297,5 @@ def test_micro_compaction_resumed_display_shows_each_input_once(world):
         sid = session.sid
     finally:
         session.close()
-    model, display = views(hermes_home, sid)
+    model, display = views(qubit_home, sid)
     assert_inputs_shown_once(inputs, display, model, "after six micro-compacted turns")

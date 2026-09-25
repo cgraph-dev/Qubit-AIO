@@ -5,6 +5,8 @@ import secrets
 from typing import Any, Dict, List
 from urllib.parse import quote
 
+from qubit_cli.timefmt import coerce_epoch
+
 # --- Icons (Lucide-style SVGs) ---
 ICON_USER = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
 ICON_BOT = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bot"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>'
@@ -14,7 +16,7 @@ ICON_SPARKLES = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" 
 ICON_CHEVRON_RIGHT = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>'
 ICON_SEARCH = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
 ICON_SHIELD = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/></svg>'
-ICON_QUBIT = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>'
+ICON_HERMES = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>'
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -650,8 +652,9 @@ def _escape_html(text: Any) -> str:
     )
 
 
-def _format_timestamp(ts: float) -> str:
-    return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") if ts else "N/A"
+def _format_timestamp(ts: Any) -> str:
+    # A corrupt cell renders as N/A; never raw text (a TEXT timestamp would otherwise reach an HTML sink).
+    return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") if ts and (ts := coerce_epoch(ts)) else "N/A"
 
 
 _ROLE_ICONS = {"user": ICON_USER, "assistant": ICON_BOT, "system": ICON_SHIELD}
@@ -745,7 +748,7 @@ def _sidebar_html(sessions: List[Dict[str, Any]]) -> str:
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-brand">
-                    {ICON_QUBIT} Qubit History
+                    {ICON_HERMES} Qubit History
                 </div>
                 <div class="search-container">
                     {ICON_SEARCH}

@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitConnection } from '@/global'
+import type { HermesConnection } from '@/global'
 
 import { deferred } from '../test/deferred'
 
@@ -24,6 +24,15 @@ const resetStarmapGraph = vi.fn()
 
 vi.mock('@/store/gateway', () => ({
   $gateway,
+  // Both activation doors publish the registry route; the latest call owns it.
+  activeGatewayProfileKey: () => {
+    const profileOrder = ensureGatewayForProfile.mock.invocationCallOrder.at(-1) ?? 0
+    const agentOrder = ensureGatewayForAgent.mock.invocationCallOrder.at(-1) ?? 0
+
+    return agentOrder > profileOrder
+      ? ensureGatewayForAgent.mock.lastCall?.[1]
+      : (ensureGatewayForProfile.mock.lastCall?.[0] ?? $activeGatewayProfile.get())
+  },
   ensureGatewayForAgent,
   ensureGatewayForProfile,
   openGatewayForProfile
@@ -47,16 +56,16 @@ const {
   setCurrentProvider
 } = await import('./session')
 
-const agentConn = (over: Partial<QubitConnection> = {}): QubitConnection =>
-  ({ baseUrl: 'https://homelab.invalid', mode: 'remote', profile: 'research', ...over }) as QubitConnection
+const agentConn = (over: Partial<HermesConnection> = {}): HermesConnection =>
+  ({ baseUrl: 'https://homelab.invalid', mode: 'remote', profile: 'research', ...over }) as HermesConnection
 
-const localConn = (over: Partial<QubitConnection> = {}): QubitConnection =>
-  ({ baseUrl: '', mode: 'local', profile: 'default', ...over }) as QubitConnection
+const localConn = (over: Partial<HermesConnection> = {}): HermesConnection =>
+  ({ baseUrl: '', mode: 'local', profile: 'default', ...over }) as HermesConnection
 
-const getConnection = vi.fn<(profile?: string | null) => Promise<QubitConnection>>()
+const getConnection = vi.fn<(profile?: string | null) => Promise<HermesConnection>>()
 
 const getConnectionFor =
-  vi.fn<(payload: { connectionId?: null | string; profile?: null | string }) => Promise<QubitConnection>>()
+  vi.fn<(payload: { connectionId?: null | string; profile?: null | string }) => Promise<HermesConnection>>()
 
 beforeEach(() => {
   const localStorage = window.localStorage
@@ -69,7 +78,7 @@ beforeEach(() => {
   $gateway.set({ id: 'live-socket' })
   $activeGatewayProfile.set('default')
   $connection.set(localConn())
-  vi.stubGlobal('window', { qubitDesktop: { getConnection, getConnectionFor }, localStorage })
+  vi.stubGlobal('window', { hermesDesktop: { getConnection, getConnectionFor }, localStorage })
   setComposerSelectionOwner('homelab', 'default')
 })
 
@@ -383,7 +392,7 @@ describe('ensureGatewayAgent commit hook (beforeActivate) — the Sessions switc
     vi.useFakeTimers()
 
     try {
-      getConnectionFor.mockImplementationOnce(() => new Promise<QubitConnection>(() => undefined))
+      getConnectionFor.mockImplementationOnce(() => new Promise<HermesConnection>(() => undefined))
 
       const activation = ensureGatewayAgent('homelab', 'research')
       await vi.advanceTimersByTimeAsync(20_000)

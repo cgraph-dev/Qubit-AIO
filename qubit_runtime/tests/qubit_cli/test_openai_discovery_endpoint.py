@@ -4,7 +4,7 @@ Coatue data-residency report, issues 3 and 4: with
 ``model.base_url: https://us.api.openai.com/v1`` in config and
 ``$OPENAI_BASE_URL`` unset, model discovery probed ``api.openai.com`` (the
 wrong endpoint) and the catalog-cache fingerprint did not change when the
-configured endpoint changed, so ``qubit config set model.base_url ...``
+configured endpoint changed, so ``hermes config set model.base_url ...``
 kept serving the stale cached catalog. Regional hosts also bypassed the
 curated intersection, flooding the picker with whisper/tts/embedding rows.
 
@@ -134,14 +134,15 @@ class TestRegionalCatalogFiltering:
     def test_official_hosts_intersect_with_curated(self, monkeypatch, base):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         monkeypatch.setenv("OPENAI_BASE_URL", base)
+        curated = models_mod._PROVIDER_MODELS["openai-api"][0]
         with mock_patch.object(
-            models_mod, "fetch_api_models", return_value=list(self._RAW_DUMP)
+            models_mod, "fetch_api_models", return_value=[curated, *self._RAW_DUMP]
         ):
             ids = models_mod.provider_model_ids("openai-api", force_refresh=True)
         assert "whisper-1" not in ids
         assert "tts-1" not in ids
         assert "text-embedding-ada-002" not in ids
-        assert "gpt-5.6-terra" in ids
+        assert curated in ids
 
     def test_custom_proxy_keeps_live_list_verbatim(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")

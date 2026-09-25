@@ -39,7 +39,7 @@ class World:
         self.env = H.isolated_env(root, pythonpath=H.WORKTREE)
         (root / "tmp").mkdir(exist_ok=True)
         self.env["TMPDIR"] = str(root / "tmp")
-        self.hermes_home = Path(self.env["QUBIT_HOME"])
+        self.qubit_home = Path(self.env["QUBIT_HOME"])
         self.src = root / "dist-src"
         self.log: list[str] = []
         self.after_install: list[dict] = []
@@ -54,7 +54,7 @@ class World:
 
     @property
     def installed(self) -> Path:
-        return self.hermes_home / "profiles" / "shipped-bot"
+        return self.qubit_home / "profiles" / "shipped-bot"
 
 
 def _by_name(jobs: list[dict]) -> dict[str, dict]:
@@ -85,7 +85,7 @@ def world(tmp_path_factory) -> World:
     w.cli("profile", "create", "author", "--no-alias")
     w.cli("-p", "author", "cron", "create", "--name", "weekly-digest", "0 9 * * 1", "write the weekly digest v1")
     w.cli("-p", "author", "cron", "create", "--name", "retired-job", "0 8 * * *", "a job the author retires in v2")
-    author = w.hermes_home / "profiles" / "author"
+    author = w.qubit_home / "profiles" / "author"
     assert set(_by_name(I.cron_jobs(author))) == {"weekly-digest", "retired-job"}
     w.src.mkdir()
     shutil.copytree(author / "cron", w.src / "cron", ignore=shutil.ignore_patterns("*.lock", "output", "*.db*"))

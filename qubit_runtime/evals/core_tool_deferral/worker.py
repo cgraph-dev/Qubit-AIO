@@ -27,7 +27,7 @@ if not os.environ.get("OPENROUTER_API_KEY"):
     print("ABORT: OPENROUTER_API_KEY missing", file=sys.stderr)
     sys.exit(3)
 
-# --- hermetic env BEFORE any qubit import -------------------------------
+# --- hermetic env BEFORE any hermes import -------------------------------
 for var in list(os.environ):
     if var.endswith(("_API_KEY", "_TOKEN")) and var != "OPENROUTER_API_KEY":
         os.environ.pop(var, None)
@@ -35,14 +35,14 @@ os.environ.pop("FAL_KEY", None)
 os.environ.pop("HERMES_PROFILE", None)
 
 tmp_root = tempfile.mkdtemp(prefix=f"ab-{ARM}-{TASK_ID}-")
-hermes_home = os.path.join(tmp_root, ".hermes")
+qubit_home = os.path.join(tmp_root, ".hermes")
 workspace = os.path.join(tmp_root, "ws")
-os.makedirs(hermes_home)
+os.makedirs(qubit_home)
 os.makedirs(workspace)
-with open(os.path.join(hermes_home, "config.yaml"), "w", encoding="utf-8") as f:
+with open(os.path.join(qubit_home, "config.yaml"), "w", encoding="utf-8") as f:
     f.write("model:\n  provider: openrouter\n  model: %s\n" % MODEL)
 
-os.environ["QUBIT_HOME"] = hermes_home
+os.environ["QUBIT_HOME"] = qubit_home
 os.environ["TERMINAL_CWD"] = workspace
 os.chdir(workspace)
 sys.path.insert(0, HARNESS)
@@ -165,9 +165,11 @@ def read_window_below_cb(**kw):
     CALLBACK_LOG.append({"name": "read_window_below", "kw": kw})
     return json.dumps({"title": "Invoices — draft", "text": WINDOW_BELOW})
 
-def setup_mcp_cb(name, action, reason):
-    CALLBACK_LOG.append({"name": "setup_mcp", "server": name, "action": action})
-    return json.dumps({"success": True, "server": name, "status": "installed"})
+def connection_cb(payload):
+    # Answer every manage_connections MCP target as installed.
+    CALLBACK_LOG.append({"name": "manage_connections", "targets": payload.get("targets", [])})
+    return json.dumps({"settled_by": "all_resolved", "targets": [
+        {"name": t["name"], "status": "installed"} for t in payload.get("targets", [])]})
 
 # --- import the tree's model_tools + patch registry stubs ------------------
 import model_tools  # noqa: E402  (triggers registrations + plugin discovery)
@@ -226,10 +228,10 @@ agent = AIAgent(
     read_preview_callback=read_preview_cb,
     drive_preview_callback=drive_preview_cb,
     read_window_below_callback=read_window_below_cb,
-    setup_mcp_callback=setup_mcp_cb,
+    connection_callback=connection_cb,
 )
 
-PREAMBLE = ("You are running inside the Qubit desktop app on the user's machine. "
+PREAMBLE = ("You are running inside the Hermes desktop app on the user's machine. "
             "Your working directory (the workspace) is: %s\n\nTask: " % workspace)
 
 t0 = time.time()
@@ -322,7 +324,7 @@ except Exception:
     pass
 
 ctx = {
-    "workspace": workspace, "hermes_home": hermes_home,
+    "workspace": workspace, "hermes_home": qubit_home,
     "events": EVENTS, "callback_log": CALLBACK_LOG,
     "tool_counts": tool_counts, "messages_tool_args": tool_args,
     "messages": messages, "final_answer": final_answer,

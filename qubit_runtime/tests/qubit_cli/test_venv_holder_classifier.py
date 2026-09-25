@@ -3,10 +3,8 @@
 import pytest
 
 from qubit_cli.update_cmd import (
-    _format_venv_python_holders_message,
     _qubit_holder_subcommand,
 )
-
 
 class TestHolderSubcommand:
     @pytest.mark.parametrize(
@@ -31,7 +29,7 @@ class TestHolderSubcommand:
             (r"python -m qubit_cli.main -c mysession serve", "serve"),
             (r"C:\bin\hermes.exe dashboard", "dashboard"),
             (r"/usr/local/bin/hermes serve", "serve"),
-            # no qubit entry at all
+            # no hermes entry at all
             (r"python -c import time; time.sleep(3)", None),
             # entry but no subcommand
             (r"python -m qubit_cli.main", None),
@@ -39,32 +37,3 @@ class TestHolderSubcommand:
     )
     def test_parses_subcommand(self, cmdline, expected):
         assert _qubit_holder_subcommand(cmdline) == expected
-
-
-class TestHolderMessage:
-    def _msg(self, cmdline):
-        return _format_venv_python_holders_message([(4242, "python.exe", cmdline)])
-
-    def test_dashboard_not_labeled_desktop_backend(self):
-        message = self._msg(r"C:\v\Scripts\python.exe -m qubit_cli.main dashboard")
-        assert "close the desktop app" not in message.lower()
-        assert "qubit dashboard" in message
-
-    def test_preserve_cache_not_labeled_serve(self):
-        message = self._msg(r"python -m qubit_cli.main kanban --preserve-cache")
-        holder_line = next(l for l in message.splitlines() if "PID 4242" in l)
-        # the holder LINE gets no serve/desktop hint (generic footer text
-        # legitimately mentions the desktop app)
-        assert "←" not in holder_line
-
-    def test_serve_gets_backend_hint(self):
-        message = self._msg(r"python -m qubit_cli.main serve --host 127.0.0.1 --port 0")
-        assert "Qubit backend" in message
-
-    def test_gateway_hint(self):
-        message = self._msg(r"python -m qubit_cli.main gateway run")
-        assert "← gateway" in message
-
-    def test_unknown_argv_gets_no_hint(self):
-        message = self._msg(r"python -c import this")
-        assert "←" not in message

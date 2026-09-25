@@ -16,14 +16,14 @@ export const PROFILE_SCORE_MIN_SIZE_BYTES = 1024
 export interface MigrationDeps {
   legacyActivePath: string
   /** Default profile home (`~/.hermes`). Default's state.db and gateway.pid live here. */
-  qubitHome: string
+  hermesHome: string
   /** Named-profile root (`~/.hermes/profiles`). Does not contain `default`. */
   profilesRoot: string
   existsSync: (path: string) => boolean
   readFileSync: (path: string, encoding: 'utf8') => string
   statSync: (path: string) => { size: number; mtimeMs: number }
   readdirSync: (path: string, options?: { withFileTypes?: boolean }) => Dirent[]
-  isQubitProcess: (pid: number) => boolean
+  isHermesProcess: (pid: number) => boolean
   now: () => number
   writeJson: (path: string, payload: MigrationDecision) => void
   isValidProfileName: (name: string) => boolean
@@ -39,17 +39,17 @@ export interface MigrationDecision {
  * Production layout: default IS `hermesHome`; named profiles are children of
  * `profilesRoot`. There is no `profiles/default` directory on a normal install.
  */
-export function profileStateDbPath(name: string, qubitHome: string, profilesRoot: string): string {
+export function profileStateDbPath(name: string, hermesHome: string, profilesRoot: string): string {
   return name === 'default' ? `${hermesHome}/state.db` : `${profilesRoot}/${name}/state.db`
 }
 
-export function profileGatewayPidPath(name: string, qubitHome: string, profilesRoot: string): string {
+export function profileGatewayPidPath(name: string, hermesHome: string, profilesRoot: string): string {
   return name === 'default' ? `${hermesHome}/gateway.pid` : `${profilesRoot}/${name}/gateway.pid`
 }
 
-function resolveQubitHome(profilesRoot: string, qubitHome?: string): string {
-  if (qubitHome) {
-    return qubitHome
+function resolveHermesHome(profilesRoot: string, hermesHome?: string): string {
+  if (hermesHome) {
+    return hermesHome
   }
 
   // Tests that predate hermesHome pass only profilesRoot.
@@ -97,7 +97,7 @@ export function readLegacyActiveProfile(
 }
 
 /**
- * Return the profile names whose gateway.pid file points to a live qubit process.
+ * Return the profile names whose gateway.pid file points to a live hermes process.
  * Tolerates missing/malformed pid files and stale-but-recycled PIDs (the latter is
  * the whole reason we check both liveness AND cmdline identity).
  *
@@ -107,13 +107,13 @@ export function readLegacyActiveProfile(
 export function findRunningGatewayProfiles(
   profilesRoot: string,
   allProfiles: string[],
-  deps: Pick<MigrationDeps, 'existsSync' | 'readFileSync' | 'isHermesProcess'> & { qubitHome?: string }
+  deps: Pick<MigrationDeps, 'existsSync' | 'readFileSync' | 'isHermesProcess'> & { hermesHome?: string }
 ): string[] {
-  const qubitHome = resolveQubitHome(profilesRoot, deps.qubitHome)
+  const hermesHome = resolveHermesHome(profilesRoot, deps.hermesHome)
   const running: string[] = []
 
   for (const name of allProfiles) {
-    const pidFile = profileGatewayPidPath(name, qubitHome, profilesRoot)
+    const pidFile = profileGatewayPidPath(name, hermesHome, profilesRoot)
 
     if (!deps.existsSync(pidFile)) {
       continue
@@ -133,7 +133,7 @@ export function findRunningGatewayProfiles(
       continue
     }
 
-    if (deps.isQubitProcess(pid)) {
+    if (deps.isHermesProcess(pid)) {
       running.push(name)
     }
   }
@@ -190,7 +190,7 @@ export function decideMigration(
   let maxScore = -Infinity
 
   for (const name of candidates) {
-    const s = score(profileStateDbPath(name, deps.qubitHome, deps.profilesRoot))
+    const s = score(profileStateDbPath(name, deps.hermesHome, deps.profilesRoot))
 
     if (s == null) {
       continue
@@ -270,11 +270,11 @@ export function readExistingPreference(
  * `--profile` instead of pinning `default`.
  */
 export function migrateActiveProfileIfMissing(desktopProfileConfigPath: string, deps: MigrationDeps): boolean {
-  const existing = deps.existsSync(desktopProfileConfigPath)
-    ? readExistingPreference(desktopProfileConfigPath, deps.readFileSync)
-    : null
+  const exists: boolean = deps.existsSync(desktopProfileConfigPath)
 
-  if (existing && !existing.migrated) {
+  const existing = exists ? readExistingPreference(desktopProfileConfigPath, deps.readFileSync) : null
+
+  if (exists && (!existing || !existing.migrated)) {
     return false
   }
 
@@ -289,7 +289,7 @@ export function migrateActiveProfileIfMissing(desktopProfileConfigPath: string, 
   )
 
   // Same as the heuristic rung: pinning `default` into active-profile.json
-  // launches `qubit --profile default` and is worse than writing nothing
+  // launches `hermes --profile default` and is worse than writing nothing
   // (legacy sticky / implicit default). Covers a lone default gateway.pid.
   if (!decision || decision.profile === 'default') {
     if (existing?.migrated) {

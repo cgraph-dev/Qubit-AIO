@@ -1,17 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { QubitReadDirResult } from '@/global'
+import type { HermesReadDirResult } from '@/global'
 import { $connection, $selectedStoredSessionId, $workspaceCwdOwner, setCurrentCwd } from '@/store/session'
 
 import { resetProjectTreeState } from './files/use-project-tree'
 
 import { RightSidebarPane } from './index'
 
-const readDir = vi.fn<(path: string) => Promise<QubitReadDirResult>>()
+const readDir = vi.fn<(path: string) => Promise<HermesReadDirResult>>()
 
 function installBridge() {
-  ;(window as unknown as { qubitDesktop: { readDir: typeof readDir } }).qubitDesktop = { readDir }
+  ;(window as unknown as { hermesDesktop: { readDir: typeof readDir } }).hermesDesktop = { readDir }
 }
 
 describe('RightSidebarPane', () => {
@@ -32,7 +32,7 @@ describe('RightSidebarPane', () => {
     $workspaceCwdOwner.set(null)
     setCurrentCwd('')
     resetProjectTreeState()
-    delete (window as unknown as { qubitDesktop?: unknown }).qubitDesktop
+    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
   })
 
   it('renders the tree whenever the session has a working dir (repo or not) — no picker', async () => {

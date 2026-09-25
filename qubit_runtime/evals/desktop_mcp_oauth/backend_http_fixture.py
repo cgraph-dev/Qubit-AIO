@@ -184,7 +184,7 @@ def run_probe(repo, receipt):
     import httpx
     from qubit_constants import set_qubit_home_override, reset_qubit_home_override
     from tui_gateway import mcp_oauth_sessions as sessions
-    from tools.mcp_oauth import HermesTokenStorage
+    from tools.mcp_oauth import QubitTokenStorage
 
     owner = Path(os.environ["QUBIT_HOME"])
     other = owner.parent / "other-profile"
@@ -237,7 +237,7 @@ def run_probe(repo, receipt):
         check("disk_token_matches_provider", stored["access_token"] in provider.tokens)
         check("disk_refresh_token_and_absolute_expiry", bool(stored.get("refresh_token")) and stored["expires_at"] > time.time())
         check("token_file_private", token_path.stat().st_mode & 0o777 == 0o600)
-        reloaded = asyncio.run(HermesTokenStorage("positive", hermes_home=owner).get_tokens())
+        reloaded = asyncio.run(QubitTokenStorage("positive", qubit_home=owner).get_tokens())
         check("fresh_storage_reload", reloaded.access_token in provider.tokens)
         check("wrong_profile_has_no_token", not (other / "mcp-tokens" / "positive.json").exists())
         check("config_saved_to_owner", "positive" in (owner / "config.yaml").read_text(encoding="utf-8"))

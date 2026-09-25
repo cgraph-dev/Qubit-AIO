@@ -102,6 +102,7 @@ class TestConfigHomeChannelFallback:
             "platform": "discord",
             "chat_id": "1517373704248758474",
             "thread_id": None,
+            "_resolved_from": "home",
         }]
 
 
@@ -137,7 +138,7 @@ class TestRelayDeliveryGate:
 
         router = MagicMock()
 
-        async def _deliver_to_platform(target, content, metadata):
+        async def _deliver_to_platform(target, content, metadata, transport=None):
             return {"success": True, "raw_response": None}
 
         router._deliver_to_platform = _deliver_to_platform
@@ -172,7 +173,7 @@ class TestRelayDeliveryGate:
 
     def test_relay_fronted_without_live_gateway_errors_accurately(self, monkeypatch):
         """A relay-fronted platform with NO live relay transport (manual
-        in-process `qubit cron run`) fails with the accurate 'gateway required'
+        in-process `hermes cron run`) fails with the accurate 'gateway required'
         message — never the native 'not configured/enabled' gate, which
         misdiagnoses relay-fronted deployments whose credential lives in the
         connector, not natively."""

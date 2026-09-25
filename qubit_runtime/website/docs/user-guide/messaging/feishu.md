@@ -1,24 +1,28 @@
 ---
 sidebar_position: 11
 title: "Feishu / Lark"
-description: "Set up Qubit Agent as a Feishu or Lark bot"
+description: "Set up Hermes Agent as a Feishu or Lark bot"
 ---
 
 # Feishu / Lark Setup
 
-Qubit Agent integrates with Feishu and Lark as a full-featured bot. Once connected, you can chat with the agent in direct messages or group chats, receive cron job results in a home chat, and send text, images, audio, and file attachments through the normal gateway flow.
+Python dependency commands on this page use a
+[PM-prepared source checkout](../../reference/package-management.md#developer-workflow).
+After a dependency change, reactivate the checkout and restart Hermes.
+
+Hermes Agent integrates with Feishu and Lark as a full-featured bot. Once connected, you can chat with the agent in direct messages or group chats, receive cron job results in a home chat, and send text, images, audio, and file attachments through the normal gateway flow.
 
 The integration supports both connection modes:
 
-- `websocket` — recommended; Qubit opens the outbound connection and you do not need a public webhook endpoint
+- `websocket` — recommended; Hermes opens the outbound connection and you do not need a public webhook endpoint
 - `webhook` — useful when you want Feishu/Lark to push events into your gateway over HTTP
 
-## How Qubit Behaves
+## How Hermes Behaves
 
 | Context | Behavior |
 |---------|----------|
-| Direct messages | Qubit responds to every message. |
-| Group chats | Qubit responds only when the bot is @mentioned in the chat. |
+| Direct messages | Hermes responds to every message. |
+| Group chats | Hermes responds only when the bot is @mentioned in the chat. |
 | Shared group chats | By default, session history is isolated per user inside a shared chat. |
 
 This shared-chat behavior is controlled by `config.yaml`:
@@ -34,10 +38,10 @@ Set it to `false` only if you explicitly want one shared conversation per chat.
 ### Recommended: Scan-to-Create (one command)
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
-Select **Feishu / Lark** and scan the QR code with your Feishu or Lark mobile app. Qubit will automatically create a bot application with the correct permissions and save the credentials.
+Select **Feishu / Lark** and scan the QR code with your Feishu or Lark mobile app. Hermes will automatically create a bot application with the correct permissions and save the credentials.
 
 ### Alternative: Manual Setup
 
@@ -49,7 +53,7 @@ If scan-to-create is not available, the wizard falls back to manual input:
 2. Create a new app.
 3. In **Credentials & Basic Info**, copy the **App ID** and **App Secret**.
 4. Enable the **Bot** capability for the app.
-5. Run `qubit gateway setup`, select **Feishu / Lark**, and enter the credentials when prompted.
+5. Run `hermes gateway setup`, select **Feishu / Lark**, and enter the credentials when prompted.
 
 :::warning
 Keep the App Secret private. Anyone with it can impersonate your app.
@@ -82,8 +86,9 @@ In the Feishu developer console, go to **Permission Management** and add the fol
 In **Events and Callbacks**:
 
 1. Set the connection mode to **Long Connection (WebSocket)** (recommended) or configure a webhook URL
-2. In the **Event Configuration** section, subscribe to:
+2. In the **Event Configuration** tab, subscribe to:
    - `im.message.receive_v1` — required for receiving messages
+3. In the **Callback Configuration** tab (a separate tab from events), set the same connection mode and add the `card.action.trigger` callback — required for the approval / update-prompt buttons. See [Required Feishu App Configuration](#required-feishu-app-configuration).
 
 ### Publish the App
 
@@ -93,7 +98,7 @@ After configuring permissions and events, go to **Version Management** and publi
 
 ### Recommended: WebSocket mode
 
-Use WebSocket mode when Qubit runs on your laptop, workstation, or a private server. No public URL is required. The official Lark SDK opens and maintains a persistent outbound WebSocket connection with automatic reconnection.
+Use WebSocket mode when Hermes runs on your laptop, workstation, or a private server. No public URL is required. The official Lark SDK opens and maintains a persistent outbound WebSocket connection with automatic reconnection.
 
 ```bash
 FEISHU_CONNECTION_MODE=websocket
@@ -101,17 +106,17 @@ FEISHU_CONNECTION_MODE=websocket
 
 **Requirements:** The `websockets` Python package must be installed. The SDK handles connection lifecycle, heartbeats, and auto-reconnection internally.
 
-**How it works:** The adapter runs the Lark SDK's WebSocket client in a background executor thread. Inbound events (messages, reactions, card actions) are dispatched to the main asyncio loop. On disconnect, the SDK will attempt to reconnect automatically.
+**How it works:** The adapter runs the Lark SDK's WebSocket client in a background executor thread. Inbound events (messages, reactions, card actions) are dispatched to the main asyncio loop. On disconnect, the SDK will attempt to reconnect automatically. If the link dies outright (the SDK's retry ladder gives up or the client thread exits), Hermes' supervisor rebuilds the client with capped backoff. While a link is down, `hermes gateway status` shows the platform as `retrying` until the connection is re-established.
 
 ### Optional: Webhook mode
 
-Use webhook mode only when you already run Qubit behind a reachable HTTP endpoint.
+Use webhook mode only when you already run Hermes behind a reachable HTTP endpoint.
 
 ```bash
 FEISHU_CONNECTION_MODE=webhook
 ```
 
-In webhook mode, Qubit starts an HTTP server (via `aiohttp`) and serves a Feishu endpoint at:
+In webhook mode, Hermes starts an HTTP server (via `aiohttp`) and serves a Feishu endpoint at:
 
 ```text
 /feishu/webhook
@@ -129,12 +134,12 @@ FEISHU_WEBHOOK_PATH=/feishu/webhook  # default: /feishu/webhook
 
 When Feishu sends a URL verification challenge (`type: url_verification`), the webhook responds automatically so you can complete the subscription setup in the Feishu developer console. The challenge response is gated on `FEISHU_VERIFICATION_TOKEN` when set — challenge requests with a missing or mismatched token are rejected so an unauthenticated remote cannot prove endpoint control by echoing attacker-controlled challenge data.
 
-## Step 3: Configure Qubit
+## Step 3: Configure Hermes
 
 ### Option A: Interactive Setup
 
 ```bash
-qubit gateway setup
+hermes gateway setup
 ```
 
 Select **Feishu / Lark** and fill in the prompts.
@@ -162,7 +167,7 @@ FEISHU_HOME_CHANNEL=oc_xxx
 ## Step 4: Start the Gateway
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 Then message the bot from Feishu/Lark to confirm that the connection is live.
@@ -223,7 +228,7 @@ Both `FEISHU_ENCRYPT_KEY` and `FEISHU_VERIFICATION_TOKEN` can be used together f
 
 ## Group Message Policy
 
-The `FEISHU_GROUP_POLICY` environment variable controls whether and how Qubit responds in group chats:
+The `FEISHU_GROUP_POLICY` environment variable controls whether and how Hermes responds in group chats:
 
 ```bash
 FEISHU_GROUP_POLICY=allowlist   # default
@@ -231,13 +236,15 @@ FEISHU_GROUP_POLICY=allowlist   # default
 
 | Value | Behavior |
 |-------|----------|
-| `open` | Qubit responds to @mentions from any user in any group. |
-| `allowlist` | Qubit only responds to @mentions from users listed in `FEISHU_ALLOWED_USERS`. |
-| `disabled` | Qubit ignores all group messages entirely. |
+| `open` | Hermes responds to @mentions from any user in any group. |
+| `allowlist` | Hermes only responds to @mentions from users listed in `FEISHU_ALLOWED_USERS`. |
+| `disabled` | Hermes ignores all group messages entirely. |
 
 In all modes, the bot must be explicitly @mentioned (or @all) in the group before the message is processed. Direct messages always bypass this gate.
 
-Set `FEISHU_REQUIRE_MENTION=false` to let Qubit read all group traffic without requiring an @mention:
+With the default `allowlist` policy and an empty `FEISHU_ALLOWED_USERS`, every human group message is rejected while DMs keep working. The first such drop is logged once at `WARNING` with the keys to set; later drops are `DEBUG`. Under a [multiplexed gateway](../multi-profile-gateways.md), each profile reads only its **own** `.env` — a `FEISHU_GROUP_POLICY=open` in the default profile's `.env` does not apply to a secondary profile's bot. Put `FEISHU_GROUP_POLICY` / `FEISHU_ALLOWED_USERS` in `profiles/<name>/.env`, or use `group_rules` in that profile's `config.yaml`.
+
+Set `FEISHU_REQUIRE_MENTION=false` to let Hermes read all group traffic without requiring an @mention:
 
 ```bash
 FEISHU_REQUIRE_MENTION=false
@@ -247,7 +254,7 @@ For per-chat control, set `require_mention` on a `group_rules` entry — see [Pe
 
 ### Bot Identity
 
-Qubit auto-detects the bot's `open_id` and display name on startup. You only need to set these manually when auto-detection cannot reach the Feishu API, or when your app uses tenant-scoped user IDs:
+Hermes auto-detects the bot's `open_id` and display name on startup. You only need to set these manually when auto-detection cannot reach the Feishu API, or when your app uses tenant-scoped user IDs:
 
 ```bash
 FEISHU_BOT_OPEN_ID=ou_xxx     # only when auto-detection fails
@@ -257,7 +264,7 @@ FEISHU_BOT_NAME=MyBot         # only when auto-detection fails
 
 ## Bot-to-Bot Messaging
 
-By default Qubit ignores messages sent by other bots. Enable bot-to-bot messaging when you want Qubit to participate in A2A orchestration or receive notifications from other bots in the same group.
+By default Hermes ignores messages sent by other bots. Enable bot-to-bot messaging when you want Hermes to participate in A2A orchestration or receive notifications from other bots in the same group.
 
 ```bash
 FEISHU_ALLOW_BOTS=mentions   # default: none
@@ -266,7 +273,7 @@ FEISHU_ALLOW_BOTS=mentions   # default: none
 | Value | Behavior |
 |-------|----------|
 | `none` | Ignore all messages from other bots (default). |
-| `mentions` | Accept only when the peer bot @mentions Qubit. |
+| `mentions` | Accept only when the peer bot @mentions Hermes. |
 | `all` | Accept every peer bot message. |
 
 Also configurable as `feishu.allow_bots` in `config.yaml` (env wins when both are set).
@@ -283,7 +290,7 @@ When users click buttons or interact with interactive cards sent by the bot, the
 - The action's `value` payload from the card definition is included as JSON.
 - Card actions are deduplicated with a 15-minute window to prevent double processing.
 
-Gateway-driven update prompts use a native Feishu `Yes` / `No` card instead of falling back to plain text replies. When `qubit update --gateway` needs confirmation, the adapter records the selected answer in Qubit's `.update_response` file and replaces the card inline with a resolved state.
+Gateway-driven update prompts use a native Feishu `Yes` / `No` card instead of falling back to plain text replies. When `hermes update --gateway` needs confirmation, the adapter records the selected answer in Hermes's `.update_response` file and replaces the card inline with a resolved state.
 
 Card action events are dispatched with `MessageType.COMMAND`, so they flow through the normal command processing pipeline.
 
@@ -291,24 +298,29 @@ This is also how **command approval** works — when the agent needs to run a da
 
 ### Required Feishu App Configuration
 
-Interactive cards require **three** configuration steps in the Feishu Developer Console. Missing any of them causes error **200340** when users click card buttons.
+Interactive cards need the following configuration in the Feishu Developer Console. The usual symptom of a gap here is error **200340** when users click card buttons.
 
-1. **Subscribe to the card action event:**
-   In **Event Subscriptions**, add `card.action.trigger` to your subscribed events.
+1. **Subscribe to the card action callback (not an event):**
+   In **Development Configuration > Events and Callbacks**, open the **Callback Configuration** tab — it is separate from the **Event Configuration** tab where `im.message.receive_v1` lives — and add `card.action.trigger` under *Subscribed Callbacks*. Adding it as an event does not deliver button clicks.
 
-2. **Enable the Interactive Card capability:**
-   In **App Features > Bot**, ensure the **Interactive Card** toggle is enabled. This tells Feishu that your app can receive card action callbacks.
+2. **Set the callback delivery mode:**
+   On the same tab choose **Long Connection** when Hermes runs in `websocket` mode (the Lark SDK receives the callback on the existing connection), or enter the request URL in webhook mode (the same endpoint as your event webhook, e.g. `https://your-server:8765/feishu/webhook`). Feishu must be able to reach and resolve that URL; otherwise clicks fail with 200342/200343.
 
-3. **Configure the Card Request URL (webhook mode only):**
-   In **App Features > Bot > Message Card Request URL**, set the URL to the same endpoint as your event webhook (e.g. `https://your-server:8765/feishu/webhook`). In WebSocket mode this is handled automatically by the SDK.
+3. **Enable the Interactive Card capability:**
+   In **App Features > Bot**, ensure the **Interactive Card** toggle is enabled.
+
+4. **Publish a new app version:**
+   Callback changes only take effect after **Version Management > Create version** is published (and approved, for enterprise apps). Feishu's own description of 200340 is "the application has not configured the card callback address or the configured address is invalid … ensure that you have created and published the latest version of the app".
 
 :::warning
-Without all three steps, Feishu will successfully *send* interactive cards (sending only requires `im:message:send` permission), but clicking any button will return error 200340. The card appears to work — the error only surfaces when a user interacts with it.
+Without a published card callback, Feishu will still successfully *send* interactive cards (sending only requires `im:message:send` permission), but clicking any button returns error 200340. The card appears to work — the error only surfaces when a user interacts with it, and the click never reaches Hermes (nothing is logged), because Feishu rejects it before delivering the callback.
 :::
+
+Error codes 200672 / 200673 indicate the callback *did* reach Hermes and Feishu rejected the response; if you see them, please file an issue with the matching `gateway.log` lines.
 
 ## Document Comment Intelligent Reply
 
-Beyond chat, the adapter can also answer `@`-mentions left on **Feishu/Lark documents**. When a user comments on a document (local text selection or whole-doc comment) and @-mentions the bot, Qubit reads the document plus the surrounding comment thread and posts an LLM reply inline on the thread.
+Beyond chat, the adapter can also answer `@`-mentions left on **Feishu/Lark documents**. When a user comments on a document (local text selection or whole-doc comment) and @-mentions the bot, Hermes reads the document plus the surrounding comment thread and posts an LLM reply inline on the thread.
 
 Powered by the `drive.notice.comment_add_v1` event, the handler:
 
@@ -356,15 +368,15 @@ On top of the chat/card permissions already granted, add the drive comment event
 
 ## Meeting Invitation Events
 
-You can invite the Qubit Feishu/Lark bot into a video meeting the same way you invite a human participant. When the bot receives the meeting invitation event, Qubit can automatically start an agent turn that attempts to join the meeting.
+You can invite the Hermes Feishu/Lark bot into a video meeting the same way you invite a human participant. When the bot receives the meeting invitation event, Hermes can automatically start an agent turn that attempts to join the meeting.
 
 Powered by the `vc.bot.meeting_invited_v1` event, the flow is:
 
 - A user invites the bot to a Feishu/Lark video meeting.
-- Feishu/Lark sends Qubit the meeting invitation event.
-- Qubit extracts the inviter, meeting topic, and meeting number.
+- Feishu/Lark sends Hermes the meeting invitation event.
+- Hermes extracts the inviter, meeting topic, and meeting number.
 - If the inviter is authorized by the normal gateway allowlist or pairing policy, the agent receives the meeting number and tries to join automatically.
-- If the invite is malformed, or the agent cannot join, Qubit drops the event or replies to the inviter with a concise explanation.
+- If the invite is malformed, or the agent cannot join, Hermes drops the event or replies to the inviter with a concise explanation.
 
 Malformed invitations that do not include both an inviter and a `meeting_no` are ignored.
 
@@ -374,7 +386,7 @@ On top of the chat/card permissions already granted, add the video-meeting invit
 
 - Subscribe to `vc.bot.meeting_invited_v1` in **Event Subscriptions**.
 - Enable the Video Conferencing permission scope prompted by the Feishu/Lark developer console for that event.
-- Keep `im:message` and `im:message:send_as_bot` enabled so Qubit can reply to the inviter.
+- Keep `im:message` and `im:message:send_as_bot` enabled so Hermes can reply to the inviter.
 - Ensure the gateway user allowlist or pairing policy authorizes the inviter. Meeting invitations do not bypass normal gateway access checks.
 
 ## Media Support
@@ -390,9 +402,9 @@ The adapter receives and caches the following media types from users:
 | **Video** | .mp4, .mov, .avi, .mkv, .webm, .m4v, .3gp | Downloaded and cached as documents |
 | **Files** | .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, and more | Downloaded and cached as documents |
 
-Media from rich-text (post) messages, including inline images and file attachments, is also extracted and cached.
+Media from rich-text (post) messages is also extracted and cached — both inline images/files inside the post body and attachments the composer sends in the top-level `files` list (a caption plus a file in one bubble). Every attachment is collected; folder entries are skipped, and each one leaves an `[Attachment: <name>]` marker in the text.
 
-For small text-based documents (.txt, .md), the file content is automatically injected into the message text so the agent can read it directly without needing tools.
+For small text-based documents (.txt, .md), the file content is automatically appended after the message text so the agent can read it directly without needing tools — the caption you typed alongside the file stays in place.
 
 ### Outbound (sending)
 
@@ -569,20 +581,21 @@ WebSocket and per-group ACL settings are configured via `config.yaml` under `pla
 
 | Problem | Fix |
 |---------|-----|
-| `lark-oapi not installed` | Install the SDK: `pip install lark-oapi` |
-| `websockets not installed; websocket mode unavailable` | Install websockets: `pip install websockets` |
-| `aiohttp not installed; webhook mode unavailable` | Install aiohttp: `pip install aiohttp` |
-| `FEISHU_APP_ID or FEISHU_APP_SECRET not set` | Set both env vars or configure via `qubit gateway setup` |
-| `Another local Qubit gateway is already using this Feishu app_id` | Only one Qubit instance can use the same app_id at a time. Stop the other gateway first. |
+| `lark-oapi not installed` | Install the SDK: `python -c "import pm; pm.sync_venv(['feishu'], explicit=True)"` |
+| `websockets not installed; websocket mode unavailable` | Install websockets: `hermes pm repair` |
+| `aiohttp not installed; webhook mode unavailable` | Install aiohttp: `python -c "import pm; pm.sync_venv(['messaging'], explicit=True)"` |
+| `FEISHU_APP_ID or FEISHU_APP_SECRET not set` | Set both env vars or configure via `hermes gateway setup` |
+| `Another local Hermes gateway is already using this Feishu app_id` | Only one Hermes instance can use the same app_id at a time. Stop the other gateway first. |
 | Bot doesn't respond in groups | Ensure the bot is @mentioned, check `FEISHU_GROUP_POLICY`, and verify the sender is in `FEISHU_ALLOWED_USERS` if policy is `allowlist` |
 | `Webhook rejected: invalid verification token` | Ensure `FEISHU_VERIFICATION_TOKEN` matches the token in your Feishu app's Event Subscriptions config |
 | `Webhook rejected: invalid signature` | Ensure `FEISHU_ENCRYPT_KEY` matches the encrypt key in your Feishu app config |
 | Post messages show as plain text | The Feishu API rejected the post payload; this is normal fallback behavior. Check logs for details. |
 | Images/files not received by bot | Grant `im:message` and `im:resource` permission scopes to your Feishu app |
 | Bot identity not auto-detected | Usually a transient network issue reaching Feishu's bot info endpoint. Set `FEISHU_BOT_OPEN_ID` and `FEISHU_BOT_NAME` manually as a workaround. |
-| Peer bot messages still ignored after enabling `FEISHU_ALLOW_BOTS` | Qubit can't identify itself yet — set `FEISHU_BOT_OPEN_ID` (and `FEISHU_BOT_USER_ID` if your app uses `sender_id_type=user_id`). |
+| Peer bot messages still ignored after enabling `FEISHU_ALLOW_BOTS` | Hermes can't identify itself yet — set `FEISHU_BOT_OPEN_ID` (and `FEISHU_BOT_USER_ID` if your app uses `sender_id_type=user_id`). |
 | Peer bots show as `ou_xxxxxx` instead of by name | Grant the `application:bot.basic_info:read` scope. |
-| Error 200340 when clicking approval buttons | Enable **Interactive Card** capability and configure **Card Request URL** in the Feishu Developer Console. See [Required Feishu App Configuration](#required-feishu-app-configuration) above. |
+| Error 200340 (also seen as 220340) when clicking approval buttons | Feishu has no valid card callback for the published app version: add `card.action.trigger` under the **Callback Configuration** tab (not Event Configuration), pick Long Connection / the request URL, enable **Interactive Card**, then publish a new version. See [Required Feishu App Configuration](#required-feishu-app-configuration). The click never reaches Hermes, so nothing appears in `gateway.log`. |
+| Error 200342 / 200343 when clicking approval buttons | Webhook mode: Feishu cannot connect to / resolve the callback request URL. Fix the URL or switch to Long Connection. |
 | `Webhook rate limit exceeded` | More than 120 requests/minute from the same IP. This is usually a misconfiguration or loop. |
 
 ## Toolset

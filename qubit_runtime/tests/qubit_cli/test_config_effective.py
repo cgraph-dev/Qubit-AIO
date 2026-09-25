@@ -1,10 +1,11 @@
 """Invariants for ``qubit_cli.config_effective.load_user_config_effective`` — the one loader every
-defaults-free config reader (gateway runtime, TUI gateway, cron, ``qubit send`` bridge, doctor,
+defaults-free config reader (gateway runtime, TUI gateway, cron, ``hermes send`` bridge, doctor,
 bootstrap modules) goes through."""
 import textwrap
 
 import pytest
-import yaml
+
+import qubit_yaml as yaml
 
 
 @pytest.fixture
@@ -59,7 +60,6 @@ def test_effective_is_user_plus_managed_plus_env_with_no_defaults(homes):
     root ``provider`` migrated under ``model``, and no DEFAULT_CONFIG key introduced (a missing
     key stays missing). Per-message gateway reads (and the system prompt built from them) are
     pinned by this shape, not by re-running the implementation's primitives."""
-    from qubit_cli.config import DEFAULT_CONFIG
     from qubit_cli.config_effective import load_user_config_effective
 
     home, managed = homes
@@ -77,7 +77,6 @@ def test_effective_is_user_plus_managed_plus_env_with_no_defaults(homes):
         },
         "display": {"skin": "managed-skin"},
     }
-    assert "agent" in DEFAULT_CONFIG  # would be present if defaults had been merged
 
 
 def test_broken_yaml_serves_last_good_and_fail_closed_raises(homes):

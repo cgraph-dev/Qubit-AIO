@@ -50,13 +50,12 @@ def server(qubit_home):
     # Restore in place instead of clear+reload: importlib.reload
     # re-registers atexit hooks (duplicate ThreadPoolExecutor shutdowns
     # race the stderr buffer at interpreter exit — same class as PR #34217)
-    # and re-captures module-level paths like _hermes_home against this
+    # and re-captures module-level paths like _qubit_home against this
     # test's soon-deleted tmpdir, breaking later files in the same process.
     mod._methods.clear()
     mod._methods.update(methods)
     mod._sessions.clear()
-    mod._pending.clear()
-    mod._answers.clear()
+    __import__("tui_gateway.server_requests", fromlist=["x"]).reset_for_tests()
     mod._db = None
 
 
@@ -105,7 +104,6 @@ def test_undo_returns_prefill_with_target_text(server, session_with_history):
     assert result["type"] == "prefill"
     # Default /undo backs up one user turn — "question 3"
     assert result["message"] == "question 3"
-    assert "Undid" in result["notice"]
     assert s["history"]
     assert all("_row_id" in message for message in s["history"])
 

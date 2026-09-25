@@ -84,7 +84,7 @@ async def _run_browser_flow(tmp_path, monkeypatch, *, issuer, authorization_serv
     if scope is not None:
         metadata.scope = scope
     provider = _HERMES_PROVIDER_CLS(
-        server_name="srv", server_url=RESOURCE, storage=HermesTokenStorage("srv"), client_metadata=metadata,
+        server_name="srv", server_url=RESOURCE, storage=QubitTokenStorage("srv"), client_metadata=metadata,
         redirect_handler=redirect, callback_handler=callback)
     async with httpx.AsyncClient(auth=provider, transport=httpx.MockTransport(_standin(
             httpx, issuer=issuer, authorization_servers=authorization_servers))) as client:
@@ -171,7 +171,7 @@ async def test_device_flow_normalizes_issuer_and_asks_google_for_offline_access(
                                              "expires_in": 3600}, request=request)
 
         provider = _HERMES_PROVIDER_CLS(
-            server_name="srv", server_url=RESOURCE, storage=HermesTokenStorage("srv"),
+            server_name="srv", server_url=RESOURCE, storage=QubitTokenStorage("srv"),
             client_metadata=OAuthClientMetadata(redirect_uris=[AnyUrl("http://127.0.0.1:1/cb")], client_name="Hermes Agent"))
         provider.context.oauth_metadata = DeviceOAuthMetadata.model_validate(
             _asm_doc(issuer, device_authorization_endpoint=f"{issuer}/device/code"))

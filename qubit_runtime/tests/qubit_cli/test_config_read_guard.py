@@ -47,6 +47,10 @@ ALLOWLIST = {
     "qubit_cli/managed_scope.py",
     # Parse-health probe: intentionally answers "does the raw file parse?".
     "gateway/readiness.py",
+    # _early_interface_from_config(): the pre-argparse TUI decision runs before
+    # qubit_cli.config is importable; it reads one display key best-effort and
+    # defaults to the classic REPL on any error.
+    "qubit_cli/main.py",
 }
 
 # Directories that never count (tests may build fixture configs freely).

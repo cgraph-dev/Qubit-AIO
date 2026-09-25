@@ -6,18 +6,18 @@ from __future__ import annotations
 import os
 
 from agent.secret_scope import reset_secret_scope, set_multiplex_active, set_secret_scope
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 
 def _under_secondary(home, fn):
     set_multiplex_active(True)
-    home_token = set_hermes_home_override(str(home))
+    home_token = set_qubit_home_override(str(home))
     secret_token = set_secret_scope({})
     try:
         return fn()
     finally:
         reset_secret_scope(secret_token)
-        reset_hermes_home_override(home_token)
+        reset_qubit_home_override(home_token)
         set_multiplex_active(False)
 
 

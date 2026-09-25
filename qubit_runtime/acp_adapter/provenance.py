@@ -63,12 +63,12 @@ def build_session_provenance(
     is_continuation = bool(parent_id) and _is_compression_end(_get_row(db, parent_id))
 
     provenance: Dict[str, Any] = {
-        "acpSessionId": acp_session_id, "currentQubitSessionId": current_qubit_session_id,
-        "rootQubitSessionId": root_id, "parentQubitSessionId": parent_id,
+        "acpSessionId": acp_session_id, "currentHermesSessionId": current_qubit_session_id,
+        "rootHermesSessionId": root_id, "parentHermesSessionId": parent_id,
         "sessionKind": "continuation" if is_continuation else "root", "compressionDepth": compression_depth,
     }
     if previous_qubit_session_id:
-        provenance["previousQubitSessionId"] = previous_qubit_session_id
+        provenance["previousHermesSessionId"] = previous_qubit_session_id
         if previous_qubit_session_id != current_qubit_session_id:
             # The only mechanism that rotates the internal id mid-turn is
             # compression-driven session splitting.

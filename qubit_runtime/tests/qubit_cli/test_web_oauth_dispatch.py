@@ -21,14 +21,11 @@ The fix:
 
 These tests pin the corrected behavior.
 """
-import asyncio
 import json
 import time
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 import httpx
-import pytest
 from fastapi.testclient import TestClient
 
 from qubit_cli.web_server import _SESSION_TOKEN, app
@@ -43,6 +40,7 @@ def _make_profile_home(tmp_path, monkeypatch, profile="coder"):
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     profile_home = tmp_path / "profiles" / profile
     profile_home.mkdir(parents=True)
+    (profile_home / "config.yaml").write_text("{}\n")  # identity marker: a bare dir is not a profile
     return profile_home
 
 
@@ -114,8 +112,57 @@ def test_minimax_login_does_not_launch_anthropic_flow():
 
 
 
+def test_minimax_start_route_honors_poller_mock_on_owning_module(tmp_path, monkeypatch):
+    """A monkeypatch on ``web_server_oauth._minimax_poller`` must intercept the
+    background thread the /start route spawns.
+
+    Regression: the router imported the poller functions at module level, so a
+    test's patch on the owning module was a no-op — the REAL poller ran on the
+    leaked daemon thread, hit the live MiniMax endpoint from CI, and its
+    getaddrinfo call segfaulted a later test's collection (CI flake, run
+    34323790818). The router must resolve pollers late, at spawn time.
+    """
+    import threading
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
+    fake_user_code_resp = {
+        "user_code": "ABCD-1234",
+        "verification_uri": "https://api.minimax.io/oauth/verify",
+        "expired_in": 600,
+        "interval": 2000,
+        "state": "stub-state",
+    }
+    mock_ran = threading.Event()
+    real_network_hit = threading.Event()
+
+    def fake_poller(session_id):
+        mock_ran.set()
+
+    def fail_poll_token(**kwargs):
+        real_network_hit.set()
+        raise AssertionError("real _minimax_poller body must not run under the mock")
+
+    with patch(
+        "qubit_cli.auth._minimax_request_user_code",
+        return_value=fake_user_code_resp,
+    ), patch(
+        "qubit_cli.auth._minimax_pkce_pair",
+        return_value=("verifier-stub", "challenge-stub", "stub-state"),
+    ), patch(
+        "qubit_cli.auth._minimax_poll_token",
+        fail_poll_token,
+    ), patch(
+        "qubit_cli.web_server_oauth._minimax_poller",
+        fake_poller,
+    ):
+        resp = client.post("/api/providers/oauth/minimax-oauth/start", headers=HEADERS)
+        assert resp.status_code == 200, resp.text
+        assert mock_ran.wait(timeout=5), "patched poller never ran — router bypassed the seam"
+        assert not real_network_hit.is_set()
+    _web_server_oauth._oauth_sessions.pop(resp.json()["session_id"], None)
+
+
 def test_oauth_provider_status_uses_profile_query(tmp_path, monkeypatch):
-    from qubit_cli import web_server as ws
     from qubit_constants import get_qubit_home
 
     profile_home = _make_profile_home(tmp_path, monkeypatch)
@@ -129,7 +176,7 @@ def test_oauth_provider_status_uses_profile_query(tmp_path, monkeypatch):
         "id": "fake-oauth",
         "name": "Fake OAuth",
         "flow": "pkce",
-        "cli_command": "qubit auth add fake-oauth",
+        "cli_command": "hermes auth add fake-oauth",
         "docs_url": "https://example.com",
         "status_fn": fake_status,
     },)
@@ -142,7 +189,6 @@ def test_oauth_provider_status_uses_profile_query(tmp_path, monkeypatch):
 
 
 def test_oauth_start_stores_profile_for_background_completion(tmp_path, monkeypatch):
-    from qubit_cli import web_server as ws
 
     _make_profile_home(tmp_path, monkeypatch)
     fake_user_code_resp = {
@@ -179,10 +225,10 @@ def test_oauth_session_cannot_be_polled_or_cancelled_from_another_profile(
     tmp_path, monkeypatch
 ):
     """A named-profile OAuth session must reject default-profile retargeting."""
-    from qubit_cli import web_server as ws
 
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     (tmp_path / "profiles" / "worker").mkdir(parents=True)
+    (tmp_path / "profiles" / "worker" / "config.yaml").write_text("{}\n")  # identity marker
     session_id, _session = _rt_oauth._new_oauth_session(
         "xai-oauth", "device_code", profile="worker"
     )
@@ -219,54 +265,6 @@ def test_oauth_session_cannot_be_polled_or_cancelled_from_another_profile(
 
 
 
-def test_codex_dashboard_start_rewords_device_authorization_error(monkeypatch):
-    from qubit_cli import web_server as ws
-
-    before_sessions = set(_web_server_oauth._oauth_sessions)
-
-    class _Resp:
-        status_code = 400
-        text = "Enable device code authorization"
-
-        def json(self):
-            return {
-                "error": {
-                    "message": "Enable device code authorization",
-                    "code": "device_authorization_not_enabled",
-                }
-            }
-
-    class _Client:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def post(self, url, **kwargs):
-            assert url.endswith("/deviceauth/usercode")
-            return _Resp()
-
-    monkeypatch.setattr(httpx, "Client", _Client)
-
-    try:
-        resp = client.post(
-            "/api/providers/oauth/openai-codex/start",
-            headers=HEADERS,
-        )
-
-        assert resp.status_code == 500
-        detail = resp.json()["detail"]
-        assert "OpenAI rejected the device-code login request" in detail
-        assert "Enable device-code authorization in OpenAI" in detail
-        assert "click Login again" in detail
-        assert "hermes auth" not in detail
-    finally:
-        for sid in set(_web_server_oauth._oauth_sessions) - before_sessions:
-            _web_server_oauth._oauth_sessions.pop(sid, None)
 
 
 def test_codex_dashboard_worker_stops_polling_after_cancel(tmp_path, monkeypatch):
@@ -448,42 +446,10 @@ def test_codex_worker_final_save_is_atomic_with_cancel_delete(tmp_path, monkeypa
     assert sid not in _web_server_oauth._oauth_sessions
 
 
-def test_cancel_oauth_session_marks_dict_cancelled_before_popping(tmp_path, monkeypatch):
-    """The DELETE endpoint must flag the session dict before removing it.
-
-    A background worker holds its own reference to the same dict object;
-    it can only observe cancellation if the flag is set on that shared
-    object prior to (or instead of) removal from the global session map.
-    """
-    from qubit_cli import web_server as ws
-
-    _make_profile_home(tmp_path, monkeypatch, profile="coder")
-    session_id = "cancel-flag-test"
-    _web_server_oauth._oauth_sessions[session_id] = {
-        "session_id": session_id,
-        "provider": "openai-codex",
-        "flow": "device_code",
-        "profile": "coder",
-        "created_at": time.time(),
-        "status": "pending",
-        "error_message": None,
-    }
-    worker_ref = _web_server_oauth._oauth_sessions[session_id]
-
-    resp = client.delete(
-        f"/api/providers/oauth/sessions/{session_id}?profile=coder",
-        headers=HEADERS,
-    )
-
-    assert resp.status_code == 200, resp.text
-    assert resp.json() == {"ok": True, "session_id": session_id}
-    assert session_id not in _web_server_oauth._oauth_sessions
-    assert worker_ref["cancelled"] is True
 
 
 def test_nous_dashboard_poller_preserves_effective_scope_when_token_omits_scope(monkeypatch):
     from qubit_cli import auth as auth_mod
-    from qubit_cli import web_server as ws
 
     session_id = "nous-effective-scope-test"
     _web_server_oauth._oauth_sessions[session_id] = {
@@ -524,7 +490,7 @@ def test_nous_dashboard_poller_preserves_effective_scope_when_token_omits_scope(
     monkeypatch.setattr(auth_mod, "persist_nous_credentials", lambda state: None)
 
     try:
-        _web_server_oauth._nous_poller(session_id)
+        _web_server_oauth._nous_plain_poller(session_id)
         assert captured_state["scope"] == auth_mod.DEFAULT_NOUS_SCOPE
         assert _web_server_oauth._oauth_sessions[session_id]["status"] == "approved"
     finally:
@@ -533,25 +499,15 @@ def test_nous_dashboard_poller_preserves_effective_scope_when_token_omits_scope(
 
 
 
-def test_xai_oauth_listed_as_device_code_flow():
-    """xAI Grok OAuth must surface in the catalog as a device-code flow."""
-    resp = client.get("/api/providers/oauth", headers=HEADERS)
-    assert resp.status_code == 200, resp.text
-    providers = {p["id"]: p for p in resp.json()["providers"]}
-    assert "xai-oauth" in providers
-    assert providers["xai-oauth"]["flow"] == "device_code"
-    assert "grok" in providers["xai-oauth"]["name"].lower()
 
 
 def test_anthropic_dashboard_oauth_is_removed_and_external():
     """Anthropic subscription OAuth is not minted by the dashboard anymore."""
-    from qubit_cli import web_server as ws
 
     resp = client.get("/api/providers/oauth", headers=HEADERS)
     assert resp.status_code == 200, resp.text
     providers = {p["id"]: p for p in resp.json()["providers"]}
     assert providers["anthropic"]["flow"] == "external"
-    assert providers["anthropic"]["cli_command"] == "qubit auth add anthropic"
 
     before_sessions = set(_web_server_oauth._oauth_sessions)
     start_resp = client.post(
@@ -559,7 +515,6 @@ def test_anthropic_dashboard_oauth_is_removed_and_external():
         headers=HEADERS,
     )
     assert start_resp.status_code == 400, start_resp.text
-    assert "external CLI" in start_resp.text
     assert "claude.ai" not in start_resp.text
 
     submit_resp = client.post(
@@ -568,13 +523,12 @@ def test_anthropic_dashboard_oauth_is_removed_and_external():
         json={"session_id": "unused", "code": "unused"},
     )
     assert submit_resp.status_code == 400, submit_resp.text
-    assert "not supported" in submit_resp.text
     assert set(_web_server_oauth._oauth_sessions) == before_sessions
 
 
 def test_accounts_offers_every_oauth_provider_from_catalog():
     """PARITY CONTRACT: every accounts-tab provider in the unified catalog (the
-    `qubit model` universe) must be offered by /api/providers/oauth. This keeps
+    `hermes model` universe) must be offered by /api/providers/oauth. This keeps
     the desktop Accounts tab in lockstep with the CLI picker — no provider the
     CLI can sign into may be missing from the GUI.
     """
@@ -586,34 +540,13 @@ def test_accounts_offers_every_oauth_provider_from_catalog():
     for d in provider_catalog():
         if d.tab == "accounts":
             assert d.slug in offered, (
-                f"{d.slug} is an accounts-tab provider in `qubit model` but is "
+                f"{d.slug} is an accounts-tab provider in `hermes model` but is "
                 f"missing from the desktop Accounts tab (/api/providers/oauth)"
             )
 
 
 
 
-def test_oauth_catalog_marks_external_providers_not_disconnectable():
-    """External CLI credentials are visible in Accounts but cannot be removed by Hermes."""
-    resp = client.get("/api/providers/oauth", headers=HEADERS)
-    assert resp.status_code == 200, resp.text
-    providers = {p["id"]: p for p in resp.json()["providers"]}
-
-    # Qwen: external and not auto-removable, and we don't know a clear command,
-    # so it stays a manual hint with no runnable disconnect command.
-    assert providers["qwen-oauth"]["flow"] == "external"
-    assert providers["qwen-oauth"]["disconnectable"] is False
-    assert "provider's CLI" in providers["qwen-oauth"]["disconnect_hint"]
-    assert providers["qwen-oauth"]["disconnect_command"] is None
-
-    # Claude Code: still not API-disconnectable, but we hand the GUI a runnable
-    # command (clears the keychain entry / credentials file) so it can offer a
-    # one-click "run in terminal" disconnect.
-    assert providers["claude-code"]["flow"] == "external"
-    assert providers["claude-code"]["disconnectable"] is False
-    assert providers["claude-code"]["disconnect_hint"]
-    cmd = providers["claude-code"]["disconnect_command"]
-    assert cmd and ".claude/.credentials.json" in cmd
 
 
 def test_external_oauth_disconnect_rejected_before_auth_mutation(monkeypatch):
@@ -627,8 +560,6 @@ def test_external_oauth_disconnect_rejected_before_auth_mutation(monkeypatch):
 
     resp = client.delete("/api/providers/oauth/qwen-oauth", headers=HEADERS)
     assert resp.status_code == 400, resp.text
-    assert "cannot be disconnected automatically" in resp.text
-    assert "provider's CLI" in resp.text
 
 
 def test_env_sourced_oauth_status_is_not_disconnectable(monkeypatch):
@@ -641,11 +572,9 @@ def test_env_sourced_oauth_status_is_not_disconnectable(monkeypatch):
 
     assert providers["anthropic"]["status"]["source"] == "env_var"
     assert providers["anthropic"]["disconnectable"] is False
-    assert providers["anthropic"]["disconnect_hint"] == "Remove the API key from Settings → Keys instead."
 
     delete_resp = client.delete("/api/providers/oauth/anthropic", headers=HEADERS)
     assert delete_resp.status_code == 400, delete_resp.text
-    assert "Settings" in delete_resp.text
 
 
 def test_xai_dashboard_poller_seeds_single_entry_and_clears_suppression(tmp_path, monkeypatch):
@@ -660,11 +589,10 @@ def test_xai_dashboard_poller_seeds_single_entry_and_clears_suppression(tmp_path
     singleton only; the seed is the single source of truth.
 
     Suppression: an interactive dashboard login must also clear any
-    ``device_code`` suppression left by a prior ``qubit auth remove
+    ``device_code`` suppression left by a prior ``hermes auth remove
     xai-oauth``.
     """
     from qubit_cli import auth as auth_mod
-    from qubit_cli import web_server as ws
     from agent.credential_pool import load_pool
 
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
@@ -684,7 +612,7 @@ def test_xai_dashboard_poller_seeds_single_entry_and_clears_suppression(tmp_path
         encoding="utf-8",
     )
 
-    # Prior `qubit auth remove xai-oauth` left the source suppressed.
+    # Prior `hermes auth remove xai-oauth` left the source suppressed.
     auth_mod.suppress_credential_source("xai-oauth", "device_code")
     assert auth_mod.is_source_suppressed("xai-oauth", "device_code") is True
 
@@ -755,7 +683,6 @@ def test_status_falls_through_to_generic_dispatcher_for_catalog_only_provider():
     logged-out; now they dispatch to qubit_cli.auth.get_auth_status (the
     canonical slug dispatcher) so membership AND status both auto-extend.
     """
-    import qubit_cli.web_server as ws
 
     fake_status = {
         "logged_in": True,

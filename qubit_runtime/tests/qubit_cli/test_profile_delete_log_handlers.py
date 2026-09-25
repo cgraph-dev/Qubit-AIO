@@ -16,7 +16,7 @@ import pytest
 
 import qubit_logging
 from qubit_cli import profiles
-from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def routed_profile(tmp_path, monkeypatch):
     monkeypatch.setattr(profiles, "_stop_profile_backends", lambda *_: None)
     monkeypatch.setattr(profiles, "_notify_multiplexer", lambda *_: None)
     profile = profiles.create_profile("routed-log-delete", no_alias=True)
-    qubit_logging.setup_logging(hermes_home=home, force=True)
+    qubit_logging.setup_logging(qubit_home=home, force=True)
     try:
         yield home, profile
     finally:
@@ -42,17 +42,17 @@ def routed_profile(tmp_path, monkeypatch):
 
 def _log_into(profile: Path, *, adopt: bool) -> None:
     """Route one record to *profile*: explicitly (Desktop cron startup) or through the
-    ``setup_logging(hermes_home=<profile>)`` adoption path ``agent_init`` takes."""
+    ``setup_logging(qubit_home=<profile>)`` adoption path ``agent_init`` takes."""
     logger = logging.getLogger("agent.tests.profile-delete")
-    token = set_hermes_home_override(profile)
+    token = set_qubit_home_override(profile)
     try:
         if adopt:
-            qubit_logging.setup_logging(hermes_home=profile)
+            qubit_logging.setup_logging(qubit_home=profile)
         else:
             assert qubit_logging.enable_profile_log_routing([Path(profile).parent.parent, profile]) is True
         logger.error("routed record before deletion")
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
     qubit_logging.flush_log_queue()
     assert "routed record before deletion" in (profile / "logs" / "agent.log").read_text(encoding="utf-8")
 

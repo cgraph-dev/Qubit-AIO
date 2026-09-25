@@ -19,7 +19,7 @@ def multiplex_root(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(root))
     monkeypatch.delenv("API_SERVER_KEY", raising=False)
     import qubit_constants
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
     from agent import secret_scope
     monkeypatch.setattr(secret_scope, "_MULTIPLEX_ACTIVE", True)
     return root

@@ -35,7 +35,7 @@ def write_portable_plugin(eh: E2EHome, dirname: str, servers: dict[str, dict[str
                           name: str | None = None, version: str = "1.0.0") -> Path:
     """``<QUBIT_HOME>/plugins/<dirname>/`` with ``plugin.json`` (manifest ``name``), ``mcp.json`` and an
     in-root launcher that execs the fixture MCP server with this interpreter."""
-    root = eh.hermes_home / "plugins" / dirname
+    root = eh.qubit_home / "plugins" / dirname
     root.mkdir(parents=True, exist_ok=True)
     (root / "plugin.json").write_text(json.dumps(
         {"$schema": PLUGIN_SCHEMA, "name": name or dirname, "version": version}), encoding="utf-8")

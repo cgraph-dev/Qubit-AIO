@@ -26,7 +26,7 @@ from typing import Any, Callable, Iterable
 
 from websockets.sync.client import connect as ws_connect
 
-from tests.fakes.fake_llm_provider import FakeLLMServer, write_hermes_home
+from tests.fakes.fake_llm_provider import FakeLLMServer, write_qubit_home
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 READY_RE = re.compile(r"HERMES_BACKEND_READY port=(\d+)")
@@ -69,13 +69,13 @@ def _operator_home() -> str:
         return os.path.expanduser("~")
 
 
-def _minimal_env(home: Path, hermes_home: Path, token: str, extra: dict[str, str] | None) -> dict[str, str]:
+def _minimal_env(home: Path, qubit_home: Path, token: str, extra: dict[str, str] | None) -> dict[str, str]:
     """A clean child env: nothing Hermes-, provider- or credential-shaped leaks in from the test runner."""
     env = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TERM", "SYSTEMROOT") if k in os.environ}
     tmpdir = home.parent / "tmp"
     tmpdir.mkdir(parents=True, exist_ok=True)
     env.update(
-        HOME=str(home), QUBIT_HOME=str(hermes_home), PYTHONPATH=str(REPO_ROOT),
+        HOME=str(home), QUBIT_HOME=str(qubit_home), PYTHONPATH=str(REPO_ROOT),
         TMPDIR=str(tmpdir), HERMES_DASHBOARD_SESSION_TOKEN=token, PYTHONUNBUFFERED="1",
         NO_COLOR="1",
         # The child's HOME *is* the sandbox, so its "real" root (expanduser('~')/.hermes) is the tmp
@@ -94,7 +94,7 @@ class Backend:
                  aux=None) -> None:
         self.root = root
         self.home = root / "home"
-        self.hermes_home = self.home / ".hermes"
+        self.qubit_home = self.home / ".hermes"
         self.llm = FakeLLMServer(responder, aux=aux)
         self.extra_config = extra_config
         self.extra_env = env or {}
@@ -105,16 +105,16 @@ class Backend:
 
     def start(self, *, timeout: float = 90.0) -> "Backend":
         operator_root = (Path(_operator_home()) / ".hermes").resolve()
-        assert operator_root not in (self.hermes_home.resolve(), *self.hermes_home.resolve().parents), (
-            f"sandbox {self.hermes_home} sits inside the operator's Hermes home {operator_root}")
+        assert operator_root not in (self.qubit_home.resolve(), *self.qubit_home.resolve().parents), (
+            f"sandbox {self.qubit_home} sits inside the operator's Hermes home {operator_root}")
         self.llm.start()
-        write_hermes_home(self.hermes_home, self.llm.base_url, extra_config=self.extra_config)
+        write_qubit_home(self.qubit_home, self.llm.base_url, extra_config=self.extra_config)
         self._stdout = open(self.root / "serve.stdout.log", "wb")
         self._stderr = open(self.root / "serve.stderr.log", "wb")
         # Own process group: stop() signals exactly the tree this fixture spawned, never a pattern match.
         self.proc = subprocess.Popen(
             [sys.executable, "-m", "qubit_cli.main", "serve", "--host", "127.0.0.1", "--port", "0"],
-            cwd=str(self.root), env=_minimal_env(self.home, self.hermes_home, self.token, self.extra_env),
+            cwd=str(self.root), env=_minimal_env(self.home, self.qubit_home, self.token, self.extra_env),
             stdin=subprocess.DEVNULL, stdout=self._stdout, stderr=self._stderr, start_new_session=True)
 
         proc = self.proc
@@ -144,7 +144,7 @@ class Backend:
     def logs(self, tail: int = 60) -> str:
         parts = []
         for path in (self.root / "serve.stdout.log", self.root / "serve.stderr.log",
-                     self.hermes_home / "logs" / "errors.log"):
+                     self.qubit_home / "logs" / "errors.log"):
             name = path.name
             if path.exists():
                 lines = path.read_text(errors="replace").splitlines()[-tail:]
@@ -175,7 +175,7 @@ class Backend:
 
     # state.db, read-only (never a second writer next to the backend's)
     def db_rows(self, sql: str, args: Iterable[Any] = ()) -> list[tuple]:
-        path = self.hermes_home / "state.db"
+        path = self.qubit_home / "state.db"
         if not path.exists():
             return []
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)

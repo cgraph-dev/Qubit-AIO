@@ -72,12 +72,6 @@ from qubit_state_repair import repair_state_db_schema
 PAGE_SIZE = 4096
 
 
-_F2 = pytest.mark.skip(
-    reason="W9-tests2-F2: fork qubit_constants lacks profile_cli_selector "
-    "(dropped in W9 slice-0; 5 lazy call sites) — product follow-up, then unskip"
-)
-
-
 def _writer_after_stage(
     db_path: str,
     ready: "multiprocessing.synchronize.Event",
@@ -478,7 +472,6 @@ def test_repair_outcome_is_recorded_while_cross_process_lock_is_held(
     )
 
 
-@_F2
 def test_exhaustion_is_rechecked_after_acquiring_repair_lock(tmp_path, monkeypatch):
     """A queued repairer must not start surgery on a newly exhausted ledger."""
     db = tmp_path / "state.db"

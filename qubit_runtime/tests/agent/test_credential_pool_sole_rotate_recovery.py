@@ -29,12 +29,12 @@ def _entry(idx: int, *, token: str, refresh: str) -> dict:
 
 
 def _load(tmp_path, monkeypatch, entries: list[dict]):
-    hermes_home = tmp_path / "hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "auth.json").write_text(
+    qubit_home = tmp_path / "hermes"
+    qubit_home.mkdir(parents=True, exist_ok=True)
+    (qubit_home / "auth.json").write_text(
         json.dumps({"version": 1, "credential_pool": {"openai-codex": entries}})
     )
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     from agent.credential_pool import load_pool
 
     return load_pool("openai-codex")

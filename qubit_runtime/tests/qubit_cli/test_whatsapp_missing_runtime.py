@@ -11,7 +11,7 @@ def _missing_package(monkeypatch):
     import qubit_constants
 
     monkeypatch.setattr(qubit_constants, "find_node_executable", lambda executable: None)
-    monkeypatch.setattr(qubit_constants, "with_hermes_node_path", lambda: {})
+    monkeypatch.setattr(qubit_constants, "with_qubit_node_path", lambda: {})
     monkeypatch.setattr(pm, "ensure", lambda package, explicit: SimpleNamespace(env={}))
     monkeypatch.setattr(pm, "installed_package", lambda package: None)
 
@@ -55,7 +55,7 @@ def test_cli_reports_prepared_bridge_binary_missing(tmp_path, monkeypatch, capsy
         monkeypatch.setattr(setup, "_whatsapp_allowed_users", lambda *args: None)
         monkeypatch.setattr(setup, "_whatsapp_install_bridge", lambda path: True)
         monkeypatch.setattr(whatsapp_common, "resolve_whatsapp_bridge_dir", lambda: bridge_dir)
-        monkeypatch.setattr(main, "get_hermes_home", lambda: tmp_path)
+        monkeypatch.setattr(main, "get_qubit_home", lambda: tmp_path)
         setup.cmd_whatsapp(SimpleNamespace())
     output = capsys.readouterr().out
     if executable not in output or "binary" not in output:

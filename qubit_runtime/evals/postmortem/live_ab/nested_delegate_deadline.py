@@ -1,7 +1,7 @@
 """Live A/B for the nested-delegate deadline. A depth-1 orchestrator child dispatches one leaf that runs a
 ~460 s task (longer than the 420 s sequential deadline). On main the orchestrator's delegate_task call returns
 'timed out after 420.0s' and the leaf runs on as an orphan; on the branch the call blocks and returns the
-real result. Uses glm-5.3 via Qubit for cost. Deadline shortened via config to keep the run short."""
+real result. Uses glm-5.3 via Nous for cost. Deadline shortened via config to keep the run short."""
 import os, sys, json, time, re, subprocess
 # Usage: python nested_delegate_deadline.py <repo_root>   (run once per ref; LIVE: a couple of real child calls)
 root = sys.argv[1]; arm = os.path.basename(os.path.normpath(root))
@@ -9,7 +9,8 @@ sys.path.insert(0, root)
 # Temp QUBIT_HOME with the real auth + a config that shortens the generic sequential deadline to 40 s, so the
 # run takes ~1.5 min instead of 8. The fix exempts delegate_task from this deadline entirely, so the shortened
 # value is exactly what main will hit.
-import shutil, tempfile, yaml
+import shutil, tempfile
+import qubit_yaml as yaml
 home = tempfile.mkdtemp(prefix="dl_home_"); os.environ["QUBIT_HOME"] = home
 real_home = os.environ.get("HERMES_HOME_SOURCE", os.path.expanduser("~/.hermes"))  # credentials are copied from here into a temp home
 shutil.copy(f"{real_home}/auth.json", f"{home}/auth.json")

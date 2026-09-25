@@ -55,7 +55,7 @@ beforeEach(() => {
   $awaitingResponse.set(false)
   vi.clearAllMocks()
   api.mockReset().mockImplementation(reply)
-  window.qubitDesktop = { api } as never
+  window.hermesDesktop = { api } as never
 })
 afterEach(() => {
   cleanup()

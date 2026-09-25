@@ -22,7 +22,7 @@ from mcp.client.auth.oauth2 import OAuthClientProvider  # noqa: E402
 from mcp.client.auth.utils import validate_authorization_response_iss  # noqa: E402
 from mcp.shared.auth import AuthorizationCodeResult, OAuthMetadata  # noqa: E402
 
-from tools.mcp_oauth_provider import QubitProviderMixin# noqa: E402
+from tools.mcp_oauth_provider import QubitProviderMixin  # noqa: E402
 
 
 class _Provider(QubitProviderMixin, OAuthClientProvider):

@@ -152,7 +152,7 @@ def _(rid, params: dict) -> dict:
     """Mint a single-use, 30 s ticket for ``/api/display/ws``. The ticket carries the profile home so
     the bridge dials THIS profile's RFB socket, and a server-minted viewer id (returned to the caller,
     who passes it to ``display.lease.acquire`` / ``release``) so the lease can name the holder."""
-    from qubit_constants import get_hermes_home
+    from qubit_constants import get_qubit_home
     from qubit_cli.dashboard_auth.ws_tickets import mint_ticket
     from tools.bot_desktop import runtime as _bd_runtime
     try:
@@ -160,7 +160,7 @@ def _(rid, params: dict) -> dict:
             return _err(rid, _DISPLAY_ERR, "this profile's Bot Desktop is not running; call display.start first")
         viewer_id = _mint_viewer_id(str(params.get("viewer_id") or "").strip())
         ticket = mint_ticket(user_id=f"display:{viewer_id}", provider="bot-desktop",
-                             extra={"hermes_home": str(get_hermes_home()), "viewer_id": viewer_id})
+                             extra={"hermes_home": str(get_qubit_home()), "viewer_id": viewer_id})
         return _ok(rid, {"ticket": ticket, "path": "/api/display/ws", "viewer_id": viewer_id,
                          **_display_snapshot()})
     except Exception as e:

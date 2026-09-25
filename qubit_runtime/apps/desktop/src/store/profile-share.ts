@@ -152,13 +152,13 @@ export function activeProfileKey(): string {
 // item all funnel here). Toasts via the shared notification store; strings via
 // translateNow so the flows stay callable from non-React surfaces.
 
-const ARCHIVE_FILTERS = [{ extensions: ['tar.gz', 'tgz'], name: 'Qubit profile' }]
+const ARCHIVE_FILTERS = [{ extensions: ['tar.gz', 'tgz'], name: 'Hermes profile' }]
 
 /** Pick a save location and export `profile` (default: the active one).
  *  Returns the archive path, or null when the user cancelled. */
 export async function runExportProfileFlow(profile?: string): Promise<null | string> {
   const target = normalizeProfileKey(profile ?? activeProfileKey())
-  const pick = window.qubitDesktop?.selectSavePath
+  const pick = window.hermesDesktop?.selectSavePath
 
   if (!pick) {
     return null
@@ -189,7 +189,7 @@ export async function runExportProfileFlow(profile?: string): Promise<null | str
 /** Pick an archive and import it as a new profile; lands the user in it on a
  *  fresh chat. Returns the new profile name, or null when cancelled/failed. */
 export async function runImportProfileFlow(): Promise<null | string> {
-  const paths = await window.qubitDesktop?.selectPaths?.({
+  const paths = await window.hermesDesktop?.selectPaths?.({
     title: translateNow('profiles.importProfile'),
     multiple: false,
     filters: ARCHIVE_FILTERS

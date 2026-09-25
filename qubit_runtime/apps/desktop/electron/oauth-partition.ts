@@ -8,7 +8,7 @@
  * (`persist:hermes-remote-oauth`) — the jar was keyed on the auth *mode*, not
  * on the connection's identity. Chromium cookie jars scope by host and ignore
  * the port, so two registered gateways on the same host (the #92183 VPN
- * setup: one box, two dashboards) fought over the same `qubit_session*`
+ * setup: one box, two dashboards) fought over the same `hermes_session*`
  * cookies: signing in to gateway B evicted gateway A's session, and A's
  * cookie was silently PRESENTED to B on every request — a cross-connection
  * credential leak.
@@ -26,7 +26,7 @@
  *     LEGACY shared partition, so existing signed-in users are not signed out
  *     by the upgrade.
  *   - `cloud` entries stay on the legacy partition: the silent per-agent
- *     cascade deliberately shares one jar with the Qubit Portal session.
+ *     cascade deliberately shares one jar with the Nous Portal session.
  *   - Token-auth remotes, portal URLs, and anything unmatched or malformed
  *     fall back to the legacy partition (cookie-free flows are unaffected).
  *
@@ -36,7 +36,22 @@
 
 export const LEGACY_OAUTH_PARTITION = 'persist:hermes-remote-oauth'
 
-const CONNECTION_PARTITION_PREFIX = `${LEGACY_OAUTH_PARTITION}:conn:`
+// Colon-free ON PURPOSE: Electron escapes ':' in a partition name to '%3A' in
+// the on-disk profile folder, and a Windows profile folder whose name contains
+// '%3A' gets a cookie store the network stack can neither read nor write (a
+// jar seeded into it reads back zero cookies, `cookies.set()` never reaches
+// disk, and every cookie-authenticated request 401s as `no_cookie`). A jar
+// the app cannot see means the dial always looks signed-out and the user is
+// asked to sign in again on every connect. The whole path component (prefix
+// AND the sanitized id below) must stay within the characters Electron never
+// percent-escapes — the invariant test pins "no ':' and no '%'".
+//
+// The name used to be `${LEGACY_OAUTH_PARTITION}:conn:<id>` (#92183). That
+// jar never worked on Windows; on macOS/Linux a non-primary remote signed in
+// under the old name is re-prompted ONCE after this change (the old
+// `Partitions/hermes-remote-oauth%3Aconn%3A<id>` folder is left on disk,
+// inert). One name on every platform beats a per-OS partition scheme.
+const CONNECTION_PARTITION_PREFIX = `${LEGACY_OAUTH_PARTITION}-conn-`
 
 export interface PartitionRegistrySnapshot {
   primary?: unknown

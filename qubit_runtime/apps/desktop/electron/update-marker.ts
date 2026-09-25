@@ -29,8 +29,8 @@ import path from 'path'
 // recycled the pid onto an unrelated process), so the gate self-heals.
 export const UPDATE_MARKER_MAX_AGE_MS = 20 * 60 * 1000
 
-export function markerPath(qubitHome) {
-  return path.join(qubitHome, '.hermes-update-in-progress')
+export function markerPath(hermesHome) {
+  return path.join(hermesHome, '.hermes-update-in-progress')
 }
 
 // True only if a host process with this pid is currently alive. Signal 0 does
@@ -64,7 +64,7 @@ export function isPidAlive(pid, kill: typeof process.kill = process.kill.bind(pr
  * clock for tests.
  */
 export function readLiveUpdateMarker(
-  qubitHome,
+  hermesHome,
   {
     kill,
     now = Date.now,
@@ -75,7 +75,7 @@ export function readLiveUpdateMarker(
     kill?: typeof process.kill
   } = {}
 ) {
-  const file = markerPath(qubitHome)
+  const file = markerPath(hermesHome)
   let raw
 
   try {
@@ -127,7 +127,7 @@ export function readLiveUpdateMarker(
  * real PID, so `readLiveUpdateMarker` will self-heal once that PID exits.
  */
 export function writeUpdateMarker(
-  qubitHome,
+  hermesHome,
   pid,
   {
     kill,
@@ -141,9 +141,9 @@ export function writeUpdateMarker(
     startedAt?: number
   } = {}
 ) {
-  const file = markerPath(qubitHome)
+  const file = markerPath(hermesHome)
   const nowMs = now()
-  const owner = readLiveUpdateMarker(qubitHome, { kill, maxAgeMs, now: () => nowMs })
+  const owner = readLiveUpdateMarker(hermesHome, { kill, maxAgeMs, now: () => nowMs })
 
   const acquiredAt =
     typeof startedAt === 'number' && Number.isInteger(startedAt)
@@ -167,7 +167,7 @@ export function writeUpdateMarker(
  * `writeUpdateMarker` unconditionally overwrites the marker file. Called
  * before every hand-off with no conflict check, a user who clicks "Update"
  * again while a prior updater is still parked mid-run (e.g. "waiting for
- * Qubit to exit…") clobbers that still-running updater's claim: the
+ * Hermes to exit…") clobbers that still-running updater's claim: the
  * retry's pre-write now names the NEW child, so the OLD process — alive
  * and mutating the checkout — is no longer recorded as the owner. A second
  * live updater can then run over the same tree unrecorded, the exact
@@ -180,14 +180,14 @@ export function writeUpdateMarker(
  * `readLiveUpdateMarker`.
  */
 export function updateHandoffConflict(
-  qubitHome,
+  hermesHome,
   opts: {
     now?: () => number
     maxAgeMs?: number
     kill?: typeof process.kill
   } = {}
 ) {
-  const owner = readLiveUpdateMarker(qubitHome, opts)
+  const owner = readLiveUpdateMarker(hermesHome, opts)
 
   if (!owner) {
     return null

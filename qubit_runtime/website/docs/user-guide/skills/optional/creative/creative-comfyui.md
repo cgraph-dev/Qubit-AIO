@@ -14,19 +14,19 @@ Generate images, video, and audio via diffusion workflows.
 
 | | |
 |---|---|
-| Source | Optional — install with `qubit skills install official/creative/comfyui` |
-| Path | `optional-skills/creative\comfyui` |
+| Source | Optional — install with `hermes skills install official/creative/comfyui` |
+| Path | `optional-skills/creative/comfyui` |
 | Version | `5.1.0` |
 | Author | ['kshitijk4poor', 'alt-glitch', 'purzbeats'] |
 | License | MIT |
 | Platforms | macos, linux, windows |
 | Tags | `comfyui`, `image-generation`, `stable-diffusion`, `flux`, `sd3`, `wan-video`, `hunyuan-video`, `creative`, `generative-ai`, `video-generation` |
-| Related skills | [`stable-diffusion`](/docs/user-guide/skills/optional/mlops/mlops-stable-diffusion) |
+| Related skills | [`stable-diffusion`](../../optional/mlops/mlops-stable-diffusion.md) |
 
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Qubit loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # ComfyUI

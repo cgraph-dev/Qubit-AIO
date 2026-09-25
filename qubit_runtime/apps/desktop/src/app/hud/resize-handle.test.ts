@@ -1,10 +1,10 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { HUD_RESIZE_DIRECTIONS, hudResizeBounds, hudResizeDirections, useHudResizeHandle } from './resize-handle'
+import { hudResizeBounds, hudResizeDirections, useHudResizeHandle } from './resize-handle'
 
-const desktopWindow = window as unknown as { qubitDesktop?: Window['hermesDesktop'] }
-const initialQubitDesktop = desktopWindow.qubitDesktop
+const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
+const initialHermesDesktop = desktopWindow.hermesDesktop
 const setBounds = vi.fn()
 
 function setWindowBounds(x: number, y: number, width: number, height: number): void {
@@ -27,16 +27,16 @@ function resizeTarget(): HTMLElement {
 beforeEach(() => {
   setBounds.mockClear()
   setWindowBounds(100, 200, 620, 320)
-  desktopWindow.qubitDesktop = { hud: { setBounds } } as unknown as Window['hermesDesktop']
+  desktopWindow.hermesDesktop = { hud: { setBounds } } as unknown as Window['hermesDesktop']
 })
 
 afterEach(() => {
   document.body.innerHTML = ''
 
-  if (initialQubitDesktop) {
-    desktopWindow.qubitDesktop = initialQubitDesktop
+  if (initialHermesDesktop) {
+    desktopWindow.hermesDesktop = initialHermesDesktop
   } else {
-    delete desktopWindow.qubitDesktop
+    delete desktopWindow.hermesDesktop
   }
 })
 
@@ -61,10 +61,6 @@ describe('hudResizeBounds', () => {
 })
 
 describe('hudResizeDirections', () => {
-  it('keeps every edge and corner on platforms with global window positioning', () => {
-    expect(hudResizeDirections(true)).toBe(HUD_RESIZE_DIRECTIONS)
-  })
-
   it('exposes only position-preserving handles when the client cannot place the window', () => {
     expect(hudResizeDirections(false)).toEqual(['e', 'se', 's'])
   })

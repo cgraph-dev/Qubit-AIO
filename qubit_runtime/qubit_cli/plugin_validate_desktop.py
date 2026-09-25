@@ -5,9 +5,6 @@ A ``plugin.js`` is evaluated as ESM in the Electron renderer realm with the app'
 capability boundary). The loader accepts that for files the user put on disk; a catalog install is a
 remote source, so listed plugins must stay inside the SDK surface. This lint refuses the moves that
 step outside it. It is a tripwire for review, not a sandbox.
-
-Ported from the read-only reference ``hermes_cli/plugin_validate_desktop.py``; the allowed SDK
-specifier is the vendored alias (``@hermes/plugin-sdk`` — see ``apps/desktop/vite.config.ts``).
 """
 
 from __future__ import annotations
@@ -44,13 +41,23 @@ _COMMENT = re.compile(r"/\*.*?\*/|(?<![:\w])//[^\n]*", re.S)
 # feed sanitiser that STRIPS script tags is the opposite of the move the rule refuses. Regex
 # literals are masked for the markup-shaped rules only; a ``<script`` inside a string literal is
 # still the payload of an ``innerHTML`` write and keeps firing. The lookbehind keeps division
-# (``a / b / c``) from reading as a literal.
+# (``a / b / c``) from reading as a literal. The pattern string handed straight to ``new RegExp(``
+# is the same sanitiser spelled for a dynamic flag (rss-reader split it into ``"<scr"+"ipt"`` to
+# dodge this rule) — but only where the constructor is USED as a matcher: the argument of a string
+# method (``html.replace(new RegExp("<script…", flags), '')``) or the receiver of ``.test``/``.exec``.
+# Anywhere else (``el.innerHTML = new RegExp("<script src=x></script>").source``) the constructor is
+# a string-builder and its literal keeps firing.
 _REGEX_LITERAL = re.compile(r"(?<![\w)\]])/(?:[^/\\\n\[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+/[a-z]*")
+_JS_STRING = r"(?:\"(?:[^\"\\\n]|\\.)*\"|'(?:[^'\\\n]|\\.)*')"
+_REGEXP_CTOR_MATCHER = re.compile(
+    r"\.(?:replace|replaceAll|split|match|matchAll|search)\(\s*new\s+RegExp\(\s*" + _JS_STRING
+    + r"|\bnew\s+RegExp\(\s*" + _JS_STRING + r"(?=[^()\n]*\)\s*\.\s*(?:test|exec)\()")
 _MARKUP_RULES = frozenset({"script injection"})
 
 
 def _mask_regex_literals(source: str) -> str:
-    return _REGEX_LITERAL.sub(lambda m: " " * len(m.group(0)), source)
+    masked = _REGEX_LITERAL.sub(lambda m: " " * len(m.group(0)), source)
+    return _REGEXP_CTOR_MATCHER.sub(lambda m: " " * len(m.group(0)), masked)
 
 
 def desktop_surface_findings(source: str) -> List[Tuple[str, int]]:
@@ -90,7 +97,7 @@ def desktop_surface_hits(plugin_dir: Path) -> List[str]:
         if not is_desktop_surface(rel):
             continue
         try:
-            source = js.read_text(encoding="utf-8", errors="replace")
+            source = js.read_text(encoding="utf-8-sig", errors="replace")
         except OSError:
             continue
         hits.extend(f"{rule} ({rel}:{line})" for rule, line in desktop_surface_findings(source))

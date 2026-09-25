@@ -135,15 +135,15 @@ def test_a_provider_configured_after_boot_flips_the_stale_setup_record(isolated_
 
     # The record is the launch profile's: a write scoped to another profile (the dashboard's
     # ``?profile=b``) must not let THAT profile's provider open the launch gate.
-    from qubit_constants import reset_hermes_home_override, set_hermes_home_override
+    from qubit_constants import reset_qubit_home_override, set_qubit_home_override
     profile_b = isolated_home / "profiles" / "b"
     profile_b.mkdir(parents=True)
     (profile_b / "config.yaml").write_text("model:\n  default: qwen3\n  provider: custom\n  base_url: http://127.0.0.1:8000/v1\n  api_key: dummy\n", encoding="utf-8")
-    token = set_hermes_home_override(str(profile_b))
+    token = set_qubit_home_override(str(profile_b))
     try:
         assert fb.reconcile_record() is boot and broadcasts == [], "another profile's provider is not ours"
     finally:
-        reset_hermes_home_override(token)
+        reset_qubit_home_override(token)
 
     (isolated_home / "config.yaml").write_text(
         "model:\n  default: qwen3\n  provider: custom\n  base_url: http://127.0.0.1:8000/v1\n  api_key: dummy\n",

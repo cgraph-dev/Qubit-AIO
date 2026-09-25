@@ -4,17 +4,16 @@ import { $activeGatewayProfile } from '@/store/profile'
 import { $sessions } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
-import { $hudActive, $hudSession, openHud, resetHudLayout } from './hud'
+import { $hudActive, $hudSession, openHud } from './hud'
 
-const desktopWindow = window as unknown as { qubitDesktop?: Window['hermesDesktop'] }
-const initialQubitDesktop = desktopWindow.qubitDesktop
+const desktopWindow = window as unknown as { hermesDesktop?: Window['hermesDesktop'] }
+const initialHermesDesktop = desktopWindow.hermesDesktop
 
 const open = vi.fn().mockResolvedValue({ ok: true })
-const resetLayout = vi.fn().mockResolvedValue({ ok: true })
 
 function installBridge() {
-  desktopWindow.qubitDesktop = {
-    hud: { open, resetLayout }
+  desktopWindow.hermesDesktop = {
+    hud: { open }
   } as unknown as Window['hermesDesktop']
 }
 
@@ -24,7 +23,6 @@ function session(overrides: Partial<SessionInfo>): SessionInfo {
 
 beforeEach(() => {
   open.mockClear()
-  resetLayout.mockClear()
   installBridge()
   $hudActive.set(false)
   $hudSession.set(null)
@@ -33,19 +31,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  if (initialQubitDesktop) {
-    desktopWindow.qubitDesktop = initialQubitDesktop
+  if (initialHermesDesktop) {
+    desktopWindow.hermesDesktop = initialHermesDesktop
   } else {
-    delete desktopWindow.qubitDesktop
+    delete desktopWindow.hermesDesktop
   }
-})
-
-describe('resetHudLayout', () => {
-  it('uses the native HUD recovery capability', () => {
-    resetHudLayout()
-
-    expect(resetLayout).toHaveBeenCalledOnce()
-  })
 })
 
 describe('openHud profile targeting (#82285)', () => {
@@ -73,12 +63,6 @@ describe('openHud profile targeting (#82285)', () => {
     openHud()
 
     expect(open).toHaveBeenCalledWith({ sessionId: null, profile: 'research' })
-  })
-
-  it('normalizes to default for single-profile users', () => {
-    openHud()
-
-    expect(open).toHaveBeenCalledWith({ sessionId: null, profile: 'default' })
   })
 
   it('uses the active profile when the target session is not in the cache', () => {

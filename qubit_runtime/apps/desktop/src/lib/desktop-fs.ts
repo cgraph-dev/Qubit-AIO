@@ -1,14 +1,15 @@
-import { qubitApi } from '@/api/client'
+import { hermesApi } from '@/api/client'
 import type {
-  QubitConnection,
-  QubitReadDirResult,
-  QubitReadFileTextResult,
-  QubitSelectPathsOptions
+  HermesConnection,
+  HermesReadDirResult,
+  HermesReadFileTextResult,
+  HermesSelectPathsOptions
 } from '@/global'
+import { translateNow } from '@/i18n'
 import { $connection } from '@/store/session'
 
 export interface DesktopFsRemotePicker {
-  selectPaths: (options?: QubitSelectPathsOptions) => Promise<string[]>
+  selectPaths: (options?: HermesSelectPathsOptions) => Promise<string[]>
 }
 
 let remotePicker: DesktopFsRemotePicker | null = null
@@ -17,7 +18,7 @@ export function setDesktopFsRemotePicker(next: DesktopFsRemotePicker | null) {
   remotePicker = next
 }
 
-function connectionCacheKey(connection: QubitConnection | null) {
+function connectionCacheKey(connection: HermesConnection | null) {
   if (!connection) {
     return 'local:'
   }
@@ -37,7 +38,7 @@ function connectionCacheKey(connection: QubitConnection | null) {
   return `${connection.mode || 'local'}:${connection.remoteKind || ''}:${connection.profile || ''}:${target}`
 }
 
-export function desktopFsCacheKey(connection: QubitConnection | null = $connection.get()) {
+export function desktopFsCacheKey(connection: HermesConnection | null = $connection.get()) {
   return connectionCacheKey(connection)
 }
 
@@ -56,35 +57,35 @@ function fsPath(endpoint: string, filePath: string) {
 }
 
 function bridge() {
-  const desktop = window.qubitDesktop
+  const desktop = window.hermesDesktop
 
   if (!desktop) {
-    throw new Error('Qubit Desktop bridge is unavailable')
+    throw new Error('Hermes Desktop bridge is unavailable')
   }
 
   return desktop
 }
 
 function remoteFsApi<T>(path: string, body?: Record<string, unknown>): Promise<T> {
-  return qubitApi<T>(
+  return hermesApi<T>(
     body ? { body, method: 'POST', path, profile: desktopFsProfile() } : { path, profile: desktopFsProfile() }
   )
 }
 
-export async function readDesktopDir(path: string): Promise<QubitReadDirResult> {
+export async function readDesktopDir(path: string): Promise<HermesReadDirResult> {
   if (!isDesktopFsRemoteMode()) {
     return bridge().readDir(path)
   }
 
-  return remoteFsApi<QubitReadDirResult>(fsPath('list', path))
+  return remoteFsApi<HermesReadDirResult>(fsPath('list', path))
 }
 
-export async function readDesktopFileText(path: string): Promise<QubitReadFileTextResult> {
+export async function readDesktopFileText(path: string): Promise<HermesReadFileTextResult> {
   if (!isDesktopFsRemoteMode()) {
     return bridge().readFileText(path)
   }
 
-  return remoteFsApi<QubitReadFileTextResult>(fsPath('read-text', path))
+  return remoteFsApi<HermesReadFileTextResult>(fsPath('read-text', path))
 }
 
 // Save UTF-8 text back to a file. Local writes go through the hardened Electron
@@ -107,6 +108,14 @@ export async function writeDesktopFileText(path: string, content: string): Promi
   return { path: result.path || path }
 }
 
+// Create a folder on the connected backend (POST /api/files/mkdir). Remote-only:
+// in local mode the picker is the native dialog, which creates folders itself.
+export async function createRemoteDir(path: string): Promise<string> {
+  const result = await remoteFsApi<{ path?: string }>('/api/files/mkdir', { path })
+
+  return result.path || path
+}
+
 export async function readDesktopFileDataUrl(path: string): Promise<string> {
   if (!isDesktopFsRemoteMode()) {
     return bridge().readFileDataUrl(path)
@@ -124,7 +133,7 @@ export async function readDesktopFileDataUrl(path: string): Promise<string> {
  */
 export async function readDesktopFileDataUrlLocalFirst(path: string): Promise<string> {
   try {
-    const local = await window.qubitDesktop?.readFileDataUrl?.(path)
+    const local = await window.hermesDesktop?.readFileDataUrl?.(path)
 
     if (local) {
       return local
@@ -159,8 +168,14 @@ export async function desktopDefaultCwd(): Promise<{ branch: string; cwd: string
 }
 
 // Reveal a path in the OS file manager (Finder / Explorer / Files). Local only.
+// The bridge answers `false` when the path is not on this computer (a remote
+// backend's workspace) — surface it instead of a silent no-op.
 export async function revealDesktopPath(path: string): Promise<void> {
-  await bridge().revealPath?.(path)
+  const revealed = await bridge().revealPath?.(path)
+
+  if (revealed === false) {
+    throw new Error(translateNow('fileMenu.revealMissing'))
+  }
 }
 
 // Rename a file/folder in place; returns the new absolute path. Local only.
@@ -207,7 +222,7 @@ export async function desktopFileDiff(repoRoot: string, filePath: string): Promi
   return git?.fileDiff ? git.fileDiff(repoRoot, filePath) : ''
 }
 
-export async function selectDesktopPaths(options?: QubitSelectPathsOptions): Promise<string[]> {
+export async function selectDesktopPaths(options?: HermesSelectPathsOptions): Promise<string[]> {
   const desktop = bridge()
   const profile = desktopFsProfile()
   const localOptions = profile ? { ...options, profile } : options

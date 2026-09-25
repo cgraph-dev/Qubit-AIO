@@ -29,6 +29,8 @@ import CopyButton from "../../components/PluginCatalog/CopyButton";
 // `static/api/` ends up at `/docs/api/` — same pattern as the Skills Hub.
 const PLUGINS_URL = "/docs/api/plugins.json";
 const META_URL = "/docs/api/plugins-meta.json";
+/** Mirrors the `max-width: 600px` blocks in styles.module.css. */
+const MOBILE_PANEL_QUERY = "(max-width: 600px)";
 
 const TIER_ORDER = ["all", "official", "community"];
 
@@ -235,10 +237,10 @@ function PluginCard({
           <a
             className={styles.pickBtn}
             href={desktopInstallLink(plugin.name)}
-            title="Opens the Install Plugin dialog in Qubit Desktop at the reviewed version. No app? Use the install command below."
+            title="Opens the Install Plugin dialog in Hermes Desktop at the reviewed version. No app? Use the install command below."
             onClick={(e) => e.stopPropagation()}
           >
-            Open in Qubit Desktop
+            Open in Hermes Desktop
           </a>
         )}
 
@@ -262,7 +264,7 @@ function PluginCard({
               <div className={styles.metaRow}>
                 <span className={styles.metaLabel}>Requires</span>
                 <span className={styles.metaValue}>
-                  <code>qubit {plugin.requiresHermes}</code>
+                  <code>hermes {plugin.requiresHermes}</code>
                 </span>
               </div>
             )}
@@ -348,7 +350,7 @@ function buildSearchHaystack(p: CatalogPlugin): string {
 
 export default function PluginCatalogPage() {
   // Picker embed mode (?embed=picker): the page is iframed by a host app
-  // (Qubit desktop's Capabilities > Plugins tab) as a one-click catalog
+  // (Hermes desktop's Capabilities > Plugins tab) as a one-click catalog
   // picker. Site chrome is hidden via CSS and every card gains an
   // "+ Add to this Agent" button that posts
   //   { type: 'hermes-plugin-pick', name, repo, sha, subdir, tier,
@@ -370,7 +372,7 @@ export default function PluginCatalogPage() {
         sha: plugin.sha,
         subdir: plugin.subdir || "",
         tier: plugin.tier,
-        installCmd: plugin.installCommand || `qubit plugins install ${plugin.name}`,
+        installCmd: plugin.installCommand || `hermes plugins install ${plugin.name}`,
       },
       "*"
     );
@@ -385,7 +387,9 @@ export default function PluginCatalogPage() {
   const [tierFilter, setTierFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sort, setSort] = useState<SortKey>("stars");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -414,16 +418,44 @@ export default function PluginCatalogPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const isEditable =
+        target?.matches("input, textarea, select") ||
+        target?.isContentEditable ||
+        Boolean(target?.closest("[contenteditable='true']"));
+      if (e.key === "/" && !isEditable) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         searchRef.current?.focus();
       }
       if (e.key === "Escape") {
         searchRef.current?.blur();
+        setFiltersOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Reveal the panel once it opens. `block: "nearest"` leaves the page alone
+  // when the panel is already in view; `start` scrolled the hero off-screen.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const frame = requestAnimationFrame(() => {
+      filterPanelRef.current?.scrollIntoView({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [filtersOpen]);
+
+  // The panel only exists in the mobile band, so leaving it should drop the
+  // state too — otherwise `aria-expanded` stays "true" on a hidden toggle.
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_PANEL_QUERY);
+    const sync = () => {
+      if (!media.matches) setFiltersOpen(false);
+    };
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
   }, []);
 
   const allPlugins: CatalogPlugin[] = data?.plugins ?? [];
@@ -463,13 +495,11 @@ export default function PluginCatalogPage() {
     return counts;
   }, [allPlugins, tierFilter]);
 
-  useEffect(() => {
-  }, [search, tierFilter, categoryFilter]);
-
   const clearAll = useCallback(() => {
     setSearch("");
     setTierFilter("all");
     setCategoryFilter("all");
+    setFiltersOpen(false);
   }, []);
 
   const pickCategory = useCallback((c: string) => {
@@ -496,13 +526,13 @@ export default function PluginCatalogPage() {
   return (
     <Layout
       title="Plugin Catalog"
-      description="Give Qubit new powers: reviewed plugins you can install in one click"
+      description="Give Hermes new powers: reviewed plugins you can install in one click"
     >
       <div className={`${styles.page} ${pickerMode ? styles.pickerMode : ""}`}>
         <header className={styles.hero}>
           <div className={styles.heroGlow} />
           <div className={styles.heroContent}>
-            <p className={styles.heroEyebrow}>Qubit Agent</p>
+            <p className={styles.heroEyebrow}>Hermes Agent</p>
             <h1 className={styles.heroTitle}>Plugin Catalog</h1>
             <nav className={styles.crossNav} aria-label="Catalog pages">
               <Link className={styles.crossNavLink} to="/skills">
@@ -513,7 +543,7 @@ export default function PluginCatalogPage() {
               </span>
             </nav>
             <p className={styles.heroSub}>
-              Give Qubit new powers. Memory, voice, messaging, browsing, Desktop panes and more,
+              Give Hermes new powers. Memory, voice, messaging, browsing, Desktop panes and more,
               built by the community.
               {loadError && (
                 <span style={{ color: "#f87171", marginLeft: 8 }}>
@@ -549,6 +579,7 @@ export default function PluginCatalogPage() {
 
         {!catalogEmpty && (
           <div className={styles.controlsBar}>
+            <div className={styles.controlsTopRow}>
             <div className={styles.searchWrap}>
               <svg
                 className={styles.searchIcon}
@@ -566,7 +597,7 @@ export default function PluginCatalogPage() {
               <input
                 ref={searchRef}
                 type="text"
-                placeholder="Search plugins by name or by what you want Qubit to do"
+                placeholder="Search plugins"
                 title='Tip: press "/" to jump here'
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -585,6 +616,50 @@ export default function PluginCatalogPage() {
               )}
             </div>
 
+            <button
+              type="button"
+              className={styles.filterToggle}
+              aria-expanded={filtersOpen}
+              aria-controls="plugin-directory-filters"
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              Filters
+              {(tierFilter !== "all" || categoryFilter !== "all") && (
+                <span className={styles.activeFilterCount}>
+                  {Number(tierFilter !== "all") + Number(categoryFilter !== "all")}
+                </span>
+              )}
+            </button>
+            <label className={styles.compactSelect}>
+              <span>Source</span>
+              <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}>
+                {TIER_ORDER.map((tier) => (
+                  <option key={tier} value={tier}>{tier === "all" ? "All sources" : TIER_CONFIG[tier]?.label || tier}</option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.compactSelect}>
+              <span>Category</span>
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="all">All categories</option>
+                {CATEGORY_ORDER.filter((c) => categoryCounts[c]).map((c) => (
+                  <option key={c} value={c}>{CATEGORY_CONFIG[c].label}</option>
+                ))}
+              </select>
+            </label>
+            <label className={`${styles.compactSelect} ${styles.compactSort}`}>
+              <span>Sort</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+                {SORT_OPTIONS.map((opt) => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
+              </select>
+            </label>
+            </div>
+
+            <div
+              id="plugin-directory-filters"
+              ref={filterPanelRef}
+              className={`${styles.filterPanel} ${filtersOpen ? styles.filterPanelOpen : ""}`}
+            >
             <div className={styles.tierPills}>
               {TIER_ORDER.map((tier) => {
                 const active = tierFilter === tier;
@@ -661,6 +736,7 @@ export default function PluginCatalogPage() {
                 );
               })}
             </div>
+            </div>
           </div>
         )}
 
@@ -675,7 +751,7 @@ export default function PluginCatalogPage() {
               <div className={styles.emptyIcon}>{"\u{1F331}"}</div>
               <h3 className={styles.emptyTitle}>The catalog is just getting started</h3>
               <p className={styles.emptyDesc}>
-                The plugin catalog is a curated, human-reviewed list of Qubit
+                The plugin catalog is a curated, human-reviewed list of Hermes
                 plugins — each entry pinned to an exact commit. Want yours listed?
                 Submissions are open.
               </p>

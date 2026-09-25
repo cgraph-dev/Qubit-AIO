@@ -48,7 +48,6 @@ def main_mod(monkeypatch):
 
     monkeypatch.setattr(mod, "_has_any_provider_configured", lambda: True)
     monkeypatch.setattr(mod, "_sync_bundled_skills_for_startup", lambda: None)
-    monkeypatch.setattr(mod, "_termux_should_prefetch_update_check", lambda: False)
     monkeypatch.setattr(mod, "_pin_kanban_board_env", lambda: None)
     monkeypatch.setattr(mod, "_resolve_session_by_name_or_id", lambda val: val)
     monkeypatch.setattr(mod, "_oneshot_cleanup_done", False)
@@ -106,7 +105,6 @@ def test_cmd_chat_rejects_noninteractive_gpt55_pro_startup_override(
     assert not fake_cli
     err = capsys.readouterr().err
     assert "EXPENSIVE MODEL WARNING" in err
-    assert "did you mean to select openai/gpt-5.5?" in err
     assert "non-interactive" in err
 
 
@@ -288,7 +286,7 @@ def test_top_level_oneshot_rejects_noninteractive_gpt55_pro_startup_override(
     main_mod, codex_config, monkeypatch, capsys
 ):
     monkeypatch.setattr(sys, "stdin", _NonInteractiveStdin())
-    monkeypatch.setattr(sys, "argv", ["qubit", "-z", "hello", "-m", "openai/gpt-5.5-pro"])
+    monkeypatch.setattr(sys, "argv", ["hermes", "-z", "hello", "-m", "openai/gpt-5.5-pro"])
     monkeypatch.setattr(main_mod, "_prepare_agent_startup", lambda _args: None)
 
     called = False

@@ -1,15 +1,15 @@
 import fs from 'node:fs'
 
-// `qubit serve` announces HERMES_BACKEND_READY; the legacy `qubit dashboard`
+// `hermes serve` announces HERMES_BACKEND_READY; the legacy `hermes dashboard`
 // backend announces HERMES_DASHBOARD_READY. Accept either so the desktop spawn
 // works against both the headless backend and old/dashboard runtimes.
-const _READY_RE = /^QUBIT_(?:BACKEND|DASHBOARD)_READY port=(\d+)/m
+const _READY_RE = /^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/m
 
 // Same sentinel inside a MERGED stdout+stderr buffer (the spawn-time output tail, a remote
 // `>> log 2>&1` file): uvicorn's stderr chunks end without a newline, so the sentinel can be
 // spliced onto them (`...process [4711]HERMES_BACKEND_READY port=65238`) and `^` never lines up
 // (#103792). Match on a token boundary instead; `port=<digits>` keeps prose mentions out.
-export const READY_IN_MERGED_OUTPUT_RE = /(?<!\w)QUBIT_(?:BACKEND|DASHBOARD)_READY port=(\d+)/
+export const READY_IN_MERGED_OUTPUT_RE = /(?<!\w)HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)/
 
 // The announcement clock starts the instant the backend process is spawned —
 // before uvicorn binds its socket. On a cold install the child must first
@@ -31,7 +31,7 @@ const MIN_PORT_ANNOUNCE_TIMEOUT_MS = 45_000
  * to a sane floor so a bad value can't make boot flakier than the default.
  */
 function resolvePortAnnounceTimeoutMs(env = process.env) {
-  const parsed = Number(env.QUBIT_DESKTOP_PORT_ANNOUNCE_TIMEOUT_MS)
+  const parsed = Number(env.HERMES_DESKTOP_PORT_ANNOUNCE_TIMEOUT_MS)
 
   if (Number.isFinite(parsed) && parsed > 0) {
     return Math.max(MIN_PORT_ANNOUNCE_TIMEOUT_MS, Math.round(parsed))
@@ -107,7 +107,7 @@ function waitForDashboardPort(
 
     function onExit(code, signal) {
       cleanup()
-      reject(new Error(`Qubit backend: exited before port announcement (${signal || code})${describeOutputTail()}`))
+      reject(new Error(`Hermes backend: exited before port announcement (${signal || code})${describeOutputTail()}`))
     }
 
     function onError(err) {
@@ -117,7 +117,7 @@ function waitForDashboardPort(
 
     const timer = setTimeout(() => {
       cleanup()
-      reject(new Error(`Timed out waiting for Qubit backend port announcement (${timeoutMs}ms)`))
+      reject(new Error(`Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)`))
     }, timeoutMs)
 
     child.stdout.on('data', onData)
@@ -194,7 +194,7 @@ function waitForDashboardReadyFile(
 
     function onExit(code, signal) {
       cleanup()
-      reject(new Error(`Qubit backend: exited before port announcement (${signal || code})${describeOutputTail()}`))
+      reject(new Error(`Hermes backend: exited before port announcement (${signal || code})${describeOutputTail()}`))
     }
 
     function onError(err) {
@@ -204,7 +204,7 @@ function waitForDashboardReadyFile(
 
     const timer = setTimeout(() => {
       cleanup()
-      reject(new Error(`Timed out waiting for Qubit backend port announcement (${timeoutMs}ms)`))
+      reject(new Error(`Timed out waiting for Hermes backend port announcement (${timeoutMs}ms)`))
     }, timeoutMs)
 
     child.on('exit', onExit)

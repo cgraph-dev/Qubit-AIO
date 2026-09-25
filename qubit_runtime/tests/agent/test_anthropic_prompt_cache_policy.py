@@ -264,9 +264,9 @@ class TestThirdPartyAnthropicGateway:
         agent and the policy loads config itself."""
         import textwrap
 
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        (hermes_home / "config.yaml").write_text(
+        qubit_home = tmp_path / ".hermes"
+        qubit_home.mkdir()
+        (qubit_home / "config.yaml").write_text(
             textwrap.dedent(
                 """
                 providers:
@@ -282,7 +282,7 @@ class TestThirdPartyAnthropicGateway:
                 """
             )
         )
-        monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+        monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         # load_config's cache is keyed by resolved config path, so pointing
         # QUBIT_HOME at a fresh tempdir needs no cache invalidation.
         agent = _make_agent(
@@ -437,9 +437,9 @@ class TestCustomProviderOpenAIWireCapability:
     ):
         import textwrap
 
-        hermes_home = tmp_path / ".hermes"
-        hermes_home.mkdir()
-        (hermes_home / "config.yaml").write_text(
+        qubit_home = tmp_path / ".hermes"
+        qubit_home.mkdir()
+        (qubit_home / "config.yaml").write_text(
             textwrap.dedent(
                 """
                 providers:
@@ -452,7 +452,7 @@ class TestCustomProviderOpenAIWireCapability:
                 """
             )
         )
-        monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+        monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         agent = _make_agent(
             provider="edge-router",
             base_url="https://models.example.net/v1",

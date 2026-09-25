@@ -139,7 +139,7 @@ class Sandbox:
         return self.root / "home"
 
     @property
-    def hermes_home(self) -> Path:
+    def qubit_home(self) -> Path:
         return self.home / ".hermes"
 
     def env(self, extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -188,18 +188,18 @@ def write_profile_home(p: Profile, extra_config: dict[str, Any] | None = None) -
 def _select_test_dependencies(sb: Sandbox) -> None:
     from tests.e2e.core._pm_dependencies import select_test_dependencies
 
-    select_test_dependencies(sb.hermes_home, REPO_ROOT)
+    select_test_dependencies(sb.qubit_home, REPO_ROOT)
 
 
 def make_sandbox(root: Path, names: tuple[str, ...] = ("default",),
                  responder: Callable[[Profile], Any] | None = None) -> Sandbox:
     """Launch profile at HOME/.hermes, the rest under profiles/<name>; each owns a started provider
     that accepts only its own key, so every recorded request proves WHO sent it."""
-    hermes_home = root / "home" / ".hermes"
+    qubit_home = root / "home" / ".hermes"
     profiles: dict[str, Profile] = {}
     _reaper.adopt_orphans()  # before any spawn: every detached descendant stays reapable
     for name in names:
-        home = hermes_home if name == "default" else hermes_home / "profiles" / name
+        home = qubit_home if name == "default" else qubit_home / "profiles" / name
         p = Profile(name=name, home=home)
         script = responder(p) if responder else None
         p.srv = FakeLLMServer(script, default_text=f"reply-from-{p.name}-{p.tag}", api_key=p.provider_key)
@@ -329,9 +329,9 @@ def db_rows(db: Path, sql: str, args: tuple = ()) -> list[tuple]:
         conn.close()
 
 
-def run_py(sb: Sandbox, code: str, *args: str, hermes_home: Path | None = None,
+def run_py(sb: Sandbox, code: str, *args: str, qubit_home: Path | None = None,
            timeout: float = 120.0) -> subprocess.CompletedProcess:
-    extra = {"QUBIT_HOME": str(hermes_home)} if hermes_home else None
+    extra = {"QUBIT_HOME": str(qubit_home)} if qubit_home else None
     return subprocess.run([sys.executable, "-c", code, *args], env=sb.env(extra), cwd=str(sb.home),
                           capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
 
@@ -352,7 +352,7 @@ print("seeded", n)
 
 
 def seed_sessions(sb: Sandbox, p: Profile, prefix: str, n: int) -> None:
-    r = run_py(sb, SEED_SESSIONS, prefix, str(n), hermes_home=p.home)
+    r = run_py(sb, SEED_SESSIONS, prefix, str(n), qubit_home=p.home)
     assert r.returncode == 0, r.stderr[-2000:]
 
 

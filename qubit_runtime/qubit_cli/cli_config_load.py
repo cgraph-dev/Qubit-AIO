@@ -36,7 +36,7 @@ def _load_prefill_messages(file_path: str) -> List[Dict[str, Any]]:
         logger.warning("Prefill messages file not found: %s", path)
         return []
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
         if not isinstance(data, list):
             logger.warning("Prefill messages file must contain a JSON array: %s", path)
@@ -231,7 +231,7 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
             defaults["model"]["default"] = file_config["model"]
         elif isinstance(file_config["model"], dict):
             defaults["model"].update(file_config["model"])
-            # Promote model.model -> model.default (QubitCLI checks "default" first).
+            # Promote model.model -> model.default (HermesCLI checks "default" first).
             if "model" in file_config["model"] and "default" not in file_config["model"]:
                 defaults["model"]["default"] = file_config["model"]["model"]
 
@@ -273,7 +273,7 @@ def load_cli_config() -> Dict[str, Any]:
 
     if config_path.exists():
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, "r", encoding="utf-8-sig") as f:
                 from qubit_cli.config import _normalize_root_model_keys
 
                 file_config = _normalize_root_model_keys(fast_safe_load(f) or {})

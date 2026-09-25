@@ -11,7 +11,7 @@ sandbox = tempfile.TemporaryDirectory(prefix="hermes-104260-")
 os.environ.clear()
 os.environ.update(
     HOME=sandbox.name,
-    QUBIT_HOME=sandbox.name + "/qubit",
+    QUBIT_HOME=sandbox.name + "/hermes",
     PATH="/usr/bin:/bin",
     PYTHONDONTWRITEBYTECODE="1",
     HERMES_DISABLE_MODEL_METADATA_FETCH="1",
@@ -126,7 +126,7 @@ config = {
         }
     },
 }
-# JSON is valid YAML; only the temporary Qubit home is written.
+# JSON is valid YAML; only the temporary Hermes home is written.
 Path(os.environ["QUBIT_HOME"], "config.yaml").write_text(
     json.dumps(config), encoding="utf-8"
 )

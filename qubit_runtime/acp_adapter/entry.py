@@ -12,13 +12,20 @@ Usage::
 # on Windows.  No-op on POSIX.  See qubit_bootstrap.py for full rationale.
 try:
     import qubit_bootstrap  # noqa: F401
-except ModuleNotFoundError:
-    # Partial ``qubit update`` (git-reset landed, ``uv pip install -e .`` did not):
-    # UTF-8 stdio setup is skipped on Windows; POSIX is unaffected.
-    pass
+except ModuleNotFoundError as exc:
+    # Partial ``qubit update`` (git-reset landed, ``uv pip install -e .`` did not).
+    if exc.name != "qubit_bootstrap":
+        raise  # the bootstrap exists but cannot load: skipping it would skip PM activation
 else:
     # Stop a ``utils/``/``proxy/``/``ui/`` package in the launch cwd from shadowing Qubit modules.
     qubit_bootstrap.harden_import_path()
+
+# `hermes-acp` runs without qubit_cli.main: repair a `qubit update` killed mid-pull here, before
+# importing anything else from the checkout (a no-op under `qubit acp`, which already did).
+from qubit_cli import _early_recovery
+
+if _early_recovery.restore_interrupted_pull():
+    _early_recovery.relaunch_after_restore()
 
 import argparse
 import asyncio
@@ -91,34 +98,32 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--setup", action="store_true",
                         help="Run interactive Qubit provider/model setup for ACP terminal auth")
     parser.add_argument("--setup-browser", action="store_true",
-                        help="Install agent-browser + Playwright Chromium into ~/.hermes/node/ "
-                             "for browser tool support. Idempotent.")
+                        help="Prepare PM's pinned browser tools and Chromium.")
     parser.add_argument("--yes", "-y", action="store_true", dest="assume_yes",
-                        help="Accept all prompts (currently used by --setup-browser to skip the "
-                             "~400 MB Chromium download confirmation).")
+                        help="Accept setup prompts.")
     return parser.parse_args(argv)
 
 
 def _print_version() -> None:
-    from qubit_cli import __version__ as qubit_version
+    from qubit_cli.version_info import get_version_info
 
-    print(qubit_version)
+    print(get_version_info().derived_version)
 
 
 def _run_check() -> None:
     import acp  # noqa: F401
-    from acp_adapter.server import QubitACPAgent  # noqa: F401
+    from acp_adapter.server import HermesACPAgent  # noqa: F401
 
     print("Qubit ACP check OK")
 
 
 def _run_setup() -> None:
-    from qubit_cli.main import main as qubit_main
+    from qubit_cli.main import main as hermes_main
 
     old_argv = sys.argv[:]
     try:
         sys.argv = [old_argv[0] if old_argv else "hermes", "model"]
-        qubit_main()
+        hermes_main()
     finally:
         sys.argv = old_argv
 
@@ -127,34 +132,32 @@ def _run_setup() -> None:
     if not sys.stdin.isatty():
         return
     try:
-        reply = input("\nInstall browser tools? Downloads agent-browser (npm) and "
-                      "optionally Playwright Chromium (~400 MB). [y/N] ").strip().lower()
+        reply = input("\nInstall browser tools? Downloads the pinned browser and "
+                      "Chromium through PM. [y/N] ").strip().lower()
     except (EOFError, KeyboardInterrupt):
         return
     if reply in {"y", "yes"}:
         _run_setup_browser(assume_yes=False)
 
 
-_SETUP_BROWSER_STEPS = (
-    ("node", "Node.js installation failed — cannot proceed with browser tools."),
-    ("browser", "Browser tools installation failed."),
-)
-
-
 def _run_setup_browser(assume_yes: bool = False) -> int:
-    """Bootstrap agent-browser + Chromium via dep_ensure -> install.{sh,ps1}
-    --ensure (shared with the runtime lazy installer). Returns 0 on success, 1 on failure."""
-    from qubit_cli.dep_ensure import ensure_dependency
+    """The setup command is an explicit request for PM's browser closure."""
+    import pm
 
     try:
-        for dep, failure_msg in _SETUP_BROWSER_STEPS:
-            if not ensure_dependency(dep, interactive=not assume_yes):
-                print(failure_msg, file=sys.stderr)
-                return 1
-        return 0
-    except OSError as exc:
-        print(f"Browser bootstrap failed: {exc}", file=sys.stderr)
+        pm.ensure("agent-browser", explicit=True)
+    except (pm.InstallError, OSError) as exc:
+        print(f"Browser setup failed: {exc}", file=sys.stderr)
         return 1
+    return 0
+
+
+def _warm_memory_provider_import(logger: logging.Logger) -> None:
+    """Import ``memory.provider``'s module + numpy (no provider instance) before the ACP threads start."""
+    from plugins.memory import import_memory_provider_module
+
+    if not import_memory_provider_module():
+        logger.debug("memory provider not warmed (none configured or import failed; agent init reports that)")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -179,8 +182,24 @@ def main(argv: list[str] | None = None) -> None:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
+    # One TLS authority: trust the OS store before any outbound call (bare
+    # requests/urllib included) resolves a CA bundle — see agent/ssl_verify.py.
+    # This console script bypasses qubit_cli.main, which does the same.
+    from agent.ssl_verify import install_truststore
+
+    install_truststore()
+
     import acp
-    from .server import QubitACPAgent
+    from .server import HermesACPAgent
+
+    # Windows: import the configured memory provider (and numpy) on the main thread before
+    # the MCP-discovery and ACP stdin-reader threads start (qubit_cli's ~150 ms
+    # plugin-discovery thread is the only one already running). A first-time
+    # native-extension import (numpy via holographic / mnemosyne / hindsight) racing another
+    # thread's import chain deadlocked in create_module and session/new never answered
+    # (#58083). After this the off-loop agent build finds the modules in sys.modules.
+    if sys.platform == "win32":
+        _warm_memory_provider_import(logger)
 
     # MCP discovery from config.yaml runs in a background daemon thread so the ACP server is
     # responsive immediately (blocking here cost 2-5 s); per-session MCP servers registered via
@@ -196,7 +215,7 @@ def main(argv: list[str] | None = None) -> None:
         except Exception:
             logger.debug("MCP tool discovery failed at ACP startup", exc_info=True)
 
-    agent = QubitACPAgent()
+    agent = HermesACPAgent()
     try:
         asyncio.run(acp.run_agent(agent, use_unstable_protocol=True))
     except KeyboardInterrupt:

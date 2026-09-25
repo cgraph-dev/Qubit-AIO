@@ -76,7 +76,7 @@ function previewSelectionLabel(): string {
   return source.split(/[\\/]/).filter(Boolean).pop() || target?.label?.trim() || ''
 }
 
-const QUBIT_PATHS_MIME = 'application/x-hermes-paths'
+const HERMES_PATHS_MIME = 'application/x-hermes-paths'
 
 function readEscapeSequence(data: string, index: number) {
   if (data.charCodeAt(index) !== 0x1b || index + 1 >= data.length) {
@@ -292,7 +292,7 @@ function withSurface(theme: ReturnType<typeof terminalTheme>) {
 }
 
 function transferHasDropCandidates(t: DataTransfer): boolean {
-  if (t.types?.includes(QUBIT_PATHS_MIME)) {
+  if (t.types?.includes(HERMES_PATHS_MIME)) {
     return true
   }
 
@@ -325,7 +325,7 @@ function collectDroppedPaths(t: DataTransfer): string[] {
   }
 
   try {
-    const raw = t.getData(QUBIT_PATHS_MIME)
+    const raw = t.getData(HERMES_PATHS_MIME)
 
     if (raw) {
       for (const entry of JSON.parse(raw) as { path?: unknown }[]) {
@@ -336,7 +336,7 @@ function collectDroppedPaths(t: DataTransfer): string[] {
     // Malformed in-app drag payload — fall through to OS files.
   }
 
-  const getPath = window.qubitDesktop?.getPathForFile
+  const getPath = window.hermesDesktop?.getPathForFile
 
   const addFile = (file: File | null) => {
     if (!file || !getPath) {
@@ -493,7 +493,7 @@ export function useTerminalSession({
   // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
     const host = hostRef.current
-    const terminalApi = window.qubitDesktop?.terminal
+    const terminalApi = window.hermesDesktop?.terminal
 
     if (!host || !terminalApi) {
       setStatus('closed')
@@ -837,7 +837,7 @@ export function useTerminalSession({
         return false
       }
       void (async () => {
-        const text = (await window.qubitDesktop?.readClipboard?.()) ?? ''
+        const text = (await window.hermesDesktop?.readClipboard?.()) ?? ''
 
         if (text) {
           hasSessionActivityRef.current = true
@@ -1064,7 +1064,7 @@ export function useTerminalSession({
       }
 
       hasSessionActivityRef.current = true
-      void window.qubitDesktop?.terminal?.write(sessionId, `${command}\r`)
+      void window.hermesDesktop?.terminal?.write(sessionId, `${command}\r`)
       $terminalInjection.set(null)
       termRef.current?.focus()
     })

@@ -101,14 +101,14 @@ def chaos_config(
 def write_chaos_home(root: Path, base_url: str, **cfg: Any) -> tuple[Path, Path]:
     """Create ``root/home`` (fake $HOME) and ``root/home/.hermes`` (QUBIT_HOME)."""
     home = root / "home"
-    hermes_home = home / ".hermes"
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "config.yaml").write_text(chaos_config(base_url, **cfg), encoding="utf-8")
-    (hermes_home / ".env").write_text("OPENAI_API_KEY=sk-fake-chaos\n", encoding="utf-8")
-    return home, hermes_home
+    qubit_home = home / ".hermes"
+    qubit_home.mkdir(parents=True, exist_ok=True)
+    (qubit_home / "config.yaml").write_text(chaos_config(base_url, **cfg), encoding="utf-8")
+    (qubit_home / ".env").write_text("OPENAI_API_KEY=sk-fake-chaos\n", encoding="utf-8")
+    return home, qubit_home
 
 
-def hermetic_env(home: Path, hermes_home: Path, tag: str) -> dict[str, str]:
+def hermetic_env(home: Path, qubit_home: Path, tag: str) -> dict[str, str]:
     """Child env: fake HOME/QUBIT_HOME, no real credentials, repo importable, and a
     tag every descendant inherits so the orphan scan can find it after reparenting."""
     env = {
@@ -121,7 +121,7 @@ def hermetic_env(home: Path, hermes_home: Path, tag: str) -> dict[str, str]:
     }
     env.update({
         "HOME": str(home),
-        "QUBIT_HOME": str(hermes_home),
+        "QUBIT_HOME": str(qubit_home),
         "OPENAI_API_KEY": "sk-fake-chaos",
         "PYTHONPATH": str(REPO_ROOT),
         "PYTHONUNBUFFERED": "1",

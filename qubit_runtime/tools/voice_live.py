@@ -115,7 +115,7 @@ def _resolve_credentials(live: Dict[str, Any]) -> tuple[str, str]:
     """``(api_key, base_url)`` — ``voice.gpt_live.api_key`` first, else the same OpenAI audio
     chain the STT/TTS providers use (``VOICE_TOOLS_OPENAI_KEY`` → ``OPENAI_API_KEY`` → pool).
 
-    The managed audio proxy does not carry ``/live/sessions``; this mode is direct-key only.
+    The Qubit-managed audio proxy does not carry ``/live/sessions``; this mode is direct-key only.
     """
     from tools.tool_backend_helpers import resolve_openai_audio_api_key
     api_key = str(live.get("api_key") or "").strip() or resolve_openai_audio_api_key()

@@ -32,7 +32,7 @@ DEFAULT_FETCH_TIMEOUT_SECONDS = 120.0
 DEFAULT_CLI_TIMEOUT_SECONDS = 30.0
 
 _SOURCE_ENVIRONMENT: ContextVar[Optional[MutableMapping[str, str]]]
-_SOURCE_ENVIRONMENT = ContextVar("qubit_secret_source_environment", default=None)
+_SOURCE_ENVIRONMENT = ContextVar("hermes_secret_source_environment", default=None)
 
 
 def set_source_environment(environ: MutableMapping[str, str]) -> Token:

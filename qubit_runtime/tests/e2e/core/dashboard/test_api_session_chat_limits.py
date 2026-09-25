@@ -43,7 +43,7 @@ def gateway(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Sandbox,
     sb = make_sandbox(root)
     gw = None
     try:
-        gw = GatewayApiServer(sb, sb.hermes_home, root / "gateway.log")
+        gw = GatewayApiServer(sb, sb.qubit_home, root / "gateway.log")
         yield sb, gw
     finally:
         if gw is not None:

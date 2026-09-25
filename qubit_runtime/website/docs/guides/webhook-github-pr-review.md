@@ -2,21 +2,21 @@
 sidebar_position: 11
 sidebar_label: "GitHub PR Reviews via Webhook"
 title: "Automated GitHub PR Comments with Webhooks"
-description: "Connect Qubit to GitHub so it automatically fetches PR diffs, reviews code changes, and posts comments — triggered by webhooks with no manual prompting"
+description: "Connect Hermes to GitHub so it automatically fetches PR diffs, reviews code changes, and posts comments — triggered by webhooks with no manual prompting"
 ---
 
 # Automated GitHub PR Comments with Webhooks
 
-This guide walks you through connecting Qubit Agent to GitHub so it automatically fetches a pull request's diff, analyzes the code changes, and posts a comment — triggered by a webhook event with no manual prompting.
+This guide walks you through connecting Hermes Agent to GitHub so it automatically fetches a pull request's diff, analyzes the code changes, and posts a comment — triggered by a webhook event with no manual prompting.
 
-When a PR is opened or updated, GitHub sends a webhook POST to your Qubit instance. Qubit runs the agent with a prompt that instructs it to retrieve the diff via the `gh` CLI, and the response is posted back to the PR thread.
+When a PR is opened or updated, GitHub sends a webhook POST to your Hermes instance. Hermes runs the agent with a prompt that instructs it to retrieve the diff via the `gh` CLI, and the response is posted back to the PR thread.
 
 :::tip Want a simpler setup without a public endpoint?
 If you don't have a public URL or just want to get started quickly, check out [Build a GitHub PR Review Agent](./github-pr-review-agent.md) — uses cron jobs to poll for PRs on a schedule, works behind NAT and firewalls.
 :::
 
 :::info Reference docs
-For the full webhook platform reference (all config options, delivery types, dynamic subscriptions, security model) see [Webhooks](/user-guide/messaging/webhooks).
+For the full webhook platform reference (all config options, delivery types, dynamic subscriptions, security model) see [Webhooks](../user-guide/messaging/webhooks.md).
 :::
 
 :::warning Prompt injection risk
@@ -27,9 +27,9 @@ Webhook payloads contain attacker-controlled data — PR titles, commit messages
 
 ## Prerequisites
 
-- Qubit Agent installed and running (`qubit gateway`)
+- Hermes Agent installed and running (`hermes gateway`)
 - [`gh` CLI](https://cli.github.com/) installed and authenticated on the gateway host (`gh auth login`)
-- A publicly reachable URL for your Qubit instance (see [Local testing with ngrok](#local-testing-with-ngrok) if running locally)
+- A publicly reachable URL for your Hermes instance (see [Local testing with ngrok](#local-testing-with-ngrok) if running locally)
 - Admin access to the GitHub repository (required to manage webhooks)
 
 ---
@@ -88,7 +88,7 @@ platforms:
 | `deliver_extra.pr_number` | Resolves to the PR number from the payload. |
 
 :::note The payload does not contain code
-The GitHub webhook payload includes PR metadata (title, description, branch names, URLs) but **not the diff**. The prompt above instructs the agent to run `gh pr diff` to fetch the actual changes. The default `hermes-webhook` toolset is deliberately constrained (web search/extract, vision, clarify — **no terminal**) because webhook payloads can carry untrusted content. To let this route run `gh`, add a per-route toolset grant: `toolsets: ["terminal", "web"]` on the route config — see [Per-route toolsets](/docs/user-guide/messaging/webhooks#per-route-toolsets).
+The GitHub webhook payload includes PR metadata (title, description, branch names, URLs) but **not the diff**. The prompt above instructs the agent to run `gh pr diff` to fetch the actual changes. The default `hermes-webhook` toolset is deliberately constrained (web search/extract, vision, clarify — **no terminal**) because webhook payloads can carry untrusted content. To let this route run `gh`, add a per-route toolset grant: `toolsets: ["terminal", "web"]` on the route config — see [Per-route toolsets](../user-guide/messaging/webhooks.md#per-route-toolsets).
 :::
 
 ---
@@ -96,7 +96,7 @@ The GitHub webhook payload includes PR metadata (title, description, branch name
 ## Step 2 — Start the gateway
 
 ```bash
-qubit gateway
+hermes gateway
 ```
 
 You should see:
@@ -130,19 +130,19 @@ GitHub will immediately send a `ping` event to confirm the connection. It is saf
 
 ## Step 4 — Open a test PR
 
-Create a branch, push a change, and open a PR. Within 30–90 seconds (depending on PR size and model), Qubit should post a review comment.
+Create a branch, push a change, and open a PR. Within 30–90 seconds (depending on PR size and model), Hermes should post a review comment.
 
 To follow the agent's progress in real time:
 
 ```bash
-tail -f "${QUBIT_HOME:-$HOME/.hermes}/logs/gateway.log"
+tail -f "${HERMES_HOME:-$HOME/.hermes}/logs/gateway.log"
 ```
 
 ---
 
 ## Local testing with ngrok
 
-If Qubit is running on your laptop, use [ngrok](https://ngrok.com/) to expose it:
+If Hermes is running on your laptop, use [ngrok](https://ngrok.com/) to expose it:
 
 ```bash
 ngrok http 8644
@@ -171,11 +171,11 @@ curl -s -X POST http://localhost:8644/webhooks/github-pr-review \
 
 Then watch the agent run:
 ```bash
-tail -f "${QUBIT_HOME:-$HOME/.hermes}/logs/gateway.log"
+tail -f "${HERMES_HOME:-$HOME/.hermes}/logs/gateway.log"
 ```
 
 :::note
-`qubit webhook test <name>` only works for **dynamic subscriptions** created with `qubit webhook subscribe`. It does not read routes from `config.yaml`.
+`hermes webhook test <name>` only works for **dynamic subscriptions** created with `hermes webhook subscribe`. It does not read routes from `config.yaml`.
 :::
 
 ---
@@ -204,7 +204,7 @@ For high-volume repositories, you can still filter upstream with a GitHub Action
 
 ## Using a skill for consistent review style
 
-Load a [Qubit skill](/user-guide/features/skills) to give the agent a consistent review persona. Add `skills` to your route inside `platforms.webhook.extra.routes` in `config.yaml`:
+Load a [Hermes skill](../user-guide/features/skills.md) to give the agent a consistent review persona. Add `skills` to your route inside `platforms.webhook.extra.routes` in `config.yaml`:
 
 ```yaml
 platforms:
@@ -234,7 +234,7 @@ platforms:
             pr_number: "{number}"
 ```
 
-> **Note:** Only the first skill in the list that is found is loaded. Qubit does not stack multiple skills — subsequent entries are ignored.
+> **Note:** Only the first skill in the list that is found is loaded. Hermes does not stack multiple skills — subsequent entries are ignored.
 
 ---
 
@@ -264,7 +264,7 @@ Valid `deliver` values: `log` · `github_comment` · `telegram` · `discord` · 
 
 ## GitLab support
 
-The same adapter works with GitLab. GitLab uses `X-Gitlab-Token` for authentication (plain string match, not HMAC) — Qubit handles both automatically.
+The same adapter works with GitLab. GitLab uses `X-Gitlab-Token` for authentication (plain string match, not HMAC) — Hermes handles both automatically.
 
 For event filtering, GitLab sets `X-GitLab-Event` to values like `Merge Request Hook`, `Push Hook`, `Pipeline Hook`. Use the exact header value in `events`:
 
@@ -273,7 +273,7 @@ events:
   - Merge Request Hook
 ```
 
-GitLab payload fields differ from GitHub's — e.g. `{object_attributes.title}` for the MR title and `{object_attributes.iid}` for the MR number. The easiest way to discover the full payload structure is GitLab's **Test** button in your webhook settings, combined with the **Recent Deliveries** log. Alternatively, omit `prompt` from your route config — Qubit will then pass the full payload as formatted JSON directly to the agent, and the agent's response (visible in the gateway log with `deliver: log`) will describe its structure.
+GitLab payload fields differ from GitHub's — e.g. `{object_attributes.title}` for the MR title and `{object_attributes.iid}` for the MR number. The easiest way to discover the full payload structure is GitLab's **Test** button in your webhook settings, combined with the **Recent Deliveries** log. Alternatively, omit `prompt` from your route config — Hermes will then pass the full payload as formatted JSON directly to the agent, and the agent's response (visible in the gateway log with `deliver: log`) will describe its structure.
 
 ---
 
@@ -331,6 +331,6 @@ platforms:
 ## What's Next?
 
 - **[Cron-Based PR Reviews](./github-pr-review-agent.md)** — poll for PRs on a schedule, no public endpoint needed
-- **[Webhook Reference](/user-guide/messaging/webhooks)** — full config reference for the webhook platform
-- **[Build a Plugin](/developer-guide/plugins)** — package review logic into a shareable plugin
-- **[Profiles](/user-guide/profiles)** — run a dedicated reviewer profile with its own memory and config
+- **[Webhook Reference](../user-guide/messaging/webhooks.md)** — full config reference for the webhook platform
+- **[Build a Plugin](../developer-guide/plugins/index.md)** — package review logic into a shareable plugin
+- **[Profiles](../user-guide/profiles.md)** — run a dedicated reviewer profile with its own memory and config

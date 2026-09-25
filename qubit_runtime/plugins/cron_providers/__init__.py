@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 _CRON_PLUGINS_DIR = Path(__file__).parent
 # Synthetic parent package for user-installed providers (keeps them out of the bundled namespace).
-_USER_NAMESPACE = "_hermes_user_cron"
+_USER_NAMESPACE = "_qubit_user_cron"
 
 
 def _is_cron_provider_dir(path: Path) -> bool:

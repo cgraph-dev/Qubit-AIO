@@ -27,7 +27,7 @@ approvals:
 def home(tmp_path, monkeypatch):
     from tui_gateway import server
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
-    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setattr(server, "_qubit_home", tmp_path)
     server._cfg_cache = server._cfg_sig = server._cfg_path = None
     (tmp_path / "config.yaml").write_text(_CONFIG, encoding="utf-8")
     yield tmp_path

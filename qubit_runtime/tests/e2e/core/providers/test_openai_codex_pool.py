@@ -181,7 +181,7 @@ def _env(tmp_path: Path, codex_url: str, token: FakeTokenServer, dead_port: int)
 
 
 def _auth(h: Home) -> dict[str, Any]:
-    return json.loads((h.hermes_home / "auth.json").read_text(encoding="utf-8"))
+    return json.loads((h.qubit_home / "auth.json").read_text(encoding="utf-8"))
 
 
 def _answer(run) -> str:

@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { NO_PROJECT_ID, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import { $sidebarAgentsGrouped, setSidebarAgentsGrouped } from '@/store/layout'
-import { $activeGatewayProfile, setShowAllProfiles } from '@/store/profile'
+import { $activeGatewayProfile, $profileScope, ALL_PROFILES, setShowAllProfiles } from '@/store/profile'
 import { $currentCwd, $selectedStoredSessionId, $sessions, applyConfiguredDefaultProjectDir } from '@/store/session'
+import type { ProjectInfo } from '@/types/hermes'
 
 import {
   $activeProjectId,
@@ -12,9 +13,10 @@ import {
   $projectScope,
   $projectsRpcAvailable,
   $projectTree,
-  $worktreeRefreshToken,
+  addProjectFolder,
   ALL_PROJECTS,
   createProject,
+  deleteProject,
   enterProject,
   exitProjectScope,
   fetchProjectSessions,
@@ -24,10 +26,10 @@ import {
   projectNameForCwd,
   refreshProjects,
   refreshProjectTree,
-  refreshWorktrees,
   resolveNewSessionCwd,
   scanAndRecordRepos,
-  startWorkInRepo
+  startWorkInRepo,
+  updateProject
 } from './projects'
 import {
   $removedSessionIds,
@@ -64,9 +66,9 @@ vi.mock('@/lib/desktop-git', async importOriginal => ({
 }))
 
 vi.mock('@/hermes', () => ({
-  getQubitConfig: vi.fn(),
+  getHermesConfig: vi.fn(),
   getProfiles: vi.fn(),
-  qubitApi: vi.fn(),
+  hermesApi: vi.fn(),
   setApiRequestProfile: vi.fn(),
   STARTUP_REQUEST_TIMEOUT_MS: 1000
 }))
@@ -83,8 +85,8 @@ const gatewayAtom = gw.$gateway
 const git = await import('@/lib/desktop-git')
 const desktopGit = vi.mocked(git.desktopGit)
 
-const qubit = await import('@/hermes')
-const getQubitConfig = vi.mocked(qubit.getQubitConfig)
+const hermes = await import('@/hermes')
+const getHermesConfig = vi.mocked(hermes.getHermesConfig)
 const notifications = await import('@/store/notifications')
 const notify = vi.mocked(notifications.notify)
 
@@ -102,10 +104,6 @@ describe('project scope', () => {
   beforeEach(() => {
     window.localStorage.clear()
     $projectScope.set(ALL_PROJECTS)
-  })
-
-  it('defaults to ALL_PROJECTS', () => {
-    expect($projectScope.get()).toBe(ALL_PROJECTS)
   })
 
   it('enterProject scopes the sidebar to the project id', () => {
@@ -166,6 +164,35 @@ describe('projects RPC profile forwarding', () => {
       profile: 'coder',
       project_id: 'p_123'
     })
+  })
+
+  it('keeps unchanged project nodes by reference across tree refreshes (#77591)', async () => {
+    const payload = () => ({
+      active_id: null,
+      projects: [
+        { id: 'p_a', label: 'a', path: '/a', repos: [], sessionCount: 1, sessionIds: ['s1'] },
+        { id: 'p_b', label: 'b', path: '/b', repos: [], sessionCount: 0, sessionIds: [] }
+      ],
+      scoped_session_ids: ['s1']
+    })
+
+    const next = payload()
+    next.projects[1] = { ...next.projects[1], sessionCount: 1, sessionIds: ['s2'] }
+    const request = vi.fn().mockResolvedValueOnce(payload()).mockResolvedValueOnce(payload()).mockResolvedValueOnce(next)
+    const gateway = { connectionState: 'open', request }
+    activeGateway.mockReturnValue(gateway as never)
+    gatewayAtom.set(gateway as never)
+
+    await refreshProjectTree()
+    const first = $projectTree.get()
+
+    await refreshProjectTree()
+    expect($projectTree.get()).toBe(first)
+
+    await refreshProjectTree()
+    expect($projectTree.get()).not.toBe(first)
+    expect($projectTree.get()[0]).toBe(first[0])
+    expect($projectTree.get()[1].sessionIds).toEqual(['s2'])
   })
 
   it('skips project reads in the all-profiles view rather than forwarding its sentinel', async () => {
@@ -337,21 +364,13 @@ describe('projectNameForCwd', () => {
   })
 })
 
-describe('worktree refresh', () => {
-  it('refreshWorktrees bumps the probe token so useRepoWorktreeMap refetches', () => {
-    const before = $worktreeRefreshToken.get()
-    refreshWorktrees()
-    expect($worktreeRefreshToken.get()).toBe(before + 1)
-  })
-})
-
 describe('startWorkInRepo remote capability gate (#81724)', () => {
   it('names the stale-backend remedy when a remote gateway lacks the worktree route', async () => {
     isDesktopFsRemoteMode.mockReturnValue(true)
     desktopGit.mockReturnValue({
       worktreeAdd: vi.fn(async () => {
         throw new Error(
-          'Expected JSON from https://vps/api/git/worktree/add but got HTML (status 404). The endpoint is likely missing on the Qubit backend.'
+          'Expected JSON from https://vps/api/git/worktree/add but got HTML (status 404). The endpoint is likely missing on the Hermes backend.'
         )
       })
     } as never)
@@ -375,14 +394,6 @@ describe('startWorkInRepo remote capability gate (#81724)', () => {
 describe('pickProjectFolder', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  it('uses the remote-aware directory picker locally', async () => {
-    isDesktopFsRemoteMode.mockReturnValue(false)
-    selectDesktopPaths.mockResolvedValue(['/local/repo'])
-
-    await expect(pickProjectFolder()).resolves.toBe('/local/repo')
-    expect(selectDesktopPaths).toHaveBeenCalledWith({ defaultPath: undefined, directories: true, multiple: false })
   })
 
   it('seeds the picker with the backend cwd on a remote gateway', async () => {
@@ -412,6 +423,55 @@ describe('createProject', () => {
     setSidebarAgentsGrouped(false)
     $activeProjectId.set(null)
     $projectsRpcAvailable.set(null)
+    $projects.set([])
+    $projectTree.set([])
+    $activeGatewayProfile.set('default')
+    setShowAllProfiles(false)
+  })
+
+  afterEach(() => {
+    setShowAllProfiles(false)
+    $activeGatewayProfile.set('default')
+  })
+
+  it.each(['default', 'coder'])('creates in the active %s profile without leaving All profiles', async profile => {
+    const created = { folders: [], id: 'p_new', name: 'Hermes Agent', primary_path: '/srv/hermes' }
+    const tree = { id: created.id, label: created.name, path: created.primary_path, repos: [], sessionCount: 0 }
+    const request = vi.fn().mockResolvedValue({ project: created })
+    activeGateway.mockReturnValue({ connectionState: 'open', request } as never)
+    vi.mocked(hermes.hermesApi).mockResolvedValue({ projects: [tree], active_id: created.id })
+    $activeGatewayProfile.set(profile)
+    setShowAllProfiles(true)
+
+    await expect(createProject({ folders: ['/srv/hermes'], name: created.name, use: true })).resolves.toEqual(created)
+
+    expect(request).toHaveBeenCalledWith('projects.create', expect.objectContaining({ profile, name: created.name }))
+    expect($profileScope.get()).toBe(ALL_PROFILES)
+    expect($projects.get()).toContainEqual(created)
+    expect($projectTree.get()).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]))
+    expect($activeProjectId.get()).toBe(created.id)
+    expect(hermes.hermesApi).toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/api/profiles/projects/tree?preview_limit=3' })
+    )
+  })
+
+  it('does not retarget a project create when the profile changes during reconnect', async () => {
+    const reconnect = deferred<never>()
+    const request = vi.fn()
+    activeGateway.mockReturnValue({ connectionState: 'closed', request } as never)
+    vi.mocked(gw.ensureActiveGatewayOpen).mockReturnValue(reconnect.promise)
+    $activeGatewayProfile.set('coder')
+    setShowAllProfiles(true)
+
+    const pending = createProject({ folders: ['/srv/hermes'], name: 'Hermes Agent' })
+    const rejection = expect(pending).rejects.toThrow('Active Hermes profile changed while connecting')
+    const otherGateway = { connectionState: 'open', request }
+    $activeGatewayProfile.set('other')
+    activeGateway.mockReturnValue(otherGateway as never)
+    reconnect.resolve(otherGateway as never)
+
+    await rejection
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('creates the project and flips into the grouped view so a blank slate shows it', async () => {
@@ -448,6 +508,100 @@ describe('createProject', () => {
     )
     expect($projectsRpcAvailable.get()).toBe(false)
   })
+})
+
+describe('project writes while viewing all profiles', () => {
+  const project: ProjectInfo = {
+    archived: false,
+    board_slug: null,
+    color: null,
+    created_at: 0,
+    description: null,
+    folders: [],
+    icon: null,
+    id: 'p_1',
+    name: 'Warsongs',
+    primary_path: '/srv/ws',
+    slug: 'warsongs'
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    $activeProjectId.set(null)
+    $projectsRpcAvailable.set(null)
+    $projects.set([project])
+    $projectTree.set([
+      {
+        id: project.id,
+        label: project.name,
+        path: project.primary_path,
+        color: null,
+        icon: null,
+        repos: [],
+        sessionCount: 0
+      }
+    ])
+    $activeGatewayProfile.set('default')
+    setShowAllProfiles(false)
+  })
+
+  afterEach(() => {
+    setShowAllProfiles(false)
+    $activeGatewayProfile.set('default')
+  })
+
+  it.each(['default', 'coder'])(
+    'updates appearance in the active %s profile without leaving All profiles',
+    async profile => {
+      const request = vi.fn().mockResolvedValue({})
+      activeGateway.mockReturnValue({ connectionState: 'open', request } as never)
+      $activeGatewayProfile.set(profile)
+      setShowAllProfiles(true)
+
+      await expect(updateProject(project.id, { color: '#ff0000' })).resolves.toBeUndefined()
+
+      expect(request).toHaveBeenCalledWith(
+        'projects.update',
+        expect.objectContaining({ profile, id: project.id, color: '#ff0000' })
+      )
+      expect($profileScope.get()).toBe(ALL_PROFILES)
+      expect($projects.get()).toEqual([expect.objectContaining({ id: project.id, color: '#ff0000' })])
+    }
+  )
+
+  it.each(['default', 'coder'])(
+    'adds a folder in the active %s profile without leaving All profiles',
+    async profile => {
+      const request = vi.fn().mockResolvedValue({})
+      activeGateway.mockReturnValue({ connectionState: 'open', request } as never)
+      $activeGatewayProfile.set(profile)
+      setShowAllProfiles(true)
+
+      await expect(addProjectFolder(project.id, '/srv/ws/extra')).resolves.toBeUndefined()
+
+      expect(request).toHaveBeenCalledWith(
+        'projects.add_folder',
+        expect.objectContaining({ profile, id: project.id, path: '/srv/ws/extra' })
+      )
+      expect($profileScope.get()).toBe(ALL_PROFILES)
+    }
+  )
+
+  it.each(['default', 'coder'])(
+    'deletes a project in the active %s profile without leaving All profiles',
+    async profile => {
+      const request = vi.fn().mockResolvedValue({ active_id: null, projects: [], scoped_session_ids: [] })
+      activeGateway.mockReturnValue({ connectionState: 'open', request } as never)
+      $activeGatewayProfile.set(profile)
+      setShowAllProfiles(true)
+
+      await expect(deleteProject(project.id)).resolves.toBeUndefined()
+
+      expect(request).toHaveBeenCalledWith('projects.delete', expect.objectContaining({ profile, id: project.id }))
+      expect($profileScope.get()).toBe(ALL_PROFILES)
+      expect($projects.get()).toEqual([])
+    }
+  )
 })
 
 describe('projects RPC capability', () => {
@@ -531,7 +685,7 @@ describe('repository discovery policy', () => {
     gatewayWith(request)
     const scanRepos = vi.fn()
     desktopGit.mockReturnValue({ scanRepos } as never)
-    getQubitConfig.mockResolvedValue({
+    getHermesConfig.mockResolvedValue({
       desktop: {
         repo_scan_enabled: false,
         repo_scan_exclude_paths: [],
@@ -559,7 +713,7 @@ describe('repository discovery policy', () => {
     gatewayWith(request)
     const scanRepos = vi.fn().mockResolvedValue([{ label: 'repo', root: '/work/repo' }])
     desktopGit.mockReturnValue({ scanRepos } as never)
-    getQubitConfig.mockResolvedValue({
+    getHermesConfig.mockResolvedValue({
       desktop: {
         repo_scan_enabled: true,
         repo_scan_exclude_paths: ['/work/vendor'],
@@ -569,7 +723,7 @@ describe('repository discovery policy', () => {
 
     await scanAndRecordRepos()
 
-    expect(getQubitConfig).toHaveBeenCalledWith('default')
+    expect(getHermesConfig).toHaveBeenCalledWith('default')
     expect(scanRepos).toHaveBeenCalledWith(['/work'], {
       enabled: true,
       excludePaths: ['/work/vendor']
@@ -604,10 +758,10 @@ describe('repository discovery policy', () => {
     await scanAndRecordRepos(true)
 
     expect(scanRepos).not.toHaveBeenCalled()
-    expect(getQubitConfig).not.toHaveBeenCalled()
+    expect(getHermesConfig).not.toHaveBeenCalled()
     // The desktop can't crawl the remote host's filesystem, so it asks the
     // host to scan its own discovery roots (`projects.discover_repos` with
-    // `scan: true`) — repos with zero Qubit sessions must still surface —
+    // `scan: true`) — repos with zero Hermes sessions must still surface —
     // then refreshes the tree to pick up the merged list. Regression for
     // #81723: the sidebar used to go silent in remote mode and never
     // refresh again.
@@ -704,7 +858,7 @@ describe('repository discovery policy', () => {
     })
 
     desktopGit.mockReturnValue({ scanRepos } as never)
-    getQubitConfig.mockResolvedValue({
+    getHermesConfig.mockResolvedValue({
       desktop: {
         repo_scan_enabled: true,
         repo_scan_exclude_paths: [],

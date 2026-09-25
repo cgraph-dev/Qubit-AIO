@@ -1,4 +1,4 @@
-import type * as QubitSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@hermes/plugin-sdk'
 import { atom } from 'nanostores'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -20,7 +20,7 @@ const request = vi.fn(async (method: string) =>
 )
 
 vi.mock('@hermes/plugin-sdk', async importOriginal => {
-  const sdk = await importOriginal<typeof QubitSdk>()
+  const sdk = await importOriginal<typeof HermesSdk>()
 
   return {
     ...sdk,

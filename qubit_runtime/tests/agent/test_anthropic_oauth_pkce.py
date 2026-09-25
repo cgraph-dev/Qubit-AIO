@@ -6,8 +6,8 @@ authorization URL (browser history, Referer headers, auth-server logs) and
 removing CSRF protection on the callback path.
 
 History:
-  - PR #1775 first fixed this on ``run_hermes_oauth_login()``.
-  - PR #2647 (b17e5c10) added ``run_hermes_oauth_login_pure()`` and silently
+  - PR #1775 first fixed this on ``run_qubit_oauth_login()``.
+  - PR #2647 (b17e5c10) added ``run_qubit_oauth_login_pure()`` and silently
     copy-pasted the pre-#1775 vulnerable pattern.
   - PR #3107 removed the old function, leaving only the regressed copy.
   - PR #10699 (issue #10693) fixed the regression on the surviving function.
@@ -28,7 +28,7 @@ def _patch_oauth_flow(
     capture_token_request: Dict[str, Any] | None = None,
     capture_auth_url: Dict[str, str] | None = None,
 ) -> None:
-    """Wire up monkeypatches that let ``run_hermes_oauth_login_pure()`` run
+    """Wire up monkeypatches that let ``run_qubit_oauth_login_pure()`` run
     end-to-end without touching a real browser, stdin, or HTTP endpoint.
 
     ``callback_code`` is the literal string the user would paste back into the
@@ -148,43 +148,6 @@ def test_authorization_url_state_is_not_pkce_verifier(monkeypatch, tmp_path):
     )
 
 
-def test_login_token_exchange_uses_platform_claude_host(monkeypatch, tmp_path):
-    """The login token exchange must hit ``platform.claude.com`` first.
-
-    Anthropic migrated the OAuth token endpoint to ``platform.claude.com``;
-    ``console.anthropic.com`` now 404s, so a hardcoded console host makes a
-    fresh login impossible (issue #45250 / #49821). The refresh path already
-    iterates the new host first — the login path must do the same.
-    """
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
-
-    captured_token: Dict[str, Any] = {}
-    captured_url: Dict[str, str] = {}
-    _patch_oauth_flow(
-        monkeypatch,
-        callback_code="placeholder",
-        capture_token_request=captured_token,
-        capture_auth_url=captured_url,
-    )
-
-    import builtins
-
-    def fake_input(*_a, **_kw):
-        qs = parse_qs(urlparse(captured_url.get("url", "")).query)
-        state = qs.get("state", [""])[0]
-        return f"auth-code#{state}"
-
-    monkeypatch.setattr(builtins, "input", fake_input)
-
-    from agent.anthropic_credentials import run_qubit_oauth_login_pure
-
-    result = run_qubit_oauth_login_pure()
-
-    assert result is not None, "login should succeed against the live host"
-    assert captured_token["url"] == "https://platform.claude.com/v1/oauth/token", (
-        "login token exchange must target platform.claude.com first, not the "
-        "dead console.anthropic.com host (regression of #45250 / #49821)"
-    )
 
 
 

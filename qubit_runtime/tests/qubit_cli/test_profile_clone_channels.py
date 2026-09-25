@@ -1,4 +1,4 @@
-"""``qubit profile create --clone`` leaves messaging channels behind (``qubit_cli.profile_channels``).
+"""``hermes profile create --clone`` leaves messaging channels behind (``qubit_cli.profile_channels``).
 
 Invariant, not snapshot: the clone's credential fingerprint set — computed by the gateway's own
 ``_adapter_credential_fingerprint`` through the migrate preflight — is DISJOINT from the source's,
@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import yaml
+import qubit_yaml as yaml
 
 import qubit_constants
 from qubit_cli import gateway_migrate as gm
@@ -49,7 +49,7 @@ def home(tmp_path, monkeypatch):
     root.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(root))
-    monkeypatch.setattr(qubit_constants, "_default_hermes_root_memo", None)
+    monkeypatch.setattr(qubit_constants, "_default_qubit_root_memo", None)
     for name in ("TELEGRAM_BOT_TOKEN", "DISCORD_BOT_TOKEN", "API_SERVER_KEY", "WHATSAPP_ENABLED",
                  "GATEWAY_MULTIPLEX_PROFILES", "TELEGRAM_ALLOWED_USERS"):
         monkeypatch.delenv(name, raising=False)

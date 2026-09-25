@@ -1,4 +1,4 @@
-export interface QubitNotification {
+export interface HermesNotification {
   title?: string
   body?: string
   silent?: boolean

@@ -259,14 +259,14 @@ class Cell:
     def __init__(self, tmp_path: Path):
         self.root = tmp_path
         self.home = tmp_path / "home"
-        self.hermes_home = self.home / ".hermes"
-        self.hermes_home.mkdir(parents=True)
-        (self.hermes_home / "config.yaml").write_text(
+        self.qubit_home = self.home / ".hermes"
+        self.qubit_home.mkdir(parents=True)
+        (self.qubit_home / "config.yaml").write_text(
             "gateway:\n  delivery_ledger: true\n", encoding="utf-8"
         )
         self.journal = tmp_path / "transport.jsonl"
         self.ids_file = tmp_path / "ids.json"
-        self.db_path = self.hermes_home / "state.db"
+        self.db_path = self.qubit_home / "state.db"
         (tmp_path / "tmp").mkdir()
         self._boots = 0
 
@@ -278,7 +278,7 @@ class Cell:
             "PYTHONPATH": f"{REPO_ROOT}{os.pathsep}{inherited}" if inherited else str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1",
             "HOME": str(self.home),
-            "QUBIT_HOME": str(self.hermes_home),
+            "QUBIT_HOME": str(self.qubit_home),
             "TMPDIR": str(self.root / "tmp"),
             # HOME/.hermes IS the temp home here, so the live-system guard would
             # read it as production; bypass it in the CHILD only.

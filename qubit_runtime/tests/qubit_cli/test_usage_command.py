@@ -1,4 +1,4 @@
-"""``qubit usage`` — the non-interactive /usage surface (issue #33094).
+"""``hermes usage`` — the non-interactive /usage surface (issue #33094).
 
 Drives the real ``hermes`` argparse entrypoint; only the network fetch is replaced with a snapshot
 (``agent.account_usage.fetch_account_usage`` is what ``cmd_usage`` reads at call time).
@@ -26,7 +26,7 @@ _SNAPSHOT = AccountUsageSnapshot(
 def _run(argv, fetch):
     with patch.object(hermes_main, "_plugin_cli_discovery_needed", return_value=False), \
          patch("agent.account_usage.fetch_account_usage", fetch), \
-         patch.object(sys, "argv", ["qubit", *argv]):
+         patch.object(sys, "argv", ["hermes", *argv]):
         try:
             hermes_main.main()
         except SystemExit as exc:
@@ -34,7 +34,7 @@ def _run(argv, fetch):
     return 0
 
 
-def test_hermes_usage_json_is_one_stable_document(capsys):
+def test_qubit_usage_json_is_one_stable_document(capsys):
     calls = []
 
     def fetch(provider, **kwargs):
@@ -55,7 +55,7 @@ def test_hermes_usage_json_is_one_stable_document(capsys):
     assert set(doc) == {"provider", "source", "title", "plan", "fetched_at", "windows", "details", "unavailable_reason"}
 
 
-def test_hermes_usage_without_credential_exits_nonzero_with_one_stderr_line(capsys):
+def test_qubit_usage_without_credential_exits_nonzero_with_one_stderr_line(capsys):
     # fetch_account_usage returns None when no credential resolves (or the fetch fails) — script-friendly failure.
     assert _run(["usage", "--json", "--provider", "openai-codex"], lambda provider, **kw: None) == 1
     out, err = capsys.readouterr()

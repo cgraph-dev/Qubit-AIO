@@ -68,7 +68,7 @@ def _assert_reset_kept_local_commit(checkout, local_sha, output):
     assert dropped == [local_sha]
 
 
-def test_hermes_update_keeps_local_commit_behind_a_rescue_ref(
+def test_qubit_update_keeps_local_commit_behind_a_rescue_ref(
         diverged_checkout, monkeypatch, capsys):
     """The real apply path: ff-only fails, the reconcile resets, the local commit stays reachable."""
     checkout, local_sha = diverged_checkout

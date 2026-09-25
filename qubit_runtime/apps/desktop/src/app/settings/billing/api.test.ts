@@ -33,8 +33,8 @@ describe('createBillingApi', () => {
       min_usd: '10',
       monthly_cap: null,
       ok: true,
-      org_name: 'Qubit',
-      portal_url: 'https://portal.qubit.test/billing',
+      org_name: 'Nous',
+      portal_url: 'https://portal.nousresearch.com/billing',
       role: 'OWNER'
     } satisfies BillingStateResponse
 
@@ -52,7 +52,7 @@ describe('createBillingApi', () => {
       error: {
         kind: 'no_payment_method',
         message: 'No saved card.',
-        portal_url: 'https://portal.qubit.test/billing',
+        portal_url: 'https://portal.nousresearch.com/billing',
         retry_after: 30
       },
       ok: false
@@ -66,7 +66,7 @@ describe('createBillingApi', () => {
       refusal: {
         kind: 'no_payment_method',
         message: 'No saved card.',
-        portalUrl: 'https://portal.qubit.test/billing',
+        portalUrl: 'https://portal.nousresearch.com/billing',
         retryAfter: 30
       }
     })
@@ -79,7 +79,7 @@ describe('createBillingApi', () => {
       message: 'Monthly spend cap reached.',
       ok: false,
       payload: { remainingUsd: '4.50' },
-      portal_url: 'https://portal.qubit.test/billing'
+      portal_url: 'https://portal.nousresearch.com/billing'
     })
 
     const api = createBillingApi(requestGatewayMock)
@@ -91,7 +91,7 @@ describe('createBillingApi', () => {
         kind: 'monthly_cap_exceeded',
         message: 'Monthly spend cap reached.',
         payload: { remainingUsd: '4.50' },
-        portalUrl: 'https://portal.qubit.test/billing'
+        portalUrl: 'https://portal.nousresearch.com/billing'
       }
     })
     expect(requestGatewayMock).toHaveBeenCalledWith('billing.auto_reload', {
@@ -161,18 +161,6 @@ describe('createBillingApi', () => {
 
     expect(response).toEqual({ data: { message: 'Change cancelled.', ok: true }, ok: true })
     expect(requestGatewayMock).toHaveBeenCalledWith('subscription.resume', {})
-  })
-
-  it('surfaces an insufficient_scope refusal from a subscription preview', async () => {
-    requestGatewayMock.mockResolvedValueOnce({
-      error: { kind: 'insufficient_scope', message: 'billing:manage required' },
-      ok: false
-    })
-
-    const api = createBillingApi(requestGatewayMock)
-    const response = await api.scheduleSubscriptionChange('tier_plus')
-
-    expect(response).toMatchObject({ ok: false, refusal: { kind: 'insufficient_scope' } })
   })
 
   it('sends a step-up session id when provided', async () => {

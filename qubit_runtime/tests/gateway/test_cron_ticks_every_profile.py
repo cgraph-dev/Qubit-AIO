@@ -38,17 +38,17 @@ class _CapturedTicker:
 def isolated_profiles(tmp_path, monkeypatch):
     """A scratch HOME so profile enumeration can never read or write the live install."""
     fake_home = tmp_path / "fakehome"
-    hermes_home = fake_home / ".hermes"
-    (hermes_home / "profiles" / "secondary").mkdir(parents=True)
+    qubit_home = fake_home / ".hermes"
+    (qubit_home / "profiles" / "secondary").mkdir(parents=True)
     # A dir is only a profile once it carries an identity marker.
-    (hermes_home / "profiles" / "secondary" / "config.yaml").write_text("{}\n")
+    (qubit_home / "profiles" / "secondary" / "config.yaml").write_text("{}\n")
     monkeypatch.setenv("HOME", str(fake_home))
     monkeypatch.setenv("USERPROFILE", str(fake_home))
-    monkeypatch.setenv("QUBIT_HOME", str(hermes_home))
+    monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     from qubit_cli import profiles as profiles_mod
 
     assert str(profiles_mod._get_profiles_root()).startswith(str(tmp_path))
-    return hermes_home
+    return qubit_home
 
 
 def test_secondary_profile_is_ticked_with_multiplex_profiles_off(

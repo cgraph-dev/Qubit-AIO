@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate llms.txt and llms-full.txt for the Qubit docs site.
+"""Generate llms.txt and llms-full.txt for the Hermes docs site.
 
 Outputs:
   website/static/llms.txt        — index of the docs, one link per page, grouped by
@@ -14,7 +14,7 @@ gets indexed, under the section its path belongs to. That distinction is the
 reason this file was rewritten — when the section list also decided membership,
 it silently drifted to 53% coverage, and Bot Mode, the desktop app, computer
 use, web search, and 22 messaging platforms were absent from the index every
-LLM reads to learn what Qubit does.
+LLM reads to learn what Hermes does.
 
 Both publish at:
   https://hermes-agent.nousresearch.com/docs/llms.txt
@@ -52,10 +52,9 @@ SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
         ("getting-started/quickstart", "Quickstart", None),
         ("getting-started/learning-path", "Learning Path", None),
         ("getting-started/updating", "Updating", None),
-        ("getting-started/termux", "Termux (Android)", None),
         ("getting-started/nix-setup", "Nix Setup", None),
     ]),
-    ("Using Qubit", [
+    ("Using Hermes", [
         ("user-guide/cli", "CLI", None),
         ("user-guide/tui", "TUI (Ink terminal UI)", None),
         ("user-guide/configuration", "Configuration", None),
@@ -127,10 +126,10 @@ SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
         ("guides/local-llm-on-mac", "Local LLMs on Mac", None),
         ("guides/daily-briefing-bot", "Daily Briefing Bot", None),
         ("guides/team-telegram-assistant", "Team Telegram Assistant", None),
-        ("guides/python-library", "Use Qubit as a Python Library", None),
-        ("guides/use-mcp-with-qubit", "Use MCP with Qubit", None),
-        ("guides/use-voice-mode-with-qubit", "Use Voice Mode with Qubit", None),
-        ("guides/use-soul-with-qubit", "Use SOUL.md with Qubit", None),
+        ("guides/python-library", "Use Hermes as a Python Library", None),
+        ("guides/use-mcp-with-hermes", "Use MCP with Hermes", None),
+        ("guides/use-voice-mode-with-hermes", "Use Voice Mode with Hermes", None),
+        ("guides/use-soul-with-hermes", "Use SOUL.md with Hermes", None),
         ("guides/automate-with-cron", "Automate with Cron", None),
         ("guides/work-with-skills", "Work with Skills", None),
         ("guides/delegation-patterns", "Delegation Patterns", None),
@@ -160,7 +159,7 @@ SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
         ("reference/toolsets-reference", "Toolsets Reference", None),
         ("reference/mcp-config-reference", "MCP Config Reference", None),
         ("reference/model-catalog", "Model Catalog", None),
-        ("reference/skills-catalog", "Bundled Skills Catalog", "Table of all ~90 skills bundled with Qubit"),
+        ("reference/skills-catalog", "Bundled Skills Catalog", "Table of all ~90 skills bundled with Hermes"),
         ("reference/optional-skills-catalog", "Optional Skills Catalog", "Table of ~60 additional installable skills"),
         ("reference/faq", "FAQ & Troubleshooting", None),
     ]),
@@ -181,7 +180,7 @@ ABSORB: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Getting Started", ("getting-started",)),
     ("Messaging Platforms", ("user-guide/messaging",)),
     ("Core Features", ("user-guide/features",)),
-    ("Using Qubit", ("user-guide",)),
+    ("Using Hermes", ("user-guide",)),
     ("Integrations", ("integrations",)),
     ("Guides & Tutorials", ("guides",)),
     ("Developer Guide", ("developer-guide",)),
@@ -226,7 +225,7 @@ def slug_for(path: Path) -> str:
     rel = path.relative_to(DOCS).with_suffix("")
     if rel.name == "index":
         rel = rel.parent
-    return "" if str(rel) == "." else str(rel)
+    return "" if str(rel) == "." else rel.as_posix()
 
 
 def doc_path(slug: str) -> Path | None:
@@ -293,22 +292,22 @@ def emit_llms_index() -> str:
             absorbed.setdefault(section_for(slug), []).append(slug)
 
     lines: list[str] = []
-    lines.append("# Qubit Agent")
+    lines.append("# Hermes Agent")
     lines.append("")
     lines.append(
-        "> The self-improving AI agent built by Qubit Labs. A terminal-native "
+        "> The self-improving AI agent built by Nous Research. A terminal-native "
         "autonomous coding and task agent with persistent memory, agent-created skills, "
         "and a messaging gateway that lives on 21+ messaging platforms — 19 native to "
         "the gateway plus IRC and Microsoft Teams via plugins (Telegram, Discord, Slack, "
         "SMS, Matrix, ...). Runs on local, Docker, SSH, Daytona, Modal, or Singularity "
-        "backends. Works with Qubit Labs, OpenRouter, OpenAI, Anthropic, Google, or any "
+        "backends. Works with Nous Portal, OpenRouter, OpenAI, Anthropic, Google, or any "
         "OpenAI-compatible endpoint."
     )
     lines.append("")
     lines.append(
         "Install: `curl -fsSL https://raw.githubusercontent.com/NousResearch/"
         "hermes-agent/main/scripts/install.sh | bash`  "
-        "(Linux, macOS, WSL2, Termux)"
+        "(Linux, macOS, WSL2)"
     )
     lines.append("")
     lines.append("Repo: https://github.com/NousResearch/hermes-agent")
@@ -338,11 +337,11 @@ def emit_llms_full() -> str:
     """Concatenate every doc under website/docs/ into a single markdown file."""
     seen: set[Path] = set()
     chunks: list[str] = [
-        "# Qubit Agent — Full Documentation\n",
+        "# Hermes Agent — Full Documentation\n",
         (
-            "This file is the entire Qubit Agent documentation concatenated for LLM "
+            "This file is the entire Hermes Agent documentation concatenated for LLM "
             "context ingestion. Section order reflects docs-site navigation: Getting "
-            "Started, Using Qubit, Features, Messaging, Integrations, Guides, "
+            "Started, Using Hermes, Features, Messaging, Integrations, Guides, "
             "Developer Guide, Reference, then everything else.\n"
         ),
         "Canonical site: https://hermes-agent.nousresearch.com/docs\n",

@@ -120,8 +120,8 @@ export const ko: Translations = {
     starting: "시작 중",
     startedInBackground: "백그라운드에서 시작됨 — 진행 상황은 로그를 확인하세요",
     stopped: "중지됨",
-    updateQubit: "Qubit 업데이트",
-    updatingQubit: "Qubit 업데이트 중…",
+    updateHermes: "Qubit 업데이트",
+    updatingHermes: "Qubit 업데이트 중…",
     waitingForOutput: "출력 대기 중…",
   },
 
@@ -165,6 +165,10 @@ export const ko: Translations = {
     failedToDeleteSelected: "선택한 세션 삭제에 실패했습니다",
     resumeInChat: "채팅에서 다시 시작",
     newChat: "새 채팅",
+    workspace: "작업 공간",
+    workspaceDefault: "기본값",
+    workspaceRescan: "저장소 다시 검색",
+    workspaceCustom: "다른 경로…",
     previousPage: "이전 페이지",
     nextPage: "다음 페이지",
     roles: {
@@ -323,6 +327,8 @@ export const ko: Translations = {
     disableRuntime: "비활성화",
     enableAfterInstall: "설치 후 활성화",
     enableRuntime: "활성화",
+    toggleTakesEffectAfterRestart:
+      "저장됨 — 변경 사항을 적용하려면 게이트웨이를 다시 시작하세요.",
     forceReinstall: "강제 재설치 (기존 폴더를 먼저 삭제)",
     headline:
       "Qubit 플러그인을 검색, 설치, 활성화 및 업데이트합니다 (`qubit plugins` 동등).",
@@ -342,8 +348,8 @@ export const ko: Translations = {
     providersHint:
       "memory.provider (비어 있으면 = 내장)와 context.engine을 config.yaml에 기록합니다. 다음 세션부터 적용됩니다.",
     refreshDashboard: "대시보드 확장 재스캔",
-    removeConfirm: "$QUBIT_HOME/plugins/에서 이 플러그인을 제거하시겠습니까?",
-    removeHint: "$QUBIT_HOME/plugins 아래에 사용자가 설치한 플러그인만 제거할 수 있습니다.",
+    removeConfirm: "~/.hermes/plugins/에서 이 플러그인을 제거하시겠습니까?",
+    removeHint: "~/.hermes/plugins 아래에 사용자가 설치한 플러그인만 제거할 수 있습니다.",
     rescanHeading: "SPA 플러그인 레지스트리",
     rescanHint: "디스크에 파일을 추가한 후 재스캔하여 대시보드 사이드바가 새 매니페스트를 인식하도록 합니다.",
     runtimeHeading: "게이트웨이 런타임 (YAML 플러그인)",
@@ -365,7 +371,7 @@ export const ko: Translations = {
     all: "전체",
     categories: "카테고리",
     filters: "필터",
-    noSkills: "스킬을 찾을 수 없습니다. 스킬은 ~/.qubit/skills/ 에서 로드됩니다",
+    noSkills: "스킬을 찾을 수 없습니다. 스킬은 ~/.hermes/skills/ 에서 로드됩니다",
     noSkillsMatch: "검색이나 필터와 일치하는 스킬이 없습니다.",
     skillCount: "{count}개 스킬",
     resultCount: "{count}개 결과",
@@ -379,7 +385,7 @@ export const ko: Translations = {
   },
 
   config: {
-    configPath: "~/.qubit/config.yaml",
+    configPath: "~/.hermes/config.yaml",
     filters: "필터",
     sections: "섹션",
     exportConfig: "설정을 JSON으로 내보내기",
@@ -439,7 +445,7 @@ export const ko: Translations = {
     showValue: "실제 값 표시",
     hideValue: "값 숨기기",
     customTitle: "사용자 지정 키",
-    customHint: "Qubit이 인식하지 못하는, .env에 저장된 임의의 환경 변수입니다. 스킬, MCP 서버 또는 자체 도구를 위한 환경 변수를 주입하는 데 사용하세요.",
+    customHint: "Hermes가 인식하지 못하는, .env에 저장된 임의의 환경 변수입니다. 스킬, MCP 서버 또는 자체 도구를 위한 환경 변수를 주입하는 데 사용하세요.",
     customConfigured: "사용자 지정 키 {count}개 설정됨",
     addCustomKey: "사용자 지정 키 추가",
     customKeyName: "변수 이름",
@@ -523,7 +529,7 @@ export const ko: Translations = {
       highest_tier: "최고 등급",
       highest_tier_hint: "Copper → Silver → Gold → Diamond → Olympian",
       latest: "최근",
-      latest_hint_empty: "Qubit을 더 사용해 보세요",
+      latest_hint_empty: "Hermes를 더 사용해 보세요",
       none_yet: "아직 없음",
     },
     state: {
@@ -554,10 +560,10 @@ export const ko: Translations = {
       tiers_header: "등급",
       secret_header: "시크릿 업적",
       secret_body:
-        "시크릿은 정확한 트리거 조건을 숨깁니다. Qubit이 관련 신호를 감지하면 카드가 Discovered로 바뀌고 요건이 표시됩니다.",
+        "시크릿은 정확한 트리거 조건을 숨깁니다. Hermes가 관련 신호를 감지하면 카드가 Discovered로 바뀌고 요건이 표시됩니다.",
       scan_status_header: "스캔 상태",
       scan_status_body:
-        "Qubit은 로컬 기록을 한 번 스캔한 뒤 카드를 자동으로 표시합니다. 몇 초 걸리더라도 멈춘 것이 아닙니다.",
+        "Hermes는 로컬 기록을 한 번 스캔한 뒤 카드를 자동으로 표시합니다. 몇 초 걸리더라도 멈춘 것이 아닙니다.",
       what_scanned_header: "스캔 대상",
       what_scanned_body:
         "세션, 도구 호출, 모델 메타데이터, 오류, 업적 및 로컬 해제 상태입니다.",

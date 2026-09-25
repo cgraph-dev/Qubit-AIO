@@ -6,7 +6,7 @@ description: "安全模型、危险命令审批、用户授权、容器隔离及
 
 # 安全
 
-Qubit Agent 采用纵深防御安全模型。本页涵盖所有安全边界——从命令审批到容器隔离，再到消息平台上的用户授权。
+Hermes Agent 采用纵深防御安全模型。本页涵盖所有安全边界——从命令审批到容器隔离，再到消息平台上的用户授权。
 
 ## 概述
 
@@ -22,7 +22,7 @@ Qubit Agent 采用纵深防御安全模型。本页涵盖所有安全边界—�
 
 ## 危险命令审批
 
-在执行任何命令之前，Qubit 会将其与一份精心维护的危险模式列表进行比对。若匹配，用户必须明确批准。
+在执行任何命令之前，Hermes 会将其与一份精心维护的危险模式列表进行比对。若匹配，用户必须明确批准。
 
 ### 审批模式
 
@@ -48,7 +48,7 @@ approvals:
 
 YOLO 模式会绕过当前会话中**所有**危险命令审批提示。可通过以下三种方式激活：
 
-1. **CLI 标志**：使用 `qubit --yolo` 或 `qubit chat --yolo` 启动会话
+1. **CLI 标志**：使用 `hermes --yolo` 或 `hermes chat --yolo` 启动会话
 2. **斜杠命令**：在会话中输入 `/yolo` 以切换开/关
 3. **环境变量**：设置 `HERMES_YOLO_MODE=1`
 
@@ -64,7 +64,7 @@ YOLO 模式会绕过当前会话中**所有**危险命令审批提示。可通�
 
 YOLO 模式在 CLI 和 gateway 会话中均可使用。在内部，它会设置 `HERMES_YOLO_MODE` 环境变量，该变量在每次命令执行前都会被检查。
 
-当 YOLO 激活时，Qubit 会显示两个持久的视觉提醒，以确保用户不会忘记审批提示已被绕过：
+当 YOLO 激活时，Hermes 会显示两个持久的视觉提醒，以确保用户不会忘记审批提示已被绕过：
 
 - 当 YOLO 已激活时，会话开始时显示一条红色横幅：`⚠ YOLO mode — all approval prompts bypassed`。YOLO 关闭时隐藏，以保持默认横幅整洁。
 - 状态栏中所有宽度层级均显示 `⚠ YOLO` 片段，随着 YOLO 的切换实时更新（富文本渲染器和纯文本回退均支持）。
@@ -73,11 +73,11 @@ YOLO 模式在 CLI 和 gateway 会话中均可使用。在内部，它会设置 
 YOLO 模式会禁用会话中**所有**危险命令安全检查——**但硬性黑名单除外**（见下文）。仅在完全信任所生成命令的情况下使用（例如，在一次性环境中经过充分测试的自动化脚本）。
 :::
 
-对于破坏性会话斜杠命令（`/clear`、`/new` / `/reset`、`/undo`、`/exit --delete`），CLI 在执行前也会提示确认。参见[斜杠命令——破坏性命令的确认提示](../reference/slash-commands.md#confirmation-prompts-for-destructive-commands)。
+对于破坏性会话斜杠命令（`/clear`、`/new` / `/reset`、`/undo`、`/exit --delete`），CLI 在执行前也会提示确认。参见[斜杠命令——破坏性命令的确认提示](../reference/slash-commands.md#破坏性命令的确认提示)。
 
 ### 硬性黑名单（始终生效的底线）
 
-某些命令极具破坏性——不可逆的文件系统清除、fork 炸弹、直接写入块设备——无论以下任何情况，Qubit 都**拒绝**执行：
+某些命令极具破坏性——不可逆的文件系统清除、fork 炸弹、直接写入块设备——无论以下任何情况，Hermes 都**拒绝**执行：
 
 - `--yolo` / `/yolo` 已开启
 - `approvals.mode: off`
@@ -140,7 +140,7 @@ approvals:
 | `find -exec rm` / `find -delete` | find 配合破坏性操作 |
 | `cp`/`mv`/`install` 写入 `/etc/` | 复制/移动文件到系统配置目录 |
 | `sed -i` / `sed --in-place` 作用于 `/etc/` | 就地编辑系统配置 |
-| `pkill`/`killall` qubit/gateway | 防止自我终止 |
+| `pkill`/`killall` hermes/gateway | 防止自我终止 |
 | `gateway run` 配合 `&`/`disown`/`nohup`/`setsid` | 防止在服务管理器外启动 gateway |
 
 :::info
@@ -190,12 +190,12 @@ command_allowlist:
 这些模式在启动时加载，并在所有后续会话中静默批准。
 
 :::tip
-使用 `qubit config edit` 查看或删除永久允许列表中的模式。
+使用 `hermes config edit` 查看或删除永久允许列表中的模式。
 :::
 
 ## 用户授权（Gateway）
 
-运行消息 gateway 时，Qubit 通过分层授权系统控制谁可以与机器人交互。
+运行消息 gateway 时，Hermes 通过分层授权系统控制谁可以与机器人交互。
 
 ### 授权检查顺序
 
@@ -241,13 +241,13 @@ or configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id).
 
 ### DM 配对系统
 
-为实现更灵活的授权，Qubit 提供了基于验证码的配对系统。无需预先提供用户 ID，未知用户会收到一次性配对码，由机器人所有者通过 CLI 批准。
+为实现更灵活的授权，Hermes 提供了基于验证码的配对系统。无需预先提供用户 ID，未知用户会收到一次性配对码，由机器人所有者通过 CLI 批准。
 
 **工作原理：**
 
 1. 未知用户向机器人发送 DM
 2. 机器人回复一个 8 位配对码
-3. 机器人所有者在 CLI 上运行 `qubit pairing approve <platform> <code>`
+3. 机器人所有者在 CLI 上运行 `hermes pairing approve <platform> <code>`
 4. 该用户在该平台上获得永久批准
 
 在 `~/.hermes/config.yaml` 中控制未授权私信的处理方式：
@@ -280,16 +280,16 @@ whatsapp:
 
 ```bash
 # 列出待处理和已批准的用户
-qubit pairing list
+hermes pairing list
 
 # 批准配对码
-qubit pairing approve telegram ABC12DEF
+hermes pairing approve telegram ABC12DEF
 
 # 撤销用户访问权限
-qubit pairing revoke telegram 123456789
+hermes pairing revoke telegram 123456789
 
 # 清除所有待处理验证码
-qubit pairing clear-pending
+hermes pairing clear-pending
 ```
 
 **存储：** 配对数据存储于 `~/.hermes/pairing/`，按平台分为独立的 JSON 文件：
@@ -299,7 +299,7 @@ qubit pairing clear-pending
 
 ## 容器隔离
 
-使用 `docker` 终端后端时，Qubit 对每个容器应用严格的安全加固。
+使用 `docker` 终端后端时，Hermes 对每个容器应用严格的安全加固。
 
 ### Docker 安全标志
 
@@ -398,7 +398,7 @@ terminal:
 
 ### 凭据文件透传（OAuth token 等） {#credential-file-passthrough}
 
-某些技能需要在沙箱中访问**文件**（而非仅环境变量）——例如，Google Workspace 将 OAuth token 存储为活跃 profile 的 `QUBIT_HOME` 下的 `google_token.json`。技能在 frontmatter 中声明这些文件：
+某些技能需要在沙箱中访问**文件**（而非仅环境变量）——例如，Google Workspace 将 OAuth token 存储为活跃 profile 的 `HERMES_HOME` 下的 `google_token.json`。技能在 frontmatter 中声明这些文件：
 
 ```yaml
 required_credential_files:
@@ -408,7 +408,7 @@ required_credential_files:
     description: Google OAuth2 client credentials
 ```
 
-加载后，Qubit 会检查这些文件是否存在于活跃 profile 的 `QUBIT_HOME` 中，并将其注册为挂载：
+加载后，Hermes 会检查这些文件是否存在于活跃 profile 的 `HERMES_HOME` 中，并将其注册为挂载：
 
 - **Docker**：只读绑定挂载（`-v host:container:ro`）
 - **Modal**：在沙箱创建时挂载，并在每次命令前同步（处理会话中途的 OAuth 配置）
@@ -430,7 +430,7 @@ terminal:
 | 沙箱 | 默认过滤 | 透传覆盖 |
 |---------|---------------|---------------------|
 | **execute_code** | 阻止名称中包含 `KEY`、`TOKEN`、`SECRET`、`PASSWORD`、`CREDENTIAL`、`PASSWD`、`AUTH` 的变量；仅允许安全前缀变量通过 | ✅ 透传变量绕过两项检查 |
-| **terminal**（本地） | 阻止明确的 Qubit 基础设施变量（提供商密钥、gateway token、工具 API 密钥） | ✅ 透传变量绕过黑名单 |
+| **terminal**（本地） | 阻止明确的 Hermes 基础设施变量（提供商密钥、gateway token、工具 API 密钥） | ✅ 透传变量绕过黑名单 |
 | **terminal**（Docker） | 默认不传入宿主机环境变量 | ✅ 透传变量 + `docker_forward_env` 通过 `-e` 转发 |
 | **terminal**（Modal） | 默认不传入宿主机环境/文件 | ✅ 凭据文件挂载；环境变量通过同步透传 |
 | **MCP** | 阻止所有变量，仅允许安全系统变量 + 显式配置的 `env` | ❌ 不受透传影响（改用 MCP `env` 配置） |
@@ -441,7 +441,7 @@ terminal:
 - 凭据文件以**只读**方式挂载到 Docker 容器中
 - Skills Guard 在安装前会扫描技能内容中的可疑环境变量访问模式
 - 缺失/未设置的变量永远不会被注册（不存在的内容无法泄露）
-- Qubit 基础设施密钥（提供商 API 密钥、gateway token）不应添加到 `env_passthrough`——它们有专用机制
+- Hermes 基础设施密钥（提供商 API 密钥、gateway token）不应添加到 `env_passthrough`——它们有专用机制
 
 ## MCP 凭据处理
 
@@ -490,12 +490,12 @@ security:
       - "*.internal.company.com"
       - "admin.example.com"
     shared_files:
-      - "/etc/qubit/blocked-sites.txt"
+      - "/etc/hermes/blocked-sites.txt"
 ```
 
 当请求被阻止的 URL 时，工具会返回一条错误，说明该域名已被策略阻止。黑名单在 `web_search`、`web_extract`、`browser_navigate` 及所有支持 URL 的工具中均强制执行。
 
-完整详情请参见配置指南中的[网站黑名单](/user-guide/configuration#website-blocklist)。
+完整详情请参见配置指南中的[网站黑名单](./configuration.md#网站黑名单)。
 
 ### SSRF 防护
 
@@ -523,9 +523,27 @@ security:
 
 主机子字符串防护（即使底层 IP 是公共的，也能阻止 Unicode 同形字域名欺骗）无论此设置如何均保持开启。
 
+#### 本地代理的 fake-ip 地址段
+
+以 fake-ip 模式工作的 TUN 代理（Mihomo/Clash `fake-ip`、Surge 增强模式）会对不在其过滤器内的
+每个域名返回自己地址段中的地址——默认是 `198.18.0.0/15`（RFC 2544 基准测试段）。这些地址是代理
+的哨兵地址，而不是内网主机，因此私网 IP 守卫会在这种机器上拦掉全部出网抓取：`web_extract`、平台
+附件下载、浏览器链路都会以 *URL targets a private or internal network address* 失败，而请求根本
+没有发出。声明该地址段即可放行哨兵地址：
+
+```yaml
+security:
+  fake_ip_ranges:
+    - 198.18.0.0/15
+```
+
+默认为空，且比 `allow_private_urls` 更窄：只有被声明的地址段获得豁免，且应当是本地代理自己拥有的
+地址段（连接仍然发往代理，由代理自行解析真实目标），回环、RFC 1918、链路本地、CGNAT 和云元数据
+目标依然被拦截。
+
 ### Tirith 预执行安全扫描
 
-Qubit 集成了 [tirith](https://github.com/sheeki03/tirith) 用于在执行前进行内容级命令扫描。Tirith 能检测单纯模式匹配所遗漏的威胁：
+Hermes 集成了 [tirith](https://github.com/sheeki03/tirith) 用于在执行前进行内容级命令扫描。Tirith 能检测单纯模式匹配所遗漏的威胁：
 
 - 同形字 URL 欺骗（国际化域名攻击）
 - 管道传解释器模式（`curl | bash`、`wget | sh`）
@@ -544,7 +562,7 @@ security:
 
 当 `tirith_fail_open` 为 `true`（默认）时，若 tirith 未安装或超时，命令照常执行。在高安全性环境中，将其设置为 `false` 可在 tirith 不可用时阻止命令执行。
 
-Tirith 为 Linux（x86_64 / aarch64）和 macOS（x86_64 / arm64）提供预构建二进制文件。在没有预构建二进制文件的平台（Windows 等）上，tirith 会被静默跳过——模式匹配防护仍然运行，CLI 不会显示"不可用"横幅。若要在 Windows 上使用 tirith，请在 WSL 下运行 Qubit。
+Tirith 为 Linux（x86_64 / aarch64）和 macOS（x86_64 / arm64）提供预构建二进制文件。在没有预构建二进制文件的平台（Windows 等）上，tirith 会被静默跳过——模式匹配防护仍然运行，CLI 不会显示"不可用"横幅。若要在 Windows 上使用 tirith，请在 WSL 下运行 Hermes。
 
 Tirith 的判定与审批流程集成：安全命令直接通过，可疑和被阻止的命令会触发用户审批，并附上完整的 tirith 发现（严重性、标题、描述、更安全的替代方案）。用户可以批准或拒绝——默认选择为拒绝，以确保无人值守场景的安全。
 
@@ -577,7 +595,7 @@ Tirith 的判定与审批流程集成：安全命令直接通过，可疑和被�
 7. **设置 `MESSAGING_CWD`** — 不要让 Agent 在敏感目录中操作
 8. **以非 root 用户运行** — 切勿以 root 身份运行 gateway
 9. **监控日志** — 检查 `~/.hermes/logs/` 中的未授权访问尝试
-10. **保持更新** — 定期运行 `qubit update` 以获取安全补丁
+10. **保持更新** — 定期运行 `hermes update` 以获取安全补丁
 
 ### 保护 API 密钥
 
@@ -602,7 +620,7 @@ terminal:
 ```bash
 # ~/.hermes/.env
 TERMINAL_SSH_HOST=agent-worker.local
-TERMINAL_SSH_USER=qubit
+TERMINAL_SSH_USER=hermes
 TERMINAL_SSH_KEY=~/.ssh/hermes_agent_key
 ```
 
@@ -610,18 +628,18 @@ SSH 连接详情保存在 `.env`（而非 `config.yaml`）中，以避免随 pro
 
 ## 供应链安全公告检查
 
-Qubit 内置了一个公告扫描器，用于标记活跃 venv 中与已知受损版本目录匹配的 Python 包（例如 2026 年 5 月的 `mistralai 2.4.6` 供应链投毒事件）。实现位于 `qubit_cli/security_advisories.py`。
+Hermes 内置了一个公告扫描器，用于标记活跃 venv 中与已知受损版本目录匹配的 Python 包（例如 2026 年 5 月的 `mistralai 2.4.6` 供应链投毒事件）。实现位于 `hermes_cli/security_advisories.py`。
 
 运行方式：
 
-- **CLI 启动横幅。** 若有任何公告匹配，会打印一行警告，并指向 `qubit doctor` 获取完整修复方案。
-- **`qubit doctor`。** 显示所有活跃公告的版本详情和 2-4 步修复说明。
+- **CLI 启动横幅。** 若有任何公告匹配，会打印一行警告，并指向 `hermes doctor` 获取完整修复方案。
+- **`hermes doctor`。** 显示所有活跃公告的版本详情和 2-4 步修复说明。
 - **Gateway 启动。** 记录到 `gateway.log`；第一条交互消息会附带简短的操作者横幅。
 
 每条公告都有一个稳定 ID。阅读并处理后，可以永久忽略它：
 
 ```bash
-qubit doctor --ack <advisory-id>
+hermes doctor --ack <advisory-id>
 ```
 
 确认信息持久化到 `config.security.acked_advisories`，重启后仍有效。旧公告**不会**从目录中删除——保留它们可以确保新安装的用户收到关于历史受损版本的警告，这些版本可能仍缓存在私有镜像中。
@@ -630,35 +648,33 @@ qubit doctor --ack <advisory-id>
 
 ### 可选依赖的懒加载安装
 
-许多功能（Mistral TTS、ElevenLabs、Honcho 记忆、Bedrock、Slack、Matrix 等）依赖并非每个用户都需要的 Python 包。Qubit 在首次使用时**懒加载**安装这些包，而非在 `hermes-agent[all]` 下急切安装。实现位于 `tools/lazy_deps.py`。
+PM 通过 `pyproject.toml` 中的 extras 管理可选 Python 功能。
+源码安装选择 `all` extra，原生桌面包预装目标平台支持的所有 extras。
+这两种集合并不相同。
 
-此方案解决的权衡问题：
+当功能请求缺失的 extra 时，`pm.ensure_import("extra-name")` 使用与插件准入相同的依赖事务：
 
-- **脆弱性。** 当某个额外依赖的传递依赖在 PyPI 上不可用时（因恶意软件被隔离、被撤回、上传损坏），整个 `[all]` 解析会失败，新安装会静默回退到精简版本——同时丢失 10 个以上不相关的额外功能。懒加载安装将每个后端隔离，使一个受损依赖不会破坏不相关的功能。
-- **臃肿。** 只使用一个提供商的用户不再需要拉取数百个永远不会导入的包。
+1. 检查平台支持和 `security.allow_lazy_installs`。
+2. 在候选环境中统一准备核心依赖、现有 extras 和已启用插件的依赖。
+3. 没有插件成员时保持提交的锁文件不变；有成员时从先前选择开始解析，然后执行冻结同步。
+4. 验证候选环境后才发布新选择。失败会保留原环境，不会自动禁用或删除其他插件。
+5. 若当前进程仍使用旧环境，则提示重启，不在进程中直接替换已导入的库。
 
-工作原理：
+已发布的源码、锁文件和签名载荷保持不变。新增依赖使用包外的可写存储。
+插件依赖共享完整 Python 环境，不是相互隔离的沙箱。
+兼容的传递依赖可以更新，但声明的约束和精确固定版本仍有效。
+失败通过 `pm.InstallError` 和同步记录报告。
 
-1. 后端模块在其首次导入路径的顶部调用 `ensure("feature.name")`。
-2. 若依赖缺失，`ensure` 检查 `config.yaml` 中的 `security.allow_lazy_installs`（默认 `true`），并为允许列表中的规格运行 venv 作用域的 `pip install`。
-3. 若安装失败或用户已禁用懒加载安装，调用会抛出 `FeatureUnavailable`，附带实际的 pip stderr 和指向 `qubit tools` 的提示。
+关闭按需安装：
 
-`tools/lazy_deps.py` 强制执行的安全保证：
-
-| 保证 | 含义 |
-|---|---|
-| 仅限 venv 作用域 | 安装目标为活跃 venv 中的 `sys.executable`——绝不安装到系统 Python |
-| 仅按名称从 PyPI 安装 | 规格接受 `"package>=1.0,<2"` 语法。不允许 `--index-url`、`git+https://` 或 `file:` 路径——恶意的 `config.yaml` 无法重定向安装 |
-| 允许列表 | 只有出现在内置 `LAZY_DEPS` 映射中的规格才能通过此路径安装。功能名称中的拼写错误**不会**获得任意安装语义 |
-| 可选退出 | 设置 `security.allow_lazy_installs: false` 可完全禁用运行时安装。适用于受限网络或严格安全态势 |
-| 无静默重试 | 失败以 `FeatureUnavailable` 形式呈现——不缓存错误状态，不发生重试风暴 |
-
-禁用运行时安装：
-
-```yaml
-# ~/.hermes/config.yaml
-security:
-  allow_lazy_installs: false
+```bash
+hermes config set security.allow_lazy_installs false
 ```
 
-禁用后，需要可选依赖的后端会提示用户手动运行安装（`pip install …`）或通过 `qubit tools` 选择其他后端。
+已安装的依赖仍可使用。显式安装命令与按需安装不同。
+关闭懒加载且存在包内冻结功能列表时，请求的 Python extra 名称仍受该列表限制。
+该设置不是禁止显式插件准入或手动包管理命令的沙箱。
+官方 Docker 镜像还通过内部策略关闭按需安装，仅更改配置不能覆盖它。
+
+用 `hermes tools` 和 `hermes doctor` 检查缺失需求。
+不要向签名载荷或系统 Python 执行 pip 安装。详见[包管理](../reference/package-management.md)。

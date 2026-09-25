@@ -27,7 +27,7 @@ from gateway.run import GatewayRunner, _profile_runtime_scope
 from qubit_cli import kanban_db as kb
 from qubit_cli import kanban_db_connect as kbc
 from qubit_cli import kanban_db_notify as kbn
-from qubit_constants import get_hermes_home
+from qubit_constants import get_qubit_home
 from qubit_state import SessionDB
 
 SESSION = "20260918_033413_0665eb"      # the originating (Relay/web-UI) session id
@@ -45,7 +45,7 @@ class RecordingApiServerAdapter:
         self.profiles = []
 
     async def run_internal_session_turn(self, *, session_id, text, profile, notification_category="result"):
-        self.homes.append(str(get_hermes_home()))
+        self.homes.append(str(get_qubit_home()))
         self.profiles.append(profile)
         self.turns.append({"session_id": session_id, "text": text, "category": notification_category})
 
@@ -108,7 +108,7 @@ def served(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(root))
     monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "board.db"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setattr("qubit_constants.get_default_hermes_root", lambda: root)
+    monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda: root)
     return SimpleNamespace(root=root, builder=root / "profiles" / "builder", atlas=root / "profiles" / "atlas")
 
 
@@ -252,7 +252,7 @@ def test_internal_session_turn_targets_the_live_session_under_the_owner_profile(
 
     async def fake_run_agent(**kwargs):
         seen.update(kwargs)
-        seen["home"] = str(get_hermes_home())
+        seen["home"] = str(get_qubit_home())
         seen["request_profile"] = _api_request_profile.get()
         return {}, {}
 
