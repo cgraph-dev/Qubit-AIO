@@ -224,6 +224,36 @@ def _prepend_tool_paths(env: dict[str, str]) -> dict[str, str]:
     return env
 
 
+def _vendored_src_root() -> Path:
+    """Directory holding the vendored top-level packages (``tui_gateway``, ``qubit_cli``, ...).
+
+    Upstream keeps these at the repo root, so a ``-m tui_gateway.*`` child launched from
+    the repo root imported them via cwd. Qubit nests the whole runtime under
+    ``qubit_runtime/``, so the package root is this module's grandparent.
+    """
+    return Path(__file__).resolve().parents[1]
+
+
+def _seed_vendored_src_root_pythonpath(env: dict[str, str]) -> dict[str, str]:
+    """Put :func:`_vendored_src_root` first on the child's PYTHONPATH.
+
+    ``served_profile_child_env``/``build_subprocess_env`` strip Qubit-owned PYTHONPATH
+    entries, and the slash worker is launched as ``-m tui_gateway.slash_worker`` from an
+    arbitrary caller cwd; without re-seeding the package root the child dies on
+    ``ModuleNotFoundError: No module named 'tui_gateway'`` (dashboard audit D-1). Independent
+    of cwd and of any ``~/.hermes`` fallback. The shared import guard reads the same root
+    (``qubit_bootstrap`` honours ``HERMES_PYTHON_SRC_ROOT``), so a stale inherited value
+    cannot relocate a different directory to the front.
+    """
+    root = str(_vendored_src_root())
+    existing = [p for p in (env.get("PYTHONPATH") or "").split(os.pathsep) if p]
+    if root not in existing:
+        env["PYTHONPATH"] = os.pathsep.join([root, *existing])
+    env["HERMES_PYTHON_SRC_ROOT"] = root
+    env["QUBIT_PYTHON_SRC_ROOT"] = root
+    return env
+
+
 class _SlashWorker:
     """Persistent HermesCLI subprocess for slash commands."""
 
@@ -251,11 +281,10 @@ class _SlashWorker:
         env = _prepend_tool_paths(served_profile_child_env(
             target_home=profile_home or (_qubit_home if is_multiplex_active() else None),
             inherit_credentials=True))
-        # Internal slash workers must import the same checkout as their parent.
-        module_root = str(Path(__file__).resolve().parent.parent)
-        env["PYTHONPATH"] = os.pathsep.join(
-            part for part in (module_root, env.get("PYTHONPATH", "")) if part
-        )
+        # Internal slash workers must import the same checkout as their parent. Seed the
+        # vendored package root on PYTHONPATH AND the shared import guard's env after the
+        # sanitizer stripped Qubit-owned PYTHONPATH entries (dashboard audit D-1).
+        _seed_vendored_src_root_pythonpath(env)
         # start_new_session: otherwise the worker inherits the gateway's pgid and mcp_tool's orphan
         # sweep, racing the spawn, killpg()s the TUI parent itself. errors="replace": bytes invalid
         # in the system locale (GBK Windows) must not raise UnicodeDecodeError in the drain threads.
