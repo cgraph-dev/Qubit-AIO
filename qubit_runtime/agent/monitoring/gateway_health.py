@@ -230,8 +230,8 @@ def _safe_profile() -> str:
 
 def _safe_version() -> str:
     try:
-        from qubit_cli import __version__
-        return str(__version__)
+        from qubit_cli.version_info import get_version_info
+        return get_version_info().base_version
     except Exception:
         return "unknown"
 

@@ -5,28 +5,36 @@
  "theirs_root": "/tmp/qubit-sdd/qubit_runtime",
  "merge_rule": "TAKE_OURS->ours; REAPPLY_THEIRS->merge_file; CONFLICT->keep theirs; add candidate-only",
  "totals": {
-  "changed": 17,
-  "written": 10,
-  "deleted": 0,
-  "conflicts": 6,
+  "changed": 237,
+  "written": 46,
+  "deleted": 1,
+  "conflicts": 106,
   "by_resolution": {
-   "AUTO_OURS": 9,
-   "ADDED": 1,
-   "MERGE_FILE": 1,
-   "KEEP_THEIRS_CONFLICT": 6,
+   "AUTO_OURS": 37,
+   "ADDED": 9,
+   "MERGE_FILE": 84,
+   "KEEP_THEIRS_CONFLICT": 106,
    "KEEP_THEIRS": 0,
-   "DELETED": 0,
+   "DELETED": 1,
    "SKIP_IDENTICAL": 0
   },
   "by_class": {
-   "CONFLICT": 6,
-   "REAPPLY_THEIRS": 1,
-   "TAKE_OURS": 10
+   "CONFLICT": 106,
+   "REAPPLY_THEIRS": 84,
+   "TAKE_OURS": 47
   },
   "by_bucket": {
+   "agent": 220,
    "qubit_state*": 17
   },
   "by_bucket_resolution": {
+   "agent": {
+    "ADDED": 8,
+    "AUTO_OURS": 28,
+    "DELETED": 1,
+    "KEEP_THEIRS_CONFLICT": 100,
+    "MERGE_FILE": 83
+   },
    "qubit_state*": {
     "ADDED": 1,
     "AUTO_OURS": 9,
@@ -69,6 +77,606 @@
   {
    "path": "qubit_state_sessions.py",
    "bucket": "qubit_state*",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/AGENTS.md",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/account_usage.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/agent_init.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/agent_runtime_helpers.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/anthropic_adapter.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/anthropic_credentials.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/api_error_summary.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/auxiliary_client.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/azure_identity_adapter.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/background_review.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/bedrock_adapter.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/billing_usage.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/chat_completion_helpers.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/chat_completion_nonstream.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/client_lifecycle.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/codex_headers.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/codex_responses_adapter.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/codex_runtime.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/command_token_source.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/compression_facade.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/context_compressor.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/context_engine.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/context_references.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/conversation_compression.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/conversation_loop.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/copilot_acp_client.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/credential_pool.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/credential_pool_admin.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/credits_tracker.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/curator.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/curator_backup.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/display.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/error_classifier.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/estop.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/gemini_native_adapter.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/i18n.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/image_routing.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/inline_tool_executors.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/insights.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/learning_graph.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/learning_mutations.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/lsp/client.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/lsp/install.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/lsp/servers.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/memory_manager.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/memory_provider.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/message_sanitization.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/micro_compaction.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/moa_loop.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/model_metadata.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/models_dev.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/monitoring/gateway_health_export.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/nous_rate_guard.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/pet/store.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/plugin_stream_hooks.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/portal_tags.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/prompt_builder.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/proxy_sources/iron_proxy.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/reasoning_effort.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/redact.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/relay_llm.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/relay_runtime.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/repetition_guard.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/runtime_cwd.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/secret_scope.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/secret_sources/_cache.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/secret_sources/bitwarden.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/secret_sources/registry.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/session_persistence.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/shell_hooks.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/skill_bundles.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/skill_commands.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/skill_utils.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/stream_diag.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/subdirectory_hints.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/system_prompt.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/think_scrubber.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/title_generator.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/tool_dispatch_helpers.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/tool_executor.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/trace_upload.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/transports/qubit_tools_mcp_server.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_api_call.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_api_error.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_context.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_context_compaction.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_empty_response.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_facade.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_failure_copy.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_final_response.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_finalizer.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_iteration_prep.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_overflow.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_preflight.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_recovery.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_stop_gates.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_tool_round.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/turn_truncation.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/usage_pricing.py",
+   "bucket": "agent",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "agent/video_gen_provider.py",
+   "bucket": "agent",
    "kind": "MERGE_MARKERS",
    "action": "noop"
   }
@@ -277,6 +885,2646 @@
    "ours_sha256": "a5be6a4bc7bd0ac8aa719e90f18c8474741bd33fb1857ab79df5dc4ac84cda04",
    "theirs_sha256": "a5be6a4bc7bd0ac8aa719e90f18c8474741bd33fb1857ab79df5dc4ac84cda04",
    "result_sha256": "a5be6a4bc7bd0ac8aa719e90f18c8474741bd33fb1857ab79df5dc4ac84cda04"
+  },
+  {
+   "path": "agent/AGENTS.md",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5a92861df5410019122fd4c76c99683d8b3467c63e0679c58f3853960e0c8a1d",
+   "ours_sha256": "f0af06eddad7d89fa141dce304add413d57d143f7817f235c701a4054af16bf6",
+   "theirs_sha256": "59cf641d81cad9c8705b83bb4cd6633a47fa3677ceb0fb428bf859d420625c5b",
+   "result_sha256": "59cf641d81cad9c8705b83bb4cd6633a47fa3677ceb0fb428bf859d420625c5b"
+  },
+  {
+   "path": "agent/account_usage.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "cf3e64e3c931cbf3f5639c82001c3acc8315f689fd07e480961b9c6b0a581e16",
+   "ours_sha256": "e88d104cce575107c1c2bdd49293daa3b9acff76003542a268c728184ac6b456",
+   "theirs_sha256": "0b0bfd53e6b563a9adf3b0a8b8a091b843847c4110ab82abc006128a2a80d151",
+   "result_sha256": "0b0bfd53e6b563a9adf3b0a8b8a091b843847c4110ab82abc006128a2a80d151"
+  },
+  {
+   "path": "agent/acp_openai_bridge.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "6dabd96bbe7f0147d599955ea392f8a7b1c5511ec615ee2bf0ad8d185417ad80",
+   "ours_sha256": "6dabd96bbe7f0147d599955ea392f8a7b1c5511ec615ee2bf0ad8d185417ad80",
+   "theirs_sha256": "e527537e5f4ff7b0d937799bbe029f610531c13a8f01e77033650e8c009fa9b5",
+   "result_sha256": "e527537e5f4ff7b0d937799bbe029f610531c13a8f01e77033650e8c009fa9b5"
+  },
+  {
+   "path": "agent/activity_tracking.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "594ddad17fdb20f45fa6b0276a6dbed2672ba3d94d096a0f24304d881fe74403",
+   "ours_sha256": "594ddad17fdb20f45fa6b0276a6dbed2672ba3d94d096a0f24304d881fe74403",
+   "theirs_sha256": "0ffb191fbdf52e24fe3f9a11910003e4234d75e23511ded8f003366c8eb792c4",
+   "result_sha256": "0ffb191fbdf52e24fe3f9a11910003e4234d75e23511ded8f003366c8eb792c4"
+  },
+  {
+   "path": "agent/agent_init.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "ae199fde988a3d2553b37f6342c0eef600f4c5f57c8639b779134813f4d91076",
+   "ours_sha256": "a3b3bc7d11023962f2d4d2af737ae61d9e4d5f5639b52263f1148ed6066d0f43",
+   "theirs_sha256": "186e403a3ac856f4d169dd47e6b16bbc029fa189405728265a0947cad8dc6495",
+   "result_sha256": "186e403a3ac856f4d169dd47e6b16bbc029fa189405728265a0947cad8dc6495"
+  },
+  {
+   "path": "agent/agent_runtime_helpers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b2a1960cce03a894bbbcc61142aaeea8ce81510efe2e3122d13183dd9beb79e6",
+   "ours_sha256": "0b3618dacd5b08db2ed9515e6a3430973fb328d87cf2c79676ccdd560a78b8bc",
+   "theirs_sha256": "9e1d4db917e081de8cb39129e39453aeeb7beea121aac6ee6365f802b25e7249",
+   "result_sha256": "9e1d4db917e081de8cb39129e39453aeeb7beea121aac6ee6365f802b25e7249"
+  },
+  {
+   "path": "agent/anthropic_adapter.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "034ede3965232a4f8dbd3e61fa25d550406a5d0c1ab8d67a0f084efb951e6546",
+   "ours_sha256": "e4a1c6c6232d18337b7772cf4ea465073db1d6f9f7606b380dda6f4feabc462f",
+   "theirs_sha256": "27af5f409665ae1d129f0c601fa4f2f06e7bea5e37d8a7a1ed9f029156c8c3aa",
+   "result_sha256": "27af5f409665ae1d129f0c601fa4f2f06e7bea5e37d8a7a1ed9f029156c8c3aa"
+  },
+  {
+   "path": "agent/anthropic_credentials.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "48e07078161d66cf7d0a1037d4f5836e2b2e8a07a9d1d104533bc4c471c5d9cd",
+   "ours_sha256": "31c9f0d981247d039cbcde471b9a09672a53d431aad6e9c06662c12608ff48d1",
+   "theirs_sha256": "be5d4a4bdb89672eb17c57649b7045460e68b76c9f6d3a388152ca31b56ecf9a",
+   "result_sha256": "be5d4a4bdb89672eb17c57649b7045460e68b76c9f6d3a388152ca31b56ecf9a"
+  },
+  {
+   "path": "agent/anthropic_message_convert.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b1f6000d51e575362291a5010ae0aa4b5ba31cb26e976d362023afd7bb638c85",
+   "ours_sha256": "b1f6000d51e575362291a5010ae0aa4b5ba31cb26e976d362023afd7bb638c85",
+   "theirs_sha256": "a752e39fe02da5398222d5cf46edfdd943aeb0bee8305da2aa6cacff279cbea2",
+   "result_sha256": "a752e39fe02da5398222d5cf46edfdd943aeb0bee8305da2aa6cacff279cbea2"
+  },
+  {
+   "path": "agent/api_error_summary.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c4a3618e8e60e7d0bf8609e43d452ab4014df5f9c99a02e425d47c2b1fbf18b6",
+   "ours_sha256": "fc9098d161dcad4c6e6f9f46b58a60d3f0809bc0665081e7a3dff058d697b589",
+   "theirs_sha256": "5530285bfd2b3ece1f9459793d1b220b6170f372482ad96082ae8ead748a5bfa",
+   "result_sha256": "5530285bfd2b3ece1f9459793d1b220b6170f372482ad96082ae8ead748a5bfa"
+  },
+  {
+   "path": "agent/api_request_hooks.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "a030869dfdcd5a4e85be6c1eabadb3a67ff540b278357906c4107eacff4b5d44",
+   "ours_sha256": "f080460cc75547fd3c5929bea2485713c4e95112246d5304f06a9d65d8d50161",
+   "theirs_sha256": "f080460cc75547fd3c5929bea2485713c4e95112246d5304f06a9d65d8d50161",
+   "result_sha256": "f080460cc75547fd3c5929bea2485713c4e95112246d5304f06a9d65d8d50161"
+  },
+  {
+   "path": "agent/auxiliary_client.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "8c76264d78ef3c6ab646091635778349642db229c258b0eef71c2267c60026b6",
+   "ours_sha256": "0e007da7b51382fb408f595aaf9b808270c7ed8f104c1a3867908276044723c1",
+   "theirs_sha256": "5d3c3b5e20ea46d5306b147469f5d78f46ec6b094d242079d30ed3705e468e48",
+   "result_sha256": "5d3c3b5e20ea46d5306b147469f5d78f46ec6b094d242079d30ed3705e468e48"
+  },
+  {
+   "path": "agent/auxiliary_health.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c7399749658da3a4d466111af1cea3698e7e392cdde785a328fe965adacd0df6",
+   "ours_sha256": "c7399749658da3a4d466111af1cea3698e7e392cdde785a328fe965adacd0df6",
+   "theirs_sha256": "1318c00bf0bc031021118e039963d5a03ffa2127028cf772ed0863bd1c5eff29",
+   "result_sha256": "1318c00bf0bc031021118e039963d5a03ffa2127028cf772ed0863bd1c5eff29"
+  },
+  {
+   "path": "agent/auxiliary_hooks.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "cfa47ea3cc5ed7812a168efb0e0e2ff6da6f8e2f4d374e6e997121ca7cdb75fe",
+   "theirs_sha256": "cfa47ea3cc5ed7812a168efb0e0e2ff6da6f8e2f4d374e6e997121ca7cdb75fe",
+   "result_sha256": "cfa47ea3cc5ed7812a168efb0e0e2ff6da6f8e2f4d374e6e997121ca7cdb75fe"
+  },
+  {
+   "path": "agent/auxiliary_reasoning_floor.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "46e7782e1f1df35fa2f760a6c6d2d387017cf60ffad4dc50726988e204ae1765",
+   "ours_sha256": "15a0b62c880e3d20b81039050722de0603acbd0de1b104f839db28369df6a604",
+   "theirs_sha256": "15a0b62c880e3d20b81039050722de0603acbd0de1b104f839db28369df6a604",
+   "result_sha256": "15a0b62c880e3d20b81039050722de0603acbd0de1b104f839db28369df6a604"
+  },
+  {
+   "path": "agent/auxiliary_unavailable.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "11c40683610009c0a72898efb417d47debd8cdb38b40ef8f79d0159fcb6d8e5b",
+   "ours_sha256": "3a4f26b29efd8de9f22df278cc709456bd795e525d16b67b6e9a5e9e8b446cdc",
+   "theirs_sha256": "3a4f26b29efd8de9f22df278cc709456bd795e525d16b67b6e9a5e9e8b446cdc",
+   "result_sha256": "3a4f26b29efd8de9f22df278cc709456bd795e525d16b67b6e9a5e9e8b446cdc"
+  },
+  {
+   "path": "agent/auxiliary_wire.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "71d44581fef4f675111c97841a8756d0a060f1dfcbc46a33cb726561bf428ad8",
+   "ours_sha256": "71d44581fef4f675111c97841a8756d0a060f1dfcbc46a33cb726561bf428ad8",
+   "theirs_sha256": "9e43dbd82506784753667fed0cc6c6810957b696d00c2d8676c66b9031f94dca",
+   "result_sha256": "9e43dbd82506784753667fed0cc6c6810957b696d00c2d8676c66b9031f94dca"
+  },
+  {
+   "path": "agent/azure_identity_adapter.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f1168d2260a283b06e9b60b18166a8d0e3149030a51b25f930e321190bfae1d4",
+   "ours_sha256": "20d9783735534ded5d068df3f982fc9bd8fa3732255a9e23c2dc71350613f589",
+   "theirs_sha256": "640137b827a0fbb41a306694b2a9f7405655d9b26faea6dc56307d5aa86facb7",
+   "result_sha256": "640137b827a0fbb41a306694b2a9f7405655d9b26faea6dc56307d5aa86facb7"
+  },
+  {
+   "path": "agent/background_review.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "25bd1f22139575e2f0ca6cc0a42a03933f7628a90be598bfe1c6dfd92c443a5e",
+   "ours_sha256": "00abbe1b9a5b60ab5fdc8abf958500910a1ed83639286b209a5a0b9c3059c6f1",
+   "theirs_sha256": "94d7b1fcb4f59bd87a5b4b7599d64fbd3a8f4509934bfb7a4d232abf8bb10586",
+   "result_sha256": "94d7b1fcb4f59bd87a5b4b7599d64fbd3a8f4509934bfb7a4d232abf8bb10586"
+  },
+  {
+   "path": "agent/bedrock_adapter.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "82b81848c2ce6b6770b964284f0b500ea228d840e22b6abe5a7760d0d9780993",
+   "ours_sha256": "6d79312759ec8788bfc7bff78c92196c9fc11c06a92720bba966ec6022969199",
+   "theirs_sha256": "564a0efcd8db606cba7312704a4d5f4dba9de336c45e43c51b8619d42065e109",
+   "result_sha256": "564a0efcd8db606cba7312704a4d5f4dba9de336c45e43c51b8619d42065e109"
+  },
+  {
+   "path": "agent/billing_usage.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "1bcf51e5e18d65718b7e871f69dd6567545cef0fcf06acbf6fca967c56aa5ff4",
+   "ours_sha256": "f7634a5a098b20c270ebec21cf331b64e28806cbd56a50d1e1ff9f6838c069e1",
+   "theirs_sha256": "c10b1324a23173049a3ee1283ca48cbee4e86f49e268c5270ee20f4f9de4337f",
+   "result_sha256": "c10b1324a23173049a3ee1283ca48cbee4e86f49e268c5270ee20f4f9de4337f"
+  },
+  {
+   "path": "agent/chat_completion_helpers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "93b42fdd533dd2e31b076537ec67ebee77b417f8b55b944f6d832692fa34d7b6",
+   "ours_sha256": "dd820ed93ce811ee6282f13ce6edffec5681f4430784f67b8167ccded9e1e1b8",
+   "theirs_sha256": "c517fef56d5d1ecdfcae38b3f489e25667841aaa45222f3626fc742fae1bb14a",
+   "result_sha256": "c517fef56d5d1ecdfcae38b3f489e25667841aaa45222f3626fc742fae1bb14a"
+  },
+  {
+   "path": "agent/chat_completion_helpers_relay.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f7d83bc505405bf2c551de1efdfc951c71ab4c72a90bc479b04e70bb5ca28b6f",
+   "ours_sha256": "f7d83bc505405bf2c551de1efdfc951c71ab4c72a90bc479b04e70bb5ca28b6f",
+   "theirs_sha256": "2abac6c096f1aa0cf28302327fccf2fe83aa7dafe10c092f38c227ba64e633c2",
+   "result_sha256": "2abac6c096f1aa0cf28302327fccf2fe83aa7dafe10c092f38c227ba64e633c2"
+  },
+  {
+   "path": "agent/chat_completion_nonstream.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e56a634360d4f4400740966916427210ac86310a6c57ae6ba778b997e2fd6bc5",
+   "ours_sha256": "34d4afad0a0c7228a0518eed4a2521ba1a340f509c83784c74abceb56f1becb7",
+   "theirs_sha256": "d85ccaca90fbdd78bc3c62a3a8bbaf7922cbdba74e2c57f88115d2d96dcebe81",
+   "result_sha256": "d85ccaca90fbdd78bc3c62a3a8bbaf7922cbdba74e2c57f88115d2d96dcebe81"
+  },
+  {
+   "path": "agent/chat_completion_stream_monitor.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "8c232eb9e90335ce599b5c8d403c6e369e3fb9e01e78d4a178c517b62da420c5",
+   "ours_sha256": "8c232eb9e90335ce599b5c8d403c6e369e3fb9e01e78d4a178c517b62da420c5",
+   "theirs_sha256": "634975f7a6b27283adda06d0d34d9069b1b8e2d025088ea9d74e9f66ff03c0ac",
+   "result_sha256": "634975f7a6b27283adda06d0d34d9069b1b8e2d025088ea9d74e9f66ff03c0ac"
+  },
+  {
+   "path": "agent/chat_completion_wait_notice.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "b1af4da22fd97fdf02b619b6964cbe113df1effb24ba89b3bea4897c01f78f26",
+   "ours_sha256": "26aa4d603687f365729e4d8108efda7be627ea5482fa10c56f225c2a6cbc8c84",
+   "theirs_sha256": "26aa4d603687f365729e4d8108efda7be627ea5482fa10c56f225c2a6cbc8c84",
+   "result_sha256": "26aa4d603687f365729e4d8108efda7be627ea5482fa10c56f225c2a6cbc8c84"
+  },
+  {
+   "path": "agent/client_lifecycle.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4002e3b54b83b36ff6b7928b0ce3374b45bad14180c91d83cb1a7df268a2ccca",
+   "ours_sha256": "7236cff4c45df7353e942d238e9475f3fbe34c101d6013638328d5699271ead6",
+   "theirs_sha256": "7d5c1565234febde02686fdf000236b893ebd4e7475f89e63c48467eade09961",
+   "result_sha256": "7d5c1565234febde02686fdf000236b893ebd4e7475f89e63c48467eade09961"
+  },
+  {
+   "path": "agent/codex_headers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e8079c266289eb5fbc5f77c38805040b719087070a84382a31db6fc8e2cf64ba",
+   "ours_sha256": "c1e32e7815f5d04623e5e0a49417019615d7e2d9d32c88bdda457fb045edf363",
+   "theirs_sha256": "b120d6dbb2594ff19119a63d816d8d5f14f47e5c06e7e8741e5d7aef7bd47d39",
+   "result_sha256": "b120d6dbb2594ff19119a63d816d8d5f14f47e5c06e7e8741e5d7aef7bd47d39"
+  },
+  {
+   "path": "agent/codex_responses_adapter.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c9f70a8dd5d19c70ffeef79858d4d16e85c3c346ac9c5415350f2ddc79c06fc8",
+   "ours_sha256": "d2bb8c10aa3a635c923582aab8fc66faeb5e292bc71cab422c0b284329a95991",
+   "theirs_sha256": "d420f44012a858ea19a7c8618703d7d547f501febbff6d90faafa2bac8c10a5a",
+   "result_sha256": "d420f44012a858ea19a7c8618703d7d547f501febbff6d90faafa2bac8c10a5a"
+  },
+  {
+   "path": "agent/codex_runtime.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "51de09cebfa146d95b598a4eac1c93b02d3cd987818127cad40b172c0f917687",
+   "ours_sha256": "9046e09f2b5184431278f83268de4eca9345a93d7741e25f481bf5a46b59007a",
+   "theirs_sha256": "dd978b3fc3ede6e9b3a0bcd578a552881828fae6df92d1b23d1b308a75ae786a",
+   "result_sha256": "dd978b3fc3ede6e9b3a0bcd578a552881828fae6df92d1b23d1b308a75ae786a"
+  },
+  {
+   "path": "agent/coding_context.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "6b307d4e222f08d82674e0800b8c1e80eaff627062cc6a496ea9bd1f45e9f16a",
+   "ours_sha256": "30fb6b53a4f97019461e19616c10ecc484b8ece015a6f50aff26c2d5bd92038a",
+   "theirs_sha256": "30fb6b53a4f97019461e19616c10ecc484b8ece015a6f50aff26c2d5bd92038a",
+   "result_sha256": "30fb6b53a4f97019461e19616c10ecc484b8ece015a6f50aff26c2d5bd92038a"
+  },
+  {
+   "path": "agent/command_token_source.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4ce3697675c6b3585ad37fcfa8cf2590aed9052a54039a9db53becc2e98400d3",
+   "ours_sha256": "130a894369de21feab0d07f49a0685c283f574102a46e965a395b54c9e019e02",
+   "theirs_sha256": "956ea58157e75356bfe87ba9ecec08513ca0ecc71cbd8c077bb4a52e5d792c96",
+   "result_sha256": "956ea58157e75356bfe87ba9ecec08513ca0ecc71cbd8c077bb4a52e5d792c96"
+  },
+  {
+   "path": "agent/compression_facade.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c1ecf2722484a4396f7080ecd7b78989da09a074de074a2faac46193bc5047c2",
+   "ours_sha256": "4db738f4bb490dd0276e578bafb1f5469a128c1871cf16f066d663460fbe2bb8",
+   "theirs_sha256": "ec7829f4fb3afc0ce0542a513b5c4e732c349513e6bc36fb2cf9afb991ee5945",
+   "result_sha256": "ec7829f4fb3afc0ce0542a513b5c4e732c349513e6bc36fb2cf9afb991ee5945"
+  },
+  {
+   "path": "agent/compression_marker.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "a58b84f9590814d9f7c2901e8f45fb5264a4bae7e4413022cc0134c55170c887",
+   "theirs_sha256": "a58b84f9590814d9f7c2901e8f45fb5264a4bae7e4413022cc0134c55170c887",
+   "result_sha256": "a58b84f9590814d9f7c2901e8f45fb5264a4bae7e4413022cc0134c55170c887"
+  },
+  {
+   "path": "agent/context_breakdown.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "004c9bf0fd1ce67e8203f248ecfd8c63e3a877789968b12a57ab83585b44d9c1",
+   "ours_sha256": "004c9bf0fd1ce67e8203f248ecfd8c63e3a877789968b12a57ab83585b44d9c1",
+   "theirs_sha256": "251b5c846f3cba59a88b193ca868d2c02b7da3153ebcc038f85eb35cf9e8d2c0",
+   "result_sha256": "251b5c846f3cba59a88b193ca868d2c02b7da3153ebcc038f85eb35cf9e8d2c0"
+  },
+  {
+   "path": "agent/context_compressor.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "82be9ea601a805b15d04e7a7d59e932f426d8e4a51192a50f09df600f532b22d",
+   "ours_sha256": "f8a11463ff1fa1f14fff120bc6b5bd952e07812174f06bbb506149418c4381ff",
+   "theirs_sha256": "d312bcbf1e68ec6273af3117db4834ff8fb972203188049476a8aff5373e43e7",
+   "result_sha256": "d312bcbf1e68ec6273af3117db4834ff8fb972203188049476a8aff5373e43e7"
+  },
+  {
+   "path": "agent/context_compressor_summary.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3eeebd4d584a02147a675bdc8b446f40bef139c018783d942812dcc01407a7fe",
+   "ours_sha256": "3eeebd4d584a02147a675bdc8b446f40bef139c018783d942812dcc01407a7fe",
+   "theirs_sha256": "36953d0efcda0a289f317a2b91081a206e5d1ed23813e96174fbabd66a37ea4c",
+   "result_sha256": "36953d0efcda0a289f317a2b91081a206e5d1ed23813e96174fbabd66a37ea4c"
+  },
+  {
+   "path": "agent/context_engine.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "97c9c6f57a7c8a5e0f0dd6242d08b3417b8bbcfdf226eddf2d3b3af78cb42be5",
+   "ours_sha256": "e7419747060ea64426c8620a93304944593301fced78c543cfa11aed1b9106b3",
+   "theirs_sha256": "45ca98bbeaab3dbbcb8b9b009275d287b5c2d552d96a4a2fc56ec8616b290cbe",
+   "result_sha256": "45ca98bbeaab3dbbcb8b9b009275d287b5c2d552d96a4a2fc56ec8616b290cbe"
+  },
+  {
+   "path": "agent/context_file_sources.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "079e04ea27e1f8fd57d6d06f92157579283764b6986c37c3446a07d404cd0682",
+   "ours_sha256": "079e04ea27e1f8fd57d6d06f92157579283764b6986c37c3446a07d404cd0682",
+   "theirs_sha256": "1f421072c37f9fef2bada06236697d47f2764a19f510a3438c020d57ce435914",
+   "result_sha256": "1f421072c37f9fef2bada06236697d47f2764a19f510a3438c020d57ce435914"
+  },
+  {
+   "path": "agent/context_references.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "6b39d83999e741d13b031d538cd9940d82cef858ca6fc772570e06704cf4b749",
+   "ours_sha256": "49e921abf170fd7c70103c030fbc6a33e437f0b2d1c4e94f90ccc2249819f587",
+   "theirs_sha256": "096e16bebb39fc7abdf86d2b831ed05c23e10b3a26ed659ac1a411067043f834",
+   "result_sha256": "096e16bebb39fc7abdf86d2b831ed05c23e10b3a26ed659ac1a411067043f834"
+  },
+  {
+   "path": "agent/conversation_compression.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "03547b837457c863ebb36c3ca75f95427cce9f2941f702344c515cd214769f71",
+   "ours_sha256": "4de29a000d99580307b9d1c2b98398a9571ac7337995e236b9aa16d3fa8aba8c",
+   "theirs_sha256": "1246ea63f9eb9b4385bb9b4b4f58f7bf26eb11d6fab13a30adaa471efee56bf3",
+   "result_sha256": "1246ea63f9eb9b4385bb9b4b4f58f7bf26eb11d6fab13a30adaa471efee56bf3"
+  },
+  {
+   "path": "agent/conversation_compression_archive.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "ad304a1d86fa125b420db4daa2bf2b30ecb789ca623af6a338e57456c779e128",
+   "theirs_sha256": "ad304a1d86fa125b420db4daa2bf2b30ecb789ca623af6a338e57456c779e128",
+   "result_sha256": "ad304a1d86fa125b420db4daa2bf2b30ecb789ca623af6a338e57456c779e128"
+  },
+  {
+   "path": "agent/conversation_compression_manual.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "c971eaba157ca2b2bcd21ea5116419f348230d21c7535f39c1a02176bd29df6b",
+   "ours_sha256": "23fd39ddbff7a605ac8190c4b57283d287c386d4ac7e6f3f8ec9ad785d071b28",
+   "theirs_sha256": "23fd39ddbff7a605ac8190c4b57283d287c386d4ac7e6f3f8ec9ad785d071b28",
+   "result_sha256": "23fd39ddbff7a605ac8190c4b57283d287c386d4ac7e6f3f8ec9ad785d071b28"
+  },
+  {
+   "path": "agent/conversation_compression_reply_anchor.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "2d2102af21065a514cb06c46069e28f8df2b3db5e00691881d8636b4cd37e402",
+   "theirs_sha256": "2d2102af21065a514cb06c46069e28f8df2b3db5e00691881d8636b4cd37e402",
+   "result_sha256": "2d2102af21065a514cb06c46069e28f8df2b3db5e00691881d8636b4cd37e402"
+  },
+  {
+   "path": "agent/conversation_loop.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4264e91f33dc91b6dd59bbe6212e62c48650b0067753ca1b1e76df0b040fdd51",
+   "ours_sha256": "5cae98adb46eae063aec60d6f69634a33885f77ddfc24b7556130a2e894c03b6",
+   "theirs_sha256": "6a3e87705ca4c06acff630ba504556c554c4f96738e705656d64a87d9ee401c5",
+   "result_sha256": "6a3e87705ca4c06acff630ba504556c554c4f96738e705656d64a87d9ee401c5"
+  },
+  {
+   "path": "agent/copilot_acp_client.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4d61735e49d4299be46ee5a1fc4b1718c6c63a20d2b6071fcb15d0d3c3d9fd2f",
+   "ours_sha256": "0676ae1111fa503126414d795aa1db702a907057b669cf5ec1189e96d2231539",
+   "theirs_sha256": "e38a81b67728ded865bd25d17a74c1be136170d00e44a53ba2e196385f0f15a9",
+   "result_sha256": "e38a81b67728ded865bd25d17a74c1be136170d00e44a53ba2e196385f0f15a9"
+  },
+  {
+   "path": "agent/credential_pool.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f44b3658025e5b0597d07a92364c9c69ca9162107d3319e0c1f5f5aa49a1e368",
+   "ours_sha256": "12882ac00d62806b7b84128c431cd912eb482d17fe9f17fa97f7162157ee825b",
+   "theirs_sha256": "6e615dc13189ce67d40ffc78742663e7eeb1e5b2d617d2401840712287d373b0",
+   "result_sha256": "6e615dc13189ce67d40ffc78742663e7eeb1e5b2d617d2401840712287d373b0"
+  },
+  {
+   "path": "agent/credential_pool_admin.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3d6144f7cc1970fb1c5fb791a2a812d6910f1812001c6dabe40af351e43e9475",
+   "ours_sha256": "0f6dfeeb51ba5089730d72e8a514fb600023e43c2bad8d1c37ac5b5609b3e4b4",
+   "theirs_sha256": "69f5a2c40dabd0f54eedc25fb86c6ec34cbb782c5899509fdd55e44ad33c7f7a",
+   "result_sha256": "69f5a2c40dabd0f54eedc25fb86c6ec34cbb782c5899509fdd55e44ad33c7f7a"
+  },
+  {
+   "path": "agent/credential_sources.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "d4150a76f731761889d1aa1e5b9569866678319a520c02869dcadbd900813111",
+   "ours_sha256": "d4150a76f731761889d1aa1e5b9569866678319a520c02869dcadbd900813111",
+   "theirs_sha256": "9394eb9aacdb4cfc1863985a7658461c1ccfb8f08408a2e626edc30ae3b21393",
+   "result_sha256": "9394eb9aacdb4cfc1863985a7658461c1ccfb8f08408a2e626edc30ae3b21393"
+  },
+  {
+   "path": "agent/credits_tracker.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e6b48bcbb558ffa8564864a729160aca95602b68f7714b38fb065dc6d9a376b8",
+   "ours_sha256": "10bf84976fbea9baf558536d4ac66131a5b4e13db2c7718989659d50bc9e41f6",
+   "theirs_sha256": "c4889add59b96f5290cb0368ccad8ef7b6d5fb1d3f022bcd7bdc4db0d7b922d8",
+   "result_sha256": "c4889add59b96f5290cb0368ccad8ef7b6d5fb1d3f022bcd7bdc4db0d7b922d8"
+  },
+  {
+   "path": "agent/curator.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "cb1d6f3a87615c65c1eaf4b3fa68573c1f98ce92fe6636502200fed3d06c3def",
+   "ours_sha256": "baafe16d2b8adeb0ce67d8557f71cde4092be5761583830de7e13d17e8b09cb8",
+   "theirs_sha256": "7dbaf9f1bb08836f908adc3c98ee52db26f71e290158096a5eed09bf3dd9c941",
+   "result_sha256": "7dbaf9f1bb08836f908adc3c98ee52db26f71e290158096a5eed09bf3dd9c941"
+  },
+  {
+   "path": "agent/curator_backup.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3a7f4fc7ebe0e41f819f064016b6d92b15bae55a278b705cdd0ff3cc92d86d95",
+   "ours_sha256": "35df40df662a47c41d2bad0609e56ec9bd5ef7d0ffc08dc84ce7798dcd77727d",
+   "theirs_sha256": "c58a6f28147cb4a2cea2386adfa9b7bf07bc11a99ef3414aab02468361e7451d",
+   "result_sha256": "c58a6f28147cb4a2cea2386adfa9b7bf07bc11a99ef3414aab02468361e7451d"
+  },
+  {
+   "path": "agent/deadline.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "32cc643b09ea00181932adc738d97e83f2ab60b2548e28997a805a65b3af1026",
+   "ours_sha256": "42b07a4574188d204dc3bcc96b03895ab57bc88b4cd1a7f452b8404b2b1cb4b2",
+   "theirs_sha256": "42b07a4574188d204dc3bcc96b03895ab57bc88b4cd1a7f452b8404b2b1cb4b2",
+   "result_sha256": "42b07a4574188d204dc3bcc96b03895ab57bc88b4cd1a7f452b8404b2b1cb4b2"
+  },
+  {
+   "path": "agent/delegation_context.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "709cd9f98062d793c3c2aebdf910607bb94b3454f6e8e6f2f6e54ce7b2c40ef5",
+   "ours_sha256": "709cd9f98062d793c3c2aebdf910607bb94b3454f6e8e6f2f6e54ce7b2c40ef5",
+   "theirs_sha256": "1a1ce49a7efc0e70f7cf4aab4ab8b1e35de0f9934ac97ff31db3493c67c12b53",
+   "result_sha256": "1a1ce49a7efc0e70f7cf4aab4ab8b1e35de0f9934ac97ff31db3493c67c12b53"
+  },
+  {
+   "path": "agent/display.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4eeb8e7b8f4f5b782e6b51466b7a67c862f781320c09a195c651bc3add762c7d",
+   "ours_sha256": "5a4269706588ef76dbd74bb06641bae2947b1a6f63df13b0219bb80748ef1893",
+   "theirs_sha256": "8e7fa7524b8dae9667231a4215eaa243d63e2cf9b9d13cec840dac39bf5033ae",
+   "result_sha256": "8e7fa7524b8dae9667231a4215eaa243d63e2cf9b9d13cec840dac39bf5033ae"
+  },
+  {
+   "path": "agent/error_classifier.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "05133494d8f499a0538c4807b65e1b4ec28622c935e372a86f04009236a74e09",
+   "ours_sha256": "1f1b95b9ceec7d018ffe0e86d377bc0962b9f1b38333da7fe0ebee26f7930ab9",
+   "theirs_sha256": "34ae4844a5734d1da926a78c677e9a0ea5554a88e9318dd28c54fc1422b27151",
+   "result_sha256": "34ae4844a5734d1da926a78c677e9a0ea5554a88e9318dd28c54fc1422b27151"
+  },
+  {
+   "path": "agent/error_surface.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5bab74993dfbddca1e50d9e3410874bff19a9d3431cd42e2af3f7de201e7030a",
+   "ours_sha256": "5bab74993dfbddca1e50d9e3410874bff19a9d3431cd42e2af3f7de201e7030a",
+   "theirs_sha256": "cc6669bd4c538f2a66ea9e5f7a76555d6ad49d440c25c5d334b4b6cadb025782",
+   "result_sha256": "cc6669bd4c538f2a66ea9e5f7a76555d6ad49d440c25c5d334b4b6cadb025782"
+  },
+  {
+   "path": "agent/errors.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "7a1cec5d0c875f5fb9c668a1b7c3ef61ee82a5ed5bd13b535cbad118bc3daec1",
+   "ours_sha256": "d59845a9357f14109589cc07ff327b89a43569108e798cbfd121b618d4edc8a6",
+   "theirs_sha256": "d59845a9357f14109589cc07ff327b89a43569108e798cbfd121b618d4edc8a6",
+   "result_sha256": "d59845a9357f14109589cc07ff327b89a43569108e798cbfd121b618d4edc8a6"
+  },
+  {
+   "path": "agent/estop.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f291a6ea601750c9c1d4c620c61a9e457e887dda5948c2d6282f375d66ef6b24",
+   "ours_sha256": "34b43b1ec52b96d33daf34e937ce8aa8c757ded934188ce59887af946b23ee1a",
+   "theirs_sha256": "3b8994ec4a2f1ca671fac41e936a6312072730f5bdb737ec0aa94d7bfa076738",
+   "result_sha256": "3b8994ec4a2f1ca671fac41e936a6312072730f5bdb737ec0aa94d7bfa076738"
+  },
+  {
+   "path": "agent/fallback_cooldown.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "ac78997a98c97f46480e8d009f98291389877c1637a580343af8a3ac11f61125",
+   "ours_sha256": "ac78997a98c97f46480e8d009f98291389877c1637a580343af8a3ac11f61125",
+   "theirs_sha256": "410ac97de6e82df472015a11cbc9149fb8e95d7da84b72efe76ffa94a9376b1b",
+   "result_sha256": "410ac97de6e82df472015a11cbc9149fb8e95d7da84b72efe76ffa94a9376b1b"
+  },
+  {
+   "path": "agent/fast_mode.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "668f8520b419952ab8523bbdacf59cf7cadc44d7ada2f99147ac770697921e21",
+   "ours_sha256": "335351d2ee4d132a793f3727fbfe0c9e4857ed50cc148c7367616b16f7709152",
+   "theirs_sha256": "335351d2ee4d132a793f3727fbfe0c9e4857ed50cc148c7367616b16f7709152",
+   "result_sha256": "335351d2ee4d132a793f3727fbfe0c9e4857ed50cc148c7367616b16f7709152"
+  },
+  {
+   "path": "agent/file_safety.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "6e4162209ac81f658463c13ac711833f2a01cf263171073d4f1f881b9f9818b0",
+   "ours_sha256": "6e4162209ac81f658463c13ac711833f2a01cf263171073d4f1f881b9f9818b0",
+   "theirs_sha256": "4f86e72949c0d310602e0757e27367ece8327614826d71149e4de1cd4ff4c415",
+   "result_sha256": "4f86e72949c0d310602e0757e27367ece8327614826d71149e4de1cd4ff4c415"
+  },
+  {
+   "path": "agent/gemini_native_adapter.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b5da0e5299f73fc946664296f65a3cac142f708352a9c4baa662ee00f2520fa5",
+   "ours_sha256": "9084c078ab3b5a343974f1f72a18452e8a5bf1a6fa6472b95f7cc275e15e7bad",
+   "theirs_sha256": "63e0ed15589ac99ef4263632ed6dd7675bc83a7b58a441033e518b359ade71dd",
+   "result_sha256": "63e0ed15589ac99ef4263632ed6dd7675bc83a7b58a441033e518b359ade71dd"
+  },
+  {
+   "path": "agent/gemini_schema.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c3fee3cc27deb1a05fffeb3504c10064c53547d67775e42dcdd56cb32eb1e664",
+   "ours_sha256": "c3fee3cc27deb1a05fffeb3504c10064c53547d67775e42dcdd56cb32eb1e664",
+   "theirs_sha256": "fd8a6eb6739a8ea0c9b0c849c4abd2791e44b9f8368341cf78ff0974f879d889",
+   "result_sha256": "fd8a6eb6739a8ea0c9b0c849c4abd2791e44b9f8368341cf78ff0974f879d889"
+  },
+  {
+   "path": "agent/history_commentary.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "7cb5dd48efdf52cbf36db2da0f4a46fe4db9b6ce9b92b9b769de3669040a974e",
+   "theirs_sha256": "7cb5dd48efdf52cbf36db2da0f4a46fe4db9b6ce9b92b9b769de3669040a974e",
+   "result_sha256": "7cb5dd48efdf52cbf36db2da0f4a46fe4db9b6ce9b92b9b769de3669040a974e"
+  },
+  {
+   "path": "agent/i18n.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "57b1a47a81c1c1830f3df64982ac81d8679e73af88d8024694f1a98597c51138",
+   "ours_sha256": "1ce922196ffb3bbde32868668fdfbc0bdc20affdc5740618e024cb6bf87523b1",
+   "theirs_sha256": "c464c5bf0cb6f9d3383673ff9cb680937ac42a421601e9b16bb10b87e80501a5",
+   "result_sha256": "c464c5bf0cb6f9d3383673ff9cb680937ac42a421601e9b16bb10b87e80501a5"
+  },
+  {
+   "path": "agent/image_routing.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "330333d9f3dc6100e1f2d3cd095af33a065c9b8e3a09853c6aa45a7de253a3d0",
+   "ours_sha256": "d5e943bd08bb92ef6d5df411b59ef35940e6c2f4eac163109bcf2a86ad5d358d",
+   "theirs_sha256": "a2a7a564c972d8ba469d039f55cb3e0291c59c24bc373f7c3f5d3ee78c505a98",
+   "result_sha256": "a2a7a564c972d8ba469d039f55cb3e0291c59c24bc373f7c3f5d3ee78c505a98"
+  },
+  {
+   "path": "agent/image_token_cost.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "d9935c4ecf6eff4a149b13dcbec396bd2b87fc3f17735fab72cb8858b408fd49",
+   "ours_sha256": "d9935c4ecf6eff4a149b13dcbec396bd2b87fc3f17735fab72cb8858b408fd49",
+   "theirs_sha256": "44bdcb3363602a5e4e311fd9164a7c971deef2b1655c63d6af6e53a0de3ae939",
+   "result_sha256": "44bdcb3363602a5e4e311fd9164a7c971deef2b1655c63d6af6e53a0de3ae939"
+  },
+  {
+   "path": "agent/inline_tool_executors.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "194fad123e43d1c4945de903e8790f03c70e494d3e27d465606848292616ffdd",
+   "ours_sha256": "998ced71138122a4d73f21dea7f7c552a9afec02b8b27b590200398025ee22e7",
+   "theirs_sha256": "a977ae2df876ca6ae7a074c8611e4930c407d47d684e3655e0a68531ddcb4b9a",
+   "result_sha256": "a977ae2df876ca6ae7a074c8611e4930c407d47d684e3655e0a68531ddcb4b9a"
+  },
+  {
+   "path": "agent/insights.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f9039eb8ba673dc7bca9729531e4242147c5bfa9b698299716842f0e34a737fd",
+   "ours_sha256": "51e459a87a2a9bf3f2e4b8bfce13831668a5ede12a9a7f9ac133bb150dc8bdee",
+   "theirs_sha256": "7c97a4bf5df519038dbcd73467e5316fecfc99b00e73b5fb8f5b5e55d4048596",
+   "result_sha256": "7c97a4bf5df519038dbcd73467e5316fecfc99b00e73b5fb8f5b5e55d4048596"
+  },
+  {
+   "path": "agent/interrupt_control.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4529ecc92ce8dfad5c016c63e338b304260bfdee462bbdcd98cb032b193660c9",
+   "ours_sha256": "4529ecc92ce8dfad5c016c63e338b304260bfdee462bbdcd98cb032b193660c9",
+   "theirs_sha256": "572c6abeb287cbb8728297cf357a7011537f4cfbf0f1e26db80401c0afe790e4",
+   "result_sha256": "572c6abeb287cbb8728297cf357a7011537f4cfbf0f1e26db80401c0afe790e4"
+  },
+  {
+   "path": "agent/interrupt_scope.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5f9e2bd5e0db8c9499b5c316ed682fde35c48b5fc64adde9fbd92f45fba06f4a",
+   "ours_sha256": "5f9e2bd5e0db8c9499b5c316ed682fde35c48b5fc64adde9fbd92f45fba06f4a",
+   "theirs_sha256": "dbf0112c7c4fc9ef14874f97383245ea1c55e958de5cc7b5c9a046dfc3f4a1f1",
+   "result_sha256": "dbf0112c7c4fc9ef14874f97383245ea1c55e958de5cc7b5c9a046dfc3f4a1f1"
+  },
+  {
+   "path": "agent/kanban_stop.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "9571912fc0084a35c67035126243f2a63c2d119fbe4dd0de583a837898a5f9f8",
+   "ours_sha256": "9571912fc0084a35c67035126243f2a63c2d119fbe4dd0de583a837898a5f9f8",
+   "theirs_sha256": "f7d1b0b96922f8425fa8efab232682a1ab372e87b0bce4ca3f4b82922a6bac27",
+   "result_sha256": "f7d1b0b96922f8425fa8efab232682a1ab372e87b0bce4ca3f4b82922a6bac27"
+  },
+  {
+   "path": "agent/learning_graph.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b413b0a27f06e1c8b00743716d169111fd9cd5ff584d6069ea252365244b632c",
+   "ours_sha256": "4bb4e045166a93d3834de9a9ac9878679aa921ed5f9efb9a883f574f3a727ec0",
+   "theirs_sha256": "19f187f239d12b6e49c919c8e64f897f49097b27ad6b80a9e5d1334fd929ed44",
+   "result_sha256": "19f187f239d12b6e49c919c8e64f897f49097b27ad6b80a9e5d1334fd929ed44"
+  },
+  {
+   "path": "agent/learning_graph_render.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "a9b6de1a511c98df11745f698b101e04f4e3aa53221d32406fb19e967ff9137d",
+   "ours_sha256": "e5fba0caf343863b01b80686551045351deaee9919fb0f1ef4fc8154fd18d28b",
+   "theirs_sha256": "e5fba0caf343863b01b80686551045351deaee9919fb0f1ef4fc8154fd18d28b",
+   "result_sha256": "e5fba0caf343863b01b80686551045351deaee9919fb0f1ef4fc8154fd18d28b"
+  },
+  {
+   "path": "agent/learning_mutations.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "49cf634e467a3ebd21ac0e6700f9ee87d9620f5c17ae9eb4c5de20295be5ab9c",
+   "ours_sha256": "03142bf33456ed9a5f41cbfc14619277313244e2b59bd0507383724e50d993ef",
+   "theirs_sha256": "6809fc3ed14ef6b3955600d625b1a6393335e139aa153fd20a5879f2ff60660e",
+   "result_sha256": "6809fc3ed14ef6b3955600d625b1a6393335e139aa153fd20a5879f2ff60660e"
+  },
+  {
+   "path": "agent/legacy_cli.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "ce7966ec927eaa93e3562f0aab99855d7d95785f7af9a3efc273c3aa8d6cbfe5",
+   "theirs_sha256": "ce7966ec927eaa93e3562f0aab99855d7d95785f7af9a3efc273c3aa8d6cbfe5",
+   "result_sha256": "ce7966ec927eaa93e3562f0aab99855d7d95785f7af9a3efc273c3aa8d6cbfe5"
+  },
+  {
+   "path": "agent/lsp/__init__.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "9453bdd39bb42553059dd8086e964ef72643da97862aa68b1f978f3dddd5f6e7",
+   "ours_sha256": "9453bdd39bb42553059dd8086e964ef72643da97862aa68b1f978f3dddd5f6e7",
+   "theirs_sha256": "01e55a42d1ed7fbec3ff420ad37b0c3df3b0cf800c777182d1f73d84b78212aa",
+   "result_sha256": "01e55a42d1ed7fbec3ff420ad37b0c3df3b0cf800c777182d1f73d84b78212aa"
+  },
+  {
+   "path": "agent/lsp/cli.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "10480a87471102fb88bb36283d345009137d7faf44d6847be8a21dc78edf7ac3",
+   "ours_sha256": "10480a87471102fb88bb36283d345009137d7faf44d6847be8a21dc78edf7ac3",
+   "theirs_sha256": "533fab2f5d34103f5cc516bb639d848b2933f9963c1a6d5d7bfaddd650c73b83",
+   "result_sha256": "533fab2f5d34103f5cc516bb639d848b2933f9963c1a6d5d7bfaddd650c73b83"
+  },
+  {
+   "path": "agent/lsp/client.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "fadf4e150ec7e3524ea3fcb0d45ef018b6f2b8ecaa3ec364a0596daafaa52024",
+   "ours_sha256": "3007e9fa3c216b7ead082072d4d334cf9aab8e3e8b3d22c4c451782d92efa8cb",
+   "theirs_sha256": "4a5092a2606075ad9576b428e0b7d919f8ab6c5f62acb06c2c8645ece8df89cb",
+   "result_sha256": "4a5092a2606075ad9576b428e0b7d919f8ab6c5f62acb06c2c8645ece8df89cb"
+  },
+  {
+   "path": "agent/lsp/eventlog.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "12eb4d6415882ab4eb4ef2280f5d548c686092cee90bc2cbc440e37bcf7c3e29",
+   "ours_sha256": "12eb4d6415882ab4eb4ef2280f5d548c686092cee90bc2cbc440e37bcf7c3e29",
+   "theirs_sha256": "c5d891e075cb9d69468c6377416ccfecc4abe23ffe796c9a84e3e3ae44e5a716",
+   "result_sha256": "c5d891e075cb9d69468c6377416ccfecc4abe23ffe796c9a84e3e3ae44e5a716"
+  },
+  {
+   "path": "agent/lsp/install.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "20b922fda40e1593c7392026ea69d1b1cfef20c408b5ab15f823210dd42163a1",
+   "ours_sha256": "0a5573c02e34b934a3ade6c0965dcfa452065dd459132b6a7f9625f03f45ff24",
+   "theirs_sha256": "b0005d0f976a9e506242ddbf642125b6ddfcaed673455b3ecfe98bde3a96e344",
+   "result_sha256": "b0005d0f976a9e506242ddbf642125b6ddfcaed673455b3ecfe98bde3a96e344"
+  },
+  {
+   "path": "agent/lsp/manager.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "afd31a5a1a99f8e9c22dac16c522f8540c0391d918adc30623b6b0cc26a13f36",
+   "ours_sha256": "afd31a5a1a99f8e9c22dac16c522f8540c0391d918adc30623b6b0cc26a13f36",
+   "theirs_sha256": "92f32276938c0031b9f9bb9472d0d6edc99a9c1e59483f3e14a59955e7c48b96",
+   "result_sha256": "92f32276938c0031b9f9bb9472d0d6edc99a9c1e59483f3e14a59955e7c48b96"
+  },
+  {
+   "path": "agent/lsp/servers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "2ff851d358b6a564bfaf67bc8df85c644a2ad90a30b2a4cef08d59a4f03aafcc",
+   "ours_sha256": "301f4018119735d06b7e427307a097825e774d26a6dcbf5eba968ec39b9b2cf5",
+   "theirs_sha256": "1f5739be6645100d6e324ce514552365d79ab7092fdab9b89184afe83cd9ff31",
+   "result_sha256": "1f5739be6645100d6e324ce514552365d79ab7092fdab9b89184afe83cd9ff31"
+  },
+  {
+   "path": "agent/lsp/workspace.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "76829fc81ba05eebe5d9713c6df41fe53e3bf9536005ed880a247b5e320ec011",
+   "ours_sha256": "76829fc81ba05eebe5d9713c6df41fe53e3bf9536005ed880a247b5e320ec011",
+   "theirs_sha256": "d808a7c1e556c53502aa4ac37e1373d89cc93517af5e8a57f4fe5ff7d98c8907",
+   "result_sha256": "d808a7c1e556c53502aa4ac37e1373d89cc93517af5e8a57f4fe5ff7d98c8907"
+  },
+  {
+   "path": "agent/memory_manager.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "944a2b3a87566446c32edaf6b5b43e614e04290009c26efc7229b192b52affef",
+   "ours_sha256": "c1a56b5cc393305cb7da439593a5d8e1042bece74dde8b63da0ae094030490cc",
+   "theirs_sha256": "e5def70e1863a604dee6720abcd6d81daeea038720ee6b073474d4127c07d5a6",
+   "result_sha256": "e5def70e1863a604dee6720abcd6d81daeea038720ee6b073474d4127c07d5a6"
+  },
+  {
+   "path": "agent/memory_provider.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5a948a2535c79d2e1475ea1bb8d3aef032df3b863a7456d473b3ffa285adfe47",
+   "ours_sha256": "2e82879a4390d3372f8a2f0c931ae4636323a85e0c3fecb56c31ad337da590f2",
+   "theirs_sha256": "071106d726cb2c4c72bda1c3fe4a800309e8f30aafdee20d0efa9f32f60cc910",
+   "result_sha256": "071106d726cb2c4c72bda1c3fe4a800309e8f30aafdee20d0efa9f32f60cc910"
+  },
+  {
+   "path": "agent/message_metadata.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "f6e3b903e0100d9cfd2a243a6706af9344843452d3e508cfb9c33abd5facfb35",
+   "ours_sha256": "466eefd62e06e3b26c2a789d156372c21761a41b7f14be48a9d4fd9810110a2c",
+   "theirs_sha256": "466eefd62e06e3b26c2a789d156372c21761a41b7f14be48a9d4fd9810110a2c",
+   "result_sha256": "466eefd62e06e3b26c2a789d156372c21761a41b7f14be48a9d4fd9810110a2c"
+  },
+  {
+   "path": "agent/message_sanitization.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "9ff32174aef4cf1b31f0d24f3e45411c1959021912487fbc1089a14054567627",
+   "ours_sha256": "1e2d391063a0c73c2760d1c21c0f2e4347a3df1ce068f49a41bd44b58858c779",
+   "theirs_sha256": "147fbae1ddeb42f803831ac88035ffaeec498f68935399ae8fe2c69e25deabd5",
+   "result_sha256": "147fbae1ddeb42f803831ac88035ffaeec498f68935399ae8fe2c69e25deabd5"
+  },
+  {
+   "path": "agent/micro_compaction.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "7529bd539752b91c196da9918c02e0e6eb091efbbaa330bec7a008b998abb3c9",
+   "ours_sha256": "48e8104381472376878076b35b4480ad12821d6be026f539ac30ee2d6c809d2d",
+   "theirs_sha256": "d12ac14e1d2e7c756a4c3ba88c63db1862fb502a130796dc37d69a214d788327",
+   "result_sha256": "d12ac14e1d2e7c756a4c3ba88c63db1862fb502a130796dc37d69a214d788327"
+  },
+  {
+   "path": "agent/moa_loop.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e74f2e3a5c08314999aa6841dc022bab68dd49c0144f2a6375b6ba16f9f22330",
+   "ours_sha256": "4b54a2bc88c0d662e82651f6b91f829df52008345842f30163c7d48d37a29401",
+   "theirs_sha256": "7f2430710884797254d1e0efcff6b598acc847938db87bc4676eca4e1d04ac63",
+   "result_sha256": "7f2430710884797254d1e0efcff6b598acc847938db87bc4676eca4e1d04ac63"
+  },
+  {
+   "path": "agent/moa_trace.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "fdd1a7df70482518912fea5269a763c8c730695a1a90837c94a5c34de5f10ee1",
+   "ours_sha256": "fdd1a7df70482518912fea5269a763c8c730695a1a90837c94a5c34de5f10ee1",
+   "theirs_sha256": "476859fcc7b60ed89a1ad51b1d32748b921ead2025ffece898e31b2f9feaaf39",
+   "result_sha256": "476859fcc7b60ed89a1ad51b1d32748b921ead2025ffece898e31b2f9feaaf39"
+  },
+  {
+   "path": "agent/model_metadata.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "746c2bcf3b86700a237fff65679af25444f6d739a9483aa55142bbd3df9bbf3e",
+   "ours_sha256": "66961c3ec0dbb4582527b168a882ead95fca2d19b7df74e71725009e2a3a3c56",
+   "theirs_sha256": "6cbf5c3af9e1391e0f963a781f96740c59dd370459ca30938d50467431342075",
+   "result_sha256": "6cbf5c3af9e1391e0f963a781f96740c59dd370459ca30938d50467431342075"
+  },
+  {
+   "path": "agent/model_metadata_http.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "17f724efd01be857c0265bc5b78cb5050c925cad57d52c0098aaa7f306ad0ebe",
+   "theirs_sha256": "17f724efd01be857c0265bc5b78cb5050c925cad57d52c0098aaa7f306ad0ebe",
+   "result_sha256": "17f724efd01be857c0265bc5b78cb5050c925cad57d52c0098aaa7f306ad0ebe"
+  },
+  {
+   "path": "agent/models_dev.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b46983e6eec5c8235c92a3e7e39c03d4ee4d1e35aef0476d8fab679e7eb22a07",
+   "ours_sha256": "6403254e63cfc84f30ed73ed148500dc220679e3a87b446928ffb3723d51e08c",
+   "theirs_sha256": "b6394bb599171a5e341c119fa96af5512979ec32bc5d63c4efd24f6793aed763",
+   "result_sha256": "b6394bb599171a5e341c119fa96af5512979ec32bc5d63c4efd24f6793aed763"
+  },
+  {
+   "path": "agent/monitoring/cron_health.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3719d9d194988abc00b92ff267518a3036996ea3bc1c09f498a2fcbffe64257a",
+   "ours_sha256": "3719d9d194988abc00b92ff267518a3036996ea3bc1c09f498a2fcbffe64257a",
+   "theirs_sha256": "366a90864b4b93f59a93da680c261e6446d785b89c2cefb9d05efa85185089b2",
+   "result_sha256": "366a90864b4b93f59a93da680c261e6446d785b89c2cefb9d05efa85185089b2"
+  },
+  {
+   "path": "agent/monitoring/emitter.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b2a09cc1fffb5de76e959496c6c07629dbca8feb27cdbce941e0cf27b73457da",
+   "ours_sha256": "b2a09cc1fffb5de76e959496c6c07629dbca8feb27cdbce941e0cf27b73457da",
+   "theirs_sha256": "c48e176d4f9451abb3717d8f3fe2ccac0990a5d8dba2e6e0c25eba81565d92e3",
+   "result_sha256": "c48e176d4f9451abb3717d8f3fe2ccac0990a5d8dba2e6e0c25eba81565d92e3"
+  },
+  {
+   "path": "agent/monitoring/gateway_health.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "ad704ffdd200dd9508d04520c297d82cfce2ff3204ea705e19b4cb140248ad1e",
+   "ours_sha256": "66dc1366c132139e6c33597fdb2944d33da4cb21c73fbbcd058acaa285004f3c",
+   "theirs_sha256": "66dc1366c132139e6c33597fdb2944d33da4cb21c73fbbcd058acaa285004f3c",
+   "result_sha256": "66dc1366c132139e6c33597fdb2944d33da4cb21c73fbbcd058acaa285004f3c"
+  },
+  {
+   "path": "agent/monitoring/gateway_health_export.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5415a28d7e3e900386927d91f52d0b54bae0b5ca6c79c71229e9df14de4be7da",
+   "ours_sha256": "769d1fb8d1eb9bc3a059c865a8f76e0e0dbd4e26423d883c2e068830f7eed465",
+   "theirs_sha256": "953fe179b051212ba850242bf494fd8dfd6da9e3241ec7fc798e07d78546a5b8",
+   "result_sha256": "953fe179b051212ba850242bf494fd8dfd6da9e3241ec7fc798e07d78546a5b8"
+  },
+  {
+   "path": "agent/monitoring/otlp_exporter.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "5373fb737b1fbf3e902fc664ce22c7e3eb6fd4bb44de36636104bb87374b8933",
+   "ours_sha256": "ecbdcbaa052198e9a539db066403b21b93864a98f90260acf87c9af71f94d24a",
+   "theirs_sha256": "ecbdcbaa052198e9a539db066403b21b93864a98f90260acf87c9af71f94d24a",
+   "result_sha256": "ecbdcbaa052198e9a539db066403b21b93864a98f90260acf87c9af71f94d24a"
+  },
+  {
+   "path": "agent/monitoring/redaction.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "756d9ba1b554edb53cac3f794ef21ed73246c4ecd2c9e89a7b26603224f555ed",
+   "ours_sha256": "756d9ba1b554edb53cac3f794ef21ed73246c4ecd2c9e89a7b26603224f555ed",
+   "theirs_sha256": "cadb1b791898967f8b9049f6084afc2dc592f819f89ec78066b654810e9b0d6b",
+   "result_sha256": "cadb1b791898967f8b9049f6084afc2dc592f819f89ec78066b654810e9b0d6b"
+  },
+  {
+   "path": "agent/moonshot_schema.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "b27863f2af5d76a7c53b3d5de52b31be429e7ace74073a736859f3556c9c669f",
+   "ours_sha256": "e689ee8c25e70468e3824f90ecfbd41eae5294cc0edf0331804122bd304b18ad",
+   "theirs_sha256": "e689ee8c25e70468e3824f90ecfbd41eae5294cc0edf0331804122bd304b18ad",
+   "result_sha256": "e689ee8c25e70468e3824f90ecfbd41eae5294cc0edf0331804122bd304b18ad"
+  },
+  {
+   "path": "agent/native_compaction.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4890c4d5397bd421af85dd0e8cb66c192189eb13df30961cc98009609011c89a",
+   "ours_sha256": "4890c4d5397bd421af85dd0e8cb66c192189eb13df30961cc98009609011c89a",
+   "theirs_sha256": "5364e5b52c7e20d622cdcc7aa6fdd89d46ecb30cf5d7e2fcff96af9227730233",
+   "result_sha256": "5364e5b52c7e20d622cdcc7aa6fdd89d46ecb30cf5d7e2fcff96af9227730233"
+  },
+  {
+   "path": "agent/nous_rate_guard.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c6c23a559a446b92633c344dfbaef65e34599aa7be6409933391191f3d8ba1fc",
+   "ours_sha256": "241d266828aa70ce1d60d9ed37677c2ddfd80efe1e35331121ca701ac1e55e53",
+   "theirs_sha256": "d5948a4d084fdff50bd38f7c89a266175a7a3706e84f8877d5e3a2d97314c2e1",
+   "result_sha256": "d5948a4d084fdff50bd38f7c89a266175a7a3706e84f8877d5e3a2d97314c2e1"
+  },
+  {
+   "path": "agent/onboarding.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5f1ea0ac6d37bae50cf3db34384605640e557cc95e2a23d5536acd30580b5ba5",
+   "ours_sha256": "5f1ea0ac6d37bae50cf3db34384605640e557cc95e2a23d5536acd30580b5ba5",
+   "theirs_sha256": "f8214c3b8e550e220429b68754bb34a1b719bf4e2cd5d2788b0730d6187539c5",
+   "result_sha256": "f8214c3b8e550e220429b68754bb34a1b719bf4e2cd5d2788b0730d6187539c5"
+  },
+  {
+   "path": "agent/opencode_affinity.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "0090dcdfc0895dca6c90fc88421262d40d7be3e71f430a5e300fa4cf5aa7ff31",
+   "ours_sha256": "0090dcdfc0895dca6c90fc88421262d40d7be3e71f430a5e300fa4cf5aa7ff31",
+   "theirs_sha256": "01fee87196cbc03dd5b7392dc1754ffb59ea33a5b9dabf67f3acf71ce09f585c",
+   "result_sha256": "01fee87196cbc03dd5b7392dc1754ffb59ea33a5b9dabf67f3acf71ce09f585c"
+  },
+  {
+   "path": "agent/outbound_webhooks.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e149090667a6d1360d777f8d0dc7dff1c61a40d6fabeb4e5e5e40e14a7c4586f",
+   "ours_sha256": "e149090667a6d1360d777f8d0dc7dff1c61a40d6fabeb4e5e5e40e14a7c4586f",
+   "theirs_sha256": "3ef3a995eea9fd5c29b5115b92b1fd6c63dc89fb225235945dd23798cc58dd14",
+   "result_sha256": "3ef3a995eea9fd5c29b5115b92b1fd6c63dc89fb225235945dd23798cc58dd14"
+  },
+  {
+   "path": "agent/periodic_scheduler.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "dd929ecf6ee0275772b60912c9637e27749d065fc11a7af5785465c8b6041bb7",
+   "ours_sha256": "dd929ecf6ee0275772b60912c9637e27749d065fc11a7af5785465c8b6041bb7",
+   "theirs_sha256": "9b09957f014ed6fb6ac8d2e8da81cd77fa4d37be45d2e8040308bb88266e91fb",
+   "result_sha256": "9b09957f014ed6fb6ac8d2e8da81cd77fa4d37be45d2e8040308bb88266e91fb"
+  },
+  {
+   "path": "agent/pet/manifest.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "a75ff65a33fec8b7b3c35baee3ae38fc2b2ccb59015b85336bdd7f9854a30212",
+   "ours_sha256": "a75ff65a33fec8b7b3c35baee3ae38fc2b2ccb59015b85336bdd7f9854a30212",
+   "theirs_sha256": "6102b3f430619c87979fbefd2713a1fbab00c59ac79fe22ef65f61f5ba10f406",
+   "result_sha256": "6102b3f430619c87979fbefd2713a1fbab00c59ac79fe22ef65f61f5ba10f406"
+  },
+  {
+   "path": "agent/pet/store.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "bf2b063cb298454d2988d1df8d1bd11fe6a1a79928a6a3932806c9ec3fa779ca",
+   "ours_sha256": "2b93f69fc7ecffd829cdb4997c46240261b42e66be330ca78cadf4f318cb0502",
+   "theirs_sha256": "deb5da9b50b396d4e419f910bc2945b5fb6df12c5310300408178419adf28d0a",
+   "result_sha256": "deb5da9b50b396d4e419f910bc2945b5fb6df12c5310300408178419adf28d0a"
+  },
+  {
+   "path": "agent/plan_prompt.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "952488833c484602c8e58800b3b558bf0153ce8c1e250a6a81b99497c6390b45",
+   "ours_sha256": "952488833c484602c8e58800b3b558bf0153ce8c1e250a6a81b99497c6390b45",
+   "theirs_sha256": "903c3b003c65221347e5bf3cd571ac2a359210aa987654263a7c3804fe524181",
+   "result_sha256": "903c3b003c65221347e5bf3cd571ac2a359210aa987654263a7c3804fe524181"
+  },
+  {
+   "path": "agent/plugin_stream_hooks.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5addacb685aaff716bfed2e8f911928a1fb8606521a1f9e1352c5dd96e96f318",
+   "ours_sha256": "4ab765d56981535fb0553b159438158a1f53bcdcbb105d97805be411e9b6fdb4",
+   "theirs_sha256": "f30f349873fb4f0c3a93d85bb58f01470bddb2ccc08fb15730a86a81bdc96378",
+   "result_sha256": "f30f349873fb4f0c3a93d85bb58f01470bddb2ccc08fb15730a86a81bdc96378"
+  },
+  {
+   "path": "agent/portal_tags.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "95dbb6151bce5419e6f7fc1dbfe95dfbe4940aad9f3fa60f8b74e886e47853d2",
+   "ours_sha256": "1453b368ef0dcd7651094ab484b574c4acc71f7ede83f885649d405fca36f787",
+   "theirs_sha256": "645cc058112fca061348082f6e7b640888982ceb404dafc70000908783dcde17",
+   "result_sha256": "645cc058112fca061348082f6e7b640888982ceb404dafc70000908783dcde17"
+  },
+  {
+   "path": "agent/process_bootstrap.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f03b329cbc50ecfef0d64b17885767663915a4d5a0cb908e6c144f05c27b17bd",
+   "ours_sha256": "f03b329cbc50ecfef0d64b17885767663915a4d5a0cb908e6c144f05c27b17bd",
+   "theirs_sha256": "52aa9433530ca24c15ab17ee4ed67d85cdeee243de71cabe0ef51978862a04c6",
+   "result_sha256": "52aa9433530ca24c15ab17ee4ed67d85cdeee243de71cabe0ef51978862a04c6"
+  },
+  {
+   "path": "agent/prompt_builder.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f89520c5c7c2522fc342af514427b6ae8b1512260f91dcb3c57eb6dc90a5a79e",
+   "ours_sha256": "0946e57eb121e56f9e73befb34a86e653ebf674726d82c0b06d2cbeede65e0d8",
+   "theirs_sha256": "316391691775eb238b6888c8a0087276c70cc23a7ec17ece6a611540225318be",
+   "result_sha256": "316391691775eb238b6888c8a0087276c70cc23a7ec17ece6a611540225318be"
+  },
+  {
+   "path": "agent/prompt_cache_scope.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "2fedeae25a7220cc35090d2674174b645b2571a887c1d52d239934fb9e7da439",
+   "ours_sha256": "2fedeae25a7220cc35090d2674174b645b2571a887c1d52d239934fb9e7da439",
+   "theirs_sha256": "6303243b6622de2ff068831a08c00d6845e450b8cb9f9183ae5a9cda25df2a4b",
+   "result_sha256": "6303243b6622de2ff068831a08c00d6845e450b8cb9f9183ae5a9cda25df2a4b"
+  },
+  {
+   "path": "agent/prompt_caching.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "17b4d7c336f1da981dbaac940f15f656b0d2aeb5a2b1f041e7c210e8865f5c81",
+   "ours_sha256": "f5978ac68866c7d0e7593e7a5dd2625ac574657a6e40aa83b4e9c9965b496752",
+   "theirs_sha256": "f5978ac68866c7d0e7593e7a5dd2625ac574657a6e40aa83b4e9c9965b496752",
+   "result_sha256": "f5978ac68866c7d0e7593e7a5dd2625ac574657a6e40aa83b4e9c9965b496752"
+  },
+  {
+   "path": "agent/provider_media.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "934021cdac8e632da20b162018e0df0ed6fc555d09e55a0125ef4d03751a61cc",
+   "ours_sha256": "934021cdac8e632da20b162018e0df0ed6fc555d09e55a0125ef4d03751a61cc",
+   "theirs_sha256": "0520b02e0426b197dc959c3750610232b097af6626a62cdd55be3827e3fdd43b",
+   "result_sha256": "0520b02e0426b197dc959c3750610232b097af6626a62cdd55be3827e3fdd43b"
+  },
+  {
+   "path": "agent/provider_projection.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "01dc7e1e8cf7635de1dcbe8185c1079197d54b3db9e8bf792501e1190e5e7d83",
+   "ours_sha256": "01dc7e1e8cf7635de1dcbe8185c1079197d54b3db9e8bf792501e1190e5e7d83",
+   "theirs_sha256": "ff970469bd4af699e059926f1b01f0fbfff588a58c84aeeefddece6b9d7f5a5a",
+   "result_sha256": "ff970469bd4af699e059926f1b01f0fbfff588a58c84aeeefddece6b9d7f5a5a"
+  },
+  {
+   "path": "agent/provider_registry.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "ae89e60c04b92d1736f9a2229f147efbce5c4ae9d6412555841c403bd5d7a467",
+   "ours_sha256": "ddba36295f63a3a8c7111defb9aeb45be3a61f189f9d1d1db4c42ed0e4dd2066",
+   "theirs_sha256": "ddba36295f63a3a8c7111defb9aeb45be3a61f189f9d1d1db4c42ed0e4dd2066",
+   "result_sha256": "ddba36295f63a3a8c7111defb9aeb45be3a61f189f9d1d1db4c42ed0e4dd2066"
+  },
+  {
+   "path": "agent/proxy_sources/iron_proxy.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f0f19d506997275377e775479bb84b2bc5ac0bab21290852fdc3ffb31a29bb12",
+   "ours_sha256": "45e9ea0abdce0cc5dcfa33838f1940fc5cc707a0cc31078f3414978334d29c10",
+   "theirs_sha256": "ecd031f8e8adaced27cbd2f2d4023b3c84731180fbcc33e174b0abd1a5d6d645",
+   "result_sha256": "ecd031f8e8adaced27cbd2f2d4023b3c84731180fbcc33e174b0abd1a5d6d645"
+  },
+  {
+   "path": "agent/rate_limit_credits.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "7a5b2d7768b6235b668b7a6ec3bc645968587d1933610017308459c7a5ad8a0e",
+   "ours_sha256": "7a5b2d7768b6235b668b7a6ec3bc645968587d1933610017308459c7a5ad8a0e",
+   "theirs_sha256": "c90f33a87292ee75998b0f3437608dc27a7f46f23b1f205452585d0b46280cba",
+   "result_sha256": "c90f33a87292ee75998b0f3437608dc27a7f46f23b1f205452585d0b46280cba"
+  },
+  {
+   "path": "agent/reasoning_effort.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "67f27b19302c89b4370b4cf9b8582e7ea4b1bc4f8274bb798144a0082b94208e",
+   "ours_sha256": "c3dfc6e07c008613a26491e98ccdbbaa6ef3c8cb09d1eed243b66738806d9ade",
+   "theirs_sha256": "f2b4e11663dd66fe72bed0436561b30fe631bf940254eacc45de15c5953c94da",
+   "result_sha256": "f2b4e11663dd66fe72bed0436561b30fe631bf940254eacc45de15c5953c94da"
+  },
+  {
+   "path": "agent/reasoning_params.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f99e49783eadf811019b697e9897ec7420966c1a856f1bee086753fc41af7cf9",
+   "ours_sha256": "f99e49783eadf811019b697e9897ec7420966c1a856f1bee086753fc41af7cf9",
+   "theirs_sha256": "4067082fc03dbde211dd6edf6a6177f25f518ab49dcc77dc6fccb999c0996264",
+   "result_sha256": "4067082fc03dbde211dd6edf6a6177f25f518ab49dcc77dc6fccb999c0996264"
+  },
+  {
+   "path": "agent/reasoning_summaries.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "d44287e68a4f26bb2697bfebd8ee68ef78d3978191b847002d2f544c81e76cc8",
+   "ours_sha256": "d44287e68a4f26bb2697bfebd8ee68ef78d3978191b847002d2f544c81e76cc8",
+   "theirs_sha256": "d4c4b46a1f0d3488c65abe69cd620443a7e01618aa5a169e1b37ca00db9a56b6",
+   "result_sha256": "d4c4b46a1f0d3488c65abe69cd620443a7e01618aa5a169e1b37ca00db9a56b6"
+  },
+  {
+   "path": "agent/reasoning_timeouts.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "179b597afd80cf16382bbe9d64ea601b36574f92ea495983bdd197ecd55d20eb",
+   "ours_sha256": "179b597afd80cf16382bbe9d64ea601b36574f92ea495983bdd197ecd55d20eb",
+   "theirs_sha256": "1083ab4bfa3b758ff742463ddc8a7a57d86584fd6f1a112f581484d4597d4718",
+   "result_sha256": "1083ab4bfa3b758ff742463ddc8a7a57d86584fd6f1a112f581484d4597d4718"
+  },
+  {
+   "path": "agent/redact.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "de389436dae14b14ae2fdf6edb0c5152a7f888e5bbfec47bfb04aba2139e671b",
+   "ours_sha256": "028a7fb8361f19362e8bc005eba194d9c3f057cf9aa8acc3e116b09143cf9df4",
+   "theirs_sha256": "61641f7daa18cb970a3c8e66c774c9cd4b982fdf4cbc55f222b3bad66cfa01a8",
+   "result_sha256": "61641f7daa18cb970a3c8e66c774c9cd4b982fdf4cbc55f222b3bad66cfa01a8"
+  },
+  {
+   "path": "agent/relay_cwd.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": null,
+   "ours_sha256": "5350587cf1f151bfebbe776e592139ab84dfcc61962c1801b6092456a314357d",
+   "theirs_sha256": "5350587cf1f151bfebbe776e592139ab84dfcc61962c1801b6092456a314357d",
+   "result_sha256": "5350587cf1f151bfebbe776e592139ab84dfcc61962c1801b6092456a314357d"
+  },
+  {
+   "path": "agent/relay_llm.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "828ed5d96f84dcc0e8cd64ce113e0bd39cea7c15ff304239332962a90c4f472d",
+   "ours_sha256": "e0fb099214b6953983ba7ae79d06804b1b0d5ddaae9bc99e0d66b5885bbdc51c",
+   "theirs_sha256": "7fccceaf98e6640c8f81e4aa4a56e9ae3f390dc86033b24b0ccb00ca0e60c996",
+   "result_sha256": "7fccceaf98e6640c8f81e4aa4a56e9ae3f390dc86033b24b0ccb00ca0e60c996"
+  },
+  {
+   "path": "agent/relay_runtime.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "0362597ba196701dab40ae5b023597f18242d27e1eb1c5be7412bec794d7a37e",
+   "ours_sha256": "fc6fb4978e1f932c09e696480fe498a3abf49a9bb65d490928a375358417dcea",
+   "theirs_sha256": "4f050c5746b4255cd01398918bcc25ff998cf3a1b4bb09f7b82e9e0cda40bb36",
+   "result_sha256": "4f050c5746b4255cd01398918bcc25ff998cf3a1b4bb09f7b82e9e0cda40bb36"
+  },
+  {
+   "path": "agent/repetition_guard.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "56072b2437ea6d0c6ab67f893937e87b03026d33324490ec6bf3d072bab3a1af",
+   "ours_sha256": "493fe087db8c15f93c2d6ec161f3f9f2b81c4cfcd006aaf089c3349b2265883c",
+   "theirs_sha256": "cfc2ae6b1ea9ac25fbd284d293680e88fec28ef801ab8f961a782484ecf04223",
+   "result_sha256": "cfc2ae6b1ea9ac25fbd284d293680e88fec28ef801ab8f961a782484ecf04223"
+  },
+  {
+   "path": "agent/replay_cleanup.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f85258bae8714f8df416aa8f6a42481b76edc700c0106854bc36267d442cbb29",
+   "ours_sha256": "f85258bae8714f8df416aa8f6a42481b76edc700c0106854bc36267d442cbb29",
+   "theirs_sha256": "ce8fe5a80d9d1d2b944bfd23187b732e276c3910c9df1296784ecdaaee80a982",
+   "result_sha256": "ce8fe5a80d9d1d2b944bfd23187b732e276c3910c9df1296784ecdaaee80a982"
+  },
+  {
+   "path": "agent/retry_utils.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c51c7fca5d9ce2bfd4cc5722a0f1a371a645d3839cd56646f372f9070c0f62f0",
+   "ours_sha256": "c51c7fca5d9ce2bfd4cc5722a0f1a371a645d3839cd56646f372f9070c0f62f0",
+   "theirs_sha256": "1682967734b3c6e68ea1f0fef91da81508c5e5c7a67659ac64dbaec0b4bf9bc9",
+   "result_sha256": "1682967734b3c6e68ea1f0fef91da81508c5e5c7a67659ac64dbaec0b4bf9bc9"
+  },
+  {
+   "path": "agent/review_engine.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b82b8d0abe80525aac8a9daae0b43f2771999f116f09964e3e7257e13c7a05c7",
+   "ours_sha256": "b82b8d0abe80525aac8a9daae0b43f2771999f116f09964e3e7257e13c7a05c7",
+   "theirs_sha256": "2c3473d520c7055165e0ee5aab41e30293dd5f5a00d3174c4e10af4d975c77c3",
+   "result_sha256": "2c3473d520c7055165e0ee5aab41e30293dd5f5a00d3174c4e10af4d975c77c3"
+  },
+  {
+   "path": "agent/review_idle_queue.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "c137998ad60ce41501126c16b7c15bca3854b8bbfa68caa5fe45749110148a8a",
+   "ours_sha256": "ef5398084ed9d295c93616417d6b761c01a0c6f99ac0260b9f6a3b47a0ac8ceb",
+   "theirs_sha256": "ef5398084ed9d295c93616417d6b761c01a0c6f99ac0260b9f6a3b47a0ac8ceb",
+   "result_sha256": "ef5398084ed9d295c93616417d6b761c01a0c6f99ac0260b9f6a3b47a0ac8ceb"
+  },
+  {
+   "path": "agent/runtime_cwd.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "087adad51c31dc0655335b1d177f8f9aeb197b1a7606e52a90df20a6ef206dca",
+   "ours_sha256": "0f0cc51325608f6e03875a63b27f41df8fbf5a6622b38f52eac7460dbac72b64",
+   "theirs_sha256": "6383a8922b9dfe784b636f76101328ffc9fc12401f0b24beac519c5187273468",
+   "result_sha256": "6383a8922b9dfe784b636f76101328ffc9fc12401f0b24beac519c5187273468"
+  },
+  {
+   "path": "agent/secret_scope.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "897adf49d8f909b3448615d92841e2a5ea35ea51083645c60af63f0e9ed73500",
+   "ours_sha256": "e8d16cf9ed5b1b8a2af83837f7f593523a8c41085aeca4e3aef03c248f98813e",
+   "theirs_sha256": "d9b98d233b6e4cc1040a113183b0659da33d855806e329b4b6fdaf5c3888323f",
+   "result_sha256": "d9b98d233b6e4cc1040a113183b0659da33d855806e329b4b6fdaf5c3888323f"
+  },
+  {
+   "path": "agent/secret_sources/_cache.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "14e18083b861db986d165a82200828281d47aa5eb3fe32c601a9b3d8356b946d",
+   "ours_sha256": "0f294fc1332069351f860e2864d30ae67ba7329c564cda9a25230827d0432361",
+   "theirs_sha256": "e63f69f01ccf7edfca036a683d85db38a222647c70c178d28c6e896be1534337",
+   "result_sha256": "e63f69f01ccf7edfca036a683d85db38a222647c70c178d28c6e896be1534337"
+  },
+  {
+   "path": "agent/secret_sources/base.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b8f6bd3b5978d4965d8a3f43f478b3313fbe896cb088b825b32ae7beaaba3e5b",
+   "ours_sha256": "b8f6bd3b5978d4965d8a3f43f478b3313fbe896cb088b825b32ae7beaaba3e5b",
+   "theirs_sha256": "df028ae27eea9d54ff8049ac7fc33386838a316b4b980862f498f5d70b03802a",
+   "result_sha256": "df028ae27eea9d54ff8049ac7fc33386838a316b4b980862f498f5d70b03802a"
+  },
+  {
+   "path": "agent/secret_sources/bitwarden.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e67f609f56842d1532eb628a8aca946691ef5f057996e31e18cdc40a15a997d1",
+   "ours_sha256": "1b57364789de7066e7cd94bed012a534170acaeb4d8c41ff0090fb8c8fd9cdbd",
+   "theirs_sha256": "ead614894e1cb1e88d14fe6bb343e12f7a3878b6490f803b2eac8b8a4202d05e",
+   "result_sha256": "ead614894e1cb1e88d14fe6bb343e12f7a3878b6490f803b2eac8b8a4202d05e"
+  },
+  {
+   "path": "agent/secret_sources/onepassword.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "17e0c95d9f9ae7ef6a05110f00c42fc3f3bf2b8f99f2b0454546d05456796b74",
+   "ours_sha256": "17e0c95d9f9ae7ef6a05110f00c42fc3f3bf2b8f99f2b0454546d05456796b74",
+   "theirs_sha256": "7055eeee352a4967826fe753b53ec3c2d35c0f30c39f07d08781825bf95ecfad",
+   "result_sha256": "7055eeee352a4967826fe753b53ec3c2d35c0f30c39f07d08781825bf95ecfad"
+  },
+  {
+   "path": "agent/secret_sources/registry.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "45ecf5fb96b60f1e68f1186ff2b1ee7cffca139295054498ce43ec804f340b5e",
+   "ours_sha256": "9f1b9390dcc6d28a1f97baa09d3fa12a5a248133830e4885a5da52edf7df726e",
+   "theirs_sha256": "da0087da693352590c458b3e18746f63dcdbee38a142ef55a8806ee7287579c9",
+   "result_sha256": "da0087da693352590c458b3e18746f63dcdbee38a142ef55a8806ee7287579c9"
+  },
+  {
+   "path": "agent/served_model.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "9a2b1ef07823ba54b1b4a3295a9a3fb07531ebc8dcdcec8e12949292fef10b1b",
+   "ours_sha256": "9a2b1ef07823ba54b1b4a3295a9a3fb07531ebc8dcdcec8e12949292fef10b1b",
+   "theirs_sha256": "16937119ef867e05ba40dd3c1be91010e4be909b253765f66053ee4eea3c547a",
+   "result_sha256": "16937119ef867e05ba40dd3c1be91010e4be909b253765f66053ee4eea3c547a"
+  },
+  {
+   "path": "agent/session_persistence.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "046866a11b6f51afa015407f0abcbe47ec02d791902d2f81b95a5f15196dc0c2",
+   "ours_sha256": "db439bc39ff1bac68798ec89611c74fb22e12180fc3fbeb39a0eac5c4448f16b",
+   "theirs_sha256": "afde5914ec9fae22fef98ad1517bbf56b831358c1472acd871ac754088bf474b",
+   "result_sha256": "afde5914ec9fae22fef98ad1517bbf56b831358c1472acd871ac754088bf474b"
+  },
+  {
+   "path": "agent/shell_hooks.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "7e24d9a2c369de25f3bc341150cfb648acadc9b854eeca35de24a255581b44b5",
+   "ours_sha256": "14e035691dda3fa0f0cb4e2fc9eb29ab6312a905c7b30068f858bcb8d0bc29a4",
+   "theirs_sha256": "3711418d1848da08c211e147ba421f3fd9c1cd0e48afa7651707776444128aea",
+   "result_sha256": "3711418d1848da08c211e147ba421f3fd9c1cd0e48afa7651707776444128aea"
+  },
+  {
+   "path": "agent/skill_bundles.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "a49f61eff3dba42582698eb1fea531caedc8d2150d2b53d4700868a14da721fe",
+   "ours_sha256": "5afe7ebf82f2bcec33ad4e02661a892ce37d1f7da65712dca39a252504c5bb7f",
+   "theirs_sha256": "734a91cab839b29b4883578873504b30c253b2ee5a9d2fa20aa13202b4b410dc",
+   "result_sha256": "734a91cab839b29b4883578873504b30c253b2ee5a9d2fa20aa13202b4b410dc"
+  },
+  {
+   "path": "agent/skill_commands.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "47d29514137ce5bba09b8dc21f56a52cc74400895cc34637dea431ec085fd3c8",
+   "ours_sha256": "964a6f440375aac4f206c9a8d9450f941304cda22cf68433c679c0c364b9bcac",
+   "theirs_sha256": "c26446523088108ebda88503bb7d42b2ccc628e5ae4ced218cae9f7598f2fe71",
+   "result_sha256": "c26446523088108ebda88503bb7d42b2ccc628e5ae4ced218cae9f7598f2fe71"
+  },
+  {
+   "path": "agent/skill_preprocessing.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "c70df40fb9001756dd9c2c32cf79bb764d68a3345e7f02a85731c7bce0332bbd",
+   "ours_sha256": "c70df40fb9001756dd9c2c32cf79bb764d68a3345e7f02a85731c7bce0332bbd",
+   "theirs_sha256": "da1f8e61fc78eee0a70448e8337b8837bd7a331fc5677ecc2742dd3abba38334",
+   "result_sha256": "da1f8e61fc78eee0a70448e8337b8837bd7a331fc5677ecc2742dd3abba38334"
+  },
+  {
+   "path": "agent/skill_utils.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "fb04d35ea7cba375a7e4f14601f676ea68caba45d7f4af2d86ee99426270e826",
+   "ours_sha256": "f91544bc6927932d38cf59cdf607bb7f3c373be812af722ea5d84c4a2e5a8484",
+   "theirs_sha256": "7a6531c0fb1ae1a7f09cc568574ad36525547f8eff682730d14ac19e1b474783",
+   "result_sha256": "7a6531c0fb1ae1a7f09cc568574ad36525547f8eff682730d14ac19e1b474783"
+  },
+  {
+   "path": "agent/ssl_guard.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "DELETED",
+   "action": "delete",
+   "bucket": "agent",
+   "base_sha256": "d3302d34dad949fb8e5bbd6caf5a9f65a76c8dee4467e202c844d3c7e06df5f1",
+   "ours_sha256": null,
+   "theirs_sha256": null,
+   "result_sha256": null
+  },
+  {
+   "path": "agent/ssl_verify.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "6327d3c0ee0d38765bbfabdf3c9a45eead10e5ef035a8b9ab68f522d0d2c75c2",
+   "ours_sha256": "980e8ed516607a5783f5e6f8f82abe0f455bfa6a1ddd459d67d3b3d44c895d80",
+   "theirs_sha256": "980e8ed516607a5783f5e6f8f82abe0f455bfa6a1ddd459d67d3b3d44c895d80",
+   "result_sha256": "980e8ed516607a5783f5e6f8f82abe0f455bfa6a1ddd459d67d3b3d44c895d80"
+  },
+  {
+   "path": "agent/status_output.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "85c306c0119657ac96b8a81a0bc0c23647753b5c59902266739f8d8ad224c442",
+   "ours_sha256": "85c306c0119657ac96b8a81a0bc0c23647753b5c59902266739f8d8ad224c442",
+   "theirs_sha256": "0e4f82f1e80eee5049a963d1de84d939a7bd1a635f87ddab1680bc08f64cd81c",
+   "result_sha256": "0e4f82f1e80eee5049a963d1de84d939a7bd1a635f87ddab1680bc08f64cd81c"
+  },
+  {
+   "path": "agent/stream_delivery.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "38d3fda9b9ab09048c14154588e30fa695db89db20efb06fdeb6ffdbf00721c3",
+   "ours_sha256": "ca2dfb64dfee0e21c617083719045a1d423c8450f2def4e74df21d63540e9e20",
+   "theirs_sha256": "ca2dfb64dfee0e21c617083719045a1d423c8450f2def4e74df21d63540e9e20",
+   "result_sha256": "ca2dfb64dfee0e21c617083719045a1d423c8450f2def4e74df21d63540e9e20"
+  },
+  {
+   "path": "agent/stream_diag.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "7461cc1b89ccc1bafd7374376507cae435ee583786eaea56c07403e4385ee42f",
+   "ours_sha256": "0286bfebd94dcb1dc9ea034752549a26a88c949b843db149028a871f8deb4907",
+   "theirs_sha256": "d14cf9db9fbf27561d66aa343e6921da24557321ea50e7811793305c86555746",
+   "result_sha256": "d14cf9db9fbf27561d66aa343e6921da24557321ea50e7811793305c86555746"
+  },
+  {
+   "path": "agent/subagent_lifecycle.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "bef42e154d6ff6689a3635b076ff47f6fa153156ed8882225f2b0d2981fa5c39",
+   "ours_sha256": "bef42e154d6ff6689a3635b076ff47f6fa153156ed8882225f2b0d2981fa5c39",
+   "theirs_sha256": "334d23770cfc2dfd7da21d1a60bf085ef4731501bb6eabf2459b15d9fdddaa08",
+   "result_sha256": "334d23770cfc2dfd7da21d1a60bf085ef4731501bb6eabf2459b15d9fdddaa08"
+  },
+  {
+   "path": "agent/subdirectory_hints.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b9d5d85d1339b7f5375c5f2aeb1c94abe0beca6af760cf687c11380fc7217923",
+   "ours_sha256": "7920dffcbc1a656b55d3160444de2cc1249c3ff984208c7d7abe2ea0cd9fe3c6",
+   "theirs_sha256": "6a921ff83b36973da6112fbc869ca57e8264ec0e0fc4e90b4e9e90d543bfdaf7",
+   "result_sha256": "6a921ff83b36973da6112fbc869ca57e8264ec0e0fc4e90b4e9e90d543bfdaf7"
+  },
+  {
+   "path": "agent/surface_switch.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "d6e0b45688c494f28bd91091a7a5b593abca4b210367c7391d34deb347cd647f",
+   "ours_sha256": "c4371ae0ef5fd4650c3818d6ab727a4f0ef2bb1f9fb55e933df218b3a26d4aec",
+   "theirs_sha256": "c4371ae0ef5fd4650c3818d6ab727a4f0ef2bb1f9fb55e933df218b3a26d4aec",
+   "result_sha256": "c4371ae0ef5fd4650c3818d6ab727a4f0ef2bb1f9fb55e933df218b3a26d4aec"
+  },
+  {
+   "path": "agent/system_prompt.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e3ba8be5d23fe9c3559219c917ecfe9edb11a479ecd3ac70be0bb75edcc2b847",
+   "ours_sha256": "b3c3da5d97fdc214c3229b3e92fc8ab5ae0983d8cb8bb7d07691d35b983f08b1",
+   "theirs_sha256": "e7d6e1ab3541be5b526ac2a1f7436b7a0e0268f99bb522968abf6a54569feaac",
+   "result_sha256": "e7d6e1ab3541be5b526ac2a1f7436b7a0e0268f99bb522968abf6a54569feaac"
+  },
+  {
+   "path": "agent/think_scrubber.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "79c8b6e3381667f815ff552d8f73065881e330b815aec940ea385cb4d98ff06a",
+   "ours_sha256": "974d8fd931c6f9622e816f8171c3ba980b2c2fb0f784d91a745d2f1a3d561adc",
+   "theirs_sha256": "6ceb04bbc2549811f16380728e559dabad60a19d5a40777270ccc3742612d0ad",
+   "result_sha256": "6ceb04bbc2549811f16380728e559dabad60a19d5a40777270ccc3742612d0ad"
+  },
+  {
+   "path": "agent/thinking_timeout_guidance.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e8fc59c60de8d77e054beccdf5def54f808d75710fe87bc9de95af6a39be3e16",
+   "ours_sha256": "e8fc59c60de8d77e054beccdf5def54f808d75710fe87bc9de95af6a39be3e16",
+   "theirs_sha256": "836ff7f5cb1bfbd8026b18f68cabf83ebaa70c6ae411f60c79e49d120e8bc43d",
+   "result_sha256": "836ff7f5cb1bfbd8026b18f68cabf83ebaa70c6ae411f60c79e49d120e8bc43d"
+  },
+  {
+   "path": "agent/title_generator.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "ecda8711a51dedb16d55b4a20dcf592386523290c6d13876eb1b24e9d28dad64",
+   "ours_sha256": "388cb2624dc7281c02a8434cf37a1c1228c4e41edbdec09fd32638eb9ae9994b",
+   "theirs_sha256": "efd97f7869c02b6966e6220d323dade44c53b3708368c1b6ed267b22ff16faed",
+   "result_sha256": "efd97f7869c02b6966e6220d323dade44c53b3708368c1b6ed267b22ff16faed"
+  },
+  {
+   "path": "agent/tool_dispatch_helpers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "327ee8f03bb26ae9023acb40370e26a3bd751271034e111b58b468abdf219394",
+   "ours_sha256": "614012bdf86b58994f23f0a8c5fda6698f021e2b9249786d51c7a8cdf9d6ecc0",
+   "theirs_sha256": "07d993d2b5acbd02eacaa3e12f835a958c9bb3c728be3c7ca1ee2b9ecfa3d57c",
+   "result_sha256": "07d993d2b5acbd02eacaa3e12f835a958c9bb3c728be3c7ca1ee2b9ecfa3d57c"
+  },
+  {
+   "path": "agent/tool_executor.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "a8b1db7fa6a1c33704800d5fe87021edbac9e809549292b5fdd58ac2f8836193",
+   "ours_sha256": "e92389b13561902af3f552ede1ada753896f079780fb46aed3a5375555ed3b50",
+   "theirs_sha256": "bee07f515b37f8f7397fb82e6c18e2c2650d945474c9835f0a669c615acb3cf8",
+   "result_sha256": "bee07f515b37f8f7397fb82e6c18e2c2650d945474c9835f0a669c615acb3cf8"
+  },
+  {
+   "path": "agent/tool_guardrails.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "45b99c96d311c043fee2d27bbfe4db6ee00b6f774a2efe0978748b118f5c78a8",
+   "ours_sha256": "45b99c96d311c043fee2d27bbfe4db6ee00b6f774a2efe0978748b118f5c78a8",
+   "theirs_sha256": "0f72eea93b1db7d25355b89e206c58b75ce2a4911d5699f2d4902b941bc45d2e",
+   "result_sha256": "0f72eea93b1db7d25355b89e206c58b75ce2a4911d5699f2d4902b941bc45d2e"
+  },
+  {
+   "path": "agent/tool_result_classification.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "83e1fb5b832f2e9df93a7d033e77c04a8bbeac4bdf1378adc124177dc0247a85",
+   "ours_sha256": "83e1fb5b832f2e9df93a7d033e77c04a8bbeac4bdf1378adc124177dc0247a85",
+   "theirs_sha256": "f78d62d85964583a9b98b0d0cff60776cc3d64cf93db9afa146c08b0f5d9ecb0",
+   "result_sha256": "f78d62d85964583a9b98b0d0cff60776cc3d64cf93db9afa146c08b0f5d9ecb0"
+  },
+  {
+   "path": "agent/trace_upload.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "81a8f6e282e4d2e8e4109e13b2073c1f9c992987f37fa6e291e5d019f84dd421",
+   "ours_sha256": "fad3cb4221f2e321cb28cb9b9d1df89cad2920fec2362280e78b7eff9056d303",
+   "theirs_sha256": "bf43369e02fdcf61017d27d64c4efdf982881648398523e40dd155cb610b142c",
+   "result_sha256": "bf43369e02fdcf61017d27d64c4efdf982881648398523e40dd155cb610b142c"
+  },
+  {
+   "path": "agent/trajectory.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "209d8e5c723f19f425c7daf5fa10ba828a5b84fd17b2f577746f4a720b867c91",
+   "ours_sha256": "209d8e5c723f19f425c7daf5fa10ba828a5b84fd17b2f577746f4a720b867c91",
+   "theirs_sha256": "4fc5adc9106a17a99086721d5d747844b76f1f6d8ed33884d958a250e765a458",
+   "result_sha256": "4fc5adc9106a17a99086721d5d747844b76f1f6d8ed33884d958a250e765a458"
+  },
+  {
+   "path": "agent/transcript_repair.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "2f66bd8b605bae65394e512c778d71ae6a1a158923101e7644283dca4c3b6d9a",
+   "ours_sha256": "2f66bd8b605bae65394e512c778d71ae6a1a158923101e7644283dca4c3b6d9a",
+   "theirs_sha256": "a11127bc4f722795036220134dc62a61a57225f0b95e89b2e9771546a92a6583",
+   "result_sha256": "a11127bc4f722795036220134dc62a61a57225f0b95e89b2e9771546a92a6583"
+  },
+  {
+   "path": "agent/transcription_registry.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "cbdd56bd859aa31ba3e9e967e9aa93312258fbe9107b8c0e9a94385229e02023",
+   "ours_sha256": "4d1cdc82ef319d5bb660a51d80b678d72f36a109ae11f3eb9435cfe116b9f547",
+   "theirs_sha256": "4d1cdc82ef319d5bb660a51d80b678d72f36a109ae11f3eb9435cfe116b9f547",
+   "result_sha256": "4d1cdc82ef319d5bb660a51d80b678d72f36a109ae11f3eb9435cfe116b9f547"
+  },
+  {
+   "path": "agent/transports/__init__.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "962e4191298ca8f290e00bf409a01501c0e6437a3c3af1fc17bcd3bac4a599c3",
+   "ours_sha256": "962e4191298ca8f290e00bf409a01501c0e6437a3c3af1fc17bcd3bac4a599c3",
+   "theirs_sha256": "b42c824911dcf94375e570a55415fb40a18ad61fea7def7e6ac1dcfabe7b51bb",
+   "result_sha256": "b42c824911dcf94375e570a55415fb40a18ad61fea7def7e6ac1dcfabe7b51bb"
+  },
+  {
+   "path": "agent/transports/anthropic.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "26099c12d701b14f0172b1335cd01e5dcec3468485161c8d7e281f31097382bf",
+   "ours_sha256": "26099c12d701b14f0172b1335cd01e5dcec3468485161c8d7e281f31097382bf",
+   "theirs_sha256": "a487494e76349687fa5b7c47ede24317b02b6d4710e83a45617ae13a4ac139e9",
+   "result_sha256": "a487494e76349687fa5b7c47ede24317b02b6d4710e83a45617ae13a4ac139e9"
+  },
+  {
+   "path": "agent/transports/chat_completions.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "6d9c7e512176a9f53fd849f954af3698d75f4d68099e6be4747f40cb9414dd75",
+   "ours_sha256": "6d9c7e512176a9f53fd849f954af3698d75f4d68099e6be4747f40cb9414dd75",
+   "theirs_sha256": "d216f3523e0b7980881f646fda57ee527ab5a02c91629af047fbbe584e625e61",
+   "result_sha256": "d216f3523e0b7980881f646fda57ee527ab5a02c91629af047fbbe584e625e61"
+  },
+  {
+   "path": "agent/transports/codex.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "658e3b497a4648d41d73425fa15c714df7f98553f8768203aaba209836838364",
+   "ours_sha256": "658e3b497a4648d41d73425fa15c714df7f98553f8768203aaba209836838364",
+   "theirs_sha256": "311dc0a33fcc8f9b350aeb5ca09c3e99c7d21b72f839016774b772459372b643",
+   "result_sha256": "311dc0a33fcc8f9b350aeb5ca09c3e99c7d21b72f839016774b772459372b643"
+  },
+  {
+   "path": "agent/transports/codex_app_server.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4aa7393971fcb093b44a1665d86848c01b941904aba83350b683fb42d771f17a",
+   "ours_sha256": "4aa7393971fcb093b44a1665d86848c01b941904aba83350b683fb42d771f17a",
+   "theirs_sha256": "92cde5d33d5be301c3c3f7768e818b72f9cf6e2a974458cd3b6af44cb52ee5d8",
+   "result_sha256": "92cde5d33d5be301c3c3f7768e818b72f9cf6e2a974458cd3b6af44cb52ee5d8"
+  },
+  {
+   "path": "agent/transports/codex_app_server_session.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "abdd8975ad088da48aca3faeef29cf8d31b44683b79b8bc1b47f55d57c54ad42",
+   "ours_sha256": "abdd8975ad088da48aca3faeef29cf8d31b44683b79b8bc1b47f55d57c54ad42",
+   "theirs_sha256": "be2a830acb5ae6b3ccde06b411a4866c414fadf47878af2ff262949fe28578df",
+   "result_sha256": "be2a830acb5ae6b3ccde06b411a4866c414fadf47878af2ff262949fe28578df"
+  },
+  {
+   "path": "agent/transports/codex_event_projector.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "45748d19f4e26ac33e9b243f34f38accfe4b6649e8d1c2fa5ee581ebbd025338",
+   "ours_sha256": "45748d19f4e26ac33e9b243f34f38accfe4b6649e8d1c2fa5ee581ebbd025338",
+   "theirs_sha256": "1cf1ed7081f8a4c9a22035e7e262d318503778ad086241edc65e7ab7b10d8dba",
+   "result_sha256": "1cf1ed7081f8a4c9a22035e7e262d318503778ad086241edc65e7ab7b10d8dba"
+  },
+  {
+   "path": "agent/transports/qubit_tools_mcp_server.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "aceb5a4b7df0e3ff42c00474d1b346bed3756773a703f67c13e7f55858d810e6",
+   "ours_sha256": "0ae5cf4d74282bf6a5c51b7c895fd8d240c2107cef441c1df0bb6dc25b10a55a",
+   "theirs_sha256": "6464ddfc117e3a4bee119f05146052922a0d4c3f68b8ba900c33625707581d07",
+   "result_sha256": "6464ddfc117e3a4bee119f05146052922a0d4c3f68b8ba900c33625707581d07"
+  },
+  {
+   "path": "agent/tts_registry.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "6d6c7e122962d65cc84f2a523fc7f352fbbcbf8f28a6d0026222fc89809f4aa1",
+   "ours_sha256": "f33e9e5429a3fd0a3b1bcfba73039fe68d5768a7805c418ea37d05c65dd9aa3b",
+   "theirs_sha256": "f33e9e5429a3fd0a3b1bcfba73039fe68d5768a7805c418ea37d05c65dd9aa3b",
+   "result_sha256": "f33e9e5429a3fd0a3b1bcfba73039fe68d5768a7805c418ea37d05c65dd9aa3b"
+  },
+  {
+   "path": "agent/turn_api_call.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "4bc58089cc45c32068ee5eeb458362a33ca2b92d02f6d8d09542417458eb3586",
+   "ours_sha256": "ac3b7bfc614060ac2bd09df33ec54cfea051a947a6609d949b49c801776bfd47",
+   "theirs_sha256": "9f6047251b9c7ee778237760ceeedb5ded6187ff195ca7fbbae125ee7e42b7cd",
+   "result_sha256": "9f6047251b9c7ee778237760ceeedb5ded6187ff195ca7fbbae125ee7e42b7cd"
+  },
+  {
+   "path": "agent/turn_api_error.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "695a29b8117678dc91bb9cf8234d9b2644123ff7f4e309b0cd80e0b3a20ca5d0",
+   "ours_sha256": "4290cb91411abec9aa804e5bc8e5454caf6fca5f0eaea86ba2b2c332db3198ec",
+   "theirs_sha256": "5aff1dd0bb54f743b924647bff7e695f30062dab0d772f9983a733d7feb8dfb1",
+   "result_sha256": "5aff1dd0bb54f743b924647bff7e695f30062dab0d772f9983a733d7feb8dfb1"
+  },
+  {
+   "path": "agent/turn_api_request.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "6ab86c441e66ce506816422297285d33dab29246c5fd797cf6fb5cb476328ef8",
+   "ours_sha256": "6ab86c441e66ce506816422297285d33dab29246c5fd797cf6fb5cb476328ef8",
+   "theirs_sha256": "c8506349b792d67a80a1120a85455c766d06ee0ca99b3258c5abde08ac5d4591",
+   "result_sha256": "c8506349b792d67a80a1120a85455c766d06ee0ca99b3258c5abde08ac5d4591"
+  },
+  {
+   "path": "agent/turn_context.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "65075efda36befa0efefe3421fb534ddc9a37256361f4aee603ca58af438adbe",
+   "ours_sha256": "c7899dd92417753adb52d7bc5225d94213d33fdab634a24bab34f5f9bbcecf2b",
+   "theirs_sha256": "b2eb14cdf72329d6498bcd8272c03a6a5295548f7de4c6a5cb2edb0ed1956761",
+   "result_sha256": "b2eb14cdf72329d6498bcd8272c03a6a5295548f7de4c6a5cb2edb0ed1956761"
+  },
+  {
+   "path": "agent/turn_context_compaction.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "028fd666bebc816cde345927a34acbd402df10d7b9ca196bc7b5639a487f9c2d",
+   "ours_sha256": "41191c715de5fa0561078c4fc14662dd7fa5ced92c3b8a204ba21edd87b9f6c3",
+   "theirs_sha256": "bd7f98a99c3b0a2f84b7d660e2fae9c43590e0ffde01ce6fb017e6d8e9c70660",
+   "result_sha256": "bd7f98a99c3b0a2f84b7d660e2fae9c43590e0ffde01ce6fb017e6d8e9c70660"
+  },
+  {
+   "path": "agent/turn_empty_response.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3e39c35a93b6c31b7ede1b25c47b854d5b26cdc29fa8c963083c4fce767bdcec",
+   "ours_sha256": "cc9d81cc616d9dd745be8212474c4c3a9d25762afe549bd80c64126a4550fe72",
+   "theirs_sha256": "7e8f1775974d2f22729f9823636742940729717eb54a5c45c962274ef1776033",
+   "result_sha256": "7e8f1775974d2f22729f9823636742940729717eb54a5c45c962274ef1776033"
+  },
+  {
+   "path": "agent/turn_explainers.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "abd119be71d821ef2adc8f5b9267dacbeb1d1aca2ca5a40a0a279ced1e47cedb",
+   "ours_sha256": "abd119be71d821ef2adc8f5b9267dacbeb1d1aca2ca5a40a0a279ced1e47cedb",
+   "theirs_sha256": "4ddfe0c05b710d8a96c7d79616c925b97bd8d0f6ce835ddf8a5bf4bf2b361a54",
+   "result_sha256": "4ddfe0c05b710d8a96c7d79616c925b97bd8d0f6ce835ddf8a5bf4bf2b361a54"
+  },
+  {
+   "path": "agent/turn_facade.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "de34643634b59e9cb6f5de04c1c39a173a5424bfec53729fdd94ad4ddc3f6b8e",
+   "ours_sha256": "31e16f0cb951b898faaf8342ced8e633dd82a484283ac505d05912bc62956182",
+   "theirs_sha256": "b4831316b54870d4dfe13651e17e1dacc2e0e07456127e05f55438b9563d9079",
+   "result_sha256": "b4831316b54870d4dfe13651e17e1dacc2e0e07456127e05f55438b9563d9079"
+  },
+  {
+   "path": "agent/turn_facade_lease.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b715a5ba2b2d8adbd76975216568d46c81eeb41627174e8499c8b0e28dd056f9",
+   "ours_sha256": "b715a5ba2b2d8adbd76975216568d46c81eeb41627174e8499c8b0e28dd056f9",
+   "theirs_sha256": "95d2da16b8654afee2b0079721e8ae585ba5372b10149ee397e21654ac8fa31f",
+   "result_sha256": "95d2da16b8654afee2b0079721e8ae585ba5372b10149ee397e21654ac8fa31f"
+  },
+  {
+   "path": "agent/turn_failure_copy.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "59f3c056e898d48d7e835f53da0e8a99b6f989a415b939556145803b1a335cce",
+   "ours_sha256": "2acd7eb6b6af3bbc6d497df0da3bdbe2cd72021eb7e1ef065a0252006c70545f",
+   "theirs_sha256": "3b7fc0a922e9ecf26f41907aff9c0d94ae28f367916a62465f1c31693d985dee",
+   "result_sha256": "3b7fc0a922e9ecf26f41907aff9c0d94ae28f367916a62465f1c31693d985dee"
+  },
+  {
+   "path": "agent/turn_final_response.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "273ef95365c0232bc03177f7f1537165ac56dc40ea41fb3a1ca9f99b05bc9782",
+   "ours_sha256": "4e2d1bd9c2870dc53cb788f32042794af3ae991f93194643764bcc3594710676",
+   "theirs_sha256": "ff414924aa9ffc30fb64b91a602f4621307f22a9f6e5aa3f88e916eabbadbce1",
+   "result_sha256": "ff414924aa9ffc30fb64b91a602f4621307f22a9f6e5aa3f88e916eabbadbce1"
+  },
+  {
+   "path": "agent/turn_finalizer.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3b9e4ff843e78a67b76af530ca278f6eb6a2de51d8d4e3fa32bf3b94e4d32f87",
+   "ours_sha256": "ed587e8c2c2bcb2ed98440ae3045d62b83e28b9a3aa152f8bcc9144dd21b865b",
+   "theirs_sha256": "28fb2c495f49c6774882b21f8c75a90ed579f5e0f53a3092955951f806188ccb",
+   "result_sha256": "28fb2c495f49c6774882b21f8c75a90ed579f5e0f53a3092955951f806188ccb"
+  },
+  {
+   "path": "agent/turn_iteration_prep.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "83d6b3dd14d0a2f4e518e177b1810cd720b57a0f4c93acb7c9baaa951bb7ee92",
+   "ours_sha256": "fe8f3b6ccebbbb9fdef7241c91b5f1a05ee201a8bd810d1b1cac6c542b1c7f86",
+   "theirs_sha256": "1ab7679531307237bed38a816128920fb4df30e1a4733b5b65415eb8608d6fc5",
+   "result_sha256": "1ab7679531307237bed38a816128920fb4df30e1a4733b5b65415eb8608d6fc5"
+  },
+  {
+   "path": "agent/turn_liveness.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "116291ac96af89016bbf1af2b30ded064015304f4821d5cb4e985ce4dab1ac85",
+   "ours_sha256": "116291ac96af89016bbf1af2b30ded064015304f4821d5cb4e985ce4dab1ac85",
+   "theirs_sha256": "8b7a2baca6b3ea888dc58dbd36adf12a7102878430070348d5a08df07ca58e9e",
+   "result_sha256": "8b7a2baca6b3ea888dc58dbd36adf12a7102878430070348d5a08df07ca58e9e"
+  },
+  {
+   "path": "agent/turn_loop_errors.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "f3d8e963109b1c3a20152a0d8791d38d3e1fb759ccb68c50f28c20d4ce6819d8",
+   "ours_sha256": "f3d8e963109b1c3a20152a0d8791d38d3e1fb759ccb68c50f28c20d4ce6819d8",
+   "theirs_sha256": "3177f9b46f972512500480a2765ce36c0c8c07596ead32a19ed21e2ced5e25ad",
+   "result_sha256": "3177f9b46f972512500480a2765ce36c0c8c07596ead32a19ed21e2ced5e25ad"
+  },
+  {
+   "path": "agent/turn_overflow.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "d09fa03657ef062fc564bb72300b6afe47e2fc9771538de6d5ce824bf5882666",
+   "ours_sha256": "d7449119734ecd4f450869183a1268105046a9ab29bca8f78bd1cce0244abc53",
+   "theirs_sha256": "2f863d3585921a80da3ab0bd3a078bd250a19fc5ea6a744cff1adb7720f18852",
+   "result_sha256": "2f863d3585921a80da3ab0bd3a078bd250a19fc5ea6a744cff1adb7720f18852"
+  },
+  {
+   "path": "agent/turn_preflight.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "a23ffe30b120ce80a4160742adaa676082c04fdf3f00c819587712cd93021b5c",
+   "ours_sha256": "2112fbc14e75952761ec84cdb957ed83ae22704ae2a868844d1c6b725a18f08a",
+   "theirs_sha256": "4afbf26a3ce1c7005e5751708dc12d65579d5d0f783804c21cf742c575b1bb80",
+   "result_sha256": "4afbf26a3ce1c7005e5751708dc12d65579d5d0f783804c21cf742c575b1bb80"
+  },
+  {
+   "path": "agent/turn_preflight_gate.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "805a9f2e380a1c289667c8be89eb7fcaa8df4e2094c1808522e1726c79bbc3e5",
+   "ours_sha256": "805a9f2e380a1c289667c8be89eb7fcaa8df4e2094c1808522e1726c79bbc3e5",
+   "theirs_sha256": "641831bb9d8577c3aa4c85bfa94e90a3520590da2d5d3ca56de7fba17e952db1",
+   "result_sha256": "641831bb9d8577c3aa4c85bfa94e90a3520590da2d5d3ca56de7fba17e952db1"
+  },
+  {
+   "path": "agent/turn_recovery.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "b65031eb0846e4ec97c14d1d979a472ae786e4cf69500b5eab714129d212da1d",
+   "ours_sha256": "9f7884b45aa04fb634763f445022c068c19930dd31568c9fad6121adbcf8407c",
+   "theirs_sha256": "5d791929bf34cf4c0437c60df6588fb6db9a2eb383bf53f44dde9c4dba6d8c9a",
+   "result_sha256": "5d791929bf34cf4c0437c60df6588fb6db9a2eb383bf53f44dde9c4dba6d8c9a"
+  },
+  {
+   "path": "agent/turn_request_assembly.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "13d696c214a2ed2712b1404b11e9e5239715e80f6415c9de057643c554b9363c",
+   "ours_sha256": "13d696c214a2ed2712b1404b11e9e5239715e80f6415c9de057643c554b9363c",
+   "theirs_sha256": "c95105f23228dee2d274165fc0fd2ba4b3954bfe9ab457f14d0f64c7281ac281",
+   "result_sha256": "c95105f23228dee2d274165fc0fd2ba4b3954bfe9ab457f14d0f64c7281ac281"
+  },
+  {
+   "path": "agent/turn_response_check.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "d503ac888d8d7b6f321cff2738c6e633fbea90d75cdc72a91174eb987b069c97",
+   "ours_sha256": "d503ac888d8d7b6f321cff2738c6e633fbea90d75cdc72a91174eb987b069c97",
+   "theirs_sha256": "bf6faecb0aaedaa2d1c92113cff38de4c4b16d577fe5ee892be0174a24aa673e",
+   "result_sha256": "bf6faecb0aaedaa2d1c92113cff38de4c4b16d577fe5ee892be0174a24aa673e"
+  },
+  {
+   "path": "agent/turn_response_intake.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "2fd55003cad8341631cd61c9ee4ab6393aacaab1fbb6ca7a99b9cefba52bb02a",
+   "ours_sha256": "2fd55003cad8341631cd61c9ee4ab6393aacaab1fbb6ca7a99b9cefba52bb02a",
+   "theirs_sha256": "f26b6700aec89eb75b42847ea25ee7db98f79c394a584dc871f91be73477e33d",
+   "result_sha256": "f26b6700aec89eb75b42847ea25ee7db98f79c394a584dc871f91be73477e33d"
+  },
+  {
+   "path": "agent/turn_retry_state.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "ff2692da7feefbfba3f332a6b10b297207807b3472d28f64963b65d02ab2fda9",
+   "ours_sha256": "ff2692da7feefbfba3f332a6b10b297207807b3472d28f64963b65d02ab2fda9",
+   "theirs_sha256": "3e319b9f0c0a1a5256e9a1bf370a28fef163cff3a9b7fc2fc94a4d1d24fe80e4",
+   "result_sha256": "3e319b9f0c0a1a5256e9a1bf370a28fef163cff3a9b7fc2fc94a4d1d24fe80e4"
+  },
+  {
+   "path": "agent/turn_stop_gates.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "dd8fedbb5ea38bde51c1482bc1e41a144091c23c9fc0cb43853acd8ecc3845e1",
+   "ours_sha256": "6e0f9c7c6fad8d5eddcdfe42e8a3295ff51a70ca5b2630177f13c7e6606cf7e1",
+   "theirs_sha256": "60c7ee7bdb55c0512b4e908b66b687c361a3c37ee948f152960b9bac82d89d28",
+   "result_sha256": "60c7ee7bdb55c0512b4e908b66b687c361a3c37ee948f152960b9bac82d89d28"
+  },
+  {
+   "path": "agent/turn_tool_round.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "ef1ca4db6e5150d4bbf214867a5210bc8c755806e3af88db931fe024e227235e",
+   "ours_sha256": "3e4dc49ef00f41eaade40174734a371ea003eaacc43a939cf73b9db165b4be0f",
+   "theirs_sha256": "a8db06606758ef47860fd06cc35920f9b89d49dfcd90112b4422bc1f9a814606",
+   "result_sha256": "a8db06606758ef47860fd06cc35920f9b89d49dfcd90112b4422bc1f9a814606"
+  },
+  {
+   "path": "agent/turn_tool_validation.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "9148a4a47790649d63d1b8e91e7c58ccb800489dad3fc160d313bb7abe4f7f65",
+   "ours_sha256": "9148a4a47790649d63d1b8e91e7c58ccb800489dad3fc160d313bb7abe4f7f65",
+   "theirs_sha256": "7bbc0cf31e38e0621ca0a85b6a3e0e9ad227aae7fb83d4a2bac8b486e64b692d",
+   "result_sha256": "7bbc0cf31e38e0621ca0a85b6a3e0e9ad227aae7fb83d4a2bac8b486e64b692d"
+  },
+  {
+   "path": "agent/turn_truncation.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "2cf90f7b49ce561fb2a50f968d30864db1f1c0b250fd4d62cc163c4287804eaa",
+   "ours_sha256": "87d5997de5c701ce47309617d519020ef92a7a524018cedbc269220e54c53876",
+   "theirs_sha256": "81abb22dbc6c42d5f6ffbb75b4cb0bc7655fed23191408345bfc205e4227c7b6",
+   "result_sha256": "81abb22dbc6c42d5f6ffbb75b4cb0bc7655fed23191408345bfc205e4227c7b6"
+  },
+  {
+   "path": "agent/turn_usage.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "863c37907c8805e2cae14e620574b24cc4db67aa5f4de0b46e59162ecc891df8",
+   "ours_sha256": "863c37907c8805e2cae14e620574b24cc4db67aa5f4de0b46e59162ecc891df8",
+   "theirs_sha256": "baaf017d6cc6c72a3a59080fdc5da206b36c489f10cce52d1e016885ed732299",
+   "result_sha256": "baaf017d6cc6c72a3a59080fdc5da206b36c489f10cce52d1e016885ed732299"
+  },
+  {
+   "path": "agent/usage_pricing.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "1ef9e3e1e258e983fbe94f2e90ff81978961d7d242a4cec644dfab1ebdcdd49d",
+   "ours_sha256": "47437d8d498ab4c81253e7a4b197f2b7b77a918a5575a7608664fcc4188c30df",
+   "theirs_sha256": "8063a823a16a4e9ff8b134a8276e9a1712f02897d5e0a7e55fb3479151972405",
+   "result_sha256": "8063a823a16a4e9ff8b134a8276e9a1712f02897d5e0a7e55fb3479151972405"
+  },
+  {
+   "path": "agent/vault_backends/bitwarden.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "74eb85190dc7b7914a0f57f49d8b933deb4243626bebdd66ef5fe48a9888c521",
+   "ours_sha256": "74eb85190dc7b7914a0f57f49d8b933deb4243626bebdd66ef5fe48a9888c521",
+   "theirs_sha256": "28307735a126de64ac0d1b1a2f726450e65ddc9537f199f684f737e00e29fe78",
+   "result_sha256": "28307735a126de64ac0d1b1a2f726450e65ddc9537f199f684f737e00e29fe78"
+  },
+  {
+   "path": "agent/vault_backends/unlock.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "06e2e23bbc7f8bef44a6a6a7c0c63cf2929752fb3b52e35d70b665dc5b33e255",
+   "ours_sha256": "06e2e23bbc7f8bef44a6a6a7c0c63cf2929752fb3b52e35d70b665dc5b33e255",
+   "theirs_sha256": "666c04940bf0935d60783fd0747edb874ac4c780a688766d84ae215a25ca28a6",
+   "result_sha256": "666c04940bf0935d60783fd0747edb874ac4c780a688766d84ae215a25ca28a6"
+  },
+  {
+   "path": "agent/vault_login_classifier.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "11c7acbd0b1e98d2f253ddd32485fd15e9c31d69d574a2b52110de7d20825537",
+   "ours_sha256": "11c7acbd0b1e98d2f253ddd32485fd15e9c31d69d574a2b52110de7d20825537",
+   "theirs_sha256": "5b1ca7119868aaf1ccb76cdf8b4e291abce6d453350ac14a27e0874d793d513c",
+   "result_sha256": "5b1ca7119868aaf1ccb76cdf8b4e291abce6d453350ac14a27e0874d793d513c"
+  },
+  {
+   "path": "agent/vault_store.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "5f602fcf1198cac5bb9f64af6f222fec9f142bf3c7fdaff95da0b88f714ea46f",
+   "ours_sha256": "5f602fcf1198cac5bb9f64af6f222fec9f142bf3c7fdaff95da0b88f714ea46f",
+   "theirs_sha256": "b0de8c52256c2f2bc5bdeb16d643d8eaed714a70a4ff290e90b18186e2d71851",
+   "result_sha256": "b0de8c52256c2f2bc5bdeb16d643d8eaed714a70a4ff290e90b18186e2d71851"
+  },
+  {
+   "path": "agent/verification_evidence.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "466ca3bbbf04e8283bfee2983b69994c51c5bac967b128f28dccd350a8f9ad13",
+   "ours_sha256": "466ca3bbbf04e8283bfee2983b69994c51c5bac967b128f28dccd350a8f9ad13",
+   "theirs_sha256": "cf9495957cb9bd06f5f111e5f33a01c84ab70e0aa9f684bc8a04299ce1730ac0",
+   "result_sha256": "cf9495957cb9bd06f5f111e5f33a01c84ab70e0aa9f684bc8a04299ce1730ac0"
+  },
+  {
+   "path": "agent/verify/environment.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "5584b9e425d5200dac21d1e7e07cd5502d84cb04f9a9ac0a6da20f09dd0d9f88",
+   "ours_sha256": "0c3d9efe55b3e6e656191239fcea21e02f9d0e75159671fb0252a4403ada934f",
+   "theirs_sha256": "0c3d9efe55b3e6e656191239fcea21e02f9d0e75159671fb0252a4403ada934f",
+   "result_sha256": "0c3d9efe55b3e6e656191239fcea21e02f9d0e75159671fb0252a4403ada934f"
+  },
+  {
+   "path": "agent/verify/recipes.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "6404e1ef514152d6a92a467f66c6bd681da86c1e51ea0ca5631c6f136ce021b5",
+   "ours_sha256": "635cd3390bcb9b399a4b92a22974e8636a205aed70cecc75a2ff0631246754ca",
+   "theirs_sha256": "635cd3390bcb9b399a4b92a22974e8636a205aed70cecc75a2ff0631246754ca",
+   "result_sha256": "635cd3390bcb9b399a4b92a22974e8636a205aed70cecc75a2ff0631246754ca"
+  },
+  {
+   "path": "agent/vertex_adapter.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "ed56be8379c129752f526d542a5ebc38483b68597781a82e4ff259e31a60f993",
+   "ours_sha256": "4ae76891c1d44ea511621e7089b169f17d7e0bbf78413a5dcd5c91977e6ff708",
+   "theirs_sha256": "4ae76891c1d44ea511621e7089b169f17d7e0bbf78413a5dcd5c91977e6ff708",
+   "result_sha256": "4ae76891c1d44ea511621e7089b169f17d7e0bbf78413a5dcd5c91977e6ff708"
+  },
+  {
+   "path": "agent/video_gen_provider.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "3a69f27c6119163cc27479c61e7c7fe4a8af21853984a6957de7c9f39eb7afcd",
+   "ours_sha256": "d1f111e866b224ba9124ca5480f92be65daed70cad8bc11892e330794854591b",
+   "theirs_sha256": "8cada08b2e354f60773116fae356ebb4ea4ffa024e36e04ab906431ba944c8f5",
+   "result_sha256": "8cada08b2e354f60773116fae356ebb4ea4ffa024e36e04ab906431ba944c8f5"
+  },
+  {
+   "path": "agent/video_gen_registry.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "087aa1a7fb2b8b54185a87712ae075c55382c1095c453dfa401d2f8d2c42afd1",
+   "ours_sha256": "770b3076717168d5bc6996a712bc96077979bfb41917cea6cc55d23cd565c454",
+   "theirs_sha256": "770b3076717168d5bc6996a712bc96077979bfb41917cea6cc55d23cd565c454",
+   "result_sha256": "770b3076717168d5bc6996a712bc96077979bfb41917cea6cc55d23cd565c454"
+  },
+  {
+   "path": "agent/vision_message_prep.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "agent",
+   "base_sha256": "e63820da11c7e033d3b4d4702c065c9e10307162cad03a5918dca1b429623220",
+   "ours_sha256": "e63820da11c7e033d3b4d4702c065c9e10307162cad03a5918dca1b429623220",
+   "theirs_sha256": "d949a23f7332f26691dbc36cd7306eb162597d318e5821d5d30c25458445e931",
+   "result_sha256": "d949a23f7332f26691dbc36cd7306eb162597d318e5821d5d30c25458445e931"
+  },
+  {
+   "path": "agent/web_search_provider.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "da21bb155982c2190f0a3e27a0397e4c768e8452e79a2b053a34f399039153f9",
+   "ours_sha256": "d5ca7ae37523db9ec0e3157afb72796f3f61849c526f2b36baf639189d57d641",
+   "theirs_sha256": "d5ca7ae37523db9ec0e3157afb72796f3f61849c526f2b36baf639189d57d641",
+   "result_sha256": "d5ca7ae37523db9ec0e3157afb72796f3f61849c526f2b36baf639189d57d641"
+  },
+  {
+   "path": "agent/web_search_registry.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "agent",
+   "base_sha256": "05bf6fa9ec164dbf499377ca54fcf34c51b06fe9e5d4adc90e56e60b3dd809fe",
+   "ours_sha256": "4193c0f7ec7a646fc49c01a762f2587f5b7bfd89de01656be82771d1641b331c",
+   "theirs_sha256": "4193c0f7ec7a646fc49c01a762f2587f5b7bfd89de01656be82771d1641b331c",
+   "result_sha256": "4193c0f7ec7a646fc49c01a762f2587f5b7bfd89de01656be82771d1641b331c"
   }
  ]
 }
