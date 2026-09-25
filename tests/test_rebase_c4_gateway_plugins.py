@@ -81,7 +81,7 @@ def test_perplexity_headers_are_debranded(runtime_on_path):
     assert "nousresearch" not in provider._HEADERS["HTTP-Referer"]
 
 
-def test_qubit_achievements_plugin_id_and_read_old(runtime_on_path):
+def test_qubit_achievements_plugin_id_and_read_old(runtime_on_path, tmp_path):
     # The plugin directory + manifest carry the Qubit id; the legacy path is gone.
     plugin_dir = RUNTIME / "plugins" / "qubit-achievements"
     assert plugin_dir.is_dir()
@@ -100,6 +100,25 @@ def test_qubit_achievements_plugin_id_and_read_old(runtime_on_path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert hasattr(mod, "_migrate_legacy_data_dir")
+
+    # Functional read-old: a legacy plugin-data dir migrates into the new root.
+    home = tmp_path / "home"
+    new_root = home / "plugin-data" / "qubit-achievements"
+    new_root.mkdir(parents=True)
+    legacy = home / "plugin-data" / "hermes-achievements"
+    legacy.mkdir(parents=True)
+    (legacy / "state.json").write_text('{"unlocks": {"a": 1}}', encoding="utf-8")
+    MonkeyPatch = pytest.MonkeyPatch()
+    try:
+        MonkeyPatch.setattr(mod, "get_qubit_home", lambda: home, raising=False)
+        # Pre-existing new-root file must win; only new files migrate.
+        (new_root / "keep.json").write_text("{}", encoding="utf-8")
+        mod._migrate_legacy_data_dir(new_root)
+    finally:
+        MonkeyPatch.undo()
+    assert (new_root / "state.json").is_file()
+    assert not (legacy / "state.json").exists()  # moved, not copied
+    assert (new_root / "keep.json").is_file()
 
 
 def test_dashboard_discovery_resolves_only_qubit_achievements(runtime_on_path):
