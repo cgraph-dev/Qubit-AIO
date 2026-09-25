@@ -5,7 +5,7 @@ Cloud memory API with hybrid search (Vector + BM25 + Reranking) and 7 memory typ
 ## Requirements
 
 - RetainDB account ($20/month) from [retaindb.com](https://www.retaindb.com)
-- `pip install requests`
+- `requests` is part of Qubit's core dependencies; no separate SDK install is needed. For damaged dependencies, use `qubit pm repair` and restart Qubit.
 
 ## Setup
 
