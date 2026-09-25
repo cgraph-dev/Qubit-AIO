@@ -1808,9 +1808,8 @@ def _print_legacy_units_warning() -> None:
         scope = "system" if is_sys else "user"
         print(f"    {path}  ({scope} scope)")
     print()
-    print("  These pre-rename units (hermes.service) fight the current")
-    print("  hermes-gateway.service for the bot token and cause SIGTERM")
-    print("  flap loops. Remove them with:")
+    print("  These pre-rename units fight the current gateway service for the")
+    print("  bot token and cause SIGTERM flap loops. Remove them with:")
     print()
     print("    qubit gateway migrate-legacy")
     print()

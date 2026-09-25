@@ -20,7 +20,6 @@ _ORPHAN_RESCUE_REF_MAX_AGE_DAYS = 30
 
 _GIT_TEXT_KW = dict(capture_output=True, text=True, encoding="utf-8", errors="replace")
 _BAR = "=" * 68
-_UPSTREAM_ADD_CMD = "git remote add upstream https://github.com/NousResearch/hermes-agent.git"
 
 
 def _git_ok(git_cmd, args, cwd, **kw) -> bool:
@@ -262,10 +261,11 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
     from qubit_cli.update_cmd import _add_upstream_remote, _mark_skip_upstream_prompt
     print(
         "\nℹ Your fork is not tracking the official Qubit repository.\n"
-        "  This means you may miss updates from NousResearch/hermes-agent.\n"
+        "  This means you may miss upstream Qubit updates.\n"
     )
     if assume_yes or (input_fn is None and not (sys.stdin.isatty() and sys.stdout.isatty())):
-        print(f"  Skipping upstream setup (non-interactive run).\n  Add it later with: {_UPSTREAM_ADD_CMD}")
+        print("  Skipping upstream setup (non-interactive run).\n"
+              "  Re-run interactively to configure the upstream remote later.")
         return False
     if input_fn is not None:
         response = input_fn("Add official repo as 'upstream' remote? [y/N]", "n").strip().lower()
@@ -276,14 +276,14 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
             print()
             response = "n"
     if response not in {"", "y", "yes"}:
-        print(f"  Skipped. Run '{_UPSTREAM_ADD_CMD}' to add later.")
+        print("  Skipped. Re-run interactively to add the upstream remote later.")
         _mark_skip_upstream_prompt()
         return False
     print("→ Adding upstream remote...")
     if not _add_upstream_remote(git_cmd, cwd):
         print("  ✗ Failed to add upstream remote. Skipping upstream sync.")
         return False
-    print("  ✓ Added upstream: https://github.com/NousResearch/hermes-agent.git")
+    print("  ✓ Added upstream remote.")
     return True
 
 

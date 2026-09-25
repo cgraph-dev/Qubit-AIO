@@ -808,15 +808,29 @@ async def run_debug_share_endpoint(body: DebugShareRequest | None = None,
 async def get_logs(
     file: str = "agent", lines: int = 100, level: Optional[str] = None,
     component: Optional[str] = None, search: Optional[str] = None,
-    profile: Optional[str] = None):
+    profile: Optional[str] = None, offset: int = 0):
+    """Tail a log file, newest-first, with an additive ``offset`` page contract.
+
+    Upstream accepts only ``file/lines/level/component/search`` and returns
+    ``{file, lines}``; ``offset`` is Qubit-added and backwards-compatible:
+    ``offset=0`` (the default) returns exactly the same ``lines`` as before, and
+    the extra pagination fields are additive. ``offset`` counts matching lines to
+    skip from the newest end, so ``offset += returned`` walks backwards.
+    """
     from qubit_cli.logs import _read_tail, LOG_FILES
     log_name = LOG_FILES.get(file)
     if not log_name:
         raise HTTPException(status_code=400, detail=f"Unknown log file: {file}")
     with _config_profile_scope(profile):
         log_path = get_qubit_home() / "logs" / log_name
+    cap = min(lines, 500)
+    if cap < 0:
+        cap = 0
+    offset = max(0, offset)
+    empty = {"file": file, "lines": [], "offset": offset, "limit": cap,
+             "returned": 0, "has_more": False, "next_offset": None}
     if not log_path.exists():
-        return {"file": file, "lines": []}
+        return empty
 
     try:
         from qubit_logging import COMPONENT_PREFIXES
@@ -831,17 +845,33 @@ async def get_logs(
         if comp_prefixes is None:
             raise HTTPException(status_code=400, detail=f"Unknown component: {component}. "
                                 f"Available: {', '.join(sorted(COMPONENT_PREFIXES))}")
+    # Read one matching line past the requested page so ``has_more`` is proven
+    # (an older line exists), never guessed. Search keeps the upstream 2000-line
+    # over-read; without search we read exactly offset+cap+1 matching lines.
+    read_n = 2000 if search else max(1, offset + cap + 1)
+
     def _load_logs():
         result = _read_tail(
-            log_path, min(lines, 500) if not search else 2000,
+            log_path, read_n,
             has_filters=bool(min_level or comp_prefixes or search),
             min_level=min_level, component_prefixes=comp_prefixes)
         # _read_tail doesn't support free-text search, so post-filter (case-insensitive
-        # substring) here and trim to the requested line count afterward.
+        # substring) here before paginating.
         if search:
             needle = search.lower()
-            result = [line for line in result if needle in line.lower()][-min(lines, 500):]
-        return result
+            result = [line for line in result if needle in line.lower()]
+        # result is oldest→newest. Skip the newest ``offset`` matching lines, then
+        # take the next ``cap`` (the page); anything before that is older => has_more.
+        end = len(result) - offset
+        if end <= 0:
+            page: list = []
+        else:
+            start = max(0, end - cap)
+            page = result[start:end]
+        has_more = cap > 0 and (len(result) - offset - cap) > 0
+        return page, has_more
 
-    result = await asyncio.to_thread(_load_logs)
-    return {"file": file, "lines": result}
+    page, has_more = await asyncio.to_thread(_load_logs)
+    return {"file": file, "lines": page, "offset": offset, "limit": cap,
+            "returned": len(page), "has_more": has_more,
+            "next_offset": (offset + len(page)) if has_more else None}

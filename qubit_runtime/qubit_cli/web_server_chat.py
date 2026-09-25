@@ -366,6 +366,22 @@ def _resolve_chat_argv(
     env.setdefault("COLORTERM", "truecolor")
     env["HERMES_TUI_DASHBOARD"] = "1"
 
+    def _mirror_tui(name: str) -> None:
+        """Publish the QUBIT_TUI_* name the rebranded TUI reads.
+
+        The vendored launch path sets the HERMES_TUI_* names; the deep-rebranded
+        ui-tui reads QUBIT_TUI_*. Without the mirror, dashboard mode, inline
+        mode, mouse suppression, resume, and sidecar/gateway attach are silently
+        off in the Qubit terminal.
+        """
+        qubit_name = "QUBIT_TUI_" + name[len("HERMES_TUI_"):]
+        if name in env:
+            env[qubit_name] = env[name]
+
+    for _name in ("HERMES_TUI_DISABLE_MOUSE", "HERMES_TUI_INLINE",
+                  "HERMES_TUI_DASHBOARD"):
+        _mirror_tui(_name)
+
     if resume:
         _resume_db = _open_session_db_for_profile(
             requested if profile_dir is not None else None, read_only=True)
@@ -376,17 +392,21 @@ def _resolve_chat_argv(
         if latest_resume:
             resume = latest_resume
         env["HERMES_TUI_RESUME"] = resume
+        env["QUBIT_TUI_RESUME"] = resume
 
     if sidecar_url:
         env["HERMES_TUI_SIDECAR_URL"] = sidecar_url
+        env["QUBIT_TUI_SIDECAR_URL"] = sidecar_url
 
     if active_session_file:
         env["HERMES_TUI_ACTIVE_SESSION_FILE"] = active_session_file
+        env["QUBIT_TUI_ACTIVE_SESSION_FILE"] = active_session_file
 
     # Without the attach URL, gatewayClient spawns its own `tui_gateway.entry`,
     # which inherits the profile QUBIT_HOME set above.
     if profile_dir is None and (gateway_ws_url := _build_gateway_ws_url()):
         env["HERMES_TUI_GATEWAY_URL"] = gateway_ws_url
+        env["QUBIT_TUI_GATEWAY_URL"] = gateway_ws_url
 
     return list(argv), str(cwd) if cwd else None, env
 

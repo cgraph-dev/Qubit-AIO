@@ -76,7 +76,8 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
 def _tui_need_rebuild(root: Path) -> bool:
     from qubit_cli.source_build import source_product_current
 
-    force = (os.environ.get("HERMES_TUI_FORCE_BUILD") or "").strip().lower()
+    force = (os.environ.get("QUBIT_TUI_FORCE_BUILD")
+             or os.environ.get("HERMES_TUI_FORCE_BUILD") or "").strip().lower()
     return force in {"1", "true", "yes", "on"} or not source_product_current(root.parent, "tui", root / "dist")
 
 

@@ -461,8 +461,7 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
         help="Multi-profile collaboration board (tasks, links, comments)",
         description="Durable SQLite-backed task board shared across Qubit profiles. "
                     "Tasks are claimed atomically, can depend on other tasks, and "
-                    "are executed by a named profile in an isolated workspace. "
-                    "See https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban.",
+                    "are executed by a named profile in an isolated workspace.",
     )
     # --board scopes every subcommand to one board's DB; when omitted the
     # resolution is HERMES_KANBAN_BOARD, then the persisted current-board

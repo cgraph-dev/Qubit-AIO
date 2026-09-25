@@ -345,9 +345,12 @@ def _known_wrapper_candidates():
     candidates = []
     prefix = os.environ.get("PREFIX")
     if prefix:
+        candidates.append(Path(prefix) / "bin" / "qubit")
         candidates.append(Path(prefix) / "bin" / "hermes")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         candidates.append(Path("/usr/local/bin/qubit"))
+        candidates.append(Path("/usr/local/bin/hermes"))
+    candidates.append(Path.home() / ".local" / "bin" / "qubit")
     candidates.append(Path.home() / ".local" / "bin" / "hermes")
     return candidates
 

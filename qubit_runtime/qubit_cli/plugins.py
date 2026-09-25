@@ -1013,7 +1013,7 @@ class PluginContext:
         frontmatter: Optional[Mapping[str, Any]] = None,
     ) -> PluginRegistration:
         """Register a read-only skill resolvable as ``'<plugin_name>:<name>'`` via ``skill_view()``
-        and listed by ``skills_list``. Not copied into ``~/.hermes/skills/`` and not in the system
+        and listed by ``skills_list``. Not copied into ``$QUBIT_HOME/skills/`` and not in the system
         prompt's ``<available_skills>``. Raises ``ValueError`` (``':'``/invalid chars) or
         ``FileNotFoundError``."""
         from agent.skill_utils import _NAMESPACE_RE
@@ -2188,7 +2188,7 @@ def resolve_plugin_command_result(result: Any) -> Any:
     # copy_context: the helper thread must see the caller's profile/secret scope, else an
     # async hook under a running loop reads the default QUBIT_HOME and get_secret raises.
     threading.Thread(target=contextvars.copy_context().run, args=(_runner,),
-                     name="hermes-plugin-command-await", daemon=True).start()
+                     name="qubit-plugin-command-await", daemon=True).start()
     if not done.wait(timeout=_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS):
         raise TimeoutError("Plugin command async handler did not complete within "
                            f"{_PLUGIN_COMMAND_AWAIT_TIMEOUT_SECS:.0f}s")

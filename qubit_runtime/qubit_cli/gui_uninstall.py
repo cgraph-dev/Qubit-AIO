@@ -64,8 +64,7 @@ def packaged_gui_app_paths() -> "list[Path]":
     icons = data_base / "icons" / "hicolor"
     # "scalable" plus every fixed-size dir the installer may have written (panel sizes + older native copies).
     return [desktop_entry_path(), data_base / "applications" / "Hermes.desktop"] + [
-        icons / size / "apps" / "hermes.png"
-        for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024")]
+        icons / size / "apps" / name for size in ("scalable", "24x24", "32x32", "48x48", "256x256", "512x512", "1024x1024") for name in ("qubit.png", "hermes.png")]
 
 
 def agent_is_installed(qubit_home: Path) -> bool:
