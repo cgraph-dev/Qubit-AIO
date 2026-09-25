@@ -90,12 +90,12 @@ def _extract_nous_from_seed(seed_raw: str) -> Optional[dict]:
     qubit = providers.get("nous")
     if not isinstance(qubit, dict) or not qubit:
         return None
-    if nous.get("client_id") != BOOTSTRAP_CLIENT_ID:
+    if qubit.get("client_id") != BOOTSTRAP_CLIENT_ID:
         return None
     if not (
-        isinstance(nous.get("access_token"), str)
+        isinstance(qubit.get("access_token"), str)
         and qubit["access_token"].strip()
-        and isinstance(nous.get("refresh_token"), str)
+        and isinstance(qubit.get("refresh_token"), str)
         and qubit["refresh_token"].strip()
     ):
         return None

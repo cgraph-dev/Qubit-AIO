@@ -97,7 +97,7 @@ def _migrate_stale_nous_portal_url(providers: Dict[str, Any]) -> None:
     qubit = providers.get("nous")
     if not isinstance(qubit, dict):
         return
-    stored = (nous.get("portal_base_url") or "").strip()
+    stored = (qubit.get("portal_base_url") or "").strip()
     if stored and urlparse(stored).hostname in _NOUS_STALE_PORTAL_HOSTS:
         logger.warning(
             "auth: migrating stale qubit labs_base_url %s -> %s", stored, DEFAULT_NOUS_PORTAL_URL)
