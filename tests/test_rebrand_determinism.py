@@ -15,10 +15,15 @@ The pinned source is read-only input; all work happens in ``tmp_path``.  To keep
 the run bounded the pin is staged once per tree (two independent copies of the
 identical bytes carry the identical input), and the byte comparison is over the
 whole staged tree, including the manifests the engines emit by default.
+
+The gate is non-vacuous: it asserts the pin is the expected upstream revision
+and that the transform actually changed files and renamed paths before it
+asserts the two runs agree.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -29,10 +34,19 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 
-#: Read-only pinned upstream source (v0.21.5 @ 69948c0057).  Overridable for a
-#: relocated checkout; the test skips (not fails) when it is unavailable.
+#: Expected upstream revision of the pinned source (v0.21.5 @ 69948c0057).
+EXPECTED_REVISION = "69948c005791d4d0e51670ca015238c2c7663749"
+
+#: Read-only pinned upstream source.  Overridable for a relocated checkout.
 PINNED_SOURCE = Path(os.environ.get(
     "QUBIT_PINNED_SOURCE", "/tmp/qubit-1to1-20260925-082150/ref"))
+
+#: Read-only source of record for the pin (a git checkout at EXPECTED_REVISION).
+REFERENCE_HOME = Path(os.environ.get(
+    "QUBIT_REFERENCE_HOME", "/home/trick/.hermes/hermes-agent"))
+
+#: Representative pin files checked blob-for-blob against EXPECTED_REVISION.
+REVISION_SAMPLE = ("pyproject.toml", "cli.py", "agent/__init__.py", "README.md")
 
 #: Manifests the engines emit into the staged tree by default.  They are part of
 #: the determinism contract (the rename plan is recorded in order), but they are
@@ -42,6 +56,7 @@ GENERATED = (
     "docs/archive/2026-09-21/QUBIT_REBRAND_MANIFEST.json",
     "docs/archive/2026-09-21/QUBIT_DEBRAND_MANIFEST.json",
 )
+REBRAND_MANIFEST = GENERATED[0]
 
 
 def tree_hash(root, exclude=()) -> str:
@@ -60,6 +75,36 @@ def tree_hash(root, exclude=()) -> str:
     for line in lines:
         h.update(line.encode("utf-8"))
     return h.hexdigest()
+
+
+def _git(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def _assert_pinned_revision() -> None:
+    """Hard-fail unless the pin is the expected upstream revision.
+
+    The pin directory is not a git checkout, so the read-only reference install
+    (the source of record, at ``EXPECTED_REVISION``) is used to check a sample
+    of the pin's blobs.  A missing or unknown pin fails the gate rather than
+    skipping it: a skip would let this gate pass without exercising anything.
+    """
+    if not PINNED_SOURCE.is_dir():
+        pytest.fail(f"pinned source unavailable: {PINNED_SOURCE}")
+    if not REFERENCE_HOME.is_dir():
+        pytest.fail("cannot verify pin revision: reference install unavailable "
+                    f"at {REFERENCE_HOME} (set QUBIT_REFERENCE_HOME)")
+    head = _git("-C", str(REFERENCE_HOME), "rev-parse", "HEAD")
+    assert head == EXPECTED_REVISION, (
+        f"reference revision is {head}, expected {EXPECTED_REVISION}")
+    for rel in REVISION_SAMPLE:
+        pin_blob = _git("hash-object", str(PINNED_SOURCE / rel))
+        ref_blob = _git("-C", str(REFERENCE_HOME), "rev-parse", f"HEAD:{rel}")
+        assert pin_blob == ref_blob, (
+            f"pinned {rel} does not match {EXPECTED_REVISION[:10]} "
+            f"(pin={pin_blob} ref={ref_blob})")
 
 
 def _stage(dest: Path) -> None:
@@ -84,30 +129,48 @@ def _run_engines(root: Path, seed: int) -> None:
 
 @pytest.fixture(scope="module")
 def rebranded(tmp_path_factory):
-    if not PINNED_SOURCE.is_dir():
-        pytest.skip(f"pinned source unavailable: {PINNED_SOURCE}")
+    _assert_pinned_revision()
     base = tmp_path_factory.mktemp("determinism")
     tmp_a, tmp_b = base / "a", base / "b"
     _stage(tmp_a)
     _stage(tmp_b)
     # Pin the premise: both trees start from byte-identical input.
-    assert tree_hash(tmp_a / "qubit_hermes") == tree_hash(tmp_b / "qubit_hermes")
+    input_hash = tree_hash(tmp_a / "qubit_hermes")
+    assert input_hash == tree_hash(tmp_b / "qubit_hermes")
     # Distinct hash seeds force truly independent plan orderings.  The seed only
     # affects in-process string-set iteration, never the input bytes.
     _run_engines(tmp_a, seed=0)
     _run_engines(tmp_b, seed=1)
     # Snapshot now so the determinism assertion is independent of whether the
     # idempotency test (which mutates tmp_a) runs first.
-    return tmp_a, tmp_b, tree_hash(tmp_a), tree_hash(tmp_b)
+    results = {}
+    for name, root in (("a", tmp_a), ("b", tmp_b)):
+        manifest = json.loads((root / REBRAND_MANIFEST).read_text(encoding="utf-8"))
+        results[name] = {
+            "root": root,
+            "hash": tree_hash(root),
+            "input_hash": input_hash,
+            "content_files_changed": manifest["content_files_changed"],
+            "path_renames": len(manifest["path_renames"]),
+        }
+    return results
+
+
+def test_transform_did_real_work(rebranded):
+    """Non-vacuity: the gate must not pass when the transform is a no-op."""
+    for name in ("a", "b"):
+        r = rebranded[name]
+        assert r["path_renames"] > 0, f"run {name}: no paths renamed"
+        assert r["content_files_changed"] > 0, f"run {name}: no files changed"
+        assert r["hash"] != r["input_hash"], f"run {name}: tree unchanged"
 
 
 def test_two_independent_runs_are_byte_identical(rebranded):
-    _tmp_a, _tmp_b, hash_a, hash_b = rebranded
-    assert hash_a == hash_b
+    assert rebranded["a"]["hash"] == rebranded["b"]["hash"]
 
 
 def test_engine_second_run_changes_no_source_file(rebranded):
-    tmp_a, _tmp_b, _hash_a, _hash_b = rebranded
+    tmp_a = rebranded["a"]["root"]
     before = tree_hash(tmp_a, exclude=GENERATED)
     _run_engines(tmp_a, seed=2)
     after = tree_hash(tmp_a, exclude=GENERATED)
