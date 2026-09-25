@@ -298,9 +298,20 @@ def _valid_index_entry(raw: Any) -> Optional[Dict[str, Any]]:
     name = str(raw.get("name") or "").strip()
     repo = str(raw.get("repo") or "").strip()
     pin = str(raw.get("pinned_ref") or raw.get("sha") or "").strip().lower()
-    if not name or not repo.startswith("https://") or not _SHA40_RE.match(pin):
-        return None
     provenance = raw.get("provenance")
+    provenance = provenance if isinstance(provenance, dict) else {}
+    # B4-06: the served row is product surface and must carry no legacy brand,
+    # so the real upstream URL now lives only in the internal ``provenance``
+    # sub-field (rendered behind the plugin's Details disclosure). Admission
+    # still requires a real https upstream repo + a full 40-hex pin — the same
+    # rules the upstream loader enforces (``hermes_cli/plugin_catalog.py:125-171``).
+    upstream_repo = str(
+        provenance.get("upstream_repo")
+        or provenance.get("source_repo_url")
+        or repo or "").strip()
+    if not name or not upstream_repo.startswith("https://") or \
+            not _SHA40_RE.match(pin):
+        return None
     return {
         "id": name,
         "name": name,
@@ -323,7 +334,7 @@ def _valid_index_entry(raw: Any) -> Optional[Dict[str, Any]]:
         "install_state": "OPERATOR_GATED",
         "install_code": INDEX_CODE,
         "install_capability": _install_capability(),
-        "provenance": provenance if isinstance(provenance, dict) else {},
+        "provenance": provenance,
     }
 
 

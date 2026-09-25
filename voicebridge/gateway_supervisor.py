@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import socket
@@ -243,6 +244,54 @@ def _daemon_home(home: Optional[Any] = None) -> Path:
     return QR.default_home()
 
 
+def _resolved_home_path() -> Optional[Path]:
+    """Best-effort resolved home path for home-scoping; ``None`` when unknown."""
+    try:
+        return _daemon_home(None)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+# ``Environment=QUBIT_HOME=/path`` (``%h`` already expanded by systemd). A
+# quoted value is tolerated; whitespace-separated assignments are scanned.
+_UNIT_ENV_HOME_RE = re.compile(
+    r'(?:^|\s)QUBIT_HOME=(?:"([^"]+)"|\'([^\']+)\'|([^\s"\']+))')
+
+
+def _unit_env_qubit_home(props: Dict[str, str]) -> Optional[str]:
+    """The QUBIT_HOME the active systemd unit was configured with, or ``None``.
+
+    B4-04: the supervisor must not report a host-global gateway for an isolated
+    install. The unit pins its home via ``Environment=QUBIT_HOME=...``; when
+    that value differs from this process's resolved home the unit belongs to a
+    different install and must not be surfaced as ours. An absent/parseless
+    value is ``None`` (unknown) so non-systemd/injected reads keep their prior
+    behavior.
+    """
+    raw = str(props.get("Environment", "") or "")
+    if not raw:
+        return None
+    match = _UNIT_ENV_HOME_RE.search(raw)
+    if not match:
+        return None
+    value = next((g for g in match.groups() if g), "")
+    return value or None
+
+
+def _same_home(a: Any, b: Any) -> bool:
+    """True when two home paths point at the same directory (best effort)."""
+    try:
+        pa = Path(a)
+        pb = Path(b)
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        return pa.expanduser().resolve(strict=False) == \
+            pb.expanduser().resolve(strict=False)
+    except Exception:  # noqa: BLE001
+        return str(pa) == str(pb)
+
+
 def daemon_runtime_status(home: Optional[Any] = None) -> Optional[Dict[str, Any]]:
     """Read the vendored gateway's live ``gateway_state.json`` (read-only).
 
@@ -291,6 +340,12 @@ def daemon_runtime_status(home: Optional[Any] = None) -> Optional[Dict[str, Any]
         "pid": pid,
         "updated_at": record.get("updated_at"),
         "platforms": len(platforms),
+        # B4-03: the raw platform map so /api/status can serve the reference
+        # ``gateway_platforms`` shape (platform -> state) instead of ``{}``.
+        "platforms_map": {
+            str(k): v for k, v in platforms.items()
+            if isinstance(v, dict)
+        },
         "connected_platforms": connected,
         "active_agents": record.get("active_agents"),
     }
@@ -380,7 +435,7 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
     argv = _systemctl_argv(
         cfg, "show", unit, "--no-pager",
         "--property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,"
-        "ActiveEnterTimestamp,NRestarts,ExecMainStatus")
+        "ActiveEnterTimestamp,NRestarts,ExecMainStatus,Environment")
     rc, stdout, stderr = _run(run, argv, STATUS_TIMEOUT_S)
     props: Dict[str, str] = {}
     for line in (stdout or "").splitlines():
@@ -400,6 +455,26 @@ def status(cfg: Any, *, runner: Optional[Runner] = None,
     out["running"] = out["active_state"] == "active"
     out["exec_main_status"] = _int_prop(props, "ExecMainStatus")
     out["n_restarts"] = _int_prop(props, "NRestarts")
+    # B4-04: scope the systemd read to THIS install. The unit pins its home via
+    # ``Environment=QUBIT_HOME=...``; if that names a different home, an active
+    # host unit must not be reported as this QUBIT_HOME's gateway (a fresh
+    # isolated install previously surfaced the live host daemon's pid/port).
+    unit_home = _unit_env_qubit_home(props)
+    our_home = _resolved_home_path()
+    if unit_home and our_home is not None and not _same_home(unit_home, our_home):
+        out["state"] = "NOT_INSTALLED"
+        out["running"] = False
+        out["pid"] = None
+        out["exec_main_status"] = 0
+        out["n_restarts"] = 0
+        out["port_in_use"] = False
+        out["healthy"] = False
+        out["health"] = "DOWN"
+        out["detail"] = (
+            f"the active {unit} belongs to a different QUBIT_HOME "
+            f"({unit_home}); no gateway daemon is installed for this home "
+            f"({our_home})")
+        return out
     if rc != 0 and out["active_state"] == "unknown":
         # The unit may simply not be installed; that is a typed state, not a
         # crash. Surface the exact systemd message (redacted by the caller).
