@@ -769,7 +769,7 @@ def _download_url_with_cap(url: str, max_bytes: int) -> tuple[bytes, Optional[st
                 f"URL blocked by SSRF protection (private/internal address): {current_url}")
         chunks: list[bytes] = []
         total = 0
-        with httpx.stream("GET", current_url, headers={"User-Agent": "hermes-kanban/attach"},
+        with httpx.stream("GET", current_url, headers={"User-Agent": "qubit-kanban/attach"},
                           timeout=30, follow_redirects=False) as resp:
             if resp.is_redirect:
                 location = resp.headers.get("location")

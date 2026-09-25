@@ -70,7 +70,7 @@ def isolated_update_runtime(monkeypatch, tmp_path, request):
         monkeypatch.setattr(request.module, "PROJECT_ROOT", checkout)
 
     # A real purge would discard the module objects patched below.
-    monkeypatch.setattr(main, "_purge_stale_hermes_modules", lambda: None)
+    monkeypatch.setattr(main, "_purge_stale_qubit_modules", lambda: None)
     monkeypatch.setattr(gateway, "find_gateway_pids", lambda *a, **k: [])
     monkeypatch.setattr(gateway, "find_profile_gateway_processes", lambda *a, **k: [])
     monkeypatch.setattr(gateway, "_get_service_pids", lambda *a, **k: set())

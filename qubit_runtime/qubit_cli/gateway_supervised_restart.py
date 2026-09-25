@@ -33,10 +33,10 @@ def gateway_declares_external_supervisor(pid: int, home: Path | None = None) -> 
     if not pid or pid <= 1:
         return False
     from gateway.control_socket import identify_gateway
-    from gateway.status import _get_process_hermes_home, read_runtime_status
+    from gateway.status import _get_process_qubit_home, read_runtime_status
     from qubit_cli.gateway import _capture_gateway_argv
 
-    home = home or _get_process_hermes_home()
+    home = home or _get_process_qubit_home()
     identity = identify_gateway(home) or {}
     if identity.get("pid") == pid and identity.get("supervisor") not in (None, "", "manual"):
         return True

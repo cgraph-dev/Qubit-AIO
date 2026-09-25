@@ -56,7 +56,7 @@ def test_run_job_bounds_sessiondb_finalization(tmp_path):
     job = {"id": "cleanup-sessiondb-hang", "name": "test", "prompt": "hello"}
 
     try:
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -137,7 +137,7 @@ def test_dispatch_guard_releases_after_sessiondb_finalization_hang(tmp_path):
     sched._running_job_ids.clear()
 
     try:
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \

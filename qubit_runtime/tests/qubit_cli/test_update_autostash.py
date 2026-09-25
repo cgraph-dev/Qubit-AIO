@@ -52,7 +52,7 @@ def _patch_gateway_discovery():
     ``sys.exit(1)`` (#78574). Discovery returning nothing makes the phase a
     clean no-op — none of the tests here assert on gateway restarts.
 
-    ``_purge_stale_hermes_modules`` must also be stubbed: it evicts
+    ``_purge_stale_qubit_modules`` must also be stubbed: it evicts
     ``qubit_cli.gateway`` from ``sys.modules`` mid-update, and the restart
     phase's fresh ``from qubit_cli.gateway import ...`` then loads an
     UNPATCHED copy of the module — silently discarding every mock here and
@@ -64,7 +64,7 @@ def _patch_gateway_discovery():
          patch("qubit_cli.update_inventory.collect_runtime_inventory", return_value=None), \
          patch("qubit_cli.update_inventory.report_unaccounted_runtimes", return_value=False), \
          patch.object(qubit_main, "_fleet_probe_expected_runtimes", lambda *a, **kw: False), \
-         patch.object(qubit_main, "_purge_stale_hermes_modules", lambda *a, **kw: None), \
+         patch.object(qubit_main, "_purge_stale_qubit_modules", lambda *a, **kw: None), \
          patch("qubit_cli.update_receipt.collect_fleet_versions", return_value=[]):
         yield
 
@@ -654,7 +654,7 @@ def test_update_parser_accepts_keep_stash():
 
 def test_bootstrap_marker_not_autostashed_by_update(tmp_path):
     """#38529: the Desktop bootstrap marker must be git-ignored so that
-    ``hermes update``'s ``git stash push --include-untracked`` does not sweep it
+    ``qubit update``'s ``git stash push --include-untracked`` does not sweep it
     into an autostash on every run.
 
     Behavioral + hermetic: build a throwaway repo that adopts the project's real
@@ -685,7 +685,7 @@ def test_bootstrap_marker_not_autostashed_by_update(tmp_path):
     marker = tmp_path / ".hermes-bootstrap-complete"
     marker.write_text("")
 
-    # Exact flags used by hermes update (qubit_cli/main.py).
+    # Exact flags used by qubit update (qubit_cli/main.py).
     git("stash", "push", "--include-untracked", "-m", "hermes-update-autostash")
 
     assert marker.exists(), (

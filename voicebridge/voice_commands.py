@@ -782,6 +782,73 @@ def _b_sessions(ctx, args):
     return {"sessions": recent_sessions(ctx.cfg, limit)}
 
 
+# Non-interactive, deterministic subcommands of the vendored
+# ``qubit_cli.sessions_cmd`` dispatcher (the EXACT handler ``qubit sessions
+# <sub>`` runs). Voice dispatches them through the real parser + handler so the
+# namespace shape and the mutation are identical to the CLI — no parallel
+# projection, no re-implemented logic. Mutations are confirm-tier through the
+# one voice journal before this body runs. Interactive-only subcommands
+# (``browse``/``import``) and path-driven offline recovery stay guarded.
+_SESSIONS_CLI_SUBCOMMANDS = frozenset({
+    "pinned", "pin", "unpin", "prune", "optimize", "optimize-storage",
+    "clean-markers", "repair", "repair-routing", "retitle-skills",
+    "repair-profiles",
+})
+
+
+def _b_sessions_cli(ctx, args):
+    """Drive the canonical vendored ``qubit_cli.sessions_cmd`` handler.
+
+    The SAME code path ``qubit sessions <sub>`` runs: the real argparse parser
+    (:func:`qubit_cli.subcommands.sessions.build_sessions_parser`) builds the
+    namespace and :func:`qubit_cli.sessions_cmd.cmd_sessions` reads/mutates the
+    one canonical ``state.db``. Voice only supplies the already-confirmed
+    non-interactive argv (``--yes``/``--apply``); it never invents a store.
+    """
+    from . import qubit_runtime as _HR
+
+    action = str(args.get("sessions_action", "") or "")
+    if action not in _SESSIONS_CLI_SUBCOMMANDS:
+        raise ValueError(f"sessions store does not route {action!r}")
+    _HR.ensure_path()
+    try:
+        _HR.use_qubit_home(getattr(ctx, "cfg", None))
+    except Exception:  # noqa: BLE001 - keep serving a typed state
+        pass
+    import argparse
+
+    from qubit_cli.sessions_cmd import cmd_sessions
+    from qubit_cli.subcommands.sessions import build_sessions_parser
+
+    parser = argparse.ArgumentParser(prog="qubit sessions", add_help=False)
+    subs = parser.add_subparsers(dest="sessions_action")
+    build_sessions_parser(subs, cmd_sessions=cmd_sessions)
+
+    argv = ["sessions", action]
+    if action in ("pin", "unpin"):
+        argv += [t for t in str(args.get("session_ids", "") or "").split() if t]
+    elif action == "prune":
+        argv.append("--yes")
+    elif action == "optimize-storage":
+        argv.append("--yes")
+    elif action == "repair-routing":
+        argv.append("--apply")
+    elif action == "retitle-skills":
+        argv.append("--apply")
+    elif action == "repair-profiles":
+        argv += ["--apply", "--yes"]
+    try:
+        ns = parser.parse_args(argv)
+    except SystemExit as exc:  # argparse errors -> typed failure, never a crash
+        raise ValueError(f"invalid sessions arguments (exit {exc.code})")
+    rc, text = _cli_stdout(ns.func, ns)
+    return {"sessions_cli": {
+        "state": "OK" if rc in (None, 0) else "FAILED",
+        "action": action,
+        "exit_code": 0 if rc is None else int(rc),
+        "output": text.strip()[:2000]}}
+
+
 def _b_chat_sessions(ctx, args):
     """Canonical chat sessions (state.db) — migrated Qubit history included.
 
@@ -797,6 +864,11 @@ def _b_chat_sessions(ctx, args):
     sid = str(args.get("session_id", "") or "")
     if action == "show":
         return {"session": store.show(sid)}
+    if action == "export":
+        # Same canonical-store export the dashboard/session surfaces read
+        # (``voicebridge/qubit_session_store.py`` ``QubitSessionStore.export``:612),
+        # never a copy or a parallel store.
+        return {"export": store.export(sid)}
     if action == "messages":
         try:
             limit = int(args.get("limit", 50) or 50)
@@ -1934,6 +2006,20 @@ def _b_tools(ctx, args):
     # surface reading a divergent registry.
     from . import qubit_runtime as _HR
 
+    action = str(args.get("action", "list") or "list")
+    if action in ("enable", "disable"):
+        # The terminal step of the dashboard Settings toolset toggle
+        # (``voicebridge/toolsets.py`` ``settle_toolset_mutation``:320 calls
+        # ``apply_toolset_mutation``:243). The voice confirmation journal is the
+        # human authorization, so apply directly instead of re-staging a second
+        # confirmation on the dashboard journal.
+        from . import toolsets as TS
+
+        name = str(args.get("name", "") or "").strip()
+        if not name:
+            raise ValueError("which toolset?")
+        return {"tools": TS.apply_toolset_mutation(
+            ctx.cfg, name, action == "enable", actor="voice:user")}
     names = []
     try:
         _HR.ensure_path()
@@ -2611,6 +2697,107 @@ def _b_config_profiles(ctx, args):
         return PF.rollback_profile(ctx.cfg, str(args.get("kind", "")),
                                    dry_run=False)
     return PF.profiles_list(ctx.cfg)
+
+
+def _b_config(ctx, args):
+    """Effective Qubit configuration + secret-reference store.
+
+    Same functions the CLI ``qubit config`` family drives
+    (``voicebridge/cli.py`` ``_cmd_config``:9379): the effective config path and
+    a resolved value (``voicebridge/config.py`` ``resolve_config_path``:150 /
+    ``Config.get``:686), the config/env-reference check
+    (``voicebridge/env_store.py`` ``names``:79), the reference-store path
+    (``store_path``:50), and the reference set/unset (``set_ref``:222 /
+    ``remove_ref``:237). Reads are read-only; ``set``/``unset`` write ONLY a
+    ``vault:``/``ref:`` reference (a raw secret is refused) and are gated by the
+    shared voice confirmation journal.
+    """
+    from . import env_store as ES
+    from .config import Config, resolve_config_path
+
+    action = str(args.get("action", "path") or "path")
+    target = getattr(ctx.cfg, "path", None) or resolve_config_path()
+    if action == "path":
+        return {"config_path": {"state": "OK", "path": str(target)}}
+    if action == "get":
+        key = str(args.get("key", "") or "").strip()
+        if not key:
+            raise ValueError("which config key?")
+        loaded = Config.load(target)
+        return {"config_value": {"state": "OK", "key": key,
+                                 "value": loaded.get(*key.split("."))}}
+    if action == "check":
+        loaded = Config.load(target)
+        names = ES.names(ctx.cfg)
+        return {"config_check": {"state": "OK", "path": str(target),
+                                 "sections": sorted(loaded.data.keys()),
+                                 "env_refs": len(names)}}
+    if action == "env-path":
+        return {"config_env_path": {"state": "OK",
+                                    "path": str(ES.store_path(ctx.cfg))}}
+    if action == "set":
+        name = str(args.get("name", "") or "").strip()
+        ref = str(args.get("ref", "") or "").strip()
+        if not name or not ref:
+            raise ValueError(
+                "config set needs a name and a vault:/ref: reference")
+        return {"config_set": {"state": "OK",
+                               **ES.set_ref(ctx.cfg, name, ref)}}
+    if action == "unset":
+        name = str(args.get("name", "") or "").strip()
+        if not name:
+            raise ValueError("which config reference?")
+        return {"config_unset": {"state": "OK",
+                                 **ES.remove_ref(ctx.cfg, name)}}
+    raise ValueError(f"unknown config action {action!r}")
+
+
+def _b_profile_admin(ctx, args):
+    """Agent-profile registry admin (create / rename).
+
+    Dispatches the EXACT ``qubit_compat`` route the Profiles dashboard page
+    calls: ``POST /api/profiles`` (``h_profile_create``:5940) and ``PATCH
+    /api/profiles/{name}`` (``profile_rename``:8864). Both mutations are
+    confirm-gated by the dashboard handler through the shared journal; voice
+    supplies ``confirm=true`` only after the voice confirmation journal settled
+    the spoken confirmation, and a non-2xx route raises
+    :class:`PluginFleetError` so a refusal can never be reported as success.
+    """
+    from urllib.parse import quote
+
+    from . import qubit_compat as HC
+
+    action = str(args.get("action", "") or "")
+    name = str(args.get("name", "") or "").strip()
+    if action == "create":
+        method, path, body = "POST", "/api/profiles", {
+            "name": name, "confirm": True}
+    elif action == "rename":
+        new_name = str(args.get("new_name", "") or "").strip()
+        if not name or not new_name:
+            raise ValueError("rename needs the current and new name")
+        method, path, body = "PATCH", f"/api/profiles/{quote(name)}", {
+            "new_name": new_name, "confirm": True}
+    elif action == "describe":
+        # ``POST /api/profiles/{name}/describe-auto`` (``profile_describe_auto``:8831)
+        # generates an auxiliary-LLM description; a failed generation is a typed
+        # ``ok:false`` reason, never a fabricated description.
+        if not name:
+            raise ValueError("which profile?")
+        method, path, body = "POST", f"/api/profiles/{quote(name)}/describe-auto", {}
+    else:
+        raise PluginFleetError(400, "PROFILE_BAD_OP",
+                               f"unknown profile action {action!r}")
+    code, payload = HC.dispatch(ctx.cfg, method, path, query={}, body=body,
+                                actor=ctx.actor)
+    if int(code) >= 400:
+        code_str = detail = ""
+        if isinstance(payload, dict):
+            code_str = str(payload.get("code") or "")
+            detail = str(payload.get("detail") or "")
+        raise PluginFleetError(int(code), code_str, detail or path)
+    return {"state": "OK", "http_status": int(code), "action": action,
+            "data": payload}
 
 
 # ------------------------------------------------ model/provider profiles
@@ -4133,6 +4320,43 @@ def _b_plugin_runtime(ctx, args):
             return {"marketplace": PR.marketplace_discover(
                 ctx.cfg, str(args.get("source", "") or ""),
                 query=str(args.get("query", "") or ""))}
+        if action == "enable":
+            # Same canonical load/persist the dashboard Settings + CLI plugin
+            # enable path run (``voicebridge/plugin_runtime.py``
+            # ``enable_plugin``:1613).
+            return {"plugins_runtime": PR.enable_plugin(
+                ctx.cfg, str(args.get("plugin_id", "") or ""),
+                confirmed=True, requested_by="voice:user")}
+        if action == "disable":
+            return {"plugins_runtime": PR.disable_plugin(
+                ctx.cfg, str(args.get("plugin_id", "") or ""),
+                confirmed=True, requested_by="voice:user")}
+        if action == "validate":
+            # The vendored admission validator the CLI `plugins validate`
+            # drives (``qubit_cli/plugin_validate.py`` ``validate_plugin_dir``:591);
+            # nothing is imported, installed, or executed.
+            from . import qubit_runtime as _HR
+
+            _HR.ensure_path()
+            try:
+                _HR.use_qubit_home(getattr(ctx, "cfg", None))
+            except Exception:  # noqa: BLE001 - keep the validator importable
+                pass
+            from qubit_cli.plugin_validate import validate_plugin_dir  # type: ignore
+
+            path = str(args.get("path", "") or "").strip()
+            if not path:
+                raise ValueError("which plugin directory?")
+            return {"plugins_runtime": validate_plugin_dir(
+                Path(path).expanduser()).to_dict()}
+        if action == "search":
+            # The curated, pinned index the dashboard Plugins page serves
+            # (``voicebridge/plugin_catalog.py`` ``local_catalog``:459); no
+            # remote catalog is fetched.
+            from . import plugin_catalog as PC
+
+            return {"plugins_runtime": PC.local_catalog(
+                ctx.cfg, query=str(args.get("query", "") or ""))}
     except PR.PluginRuntimeError as exc:
         return {"state": "FAILED", "code": exc.code,
                 "detail": exc.detail[:300], "owner": "qubit-policy",
@@ -4756,6 +4980,7 @@ _BACKENDS: Dict[str, Callable] = {
     "backup": _b_backup,
     "voice_unsupported": _b_voice_unsupported,
     "sessions": _b_sessions,
+    "sessions_cli": _b_sessions_cli,
     "chat_sessions": _b_chat_sessions,
     "capability": _b_capability,
     "checkpoints": _b_checkpoints,
@@ -4806,6 +5031,8 @@ _BACKENDS: Dict[str, Callable] = {
     "curator": _b_curator,
     "update_status": _b_update_status,
     "config_profiles": _b_config_profiles,
+    "config": _b_config,
+    "profile_admin": _b_profile_admin,
     "model_profile_status": _b_model_profile_status,
     "model_profile_test": _b_model_profile_test,
     "speech_profile_test": _b_speech_profile_test,
@@ -9837,10 +10064,10 @@ _CB("cli_env", "Environment references",
 def _CL(entry_id: str, aliases: Tuple[str, ...], backend: str, *,
         fixed: Tuple[Tuple[str, str], ...] = (),
         args: Tuple[VoiceArg, ...] = (), confirm: bool = False,
-        help_text: str = "") -> VoiceCommand:
+        split: str = "", help_text: str = "") -> VoiceCommand:
     return _CB(entry_id, entry_id.replace("_", " ").title(), tuple(aliases),
                backend, args=tuple(args), fixed=tuple(fixed), confirm=confirm,
-               examples=(),
+               examples=(), split=split,
                help=help_text or ("CLI-literal bridge to the same backend the "
                                   "CLI/dashboard call."))
 
@@ -9880,6 +10107,12 @@ _CL("cli_kanban_init", (r"rx:^kanban init$",), "kanban",
 _CL("cli_kanban_boards_create", (r"rx:^kanban boards create\b",), "kanban",
     fixed=(("action", "boards_create"),), args=(_S("name"),), confirm=True,
     help_text="Create a kanban board (confirmed).")
+_CL("cli_kanban_claim", (r"rx:^kanban claim\b",), "kanban",
+    fixed=(("action", "claim"),), args=(_I("task_id"),), confirm=True,
+    help_text="Claim a kanban task (confirmed).")
+_CL("cli_kanban_comment", (r"rx:^kanban comment\b",), "kanban",
+    fixed=(("action", "comment"),), args=(_I("task_id"), _R("body")),
+    confirm=True, help_text="Comment on a kanban task (confirmed).")
 _CL("cli_kanban_assign", (r"rx:^kanban assign\b",), "kanban",
     fixed=(("action", "assign"),), args=(_I("task_id"), _S("assignee")),
     confirm=True, help_text="Assign a kanban task (confirmed).")
@@ -9898,12 +10131,6 @@ _CL("cli_kanban_block", (r"rx:^kanban block\b",), "kanban",
 _CL("cli_kanban_archive", (r"rx:^kanban archive\b",), "kanban",
     fixed=(("action", "archive"),), args=(_I("task_id"),), confirm=True,
     help_text="Archive a kanban task (confirmed).")
-_CL("cli_kanban_stats", (r"rx:^kanban stats$",), "kanban",
-    fixed=(("action", "stats"),),
-    help_text="Kanban board statistics (read-only).")
-_CL("cli_kanban_log", (r"rx:^kanban log$",), "kanban",
-    fixed=(("action", "log"),),
-    help_text="Kanban board activity log (read-only).")
 _CL("cli_kanban_export", (r"rx:^kanban export$",), "kanban",
     fixed=(("action", "export"),),
     help_text="Export the kanban board (read-only).")
@@ -9992,9 +10219,6 @@ _CL("cli_skills_rollback", (r"rx:^skills rollback\b",), "skills",
 _CL("cli_plugins_show", (r"rx:^plugins show\b",), "plugin_runtime",
     fixed=(("action", "show"),), args=(_S("plugin_id", True),),
     help_text="Show one registered plugin (read-only).")
-_CL("cli_plugins_status", (r"rx:^plugins status$",), "plugin_runtime",
-    fixed=(("action", "status"),),
-    help_text="Plugin-runtime status (read-only).")
 _CL("cli_plugins_doctor", (r"rx:^plugins doctor$",), "plugin_runtime",
     fixed=(("action", "doctor"),),
     help_text="Plugin-runtime health (read-only).")
@@ -10248,9 +10472,6 @@ _CL("cli_hooks_revoke", (r"rx:^hooks revoke\b",), "hooks",
 _CL("cli_hooks_test", (r"rx:^hooks test\b",), "hooks",
     fixed=(("action", "test"),),
     help_text="Dry-run a hook (read-only).")
-_CL("cli_hooks_doctor", (r"rx:^hooks doctor$",), "hooks",
-    fixed=(("action", "doctor"),),
-    help_text="Hook health (read-only).")
 
 # --- sync (existing sync backend) ---
 _CL("cli_sync_root", (r"rx:^sync$",), "sync",
@@ -10518,11 +10739,11 @@ _CL("cli_computer_pip", (r"rx:^computer pip$",), "computer",
 _CL("cli_computer_present", (r"rx:^computer present$",), "computer",
     fixed=(("action", "present"),), confirm=True,
     help_text="Enter presentation mode (confirmed).")
-_CL("cli_computer_install_refusal", (r"rx:^computer(?:-use)? install$",),
+_CL("cli_computer_install_refusal", (r"rx:^computer(?:-use)? install(?: refusal)?$",),
     "computer", fixed=(("action", "install"),),
     help_text="Installing the desktop driver is CLI/dashboard-only: typed "
               "refusal naming the counterpart.")
-_CL("cli_computer_permissions", (r"rx:^computer(?:-use)? permissions$",),
+_CL("cli_computer_permissions", (r"rx:^computer-use permissions$",),
     "computer", fixed=(("action", "permissions"),),
     help_text="Desktop access permissions (read-only).")
 _CL("cli_acp_serve_refusal", (r"rx:^acp serve refusal$",), "acp",
@@ -10637,6 +10858,824 @@ _CL("cli_console_help", (r"rx:^console help$",), "console_guidance",
     help_text="Terminal/console guidance (read-only).")
 _CL("cli_mic_help", (r"rx:^mic help$",), "mic_guidance",
     help_text="Microphone-test guidance (the capture itself stays CLI-only).")
+
+# --- projects (existing projects backend; CLI subcommand literals) ---
+_CL("cli_project_root", (r"rx:^project$",), "projects",
+    fixed=(("action", "list"),),
+    help_text="List registered projects (read-only).")
+_CL("cli_project_show", (r"rx:^project show\b",), "projects",
+    fixed=(("action", "show"),), args=(_R("project"),),
+    help_text="Show one project (read-only).")
+_CL("cli_project_create", (r"rx:^project create\b",), "projects",
+    fixed=(("action", "create"),), confirm=True,
+    help_text="Create a project (confirmed).")
+_CL("cli_project_archive", (r"rx:^project archive\b",), "projects",
+    fixed=(("action", "archive"),), confirm=True,
+    help_text="Archive a project (confirmed).")
+_CL("cli_project_rename", (r"rx:^project rename\b",), "projects",
+    fixed=(("action", "rename"),), confirm=True,
+    help_text="Rename a project (confirmed).")
+_CL("cli_project_restore", (r"rx:^project restore\b",), "projects",
+    fixed=(("action", "restore"),), confirm=True,
+    help_text="Restore a project (confirmed).")
+_CL("cli_project_rollback", (r"rx:^project rollback\b",), "projects",
+    fixed=(("action", "rollback"),), confirm=True,
+    help_text="Roll back projects (confirmed).")
+_CL("cli_project_add_folder", (r"rx:^project add(?: |-)?folder\b",), "projects",
+    fixed=(("action", "add_folder"),), confirm=True,
+    help_text="Add a project folder (confirmed).")
+_CL("cli_project_remove_folder", (r"rx:^project remove(?: |-)?folder\b",),
+    "projects", fixed=(("action", "remove_folder"),), confirm=True,
+    help_text="Remove a project folder (confirmed).")
+_CL("cli_project_set_primary", (r"rx:^project set(?: |-)?primary\b",),
+    "projects", fixed=(("action", "set_primary"),), confirm=True,
+    help_text="Set the primary project folder (confirmed).")
+_CL("cli_project_bind_board", (r"rx:^project bind(?: |-)?board\b",),
+    "projects", fixed=(("action", "bind_board"),), confirm=True,
+    help_text="Bind a board to a project (confirmed).")
+_CL("cli_projects_active", (r"rx:^projects active$",), "projects",
+    fixed=(("action", "active"),),
+    help_text="Show the active project (read-only).")
+_CL("cli_projects_create", (r"rx:^projects create\b",), "projects",
+    fixed=(("action", "create"),), confirm=True,
+    help_text="Create a project (confirmed).")
+_CL("cli_projects_archive", (r"rx:^projects archive\b",), "projects",
+    fixed=(("action", "archive"),), confirm=True,
+    help_text="Archive a project (confirmed).")
+
+# --- autonomy (existing autonomy backends; CLI subcommand literals) ---
+_CL("cli_autonomy_expire", (r"rx:^autonomy expire$",), "autonomy_expire",
+    help_text="Expire elapsed autonomy profiles (read-only).")
+_CL("cli_autonomy_show", (r"rx:^autonomy show\b",), "autonomy_show",
+    args=(_S("profile_id"),),
+    help_text="Show one autonomy profile (read-only).")
+_CL("cli_autonomy_pause", (r"rx:^autonomy pause\b",), "autonomy_pause",
+    args=(_S("profile_id"),), confirm=True,
+    help_text="Pause an autonomy profile (confirmed).")
+_CL("cli_autonomy_resume", (r"rx:^autonomy resume\b",), "autonomy_resume",
+    args=(_S("profile_id"),), confirm=True,
+    help_text="Resume an autonomy profile (confirmed).")
+_CL("cli_autonomy_revoke", (r"rx:^autonomy revoke\b",), "autonomy_revoke",
+    args=(_S("profile_id"),), confirm=True,
+    help_text="Revoke an autonomy profile (confirmed).")
+
+# --- ghost desktop adapter (existing ghost backend; CLI subcommand literals) ---
+_CL("cli_ghost_show", (r"rx:^ghost show\b",), "ghost",
+    fixed=(("action", "show"),), args=(_S("capability"),),
+    help_text="Show a Ghost capability (read-only).")
+_CL("cli_ghost_check", (r"rx:^ghost check\b",), "ghost",
+    fixed=(("action", "check"),), args=(_S("capability"),),
+    help_text="Check whether a Ghost capability can run (read-only).")
+_CL("cli_ghost_grant", (r"rx:^ghost grant\b",), "ghost",
+    fixed=(("action", "grant"),), confirm=True,
+    help_text="Grant a Ghost session (confirmed).")
+_CL("cli_ghost_revoke", (r"rx:^ghost revoke\b",), "ghost",
+    fixed=(("action", "revoke"),), confirm=True,
+    help_text="Revoke a Ghost grant (confirmed).")
+_CL("cli_ghost_execute", (r"rx:^ghost execute\b",), "ghost",
+    fixed=(("action", "execute"),), confirm=True,
+    help_text="Execute a Ghost action (confirmed).")
+_CL("cli_ghost_cancel", (r"rx:^ghost cancel\b",), "ghost",
+    fixed=(("action", "cancel"),), confirm=True,
+    help_text="Cancel a Ghost action (confirmed).")
+_CL("cli_ghost_enable", (r"rx:^ghost enable$",), "ghost",
+    fixed=(("action", "enable"),), confirm=True,
+    help_text="Enable Ghost (confirmed).")
+_CL("cli_ghost_disable", (r"rx:^ghost disable$",), "ghost",
+    fixed=(("action", "disable"),), confirm=True,
+    help_text="Disable Ghost (confirmed).")
+_CL("cli_ghost_estop", (r"rx:^ghost estop$",), "ghost",
+    fixed=(("action", "emergency-stop"),), confirm=True,
+    help_text="Ghost emergency stop (confirmed).")
+_CL("cli_ghost_reset", (r"rx:^ghost reset$",), "ghost",
+    fixed=(("action", "reset"),), confirm=True,
+    help_text="Reset the Ghost adapter (confirmed).")
+_CL("cli_ghost_action_preview", (r"rx:^ghost action preview\b",), "ghost",
+    fixed=(("action", "preview"),),
+    help_text="Preview a Ghost action (read-only).")
+_CL("cli_ghost_action_retry", (r"rx:^ghost action retry\b",), "ghost",
+    fixed=(("action", "retry"),), confirm=True,
+    help_text="Retry a Ghost action (confirmed).")
+_CL("cli_ghost_action_recover", (r"rx:^ghost action recover\b",), "ghost",
+    fixed=(("action", "recover"),), confirm=True,
+    help_text="Recover a Ghost action (confirmed).")
+_CL("cli_ghost_read_tab", (r"rx:^ghost read tab$",), "ghost",
+    fixed=(("action", "read_tab"),),
+    help_text="Read the current browser tab via Ghost (read-only).")
+_CL("cli_ghost_type", (r"rx:^ghost type\b",), "ghost",
+    fixed=(("action", "type"),), confirm=True,
+    help_text="Type into a field via Ghost (confirmed).")
+
+# --- speech profiles (existing speech_profile backends) ---
+_CL("cli_speech_profile_list", (r"rx:^speech profile list$",),
+    "speech_profile_list",
+    help_text="List speech profiles (read-only).")
+_CL("cli_speech_profile_show", (r"rx:^speech profile show\b",),
+    "speech_profile_show", args=(_S("profile_id"),),
+    help_text="Show a speech profile (read-only).")
+_CL("cli_speech_profile_create", (r"rx:^speech profile create\b",),
+    "speech_profile_create", confirm=True,
+    help_text="Create a speech profile (confirmed).")
+_CL("cli_speech_profile_clone", (r"rx:^speech profile clone\b",),
+    "speech_profile_clone", confirm=True,
+    help_text="Clone a speech profile (confirmed).")
+_CL("cli_speech_profile_remove", (r"rx:^speech profile remove\b",),
+    "speech_profile_remove", confirm=True,
+    help_text="Remove a speech profile (confirmed).")
+_CL("cli_speech_profile_select", (r"rx:^speech profile select\b",),
+    "speech_profile_select", confirm=True,
+    help_text="Select a speech profile for this session (confirmed).")
+_CL("cli_speech_profile_clear", (r"rx:^speech profile clear$",),
+    "speech_profile_clear", confirm=True,
+    help_text="Clear the session speech profile (confirmed).")
+_CL("cli_speech_profile_test", (r"rx:^speech profile test\b",),
+    "speech_profile_test",
+    help_text="Preflight the speech profile (read-only).")
+
+# --- canonical chat sessions (existing chat_sessions backend) ---
+_CL("cli_chat_sessions", (r"rx:^chat sessions$",), "chat_sessions",
+    fixed=(("action", "list"),),
+    help_text="List canonical chat sessions from state.db (read-only).")
+_CL("cli_chat_session_show", (r"rx:^chat session show\b",), "chat_sessions",
+    fixed=(("action", "show"),), args=(_S("session_id"),),
+    help_text="Show one canonical chat session (read-only).")
+_CL("cli_chat_session_search", (r"rx:^chat session search\b",), "chat_sessions",
+    fixed=(("action", "search"),), args=(_R("query"),),
+    help_text="Search canonical chat sessions (read-only).")
+
+# --- foreign-setup import (existing import_agent backend) ---
+_CL("cli_import_inspect", (r"rx:^import inspect$",), "import_agent",
+    fixed=(("action", "inspect"),),
+    help_text="Inspect a foreign setup before importing (read-only).")
+_CL("cli_import_refusal", (r"rx:^import refusal$",), "import_agent",
+    fixed=(("action", "import"),),
+    help_text="Foreign-setup import is CLI/dashboard-only: typed refusal "
+              "naming the counterpart.")
+_CL("cli_import_agent", (r"rx:^import-agent$",), "import_agent",
+    fixed=(("action", "inspect"),),
+    help_text="Inspect a foreign agent setup (read-only).")
+
+# --- emergency stop / theme pets (existing backends) ---
+_CL("cli_pause", (r"rx:^pause$",), "pause", confirm=True,
+    help_text="Latch the emergency stop (confirmed).")
+_CL("cli_pets_refusal", (r"rx:^pets downloads refusal$",), "themes",
+    fixed=(("action", "pets"),),
+    help_text="Pet downloads are CLI/dashboard-only: typed refusal naming the "
+              "counterpart.")
+
+# --- skills workshop (existing workshop backend) ---
+_CL("cli_skills_workshop", (r"rx:^skills workshop$",), "workshop",
+    fixed=(("action", "collection"),),
+    help_text="Skills-workshop collection status (read-only).")
+_CL("cli_skills_workshop_backup", (r"rx:^skills workshop backup$",), "workshop",
+    fixed=(("action", "backup"),), confirm=True,
+    help_text="Back up the skills workshop (confirmed).")
+_CL("cli_skills_workshop_restore", (r"rx:^skills workshop restore$",),
+    "workshop", fixed=(("action", "restore"),), confirm=True,
+    help_text="Restore the skills workshop (confirmed).")
+_CL("cli_skills_workshop_rollback", (r"rx:^skills workshop rollback$",),
+    "workshop", fixed=(("action", "rollback"),), confirm=True,
+    help_text="Roll back the skills workshop (confirmed).")
+
+# --- effective config + secret-reference store (existing voicebridge.config /
+# voicebridge.env_store backend, the same functions `qubit config` calls) ---
+_CL("cli_config_path", (r"rx:^config path$",), "config",
+    fixed=(("action", "path"),),
+    help_text="Effective Qubit config file path (read-only).")
+_CL("cli_config_get", (r"rx:^config get\b",), "config",
+    fixed=(("action", "get"),), args=(_R("key"),),
+    help_text="Resolved value for one config key (read-only).")
+_CL("cli_config_check", (r"rx:^config check$",), "config",
+    fixed=(("action", "check"),),
+    help_text="Load + validate the effective config and reference store "
+              "(read-only).")
+_CL("cli_config_env_path", (r"rx:^config env-path$",), "config",
+    fixed=(("action", "env-path"),),
+    help_text="Secret-reference store path (read-only).")
+_CL("cli_config_set", (r"rx:^config set\b",), "config",
+    fixed=(("action", "set"),), args=(_S("name", True), _R("ref")),
+    confirm=True, split="first-rest",
+    help_text="Set a vault:/ref: secret reference (confirmed; a raw secret "
+              "value is refused).")
+_CL("cli_config_unset", (r"rx:^config unset\b",), "config",
+    fixed=(("action", "unset"),), args=(_S("name", True),), confirm=True,
+    help_text="Remove a secret reference (confirmed).")
+_CL("cli_config_edit_guard", (r"rx:^config edit$",), "voice_unsupported",
+    fixed=(("op", "config_edit"), ("code", "VOICE_UNSUPPORTED"),
+           ("guidance", "use the dashboard Config editor or `qubit config "
+                        "edit` in a terminal")),
+    help_text="Opening an editor by voice is refused: typed refusal naming the "
+              "counterpart.")
+_CL("cli_config_migrate_guard", (r"rx:^config migrate$",), "voice_unsupported",
+    fixed=(("op", "config_migrate"), ("code", "VOICE_UNSUPPORTED"),
+           ("guidance", "run `qubit config migrate` in a terminal; it is "
+                        "interactive")),
+    help_text="Interactive config migration is refused by voice: typed refusal "
+              "naming the counterpart.")
+
+# --- toolset enable/disable (existing toolsets backend) ---
+_CL("cli_tools_enable", (r"rx:^tools enable\b",), "tools",
+    fixed=(("action", "enable"),), args=(_S("name", True),), confirm=True,
+    help_text="Enable a configurable toolset (confirmed; the same apply the "
+              "dashboard Settings toggle runs).")
+_CL("cli_tools_disable", (r"rx:^tools disable\b",), "tools",
+    fixed=(("action", "disable"),), args=(_S("name", True),), confirm=True,
+    help_text="Disable a configurable toolset (confirmed).")
+
+# --- plugin lifecycle (existing plugin_runtime / plugin_catalog backend) ---
+_CL("cli_plugins_enable", (r"rx:^plugins enable\b",), "plugin_runtime",
+    fixed=(("action", "enable"),), args=(_S("plugin_id", True),), confirm=True,
+    help_text="Enable an installed plugin (confirmed; same load/persist the "
+              "dashboard Settings path runs).")
+_CL("cli_plugins_disable", (r"rx:^plugins disable\b",), "plugin_runtime",
+    fixed=(("action", "disable"),), args=(_S("plugin_id", True),), confirm=True,
+    help_text="Disable an installed plugin (confirmed).")
+_CL("cli_plugins_validate", (r"rx:^plugins validate\b",), "plugin_runtime",
+    fixed=(("action", "validate"),), args=(_R("path"),),
+    help_text="Validate a plugin directory (read-only; nothing installed or "
+              "executed).")
+_CL("cli_plugins_search", (r"rx:^plugins search\b",), "plugin_runtime",
+    fixed=(("action", "search"),), args=(_R("query"),),
+    help_text="Search the curated local plugin index (read-only).")
+
+# --- canonical chat-session export (existing chat_sessions backend) ---
+_CL("cli_sessions_export", (r"rx:^sessions export\b",), "chat_sessions",
+    fixed=(("action", "export"),), args=(_S("session_id", True),),
+    help_text="Export one canonical chat session (read-only; same store the "
+              "dashboard reads).")
+
+# --- agent-profile registry (existing qubit_compat Profiles routes) ---
+_CL("cli_agent_profile_create", (r"rx:^profile create\b",), "profile_admin",
+    fixed=(("action", "create"),), args=(_S("name", True),), confirm=True,
+    help_text="Create a reference profile (confirmed; the same handler the "
+              "Profiles dashboard page calls).")
+_CL("cli_agent_profile_rename", (r"rx:^profile rename\b",), "profile_admin",
+    fixed=(("action", "rename"),), args=(_S("name", True), _R("new_name")),
+    confirm=True, split="first-rest",
+    help_text="Rename a reference profile (confirmed).")
+_CL("cli_agent_profile_describe", (r"rx:^profile describe\b",), "profile_admin",
+    fixed=(("action", "describe"),), args=(_S("name", True),),
+    help_text="Generate an auxiliary-LLM profile description (same handler the "
+              "Profiles dashboard page calls).")
+_CL("cli_mcp_add", (r"rx:^mcp add\b",), "mcp_admin",
+    fixed=(("action", "install"),), args=(_S("name", True),), confirm=True,
+    help_text="Add a curated catalog MCP (same install handler `qubit mcp "
+              "install` uses; interactive/credentialed entries are typed "
+              "refused, never half-installed).")
+
+# --- existing-backend CLI-literal bridges (files / vision / verified / shares /
+# transfers / package / branding / capability / worktree / monitor / verify /
+# skin / task). Each binds the exact CLI literal to the SAME read/mutation the
+# REGISTRY's spoken alias already drives — no new backend, no stub. ---
+_CL("cli_files_read_cmd", (r"rx:^files? read\b",), "files",
+    fixed=(("action", "read"),), args=(_R("path"),), split="path",
+    help_text="Bounded redacted read inside project roots (read-only).")
+_CL("cli_files_list_cmd", (r"rx:^files? list\b",), "files",
+    fixed=(("action", "list"),), args=(_S("path"),), split="path",
+    help_text="Bounded folder listing inside project roots (read-only).")
+_CL("cli_file_patch_rollback", (r"rx:^file patch rollback\b",), "files",
+    fixed=(("action", "rollback"),), args=(_S("target", True),), confirm=True,
+    help_text="Restore the prior content of the last applied patch "
+              "(confirmed).")
+_CL("cli_vision_describe_cmd", (r"rx:^vision describe\b",), "vision_describe",
+    args=(_R("image"), _S("prompt")), confirm=True, split="path",
+    help_text="VRAM-guarded image analysis (confirmed).")
+_CL("cli_verified_list_cmd", (r"rx:^verified list$",), "verified",
+    fixed=(("action", "list"),),
+    help_text="Curated skill inventory (read-only).")
+_CL("cli_shares_publish_cmd", (r"rx:^shares publish\b",), "session_share",
+    fixed=(("action", "publish"),), args=(_R("session_id"),), confirm=True,
+    help_text="Publish a redacted session-share snapshot (confirmed).")
+_CL("cli_shares_revoke_cmd", (r"rx:^shares revoke\b",), "session_share",
+    fixed=(("action", "revoke"),), args=(_R("share_id"),), confirm=True,
+    help_text="Revoke a session share (confirmed).")
+_CL("cli_shares_purge_cmd", (r"rx:^shares purge$",), "session_share",
+    fixed=(("action", "purge"),), confirm=True,
+    help_text="Purge expired session shares (confirmed).")
+_CL("cli_transfers_fetch_cmd", (r"rx:^transfers fetch\b",), "file_transfer",
+    fixed=(("action", "fetch"),), args=(_R("path"),), confirm=True,
+    split="path",
+    help_text="Confirmed bounded chunk read; size/digest summary only.")
+_CL("cli_transfers_plan_cmd", (r"rx:^transfers plan\b",), "file_transfer",
+    fixed=(("action", "plan"),), args=(_R("path"),), confirm=True,
+    split="path",
+    help_text="Confirmed resumable transfer plan (digests only).")
+_CL("cli_transfers_resume_cmd", (r"rx:^transfers resume\b",), "file_transfer",
+    fixed=(("action", "resume"),), args=(_R("transfer_id"),),
+    help_text="Validate a persisted transfer plan (read-only).")
+_CL("cli_package_certify", (r"rx:^package certify$",), "package",
+    fixed=(("action", "certify"),),
+    help_text="Static release checks (read-only).")
+_CL("cli_branding_migrate", (r"rx:^branding migrate$",), "branding",
+    fixed=(("action", "migrate"),), confirm=True,
+    help_text="Backed-up branding migration apply (confirmed).")
+_CL("cli_capabilities_list", (r"rx:^capabilities( list)?$",), "capability",
+    fixed=(("action", "list"),),
+    help_text="Every capability with availability counts (read-only).")
+_CL("cli_capability", (r"rx:^capability\b",), "capability",
+    fixed=(("action", "check"),), args=(_R("name"),),
+    help_text="Typed availability for one capability (read-only).")
+_CL("cli_worktree_list", (r"rx:^worktree list$",), "worktree",
+    help_text="Orphaned worktree sweep report (read-only).")
+_CL("cli_worktree_prune", (r"rx:^worktree prune$",), "worktree", confirm=True,
+    help_text="Reap orphaned worktrees (confirmed; same reap the dashboard "
+              "worktree op runs).")
+_CL("cli_monitor", (r"rx:^monitor( run)?$",), "monitor", confirm=True,
+    help_text="Bounded monitor pass handoff (confirmed).")
+_CL("cli_reasoning", (r"rx:^reasoning$",), "reasoning",
+    help_text="Per-request output budgets (read-only).")
+_CL("cli_loop_start", (r"rx:^loop start$",), "loop",
+    fixed=(("action", "start"),),
+    help_text="Loop how-to guidance (you are already inside it).")
+_CL("cli_verify", (r"rx:^verify$",), "verify_release",
+    fixed=(("action", "status"),),
+    help_text="Static release qualification (read-only).")
+_CL("cli_skin", (r"rx:^skin$",), "themes", fixed=(("action", "show"),),
+    help_text="Active dashboard theme (read-only).")
+_CL("cli_verify_voice", (r"rx:^verify voice$",), "audio_hw",
+    fixed=(("action", "verify"),), confirm=True,
+    help_text="Bounded audio-hardware voice probe (operator-gated; "
+              "confirmed).")
+_CL("cli_task_run_current", (r"rx:^task run current$",), "task_run",
+    fixed=(("from_current", "true"),), confirm=True,
+    help_text="Run the newest actionable kanban task (same CLI `task "
+              "--current`).")
+_CL("cli_computer_screen", (r"rx:^computer screen$",), "computer_screen",
+    fixed=(("action", "panes"),),
+    help_text="Control-UI pane layout (read-only).")
+_CL("cli_computer_screen_arrange", (r"rx:^computer screen arrange\b",),
+    "computer_screen", fixed=(("action", "arrange"),), args=(_R("panes"),),
+    confirm=True,
+    help_text="Arrange Control-UI panes (confirmed).")
+
+
+# ----------------------------------- wave 20: sessions-store subcommands
+# The vendored ``qubit_cli.sessions_cmd`` dispatcher is the EXACT handler the CLI
+# ``qubit sessions <sub>`` runs against the one canonical ``state.db``. Voice
+# binds the non-interactive, deterministic subcommands through that same handler
+# (``_b_sessions_cli``), so there is no parallel projection and no re-implemented
+# logic. Mutations are confirm-tier through the one voice journal before the
+# backend runs. Interactive-only subcommands (browse/import), path-driven offline
+# recovery, and the holder-sensitive journal-mode conversion stay guarded below.
+_CL("cli_sessions_pinned", (r"rx:^sessions? pinned$",), "sessions_cli",
+    fixed=(("sessions_action", "pinned"),),
+    help_text="List pinned sessions (read-only; same store the CLI/desktop read).")
+_CL("cli_sessions_pin", (r"rx:^sessions? pin\b",), "sessions_cli",
+    fixed=(("sessions_action", "pin"),), args=(_R("session_ids"),), confirm=True,
+    help_text="Pin session(s) (confirmed; durable keep flag, exempt from "
+              "auto-archive; same pin the CLI runs).")
+_CL("cli_sessions_unpin", (r"rx:^sessions? unpin\b",), "sessions_cli",
+    fixed=(("sessions_action", "unpin"),), args=(_R("session_ids"),),
+    confirm=True, help_text="Unpin session(s) (confirmed).")
+_CL("cli_sessions_prune", (r"rx:^sessions? prune$",), "sessions_cli",
+    fixed=(("sessions_action", "prune"),), confirm=True,
+    help_text="Prune ended sessions matching the default age window (confirmed; "
+              "same state.db prune `qubit sessions prune` runs).")
+_CL("cli_sessions_optimize", (r"rx:^sessions? optimize$",), "sessions_cli",
+    fixed=(("sessions_action", "optimize"),), confirm=True,
+    help_text="Merge FTS5 segments + VACUUM the session store (confirmed; no "
+              "conversation data changed).")
+_CL("cli_sessions_optimize_storage", (r"rx:^sessions? optimize-storage$",),
+    "sessions_cli", fixed=(("sessions_action", "optimize-storage"),),
+    confirm=True,
+    help_text="Rebuild the compact search index (confirmed; no conversation data "
+              "changed).")
+_CL("cli_sessions_clean_markers", (r"rx:^sessions? clean-markers$",),
+    "sessions_cli", fixed=(("sessions_action", "clean-markers"),), confirm=True,
+    help_text="Clear stale tool-call marker rows once (confirmed; backup first).")
+_CL("cli_sessions_repair", (r"rx:^sessions? repair$",), "sessions_cli",
+    fixed=(("sessions_action", "repair"),), confirm=True,
+    help_text="Repair a malformed state.db schema (confirmed; backup first).")
+_CL("cli_sessions_repair_routing", (r"rx:^sessions? repair-routing$",),
+    "sessions_cli", fixed=(("sessions_action", "repair-routing"),), confirm=True,
+    help_text="Re-stamp gateway sessions that lost routing identity (confirmed; "
+              "--apply).")
+_CL("cli_sessions_retitle_skills", (r"rx:^sessions? retitle-skills$",),
+    "sessions_cli", fixed=(("sessions_action", "retitle-skills"),), confirm=True,
+    help_text="Re-title /skill-scaffolded sessions from the user's own request "
+              "(confirmed; --apply).")
+_CL("cli_sessions_repair_profiles", (r"rx:^sessions? repair-profiles$",),
+    "sessions_cli", fixed=(("sessions_action", "repair-profiles"),), confirm=True,
+    help_text="Settle session/routing state that landed under the wrong profile "
+              "(confirmed; snapshots each store first).")
+
+
+# ----------------------------------- wave 20: operator-only / external guards
+# Every remaining unresolved CLI family has NO spoken-safe execution path:
+# interactive TTY pickers/OAuth, host/network service lifecycle, external
+# portals, credential prompts, or a removed subsystem. Each is an AUDITED typed
+# refusal (``voice_unsupported``) that NAMES the exact CLI/dashboard counterpart
+# — real execution of Qubit's safety policy, never fabricated success and never
+# a silent no-op. Anchored ``rx:^...$`` aliases keep the bridge honest.
+def _CG(literal: str, guidance: str, code: str = "VOICE_TERMINAL_ONLY") -> None:
+    """Register one CLI-literal typed-refusal guard (anchored exact match)."""
+    slug = re.sub(r"[^a-z0-9]+", "_", literal).strip("_")
+    _CB(f"cli_guard_{slug}", f"{literal} (voice guard)",
+        (f"rx:^{re.escape(literal)}$",), "voice_unsupported",
+        fixed=(("op", slug), ("guidance", guidance), ("code", code)),
+        summary="guidance",
+        examples=(f"qubit, {literal}",),
+        help="Typed refusal with guidance: this CLI family is terminal/dashboard "
+             "only for safety; the spoken attempt never claims success.")
+
+
+_CLI_GUARDS: Dict[str, Tuple[str, str]] = {
+    # -- sessions: interactive/offline-only shapes ----------------------------
+    "sessions browse": ("interactive TTY picker; run `qubit sessions browse` in "
+                        "a terminal", "VOICE_INTERACTIVE"),
+    "sessions import": ("interactive foreign-session picker; run `qubit sessions "
+                        "import` in a terminal", "VOICE_INTERACTIVE"),
+    "sessions recover": ("offline, file-path driven recovery; run `qubit "
+                         "sessions recover --source <db>` in a terminal",
+                         "VOICE_PATH_DRIVEN"),
+    "sessions set-journal-mode": ("needs an explicit mode with every holder "
+                                  "stopped; run `qubit sessions set-journal-mode "
+                                  "delete|wal` in a terminal",
+                                  "VOICE_TERMINAL_ONLY"),
+    # -- MCP interactive OAuth/credential flows -------------------------------
+    "mcp configure": ("interactive credential/OAuth prompt; use `qubit mcp "
+                      "install <name>` or the dashboard Plugins form",
+                      "VOICE_INTERACTIVE"),
+    "mcp login": ("interactive OAuth; run `qubit mcp login <name>` in a terminal",
+                  "VOICE_INTERACTIVE"),
+    "mcp picker": ("interactive picker; run `qubit mcp install <name>` in a "
+                   "terminal", "VOICE_INTERACTIVE"),
+    "mcp reauth": ("interactive OAuth; run `qubit mcp reauth <name>` in a "
+                   "terminal", "VOICE_INTERACTIVE"),
+    "mcp serve": ("runs a foreground MCP server; run `qubit mcp serve` in a "
+                  "terminal", "VOICE_TERMINAL_ONLY"),
+    # -- host network-egress service lifecycle --------------------------------
+    "egress config": ("host network-egress guard; run `qubit egress config` in "
+                      "a terminal", "VOICE_HOST_SERVICE"),
+    "egress disable": ("host network-egress guard; run `qubit egress disable` "
+                       "in a terminal", "VOICE_HOST_SERVICE"),
+    "egress install": ("host network-egress guard; run `qubit egress install` in "
+                       "a terminal", "VOICE_HOST_SERVICE"),
+    "egress reload": ("host network-egress guard; run `qubit egress reload` in a "
+                      "terminal", "VOICE_HOST_SERVICE"),
+    "egress restart": ("host network-egress guard; run `qubit egress restart` in "
+                       "a terminal", "VOICE_HOST_SERVICE"),
+    "egress setup": ("host network-egress guard; run `qubit egress setup` in a "
+                     "terminal", "VOICE_HOST_SERVICE"),
+    "egress start": ("host network-egress guard; run `qubit egress start` in a "
+                     "terminal", "VOICE_HOST_SERVICE"),
+    "egress stop": ("host network-egress guard; run `qubit egress stop` in a "
+                    "terminal", "VOICE_HOST_SERVICE"),
+    # -- cross-device sync transfer -------------------------------------------
+    "sync device": ("cross-device sync transport; run `qubit sync device` in a "
+                    "terminal", "VOICE_EXTERNAL_TRANSFER"),
+    "sync disable": ("cross-device sync transport; run `qubit sync disable` in "
+                     "a terminal", "VOICE_EXTERNAL_TRANSFER"),
+    "sync enable": ("cross-device sync transport; run `qubit sync enable` in a "
+                    "terminal", "VOICE_EXTERNAL_TRANSFER"),
+    "sync now": ("cross-device sync transport; run `qubit sync now` in a "
+                 "terminal", "VOICE_EXTERNAL_TRANSFER"),
+    "sync propose": ("cross-device sync transport; run `qubit sync propose` in a "
+                     "terminal", "VOICE_EXTERNAL_TRANSFER"),
+    "sync pull": ("cross-device sync transport; run `qubit sync pull` in a "
+                  "terminal", "VOICE_EXTERNAL_TRANSFER"),
+    "sync push": ("cross-device sync transport; run `qubit sync push` in a "
+                  "terminal", "VOICE_EXTERNAL_TRANSFER"),
+    # -- external Portal account ---------------------------------------------
+    "portal": ("external Portal account surface; use `qubit portal` in a "
+               "terminal or the dashboard Portal page", "VOICE_EXTERNAL_ACCOUNT"),
+    "portal info": ("external Portal account surface; use `qubit portal info` in "
+                    "a terminal", "VOICE_EXTERNAL_ACCOUNT"),
+    "portal login": ("interactive Portal login; use the dashboard Portal page or "
+                     "`qubit portal login` in a terminal",
+                     "VOICE_EXTERNAL_ACCOUNT"),
+    "portal open": ("opens the external Portal; use `qubit portal open` in a "
+                    "terminal", "VOICE_EXTERNAL_ACCOUNT"),
+    "portal tools": ("external Portal tool catalog; use `qubit portal tools` in "
+                     "a terminal", "VOICE_EXTERNAL_ACCOUNT"),
+    # -- provider credential flows -------------------------------------------
+    "auth add": ("provider credential flow; use `qubit auth add` in a terminal "
+                 "or the dashboard Providers page", "VOICE_CREDENTIAL_FLOW"),
+    "auth priority": ("provider priority config; use `qubit auth priority` in a "
+                      "terminal", "VOICE_CREDENTIAL_FLOW"),
+    "auth refresh": ("provider credential refresh; use `qubit auth refresh` in a "
+                     "terminal", "VOICE_CREDENTIAL_FLOW"),
+    "auth remove": ("provider credential removal; use `qubit auth remove` in a "
+                    "terminal or the dashboard Providers page",
+                    "VOICE_CREDENTIAL_FLOW"),
+    "auth reset": ("provider credential reset; use `qubit auth reset` in a "
+                   "terminal", "VOICE_CREDENTIAL_FLOW"),
+    "auth spotify": ("interactive Spotify OAuth; use `qubit auth spotify` in a "
+                     "terminal", "VOICE_CREDENTIAL_FLOW"),
+    "auth upgrade": ("operator-owned provider upgrade; use `qubit auth upgrade` "
+                     "in a terminal", "VOICE_CREDENTIAL_FLOW"),
+    # -- Qubit gateway daemon (host service, operator-owned) ------------------
+    "gateway enroll": ("interactive gateway enrollment; use the dashboard "
+                       "Gateway page or `qubit gateway enroll` in a terminal",
+                       "VOICE_HOST_SERVICE"),
+    "gateway install": ("installs the host service unit; use `qubit gateway "
+                        "install --confirm` in a terminal",
+                        "VOICE_HOST_SERVICE"),
+    "gateway migrate": ("gateway store migration; run `qubit gateway migrate` in "
+                        "a terminal", "VOICE_HOST_SERVICE"),
+    "gateway migrate-legacy": ("gateway store migration; run `qubit gateway "
+                               "migrate-legacy` in a terminal",
+                               "VOICE_HOST_SERVICE"),
+    "gateway restart": ("host service lifecycle; use `qubit gateway restart "
+                        "--confirm` or the dashboard Gateway page",
+                        "VOICE_HOST_SERVICE"),
+    "gateway run": ("runs the gateway in the foreground; run `qubit gateway run` "
+                    "in a terminal", "VOICE_HOST_SERVICE"),
+    "gateway setup": ("interactive gateway setup; use the dashboard Gateway page "
+                      "or `qubit gateway setup` in a terminal",
+                      "VOICE_HOST_SERVICE"),
+    "gateway start": ("host service lifecycle; use `qubit gateway start "
+                      "--confirm` or the dashboard Gateway page",
+                      "VOICE_HOST_SERVICE"),
+    "gateway stop": ("host service lifecycle; use `qubit gateway stop --confirm` "
+                     "or the dashboard Gateway page", "VOICE_HOST_SERVICE"),
+    "gateway uninstall": ("removes the host service unit; use `qubit gateway "
+                          "uninstall` in a terminal", "VOICE_HOST_SERVICE"),
+    # -- encrypted bundles ----------------------------------------------------
+    "bundles": ("passphrase-sealed bundles; use `qubit bundles` in a terminal",
+                "VOICE_TERMINAL_ONLY"),
+    "bundles create": ("passphrase-sealed bundles; use `qubit bundles create` in "
+                       "a terminal", "PASSPHRASE_NEVER_SPOKEN"),
+    "bundles delete": ("passphrase-sealed bundles; use `qubit bundles delete` in "
+                       "a terminal", "PASSPHRASE_NEVER_SPOKEN"),
+    "bundles list": ("passphrase-sealed bundles; use `qubit bundles list` in a "
+                     "terminal", "VOICE_TERMINAL_ONLY"),
+    "bundles reload": ("passphrase-sealed bundles; use `qubit bundles reload` in "
+                       "a terminal", "VOICE_TERMINAL_ONLY"),
+    "bundles show": ("passphrase-sealed bundles; use `qubit bundles show` in a "
+                     "terminal", "VOICE_TERMINAL_ONLY"),
+    # -- MoA (removed subsystem) ---------------------------------------------
+    "moa": ("Mixture-of-Agents was removed from Qubit; use the active model "
+            "profile (`qubit profile model`)", "VOICE_REMOVED_SUBSYSTEM"),
+    "moa configure": ("Mixture-of-Agents was removed from Qubit; use the active "
+                      "model profile (`qubit profile model`)",
+                      "VOICE_REMOVED_SUBSYSTEM"),
+    "moa delete": ("Mixture-of-Agents was removed from Qubit; use the active "
+                   "model profile (`qubit profile model`)",
+                   "VOICE_REMOVED_SUBSYSTEM"),
+    "moa list": ("Mixture-of-Agents was removed from Qubit; use the active model "
+                 "profile (`qubit profile model`)", "VOICE_REMOVED_SUBSYSTEM"),
+    # -- skills hub / interactive configuration -------------------------------
+    "skills audit": ("skill registry tooling; run `qubit skills audit` in a "
+                     "terminal", "VOICE_TERMINAL_ONLY"),
+    "skills browse": ("network skill registry; use the dashboard Skills page or "
+                      "`qubit skills browse` in a terminal",
+                      "VOICE_NETWORK_REGISTRY"),
+    "skills check": ("hub update check; run `qubit skills check` in a terminal",
+                     "VOICE_NETWORK_REGISTRY"),
+    "skills config": ("interactive skill configuration; use the dashboard Skills "
+                      "page or `qubit skills config` in a terminal",
+                      "VOICE_INTERACTIVE"),
+    "skills diff": ("local skill diff; run `qubit skills diff <name>` in a "
+                    "terminal", "VOICE_TERMINAL_ONLY"),
+    "skills list-modified": ("local skill list; run `qubit skills list-modified` "
+                             "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "skills opt-in": ("bundled-skill seeding toggle; run `qubit skills opt-in` "
+                      "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "skills opt-out": ("bundled-skill seeding toggle; run `qubit skills opt-out` "
+                       "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "skills publish": ("publishes to an external registry; run `qubit skills "
+                       "publish` in a terminal", "VOICE_NETWORK_REGISTRY"),
+    "skills repair-official": ("skill provenance repair; run `qubit skills "
+                               "repair-official <name>` in a terminal",
+                               "VOICE_TERMINAL_ONLY"),
+    "skills reset": ("skill sync-manifest reset; run `qubit skills reset <name>` "
+                     "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "skills search": ("network skill registry search; use the dashboard Skills "
+                      "page or `qubit skills search <q>` in a terminal",
+                      "VOICE_NETWORK_REGISTRY"),
+    "skills snapshot": ("skill config export/import; run `qubit skills snapshot` "
+                        "in a terminal", "VOICE_PATH_DRIVEN"),
+    "skills tap": ("external skill source management; run `qubit skills tap` in "
+                   "a terminal", "VOICE_NETWORK_REGISTRY"),
+    "skills trust": ("project-skill trust grant; run `qubit skills trust <path>` "
+                     "in a terminal", "VOICE_PATH_DRIVEN"),
+    "skills untrust": ("project-skill trust revoke; run `qubit skills untrust "
+                       "<path>` in a terminal", "VOICE_PATH_DRIVEN"),
+    "skills update": ("hub skill update; run `qubit skills update` in a terminal",
+                      "VOICE_NETWORK_REGISTRY"),
+    # -- upstream-only kanban shapes ------------------------------------------
+    "kanban assignees": ("use the dashboard Boards page or `qubit kanban "
+                         "assignees` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban attach": ("use the dashboard Boards page or `qubit kanban attach` in "
+                      "a terminal", "VOICE_UNSUPPORTED"),
+    "kanban attach-rm": ("use the dashboard Boards page or `qubit kanban "
+                         "attach-rm` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban attachments": ("use the dashboard Boards page or `qubit kanban "
+                           "attachments` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban context": ("use the dashboard Boards page or `qubit kanban context` "
+                       "in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban decompose": ("use the dashboard Boards page or `qubit kanban "
+                         "decompose` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban diagnostics": ("use the dashboard Boards page or `qubit kanban "
+                           "diagnostics` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban gc": ("use the dashboard Boards page or `qubit kanban gc` in a "
+                  "terminal", "VOICE_UNSUPPORTED"),
+    "kanban heartbeat": ("use the dashboard Boards page or `qubit kanban "
+                         "heartbeat` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban notify-list": ("use the dashboard Boards page or `qubit kanban "
+                           "notify-list` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban notify-subscribe": ("use the dashboard Boards page or `qubit kanban "
+                                "notify-subscribe` in a terminal",
+                                "VOICE_UNSUPPORTED"),
+    "kanban notify-unsubscribe": ("use the dashboard Boards page or `qubit "
+                                  "kanban notify-unsubscribe` in a terminal",
+                                  "VOICE_UNSUPPORTED"),
+    "kanban promote": ("use the dashboard Boards page or `qubit kanban promote` "
+                       "in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban repair": ("use the dashboard Boards page or `qubit kanban repair` in "
+                      "a terminal", "VOICE_UNSUPPORTED"),
+    "kanban runs": ("use the dashboard Boards page or `qubit kanban runs` in a "
+                    "terminal", "VOICE_UNSUPPORTED"),
+    "kanban schedule": ("use the dashboard Boards page or `qubit kanban "
+                        "schedule` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban set-model": ("use the dashboard Boards page or `qubit kanban "
+                         "set-model` in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban specify": ("use the dashboard Boards page or `qubit kanban specify` "
+                       "in a terminal", "VOICE_UNSUPPORTED"),
+    "kanban tail": ("use the dashboard Boards page or `qubit kanban tail` in a "
+                    "terminal", "VOICE_UNSUPPORTED"),
+    # -- scheduler internals --------------------------------------------------
+    "cron blueprints": ("scheduler internals; use the dashboard Schedules page "
+                        "or `qubit cron blueprints` in a terminal",
+                        "VOICE_TERMINAL_ONLY"),
+    "cron blueprints instantiate": ("scheduler internals; use the dashboard "
+                                    "Schedules page or `qubit cron blueprints "
+                                    "instantiate` in a terminal",
+                                    "VOICE_TERMINAL_ONLY"),
+    "cron edit": ("scheduler internals; use the dashboard Schedules page or "
+                  "`qubit cron edit` in a terminal", "VOICE_TERMINAL_ONLY"),
+    "cron incidents": ("scheduler internals; use the dashboard Schedules page or "
+                       "`qubit cron incidents` in a terminal",
+                       "VOICE_TERMINAL_ONLY"),
+    "cron notepad": ("scheduler internals; use the dashboard Schedules page or "
+                     "`qubit cron notepad` in a terminal",
+                     "VOICE_TERMINAL_ONLY"),
+    "cron runs": ("scheduler internals; use the dashboard Schedules page or "
+                  "`qubit cron runs` in a terminal", "VOICE_TERMINAL_ONLY"),
+    "cron tick": ("scheduler internals; use the dashboard Schedules page or "
+                  "`qubit cron tick` in a terminal", "VOICE_TERMINAL_ONLY"),
+    # -- misc operator / dev surfaces ----------------------------------------
+    "approvals suggest": ("interactive approval drafting; use the dashboard "
+                          "Approvals page or `qubit approvals suggest` in a "
+                          "terminal", "VOICE_INTERACTIVE"),
+    "approvals test": ("approval-journal test; run `qubit approvals test` in a "
+                       "terminal", "VOICE_TERMINAL_ONLY"),
+    "backup": ("passphrase-sealed backup; use the dashboard Backup form or `qubit "
+               "export-state` in a terminal", "PASSPHRASE_NEVER_SPOKEN"),
+    "browser close refusal": ("closing a browser session is CLI/dashboard-only; "
+                              "run `qubit browser close` in a terminal",
+                              "VOICE_TERMINAL_ONLY"),
+    "checkpoints clear": ("clearing checkpoint records; run `qubit checkpoints "
+                          "clear` in a terminal", "VOICE_TERMINAL_ONLY"),
+    "checkpoints clear-legacy": ("clearing legacy checkpoint records; run `qubit "
+                                 "checkpoints clear-legacy` in a terminal",
+                                 "VOICE_TERMINAL_ONLY"),
+    "claw": ("legacy-assistant migration tooling; run `qubit claw` in a terminal",
+             "VOICE_TERMINAL_ONLY"),
+    "claw cleanup": ("legacy-assistant migration tooling; run `qubit claw "
+                     "cleanup` in a terminal", "VOICE_TERMINAL_ONLY"),
+    "claw migrate": ("legacy-assistant migration; run `qubit claw migrate` in a "
+                     "terminal (dry-run by default)",
+                     "VOICE_TERMINAL_ONLY"),
+    "computer-use": ("computer-use control session; use the dashboard Control UI "
+                     "or `qubit computer-use` in a terminal",
+                     "VOICE_TERMINAL_ONLY"),
+    "credentials pool": ("credential pooling config; use `qubit credentials` in "
+                         "a terminal", "VOICE_CREDENTIAL_FLOW"),
+    "debug": ("debug bundle handling; run `qubit debug` in a terminal",
+              "VOICE_TERMINAL_ONLY"),
+    "debug delete": ("debug bundle handling; run `qubit debug delete` in a "
+                     "terminal", "VOICE_TERMINAL_ONLY"),
+    "debug share": ("debug bundle handling; run `qubit debug share` in a "
+                    "terminal", "VOICE_TERMINAL_ONLY"),
+    "desktop": ("launches the desktop app; run `qubit desktop` on the desktop "
+                "host", "VOICE_TERMINAL_ONLY"),
+    "dump": ("diagnostic core dump; run `qubit dump` in a terminal",
+             "VOICE_TERMINAL_ONLY"),
+    "enroll voice": ("voice enrollment records a biometric sample; use the "
+                     "dashboard Voice page or `qubit enroll voice` in a terminal",
+                     "VOICE_INTERACTIVE"),
+    "env reveal": ("revealing secret values is refused by voice; use the "
+                   "dashboard Env page (values are never spoken)",
+                   "VOICE_SECRET_REVEAL"),
+    "events": ("event stream reader; run `qubit events` in a terminal",
+               "VOICE_TERMINAL_ONLY"),
+    "journey": ("guided onboarding; run `qubit journey` in a terminal",
+                "VOICE_TERMINAL_ONLY"),
+    "lsp install refusal": ("installing a language server is CLI/dashboard-only; "
+                            "run `qubit lsp install` in a terminal",
+                            "VOICE_TERMINAL_ONLY"),
+    "memory off": ("memory provider setup; use the dashboard Memory page or "
+                   "`qubit memory off` in a terminal", "VOICE_TERMINAL_ONLY"),
+    "memory reset": ("memory provider reset; use the dashboard Memory page or "
+                     "`qubit memory reset` in a terminal",
+                     "VOICE_TERMINAL_ONLY"),
+    "memory setup": ("interactive memory provider setup; use the dashboard "
+                     "Memory page or `qubit memory setup` in a terminal",
+                     "VOICE_INTERACTIVE"),
+    "navigate /cron": ("dashboard navigation; open `/cron` in the dashboard",
+                       "VOICE_TERMINAL_ONLY"),
+    "navigate /docs": ("dashboard navigation; open `/docs` in the dashboard",
+                       "VOICE_TERMINAL_ONLY"),
+    "navigate /env": ("dashboard navigation; open `/env` in the dashboard",
+                      "VOICE_TERMINAL_ONLY"),
+    "pairing clear-pending": ("pairing journal maintenance; run `qubit pairing "
+                              "clear-pending` in a terminal",
+                              "VOICE_TERMINAL_ONLY"),
+    "peer stop": ("stopping a peer gateway; use the dashboard Peers page or "
+                  "`qubit peer stop` in a terminal", "VOICE_HOST_SERVICE"),
+    "plugins compat": ("plugin compatibility tooling; run `qubit plugins compat` "
+                       "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "plugins pack": ("plugin packaging; run `qubit plugins pack` in a terminal",
+                     "VOICE_TERMINAL_ONLY"),
+    "plugins remote refusal": ("raw unvetted remote install is refused; use the "
+                               "pinned curated catalog or `qubit plugins install` "
+                               "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "plugins update": ("plugin update; run `qubit plugins update` in a terminal",
+                       "VOICE_TERMINAL_ONLY"),
+    "profile alias": ("profile administration; run `qubit profile alias` in a "
+                      "terminal", "VOICE_TERMINAL_ONLY"),
+    "profile export": ("profile export; run `qubit profile export <name>` in a "
+                       "terminal", "VOICE_PATH_DRIVEN"),
+    "profile import": ("profile import; run `qubit profile import <name>` in a "
+                       "terminal", "VOICE_PATH_DRIVEN"),
+    "profile install": ("profile install; run `qubit profile install <name>` in "
+                        "a terminal", "VOICE_PATH_DRIVEN"),
+    "profile migrate-identity": ("durable cross-store profile rebind; run `qubit "
+                                 "profile migrate-identity` in a terminal",
+                                 "VOICE_TERMINAL_ONLY"),
+    "profile purge-identity": ("durable cross-store profile purge; run `qubit "
+                               "profile purge-identity` in a terminal",
+                               "VOICE_TERMINAL_ONLY"),
+    "pty": ("raw PTY access is refused by voice (Qubit policy); run `qubit pty` "
+            "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "pub": ("raw publish transport is refused by voice (Qubit policy); run "
+            "`qubit pub` in a terminal", "VOICE_TERMINAL_ONLY"),
+    "setup": ("interactive first-run setup; run `qubit setup` in a terminal",
+              "VOICE_INTERACTIVE"),
+    "ssh ownership": ("SSH ownership repair; run `qubit ssh ownership` in a "
+                      "terminal", "VOICE_TERMINAL_ONLY"),
+    "tools post-setup": ("post-setup tool refresh; run `qubit tools post-setup` "
+                         "in a terminal", "VOICE_TERMINAL_ONLY"),
+    "ws": ("raw websocket transport is refused by voice (Qubit policy); run "
+           "`qubit ws` in a terminal", "VOICE_TERMINAL_ONLY"),
+    # -- `qubit guard <shape>`: the CLI-literal forms of the safety guards -----
+    "guard actions prepare": ("structured action envelopes: use the dashboard or "
+                              "`qubit guard actions prepare` in a terminal",
+                              "VOICE_NESTED_UNSUPPORTED"),
+    "guard actions preview": ("structured action envelopes: use the dashboard or "
+                              "`qubit guard actions preview` in a terminal",
+                              "VOICE_NESTED_UNSUPPORTED"),
+    "guard actions recover": ("structured action envelopes: use the dashboard or "
+                              "`qubit guard actions recover` in a terminal",
+                              "VOICE_NESTED_UNSUPPORTED"),
+    "guard actions retry": ("structured action envelopes: use the dashboard or "
+                            "`qubit guard actions retry` in a terminal",
+                            "VOICE_NESTED_UNSUPPORTED"),
+    "guard ask answer": ("structured answers: use the dashboard or `qubit guard "
+                         "ask answer` in a terminal", "VOICE_NESTED_UNSUPPORTED"),
+    "guard backup create": ("passphrase-sealed bundles: use the dashboard "
+                            "password form or `qubit guard backup create` in a "
+                            "terminal", "PASSPHRASE_NEVER_SPOKEN"),
+    "guard backup restore": ("passphrase-sealed bundles: use the dashboard "
+                             "password form or `qubit guard backup restore` in a "
+                             "terminal", "PASSPHRASE_NEVER_SPOKEN"),
+    "guard brain onboard apply": ("structured onboarding answers: use the "
+                                  "dashboard onboarding form or `qubit guard "
+                                  "brain onboard apply`",
+                                  "VOICE_NESTED_UNSUPPORTED"),
+    "guard file patch": ("structured diffs: use the dashboard file form or "
+                         "`qubit guard file patch` in a terminal",
+                         "VOICE_NESTED_UNSUPPORTED"),
+    "guard kanban import": ("structured snapshots: use the dashboard boards form "
+                            "or `qubit guard kanban import` in a terminal",
+                            "VOICE_NESTED_UNSUPPORTED"),
+    "guard opencode prepare": ("preview-hash-bound coding change: use the "
+                               "dashboard or `qubit guard opencode prepare` in a "
+                               "terminal", "VOICE_PREVIEW_HASH_ONLY"),
+    "guard opencode run confirmed": ("preview-hash-bound coding change: use the "
+                                     "dashboard or `qubit guard opencode run "
+                                     "confirmed` in a terminal",
+                                     "VOICE_PREVIEW_HASH_ONLY"),
+    "guard shares resolve": ("passphrase-sealed session shares: use the "
+                             "dashboard or `qubit guard shares resolve` in a "
+                             "terminal", "PASSPHRASE_NEVER_SPOKEN"),
+    "guard sync accept": ("passphrase-sealed sync bundles: use the dashboard "
+                          "sync form or `qubit guard sync accept` in a terminal",
+                          "PASSPHRASE_NEVER_SPOKEN"),
+    "guard sync offer": ("passphrase-sealed sync bundles: use the dashboard sync "
+                         "form or `qubit guard sync offer` in a terminal",
+                         "PASSPHRASE_NEVER_SPOKEN"),
+    "guard transfers fetch raw": ("raw byte payloads: use the dashboard file "
+                                  "form or `qubit guard transfers fetch raw` in "
+                                  "a terminal", "VOICE_BYTES_UNSUPPORTED"),
+    "guard webhook verify": ("raw byte payloads: use the dashboard webhooks form "
+                             "or `qubit guard webhook verify` in a terminal",
+                             "VOICE_BYTES_UNSUPPORTED"),
+}
+for _lit, (_guide, _code) in _CLI_GUARDS.items():
+    _CG(_lit, _guide, _code)
 
 
 # ------------------------------------------------- wave 4: plugin fleet

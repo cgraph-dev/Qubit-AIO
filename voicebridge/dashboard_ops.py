@@ -832,6 +832,56 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                                     "category": staged.get("category", "")}
             return HC.skill_create(cfg, {}, body, {})
         return _run
+    if action in ("cron.pause", "cron.resume", "cron.run_due"):
+        # The cron row actions (pause/resume/trigger) stage via
+        # ``_cron_mutate`` with ``payload={"id": job_id}``. Re-enter the same
+        # mutation with the staged id so the pending-approvals banner's id-only
+        # Confirm executes the real ``schedules`` backend exactly once, rather
+        # than failing ``CONFIRM_UNSUPPORTED``.
+        fn_name = {"cron.pause": "pause", "cron.resume": "resume",
+                   "cron.run_due": "run_due"}[action]
+
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            return HC._cron_mutate(fn_name, cfg, {}, {"confirm": True},
+                                   {"id": str(staged.get("id", "") or "")})
+        return _run
+    if action.startswith("webhook_"):
+        # Webhook create/enable/delete/rotate/test/retry are staged by
+        # ``_compat_confirm`` as ``webhook_*``; the pending-approvals banner's
+        # id-only Confirm must execute the real handler with the staged payload
+        # (create carries name/url/events/secret_ref), exactly once.
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            sid = str(staged.get("id", "") or "")
+            if action == "webhook_create":
+                body = {"confirm": True,
+                        "id": sid,
+                        "name": str(staged.get("name", "") or ""),
+                        "url": str(staged.get("url", "") or ""),
+                        "events": list(staged.get("events", []) or []),
+                        "secret_ref": str(staged.get("secret_ref", "") or "")}
+                return HC.h_webhooks_mutate("add", cfg, {}, body, {})
+            if action == "webhook_enable":
+                return HC.webhooks_enable(cfg, {}, {"confirm": True}, {})
+            if action == "webhook_enabled":
+                return HC.webhooks_enabled(cfg, {}, {"confirm": True, "id": sid},
+                                           {"id": sid})
+            if action == "webhook_delete":
+                return HC.webhooks_delete(cfg, {}, {"confirm": True, "id": sid},
+                                          {"id": sid})
+            handler = {"webhook_rotate": HC.webhooks_rotate,
+                       "webhook_test": HC.webhooks_test,
+                       "webhook_retry": HC.webhooks_retry}.get(action)
+            if handler is not None:
+                return handler(cfg, {}, {"confirm": True, "id": sid},
+                               {"id": sid})
+            return None
+        return _run
     return None
 
 

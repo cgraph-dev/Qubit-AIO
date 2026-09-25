@@ -151,7 +151,7 @@ def test_resolve_nous_runtime_credentials_prefers_invoke_jwt_and_mirrors(
 ):
     import qubit_cli.auth as auth_mod
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     token = _invoke_jwt(seconds=3600)
     _setup_nous_auth(
         qubit_home,
@@ -186,7 +186,7 @@ def test_resolve_nous_runtime_credentials_invoke_jwt_is_idempotent(
     import qubit_cli.auth as auth_mod
     import qubit_cli.auth_nous as auth_nous
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     exp = int(time.time() + 3600)
     expires_at = datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
@@ -265,7 +265,7 @@ def test_resolve_nous_runtime_credentials_reauths_when_invoke_scope_missing(
 ):
     import qubit_cli.auth as auth_mod
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     token = _jwt_with_claims({
         "sub": "test-user",
         "scope": "inference:mint_agent_key",
@@ -296,7 +296,7 @@ def test_resolve_nous_runtime_credentials_reauths_when_invoke_scope_missing(
 def test_removed_legacy_session_env_var_does_not_change_jwt_auth(tmp_path, monkeypatch):
     import qubit_cli.auth as auth_mod
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     token = _invoke_jwt(seconds=3600)
     _setup_nous_auth(
         qubit_home,
@@ -360,7 +360,7 @@ def test_nous_inference_auth_logs_do_not_include_secret_values(
     import qubit_cli.auth as auth_mod
     import qubit_cli.auth_nous as auth_nous
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     token = _invoke_jwt(seconds=3600)
     refreshed_token = _invoke_jwt(seconds=7200)
     refresh_token = "refresh-secret-token"
@@ -412,7 +412,7 @@ def test_get_nous_auth_status_checks_credential_pool(tmp_path, monkeypatch):
     """
     from qubit_cli.auth import get_nous_auth_status
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     # Empty auth store — no Nous provider entry
     (qubit_home / "auth.json").write_text(json.dumps({
@@ -451,7 +451,7 @@ def test_get_nous_auth_status_empty_returns_not_logged_in(tmp_path, monkeypatch)
     """
     from qubit_cli.auth import get_nous_auth_status
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1, "providers": {},
@@ -474,7 +474,7 @@ def test_get_nous_auth_status_empty_returns_not_logged_in(tmp_path, monkeypatch)
 
 
 class TestLoginNousSkipKeepsCurrent:
-    """When a user runs `hermes model` → Nous Portal → Skip (keep current) after
+    """When a user runs `qubit model` → Nous Portal → Skip (keep current) after
     a successful OAuth login, the prior provider and model MUST be preserved.
 
     Regression: previously, _update_config_for_provider was called
@@ -485,7 +485,7 @@ class TestLoginNousSkipKeepsCurrent:
 
     def _setup_home_with_openrouter(self, tmp_path, monkeypatch):
         import yaml
-        qubit_home = tmp_path / "hermes"
+        qubit_home = tmp_path / "qubit"
         qubit_home.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -613,7 +613,7 @@ class TestLoginNousSkipKeepsCurrent:
         import yaml
         from qubit_cli.auth import PROVIDER_REGISTRY, _login_nous
 
-        qubit_home = tmp_path / "hermes"
+        qubit_home = tmp_path / "qubit"
         qubit_home.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -671,7 +671,7 @@ def _full_state_fixture() -> dict:
 def test_persist_nous_credentials_writes_both_pool_and_providers(tmp_path, monkeypatch):
     """Helper must populate BOTH credential_pool.nous AND providers.nous.
 
-    Regression guard: before this helper existed, `hermes auth add nous`
+    Regression guard: before this helper existed, `qubit auth add nous`
     wrote only the pool. After the Nous agent_key's 24h TTL expired, the
     401-recovery path in run_agent.py called resolve_nous_runtime_credentials
     which reads providers.nous, found it empty, raised AuthError, and the
@@ -680,7 +680,7 @@ def test_persist_nous_credentials_writes_both_pool_and_providers(tmp_path, monke
     """
     from qubit_cli.auth import persist_nous_credentials, NOUS_DEVICE_CODE_SOURCE
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1, "providers": {},
@@ -724,7 +724,7 @@ def test_persist_nous_credentials_idempotent_no_duplicate_pool_entries(tmp_path,
     """
     from qubit_cli.auth import persist_nous_credentials, NOUS_DEVICE_CODE_SOURCE
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1, "providers": {},
@@ -764,7 +764,7 @@ def test_persist_nous_credentials_no_label_uses_auto_derived(tmp_path, monkeypat
     """
     from qubit_cli.auth import persist_nous_credentials
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1, "providers": {},
@@ -822,7 +822,7 @@ def test_refresh_token_reuse_detection_surfaces_actionable_message():
     assert "refresh-token reuse" in message.lower() or "refresh token reuse" in message.lower()
     # The message must mention the external-process cause and give next steps.
     assert "external process" in message.lower() or "monitoring script" in message.lower()
-    assert "hermes auth add nous" in message.lower()
+    assert "qubit auth add nous" in message.lower()
     # Must still be classified as invalid_grant + relogin_required.
     assert exc_info.value.code == "invalid_grant"
     assert exc_info.value.relogin_required is True
@@ -938,7 +938,7 @@ def test_persist_nous_credentials_mirrors_to_shared_store(
     tmp_path, monkeypatch, shared_store_env,
 ):
     """persist_nous_credentials must populate BOTH per-profile auth.json
-    AND the shared store, so a future profile's `hermes auth add nous
+    AND the shared store, so a future profile's `qubit auth add nous
     --type oauth` can one-tap import instead of redoing device-code.
     """
     from qubit_cli.auth import (
@@ -947,7 +947,7 @@ def test_persist_nous_credentials_mirrors_to_shared_store(
         persist_nous_credentials,
     )
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(
         json.dumps({"version": 1, "providers": {}})
@@ -1050,7 +1050,7 @@ class TestStalePortalBaseUrlMigration:
         from qubit_cli import auth as auth_mod
         import qubit_cli.auth_nous as auth_nous
 
-        qubit_home = tmp_path / "hermes"
+        qubit_home = tmp_path / "qubit"
         monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
         _setup_nous_auth(
             qubit_home,
@@ -1102,7 +1102,7 @@ class TestNousDeviceAuthTimeoutMessage:
 
         msg = _nous_device_auth_timeout_message("https://portal.nousresearch.com")
         assert "CAPTCHA" in msg
-        assert "hermes portal" in msg
+        assert "qubit portal" in msg
         assert "https://portal.nousresearch.com/login" in msg
         # Must NOT point at the nonexistent /device page (live Portal 404s it).
         assert "/device" not in msg
@@ -1149,7 +1149,7 @@ def test_poll_for_token_timeout_raises_actionable_message():
 
     msg = str(excinfo.value)
     assert "CAPTCHA" in msg
-    assert "hermes portal" in msg
+    assert "qubit portal" in msg
     assert "https://portal.nousresearch.com/login" in msg
 
 
@@ -1197,5 +1197,5 @@ def test_nous_device_code_login_timeout_raises_actionable_message(monkeypatch):
 
     msg = str(excinfo.value)
     assert "CAPTCHA" in msg
-    assert "hermes portal" in msg
+    assert "qubit portal" in msg
     assert "https://portal.nousresearch.com/login" in msg

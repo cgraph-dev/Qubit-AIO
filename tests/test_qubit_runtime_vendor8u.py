@@ -19,12 +19,10 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 FORK = REPO / "qubit_runtime"
-# Frozen 0.21.1 provenance baseline. Production ``voicebridge.qubit_runtime``
-# still reports this path (``manifest_path()``), so the runtime-status test
-# reads it. The live, slice-by-slice record is the canonical generated manifest.
-MANIFEST = REPO / "docs/archive/2026-09-21" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
-CANONICAL_MANIFEST = (
-    REPO / "docs/generated" / "QUBIT_HERMES_VENDOR_MANIFEST.json")
+# Canonical generated provenance record (Owner Decision #24): the live 0.21.4
+# slice-sync manifest under docs/generated/. The frozen 0.21.1 archive copy is
+# historical lineage only and is never parsed here.
+MANIFEST = REPO / "docs/generated" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 W9_PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
 
@@ -47,7 +45,7 @@ def test_manifest_pins_exact_revision_and_is_clean():
     # The invariant is that every divergence is *recorded* (no UNEXPLAINED) and
     # that missing/extra/patched reconcile with the source inventory -- not that
     # the tree is fully synced.
-    m = _manifest(CANONICAL_MANIFEST)
+    m = _manifest(MANIFEST)
     assert m["upstream_revision"] == W9_PIN
     assert m["upstream_repo"].endswith("/hermes-agent")
     assert m["local_root"] == "qubit_runtime"
@@ -67,21 +65,33 @@ def test_manifest_pins_exact_revision_and_is_clean():
         assert entry.get("affected_regression_test"), rel
 
     # The recorded unported/added/changed sets must agree with the canonical
-    # source inventory that is generated from the same tree.
+    # source inventory that is generated from the same tree. The inventory's
+    # raw byte diff counts reference-only upstream test trees as ``missing``;
+    # the canonical manifest records those as ``intentionally_omitted`` (owner
+    # policy), so the two agree once the omission set is accounted for.
     inv = json.loads(
         (REPO / "docs/generated" / "QUBIT_SOURCE_INVENTORY.json").read_text(
             encoding="utf-8"))
-    bd = inv["hermes_byte_diff"]["counts"]
-    assert bd["missing"] == len(m["missing_from_local"])
-    assert bd["extra"] == len(m["extra_local"])
-    assert bd["changed"] == len(m["patched"])
-    recon = inv["hermes_byte_diff"].get("manifest_reconciliation") or {}
+    bd = inv["hermes_byte_diff"]
+    counts = bd["counts"]
+    recorded_missing = set(m["missing_from_local"]) | set(m["intentionally_omitted"])
+    assert counts["missing"] == len(recorded_missing), (
+        counts["missing"], len(recorded_missing))
+    assert counts["extra"] == len(m["extra_local"])
+    # The inventory compares the pinned checkout with EOL normalization, so a
+    # CRLF-checkout-only difference is counted identical exactly as the
+    # blob-based manifest classifies it. The two artifacts must agree exactly.
+    inv_changed = {e["path"] for e in bd["changed"]}
+    recorded = set(m["patched"])
+    assert inv_changed == recorded, sorted(inv_changed ^ recorded)[:10]
+    assert counts["changed"] == len(inv_changed)
+    recon = bd.get("manifest_reconciliation") or {}
     assert recon.get("changed_equals_patched") is True
     assert recon.get("extra_equals_extra_local") is True
 
 
 def test_manifest_covers_every_file_on_disk():
-    m = _manifest(CANONICAL_MANIFEST)
+    m = _manifest(MANIFEST)
     expected = set(m["files"])
     actual = set()
     for p in FORK.rglob("*"):
@@ -136,7 +146,7 @@ def test_runtime_status_reports_fork_and_pin():
     # Qubit ships a source-level rebrand of upstream: patches are recorded and
     # owned in the patch manifest, not silent divergence (owner amendment
     # 2026-09-18). The runtime status must match the recorded patch set.
-    m = _manifest(CANONICAL_MANIFEST)
+    m = _manifest(MANIFEST)
     assert st["patched"] == len(m["patched"]) == len(m["patch_manifest"])
     assert st["file_count"] > 1000
 

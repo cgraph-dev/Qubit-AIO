@@ -16,9 +16,9 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **4**
 - Parented surfaces covered by an IMPLEMENTED parent: **1002**
 - Distinct capabilities total: **884**; parented surfaces total: **1006**
-- Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 153, GATED 21)
+- Fork-runtime dispositions (tools/skills/plugins): **174** (IMPLEMENTED 158, GATED 16)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
-- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=12846 identical=5092 missing=2730 extra=843 changed=6911
+- Hermes byte diff vs `qubit_runtime/`: upstream=14733 local=14439 identical=6103 missing=1122 extra=828 changed=7508
 
 ### Omission counts by category (all uncovered)
 
@@ -439,7 +439,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `skill:skills/software-development` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for skills/software-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:skills/web` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for skills/web; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 
-### `fork_tool_runtime` (99; IMPLEMENTED 94, GATED 5)
+### `fork_tool_runtime` (99; IMPLEMENTED 99, GATED 0)
 
 - `tool:annotate_preview` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'annotate_preview'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:apply_layout` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'apply_layout'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
@@ -455,11 +455,11 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `tool:browser_scroll` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_scroll'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_snapshot` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_snapshot'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_type` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_type'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:browser_vault_enter_code` — **GATED**; backend `—`; tool 'browser_vault_enter_code' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_vault_fill` — **GATED**; backend `—`; tool 'browser_vault_fill' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_vault_list` — **GATED**; backend `—`; tool 'browser_vault_list' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_vault_save_login` — **GATED**; backend `—`; tool 'browser_vault_save_login' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_vault_unlock` — **GATED**; backend `—`; tool 'browser_vault_unlock' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:browser_vault_enter_code` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_enter_code'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_vault_fill` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_fill'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_vault_list` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_vault_save_login` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_save_login'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_vault_unlock` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_unlock'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_vision` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vision'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:clarify` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'clarify'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:close_terminal` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'close_terminal'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`

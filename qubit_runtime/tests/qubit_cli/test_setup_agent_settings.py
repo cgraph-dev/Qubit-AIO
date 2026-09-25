@@ -37,7 +37,7 @@ def test_setup_agent_settings_prefers_config_over_stale_env(tmp_path, monkeypatc
     """Config.yaml wins even when a stale .env value disagrees.
 
     Regression guard for the bug where `.env HERMES_MAX_ITERATIONS=60`
-    from an old `hermes setup` run shadowed `agent.max_turns: 500` in
+    from an old `qubit setup` run shadowed `agent.max_turns: 500` in
     config.yaml. The wizard must now display the config value.
     """
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))

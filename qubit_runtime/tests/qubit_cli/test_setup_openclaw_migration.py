@@ -36,7 +36,7 @@ class TestOfferOpenclawMigration:
         openclaw_dir = tmp_path / ".openclaw"
         openclaw_dir.mkdir()
 
-        # Create a fake hermes home with config
+        # Create a fake qubit home with config
         qubit_home = tmp_path / ".hermes"
         qubit_home.mkdir()
         config_path = qubit_home / "config.yaml"
@@ -150,7 +150,7 @@ class TestSetupWizardOpenclawIntegration:
         args = _first_time_args()
 
         with (
-            patch.object(setup_mod, "ensure_hermes_home"),
+            patch.object(setup_mod, "ensure_qubit_home"),
             patch.object(setup_mod, "load_config", return_value={}),
             patch.object(setup_mod, "get_qubit_home", return_value=tmp_path),
             patch.object(setup_mod, "get_env_value", return_value=""),
@@ -187,7 +187,7 @@ class TestSetupWizardOpenclawIntegration:
             return {}
 
         with (
-            patch.object(setup_mod, "ensure_hermes_home"),
+            patch.object(setup_mod, "ensure_qubit_home"),
             patch.object(setup_mod, "load_config", side_effect=tracking_load_config),
             patch.object(setup_mod, "get_qubit_home", return_value=tmp_path),
             patch.object(setup_mod, "get_env_value", return_value=""),
@@ -300,7 +300,7 @@ class TestSetupWizardSkipsConfiguredSections:
         import qubit_cli.gateway as gateway_mod
 
         with (
-            patch.object(setup_mod, "ensure_hermes_home"),
+            patch.object(setup_mod, "ensure_qubit_home"),
             patch.object(
                 setup_mod, "load_config",
                 side_effect=[{}, reloaded_config],

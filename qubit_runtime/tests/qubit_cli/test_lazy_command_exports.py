@@ -3,7 +3,7 @@
 ``qubit_cli/update_cmd*.py`` (frozen: old installed versions call into it) reads
 helpers off ``qubit_cli.main`` via ``_m().<name>``. main.py resolves the ones that
 live in the lazily-imported command modules through PEP 562 ``__getattr__`` so
-every ``hermes`` invocation (including ``hermes --version``) does not pay for
+every ``hermes`` invocation (including ``qubit --version``) does not pay for
 update_cmd's dependency chain (jwt, click, ...) when no subcommand runs.
 """
 

@@ -1,4 +1,4 @@
-"""Tests for qubit_cli/terminal_breadcrumbs.py — per-terminal ``hermes -c``.
+"""Tests for qubit_cli/terminal_breadcrumbs.py — per-terminal ``qubit -c``.
 
 Covers terminal id derivation (tty vs env vars vs none), breadcrumb
 write/read roundtrip under a temp QUBIT_HOME, stale-session fallback

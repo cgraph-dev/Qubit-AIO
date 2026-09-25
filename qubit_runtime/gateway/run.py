@@ -233,9 +233,9 @@ async def run_codex_hygiene_compaction(
     user-facing damage documented on #73503).
     """
     mode = str(auto_mode or "native").lower()
-    if mode not in {"native", "hermes", "off"}:
+    if mode not in {"native", "hermes", "qubit", "off"}:
         mode = "native"
-    if mode != "hermes":
+    if mode not in {"hermes", "qubit"}:
         # native = app-server compacts itself; off = operator disabled. Local fallback can't shrink the thread.
         return f"skipped:mode={mode}"
 

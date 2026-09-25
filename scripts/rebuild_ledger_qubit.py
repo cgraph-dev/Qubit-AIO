@@ -1556,8 +1556,8 @@ def _has_typed_evidence(note: str) -> bool:
 
 # Per-row canonical evidence for the terminal gate rows whose raw audit surface
 # is ``PARTIAL``/``GATED``.  Determined from the live production path and the
-# on-disk test that exercises it (docs/archive/2026-09-21/OPERATOR_QUALIFICATION.md and
-# docs/archive/2026-09-21/QUBIT_SAFE_EQUIVALENTS.md):
+# on-disk test that exercises it (docs/generated/QUBIT_SAFE_EQUIVALENTS.md; the
+# frozen operator-qualification record is preserved under docs/archive/):
 #
 # * ``browser_close`` / ``browser_close_refusal`` are a typed refusal of the
 #   unsafe raw upstream behavior (closing a personal browser profile) ->

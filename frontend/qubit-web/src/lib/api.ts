@@ -2137,6 +2137,24 @@ export const api = {
         ),
       confirm,
     ),
+  // Read-only MCP capability drains over the canonical `voicebridge.mcp_servers`
+  // registry (compat `GET /api/mcp/servers/{name}/resources|prompts|
+  // resource-templates`). No confirmation: the shared e-stop + method gate
+  // still apply server-side. A real drained list resolves verbatim; an
+  // inventory-only / gated / unknown / transport-failed server resolves to a
+  // typed `{ok:false, code, detail}` disposition — never a fabricated list.
+  getMcpServerResources: (name: string) =>
+    fetchJSON<McpCapabilityResult>(
+      `/api/mcp/servers/${encodeURIComponent(name)}/resources`,
+    ),
+  getMcpServerPrompts: (name: string) =>
+    fetchJSON<McpCapabilityResult>(
+      `/api/mcp/servers/${encodeURIComponent(name)}/prompts`,
+    ),
+  getMcpServerResourceTemplates: (name: string) =>
+    fetchJSON<McpCapabilityResult>(
+      `/api/mcp/servers/${encodeURIComponent(name)}/resource-templates`,
+    ),
 
   // ── Admin: Pairing ──────────────────────────────────────────────────
   // The mutating endpoints read the profile off the BODY, so the query-param
@@ -2821,6 +2839,36 @@ export interface McpInvokeResult {
   duration_ms?: number;
 }
 
+/** One drained MCP capability list (`GET /api/mcp/servers/{name}/resources|
+ *  prompts|resource-templates`). Served verbatim from the canonical
+ *  `voicebridge.mcp_servers` registry over the brokered client transport.
+ *  `ok:false` is the honest typed disposition (unknown / gated / disabled /
+ *  transport-failed server) — never a fabricated empty list. The list key
+ *  varies by capability (`resources` | `prompts` | `resource_templates`, with
+ *  `resourceTemplates` accepted as the wire alias); `result` carries the raw
+ *  drained payload and `names` the server-reported names. */
+export interface McpCapabilityResult {
+  ok: boolean;
+  server: string;
+  capability: string;
+  state?: string;
+  connected?: boolean;
+  invocable?: boolean;
+  code?: string;
+  detail?: string;
+  operator_prerequisite?: string;
+  qubit_counterpart?: string;
+  authority?: string;
+  count?: number;
+  names?: string[] | null;
+  resources?: Array<Record<string, unknown>>;
+  prompts?: Array<Record<string, unknown>>;
+  resource_templates?: Array<Record<string, unknown>>;
+  /** Wire alias for `resource_templates` (accepted defensively). */
+  resourceTemplates?: Array<Record<string, unknown>>;
+  result?: Record<string, unknown> | null;
+}
+
 export interface McpOAuthFlow {
   flow_id: string;
   server_name: string;
@@ -3227,6 +3275,10 @@ export interface StatusResponse {
   gateway_pid: number | null;
   gateway_platforms: Record<string, PlatformStatus>;
   gateway_running: boolean;
+  /** Every profile the gateway process serves when the managed profile is carried by the
+   * shared multiplexer (e.g. ["default", "alpha", "beta"]); null/absent for a standalone
+   * gateway or an older backend. Ported from the pinned upstream `StatusResponse`. */
+  gateway_shared_with?: string[] | null;
   gateway_state: string | null;
   gateway_updated_at: string | null;
   qubit_home: string;

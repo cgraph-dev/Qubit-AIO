@@ -6,11 +6,11 @@
  "classic_dispatch_routes": 90,
  "compat_routes": 448,
  "counts": {
-  "qubit_addition": 157,
+  "qubit_addition": 158,
   "qubit_policy": 289,
-  "qubit_runtime": 40
+  "qubit_runtime": 39
  },
- "non_authoritative_handler_count": 39,
+ "non_authoritative_handler_count": 38,
  "non_authoritative_handlers": [
   "GET /api/analytics/models -> h_analytics_models",
   "GET /api/analytics/usage -> h_analytics",
@@ -44,7 +44,6 @@
   "GET /api/model/auxiliary -> h_model_auxiliary",
   "GET /api/model/moa -> h_model_moa",
   "GET /api/model/recommended-default -> h_model_recommended_default",
-  "GET /api/providers/custom-endpoints -> h_custom_endpoints",
   "GET /api/system/stats -> h_system_stats",
   "GET /api/tools/computer-use/status -> h_computer_use_status",
   "GET /api/tools/terminal/backends -> h_terminal_backends",
@@ -1117,6 +1116,19 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_profile_soul",
+   "source": "fork",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/providers/custom-endpoints",
+   "route": "/api/providers/custom-endpoints",
+   "owner": "qubit_addition",
+   "reason": "single-store read-authority quarantine (avoids split-brain against the matching Qubit write)",
+   "disposition": "implemented",
+   "fork_declares": true,
+   "classic_served": false,
+   "qubit_handler": "h_custom_endpoints",
    "source": "fork",
    "sample_ok": true
   },
@@ -6265,19 +6277,6 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_model_recommended_default",
-   "source": "fork",
-   "sample_ok": true
-  },
-  {
-   "method": "GET",
-   "path": "/api/providers/custom-endpoints",
-   "route": "/api/providers/custom-endpoints",
-   "owner": "qubit_runtime",
-   "reason": "safe vendor-compatible route; the vendored runtime is the canonical implementation",
-   "disposition": "implemented",
-   "fork_declares": true,
-   "classic_served": false,
-   "qubit_handler": "h_custom_endpoints",
    "source": "fork",
    "sample_ok": true
   },

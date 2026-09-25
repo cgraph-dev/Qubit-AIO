@@ -98,7 +98,7 @@ class TestSessionDbInitTimeout:
         job = {"id": "profile-sessiondb", "name": "test", "prompt": "hello"}
         profile_token = set_qubit_home_override(profile_home)
         try:
-            with patch("cron.scheduler._hermes_home", None), \
+            with patch("cron.scheduler._qubit_home", None), \
                  patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                  patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                  patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -127,7 +127,7 @@ class TestSessionDbInitTimeout:
         job = {"id": "wedged-sessiondb", "name": "test", "prompt": "hello"}
         timeouts: list = []
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -162,7 +162,7 @@ class TestSessionDbInitTimeout:
         job = {"id": "bad-timeout-env", "name": "test", "prompt": "hello"}
         timeouts: list = []
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -205,7 +205,7 @@ class TestSessionDbInitTimeout:
         job = {"id": "config-timeout", "name": "test", "prompt": "hello"}
         timeouts: list = []
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -255,7 +255,7 @@ class TestDispatchGuardReleasedAfterHang:
         timeouts: list = []
 
         try:
-            with patch("cron.scheduler._hermes_home", tmp_path), \
+            with patch("cron.scheduler._qubit_home", tmp_path), \
                  patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                  patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                  patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -353,7 +353,7 @@ class TestLateSessionDbClosedAfterTimeout:
         job = {"id": "late-close-test", "name": "test", "prompt": "hello"}
 
         try:
-            with patch("cron.scheduler._hermes_home", tmp_path), \
+            with patch("cron.scheduler._qubit_home", tmp_path), \
                  patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                  patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                  patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -411,7 +411,7 @@ class TestSessionDbInitAfterEarlyReturns:
             "script": "gate.py",
         }
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \

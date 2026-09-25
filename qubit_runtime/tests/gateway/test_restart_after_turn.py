@@ -44,7 +44,7 @@ def test_load_restart_after_turn_timeout_preserves_zero(tmp_path, monkeypatch):
     import gateway.run as gateway_run
 
     monkeypatch.delenv("HERMES_RESTART_AFTER_TURN_TIMEOUT", raising=False)
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_qubit_home", tmp_path)
     (tmp_path / "config.yaml").write_text(
         "agent:\n  restart_after_turn_timeout: 0\n",
         encoding="utf-8",

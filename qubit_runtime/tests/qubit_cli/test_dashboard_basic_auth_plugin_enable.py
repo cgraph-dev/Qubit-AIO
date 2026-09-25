@@ -27,7 +27,7 @@ def _reset_auth_registry():
 
 @pytest.fixture
 def qubit_home(tmp_path, monkeypatch):
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
     return home

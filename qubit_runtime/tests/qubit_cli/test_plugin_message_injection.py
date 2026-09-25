@@ -16,7 +16,7 @@ def _context(name: str = "notify-plugin") -> tuple[PluginContext, PluginManager]
 
 
 def _write_plugin_config(tmp_path, monkeypatch, entry: dict) -> None:
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir()
     (qubit_home / "config.yaml").write_text(
         yaml.safe_dump({"plugins": {"entries": {"notify-plugin": entry}}})

@@ -57,7 +57,7 @@ def test_fire_cron_job_scopes_store_and_runtime_home_together(
 
     default_home = isolated_profiles["default"]
     worker_home = isolated_profiles["worker_alpha"]
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_qubit_home", None)
     captured = {}
 
     class RecordingProvider:
@@ -186,7 +186,7 @@ def test_notify_cron_provider_scopes_store_and_runtime_home_together(
 
     default_home = isolated_profiles["default"]
     worker_home = isolated_profiles["worker_alpha"]
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_qubit_home", None)
     monkeypatch.setattr(
         _web_server_cron,
         "_cron_profile_dicts",
@@ -261,7 +261,7 @@ def test_external_provider_reconcile_fails_closed_with_multiple_profiles(
     from cron import scheduler
     from qubit_cli import web_server
 
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_qubit_home", None)
     monkeypatch.setattr(
         _web_server_cron,
         "_cron_profile_dicts",
@@ -310,7 +310,7 @@ def test_builtin_provider_hook_still_fires_with_multiple_profiles(
     from cron.scheduler_provider import InProcessCronScheduler
     from qubit_cli import web_server
 
-    monkeypatch.setattr(scheduler, "_hermes_home", None)
+    monkeypatch.setattr(scheduler, "_qubit_home", None)
     monkeypatch.setattr(
         _web_server_cron,
         "_cron_profile_dicts",

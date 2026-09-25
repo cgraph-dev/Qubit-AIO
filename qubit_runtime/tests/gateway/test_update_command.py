@@ -51,10 +51,10 @@ class TestHandleUpdateCommand:
         """Returns an error when .git does not exist."""
         runner = _make_runner()
         event = _make_event()
-        # Point _hermes_home to tmp_path and project_root to a dir without .git
+        # Point _qubit_home to tmp_path and project_root to a dir without .git
         fake_root = tmp_path / "project"
         fake_root.mkdir()
-        with patch("gateway.run._hermes_home", tmp_path), \
+        with patch("gateway.run._qubit_home", tmp_path), \
              patch("gateway.run.Path") as MockPath:
             # Path(__file__).parent.parent.resolve() -> fake_root
             MockPath.return_value = MagicMock()
@@ -65,7 +65,7 @@ class TestHandleUpdateCommand:
         # Simpler approach — mock at method level using a wrapper
         runner = _make_runner()
 
-        with patch("gateway.run._hermes_home", tmp_path):
+        with patch("gateway.run._qubit_home", tmp_path):
             # The handler does Path(__file__).parent.parent.resolve()
             # We need to make project_root / '.git' not exist.
             # Since Path(__file__) resolves to the real gateway/run.py,
@@ -120,7 +120,7 @@ class TestHandleUpdateCommand:
         qubit_home = tmp_path / "hermes"
         qubit_home.mkdir()
 
-        with patch("gateway.run._hermes_home", qubit_home), \
+        with patch("gateway.run._qubit_home", qubit_home), \
              patch("gateway.run.__file__", fake_file), \
              patch("shutil.which", side_effect=lambda x: "/usr/bin/hermes" if x == "hermes" else "/usr/bin/setsid"), \
              patch("subprocess.Popen"):
@@ -161,7 +161,7 @@ class TestHandleUpdateCommand:
                 return None
             return None
 
-        with patch("gateway.run._hermes_home", qubit_home), \
+        with patch("gateway.run._qubit_home", qubit_home), \
              patch("gateway.run.__file__", fake_file), \
              patch("shutil.which", side_effect=which_no_setsid), \
              patch("subprocess.Popen", mock_popen):
@@ -282,7 +282,7 @@ class TestSendUpdateNotification:
         mock_adapter = AsyncMock()
         runner.adapters = {Platform.TELEGRAM: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             result = await runner._send_update_notification()
 
         assert result is False
@@ -306,7 +306,7 @@ class TestSendUpdateNotification:
         mock_adapter = AsyncMock()
         runner.adapters = {Platform.TELEGRAM: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             result = await runner._send_update_notification()
 
         assert result is True
@@ -338,7 +338,7 @@ class TestSendUpdateNotification:
         mock_adapter.send = AsyncMock()
         runner.adapters = {Platform.TELEGRAM: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             await runner._send_update_notification()
 
         mock_adapter.send.assert_called_once()
@@ -368,7 +368,7 @@ class TestSendUpdateNotification:
         mock_adapter.send.side_effect = RuntimeError("network error")
         runner.adapters = {Platform.TELEGRAM: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             await runner._send_update_notification()
 
         # Files should still be cleaned up (finally block)
@@ -402,7 +402,7 @@ class TestSendUpdateNotification:
         mock_adapter = AsyncMock()
         runner.adapters = {Platform.TELEGRAM: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             result = await runner._send_update_notification()
 
         # No send (wrong platform offline) and the result is deferred.
@@ -437,7 +437,7 @@ class TestSendUpdateNotification:
         exit_code_path.write_text("0")
 
         # First pass: target platform (discord) is still offline → defer.
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             first = await runner._send_update_notification()
 
         assert first is False
@@ -447,7 +447,7 @@ class TestSendUpdateNotification:
         mock_adapter = AsyncMock()
         runner.adapters = {Platform.DISCORD: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             second = await runner._send_update_notification()
 
         assert second is True
@@ -478,7 +478,7 @@ class TestSendUpdateNotification:
         mock_adapter = AsyncMock()
         runner.adapters = {Platform.DISCORD: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             delivered = await runner._send_update_notification()
 
         assert delivered is True
@@ -536,7 +536,7 @@ class TestWatchUpdateProgress:
         mock_adapter = AsyncMock()
         runner.adapters = {Platform.TELEGRAM: mock_adapter}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             await runner._watch_update_progress(poll_interval=0.01, stream_interval=0.01, timeout=1.0)
 
         sent = "\n".join(call.args[1] for call in mock_adapter.send.call_args_list)

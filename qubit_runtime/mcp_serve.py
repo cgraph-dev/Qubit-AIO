@@ -4,7 +4,7 @@ Qubit MCP Server — expose messaging conversations as MCP tools (`qubit mcp ser
 A stdio MCP server letting any MCP client (Claude Code, Cursor, Codex, ...) list
 conversations, read history, send messages, poll live events, and manage approvals.
 Matches Qubit's 9-tool channel bridge surface plus the Qubit-specific
-channels_list. Client config: {"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}
+channels_list. Client config: {"mcpServers": {"qubit": {"command": "qubit", "args": ["mcp", "serve"]}}}
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-logger = logging.getLogger("hermes.mcp_serve")
+logger = logging.getLogger("qubit.mcp_serve")
 
 # mcp 2.0 removed `mcp.server.fastmcp`; `mcp.server.MCPServer` keeps the same
 # `@server.tool()` / `run_stdio_async()` surface (docstring -> description,
@@ -693,7 +693,7 @@ def create_mcp_server(event_bridge: Optional[EventBridge] = None) -> "MCPServer"
     """Create and return the Qubit MCP server with all tools registered."""
     if not _MCP_SERVER_AVAILABLE:
         raise ImportError(f"MCP server requires the 'mcp' package. Install with: {sys.executable} -m pip install 'mcp'")
-    mcp = MCPServer("hermes", instructions=(
+    mcp = MCPServer("qubit", instructions=(
         "Qubit Agent messaging bridge. Use these tools to interact with "
         "conversations across Telegram, Discord, Slack, WhatsApp, Signal, "
         "Matrix, and other connected platforms."

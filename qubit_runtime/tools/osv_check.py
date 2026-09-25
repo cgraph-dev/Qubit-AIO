@@ -256,7 +256,7 @@ def _query_osv(package: str, ecosystem: str, version: Optional[str] = None) -> l
     req = urllib.request.Request(
         _OSV_ENDPOINT,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "hermes-agent-osv-check/1.0"},
+        headers={"Content-Type": "application/json", "User-Agent": "qubit-agent-osv-check/1.0"},
         method="POST")
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         result = json.loads(resp.read())

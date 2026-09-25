@@ -50,7 +50,7 @@ def _run_with_current_provider(job, current_provider, tmp_path):
     Returns (success, output, final_response, error, agent_constructed).
     """
     fake_db = MagicMock()
-    with patch("cron.scheduler._hermes_home", tmp_path), \
+    with patch("cron.scheduler._qubit_home", tmp_path), \
          patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
          patch("qubit_cli.env_loader.load_qubit_dotenv"), \
          patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -108,13 +108,13 @@ class TestProviderDriftGuard:
         assert "openrouter" in blob
         assert "nous" in blob
         assert "spend" in blob
-        assert "hermes cron edit pin-test --provider <provider> --model <model>" in blob
+        assert "qubit cron edit pin-test --provider <provider> --model <model>" in blob
         assert "cronjob action=update" not in blob
         assert "44585" in blob
 
         delivered = _summarize_cron_failure_for_delivery(job, error).lower()
-        assert "host running hermes" in delivered
-        assert "hermes cron edit pin-test --provider <provider> --model <model>" in delivered
+        assert "host running qubit" in delivered
+        assert "qubit cron edit pin-test --provider <provider> --model <model>" in delivered
         assert "cronjob action=update" not in delivered
 
     def test_c_no_snapshot_runs_backcompat(self, tmp_path):
@@ -152,7 +152,7 @@ class TestProviderDriftGuard:
         assert success is False
         assert agent_constructed is False
         assert error is not None
-        assert "hermes cron edit pin-test --model <name>" in error
+        assert "qubit cron edit pin-test --model <name>" in error
         assert "cronjob action=update" not in error
 
     def test_d_explicitly_pinned_runs_regardless_of_drift(self, tmp_path):
@@ -254,7 +254,7 @@ def _run_with_current_provider_and_model(
         config_yaml += "cron:\n" + "\n".join(cron_lines) + "\n"
     (tmp_path / "config.yaml").write_text(config_yaml)
     fake_db = MagicMock()
-    with patch("cron.scheduler._hermes_home", tmp_path), \
+    with patch("cron.scheduler._qubit_home", tmp_path), \
          patch("cron.scheduler._get_qubit_home", return_value=tmp_path), \
          patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
          patch("qubit_cli.env_loader.load_qubit_dotenv"), \
@@ -419,7 +419,7 @@ class TestRuntimeResolutionTargetModel:
             }
 
         fake_db = MagicMock()
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \

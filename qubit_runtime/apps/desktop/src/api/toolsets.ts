@@ -74,9 +74,9 @@ export interface SelectToolsetProviderResponse {
   provider: string
   /** Present when the selection was scoped to one web capability. */
   capability?: string
-  /** Present (true) when a managed Nous row was selected but the Portal
+  /** Present (true) when a managed Qubit row was selected but the Portal
    *  entitlement is missing — the row won't activate until the user signs
-   *  in to Nous Portal. */
+   *  in to Qubit Labs. */
   needs_nous_auth?: boolean
   /** The managed feature key (e.g. "browser") when needs_nous_auth is set. */
   feature?: string

@@ -26,7 +26,7 @@ def test_unsupported_allocator_is_noop_without_gc(monkeypatch):
 def test_config_kill_switch_overrides_force_from_config_file(monkeypatch, tmp_path):
     from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir()
     (qubit_home / "config.yaml").write_text(
         "context:\n  memory_trim:\n    enabled: false\n",

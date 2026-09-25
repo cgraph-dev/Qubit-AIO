@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { maybeReloadForLoopbackWsAuthFailure } from "@/lib/dashboard-auth-reload";
 import { cn, themedBody } from "@/lib/utils";
 import { useTheme } from "@/themes";
+import { errorMessage } from "@/lib/api-error";
 
 type ConsoleFrame =
   | {
@@ -471,7 +472,7 @@ export function QubitConsoleModal({ open, onClose }: QubitConsoleModalProps) {
       } catch (err) {
         if (cancelled) return;
         setConnectionState("error");
-        writeLine(term, `\x1b[31mConsole unavailable: ${err}\x1b[0m`);
+        writeLine(term, `\x1b[31mConsole unavailable: ${errorMessage(err)}\x1b[0m`);
       }
     })();
 

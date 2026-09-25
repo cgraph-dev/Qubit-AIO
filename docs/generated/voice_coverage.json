@@ -5,10 +5,10 @@
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
-    "bound_backends": 868,
+    "bound_backends": 1137,
     "dead_backend_ids": [],
     "dead_backends": 0,
-    "total_entries": 868
+    "total_entries": 1137
   },
   "rows": [
     {
@@ -28,18 +28,18 @@
       "voice_intent": "qubit approvals"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_approvals_suggest",
       "id": "hermes approvals suggest",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit approvals suggest"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_approvals_test",
       "id": "hermes approvals test",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit approvals test"
     },
@@ -52,10 +52,10 @@
       "voice_intent": "qubit auth"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_add",
       "id": "hermes auth add",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth add"
     },
@@ -76,42 +76,42 @@
       "voice_intent": "qubit auth logout"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_priority",
       "id": "hermes auth priority",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth priority"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_refresh",
       "id": "hermes auth refresh",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth refresh"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_remove",
       "id": "hermes auth remove",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth remove"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_reset",
       "id": "hermes auth reset",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth reset"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_spotify",
       "id": "hermes auth spotify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth spotify"
     },
@@ -124,18 +124,18 @@
       "voice_intent": "qubit auth status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_auth_upgrade",
       "id": "hermes auth upgrade",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit auth upgrade"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_backup",
       "id": "hermes backup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit backup"
     },
@@ -156,58 +156,58 @@
       "voice_intent": "qubit browser close-profile"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_bundles",
       "id": "hermes bundles",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit bundles"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_bundles_create",
       "id": "hermes bundles create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit bundles create"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_bundles_delete",
       "id": "hermes bundles delete",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit bundles delete"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_bundles_list",
       "id": "hermes bundles list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit bundles list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_bundles_reload",
       "id": "hermes bundles reload",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit bundles reload"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_bundles_show",
       "id": "hermes bundles show",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit bundles show"
     },
     {
-      "entry": null,
+      "entry": "cli_chat_sessions",
       "id": "hermes chat",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit chat sessions"
     },
@@ -220,18 +220,18 @@
       "voice_intent": "qubit checkpoints"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_checkpoints_clear",
       "id": "hermes checkpoints clear",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit checkpoints clear"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_checkpoints_clear_legacy",
       "id": "hermes checkpoints clear-legacy",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit checkpoints clear-legacy"
     },
@@ -260,26 +260,26 @@
       "voice_intent": "qubit checkpoints status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_claw",
       "id": "hermes claw",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit claw"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_claw_cleanup",
       "id": "hermes claw cleanup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit claw cleanup"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_claw_migrate",
       "id": "hermes claw migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit claw migrate"
     },
@@ -292,10 +292,10 @@
       "voice_intent": "qubit runtime images"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "hermes codex-runtime migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
@@ -308,10 +308,10 @@
       "voice_intent": "qubit completion"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_computer_use",
       "id": "hermes computer-use",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit computer-use"
     },
@@ -356,58 +356,58 @@
       "voice_intent": "qubit config"
     },
     {
-      "entry": null,
+      "entry": "cli_config_check",
       "id": "hermes config check",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit config check"
     },
     {
-      "entry": null,
+      "entry": "cli_config_edit_guard",
       "id": "hermes config edit",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit config edit"
     },
     {
-      "entry": null,
+      "entry": "cli_config_env_path",
       "id": "hermes config env-path",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit config env-path"
     },
     {
-      "entry": null,
+      "entry": "cli_config_get",
       "id": "hermes config get",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit config get"
     },
     {
-      "entry": null,
+      "entry": "cli_config_migrate_guard",
       "id": "hermes config migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit config migrate"
     },
     {
-      "entry": null,
+      "entry": "cli_config_path",
       "id": "hermes config path",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit config path"
     },
     {
-      "entry": null,
+      "entry": "cli_config_set",
       "id": "hermes config set",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit config set"
     },
@@ -420,10 +420,10 @@
       "voice_intent": "qubit config show"
     },
     {
-      "entry": null,
+      "entry": "cli_config_unset",
       "id": "hermes config unset",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit config unset"
     },
@@ -460,18 +460,18 @@
       "voice_intent": "qubit cron doctor"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_edit",
       "id": "hermes cron edit",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit cron edit"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_incidents",
       "id": "hermes cron incidents",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit cron incidents"
     },
@@ -484,10 +484,10 @@
       "voice_intent": "qubit cron list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_notepad",
       "id": "hermes cron notepad",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit cron notepad"
     },
@@ -524,10 +524,10 @@
       "voice_intent": "qubit cron run"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_runs",
       "id": "hermes cron runs",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit cron runs"
     },
@@ -540,10 +540,10 @@
       "voice_intent": "qubit cron status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_tick",
       "id": "hermes cron tick",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit cron tick"
     },
@@ -604,10 +604,10 @@
       "voice_intent": "qubit autonomy list"
     },
     {
-      "entry": null,
+      "entry": "cli_pause",
       "id": "hermes curator pause",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit pause"
     },
@@ -708,34 +708,34 @@
       "voice_intent": "qubit tui help"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_debug",
       "id": "hermes debug",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit debug"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_debug_delete",
       "id": "hermes debug delete",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit debug delete"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_debug_share",
       "id": "hermes debug share",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit debug share"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_desktop",
       "id": "hermes desktop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit desktop"
     },
@@ -748,10 +748,10 @@
       "voice_intent": "qubit doctor"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_dump",
       "id": "hermes dump",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit dump"
     },
@@ -764,58 +764,58 @@
       "voice_intent": "qubit egress"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_config",
       "id": "hermes egress config",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress config"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_disable",
       "id": "hermes egress disable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress disable"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_install",
       "id": "hermes egress install",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress install"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_reload",
       "id": "hermes egress reload",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress reload"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_restart",
       "id": "hermes egress restart",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress restart"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_setup",
       "id": "hermes egress setup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress setup"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_start",
       "id": "hermes egress start",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress start"
     },
@@ -828,10 +828,10 @@
       "voice_intent": "qubit egress status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_egress_stop",
       "id": "hermes egress stop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit egress stop"
     },
@@ -884,18 +884,18 @@
       "voice_intent": "qubit gateway"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_enroll",
       "id": "hermes gateway enroll",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway enroll"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_install",
       "id": "hermes gateway install",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway install"
     },
@@ -908,50 +908,50 @@
       "voice_intent": "qubit gateway list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_migrate",
       "id": "hermes gateway migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway migrate"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_migrate_legacy",
       "id": "hermes gateway migrate-legacy",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway migrate-legacy"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_restart",
       "id": "hermes gateway restart",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway restart"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_run",
       "id": "hermes gateway run",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway run"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_setup",
       "id": "hermes gateway setup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway setup"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_start",
       "id": "hermes gateway start",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway start"
     },
@@ -964,18 +964,18 @@
       "voice_intent": "qubit gateway status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_stop",
       "id": "hermes gateway stop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway stop"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_gateway_uninstall",
       "id": "hermes gateway uninstall",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit gateway uninstall"
     },
@@ -988,7 +988,7 @@
       "voice_intent": "qubit hooks"
     },
     {
-      "entry": "cli_hooks_doctor",
+      "entry": "hooks_doctor",
       "id": "hermes hooks doctor",
       "kind": "match",
       "resolution": "real",
@@ -1028,10 +1028,10 @@
       "voice_intent": "qubit import state voice"
     },
     {
-      "entry": null,
+      "entry": "cli_import_agent",
       "id": "hermes import-agent",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit import-agent"
     },
@@ -1044,18 +1044,18 @@
       "voice_intent": "qubit insights"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_journey",
       "id": "hermes journey",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit journey"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_revoke",
       "id": "hermes journey delete",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit autonomy revoke"
     },
@@ -1100,34 +1100,34 @@
       "voice_intent": "qubit kanban assign"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_assignees",
       "id": "hermes kanban assignees",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban assignees"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_attach",
       "id": "hermes kanban attach",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban attach"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_attach_rm",
       "id": "hermes kanban attach-rm",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban attach-rm"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_attachments",
       "id": "hermes kanban attachments",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban attachments"
     },
@@ -1148,18 +1148,18 @@
       "voice_intent": "qubit kanban boards"
     },
     {
-      "entry": null,
+      "entry": "cli_kanban_claim",
       "id": "hermes kanban claim",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit kanban claim"
     },
     {
-      "entry": null,
+      "entry": "cli_kanban_comment",
       "id": "hermes kanban comment",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit kanban comment"
     },
@@ -1172,10 +1172,10 @@
       "voice_intent": "qubit kanban complete"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_context",
       "id": "hermes kanban context",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban context"
     },
@@ -1196,18 +1196,18 @@
       "voice_intent": "qubit kanban daemon"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_decompose",
       "id": "hermes kanban decompose",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban decompose"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_diagnostics",
       "id": "hermes kanban diagnostics",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban diagnostics"
     },
@@ -1228,18 +1228,18 @@
       "voice_intent": "qubit kanban edit"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_gc",
       "id": "hermes kanban gc",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban gc"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_heartbeat",
       "id": "hermes kanban heartbeat",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban heartbeat"
     },
@@ -1268,7 +1268,7 @@
       "voice_intent": "qubit kanban list"
     },
     {
-      "entry": "cli_kanban_log",
+      "entry": "kanban_log",
       "id": "hermes kanban log",
       "kind": "match",
       "resolution": "real",
@@ -1276,34 +1276,34 @@
       "voice_intent": "qubit kanban log"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_notify_list",
       "id": "hermes kanban notify-list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban notify-list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_notify_subscribe",
       "id": "hermes kanban notify-subscribe",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban notify-subscribe"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_notify_unsubscribe",
       "id": "hermes kanban notify-unsubscribe",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban notify-unsubscribe"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_promote",
       "id": "hermes kanban promote",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban promote"
     },
@@ -1332,10 +1332,10 @@
       "voice_intent": "qubit kanban reopen-review"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_repair",
       "id": "hermes kanban repair",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban repair"
     },
@@ -1356,26 +1356,26 @@
       "voice_intent": "qubit kanban request-review"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_runs",
       "id": "hermes kanban runs",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban runs"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_schedule",
       "id": "hermes kanban schedule",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban schedule"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_set_model",
       "id": "hermes kanban set-model",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban set-model"
     },
@@ -1388,15 +1388,15 @@
       "voice_intent": "qubit kanban show"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_specify",
       "id": "hermes kanban specify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban specify"
     },
     {
-      "entry": "cli_kanban_stats",
+      "entry": "kanban_stats",
       "id": "hermes kanban stats",
       "kind": "match",
       "resolution": "real",
@@ -1412,10 +1412,10 @@
       "voice_intent": "qubit kanban swarm"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_kanban_tail",
       "id": "hermes kanban tail",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit kanban tail"
     },
@@ -1524,10 +1524,10 @@
       "voice_intent": "qubit mcp"
     },
     {
-      "entry": null,
+      "entry": "cli_mcp_add",
       "id": "hermes mcp add",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit mcp add"
     },
@@ -1540,10 +1540,10 @@
       "voice_intent": "qubit mcp catalog"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_mcp_configure",
       "id": "hermes mcp configure",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit mcp configure"
     },
@@ -1564,26 +1564,26 @@
       "voice_intent": "qubit mcp list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_mcp_login",
       "id": "hermes mcp login",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit mcp login"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_mcp_picker",
       "id": "hermes mcp picker",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit mcp picker"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_mcp_reauth",
       "id": "hermes mcp reauth",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit mcp reauth"
     },
@@ -1596,10 +1596,10 @@
       "voice_intent": "qubit mcp remove"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_mcp_serve",
       "id": "hermes mcp serve",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit mcp serve"
     },
@@ -1620,26 +1620,26 @@
       "voice_intent": "qubit memory"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_memory_off",
       "id": "hermes memory off",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit memory off"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_memory_reset",
       "id": "hermes memory reset",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit memory reset"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_memory_setup",
       "id": "hermes memory setup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit memory setup"
     },
@@ -1652,58 +1652,58 @@
       "voice_intent": "qubit memory status"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "hermes migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "hermes migrate relay",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "hermes migrate xai",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_moa",
       "id": "hermes moa",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit moa"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_moa_configure",
       "id": "hermes moa configure",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit moa configure"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_moa_delete",
       "id": "hermes moa delete",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit moa delete"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_moa_list",
       "id": "hermes moa list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit moa list"
     },
@@ -1748,10 +1748,10 @@
       "voice_intent": "qubit pairing approve"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_pairing_clear_pending",
       "id": "hermes pairing clear-pending",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit pairing clear-pending"
     },
@@ -1772,10 +1772,10 @@
       "voice_intent": "qubit pairing revoke"
     },
     {
-      "entry": null,
+      "entry": "cli_pause",
       "id": "hermes pause",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit pause"
     },
@@ -1836,18 +1836,18 @@
       "voice_intent": "qubit peer status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_peer_stop",
       "id": "hermes peer stop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit peer stop"
     },
     {
-      "entry": null,
+      "entry": "cli_pets_refusal",
       "id": "hermes pets",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -1860,10 +1860,10 @@
       "voice_intent": "qubit doctor"
     },
     {
-      "entry": null,
+      "entry": "cli_pets_refusal",
       "id": "hermes pets install",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -1892,18 +1892,18 @@
       "voice_intent": "qubit pairing revoke"
     },
     {
-      "entry": null,
+      "entry": "cli_pets_refusal",
       "id": "hermes pets scale",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_pets_refusal",
       "id": "hermes pets select",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -1940,18 +1940,18 @@
       "voice_intent": "qubit plugins capabilities"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_compat",
       "id": "hermes plugins compat",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit plugins compat"
     },
     {
-      "entry": null,
+      "entry": "cli_plugins_disable",
       "id": "hermes plugins disable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit plugins disable"
     },
@@ -1964,10 +1964,10 @@
       "voice_intent": "qubit plugins doctor"
     },
     {
-      "entry": null,
+      "entry": "cli_plugins_enable",
       "id": "hermes plugins enable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit plugins enable"
     },
@@ -1988,10 +1988,10 @@
       "voice_intent": "qubit plugins list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_pack",
       "id": "hermes plugins pack",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit plugins pack"
     },
@@ -2004,10 +2004,10 @@
       "voice_intent": "qubit plugins remove"
     },
     {
-      "entry": null,
+      "entry": "cli_plugins_search",
       "id": "hermes plugins search",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit plugins search"
     },
@@ -2020,58 +2020,58 @@
       "voice_intent": "qubit plugins show"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_update",
       "id": "hermes plugins update",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit plugins update"
     },
     {
-      "entry": null,
+      "entry": "cli_plugins_validate",
       "id": "hermes plugins validate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit plugins validate"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_portal",
       "id": "hermes portal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit portal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_portal_info",
       "id": "hermes portal info",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit portal info"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_portal_login",
       "id": "hermes portal login",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit portal login"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_portal_open",
       "id": "hermes portal open",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit portal open"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_portal_tools",
       "id": "hermes portal tools",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit portal tools"
     },
@@ -2084,18 +2084,18 @@
       "voice_intent": "qubit profile"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_profile_alias",
       "id": "hermes profile alias",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit profile alias"
     },
     {
-      "entry": null,
+      "entry": "cli_agent_profile_create",
       "id": "hermes profile create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit profile create"
     },
@@ -2108,26 +2108,26 @@
       "voice_intent": "qubit profile delete"
     },
     {
-      "entry": null,
+      "entry": "cli_agent_profile_describe",
       "id": "hermes profile describe",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit profile describe"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_profile_export",
       "id": "hermes profile export",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit profile export"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_profile_import",
       "id": "hermes profile import",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit profile import"
     },
@@ -2140,10 +2140,10 @@
       "voice_intent": "qubit profile info"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_profile_install",
       "id": "hermes profile install",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit profile install"
     },
@@ -2156,26 +2156,26 @@
       "voice_intent": "qubit profile list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_profile_migrate_identity",
       "id": "hermes profile migrate-identity",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit profile migrate-identity"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_profile_purge_identity",
       "id": "hermes profile purge-identity",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit profile purge-identity"
     },
     {
-      "entry": null,
+      "entry": "cli_agent_profile_rename",
       "id": "hermes profile rename",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit profile rename"
     },
@@ -2204,42 +2204,42 @@
       "voice_intent": "qubit profile use"
     },
     {
-      "entry": null,
+      "entry": "cli_project_root",
       "id": "hermes project",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project"
     },
     {
-      "entry": null,
+      "entry": "cli_project_add_folder",
       "id": "hermes project add-folder",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project add-folder"
     },
     {
-      "entry": null,
+      "entry": "cli_project_archive",
       "id": "hermes project archive",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project archive"
     },
     {
-      "entry": null,
+      "entry": "cli_project_bind_board",
       "id": "hermes project bind-board",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project bind-board"
     },
     {
-      "entry": null,
+      "entry": "cli_project_create",
       "id": "hermes project create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project create"
     },
@@ -2252,42 +2252,42 @@
       "voice_intent": "qubit project list"
     },
     {
-      "entry": null,
+      "entry": "cli_project_remove_folder",
       "id": "hermes project remove-folder",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project remove-folder"
     },
     {
-      "entry": null,
+      "entry": "cli_project_rename",
       "id": "hermes project rename",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project rename"
     },
     {
-      "entry": null,
+      "entry": "cli_project_restore",
       "id": "hermes project restore",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project restore"
     },
     {
-      "entry": null,
+      "entry": "cli_project_set_primary",
       "id": "hermes project set-primary",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project set-primary"
     },
     {
-      "entry": null,
+      "entry": "cli_project_show",
       "id": "hermes project show",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit project show"
     },
@@ -2420,18 +2420,18 @@
       "voice_intent": "qubit sessions archive"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sessions_browse",
       "id": "hermes sessions browse",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sessions browse"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_clean_markers",
       "id": "hermes sessions clean-markers",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions clean-markers"
     },
@@ -2444,18 +2444,18 @@
       "voice_intent": "qubit sessions delete"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_export",
       "id": "hermes sessions export",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions export"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sessions_import",
       "id": "hermes sessions import",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sessions import"
     },
@@ -2468,50 +2468,50 @@
       "voice_intent": "qubit sessions list"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_optimize",
       "id": "hermes sessions optimize",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions optimize"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_optimize_storage",
       "id": "hermes sessions optimize-storage",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions optimize-storage"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_pin",
       "id": "hermes sessions pin",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions pin"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_pinned",
       "id": "hermes sessions pinned",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions pinned"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_prune",
       "id": "hermes sessions prune",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions prune"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sessions_recover",
       "id": "hermes sessions recover",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sessions recover"
     },
@@ -2524,42 +2524,42 @@
       "voice_intent": "qubit sessions rename"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_repair",
       "id": "hermes sessions repair",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions repair"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_repair_profiles",
       "id": "hermes sessions repair-profiles",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions repair-profiles"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_repair_routing",
       "id": "hermes sessions repair-routing",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions repair-routing"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_retitle_skills",
       "id": "hermes sessions retitle-skills",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions retitle-skills"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sessions_set_journal_mode",
       "id": "hermes sessions set-journal-mode",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sessions set-journal-mode"
     },
@@ -2572,18 +2572,18 @@
       "voice_intent": "qubit sessions stats"
     },
     {
-      "entry": null,
+      "entry": "cli_sessions_unpin",
       "id": "hermes sessions unpin",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit sessions unpin"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_setup",
       "id": "hermes setup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit setup"
     },
@@ -2596,42 +2596,42 @@
       "voice_intent": "qubit skills"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_audit",
       "id": "hermes skills audit",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills audit"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_browse",
       "id": "hermes skills browse",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills browse"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_check",
       "id": "hermes skills check",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills check"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_config",
       "id": "hermes skills config",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills config"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_diff",
       "id": "hermes skills diff",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills diff"
     },
@@ -2660,82 +2660,82 @@
       "voice_intent": "qubit skills list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_list_modified",
       "id": "hermes skills list-modified",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills list-modified"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_opt_in",
       "id": "hermes skills opt-in",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills opt-in"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_opt_out",
       "id": "hermes skills opt-out",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills opt-out"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_publish",
       "id": "hermes skills publish",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills publish"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_repair_official",
       "id": "hermes skills repair-official",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills repair-official"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_reset",
       "id": "hermes skills reset",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills reset"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_search",
       "id": "hermes skills search",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills search"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_snapshot",
       "id": "hermes skills snapshot",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills snapshot"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_tap",
       "id": "hermes skills tap",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills tap"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_trust",
       "id": "hermes skills trust",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills trust"
     },
@@ -2748,26 +2748,26 @@
       "voice_intent": "qubit skills uninstall"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_untrust",
       "id": "hermes skills untrust",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills untrust"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_skills_update",
       "id": "hermes skills update",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit skills update"
     },
     {
-      "entry": null,
+      "entry": "cli_skin",
       "id": "hermes skin",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit skin"
     },
@@ -2828,58 +2828,58 @@
       "voice_intent": "qubit sync"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_device",
       "id": "hermes sync device",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync device"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_disable",
       "id": "hermes sync disable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync disable"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_enable",
       "id": "hermes sync enable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync enable"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_now",
       "id": "hermes sync now",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync now"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_propose",
       "id": "hermes sync propose",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync propose"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_pull",
       "id": "hermes sync pull",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync pull"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_sync_push",
       "id": "hermes sync push",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit sync push"
     },
@@ -2900,18 +2900,18 @@
       "voice_intent": "qubit tools"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_disable",
       "id": "hermes tools disable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit tools disable"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "hermes tools enable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit tools enable"
     },
@@ -2924,10 +2924,10 @@
       "voice_intent": "qubit tools list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_tools_post_setup",
       "id": "hermes tools post-setup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit tools post-setup"
     },
@@ -2996,10 +2996,10 @@
       "voice_intent": "qubit secrets"
     },
     {
-      "entry": null,
+      "entry": "cli_verify",
       "id": "hermes verify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit verify"
     },
@@ -3068,18 +3068,18 @@
       "voice_intent": "qubit worktree"
     },
     {
-      "entry": null,
+      "entry": "cli_worktree_list",
       "id": "hermes worktree list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit worktree list"
     },
     {
-      "entry": null,
+      "entry": "cli_worktree_prune",
       "id": "hermes worktree prune",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "cli",
       "voice_intent": "qubit worktree prune"
     },
@@ -3100,10 +3100,10 @@
       "voice_intent": "qubit channels status"
     },
     {
-      "entry": null,
+      "entry": "cli_chat_sessions",
       "id": "client-route /chat",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit chat sessions"
     },
@@ -3116,26 +3116,26 @@
       "voice_intent": "qubit config profiles"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_navigate_cron",
       "id": "client-route /cron",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit navigate /cron"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_navigate_docs",
       "id": "client-route /docs",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit navigate /docs"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_navigate_env",
       "id": "client-route /env",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit navigate /env"
     },
@@ -3356,18 +3356,18 @@
       "voice_intent": "qubit actions list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_prepare",
       "id": "op actions_prepare",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions prepare"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_preview",
       "id": "op actions_preview",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions preview"
     },
@@ -3388,18 +3388,18 @@
       "voice_intent": "qubit actions receipts"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_recover",
       "id": "op actions_recover",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions recover"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_retry",
       "id": "op actions_retry",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions retry"
     },
@@ -3604,10 +3604,10 @@
       "voice_intent": "qubit automation yield resume"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_expire",
       "id": "op autonomy_expire",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit autonomy expire"
     },
@@ -3620,26 +3620,26 @@
       "voice_intent": "qubit autonomy list"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_pause",
       "id": "op autonomy_pause",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit autonomy pause"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_resume",
       "id": "op autonomy_resume",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit autonomy resume"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_revoke",
       "id": "op autonomy_revoke",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit autonomy revoke"
     },
@@ -3660,10 +3660,10 @@
       "voice_intent": "qubit autonomy status"
     },
     {
-      "entry": null,
+      "entry": "cli_skills_workshop_backup",
       "id": "op backup_create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit skills workshop backup"
     },
@@ -3732,10 +3732,10 @@
       "voice_intent": "qubit brain member remove"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_brain_onboard_apply",
       "id": "op brain_onboard_apply",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard brain onboard apply"
     },
@@ -3820,10 +3820,10 @@
       "voice_intent": "qubit brain vault set"
     },
     {
-      "entry": null,
+      "entry": "cli_branding_migrate",
       "id": "op branding_migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit branding migrate"
     },
@@ -3868,10 +3868,10 @@
       "voice_intent": "qubit browser close tab"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_browser_close_refusal",
       "id": "op browser_close_refusal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit browser close refusal"
     },
@@ -3956,10 +3956,10 @@
       "voice_intent": "qubit browser tabs"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_browser_close_refusal",
       "id": "op browser_profile_close",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit browser close refusal"
     },
@@ -4028,18 +4028,18 @@
       "voice_intent": "qubit browser tabs"
     },
     {
-      "entry": null,
+      "entry": "cli_capabilities_list",
       "id": "op capabilities_list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit capabilities list"
     },
     {
-      "entry": null,
+      "entry": "cli_capability",
       "id": "op capability",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit capability"
     },
@@ -4100,26 +4100,26 @@
       "voice_intent": "qubit channels unconfigure"
     },
     {
-      "entry": null,
+      "entry": "cli_chat_session_search",
       "id": "op chat_session_search",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit chat session search"
     },
     {
-      "entry": null,
+      "entry": "cli_chat_session_show",
       "id": "op chat_session_show",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit chat session show"
     },
     {
-      "entry": null,
+      "entry": "cli_chat_sessions",
       "id": "op chat_sessions",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit chat sessions"
     },
@@ -4140,34 +4140,34 @@
       "voice_intent": "qubit checkpoints write"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_clear",
       "id": "op clear_session_model",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile clear"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_clear",
       "id": "op clear_session_speech",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile clear"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_clone",
       "id": "op clone_model_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile clone"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_clone",
       "id": "op clone_speech_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile clone"
     },
@@ -4196,18 +4196,18 @@
       "voice_intent": "qubit computer doctor"
     },
     {
-      "entry": null,
+      "entry": "cli_computer_install_refusal",
       "id": "op computer_install",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit computer install refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_computer_install_refusal",
       "id": "op computer_install_refusal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit computer install refusal"
     },
@@ -4228,7 +4228,7 @@
       "voice_intent": "qubit computer ops"
     },
     {
-      "entry": "cli_computer_permissions",
+      "entry": "computer_permissions",
       "id": "op computer_permissions",
       "kind": "match",
       "resolution": "real",
@@ -4268,18 +4268,18 @@
       "voice_intent": "qubit computer present"
     },
     {
-      "entry": null,
+      "entry": "cli_computer_screen_arrange",
       "id": "op computer_screen_arrange",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit computer screen arrange"
     },
     {
-      "entry": null,
+      "entry": "cli_computer_screen",
       "id": "op computer_screen_panes",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit computer screen"
     },
@@ -4316,10 +4316,10 @@
       "voice_intent": "qubit browser profile create"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_create",
       "id": "op create_speech_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile create"
     },
@@ -4404,10 +4404,10 @@
       "voice_intent": "qubit egress status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_enroll_voice",
       "id": "op enroll_voice",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit enroll voice"
     },
@@ -4532,10 +4532,10 @@
       "voice_intent": "qubit export state voice"
     },
     {
-      "entry": null,
+      "entry": "cli_file_patch_rollback",
       "id": "op file_patch_rollback",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit file patch rollback"
     },
@@ -4548,18 +4548,18 @@
       "voice_intent": "qubit files inspect"
     },
     {
-      "entry": null,
+      "entry": "cli_files_list_cmd",
       "id": "op files_list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit files list"
     },
     {
-      "entry": null,
+      "entry": "cli_files_read_cmd",
       "id": "op files_read",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit files read"
     },
@@ -4668,42 +4668,42 @@
       "voice_intent": "qubit gateway supervision revert"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_action_preview",
       "id": "op ghost_action_preview",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost action preview"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_action_recover",
       "id": "op ghost_action_recover",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost action recover"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_action_retry",
       "id": "op ghost_action_retry",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost action retry"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_cancel",
       "id": "op ghost_cancel",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost cancel"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_check",
       "id": "op ghost_check",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost check"
     },
@@ -4716,42 +4716,42 @@
       "voice_intent": "qubit ghost click"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_disable",
       "id": "op ghost_disable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost disable"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_enable",
       "id": "op ghost_enable",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost enable"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_estop",
       "id": "op ghost_estop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost estop"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_execute",
       "id": "op ghost_execute",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost execute"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_grant",
       "id": "op ghost_grant",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost grant"
     },
@@ -4764,18 +4764,18 @@
       "voice_intent": "qubit ghost list"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_action_preview",
       "id": "op ghost_preview",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost action preview"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_read_tab",
       "id": "op ghost_read_tab",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost read tab"
     },
@@ -4788,26 +4788,26 @@
       "voice_intent": "qubit ghost receipts"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_reset",
       "id": "op ghost_reset",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost reset"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_revoke",
       "id": "op ghost_revoke",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost revoke"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_show",
       "id": "op ghost_show",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost show"
     },
@@ -4820,10 +4820,10 @@
       "voice_intent": "qubit ghost status"
     },
     {
-      "entry": null,
+      "entry": "cli_ghost_type",
       "id": "op ghost_type",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit ghost type"
     },
@@ -4860,74 +4860,74 @@
       "voice_intent": "qubit git status"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_prepare",
       "id": "op guard_actions_prepare",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions prepare"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_preview",
       "id": "op guard_actions_preview",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions preview"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_recover",
       "id": "op guard_actions_recover",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions recover"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_actions_retry",
       "id": "op guard_actions_retry",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard actions retry"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_ask_answer",
       "id": "op guard_ask_answer",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard ask answer"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_backup_create",
       "id": "op guard_backup_create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard backup create"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_backup_restore",
       "id": "op guard_backup_restore",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard backup restore"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_brain_onboard_apply",
       "id": "op guard_brain_onboard_apply",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard brain onboard apply"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_file_patch",
       "id": "op guard_file_patch",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard file patch"
     },
@@ -4940,66 +4940,66 @@
       "voice_intent": "qubit guard ghost preview"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_kanban_import",
       "id": "op guard_kanban_import",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard kanban import"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_opencode_prepare",
       "id": "op guard_opencode_prepare",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard opencode prepare"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_opencode_run_confirmed",
       "id": "op guard_opencode_run_confirmed",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard opencode run confirmed"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_shares_resolve",
       "id": "op guard_shares_resolve",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard shares resolve"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_sync_accept",
       "id": "op guard_sync_accept",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard sync accept"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_sync_offer",
       "id": "op guard_sync_offer",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard sync offer"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_transfers_fetch_raw",
       "id": "op guard_transfers_fetch_raw",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard transfers fetch raw"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_webhook_verify",
       "id": "op guard_webhook_verify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard webhook verify"
     },
@@ -5012,7 +5012,7 @@
       "voice_intent": "qubit hooks declare"
     },
     {
-      "entry": "cli_hooks_doctor",
+      "entry": "hooks_doctor",
       "id": "op hooks_doctor",
       "kind": "match",
       "resolution": "real",
@@ -5100,18 +5100,18 @@
       "voice_intent": "qubit ide status"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "op import_agent_import",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit import refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_import_inspect",
       "id": "op import_inspect",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit import inspect"
     },
@@ -5156,10 +5156,10 @@
       "voice_intent": "qubit kanban archive"
     },
     {
-      "entry": null,
+      "entry": "cli_kanban_claim",
       "id": "op kanban_assign",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit kanban claim"
     },
@@ -5188,18 +5188,18 @@
       "voice_intent": "qubit kanban boards create"
     },
     {
-      "entry": null,
+      "entry": "cli_kanban_claim",
       "id": "op kanban_claim",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit kanban claim"
     },
     {
-      "entry": null,
+      "entry": "cli_kanban_comment",
       "id": "op kanban_comment",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit kanban comment"
     },
@@ -5292,7 +5292,7 @@
       "voice_intent": "qubit kanban boards"
     },
     {
-      "entry": "cli_kanban_log",
+      "entry": "kanban_log",
       "id": "op kanban_log",
       "kind": "match",
       "resolution": "real",
@@ -5412,7 +5412,7 @@
       "voice_intent": "qubit kanban snapshots"
     },
     {
-      "entry": "cli_kanban_stats",
+      "entry": "kanban_stats",
       "id": "op kanban_stats",
       "kind": "match",
       "resolution": "real",
@@ -5564,10 +5564,10 @@
       "voice_intent": "qubit autonomy list"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_list",
       "id": "op list_speech_profiles",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile list"
     },
@@ -5700,10 +5700,10 @@
       "voice_intent": "qubit logs"
     },
     {
-      "entry": null,
+      "entry": "cli_loop_start",
       "id": "op loop_start",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit loop start"
     },
@@ -5716,18 +5716,18 @@
       "voice_intent": "qubit lsp"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_lsp_install_refusal",
       "id": "op lsp_install",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit lsp install refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_lsp_install_refusal",
       "id": "op lsp_install_refusal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit lsp install refusal"
     },
@@ -5844,10 +5844,10 @@
       "voice_intent": "qubit model"
     },
     {
-      "entry": null,
+      "entry": "cli_monitor",
       "id": "op monitor",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit monitor"
     },
@@ -6052,10 +6052,10 @@
       "voice_intent": "qubit opencode list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_opencode_prepare",
       "id": "op opencode_prepare",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard opencode prepare"
     },
@@ -6108,10 +6108,10 @@
       "voice_intent": "qubit opencode check"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_opencode_run_confirmed",
       "id": "op opencode_run_confirmed",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard opencode run confirmed"
     },
@@ -6132,10 +6132,10 @@
       "voice_intent": "qubit opencode status"
     },
     {
-      "entry": null,
+      "entry": "cli_package_certify",
       "id": "op package_certify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit package certify"
     },
@@ -6196,10 +6196,10 @@
       "voice_intent": "qubit pairing setup code"
     },
     {
-      "entry": null,
+      "entry": "cli_pause",
       "id": "op pause",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit pause"
     },
@@ -6268,18 +6268,18 @@
       "voice_intent": "qubit permissions"
     },
     {
-      "entry": null,
+      "entry": "cli_pets_refusal",
       "id": "op pets_downloads",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit pets downloads refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_pets_refusal",
       "id": "op pets_downloads_refusal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -6332,18 +6332,18 @@
       "voice_intent": "qubit plugins register"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "op plugins_remote",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit plugins remote refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "op plugins_remote_refusal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit plugins remote refusal"
     },
@@ -6364,7 +6364,7 @@
       "voice_intent": "qubit plugins list"
     },
     {
-      "entry": "cli_plugins_status",
+      "entry": "plugins_status",
       "id": "op plugins_status",
       "kind": "match",
       "resolution": "real",
@@ -6500,10 +6500,10 @@
       "voice_intent": "qubit profile select"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_show",
       "id": "op profile_show",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit autonomy show"
     },
@@ -6516,15 +6516,15 @@
       "voice_intent": "qubit profile upgrade"
     },
     {
-      "entry": null,
+      "entry": "cli_project_add_folder",
       "id": "op project_add_folder",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit project add folder"
     },
     {
-      "entry": "project_bind_board",
+      "entry": "cli_project_bind_board",
       "id": "op project_bind_board",
       "kind": "match",
       "resolution": "real",
@@ -6532,66 +6532,66 @@
       "voice_intent": "qubit project bind board"
     },
     {
-      "entry": null,
+      "entry": "cli_project_remove_folder",
       "id": "op project_remove_folder",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit project remove folder"
     },
     {
-      "entry": null,
+      "entry": "cli_project_rename",
       "id": "op project_rename",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit project rename"
     },
     {
-      "entry": null,
+      "entry": "cli_project_restore",
       "id": "op project_restore",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit project restore"
     },
     {
-      "entry": null,
+      "entry": "cli_project_rollback",
       "id": "op project_rollback",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit project rollback"
     },
     {
-      "entry": null,
+      "entry": "cli_project_set_primary",
       "id": "op project_set_primary",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit project set primary"
     },
     {
-      "entry": null,
+      "entry": "cli_projects_active",
       "id": "op projects_active",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit projects active"
     },
     {
-      "entry": null,
+      "entry": "cli_projects_archive",
       "id": "op projects_archive",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit projects archive"
     },
     {
-      "entry": null,
+      "entry": "cli_projects_create",
       "id": "op projects_create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit projects create"
     },
@@ -6684,10 +6684,10 @@
       "voice_intent": "qubit questions status"
     },
     {
-      "entry": null,
+      "entry": "cli_reasoning",
       "id": "op reasoning",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit reasoning"
     },
@@ -6764,10 +6764,10 @@
       "voice_intent": "qubit profile remove"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_remove",
       "id": "op remove_speech_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile remove"
     },
@@ -6996,18 +6996,18 @@
       "voice_intent": "qubit security"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_select",
       "id": "op select_session_model",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile select"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_select",
       "id": "op select_session_speech",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile select"
     },
@@ -7084,26 +7084,26 @@
       "voice_intent": "qubit shares list"
     },
     {
-      "entry": null,
+      "entry": "cli_shares_publish_cmd",
       "id": "op shares_publish",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit shares publish"
     },
     {
-      "entry": null,
+      "entry": "cli_shares_purge_cmd",
       "id": "op shares_purge",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit shares purge"
     },
     {
-      "entry": null,
+      "entry": "cli_shares_revoke_cmd",
       "id": "op shares_revoke",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit shares revoke"
     },
@@ -7116,18 +7116,18 @@
       "voice_intent": "qubit shares status"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_show",
       "id": "op show_model_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit autonomy show"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_show",
       "id": "op show_speech_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile show"
     },
@@ -7180,18 +7180,18 @@
       "voice_intent": "qubit skills list"
     },
     {
-      "entry": null,
+      "entry": "cli_skills_workshop",
       "id": "op skills_workshop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit skills workshop"
     },
     {
-      "entry": null,
+      "entry": "cli_skills_workshop_backup",
       "id": "op skills_workshop_backup",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit skills workshop backup"
     },
@@ -7212,82 +7212,82 @@
       "voice_intent": "qubit skills workshop curator"
     },
     {
-      "entry": null,
+      "entry": "cli_skills_workshop_restore",
       "id": "op skills_workshop_restore",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit skills workshop restore"
     },
     {
-      "entry": null,
+      "entry": "cli_skills_workshop_rollback",
       "id": "op skills_workshop_rollback",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit skills workshop rollback"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_clear",
       "id": "op speech_profile_clear",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile clear"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_clone",
       "id": "op speech_profile_clone",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile clone"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_create",
       "id": "op speech_profile_create",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile create"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_list",
       "id": "op speech_profile_list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile list"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_remove",
       "id": "op speech_profile_remove",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile remove"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_select",
       "id": "op speech_profile_select",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile select"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_show",
       "id": "op speech_profile_show",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile show"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_test",
       "id": "op speech_profile_test",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile test"
     },
@@ -7308,10 +7308,10 @@
       "voice_intent": "qubit substitute egress"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_sync_accept",
       "id": "op sync_accept",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard sync accept"
     },
@@ -7388,26 +7388,26 @@
       "voice_intent": "qubit peer run"
     },
     {
-      "entry": null,
+      "entry": "cli_task_run_current",
       "id": "op task_run_current",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit task run current"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_test",
       "id": "op test_model_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile test"
     },
     {
-      "entry": null,
+      "entry": "cli_speech_profile_test",
       "id": "op test_speech_profile",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit speech profile test"
     },
@@ -7460,10 +7460,10 @@
       "voice_intent": "qubit tools"
     },
     {
-      "entry": null,
+      "entry": "cli_transfers_fetch_cmd",
       "id": "op transfers_fetch",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit transfers fetch"
     },
@@ -7476,18 +7476,18 @@
       "voice_intent": "qubit transfers list"
     },
     {
-      "entry": null,
+      "entry": "cli_transfers_plan_cmd",
       "id": "op transfers_plan",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit transfers plan"
     },
     {
-      "entry": null,
+      "entry": "cli_transfers_resume_cmd",
       "id": "op transfers_resume",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit transfers resume"
     },
@@ -7540,10 +7540,10 @@
       "voice_intent": "qubit verified bundled"
     },
     {
-      "entry": null,
+      "entry": "cli_verified_list_cmd",
       "id": "op verified_list",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit verified list"
     },
@@ -7596,18 +7596,18 @@
       "voice_intent": "qubit verify release"
     },
     {
-      "entry": null,
+      "entry": "cli_verify_voice",
       "id": "op verify_voice",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit verify voice"
     },
     {
-      "entry": null,
+      "entry": "cli_vision_describe_cmd",
       "id": "op vision_describe",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit vision describe"
     },
@@ -7676,10 +7676,10 @@
       "voice_intent": "qubit webhook test"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_webhook_verify",
       "id": "op webhook_verify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit guard webhook verify"
     },
@@ -8116,18 +8116,18 @@
       "voice_intent": "qubit config profiles"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_credentials_pool",
       "id": "GET /api/credentials/pool",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit credentials pool"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_blueprints",
       "id": "GET /api/cron/blueprints",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit cron blueprints"
     },
@@ -8252,10 +8252,10 @@
       "voice_intent": "qubit browser download"
     },
     {
-      "entry": null,
+      "entry": "cli_files_read_cmd",
       "id": "GET /api/files/read",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit files read"
     },
@@ -8284,10 +8284,10 @@
       "voice_intent": "qubit browser download"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "GET /api/fs/git-root",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
@@ -8308,34 +8308,34 @@
       "voice_intent": "qubit backup info"
     },
     {
-      "entry": null,
+      "entry": "cli_vision_describe_cmd",
       "id": "GET /api/fs/read-text",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "clarify",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit vision describe"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "GET /api/gateway/migrate/plan",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit import refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "GET /api/git/base-branches",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "GET /api/git/branches",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
@@ -8380,10 +8380,10 @@
       "voice_intent": "qubit autonomy list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "GET /api/git/review/rev-parse",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
@@ -8684,10 +8684,10 @@
       "voice_intent": "qubit pairing list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_portal",
       "id": "GET /api/portal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit portal"
     },
@@ -8916,10 +8916,10 @@
       "voice_intent": "qubit skills list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_ssh_ownership",
       "id": "GET /api/ssh/ownership",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit ssh ownership"
     },
@@ -9036,34 +9036,34 @@
       "voice_intent": "qubit audio"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_shares_resolve",
       "id": "POST /api/audio/voice-live/session",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit guard shares resolve"
     },
     {
-      "entry": null,
+      "entry": "cli_chat_sessions",
       "id": "POST /api/chat/image-upload",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit chat sessions"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_credentials_pool",
       "id": "POST /api/credentials/pool",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit credentials pool"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_cron_blueprints_instantiate",
       "id": "POST /api/cron/blueprints/instantiate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit cron blueprints instantiate"
     },
@@ -9084,10 +9084,10 @@
       "voice_intent": "qubit schedules run due"
     },
     {
-      "entry": null,
+      "entry": "cli_pause",
       "id": "POST /api/cron/jobs/{job_id}/pause",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit pause"
     },
@@ -9156,10 +9156,10 @@
       "voice_intent": "qubit session rename"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_env_reveal",
       "id": "POST /api/env/reveal",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit env reveal"
     },
@@ -9204,10 +9204,10 @@
       "voice_intent": "qubit gateway"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "POST /api/gateway/migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit import refusal"
     },
@@ -9228,10 +9228,10 @@
       "voice_intent": "qubit gateway supervision refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_pause",
       "id": "POST /api/gateway/stop",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit pause"
     },
@@ -9268,34 +9268,34 @@
       "voice_intent": "qubit autonomy list"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "POST /api/git/review/push",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "POST /api/git/review/revert",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "POST /api/git/review/stage",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "POST /api/git/review/unstage",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit plugins remote refusal"
     },
@@ -9452,18 +9452,18 @@
       "voice_intent": "qubit msg accounts"
     },
     {
-      "entry": null,
+      "entry": "cli_projects_create",
       "id": "POST /api/messaging/telegram/onboarding/start",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit projects create"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_guard_brain_onboard_apply",
       "id": "POST /api/messaging/telegram/onboarding/{pairing_id}/apply",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit guard brain onboard apply"
     },
@@ -9508,10 +9508,10 @@
       "voice_intent": "qubit checkpoints write"
     },
     {
-      "entry": null,
+      "entry": "cli_import_refusal",
       "id": "POST /api/ops/config-migrate",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit import refusal"
     },
@@ -9708,10 +9708,10 @@
       "voice_intent": "qubit hooks validate"
     },
     {
-      "entry": null,
+      "entry": "cli_autonomy_revoke",
       "id": "POST /api/sessions/bulk-delete",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "routes",
       "voice_intent": "qubit autonomy revoke"
     },
@@ -9772,7 +9772,7 @@
       "voice_intent": "qubit skills list"
     },
     {
-      "entry": "cli_computer_permissions",
+      "entry": "computer_permissions",
       "id": "POST /api/tools/computer-use/permissions/grant",
       "kind": "match",
       "resolution": "real",
@@ -10028,34 +10028,34 @@
       "voice_intent": "qubit console help"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_events",
       "id": "WEBSOCKET /api/events",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit events"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_pty",
       "id": "WEBSOCKET /api/pty",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit pty"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_pub",
       "id": "WEBSOCKET /api/pub",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit pub"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_ws",
       "id": "WEBSOCKET /api/ws",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit ws"
     },
@@ -10668,10 +10668,10 @@
       "voice_intent": "qubit skills install gaming"
     },
     {
-      "entry": null,
+      "entry": "cli_guard_plugins_remote_refusal",
       "id": "skill github",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "guard",
       "surface": "tools",
       "voice_intent": "qubit plugins remote refusal"
     },
@@ -10820,10 +10820,10 @@
       "voice_intent": "qubit skills install yuanbao"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset a2a",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable a2a"
     },
@@ -10836,58 +10836,58 @@
       "voice_intent": "qubit browser status"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset clarify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable clarify"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset code_execution",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable code_execution"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset computer_use",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable computer_use"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset connections",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable connections"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset context_engine",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable context_engine"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset cronjob",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable cronjob"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset delegation",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable delegation"
     },
@@ -10900,18 +10900,18 @@
       "voice_intent": "qubit plugins install"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset homeassistant",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable homeassistant"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset image_gen",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable image_gen"
     },
@@ -10932,10 +10932,10 @@
       "voice_intent": "qubit memory search"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset session_search",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable session_search"
     },
@@ -10948,18 +10948,18 @@
       "voice_intent": "qubit skills list"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset spotify",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable spotify"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset stt",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable stt"
     },
@@ -10972,10 +10972,10 @@
       "voice_intent": "qubit console help"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset todo",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable todo"
     },
@@ -10996,10 +10996,10 @@
       "voice_intent": "qubit media gen generate"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset video_gen",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable video_gen"
     },
@@ -11020,18 +11020,18 @@
       "voice_intent": "qubit web fetch"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset x_search",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable x_search"
     },
     {
-      "entry": null,
+      "entry": "cli_tools_enable",
       "id": "toolset yuanbao",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit tools enable yuanbao"
     }
@@ -11041,26 +11041,26 @@
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
     "distinct_intents": 866,
-    "guard": 5,
-    "real": 1009,
-    "real_pct": 73.22,
+    "guard": 193,
+    "real": 1185,
+    "real_pct": 85.99,
     "rows": 1378,
-    "unresolved": 364
+    "unresolved": 0
   },
   "surfaces": {
     "cli": {
-      "guard": 5,
-      "real": 192,
-      "real_pct": 50.0,
+      "guard": 135,
+      "real": 249,
+      "real_pct": 64.84,
       "total": 384,
-      "unresolved": 187
+      "unresolved": 0
     },
     "controls": {
-      "guard": 0,
-      "real": 472,
-      "real_pct": 78.67,
+      "guard": 36,
+      "real": 564,
+      "real_pct": 94.0,
       "total": 600,
-      "unresolved": 128
+      "unresolved": 0
     },
     "other": {
       "guard": 0,
@@ -11070,18 +11070,18 @@
       "unresolved": 0
     },
     "routes": {
-      "guard": 0,
-      "real": 241,
-      "real_pct": 88.6,
+      "guard": 21,
+      "real": 251,
+      "real_pct": 92.28,
       "total": 272,
-      "unresolved": 31
+      "unresolved": 0
     },
     "tools": {
-      "guard": 0,
-      "real": 104,
-      "real_pct": 85.25,
+      "guard": 1,
+      "real": 121,
+      "real_pct": 99.18,
       "total": 122,
-      "unresolved": 18
+      "unresolved": 0
     }
   }
 }

@@ -66,7 +66,7 @@ secrets:
 
 
 def test_update_startup_does_not_import_bitwarden_or_cryptography(tmp_path):
-    loaded = _probe_startup_modules(tmp_path, ["hermes", "update", "--check"])
+    loaded = _probe_startup_modules(tmp_path, ["qubit", "update", "--check"])
 
     assert "agent.secret_sources.bitwarden" not in loaded
     assert not any(
@@ -78,7 +78,7 @@ def test_complete_update_dispatch_does_not_import_cryptography(tmp_path):
     """Building every CLI parser used to re-import Bitwarden via secrets_cli."""
     loaded = _probe_startup_modules(
         tmp_path,
-        ["hermes", "update", "--check"],
+        ["qubit", "update", "--check"],
         run_main=True,
     )
 
@@ -88,7 +88,7 @@ def test_complete_update_dispatch_does_not_import_cryptography(tmp_path):
 
 
 def test_normal_startup_still_loads_enabled_external_secret_source(tmp_path):
-    loaded = _probe_startup_modules(tmp_path, ["hermes", "chat"])
+    loaded = _probe_startup_modules(tmp_path, ["qubit", "chat"])
 
     assert "agent.secret_sources.bitwarden" in loaded
 

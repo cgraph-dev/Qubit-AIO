@@ -1,4 +1,4 @@
-"""``hermes update`` skips the editable reinstall when the pull can't affect it.
+"""``qubit update`` skips the editable reinstall when the pull can't affect it.
 
 ``uv pip install -e .`` never audits an editable target — it reinstalls on
 every invocation and rewrites the console-script shims each time. On Windows
@@ -29,7 +29,7 @@ def repo(tmp_path):
         GIT + ["config", "user.email", "t@example.com"], cwd=tmp_path, check=True
     )
     subprocess.run(GIT + ["config", "user.name", "t"], cwd=tmp_path, check=True)
-    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'hermes'\n")
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'qubit'\n")
     (tmp_path / "agent").mkdir()
     (tmp_path / "agent" / "__init__.py").write_text("")
     (tmp_path / "cli.py").write_text("x = 1\n")
@@ -85,7 +85,7 @@ def test_source_churn_alongside_a_pyproject_edit_still_reinstalls(repo):
     """The gate must not be fooled by burying the pyproject diff in noise."""
     before = _head(repo)
     (repo / "cli.py").write_text("x = 3\n")
-    (repo / "pyproject.toml").write_text("[project]\nname = 'hermes'\ndeps = []\n")
+    (repo / "pyproject.toml").write_text("[project]\nname = 'qubit'\ndeps = []\n")
     _commit(repo, "mixed")
 
     assert _editable_install_is_current(GIT, repo, before) is False

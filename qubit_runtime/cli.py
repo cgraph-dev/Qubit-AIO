@@ -430,7 +430,7 @@ def _merge_file_config(defaults: Dict[str, Any], file_config: Dict[str, Any]) ->
             defaults["model"]["default"] = file_config["model"]
         elif isinstance(file_config["model"], dict):
             defaults["model"].update(file_config["model"])
-            # Promote model.model -> model.default (HermesCLI checks "default" first).
+            # Promote model.model -> model.default (QubitCLI checks "default" first).
             if "model" in file_config["model"] and "default" not in file_config["model"]:
                 defaults["model"]["default"] = file_config["model"]["model"]
 
@@ -3997,7 +3997,7 @@ def _interrupt_agent_for_signal(agent, signum) -> None:
         pass  # never block signal handling
 
 
-def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> None:
+def _run_kanban_goal_loop_q(cli: "QubitCLI", first_response: str) -> None:
     """Drive a kanban goal_mode worker through ``goals.run_kanban_goal_loop`` after its first turn.
 
     The caller swallows all errors: a broken loop must never wedge a worker.
@@ -4219,7 +4219,7 @@ def _install_single_query_signal_handlers(cli):
 
 
 def _build_cli_from_args(model, toolsets, provider, reasoning, api_key, base_url, max_turns, run_budget, verbose, compact, resume, checkpoints, pass_session_id, ignore_rules, skills):
-    """Resolve the toolset list (explicit / coding posture / platform default), construct HermesCLI, and start the background skills preload."""
+    """Resolve the toolset list (explicit / coding posture / platform default), construct QubitCLI, and start the background skills preload."""
     toolsets_list = None
     if isinstance(toolsets, str) and toolsets:
         toolsets_list = [t.strip() for t in toolsets.split(",")]
@@ -4583,8 +4583,8 @@ def CanonicalUsage(*args, **kwargs):
 
 _PLUGIN_COMPAT_LAZY = {
     'DEFAULT_BROWSER_CDP_URL': ('qubit_cli.browser_connect', 'DEFAULT_BROWSER_CDP_URL'),
-    'HERMES_AGENT_LOGO': ('qubit_cli.banner', 'HERMES_AGENT_LOGO'),
-    'HERMES_CADUCEUS': ('qubit_cli.banner', 'HERMES_CADUCEUS'),
+    'HERMES_AGENT_LOGO': ('qubit_cli.banner', 'QUBIT_AGENT_LOGO'),
+    'HERMES_CADUCEUS': ('qubit_cli.banner', 'QUBIT_CADUCEUS'),
     'SlashCommandAutoSuggest': ('qubit_cli.commands_completion', 'SlashCommandAutoSuggest'),
     'SlashCommandCompleter': ('qubit_cli.commands_completion', 'SlashCommandCompleter'),
     'build_welcome_banner': ('qubit_cli.banner', 'build_welcome_banner'),

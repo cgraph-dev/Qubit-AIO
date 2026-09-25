@@ -28,9 +28,9 @@ def _is_valid(name):
 
 
 def test_38798_corruption_warns_and_suggests_correct_name():
-    # The exact reported shape: cli holds 'hermes' instead of 'hermes-cli'.
-    warnings = validate_platform_toolsets({"cli": ["hermes"]}, _is_valid)
-    unknown = [w for w in warnings if "unknown toolset 'hermes'" in w]
+    # The exact reported shape: cli holds 'qubit' instead of 'hermes-cli'.
+    warnings = validate_platform_toolsets({"cli": ["qubit"]}, _is_valid)
+    unknown = [w for w in warnings if "unknown toolset 'qubit'" in w]
     assert len(unknown) == 1
     # Actionable: points at the valid name the entry should have been.
     assert "did you mean 'hermes-cli'?" in unknown[0]

@@ -41,7 +41,7 @@ OPENCLAW_TAG = "v2026.4.19-beta.2-28254-gda03996ab7"
 OPENCLAW_REPO = "https://github.com/openclaw/openclaw"
 OPENCLAW_LICENSE = "MIT (Copyright (c) 2026 OpenClaw Foundation)"
 
-_SKIP_DIR_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache"}
+_SKIP_DIR_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache", "MagicMock"}
 _SKIP_SUFFIX = (".pyc", ".pyo")
 _UPSTREAM_SKIP_DIRS = _SKIP_DIR_PARTS
 # Disposable dependency/build/cache trees. A path under one of these is skipped
@@ -116,6 +116,46 @@ _QUBIT_PATCH_SPEC: dict[str, dict] = {
 _OPENCLAW_OVERLAY: set[str] = set()
 # Upstream files deliberately not vendored into the fork (none at present).
 _INTENTIONAL_OMISSIONS: dict[str, str] = {}
+# Upstream test trees are reference-only, never shipped product: the fork ships
+# its own test suite (repo ``tests/`` + vendored ``qubit_runtime/tests``).
+# Recording thousands of upstream pytest files as ``missing_from_local`` hid
+# the real product-code sync gap, so they are classified
+# INTENTIONALLY_OMITTED by this deterministic prefix rule (still listed in the
+# artifact as ``omitted``, never silently dropped).
+_INTENTIONALLY_OMITTED_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("tests/", "upstream test suite is reference-only; the fork ships its own tests"),
+    ("tests-js/", "upstream JS test harness is reference-only"),
+)
+
+
+def _intentional_omission_reason(rel: str) -> str | None:
+    reason = _INTENTIONAL_OMISSIONS.get(rel)
+    if reason is not None:
+        return reason
+    for prefix, why in _INTENTIONALLY_OMITTED_PREFIXES:
+        if rel == prefix.rstrip("/") or rel.startswith(prefix):
+            return why
+    # Upstream unit tests colocated with source (ui-tui __tests__, *.test.*)
+    # are reference-only like the tests/ tree.
+    if "/__tests__/" in rel or rel.endswith((".test.ts", ".test.tsx",
+                                             ".test.js", ".test.jsx")):
+        return "upstream unit test is reference-only; the fork ships its own tests"
+    # Legacy-named skill content whose canonical de-branded Qubit counterpart
+    # is already vendored (hermes-agent -> qubit-agent,
+    # hermes-agent-skill-authoring -> qubit-agent-skill-authoring,
+    # inspecting-hermes-desktop-dom -> inspecting-qubit-desktop-dom,
+    # openclaw-migration -> qubit-migration,
+    # hermes-s6-container-supervision -> qubit-s6-container-supervision).
+    # The rename is the port; shipping the legacy name too would clobber it.
+    for legacy in ("skills/autonomous-ai-agents/hermes-agent/",
+                   "skills/software-development/hermes-agent-skill-authoring/",
+                   "skills/software-development/inspecting-hermes-desktop-dom/",
+                   "optional-skills/migration/openclaw-migration/",
+                   "optional-skills/devops/hermes-s6-container-supervision/"):
+        if rel == legacy.rstrip("/") or rel.startswith(legacy):
+            return ("legacy-named skill content; covered by the canonical "
+                    "de-branded Qubit skill of the same name")
+    return None
 
 # ---------------------------------------------------------------------------
 # Deep source rebrand path renames (owner amendment 2026-09-19)
@@ -1412,7 +1452,7 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
     covered_upstream = {upstream_local[r] for r in local_set
                         if r in upstream_local}
     for rel in sorted(set(tree) - covered_upstream):
-        reason = _INTENTIONAL_OMISSIONS.get(rel)
+        reason = _intentional_omission_reason(rel)
         if reason is None:
             classification = MISSING
             missing.append(rel)

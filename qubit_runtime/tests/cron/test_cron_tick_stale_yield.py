@@ -163,7 +163,7 @@ class TestYieldedTickIsAFailedTick:
             t.join(timeout=5)
 
         assert not t.is_alive(), "ticker must keep yielding, not die"
-        assert errors, "yield reason must be persisted for `hermes cron status`"
+        assert errors, "yield reason must be persisted for `qubit cron status`"
         assert "CronTickYielded" in errors[0] or "yielded" in errors[0]
         assert beats[-1] is False, "a yielded tick is not a successful tick"
         clear.assert_not_called()

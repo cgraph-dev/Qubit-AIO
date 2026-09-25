@@ -52,7 +52,7 @@ class TestVerboseCommand:
         config_path = qubit_home / "config.yaml"
         config_path.write_text("display:\n  tool_progress: all\n", encoding="utf-8")
 
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
         runner = _make_runner()
         result = await runner._handle_verbose_command(_make_event())
@@ -71,7 +71,7 @@ class TestVerboseCommand:
             encoding="utf-8",
         )
 
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
         runner = _make_runner()
         result = await runner._handle_verbose_command(_make_event())
@@ -95,7 +95,7 @@ class TestVerboseCommand:
             encoding="utf-8",
         )
 
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
         runner = _make_runner()
         result = await runner._handle_verbose_command(_make_event())

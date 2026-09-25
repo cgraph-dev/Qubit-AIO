@@ -1,4 +1,4 @@
-"""`hermes sessions set-journal-mode delete|wal` — the offline self-service path for #100896.
+"""`qubit sessions set-journal-mode delete|wal` — the offline self-service path for #100896.
 
 ``database.journal_mode: delete`` can never self-apply on a store that is already WAL:
 ``apply_wal_with_fallback`` deliberately never live-downgrades (#68545 — other gateway/cron/worker connections

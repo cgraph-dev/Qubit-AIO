@@ -327,7 +327,7 @@ class TestHistoryDisplay:
             {
                 "id": "20260401_201329_d85961",
                 "title": "Checking Running Hermes Agent",
-                "preview": "check running gateways for hermes agent",
+                "preview": "check running gateways for qubit agent",
                 "last_active": 0,
             },
         ]
@@ -357,7 +357,7 @@ class TestHistoryDisplay:
             {
                 "id": "20260401_201329_d85961",
                 "title": "Checking Running Hermes Agent",
-                "preview": "check running gateways for hermes agent",
+                "preview": "check running gateways for qubit agent",
                 "last_active": 0,
             },
         ]
@@ -506,7 +506,7 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", qubit_home)
+        monkeypatch.setattr(cli, "_qubit_home", qubit_home)
         cfg = cli.load_cli_config()
 
         assert cfg["model"]["provider"] == "openrouter"
@@ -529,7 +529,7 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", qubit_home)
+        monkeypatch.setattr(cli, "_qubit_home", qubit_home)
         cfg = cli.load_cli_config()
 
         assert cfg["model"]["provider"] == "opencode-go"
@@ -551,7 +551,7 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", qubit_home)
+        monkeypatch.setattr(cli, "_qubit_home", qubit_home)
         cfg = cli.load_cli_config()
 
         assert cfg["model"]["base_url"] == "https://example.com/v1"
@@ -574,7 +574,7 @@ class TestRootLevelProviderOverride:
         }))
 
         import cli
-        monkeypatch.setattr(cli, "_hermes_home", qubit_home)
+        monkeypatch.setattr(cli, "_qubit_home", qubit_home)
         cfg = cli.load_cli_config()
 
         assert cfg["terminal"]["vercel_runtime"] == "python3.13"

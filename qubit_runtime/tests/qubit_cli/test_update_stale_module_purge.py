@@ -1,7 +1,7 @@
-"""Tests for _purge_stale_hermes_modules — the class fix for stale
-sys.modules breaking the gateway auto-restart after `hermes update`.
+"""Tests for _purge_stale_qubit_modules — the class fix for stale
+sys.modules breaking the gateway auto-restart after `qubit update`.
 
-Field failure (2026-08-20, Teknium's Linux box): `hermes update` pulled a
+Field failure (2026-08-20, Teknium's Linux box): `qubit update` pulled a
 checkout where qubit_cli/gateway.py newly imports `line_input` from
 qubit_cli.cli_output, but the updater process had cli_output cached from
 before that symbol existed. The function-level `from qubit_cli.gateway

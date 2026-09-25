@@ -51,7 +51,7 @@ def _tick_failing(job, tmp_path, deliveries, error="boom unrelated"):
         return None
 
     with cron_jobs.use_cron_store(tmp_path), \
-         patch("cron.scheduler._hermes_home", tmp_path), \
+         patch("cron.scheduler._qubit_home", tmp_path), \
          patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
          patch("qubit_cli.env_loader.load_qubit_dotenv"), \
          patch("qubit_cli.env_loader.reset_secret_source_cache"), \

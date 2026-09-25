@@ -50,6 +50,20 @@ def _note_tick_failure(exc: BaseException, consecutive_failures: int) -> int:
     return 0
 
 
+def _guarded_store_write(action, description, *args, **kwargs):
+    """Run a ticker status-marker write so a failing store never ends the ticker thread.
+
+    The gateway runs the provider on an unsupervised daemon thread: one escaping exception
+    there stops cron silently while the gateway keeps serving (#111010). Heartbeat/error
+    markers are diagnostics for ``qubit cron status`` — losing one write to a broken store
+    must degrade to a logged warning, not thread death.
+    """
+    try:
+        action(*args, **kwargs)
+    except BaseException as e:  # noqa: BLE001 - mirror the tick body's BaseException policy
+        logger.warning("Cron %s write failed: %s", description, e, exc_info=True)
+
+
 def _profile_entry(entry) -> tuple:
     """Normalize a ``profile_homes`` entry (``(name, home)`` tuple or bare home) to ``(name,
     home)``."""
@@ -189,6 +203,11 @@ class CronScheduler(ABC):
 
 def provider_supports_force_fire(provider: Any) -> bool:
     """Return whether a provider can safely receive ``fire_due(force=...)`` (signature-detected)."""
+    return provider_fire_due_accepts(provider, "force")
+
+
+def provider_fire_due_accepts(provider: Any, name: str) -> bool:
+    """Whether ``provider.fire_due`` takes keyword ``name`` (third-party providers may predate it)."""
     try:
         parameters = inspect.signature(provider.fire_due).parameters.values()
     except (TypeError, ValueError):
@@ -196,7 +215,7 @@ def provider_supports_force_fire(provider: Any) -> bool:
     return any(
         p.kind is inspect.Parameter.VAR_KEYWORD
         or (
-            p.name == "force"
+            p.name == name
             and p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
         )
         for p in parameters

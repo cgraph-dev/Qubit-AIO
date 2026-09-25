@@ -1,4 +1,4 @@
-"""Tests for ``hermes gui`` desktop launcher wiring."""
+"""Tests for ``qubit gui`` desktop launcher wiring."""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def _make_packaged_executable(root: Path, monkeypatch) -> Path:
     elif sys.platform == "win32":
         exe = desktop_dir / "release" / "win-unpacked" / "Qubit.exe"
     else:
-        exe = desktop_dir / "release" / "linux-unpacked" / "hermes"
+        exe = desktop_dir / "release" / "linux-unpacked" / "qubit"
     exe.parent.mkdir(parents=True, exist_ok=True)
     exe.write_text("", encoding="utf-8")
     if sys.platform not in ("darwin", "win32"):
@@ -117,7 +117,7 @@ def _packaged_exe_rel() -> Path:
         return Path("mac-arm64") / "Qubit.app" / "Contents" / "MacOS" / "Hermes"
     if sys.platform == "win32":
         return Path("win-unpacked") / "Qubit.exe"
-    return Path("linux-unpacked") / "hermes"
+    return Path("linux-unpacked") / "qubit"
 
 
 def _pack_into_staging(root: Path, content: str = "", returncode: int = 0):
@@ -204,7 +204,7 @@ def test_gui_install_env_prepends_managed_node_on_bare_path(tmp_path, monkeypatc
     monkeypatch.setenv("PATH", os.pathsep.join(["/usr/bin", "/bin"]))
 
     install_ok = subprocess.CompletedProcess(["npm", "ci"], 0)
-    launch_ok = subprocess.CompletedProcess(["hermes"], 0)
+    launch_ok = subprocess.CompletedProcess(["qubit"], 0)
 
     # A plain return_value rather than a fixed side_effect list: this test only
     # cares about the env handed to the npm install, and pinning an exact
@@ -783,7 +783,7 @@ def test_setup_tcc_identity_non_macos_skips(tmp_path, monkeypatch, capsys):
 
 
 def test_cmd_gui_setup_tcc_identity_exits_before_build(tmp_path, monkeypatch):
-    """`hermes desktop --setup-tcc-identity` calls the setup and exits 0/1
+    """`qubit desktop --setup-tcc-identity` calls the setup and exits 0/1
     without building or launching the app."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
@@ -974,7 +974,7 @@ def test_relaunchable_fixup_legacy_adhoc_success_still_verifies_and_never_delete
 
 @pytest.mark.linux_only
 def test_gui_registers_linux_desktop_entry_before_launch(tmp_path, monkeypatch):
-    """`hermes desktop` gives the app a launcher presence on Linux."""
+    """`qubit desktop` gives the app a launcher presence on Linux."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     packaged_exe = _make_packaged_executable(root, monkeypatch)

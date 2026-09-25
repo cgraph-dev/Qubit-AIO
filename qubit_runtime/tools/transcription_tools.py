@@ -309,7 +309,7 @@ def _start_idle_unload_watcher(timeout_seconds: int) -> None:
                     _unload_local_model()
                     break
         _idle_unload_stop.clear()
-        _idle_unload_thread = threading.Thread(target=_watch, name="hermes-stt-idle-unload", daemon=True)
+        _idle_unload_thread = threading.Thread(target=_watch, name="qubit-stt-idle-unload", daemon=True)
         _idle_unload_thread.start()
 
 

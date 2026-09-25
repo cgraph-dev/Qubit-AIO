@@ -660,7 +660,7 @@ class TestSlackModelPickerGatewayIntegration:
         )
 
         import gateway.run as gateway_run
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
         monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
         monkeypatch.setattr(
             "qubit_cli.model_switch_providers.list_picker_providers",
@@ -711,7 +711,7 @@ class TestSlackModelPickerGatewayIntegration:
         )
 
         import gateway.run as gateway_run
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
         monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
         monkeypatch.setattr(
             "qubit_cli.model_switch_providers.list_authenticated_providers",

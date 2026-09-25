@@ -4,7 +4,7 @@
  * The reported bug: configuring a remote gateway persisted the dashboard
  * session token as PLAINTEXT into `connection.json` under the app's userData
  * dir (macOS `~/Library/Application Support/Hermes/connection.json`, Windows
- * `AppData\Roaming\Hermes\connection.json`). Anything that can read the file
+ * `AppData\Roaming\Qubit\connection.json`). Anything that can read the file
  * — a backup, a sync client, another local process, a support bundle — got a
  * live gateway credential.
  *
@@ -72,7 +72,7 @@
  * `d3d177283` exists only on `upstream/bb/gui-mainmerge-tmp`,
  * `brooklyn/gui-installer-prereqs`, and the `desktop-pr20059-installers`
  * pre-release tag. Mainline NEVER shipped a code path that wrote a plaintext
- * gateway token: `51c68d4ab` ("Add Hermes desktop app (#20059)"), the commit
+ * gateway token: `51c68d4ab` ("Add Qubit desktop app (#20059)"), the commit
  * that brought the desktop app to mainline, already contained the strict
  * throw ("Secure token storage is unavailable, …") in `hardening.cjs`.
  *
@@ -156,7 +156,7 @@ interface FakeGateway {
 }
 
 /**
- * A minimal stand-in for a remote Hermes gateway. It serves the public
+ * A minimal stand-in for a remote Qubit gateway. It serves the public
  * `/api/status` probe (which the desktop connection test hits first, with the
  * session token in a header) and refuses the WebSocket upgrade immediately so
  * the second leg of the connection test fails fast instead of burning the
@@ -410,7 +410,7 @@ interface SafeStorageCapability {
  * the `basic_text` backend, which encrypts with a hardcoded password — the
  * bytes on disk are not the plaintext, but they are not meaningfully
  * protected either. We record it rather than assert on it, because which
- * posture Hermes should take there (refuse to save vs. accept basic_text) is
+ * posture Qubit should take there (refuse to save vs. accept basic_text) is
  * a product decision, not something this test should silently ratify.
  */
 async function readSafeStorageCapability(app: ElectronApplication): Promise<SafeStorageCapability> {

@@ -145,7 +145,7 @@ class TestUpdateCommandGatewayFlag:
         qubit_home.mkdir()
 
         mock_popen = MagicMock()
-        with patch("gateway.run._hermes_home", qubit_home), \
+        with patch("gateway.run._qubit_home", qubit_home), \
              patch("gateway.run.__file__", fake_file), \
              patch("shutil.which", side_effect=lambda x: f"/usr/bin/{x}"), \
              patch("subprocess.Popen", mock_popen):
@@ -193,7 +193,7 @@ class TestWatchUpdateProgress:
             , encoding="utf-8")
             (qubit_home / ".update_exit_code").write_text("0")
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             task = asyncio.create_task(write_exit_code())
             await runner._watch_update_progress(
                 poll_interval=0.1,
@@ -234,7 +234,7 @@ class TestWatchUpdateProgress:
             await asyncio.sleep(0.2)
             (qubit_home / ".update_exit_code").write_text("0")
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             task = asyncio.create_task(simulate_prompt_cycle())
             await runner._watch_update_progress(
                 poll_interval=0.1,
@@ -276,7 +276,7 @@ class TestWatchUpdateProgress:
         adapter1 = AsyncMock()
         runner1.adapters = {Platform.TELEGRAM: adapter1}
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             watch1 = asyncio.create_task(
                 runner1._watch_update_progress(
                     poll_interval=0.05,
@@ -351,7 +351,7 @@ class TestUpdatePromptInterception:
         runner._handle_reset_command = AsyncMock(return_value="reset ok")
         (qubit_home / ".update_prompt.json").write_text(json.dumps({"prompt": "test"}))
 
-        with patch("gateway.run._hermes_home", qubit_home):
+        with patch("gateway.run._qubit_home", qubit_home):
             result = await runner._handle_message(event)
 
         assert result == "reset ok"

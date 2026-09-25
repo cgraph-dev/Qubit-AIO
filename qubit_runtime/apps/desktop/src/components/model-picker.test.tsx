@@ -37,7 +37,7 @@ const OPTIONS: ModelOptionsResponse = {
     },
     {
       slug: 'nous',
-      name: 'Nous',
+      name: 'Qubit',
       models: ['Hermes-4.5'],
       authenticated: true
     }

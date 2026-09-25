@@ -24,7 +24,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 def _invoke(monkeypatch: pytest.MonkeyPatch, *args: str) -> int:
     """Run the in-process CLI and normalize its process-style exit status."""
     cli_main = import_module("qubit_cli.main")
-    monkeypatch.setattr(sys, "argv", ["hermes", "computer-use", *args])
+    monkeypatch.setattr(sys, "argv", ["qubit", "computer-use", *args])
     monkeypatch.setattr(cli_main, "_prepare_agent_startup", lambda _args: None)
     try:
         cli_main.main()
@@ -118,7 +118,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_standard_driver(
     assert _invoke(monkeypatch, "status") == 1
     output = capsys.readouterr().out
     assert "Repair required" in output
-    assert "Run: hermes computer-use install" in output
+    assert "Run: qubit computer-use install" in output
 
 
 def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(

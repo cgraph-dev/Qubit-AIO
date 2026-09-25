@@ -40,7 +40,7 @@ def _run_qubit(home: Path, *args: str, marker: bool = False) -> subprocess.Compl
 
 def test_delegated_child_kanban_cli_refusal_returns_nonzero_exit_status(tmp_path):
     """A printed Kanban mutation refusal must not look like CLI success."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
 
     created = _run_qubit(home, "kanban", "create", "exit status probe", "--json")

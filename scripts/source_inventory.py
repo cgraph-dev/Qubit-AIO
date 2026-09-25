@@ -68,7 +68,7 @@ DEFAULT_OPENCLAW = "/tmp/opencode/pinned/openclaw"
 
 # Directories/files excluded from the byte diff, matching
 # scripts/hermes_vendor_manifest.py so counts reconcile.
-_BYTE_SKIP_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache"}
+_BYTE_SKIP_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache", "MagicMock"}
 _BYTE_SKIP_SUFFIX = (".pyc", ".pyo")
 
 # Categories whose items are cross-cutting evidence rather than a capability
@@ -477,6 +477,20 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 16), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _sha256_eol_normalized(data: bytes) -> str:
+    """sha256 of *data* after normalizing CRLF to LF.
+
+    The pinned checkout can differ from its committed git blob only by the
+    upstream CRLF checkout attribute (``.gitattributes``): the blob stores LF
+    while the checkout writes CRLF. The canonical vendor manifest compares the
+    fork against the committed **blob**, so a byte diff that compares the raw
+    **worktree** would falsely report those files changed. Normalizing the
+    checkout bytes reproduces the blob and keeps the two artifacts consistent
+    (mirrors ``scripts/hermes_byte_manifest.py::_classify``).
+    """
+    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -1311,15 +1325,28 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
                             "upstream_blob": blob})
             continue
         up_file = hermes / rel
+        up_bytes = None
         if up_file.is_file():
-            up_sha = _sha256_file(up_file)
+            up_bytes = up_file.read_bytes()
+            up_sha = _sha256_bytes(up_bytes)
         else:
             up_sha = None
-        if up_sha is not None and up_sha != local[lrel]:
-            changed.append({"path": lrel, "upstream_path": rel,
-                            "upstream_blob": blob,
-                            "upstream_sha256": up_sha,
-                            "local_sha256": local[lrel]})
+        local_sha = local[lrel]
+        if up_sha is not None and up_sha != local_sha:
+            # The manifest compares the committed blob; this diff compares the
+            # pinned checkout. An EOL-only difference (upstream .gitattributes
+            # CRLF) is not a content change: normalizing the checkout bytes
+            # reproduces the blob, so it must be counted identical here too.
+            # Otherwise ``changed`` would disagree with the manifest's
+            # ``patched`` set and reconciliation would be False.
+            if up_bytes is not None and \
+                    _sha256_eol_normalized(up_bytes) == local_sha:
+                pass
+            else:
+                changed.append({"path": lrel, "upstream_path": rel,
+                                "upstream_blob": blob,
+                                "upstream_sha256": up_sha,
+                                "local_sha256": local_sha})
     for rel in local:
         if rel not in covered:
             extra.append({"path": rel, "local_sha256": local[rel]})

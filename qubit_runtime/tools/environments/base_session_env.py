@@ -33,7 +33,7 @@ _SHELL_ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # mktemp template suffix + the shell variable holding the allocated temp path.
 _SNAP_TMP_SUFFIX = ".tmp.XXXXXXXXXX"
-_SNAP_TMP = '"$__hermes_snap_tmp"'
+_SNAP_TMP = '"$__qubit_snap_tmp"'
 
 
 def _cwd_marker(session_id: str) -> str:
@@ -90,10 +90,10 @@ def _snapshot_bootstrap_script(
     ``cd ~``) so ``pwd -P`` reports terminal.cwd, not the profile's directory."""
     return (
         "umask 077\n"
-        f"__hermes_snap_tmp=$(mktemp {snap_tmp_template}) || exit 1\n"
+        f"__qubit_snap_tmp=$(mktemp {snap_tmp_template}) || exit 1\n"
         f"{_export_dump_excluding_session_vars(_SNAP_TMP, excluded_names)}\n"
-        "__hermes_fns=$(declare -F | awk '{print $3}' | grep -vE '^_[^_]') || true\n"
-        f"[ -n \"$__hermes_fns\" ] && declare -f $__hermes_fns >> {_SNAP_TMP} 2>/dev/null || true\n"
+        "__qubit_fns=$(declare -F | awk '{print $3}' | grep -vE '^_[^_]') || true\n"
+        f"[ -n \"$__qubit_fns\" ] && declare -f $__qubit_fns >> {_SNAP_TMP} 2>/dev/null || true\n"
         f"alias -p >> {_SNAP_TMP}\n"
         f"echo 'shopt -s expand_aliases' >> {_SNAP_TMP}\n"
         f"echo 'set +e' >> {_SNAP_TMP}\n"
@@ -145,15 +145,15 @@ def _wrap_command_script(
         # ``--`` keeps hyphen-prefixed directory names from being parsed as options.
         f"builtin cd -- {quoted_cwd} || exit 126",
         f"eval '{escaped}'",
-        "__hermes_ec=$?",
+        "__qubit_ec=$?",
         "umask 077"]
     if snapshot_ready:
         parts.append(
-            f"__hermes_snap_tmp=$(mktemp {snap_tmp_template}) && "
+            f"__qubit_snap_tmp=$(mktemp {snap_tmp_template}) && "
             f"{{ {_export_dump_excluding_session_vars(_SNAP_TMP, passthrough_names)} "
             f"&& mv -f {_SNAP_TMP} {quoted_snap}; }} "
             f"2>/dev/null || rm -f {_SNAP_TMP} 2>/dev/null || true")
-    parts += [_cwd_marker_printf(cwd_marker), "exit $__hermes_ec"]
+    parts += [_cwd_marker_printf(cwd_marker), "exit $__qubit_ec"]
     return "\n".join(parts)
 
 

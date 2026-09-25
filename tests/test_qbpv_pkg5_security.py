@@ -36,6 +36,10 @@ _SCAN_SUFFIXES = {".py", ".js", ".mjs", ".ts", ".tsx", ".json", ".yaml",
                   ".yml", ".sh", ".md", ".html", ".css", ".env", ".toml"}
 _SCAN_SKIP_PARTS = {"node_modules", "qubit-dist", "_data", "__pycache__",
                     ".venv", ".git", "dist"}
+# Colocated test/spec artifacts are not shipped product surfaces; their
+# fixtures may legitimately hold obviously-fake secret-shaped placeholders
+# (the scan itself is self-tested for non-vacuous patterns).
+_SCAN_SKIP_NAME_MARKERS = (".test.", ".spec.")
 
 
 def _cfg(tmp_path, monkeypatch):
@@ -186,6 +190,8 @@ def test_no_live_secrets_in_product_surfaces():
             if not path.is_file() or path.suffix not in _SCAN_SUFFIXES:
                 continue
             if _SCAN_SKIP_PARTS.intersection(path.parts):
+                continue
+            if any(marker in path.name for marker in _SCAN_SKIP_NAME_MARKERS):
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
             for pat in _LIVE_SECRET_PATTERNS:

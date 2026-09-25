@@ -9,7 +9,7 @@ from qubit_cli import config
 @pytest.mark.linux_only
 @pytest.mark.parametrize("subdir", (".", *config._QUBIT_HOME_SUBDIRS))
 def test_unavailable_directory_links_are_diagnosed_without_creating_targets(tmp_path, monkeypatch, subdir):
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     link = home / subdir
     link.parent.mkdir(parents=True, exist_ok=True)
     target = tmp_path / "unmounted" / "external"
@@ -37,7 +37,7 @@ def test_unavailable_directory_links_are_diagnosed_without_creating_targets(tmp_
 @pytest.mark.linux_only
 @pytest.mark.parametrize("linked", ("plain", "logs", "home"))
 def test_initialization_preserves_external_directory_modes(tmp_path, monkeypatch, linked):
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     target = tmp_path / "shared"
     target.mkdir(mode=0o750)
     if linked == "home":

@@ -1,6 +1,6 @@
 """Phase-1 bullet 3 (#91277): the dashboard/Desktop READ the update receipt.
 
-The update receipt (written by every `hermes update` run since #91283,
+The update receipt (written by every `qubit update` run since #91283,
 `latest.json` pointer) is the durable outcome record. These tests pin:
 
 - GET /api/hermes/update/receipt returns the full receipt + summary; 404
@@ -37,7 +37,7 @@ def _write_receipt(tmp_path: Path, monkeypatch, *, outcome="success") -> dict:
         "schema": 1,
         "started_at": "2026-08-23T07:00:00+00:00",
         "finished_at": "2026-08-23T07:03:20+00:00",
-        "argv": ["hermes", "update"],
+        "argv": ["qubit", "update"],
         "pid": 12345,
         "outcome": outcome,
         "pre_update": {"sha": "a" * 40, "version": "0.20.4"},

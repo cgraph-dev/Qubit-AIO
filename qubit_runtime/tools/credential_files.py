@@ -215,7 +215,7 @@ def _safe_skills_path(skills_dir: Path) -> str:
 
     if _safe_skills_tempdir and _safe_skills_tempdir.is_dir():
         shutil.rmtree(_safe_skills_tempdir, ignore_errors=True)
-    safe_dir = _safe_skills_tempdir = Path(tempfile.mkdtemp(prefix="hermes-skills-safe-"))
+    safe_dir = _safe_skills_tempdir = Path(tempfile.mkdtemp(prefix="qubit-skills-safe-"))
 
     for base, files in _walk_skill_tree(skills_dir):
         (safe_dir / base.relative_to(skills_dir)).mkdir(parents=True, exist_ok=True)

@@ -26,7 +26,7 @@ def _set_profile_env(monkeypatch, root: Path, profile_home: Path) -> None:
     import qubit_constants
 
     monkeypatch.setattr(
-        qubit_constants, "_get_platform_default_hermes_home", lambda: root
+        qubit_constants, "_get_platform_default_qubit_home", lambda: root
     )
     monkeypatch.setenv("QUBIT_HOME", str(profile_home))
 

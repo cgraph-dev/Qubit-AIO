@@ -100,8 +100,10 @@ def test_wheel_and_sdist_carry_runtime_dashboard_and_metadata():
     assert any(k.startswith("qubit_runtime/") for k in include)
     assert "qubit_runtime/LICENSE" in include
     assert "qubit_runtime/pyproject.toml" in include
+    # Canonical vendor-manifest source is docs/generated/ (Owner Decision #24:
+    # docs/archive/ is historical-only); the installed destination is unchanged.
     assert include.get(
-        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+        "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
     ) == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
     # sdist mirrors the runtime subset so a wheel rebuilds without network
     sinclude = sdist["force-include"]
@@ -116,8 +118,9 @@ def test_project_metadata_declares_license_notices_and_entry_points():
     scripts = project["scripts"]
     assert scripts["qubit"] == "voicebridge.cli:main"
     assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:entry"
-    # hidden compatibility alias for pre-rebrand installs
-    assert scripts["qubit-hermes"] == "voicebridge.qubit_runtime:entry"
+    # the pre-rebrand ``qubit-hermes`` alias was retired (Phase 0 item 0.5);
+    # it must stay out of the shipped entry points.
+    assert "qubit-hermes" not in scripts
     # private developer state and build tooling stay out of the sdist
     excluded = set(_targets()[1].get("exclude", []))
     for private in ("config/voice.yaml", "config/task-templates.yaml",
@@ -329,9 +332,9 @@ def test_built_wheel_ships_fork_dashboard_and_licenses():
     assert re.search(r"^qubit\s*=\s*voicebridge\.cli:main$", entry_points,
                      re.M)
     assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:entry$",
-                     entry_points, re.M)
-    assert re.search(r"^qubit-hermes\s*=\s*voicebridge\.qubit_runtime:entry$",
-                     entry_points, re.M)
+                      entry_points, re.M)
+    # the retired pre-rebrand alias must not ship in the wheel
+    assert not re.search(r"^qubit-hermes\s*=", entry_points, re.M)
 
 
 if __name__ == "__main__":

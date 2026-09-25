@@ -312,7 +312,7 @@ def test_trusted_container_proxy_controls_https_detection():
             "root_path": "",
             "headers": [(b"x-forwarded-proto", b"https")],
             "client": (peer, 43120),
-            "server": ("hermes", 9119),
+            "server": ("qubit", 9119),
         }
 
         async def receive():
@@ -445,7 +445,7 @@ def test_loopback_public_url_fail_closed_message_is_actionable(monkeypatch):
     assert "https://dashboard.example.test:9443" in msg
     # Exit 1: configure auth.
     assert "basic_auth" in msg
-    assert "hermes dashboard register" in msg
+    assert "qubit dashboard register" in msg
     # Exit 2: remove public_url to restore local-only mode.
     assert "remove dashboard.public_url" in msg
     assert "LOCAL-ONLY" in msg

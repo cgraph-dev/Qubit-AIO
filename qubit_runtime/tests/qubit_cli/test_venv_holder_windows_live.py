@@ -10,7 +10,7 @@ the consolidation fix intentionally pin the CORRECT behavior, so on
 unfixed main the buggy ones fail — that failure on the Windows runner is
 the empirical premise-check for each issue:
 
-  #90778 — holder message mislabels `hermes dashboard` as the Desktop
+  #90778 — holder message mislabels `qubit dashboard` as the Desktop
            backend, and matches subcommands by substring ("--preserve"
            contains "serve").
   #78089 — pausable-gateway exemption vs. long managed-runtime
@@ -160,7 +160,7 @@ class TestHolderMessage:
             assert matches, "dashboard process not detected"
             message = _format_venv_python_holders_message(matches)
             assert "close the desktop app" not in message.lower(), (
-                "standalone `hermes dashboard` mislabeled as the Desktop "
+                "standalone `qubit dashboard` mislabeled as the Desktop "
                 f"backend (#90778):\n{message}"
             )
         finally:

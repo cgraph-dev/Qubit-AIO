@@ -55,7 +55,7 @@ def _jwt_with_exp(exp_epoch: int) -> str:
 
 
 def test_resolve_codex_runtime_credentials_missing_access_token(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _setup_qubit_auth(qubit_home, access_token="")
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing-codex"))
@@ -76,7 +76,7 @@ def test_resolve_codex_runtime_credentials_falls_back_to_pool_when_singleton_emp
     re-auth, restore from backup) hit a bare HTTP 401 on chat but worked fine on
     auxiliary calls.  The fallback closes that divergence.
     """
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     # Singleton: empty tokens (would normally raise AuthError).
     # Pool: valid access_token.
@@ -114,7 +114,7 @@ def test_save_codex_tokens_syncs_credential_pool(tmp_path, monkeypatch):
     holding a consumed refresh token and stale error markers, causing an
     immediate 401 token_invalidated on the next request.
     """
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -178,7 +178,7 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
     aliases of the singleton, while leaving INDEPENDENT entries alone.
 
     Original regression for #33538: a user who hit #33000 before the #33164
-    fix landed would have run ``hermes auth add openai-codex`` as a
+    fix landed would have run ``qubit auth add openai-codex`` as a
     workaround, leaving a pool entry with ``source="manual:device_code"``.
     On every subsequent re-auth via setup/model picker, the singleton-seeded
     ``device_code`` entry got refreshed but the ``manual:device_code`` entry
@@ -187,12 +187,12 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
 
     Narrowed for #39236: the original fix treated every ``manual:device_code``
     entry as a singleton-alias and refreshed them all, which silently
-    clobbered independent accounts added via ``hermes auth add openai-codex``.
+    clobbered independent accounts added via ``qubit auth add openai-codex``.
     The current behavior refreshes only entries whose access_token matches
     the *previous* singleton access_token (true legacy aliases), and leaves
     distinct-token entries alone (independent accounts).
     """
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -225,7 +225,7 @@ def test_save_codex_tokens_syncs_manual_device_code_entries(tmp_path, monkeypatc
                     "last_error_code": 401,
                     "last_error_reason": "token_invalidated",
                 },
-                # Independent account from `hermes auth add openai-codex` —
+                # Independent account from `qubit auth add openai-codex` —
                 # its tokens are distinct from the singleton.  Must NOT be
                 # overwritten by a re-auth that targeted a different account
                 # (#39236).
@@ -282,7 +282,7 @@ def test_save_codex_tokens_does_not_overwrite_independent_manual_entries(tmp_pat
     """Re-auth must NOT overwrite ``manual:device_code`` entries that hold
     independent token material (different OpenAI/ChatGPT accounts).
 
-    Regression for #39236: ``hermes auth add openai-codex`` for accounts B and C
+    Regression for #39236: ``qubit auth add openai-codex`` for accounts B and C
     routes through ``_save_codex_tokens`` because the singleton path is the
     only Codex OAuth save flow.  The #33538 fix refreshed every
     ``manual:device_code`` entry on every re-auth, which works fine for the
@@ -295,7 +295,7 @@ def test_save_codex_tokens_does_not_overwrite_independent_manual_entries(tmp_pat
     entries whose tokens never matched the singleton are independent accounts
     and must be left alone.
     """
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -321,7 +321,7 @@ def test_save_codex_tokens_does_not_overwrite_independent_manual_entries(tmp_pat
                     "refresh_token": "acctA-rt",
                 },
                 # Two INDEPENDENT manual entries added later via
-                # ``hermes auth add openai-codex`` (account B and account C).
+                # ``qubit auth add openai-codex`` (account B and account C).
                 # Each has its OWN distinct token material, unrelated to the
                 # singleton.
                 {
@@ -383,7 +383,7 @@ def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_pa
     with their own stale-error markers must be left alone (their stale state
     is not the current re-auth's business).
     """
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     (qubit_home / "auth.json").write_text(json.dumps({
         "version": 1,
@@ -446,7 +446,7 @@ def test_save_codex_tokens_clears_error_markers_only_on_refreshed_entries(tmp_pa
 
 def test_codex_tokens_not_written_to_shared_file(tmp_path, monkeypatch):
     """Verify _save_codex_tokens writes only to Hermes auth store, not ~/.codex/."""
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     codex_home = tmp_path / "codex-cli"
     qubit_home.mkdir(parents=True, exist_ok=True)
     codex_home.mkdir(parents=True, exist_ok=True)
@@ -466,7 +466,7 @@ def test_codex_tokens_not_written_to_shared_file(tmp_path, monkeypatch):
 
 
 def test_resolve_returns_qubit_auth_store_source(tmp_path, monkeypatch):
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _setup_qubit_auth(qubit_home)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -517,7 +517,7 @@ def test_refresh_429_classified_as_quota_not_auth_failure(monkeypatch):
 
     Regression test for #32790: must NOT force relogin and must carry the
     dedicated rate-limit code so callers surface a "retry later" notice rather
-    than a misleading "run hermes auth".
+    than a misleading "run qubit auth".
     """
     from qubit_cli.auth import (
         CODEX_RATE_LIMITED_CODE,

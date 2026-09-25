@@ -607,7 +607,7 @@ describe('repository discovery policy', () => {
     expect(getQubitConfig).not.toHaveBeenCalled()
     // The desktop can't crawl the remote host's filesystem, so it asks the
     // host to scan its own discovery roots (`projects.discover_repos` with
-    // `scan: true`) — repos with zero Hermes sessions must still surface —
+    // `scan: true`) — repos with zero Qubit sessions must still surface —
     // then refreshes the tree to pick up the merged list. Regression for
     // #81723: the sidebar used to go silent in remote mode and never
     // refresh again.

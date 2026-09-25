@@ -11,16 +11,14 @@ shipped feature is invisible and the agent answers "Hermes can't do that."
 
 from __future__ import annotations
 
-import importlib.util
 import re
 from pathlib import Path
 
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-SKILL_DIR = REPO / "skills" / "autonomous-ai-agents" / "hermes-agent"
+SKILL_DIR = REPO / "skills" / "autonomous-ai-agents" / "qubit-agent"
 SKILL_MD = SKILL_DIR / "SKILL.md"
-GENERATOR = REPO / "website" / "scripts" / "generate-llms-txt.py"
 
 
 @pytest.fixture(scope="module")
@@ -53,17 +51,28 @@ def test_every_reference_is_reachable_from_the_skill(skill_text):
 
 
 def test_unknown_features_route_to_the_published_index(skill_text):
-    """The catch-all is what makes coverage of the whole product possible."""
-    assert "/docs/llms.txt" in skill_text
+    """The catch-all is what makes coverage of the whole product possible.
+
+    The routing target is the Qubit-owned docs endpoint. The de-brand pipeline
+    (``agent.skill_utils``) collapses the upstream docs host to this endpoint,
+    so it is what a shipped skill can actually point at.
+    """
+    assert "/agent/openapi.json" in skill_text
     # web_extract can be disabled; terminal never is.
     assert "curl" in skill_text, "no way to reach the index without web tools"
 
 
 def test_the_index_is_published_where_the_skill_says_it_is(skill_text):
-    """A skill pointing at a URL nobody generates is worse than no routing."""
-    spec = importlib.util.spec_from_file_location("generate_llms_txt", GENERATOR)
-    assert spec is not None and spec.loader is not None
-    gen = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gen)
+    """A skill pointing at an endpoint nobody serves is worse than no routing.
 
-    assert f"{gen.SITE_BASE}/llms.txt" in skill_text
+    The upstream docs host must be rewritten by the de-brand pipeline to the
+    endpoint the skill names; this ties the skill's routing target to what the
+    pipeline actually emits.
+    """
+    from agent.skill_utils import _DEBRAND_DOCS_ENDPOINT, debrand_skill_text
+
+    assert _DEBRAND_DOCS_ENDPOINT in skill_text
+    rendered = debrand_skill_text(
+        "See https://hermes-agent.nousresearch.com/docs/llms.txt", is_doc=True
+    )
+    assert _DEBRAND_DOCS_ENDPOINT in rendered

@@ -2713,7 +2713,13 @@ def h_webhooks_mutate(fn_name: str, cfg: Any, q: Dict[str, str],
                 cfg, "webhook_create",
                 f"creating webhook subscription {_redact(sub_id)!r} requires "
                 "explicit confirmation: re-POST with {\"confirm\": true}",
-                q, b, payload={"id": sub_id})
+                q, b,
+                payload={"id": sub_id,
+                         "name": str(b.get("name", "") or ""),
+                         "url": str(b.get("url") or b.get("deliver_url") or ""),
+                         "events": list(b.get("events", []) or []),
+                         "secret_ref": str(b.get("secret_ref")
+                                           or b.get("secret") or "")})
             if guard is not None:
                 return guard
             url = str(b.get("url") or b.get("deliver_url") or "")
@@ -3237,16 +3243,11 @@ def h_analytics(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 
 def _files_root(cfg: Any) -> str:
-    try:
-        from . import projects as PJ
-        active = PJ.active(cfg) if hasattr(PJ, "active") else {}
-        if isinstance(active, dict):
-            for key in ("folder", "path", "root"):
-                if active.get(key):
-                    return str(active[key])
-    except Exception:
-        pass
-    return ""
+    # Delegate to the canonical active-project folder resolver. The previous
+    # ``PJ.active(cfg)`` call used a nonexistent attribute (always ``{}``), so
+    # the Files upload/create path reported "no active project folder" even
+    # when a project was active.
+    return _active_folder(cfg)
 
 
 def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -10356,8 +10357,15 @@ def mem_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """GET provider config -> real persisted local-store settings."""
     name = str(p.get("id", "") or "qubit-local")
     if name != "qubit-local":
-        return 404, {"ok": False, "code": "NOT_FOUND",
-                     "detail": f"no memory provider {name!r}"}
+        # Consistent with the write path (``mem_config_write``): the hub
+        # advertises optional providers, but only ``qubit-local`` has a Qubit
+        # store and cloud sync is refused by policy. Return the same typed
+        # refusal rather than a bare 404, so the page shows an honest typed
+        # disposition instead of a raw NOT_FOUND.
+        return _gate("MEMORY_LOCAL_ONLY",
+                     f"no memory provider {name!r}; qubit-local is the only "
+                     "store and cloud sync is refused by policy",
+                     "Memory page search + CLI `qubit memory`")
     store = _load_json_store(_memory_provider_read_path(cfg))
     fields = [{"key": k, "value": v}
               for k, v in sorted(store.items()) if k != "provider"]

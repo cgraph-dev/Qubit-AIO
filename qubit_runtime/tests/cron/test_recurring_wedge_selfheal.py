@@ -4,7 +4,7 @@ The 2026-08-14 incident (t_20e23f84): 4 recurring no_agent interval jobs
 EAGAIN-failed at 12:50:05 and then recorded ZERO executions for ~1h47m while
 the scheduler ticked normally and fired 100+ other jobs — wedged in a
 non-dispatch state that even survived a gateway restart, cleared only by a
-manual force-run (`hermes cron run <id>`).
+manual force-run (`qubit cron run <id>`).
 
 Root cause class (t_3778a491, the SAME symptom on 2026-08-02): `_submit_with_guard`
 adds a job id to the in-memory `_running_job_ids` set BEFORE the future that
@@ -49,7 +49,7 @@ def cron_env(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", qubit_home)
+    monkeypatch.setattr(jobs_mod, "QUBIT_DIR", qubit_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", qubit_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", qubit_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", qubit_home / "cron" / "output")
@@ -76,7 +76,7 @@ class TestStaleInflightSelfHeal:
 
         env = cron_env
         monkeypatch.setattr(E, "EXECUTIONS_FILE", env["home"] / "cron" / "executions.db")
-        monkeypatch.setattr(S, "_hermes_home", env["home"])
+        monkeypatch.setattr(S, "_qubit_home", env["home"])
         return S, E, env
 
     def test_stale_claim_self_heals_and_redispatches(self, cron_env, monkeypatch):
@@ -171,7 +171,7 @@ class TestEAGAINCreateExecutionLeak:
 
         env = cron_env
         monkeypatch.setattr(E, "EXECUTIONS_FILE", env["home"] / "cron" / "executions.db")
-        monkeypatch.setattr(S, "_hermes_home", env["home"])
+        monkeypatch.setattr(S, "_qubit_home", env["home"])
         job_id = env["job_id"]
         job = J.get_job(job_id)
 
@@ -204,7 +204,7 @@ class TestEAGAINCreateExecutionLeak:
 
         env = cron_env
         monkeypatch.setattr(E, "EXECUTIONS_FILE", env["home"] / "cron" / "executions.db")
-        monkeypatch.setattr(S, "_hermes_home", env["home"])
+        monkeypatch.setattr(S, "_qubit_home", env["home"])
         job_id = env["job_id"]
         job = J.get_job(job_id)
 

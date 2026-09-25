@@ -1,4 +1,4 @@
-"""Tests for qubit_cli.plugins_cmd — the ``hermes plugins`` CLI subcommand."""
+"""Tests for qubit_cli.plugins_cmd — the ``qubit plugins`` CLI subcommand."""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 /**
- * Routines: the Hermes cron jobs scoped to the bot you're chatting with — the
+ * Routines: the Qubit cron jobs scoped to the bot you're chatting with — the
  * list query and its owner resolution, the schedule picker, the create and
  * detail dialogs, and the pane the right tile renders.
  */
@@ -650,7 +650,7 @@ const TIMES = (() => {
   return out
 })()
 
-/** Compose the Hermes schedule string from picker state. */
+/** Compose the Qubit schedule string from picker state. */
 function composeSchedule(state: ScheduleState): string {
   const [h, m] = (state.time || '9:0').split(':').map(Number)
 

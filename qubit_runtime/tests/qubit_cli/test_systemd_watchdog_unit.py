@@ -48,7 +48,7 @@ def test_system_unit_reads_watchdog_from_target_home(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         gateway_cli,
-        "_hermes_home_for_target_user",
+        "_qubit_home_for_target_user",
         lambda _home: str(target_home),
     )
 

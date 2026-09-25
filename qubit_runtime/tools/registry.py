@@ -1,4 +1,4 @@
-"""Central registry for all hermes-agent tools: each tool file calls ``registry.register()``
+"""Central registry for all Qubit tools: each tool file calls ``registry.register()``
 at import to declare schema, handler, toolset membership and availability check;
 ``model_tools.py`` queries the registry instead of keeping parallel data structures.
 Cycle-safe import chain: this module imports nothing from model_tools or tool files;

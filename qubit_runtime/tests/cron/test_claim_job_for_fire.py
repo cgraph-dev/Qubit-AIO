@@ -115,7 +115,7 @@ def test_fire_claim_heartbeat_refreshes_only_expected_owner(temp_home, monkeypat
     claimed_at = datetime.fromisoformat(claimed["at"])
     monkeypatch.setattr(
         jobs,
-        "_hermes_now",
+        "_qubit_now",
         lambda: claimed_at + timedelta(seconds=30),
     )
 
@@ -143,7 +143,7 @@ def test_reclaimed_fire_uses_new_owner_token(temp_home, monkeypatch):
     original_at = datetime.fromisoformat(original["at"])
     monkeypatch.setattr(
         jobs,
-        "_hermes_now",
+        "_qubit_now",
         lambda: original_at + timedelta(seconds=301),
     )
 

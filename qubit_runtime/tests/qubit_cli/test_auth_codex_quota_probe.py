@@ -223,7 +223,7 @@ def test_resolver_recovers_when_probe_confirms_reset(tmp_path, monkeypatch):
     """The screenshot bug: pool-only cooldown raises `quota exhausted (429);
     retry after Ns` even though the upstream window already reset.  A positive
     probe must clear the cooldown and return the pool credential."""
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _write_auth_store(qubit_home, _pool_only_rate_limited_store())
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
@@ -261,8 +261,8 @@ def test_pool_probe_not_fired_for_non_quota_exhaustion(tmp_path, monkeypatch):
     entry["last_error_code"] = 401
     entry["last_error_reason"] = "token_expired"
     entry["last_error_message"] = "expired"
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "hermes"))
-    _write_auth_store(tmp_path / "hermes", store)
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit"))
+    _write_auth_store(tmp_path / "qubit", store)
 
     from agent.credential_pool import load_pool
 

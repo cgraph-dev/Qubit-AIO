@@ -147,6 +147,22 @@ def _is_same_writer(entry: dict[str, Any], metadata: Optional[dict[str, Any]]) -
     return bool(existing_live and incoming_live) and existing_live == incoming_live
 
 
+def session_owner_details(session_id: str, entry: dict[str, Any]) -> str:
+    """The ``Details:`` line shared by every owner-refusal message."""
+    surface = str(entry.get("surface") or "another surface")
+    started = _optional_float(entry.get("started_at"))
+    age = f" {format_age(time.time() - started)} ago" if started else ""
+    return f"Details: session {session_id} opened by {surface}{age}."
+
+
+def session_owner_details(session_id: str, entry: dict[str, Any]) -> str:
+    """The ``Details:`` line shared by every owner-refusal message."""
+    surface = str(entry.get("surface") or "another surface")
+    started = _optional_float(entry.get("started_at"))
+    age = f" {format_age(time.time() - started)} ago" if started else ""
+    return f"Details: session {session_id} opened by {surface}{age}."
+
+
 def session_already_owned_message(session_id: str, entry: dict[str, Any]) -> str:
     surface = str(entry.get("surface") or "another surface")
     pid = entry.get("pid")
@@ -665,16 +681,37 @@ def release_orphaned_leases(live_lease_ids: set[str]) -> int:
 
 
 def active_session_registry_snapshot(
-    registry_home: str | Path | None = None,
+    registry_home: str | Path | None = None, *, strict: bool = False,
 ) -> list[dict[str, Any]]:
-    """Return the pruned active-session registry for diagnostics/tests."""
+    """Return live leases; attachment callers require provable liveness.
+
+    The per-entry liveness probes in ``_prune_dead`` run AFTER the file lock
+    is released: holding an exclusive, unfair lock across process-introspection
+    syscalls starves concurrent pollers once a handful of leases exist
+    (#115578). The prune write-back re-locks and drops only the lease ids
+    already proven dead, so a lease created between the snapshot and the
+    write-back is never lost.
+    """
     state_path, lock_path = _lease_paths(registry_home=registry_home)
     with _FileLock(lock_path):
         raw_entries = _read_entries(state_path, strict=True)
-        entries = _prune_dead(raw_entries)
-        if entries != raw_entries:
-            _write_entries(state_path, entries)
-        return entries
+    entries = _prune_dead(raw_entries, strict=strict)
+    if entries != raw_entries:
+        live_lease_ids = {str(entry.get("lease_id") or "") for entry in entries}
+        dead_lease_ids = {
+            str(entry.get("lease_id") or "")
+            for entry in raw_entries
+            if str(entry.get("lease_id") or "") not in live_lease_ids
+        }
+        with _FileLock(lock_path):
+            current_entries = _read_entries(state_path, strict=True)
+            kept_entries = [
+                entry for entry in current_entries
+                if str(entry.get("lease_id") or "") not in dead_lease_ids
+            ]
+            if len(kept_entries) != len(current_entries):
+                _write_entries(state_path, kept_entries)
+    return entries
 
 
 @contextmanager

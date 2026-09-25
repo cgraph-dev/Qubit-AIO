@@ -1,7 +1,7 @@
 """Regression coverage for the updater self-lock deferral (#83569, #86735).
 
 ``_detect_venv_python_processes`` excludes the calling process and its
-ancestors by design — a CLI ``hermes update`` IS the venv python.  Before
+ancestors by design — a CLI ``qubit update`` IS the venv python.  Before
 this guard, an updater that had already imported a native venv extension
 (e.g. ``cryptography.hazmat.bindings._rust``) died mid-sync with
 ``os error 5`` when ``uv`` tried to replace the mapped ``.pyd``, stranding
@@ -10,7 +10,7 @@ the venv half-updated (#83569).
 The first version of the guard (#86687) fired as a PRE-FETCH preflight and
 keyed on nothing but "is the module in sys.modules" — which was ALWAYS true
 while ``bitwarden.py`` imported cryptography at module level, so every
-Windows ``hermes update`` exited 2 before even fetching and the update
+Windows ``qubit update`` exited 2 before even fetching and the update
 looped forever (#86735 / #86780 / #86781).  The guard is now honest:
 
 * it only reports a loaded module when the dependency sync would actually
@@ -168,7 +168,7 @@ def test_recovered_update_retry_builds_parser_without_native_secret_modules(
     called = []
     monkeypatch.setattr(_early_recovery, "_UPDATE_RETRY_RECOVERED", True)
     monkeypatch.setattr(cli_main, "cmd_update", lambda args: called.append(args))
-    monkeypatch.setattr(sys, "argv", ["hermes", "update", "--yes"])
+    monkeypatch.setattr(sys, "argv", ["qubit", "update", "--yes"])
     sys.modules.pop("cryptography.hazmat.bindings._rust", None)
 
     cli_main.main()
@@ -317,7 +317,7 @@ class TestUpdateEntrypointImportHygiene:
                 """
                 import sys
                 from unittest.mock import patch
-                sys.argv = ["hermes", "update", "--check"]
+                sys.argv = ["qubit", "update", "--check"]
                 import qubit_cli.main as m
                 with patch("qubit_cli.update_cmd._cmd_update_check", lambda *a, **k: 0):
                     try:

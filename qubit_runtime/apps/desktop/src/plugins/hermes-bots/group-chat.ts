@@ -906,7 +906,7 @@ function groupChatSyncPayloadEqual(
 /** Every default-profile gateway route this Desktop can currently reach.
  *  The projection fans out to ALL of them, so any single gateway can die or
  *  be removed without losing the shared room state, and gateway-only
- *  clients (Hermes Go, headless backends) see rooms regardless of which
+ *  clients (Qubit Go, headless backends) see rooms regardless of which
  *  gateway a Desktop was foregrounding when the room was used. */
 async function groupChatSyncTargetConnections() {
   const targets = new Set<string>()
@@ -1218,9 +1218,9 @@ export const GROUP_CHAT_MAX_MEMBERS = 6
  *  "Lucy") labels the speaker everywhere this helper feeds — the "X is
  *  thinking…" working line, the activity feed, and transcript lines — so a
  *  renamed bot never shows up as its raw profile id or a stale "Qubit"
- *  (community report, Aug 21 2026: renamed default still read "Hermes is
+ *  (community report, Aug 21 2026: renamed default still read "Qubit is
  *  thinking…" in group rooms). The untitled primary profile is literally
- *  named "default" — render it as Hermes (matching displayName and the
+ *  named "default" — render it as Qubit (matching displayName and the
  *  @hermes handle) so the main agent never loses its name in rooms. */
 export function groupSpeakerLabel(name?: null | string) {
   const trimmed = (name || '').trim()

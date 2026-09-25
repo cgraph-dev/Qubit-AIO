@@ -508,7 +508,7 @@ def drain_log_queue(timeout: float = 1.0) -> None:
     listener = _queue_listener
     if listener is None:
         return
-    t = threading.Thread(target=lambda: _quietly(listener.stop), name="hermes-log-drain", daemon=True)
+    t = threading.Thread(target=lambda: _quietly(listener.stop), name="qubit-log-drain", daemon=True)
     t.start()
     t.join(timeout)
 

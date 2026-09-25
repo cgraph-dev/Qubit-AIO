@@ -10,7 +10,7 @@ Covers:
   - Owner unload / generation reset cancel zombie callbacks
   - Recursion cap: mutually-emitting plugins terminate + warn
   - Manifest emits/listens parsed as optional advisory fields
-  - `hermes plugins show` output includes emits/listens
+  - `qubit plugins show` output includes emits/listens
 """
 
 from __future__ import annotations
@@ -168,7 +168,7 @@ def test_subscribe_is_unrestricted():
     ctx_a = _make_ctx(manager, "plugin_a", key="a")
     got = []
     # None of these raise — only emit is namespace-gated.
-    ctx_a.subscribe("hermes:core_event", lambda **p: got.append("hermes"))
+    ctx_a.subscribe("hermes:core_event", lambda **p: got.append("qubit"))
     ctx_a.subscribe("b:ping", lambda **p: got.append("b"))
     assert "hermes:core_event" in manager._subscriptions
     assert "b:ping" in manager._subscriptions

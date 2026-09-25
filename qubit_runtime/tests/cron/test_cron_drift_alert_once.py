@@ -52,7 +52,7 @@ def _tick(job, tmp_path, current_provider, deliveries):
         deliveries.append(content)
         return None
 
-    with patch("cron.scheduler._hermes_home", tmp_path), \
+    with patch("cron.scheduler._qubit_home", tmp_path), \
          patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
          patch("qubit_cli.env_loader.load_qubit_dotenv"), \
          patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -92,10 +92,10 @@ class TestDriftAlertOnce:
         blob = deliveries[0].lower()
         assert "drift" in blob
         assert "pin" in blob
-        assert "host running hermes" in blob
+        assert "host running qubit" in blob
         # The single alert must carry the complete supported remediation
         # command — the generic summarizer's 180-char truncation must not eat it.
-        assert "hermes cron edit drift-once-test" in deliveries[0]
+        assert "qubit cron edit drift-once-test" in deliveries[0]
         assert "cronjob action=update" not in deliveries[0]
         assert "[drift_skip" not in deliveries[0]
 
@@ -137,7 +137,7 @@ class TestDriftAlertOnce:
         with cron_jobs.use_cron_store(tmp_path):
             cron_jobs.save_jobs([job])
             fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
-            with patch("cron.scheduler._hermes_home", tmp_path), \
+            with patch("cron.scheduler._qubit_home", tmp_path), \
                  patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                  patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                  patch("qubit_cli.env_loader.reset_secret_source_cache"), \

@@ -345,7 +345,7 @@ class TestFleetClassification:
         assert stale is True
         out = capsys.readouterr().out
         assert "STALE" in out
-        assert "hermes -p <profile> gateway restart" in out
+        assert "qubit -p <profile> gateway restart" in out
 
     def test_unknown_does_not_fail_update(self, capsys):
         ok = ur.print_fleet_version_matrix(

@@ -197,8 +197,8 @@ describe('startNewSessionDrag', () => {
   })
 
   it('labels the ghost with the project name for a project-row drag', () => {
-    startNewSessionDrag(vi.fn(), fakePointerEvent(), { cwd: '/repo', label: 'New session in Hermes Browser' })
-    expect(captured.spec?.ghost).toEqual({ label: 'New session in Hermes Browser' })
+    startNewSessionDrag(vi.fn(), fakePointerEvent(), { cwd: '/repo', label: 'New session in Qubit Browser' })
+    expect(captured.spec?.ghost).toEqual({ label: 'New session in Qubit Browser' })
   })
 
   it('pins the created session to the project cwd on a center drop', () => {

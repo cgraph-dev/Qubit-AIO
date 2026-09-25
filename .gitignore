@@ -51,3 +51,6 @@ power-control.json
 
 # pytest scratch cache (never committed).
 .pytest-cache/
+
+# pytest MagicMock residue (never committed).
+MagicMock/

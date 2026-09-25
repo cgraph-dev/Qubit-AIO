@@ -700,10 +700,10 @@ _PLUGIN_COMPAT_LAZY = {
     'is_rotation_consumed_uncommitted': ('agent.anthropic_credentials', 'is_rotation_consumed_uncommitted'),
     'mark_rotation_consumed_uncommitted': ('agent.anthropic_credentials', 'mark_rotation_consumed_uncommitted'),
     'read_claude_code_credentials': ('agent.anthropic_credentials', 'read_claude_code_credentials'),
-    'read_hermes_oauth_credentials': ('agent.anthropic_credentials', 'read_hermes_oauth_credentials'),
+    'read_hermes_oauth_credentials': ('agent.anthropic_credentials', 'read_qubit_oauth_credentials'),
     'refresh_anthropic_oauth_pure': ('agent.anthropic_credentials', 'refresh_anthropic_oauth_pure'),
     'resolve_anthropic_token': ('agent.anthropic_credentials', 'resolve_anthropic_token'),
-    'run_hermes_oauth_login_pure': ('agent.anthropic_credentials', 'run_hermes_oauth_login_pure'),
+    'run_hermes_oauth_login_pure': ('agent.anthropic_credentials', 'run_qubit_oauth_login_pure'),
     'run_oauth_setup_token': ('agent.anthropic_credentials', 'run_oauth_setup_token'),
 }
 

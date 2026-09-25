@@ -11,7 +11,7 @@ store into two concurrent generations. Both generations report
 
 Hermes' own corruption banners used to instruct exactly that command
 (`sqlite3 ~/.hermes/state.db ".recover"`). The fix routes operators to
-`hermes sessions recover --source ...`, whose lane snapshots the damaged
+`qubit sessions recover --source ...`, whose lane snapshots the damaged
 bundle before any shell touches it, and refuses a WAL-reset-vulnerable
 sqlite3 CLI for the page-level salvage lane even on the snapshot.
 """
@@ -222,7 +222,7 @@ class TestGuidanceNeverNamesLiveDb:
             "session_persistence_failed", "corrupt"
         )
         assert LIVE_DB_SALVAGE_COMMAND not in explanation
-        assert "hermes sessions recover --source" in explanation
+        assert "qubit sessions recover --source" in explanation
         assert "--inspect-only" in explanation
         assert "--output recovered-state.db" in explanation
         assert ".recover" in explanation  # the warning still names the hazard
@@ -264,7 +264,7 @@ class TestGuidanceNeverNamesLiveDb:
 # The emitted command satisfies the real CLI contract
 # ---------------------------------------------------------------------------
 # The reviewer's blocker on the first iteration of this fix: the banners
-# printed `hermes sessions recover --source <db>` — which cmd_sessions
+# printed `qubit sessions recover --source <db>` — which cmd_sessions
 # rejects with exit 2 ("--output is required unless --inspect-only is
 # used") before any snapshot is taken. These tests dispatch the EXACT argv
 # shapes the banners emit through the real parser + cmd_sessions, so a
@@ -276,7 +276,7 @@ class TestEmittedCommandsSatisfyCliContract:
     """Every `sessions recover` argv the guidance prints must be accepted
     by the real CLI contract — the reviewer's blocker on the first
     iteration of this fix was exactly this: the banners printed
-    `hermes sessions recover --source <db>`, which cmd_sessions rejects
+    `qubit sessions recover --source <db>`, which cmd_sessions rejects
     with exit 2 ("--output is required unless --inspect-only is used")
     before any snapshot is taken.
 
@@ -289,7 +289,7 @@ class TestEmittedCommandsSatisfyCliContract:
 
     @staticmethod
     def _namespace(source: Path, **overrides) -> "argparse.Namespace":
-        """The namespace hermes main() produces for `sessions recover`.
+        """The namespace qubit main() produces for `sessions recover`.
 
         Mirrors the registrations in qubit_cli/main.py (sessions_recover
         subparser): --source, --output, --inspect-only, --work-dir,

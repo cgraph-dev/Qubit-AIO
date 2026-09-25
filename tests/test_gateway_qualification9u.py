@@ -492,14 +492,23 @@ def test_dispatch_start_stop_restart_and_confirm(tmp_path, monkeypatch,
     _wire(monkeypatch, spawned=spawned)
     cfg = _cfg_file(tmp_path, monkeypatch)
 
+    # Owner Decision #10/#15: gateway control is confirm-gated through the one
+    # authority path; a bare POST executes nothing and is a typed refusal.
     status, body = _dispatch(cfg, "POST", "/api/gateway/start")
+    assert status == 409 and body["code"] == "GATEWAY_CONFIRM_REQUIRED", (status, body)
+    assert fake_systemctl.state.read_text().strip() == "inactive"
+
+    status, body = _dispatch(cfg, "POST", "/api/gateway/start",
+                             {"confirm": True})
     assert status == 200 and body["state"] == "OK", (status, body)
     assert fake_systemctl.state.read_text().strip() == "active"
 
-    status, body = _dispatch(cfg, "POST", "/api/gateway/start")
+    status, body = _dispatch(cfg, "POST", "/api/gateway/start",
+                             {"confirm": True})
     assert status == 200 and body.get("noop") is True, (status, body)
 
-    status, body = _dispatch(cfg, "POST", "/api/gateway/restart")
+    status, body = _dispatch(cfg, "POST", "/api/gateway/restart",
+                             {"confirm": True})
     assert status == 200 and body["state"] == "RESTARTING", (status, body)
     assert body["detached"] is True and len(spawned) == 1
 
@@ -518,7 +527,8 @@ def test_dispatch_maps_not_installed_and_failure(tmp_path, monkeypatch,
     assert status == 200 and body["process"]["state"] == "NOT_INSTALLED", body
 
     fake_systemctl.set("fail-start")
-    status, body = _dispatch(cfg, "POST", "/api/gateway/start")
+    status, body = _dispatch(cfg, "POST", "/api/gateway/start",
+                             {"confirm": True})
     assert status == 500 and body["code"] == "GATEWAY_CONTROL_FAILED", body
     assert "supersecretvalue123" not in json.dumps(body)
     assert "[REDACTED]" in body["detail"], body["detail"]
@@ -535,5 +545,6 @@ def test_dispatch_returns_typed_unavailable_without_systemctl(tmp_path,
     assert status == 200 and body["ok"] is True
     assert body["supervision"].startswith("GATEWAY_SUPERVISION_UNAVAILABLE"), body
 
-    status, body = _dispatch(cfg, "POST", "/api/gateway/start")
+    status, body = _dispatch(cfg, "POST", "/api/gateway/start",
+                             {"confirm": True})
     assert status == 503 and body["code"] == "GATEWAY_SUPERVISION_UNAVAILABLE"

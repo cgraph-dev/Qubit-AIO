@@ -239,6 +239,17 @@ def run_oneshot(
 
     _write_usage_file(usage_file, result)
 
+    if result.get("failed"):
+        # A provider/API failure can arrive as a non-empty ``final_response``
+        # (e.g. "HTTP 403: Upstream request failed: …"), which would otherwise
+        # be written to stdout and returned as exit 0 — indistinguishable from
+        # success. Honour the run's failure flag instead.
+        err = str(result.get("error") or result.get("failure")
+                  or "agent run failed").strip()
+        real_stderr.write(f"qubit -z: agent failed: {err}\n")
+        real_stderr.flush()
+        return 1
+
     if response:
         # Lone UTF-16 surrogates would raise UnicodeEncodeError on a real stdout and abort with
         # exit 1 after the turn already completed — scrub to U+FFFD first.

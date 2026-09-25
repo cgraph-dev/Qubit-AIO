@@ -63,7 +63,7 @@ def test_self_heals_on_stale_refresh_token(monkeypatch):
 
 def test_self_heals_missing_singleton_access_token_from_codex_cli(tmp_path, monkeypatch):
     """Exact cron failure path: Hermes auth has refresh_token but missing access_token."""
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     codex_home = tmp_path / "codex"
     qubit_home.mkdir()
     codex_home.mkdir()

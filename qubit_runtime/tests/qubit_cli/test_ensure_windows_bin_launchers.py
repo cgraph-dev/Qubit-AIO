@@ -3,7 +3,7 @@
 The Windows ``hermes`` command is a launcher derived from the venv console
 script. Its canonical home is the managed binary dir ``QUBIT_HOME\\bin`` —
 OUTSIDE the git checkout — because the earlier in-checkout home
-(``hermes-agent\\bin``) was swept by ``hermes update``'s autostash
+(``hermes-agent\\bin``) was swept by ``qubit update``'s autostash
 (``git stash push --include-untracked``) and, with the desktop updater's
 ``--keep-stash``, never restored: ``hermes`` stopped resolving in every new
 terminal (``venv\\Scripts`` itself must stay off PATH — it shadows the
@@ -14,7 +14,7 @@ always for the managed clone; legacy dir only while the user PATH still
 points at it), choosing the form by venv kind: exe copy for normal venvs,
 ``.cmd`` delegator for relocatable venvs whose exe trampolines die when
 copied out of ``venv\\Scripts``. ``migrate_windows_bin_path`` moves an
-existing install's PATH to the canonical layout from the ``hermes update``
+existing install's PATH to the canonical layout from the ``qubit update``
 tail. Platform verdict, PATH values, and registry I/O are injected
 parameters (same pattern as ``qubit_constants.venv_bin_dir``), so these
 tests are host-independent input→output checks, not host fakes.
@@ -34,7 +34,7 @@ from qubit_cli._install_repair import (
 
 def _make_managed(tmp_path, monkeypatch, *, relocatable: bool = False):
     """Fake managed layout: QUBIT_HOME/hermes-agent/venv/Scripts + launchers."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     root = home / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
@@ -151,10 +151,10 @@ def test_noop_on_posix(managed_install):
 
 
 def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
-    """Under ``hermes -p <name>`` QUBIT_HOME points inside profiles/<name>;
+    """Under ``qubit -p <name>`` QUBIT_HOME points inside profiles/<name>;
     the launcher dir is per-machine, so the heal must anchor on the default
     root and fire anyway — a habitual profile user gets the same repair."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     root = home / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
@@ -173,7 +173,7 @@ def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
 
 def test_noop_when_console_scripts_missing(tmp_path, monkeypatch):
     """A venv mid-repair has no console scripts — nothing to copy, no error."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -191,7 +191,7 @@ def test_no_staging_litter_left_behind(managed_install):
 
 
 # ---------------------------------------------------------------------------
-# migrate_windows_bin_path — the `hermes update` tail migration
+# migrate_windows_bin_path — the `qubit update` tail migration
 # ---------------------------------------------------------------------------
 
 
@@ -271,7 +271,7 @@ def test_migration_is_idempotent(managed_install):
 
 def test_migration_never_strips_path_when_staging_fails(tmp_path, monkeypatch):
     """No venv sources → launchers can't stage → PATH must stay untouched."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)  # no launcher exes inside
     monkeypatch.setenv("QUBIT_HOME", str(home))
@@ -321,7 +321,7 @@ def test_repo_gitignores_the_legacy_bin_dir():
     """Transition safety: legacy in-checkout launchers must not be stash-swept.
 
     Until every install has migrated, pre-migration checkouts still carry
-    launchers at ``<checkout>/bin``. ``hermes update`` autostashes with
+    launchers at ``<checkout>/bin``. ``qubit update`` autostashes with
     ``git stash push --include-untracked``; anything untracked and NOT
     ignored inside the checkout gets swept off disk. Exercises git's real
     ignore machinery rather than reading .gitignore text.
@@ -337,6 +337,6 @@ def test_repo_gitignores_the_legacy_bin_dir():
         capture_output=True,
     )
     assert result.returncode == 0, (
-        "bin/hermes.exe is not gitignored — hermes update's autostash "
+        "bin/hermes.exe is not gitignored — qubit update's autostash "
         "(--include-untracked) would sweep pre-migration launchers off disk"
     )

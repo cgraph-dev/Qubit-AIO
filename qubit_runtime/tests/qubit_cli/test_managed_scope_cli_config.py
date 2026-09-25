@@ -3,7 +3,7 @@
 cli.py's load_cli_config() builds config separately from
 qubit_cli.config._load_config_impl, so the managed-scope merge has to be
 applied in BOTH places or the interactive CLI/TUI surface (skin, display prefs)
-silently ignores administrator-pinned values while `hermes config`/`doctor`
+silently ignores administrator-pinned values while `qubit config`/`doctor`
 honor them. This locks the cli.py path.
 """
 import importlib
@@ -31,7 +31,7 @@ def homes(tmp_path, monkeypatch):
 def _load_cli_config(home):
     """Call cli.py's standalone loader fresh.
 
-    cli.py binds ``_hermes_home = get_qubit_home()`` at import time (module
+    cli.py binds ``_qubit_home = get_qubit_home()`` at import time (module
     singleton), so monkeypatching QUBIT_HOME after import doesn't move it.
     Point the module's cached home at the test's home for the duration of the
     call. (In real use cli is imported once per process with the real home, so

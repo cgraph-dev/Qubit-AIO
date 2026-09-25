@@ -77,10 +77,10 @@ def test_pyproject_ships_fork_dashboard_and_plugins():
         "voicebridge/_data/qubit_runtime/LICENSE"
     # whole frontend tree (dashboard + hermes-qubit plugin assets) is packaged
     assert _frontend_tree_packaged(wheel)
-    # provenance manifest travels with the installed runtime (source moved to
-    # docs/archive/2026-09-21/ in the docs reorg; wheel keeps docs/ dest)
+    # provenance manifest travels with the installed runtime (canonical source
+    # docs/generated/ per Owner Decision #24; wheel keeps the docs/ dest)
     assert include.get(
-        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+        "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
     ) == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
     # the sdist mirrors the fork subset so a wheel can be rebuilt offline
     assert any(k.startswith("qubit_runtime/") for k in sdist["force-include"])
@@ -130,8 +130,10 @@ def test_wheel_contains_fork_dashboard_plugins_and_metadata():
         entry = z.read(next(n for n in names
                             if n.endswith("dist-info/entry_points.txt"))).decode()
         assert re.search(r"^qubit\s*=\s*voicebridge\.cli:main$", entry, re.M)
-        assert re.search(r"^qubit-runtime\s*=\s*voicebridge\.qubit_runtime:entry$",
+        assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:entry$",
                          entry, re.M)
+        # the retired pre-rebrand alias must not ship in the wheel
+        assert not re.search(r"^qubit-hermes\s*=", entry, re.M)
         _assert_clean(names, "wheel")
 
 

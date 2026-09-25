@@ -315,7 +315,7 @@ describe('checkBackendUpdates', () => {
   })
 })
 
-// The ⌘K "Update Hermes" row. It used to call applyBackendUpdate() flat, which
+// The ⌘K "Update Qubit" row. It used to call applyBackendUpdate() flat, which
 // in local mode aimed at the backend checkout instead of the client and, with
 // no overlay open, showed nothing at all.
 describe('requestActiveUpdate', () => {
@@ -908,7 +908,7 @@ describe('applyUpdates terminal state', () => {
       guiUpdated: false,
       manualRestart: true,
       sandboxBlocked: true,
-      message: 'Backend updated. Quit and reopen Hermes to finish.'
+      message: 'Backend updated. Quit and reopen Qubit to finish.'
     })
 
     const result = await applyUpdates()
@@ -1126,7 +1126,7 @@ describe('applyBackendUpdate recovery', () => {
   it('proves a pre-action-ID backend reached its requested commit after restart', async () => {
     $backendUpdateStatus.set({
       behind: 2,
-      commits: [{ at: 1, author: 'Nous', sha: 'requested-target', summary: 'target' }],
+      commits: [{ at: 1, author: 'Qubit', sha: 'requested-target', summary: 'target' }],
       fetchedAt: 1,
       supported: true,
       targetSha: 'backend:0.18.2',
@@ -1154,7 +1154,7 @@ describe('applyBackendUpdate recovery', () => {
       .mockResolvedValueOnce({
         behind: 1,
         can_apply: true,
-        commits: [{ at: 2, author: 'Nous', sha: 'newer-commit', summary: 'newer' }],
+        commits: [{ at: 2, author: 'Qubit', sha: 'newer-commit', summary: 'newer' }],
         current_version: '0.18.2',
         install_method: 'git',
         message: null,

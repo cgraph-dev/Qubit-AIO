@@ -96,10 +96,10 @@ class TestGatewayPersonalityNone:
 
     def _gateway_env(self, tmp_path):
         # The gateway reads via _load_gateway_config (rooted at
-        # gateway.run._hermes_home) and persists via persist_personality
+        # gateway.run._qubit_home) and persists via persist_personality
         # (rooted at QUBIT_HOME) — point both at the same tmp dir.
         return (
-            patch("gateway.run._hermes_home", tmp_path),
+            patch("gateway.run._qubit_home", tmp_path),
             patch.dict(os.environ, {"QUBIT_HOME": str(tmp_path)}),
         )
 

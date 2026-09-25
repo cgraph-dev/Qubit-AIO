@@ -85,7 +85,7 @@ class TestWrapCommandAdvertisesHarness:
         )
         assert f"AI={HARNESS_ID} HERMES=true" in out.stdout
 
-        outer_env = dict(clean_env, AI_AGENT="pi", QUBIT_AGENT="false")
+        outer_env = dict(clean_env, AI_AGENT="pi", HERMES_AGENT="false")
         out = subprocess.run(
             ["bash", "-c", wrapped], capture_output=True, text=True,
             env=outer_env, timeout=30,

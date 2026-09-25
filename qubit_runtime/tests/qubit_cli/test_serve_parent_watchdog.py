@@ -1,4 +1,4 @@
-"""Regression tests for Desktop-owned ``hermes serve`` lifecycle tracking."""
+"""Regression tests for Desktop-owned ``qubit serve`` lifecycle tracking."""
 
 from qubit_cli.web_server_lifecycle import (
     _is_serve_orphaned,

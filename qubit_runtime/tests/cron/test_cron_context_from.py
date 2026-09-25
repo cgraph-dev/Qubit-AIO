@@ -19,7 +19,7 @@ def cron_env(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", qubit_home)
+    monkeypatch.setattr(jobs_mod, "QUBIT_DIR", qubit_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", qubit_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", qubit_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", qubit_home / "cron" / "output")
@@ -172,7 +172,7 @@ class TestBuildJobPromptContextFrom:
             prompt="Process", schedule="every 2h", context_from=job_a["id"]
         )
         prompt = _build_job_prompt(job_b)
-        assert "truncated" in prompt
+        assert "chars omitted" in prompt
         assert "x" * 10000 not in prompt
 
 

@@ -125,7 +125,7 @@ describe('speaker labels', () => {
 
     // A renamed default (core display_name via `hermes profile rename`) must
     // read as its new name — the community report was "Lucy" still showing
-    // "Hermes is thinking…" in group rooms.
+    // "Qubit is thinking…" in group rooms.
     data.$lastRoster.set([{ display_name: 'Lucy', name: 'default' }])
 
     expect(chat.groupSpeakerLabel('default')).toBe('Lucy')
@@ -145,7 +145,7 @@ describe('speaker labels', () => {
 
     expect(chat.groupSpeakerLabel('research')).toBe('Radar')
 
-    // Untitled rows keep today's behavior: default → Hermes, others verbatim.
+    // Untitled rows keep today's behavior: default → Qubit, others verbatim.
     data.$botMeta.set({})
 
     expect(chat.groupSpeakerLabel('default')).toBe('Qubit')

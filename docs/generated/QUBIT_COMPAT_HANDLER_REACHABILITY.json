@@ -3,8 +3,8 @@
  "decision": "owner architecture decision 2026-09-17",
  "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
  "counts": {
-  "production_referenced": 20,
-  "route_test_reachable": 35,
+  "production_referenced": 26,
+  "route_test_reachable": 34,
   "registration_only": 2
  },
  "registered_untested": [
@@ -90,6 +90,20 @@
    },
    "script_references": {},
    "test_references": {
+    "tests/test_w9_held_back_port_wave.py": [
+     "32: delivery = __import__(\"tools.bot_live_delivery\", fromlist=[\"x\"])",
+     "56: delivery = __import__(\"tools.bot_live_delivery\", fromlist=[\"x\"])",
+     "37: record = delivery.deliver_to_live_owner(home, owner, \"hello\", delivery_id=\"a\" * 32)",
+     "39: assert delivery.has_mailbox(home)",
+     "43: claimed = delivery.claim_pending_delivery(home, owner)",
+     "46: receipt = delivery.complete_delivery(home, \"a\" * 32, status=\"settled\", reply=\"done\")",
+     "60: delivery.deliver_to_live_owner(home, owner, \"one\", delivery_id=\"b\" * 32)",
+     "52: delivery.complete_delivery(home, \"a\" * 32, status=\"failed\")",
+     "62: delivery.deliver_to_live_owner(home, owner, \"two\", delivery_id=\"b\" * 32)",
+     "41: assert delivery.deliver_to_live_owner(home, owner, \"hello\", delivery_id=\"a\" * 32)[\"status\"] == \"queued\"",
+     "48: assert delivery.read_delivery_result(home, \"a\" * 32)[\"status\"] == \"settled\"",
+     "50: assert delivery.complete_delivery(home, \"a\" * 32, status=\"settled\", reply=\"done\")[\"reply\"] == \"done\""
+    ],
     "tests/test_schedule_delivery8u.py": [
      "139: delivery = out[\"results\"][0][\"delivery\"]",
      "167: delivery = out[\"results\"][0][\"delivery\"]",
@@ -226,7 +240,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "1683: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+     "1689: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
     ]
    },
    "script_references": {},
@@ -302,18 +316,6 @@
    "defined": true,
    "routes": [
     "GET /api/curator"
-   ],
-   "classification": "route_test_reachable",
-   "route_test_reachable": true,
-   "production_references": {},
-   "script_references": {},
-   "test_references": {}
-  },
-  {
-   "handler": "h_custom_endpoints",
-   "defined": true,
-   "routes": [
-    "GET /api/providers/custom-endpoints"
    ],
    "classification": "route_test_reachable",
    "route_test_reachable": true,
@@ -725,7 +727,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "2678: code, out = _HC.h_power(self.app.orch.cfg,"
+     "2684: code, out = _HC.h_power(self.app.orch.cfg,"
     ]
    },
    "script_references": {},
@@ -834,7 +836,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "3302: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+     "3308: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
     ]
    },
    "script_references": {},
@@ -860,6 +862,102 @@
      "194: code, done = HC.skill_create("
     ]
    }
+  },
+  {
+   "handler": "webhooks_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/webhooks/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "875: return HC.webhooks_delete(cfg, {}, {\"confirm\": True, \"id\": sid},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_enable",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/enable"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "870: return HC.webhooks_enable(cfg, {}, {\"confirm\": True}, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_enabled",
+   "defined": true,
+   "routes": [
+    "PUT /api/webhooks/(?P<id>[^/]+)/enabled"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "872: return HC.webhooks_enabled(cfg, {}, {\"confirm\": True, \"id\": sid},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_retry",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/(?P<id>[^/]+)/retry"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "879: \"webhook_retry\": HC.webhooks_retry}.get(action)"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_rotate",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/(?P<id>[^/]+)/rotate"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "877: handler = {\"webhook_rotate\": HC.webhooks_rotate,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "webhooks_test",
+   "defined": true,
+   "routes": [
+    "POST /api/webhooks/(?P<id>[^/]+)/test"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "878: \"webhook_test\": HC.webhooks_test,"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
   }
  ]
 }

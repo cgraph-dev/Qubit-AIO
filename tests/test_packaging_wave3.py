@@ -124,8 +124,11 @@ def test_every_runtime_resource_is_reachable_from_package_data():
             "config/local-actions.example.yaml",
         "docs/archive/2026-09-21/QUBIT_MIGRATION.md":
             "docs/archive/2026-09-21/QUBIT_MIGRATION.md",
+        # Canonical vendor-manifest source is docs/generated/ (Owner Decision
+        # #24: docs/archive/ is historical-only); the installed destination is
+        # unchanged so qubit_runtime.manifest_path() keeps resolving.
         "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json":
-            "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json",
+            "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
         "systemd": "systemd",
     }
     for resource, source in required.items():
@@ -139,12 +142,17 @@ def test_every_runtime_resource_is_reachable_from_package_data():
 
 def test_force_include_destinations_live_under_package_data():
     wheel, _ = _targets()
+    # The vendor manifest is the one sanctioned wheel-root ``docs/``
+    # destination: it is intentionally read by qubit_runtime.manifest_path()
+    # from <site-packages>/docs/, not from _data. Its source moved from the
+    # frozen archive to the canonical generated location (Owner Decision #24);
+    # the installed destination is unchanged either way.
+    manifest_sources = {
+        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json",
+        "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
+    }
     for source, dest in wheel["force-include"].items():
-        if source == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json":
-            # intentionally read by qubit_runtime.manifest_path() from
-            # <site-packages>/docs/, not from _data. The source doc moved to
-            # docs/archive/2026-09-21/ in the 2026-09-21 reorg; the installed
-            # destination is unchanged.
+        if source in manifest_sources:
             assert dest == "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json", (source, dest)
             continue
         assert dest.startswith("voicebridge/_data/"), (source, dest)
@@ -270,8 +278,12 @@ def test_release_qualify_has_uv_build_fallback_and_runtime_checks():
     assert 'shutil.which("uv")' in text
     assert "uv build" in text
     assert "qubit_runtime" in text
-    assert '"qubit-hermes"' in text
+    # The legacy ``qubit-hermes`` launcher was removed from [project.scripts]
+    # (Phase 0 item 0.5); the qualifier must gate the shipped launchers and
+    # must not reference the retired alias.
+    assert '"qubit-hermes"' not in text
     assert "entrypoint.qubit_console_script" in text
+    assert "entrypoint.qubit-agent" in text
 
 
 # ===========================================================================

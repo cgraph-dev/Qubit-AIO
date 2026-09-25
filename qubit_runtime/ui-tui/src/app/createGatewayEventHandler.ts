@@ -1275,6 +1275,10 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
             choices: ev.payload.choices,
             command: String(ev.payload.command ?? ''),
             description,
+            // The legacy `approval.request` gateway event is session-scoped and carries no
+            // server-request id; it is answered via `approval.respond` (session_id). The id
+            // is only used by the server-request `approval` path (createServerRequestHandler).
+            requestId: '',
             smartDenied: ev.payload.smart_denied === true
           }
         })

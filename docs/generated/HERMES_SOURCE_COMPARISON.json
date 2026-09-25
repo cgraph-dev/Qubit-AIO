@@ -616,7 +616,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "8c1ed9fc49c52e6896db27d1825134eb9e5cd82ae8cd165d7599e8891fb3f9b3",
    "qubit": "frontend/qubit-web/src/components/QubitConsoleModal.tsx",
-   "qubit_sha256": "8fbbbfa3f0a12e29bf3222f2f11c5c40f05855274496642cf3d6fe5f4d192187",
+   "qubit_sha256": "ca3a2a4704263ba627a8c29a2346d8111ed2b4558c02d07d23c13824e65ed98e",
    "patch": "wave2/frontend-rebrand-console-prompt",
    "reason": "Rebrand the refused raw-console prompt fallback from a Qubit product perspective. Presentation-only; the raw console/PTY remains a typed refusal. Regression: tests/test_qubit_playwright8tf.py.",
    "upstream_blob_sha256": "8c1ed9fc49c52e6896db27d1825134eb9e5cd82ae8cd165d7599e8891fb3f9b3",
@@ -641,12 +641,12 @@
    "upstream": "web/src/components/LoadErrorNotice.tsx",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "b721861aba752bd8fdd38606501c074273fa86fafdf9ecfb0898ef81c0d6453b",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/components/LoadErrorNotice.tsx has no shipped Qubit counterpart at frontend/qubit-web/src/components/LoadErrorNotice.tsx (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/components/LoadErrorNotice.tsx",
+   "qubit_sha256": "89ae2474fa5bb85e96f66a29f9217b30d6e4e97a8d27ea44499350d797164929",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "b721861aba752bd8fdd38606501c074273fa86fafdf9ecfb0898ef81c0d6453b",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1110,7 +1110,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "bbf14b82fb448f90cb97f93751a56fb000367edd6461d16274a093e9fc26f2d4",
    "qubit": "frontend/qubit-web/src/i18n/en.ts",
-   "qubit_sha256": "1cf0d46d72f9f8805e1077e6a131a8a2edde345b63cc9710e922a10a6ea62da6",
+   "qubit_sha256": "6d2cc2ca2a581b19d57e8fa74182494607525c2bddb2b6dbbdac13b701f47426",
    "patch": "product-string rebrand: 'Update Hermes'/'Updating Hermes'/'Update Hermes?' -> Qubit; confirm text hermes->qubit (owner rebrand)",
    "reason": "Qubit rebrand of product-facing English dashboard strings; translation keys unchanged; no logic or route change.",
    "upstream_blob_sha256": "bbf14b82fb448f90cb97f93751a56fb000367edd6461d16274a093e9fc26f2d4",
@@ -1266,7 +1266,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "44711d5dbd97e4109baccd228c2af99c37880a33f9054368b6d2ef50f86691ab",
    "qubit": "frontend/qubit-web/src/i18n/types.ts",
-   "qubit_sha256": "50fb31a54a9e644bf174b8cf86eb53416f6929bbca9477dcc0289c5a0aff034d",
+   "qubit_sha256": "31e42b874b835096faa77da7f36fa84c0b570b86d33a49b1bd452b8b39f01610",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "44711d5dbd97e4109baccd228c2af99c37880a33f9054368b6d2ef50f86691ab",
@@ -1343,12 +1343,12 @@
    "upstream": "web/src/lib/api-error.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "275742acbd0110ff2271e0d32980f06515aa5dff593faffe864648defee43444",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/api-error.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/api-error.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/api-error.ts",
+   "qubit_sha256": "3d22dd710ebd8941bb3c5429252dc67b85b465fa1e2619f55440c24c6fe829c8",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "275742acbd0110ff2271e0d32980f06515aa5dff593faffe864648defee43444",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1383,7 +1383,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "fd019205925a6eadb9518902d0ae0e0d88a7cab41454b6e80dcfdb442e515a52",
    "qubit": "frontend/qubit-web/src/lib/api.ts",
-   "qubit_sha256": "73f25b9f9311db7d5bf762f602dc277ca9f6c9c83e43e6b0b2b6c588c16832d7",
+   "qubit_sha256": "bf2c65efb915b4dd432c737b557456295994a52f666c77b1ce992ab98fbac8f9",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "fd019205925a6eadb9518902d0ae0e0d88a7cab41454b6e80dcfdb442e515a52",
@@ -1434,12 +1434,12 @@
    "upstream": "web/src/lib/chat-sidebar-banner.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "e966ff9312b458ac6cf021e4354280745ff3d18f37dc6f26a2a2b846810491e7",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/chat-sidebar-banner.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/chat-sidebar-banner.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/chat-sidebar-banner.ts",
+   "qubit_sha256": "c2220b6160b9c206d6f7c8e5393e66e383f8f158f7a70acab9cf99310e112211",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "e966ff9312b458ac6cf021e4354280745ff3d18f37dc6f26a2a2b846810491e7",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1707,12 +1707,12 @@
    "upstream": "web/src/lib/eventsFeedClient.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "ff8cfedadfe4219667ed4229ad37e49fea998ee9a86e44afeb44de47b544a1b9",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/eventsFeedClient.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/eventsFeedClient.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/eventsFeedClient.ts",
+   "qubit_sha256": "715ca7c453aefdccdd84af6bfa9d9f2effadf3866fd076fabb371701cfad803e",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "ff8cfedadfe4219667ed4229ad37e49fea998ee9a86e44afeb44de47b544a1b9",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1785,12 +1785,12 @@
    "upstream": "web/src/lib/load-error-copy.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "ba905e558978039638937d736fdedc2f4b3933868e4414830e6e243d72642847",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/load-error-copy.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/load-error-copy.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/load-error-copy.ts",
+   "qubit_sha256": "a8e425b041a769da2587164eab884aae082438ec4cab69ae701f30c78df5a492",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "ba905e558978039638937d736fdedc2f4b3933868e4414830e6e243d72642847",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1928,12 +1928,12 @@
    "upstream": "web/src/lib/profile-bootstrap.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "dbc3445e56235ccc0f16a76c2a5731d13ca5f31cf2e980ee5f3d49acd65f5fa2",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/profile-bootstrap.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/profile-bootstrap.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/profile-bootstrap.ts",
+   "qubit_sha256": "d3ac9aeda8e477a92e3ea1819bf830c725bfcf6aeece4e95abfdaf7258756546",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "dbc3445e56235ccc0f16a76c2a5731d13ca5f31cf2e980ee5f3d49acd65f5fa2",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1954,12 +1954,12 @@
    "upstream": "web/src/lib/pty-attach-token.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "fa85f60f78248a282a87ce0f78a3726d5b2965b358d591c299136336f43aa592",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/pty-attach-token.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/pty-attach-token.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/pty-attach-token.ts",
+   "qubit_sha256": "fac92de91a7e05be1869790a8da8b40faa0d13bf7e41925baa222eaebb349bc9",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "fa85f60f78248a282a87ce0f78a3726d5b2965b358d591c299136336f43aa592",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1980,12 +1980,12 @@
    "upstream": "web/src/lib/pty-close-copy.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "018502dc61f9fd0db401e22f244dc33f2121cefde64a35bfc319ed792caa1803",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/pty-close-copy.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/pty-close-copy.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/pty-close-copy.ts",
+   "qubit_sha256": "136d68d8c419379ee4c62473b96cd35ed6b890035d26443cf3560da9167a1b53",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "018502dc61f9fd0db401e22f244dc33f2121cefde64a35bfc319ed792caa1803",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -2370,12 +2370,12 @@
    "upstream": "web/src/lib/shared-gateway.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "791ec84d983246f65edc34d198ddbb83aecf3f0e631e88ae304dbd9ab073401c",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/shared-gateway.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/shared-gateway.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/shared-gateway.ts",
+   "qubit_sha256": "815aec22eb9b1130b2cdd004a0c21b60c66e038e619c3e562f059ef42e67e90d",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "791ec84d983246f65edc34d198ddbb83aecf3f0e631e88ae304dbd9ab073401c",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -2409,12 +2409,12 @@
    "upstream": "web/src/lib/xterm-webgl-release.ts",
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "8eb83c2d1ca07e386206ced93d394643886be72e7ea613f1681de163188495c8",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/xterm-webgl-release.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/xterm-webgl-release.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/xterm-webgl-release.ts",
+   "qubit_sha256": "a7a6e013f72f28510f6f74949326cfcbc17bca79bfb6ed145dfbbee6a6269b9f",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "8eb83c2d1ca07e386206ced93d394643886be72e7ea613f1681de163188495c8",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -2566,7 +2566,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "897737151545182966b07b32a044c5f6ee9df79923f5982d6821c1b911526f5e",
    "qubit": "frontend/qubit-web/src/pages/McpPage.tsx",
-   "qubit_sha256": "a08718c2f9d334066a295e2c9256e462e5d35f78176b8d03d97a8114f1e4ecbc",
+   "qubit_sha256": "31040e28fd41ac4c8f216b0ae1172526b1cd664acfd3f85c04b0b73fca432629",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "897737151545182966b07b32a044c5f6ee9df79923f5982d6821c1b911526f5e",

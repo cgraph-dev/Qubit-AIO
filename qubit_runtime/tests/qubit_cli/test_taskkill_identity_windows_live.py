@@ -10,7 +10,7 @@ Class under test (#98814 / #89614):
 - ``gateway.status.terminate_pid(force=True)`` requires a matching
   ``expected_start_time`` and must refuse (never taskkill) on a missing or
   mismatched identity.
-- ``qubit_cli._subprocess_compat.pid_is_hermes`` fails closed on foreign
+- ``qubit_cli._subprocess_compat.pid_is_qubit`` fails closed on foreign
   processes and identity mismatches.
 - ``qubit_cli.update_cmd._refuse_gateway_ancestor_tree_kill`` refuses to
   nominate any ancestor of the current process for a tree-kill.
@@ -121,9 +121,9 @@ class TestPidIsQubitLive:
         proc = _spawn_sleeper()
         try:
             # sys.executable in CI lives under a uv/hostedtoolcache path with
-            # no 'hermes' token; if the checkout path itself contains one this
+            # no 'qubit' token; if the checkout path itself contains one this
             # assertion is environment-dependent, so guard for it.
-            if "hermes" in sys.executable.lower():
+            if "qubit" in sys.executable.lower():
                 pytest.skip("interpreter path names hermes; probe would match")
             assert pid_is_qubit(proc.pid) is False
         finally:

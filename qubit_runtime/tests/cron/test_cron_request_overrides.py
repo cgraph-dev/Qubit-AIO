@@ -32,7 +32,7 @@ class TestRunJobRequestOverrides:
             }
         }
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("dotenv.load_dotenv"), \
              patch("qubit_state_registry.acquire", return_value=fake_db), \

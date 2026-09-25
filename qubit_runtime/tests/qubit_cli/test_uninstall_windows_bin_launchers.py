@@ -22,7 +22,7 @@ from qubit_cli._install_repair import _WINDOWS_BIN_LAUNCHERS
 @pytest.fixture
 def managed_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Default-root ``bin`` holding launchers of both forms plus managed uv."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     bin_dir = home / "bin"
     bin_dir.mkdir(parents=True)
     (bin_dir / "hermes.exe").write_bytes(b"MZ launcher")
@@ -64,7 +64,7 @@ def test_noop_on_posix(managed_bin: Path):
 
 
 def test_noop_when_no_launchers_staged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(home))
 
@@ -86,7 +86,7 @@ def test_launcher_names_stay_in_lockstep_with_install_ps1():
 
     assert staged == set(_WINDOWS_BIN_LAUNCHERS)
     for name in _WINDOWS_BIN_LAUNCHERS:
-        assert name.startswith("hermes")  # never a generic name it could clobber
+        assert name.startswith("qubit")  # never a generic name it could clobber
 
 
 class TestManagedBinPathMarker:
@@ -97,7 +97,7 @@ class TestManagedBinPathMarker:
     ``tmp_path`` would make the test pass only on Windows hosts.
     """
 
-    HOME = r"C:\Users\me\AppData\Local\hermes"
+    HOME = r"C:\Users\me\AppData\Local\qubit"
     BIN_ENTRY = r"C:\Users\me\AppData\Local\hermes\bin"
 
     def test_keep_data_markers_spare_the_managed_bin(self):

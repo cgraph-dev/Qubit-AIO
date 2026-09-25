@@ -412,7 +412,7 @@ def test_gateway_install_noninteractive_skips_legacy_unit_prompt(monkeypatch, tm
     Covers the second hidden prompt that --start-now/--start-on-login do not
     guard. Originally contributed via PR #42124 (kyssta-exe).
     """
-    monkeypatch.setattr(gateway, "has_legacy_hermes_units", lambda: True)
+    monkeypatch.setattr(gateway, "has_legacy_qubit_units", lambda: True)
 
     calls = []
     monkeypatch.setattr(
@@ -420,7 +420,7 @@ def test_gateway_install_noninteractive_skips_legacy_unit_prompt(monkeypatch, tm
         "prompt_yes_no",
         lambda question, default=True: calls.append(("prompt", question)) or True,
     )
-    monkeypatch.setattr(gateway, "remove_legacy_hermes_units", lambda interactive=False: calls.append(("remove_legacy",)))
+    monkeypatch.setattr(gateway, "remove_legacy_qubit_units", lambda interactive=False: calls.append(("remove_legacy",)))
     monkeypatch.setattr(gateway, "print_legacy_unit_warning", lambda: None)
 
     fake_path = tmp_path / "hermes-gateway.service"
@@ -594,7 +594,7 @@ class TestReapUnsupervisedGatewayOrphansMacOS:
 
     Regression guard: without the ``is_macos()`` exclusion of
     ``_get_service_pids()``, the reaper would SIGTERM the launchd-supervised
-    gateway every time Hermes Desktop opens (``hermes serve`` calls
+    gateway every time Hermes Desktop opens (``qubit serve`` calls
     ``_reap_unsupervised_gateway_orphans`` during startup).
     """
 
@@ -672,7 +672,7 @@ class TestReapUnsupervisedGatewayOrphansWindows:
     Regression guard: without the Windows exemption of the recorded healthy
     gateway PID (and its parent chain), the reaper would SIGTERM/SIGKILL a
     Scheduled-Task-supervised gateway every time Hermes Desktop opens
-    (``hermes serve`` calls ``_reap_unsupervised_gateway_orphans`` during
+    (``qubit serve`` calls ``_reap_unsupervised_gateway_orphans`` during
     startup). The Scheduled-Task bootstrap's argv matches the gateway scan,
     so it is reaped as an "orphan" — and when the bootstrap dies, the
     detached gateway it spawned exits with it (#86098).
@@ -856,7 +856,7 @@ class TestReaperCandidateIsSupervisorOwned:
         """A Windows gateway launched by the Scheduled Task is spared even when
         gateway.pid is missing — the supervisor-owned backstop catches it."""
         gateway_pid = 52615
-        bootstrap_pid = 52616   # Task-launched `hermes gateway run` bootstrap
+        bootstrap_pid = 52616   # Task-launched `qubit gateway run` bootstrap
         orphan_pid = 99998      # a genuine orphan that SHOULD be reaped
 
         monkeypatch.setattr(gateway, "is_windows", lambda: True)

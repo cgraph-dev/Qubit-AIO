@@ -13,6 +13,9 @@ const apiMocks = vi.hoisted(() => ({
   getMcpServers: vi.fn(),
   getMcpCatalog: vi.fn(),
   invokeMcpTool: vi.fn(),
+  getMcpServerResources: vi.fn(),
+  getMcpServerPrompts: vi.fn(),
+  getMcpServerResourceTemplates: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -97,6 +100,33 @@ beforeEach(() => {
     state: "OK",
     result: { hits: 1 },
   });
+  apiMocks.getMcpServerResources.mockResolvedValue({
+    ok: true,
+    server: "cgraph-graft",
+    capability: "resources",
+    state: "OK",
+    connected: true,
+    code: "MCP_READ_OK",
+    resources: [{ uri: "graft://code", name: "code", description: "code graph" }],
+  });
+  apiMocks.getMcpServerPrompts.mockResolvedValue({
+    ok: false,
+    server: "cgraph-graft",
+    capability: "prompts",
+    state: "OPERATOR_ONLY",
+    connected: false,
+    code: "MCP_NOT_CONNECTED",
+    detail: "config-declared server records no runnable transport",
+  });
+  apiMocks.getMcpServerResourceTemplates.mockResolvedValue({
+    ok: true,
+    server: "cgraph-graft",
+    capability: "resource-templates",
+    state: "OK",
+    connected: true,
+    code: "MCP_READ_OK",
+    resource_templates: [],
+  });
 });
 
 afterEach(async () => {
@@ -146,5 +176,60 @@ describe("McpPage tool invocation", () => {
       { query: "x" },
       expect.any(Function),
     );
+  });
+
+  it("expands Capabilities and renders the real drained lists + typed disposition", async () => {
+    await renderPage();
+    await waitFor(() => apiMocks.getMcpServers.mock.calls.length > 0);
+    await waitFor(
+      () => container.querySelector('button[aria-label="Capabilities for cgraph-graft"]') !== null,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Capabilities for cgraph-graft"]')
+        ?.click();
+    });
+
+    await waitFor(() => apiMocks.getMcpServerResources.mock.calls.length > 0);
+    await waitFor(() => apiMocks.getMcpServerPrompts.mock.calls.length > 0);
+    await waitFor(
+      () => apiMocks.getMcpServerResourceTemplates.mock.calls.length > 0,
+    );
+    expect(apiMocks.getMcpServerResources).toHaveBeenCalledWith("cgraph-graft");
+    expect(apiMocks.getMcpServerPrompts).toHaveBeenCalledWith("cgraph-graft");
+    expect(apiMocks.getMcpServerResourceTemplates).toHaveBeenCalledWith(
+      "cgraph-graft",
+    );
+
+    // Real drained resource renders verbatim; the typed prompts disposition
+    // renders with its code (never a fabricated empty list).
+    await waitFor(() => container.textContent?.includes("graft://code") === true);
+    expect(container.textContent).toContain("MCP_NOT_CONNECTED");
+    expect(container.textContent).toContain("Resource templates");
+  });
+
+  it("renders a retryable typed error when a capability read rejects", async () => {
+    apiMocks.getMcpServerResources.mockRejectedValueOnce(
+      new Error("500: MCP_READ_FAILED: transport failed"),
+    );
+    await renderPage();
+    await waitFor(() => apiMocks.getMcpServers.mock.calls.length > 0);
+    await waitFor(
+      () => container.querySelector('button[aria-label="Capabilities for cgraph-graft"]') !== null,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Capabilities for cgraph-graft"]')
+        ?.click();
+    });
+
+    await waitFor(
+      () =>
+        container.querySelector('button[aria-label="Retry Resources for cgraph-graft"]') !==
+        null,
+    );
+    expect(container.textContent).toContain("MCP_READ_FAILED");
   });
 });

@@ -29,12 +29,12 @@ QUBIT_INDEX_TTL = 6 * 3600  # 6 hours
 
 def _qubit_index_cache_file() -> Path:
     from tools.skills_hub import _index_cache_dir
-    return _index_cache_dir() / "hermes-index.json"
+    return _index_cache_dir() / "qubit-index.json"
 
 
 def _load_qubit_index() -> Optional[dict]:
     """Fetch the centralized skills index (docs site, rebuilt daily), cached
-    locally for HERMES_INDEX_TTL; on any failure serve the stale cache.
+    locally for QUBIT_INDEX_TTL; on any failure serve the stale cache.
 
     Brotli is deliberately NOT negotiated: the index is tens of MB and httpx's
     streaming Brotli decoder (brotlicffi, pinned for Discord attachments) raises

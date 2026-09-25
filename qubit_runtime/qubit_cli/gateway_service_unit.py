@@ -119,11 +119,11 @@ def _systemd_watchdog_seconds(hermes_home: str | Path | None = None) -> int:
 
 
 def _append_node_dir_for_service(path_entries: list[str], qubit_root: Path | None = None) -> None:
-    """Append the Node dir a service unit should use: managed ``<hermes_root>/node`` (profile-scoped)
+    """Append the Node dir a service unit should use: managed ``<qubit_root>/node`` (profile-scoped)
     first — a unit survives reboots, so baking a shell-PATH Node is permanent breakage — else PATH lookup."""
-    from qubit_constants import (hermes_managed_node_tree_present, iter_hermes_node_dirs)
-    managed_node_present = hermes_managed_node_tree_present(qubit_root)
-    for directory in iter_hermes_node_dirs(qubit_root) if managed_node_present else ():
+    from qubit_constants import (qubit_managed_node_tree_present, iter_qubit_node_dirs)
+    managed_node_present = qubit_managed_node_tree_present(qubit_root)
+    for directory in iter_qubit_node_dirs(qubit_root) if managed_node_present else ():
         entry = str(directory)
         try:
             present = directory.is_dir()

@@ -1,4 +1,4 @@
-"""Tests for ``hermes approvals suggest`` (qubit_cli/approvals_suggest.py).
+"""Tests for ``qubit approvals suggest`` (qubit_cli/approvals_suggest.py).
 
 Approval history in Hermes is implied, not ledgered: the session DB
 (state.db) stores every assistant ``terminal`` tool call plus its paired

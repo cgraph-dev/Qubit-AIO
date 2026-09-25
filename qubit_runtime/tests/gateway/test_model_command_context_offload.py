@@ -55,7 +55,7 @@ def _runner_with_store(tmp_path, monkeypatch):
         _yaml.safe_dump({"model": {"default": "old-model", "provider": "openrouter"}}),
         encoding="utf-8",
     )
-    monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+    monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr(
         "qubit_cli.model_switch.switch_model",

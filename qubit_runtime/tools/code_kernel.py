@@ -118,7 +118,7 @@ def _start_parent_death_pipe_watchdog():
             pass
         os._exit(0)
 
-    threading.Thread(target=_wait, name="hermes-parent-watchdog", daemon=True).start()
+    threading.Thread(target=_wait, name="qubit-parent-watchdog", daemon=True).start()
 
 
 def _start_parent_process_watchdog():
@@ -168,7 +168,7 @@ def _start_parent_process_watchdog():
         if result == 0x00000000:  # WAIT_OBJECT_0: the parent exited
             os._exit(0)
 
-    threading.Thread(target=_wait, name="hermes-parent-watchdog", daemon=True).start()
+    threading.Thread(target=_wait, name="qubit-parent-watchdog", daemon=True).start()
 
 
 _start_parent_process_watchdog()

@@ -802,7 +802,7 @@ def _db_opens_cleanly(db_path: Path) -> Optional[str]:
             # would, so a stale ``_idx`` row at the next segid (IntegrityError "constraint failed", the #100227
             # class: integrity_check and MATCH both clean, every real append fails) is hit here rather than
             # by the user's next message.
-            probe_session_id = f"_hermes_fts_health_probe_{time.time_ns()}"
+            probe_session_id = f"_qubit_fts_health_probe_{time.time_ns()}"
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 conn.execute("INSERT INTO sessions (id, source, started_at) VALUES (?, ?, ?)",

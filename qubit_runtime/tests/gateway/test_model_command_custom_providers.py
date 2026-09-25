@@ -45,7 +45,7 @@ async def test_direct_model_switch_offloads_to_thread(tmp_path, monkeypatch):
 
     import gateway.run as gateway_run
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+    monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
     # Fail the switch so the handler returns before _finish_switch (which needs
     # full runner state) — we only care that the offload happened.

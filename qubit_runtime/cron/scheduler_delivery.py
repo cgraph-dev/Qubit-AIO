@@ -648,7 +648,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str) -> Optional[str]
     ``profile`` is ``""`` for the job's own profile. None on success, else an error string."""
     import tempfile
     job_id = job.get("id", "?")
-    qubit_bin = shutil.which("hermes")
+    qubit_bin = shutil.which("qubit") or shutil.which("hermes")
     if qubit_bin:
         argv = [qubit_bin]
     else:
@@ -683,7 +683,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str) -> Optional[str]
     query_file = None
     try:
         with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", suffix=".txt", prefix="hermes-cron-botchat-", delete=False,
+            "w", encoding="utf-8", suffix=".txt", prefix="qubit-cron-botchat-", delete=False,
         ) as fh:
             fh.write(message)
             query_file = fh.name

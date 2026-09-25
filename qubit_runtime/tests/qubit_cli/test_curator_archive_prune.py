@@ -1,4 +1,4 @@
-"""Tests for `hermes curator archive` and `hermes curator prune`.
+"""Tests for `qubit curator archive` and `qubit curator prune`.
 
 Covers:
 - archive refuses pinned skills with an `unpin` hint
@@ -38,7 +38,7 @@ def test_archive_refuses_pinned(monkeypatch, capsys):
     assert called == []
     out = capsys.readouterr().out
     assert "pinned" in out.lower()
-    assert "hermes curator unpin" in out
+    assert "qubit curator unpin" in out
 
 
 
@@ -75,7 +75,7 @@ def test_archive_and_prune_registered():
     import argparse
     import qubit_cli.curator as curator_cli
 
-    parser = argparse.ArgumentParser(prog="hermes curator")
+    parser = argparse.ArgumentParser(prog="qubit curator")
     curator_cli.register_cli(parser)
 
     args = parser.parse_args(["archive", "my-skill"])

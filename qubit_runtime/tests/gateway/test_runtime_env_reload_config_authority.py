@@ -27,7 +27,7 @@ def test_reload_runtime_env_preserves_config_max_turns(tmp_path: Path, monkeypat
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+    monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
     monkeypatch.setenv("HERMES_MAX_ITERATIONS", "9000")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
@@ -57,7 +57,7 @@ def test_reload_runtime_env_preserves_config_terminal_backend(
     )
     (qubit_home / ".env").write_text("TERMINAL_ENV=docker\n", encoding="utf-8")
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+    monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     # Startup bridge already ran: the effective backend is local.
     monkeypatch.setenv("TERMINAL_ENV", "local")

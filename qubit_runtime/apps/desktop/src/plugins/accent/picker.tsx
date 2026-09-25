@@ -4,7 +4,7 @@
 // crushes the entire blue family into a narrow band of its hue rail, so
 // dragging "to blue" lands you on ~266° — pure sRGB blue, which reads violet to
 // the eye. Every blue that actually looks blue (GitHub 257°, Tailwind 260°,
-// Nous 263°) sits in a few degrees you cannot reliably hit in HSV. In OKLCH the
+// Qubit 263°) sits in a few degrees you cannot reliably hit in HSV. In OKLCH the
 // rail is perceptually even, so those degrees get their fair share of track.
 //
 // The field is a CANVAS, not a CSS gradient, because a hue slice of OKLCH is a

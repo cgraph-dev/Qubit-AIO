@@ -1181,6 +1181,42 @@ the `.hermes_history` apply; the final M4 gate + independent verifier.
 `qubit_runtime/` modules; the `.hermes_history` apply; the final M4 gate +
 independent verifier.
 
+## 31. Wave 19 — W9 vendor sync COMPLETE + defect fixes — 2026-09-24
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Environmental blocker below.**
+
+- **W9 vendor sync: `missing_from_local = 0`** — the vendored `qubit_runtime/` is
+  now a full superset of the 0.21.4 pin (`d337b736`). Wave-19 slices:
+  `contributors/` **+425**, `apps/` **+616**, plus the top-level deep-rename
+  slice; the anon-auth held-back cluster was closed (0 remaining); the
+  `ui-tui/`+`apps/` brand slice de-branded product prose (**529 → 11**, the 11
+  being provenance/legal/generated-contract).
+- **D1 (clean-clone incompleteness) — FIXED.** 1608 upstream-tracked vendored
+  files were untracked in the git index (vendored `.gitignore` exclusion);
+  force-added from the manifest's `git_index_gaps`, then regenerated:
+  **`git_index_gaps = 0`**.
+- **D2 (test residue) — FIXED.** `qubit_runtime/MagicMock/` (2.1 MB) removed;
+  `MagicMock` added to the generator skip sets + `.gitignore`.
+- **D3 (gateway down) — FIXED.** The daemon was inactive; restarted via the
+  sanctioned confirm path → `qubit-gateway` active, `daemon_live:true`.
+- **D5 (`-z` exit code) — FIXED.** `qubit -z` treated a provider-error response
+  as success (exit 0). `qubit_runtime/qubit_cli/oneshot.py` now honours
+  `result["failed"]` → exit 1 + stderr, never writes the error as the response.
+- **D4 (MCP) — verified working** (`mcp invoke cgraph-graft` → `state:OK`, real
+  graft result); the verifier's failures were transient.
+- **Focused sweep: 465 passed / 5 skipped / 0 failed across 29 files.**
+- **Environmental blocker (not code):** the upstream provider returns
+  `HTTP 403: Upstream request failed: Model access is disabled` — this blocks a
+  *fresh* model-turn proof (M1 items 4/6), which were proven in wave 15
+  (screenshot + logs). Plugin/skill/session/MCP/branding/import paths all run.
+- **Brand flagged for owner disposition:** `voicebridge/data/plugin_index_pinned.json`
+  renders upstream repo URLs + `"maintainer":"NousResearch"` on the Plugins page
+  (third-party source provenance; not in the rebrand allowlist).
+
+**Still open:** owner ratification of `M1`; the deep rename of the remaining
+modules; the `.hermes_history` apply; the final M4 gate + independent verifier;
+the upstream model-access restoration for a fresh `/chat` proof.
+
 ## 24. Live dashboard E2E audit + fix — 2026-09-23 (10-agent wave)
 
 **No M1/M2/CODE_READY/VERIFIED claimed. Not committed.** Real browser + live
@@ -1358,3 +1394,67 @@ runtime-path rename is out of this slice's six-file scope).
   historical-only** — reachability test + generator repointed to
   `docs/generated/` (artifact sha256 `63fe29b4…`, determinism ×2); dead
   `h_logs_*` handlers removed. 227 focused tests pass; services active.
+
+- **Wave 6 (5 agents).** W9 vendor-sync **agent slice** ported
+  `agent/turn_failure_copy.py` + `agent/surface_switch.py` (+ `error_classifier`
+  enum members; held-back symbol deps documented); gateway/tools slice confirmed
+  complete (3 files held back for absent 0.21.4 deps: `anon_auth`,
+  `fsync_directory`, vault redaction). **Voice coverage 43.11% → 80.70%**
+  (594 → 1112 real, 5 guard, 261 unresolved) by bridging real CLI literals to
+  existing backends. Decision #24 follow-up: **6 archive-reading scripts
+  repointed to `docs/generated/`**; vendor manifest regenerated from pin
+  `d337b736` (`git_index_gaps` 106 → **0**). New behavioral **route E2E auditor**
+  (`scripts/route_e2e_audit.py` + `docs/generated/QUBIT_ROUTE_E2E_2026-09-23.json`):
+  **98/101 GET PASS, 5/6 mutations PASS**; its one FAIL exposed a real write/read
+  split-brain on `/api/providers/custom-endpoints`, **fixed** via
+  `QUBIT_READ_AUTHORITY`. 232 focused tests pass; graft refreshed; services
+  active.
+
+- **Wave 7 (5 agents).** **Voice coverage 80.70% → 85.20%** (1174 real,
+  197 unresolved, 7 guard). **W9 held-back unblocked**: ported
+  `utils.fsync_directory` + the `atomic_write_text/bytes/json_write` `mode`/
+  `fsync_dir` params, `agent.redact` vault-value registration, and
+  `qubit_cli/anon_auth.py`; then ported the 3 previously-held-back files
+  (`gateway/slash_commands_login.py`, `tools/bot_live_delivery.py`,
+  `tools/browser_vault_tool.py`) — the held-back ledger is now **empty**; fixed a
+  real `cron/bot_chat_delivery` `atomic_json_write(fsync_dir/mode)` bug. **W9 cron/
+  web slice** ported 10 files (web had nothing missing); **W9 `qubit_cli` slice**
+  made `qubit_cli/**` a superset of the pin (0 missing; 3 modules + dependency
+  symbols). **Vendor manifest missing 2730 → 1120** (git_index_gaps 1610 = newly
+  ported files untracked until a freeze commit, N23). New **real browser controls
+  E2E** (`scripts/controls_e2e_audit.py` +
+  `docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json`): 48 controls → **47 PASS**;
+  its one FAIL (memory-provider read 404 vs 8 advertised) is **fixed** — `mem_config`
+  now returns the same typed `MEMORY_LOCAL_ONLY` gate as the write path. 226
+  focused tests pass; services active.
+
+- **Solo browser E2E on /cron + runner fix (2026-09-24).** Drove the real
+  browser: New-Cron-Job dialog (fill name/prompt → native confirm → 200,
+  rendered) → Pause (staged 409 → banner Confirm → paused) → Resume (banner
+  Confirm → enabled) → Delete (row Delete → in-app dialog → native confirm →
+  200, gone). Fully cleaned up (only `jobA` remains; pending 0). This exposed a
+  **real bug**: the banner's id-only Confirm returned `400 CONFIRM_UNSUPPORTED`
+  for `qubit.cron.pause`. **Fixed** by adding `cron.pause`/`cron.resume`/
+  `cron.run_due` branches to `_compat_runner` (`dashboard_ops.py`) that re-enter
+  `_cron_mutate` with the staged id. New regression test
+  `tests/test_cron_banner_settle9u.py` (3 passed); 54 across the runner/mutation
+  suites. Confirmed honest Last/Next dates (epoch fix holds).
+
+- **Wave 8 (6 agents + solo fixes).** ui-tui `typecheck` 14 → 0 (ported pinned
+  types). **W9 backend product sync COMPLETE** (`missing_from_local` **0**; the
+  12 ui-tui files ported). Frontend W9 slice ported 11 product files
+  (`frontend/qubit-web`). **Voice 85.20% → 85.99%** (1185 real, 193 audited
+  guards, **0 unresolved**). Deep-rebrand **tools/cron slice** (28 files;
+  real `skills_hub` dead-alias bug fixed). **Packaging re-baseline**: fixed a real
+  **sdist leak of `/home/trick`**, reconciled vendor/packaging tests, proved the
+  build. Desktop electron brand leak fixed. Vendor comparison generator fixed
+  (worktree-vs-blob EOL) and the frontend coverage test now applies the
+  reference-only-test policy. **Browser controls E2E round 2** (14 pages,
+  **96 controls, 84 PASS**) found and **fixed two real product bugs**: (1)
+  `_files_root` called the nonexistent `projects.active()` so `/files` reported
+  no root — now delegates to `_active_folder` (live root resolves); (2) webhook
+  create was staged but the banner id-only Confirm returned
+  `CONFIRM_UNSUPPORTED` — the staged payload now carries the creation fields and
+  `_compat_runner` has the webhook family (live: 409 → confirm 200 → created).
+  150 focused tests pass; services active. One MCP-invoke row is environment-only
+  (`graft` not on the service `PATH`).

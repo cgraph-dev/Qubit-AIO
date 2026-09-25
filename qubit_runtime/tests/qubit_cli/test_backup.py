@@ -1,4 +1,4 @@
-"""Tests for hermes backup and import commands."""
+"""Tests for qubit backup and import commands."""
 
 import json
 import os
@@ -479,7 +479,7 @@ class TestImport:
 
         out = capsys.readouterr().out
         assert "Done. Your Hermes configuration has been restored." in out
-        assert "hermes gateway install" in out
+        assert "qubit gateway install" in out
 
 
 
@@ -684,7 +684,7 @@ class TestBackupEdgeCases:
 
 
     def test_empty_qubit_home(self, tmp_path, monkeypatch):
-        """Backup handles empty hermes home (no files to back up)."""
+        """Backup handles empty qubit home (no files to back up)."""
         qubit_home = tmp_path / ".hermes"
         qubit_home.mkdir()
         # Only excluded dirs, no actual files
@@ -818,7 +818,7 @@ def _break_member(monkeypatch, failing_member: str) -> None:
 
 
 class TestImportAtomicWrites:
-    """`hermes import` must never leave a user's file truncated.
+    """`qubit import` must never leave a user's file truncated.
 
     The pre-fix code did ``open(target, "wb")`` then ``dst.write(src.read())``,
     which zeroes the existing file *before* any replacement bytes exist. These
@@ -970,7 +970,7 @@ class TestImportAtomicWrites:
         """A root-run import must not re-own the user's files to root.
 
         ``os.replace`` swaps in a temp file owned by the *writing* user, so a
-        ``sudo hermes import`` onto a user-owned (or Docker/NAS volume-owned)
+        ``sudo qubit import`` onto a user-owned (or Docker/NAS volume-owned)
         QUBIT_HOME would hand every restored file to root. The uid/gid is
         forced so the assertion does not require running as root.
         """
@@ -1054,7 +1054,7 @@ class TestImportAtomicWrites:
         file whose contents now come from the zip.  Whoever produced the
         archive would then get whatever that file executes as.  The other
         ``utils`` writers can preserve the full mode safely because they
-        re-serialize content this process produced; ``hermes import`` is the
+        re-serialize content this process produced; ``qubit import`` is the
         one write path where the bytes are untrusted, and it is also the path
         that documents ``sudo`` use for owner preservation.
 
@@ -1338,7 +1338,7 @@ class TestQuickSnapshot:
 
     def test_restore_refused_db_is_not_counted(self, qubit_home, monkeypatch):
         """A refused live-safe restore (holder detected, backup leg failed) must
-        not be counted as a restored file — `hermes import` reports it, and
+        not be counted as a restored file — `qubit import` reports it, and
         /snapshot restore must not claim success for that file either."""
         import qubit_cli.backup as backup_mod
         from qubit_cli.backup import create_quick_snapshot, restore_quick_snapshot
@@ -1454,7 +1454,7 @@ class TestQuickSnapshot:
 
 
 # ---------------------------------------------------------------------------
-# Pre-update backup (hermes update safety net)
+# Pre-update backup (qubit update safety net)
 # ---------------------------------------------------------------------------
 
     # -- security: path traversal regression coverage -----------------------
@@ -1613,7 +1613,7 @@ class TestQuickSnapshotProjectsKanban:
 
 
 class TestPreUpdateBackup:
-    """Tests for create_pre_update_backup — the auto-backup ``hermes update``
+    """Tests for create_pre_update_backup — the auto-backup ``qubit update``
     runs before touching anything."""
 
 
@@ -1627,7 +1627,7 @@ class TestPreUpdateBackup:
 
     def test_backup_contents_match_full_backup(self, qubit_home):
         """Pre-update backup should include the same user data that
-        ``hermes backup`` would, and should exclude the same directories."""
+        ``qubit backup`` would, and should exclude the same directories."""
         from qubit_cli.backup import create_pre_update_backup
         out = create_pre_update_backup(qubit_home=qubit_home)
         assert out is not None
@@ -1647,7 +1647,7 @@ class TestPreUpdateBackup:
         assert "gateway.pid" not in names
 
     def test_pre_update_zip_does_not_nest_the_pre_update_snapshot(self, qubit_home):
-        """``hermes update`` in ``full`` mode takes the quick snapshot *before*
+        """``qubit update`` in ``full`` mode takes the quick snapshot *before*
         the full zip, so the zip walk sees the snapshot it just made. It must
         skip it — otherwise every pre-update zip ships state.db twice."""
         from qubit_cli.backup import (
@@ -1780,12 +1780,12 @@ class TestRunPreUpdateBackup:
 
 
 # ---------------------------------------------------------------------------
-# Pre-migration backup (hermes claw migrate safety net)
+# Pre-migration backup (qubit claw migrate safety net)
 # ---------------------------------------------------------------------------
 
 class TestPreMigrationBackup:
     """Tests for create_pre_migration_backup — the auto-backup
-    ``hermes claw migrate`` runs before mutating ~/.hermes/."""
+    ``qubit claw migrate`` runs before mutating ~/.hermes/."""
 
     @pytest.fixture
     def qubit_home(self, tmp_path):
@@ -1797,7 +1797,7 @@ class TestPreMigrationBackup:
 
     def test_restorable_with_qubit_import(self, qubit_home, tmp_path):
         """The zip produced by pre-migration backup must be a valid Hermes
-        backup — `hermes import` should accept it."""
+        backup — `qubit import` should accept it."""
         from qubit_cli.backup import create_pre_migration_backup, _validate_backup_zip
         out = create_pre_migration_backup(qubit_home=qubit_home)
         assert out is not None
@@ -1828,7 +1828,7 @@ class TestPreMigrationBackup:
 # ---------------------------------------------------------------------------
 
 class TestRestoreCronJobsIfEmptied:
-    """`hermes update` config migration can leave cron/jobs.json valid-but-empty,
+    """`qubit update` config migration can leave cron/jobs.json valid-but-empty,
     silently dropping every scheduled job. `restore_cron_jobs_if_emptied` is the
     post-migration safety net that restores from the pre-update snapshot."""
 
@@ -2127,7 +2127,7 @@ class TestMemoryProviderExternalPaths:
 
 
 class TestImportHonorsQubitHomeOverride:
-    """`hermes import` must restore into the home the command runs under.
+    """`qubit import` must restore into the home the command runs under.
 
     Resolving the target through get_default_qubit_root() maps a profile
     home (<root>/profiles/<name>) back to <root>: the import then overwrites
@@ -2198,7 +2198,7 @@ class TestImportHonorsQubitHomeOverride:
 
         monkeypatch.setattr(
             backup_mod,
-            "_get_platform_default_hermes_home",
+            "_get_platform_default_qubit_home",
             lambda: native_default,
         )
 
@@ -2232,7 +2232,7 @@ class TestImportHonorsQubitHomeOverride:
 
         monkeypatch.setattr(
             backup_mod,
-            "_get_platform_default_hermes_home",
+            "_get_platform_default_qubit_home",
             lambda: native_default,
         )
 
@@ -2285,7 +2285,7 @@ def _write_session_db(path: Path, sessions: int, messages_per_session: int) -> N
 
 
 class TestImportLiveSessionDatabase:
-    """`hermes import` must not swap the inode of a database Hermes holds open.
+    """`qubit import` must not swap the inode of a database Hermes holds open.
 
     Publishing state.db with a rename leaves any live gateway/dashboard/WebUI
     connection reading and writing the unlinked inode, so its sessions vanish

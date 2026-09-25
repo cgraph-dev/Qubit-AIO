@@ -59,7 +59,7 @@ def relay_plugin_payload_from_legacy_env(env: Mapping[str, Any]) -> dict[str, An
     if _truthy(env.get("HERMES_NEMO_RELAY_ATIF_ENABLED")):
         kwargs: dict[str, Any] = {
             "enabled": True,
-            "agent_name": _s(env, "HERMES_NEMO_RELAY_ATIF_AGENT_NAME", "Hermes Agent"),
+            "agent_name": _s(env, "HERMES_NEMO_RELAY_ATIF_AGENT_NAME", "Qubit Agent"),
             "model_name": _s(env, "HERMES_NEMO_RELAY_ATIF_MODEL_NAME", "unknown"),
             "filename_template": _s(env, "HERMES_NEMO_RELAY_ATIF_FILENAME_TEMPLATE", "hermes-atif-{session_id}.json"),
         }

@@ -207,7 +207,7 @@ def test_stop_process_trees_kills_full_tree():
     from qubit_cli import update_cmd
 
     with patch("gateway.status.get_process_start_time", return_value=123), patch(
-        "qubit_cli._subprocess_compat.pid_is_hermes", return_value=True
+        "qubit_cli._subprocess_compat.pid_is_qubit", return_value=True
     ), patch.object(update_cmd.subprocess, "run") as run:
         cli_main._stop_process_trees([111, 222])
     calls = [c.args[0] for c in run.call_args_list]

@@ -19,7 +19,7 @@ def _provider_row(configured_models, *, max_models=None):
             "qubit_cli.models.cached_provider_model_ids",
             return_value=["live-a", "shared"],
         ),
-        patch("qubit_cli.providers.HERMES_OVERLAYS", {}),
+        patch("qubit_cli.providers.QUBIT_OVERLAYS", {}),
         patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test-key"}),
     ):
         rows = list_authenticated_providers(

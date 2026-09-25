@@ -45,7 +45,7 @@ def _reset_fuzzy_cache(monkeypatch):
     # roots can't leak through the TTL window.
     server._fuzzy_cache.clear()
     # #70041: _launch_configured_cwd() reads the launch profile's config.yaml
-    # via _load_cfg(), which resolves through _hermes_home captured at module
+    # via _load_cfg(), which resolves through _qubit_home captured at module
     # import time — before the per-test QUBIT_HOME redirect applies. When the
     # developer's real config sets terminal.cwd, _completion_cwd() returns that
     # directory instead of the test's tmp_path (from monkeypatch.chdir). Patch

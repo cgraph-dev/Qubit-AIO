@@ -49,7 +49,7 @@ def wedge_env(tmp_path, monkeypatch):
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", qubit_home)
+    monkeypatch.setattr(jobs_mod, "QUBIT_DIR", qubit_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", qubit_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", qubit_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", qubit_home / "cron" / "output")
@@ -111,7 +111,7 @@ class TestEAGAINRecurringRedispatches:
         env = wedge_env
         # Point the executions ledger at the throwaway home.
         monkeypatch.setattr(E, "EXECUTIONS_FILE", env["home"] / "cron" / "executions.db")
-        monkeypatch.setattr(S, "_hermes_home", env["home"])
+        monkeypatch.setattr(S, "_qubit_home", env["home"])
         monkeypatch.setattr(S, "get_due_jobs", S.get_due_jobs)  # no-op, keep real
 
         state = self._make_script_eagain(env, monkeypatch)
@@ -153,7 +153,7 @@ class TestEAGAINRecurringRedispatches:
 
         env = wedge_env
         monkeypatch.setattr(E, "EXECUTIONS_FILE", env["home"] / "cron" / "executions.db")
-        monkeypatch.setattr(S, "_hermes_home", env["home"])
+        monkeypatch.setattr(S, "_qubit_home", env["home"])
 
         self._make_script_eagain(env, monkeypatch)
         n1 = S.tick(verbose=False, sync=True)

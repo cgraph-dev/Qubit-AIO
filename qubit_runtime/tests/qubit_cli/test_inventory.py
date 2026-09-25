@@ -199,16 +199,16 @@ def test_explicit_only_filters_ambient_credentials_but_keeps_current_and_custom_
     rows = [
         {"slug": "openai-codex", "name": "OpenAI Codex", "models": ["gpt-5.4"],
          "total_models": 1, "is_current": True, "is_user_defined": False,
-         "source": "hermes"},
+         "source": "qubit"},
         {"slug": "gemini", "name": "Gemini", "models": ["gemini-2.5-pro"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
          "source": "built-in"},
         {"slug": "copilot", "name": "Copilot", "models": ["gpt-5.4"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
+         "source": "qubit"},
         {"slug": "nous", "name": "Nous", "models": ["anthropic/claude-sonnet-5"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
+         "source": "qubit"},
         {"slug": "custom:lab", "name": "Lab", "models": ["lab-1"],
          "total_models": 1, "is_current": False, "is_user_defined": True,
          "source": "user-config"},
@@ -246,10 +246,10 @@ def test_explicit_only_keeps_anthropic_row_with_oauth_credentials():
     rows = [
         {"slug": "anthropic", "name": "Anthropic", "models": ["claude-sonnet-5"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
+         "source": "qubit"},
         {"slug": "copilot", "name": "Copilot", "models": ["gpt-5.4"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
+         "source": "qubit"},
     ]
     ctx = _empty_ctx(provider="opencode-go", model="glm-5.3")
     with (
@@ -280,7 +280,7 @@ def test_explicit_only_drops_anthropic_row_without_oauth_credentials():
     rows = [
         {"slug": "anthropic", "name": "Anthropic", "models": ["claude-sonnet-5"],
          "total_models": 1, "is_current": False, "is_user_defined": False,
-         "source": "hermes"},
+         "source": "qubit"},
     ]
     ctx = _empty_ctx(provider="opencode-go", model="glm-5.3")
     with (

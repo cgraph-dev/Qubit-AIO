@@ -215,7 +215,7 @@ def _idle_compaction(
 
 def _codex_native_auto_compaction(agent: Any) -> bool:
     """Codex app-server threads are compacted by the codex agent itself; Qubit only
-    initiates compaction in "hermes" mode."""
+    initiates compaction in "qubit" mode (legacy alias "hermes")."""
     return (
         # See #36801.
         getattr(agent, "api_mode", None) == "codex_app_server"

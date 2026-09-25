@@ -1407,7 +1407,7 @@ def _desktop_launch_env(args: argparse.Namespace) -> tuple[dict, list[str]]:
     """Electron child env + config-supplied extra flags. ``desktop.*`` config is bridged to env vars
     Electron already reads; an explicit env var wins over config (and over keychain detection)."""
     from qubit_constants import with_qubit_node_path
-    # with_hermes_node_path() copies os.environ when called with no arg.
+    # with_qubit_node_path() copies os.environ when called with no arg.
     env = with_qubit_node_path()
     for attr, key in (
         ("fake_boot", "HERMES_DESKTOP_BOOT_FAKE"), ("ignore_existing", "HERMES_DESKTOP_IGNORE_EXISTING")):

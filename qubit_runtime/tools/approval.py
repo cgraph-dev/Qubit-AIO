@@ -1166,10 +1166,10 @@ _PLUGIN_COMPAT_LAZY = {
     'request_elicitation_consent': ('tools.approval_prompt', 'request_elicitation_consent'),
     'reset_current_observability_context': ('tools.approval_context', 'reset_current_observability_context'),
     'reset_current_session_key': ('tools.approval_context', 'reset_current_session_key'),
-    'reset_hermes_interactive_context': ('tools.approval_context', 'reset_hermes_interactive_context'),
+    'reset_hermes_interactive_context': ('tools.approval_context', 'reset_qubit_interactive_context'),
     'set_current_observability_context': ('tools.approval_context', 'set_current_observability_context'),
     'set_current_session_key': ('tools.approval_context', 'set_current_session_key'),
-    'set_hermes_interactive_context': ('tools.approval_context', 'set_hermes_interactive_context'),
+    'set_hermes_interactive_context': ('tools.approval_context', 'set_qubit_interactive_context'),
 }
 
 

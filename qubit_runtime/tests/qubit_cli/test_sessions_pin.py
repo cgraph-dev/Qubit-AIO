@@ -44,7 +44,7 @@ def _run(monkeypatch, capsys, argv_tail, db):
     import qubit_state
 
     monkeypatch.setattr(qubit_state, "SessionDB", lambda: db)
-    monkeypatch.setattr(sys, "argv", ["hermes", "sessions", *argv_tail])
+    monkeypatch.setattr(sys, "argv", ["qubit", "sessions", *argv_tail])
     try:
         main_mod.main()
         code = 0
@@ -135,4 +135,4 @@ def test_pinned_empty_hint(monkeypatch, capsys):
     db = _FakeDB(rows=[])
     _code, out = _run(monkeypatch, capsys, ["pinned"], db)
     assert "No pinned sessions" in out
-    assert "hermes sessions pin" in out
+    assert "qubit sessions pin" in out

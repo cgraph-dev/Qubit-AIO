@@ -46,7 +46,7 @@ describe('requestModelOptions', () => {
     const restPayload = {
       model: 'profile-default',
       provider: 'openai-codex',
-      providers: [{ models: ['hermes-local'], name: 'Hermes Local vLLM', slug: 'hermes-local' }]
+      providers: [{ models: ['hermes-local'], name: 'Qubit Local vLLM', slug: 'hermes-local' }]
     }
 
     const gateway = {
@@ -68,7 +68,7 @@ describe('requestModelOptions', () => {
     const restPayload = {
       model: 'hermes-local',
       provider: 'hermes-local',
-      providers: [{ models: ['hermes-local'], name: 'Hermes Local vLLM', slug: 'hermes-local' }]
+      providers: [{ models: ['hermes-local'], name: 'Qubit Local vLLM', slug: 'hermes-local' }]
     }
 
     const gateway = {
@@ -143,7 +143,7 @@ describe('requestModelOptions', () => {
     const gatewayPayload = {
       model: 'chrome-model',
       provider: 'nous',
-      providers: [{ models: ['chrome-model'], name: 'Nous', slug: 'nous' }]
+      providers: [{ models: ['chrome-model'], name: 'Qubit', slug: 'nous' }]
     }
 
     const routedPayload = {
@@ -218,7 +218,7 @@ describe('modelOptionsQueryKey', () => {
 describe('manualPickRemoved', () => {
   const providers = [
     { name: 'OpenRouter', slug: 'openrouter', models: ['owl-alpha', 'gpt-5.5'] },
-    { name: 'Nous', slug: 'nous', models: [] } // present but unconfigured / re-auth
+    { name: 'Qubit', slug: 'nous', models: [] } // present but unconfigured / re-auth
   ]
 
   it('flags a pick whose model was dropped from a populated provider', () => {

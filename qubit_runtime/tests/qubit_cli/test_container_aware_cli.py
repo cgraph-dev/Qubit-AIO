@@ -48,7 +48,7 @@ def test_get_container_exec_info_returns_metadata(container_env):
     assert info is not None
     assert info["backend"] == "podman"
     assert info["container_name"] == "hermes-agent"
-    assert info["exec_user"] == "hermes"
+    assert info["exec_user"] == "qubit"
     assert info["hermes_bin"] == "/data/current-package/bin/hermes"
 
 
@@ -68,7 +68,7 @@ def docker_container_info():
     return {
         "backend": "docker",
         "container_name": "hermes-agent",
-        "exec_user": "hermes",
+        "exec_user": "qubit",
         "hermes_bin": "/data/current-package/bin/hermes",
     }
 
@@ -78,7 +78,7 @@ def podman_container_info():
     return {
         "backend": "podman",
         "container_name": "hermes-agent",
-        "exec_user": "hermes",
+        "exec_user": "qubit",
         "hermes_bin": "/data/current-package/bin/hermes",
     }
 
@@ -105,7 +105,7 @@ def test_exec_in_container_calls_execvp(docker_container_info):
     assert cmd[1] == "exec"
     assert "-it" in cmd
     idx_u = cmd.index("-u")
-    assert cmd[idx_u + 1] == "hermes"
+    assert cmd[idx_u + 1] == "qubit"
     e_indices = [i for i, v in enumerate(cmd) if v == "-e"]
     e_values = [cmd[i + 1] for i in e_indices]
     assert "TERM=xterm-256color" in e_values

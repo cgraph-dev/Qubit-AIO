@@ -69,7 +69,7 @@ def _run_job_patched(job, tmp_path, *, resolve=None, skill_view=None):
     """
     fake_db = MagicMock()
     patches = [
-        patch("cron.scheduler._hermes_home", tmp_path),
+        patch("cron.scheduler._qubit_home", tmp_path),
         patch("cron.scheduler_delivery._resolve_origin", return_value=None),
         patch("qubit_cli.env_loader.load_qubit_dotenv"),
         patch("qubit_cli.env_loader.reset_secret_source_cache"),
@@ -138,7 +138,7 @@ class TestMissingProviderKeyBlocks:
             fake_db = MagicMock()
             for _tick in range(2):
                 fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
-                with patch("cron.scheduler._hermes_home", tmp_path), \
+                with patch("cron.scheduler._qubit_home", tmp_path), \
                      patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                      patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                      patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -242,7 +242,7 @@ class TestOptOut:
             fake_db = MagicMock()
             for _tick in range(2):
                 fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
-                with patch("cron.scheduler._hermes_home", tmp_path), \
+                with patch("cron.scheduler._qubit_home", tmp_path), \
                      patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
                      patch("qubit_cli.env_loader.load_qubit_dotenv"), \
                      patch("qubit_cli.env_loader.reset_secret_source_cache"), \

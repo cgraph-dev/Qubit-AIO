@@ -20,7 +20,7 @@ SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "optional-skills"
     / "migration"
-    / "openclaw-migration"
+    / "qubit-migration"
     / "scripts"
     / "openclaw_to_hermes.py"
 )

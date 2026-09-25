@@ -1811,7 +1811,7 @@ class TestLoadQubitIndex:
     def _isolate_cache(monkeypatch, tmp_path):
         """Point the on-disk cache at an empty tmp dir so no real cache leaks in."""
         cache_file = tmp_path / "hermes-index.json"
-        monkeypatch.setattr("tools.skills_hub_search._hermes_index_cache_file", lambda: cache_file)
+        monkeypatch.setattr("tools.skills_hub_search._qubit_index_cache_file", lambda: cache_file)
         return cache_file
 
     def test_fetch_does_not_request_brotli(self, monkeypatch, tmp_path):

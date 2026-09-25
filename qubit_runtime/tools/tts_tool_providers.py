@@ -594,7 +594,7 @@ def _generate_gemini_tts(text: str, output_path: str, tts_config: Dict[str, Any]
             version = str(qubit_cli.__version__)
         except Exception:
             version = "0.0.0"
-        headers["X-Goog-Api-Client"] = f"hermes-agent/{version}"  # partner-integration guidance
+        headers["X-Goog-Api-Client"] = f"qubit-agent/{version}"  # partner-integration guidance
     response = _post_json(f"{base_url}/models/{model}:generateContent", payload, headers, params={"key": api_key})
     if response.status_code != 200:
         raise RuntimeError(f"Gemini TTS API error (HTTP {response.status_code}): {_gemini_error_detail(response)}")

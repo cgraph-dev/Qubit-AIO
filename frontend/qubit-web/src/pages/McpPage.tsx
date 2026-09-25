@@ -4,6 +4,7 @@ import {
   Package,
   Play,
   Power,
+  RefreshCw,
   Server,
   Trash2,
   X,
@@ -16,6 +17,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
 import type {
+  McpCapabilityResult,
   McpCatalogDiagnostic,
   McpCatalogEntry,
   McpHttpAuth,
@@ -54,6 +56,61 @@ const TRANSPORT_TONE: Record<string, "success" | "warning" | "secondary"> = {
   unknown: "secondary",
 };
 
+/** Pull the drained list out of a capability payload, accepting both the
+ *  canonical `resource_templates` key and the `resourceTemplates` wire alias.
+ *  Null when the payload is absent (not yet loaded). */
+function capabilityItems(
+  data: McpCapabilityResult | undefined,
+  kind: "resources" | "prompts" | "templates",
+): Array<Record<string, unknown>> | null {
+  if (!data) return null;
+  if (kind === "resources") return Array.isArray(data.resources) ? data.resources : [];
+  if (kind === "prompts") return Array.isArray(data.prompts) ? data.prompts : [];
+  const snake = (data as McpCapabilityResult).resource_templates;
+  const camel = (data as McpCapabilityResult).resourceTemplates;
+  if (Array.isArray(snake)) return snake;
+  if (Array.isArray(camel)) return camel;
+  // Fall back to the raw drained payload's list key.
+  const raw = (data.result ?? {}) as Record<string, unknown>;
+  for (const k of ["resource_templates", "resourceTemplates", "templates"]) {
+    if (Array.isArray(raw[k])) return raw[k] as Array<Record<string, unknown>>;
+  }
+  return [];
+}
+
+/** Primary label + secondary detail for one drained entry. Unknown shapes
+ *  render as compact JSON — never dropped, never invented. */
+function capabilityLabel(item: unknown): { primary: string; secondary: string | null } {
+  if (item && typeof item === "object" && !Array.isArray(item)) {
+    const rec = item as Record<string, unknown>;
+    const str = (v: unknown): string | null =>
+      typeof v === "string" && v.trim() ? v.trim() : null;
+    const primary =
+      str(rec.name) ?? str(rec.uri) ?? str(rec.uriTemplate) ??
+      str(rec.uri_template) ?? str(rec.id);
+    if (primary) {
+      const parts = [
+        str(rec.description),
+        str(rec.uri) === primary ? null : str(rec.uri),
+        str(rec.uriTemplate) === primary ? null : str(rec.uriTemplate),
+        str(rec.uri_template) === primary ? null : str(rec.uri_template),
+        str(rec.mimeType),
+        str(rec.mime_type),
+      ].filter((v): v is string => !!v);
+      return {
+        primary,
+        secondary: parts.length > 0 ? parts.join(" · ") : null,
+      };
+    }
+    try {
+      return { primary: JSON.stringify(rec).slice(0, 160), secondary: null };
+    } catch {
+      return { primary: String(item).slice(0, 160), secondary: null };
+    }
+  }
+  return { primary: String(item ?? "").slice(0, 160), secondary: null };
+}
+
 export default function McpPage() {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [catalog, setCatalog] = useState<McpCatalogEntry[]>([]);
@@ -87,6 +144,60 @@ export default function McpPage() {
   const [authenticating, setAuthenticating] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, McpTestResult>>(
     {},
+  );
+
+  // Honest per-server capability drain (tools are already served on the
+  // server row; resources/prompts/resource-templates come from the real
+  // compat reads `GET /api/mcp/servers/{name}/resources|prompts|
+  // resource-templates`). Lazy: nothing is fetched until the user expands a
+  // server's Capabilities panel. A typed disposition is rendered verbatim and
+  // is retryable — never a fabricated list.
+  const [capOpen, setCapOpen] = useState<Record<string, boolean>>({});
+  const [capLoading, setCapLoading] = useState<Record<string, boolean>>({});
+  const [capData, setCapData] = useState<
+    Record<string, Partial<Record<"resources" | "prompts" | "templates", McpCapabilityResult>>>
+  >({});
+  const [capErrors, setCapErrors] = useState<
+    Record<string, Partial<Record<"resources" | "prompts" | "templates", string>>>
+  >({});
+
+  const loadCapabilities = useCallback(async (serverName: string) => {
+    setCapLoading((prev) => ({ ...prev, [serverName]: true }));
+    setCapErrors((prev) => ({ ...prev, [serverName]: {} }));
+    const settled = await Promise.allSettled([
+      api.getMcpServerResources(serverName),
+      api.getMcpServerPrompts(serverName),
+      api.getMcpServerResourceTemplates(serverName),
+    ]);
+    const keys = ["resources", "prompts", "templates"] as const;
+    setCapData((prev) => {
+      const next = { ...(prev[serverName] ?? {}) };
+      settled.forEach((r, i) => {
+        if (r.status === "fulfilled") next[keys[i]] = r.value;
+      });
+      return { ...prev, [serverName]: next };
+    });
+    setCapErrors((prev) => {
+      const next: Partial<Record<"resources" | "prompts" | "templates", string>> = {};
+      settled.forEach((r, i) => {
+        if (r.status === "rejected") {
+          next[keys[i]] = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        }
+      });
+      return { ...prev, [serverName]: next };
+    });
+    setCapLoading((prev) => ({ ...prev, [serverName]: false }));
+  }, []);
+
+  const toggleCapabilities = useCallback(
+    (serverName: string) => {
+      setCapOpen((prev) => {
+        const next = !prev[serverName];
+        if (next) void loadCapabilities(serverName);
+        return { ...prev, [serverName]: next };
+      });
+    },
+    [loadCapabilities],
   );
 
   // Tool invocation (the canonical confirm-gated `POST /invoke`). The modal
@@ -927,6 +1038,17 @@ export default function McpPage() {
 
                   <Button
                     ghost
+                    size="sm"
+                    title={capOpen[server.name] ? "Hide capabilities" : "Show capabilities"}
+                    aria-label={`Capabilities for ${server.name}`}
+                    aria-expanded={!!capOpen[server.name]}
+                    onClick={() => toggleCapabilities(server.name)}
+                  >
+                    Capabilities
+                  </Button>
+
+                  <Button
+                    ghost
                     size="icon"
                     title="Invoke a tool"
                     aria-label="Invoke a tool"
@@ -958,6 +1080,141 @@ export default function McpPage() {
                   </Button>
                 </div>
               </CardContent>
+              {capOpen[server.name] && (
+                <CardContent className="border-t border-border py-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Capabilities — {server.name}
+                    </p>
+                    <Button
+                      ghost
+                      size="sm"
+                      title="Reload capabilities"
+                      aria-label={`Reload capabilities for ${server.name}`}
+                      onClick={() => loadCapabilities(server.name)}
+                      disabled={!!capLoading[server.name]}
+                      prefix={
+                        capLoading[server.name] ? <Spinner /> : <RefreshCw />
+                      }
+                    >
+                      Reload
+                    </Button>
+                  </div>
+
+                  {/* Tools: already served on the registry row + last test. */}
+                  <div className="mt-3">
+                    <p className="text-xs font-medium">Tools</p>
+                    {server.capabilities && server.capabilities.length > 0 ? (
+                      <ul className="mt-1 ml-3 list-disc space-y-0.5 text-xs">
+                        {server.capabilities.map((tool) => (
+                          <li key={`${server.name}-cap-tool-${tool}`} className="font-mono break-all">
+                            {tool}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        No tools declared on the registry row
+                        {server.invocation_code
+                          ? ` (${server.invocation_code})`
+                          : ""}
+                        . Run Test to probe the live transport.
+                      </p>
+                    )}
+                    {result && result.ok && result.tools.length > 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Last test:{" "}
+                        {result.tools.map((t) => t.name).join(", ")}
+                      </p>
+                    )}
+                  </div>
+
+                  {(
+                    [
+                      { kind: "resources" as const, title: "Resources" },
+                      { kind: "prompts" as const, title: "Prompts" },
+                      { kind: "templates" as const, title: "Resource templates" },
+                    ]
+                  ).map(({ kind, title }) => {
+                    const err = capErrors[server.name]?.[kind];
+                    const payload = capData[server.name]?.[kind];
+                    const items = capabilityItems(
+                      payload,
+                      kind,
+                    );
+                    return (
+                      <div className="mt-3" key={`${server.name}-cap-${kind}`}>
+                        <p className="text-xs font-medium">{title}</p>
+                        {capLoading[server.name] && !payload && !err ? (
+                          <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            <Spinner /> Loading…
+                          </p>
+                        ) : err ? (
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <p className="text-xs text-destructive break-words">
+                              {err}
+                            </p>
+                            <Button
+                              ghost
+                              size="sm"
+                              aria-label={`Retry ${title} for ${server.name}`}
+                              onClick={() => loadCapabilities(server.name)}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        ) : payload && !payload.ok ? (
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <p className="text-xs text-warning break-words">
+                              {payload.code ? `${payload.code}: ` : ""}
+                              {payload.detail ??
+                                "server exposes none via this read"}
+                              {payload.qubit_counterpart
+                                ? ` — ${payload.qubit_counterpart}`
+                                : ""}
+                            </p>
+                            <Button
+                              ghost
+                              size="sm"
+                              aria-label={`Retry ${title} for ${server.name}`}
+                              onClick={() => loadCapabilities(server.name)}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        ) : items !== null && items.length === 0 ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {payload?.code === "MCP_READ_OK"
+                              ? "Connected — exposes none."
+                              : "None exposed."}
+                          </p>
+                        ) : items !== null ? (
+                          <ul className="mt-1 ml-3 list-disc space-y-0.5 text-xs">
+                            {items.map((item, i) => {
+                              const { primary, secondary } =
+                                capabilityLabel(item);
+                              return (
+                                <li
+                                  key={`${server.name}-cap-${kind}-${i}`}
+                                  className="break-all"
+                                >
+                                  <code className="font-mono">{primary}</code>
+                                  {secondary && (
+                                    <span className="text-muted-foreground">
+                                      {" "}
+                                      — {secondary}
+                                    </span>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              )}
             </Card>
           );
         })}

@@ -1,6 +1,6 @@
-"""Tests for the stale-dashboard handling run at the end of ``hermes update``.
+"""Tests for the stale-dashboard handling run at the end of ``qubit update``.
 
-``hermes update`` detects ``hermes dashboard`` processes left over from the
+``qubit update`` detects ``qubit dashboard`` processes left over from the
 previous version and kills them (SIGTERM + SIGKILL grace, or ``taskkill /F``
 on Windows).  Without this, the running backend silently serves stale Python
 against a freshly-updated JS bundle, producing 401s / empty data.
@@ -150,7 +150,7 @@ class TestFindStaleDashboardPids:
                 returncode=0,
                 stdout="\n".join([
                     _ps_line(os.getpid(), "python3 -m qubit_cli.main dashboard"),
-                    _ps_line(12345, "hermes dashboard --port 9119"),
+                    _ps_line(12345, "qubit dashboard --port 9119"),
                 ]) + "\n",
                 stderr="",
             )
@@ -281,7 +281,7 @@ class TestKillStaleDashboardWindows:
         with patch("qubit_cli.main_dashboard._find_stale_dashboard_pids",
                    return_value=[12345, 12346]), \
              patch("gateway.status.get_process_start_time", return_value=123), \
-             patch("qubit_cli._subprocess_compat.pid_is_hermes", return_value=True), \
+             patch("qubit_cli._subprocess_compat.pid_is_qubit", return_value=True), \
              patch("subprocess.run", side_effect=fake_run) as mock_run:
             _kill_stale_dashboard_processes()
 
@@ -323,7 +323,7 @@ class TestDashboardUpdateCleanup:
 
 class TestWindowsWmicEncoding:
     """Regression tests for #17049 — the Windows wmic branch must not crash
-    `hermes update` on non-UTF-8 system locales (e.g. cp936 on zh-CN).
+    `qubit update` on non-UTF-8 system locales (e.g. cp936 on zh-CN).
     """
 
     def test_wmic_routed_through_bounded_probe_run_with_ignore_errors(self):
@@ -410,7 +410,7 @@ class TestSupervisedBackendRestart:
         assert "when you're ready" not in out
 
     def test_already_restarted_unit_is_left_untouched(self):
-        """Review on #83595: hermes update's systemd fleet-restart loop may
+        """Review on #83595: qubit update's systemd fleet-restart loop may
         already have restarted this PID's owning unit directly (e.g. a
         Serve-only install). Passing it via already_restarted_units must
         skip killing/restarting it again here."""
@@ -468,7 +468,7 @@ class TestManualBackendRespawn:
     def test_non_orphan_fixed_port_still_respawns(self, capsys):
         """A supervised-by-shell dashboard with a fixed port is still restarted."""
         live = self._live()
-        argv = ["hermes", "dashboard", "--port", "8300"]
+        argv = ["qubit", "dashboard", "--port", "8300"]
 
         def fake_kill(pid, sig):
             if sig == 0:
@@ -479,7 +479,7 @@ class TestManualBackendRespawn:
              patch.object(main_dashboard, "_get_pid_cgroup_path", return_value=None), \
              patch.object(main_dashboard, "_get_systemd_service_for_pid", return_value=None), \
              patch.object(main_dashboard, "_dashboard_cmdline_for_pid", return_value=argv), \
-             patch("qubit_cli.dashboard_procs._hermes_home_for_pid", return_value=None), \
+             patch("qubit_cli.dashboard_procs._qubit_home_for_pid", return_value=None), \
              patch.object(live, "_respawn_dashboard_processes", return_value=[]) as respawn, \
              patch("os.kill", side_effect=fake_kill), \
              patch("time.sleep"):
@@ -507,7 +507,7 @@ class TestManualBackendRespawn:
              patch.object(main_dashboard, "_get_pid_cgroup_path", return_value=None), \
              patch.object(main_dashboard, "_get_systemd_service_for_pid", return_value=None), \
              patch.object(main_dashboard, "_dashboard_cmdline_for_pid", return_value=argv), \
-             patch("qubit_cli.dashboard_procs._hermes_home_for_pid", return_value=None), \
+             patch("qubit_cli.dashboard_procs._qubit_home_for_pid", return_value=None), \
              patch.object(live, "_respawn_dashboard_processes") as respawn, \
              patch("os.kill", side_effect=fake_kill), \
              patch("time.sleep"):
@@ -523,7 +523,7 @@ class TestManualBackendRespawn:
     def test_detached_fixed_port_still_respawns_after_prior_update(self, capsys):
         """PPID-1 fixed-port backends (prior start_new_session respawn) stay eligible."""
         live = self._live()
-        argv = ["hermes", "dashboard", "--port", "8300"]
+        argv = ["qubit", "dashboard", "--port", "8300"]
 
         def fake_kill(pid, sig):
             if sig == 0:
@@ -534,7 +534,7 @@ class TestManualBackendRespawn:
              patch.object(main_dashboard, "_get_pid_cgroup_path", return_value=None), \
              patch.object(main_dashboard, "_get_systemd_service_for_pid", return_value=None), \
              patch.object(main_dashboard, "_dashboard_cmdline_for_pid", return_value=argv), \
-             patch("qubit_cli.dashboard_procs._hermes_home_for_pid", return_value=None), \
+             patch("qubit_cli.dashboard_procs._qubit_home_for_pid", return_value=None), \
              patch.object(live, "_respawn_dashboard_processes", return_value=[]) as respawn, \
              patch("os.kill", side_effect=fake_kill), \
              patch("time.sleep"):
@@ -555,22 +555,22 @@ class TestManualBackendRespawn:
 
         with patch.object(live.subprocess, "Popen", _FakePopen):
             failed = live._respawn_dashboard_processes([
-                ["hermes", "dashboard", "--port", "8300"],
-                ["hermes", "serve", "--host", "0.0.0.0"],
+                ["qubit", "dashboard", "--port", "8300"],
+                ["qubit", "serve", "--host", "0.0.0.0"],
             ])
 
         assert failed == []
-        assert spawned[0] == ["hermes", "dashboard", "--port", "8300", "--no-open"]
-        assert spawned[1] == ["hermes", "serve", "--host", "0.0.0.0"]
+        assert spawned[0] == ["qubit", "dashboard", "--port", "8300", "--no-open"]
+        assert spawned[1] == ["qubit", "serve", "--host", "0.0.0.0"]
 
     def test_respawn_failure_returned(self, tmp_path, monkeypatch, capsys):
         live = self._live()
         monkeypatch.setenv("QUBIT_HOME", str(tmp_path / ".hermes"))
 
         with patch.object(live.subprocess, "Popen", side_effect=OSError("no such file")):
-            failed = live._respawn_dashboard_processes([["hermes", "serve"]])
+            failed = live._respawn_dashboard_processes([["qubit", "serve"]])
 
-        assert failed == [["hermes", "serve"]]
+        assert failed == [["qubit", "serve"]]
         out = capsys.readouterr().out
         assert "✗ failed to restart" in out
 
@@ -594,7 +594,7 @@ class TestFilterDashboardRespawnCandidates:
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
         argv = [
-            "hermes", "--profile", "coder",
+            "qubit", "--profile", "coder",
             "dashboard", "--no-open", "--host", "127.0.0.1", "--port", "0",
         ]
         assert _filter_dashboard_respawn_candidates([(7, argv, None)]) == []
@@ -602,14 +602,14 @@ class TestFilterDashboardRespawnCandidates:
     def test_skips_serve_port_equals_zero(self):
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        argv = ["hermes", "serve", "--port=0"]
+        argv = ["qubit", "serve", "--port=0"]
         assert _filter_dashboard_respawn_candidates([(1, argv, None)]) == []
 
     def test_keeps_ppid1_fixed_port_for_repeat_update(self):
         """Detached prior-update respawns (PPID 1) must remain restartable (#40449)."""
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        argv = ["hermes", "dashboard", "--port", "9119"]
+        argv = ["qubit", "dashboard", "--port", "9119"]
         assert _filter_dashboard_respawn_candidates([(10, argv, None)]) == [argv]
 
     def test_dedupes_identical_normalized_cmdlines(self):
@@ -626,9 +626,9 @@ class TestFilterDashboardRespawnCandidates:
     def test_caps_one_per_profile(self):
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        a = ["hermes", "--profile", "coder", "dashboard", "--port", "8300"]
-        b = ["hermes", "--profile", "coder", "dashboard", "--port", "8301"]
-        c = ["hermes", "--profile", "writer", "dashboard", "--port", "8302"]
+        a = ["qubit", "--profile", "coder", "dashboard", "--port", "8300"]
+        b = ["qubit", "--profile", "coder", "dashboard", "--port", "8301"]
+        c = ["qubit", "--profile", "writer", "dashboard", "--port", "8302"]
         out = _filter_dashboard_respawn_candidates([
             (1, a, None),
             (2, b, None),
@@ -640,8 +640,8 @@ class TestFilterDashboardRespawnCandidates:
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
         home = "/tmp/hermes-home-a"
-        a = ["hermes", "dashboard", "--port", "8300"]
-        b = ["hermes", "dashboard", "--port", "8301"]
+        a = ["qubit", "dashboard", "--port", "8300"]
+        b = ["qubit", "dashboard", "--port", "8301"]
         out = _filter_dashboard_respawn_candidates(
             [
                 (1, a, home),
@@ -654,8 +654,8 @@ class TestFilterDashboardRespawnCandidates:
     def test_profile_flag_and_profiles_home_share_cap(self):
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        a = ["hermes", "--profile", "coder", "dashboard", "--port", "8300"]
-        b = ["hermes", "dashboard", "--port", "8301"]
+        a = ["qubit", "--profile", "coder", "dashboard", "--port", "8300"]
+        b = ["qubit", "dashboard", "--port", "8301"]
         out = _filter_dashboard_respawn_candidates([
             (1, a, None),
             (2, b, "/home/u/.hermes/profiles/coder"),
@@ -665,8 +665,8 @@ class TestFilterDashboardRespawnCandidates:
     def test_default_profile_same_root_home_caps(self):
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        a = ["hermes", "--profile", "default", "dashboard", "--port", "8300"]
-        b = ["hermes", "dashboard", "--port", "8301"]
+        a = ["qubit", "--profile", "default", "dashboard", "--port", "8300"]
+        b = ["qubit", "dashboard", "--port", "8301"]
         home = "/home/u/.hermes"
         out = _filter_dashboard_respawn_candidates(
             [
@@ -687,8 +687,8 @@ class TestFilterDashboardRespawnCandidates:
         """
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        a = ["hermes", "dashboard", "--port", "8300"]
-        b = ["hermes", "dashboard", "--port", "8301"]
+        a = ["qubit", "dashboard", "--port", "8300"]
+        b = ["qubit", "dashboard", "--port", "8301"]
         out = _filter_dashboard_respawn_candidates(
             [
                 (1, a, "/home/u/.hermes"),
@@ -716,7 +716,7 @@ class TestFilterDashboardRespawnCandidates:
     def test_matching_qubit_home_is_kept(self):
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        argv = ["hermes", "serve", "--host", "127.0.0.1", "--port", "9118"]
+        argv = ["qubit", "serve", "--host", "127.0.0.1", "--port", "9118"]
         out = _filter_dashboard_respawn_candidates(
             [(15364, argv, "/Users/u/.hermes")],
             own_home="/Users/u/.hermes",
@@ -734,7 +734,7 @@ class TestFilterDashboardRespawnCandidates:
         except (OSError, NotImplementedError):
             pytest.skip("symlinks unavailable on this platform")
 
-        argv = ["hermes", "serve", "--port", "9118"]
+        argv = ["qubit", "serve", "--port", "9118"]
         out = _filter_dashboard_respawn_candidates(
             [(15364, argv, str(real))],
             own_home=str(link),
@@ -745,7 +745,7 @@ class TestFilterDashboardRespawnCandidates:
         """Unreadable QUBIT_HOME (env probe failed) keeps pre-#94030 behaviour."""
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        argv = ["hermes", "dashboard", "--port", "8300"]
+        argv = ["qubit", "dashboard", "--port", "8300"]
         out = _filter_dashboard_respawn_candidates(
             [(1, argv, None)],
             own_home="/home/u/.hermes",
@@ -761,7 +761,7 @@ class TestFilterDashboardRespawnCandidates:
         monkeypatch.setattr(
             qubit_constants, "get_qubit_home", lambda: Path("/home/u/.hermes")
         )
-        argv = ["hermes", "serve", "--port", "9118"]
+        argv = ["qubit", "serve", "--port", "9118"]
         foreign = _filter_dashboard_respawn_candidates([
             (1, argv, "/Users/u/.hermes-lifeos"),
         ])
@@ -774,7 +774,7 @@ class TestFilterDashboardRespawnCandidates:
     def test_keeps_fixed_port_serve(self):
         from qubit_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
-        argv = ["hermes", "serve", "--host", "0.0.0.0", "--port", "9119"]
+        argv = ["qubit", "serve", "--host", "0.0.0.0", "--port", "9119"]
         assert _filter_dashboard_respawn_candidates([
             (9, argv, None),
         ]) == [argv]
@@ -829,13 +829,13 @@ class TestCmdlineCapture:
 
         def fake_run(args, *a, **kw):
             assert args == ["ps", "-p", "888", "-o", "command="]
-            return MagicMock(returncode=0, stdout="hermes serve --port 8300\n", stderr="")
+            return MagicMock(returncode=0, stdout="qubit serve --port 8300\n", stderr="")
 
         with patch.object(live.os.path, "exists", return_value=False), \
              patch("subprocess.run", side_effect=fake_run):
             argv = main_dashboard._dashboard_cmdline_for_pid(888)
 
-        assert argv == ["hermes", "serve", "--port", "8300"]
+        assert argv == ["qubit", "serve", "--port", "8300"]
 
     @pytest.mark.windows_only
     def test_returns_none_on_windows(self):
@@ -850,7 +850,7 @@ class TestCmdlineCapture:
 class TestPostUpdateStaleModuleReload:
     """Regression tests for the post-update stale-module ImportError.
 
-    ``hermes update`` runs in the PRE-pull Python process. When the update
+    ``qubit update`` runs in the PRE-pull Python process. When the update
     adds a new symbol to ``qubit_cli._subprocess_compat`` (as #87134 added
     ``bounded_probe_run``), the post-update dashboard cleanup's lazy
     ``from qubit_cli._subprocess_compat import bounded_probe_run`` hits the

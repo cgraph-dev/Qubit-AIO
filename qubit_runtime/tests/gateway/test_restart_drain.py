@@ -60,7 +60,7 @@ async def test_restart_command_while_busy_requests_drain_without_interrupt(monke
 
 
 def test_load_busy_text_mode_follows_input_mode_and_honors_legacy(tmp_path, monkeypatch):
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_qubit_home", tmp_path)
     monkeypatch.delenv("HERMES_GATEWAY_BUSY_TEXT_MODE", raising=False)
     monkeypatch.delenv("HERMES_GATEWAY_BUSY_INPUT_MODE", raising=False)
 
@@ -95,7 +95,7 @@ def test_load_busy_text_mode_follows_input_mode_and_honors_legacy(tmp_path, monk
 def test_load_signal_interrupt_grace_timeout_from_typed_config(
     tmp_path, monkeypatch, caplog
 ):
-    monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
+    monkeypatch.setattr(gateway_run, "_qubit_home", tmp_path)
 
     assert (
         gateway_run.GatewayRunner._load_signal_interrupt_grace_timeout()

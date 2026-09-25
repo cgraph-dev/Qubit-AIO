@@ -1,4 +1,4 @@
-"""ensure_hermes_home is memoized per home path (perf: it runs on every
+"""ensure_qubit_home is memoized per home path (perf: it runs on every
 load_config), but a deleted home must still be recreated on the next call."""
 
 import shutil

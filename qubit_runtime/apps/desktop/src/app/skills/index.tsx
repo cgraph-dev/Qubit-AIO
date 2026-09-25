@@ -933,7 +933,7 @@ export function SkillsView({
                       />
                     ))}
                     {/* The built-in optional-skills catalog, below the
-                        installed list: every official skill Hermes ships but
+                        installed list: every official skill Qubit ships but
                         hasn't installed yet, with a one-click install that
                         flips the row into the installed section above. */}
                     {visibleOfficial.length > 0 && (

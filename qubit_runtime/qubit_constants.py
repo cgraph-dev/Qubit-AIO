@@ -14,7 +14,7 @@ from pathlib import Path
 
 _profile_fallback_warned: bool = False
 _UNSET = object()
-_QUBIT_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_HERMES_HOME_OVERRIDE", default=_UNSET)
+_QUBIT_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_QUBIT_HOME_OVERRIDE", default=_UNSET)
 
 # TUI busy-indicator styles (CLI /indicator, TUI gateway config, /help registry).
 # Keep in sync with INDICATOR_STYLES / DEFAULT_INDICATOR_STYLE in ui-tui/src/app/interfaces.ts.
@@ -287,10 +287,10 @@ def get_qubit_node_root() -> Path:
 
     ``QUBIT_NODE_DIR`` wins. An explicit non-default home (``QUBIT_HOME``, a
     profile, or a context override) is already Qubit-owned, so its ``node/``
-    tree is reused. The platform-default Hermes-branded home (``~/.hermes`` /
+    tree is reused. The platform-default legacy home (``~/.hermes`` /
     ``%LOCALAPPDATA%\\hermes``) is NOT treated as a Qubit runtime root: the
     managed Node, npm and npx live under a per-user Qubit cache dir instead, so
-    a Hermes-branded path never owns a running Qubit runtime. Resolution
+    a legacy path never owns a running Qubit runtime. Resolution
     (:func:`iter_qubit_node_dirs`) and provisioning
     (:func:`bootstrap_qubit_managed_node`) both read this one root.
     """
@@ -315,7 +315,7 @@ def iter_qubit_node_dirs(home: Path | None = None) -> list[Path]:
     """Qubit-managed Node dirs in lookup order; both Windows and POSIX shapes so migrated installs work.
 
     With no *home*, the root is :func:`get_qubit_node_root` (a Qubit-owned path,
-    never the Hermes-home default). An explicit *home* keeps the
+    never the legacy home default). An explicit *home* keeps the
     ``<home>/node`` shape for callers that already resolved a Qubit root (the
     Windows heal path) or a profile home.
 
@@ -568,7 +568,7 @@ def _heal_managed_node_windows(home: Path | None = None) -> bool | None:
     """Redownload the portable Node zip into ``%QUBIT_HOME%\\node`` on Windows.
 
     *home* is the node root's parent (``get_qubit_node_root().parent``), so the
-    Hermes-home default is never provisioned into.
+    legacy home default is never provisioned into.
 
     ``True`` on success, ``False`` on genuine failure (offline, bad archive), ``None`` when the
     tree is in use and the heal is deferred — callers must not record the once-per-process attempt
@@ -579,7 +579,7 @@ def _heal_managed_node_windows(home: Path | None = None) -> bool | None:
     ``node.new-*`` directory, then the live tree is renamed aside (``node.old-*``) and the staged tree
     renamed into place. The live tree is never deleted before its replacement is ready, so an interrupted
     heal cannot gut the running installation. Windows allows renaming a tree whose executables are running
-    (images are mapped with ``FILE_SHARE_DELETE`` — the same mechanism as the hermes.exe quarantine); when
+    (images are mapped with ``FILE_SHARE_DELETE`` — the same mechanism as the legacy-executable quarantine); when
     the OS refuses the rename, that refusal *is* the in-use signal and the heal defers instead of forcing
     the write and crashing with ``PermissionError: [WinError 5]`` on ``npm.cmd`` (#80926).
     """
@@ -613,7 +613,7 @@ def _run_node_bootstrap(func: str, *, timeout: int, **extra_env: str) -> bool:
     """Source ``scripts/lib/node-bootstrap.sh`` and run shell function *func*.
 
     The script installs/heals ``$QUBIT_HOME/node``; point ``QUBIT_HOME`` at the
-    Qubit-owned node root's parent so a Hermes-branded default home never owns
+    Qubit-owned node root's parent so a legacy default home never owns
     the provisioned runtime.
     """
     if not _NODE_BOOTSTRAP_SCRIPT.is_file():
@@ -641,7 +641,7 @@ def bootstrap_qubit_managed_node() -> str | None:
     if sys.platform == "win32":
         ok = _heal_managed_node_windows()
     else:
-        # HERMES_NODE_SKIP_LINKS=1 keeps node/npm/npx out of ~/.local/bin: never shadow the user toolchain.
+        # QUBIT_NODE_SKIP_LINKS=1 keeps node/npm/npx out of ~/.local/bin: never shadow the user toolchain.
         ok = _run_node_bootstrap("_nb_install_bundled_node", timeout=600, QUBIT_NODE_SKIP_LINKS="1")
     if not ok:
         return None
@@ -1216,7 +1216,7 @@ FIRST_PARTY_MODULE_ROOTS = frozenset({
 def is_first_party_module(name: str | None) -> bool:
     """True when *name* ships with Qubit (exact first segment; ``startswith`` would claim ``agentops``)."""
     root = str(name).split(".")[0] if name else ""
-    return bool(root) and (root in FIRST_PARTY_MODULE_ROOTS or root.startswith("hermes_"))
+    return bool(root) and (root in FIRST_PARTY_MODULE_ROOTS or root.startswith("qubit_"))
 
 
 def partial_update_hint(exc: BaseException) -> list[str]:

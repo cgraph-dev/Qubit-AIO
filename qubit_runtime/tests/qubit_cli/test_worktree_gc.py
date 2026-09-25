@@ -126,7 +126,7 @@ class TestAuditVerdicts:
     def test_live_locked_tree_keeps(self, repo):
         tree, _ = _add_worktree(repo, "hermes-live")
         _git(["worktree", "lock", str(tree),
-              "--reason", f"hermes pid={os.getpid()}"], repo)
+              "--reason", f"qubit pid={os.getpid()}"], repo)
         records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
         record = _verdict(records, "hermes-live")
         assert record.verdict == "keep"
@@ -185,7 +185,7 @@ class TestReclaim:
     def test_dead_locked_tree_is_unlocked_and_reaped(self, repo):
         tree, _ = _add_worktree(repo, "hermes-zombie")
         _git(["worktree", "lock", str(tree),
-              "--reason", "hermes pid=999999999"], repo)
+              "--reason", "qubit pid=999999999"], repo)
         records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
         assert _verdict(records, "hermes-zombie").verdict == "reap"
         worktree_gc.reclaim_worktrees(str(repo), records=records)

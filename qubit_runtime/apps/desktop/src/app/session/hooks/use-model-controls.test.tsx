@@ -251,7 +251,7 @@ describe('useModelControls', () => {
 
   it('preserves a populated model catalog when painting a saved profile default', () => {
     const queryClient = new QueryClient()
-    const providers = [{ models: ['tencent/hy3:free'], name: 'Nous', slug: 'nous' }]
+    const providers = [{ models: ['tencent/hy3:free'], name: 'Qubit', slug: 'nous' }]
 
     queryClient.setQueryData(modelOptionsQueryKey('default'), {
       model: 'tencent/hy3:free',

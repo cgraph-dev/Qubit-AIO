@@ -1,8 +1,8 @@
-"""Venv ownership preflight for ``hermes update`` (#83529).
+"""Venv ownership preflight for ``qubit update`` (#83529).
 
 A venv touched by ``sudo pip`` / ``sudo hermes`` contains root-owned files
 (e.g. ``site-packages/hermes_agent-*.dist-info/INSTALLER``). A later normal
-``hermes update`` then dies mid-mutation inside ``uv pip install -e .``
+``qubit update`` then dies mid-mutation inside ``uv pip install -e .``
 ("Permission denied (os error 13)") with ``venv/bin/hermes`` already deleted,
 bricking the CLI. The preflight refuses BEFORE the first venv mutation and
 prints the exact chown recovery command.
@@ -23,7 +23,7 @@ def _make_fake_venv(tmp_path):
     """Minimal POSIX venv layout with a dist-info directory."""
     venv = tmp_path / "venv"
     (venv / "bin").mkdir(parents=True)
-    (venv / "bin" / "hermes").write_text("#!stub\n")
+    (venv / "bin" / "qubit").write_text("#!stub\n")
     (venv / "bin" / "python").write_text("#!stub\n")
     sp = venv / "lib" / "python3.12" / "site-packages"
     dist_info = sp / "hermes_agent-1.0.0.dist-info"
@@ -67,7 +67,7 @@ def test_foreign_owned_dist_info_child_detected(tmp_path, monkeypatch):
 
 def test_foreign_owned_refuses_with_chown_hint(tmp_path, monkeypatch, capsys):
     venv = _make_fake_venv(tmp_path)
-    qubit_bin = str(venv / "bin" / "hermes")
+    qubit_bin = str(venv / "bin" / "qubit")
     real_uid = update_cmd._path_uid
     monkeypatch.setattr(
         update_cmd,

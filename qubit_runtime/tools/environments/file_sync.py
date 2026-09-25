@@ -164,7 +164,7 @@ class FileSyncManager:
         try:
             # Hash and upload the same bytes: the original may be saved while
             # the transport is reading it or waiting for remote acknowledgement.
-            with tempfile.TemporaryDirectory(prefix="hermes-sync-push-") as staging:
+            with tempfile.TemporaryDirectory(prefix="qubit-sync-push-") as staging:
                 staged_files = []
                 pushed_hashes = {}
                 for index, (host_path, remote_path) in enumerate(to_upload):
@@ -329,7 +329,7 @@ class FileSyncManager:
                     tar_size, _SYNC_BACK_MAX_BYTES)
                 return
 
-            with tempfile.TemporaryDirectory(prefix="hermes-sync-back-") as staging:
+            with tempfile.TemporaryDirectory(prefix="qubit-sync-back-") as staging:
                 with tarfile.open(tar_path) as tar:
                     tar.extractall(staging, filter="data")
 

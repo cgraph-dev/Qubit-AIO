@@ -2,8 +2,8 @@
 
 ``qubit_cli.main`` skips eager plugin discovery at argparse-setup time
 when the invocation is clearly targeting a known built-in subcommand.
-This saves 500-650ms on ``hermes --help``, ``hermes --version``,
-``hermes logs``, etc., by not importing ``google.cloud.pubsub_v1``,
+This saves 500-650ms on ``qubit --help``, ``qubit --version``,
+``qubit logs``, etc., by not importing ``google.cloud.pubsub_v1``,
 ``aiohttp``, ``grpc``, and friends.
 
 Two invariants:
@@ -41,7 +41,7 @@ from qubit_cli.main import (
 
 
 def _live_subcommand_names() -> set[str]:
-    """Run ``hermes --help`` in-process and parse the subcommand block.
+    """Run ``qubit --help`` in-process and parse the subcommand block.
 
     We patch ``_plugin_cli_discovery_needed`` to always return False so
     plugin-registered commands aren't included — we're validating the
@@ -50,7 +50,7 @@ def _live_subcommand_names() -> set[str]:
     from qubit_cli import main as _main
 
     argv_backup = sys.argv[:]
-    sys.argv = ["hermes", "--help"]
+    sys.argv = ["qubit", "--help"]
     buf = io.StringIO()
     try:
         with patch.object(_main, "_plugin_cli_discovery_needed", return_value=False):
@@ -84,7 +84,7 @@ def test_reasoning_value_is_not_misclassified_as_subcommand(monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["hermes", "--reasoning", "high", "chat", "hello"],
+        ["qubit", "--reasoning", "high", "chat", "hello"],
     )
 
     assert _first_positional_argv() == "chat"
@@ -108,7 +108,7 @@ def test_deferred_platform_cli_resolution_targets_matching_platform():
     """The slow path must import the deferred platform whose name matches the
     invoked command, so its register_cli_command side effect fires.
 
-    Photon registers ``hermes photon`` only when its adapter module is
+    Photon registers ``qubit photon`` only when its adapter module is
     imported; on the unknown-command slow path the platform is still a
     deferred entry, so without this resolution step the CLI command stays
     absent and argparse rejects ``photon`` (issue #54678).
@@ -159,7 +159,7 @@ def test_deferred_platform_loader_registers_cli_command_before_parser_table():
 
     def _fake_loader():
         # Mirrors what a real platform adapter does on import: register its
-        # top-level hermes <name> CLI command via PluginContext.
+        # top-level qubit <name> CLI command via PluginContext.
         ctx = PluginContext(manifest, mgr)
         ctx.register_cli_command(
             name=command_name,
@@ -189,7 +189,7 @@ def test_deferred_platform_loader_registers_cli_command_before_parser_table():
     assert cmd_info["plugin"] == "fake-photon-platform"
 
     # Same parser-table assembly main() uses after reading _cli_commands.
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="qubit")
     subparsers = parser.add_subparsers(dest="command")
     for info in mgr._cli_commands.values():
         plugin_parser = subparsers.add_parser(

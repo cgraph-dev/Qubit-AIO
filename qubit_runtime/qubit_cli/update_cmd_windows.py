@@ -475,7 +475,7 @@ def _orphaned_desktop_backend_pids(matches: list[tuple[int, str, str]]) -> list[
         try:
             proc = psutil.Process(int(pid))
             # Fingerprint from the SAME psutil handle, centisecond-quantized like
-            # gateway.status.get_process_start_time so pid_is_hermes round-trips at kill time.
+            # gateway.status.get_process_start_time so pid_is_qubit round-trips at kill time.
             process_start_time = int(round(proc.create_time() * 100))
         except psutil.NoSuchProcess:
             continue  # exited during classification — nothing to reap

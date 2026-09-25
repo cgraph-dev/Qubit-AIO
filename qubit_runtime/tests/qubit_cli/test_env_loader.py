@@ -11,7 +11,7 @@ def test_recovered_update_retry_skips_external_secret_sources(tmp_path, monkeypa
     import qubit_cli.env_loader as env_loader
     from qubit_cli import _early_recovery
 
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_text("UPDATE_RETRY_DOTENV=loaded\n", encoding="utf-8")
@@ -38,7 +38,7 @@ def test_utf8_bom_does_not_mangle_first_key(tmp_path, monkeypatch):
     a BOM (EF BB BF). With encoding=utf-8, python-dotenv keeps U+FEFF on the
     first key so the canonical name is absent and callers see "not configured".
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_bytes(
@@ -59,7 +59,7 @@ def test_utf8_bom_does_not_mangle_first_key(tmp_path, monkeypatch):
 
 def test_bomless_utf8_env_still_loads(tmp_path, monkeypatch):
     """BOM-less UTF-8 .env files must keep loading after utf-8-sig."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_text("OPENAI_API_KEY=sk-plain\nSECOND_KEY=ok\n", encoding="utf-8")
@@ -76,7 +76,7 @@ def test_bomless_utf8_env_still_loads(tmp_path, monkeypatch):
 
 def test_latin1_env_falls_back(tmp_path, monkeypatch):
     """Invalid UTF-8 bytes must still load via the latin-1 fallback."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     # 0xE9 is "é" in latin-1 and not a valid UTF-8 lead sequence alone.
@@ -92,7 +92,7 @@ def test_latin1_env_falls_back(tmp_path, monkeypatch):
 
 def test_utf8_bom_preserves_first_api_key_name(tmp_path, monkeypatch):
     """Real-world case: BOM + first line is a provider API key name."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_bytes(
@@ -118,7 +118,7 @@ def test_utf8_bom_plus_invalid_utf8_preserves_first_key(tmp_path, monkeypatch):
     latin-1 fallback, a leading EF BB BF would otherwise become part of the
     first key name under latin-1 and drop the canonical name.
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     # BOM + valid first key + latin-1 é (0xE9) in a later value.
@@ -139,7 +139,7 @@ def test_utf8_bom_plus_invalid_utf8_preserves_first_key(tmp_path, monkeypatch):
 
 def test_bomless_latin1_env_still_loads(tmp_path, monkeypatch):
     """BOM-less cp1252/latin-1 .env files must keep loading after the BOM strip."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     env_file.write_bytes(b"LATIN1_VALUE=caf\xe9\nOTHER=ok\n")
@@ -157,7 +157,7 @@ def test_latin1_fallback_stream_honors_override(tmp_path, monkeypatch):
     """Stream-based latin-1 fallback must honor override= identically to dotenv_path."""
     from qubit_cli.env_loader import _load_dotenv_with_fallback
 
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     # Invalid UTF-8 forces the stream/latin-1 path.
@@ -178,7 +178,7 @@ def test_latin1_fallback_stream_honors_override(tmp_path, monkeypatch):
 
 def test_latin1_fallback_stream_preserves_interpolation(tmp_path, monkeypatch):
     """Stream/latin-1 path must still expand ${VAR} like the dotenv_path form."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     # 0xE9 forces latin-1 fallback; ${FOO} must still expand.
@@ -224,7 +224,7 @@ def test_utf16_le_bom_preserves_non_ascii_values(tmp_path, monkeypatch):
     Uses non-credential var names so _sanitize_loaded_credentials does not
     strip non-ASCII from values (that path only targets *_KEY/*_TOKEN/etc.).
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     content = "GREETING=café\nCJK_LABEL=日本語\n"
@@ -305,7 +305,7 @@ def test_utf32_warning_fires_once_per_path(tmp_path, caplog, monkeypatch):
 
 def test_plain_utf8_env_regression(tmp_path, monkeypatch):
     """Plain UTF-8 .env must keep loading after the UTF-16 sanitize changes."""
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     before = b"OPENAI_API_KEY=sk-plain\nSECOND_KEY=ok\n"
@@ -333,7 +333,7 @@ def test_cp1252_env_regression_does_not_crash(tmp_path, monkeypatch):
     errors=replace on values (original already replace-decoded equals
     sanitized), so _load_dotenv_with_fallback's latin-1 path recovers café.
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     env_file = home / ".env"
     before = b"ASCII_KEY=ok\nLATIN1_VALUE=caf\xe9\n"
@@ -364,7 +364,7 @@ def test_known_keys_absent_from_user_env_are_cleared(tmp_path, monkeypatch):
     fixes the isolation gap where one profile's ACP/provider settings silently
     leak into another profile's runtime via ``os.environ`` inheritance.
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     (home / ".env").write_text(
         "OPENAI_BASE_URL=https://profile.example/v1\n", encoding="utf-8"
@@ -396,7 +396,7 @@ def test_empty_assignment_in_user_env_is_preserved(tmp_path, monkeypatch):
     ``authenticate`` (the key exists, its value is just empty).  This is the
     documented workaround for the leak and must still work after the cleanup.
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     (home / ".env").write_text("HERMES_ACP_AUTH_METHOD=\n", encoding="utf-8")
 
@@ -417,7 +417,7 @@ def test_no_user_env_does_not_clear_anything(tmp_path, monkeypatch):
     wipe inherited known keys — the bare-profile case follows #66930 / #67027
     semantics and the user's shell environment should not be mutilated.
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     # No .env in home — bare profile
 
@@ -434,7 +434,7 @@ def test_known_key_explicitly_set_in_user_env_is_kept(tmp_path, monkeypatch):
     """A known Hermes key that IS explicitly set in the profile .env survives
     the cleanup (overrides the inherited value).
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     (home / ".env").write_text(
         "HERMES_ACP_AUTH_METHOD=claude_code_cli\n", encoding="utf-8"
@@ -453,7 +453,7 @@ def test_export_prefixed_known_key_in_user_env_is_kept(tmp_path, monkeypatch):
     cleanup - mirrors the ``export `` stripping in config.py's load_env()
     (#6659).
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     (home / ".env").write_text(
         "export HERMES_ACP_AUTH_METHOD=claude_code_cli\n", encoding="utf-8"
@@ -474,7 +474,7 @@ def test_shell_exported_credentials_survive_cleanup(tmp_path, monkeypatch):
     shell export from parent-process leakage, so credential isolation is
     owned by read-time secret scoping instead.
     """
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     (home / ".env").write_text("SOME_OTHER_KEY=x\n", encoding="utf-8")
 
@@ -519,7 +519,7 @@ def test_cleanup_scope_is_the_profile_managed_set():
 
 
 def _seed_terminal_home(tmp_path, monkeypatch, *, config_yaml=None, env_text=None):
-    home = tmp_path / "hermes"
+    home = tmp_path / "qubit"
     home.mkdir()
     if config_yaml is not None:
         (home / "config.yaml").write_text(config_yaml, encoding="utf-8")

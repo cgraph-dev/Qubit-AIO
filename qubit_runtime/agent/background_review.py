@@ -879,7 +879,7 @@ def build_cache_parity_fork(
     # hooks) stays byte-identical.
     # Inherit the parent's cached system prompt verbatim so the review fork's outbound HTTP request hits the
     # same Anthropic/OpenRouter prefix cache the parent warmed. Without this, the fork rebuilds the system
-    # prompt from scratch (fresh _hermes_now() timestamp, fresh session_id, narrower toolset → different
+    # prompt from scratch (fresh _qubit_now() timestamp, fresh session_id, narrower toolset → different
     # skills_prompt) and the byte-exact prefix-cache key misses. See issue #25322 and PR #17276 for the full
     # analysis + measured impact (~26% end-to-end cost reduction on Sonnet 4.5). When routed to a different
     # model the parent's cached prompt is for the wrong model/cache key and would miss anyway, so let the

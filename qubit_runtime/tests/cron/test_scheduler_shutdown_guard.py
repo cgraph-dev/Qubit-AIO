@@ -2,7 +2,7 @@
 interpreter finalization.
 
 When the gateway tears down (SIGTERM from ``hermes update`` /
-``hermes gateway stop`` / systemd restart, or an OOM-kill), a cron tick can
+``qubit gateway stop`` / systemd restart, or an OOM-kill), a cron tick can
 still fire. Once the Python interpreter is finalizing, ``concurrent.futures``
 refuses new work with ``RuntimeError: cannot schedule new futures after
 interpreter shutdown`` and asyncio's default executor is gone. The cron

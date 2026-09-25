@@ -33,7 +33,7 @@ from qubit_cli.subcommands.worktree import build_worktree_parser
 
 
 def _tree():
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="qubit")
     return parser, parser.add_subparsers(dest="command")
 
 

@@ -1,6 +1,6 @@
 """Tests for `--resume latest` and `--in DIR` launch sugar.
 
-`hermes --tui --resume latest --in ./dir` (and the classic-CLI equivalents)
+`qubit --tui --resume latest --in ./dir` (and the classic-CLI equivalents)
 resolve "latest" through the same workspace-scoped MRU lookup as `-c`, with
 `--in` re-homing the process before any session resolution happens.
 """
@@ -81,12 +81,12 @@ def test_chat_subparser_accepts_in_flag():
 
 
 def test_top_level_in_value_not_mistaken_for_subcommand(monkeypatch):
-    # `hermes --in chat` — "chat" is the flag's value, not the subcommand.
+    # `qubit --in chat` — "chat" is the flag's value, not the subcommand.
     import sys
 
     import qubit_cli.main as mod
 
-    monkeypatch.setattr(sys, "argv", ["hermes", "--in", "chat", "--resume", "latest"])
+    monkeypatch.setattr(sys, "argv", ["qubit", "--in", "chat", "--resume", "latest"])
     assert mod._first_positional_argv() is None
 
 

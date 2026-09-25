@@ -18,7 +18,7 @@ logger = logging.getLogger("tools.mcp_tool")
 
 _PROBE_INITIALIZE_BODY = (  # JSON-RPC ``initialize`` body for the content-type preflight POST
     '{"jsonrpc":"2.0","id":"_probe","method":"initialize","params":{"protocolVersion":"2025-03-26",'
-    '"capabilities":{},"clientInfo":{"name":"hermes-probe","version":"0.1"}}}')
+    '"capabilities":{},"clientInfo":{"name":"qubit-probe","version":"0.1"}}}')
 
 
 def _content_type_base(resp) -> str:

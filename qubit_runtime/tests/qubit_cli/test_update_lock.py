@@ -1,12 +1,12 @@
 """Cross-process update mutual exclusion (``qubit_cli.update_lock``).
 
-Three surfaces can start an update of one install tree: a terminal ``hermes
+Three surfaces can start an update of one install tree: a terminal ``qubit
 update``, the dashboard's Update button (which spawns that same command
 detached), and the desktop's Update button (Tauri updater → install-mode
 bootstrap on its failure screen). Before the shared lock, two of them could run
 concurrently and rewrite source under a live interpreter — observed in the wild
 as an installer ``git checkout`` rewinding the checkout ~9k commits while a
-dashboard-spawned ``hermes update`` was mid-``npm install``, which then failed
+dashboard-spawned ``qubit update`` was mid-``npm install``, which then failed
 against the rewound tree's manifests.
 
 These exercise the real marker file against a temp home — no mocks — because
@@ -179,7 +179,7 @@ def test_unwritable_marker_location_does_not_block_the_update(tmp_path):
 
 
 class TestHandoffFromOrchestratingUpdater:
-    """The Tauri updater holds the marker, then spawns ``hermes update``.
+    """The Tauri updater holds the marker, then spawns ``qubit update``.
 
     The regression: the child saw its own parent's live marker and exited 2,
     so every GUI update failed with "Hermes is still running" and retrying

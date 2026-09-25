@@ -1,5 +1,5 @@
 /**
- * Shared E2E fixtures for the Hermes desktop Playwright suite.
+ * Shared E2E fixtures for the Qubit desktop Playwright suite.
  *
  * Two fixture modes:
  *
@@ -498,7 +498,7 @@ providers:
   )
   writeEnvFile(sandbox.qubitHome)
 
-  const env = buildAppEnv(sandbox, options.fakeError ? { QUBIT_DESKTOP_BOOT_FAKE_ERROR: 'Failed to connect to Hermes backend: connection refused' } : {})
+  const env = buildAppEnv(sandbox, options.fakeError ? { QUBIT_DESKTOP_BOOT_FAKE_ERROR: 'Failed to connect to Qubit backend: connection refused' } : {})
   const { app, page } = await launchDesktop(env)
 
   return {
@@ -548,7 +548,7 @@ export interface PackagedAppFixture {
 /**
  * Launch the *packaged* Electron binary (from `npm run pack` →
  * `electron-builder --dir`) with `BOOT_FAKE=1` so it simulates boot
- * progress without spawning a real Hermes backend.
+ * progress without spawning a real Qubit backend.
  *
  * Uses the same sandbox isolation (credential stripping, isolated
  * QUBIT_HOME + userData, unique app name) as the dev-mode fixtures.

@@ -26,7 +26,7 @@ def _targets_this_home(text: str) -> bool:
     profile that classified every ``Hermes_Gateway`` object as its own stray would delete the default
     profile's gateway autostart on ``uninstall`` / ``install --force``."""
     w = _w()
-    marker = w._normalize_windows_path(str(w._hermes_home() / "gateway-service"))
+    marker = w._normalize_windows_path(str(w._qubit_home() / "gateway-service"))
     return marker in w._normalize_windows_path(text)
 
 
@@ -40,7 +40,7 @@ def legacy_launcher_artifacts() -> list[tuple[str, str, Path | str]]:
         return []
     found: list[tuple[str, str, Path | str]] = []
     startup = w._startup_dir()
-    service_dir = w._hermes_home() / "gateway-service"
+    service_dir = w._qubit_home() / "gateway-service"
     for path, label in (
         (startup / f"{bare}.vbs", "legacy pre-suffix Windows login item"),
         (startup / f"{bare}.cmd", "legacy pre-suffix Windows login item"),

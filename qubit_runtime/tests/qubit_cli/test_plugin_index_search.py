@@ -1,7 +1,7 @@
 """Tests for the community plugin index (#64181).
 
 Covers: index parsing, fuzzy search, cache TTL + fallback chain
-(remote → cache → seed), `hermes plugins search --json`, and install-time
+(remote → cache → seed), `qubit plugins search --json`, and install-time
 name resolution (unique / ambiguous / passthrough of owner/repo).
 No live network — every remote fetch is mocked.
 """
@@ -296,7 +296,7 @@ class TestResolveName:
         assert entry is not None and entry.name == "hermes-telegram-business"
 
     def test_ambiguous_partial(self):
-        entry, candidates = resolve_name(self.entries, "hermes")
+        entry, candidates = resolve_name(self.entries, "qubit")
         assert entry is None
         assert len(candidates) == 2
 
@@ -372,7 +372,7 @@ class TestInstallResolution:
             lambda *a, **k: called.append(1),
         )
         with pytest.raises(SystemExit) as exc:
-            plugins_cmd.cmd_install("hermes", enable=False)
+            plugins_cmd.cmd_install("qubit", enable=False)
         assert exc.value.code == 1
         assert not called
         out = capsys.readouterr().out

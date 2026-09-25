@@ -41,13 +41,13 @@ class TestDoctorPlatformHints:
         hint = doctor_platform._sqlite_upgrade_hint()
 
         assert "docker pull nousresearch/hermes-agent:latest" in hint
-        assert "recreate all Hermes containers" in hint
+        assert "recreate all Qubit containers" in hint
         assert "hermes update" not in hint
 
     def test_sqlite_upgrade_hint_keeps_git_runtime_repair(self):
         hint = doctor_platform._sqlite_upgrade_hint("git")
 
-        assert "run `hermes update`" in hint
+        assert "run `qubit update`" in hint
 
     def test_sqlite_upgrade_hint_uses_pkg_for_apt_managed_install(self):
         hint = doctor_platform._sqlite_upgrade_hint("apt")
@@ -137,7 +137,7 @@ class TestDoctorToolAvailabilitySummary:
 
 
 class TestDoctorEnvFileEncoding:
-    """Regression for #18637 (bug 3): `hermes doctor` crashed on Windows
+    """Regression for #18637 (bug 3): `qubit doctor` crashed on Windows
     Chinese locale (GBK) because `.env` was read with Path.read_text() which
     defaults to the system locale encoding, not UTF-8."""
 
@@ -851,7 +851,7 @@ def test_run_doctor_reports_agent_browser_resolves_via_npx(monkeypatch, tmp_path
 def test_run_doctor_fix_warms_npx_cache_when_agent_browser_resolves_via_npx(
     monkeypatch, tmp_path
 ):
-    """`hermes doctor --fix` must actually call warm_agent_browser_npx_cache()
+    """`qubit doctor --fix` must actually call warm_agent_browser_npx_cache()
     when agent-browser resolves via npx, and report success."""
     _doctor_env_for_agent_browser(monkeypatch, tmp_path)
 
@@ -1328,7 +1328,7 @@ class TestDoctorXaiOAuthStatus:
         with contextlib.redirect_stdout(buf):
             doctor_mod.run_doctor(Namespace(fix=False))
         out = buf.getvalue()
-        assert "Nous Portal auth" in out
+        assert "Qubit Labs auth" in out
         assert "logged in" in out
 
     def test_function_raises_does_not_crash_doctor(self, monkeypatch, tmp_path):
@@ -1602,7 +1602,7 @@ class TestMacOSTCCGrants:
         out = capsys.readouterr().out
         assert "TCC grants will reset after every update" in out
         assert "cdhash-pinned" in out
-        assert "hermes update" in out
+        assert "qubit update" in out
 
     def test_ok_and_repair_info_on_identifier_dr(self, monkeypatch, capsys, tmp_path):
         """Post-#73681 identifier-only DR → stable + stale-grant repair info."""
@@ -1629,7 +1629,7 @@ class TestMacOSTCCGrants:
         assert "relaunch" in out
 
     def test_ok_on_certificate_anchored_dr(self, monkeypatch, capsys, tmp_path):
-        """A cert-anchored DR (hermes desktop --setup-tcc-identity, or a
+        """A cert-anchored DR (qubit desktop --setup-tcc-identity, or a
         notarized release) classifies as stable in its own class — no upgrade
         hint, still prints the stale-grant repair info."""
         monkeypatch.setattr(doctor_mod.sys, "platform", "darwin")

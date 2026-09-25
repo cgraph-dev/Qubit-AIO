@@ -87,7 +87,7 @@ class TestConfigFilePermissions(unittest.TestCase):
     def test_save_config_sets_0600(self):
         config_path = Path(self.tmpdir) / "config.yaml"
         with patch("qubit_cli.config.get_config_path", return_value=config_path), \
-             patch("qubit_cli.config.ensure_hermes_home"):
+             patch("qubit_cli.config.ensure_qubit_home"):
             from qubit_cli.config import save_config
             save_config({"model": "test/model"})
 
@@ -97,7 +97,7 @@ class TestConfigFilePermissions(unittest.TestCase):
     def test_save_env_value_sets_0600(self):
         env_path = Path(self.tmpdir) / ".env"
         with patch("qubit_cli.config.get_env_path", return_value=env_path), \
-             patch("qubit_cli.config.ensure_hermes_home"):
+             patch("qubit_cli.config.ensure_qubit_home"):
             from qubit_cli.config import save_env_value
             save_env_value("TEST_KEY", "test_value")
 

@@ -561,7 +561,7 @@ def _chown_to_qubit_uid(path) -> None:
     entrypoint's startup chown -R fixes ownership on the next restart).
 
     Used by :func:`_secure_dir` to keep ownership consistent across all directories created by
-    :func:`ensure_hermes_home` on Docker deployments. See #34107.
+    :func:`ensure_qubit_home` on Docker deployments. See #34107.
     """
     uid, gid = _resolve_qubit_uid_gid()
     if uid is None and gid is None:

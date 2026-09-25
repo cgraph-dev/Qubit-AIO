@@ -917,7 +917,7 @@
    "dashboard": "hermes-dist Cron",
    "voice": "voice schedules",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_schedules8u.py::test_public_store_api_round_trip_is_one_authority",
+   "proving_test": "tests/test_cron_banner_settle9u.py::test_staged_cron_resume_settles_through_banner",
    "note": "",
    "needs": "none"
   },

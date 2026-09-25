@@ -1,9 +1,9 @@
 """Tests for git self-heal: atomic worktree-add failure cleanup + pack maintenance.
 
-Regression for the Aug 2026 `hermes -w` timeout incident: 39 accumulated packs
+Regression for the Aug 2026 `qubit -w` timeout incident: 39 accumulated packs
 slowed object lookups until `git worktree add` blew its 30s timeout, and the
 timed-out add left a partially-materialized worktree plus a LOCKED admin entry
-(lock pid = the live hermes process), poisoning every retry.
+(lock pid = the live qubit process), poisoning every retry.
 
 Two behaviors:
 1. `_cleanup_failed_worktree_add` — removes the partial dir, the admin entry
@@ -44,8 +44,8 @@ class TestCleanupFailedWorktreeAdd:
         which yields the same on-disk shape as a killed `worktree add`."""
         wt = repo / ".worktrees" / "hermes-dead00"
         _git(repo, "worktree", "add", str(wt), "-b", "hermes/hermes-dead00")
-        # Live-pid lock, exactly what `hermes -w` writes before the checkout.
-        _git(repo, "worktree", "lock", str(wt), "--reason", "hermes pid=999999")
+        # Live-pid lock, exactly what `qubit -w` writes before the checkout.
+        _git(repo, "worktree", "lock", str(wt), "--reason", "qubit pid=999999")
         # Partial materialization: gut the checkout but keep the dir + .git file.
         for child in wt.iterdir():
             if child.name != ".git":

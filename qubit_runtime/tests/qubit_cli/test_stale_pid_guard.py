@@ -3,7 +3,7 @@
 
 Refs #90471 / #89614.  The three patched Windows ``taskkill`` boundaries:
 
-- ``qubit_cli/_subprocess_compat.pid_is_hermes`` / ``kill_process_tree``
+- ``qubit_cli/_subprocess_compat.pid_is_qubit`` / ``kill_process_tree``
 - ``qubit_cli/dashboard_procs._kill_stale_dashboard_processes`` (win32)
 - ``qubit_cli/update_cmd._stop_process_trees``
 
@@ -45,7 +45,7 @@ class TestPidIsQubit:
             ) is False
 
     def test_qubit_match_requires_token_boundary(self):
-        # "hermes" buried inside an unrelated path segment must not match.
+        # "qubit" buried inside an unrelated path segment must not match.
         assert _subprocess_compat._text_names_qubit(
             r"c:\users\shermesa\app.exe"
         ) is False
@@ -67,7 +67,7 @@ class TestPidIsQubit:
         with mock.patch.object(_subprocess_compat, "IS_WINDOWS", True), mock.patch.object(
             _subprocess_compat, "_process_start_time", return_value=123
         ), mock.patch.object(
-            _subprocess_compat, "_process_command_is_hermes", return_value=True
+            _subprocess_compat, "_process_command_is_qubit", return_value=True
         ):
             assert _subprocess_compat.pid_is_qubit(1234) is True
 
@@ -75,7 +75,7 @@ class TestPidIsQubit:
         with mock.patch.object(_subprocess_compat, "IS_WINDOWS", True), mock.patch.object(
             _subprocess_compat, "_process_start_time", return_value=456
         ), mock.patch.object(
-            _subprocess_compat, "_process_command_is_hermes", return_value=True
+            _subprocess_compat, "_process_command_is_qubit", return_value=True
         ):
             assert _subprocess_compat.pid_is_qubit(
                 1234, expected_start_time=123
@@ -85,7 +85,7 @@ class TestPidIsQubit:
         with mock.patch.object(_subprocess_compat, "IS_WINDOWS", True), mock.patch.object(
             _subprocess_compat, "_process_start_time", return_value=123
         ), mock.patch.object(
-            _subprocess_compat, "_process_command_is_hermes", return_value=False
+            _subprocess_compat, "_process_command_is_qubit", return_value=False
         ):
             assert _subprocess_compat.pid_is_qubit(1234) is False
 
@@ -128,7 +128,7 @@ class TestKillProcessTree:
 
     def test_retained_handle_is_taskkilled_without_probe(self):
         with mock.patch.object(_subprocess_compat, "IS_WINDOWS", True), mock.patch.object(
-            _subprocess_compat, "pid_is_hermes"
+            _subprocess_compat, "pid_is_qubit"
         ) as guard, mock.patch.object(_subprocess_compat.subprocess, "run") as run:
             _subprocess_compat._legacy_kill_process_tree(self._proc())
             guard.assert_not_called()
@@ -146,7 +146,7 @@ class TestStopProcessTrees:
         with mock.patch(
             "gateway.status.get_process_start_time", return_value=123
         ), mock.patch(
-            "qubit_cli._subprocess_compat.pid_is_hermes", return_value=False
+            "qubit_cli._subprocess_compat.pid_is_qubit", return_value=False
         ), mock.patch.object(update_cmd.subprocess, "run") as run:
             update_cmd._stop_process_trees([1111, 2222])
         run.assert_not_called()
@@ -155,7 +155,7 @@ class TestStopProcessTrees:
         with mock.patch(
             "gateway.status.get_process_start_time", return_value=123
         ), mock.patch(
-            "qubit_cli._subprocess_compat.pid_is_hermes", return_value=True
+            "qubit_cli._subprocess_compat.pid_is_qubit", return_value=True
         ), mock.patch.object(
             update_cmd.subprocess, "run", return_value=mock.Mock(returncode=0)
         ) as run:
@@ -167,7 +167,7 @@ class TestStopProcessTrees:
         with mock.patch(
             "gateway.status.get_process_start_time", return_value=123
         ), mock.patch(
-            "qubit_cli._subprocess_compat.pid_is_hermes", return_value=False
+            "qubit_cli._subprocess_compat.pid_is_qubit", return_value=False
         ), mock.patch.object(update_cmd.subprocess, "run") as run:
             update_cmd._stop_process_trees([1111, 2222])  # must not raise
         run.assert_not_called()
@@ -187,7 +187,7 @@ class TestKillStaleDashboardProcesses:
         ), mock.patch(
             "gateway.status.get_process_start_time", return_value=123
         ), mock.patch(
-            "qubit_cli._subprocess_compat.pid_is_hermes", return_value=False
+            "qubit_cli._subprocess_compat.pid_is_qubit", return_value=False
         ), mock.patch.object(dashboard_procs.subprocess, "run") as run:
             result = dashboard_procs._kill_stale_dashboard_processes()
         assert result["killed"] == []
@@ -202,7 +202,7 @@ class TestKillStaleDashboardProcesses:
         ), mock.patch(
             "gateway.status.get_process_start_time", return_value=123
         ), mock.patch(
-            "qubit_cli._subprocess_compat.pid_is_hermes", return_value=True
+            "qubit_cli._subprocess_compat.pid_is_qubit", return_value=True
         ), mock.patch.object(
             dashboard_procs.subprocess, "run", return_value=mock.Mock(
                 returncode=0, stderr="", stdout=""

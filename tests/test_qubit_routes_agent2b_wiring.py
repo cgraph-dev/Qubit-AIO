@@ -753,7 +753,10 @@ def test_memory_reads_are_real(tmp_path, monkeypatch):
 
     code, out = HC.dispatch(cfg, "GET",
                             "/api/memory/providers/nope/config", {}, {})
-    assert (code, out["code"]) == (404, "NOT_FOUND"), (code, out)
+    # In force: the read path returns the same typed MEMORY_LOCAL_ONLY refusal
+    # as the write path (never a bare 404 / fake 200) — see STATUS §24 wave 7.
+    assert (code, out["code"]) == (403, "MEMORY_LOCAL_ONLY"), (code, out)
+    assert out["ok"] is False and "qubit-local" in out["detail"], out
 
 
 def test_toolset_reads_are_real(tmp_path, monkeypatch):

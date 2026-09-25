@@ -3764,10 +3764,10 @@ def _compress_context_via_codex_app_server(
     _sid = getattr(agent, "session_id", None) or "none"
     _tokens = f"{approx_tokens:,}" if approx_tokens else "unknown"
     auto_mode = str(getattr(agent, "codex_app_server_auto_compaction", "native") or "native").lower()
-    if auto_mode not in {"native", "hermes", "off"}:
+    if auto_mode not in {"native", "hermes", "qubit", "off"}:
         auto_mode = "native"
     skip_reason = None
-    if not force and auto_mode != "hermes":
+    if not force and auto_mode not in {"hermes", "qubit"}:
         skip_reason = f"mode={auto_mode} force=false"
     elif not force:
         # Automatic entrypoints honor the compressor-owned cooldown: a recent compaction

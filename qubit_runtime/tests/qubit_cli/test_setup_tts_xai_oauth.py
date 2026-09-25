@@ -12,10 +12,10 @@ def test_run_xai_oauth_login_from_setup_does_not_hijack_active_provider(
 
     Regression: `_run_xai_oauth_login_from_setup` used to call
     `_update_config_for_provider("xai-oauth")` (and token save flipped
-    `active_provider`), so `hermes setup tts` OAuth login hijacked the main
+    `active_provider`), so `qubit setup tts` OAuth login hijacked the main
     chat provider.
     """
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     qubit_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
 

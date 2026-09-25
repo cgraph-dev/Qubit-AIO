@@ -469,7 +469,7 @@ async def test_primary_adapter_busy_origin_uses_routed_privacy(
     secondary.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("QUBIT_HOME", str(home))
-    monkeypatch.setattr("gateway.run._hermes_home", home)
+    monkeypatch.setattr("gateway.run._qubit_home", home)
     monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
     for directory, privacy in ((home, not secondary_privacy), (secondary, secondary_privacy)):
         (directory / "config.yaml").write_text(

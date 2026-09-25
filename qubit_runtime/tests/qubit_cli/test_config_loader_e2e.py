@@ -10,7 +10,7 @@ Asserts the two halves of the contract:
   2. A WRITE-BACK site round-trips the raw user file without leaking managed
      values, expanded literals, or merged defaults into it.
 
-Subprocess (not in-process monkeypatching) so module-level ``_hermes_home``
+Subprocess (not in-process monkeypatching) so module-level ``_qubit_home``
 globals, managed-scope caches, and ``_under_pytest`` guards behave like
 production: ``HERMES_MANAGED_DIR`` is set explicitly, which bypasses the
 pytest suppression in ``get_managed_dir``.
@@ -90,7 +90,7 @@ def test_behavioral_read_gets_expansion_and_overlay_while_writeback_stays_raw(
 
         import os
         from pathlib import Path
-        saved = Path(server._hermes_home, "config.yaml").read_text(encoding="utf-8")
+        saved = Path(server._qubit_home, "config.yaml").read_text(encoding="utf-8")
         Path(os.environ["E2E_OUT_FILE"]).write_text(json.dumps({
             "behavioral_prompt": cfg.get("custom_prompt"),
             "behavioral_effort": (cfg.get("agent") or {}).get("reasoning_effort"),

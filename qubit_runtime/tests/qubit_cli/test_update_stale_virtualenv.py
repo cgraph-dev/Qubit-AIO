@@ -88,7 +88,7 @@ class StaleVirtualEnvTest(unittest.TestCase):
             fake_executable="/fake/python311/python.exe",
         )
         # Force the caller path through a manual pin with a pre-existing flag.
-        args = ["install", "--python", "/caller/choice/python.exe", "hermes"]
+        args = ["install", "--python", "/caller/choice/python.exe", "qubit"]
         pinned = main_install_repair._insert_python_pin(args)
         self.assertEqual(pinned, args, "existing --python must win")
         self.assertEqual(pinned.count("--python"), 1)

@@ -1,13 +1,13 @@
 """Interrupted-update fleet-restart obligation (#95294 parts 1+2).
 
-A ``hermes update`` killed after git pull advanced HEAD but before the
+A ``qubit update`` killed after git pull advanced HEAD but before the
 fleet restart left running gateways on stale code. The next update said
 "Already up to date" and skipped restart. These tests cover:
 
 - ``fleet_restart_pending`` marker written after HEAD advances, cleared
   after a successful (or no-op) fleet restart
 - interrupt between pull and restart leaves the marker
-- next ``hermes update`` with git already up to date still runs the
+- next ``qubit update`` with git already up to date still runs the
   pending restart when the marker OR a skewed unfinished latest.json is
   present
 
@@ -127,8 +127,8 @@ def _patch_update_deps(monkeypatch, tmp_path, run_side_effect):
     )
     monkeypatch.setattr(update_cmd, "_update_node_dependencies", lambda: [])
     monkeypatch.setattr(update_cmd_deps, "_update_node_dependencies", lambda: [])
-    monkeypatch.setattr(update_cmd, "_purge_stale_hermes_modules", lambda: None)
-    monkeypatch.setattr(qubit_main, "_purge_stale_hermes_modules", lambda: None)
+    monkeypatch.setattr(update_cmd, "_purge_stale_qubit_modules", lambda: None)
+    monkeypatch.setattr(qubit_main, "_purge_stale_qubit_modules", lambda: None)
 
     import qubit_cli.gateway as qubit_gateway
 
@@ -347,7 +347,7 @@ def test_run_pending_restart_true_when_no_gateways(monkeypatch, capsys):
     monkeypatch.setattr(
         "qubit_cli.gateway.find_gateway_pids", lambda **k: []
     )
-    monkeypatch.setattr(qubit_main, "_purge_stale_hermes_modules", lambda: None)
+    monkeypatch.setattr(qubit_main, "_purge_stale_qubit_modules", lambda: None)
 
     # An empty PID scan is insufficient; both supervisor scopes must answer empty.
     monkeypatch.setattr(update_cmd_fleet, "_systemd_gateway_unit_listings", lambda: [
@@ -601,7 +601,7 @@ def test_startup_warn_prints_when_marker_present(capsys):
     update_cmd._warn_pending_fleet_restart_on_startup()
     err = capsys.readouterr().err
     assert "did not restart running gateways" in err
-    assert "hermes gateway restart" in err
+    assert "qubit gateway restart" in err
 
 
 def test_startup_warn_silent_when_nothing_pending(capsys):

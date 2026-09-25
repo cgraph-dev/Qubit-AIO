@@ -40,7 +40,7 @@ def set_qubit_interactive_context(interactive: bool) -> contextvars.Token:
 
 
 def reset_qubit_interactive_context(token: contextvars.Token) -> None:
-    """Restore the prior value from :func:`set_hermes_interactive_context`."""
+    """Restore the prior value from :func:`set_qubit_interactive_context`."""
     _qubit_interactive_ctx.reset(token)
 
 

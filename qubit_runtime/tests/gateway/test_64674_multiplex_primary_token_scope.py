@@ -82,7 +82,7 @@ class TestLoadGatewayConfigForRunner:
         monkeypatch.delenv("API_SERVER_KEY", raising=False)
         monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
         monkeypatch.setattr(run_mod, "get_qubit_home", lambda: home)
-        monkeypatch.setattr(run_mod, "_hermes_home", home)
+        monkeypatch.setattr(run_mod, "_qubit_home", home)
         # Model the real multiplexed gateway: run.py flips the runtime flag
         # before the runner reload, making any installed scope authoritative.
         ss.set_multiplex_active(True)

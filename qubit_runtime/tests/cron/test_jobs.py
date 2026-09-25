@@ -247,14 +247,14 @@ class TestParseSchedule:
         Regression: when the configured zone differs from the server's local
         zone (common on cloud hosts running UTC), parse_schedule used
         ``dt.astimezone()`` (server-local), baking in the wrong offset. The
-        due-check compares against ``_hermes_now()`` (configured zone), so the
+        due-check compares against ``_qubit_now()`` (configured zone), so the
         stored instant landed hours off the user's wall-clock intent — far
         enough that one-shots never became due. This asserts the parsed offset
         matches the configured-now offset, the invariant that keeps the stored
         instant on the same clock the scheduler checks against.
         """
         configured_now = datetime(2026, 6, 22, 20, 0, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: configured_now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: configured_now)
 
         result = parse_schedule("2026-06-22T20:07:00")  # naive, user wall-clock
 
@@ -280,7 +280,7 @@ class TestNaiveScheduleTimezoneDivergence:
         # zone is irrelevant to the parse now — that is the whole point.
         configured = timezone(timedelta(hours=5, minutes=30))
         now = datetime(2026, 6, 22, 20, 7, 30, tzinfo=configured)
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: now)
 
         # 30s ago in the configured wall clock, supplied as a NAIVE string.
         naive_str = (now - timedelta(seconds=30)).replace(tzinfo=None).isoformat()
@@ -305,7 +305,7 @@ class TestComputeNextRun:
     def test_once_recent_past_within_grace_returns_time(self, monkeypatch):
         now = datetime(2026, 3, 18, 4, 22, 3, tzinfo=timezone.utc)
         run_at = "2026-03-18T04:22:00+00:00"
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: now)
 
         schedule = {"kind": "once", "run_at": run_at}
 
@@ -315,7 +315,7 @@ class TestComputeNextRun:
     def test_once_with_last_run_returns_none_even_within_grace(self, monkeypatch):
         now = datetime(2026, 3, 18, 4, 22, 3, tzinfo=timezone.utc)
         run_at = "2026-03-18T04:22:00+00:00"
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: now)
 
         schedule = {"kind": "once", "run_at": run_at}
 
@@ -440,7 +440,7 @@ class TestJobCRUD:
 
     def test_rejects_stale_past_one_shot_at_creation(self, tmp_cron_dir, monkeypatch):
         now = datetime(2026, 3, 18, 4, 30, 0, tzinfo=timezone.utc)
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: now)
         stale = (now - timedelta(minutes=5)).isoformat()
 
         with pytest.raises(ValueError, match="past and cannot be scheduled"):
@@ -566,7 +566,7 @@ class TestPauseResumeJob:
         """Resuming a paused one-shot whose time is now in the past must raise
         ValueError — the revived job would silently never fire."""
         now = datetime(2026, 7, 6, 12, 0, 0, tzinfo=timezone.utc)
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: now)
         # Create directly — bypass create_job's past-oneshot guard so we can
         # test the resume path independently.
         job = {
@@ -938,7 +938,7 @@ class TestGetDueJobs:
 
     def test_broken_recent_one_shot_without_next_run_is_recovered(self, tmp_cron_dir, monkeypatch):
         now = datetime(2026, 3, 18, 4, 22, 30, tzinfo=timezone.utc)
-        monkeypatch.setattr("cron.jobs._hermes_now", lambda: now)
+        monkeypatch.setattr("cron.jobs._qubit_now", lambda: now)
 
         run_at = "2026-03-18T04:22:00+00:00"
         save_jobs(
@@ -1002,7 +1002,7 @@ class TestGetDueJobs:
         # 28s later (the exact gap in the report) AND 61s later (past any
         # fixed +60s window) — both must skip.
         for gap in (28, 61, 130):
-            monkeypatch.setattr("cron.jobs._hermes_now",
+            monkeypatch.setattr("cron.jobs._qubit_now",
                                 lambda t0=t0, g=gap: t0 + timedelta(seconds=g))
             assert get_due_jobs() == [], f"double-dispatched at +{gap}s"
 
@@ -1030,7 +1030,7 @@ class TestGetDueJobs:
         assert claim_dispatch("slowrun") is True
 
         # Mid-run heartbeat before the TTL horizon refreshes the claim.
-        monkeypatch.setattr("cron.jobs._hermes_now",
+        monkeypatch.setattr("cron.jobs._qubit_now",
                             lambda: t0 + timedelta(seconds=ttl - 60))
         owner = get_job("slowrun")["run_claim"]["by"]
         assert heartbeat_run_claim("slowrun", expected_owner=owner) is True
@@ -1038,7 +1038,7 @@ class TestGetDueJobs:
         # Past the ORIGINAL claim's TTL horizon: without the heartbeat this
         # tick would stale-remove the maxed one-shot; with it the claim is
         # fresh, so the job is skipped and the record survives.
-        monkeypatch.setattr("cron.jobs._hermes_now",
+        monkeypatch.setattr("cron.jobs._qubit_now",
                             lambda: t0 + timedelta(seconds=ttl + 10))
         assert get_due_jobs() == []
         assert get_job("slowrun") is not None
@@ -1409,7 +1409,7 @@ class TestLateEnvRepointScopesStore:
 
         sim_old_home = tmp_path / "import-time-home"
         sim_cron = sim_old_home / "cron"
-        monkeypatch.setattr(jobs, "HERMES_DIR", sim_old_home)
+        monkeypatch.setattr(jobs, "QUBIT_DIR", sim_old_home)
         monkeypatch.setattr(jobs, "CRON_DIR", sim_cron)
         monkeypatch.setattr(jobs, "JOBS_FILE", sim_cron / "jobs.json")
         monkeypatch.setattr(jobs, "OUTPUT_DIR", sim_cron / "output")
@@ -1565,7 +1565,7 @@ class TestJobsJsonIdKeyedMap:
     load_jobs() return a dict. Every consumer iterates it as a list, so
     ``list_jobs()`` → ``_normalize_job_record`` → ``dict(<id-string>)`` raised
     ``ValueError: dictionary update sequence element #0 has length 1; 2 is
-    required`` and took down ``hermes cron list``, the ``cronjob(action=
+    required`` and took down ``qubit cron list``, the ``cronjob(action=
     "list")`` tool, and the Dashboard cron view. The values already carry
     their own ``id`` matching the map key, so flattening is lossless.
     """
@@ -1604,7 +1604,7 @@ class TestJobsJsonIdKeyedMap:
         assert all(isinstance(j, dict) for j in loaded)
 
     def test_list_jobs_survives_id_keyed_map(self, tmp_cron_dir):
-        """The reported traceback path (hermes cron list / cronjob list tool)."""
+        """The reported traceback path (qubit cron list / cronjob list tool)."""
         import json
         from cron.jobs import JOBS_FILE, list_jobs
 

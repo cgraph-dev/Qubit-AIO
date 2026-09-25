@@ -301,6 +301,24 @@ exclude = [
   # untracked agent execution prompt swept in by a working-tree build; carries
   # a real developer home path, so the release must not ship it.
   "docs/archive/2026-09-21/QUBIT_PROVIDER_VOICE_EXECUTION_PROMPT_2026-09-15.md",
+  # Living docs and generated evidence that record the developer's real home
+  # path (reference install / project-root provenance). They stay in the repo;
+  # the release sdist must carry no developer home path (Packet 8K sdist
+  # privacy; enforced by tests/test_packaging_wave3.py).
+  "docs/DECISIONS.md",
+  "docs/PARITY.md",
+  "docs/QUBIT_OWNER_AMENDMENT_2026-09-22_STAGED_GATES_AND_RULINGS.md",
+  "docs/QUBIT_OWNER_AMENDMENT_2026-09-23_W9_VENDOR_SYNC.md",
+  "docs/QUBIT_RESET_IMPLEMENTATION_STRATEGY_PROMPT_2026-09-22.md",
+  "docs/QUBIT_VENDOR_DELTA_2026-09-22.md",
+  "docs/STATUS.md",
+  "docs/generated/QUBIT_DASHBOARD_AUDIT_2026-09-23.json",
+  "docs/generated/QUBIT_SOURCE_INVENTORY.json",
+  "docs/generated/parity_inventory.json",
+  # Newly generated controls E2E evidence (untracked working-tree artifact)
+  # also records the developer home path; exclude it like the other generated
+  # evidence (Packet 8K sdist privacy).
+  "docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json",
   # The 2026-09-21 docs reorg relocated the internal evidence/prompt docs under
   # docs/archive/2026-09-21/. These mirror the home-path-bearing entries above
   # now that the working-tree build sweeps the archive location instead.
@@ -313,13 +331,16 @@ exclude = [
   # The active 2026-09-21 execution brief is an internal contract that records
   # the developer's repo path; it is not a shipped product doc.
   "docs/archive/2026-09-22-pre-reset/QUBIT_ACTIVE_EXECUTION_BRIEF_2026-09-21.md",
-  "tests/test_new_features.py",
   # tests that reference a concrete developer home path as a fixture or
   # scan pattern are source-only; keep the release sdist free of dev paths.
+  "tests/test_cli_chat_sessions_rebrand_9u.py",
   "tests/test_foundation_gate.py",
+  "tests/test_host_hygiene_pra07.py",
+  "tests/test_new_features.py",
   "tests/test_packet8r.py",
   "tests/test_packet8s.py",
   "tests/test_paths8tf.py",
+  "tests/test_source_inventory.py",
   "scripts/browser_profiles",
   "scripts/browser_auto_state",
   "106",

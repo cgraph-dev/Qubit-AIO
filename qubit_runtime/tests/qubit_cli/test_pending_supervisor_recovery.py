@@ -10,7 +10,7 @@ from qubit_cli import gateway, main, update_cmd_fleet as fleet
 @pytest.mark.linux_only
 @pytest.mark.parametrize("failure", ["listing", "timeout", "missing", "restart", "inactive", "running", None])
 def test_pending_marker_requires_complete_systemd_recovery(monkeypatch, tmp_path, failure):
-    monkeypatch.setattr(main, "_purge_stale_hermes_modules", lambda: None)
+    monkeypatch.setattr(main, "_purge_stale_qubit_modules", lambda: None)
     stopped = []
     monkeypatch.setattr(gateway, "find_gateway_pids", lambda **kw: [123] if failure == "running" and not stopped else [])
     monkeypatch.setattr(gateway, "kill_gateway_processes", lambda **kw: stopped.append(True))

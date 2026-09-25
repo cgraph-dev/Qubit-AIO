@@ -1,7 +1,7 @@
 """Tests for the GUI-updater hand-off backend reap (_handoff_reapable_backend_pids).
 
 Field incident (2026-08-20, Teknium's Windows box): a Desktop update hand-off
-(`hermes update --yes --gateway --force`) left a *swarm* of per-profile `serve`
+(`qubit update --yes --gateway --force`) left a *swarm* of per-profile `serve`
 backends (mr-tester, probe-inherit, turqoise, clippy, maroon, …) holding
 `cryptography\\_rust.pyd`. Some still had a live parent (the tearing-down
 Electron process, or the venv launcher→worker two-hop chain mid-exit), so the

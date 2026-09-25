@@ -2,7 +2,7 @@
 
 Covers CRUD on the SQLite-backed store, size-cap enforcement, prompt
 injection of non-empty notepads, byte-stable prompts for jobs that don't
-use the notepad, and the `hermes cron notepad` CLI handler.
+use the notepad, and the `qubit cron notepad` CLI handler.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def cron_env(tmp_path, monkeypatch, notepad):
 
     import cron.jobs as jobs_mod
 
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", qubit_home)
+    monkeypatch.setattr(jobs_mod, "QUBIT_DIR", qubit_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", qubit_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", qubit_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", qubit_home / "cron" / "output")
@@ -214,7 +214,7 @@ class TestPromptInjection:
         assert "8842" in prompt
         assert "watchlist" in prompt
         # The injected section documents the CLI write path for this job.
-        assert f"hermes cron notepad {job['id']} set" in prompt
+        assert f"qubit cron notepad {job['id']} set" in prompt
 
     def test_empty_notepad_prompt_byte_stable(self, cron_env, notepad):
         from cron.jobs import create_job

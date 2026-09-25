@@ -75,7 +75,7 @@ def _isolated_config(tmp_path, monkeypatch):
     qubit_home = tmp_path / ".hermes"
     qubit_home.mkdir()
     (qubit_home / "config.yaml").write_text("model:\n  default: gpt-x\n  provider: openrouter\nproviders: {}\n", encoding="utf-8")
-    monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+    monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     return qubit_home
 

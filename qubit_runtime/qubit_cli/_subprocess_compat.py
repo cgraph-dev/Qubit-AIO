@@ -392,7 +392,7 @@ def _legacy_kill_process_tree(proc: "subprocess.Popen") -> None:
         pass
     if IS_WINDOWS:
         # No identity guard on purpose: *proc* is our own retained Popen handle, so the PID cannot
-        # be recycled while we hold it. The fail-closed ``pid_is_hermes`` guard is for BARE pids.
+        # be recycled while we hold it. The fail-closed ``pid_is_qubit`` guard is for BARE pids.
         try:
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

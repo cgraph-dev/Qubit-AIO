@@ -469,18 +469,20 @@ def _resolve_qubit_bin_dir() -> str | None:
     global _QUBIT_BIN_DIR
     if _QUBIT_BIN_DIR is not _SENTINEL:
         return _QUBIT_BIN_DIR  # type: ignore[return-value]
-    which = shutil.which("hermes")
+    which = shutil.which("qubit") or shutil.which("hermes")
     argv0 = sys.argv[0] if sys.argv else ""
     base = os.path.basename(argv0).lower()
     exe_dir = os.path.dirname(sys.executable) if sys.executable else ""
-    shim = "hermes.exe" if _IS_WINDOWS else "hermes"
+    # Prefer the Qubit console-script; the legacy ``hermes`` shim is a read-old fallback.
+    names = ("qubit.exe", "qubit", "hermes.exe", "hermes") if _IS_WINDOWS else ("qubit", "hermes")
     if which:
         candidate = os.path.dirname(which)
-    elif (os.path.isabs(argv0) and (base == "hermes" or base.startswith("qubit."))
+    elif (os.path.isabs(argv0) and (base in names or base.startswith("qubit."))
             and os.path.isfile(argv0)):
         candidate = os.path.dirname(argv0)
     else:
-        candidate = exe_dir if exe_dir and os.path.isfile(os.path.join(exe_dir, shim)) else None
+        candidate = exe_dir if exe_dir and any(
+            os.path.isfile(os.path.join(exe_dir, n)) for n in names) else None
     _QUBIT_BIN_DIR = candidate if candidate and os.path.isdir(candidate) else None
     return _QUBIT_BIN_DIR
 

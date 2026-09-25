@@ -80,7 +80,7 @@ class TestReasoningCommand:
             encoding="utf-8",
         )
 
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
         runner = _make_runner()
         runner._reasoning_config = {"enabled": True, "effort": "xhigh"}
@@ -104,7 +104,7 @@ class TestReasoningCommand:
         (qubit_home / "config.yaml").write_text(
             "agent:\n  reasoning_effort: medium\n", encoding="utf-8"
         )
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
         runner = _make_runner()
         event = _make_event(f"/reasoning {effort}")
@@ -123,7 +123,7 @@ class TestReasoningCommand:
         qubit_home.mkdir()
         (qubit_home / "config.yaml").write_text("agent:\n  reasoning_effort: low\n", encoding="utf-8")
 
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
 
         runner = _make_runner()
         source = _make_event("/reasoning").source
@@ -147,7 +147,7 @@ class TestReasoningCommand:
             encoding="utf-8",
         )
 
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
         monkeypatch.setattr(gateway_run, "_env_path", qubit_home / ".env")
         monkeypatch.setattr(
             gateway_run,
@@ -201,7 +201,7 @@ class TestLoadShowReasoningCoercion:
         qubit_home = tmp_path / "hermes"
         qubit_home.mkdir()
         (qubit_home / "config.yaml").write_text(yaml_body, encoding="utf-8")
-        monkeypatch.setattr(gateway_run, "_hermes_home", qubit_home)
+        monkeypatch.setattr(gateway_run, "_qubit_home", qubit_home)
         return gateway_run.GatewayRunner._load_show_reasoning()
 
     def test_quoted_false_is_false(self, tmp_path, monkeypatch):

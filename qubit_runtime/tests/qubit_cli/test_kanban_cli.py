@@ -76,7 +76,7 @@ def test_board_override_is_isolated_per_concurrent_call(kanban_home, monkeypatch
     kb.create_board("alpha")
     kb.create_board("beta")
 
-    parser = argparse.ArgumentParser(prog="hermes", add_help=False)
+    parser = argparse.ArgumentParser(prog="qubit", add_help=False)
     sub = parser.add_subparsers(dest="command")
     kc.build_parser(sub)
 

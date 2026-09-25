@@ -290,7 +290,7 @@ def test_cli_turn_routing_uses_primary_when_disabled(monkeypatch):
 def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeypatch):
     import yaml
 
-    config_home = tmp_path / "hermes"
+    config_home = tmp_path / "qubit"
     config_home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(config_home))
 
@@ -360,7 +360,7 @@ def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeyp
 def _seed_stale_custom_model(tmp_path, monkeypatch):
     import yaml
 
-    config_home = tmp_path / "hermes"
+    config_home = tmp_path / "qubit"
     config_home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(config_home))
     config_path = config_home / "config.yaml"

@@ -1524,7 +1524,7 @@ def run_quick_backup(args) -> None:
 # --- Shared full-zip backup helper ---
 
 def _write_full_zip_backup(out_path: Path, qubit_root: Path) -> Optional[Path]:
-    """Full zip snapshot of ``hermes_root`` to ``out_path`` under the backup slot (same rules as
+    """Full zip snapshot of ``qubit_root`` to ``out_path`` under the backup slot (same rules as
     :func:`run_backup`); None when nothing to back up, another backup running, or write error."""
     try:
         with _backup_operation_lock(qubit_root):

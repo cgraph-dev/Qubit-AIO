@@ -156,7 +156,7 @@ def test_cross_process_acquire_claims_only_one_last_slot(tmp_path, monkeypatch):
 def test_release_orphaned_leases_reclaims_only_unowned_own_pid_entries(tmp_path, monkeypatch):
     """A long-lived server must reclaim leases whose session skipped teardown.
 
-    ``_prune_dead`` only fires when the owning pid dies, so a ``hermes
+    ``_prune_dead`` only fires when the owning pid dies, so a ``qubit
     dashboard`` running for days holds a leaked lease until restart. The
     process reconciles against the leases it still owns instead.
     """
@@ -187,7 +187,7 @@ def test_release_orphaned_leases_reclaims_only_unowned_own_pid_entries(tmp_path,
 def test_release_orphaned_leases_sweeps_profile_runtime_registries(
     tmp_path, monkeypatch
 ):
-    root = tmp_path / "hermes"
+    root = tmp_path / "qubit"
     profile = root / "profiles" / "worker"
     profile.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(root))
@@ -238,7 +238,7 @@ def test_release_under_profile_home_override_targets_acquisition_registry(
         set_qubit_home_override,
     )
 
-    root = tmp_path / "hermes"
+    root = tmp_path / "qubit"
     profile = root / "profiles" / "worker"
     profile.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(root))
@@ -275,7 +275,7 @@ def test_transfer_under_profile_home_override_targets_acquisition_registry(
         set_qubit_home_override,
     )
 
-    root = tmp_path / "hermes"
+    root = tmp_path / "qubit"
     profile = root / "profiles" / "worker"
     profile.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(root))

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 // Reproduces the portal's tier-card hero treatment at thumbnail size: each webp sits
 // over a solid Nous-blue well and blends into it. This blue well is the ONLY place
-// Nous blue appears in the billing page — everything else stays on the app's own tokens.
+// Qubit blue appears in the billing page — everything else stays on the app's own tokens.
 const NOUS_BLUE = '#0000f2'
 
 const BLEND_CLASS = {

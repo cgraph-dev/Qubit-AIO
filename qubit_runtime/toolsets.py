@@ -57,7 +57,7 @@ def _bundle(description, extras=()):
 
 
 def _core_without(*excluded, kanban=True):
-    """_HERMES_CORE_TOOLS minus *excluded* (and, unless kanban=True, every kanban_* tool); order preserved."""
+    """_QUBIT_CORE_TOOLS minus *excluded* (and, unless kanban=True, every kanban_* tool); order preserved."""
     return [t for t in _QUBIT_CORE_TOOLS if t not in excluded and (kanban or not t.startswith("kanban_"))]
 
 
@@ -305,7 +305,7 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
 
 
 def bundle_non_core_tools(toolset_name: str) -> Set[str]:
-    """A bundle's tools minus _HERMES_CORE_TOOLS (one level of includes).
+    """A bundle's tools minus _QUBIT_CORE_TOOLS (one level of includes).
 
     Disabling a `core + extras` bundle must not strip the core tools every other
     toolset shares. One `includes` pass suffices (only hermes-gateway nests

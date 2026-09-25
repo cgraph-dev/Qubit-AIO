@@ -37,7 +37,7 @@ _PRIVATE_BROWSER_SENTINEL = "_HERMES_BU_PRIVATE_BROWSER"
 # BU_NAME + daemon pid).
 _OWN_TAB_PREAMBLE = """\
 # qubit: pin this named session to its own tab (once per daemon process)
-def _hermes_ensure_own_tab():
+def _qubit_ensure_own_tab():
     import os as _os, tempfile as _tf
     _name = _os.environ.get("BU_NAME", "default")
     try:
@@ -50,7 +50,7 @@ def _hermes_ensure_own_tab():
         _dpid = "0"
     _uid = _os.getuid() if hasattr(_os, "getuid") else 0
     _marker = _os.path.join(
-        _tf.gettempdir(), "hermes-bu-owntab-%s-%s-%s" % (_uid, _name, _dpid)
+        _tf.gettempdir(), "qubit-bu-owntab-%s-%s-%s" % (_uid, _name, _dpid)
     )
     if _os.path.exists(_marker):
         return
@@ -66,8 +66,8 @@ def _hermes_ensure_own_tab():
         open(_marker, "w").close()
     except OSError:
         pass
-_hermes_ensure_own_tab()
-del _hermes_ensure_own_tab
+_qubit_ensure_own_tab()
+del _qubit_ensure_own_tab
 """
 
 _DEFAULT_TIMEOUT_S = 300

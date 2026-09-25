@@ -948,6 +948,12 @@ QUBIT_READ_AUTHORITY: tuple = (
     # the upstream portal host verbatim; BRAND.md requires zero legacy brand on
     # the served surface).
     "/api/portal",
+    # Custom provider endpoints: the confirmed compat write persists to
+    # ``qubit_custom_endpoints.json``, but GET was fork-proxied (the vendored
+    # config_env router serves config.yaml ``providers``), so a saved endpoint
+    # never appeared on reload — a write/read split-brain found by the route E2E
+    # audit. Serve GET from the same compat store the writes use.
+    "/api/providers/custom-endpoints",
 )
 
 

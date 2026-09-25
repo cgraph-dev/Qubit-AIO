@@ -358,17 +358,22 @@ def waiter_command(root: Path | str, envelope: dict) -> str:
 
 def _qubit_cli() -> str:
     """qubit CLI beside this interpreter, then ``shutil.which``, then the bare name
-    (service contexts lack PATH, so a bare "hermes" died with ENOENT).
+    (service contexts lack PATH, so a bare name died with ENOENT).
 
     The deliver RPC runs on the target gateway, whose process is the venv python — its bin/Scripts directory
-    holds the matching ``qubit`` entrypoint. A bare ``"hermes"`` relies on PATH, which is exactly what
+    holds the matching ``qubit`` entrypoint. A bare ``"qubit"`` relies on PATH, which is exactly what
     service contexts (systemd units, desktop launchers, non-login SSH shells) do not provide, so delivery
     died with ENOENT there (#93590). When no sibling exists (e.g. running from a source tree without an
-    installed script), a ``shutil.which`` lookup runs next — it honors whatever PATH the process does have —
-    before falling back to the bare name, preserving today's behavior for interactive shells.
+    installed script), a ``shutil.which`` lookup runs next — it honors whatever PATH the process does have.
+    The legacy ``hermes`` entrypoint is still resolved as a read-old fallback for pre-rename installs.
     """
-    sibling = Path(sys.executable or "").parent / ("hermes.exe" if sys.platform == "win32" else "hermes")
-    return str(sibling) if sibling.is_file() else shutil.which("hermes") or "hermes"
+    base = Path(sys.executable or "").parent
+    names = (("qubit.exe", "hermes.exe") if sys.platform == "win32" else ("qubit", "hermes"))
+    for stem in names:
+        sibling = base / stem
+        if sibling.is_file():
+            return str(sibling)
+    return shutil.which("qubit") or shutil.which("hermes") or "qubit"
 
 
 def local_delivery_command(profile: str, query_file: str) -> list[str]:

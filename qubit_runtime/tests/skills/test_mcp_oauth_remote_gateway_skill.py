@@ -87,7 +87,7 @@ def _run_main(mod, tokens_dir, argv, responses):
          patch.object(mod.urllib.request, "urlopen", side_effect=fake_urlopen), \
          patch.object(sys, "argv", ["diagnose-oauth-mcp.py", *argv]):
         # Force the env-var fallback path (ignore any importable qubit_constants).
-        with patch.object(mod, "_hermes_home", lambda: str(tokens_dir.parent)):
+        with patch.object(mod, "_qubit_home", lambda: str(tokens_dir.parent)):
             buf = io.StringIO()
             from contextlib import redirect_stdout
             with redirect_stdout(buf):
@@ -152,4 +152,4 @@ def test_skill_md_frontmatter_invariants():
     assert len(fm["description"]) <= 60
     assert fm["description"].endswith(".")
     assert "platforms" in fm and len(fm["platforms"]) >= 1
-    assert fm["author"].split(",")[0].strip() != "Hermes Agent"  # human credited first
+    assert fm["author"].split(",")[0].strip() != "Qubit Agent"  # human credited first

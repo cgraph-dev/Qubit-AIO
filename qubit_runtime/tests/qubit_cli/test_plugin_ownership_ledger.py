@@ -122,7 +122,7 @@ def test_load_force_reload_and_unload_remove_every_manager_registration(
     from qubit_cli.plugins import PluginManager
     from tools.registry import registry
 
-    qubit_home = tmp_path / "hermes"
+    qubit_home = tmp_path / "qubit"
     _write_plugin(qubit_home)
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
     monkeypatch.setattr(

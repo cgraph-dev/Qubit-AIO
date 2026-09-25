@@ -18,7 +18,7 @@ def _rows_with_env(monkeypatch, env_name: str, provider: str) -> list[dict]:
             {provider: provider},
         ),
         patch("qubit_cli.models.cached_provider_model_ids", return_value=["model-a"]),
-        patch("qubit_cli.providers.HERMES_OVERLAYS", {}),
+        patch("qubit_cli.providers.QUBIT_OVERLAYS", {}),
     ):
         return list_authenticated_providers(max_models=5)
 

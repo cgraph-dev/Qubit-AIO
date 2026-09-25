@@ -9,6 +9,7 @@ gap-ledger baseline.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -258,7 +259,12 @@ def test_byte_diff_is_reported(inventory):
     manifest = json.loads(VENDOR_MANIFEST.read_text(encoding="utf-8"))
     extra_local = manifest.get("extra_local") or []
     recorded = set(manifest.get("patched") or [])
-    missing = set(manifest.get("missing_from_local") or [])
+    # The inventory's raw byte diff counts reference-only upstream test trees
+    # as ``missing``; the canonical manifest records those as
+    # ``intentionally_omitted`` (owner policy). The recorded unported set is
+    # therefore the union of the manifest's product misses and its omissions.
+    missing = (set(manifest.get("missing_from_local") or [])
+               | set(manifest.get("intentionally_omitted") or []))
 
     # Internal arithmetic of the diff.
     assert counts["local_files"] == (counts["identical"] + counts["changed"]
@@ -271,8 +277,12 @@ def test_byte_diff_is_reported(inventory):
     assert counts["extra"] == len(extra_local), (counts["extra"],
                                                  len(extra_local))
     changed = {c["path"] for c in bd["changed"]}
-    assert changed == recorded, changed ^ recorded
-    assert counts["changed"] == len(recorded)
+    # The inventory compares the pinned checkout with EOL normalization, so a
+    # CRLF-checkout-only difference is counted identical exactly as the
+    # blob-based manifest classifies it. The two artifacts must now agree
+    # exactly: every patched manifest file is changed and nothing else is.
+    assert changed == recorded, sorted(changed ^ recorded)[:10]
+    assert counts["changed"] == len(changed)
     assert len(manifest.get("patch_manifest") or {}) == len(recorded)
 
     # The recorded reconciliation must confirm the two artifacts agree.
@@ -280,6 +290,30 @@ def test_byte_diff_is_reported(inventory):
     assert recon.get("changed_equals_patched") is True
     assert recon.get("extra_equals_extra_local") is True
     assert recon.get("vendor_manifest_revision") == manifest["upstream_revision"]
+
+
+def test_byte_diff_eol_normalization_matches_manifest():
+    """A CRLF-checkout-only difference must not be counted as changed.
+
+    The canonical vendor manifest compares the fork against the committed git
+    blob; the inventory compares the pinned checkout. Upstream
+    ``.gitattributes`` can make the checkout CRLF while the blob (and the
+    vendored fork) store LF. The inventory must normalize that difference away
+    so ``changed`` equals the manifest's ``patched`` set instead of reporting a
+    false divergence.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        import source_inventory as si
+    finally:
+        sys.path.remove(str(REPO_ROOT / "scripts"))
+    assert si._sha256_eol_normalized(b"a\r\nb\r\n") == \
+        hashlib.sha256(b"a\nb\n").hexdigest()
+    assert si._sha256_eol_normalized(b"a\nb\n") == \
+        hashlib.sha256(b"a\nb\n").hexdigest()
+    # A real content change is not normalized away.
+    assert si._sha256_eol_normalized(b"a\r\nc\r\n") != \
+        hashlib.sha256(b"a\nb\n").hexdigest()
 
 
 def test_omissions_report_consistent(inventory, omissions_text):

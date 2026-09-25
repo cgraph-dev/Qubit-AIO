@@ -549,7 +549,7 @@ class TestRunJobSessionPersistence:
         fake_db = MagicMock()
         fake_db.get_compression_tip.side_effect = lambda session_id: session_id
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -614,7 +614,7 @@ class TestRunJobSessionPersistence:
         fake_db.close.side_effect = close_db
         fake_db.end_session.side_effect = end_session
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -663,7 +663,7 @@ class TestRunJobSessionPersistence:
         mock_agent = MagicMock()
         mock_agent.run_conversation.return_value = {"final_response": "ok"}
         base = [
-            patch("cron.scheduler._hermes_home", tmp_path),
+            patch("cron.scheduler._qubit_home", tmp_path),
             patch("cron.scheduler_delivery._resolve_origin", return_value=None),
             patch("qubit_cli.env_loader.load_qubit_dotenv"),
             patch("qubit_cli.env_loader.reset_secret_source_cache"),
@@ -764,7 +764,7 @@ class TestRunJobSessionPersistence:
 
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler.get_due_jobs", return_value=[job]), \
              patch("cron.scheduler.claim_job_for_fire", return_value=True), \
              patch("cron.scheduler.mark_job_run") as mock_mark, \
@@ -807,7 +807,7 @@ class TestRunJobSessionPersistence:
                 seen["thread_id"] = get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID") or None
                 return {"final_response": "ok"}
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler._preflight_job_config", return_value=None), \
              patch("qubit_state_registry.acquire", return_value=fake_db), \
              patch(
@@ -867,7 +867,7 @@ class TestRunJobSessionPersistence:
                 seen["thread_id"] = get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID") or None
                 return {"final_response": "ok"}
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler._preflight_job_config", return_value=None), \
              patch("qubit_state_registry.acquire", return_value=fake_db), \
              patch(
@@ -931,7 +931,7 @@ class TestRunJobSessionPersistence:
         monotonic_ticks = itertools.count(step=61.0)
         monkeypatch.setenv("HERMES_CRON_TIMEOUT", timeout_value)
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler._preflight_job_config", return_value=None), \
              patch("qubit_state_registry.acquire", return_value=fake_db), \
              patch(
@@ -979,7 +979,7 @@ class TestRunJobSessionPersistence:
             call_order.append("load")
             return []
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.reset_secret_source_cache", _record_reset), \
              patch("qubit_cli.env_loader.load_qubit_dotenv", _record_load), \
@@ -1042,7 +1042,7 @@ class TestRunJobSessionPersistence:
                 )
                 return {"final_response": "ok"}
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler._preflight_job_config", return_value=None), \
              patch("qubit_state_registry.acquire", return_value=fake_db), \
              patch(
@@ -1099,7 +1099,7 @@ class TestRunJobConfigLogging:
         # resolution and MCP discovery, both of which can spawn subprocesses
         # / hit the network and have caused this test to time out on CI
         # (>30s wall clock) under load. See PR #33661 follow-up.
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1138,7 +1138,7 @@ class TestRunJobConfigEnvVarExpansion:
         job = {"id": "env-job", "name": "env test", "prompt": "hi"}
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1202,7 +1202,7 @@ class TestRunJobConfigEnvVarExpansion:
             assert kwargs["target_model"] == "grok-4.5"
             return {**self._RUNTIME, "provider": "xai", "api_mode": "chat_completions"}
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1258,7 +1258,7 @@ class TestRunJobConfigEnvVarExpansion:
             assert kwargs["target_model"] == "z-ai/glm-5.2"
             return {**self._RUNTIME, "provider": "openrouter"}
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1288,7 +1288,7 @@ class TestRunJobConfigEnvVarExpansion:
         job = {"id": "unset-job", "name": "unset var test", "prompt": "hi"}
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1333,7 +1333,7 @@ class TestRunJobModelResolution:
         job = {"id": "null-model-job", "name": "null model", "prompt": "hi", "model": None}
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1359,7 +1359,7 @@ class TestRunJobModelResolution:
         job = {"id": "no-model-job", "name": "no model anywhere", "prompt": "hi", "model": None}
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1391,7 +1391,7 @@ class TestRunJobModelResolution:
         job = {"id": "alias-job", "name": "alias", "prompt": "hi", "model": None}
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1416,7 +1416,7 @@ class TestRunJobModelResolution:
         job = {"id": "corrupt-job", "name": "corrupt", "prompt": "hi", "model": "explicit-model"}
         fake_db = MagicMock()
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -1461,7 +1461,7 @@ class TestRunJobSkillBacked:
             assert "NOTION_API_KEY" in get_all_passthrough()
             return {"final_response": "ok"}
 
-        with patch("cron.scheduler._hermes_home", tmp_path), \
+        with patch("cron.scheduler._qubit_home", tmp_path), \
              patch("cron.scheduler_delivery._resolve_origin", return_value=None), \
              patch("qubit_cli.env_loader.load_qubit_dotenv"), \
              patch("qubit_cli.env_loader.reset_secret_source_cache"), \
@@ -2883,7 +2883,7 @@ class TestFailureStreakNudge:
         with patch("cron.scheduler.load_config", return_value={}):
             out = _failure_streak_nudge(self._job(2))
         assert "failed 3 runs in a row" in out
-        assert "hermes cron pause scout" in out
+        assert "qubit cron pause scout" in out
 
     def test_silent_below_threshold(self):
         from cron.scheduler import _failure_streak_nudge
