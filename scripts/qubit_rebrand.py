@@ -104,7 +104,76 @@ CLASS_TOKENS = {
     "HermesSessionStore": "QubitSessionStore",
     "HermesSession": "QubitSession",
     "HermesHome": "QubitHome",
+    "HermesTokenStorage": "QubitTokenStorage",
+    "HermesIndexSource": "QubitIndexSource",
+    "HermesProviderMixin": "QubitProviderMixin",
+    "HermesOAuthClientProvider": "QubitOAuthClientProvider",
 }
+
+# Home / accessor identifiers the structural token map above cannot express.
+# These are always Python symbols (never serialized wire keys), so a
+# word-boundary replace is safe; the persisted ``"hermes_home"`` JSON/dict key
+# and the ``HERMES_*`` env names are deliberately absent here and preserved by
+# the debrand pass.  This map closes the v0.21.5 token-map gap (Task 6 redo,
+# amendment #25) that otherwise left OURS calling ``get_hermes_home`` while the
+# merged ``qubit_constants`` defines ``get_qubit_home``.
+IDENTIFIER_TOKENS = {
+    # public home accessors (defined in qubit_constants.py)
+    "get_hermes_home": "get_qubit_home",
+    "get_process_hermes_home": "get_process_qubit_home",
+    "get_hermes_home_override": "get_qubit_home_override",
+    "set_hermes_home_override": "set_qubit_home_override",
+    "reset_hermes_home_override": "reset_qubit_home_override",
+    "display_hermes_home": "display_qubit_home",
+    "get_default_hermes_root": "get_default_qubit_root",
+    "get_routing_process_hermes_home": "get_routing_process_qubit_home",
+    "pin_process_hermes_home": "pin_process_qubit_home",
+    "process_hermes_home_is_pinned": "process_qubit_home_is_pinned",
+    "mkdir_under_hermes_home": "mkdir_under_qubit_home",
+    "get_hermes_dir": "get_qubit_dir",
+    # private helpers (module-local, same spelling in the fork)
+    "_get_platform_default_hermes_home": "_get_platform_default_qubit_home",
+    "_expand_hermes_home": "_expand_qubit_home",
+    "_is_hermes_profiles_root": "_is_qubit_profiles_root",
+    "_same_hermes_home": "_same_qubit_home",
+    "_hermes_metadata": "_qubit_metadata",
+    "_find_hermes_md": "_find_qubit_md",
+    "_load_hermes_md": "_load_qubit_md",
+    "iter_hermes_node_dirs": "iter_qubit_node_dirs",
+    "hermes_managed_node_tree_present": "qubit_managed_node_tree_present",
+    "with_hermes_node_path": "with_qubit_node_path",
+    "_resolve_hermes_uid_gid": "_resolve_qubit_uid_gid",
+    "_chown_to_hermes_uid": "_chown_to_qubit_uid",
+    "hermes_meta": "qubit_meta",
+    "_is_hermes_internal_secret": "_is_qubit_internal_secret",
+    "_load_hermes_index": "_load_qubit_index",
+    "load_hermes_dotenv": "load_qubit_dotenv",
+    "load_hermes_env_vars": "load_qubit_env_vars",
+    "hermes_env_loader": "qubit_env_loader",
+    # private module constants (code symbols, not env names)
+    "_HERMES_CORE_TOOLS": "_QUBIT_CORE_TOOLS",
+    "_HERMES_WEBHOOK_SAFE_TOOLS": "_QUBIT_WEBHOOK_SAFE_TOOLS",
+    "_HERMES_PROVIDER_ENV_BLOCKLIST": "_QUBIT_PROVIDER_ENV_BLOCKLIST",
+    "_HERMES_PROVIDER_ENV_FORCE_PREFIX": "_QUBIT_PROVIDER_ENV_FORCE_PREFIX",
+    "_HERMES_BIN_DIR": "_QUBIT_BIN_DIR",
+    "_HERMES_CONFIG_FILES": "_QUBIT_CONFIG_FILES",
+    "_HERMES_EXECUTABLES": "_QUBIT_EXECUTABLES",
+    "_HERMES_HOME_AT_IMPORT": "_QUBIT_HOME_AT_IMPORT",
+    "_HERMES_PYTHON_MODULES": "_QUBIT_PYTHON_MODULES",
+    "_HERMES_PYTHON_SCRIPTS": "_QUBIT_PYTHON_SCRIPTS",
+    "_HERMES_SLACK_USER_AGENT_PREFIX": "_QUBIT_SLACK_USER_AGENT_PREFIX",
+    "_HERMES_HOME_MARKERS": "_QUBIT_HOME_MARKERS",
+    "HERMES_INDEX_TTL": "QUBIT_INDEX_TTL",
+    "HERMES_INDEX_URL": "QUBIT_INDEX_URL",
+}
+
+# Generic private-helper prefix (``_real_hermes_home_cached``,
+# ``_hermes_config_resolved``).  A leading double underscore is excluded so the
+# frontend/JS tokens ``__HERMES_*`` are never touched.
+_PRIVATE_HERMES_RE = re.compile(r"(?<!_)_hermes_")
+# Bare ``hermes_home`` (kwarg / local variable).  Quote-adjacent occurrences are
+# the persisted serialized key (``"hermes_home"``) and are preserved verbatim.
+_BARE_HOME_RE = re.compile(r"""(?<![A-Za-z0-9_'"])hermes_home(?![A-Za-z0-9_'"])""")
 
 # Internal environment names. HERMES_HOME is the shipped runtime home; a legacy
 # read of the old name stays in the migration adapter (see qubit_runtime).
@@ -226,6 +295,16 @@ def _build_regex():
 _TOKEN_RE = _build_regex()
 
 
+def _build_ident_regex():
+    tokens = sorted(IDENTIFIER_TOKENS, key=len, reverse=True)
+    return re.compile(r"(?<![A-Za-z0-9_])(" +
+                      "|".join(re.escape(t) for t in tokens) +
+                      r")(?![A-Za-z0-9_])")
+
+
+_IDENT_RE = _build_ident_regex()
+
+
 # Embedded identifiers (``_hermes_cli``, ``hermes_cli_dir``, ``qubit_hermes_fork``)
 # are not matched by the word-boundary regex; a longest-first literal pass
 # catches them. The tokens are specific module names, so a literal replace is
@@ -262,11 +341,15 @@ def _rewrite_text(path: Path, rel: str) -> int:
     # that look like URLs is unnecessary for these tokens; we keep the whole
     # replacement because module names in URLs must move too (they are shipped
     # module paths), while product-word strings are handled by the classifier.
-    new, n = _TOKEN_RE.subn(_replace_token, text)
+    new, _n_token = _TOKEN_RE.subn(_replace_token, text)
     new = _rewrite_embedded(new)
+    new, _n_ident = _IDENT_RE.subn(lambda m: IDENTIFIER_TOKENS[m.group(1)], new)
+    new = _PRIVATE_HERMES_RE.sub("_qubit_", new)
+    new = _BARE_HOME_RE.sub("qubit_home", new)
     if new != text:
         path.write_text(new, encoding="utf-8", errors="surrogateescape")
-    return n
+        return 1
+    return 0
 
 
 def _path_renames():
@@ -314,6 +397,9 @@ def build_plan():
         except OSError:
             continue
         n = len(_TOKEN_RE.findall(text))
+        n += len(_IDENT_RE.findall(text))
+        n += len(_PRIVATE_HERMES_RE.findall(text))
+        n += len(_BARE_HOME_RE.findall(text))
         if n:
             content.append({"path": rel, "token_hits": n})
     paths = [{"old": o, "new": n} for o, n in _path_renames()]
