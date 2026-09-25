@@ -9,9 +9,16 @@
 # The candidate is always built under a temp root (default
 # /tmp/qubit-v0215-candidate).  This script NEVER writes the live product tree.
 #
+# A successful build writes a completion marker
+# (<candidate>/.rebase_v0215_state.json) recording the pin, an engine
+# fingerprint, the completed stages, and a runtime tree hash.  ``--check``
+# reuses a candidate only when that marker matches the current engines/pin and
+# the runtime hash still matches, so a crash mid-build (e.g. after rebrand but
+# before debrand) is detected and rebuilt rather than silently reused.
+#
 # Usage:
 #   scripts/rebase_v0215.sh            # rebuild the candidate from scratch
-#   scripts/rebase_v0215.sh --check    # build if absent, then validate + delta
+#   scripts/rebase_v0215.sh --check    # build if absent/stale, then validate
 #   scripts/rebase_v0215.sh --force    # same as the default (explicit rebuild)
 #   scripts/rebase_v0215.sh --help
 #
@@ -22,6 +29,7 @@
 #   QUBIT_CANDIDATE_ROOT    temp output root (default /tmp/qubit-v0215-candidate)
 #   QUBIT_CURRENT_ROOT      tree to diff against (default the repo root)
 #   QUBIT_DELTA_OUT         delta manifest path (default docs/generated/audit/...)
+#   QUBIT_LIVE_ROOT         product tree the guards protect
 #   QUBIT_PYTHON            python interpreter (default python3)
 set -euo pipefail
 
@@ -36,13 +44,14 @@ CURRENT_ROOT="${QUBIT_CURRENT_ROOT:-$REPO_ROOT}"
 DELTA_OUT="${QUBIT_DELTA_OUT:-$REPO_ROOT/docs/generated/audit/V0_21_5_DELTA.json}"
 PYTHON="${QUBIT_PYTHON:-python3}"
 LIVE_ROOT="${QUBIT_LIVE_ROOT:-/home/trick/Projects/Repos/qubit-voicebridge}"
+MARKER_NAME=".rebase_v0215_state.json"
 #: Modules the candidate must contain and import (the v0.21.5 token additions).
 NEW_MODULES=(qubit_state_health qubit_yaml)
 
 CHECK_ONLY=0
 
 usage() {
-  sed -n '2,28p' "$0"
+  sed -n '1,40p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 for arg in "$@"; do
@@ -62,22 +71,22 @@ die() { echo "rebase_v0215: $*" >&2; exit 1; }
 _real() { realpath -m "$1"; }
 
 CAND_REAL="$(_real "$CANDIDATE_ROOT")"
+LIVE_REAL="$(_real "$LIVE_ROOT")"
 [ -n "$CAND_REAL" ] || die "empty candidate root"
 [ "$CAND_REAL" != "/" ] || die "refusing candidate root=/"
 [ "$CAND_REAL" != "$(_real "$HOME")" ] || die "refusing candidate root=HOME"
 
-case "$CAND_REAL" in
-  /tmp/*|/var/tmp/*) : ;;
-  *) [ "${QUBIT_ALLOW_NON_TMP:-0}" = "1" ] || \
-       die "candidate root must live under /tmp (set QUBIT_ALLOW_NON_TMP=1 to override): $CAND_REAL" ;;
-esac
-
-if [ "$(_real "$REPO_ROOT")" = "$(_real "$LIVE_ROOT")" ] && \
+if [ "$(_real "$REPO_ROOT")" = "$LIVE_REAL" ] && \
    [ "${QUBIT_ALLOW_LIVE_WRITE:-0}" != "1" ]; then
   die "refusing to run from the live product tree $REPO_ROOT; run from the isolated worktree (set QUBIT_ALLOW_LIVE_WRITE=1 to override)"
 fi
 case "$CAND_REAL" in
-  "$(_real "$LIVE_ROOT")"/*) die "candidate root is inside the live product tree: $CAND_REAL" ;;
+  "$LIVE_REAL"/*) die "candidate root is inside the live product tree: $CAND_REAL" ;;
+esac
+case "$CAND_REAL" in
+  /tmp/*|/var/tmp/*) : ;;
+  *) [ "${QUBIT_ALLOW_NON_TMP:-0}" = "1" ] || \
+       die "candidate root must live under /tmp (set QUBIT_ALLOW_NON_TMP=1 to override): $CAND_REAL" ;;
 esac
 
 # ---------------------------------------------------------------------------
@@ -116,11 +125,101 @@ verify_pin() {
 }
 
 # ---------------------------------------------------------------------------
+# completion marker (engine fingerprint + debrand-completion + tree integrity)
+# ---------------------------------------------------------------------------
+marker_tool() {
+  local mode="$1" cand="$2" scripts_dir="$3" pin="$4"
+  "$PYTHON" - "$mode" "$cand" "$scripts_dir" "$pin" <<'PY'
+import hashlib
+import json
+import os
+import sys
+
+mode, cand, scripts_dir, pin = sys.argv[1:5]
+marker = os.path.join(cand, ".rebase_v0215_state.json")
+ENGINES = ("qubit_rebrand.py", "qubit_debrand.py")
+STAGES = ("rebrand", "debrand", "validated")
+
+
+def sha_file(path):
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
+def engine_fingerprint():
+    h = hashlib.sha256()
+    for name in ENGINES:
+        path = os.path.join(scripts_dir, name)
+        if not os.path.isfile(path):
+            return None
+        h.update(f"{name}\0{sha_file(path)}\n".encode())
+    return h.hexdigest()
+
+
+def runtime_hash():
+    root = os.path.join(cand, "qubit_runtime")
+    if not os.path.isdir(root):
+        return None, 0
+    entries = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        for name in filenames:
+            if name.endswith(".pyc"):
+                continue
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            entries.append((rel, sha_file(path)))
+    entries.sort(key=lambda row: row[0])
+    h = hashlib.sha256()
+    for rel, digest in entries:
+        h.update(f"{rel}\0{digest}\n".encode())
+    return h.hexdigest(), len(entries)
+
+
+fingerprint = engine_fingerprint()
+runtime_sha, runtime_count = runtime_hash()
+
+if mode == "write":
+    doc = {
+        "schema": "qubit-v0215-candidate/1",
+        "pin": pin,
+        "engine_fingerprint": fingerprint,
+        "runtime_sha256": runtime_sha,
+        "runtime_file_count": runtime_count,
+        "stages": list(STAGES),
+    }
+    with open(marker, "w", encoding="utf-8") as fh:
+        json.dump(doc, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+    print(f"marker: engine={str(fingerprint)[:12]} runtime={str(runtime_sha)[:12]} "
+          f"files={runtime_count}")
+    sys.exit(0)
+
+# check mode: every condition must hold for the candidate to be reused
+try:
+    with open(marker, encoding="utf-8") as fh:
+        doc = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(1)
+if fingerprint is None or doc.get("engine_fingerprint") != fingerprint:
+    sys.exit(1)
+if doc.get("pin") != pin:
+    sys.exit(1)
+if not all(stage in doc.get("stages", []) for stage in STAGES):
+    sys.exit(1)
+if runtime_sha is None or doc.get("runtime_sha256") != runtime_sha:
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
+# ---------------------------------------------------------------------------
 # build
 # ---------------------------------------------------------------------------
 candidate_valid() {
   [ -f "$CANDIDATE_ROOT/qubit_runtime/qubit_state_health.py" ] || return 1
-  [ -f "$CANDIDATE_ROOT/scripts/qubit_rebrand.py" ] || return 1
+  [ -f "$CANDIDATE_ROOT/scripts/qubit_debrand.py" ] || return 1
+  marker_tool check "$CANDIDATE_ROOT" "$REPO_ROOT/scripts" "$PIN" || return 1
   return 0
 }
 
@@ -158,6 +257,9 @@ validate_candidate() {
     die "candidate import smoke failed"
   fi
   [ ! -e "$home/.hermes" ] || die "candidate import created the read-only reference home"
+  # Only after both engines and the smoke pass is the completion marker written;
+  # a crash before this point leaves no marker and forces a rebuild.
+  marker_tool write "$CANDIDATE_ROOT" "$REPO_ROOT/scripts" "$PIN"
   echo "candidate validated ($pkg)"
 }
 
