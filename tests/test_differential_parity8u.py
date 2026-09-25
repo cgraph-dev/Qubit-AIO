@@ -33,8 +33,9 @@ FIXTURES_DIR = REPO_ROOT / "tests" / "fixtures" / "differential"
 MANIFEST_PATH = FIXTURES_DIR / "MANIFEST.json"
 ROW_RESULT_SCHEMA_PATH = FIXTURES_DIR / "schema" / "row_result.schema.json"
 
-# Contractual upstream pins mirrored from the frozen pins in OWNERSHIP.md.
-PIN_QUBIT = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+# Contractual upstream pins mirrored from the canonical pins in
+# scripts/differential_parity.py (Owner decision #25, 2026-09-25).
+PIN_QUBIT = "69948c005791d4d0e51670ca015238c2c7663749"
 PIN_OPENCLAW = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
 VISUAL_REF_FIELDS = ("screenshot_ref", "dom_snapshot_ref", "a11y_snapshot_ref")
 

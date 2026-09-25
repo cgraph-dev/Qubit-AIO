@@ -99,7 +99,7 @@ def test_pyproject_metadata_declares_launchers_and_licenses():
     assert "THIRD_PARTY_NOTICES.md" in project["license-files"]
     scripts = project["scripts"]
     assert scripts["qubit"] == "voicebridge.cli:main"
-    assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:entry"
+    assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:legacy_entry"
 
 
 # ===========================================================================
@@ -130,7 +130,7 @@ def test_wheel_contains_fork_dashboard_plugins_and_metadata():
         entry = z.read(next(n for n in names
                             if n.endswith("dist-info/entry_points.txt"))).decode()
         assert re.search(r"^qubit\s*=\s*voicebridge\.cli:main$", entry, re.M)
-        assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:entry$",
+        assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:legacy_entry$",
                          entry, re.M)
         # the retired pre-rebrand alias must not ship in the wheel
         assert not re.search(r"^qubit-hermes\s*=", entry, re.M)

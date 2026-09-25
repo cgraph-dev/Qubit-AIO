@@ -28,12 +28,15 @@ OM_MD = GENERATED / "QUBIT_SOURCE_OMISSIONS.md"
 VENDOR_MANIFEST = GENERATED / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 LEDGER_NAMES = ["hermes", "openclaw", "qubit"]
 LEDGER_BASELINE_REV = "f5fc5776"
-# The W9 v0.21.4 vendored pin. W9 is a slice-by-slice sync, so the canonical
+# The v0.21.5 vendored pin. W9 is a slice-by-slice sync, so the canonical
 # inventory records the unported remainder as ``missing`` rather than assuming a
 # fully-synced tree. The ``-git`` clone is the read-only oracle; the pristine
 # tree has no ``.git`` and cannot satisfy ``_pins_available``.
-QUBIT_PIN = Path("/tmp/opencode/pinned/hermes-agent-d337b736-git")
-OPENCLAW_PIN = Path("/home/trick/Projects/Repos/Qubit Agent/srcodes/openclaw")
+QUBIT_PIN = Path("/tmp/opencode/pinned/hermes-agent-69948c0057")
+# The canonical pinned OpenClaw checkout the committed inventory records (the
+# ``/tmp`` symlink), so a regeneration reproduces the artifact's recorded path.
+OPENCLAW_PIN = Path(
+    "/tmp/opencode/pinned/openclaw-v2026.4.19-beta.2-28254-gda03996ab7")
 
 # Categories the inventory must always cover (mechanical counts, not statuses).
 REQUIRED_CATEGORIES = {
@@ -231,8 +234,8 @@ def test_known_mechanical_counts(inventory):
     # asserted as *derived* invariants against the recorded pin, never as
     # fully-synced hardcoded numbers.
     assert inventory["pins"]["hermes"]["revision"] == (
-        "d337b736aa1e8ebecfab043842d13e4a2d2f48a3")
-    assert inventory["pins"]["hermes"]["tag"] == "v0.21.4"
+        "69948c005791d4d0e51670ca015238c2c7663749")
+    assert inventory["pins"]["hermes"]["tag"] == "v0.21.5"
 
     # counts_by_category must equal the actual per-item tally.
     tally: dict[str, int] = {}

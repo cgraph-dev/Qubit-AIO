@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 FORK = REPO_ROOT / "qubit_runtime"
-PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 # Canonical location (docs/generated/); the frozen archive is read-only lineage.
 MANIFEST_SOURCE_REL = "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
 MANIFEST_INSTALLED_REL = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"

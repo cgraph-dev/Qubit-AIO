@@ -40,7 +40,7 @@ if str(VENDOR_ROOT) not in sys.path:
     sys.path.insert(0, str(VENDOR_ROOT))
 
 _PINNED_CANDIDATES = (
-    Path("/tmp/opencode/pinned/hermes-agent-d337b736-git"),
+    Path("/tmp/opencode/pinned/hermes-agent-69948c0057"),
     Path("/tmp/opencode/pinned/hermes-agent"),
 )
 
@@ -55,7 +55,7 @@ def _pinned_root() -> Path:
     for candidate in _PINNED_CANDIDATES:
         if (candidate / "gateway").is_dir() and (candidate / "tools").is_dir():
             return candidate
-    pytest.skip("pinned Hermes v0.21.4 source absent (ephemeral /tmp input)")
+    pytest.skip("pinned Hermes v0.21.5 source absent (ephemeral /tmp input)")
 
 
 def _relative_py_files(root: Path, sub: str) -> set[str]:

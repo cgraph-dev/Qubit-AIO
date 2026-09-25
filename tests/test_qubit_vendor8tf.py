@@ -1,6 +1,6 @@
 """Qubit vendor baseline tests (owner amendments 2026-09-11 / 2026-09-19).
 
-Proves, against the pinned upstream source (hermes-agent@d337b736, v0.21.4):
+Proves, against the pinned upstream source (hermes-agent@69948c0057, v0.21.5):
 1. the canonical generated vendor manifest
    (docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json) is pinned, clean
    (zero UNEXPLAINED), and every QUBIT_PATCHED file carries a documented
@@ -31,7 +31,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-QUBIT_REV = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+QUBIT_REV = "69948c005791d4d0e51670ca015238c2c7663749"
 PINNED_ROOT = Path("/tmp/opencode/pinned")
 # Canonical vendor authority (Owner Decisions #14/#15/#24). The frozen 0.21.1
 # comparison manifest is historical lineage and is never parsed here.
@@ -56,9 +56,10 @@ def _first_dir(cands):
 
 
 def _locate_pinned_qubit():
-    """Pinned Hermes checkout: env override, then the two known local names."""
+    """Pinned Hermes checkout: env override, then the known local names."""
     env = os.environ.get("QUBIT_PINNED_HERMES")
     cands = ([env] if env else []) + [
+        PINNED_ROOT / "hermes-agent-69948c0057",
         PINNED_ROOT / "hermes-agent",
         PINNED_ROOT / "hermes",
     ]
@@ -171,7 +172,7 @@ def _tree_files(root: Path):
 
 
 def _canonical_manifest():
-    """The generated 0.21.4 vendor manifest (canonical, not frozen)."""
+    """The generated v0.21.5 vendor manifest (canonical, not frozen)."""
     return json.loads(CANONICAL_MANIFEST.read_text(encoding="utf-8"))
 
 

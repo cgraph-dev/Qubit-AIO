@@ -117,7 +117,7 @@ def test_project_metadata_declares_license_notices_and_entry_points():
     # the public launcher plus the vendored-runtime launcher are real
     scripts = project["scripts"]
     assert scripts["qubit"] == "voicebridge.cli:main"
-    assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:entry"
+    assert scripts["qubit-agent"] == "voicebridge.qubit_runtime:legacy_entry"
     # the pre-rebrand ``qubit-hermes`` alias was retired (Phase 0 item 0.5);
     # it must stay out of the shipped entry points.
     assert "qubit-hermes" not in scripts
@@ -331,7 +331,7 @@ def test_built_wheel_ships_fork_dashboard_and_licenses():
     assert "[console_scripts]" in entry_points
     assert re.search(r"^qubit\s*=\s*voicebridge\.cli:main$", entry_points,
                      re.M)
-    assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:entry$",
+    assert re.search(r"^qubit-agent\s*=\s*voicebridge\.qubit_runtime:legacy_entry$",
                       entry_points, re.M)
     # the retired pre-rebrand alias must not ship in the wheel
     assert not re.search(r"^qubit-hermes\s*=", entry_points, re.M)

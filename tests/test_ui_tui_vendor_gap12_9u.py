@@ -1,19 +1,19 @@
 """W9 vendor-sync ui-tui gap close — port the 12 ``ui-tui/src`` files that the
 vendor manifest flags as the only real product-code miss.
 
-Pinned source (read-only): ``/tmp/opencode/pinned/hermes-agent-d337b736-git``
-(Hermes v0.21.4, pin ``d337b736``). Ported into ``qubit_runtime/ui-tui/src/``
+Pinned source (read-only): ``/tmp/opencode/pinned/hermes-agent-69948c0057``
+(Hermes v0.21.5, pin ``69948c0057``). Ported into ``qubit_runtime/ui-tui/src/``
 with the hermes→qubit rename map; product copy de-branded per docs/BRAND.md;
 wire identifiers (RPC method names, error codes, ``tui_gateway/`` module path
 cross-reference) preserved. Upstream test files (``__tests__/``,
 ``*.test.*``) are intentionally NOT ported (generator policy).
 
 Provenance per file — pinned ``ui-tui/src/`` line 1 to end:
-``app/agentRoster.ts`` (62 lines), ``app/connectionOperationStore.ts`` (77),
+``app/agentRoster.ts`` (62 lines), ``app/connectionOperationStore.ts`` (121),
 ``app/createServerRequestHandler.ts`` (114), ``app/processRoster.ts`` (122),
 ``app/serverRequestStore.ts`` (38), ``app/userMessages.ts`` (333),
 ``components/agentControls.tsx`` (154), ``components/agentsPanel.tsx`` (173),
-``components/connectionSetupOverlay.tsx`` (354), ``lib/agentRows.ts`` (176),
+``components/connectionSetupOverlay.tsx`` (580), ``lib/agentRows.ts`` (176),
 ``lib/processGlyph.ts`` (19), ``lib/subagentGlyph.ts`` (42).
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_SRC = REPO_ROOT / "qubit_runtime" / "ui-tui" / "src"
-PINNED_SRC = Path("/tmp/opencode/pinned/hermes-agent-d337b736-git/ui-tui/src")
+PINNED_SRC = Path("/tmp/opencode/pinned/hermes-agent-69948c0057/ui-tui/src")
 
 FILES = [
     "app/agentRoster.ts",

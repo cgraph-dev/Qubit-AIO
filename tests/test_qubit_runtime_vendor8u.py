@@ -19,12 +19,12 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 FORK = REPO / "qubit_runtime"
-# Canonical generated provenance record (Owner Decision #24): the live 0.21.4
-# slice-sync manifest under docs/generated/. The frozen 0.21.1 archive copy is
+# Canonical generated provenance record (Owner Decision #24): the live v0.21.5
+# vendored manifest under docs/generated/. The frozen 0.21.1 archive copy is
 # historical lineage only and is never parsed here.
 MANIFEST = REPO / "docs/generated" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
-W9_PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
+W9_PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 
 
 def _manifest(path: Path = MANIFEST):
@@ -39,7 +39,7 @@ def test_fork_present_with_license_and_entrypoint():
 
 
 def test_manifest_pins_exact_revision_and_is_clean():
-    # The canonical generated manifest records the W9 v0.21.4 pin. W9 is a
+    # The canonical generated manifest records the W9 v0.21.5 pin. W9 is a
     # slice-by-slice vendor sync, so the fork intentionally carries a recorded
     # unported set (``missing_from_local``) until the remaining slices land.
     # The invariant is that every divergence is *recorded* (no UNEXPLAINED) and

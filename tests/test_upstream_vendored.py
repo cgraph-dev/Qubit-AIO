@@ -24,16 +24,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MATRIX = REPO_ROOT / "docs/archive/2026-09-21" / "MATRIX_8T_F.json"
 
-# The pinned upstream oracle. W9 moved the vendored pin to v0.21.4
-# ``d337b736``; the pristine tree and its read-only clone live under
+# The pinned upstream oracle. Owner decision #25 moved the vendored pin to
+# v0.21.5 ``69948c0057``; the pristine tree and its read-only clone live under
 # ``/tmp/opencode/pinned``. The clone is a read-only oracle, never executed by
 # Qubit. Discover it (env override first, then the known pins) and skip -- not
 # error -- when no oracle carrying the required modules is available.
 _ORACLE_ENV = "QUBIT_8TF_HERMES_CLONE"
 _ORACLE_REQUIRED = ("tools/ansi_strip.py", "hermes_cli/sqlite_util.py")
 _ORACLE_CANDIDATES = (
-    "/tmp/opencode/pinned/hermes-agent-d337b736-git",
-    "/tmp/opencode/pinned/hermes-agent-d337b736",
+    "/tmp/opencode/pinned/hermes-agent-69948c0057",
     "/tmp/opencode/pinned/hermes-agent",
     "/tmp/upstream-8tfv3/hermes-agent",
 )
