@@ -230,8 +230,8 @@ _VUE_TSDK_MSG = (
 def _node_modules_trees(bin_path: str, root: str) -> List[str]:
     """``node_modules`` trees that may hold the Vue server and its TypeScript SDK:
     the launcher's own tree (symlinks resolved), Qubit staging, then the project's."""
-    from agent.lsp.install import hermes_lsp_bin_dir
-    trees = [str(hermes_lsp_bin_dir().parent / "node_modules"), os.path.join(root, "node_modules")]
+    from agent.lsp.install import qubit_lsp_bin_dir
+    trees = [str(qubit_lsp_bin_dir().parent / "node_modules"), os.path.join(root, "node_modules")]
     real = os.path.realpath(bin_path)
     marker = f"{os.sep}node_modules{os.sep}"
     if (idx := real.rfind(marker)) >= 0:
@@ -314,7 +314,7 @@ def _spawn_powershell_es(root: str, ctx: ServerContext) -> Optional[SpawnSpec]:
         return None
     start_script = os.path.join(bundle, "PowerShellEditorServices", "Start-EditorServices.ps1")
     # PSES writes connection info to the session details file on startup.
-    session_dir = hermes_lsp_session_dir()
+    session_dir = qubit_lsp_session_dir()
     inner = (
         f"& '{start_script}' -BundledModulesPath '{bundle}' "
         f"-LogPath '{os.path.join(session_dir, 'pses.log')}' "
@@ -329,7 +329,7 @@ def _spawn_powershell_es(root: str, ctx: ServerContext) -> Optional[SpawnSpec]:
     )
 
 
-def hermes_lsp_session_dir() -> str:
+def qubit_lsp_session_dir() -> str:
     """Return (and create) the dir for PSES session/log scratch files."""
     from qubit_constants import get_qubit_home
     d = os.path.join(str(get_qubit_home()), "lsp", "pses")
