@@ -5,23 +5,23 @@
  "theirs_root": "/tmp/qubit-sdd/qubit_runtime",
  "merge_rule": "TAKE_OURS->ours; REAPPLY_THEIRS->merge_file; CONFLICT->keep theirs; add candidate-only",
  "totals": {
-  "changed": 1112,
-  "written": 208,
+  "changed": 1184,
+  "written": 226,
   "deleted": 2,
-  "conflicts": 539,
+  "conflicts": 570,
   "by_resolution": {
-   "AUTO_OURS": 108,
-   "ADDED": 100,
-   "MERGE_FILE": 363,
-   "KEEP_THEIRS_CONFLICT": 539,
+   "AUTO_OURS": 119,
+   "ADDED": 107,
+   "MERGE_FILE": 386,
+   "KEEP_THEIRS_CONFLICT": 570,
    "KEEP_THEIRS": 0,
    "DELETED": 2,
    "SKIP_IDENTICAL": 0
   },
   "by_class": {
-   "CONFLICT": 539,
-   "REAPPLY_THEIRS": 363,
-   "TAKE_OURS": 210
+   "CONFLICT": 570,
+   "REAPPLY_THEIRS": 386,
+   "TAKE_OURS": 228
   },
   "by_bucket": {
    "agent": 220,
@@ -29,7 +29,8 @@
    "providers": 2,
    "qubit_cli": 466,
    "qubit_state*": 17,
-   "tools": 280
+   "tools": 280,
+   "tui_gateway": 72
   },
   "by_bucket_resolution": {
    "agent": {
@@ -66,6 +67,12 @@
     "DELETED": 1,
     "KEEP_THEIRS_CONFLICT": 126,
     "MERGE_FILE": 93
+   },
+   "tui_gateway": {
+    "ADDED": 7,
+    "AUTO_OURS": 11,
+    "KEEP_THEIRS_CONFLICT": 31,
+    "MERGE_FILE": 23
    }
   }
  },
@@ -3301,6 +3308,192 @@
   {
    "path": "qubit_cli/xai_retirement.py",
    "bucket": "qubit_cli",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/agent_callbacks.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/compute_host.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/compute_host_bridge.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/contracts/events.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/entry.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/host_supervisor.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/launch_profile_policy.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/mcp_rpc_helpers.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/method_ctx.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_complete.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_config.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_config_set.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_connectors.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_profiles.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_prompt.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_session.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_slash.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_tools.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/methods_voice.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/model_switch.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/onboarding_personalization.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/project_tree.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/prompt_turn.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/server.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/session_compression.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/session_history.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/session_notifications.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/session_reaper.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/session_workdir.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/tool_progress.py",
+   "bucket": "tui_gateway",
+   "kind": "MERGE_MARKERS",
+   "action": "noop"
+  },
+  {
+   "path": "tui_gateway/ws.py",
+   "bucket": "tui_gateway",
    "kind": "MERGE_MARKERS",
    "action": "noop"
   }
@@ -16649,6 +16842,870 @@
    "ours_sha256": "09d679993097d7127d5bd8a4bc1aa4bc35a737275d94da87b52b4d7970b4f3a8",
    "theirs_sha256": "6f106609ad4b65aab4732729704592f29dc40aeadeda51a2277b5d0594cca913",
    "result_sha256": "6f106609ad4b65aab4732729704592f29dc40aeadeda51a2277b5d0594cca913"
+  },
+  {
+   "path": "tui_gateway/AGENTS.md",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "a1dc198bf900adad223d55c10b9ab8b0818987f1bf34dc6f8540110813b9b6d0",
+   "ours_sha256": "a1dc198bf900adad223d55c10b9ab8b0818987f1bf34dc6f8540110813b9b6d0",
+   "theirs_sha256": "ff7bfbc5e6cec901a865f9fdb83130bbdb6273ed1154d6e108a920dd83973998",
+   "result_sha256": "ff7bfbc5e6cec901a865f9fdb83130bbdb6273ed1154d6e108a920dd83973998"
+  },
+  {
+   "path": "tui_gateway/agent_callbacks.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "8ddf7d308935e44798f4ca5d5950c93d02f76cfa4a758106d8f900a851d72b26",
+   "ours_sha256": "641ea5751fbbd96ca48da5bbfde34ea98e6332b34ac83f899df4b2618b2637d3",
+   "theirs_sha256": "f960b6474a097d6653a09767f854f5b1db68a942b41578c9e71285e61daa5d4a",
+   "result_sha256": "f960b6474a097d6653a09767f854f5b1db68a942b41578c9e71285e61daa5d4a"
+  },
+  {
+   "path": "tui_gateway/billing_view.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "b1964ef8e6ccac349285c01c92cc4156d0661d6fe261c71e0ca3865064f7475e",
+   "ours_sha256": "b1964ef8e6ccac349285c01c92cc4156d0661d6fe261c71e0ca3865064f7475e",
+   "theirs_sha256": "87e46a065fa62f9f613411e70b2a76b93e67c5ec3e5ad69ed9c115075ecf1f38",
+   "result_sha256": "87e46a065fa62f9f613411e70b2a76b93e67c5ec3e5ad69ed9c115075ecf1f38"
+  },
+  {
+   "path": "tui_gateway/change_watcher.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "48152f810a1612cbfe7702c1b5dc172f55ada81309ab943aad93c5a153e84dd4",
+   "ours_sha256": "48152f810a1612cbfe7702c1b5dc172f55ada81309ab943aad93c5a153e84dd4",
+   "theirs_sha256": "4a8efb72b6b9ffe595ab78a36a8a968883d83ecab0c8d3c3b8a5b84ba926bc25",
+   "result_sha256": "4a8efb72b6b9ffe595ab78a36a8a968883d83ecab0c8d3c3b8a5b84ba926bc25"
+  },
+  {
+   "path": "tui_gateway/compute_host.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "c3ff6b4452a92dfb0433db1ca8eaca948b30cff4de8c504d62c49a3daa0fe31e",
+   "ours_sha256": "484fc7f99261f1d52d98778e83f5dbdccd52eef04f7f170c7aa04abd148c923c",
+   "theirs_sha256": "42b6ebea035c88c9e144632ea9e93392dad5c67b15a0982b60946bc465ff8521",
+   "result_sha256": "42b6ebea035c88c9e144632ea9e93392dad5c67b15a0982b60946bc465ff8521"
+  },
+  {
+   "path": "tui_gateway/compute_host_bridge.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "de555e928e521693549b5c4ef5b750e9fed5a1bbbf6a89429b1a933dbd65f3e0",
+   "ours_sha256": "7049a92f5fbf26c158b32ef105f0b96f0a0ec9a91184a569f21af7557093d0a9",
+   "theirs_sha256": "ac6ea7195f6fb84add1ea1cf7cbae5d68a0025144b454787cda13a067d932b27",
+   "result_sha256": "ac6ea7195f6fb84add1ea1cf7cbae5d68a0025144b454787cda13a067d932b27"
+  },
+  {
+   "path": "tui_gateway/connector_payload.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "e18c19354b8a60538e461b3a49ed28e8328697c0eeae5905959fa9eb0ce28673",
+   "ours_sha256": "59754cded6500f8ae5393872beae6c91b85333f421dd119d9a13009e28e5637e",
+   "theirs_sha256": "59754cded6500f8ae5393872beae6c91b85333f421dd119d9a13009e28e5637e",
+   "result_sha256": "59754cded6500f8ae5393872beae6c91b85333f421dd119d9a13009e28e5637e"
+  },
+  {
+   "path": "tui_gateway/contracts/__init__.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "7a7fab1c6a9a250610915aac4db81e366be1be346775b806895db5e7b09035b2",
+   "ours_sha256": "c6686d48416cfad43a891eb5e26da59ca8d2d5ae8ea988999f5e1534b2616608",
+   "theirs_sha256": "c6686d48416cfad43a891eb5e26da59ca8d2d5ae8ea988999f5e1534b2616608",
+   "result_sha256": "c6686d48416cfad43a891eb5e26da59ca8d2d5ae8ea988999f5e1534b2616608"
+  },
+  {
+   "path": "tui_gateway/contracts/common.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "f69b4cde978b2eea15963be0cfbfa5d9fe12d8a50540e60eb5f32caaedaca237",
+   "ours_sha256": "5eeecdb2aae9e66ca70a4cba15188d643591be3cf1db702d926831351d06d43f",
+   "theirs_sha256": "5eeecdb2aae9e66ca70a4cba15188d643591be3cf1db702d926831351d06d43f",
+   "result_sha256": "5eeecdb2aae9e66ca70a4cba15188d643591be3cf1db702d926831351d06d43f"
+  },
+  {
+   "path": "tui_gateway/contracts/config_free_tier_control.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "6e607a4dce18e7b8ee73721b2cdaeef114bf44d4661576c2ee431892e8983cd4",
+   "ours_sha256": "2a59aa2de7755fc8be5717aaf0f124f468a0419485d575d7317bc14bb08d8d1e",
+   "theirs_sha256": "2a59aa2de7755fc8be5717aaf0f124f468a0419485d575d7317bc14bb08d8d1e",
+   "result_sha256": "2a59aa2de7755fc8be5717aaf0f124f468a0419485d575d7317bc14bb08d8d1e"
+  },
+  {
+   "path": "tui_gateway/contracts/connectors.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "2834815fbf8a5ba16a0a01a5be51861b33da9d015dfbcc9dd31e6a3bfece3a71",
+   "theirs_sha256": "2834815fbf8a5ba16a0a01a5be51861b33da9d015dfbcc9dd31e6a3bfece3a71",
+   "result_sha256": "2834815fbf8a5ba16a0a01a5be51861b33da9d015dfbcc9dd31e6a3bfece3a71"
+  },
+  {
+   "path": "tui_gateway/contracts/connectors_operation.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "ce515b38f372c1314128539358d338562bfabf307594780252f0681f35edb452",
+   "ours_sha256": "97325f9063d543691e280514cefbc8876cbcdf0ffd55744828c3cbd0175fb3fe",
+   "theirs_sha256": "97325f9063d543691e280514cefbc8876cbcdf0ffd55744828c3cbd0175fb3fe",
+   "result_sha256": "97325f9063d543691e280514cefbc8876cbcdf0ffd55744828c3cbd0175fb3fe"
+  },
+  {
+   "path": "tui_gateway/contracts/display.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "23ac923d7b2c446346b8aa11baf7447767aa3a5e78bf78172f8cd55abbf72dda",
+   "theirs_sha256": "23ac923d7b2c446346b8aa11baf7447767aa3a5e78bf78172f8cd55abbf72dda",
+   "result_sha256": "23ac923d7b2c446346b8aa11baf7447767aa3a5e78bf78172f8cd55abbf72dda"
+  },
+  {
+   "path": "tui_gateway/contracts/events.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "636ae07dfddbe254f968d507876170bb7bb5808304474c0539a920ea873c6e89",
+   "ours_sha256": "c71d18ddbb6b19fe5356ce046e2569e6b78885c423baf8b262d7687878ab107c",
+   "theirs_sha256": "cde16169cbcf11b86730f4641c7246bbbd5393c66e7e0c54d98d294c3b5573d3",
+   "result_sha256": "cde16169cbcf11b86730f4641c7246bbbd5393c66e7e0c54d98d294c3b5573d3"
+  },
+  {
+   "path": "tui_gateway/contracts/profiles_vault_complete_foreign_subagents.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "dce3d379cb664108561302934d9c770dfb97fcfcad8a4999821f1ef046b0880d",
+   "ours_sha256": "c2cf5d409f8ba050d3bffcaa34db182e2d43233b820f815ac326376272b6ffea",
+   "theirs_sha256": "c2cf5d409f8ba050d3bffcaa34db182e2d43233b820f815ac326376272b6ffea",
+   "result_sha256": "c2cf5d409f8ba050d3bffcaa34db182e2d43233b820f815ac326376272b6ffea"
+  },
+  {
+   "path": "tui_gateway/contracts/prompt_voice.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "7a79651a55424b41d65d1bb97972087e50fc1dd953143adc1da440bc0fce86c7",
+   "ours_sha256": "29fc3910fe26d19a9cfa8168dbc636bc8033e07521266c55cf87d7d5d92be92f",
+   "theirs_sha256": "29fc3910fe26d19a9cfa8168dbc636bc8033e07521266c55cf87d7d5d92be92f",
+   "result_sha256": "29fc3910fe26d19a9cfa8168dbc636bc8033e07521266c55cf87d7d5d92be92f"
+  },
+  {
+   "path": "tui_gateway/contracts/registry.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "7a0bded9c532aace605cc414ab6ef274258a5da744795e59bc3043a13ad5a8df",
+   "ours_sha256": "c45897f0177f1552faf7c6b4ea89a51bebf691fef846c2e715935a808dbb843f",
+   "theirs_sha256": "c45897f0177f1552faf7c6b4ea89a51bebf691fef846c2e715935a808dbb843f",
+   "result_sha256": "c45897f0177f1552faf7c6b4ea89a51bebf691fef846c2e715935a808dbb843f"
+  },
+  {
+   "path": "tui_gateway/contracts/sessions.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "8b9b3e35891480d4f91a27e2e07aa96205f6f7c9a3ad5011ae1f1b52847329bd",
+   "ours_sha256": "841af2cee0e6bb897aac0a8213bbc983a11cc6db9bf3c831e331db7675344466",
+   "theirs_sha256": "841af2cee0e6bb897aac0a8213bbc983a11cc6db9bf3c831e331db7675344466",
+   "result_sha256": "841af2cee0e6bb897aac0a8213bbc983a11cc6db9bf3c831e331db7675344466"
+  },
+  {
+   "path": "tui_gateway/contracts/tools_mcp_plugins.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "cca80c6f95aca1a10dcbe45c2b5178141caaa02c24fa03790610611b01c094c0",
+   "ours_sha256": "e172f988b4370c5988547ed21bae90ebed1e2630f38b9e51e29703181b2cdbcc",
+   "theirs_sha256": "e172f988b4370c5988547ed21bae90ebed1e2630f38b9e51e29703181b2cdbcc",
+   "result_sha256": "e172f988b4370c5988547ed21bae90ebed1e2630f38b9e51e29703181b2cdbcc"
+  },
+  {
+   "path": "tui_gateway/entry.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "cf6b30e6f0ca211d59a063d44e8837547b85be50fc667d49cc11afa9c6ef2e4e",
+   "ours_sha256": "e4ae321e191fa0628408ef589d5daebf9086358c49d67cc043b3df887ece2c41",
+   "theirs_sha256": "85860cd9a2e48b2b15454f4dc12350021a5638075c4975c3fbb3a34294e808f8",
+   "result_sha256": "85860cd9a2e48b2b15454f4dc12350021a5638075c4975c3fbb3a34294e808f8"
+  },
+  {
+   "path": "tui_gateway/event_replay.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "79462cc7d5a80e2f2e516327d2637d4c8c836542f9fe86e03fec8d3308e63ec7",
+   "ours_sha256": "79462cc7d5a80e2f2e516327d2637d4c8c836542f9fe86e03fec8d3308e63ec7",
+   "theirs_sha256": "2437f7642b6a1b25ca5182be557d34ee966db58c1143a59325629f19a57facb2",
+   "result_sha256": "2437f7642b6a1b25ca5182be557d34ee966db58c1143a59325629f19a57facb2"
+  },
+  {
+   "path": "tui_gateway/host_supervisor.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "1977921bd57bef1aa596677961a7373121fdb8e7b7b8b21688fbdde78c773a89",
+   "ours_sha256": "e7f954eaae60769b70f05f6938b1f10b36468d8208fba16a3c8c73c812940396",
+   "theirs_sha256": "323d74c3d2701ae3dce27ce2449deb6daf0d502b757ca4817a21182feb46b305",
+   "result_sha256": "323d74c3d2701ae3dce27ce2449deb6daf0d502b757ca4817a21182feb46b305"
+  },
+  {
+   "path": "tui_gateway/hosted_room_driver.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "70c4cb063390b4c8d9c840e968b31682932e159ee07d5bd9b2eecb4128cfc764",
+   "ours_sha256": "70c4cb063390b4c8d9c840e968b31682932e159ee07d5bd9b2eecb4128cfc764",
+   "theirs_sha256": "81396933788387ca8fd5dfaa875a5c7642edb438657d8f8fc5dcd2f4e51f80fe",
+   "result_sha256": "81396933788387ca8fd5dfaa875a5c7642edb438657d8f8fc5dcd2f4e51f80fe"
+  },
+  {
+   "path": "tui_gateway/hosted_room_peer_transport.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "a766aada40326b37f26c9da32d1b5573902deb6f35b8fb356a78ec228e4b43d7",
+   "ours_sha256": "a766aada40326b37f26c9da32d1b5573902deb6f35b8fb356a78ec228e4b43d7",
+   "theirs_sha256": "061fa2df4a82bb104e7cdd0403b6737caaa653718a71d24bd3298709f6ea6952",
+   "result_sha256": "061fa2df4a82bb104e7cdd0403b6737caaa653718a71d24bd3298709f6ea6952"
+  },
+  {
+   "path": "tui_gateway/hosted_room_server_rpc.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "13e114b42214f8bb3a31659f118e465fe245ac20d3b475b3f35067aeece2e95a",
+   "ours_sha256": "13e114b42214f8bb3a31659f118e465fe245ac20d3b475b3f35067aeece2e95a",
+   "theirs_sha256": "9107382ba2cab6328e17029a2748d54dcaad119a0a196a7f7ffdc27822008cd9",
+   "result_sha256": "9107382ba2cab6328e17029a2748d54dcaad119a0a196a7f7ffdc27822008cd9"
+  },
+  {
+   "path": "tui_gateway/hosted_room_service.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "fb166dabb343ccd33478610b9302fefcce60967122a920a435ff706ac33b30f3",
+   "ours_sha256": "fb166dabb343ccd33478610b9302fefcce60967122a920a435ff706ac33b30f3",
+   "theirs_sha256": "ee9fc2203b6bd515d9355719c58cd7f3d5084aba1416b4d777f1f54468e2c4fd",
+   "result_sha256": "ee9fc2203b6bd515d9355719c58cd7f3d5084aba1416b4d777f1f54468e2c4fd"
+  },
+  {
+   "path": "tui_gateway/launch_profile_policy.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "5f6b431fb606dd5c8999f8fcc62d04dad51bf7cf18ce890a4ae73cb71177c2aa",
+   "ours_sha256": "180e8d3e5cce6eda5089582f46d64458e19a72ba447c9cc27ad564e4e82907bf",
+   "theirs_sha256": "caa78a2016e9c7871603e92e68ef89c273e9ef7c09532ce119aea45acf40dc2b",
+   "result_sha256": "caa78a2016e9c7871603e92e68ef89c273e9ef7c09532ce119aea45acf40dc2b"
+  },
+  {
+   "path": "tui_gateway/loop_noise.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "4226e8832ebc31e6675d1f56701c922061697ae7937747fdc7256662a76c02b8",
+   "ours_sha256": "4226e8832ebc31e6675d1f56701c922061697ae7937747fdc7256662a76c02b8",
+   "theirs_sha256": "02ded2d4e6a55794bfd98deb31670f7583aaa3cbaf8808d8d661ec25341fe758",
+   "result_sha256": "02ded2d4e6a55794bfd98deb31670f7583aaa3cbaf8808d8d661ec25341fe758"
+  },
+  {
+   "path": "tui_gateway/mcp_oauth_sessions.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "de94c704d710a4263077c077805fe274187d651f63a9b47111660fbc6a318a74",
+   "ours_sha256": "de94c704d710a4263077c077805fe274187d651f63a9b47111660fbc6a318a74",
+   "theirs_sha256": "1298be15f98d5593c78d0c9a08025bc487a8d9aa050fba1120e639bfd4b015ee",
+   "result_sha256": "1298be15f98d5593c78d0c9a08025bc487a8d9aa050fba1120e639bfd4b015ee"
+  },
+  {
+   "path": "tui_gateway/mcp_rpc_helpers.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "acc5a37ec8da09137d836c587a0f3a19ce7875951d17f7b87224158de9fb9bfe",
+   "ours_sha256": "1b0797328bf2941bee1dd24c953e01087a27bc3aeefc69062f67fad21ed32f35",
+   "theirs_sha256": "9a703c780b150492eaacad6db36064b0d0ea4164f176b6b25bf75e3c12c04f20",
+   "result_sha256": "9a703c780b150492eaacad6db36064b0d0ea4164f176b6b25bf75e3c12c04f20"
+  },
+  {
+   "path": "tui_gateway/method_ctx.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "9caef90ed91a72e6fad8f17f636ceb50d205cc8ef8ab34343bc32b382c88325f",
+   "ours_sha256": "2f8b8098dc16bfecb6c31de15eca21ab426f48f7e18e8adb78492a0bb70d5514",
+   "theirs_sha256": "b1cc59a8c48a3154da4d01e54ba3c46f5fdfdd410b13ec778d9dab6b161afd69",
+   "result_sha256": "b1cc59a8c48a3154da4d01e54ba3c46f5fdfdd410b13ec778d9dab6b161afd69"
+  },
+  {
+   "path": "tui_gateway/methods_bot_relay.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "0f949cae3796274c4deef212d977796c361e5a4d8e9563ae2ca5a8d4a7028cf5",
+   "ours_sha256": "0f949cae3796274c4deef212d977796c361e5a4d8e9563ae2ca5a8d4a7028cf5",
+   "theirs_sha256": "66fd8e4700725cd751412dd297fdb73a0e1306a95f05a78b17f313a6d18a5e7f",
+   "result_sha256": "66fd8e4700725cd751412dd297fdb73a0e1306a95f05a78b17f313a6d18a5e7f"
+  },
+  {
+   "path": "tui_gateway/methods_browser_control.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "cf614404b8954d71df757b5c23ef20c6e9f34bb06dd183b08f90b298e944a6a8",
+   "ours_sha256": "cf614404b8954d71df757b5c23ef20c6e9f34bb06dd183b08f90b298e944a6a8",
+   "theirs_sha256": "cab5b6e49a3a233b14b5d40d1a237590d5513abb4e082e5aa63cf8c064eba913",
+   "result_sha256": "cab5b6e49a3a233b14b5d40d1a237590d5513abb4e082e5aa63cf8c064eba913"
+  },
+  {
+   "path": "tui_gateway/methods_complete.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "de25e779ff3555771fcca09bd3045b8509111c4d0ac505857c6b0382f0fa7097",
+   "ours_sha256": "f13c96e9b03cfb739b97fe89b64e5fb7bed7d5655b7299026b9bdf2a341fb06d",
+   "theirs_sha256": "072270745a287b82054583e4f5e9c9f7c2866acfa841e25dbff4d0243cf8b36a",
+   "result_sha256": "072270745a287b82054583e4f5e9c9f7c2866acfa841e25dbff4d0243cf8b36a"
+  },
+  {
+   "path": "tui_gateway/methods_complete_helpers.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "1e2e1b67fce28a73602ab68ad2594b7e083406622280d09638d6f98a2e06927e",
+   "ours_sha256": "1e2e1b67fce28a73602ab68ad2594b7e083406622280d09638d6f98a2e06927e",
+   "theirs_sha256": "2f5741fb605afa071c819d9e5bcd43db5f435672da32e0d6087cc069ac46e741",
+   "result_sha256": "2f5741fb605afa071c819d9e5bcd43db5f435672da32e0d6087cc069ac46e741"
+  },
+  {
+   "path": "tui_gateway/methods_config.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "ada0c4a63403e40f054a8f38157dcf0dfa708862b85c67deaed64f5e18c9e20c",
+   "ours_sha256": "992dd8213ab03f2c2f1442294931d6fe0c66c70554dbc9d16d8861e690270e17",
+   "theirs_sha256": "a10251e35ae04a4aa53d41e38672e6fa9d550f3a00db233ac391681a05d686b9",
+   "result_sha256": "a10251e35ae04a4aa53d41e38672e6fa9d550f3a00db233ac391681a05d686b9"
+  },
+  {
+   "path": "tui_gateway/methods_config_set.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "8449c8fd7ddf211870591cd4fdb052b686a1bf79997ff02dc73b7f1d10b192a1",
+   "ours_sha256": "b54456c1b58fd7de297eab7e3d61212b52658094d8a75a79627e3e8227c9cc46",
+   "theirs_sha256": "685096090801559363d9332e6c126d4ef761691346bb1c58cdbe7aaabc5673db",
+   "result_sha256": "685096090801559363d9332e6c126d4ef761691346bb1c58cdbe7aaabc5673db"
+  },
+  {
+   "path": "tui_gateway/methods_connectors.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "d3fc7d81763e708d8d6086cd7368db23d2b43a428545d4049836d43eb8ead6ba",
+   "ours_sha256": "47e8abf45da0bc19534a60ecaee20de2baaeb5cadb14039874c61f69ccfe25ac",
+   "theirs_sha256": "6c17d487697213d608eee99a417ed363286d334f3e94c21fff1a774d65e3693c",
+   "result_sha256": "6c17d487697213d608eee99a417ed363286d334f3e94c21fff1a774d65e3693c"
+  },
+  {
+   "path": "tui_gateway/methods_connectors_account.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "b77f5d71181d0cc19955e816d7cb9838a5bc37ee90a649576d3b7fe48e6dadb9",
+   "theirs_sha256": "b77f5d71181d0cc19955e816d7cb9838a5bc37ee90a649576d3b7fe48e6dadb9",
+   "result_sha256": "b77f5d71181d0cc19955e816d7cb9838a5bc37ee90a649576d3b7fe48e6dadb9"
+  },
+  {
+   "path": "tui_gateway/methods_display.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "c950b6095b7f3cc1935ce9104e21f128eda3c3e0b472e4c0c07fbbb5d5953b4d",
+   "theirs_sha256": "c950b6095b7f3cc1935ce9104e21f128eda3c3e0b472e4c0c07fbbb5d5953b4d",
+   "result_sha256": "c950b6095b7f3cc1935ce9104e21f128eda3c3e0b472e4c0c07fbbb5d5953b4d"
+  },
+  {
+   "path": "tui_gateway/methods_display_watch.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "490d63371139019fe44ae53547b8fc7479c648335f80b48f9e510dfd81c6531e",
+   "theirs_sha256": "490d63371139019fe44ae53547b8fc7479c648335f80b48f9e510dfd81c6531e",
+   "result_sha256": "490d63371139019fe44ae53547b8fc7479c648335f80b48f9e510dfd81c6531e"
+  },
+  {
+   "path": "tui_gateway/methods_groups.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "a0bd9abc994b757a7844fca9b1a6bfe134b3136fdbf9eacac6cad8c1ec06be31",
+   "ours_sha256": "a0bd9abc994b757a7844fca9b1a6bfe134b3136fdbf9eacac6cad8c1ec06be31",
+   "theirs_sha256": "e07145dab39e0e0cbec94d532faff60960473ce93f379c103f866d713500b8a6",
+   "result_sha256": "e07145dab39e0e0cbec94d532faff60960473ce93f379c103f866d713500b8a6"
+  },
+  {
+   "path": "tui_gateway/methods_images.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "41959858ddeb68c6e49763285a593d1673b236d182dc5be392d5b6eaf0828ccd",
+   "ours_sha256": "41959858ddeb68c6e49763285a593d1673b236d182dc5be392d5b6eaf0828ccd",
+   "theirs_sha256": "4b275659e9707b03e417b90611b78eb2c20fe4e93f8047d6d4af9ee3713cd733",
+   "result_sha256": "4b275659e9707b03e417b90611b78eb2c20fe4e93f8047d6d4af9ee3713cd733"
+  },
+  {
+   "path": "tui_gateway/methods_onboarding.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "a26e416bbb574dd427efa5feae3ea340e0bff4dacb014ce137daaa0e16649630",
+   "theirs_sha256": "a26e416bbb574dd427efa5feae3ea340e0bff4dacb014ce137daaa0e16649630",
+   "result_sha256": "a26e416bbb574dd427efa5feae3ea340e0bff4dacb014ce137daaa0e16649630"
+  },
+  {
+   "path": "tui_gateway/methods_profiles.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "8b20feb21c929300e107549bef63f389547573ca92000da81f9380d734b76372",
+   "ours_sha256": "d7130767525885c1423cf681ec480521328183a91cd05dc59ec1cccc41675f79",
+   "theirs_sha256": "a88e3b89aa44e2431b496691845a6fc5c3a59ff3a89d4bc59c547c5a32c82adc",
+   "result_sha256": "a88e3b89aa44e2431b496691845a6fc5c3a59ff3a89d4bc59c547c5a32c82adc"
+  },
+  {
+   "path": "tui_gateway/methods_projects.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "aed2ad68aa8d51fc58f6d8cccb81e77616ac0260bfb0ae6408438e1bcedcc8ed",
+   "ours_sha256": "aed2ad68aa8d51fc58f6d8cccb81e77616ac0260bfb0ae6408438e1bcedcc8ed",
+   "theirs_sha256": "f32ed3380cf8ef02a3209240d1ce09e65e6ae963c513fe20129579035bf96442",
+   "result_sha256": "f32ed3380cf8ef02a3209240d1ce09e65e6ae963c513fe20129579035bf96442"
+  },
+  {
+   "path": "tui_gateway/methods_prompt.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "93f71b78ace130f1cd26555ec67b998a5a46854fe829c448d5b4decff65a703d",
+   "ours_sha256": "cb7c4df80de6b1d8ce4c049c100d826b8cc26401b1cade32ae96de143583aa10",
+   "theirs_sha256": "55d546665b4107366d6e3368bcefc6d54e5b76ac69bb24f448b68cc03d3eb2bb",
+   "result_sha256": "55d546665b4107366d6e3368bcefc6d54e5b76ac69bb24f448b68cc03d3eb2bb"
+  },
+  {
+   "path": "tui_gateway/methods_session.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "e9b03162bd83727de7d68267cd0a7c36356c88decae50cc86e6ec9a49f6757b5",
+   "ours_sha256": "2c7c02532c179a1536ffe5bce411e155f8b1d7b9a69f268aa2cd467d2eff301d",
+   "theirs_sha256": "f646aef9d072cf1227478578c4bef15a4c04b52b122311a5a03b7bf8d0b212fe",
+   "result_sha256": "f646aef9d072cf1227478578c4bef15a4c04b52b122311a5a03b7bf8d0b212fe"
+  },
+  {
+   "path": "tui_gateway/methods_session_foreign.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "41128d9b87b9efc92d2637849ddf6d1e5d42f04f1c20c0bd9384697b42ebb882",
+   "ours_sha256": "41128d9b87b9efc92d2637849ddf6d1e5d42f04f1c20c0bd9384697b42ebb882",
+   "theirs_sha256": "7d9aa271a8fd90490d3f6042398140839ffe8dea51376b7351b04bc496cabfef",
+   "result_sha256": "7d9aa271a8fd90490d3f6042398140839ffe8dea51376b7351b04bc496cabfef"
+  },
+  {
+   "path": "tui_gateway/methods_slash.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "a03f5d81ab865d7da86afb7f37209c7f4d2a99b08150e7be6809d97534c2efb8",
+   "ours_sha256": "48f321273f9f48001b82f19545c01303432039f107940f1e94257baf581bceee",
+   "theirs_sha256": "8f2612ae6a7c15d5e823cf6cb0afd99903fda1eec3b7e386990198b989d8b723",
+   "result_sha256": "8f2612ae6a7c15d5e823cf6cb0afd99903fda1eec3b7e386990198b989d8b723"
+  },
+  {
+   "path": "tui_gateway/methods_tools.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "97ba18cad4cf1500f4f712f31b3b2b02fc29fd3e4306d877347e001d43c4645b",
+   "ours_sha256": "050d8aaa24d221b678a567fa494522ae1d0f4bcfc2bd9e14c2ed92ee38f51eef",
+   "theirs_sha256": "52127943ab72082e3ae83918be798e24da87b6cb6b87e1f6a9347df5b15aee22",
+   "result_sha256": "52127943ab72082e3ae83918be798e24da87b6cb6b87e1f6a9347df5b15aee22"
+  },
+  {
+   "path": "tui_gateway/methods_voice.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "14a29e2faaad5ba237e500902e5d41c62e02525c55527f87a27187e0d72e420e",
+   "ours_sha256": "2865db855169b24d86a37cdbd29f4e2d1d21bfdd963b87d82dd60691ed31ea8b",
+   "theirs_sha256": "060a44b64cc36435ca0dadfb79a4d9fdc09d07bfed006b87acccc9e92bac1934",
+   "result_sha256": "060a44b64cc36435ca0dadfb79a4d9fdc09d07bfed006b87acccc9e92bac1934"
+  },
+  {
+   "path": "tui_gateway/model_switch.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "9010dfd0eb7d0848e7d23c4de48c226df996065a36ca35ac859a2037d26a069a",
+   "ours_sha256": "8e896a43f447d669154d73dd1bb7aacda210fedef5cea709ae2b9c07d12b14ef",
+   "theirs_sha256": "f7060f25e835fa0109183fc0a11b2d96dfb5b0ec1de010fdf6943cf2883c624c",
+   "result_sha256": "f7060f25e835fa0109183fc0a11b2d96dfb5b0ec1de010fdf6943cf2883c624c"
+  },
+  {
+   "path": "tui_gateway/onboarding_personalization.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "52bc9bc3f2bb1b1c186e10b6afcf1de0831344ede68a1d0cbf5f470ebe2bc8e7",
+   "ours_sha256": "e653d93195ee12b66d5a95b6f6910f18ac15456dd1f2be0b42364f6f9c8d2967",
+   "theirs_sha256": "25a4ad9e74fba956205481f020ff23d2e2415755db89724f78e15933e927cbce",
+   "result_sha256": "25a4ad9e74fba956205481f020ff23d2e2415755db89724f78e15933e927cbce"
+  },
+  {
+   "path": "tui_gateway/plugin_inject.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "ADDED",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": null,
+   "ours_sha256": "624e97db97ddee3863f2250eda951b6b2a0439d619d7bf65551c9c58c9cfbd5a",
+   "theirs_sha256": "624e97db97ddee3863f2250eda951b6b2a0439d619d7bf65551c9c58c9cfbd5a",
+   "result_sha256": "624e97db97ddee3863f2250eda951b6b2a0439d619d7bf65551c9c58c9cfbd5a"
+  },
+  {
+   "path": "tui_gateway/project_tree.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "4e07b3edc15716645318ee87f34a6120edde8558fb60a297314c4705d7cdf759",
+   "ours_sha256": "2a3d4b76b45a7e3dd0ca3d70952733fad84770996c2e5960edee3d4961dbfe2c",
+   "theirs_sha256": "d38b24f15d9c0e8c89830d3c5dd809caa1f6faf7253a1d0df62d1399ab481a1d",
+   "result_sha256": "d38b24f15d9c0e8c89830d3c5dd809caa1f6faf7253a1d0df62d1399ab481a1d"
+  },
+  {
+   "path": "tui_gateway/prompt_attachments.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "e85a76d62961ae44629c0425e6157c58ad5e4a9a85f89f7f83498a7f5ac9fc81",
+   "ours_sha256": "e85a76d62961ae44629c0425e6157c58ad5e4a9a85f89f7f83498a7f5ac9fc81",
+   "theirs_sha256": "8da4ef5f3a07621989b9fcda713bc66d11490c9237c2aa7ab640df95deba56df",
+   "result_sha256": "8da4ef5f3a07621989b9fcda713bc66d11490c9237c2aa7ab640df95deba56df"
+  },
+  {
+   "path": "tui_gateway/prompt_turn.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "80d33d06f9dce24218c49af7c09ff77f12eceb401e99db3834cb7e90f099ee74",
+   "ours_sha256": "ebfc42d182215c4b4d3e39d8d62aa9bee62ad89d64745b0e733d065c14f42079",
+   "theirs_sha256": "28663af4b9cd482399f921dd5297b87ea58c741049e0ad8265118e57f391dd32",
+   "result_sha256": "28663af4b9cd482399f921dd5297b87ea58c741049e0ad8265118e57f391dd32"
+  },
+  {
+   "path": "tui_gateway/rpc_dispatch.py",
+   "class": "TAKE_OURS",
+   "conflict": false,
+   "resolution": "AUTO_OURS",
+   "action": "write",
+   "bucket": "tui_gateway",
+   "base_sha256": "cfb59d30418333d2df0f6fd11744cd674de5a400138b42756fd02f3ef7e885c7",
+   "ours_sha256": "ed90d1a5067bf911e2551ffdc5a3fd99e207b0576083c6b4d6c3660cecd7a4ea",
+   "theirs_sha256": "ed90d1a5067bf911e2551ffdc5a3fd99e207b0576083c6b4d6c3660cecd7a4ea",
+   "result_sha256": "ed90d1a5067bf911e2551ffdc5a3fd99e207b0576083c6b4d6c3660cecd7a4ea"
+  },
+  {
+   "path": "tui_gateway/server.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "29fd9e0f08edc5c2e41c2d8d10940b7185b5a03d6a78dc1c43cfe059ed5b240a",
+   "ours_sha256": "42840603896781fe9c7f553988116b4edf2215cb8eebac98638733b716c942b1",
+   "theirs_sha256": "d0fe1b56633e4e27d2fbee453187231e55a87fb0c10accc0e63ca541d0945047",
+   "result_sha256": "d0fe1b56633e4e27d2fbee453187231e55a87fb0c10accc0e63ca541d0945047"
+  },
+  {
+   "path": "tui_gateway/session_auto_continue.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "40eb7fcab1678e9b9496070d3c2bff23c65d7808409052ad2d1d27019e5eab78",
+   "ours_sha256": "40eb7fcab1678e9b9496070d3c2bff23c65d7808409052ad2d1d27019e5eab78",
+   "theirs_sha256": "5b68c467e8ff4caf0f69c91526c01d3fc9d8697bba89da176527dbc724dcd492",
+   "result_sha256": "5b68c467e8ff4caf0f69c91526c01d3fc9d8697bba89da176527dbc724dcd492"
+  },
+  {
+   "path": "tui_gateway/session_compression.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "963a595b129e366bafeefeffc284cc81a4426ccf0fc8206c1492f9de5b12040f",
+   "ours_sha256": "41a305a3ee74fe47c0f84991a55b81c6e46b54d7dab9408a7957b1ca68c5a022",
+   "theirs_sha256": "cfae2428addb91cd86402a6e9abc498ca1a27a054d32202dc31747d2b3515fd5",
+   "result_sha256": "cfae2428addb91cd86402a6e9abc498ca1a27a054d32202dc31747d2b3515fd5"
+  },
+  {
+   "path": "tui_gateway/session_history.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "039296514ec9da30b2a57a2ae4506170241d7d1ab562bef1af065c60735d4a45",
+   "ours_sha256": "d2496654eca7c6b9921de916607075fa6c033517e1c9f27165dcc25553c6bbf1",
+   "theirs_sha256": "2011b0475b7266dbc53799ce1339084a1f7b6cbcf47f1cc744c4ae0b0df64939",
+   "result_sha256": "2011b0475b7266dbc53799ce1339084a1f7b6cbcf47f1cc744c4ae0b0df64939"
+  },
+  {
+   "path": "tui_gateway/session_lifecycle.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "45c5614006def085cdb1950e0858eceb90b440c1f6f931cd438ceb7b6838a307",
+   "ours_sha256": "45c5614006def085cdb1950e0858eceb90b440c1f6f931cd438ceb7b6838a307",
+   "theirs_sha256": "dd3e759240d4d1d69d16999ad870b82afb48327d76ca9ebca52e0275232fdaf7",
+   "result_sha256": "dd3e759240d4d1d69d16999ad870b82afb48327d76ca9ebca52e0275232fdaf7"
+  },
+  {
+   "path": "tui_gateway/session_notifications.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "16211b64a37ef525831e85591e8a0f866ebe168c6d9423bcd63bc308d2ff6886",
+   "ours_sha256": "cd6128a96dbe07bd25cc28c14db26162878ce7eddd4e55d939d01aa0f5950005",
+   "theirs_sha256": "88ee29d65e8abfae5eddd6f14adffa3913d12173b4ede6abbc34cb4da4a346a3",
+   "result_sha256": "88ee29d65e8abfae5eddd6f14adffa3913d12173b4ede6abbc34cb4da4a346a3"
+  },
+  {
+   "path": "tui_gateway/session_reaper.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "c4ffff3b6471b9ea696cc053fa0f8aa9688be8c0d7fdaeb7e0bf95f116111567",
+   "ours_sha256": "41be729c1ce293510534666324e47d4459c5267f0fde6acdacf38cd30d05fc89",
+   "theirs_sha256": "79740e1fb27645a42fb5bbf2688b48b20ff57c4e6c5ce0adcc3b2790a65172b1",
+   "result_sha256": "79740e1fb27645a42fb5bbf2688b48b20ff57c4e6c5ce0adcc3b2790a65172b1"
+  },
+  {
+   "path": "tui_gateway/session_workdir.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "c9cbfb3dacdfa24dd101fd86519d98e42a0e1941afe5873a6a882beea97bc4aa",
+   "ours_sha256": "dc12bc520a467eaa53660ddaf68dfcf98239d1949889ec3948b8950cfe6b08ab",
+   "theirs_sha256": "73cf92acb64cd4008ffc025a1300cd85b066e5debcc362bc9269688a151fb99a",
+   "result_sha256": "73cf92acb64cd4008ffc025a1300cd85b066e5debcc362bc9269688a151fb99a"
+  },
+  {
+   "path": "tui_gateway/slash_worker.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "549a98584759e5fcae8163804c79ca1dae50daa6717169735561d6517115989a",
+   "ours_sha256": "549a98584759e5fcae8163804c79ca1dae50daa6717169735561d6517115989a",
+   "theirs_sha256": "c62ed46062381831b649f25d87ba03901f5b71988e8ebf101a91a76d398822aa",
+   "result_sha256": "c62ed46062381831b649f25d87ba03901f5b71988e8ebf101a91a76d398822aa"
+  },
+  {
+   "path": "tui_gateway/tool_progress.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "d5ac92218255dab2229a52ec544786e82ba48a2cef523b16aa632e9942035909",
+   "ours_sha256": "226e5bf7cb4720366fbe48c092a67e1c6ac17120b865977253118f6bf50767ee",
+   "theirs_sha256": "831609f7d7d6aaa9c1c73cbb52c837e483b54ab1e46555445a242ffa2e81b50b",
+   "result_sha256": "831609f7d7d6aaa9c1c73cbb52c837e483b54ab1e46555445a242ffa2e81b50b"
+  },
+  {
+   "path": "tui_gateway/transport.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "5a2f5f39bf78d1bec139b5fc0c99d7f73f5c5308f9350214175eba01213aba13",
+   "ours_sha256": "5a2f5f39bf78d1bec139b5fc0c99d7f73f5c5308f9350214175eba01213aba13",
+   "theirs_sha256": "27e234febeec797010a4722ba53d7bd0fe0e11b77b043d3f722d204582e31c21",
+   "result_sha256": "27e234febeec797010a4722ba53d7bd0fe0e11b77b043d3f722d204582e31c21"
+  },
+  {
+   "path": "tui_gateway/turn_marker.py",
+   "class": "REAPPLY_THEIRS",
+   "conflict": false,
+   "resolution": "MERGE_FILE",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "3ce306efce3fbd783e9657d6b666d58678fe241c3372ba6752ad1fc8d7af81f5",
+   "ours_sha256": "3ce306efce3fbd783e9657d6b666d58678fe241c3372ba6752ad1fc8d7af81f5",
+   "theirs_sha256": "b7481aad24198478ac9362957f241a6fcd861292c7e9c211f3a24f4c582dd3cd",
+   "result_sha256": "b7481aad24198478ac9362957f241a6fcd861292c7e9c211f3a24f4c582dd3cd"
+  },
+  {
+   "path": "tui_gateway/ws.py",
+   "class": "CONFLICT",
+   "conflict": true,
+   "resolution": "KEEP_THEIRS_CONFLICT",
+   "action": "noop",
+   "bucket": "tui_gateway",
+   "base_sha256": "5122b3051d022f0c27b55affe970da7920f6e96e4c00a2fd1761bd308e350ef5",
+   "ours_sha256": "0d0cc6549ef6660301f0d8f881758a78d67cba3f8c14e5ef623a2be51fd76586",
+   "theirs_sha256": "2f3253e5b8cd39af0d641c0ed1ab026a9fa02834d181d025bb715a398ef16787",
+   "result_sha256": "2f3253e5b8cd39af0d641c0ed1ab026a9fa02834d181d025bb715a398ef16787"
   }
  ]
 }
