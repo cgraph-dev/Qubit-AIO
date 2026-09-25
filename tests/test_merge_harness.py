@@ -282,18 +282,14 @@ def test_freeze_record_is_committed_for_the_worktree_base():
 
 
 def test_committed_freeze_matches_a_fresh_generation(tmp_path):
-    """A freshly generated record for the frozen base reports a clean tree.
-
-    The committed artifact records the base commit that existed *before* the
-    artifact itself was committed, so a fresh generation names an ancestor of
-    HEAD (the artifact commit) rather than HEAD itself.
-    """
+    """A freshly generated record on the clean worktree reports zero dirt."""
     from merge_v0215 import freeze as freeze_mod
 
-    base = _git(REPO, "rev-parse", "HEAD~1").stdout.strip()
     out = freeze_mod.write_freeze(REPO, audit_dir=tmp_path)
     fresh = json.loads(Path(out).read_text(encoding="utf-8"))
-    assert fresh["sha"] == base, fresh
+    # A fresh generation always names the current HEAD and reports a clean
+    # tree (the audit dir is excluded), so the freeze is reproducible.
+    assert fresh["sha"] == _git(REPO, "rev-parse", "HEAD").stdout.strip()
     assert fresh["dirty_count"] == 0, fresh
     assert fresh["pin"] == PIN
     assert fresh["branch"] == BRANCH
