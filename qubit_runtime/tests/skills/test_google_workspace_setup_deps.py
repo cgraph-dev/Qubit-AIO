@@ -59,7 +59,7 @@ def test_standalone_without_qubit_reports_setup_not_ambient_installs(command, tm
         timeout=15,
     )
     assert result.returncode == 1
-    assert "Hermes environment" in result.stdout
-    assert "hermes setup" in result.stdout
+    assert "Qubit environment" in result.stdout
+    assert "qubit setup" in result.stdout
     assert "pip" not in result.stdout + result.stderr
     assert "Traceback" not in result.stderr
