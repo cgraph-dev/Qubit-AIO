@@ -471,10 +471,10 @@ def create_wrapper_script(name: str, target: Optional[str] = None) -> Optional[P
     wrapper_path = _wrapper_path(canon)
     try:
         if sys.platform == "win32":
-            wrapper_path.write_text(f"@echo off\r\nhermes -p {profile} %*\r\n", encoding="utf-8")
+            wrapper_path.write_text(f"@echo off\r\nqubit -p {profile} %*\r\n", encoding="utf-8")
         else:
-            hermes_exe = shutil.which("hermes") or "hermes"
-            wrapper_path.write_text(f'#!/bin/sh\nexec {shlex.quote(hermes_exe)} -p {profile} "$@"\n', encoding="utf-8")
+            qubit_exe = shutil.which("qubit") or "qubit"
+            wrapper_path.write_text(f'#!/bin/sh\nexec {shlex.quote(qubit_exe)} -p {profile} "$@"\n', encoding="utf-8")
             wrapper_path.chmod(wrapper_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         return wrapper_path
     except OSError as e:
@@ -1497,16 +1497,16 @@ def backfill_profile_envs(quiet: bool = False) -> List[str]:
 
 
 _BACKEND_TOKENS = frozenset({"serve", "dashboard", "gateway"})
-_HERMES_ARGV_MARKERS = ("qubit_cli.main", "hermes-gateway", "tui_gateway")
+_QUBIT_ARGV_MARKERS = ("qubit_cli.main", "qubit-gateway", "tui_gateway")
 # python / python3 / python3.12 / pythonw(.exe): the interpreter basenames a
 # `#!/…/python3` console-script shim is exec'd through when something (e.g. Electron's
-# `findOnPath('hermes')`) spawns the shim by handing the interpreter its path — then the
-# OS-reported argv[0] is the interpreter, not "hermes".
+# `findOnPath('qubit')`) spawns the shim by handing the interpreter its path — then the
+# OS-reported argv[0] is the interpreter, not "qubit".
 _PYTHON_INTERPRETER_RE = re.compile(r"^python[\d.]*w?(\.exe)?$")
 # Console-script entry points this project ships (pyproject.toml [project.scripts]).
-# argv[1] is matched against exact names, not ``startswith("hermes")``: with a bare
+# argv[1] is matched against exact names, not ``startswith("qubit")``: with a bare
 # interpreter argv[0], argv[1] can be ANY user script ("hermes-notes.py").
-_HERMES_CONSOLE_SCRIPT_NAMES = frozenset({"hermes", "hermes-agent", "hermes-acp"})
+_QUBIT_CONSOLE_SCRIPT_NAMES = frozenset({"qubit", "qubit-agent", "qubit-acp"})
 
 
 def _is_qubit_argv(argv: list) -> bool:
@@ -1514,11 +1514,11 @@ def _is_qubit_argv(argv: list) -> bool:
     or a python interpreter directly exec'ing a known ``qubit`` console-script shim."""
     joined = " ".join(argv)
     exe_name = os.path.basename(argv[0]).lower()
-    if any(marker in joined for marker in _HERMES_ARGV_MARKERS) or exe_name.startswith("hermes"):
+    if any(marker in joined for marker in _QUBIT_ARGV_MARKERS) or exe_name.startswith("qubit"):
         return True
     if len(argv) >= 2 and _PYTHON_INTERPRETER_RE.match(exe_name):
         script_name = os.path.basename(str(argv[1])).lower()
-        return script_name.rsplit(".", 1)[0] in _HERMES_CONSOLE_SCRIPT_NAMES
+        return script_name.rsplit(".", 1)[0] in _QUBIT_CONSOLE_SCRIPT_NAMES
     return False
 
 
@@ -2255,10 +2255,15 @@ def _atomic_write_json(path: Path, data: dict) -> bool:
 
 
 def _migrate_honcho_profile_host(old_name: str, new_name: str, new_dir: Path) -> None:
-    """Rename Honcho host blocks for a renamed profile without changing peers."""
-    old_host = f"hermes_{old_name}"
-    legacy_old_host = f"qubit.{old_name}"
-    new_host = f"hermes_{new_name}"
+    """Rename Honcho host blocks for a renamed profile without changing peers.
+
+    Qubit-owned host keys use the ``qubit_<profile>`` prefix. ``hermes_<profile>``
+    (the pre-rebrand key) and the dot-form ``qubit.<profile>`` are still accepted as
+    legacy sources so a host block written before the rename is migrated, not orphaned."""
+    legacy_hermes_old_host = f"hermes_{old_name}"
+    old_host = f"qubit_{old_name}"
+    legacy_dot_old_host = f"qubit.{old_name}"
+    new_host = f"qubit_{new_name}"
     candidates = [
         new_dir / "honcho.json", _get_default_qubit_home() / "honcho.json", Path.home() / ".honcho" / "config.json"
     ]
@@ -2278,15 +2283,17 @@ def _migrate_honcho_profile_host(old_name: str, new_name: str, new_dir: Path) ->
         hosts = raw.get("hosts")
         if not isinstance(hosts, dict):
             continue
-        source_host = old_host if old_host in hosts else legacy_old_host
-        if source_host not in hosts:
+        source_host = next(
+            (h for h in (old_host, legacy_hermes_old_host, legacy_dot_old_host) if h in hosts), None
+        )
+        if source_host is None:
             continue
         if new_host in hosts:
             print(f"⚠ Honcho host block not migrated: {new_host} already exists in {path}")
             continue
         block = hosts[source_host]
         if isinstance(block, dict) and "aiPeer" not in block:
-            block["aiPeer"] = old_name  # source_host is ``hermes_<old>`` or legacy ``qubit.<old>``
+            block["aiPeer"] = old_name  # legacy source: ``hermes_<old>`` or dot-form ``qubit.<old>``
         hosts[new_host] = hosts.pop(source_host)
         if _atomic_write_json(path, raw):
             print(f"✓ Honcho host updated: {source_host} → {new_host}")
