@@ -331,10 +331,10 @@ REFERENCE_PROJECTS = frozenset({"hermes", "openclaw"})
 # Contractual pinned upstream revisions. A reference only counts as pinned when
 # its resolved commit equals the pin; the floating installed binaries do not.
 CONTRACTUAL_PINS = {
-    # W9 moved the vendored Hermes pin to the stable v0.21.4 release (owner
-    # decisions 2026-09-23 #14/#15). The differential byte manifest is
+    # Owner amendment 2026-09-25 (DECISIONS #25) moved the vendored Hermes pin
+    # to the v0.21.5 source commit. The differential byte manifest is
     # regenerated at this same pin by ``scripts/hermes_byte_manifest.py``.
-    "hermes": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
+    "hermes": "69948c005791d4d0e51670ca015238c2c7663749",
     "openclaw": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
 }
 # Visual evidence refs required for success rows in VISUAL_FAMILIES.

@@ -1,7 +1,7 @@
 {
  "schema": "qubit-gap-ledger-section/1",
  "source": "hermes",
- "upstream_pin": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
+ "upstream_pin": "69948c005791d4d0e51670ca015238c2c7663749",
  "generated": "2026-09-12",
  "method": "Evidence-based regeneration. API rows re-extract the pinned upstream route decorators and classify them from voicebridge.qubit_compat.match disposition plus the handler's real behaviour (a handler whose normal exits are typed gates/refusals is GATED; a real read/write is IMPLEMENTED; a wire-shape stub is PARTIAL). IMPLEMENTED additionally requires an on-disk tests/ function that dispatches the route, calls the handler, or calls the same downstream production module (AST scan), so no row is IMPLEMENTED on a phantom caller. cli / cli-subcommand rows derive status from the live voicebridge.cli build_parser tree plus voicebridge.cli_qubit_forward.FORWARD_TABLE and an AST scan of tests/ for the exercising caller. Plugin-fleet rows are declared explicitly and are IMPLEMENTED only when tests/test_qubit_plugins.py dispatches the registered compat handler over real local state. The full vendored plugin fleet is audited from voicebridge.qubit_plugins.plugin_fleet_audit (which plugin ships a dashboard/manifest.json) and embedded as the plugin_fleet metadata. No status is hand-flipped.",
  "sources_reconciled": [

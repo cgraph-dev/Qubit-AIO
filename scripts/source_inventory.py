@@ -43,8 +43,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 
-HERMES_PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
-HERMES_TAG = "v0.21.4"
+HERMES_PIN = "69948c005791d4d0e51670ca015238c2c7663749"
+HERMES_TAG = "v0.21.5"
 HERMES_REPO = "https://github.com/NousResearch/hermes-agent"
 OPENCLAW_PIN = "da03996ab7203fe6b9b4d8edb2b54726e4394c9c"
 OPENCLAW_TAG = "v2026.4.19-beta.2-28254-gda03996ab7"
@@ -63,7 +63,7 @@ LEDGER_REV = "working"
 CANONICAL_DIR = "docs/generated"
 CANONICAL_VENDOR_MANIFEST = f"{CANONICAL_DIR}/QUBIT_HERMES_VENDOR_MANIFEST.json"
 
-DEFAULT_HERMES = "/tmp/opencode/pinned/hermes-agent"
+DEFAULT_HERMES = str(Path.home() / ".hermes" / "hermes-agent")
 DEFAULT_OPENCLAW = "/tmp/opencode/pinned/openclaw"
 
 # Directories/files excluded from the byte diff, matching

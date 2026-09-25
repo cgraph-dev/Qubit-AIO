@@ -1,17 +1,26 @@
 # Qubit vs. Hermes — why it is not 1:1 (root causes)
 
 Audited 2026-09-25 against the **working reference** `69948c0057`
-(v2026.9.24-2096, v0.21.5+2053-class) and the Qubit rebrand of `d337b736`
-(v0.21.4). Machine data: `scripts/forensic_audit/` (Tier 0) plus the Tier-1 plan
-bundles in `/tmp/qubit-1to1-*/plans/`. **No milestone/verification is claimed.**
+(v2026.9.24-2096, v0.21.5+2053-class). The Qubit vendored runtime pin has since
+moved to that same commit by owner amendment (`docs/DECISIONS.md` #25,
+`QUBIT_OWNER_AMENDMENT_2026-09-25_PIN_AND_1TO1.md`): Qubit is now the
+deterministic rebrand of `69948c0057`, and the earlier `d337b736` (v0.21.4)
+rebase described below is superseded. Machine data:
+`scripts/forensic_audit/` (Tier 0) plus the Tier-1 plan bundles in
+`/tmp/qubit-1to1-*/plans/`. **No milestone/verification is claimed.**
 
 ## The model
 
 Qubit is **not hand-ported**. It is a mechanical transform plus an overlay:
 
 ```
-Qubit = rebrand(upstream @ d337b736 = v0.21.4)  +  Qubit overlay (voicebridge/, systemd/, config, frontend)
+Qubit = rebrand(upstream @ 69948c0057 = v0.21.5+2053) + Qubit overlay (voicebridge/, systemd/, config, frontend)
 ```
+
+The rebase from `d337b736` (v0.21.4) to `69948c0057` was executed deterministically
+(owner amendment 2026-09-25): the engine rebrands the exact pinned source, the
+result is 3-way merged with the current Qubit tree, and the overlay/fork patches
+are re-applied. Cause 1 below records the pre-rebase state that motivated it.
 
 The transform is `scripts/qubit_rebrand.py` (+ `qubit_debrand.py`,
 `identifier_rename.py`), an explicit ~60-token map. It is **deterministic and
@@ -20,14 +29,17 @@ changes — verified 2026-09-25).
 
 Therefore Qubit diverges from Hermes for exactly four reasons.
 
-## Cause 1 — VERSION MISMATCH (the dominant cause)
+## Cause 1 — VERSION MISMATCH (the dominant cause) — **addressed by the v0.21.5 rebase**
 
-The reference that works is **v0.21.5+2053**; Qubit rebranded **v0.21.4**.
-Delta ≈ **3,850 files** (≈1,785 added, 407 removed, 1,658 changed). Behaviours
-added after the rebrand simply do not exist in Qubit, e.g. routes
+The reference that works is **v0.21.5+2053**; Qubit originally rebranded
+**v0.21.4**. Delta ≈ **3,850 files** (≈1,785 added, 407 removed, 1,658 changed).
+Behaviours added after the original rebrand did not exist in Qubit, e.g. routes
 `GET /api/chat/workspaces`, `WS /api/display/ws`,
 `POST /api/dashboard/agent-plugins/activate`,
-`POST /api/local-models/download/{pause,resume}`.
+`POST /api/local-models/download/{pause,resume}`. The v0.21.5 rebase (owner
+amendment 2026-09-25) lands the deterministic rebrand of the exact
+`69948c0057` source; the residual gaps are tracked in the regenerated parity
+inventory and `docs/QubitVSupstream.md`.
 
 **Fix (mechanical, not a manual port):** rebase the deterministic rebrand onto
 the exact reference commit; re-apply the overlay and fork patches; 3-way merge.
@@ -91,7 +103,7 @@ surfaces, not safe to rename without an adapter.
 | B4-06 | MED | pinned plugin index renders `NousResearch`/`hermes-*` | `voicebridge/data/plugin_index_pinned.json` |
 | B4-07 | MED | `Qubit-cli` unknown toolset resolves 0 tools | `qubit_asgi.py:102-107` (only lowercase `qubit-cli` aliased) |
 | B3-R1 | MED | help epilogue drops the space (`qubitchat`) because it slices `len("hermes")`=6 for `"qubit "` | `voicebridge/qubit_runtime.py:75-84` |
-| B3-R2 | LOW | `qubit agent --version` reports `0.21.1` though content is `0.21.4` | `qubit_runtime/pyproject.toml:5` |
+| B3-R2 | LOW | `qubit agent --version` reports `0.21.1` though content is `0.21.4` — **fixed in the v0.21.5 rebase** (`qubit_runtime/pyproject.toml` → `0.21.5`) | `qubit_runtime/pyproject.toml:5` |
 | B3-R3 | LOW | `--ignore-user-config` help still names `~/.hermes/config.yaml` | `qubit_cli/_parser.py:166,264` |
 
 **Intentional overlay differences (not bugs, documented counterparts):**
@@ -134,10 +146,15 @@ upstream, 235 compat-only); GATED = 100 (38 of which match upstream).
 ## Frozen contracts
 
 Editing frozen contracts is forbidden without owner sign-off (`AGENTS.md`;
-`docs/DECISIONS.md`). A pin move to `69948c0057` would require an owner
-amendment per the upstream-sync policy, because the current pin is the stable
-v0.21.4 release and the target is a moving `main` HEAD. **Proposal only** — no
-frozen file was modified.
+`docs/DECISIONS.md`). The pin move to `69948c0057` was authorized by the owner
+amendment of 2026-09-25 (`docs/DECISIONS.md` #25,
+`QUBIT_OWNER_AMENDMENT_2026-09-25_PIN_AND_1TO1.md`), which re-baselines the 1:1
+target to that commit while the archived frozen records are preserved,
+byte-for-byte. The machine-readable interface contract
+(`docs/differential/byte_manifest/hermes/HERMES_BYTE_MANIFEST.json`,
+`manifest.sha256`) has been regenerated at the new pin; the human-readable
+`docs/differential/INTERFACE.md` and `docs/archive/2026-09-21/` were **not**
+modified.
 
 ## Verification status
 

@@ -26,15 +26,16 @@
   "cli_families": 114,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
-  "source_inventory.parented_covered": 1081,
-  "source_inventory.parented_uncovered": 0,
+  "source_inventory.parented_covered": 1076,
+  "source_inventory.parented_uncovered": 5,
   "source_inventory.distinct_uncovered": 0,
-  "source_inventory.dispositioned": 121,
-  "source_inventory.dispositioned_implemented": 117,
+  "source_inventory.dispositioned": 122,
+  "source_inventory.dispositioned_implemented": 118,
   "source_inventory.dispositioned_gated": 4
  },
  "counts_by_status": {
-  "IMPLEMENTED": 712,
+  "IMPLEMENTED": 713,
+  "MISSING": 5,
   "OPERATOR_ONLY": 3,
   "SAFE_EQUIVALENT": 36
  },
@@ -94,8 +95,12 @@
   "gateway": 10,
   "ghost": 20,
   "git": 4,
+  "hermes_dashboard_plugin": 1,
   "hermes_gated": 30,
-  "hermes_plugin": 9,
+  "hermes_plugin": 10,
+  "hermes_plugin_api": 1,
+  "hermes_plugin_asset": 2,
+  "hermes_plugin_test": 1,
   "hermes_skill": 28,
   "hermes_tool": 73,
   "hermes_web_page": 21,
@@ -185,14 +190,14 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 751
+  "qubit-surface": 757
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
   "has-cli has-dashboard has-voice": 510,
   "has-dashboard": 65,
   "has-dashboard has-voice": 4,
-  "no-surface": 124
+  "no-surface": 130
  },
  "backend_flags": [],
  "provenance": {
@@ -206,17 +211,28 @@
   "items_total": 6775,
   "surface_items": 1818,
   "evidence_only": 4957,
-  "matched": 1818,
-  "unmatched": 0,
-  "unexplained_omissions": 0,
+  "matched": 1813,
+  "unmatched": 5,
+  "unexplained_omissions": 5,
   "unidentified": 0,
-  "by_category": {},
-  "omitted_ids": [],
+  "by_category": {
+   "hermes_dashboard_plugin": 1,
+   "hermes_plugin_api": 1,
+   "hermes_plugin_asset": 2,
+   "hermes_plugin_test": 1
+  },
+  "omitted_ids": [
+   "plugin-api:hermes-achievements",
+   "plugin-asset:hermes-achievements:index.js",
+   "plugin-asset:hermes-achievements:style.css",
+   "plugin-manifest:hermes-achievements",
+   "plugin-test:hermes-achievements:test_achievement_engine.py"
+  ],
   "unreproducible_evidence": 0,
   "error": "",
-  "covered": 1697,
-  "dispositioned": 121,
-  "dispositioned_implemented": 117,
+  "covered": 1691,
+  "dispositioned": 122,
+  "dispositioned_implemented": 118,
   "dispositioned_gated": 4,
   "dispositioned_ids": [
    "openclaw-ext:cua-computer",
@@ -234,6 +250,7 @@
    "plugin:cron_providers",
    "plugin:disk-cleanup",
    "plugin:google_meet",
+   "plugin:hermes-achievements",
    "plugin:image_gen",
    "plugin:observability",
    "plugin:security-guidance",
@@ -342,20 +359,27 @@
    "tool:yb_send_sticker"
   ],
   "dispositioned_by_category": {
-   "hermes_plugin": 9,
+   "hermes_plugin": 10,
    "hermes_skill": 28,
    "hermes_tool": 73,
    "openclaw_extension": 11
   },
   "parented_surfaces": 1081,
-  "parented_covered": 1081,
-  "parented_uncovered": 0,
+  "parented_covered": 1076,
+  "parented_uncovered": 5,
   "distinct_surfaces": 737,
   "distinct_covered": 737,
   "distinct_uncovered": 0,
   "distinct_by_category": {},
-  "parented_by_category": {},
-  "by_parent": {},
+  "parented_by_category": {
+   "hermes_dashboard_plugin": 1,
+   "hermes_plugin_api": 1,
+   "hermes_plugin_asset": 2,
+   "hermes_plugin_test": 1
+  },
+  "by_parent": {
+   "plugin:hermes-achievements": 5
+  },
   "covered_by_parent": {
    "OC-02": 5,
    "OC-16": 1,
@@ -546,7 +570,6 @@
    "memory_search": 23,
    "model": 221,
    "opencode_status": 7,
-   "plugin:hermes-achievements": 5,
    "plugin:kanban": 4,
    "proxy_providers": 39,
    "reports_list": 1,
@@ -555,7 +578,13 @@
    "webui_status": 46
   },
   "distinct_omitted_ids": [],
-  "parented_omitted_ids": []
+  "parented_omitted_ids": [
+   "plugin-api:hermes-achievements",
+   "plugin-asset:hermes-achievements:index.js",
+   "plugin-asset:hermes-achievements:style.css",
+   "plugin-manifest:hermes-achievements",
+   "plugin-test:hermes-achievements:test_achievement_engine.py"
+  ]
  },
  "rows": [
   {
@@ -9379,6 +9408,20 @@
    "needs": "none"
   },
   {
+   "id": "inv:plugin-manifest:hermes-achievements",
+   "area": "hermes_dashboard_plugin",
+   "capability": "hermes-achievements",
+   "upstream_ref": "plugins/hermes-achievements/dashboard/manifest.json",
+   "qubit_backend": "",
+   "cli": "",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Parented surface of 'plugin:hermes-achievements' (parent status=absent); the parent capability is missing or not IMPLEMENTED, so this surface stays open (not a distinct capability).",
+   "needs": "owner"
+  },
+  {
    "id": "inv:plugin:context_engine",
    "area": "hermes_plugin",
    "capability": "context_engine",
@@ -9425,6 +9468,20 @@
    "area": "hermes_plugin",
    "capability": "google_meet",
    "upstream_ref": "plugins/google_meet",
+   "qubit_backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+   "cli": "",
+   "dashboard": "",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+   "note": "vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.",
+   "needs": "none"
+  },
+  {
+   "id": "inv:plugin:hermes-achievements",
+   "area": "hermes_plugin",
+   "capability": "hermes-achievements",
+   "upstream_ref": "plugins/hermes-achievements",
    "qubit_backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
    "cli": "",
    "dashboard": "",
@@ -9503,6 +9560,62 @@
    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
    "note": "vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.",
    "needs": "none"
+  },
+  {
+   "id": "inv:plugin-api:hermes-achievements",
+   "area": "hermes_plugin_api",
+   "capability": "hermes-achievements",
+   "upstream_ref": "plugins/hermes-achievements/dashboard/plugin_api.py",
+   "qubit_backend": "",
+   "cli": "",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Parented surface of 'plugin:hermes-achievements' (parent status=absent); the parent capability is missing or not IMPLEMENTED, so this surface stays open (not a distinct capability).",
+   "needs": "owner"
+  },
+  {
+   "id": "inv:plugin-asset:hermes-achievements:index.js",
+   "area": "hermes_plugin_asset",
+   "capability": "index.js",
+   "upstream_ref": "plugins/hermes-achievements/dashboard/dist/index.js",
+   "qubit_backend": "",
+   "cli": "",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Parented surface of 'plugin:hermes-achievements' (parent status=absent); the parent capability is missing or not IMPLEMENTED, so this surface stays open (not a distinct capability).",
+   "needs": "owner"
+  },
+  {
+   "id": "inv:plugin-asset:hermes-achievements:style.css",
+   "area": "hermes_plugin_asset",
+   "capability": "style.css",
+   "upstream_ref": "plugins/hermes-achievements/dashboard/dist/style.css",
+   "qubit_backend": "",
+   "cli": "",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Parented surface of 'plugin:hermes-achievements' (parent status=absent); the parent capability is missing or not IMPLEMENTED, so this surface stays open (not a distinct capability).",
+   "needs": "owner"
+  },
+  {
+   "id": "inv:plugin-test:hermes-achievements:test_achievement_engine.py",
+   "area": "hermes_plugin_test",
+   "capability": "test_achievement_engine.py",
+   "upstream_ref": "plugins/hermes-achievements/tests/test_achievement_engine.py",
+   "qubit_backend": "",
+   "cli": "",
+   "dashboard": "",
+   "voice": "",
+   "status": "MISSING",
+   "proving_test": "",
+   "note": "Parented surface of 'plugin:hermes-achievements' (parent status=absent); the parent capability is missing or not IMPLEMENTED, so this surface stays open (not a distinct capability).",
+   "needs": "owner"
   },
   {
    "id": "inv:skill:optional-skills/autonomous-ai-agents",

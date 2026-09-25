@@ -32,8 +32,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-PIN = "d337b736aa1e8ebecfab043842d13e4a2d2f48a3"
-UPSTREAM_TAG = "v0.21.4"
+PIN = "69948c005791d4d0e51670ca015238c2c7663749"
+UPSTREAM_TAG = "v0.21.5"
 UPSTREAM_REPO = "https://github.com/NousResearch/hermes-agent"
 UPSTREAM_LICENSE = "MIT License, Copyright (c) 2025 Nous Research"
 OPENCLAW_PIN = "da03996ab7203fe6b9b4d8edb2b54726e4394c9c"
