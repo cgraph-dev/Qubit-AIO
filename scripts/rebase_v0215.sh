@@ -51,7 +51,9 @@ NEW_MODULES=(qubit_state_health qubit_yaml)
 CHECK_ONLY=0
 
 usage() {
-  sed -n '1,40p' "$0" | sed 's/^# \{0,1\}//'
+  # Print the leading comment block only (skip the shebang, stop at the first
+  # non-comment line); stripping one "#" and an optional following space.
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
 }
 
 for arg in "$@"; do

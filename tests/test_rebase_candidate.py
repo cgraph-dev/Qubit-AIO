@@ -97,6 +97,17 @@ def _run(root: Path, flag: str, extra=None, timeout=1800):
     )
 
 
+def test_help_starts_with_usage():
+    res = subprocess.run(
+        ["bash", str(SCRIPT), "--help"], cwd=str(REPO),
+        capture_output=True, text=True, timeout=60,
+    )
+    assert res.returncode == 0, res.stderr
+    first = res.stdout.splitlines()[0]
+    assert not first.startswith("!"), f"--help leaked the shebang: {first!r}"
+    assert "rebase_v0215.sh" in first, first
+
+
 @pytest.fixture(scope="module")
 def candidate(tmp_path_factory):
     if not SCRIPT.is_file():
@@ -236,6 +247,22 @@ def test_refuses_candidate_root_inside_live_tree(tmp_path):
     assert res.returncode != 0
     assert "inside the live product tree" in res.stderr, res.stderr
     assert not probe.exists(), "guard created a directory inside the live tree"
+
+
+def test_refuses_non_tmp_candidate_root(tmp_path):
+    """Finding 2: a candidate root outside /tmp is refused (no writes)."""
+    home = os.environ.get("HOME")
+    if not home:
+        pytest.skip("HOME unset; cannot build a non-tmp probe path")
+    home_real = str(Path(home).resolve())
+    if home_real.startswith(("/tmp", "/var/tmp")):
+        pytest.skip(f"HOME is under a tmp dir ({home_real}); no non-tmp probe")
+    probe = Path(home) / ".rebase-non-tmp-probe"
+    res = _run(probe, "--check",
+               extra={"QUBIT_DELTA_OUT": str(tmp_path / "delta.json")})
+    assert res.returncode != 0
+    assert "must live under /tmp" in res.stderr, res.stderr
+    assert not probe.exists(), "guard created a non-tmp candidate root"
 
 
 def test_candidate_never_written_to_live_tree():
