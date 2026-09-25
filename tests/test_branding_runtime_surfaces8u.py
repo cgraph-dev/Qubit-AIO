@@ -72,6 +72,8 @@ def _source_surfaces() -> dict[str, list[Path]]:
         "desktop i18n": i18n,
         "desktop electron": electron,
         "desktop package.json": [DESKTOP / "package.json"],
+        "desktop electron-builder config":
+            [DESKTOP / "electron-builder.config.cjs"],
         "bootstrap-installer package.json":
             [REPO / "qubit_runtime" / "apps" / "bootstrap-installer"
              / "package.json"],
@@ -123,13 +125,24 @@ def test_desktop_shell_strings_are_qubit_branded():
 
 
 def test_desktop_package_metadata_and_permissions_are_qubit_branded():
-    text = (DESKTOP / "package.json").read_text(encoding="utf-8")
-    assert '"author": "Qubit Labs"' in text
-    assert '"title": "Install Qubit"' in text
-    assert '"synopsis": "Native desktop shell for Qubit Agent."' in text
-    assert '"Hermes uses' not in text and '"Hermes needs' not in text
-    assert '"Qubit uses audio capture' in text
-    assert '"Qubit accesses your music library' in text
+    """Desktop packaging identity is Qubit.
+
+    In v0.21.5 the electron-builder block moved out of ``package.json`` into
+    ``electron-builder.config.cjs`` and the name-shaped values moved into
+    ``product-identity.cjs``; the branding contract follows them.
+    """
+    pkg = (DESKTOP / "package.json").read_text(encoding="utf-8")
+    builder = (DESKTOP / "electron-builder.config.cjs").read_text(
+        encoding="utf-8")
+    identity = (DESKTOP / "product-identity.cjs").read_text(encoding="utf-8")
+    assert '"author": "Qubit Labs"' in pkg
+    assert "title: 'Install Qubit'" in builder
+    assert "Native desktop shell for Qubit Agent." in builder
+    assert "display: 'Qubit'" in identity
+    assert "uses audio capture" in builder
+    assert "accesses your music library" in builder
+    assert '"Hermes uses' not in pkg
+    assert '"Hermes needs' not in pkg
 
 
 def test_about_panel_copyright_attribution_updated():

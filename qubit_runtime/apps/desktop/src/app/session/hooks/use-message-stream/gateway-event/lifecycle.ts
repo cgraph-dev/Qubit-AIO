@@ -50,7 +50,7 @@ export function handleLifecycleEvent(ctx: GatewayEventContext): boolean {
   }
 
   if (event.type === 'skin.changed') {
-    // A runtime skin switch (Hermes activating an authored skin, or `/skin`
+    // A runtime skin switch (Qubit activating an authored skin, or `/skin`
     // on another surface). Only the active source+profile's change repaints.
     if (fromActiveSource()) {
       ingestBackendSkin(payload as HermesSkin | undefined, { apply: true })

@@ -13,7 +13,7 @@ export const zhHant = defineLocale({
   intro: introZhHant,
   sessionImport: {
     title: '從其他應用程式繼續',
-    subtitle: '將對話匯入 Hermes，接著上次的進度繼續。',
+    subtitle: '將對話匯入 Qubit，接著上次的進度繼續。',
     action: '匯入工作階段',
     readingFrom: '讀取自',
     connectedComputer: '已連線的電腦',
@@ -31,17 +31,17 @@ export const zhHant = defineLocale({
     more: '載入更多工作階段',
     messages: '則訊息',
     choose: '繼續一段對話',
-    chooseHelp: '選擇工作階段，在匯入 Hermes 前查看歷程記錄。',
+    chooseHelp: '選擇工作階段，在匯入 Qubit 前查看歷程記錄。',
     previewLoading: '正在開啟預覽',
     previewError: '無法預覽',
     previewHelp: '來源檔案可能已移動或變更。請重新整理清單後重試。',
     previewLimit: '預覽已縮短，方便閱讀。匯入時會複製完整對話。',
     you: '你',
-    snapshot: '此對話已匯入 Hermes。開啟現有副本即可繼續。',
+    snapshot: '此對話已匯入 Qubit。開啟現有副本即可繼續。',
     copyNotice: '複製對話文字，不變更來源檔案。不包含工具輸出和推理內容。',
     importing: '正在匯入…',
-    open: '在 Hermes 中開啟',
-    continue: '在 Hermes 中繼續',
+    open: '在 Qubit 中開啟',
+    continue: '在 Qubit 中繼續',
     importError: '無法匯入此對話。'
   },
   common: {
@@ -108,19 +108,19 @@ export const zhHant = defineLocale({
   },
 
   boot: {
-    ready: 'Hermes Desktop 已就緒',
+    ready: 'Qubit Desktop 已就緒',
     desktopBootFailedWithMessage: message => `桌面啟動失敗：${message}`,
     steps: {
       connectingGateway: '正在連線桌面閘道',
-      loadingSettings: '正在載入 Hermes 設定',
+      loadingSettings: '正在載入 Qubit 設定',
       loadingSessions: '正在載入最近工作階段',
-      retryingRemoteBackend: '正在重新連線遠端 Hermes 後端…',
+      retryingRemoteBackend: '正在重新連線遠端 Qubit 後端…',
       startingDesktopConnection: '正在啟動桌面連線',
-      startingHermesDesktop: '正在啟動 Hermes Desktop…'
+      startingHermesDesktop: '正在啟動 Qubit Desktop…'
     },
     errors: {
-      backgroundExited: 'Hermes 背景程序已結束。',
-      backgroundExitedDuringStartup: 'Hermes 背景程序在啟動期間結束。',
+      backgroundExited: 'Qubit 背景程序已結束。',
+      backgroundExitedDuringStartup: 'Qubit 背景程序在啟動期間結束。',
       backendStopped: '後端已停止',
       desktopBootFailed: '桌面啟動失敗',
       gatewayConnectionLost: '與閘道的連線已中斷',
@@ -130,7 +130,7 @@ export const zhHant = defineLocale({
       ipcBridgeUnavailable: '桌面 IPC 橋接器不可用。'
     },
     failure: {
-      title: 'Hermes 無法啟動',
+      title: 'Qubit 無法啟動',
       description: '背景閘道未啟動。請嘗試下面的復原步驟。這裡的操作不會刪除您的聊天或設定。',
       remoteTitle: '需要重新登入遠端閘道',
       remoteDescription: '您的遠端閘道工作階段已過期。請重新登入以重新連線。這裡的操作不會刪除您的聊天或設定。',
@@ -145,10 +145,10 @@ export const zhHant = defineLocale({
         `先登出已儲存的遠端瀏覽器工作階段，然後開啟${signInLabel}。使用本機閘道可切換至內建後端。`,
       signOutAndSignIn: '登出並重新登入',
       remoteFailureHint: '在「閘道設定」中檢查閘道 URL 與登入，或切換至本機閘道。',
-      cloudDownTitle: 'Nous Cloud 代理已停機',
+      cloudDownTitle: 'Qubit Cloud 代理已停機',
       cloudDownDescription:
-        '此閘道連線的 Nous 託管雲端代理正在回傳伺服器錯誤。無法在此處重新啟動——請檢查其狀態、切換至本機閘道，或取得支援。',
-      cloudDownHint: '使用下方按鈕開啟 Nous Portal（檢視執行個體狀態與操作）或加入 Discord 取得支援。',
+        '此閘道連線的 Qubit 託管雲端代理正在回傳伺服器錯誤。無法在此處重新啟動——請檢查其狀態、切換至本機閘道，或取得支援。',
+      cloudDownHint: '使用下方按鈕開啟 Qubit（檢視執行個體狀態與操作）或加入 Discord 取得支援。',
       cloudDownCheckPortal: '查看 Portal 狀態',
       cloudDownDiscord: '在 Discord 取得協助',
       hideRecentLogs: '隱藏最近記錄',
@@ -166,7 +166,7 @@ export const zhHant = defineLocale({
 
   notifications: {
     sharedProfileWarning:
-      '另一個 Hermes 安裝實例正在使用此設定檔。兩個實例共用此設定檔的設定和資料，因此變更可能發生衝突。你可以繼續使用，也可以在變更前關閉另一個實例。',
+      '另一個 Qubit 安裝實例正在使用此設定檔。兩個實例共用此設定檔的設定和資料，因此變更可能發生衝突。你可以繼續使用，也可以在變更前關閉另一個實例。',
     region: '通知',
     hide: '隱藏',
     show: '顯示',
@@ -177,9 +177,9 @@ export const zhHant = defineLocale({
     copyDetail: '複製詳情',
     copyDetailFailed: '無法複製通知詳情',
     backendOutOfDateTitle: '後端版本過舊',
-    backendOutOfDateMessage: '您的 Hermes 後端早於目前的桌面版本，可能無法正常運作。請更新以保持一致。',
+    backendOutOfDateMessage: '您的 Qubit 後端早於目前的桌面版本，可能無法正常運作。請更新以保持一致。',
     installMethodUnsupportedTitle: '不受支援的安裝方式',
-    updateHermes: '更新 Hermes',
+    updateHermes: '更新 Qubit',
     updateReadyTitle: '有可用更新',
     updateReadyMessage: count => `有 ${count} 項新變更可用。`,
     updateReadyMessageUnknown: '有新更新可用。',
@@ -200,7 +200,7 @@ export const zhHant = defineLocale({
       elevenLabsRejectedKey: 'ElevenLabs 拒絕了該 API 金鑰 (401)。',
       diskFull: '磁碟已滿 — 請騰出一些空間後再試。',
       gatewayAuthFailed: '閘道認證失敗 — 請檢查你的 API_SERVER_KEY。',
-      methodNotAllowed: '桌面後端拒絕了該請求 (405 Method Not Allowed)。請嘗試重新啟動 Hermes Desktop。',
+      methodNotAllowed: '桌面後端拒絕了該請求 (405 Method Not Allowed)。請嘗試重新啟動 Qubit Desktop。',
       microphonePermission: '麥克風權限已被拒絕。',
       openaiRejectedApiKey: 'OpenAI 拒絕了該 API 金鑰。',
       openaiTtsNeedsKey: 'OpenAI TTS 需要 VOICE_TOOLS_OPENAI_KEY 或 OPENAI_API_KEY。',
@@ -233,8 +233,8 @@ export const zhHant = defineLocale({
       rejectAction: '拒絕',
       inputTitle: '需要輸入',
       inputTitleNamed: session => `需要輸入 — ${session}`,
-      inputBody: 'Hermes 正在等待你的回應。',
-      turnDoneTitle: 'Hermes 已完成',
+      inputBody: 'Qubit 正在等待你的回應。',
+      turnDoneTitle: 'Qubit 已完成',
       turnDoneBody: '',
       turnErrorTitle: '本輪失敗',
       backgroundDoneTitle: '背景工作已完成',
@@ -248,7 +248,7 @@ export const zhHant = defineLocale({
   },
 
   billingBlock: {
-    titleNous: 'Nous 額度已用盡',
+    titleNous: 'Qubit 額度已用盡',
     titleProvider: provider => `額度已用盡 — ${provider}`,
     fallbackMessage: '您的帳戶額度已用盡。請儲值以繼續使用。',
     openBilling: '開啟帳單',
@@ -257,9 +257,9 @@ export const zhHant = defineLocale({
   },
 
   sendDiagnostics: {
-    title: '向 Nous 傳送診斷資訊',
+    title: '向 Qubit 傳送診斷資訊',
     privacyNotice:
-      '這會將偵錯套件上傳到 Nous 內部儲存空間（並非公開貼上板）。內容包括系統資訊（作業系統、版本、服務商、已設定的 API 金鑰種類 — 絕不包含金鑰本身）以及完整的 agent、gateway 與桌面端日誌（每個最多 512 KB，很可能包含對話內容、工具輸出與檔案路徑）。上傳前會先遮罩機密資訊。僅 Nous 員工與獲准的 Discord 版主可檢視，14 天後自動刪除。',
+      '這會將偵錯套件上傳到 Qubit 內部儲存空間（並非公開貼上板）。內容包括系統資訊（作業系統、版本、服務商、已設定的 API 金鑰種類 — 絕不包含金鑰本身）以及完整的 agent、gateway 與桌面端日誌（每個最多 512 KB，很可能包含對話內容、工具輸出與檔案路徑）。上傳前會先遮罩機密資訊。僅 Qubit 員工與獲准的 Discord 版主可檢視，14 天後自動刪除。',
     upload: '上傳',
     uploading: '上傳中…',
     cancel: '取消',
@@ -274,7 +274,7 @@ export const zhHant = defineLocale({
     handoffLead: '在以下位置繼續討論:',
     links: {
       github: 'GitHub Issues',
-      portal: 'Nous Portal 支援',
+      portal: 'Qubit 支援',
       discord: 'Discord'
     }
   },
@@ -360,7 +360,7 @@ export const zhHant = defineLocale({
     plugins: {
       openFolder: '開啟桌面外掛資料夾',
       installModal: {
-        installUncertain: 'Hermes 已停止等待安裝結果，但外掛可能仍在安裝中。請關閉此視窗，重新掃描外掛清單後再嘗試安裝。',
+        installUncertain: 'Qubit 已停止等待安裝結果，但外掛可能仍在安裝中。請關閉此視窗，重新掃描外掛清單後再嘗試安裝。',
         installFromGit: '從 Git 安裝',
         reviewRepository: '檢查儲存庫',
         repoPlaceholder: 'https://github.com/owner/repo',
@@ -374,7 +374,7 @@ export const zhHant = defineLocale({
     exportConfig: '匯出設定',
     importConfig: '匯入設定',
     resetToDefaults: '恢復預設值',
-    resetConfirm: '要將所有設定恢復為 Hermes 預設值嗎？',
+    resetConfirm: '要將所有設定恢復為 Qubit 預設值嗎？',
     exportFailed: '匯出失敗',
     resetFailed: '重設失敗',
     nav: {
@@ -441,7 +441,7 @@ export const zhHant = defineLocale({
       deleteAction: '移除已儲存項目',
       otpField: '驗證器金鑰',
       otpPlaceholder: 'Base32 金鑰或 otpauth:// 連結',
-      otpHint: '啟用兩步驟驗證時網站顯示的「設定金鑰」。儲存後 Hermes 會自動產生驗證碼。',
+      otpHint: '啟用兩步驟驗證時網站顯示的「設定金鑰」。儲存後 Qubit 會自動產生驗證碼。',
       twoFactorBadge: '自動 2FA',
       deleteTitle: '刪除此項目？',
       deleteDescription: label => `「${label}」將從加密保險庫中移除。此操作無法復原。`,
@@ -451,10 +451,10 @@ export const zhHant = defineLocale({
         blurb:
           '已安裝的密碼管理器會被自動偵測。代理第一次需要其中的登入資訊時會請你解鎖（每個工作階段一次）；記憶體中只保留工作階段權杖，代理永遠看不到你的主密碼或任何登入資訊。',
         toggleFailed: '無法更新密碼管理器',
-        notInstalled: name => `未偵測到。安裝 ${name} 命令列工具並登入後，Hermes 會自動偵測。`,
-        disabledDesc: '已偵測到，但已為 Hermes 關閉。',
+        notInstalled: name => `未偵測到。安裝 ${name} 命令列工具並登入後，Qubit 會自動偵測。`,
+        disabledDesc: '已偵測到，但已為 Qubit 關閉。',
         lockedDesc: '已偵測到。代理需要登入資訊時會請你解鎖，也可立即解鎖。',
-        unlockedDesc: '本工作階段已解鎖。閒置 30 分鐘或關閉 Hermes 後會自動鎖定。',
+        unlockedDesc: '本工作階段已解鎖。閒置 30 分鐘或關閉 Qubit 後會自動鎖定。',
         statusLocked: '已鎖定',
         statusNotDetected: '未偵測到',
         statusOff: '已關閉',
@@ -473,7 +473,7 @@ export const zhHant = defineLocale({
       intro: '原生桌面通知，與應用程式內提示不同。設定會依裝置保存，每台電腦各自獨立。',
       enableAll: '啟用通知',
       enableAllDesc: '關閉後靜音下方所有通知。',
-      focusedHint: '完成提醒僅在 Hermes 位於背景時觸發。',
+      focusedHint: '完成提醒僅在 Qubit 位於背景時觸發。',
       kinds: {
         approval: {
           label: '需要核准',
@@ -481,11 +481,11 @@ export const zhHant = defineLocale({
         },
         input: {
           label: '需要輸入',
-          description: 'Hermes 提出了問題，或需要密碼或密鑰。'
+          description: 'Qubit 提出了問題，或需要密碼或密鑰。'
         },
         turnDone: {
           label: '回覆就緒',
-          description: 'Hermes 在背景時完成了一輪對話。'
+          description: 'Qubit 在背景時完成了一輪對話。'
         },
         turnError: {
           label: '本輪失敗',
@@ -501,11 +501,11 @@ export const zhHant = defineLocale({
         },
         plugin: {
           label: '外掛通知',
-          description: 'Hermes 在背景時，桌面外掛傳送了通知。'
+          description: 'Qubit 在背景時，桌面外掛傳送了通知。'
         }
       },
       test: '傳送測試通知',
-      testTitle: 'Hermes',
+      testTitle: 'Qubit',
       testBody: '通知運作正常。',
       testSent: '測試已傳送。若沒有出現，請檢查系統通知權限與專注模式／勿擾模式。',
       testUnsupported: '此系統不支援原生通知。',
@@ -524,7 +524,7 @@ export const zhHant = defineLocale({
       advanced: '進階'
     },
     searchPlaceholder: {
-      about: '關於 Hermes Desktop',
+      about: '關於 Qubit Desktop',
       config: '搜尋設定…',
       gateway: '閘道連線…',
       keys: '搜尋 API 金鑰…',
@@ -540,7 +540,7 @@ export const zhHant = defineLocale({
       title: '外觀',
       intro: '這些是僅限桌面端的顯示偏好。模式控制亮度；主題控制強調色與聊天介面樣式。',
       colorMode: '色彩模式',
-      colorModeDesc: '選擇固定模式，或讓 Hermes 跟隨系統設定。',
+      colorModeDesc: '選擇固定模式，或讓 Qubit 跟隨系統設定。',
       toolViewTitle: '工具呼叫顯示',
       toolViewDesc: '產品模式會隱藏原始工具 payload；技術模式會顯示完整輸入/輸出。',
       hideCodeDiffsTitle: '隱藏程式碼差異',
@@ -608,12 +608,12 @@ export const zhHant = defineLocale({
       introSplashTitle: '開場標識',
       introSplashDesc: '空白對話中顯示的字標和提示語。',
       reactionsTitle: '訊息回應',
-      reactionsDesc: 'iMessage 風格的表情回應 — 你可以對訊息做出回應，Hermes 也能回應你的訊息。',
+      reactionsDesc: 'iMessage 風格的表情回應 — 你可以對訊息做出回應，Qubit 也能回應你的訊息。',
       tipsTitle: '應用程式內提示',
-      tipsDesc: '偶爾顯示來自應用程式和 Hermes 的提示，每則提示只出現一次。開始使用滿30天後自動關閉，你可以重新開啟。',
+      tipsDesc: '偶爾顯示來自應用程式和 Qubit 的提示，每則提示只出現一次。開始使用滿30天後自動關閉，你可以重新開啟。',
       tipsReset: (count: number) => `再次顯示 ${count} 則提示`,
       toursTitle: '導覽',
-      toursDesc: '讓 Hermes 逐步標示每個位置，帶你認識應用程式。開始使用滿30天後自動關閉，你可以重新開啟。',
+      toursDesc: '讓 Qubit 逐步標示每個位置，帶你認識應用程式。開始使用滿30天後自動關閉，你可以重新開啟。',
       composerPopoutTitle: '懸浮輸入框',
       composerPopoutDesc: '允許將輸入框拖出底部停靠區。關閉後，輸入框會鎖定在底部。',
       vibeHeartsTitle: '心情愛心',
@@ -647,8 +647,8 @@ export const zhHant = defineLocale({
       pet: {
         title: '寵物',
         intro:
-          '領養一隻懸浮在應用上的 petdex 動畫寵物，它會根據 Hermes 的狀態做出反應——工具執行時奔跑、成功時歡呼、出錯時沮喪。',
-        restartHint: '寵物功能需要重新啟動——目前執行的應用在此功能加入前啟動。請結束並重新開啟 Hermes，然後回到此處。',
+          '領養一隻懸浮在應用上的 petdex 動畫寵物，它會根據 Qubit 的狀態做出反應——工具執行時奔跑、成功時歡呼、出錯時沮喪。',
+        restartHint: '寵物功能需要重新啟動——目前執行的應用在此功能加入前啟動。請結束並重新開啟 Qubit，然後回到此處。',
         scaleTitle: '大小',
         scaleDesc: '調整懸浮寵物的大小，所有介面即時生效。',
         roamTitle: '漫遊',
@@ -873,10 +873,10 @@ export const zhHant = defineLocale({
         repoScanRoots: '要掃描的資料夾。留空時掃描主目錄。',
         repoScanExcludePaths: '探索程式碼儲存庫時略過這些資料夾及其子目錄。'
       },
-      timezone: 'Hermes 需要本機時間上下文時使用。留空則使用系統時區。',
+      timezone: 'Qubit 需要本機時間上下文時使用。留空則使用系統時區。',
       agent: {
         imageInputMode: '控制圖片附件如何傳送給模型。',
-        maxTurns: 'Hermes 停止一次執行前的工具呼叫輪次上限。'
+        maxTurns: 'Qubit 停止一次執行前的工具呼叫輪次上限。'
       },
       terminal: {
         cwd: '工具與終端機操作的預設專案資料夾。',
@@ -890,9 +890,9 @@ export const zhHant = defineLocale({
       codeExecution: {
         mode: '程式碼執行被限制在目前專案中的嚴格程度。'
       },
-      fileReadMaxChars: 'Hermes 單次檔案讀取可讀取的最大字元數。',
+      fileReadMaxChars: 'Qubit 單次檔案讀取可讀取的最大字元數。',
       approvals: {
-        mode: 'Hermes 如何處理需要明確批准的指令。',
+        mode: 'Qubit 如何處理需要明確批准的指令。',
         timeout: '批准提示逾時前等待的時間。'
       },
       security: {
@@ -919,15 +919,15 @@ export const zhHant = defineLocale({
       },
       browser: {
         useRealProfile:
-          '本機瀏覽會使用你的真實登入狀態。Hermes 會將預設瀏覽器的設定（Cookie、登入資訊與偏好）複製成受管理的快照，再以內建的 Chromium 驅動它——不會直接開啟你正在使用的設定檔，且每次執行都會從目前的設定檔重新整理副本。設定雲端瀏覽器後端時，也允許代理視需要開啟本機真實設定檔工作階段。僅支援 Chromium 系瀏覽器（Chrome、Edge、Brave、Brave Origin、Chromium）；若預設瀏覽器並非 Chromium 系，會顯示明確錯誤。預設關閉。'
+          '本機瀏覽會使用你的真實登入狀態。Qubit 會將預設瀏覽器的設定（Cookie、登入資訊與偏好）複製成受管理的快照，再以內建的 Chromium 驅動它——不會直接開啟你正在使用的設定檔，且每次執行都會從目前的設定檔重新整理副本。設定雲端瀏覽器後端時，也允許代理視需要開啟本機真實設定檔工作階段。僅支援 Chromium 系瀏覽器（Chrome、Edge、Brave、Brave Origin、Chromium）；若預設瀏覽器並非 Chromium 系，會顯示明確錯誤。預設關閉。'
       },
       voice: {
         autoTts: '自動朗讀助手回覆。',
         voiceChatMode:
-          'chained：語音轉文字 → Hermes → 文字轉語音，使用下方的提供方。gpt-live：由全雙工 OpenAI 語音模型（gpt-live-1）負責聆聽與說話，並將每個實際請求交給 Hermes——由你選擇的任意模型使用完整工具集作答。需要 OpenAI API 金鑰；語音層每分鐘收費 $0.05。',
+          'chained：語音轉文字 → Qubit → 文字轉語音，使用下方的提供方。gpt-live：由全雙工 OpenAI 語音模型（gpt-live-1）負責聆聽與說話，並將每個實際請求交給 Qubit——由你選擇的任意模型使用完整工具集作答。需要 OpenAI API 金鑰；語音層每分鐘收費 $0.05。',
         gptLive: {
           voice: 'GPT-Live 模式使用的音色，可填入自訂音色 ID。',
-          instructions: '附加至即時語音人設的句子（語氣、語速、語言）。Hermes 會保留自己的系統提示詞。'
+          instructions: '附加至即時語音人設的句子（語氣、語速、語言）。Qubit 會保留自己的系統提示詞。'
         }
       },
       stt: {
@@ -953,13 +953,13 @@ export const zhHant = defineLocale({
       },
       updates: {
         nonInteractiveLocalChanges:
-          'Hermes 從應用程式內更新自身時，保留本機原始碼變更（stash）或丟棄（discard）。終端機更新一律會詢問。'
+          'Qubit 從應用程式內更新自身時，保留本機原始碼變更（stash）或丟棄（discard）。終端機更新一律會詢問。'
       }
     }),
     uninstallSection: {
       dangerZone: '危險操作',
       checkingInstalled: '正在檢查已安裝內容…',
-      uninstallHermes: '解除安裝 Hermes',
+      uninstallHermes: '解除安裝 Qubit',
       chooseHowMuch: '選擇要移除的內容。應用程式會關閉以完成作業；隨時重新開啟安裝程式即可返回。',
       confirmUninstall: '確認解除安裝',
       confirmBody: what => `這將移除${what}。此操作無法復原。`,
@@ -970,18 +970,18 @@ export const zhHant = defineLocale({
       options: {
         gui: {
           title: '僅解除安裝聊天 GUI',
-          description: '移除此桌面應用程式。Hermes 代理、你的設定和聊天記錄都會保留。',
+          description: '移除此桌面應用程式。Qubit 代理、你的設定和聊天記錄都會保留。',
           consequence: '桌面聊天 GUI（此應用程式及其資料）'
         },
         lite: {
           title: '解除安裝 GUI 與代理，保留資料',
-          description: '移除應用程式和 Hermes 代理，但保留設定、聊天記錄和機密，以便日後重新安裝。',
-          consequence: '聊天 GUI 和 Hermes 代理（設定、聊天記錄和機密會保留）'
+          description: '移除應用程式和 Qubit 代理，但保留設定、聊天記錄和機密，以便日後重新安裝。',
+          consequence: '聊天 GUI 和 Qubit 代理（設定、聊天記錄和機密會保留）'
         },
         full: {
           title: '解除安裝全部',
           description: '移除應用程式、代理和所有使用者資料——設定、聊天記錄、排程工作、機密和日誌。',
-          consequence: '全部內容——聊天 GUI、Hermes 代理，以及你的所有設定、聊天記錄、機密和日誌'
+          consequence: '全部內容——聊天 GUI、Qubit 代理，以及你的所有設定、聊天記錄、機密和日誌'
         }
       }
     },
@@ -1043,7 +1043,7 @@ export const zhHant = defineLocale({
     config: {
       minimizeToTrayTitle: '最小化至系統匣',
       minimizeToTrayDesc:
-        '最小化視窗或關閉主視窗時，將其隱藏至系統匣（macOS 上為選單列），讓 Hermes 繼續執行。透過系統匣選單中的「結束 Hermes」或 Cmd+Q 結束。預設關閉，僅適用於此裝置。',
+        '最小化視窗或關閉主視窗時，將其隱藏至系統匣（macOS 上為選單列），讓 Qubit 繼續執行。透過系統匣選單中的「結束 Qubit」或 Cmd+Q 結束。預設關閉，僅適用於此裝置。',
       minimizeToTrayUnavailable: '系統匣無法使用。視窗將正常最小化和關閉。關閉此選項後重新開啟即可重試。',
       none: '無',
       noneParen: '(無)',
@@ -1053,7 +1053,7 @@ export const zhHant = defineLocale({
       searchPlaceholder: '搜尋…',
       noResults: '找不到結果',
       systemDefault: '系統預設',
-      loading: '正在載入 Hermes 設定...',
+      loading: '正在載入 Qubit 設定...',
       emptyTitle: '無可設定項目',
       emptyDesc: '此區段沒有可調整的設定。',
       failedLoad: '設定載入失敗',
@@ -1071,24 +1071,24 @@ export const zhHant = defineLocale({
       title: '輕按叫出 HUD',
       description:
         '在 Mac 上按下並放開 ⌘ + Option，在 Windows/Linux 上按下並放開 Ctrl + Alt，即可從任何應用程式將 HUD 帶到前景。預設關閉，僅適用於此裝置。',
-      permission: '請在系統設定 → 隱私權與安全性 → 輸入監控中允許 Hermes，然後重試。此手勢不會記錄按鍵或擷取畫面。',
-      unavailable: 'HUD 手勢輔助程式無法啟動或意外停止。請重試或重新啟動 Hermes。Hermes 內原有的 HUD 快速鍵仍可使用。',
-      missingHelper: '此 Hermes 安裝缺少 HUD 手勢輔助程式。請更新或重新安裝 Hermes，然後重試。',
+      permission: '請在系統設定 → 隱私權與安全性 → 輸入監控中允許 Qubit，然後重試。此手勢不會記錄按鍵或擷取畫面。',
+      unavailable: 'HUD 手勢輔助程式無法啟動或意外停止。請重試或重新啟動 Qubit。Qubit 內原有的 HUD 快速鍵仍可使用。',
+      missingHelper: '此 Qubit 安裝缺少 HUD 手勢輔助程式。請更新或重新安裝 Qubit，然後重試。',
       unsupportedSession: '此桌面工作階段不支援全域修飾鍵輕按事件。Linux 需要 X11；不支援 Wayland。'
     },
     screenshot: {
       enabledTitle: '螢幕截圖快速鍵',
       enabledDesc:
-        '在任何應用程式中同時按下左右兩個 Command 鍵，即可擷取最前方的視窗並附加到目前的 Hermes 草稿。絕不會自動傳送。預設關閉，僅適用於這台 Mac。視窗可能包含敏感內容，請在傳送前檢查附件。',
+        '在任何應用程式中同時按下左右兩個 Command 鍵，即可擷取最前方的視窗並附加到目前的 Qubit 草稿。絕不會自動傳送。預設關閉，僅適用於這台 Mac。視窗可能包含敏感內容，請在傳送前檢查附件。',
       statusTitle: '螢幕截圖快速鍵狀態',
       checking: '正在檢查螢幕截圖快速鍵…',
       disabled: '螢幕截圖快速鍵已關閉。',
       starting: '正在啟動快速鍵偵測，尚未就緒。',
       ready: '快速鍵已就緒。截圖會附加到目前的草稿，不會傳送。',
       inputPermission:
-        '輸入監控權限可讓 Hermes 在其他應用程式使用中時偵測兩個 Command 鍵。請在系統設定 → 隱私權與安全性 → 輸入監控中允許 Hermes，然後返回此處重試。',
+        '輸入監控權限可讓 Qubit 在其他應用程式使用中時偵測兩個 Command 鍵。請在系統設定 → 隱私權與安全性 → 輸入監控中允許 Qubit，然後返回此處重試。',
       screenPermission:
-        '螢幕錄製權限可讓 Hermes 在你使用此快速鍵時擷取最前方的應用程式視窗。請在系統設定 → 隱私權與安全性 → 螢幕錄製中允許 Hermes，然後返回此處重試。如果 macOS 提示，請重新啟動 Hermes。',
+        '螢幕錄製權限可讓 Qubit 在你使用此快速鍵時擷取最前方的應用程式視窗。請在系統設定 → 隱私權與安全性 → 螢幕錄製中允許 Qubit，然後返回此處重試。如果 macOS 提示，請重新啟動 Qubit。',
       openSettings: '開啟系統設定',
       retry: '重試',
       unavailable: '螢幕截圖快速鍵無法使用。請重試或將其關閉。',
@@ -1101,7 +1101,7 @@ export const zhHant = defineLocale({
     },
     quickEntry: {
       enabledTitle: '快速輸入',
-      enabledDesc: '用全域快速鍵在任何地方喚出一個小輸入框，無需開啟 Hermes 即可送出提示。',
+      enabledDesc: '用全域快速鍵在任何地方喚出一個小輸入框，無需開啟 Qubit 即可送出提示。',
       shortcutTitle: '快速輸入快速鍵',
       shortcutDesc: '至少需要一個修飾鍵，例如 CommandOrControl+Shift+Space。',
       active: '快速鍵已生效。',
@@ -1135,14 +1135,14 @@ export const zhHant = defineLocale({
       title: '閘道連線',
       envOverride: '環境變數覆寫',
       intro:
-        'Hermes Desktop 預設會啟動自己的本機閘道。如果您希望此應用程式控制另一台機器或可信代理後面已執行的 Hermes 後端，請使用遠端閘道。閘道連線屬於本機層級設定；設定檔是從已連線的閘道中探索出來的。',
+        'Qubit Desktop 預設會啟動自己的本機閘道。如果您希望此應用程式控制另一台機器或可信代理後面已執行的 Qubit 後端，請使用遠端閘道。閘道連線屬於本機層級設定；設定檔是從已連線的閘道中探索出來的。',
       envOverrideTitle: '環境變數正在控制此桌面工作階段。',
       envOverrideDesc: '取消設定 HERMES_DESKTOP_REMOTE_URL 和 HERMES_DESKTOP_REMOTE_TOKEN 後才會使用下方儲存的設定。',
       localTitle: '本機閘道',
-      localDesc: '在 localhost 啟動私有 Hermes 後端。這是預設方式，可離線使用。',
+      localDesc: '在 localhost 啟動私有 Qubit 後端。這是預設方式，可離線使用。',
       remoteTitle: '遠端閘道',
       remoteDesc:
-        '將此桌面殼層連線至遠端 Hermes 後端。託管閘道使用 OAuth 或帳號密碼；自託管閘道也可使用工作階段 Token。',
+        '將此桌面殼層連線至遠端 Qubit 後端。託管閘道使用 OAuth 或帳號密碼；自託管閘道也可使用工作階段 Token。',
       remoteUrlTitle: '遠端 URL',
       remoteUrlDesc: '遠端儀表板後端的基礎 URL。支援路徑前綴，例如 /hermes。',
       probing: '正在檢查此閘道的驗證方式…',
@@ -1186,9 +1186,9 @@ export const zhHant = defineLocale({
       enterUrlFirst: '請先輸入遠端 URL。',
       restartingTitle: '閘道連線正在重新啟動',
       savedTitle: '閘道設定已儲存',
-      restartingMessage: 'Hermes Desktop 將使用已儲存的設定重新連線。',
+      restartingMessage: 'Qubit Desktop 將使用已儲存的設定重新連線。',
       savedMessage: '已儲存，下次重新啟動後生效。',
-      connectedTo: (baseUrl, version) => `已連線至 ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `已連線至 ${baseUrl}${version ? ` · Qubit ${version}` : ''}`,
       reachableTitle: '遠端閘道可連線',
       signedOutTitle: '已登出',
       signedOutMessage: '已清除遠端閘道工作階段。',
@@ -1200,7 +1200,7 @@ export const zhHant = defineLocale({
       saveFailed: '無法儲存閘道設定',
       sshTitle: '透過 SSH 連線',
       sshDesc:
-        'Hermes 會透過 SSH 在遠端啟動並以通道連線到本應用程式——無需自行啟動或公開任何服務。前提：已具備到該主機的金鑰 SSH 存取。',
+        'Qubit 會透過 SSH 在遠端啟動並以通道連線到本應用程式——無需自行啟動或公開任何服務。前提：已具備到該主機的金鑰 SSH 存取。',
       sshTrustHint: '首次提供的主機金鑰會被信任並固定；後續變更將被拒絕。',
       sshHostTitle: '主機',
       sshHostDesc: 'user@host，或 ~/.ssh/config 中的 Host 別名。',
@@ -1215,23 +1215,23 @@ export const zhHant = defineLocale({
       sshPortDesc: '留空 = 22 或 ~/.ssh/config 中的連接埠。',
       sshKeyTitle: '金鑰檔案',
       sshKeyDesc: '私密金鑰路徑。留空 = ssh-agent 或 ~/.ssh/config。',
-      sshHermesPathTitle: 'Hermes 路徑（選用）',
+      sshHermesPathTitle: 'Qubit 路徑（選用）',
       sshHermesPathDesc: '遠端 hermes 執行檔的完整路徑。留空 = 自動偵測。',
       sshHermesPathPlaceholder: '自動偵測',
       sshTestConnection: '測試 SSH',
       sshConnect: '連線',
       sshButtonsHint: '「儲存」會在下次啟動時生效，「連線」則立即重新連線。',
-      sshReachable: (host, platform) => `可連線：${host}（${platform}）——已找到 Hermes`,
+      sshReachable: (host, platform) => `可連線：${host}（${platform}）——已找到 Qubit`,
       sshIncompleteHost: '連線前請輸入 SSH 主機。',
       sshErrUnreachable: '無法透過 SSH 連線到該主機。請檢查主機、連接埠和網路。',
       sshErrAuth:
-        'SSH 驗證失敗。請將金鑰載入 ssh-agent（ssh-add），或在 ~/.ssh/config 中設定 IdentityFile——Hermes 以非互動方式執行 ssh。',
+        'SSH 驗證失敗。請將金鑰載入 ssh-agent（ssh-add），或在 ~/.ssh/config 中設定 IdentityFile——Qubit 以非互動方式執行 ssh。',
       sshErrHostKey: '自上次連線以來主機金鑰已變更。請確認這是預期的，然後執行 ssh-keygen -R <host> 並重新連線。',
       sshErrNotInstalled:
-        '遠端主機上未安裝 Hermes。請在遠端安裝（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）或設定 Hermes 路徑。',
-      sshErrPlatform: '不支援的遠端平台。Hermes Desktop 的 SSH 模式支援 Linux、macOS 和 Windows 遠端主機。',
+        '遠端主機上未安裝 Qubit。請在遠端安裝（curl -fsSL https://raw.githubusercontent.com/cgraph-dev/qubit-voicebridge/main/scripts/install.sh | sh）或設定 Qubit 路徑。',
+      sshErrPlatform: '不支援的遠端平台。Qubit Desktop 的 SSH 模式支援 Linux、macOS 和 Windows 遠端主機。',
       sshErrTimeout: 'SSH 連線逾時。主機可能無法存取或處於睡眠狀態。',
-      sshErrUpdateRequired: '使用 Desktop SSH 連線前，請更新遠端主機上的 Hermes。',
+      sshErrUpdateRequired: '使用 Desktop SSH 連線前，請更新遠端主機上的 Qubit。',
       sshErrUnknown: 'SSH 連線失敗。'
     },
     keys: {
@@ -1273,7 +1273,7 @@ export const zhHant = defineLocale({
       authenticate: '驗證',
       noOutput: '尚無輸出。',
       deepLinkTitle: '新增 MCP 伺服器？',
-      deepLinkDescription: '一個連結要求將此 MCP 伺服器加入 Hermes。請檢查下方的完整設定——它來自該連結，而非 Hermes。',
+      deepLinkDescription: '一個連結要求將此 MCP 伺服器加入 Qubit。請檢查下方的完整設定——它來自該連結，而非 Qubit。',
       deepLinkStdioWarning: '此伺服器會使用下方所示指令在你的電腦上執行本機程序。僅在信任其來源時繼續。',
       deepLinkConfirm: '新增伺服器',
       deepLinkNameInvalid: '名稱須為 1-64 個字母、數字、點、連字號或底線。',
@@ -1348,7 +1348,7 @@ export const zhHant = defineLocale({
       runtimeReady: backend => `就緒 · ${backend}`,
       serverRunning: '執行中',
       runtimeInstalled: '已安裝 llama.cpp 執行環境',
-      runtimeInstalledDetail: (tag, backend) => `組建 ${tag}，${backend} 後端。Hermes 會為您啟動並管理伺服器。`,
+      runtimeInstalledDetail: (tag, backend) => `組建 ${tag}，${backend} 後端。Qubit 會為您啟動並管理伺服器。`,
       installTitle: '安裝本地執行環境',
       installDetail: '下載 llama.cpp 推理引擎（數百 MB）。下載的模型完全在本機執行——無需帳號，資料不會離開您的電腦。',
       installAction: '安裝執行環境',
@@ -1454,11 +1454,11 @@ export const zhHant = defineLocale({
       usageLabel: label => `${label}用量`,
       freeTier: {
         signIn: '登入',
-        title: '你正在使用 Nous 免費服務',
-        message: '登入 Nous 帳戶以解鎖更多模型和工具。',
+        title: '你正在使用 Qubit 免費服務',
+        message: '登入 Qubit 帳戶以解鎖更多模型和工具。',
         caption: '使用 nous/welcome，包含連接器。登入後會保留連接器，並增加需要帳戶的工具和其他所有模型。',
-        name: 'Nous · 免費服務',
-        footnote: '免費服務沒有餘額，無需付款。登入 Nous 帳戶後才會顯示支付與用量。',
+        name: 'Qubit · 免費服務',
+        footnote: '免費服務沒有餘額，無需付款。登入 Qubit 帳戶後才會顯示支付與用量。',
         plan: '免費服務',
         model: '模型',
         connectors: '連接器',
@@ -1557,8 +1557,8 @@ export const zhHant = defineLocale({
       state: {
         notice: {
           loggedOut: {
-            title: '連接你的 Nous 帳戶',
-            message: '登入你的 Nous 帳戶，即可在此查看餘額、方案和用量。',
+            title: '連接你的 Qubit 帳戶',
+            message: '登入你的 Qubit 帳戶，即可在此查看餘額、方案和用量。',
             action: '登入'
           },
           openPortal: '開啟入口網站 ↗',
@@ -1637,7 +1637,7 @@ export const zhHant = defineLocale({
         sessionRevoked: { title: '工作階段已登出', message: '你的工作階段已登出。請從「設定 → 閘道」重新登入。' },
         cliBillingDisabled: {
           title: '遠端支出已關閉',
-          message: '此帳戶的遠端支出已關閉，帳單管理員可在入口網站的 Hermes Agent 頁面開啟。'
+          message: '此帳戶的遠端支出已關閉，帳單管理員可在入口網站的 Qubit Agent 頁面開啟。'
         },
         roleRequired: {
           title: '需要管理員權限',
@@ -1675,7 +1675,7 @@ export const zhHant = defineLocale({
     providers: {
       connectAccount: '連結帳號',
       haveApiKey: '改用 API 金鑰？',
-      intro: '使用訂閱登入，無需複製 API 金鑰。Hermes 會在應用程式中為您完成瀏覽器登入。',
+      intro: '使用訂閱登入，無需複製 API 金鑰。Qubit 會在應用程式中為您完成瀏覽器登入。',
       connected: '已連線',
       collapse: '收合',
       connectAnother: '連結其他提供方',
@@ -1690,7 +1690,7 @@ export const zhHant = defineLocale({
       noKeysMatch: '沒有符合的提供方。',
       localEndpoint: {
         title: '本地 / 自訂端點',
-        description: '將 Hermes 指向任意 OpenAI 相容端點（Zyphra、vLLM、llama.cpp、Ollama 等）。'
+        description: '將 Qubit 指向任意 OpenAI 相容端點（Zyphra、vLLM、llama.cpp、Ollama 等）。'
       },
       loading: '正在載入提供方...'
     },
@@ -1749,13 +1749,13 @@ export const zhHant = defineLocale({
       activeBackend: '目前後端',
       activeBackendHint: '這是你目前使用的後端',
       useBackend: '使用此後端',
-      nousIncluded: '包含在 Nous 訂閱中；登入 Nous Portal 即可啟用。',
-      nousAuthNeededTitle: '登入 Nous Portal',
-      nousAuthNeededMessage: provider => `已儲存 ${provider}，但在登入 Nous Portal 之前不會啟用。`,
+      nousIncluded: '包含在 Qubit 訂閱中；登入 Qubit 即可啟用。',
+      nousAuthNeededTitle: '登入 Qubit',
+      nousAuthNeededMessage: provider => `已儲存 ${provider}，但在登入 Qubit 之前不會啟用。`,
       nousAuthSignIn: '登入',
-      nousAuthDoneTitle: '已連接 Nous Portal',
+      nousAuthDoneTitle: '已連接 Qubit',
       nousAuthDoneMessage: '訂閱後端現已啟用。',
-      nousAuthFailed: 'Nous Portal 登入未完成',
+      nousAuthFailed: 'Qubit 登入未完成',
       noApiKeyRequired: '不需要 API 金鑰。',
       postSetupHint: step => `此後端需要一次性安裝 (${step})。將在此機器上執行，可能需要幾分鐘。`,
       postSetupInstalledHint: '已安裝。僅在出現問題時才需要重新執行安裝。',
@@ -1809,7 +1809,7 @@ export const zhHant = defineLocale({
         failedSave: '無法儲存真實設定檔設定',
         prompt: {
           title: '讓網站保持登入狀態',
-          body: '讓 Hermes 使用預設瀏覽器設定檔的快照進行瀏覽，網站開啟時即已登入。',
+          body: '讓 Qubit 使用預設瀏覽器設定檔的快照進行瀏覽，網站開啟時即已登入。',
           bulletSnapshot: 'Cookie 與登入資訊會複製到受管理的快照中。',
           bulletLiveProfile: '絕不會直接開啟你的真實瀏覽器設定檔。',
           bulletLocal: '所有資料都不會離開這台電腦。',
@@ -1904,7 +1904,7 @@ export const zhHant = defineLocale({
     loadFailed: '無法載入記憶圖譜',
     loading: '載入中…',
     emptyTitle: '尚無學習內容',
-    emptyDesc: '當 Hermes 為你的工作建立技能與記憶時，會顯示在這裡。'
+    emptyDesc: '當 Qubit 為你的工作建立技能與記憶時，會顯示在這裡。'
   },
   agents: {
     extendedTranscript: '完整記錄尾端',
@@ -1968,7 +1968,7 @@ export const zhHant = defineLocale({
       placeholder: '搜尋寵物…',
       loading: '正在載入 petdex 畫廊…',
       error: '無法連線至 petdex 畫廊。',
-      staleBackend: '請重新啟動 Hermes 以使用寵物功能。',
+      staleBackend: '請重新啟動 Qubit 以使用寵物功能。',
       empty: '沒有符合的寵物。',
       turnOff: '關閉',
       turnOn: '開啟',
@@ -1995,8 +1995,8 @@ export const zhHant = defineLocale({
       hatchComposing: '正在拼合……',
       hatchSaving: '快好了……',
       namePlaceholder: '為寵物命名',
-      staleBackend: '請更新 Hermes 以生成寵物。',
-      backgroundHint: '你可以關閉此視窗——完成後 Hermes 會通知你。',
+      staleBackend: '請更新 Qubit 以生成寵物。',
+      backgroundHint: '你可以關閉此視窗——完成後 Qubit 會通知你。',
       slowProviderHint: '這可能需要幾分鐘',
       remix: '混合生成',
       remixConfirmTitle: '以此造型混合生成？',
@@ -2030,7 +2030,7 @@ export const zhHant = defineLocale({
     },
     nav: {
       newChat: { title: '新工作階段', detail: '開始新的工作階段' },
-      settings: { title: '設定', detail: '設定 Hermes 桌面端' },
+      settings: { title: '設定', detail: '設定 Qubit 桌面端' },
       capabilities: { title: '技能與工具', detail: '啟用技能、工具集和提供方' },
       messaging: { title: '訊息平台', detail: '設定 Telegram、Slack、Discord 等' },
       artifacts: { title: '成品', detail: '瀏覽產生的輸出' }
@@ -2052,7 +2052,7 @@ export const zhHant = defineLocale({
     noSessions: '暫無工作階段。',
     gatewayRunning: '訊息閘道執行中',
     gatewayStopped: '訊息閘道已停止',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · 活躍工作階段 ${count}`,
+    hermesActiveSessions: (version, count) => `Qubit ${version} · 活躍工作階段 ${count}`,
     restartGateway: '重新啟動閘道',
     openBrowser: '開啟瀏覽器',
     gatewayRestartFailed: '閘道重新啟動失敗。',
@@ -2060,7 +2060,7 @@ export const zhHant = defineLocale({
     sharedGatewayRestartDescription: bots => `此裝置上的所有機器人都會重新連線：${bots}`,
     sharedGatewayRestartConfirm: '全部重新啟動',
     sharedGatewayRestarted: count => `共享閘道已重新啟動（${count} 個機器人）`,
-    updateHermes: '更新 Hermes',
+    updateHermes: '更新 Qubit',
     reloadWindow: '重新載入視窗',
     actionRunning: '執行中',
     actionDone: '完成',
@@ -2114,10 +2114,10 @@ export const zhHant = defineLocale({
     restartFailedManual: '閘道重新啟動失敗 — 請手動重新啟動並檢查閘道日誌。',
     telegramQr: {
       title: '選擇連接 Telegram 機器人的方式',
-      subtitle: '兩種方式都會連接由你控制的機器人，憑證僅儲存在此 Hermes 安裝中。',
+      subtitle: '兩種方式都會連接由你控制的機器人，憑證僅儲存在此 Qubit 安裝中。',
       quickSetup: '快速設定',
       recommended: '推薦',
-      quickHelp: '掃描 QR 碼並在 Telegram 中確認。Hermes 會自動建立機器人並偵測你的 Telegram 使用者 ID。',
+      quickHelp: '掃描 QR 碼並在 Telegram 中確認。Qubit 會自動建立機器人並偵測你的 Telegram 使用者 ID。',
       createWithQr: '以 QR 碼建立',
       starting: '正在啟動…',
       replaceWarning: 'Telegram 憑證已設定。儲存後，新的 QR 設定或機器人權杖將取代目前的機器人。',
@@ -2272,7 +2272,7 @@ export const zhHant = defineLocale({
       menuItem: '連線至遠端主機…',
       badge: (host: string) => `執行於 ${host}`,
       title: (profile: string) => `將 ${profile} 連線至遠端主機`,
-      description: '此設定檔中的工作階段將在你指定的遠端 Hermes 上執行，而不是這台電腦。',
+      description: '此設定檔中的工作階段將在你指定的遠端 Qubit 上執行，而不是這台電腦。',
       urlLabel: '遠端位址',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: '請輸入以 http:// 或 https:// 開頭的完整位址',
@@ -2305,7 +2305,7 @@ export const zhHant = defineLocale({
     setAsDefault: '設為預設',
     defaultProfile: '預設設定檔',
     defaultSet: name => `${name} 已設為預設`,
-    defaultDescription: '用於 Hermes 啟動和新建聊天。現有工作階段仍保留在各自的設定檔中。',
+    defaultDescription: '用於 Qubit 啟動和新建聊天。現有工作階段仍保留在各自的設定檔中。',
     failedSetDefault: '無法設定預設設定檔',
     setColor: color => `設定顏色 ${color}`,
     autoColor: '自動',
@@ -2341,7 +2341,7 @@ export const zhHant = defineLocale({
     deleteDescMid: ' 並移除其 ',
     deleteDescSuffix: ' 目錄。此操作無法復原。',
     deleting: '刪除中…',
-    createDesc: '設定檔是獨立的 Hermes 環境：各自擁有獨立的設定、技能和 SOUL.md。',
+    createDesc: '設定檔是獨立的 Qubit 環境：各自擁有獨立的設定、技能和 SOUL.md。',
     nameLabel: '名稱',
     cloneFrom: '複製來源',
     cloneFromNone: '無（空白）',
@@ -2372,7 +2372,7 @@ export const zhHant = defineLocale({
   },
 
   modelAssignment: {
-    saveFailed: 'Hermes 未儲存該模型變更。',
+    saveFailed: 'Qubit 未儲存該模型變更。',
     confirmTitle: '模型選擇警告',
     confirmDetail: '僅在你接受此權衡時確認。',
     confirmAction: '確認',
@@ -2437,7 +2437,7 @@ export const zhHant = defineLocale({
     topOfHour: '每個整點',
     everyHourAt: minute => `每小時的 :${minute}`,
     newCron: '新排程工作',
-    emptyDescNew: '按 cron 表達式排程一個提示詞。Hermes 會執行它，並將結果傳送至您選擇的目的地。',
+    emptyDescNew: '按 cron 表達式排程一個提示詞。Qubit 會執行它，並將結果傳送至您選擇的目的地。',
     emptyDescSearch: '請嘗試更廣泛的搜尋詞。',
     emptyTitleNew: '暫無排程工作',
     emptyTitleSearch: '無相符項目',
@@ -2680,8 +2680,8 @@ export const zhHant = defineLocale({
       copyPath: '複製路徑',
       removeFromSidebar: '從側邊欄移除',
       createFailed: '無法建立專案',
-      staleBackend: '請更新 Hermes 後端以建立專案——目前後端比桌面應用舊（設定 → 更新 → 後端）。',
-      deleteConfirm: '這會從 Hermes 中移除已儲存的專案。檔案、git 儲存庫和工作樹維持不變。',
+      staleBackend: '請更新 Qubit 後端以建立專案——目前後端比桌面應用舊（設定 → 更新 → 後端）。',
+      deleteConfirm: '這會從 Qubit 中移除已儲存的專案。檔案、git 儲存庫和工作樹維持不變。',
       startWork: '新增工作樹',
       newWorktreeTitle: '新增工作樹',
       newWorktreeDesc: '為這個工作樹命名分支。',
@@ -2690,7 +2690,7 @@ export const zhHant = defineLocale({
       baseBranchPlaceholder: '搜尋分支…',
       baseBranchNone: '未找到分支',
       startWorkFailed: '無法建立工作樹',
-      worktreeStaleBackend: '請更新 Hermes 後端以在此遠端連線上建立工作樹 —— 該後端早於 git 工作樹 API。',
+      worktreeStaleBackend: '請更新 Qubit 後端以在此遠端連線上建立工作樹 —— 該後端早於 git 工作樹 API。',
       worktreeProjectLabel: '專案',
       worktreeProjectPlaceholder: '搜尋專案…',
       worktreeProjectNone: '沒有包含資料夾的專案',
@@ -2775,12 +2775,12 @@ export const zhHant = defineLocale({
   composer: {
     message: '訊息',
     wakingProfile: profile => `正在喚醒 ${profile}…`,
-    placeholderStarting: '正在啟動 Hermes...',
-    placeholderReconnecting: '正在重新連線至 Hermes…',
+    placeholderStarting: '正在啟動 Qubit...',
+    placeholderReconnecting: '正在重新連線至 Qubit…',
     placeholderFollowUp: '傳送後續訊息',
     newSessionPlaceholders: [
       '我們要建立什麼？',
-      '給 Hermes 一個任務',
+      '給 Qubit 一個任務',
       '您在想什麼？',
       '描述您需要什麼',
       '我們該處理什麼？',
@@ -2859,7 +2859,7 @@ export const zhHant = defineLocale({
       '/journey': '開啟記憶圖譜 — 查看技能與記憶隨時間的變化',
       '/queue': '排入、檢視、編輯、移除、移動或清空下一回合提示詞',
       '/steer': '在下一次工具呼叫後插入訊息，不會中斷目前工作',
-      '/goal': '設定持續目標，讓 Hermes 跨回合工作直到完成',
+      '/goal': '設定持續目標，讓 Qubit 跨回合工作直到完成',
       '/heartbeat': '設定週期性提示詞，在閒置時重新進入此工作階段',
       '/refine': '立即檢查此對話，並將心得儲存至記憶或技能',
       '/review': '產生獨立子代理，審查剛才討論的工作（PR、程式碼、文件）',
@@ -2871,7 +2871,7 @@ export const zhHant = defineLocale({
       '/egress': '顯示 Docker 對外連線代理狀態',
       '/context': '顯示詳細的上下文視窗，包括用量、分類明細、壓縮統計與吞吐量',
       '/whoami': '顯示你的斜線指令存取權限（admin / user）',
-      '/profile': '切換作用中的 Hermes 設定檔',
+      '/profile': '切換作用中的 Qubit 設定檔',
       '/codex-runtime': '切換 OpenAI/Codex 模型使用的 Codex app-server runtime',
       '/personality': '設定預先定義的人格',
       '/battery': '切換狀態列中的彩色電池指示器',
@@ -2895,10 +2895,10 @@ export const zhHant = defineLocale({
       '/browser': '管理瀏覽器 CDP 連線 [connect|disconnect|status]（僅限本機 gateway）',
       '/palette': '開啟模糊搜尋指令面板（也可使用 Ctrl+P）',
       '/usage': '顯示 Token 用量與速率限制；`reset` 可兌換保留的 Codex 限額重設',
-      '/subscription': '檢視你的 Nous 方案，並在瀏覽器中變更',
-      '/topup': '顯示你的 Nous 餘額，並在 Portal 管理帳務',
+      '/subscription': '檢視你的 Qubit 方案，並在瀏覽器中變更',
+      '/topup': '顯示你的 Qubit 餘額，並在 Portal 管理帳務',
       '/platform': '暫停、恢復或列出故障的閘道平台',
-      '/version': '顯示 Hermes Agent 版本',
+      '/version': '顯示 Qubit Agent 版本',
       '/debug': '上傳偵錯報告（系統資訊與記錄），並取得可分享連結',
       '/model': '切換此工作階段的模型'
     },
@@ -2913,7 +2913,7 @@ export const zhHant = defineLocale({
       'composer.history': '循環彈出視窗 / 歷史記錄'
     },
     attachUrlTitle: '附加 URL',
-    attachUrlDesc: 'Hermes 將擷取該頁面並作為此回合的脈絡。',
+    attachUrlDesc: 'Qubit 將擷取該頁面並作為此回合的脈絡。',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: '請輸入完整 URL，例如 ',
     attach: '附加',
@@ -3120,7 +3120,7 @@ export const zhHant = defineLocale({
       createPr: '建立 PR',
       openPr: '開啟 PR',
       ghMissing: '安裝 GitHub CLI (gh) 並登入後可開啟 PR',
-      agentShip: '讓 Hermes 提交並開 PR',
+      agentShip: '讓 Qubit 提交並開 PR',
       agentShipUnavailable: '擁有這些變更的對話目前不在畫面上。',
       agentShipPrompt: '檢查目前的變更，使用清晰的約定式提交訊息提交，推送分支，並開啟一個拉取請求。',
       newBranch: '新增分支',
@@ -3132,22 +3132,22 @@ export const zhHant = defineLocale({
   },
 
   updates: {
-    discontinuedTitle: '此版本的 Hermes 已停止支援',
-    discontinuedBody: '此版本的 Hermes 已停止支援，可能無法正常運作——請解除安裝。您的資料仍保留在磁碟上。',
+    discontinuedTitle: '此版本的 Qubit 已停止支援',
+    discontinuedBody: '此版本的 Qubit 已停止支援，可能無法正常運作——請解除安裝。您的資料仍保留在磁碟上。',
     channels: { stable: '穩定版', canary: '預覽版' },
     bundleSwapPending: '重新啟動以完成更新',
     bundleSwapPendingDesc:
-      '更新後的應用程式已安裝完成，只需重新啟動 Hermes 即可載入新版本。聊天記錄和設定不會受到影響。',
-    bundleSwapPendingAction: '重新啟動 Hermes',
+      '更新後的應用程式已安裝完成，只需重新啟動 Qubit 即可載入新版本。聊天記錄和設定不會受到影響。',
+    bundleSwapPendingAction: '重新啟動 Qubit',
     stages: {
       idle: '準備中…',
       prepare: '準備中…',
       fetch: '下載中…',
       pull: '快完成了…',
       pydeps: '收尾中…',
-      update: '正在更新 Hermes…',
+      update: '正在更新 Qubit…',
       rebuild: '正在重新建置桌面應用程式…',
-      restart: '正在重新啟動 Hermes…',
+      restart: '正在重新啟動 Qubit…',
       done: '更新完成',
       manual: '從終端機更新',
       guiSkew: '請更新桌面應用程式',
@@ -3157,42 +3157,42 @@ export const zhHant = defineLocale({
     checkFailedTitle: '無法檢查更新',
     tryAgain: '重試',
     notAvailableTitle: '更新不可用',
-    unsupportedMessage: '此版本的 Hermes 無法在應用程式內自行更新。',
+    unsupportedMessage: '此版本的 Qubit 無法在應用程式內自行更新。',
     connectionRetry: '請檢查網路連線後重試。',
-    gitUnusable: 'Hermes 無法在這台電腦上執行 Git，因此無法檢查更新。',
+    gitUnusable: 'Qubit 無法在這台電腦上執行 Git，因此無法檢查更新。',
     latestBody: '您正在執行最新版本。',
     versionDetailsDistributionStore: 'Microsoft Store',
     latestBodyBackend: '後端正在執行最新版本。',
     allSetTitle: '已是最新版本',
     availableTitle: '有可用更新',
-    availableBody: '新版 Hermes 已可安裝。',
+    availableBody: '新版 Qubit 已可安裝。',
     availableTitleBackend: '後端有可用更新',
-    availableBodyBackend: '已連接的 Hermes 後端有新版本可安裝。',
+    availableBodyBackend: '已連接的 Qubit 後端有新版本可安裝。',
     availableBodyNoChangelog: '已有新版本可用。此安裝方式無法顯示更新日誌。',
     updateNow: '立即更新',
     maybeLater: '稍後再說',
     moreChanges: count => `另有 ${count} 項變更。`,
     manualTitle: '從終端機更新',
-    manualBody: '您是從命令列安裝的 Hermes，因此更新也需要在那裡執行。請將此指令貼到終端機：',
-    manualPickedUp: '下次啟動 Hermes 時會使用新版本。',
+    manualBody: '您是從命令列安裝的 Qubit，因此更新也需要在那裡執行。請將此指令貼到終端機：',
+    manualPickedUp: '下次啟動 Qubit 時會使用新版本。',
     guiSkewTitle: '請更新桌面應用程式',
     guiSkewBody:
-      '後端已更新，但此桌面應用程式套件未變更。請更新或重新安裝 Hermes 桌面應用程式（你的 AppImage / .deb / .rpm）以保持一致。',
+      '後端已更新，但此桌面應用程式套件未變更。請更新或重新安裝 Qubit 桌面應用程式（你的 AppImage / .deb / .rpm）以保持一致。',
     copy: '複製',
     copied: '已複製',
     done: '完成',
     applyingBody:
-      'Hermes 更新程式會在自己的視窗中接管，並在完成後自動重新開啟 Hermes。更新期間請勿自行重新開啟 Hermes。',
-    applyingBodyBackend: '遠端後端正在套用更新並將重新啟動。恢復後 Hermes 會自動重新連線。',
-    applyingClose: '此視窗會在更新期間關閉，隨後 Hermes 會自動重新開啟。',
+      'Qubit 更新程式會在自己的視窗中接管，並在完成後自動重新開啟 Qubit。更新期間請勿自行重新開啟 Qubit。',
+    applyingBodyBackend: '遠端後端正在套用更新並將重新啟動。恢復後 Qubit 會自動重新連線。',
+    applyingClose: '此視窗會在更新期間關閉，隨後 Qubit 會自動重新開啟。',
     errorTitle: '更新未完成',
     errorBody: '沒有資料遺失。您可以現在重試。',
-    blockerTitle: '關閉本機預覽以更新 Hermes？',
-    blockerBody: 'Hermes 需要在更新前停止這些本機預覽。這不會修改或刪除您的檔案。',
-    foreignBlockerTitle: '關閉其他處理程序以更新 Hermes',
+    blockerTitle: '關閉本機預覽以更新 Qubit？',
+    blockerBody: 'Qubit 需要在更新前停止這些本機預覽。這不會修改或刪除您的檔案。',
+    foreignBlockerTitle: '關閉其他處理程序以更新 Qubit',
     foreignBlockerBody:
-      'Hermes 無法安全地自動關閉這些處理程序。請關閉擁有這些處理程序的應用程式、終端機或服務，然後重試更新。',
-    mixedBlockerBody: 'Hermes 可以關閉下方列出的本機預覽。其他處理程序必須手動關閉，更新才能繼續。',
+      'Qubit 無法安全地自動關閉這些處理程序。請關閉擁有這些處理程序的應用程式、終端機或服務，然後重試更新。',
+    mixedBlockerBody: 'Qubit 可以關閉下方列出的本機預覽。其他處理程序必須手動關閉，更新才能繼續。',
     closePreviewsAndUpdate: '關閉預覽並更新',
     closePreviewsAndCheckAgain: '關閉預覽並重新檢查',
     localPreview: '本機預覽',
@@ -3243,13 +3243,13 @@ export const zhHant = defineLocale({
     justNowSuffix: ' · 剛剛',
     bundleOutOfSync: '應用程式建置版本過舊',
     bundleOutOfSyncDesc:
-      'Hermes 執行環境已更新,但桌面應用程式本身仍是舊建置——在應用程式更新之前,新的介面功能(如 Bot Mode)不會顯示。請執行下方的更新以重新建置應用程式。如果此警告仍未消除,請從最新的桌面安裝程式重新安裝。',
+      'Qubit 執行環境已更新,但桌面應用程式本身仍是舊建置——在應用程式更新之前,新的介面功能(如 Bot Mode)不會顯示。請執行下方的更新以重新建置應用程式。如果此警告仍未消除,請從最新的桌面安裝程式重新安裝。',
     bundleOutOfSyncAction: '取得安裝程式',
     checkingShort: '檢查中…'
   },
 
   guidedGreeting: {
-    line: '來了，進來吧。我是 Hermes。給我兩分鐘，把這裡按你的習慣整理一下，然後我們找件你真正想做的事來做。\n\n先說，我該怎麼稱呼你？',
+    line: '來了，進來吧。我是 Qubit。給我兩分鐘，把這裡按你的習慣整理一下，然後我們找件你真正想做的事來做。\n\n先說，我該怎麼稱呼你？',
     nameSuggestion: (name: string) => `（如果你願意，我也可以直接叫你 ${name}。）`
   },
   install: {
@@ -3260,7 +3260,7 @@ export const zhHant = defineLocale({
       skipped: '已略過',
       failed: '失敗'
     },
-    oneTimeTitle: 'Hermes 需要一次性安裝',
+    oneTimeTitle: 'Qubit 需要一次性安裝',
     unsupportedDesc: platform =>
       `${platform} 暫不支援自動首次啟動安裝。請開啟終端機並執行下面的指令，然後重新啟動此應用程式。之後啟動會略過此步驟。`,
     installCommand: '安裝指令',
@@ -3268,21 +3268,21 @@ export const zhHant = defineLocale({
     viewDocs: '檢視安裝文件',
     installTo: '將安裝至',
     retryAfterRun: '我已執行 -- 重試',
-    setupChoiceTitle: '設定 Hermes Desktop',
-    setupChoiceDesc: '將此應用程式連線到您已執行的 Hermes 閘道，或在這台電腦上本機安裝 Hermes。',
-    connectExistingTitle: '連線到現有 Hermes',
+    setupChoiceTitle: '設定 Qubit Desktop',
+    setupChoiceDesc: '將此應用程式連線到您已執行的 Qubit 閘道，或在這台電腦上本機安裝 Qubit。',
+    connectExistingTitle: '連線到現有 Qubit',
     connectExistingShort: '連線現有環境',
     connectExistingDesc: '使用工作階段權杖或瀏覽器登入連線遠端後端。不會啟動本機安裝。',
-    installLocalTitle: '本機安裝 Hermes',
-    installLocalDesc: '下載 Hermes、建立 Python 環境，並在這台電腦上執行後端。',
-    localStartUnavailable: '無法啟動本機安裝。請重新啟動 Hermes Desktop 後再試一次。',
-    remoteSetupTitle: '連線到現有 Hermes',
-    remoteSetupDesc: '輸入閘道 URL。Hermes Desktop 會偵測需要權杖還是瀏覽器登入。',
+    installLocalTitle: '本機安裝 Qubit',
+    installLocalDesc: '下載 Qubit、建立 Python 環境，並在這台電腦上執行後端。',
+    localStartUnavailable: '無法啟動本機安裝。請重新啟動 Qubit Desktop 後再試一次。',
+    remoteSetupTitle: '連線到現有 Qubit',
+    remoteSetupDesc: '輸入閘道 URL。Qubit Desktop 會偵測需要權杖還是瀏覽器登入。',
     remoteUrlTitle: '閘道 URL',
-    remoteUrlDesc: '使用 Hermes 閘道的基礎 URL；遠端位址請包含 https://。',
+    remoteUrlDesc: '使用 Qubit 閘道的基礎 URL；遠端位址請包含 https://。',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: '正在偵測閘道驗證方式...',
-    probeError: '無法連線到該 Hermes 閘道。',
+    probeError: '無法連線到該 Qubit 閘道。',
     identityProvider: '您的身分提供者',
     authTitle: '驗證',
     authNeedsOauth: provider => `測試此閘道前請先使用 ${provider} 登入。`,
@@ -3302,11 +3302,11 @@ export const zhHant = defineLocale({
     applyRemote: '套用並重新連線',
     backToSetup: '返回',
     failedTitle: '安裝失敗',
-    settingUpTitle: '正在設定 Hermes Agent',
+    settingUpTitle: '正在設定 Qubit Agent',
     finishingTitle: '正在收尾',
     failedDesc:
-      '某個安裝步驟失敗。在 Windows 上，如果另一個 Hermes CLI 或桌面執行個體正在執行，可能會出現這種情況。請停止正在執行的 Hermes 執行個體後重試。可查看下方的詳細資訊或 desktop 記錄中的完整記錄。',
-    activeDesc: '這是一次性設定。Hermes 安裝程式正在下載相依套件並設定您的電腦。之後啟動會略過此步驟。',
+      '某個安裝步驟失敗。在 Windows 上，如果另一個 Qubit CLI 或桌面執行個體正在執行，可能會出現這種情況。請停止正在執行的 Qubit 執行個體後重試。可查看下方的詳細資訊或 desktop 記錄中的完整記錄。',
+    activeDesc: '這是一次性設定。Qubit 安裝程式正在下載相依套件並設定您的電腦。之後啟動會略過此步驟。',
     progress: (completed, total) => `${completed}/${total} 個步驟已完成`,
     currentStage: stage => ` -- 目前：${stage}`,
     fetchingManifest: '正在取得安裝程式 manifest...',
@@ -3324,10 +3324,10 @@ export const zhHant = defineLocale({
   },
 
   onboarding: {
-    headerTitle: '開始設定 Hermes Agent',
+    headerTitle: '開始設定 Qubit Agent',
     headerDesc: '連線模型提供方即可開始聊天。大多數選項只需一次點擊。',
-    preparingInstall: 'Hermes 正在完成安裝。首次執行通常不到一分鐘。',
-    starting: '正在啟動 Hermes…',
+    preparingInstall: 'Qubit 正在完成安裝。首次執行通常不到一分鐘。',
+    starting: '正在啟動 Qubit…',
     lookingUpProviders: '正在查詢提供方...',
     collapse: '收合',
     otherProviders: '其他提供方',
@@ -3335,7 +3335,7 @@ export const zhHant = defineLocale({
     chooseLater: '稍後再選擇提供方',
     recommended: '建議',
     connected: '已連線',
-    featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Hermes 的建議方式',
+    featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Qubit 的建議方式',
     fireworksPitch: '直接模型 API — Fireworks 託管的前沿模型',
     localModelsTitle: '本地執行模型',
     localModelsPitch: '無需帳號——下載模型，在本機執行',
@@ -3348,7 +3348,7 @@ export const zhHant = defineLocale({
       xai: { short: 'Grok 模型', description: '直接存取 xAI Grok 模型。' },
       local: {
         short: '自託管',
-        description: '將 Hermes 指向本機或自託管的 OpenAI 相容端點（vLLM、llama.cpp、Ollama 等）。'
+        description: '將 Qubit 指向本機或自託管的 OpenAI 相容端點（vLLM、llama.cpp、Ollama 等）。'
       }
     },
     backToSignIn: '返回登入',
@@ -3360,7 +3360,7 @@ export const zhHant = defineLocale({
     update: '更新',
     flowSubtitles: {
       pkce: '開啟瀏覽器登入，然後回到這裡繼續',
-      device_code: '在瀏覽器中開啟驗證頁面 — Hermes 會自動連線',
+      device_code: '在瀏覽器中開啟驗證頁面 — Qubit 會自動連線',
       external: '先在終端機登入一次，然後回來繼續聊天'
     },
     startingSignIn: provider => `正在為 ${provider} 啟動登入...`,
@@ -3373,11 +3373,11 @@ export const zhHant = defineLocale({
     pickDifferentProvider: '選擇其他提供方',
     signInWith: provider => `使用 ${provider} 登入`,
     openedBrowser: provider => `已在瀏覽器中開啟 ${provider}。`,
-    authorizeThere: '請在那裡授權 Hermes。',
+    authorizeThere: '請在那裡授權 Qubit。',
     copyAuthCode: '複製授權碼並貼到下方。',
     pasteAuthCode: '貼上授權碼',
     reopenAuthPage: '重新開啟授權頁面',
-    autoBrowser: provider => `已在瀏覽器中開啟 ${provider}。請在那裡授權 Hermes，連線會自動完成，無需複製或貼上。`,
+    autoBrowser: provider => `已在瀏覽器中開啟 ${provider}。請在那裡授權 Qubit，連線會自動完成，無需複製或貼上。`,
     reopenSignInPage: '重新開啟登入頁面',
     waitingAuthorize: '等待您授權...',
     externalPending: provider => `${provider} 透過自己的 CLI 登入。請在終端機執行此指令，然後回來選擇「我已登入」：`,
@@ -3407,7 +3407,7 @@ export const zhHant = defineLocale({
     localDownloadsHeading: '本地',
     noAuthenticatedProviders: '沒有已驗證的提供方。',
     pro: 'Pro',
-    proNeedsSubscription: 'Pro 模型需要付費 Nous 訂閱。',
+    proNeedsSubscription: 'Pro 模型需要付費 Qubit 訂閱。',
     free: '免費',
     freeTier: '免費層',
     priceTitle: '每百萬 Token 的輸入/輸出價格',
@@ -3486,13 +3486,13 @@ export const zhHant = defineLocale({
       update: '更新',
       updateInProgress: '更新中',
       commitsBehind: (count, branch) => `落後 ${branch} ${count} 個提交`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `Qubit Desktop v${version}`,
       backendVersion: version => `後端 v${version}`,
       clientLabel: version => `用戶端 v${version}`,
       connectionSsh: host => `SSH: ${host}`,
       connectionRemote: host => `遠端: ${host}`,
       connectionCloud: host => `雲端: ${host}`,
-      connectionCloudTooltip: host => `Hermes Cloud · ${host}`,
+      connectionCloudTooltip: host => `Qubit Cloud · ${host}`,
       connectionSshTooltip: host => `SSH · ${host}`,
       connectionRemoteTooltip: host => `Remote · ${host}`,
       backendLabel: version => `後端 v${version}`,
@@ -3627,7 +3627,7 @@ export const zhHant = defineLocale({
     binaryTitle: '這看起來像二進位檔案',
     binaryBody: label => `預覽 ${label} 可能會顯示無法讀取的文字。`,
     largeTitle: '此檔案較大',
-    largeBody: (label, size) => `${label} 大小為 ${size}。Hermes 只會顯示前 512 KB。`,
+    largeBody: (label, size) => `${label} 大小為 ${size}。Qubit 只會顯示前 512 KB。`,
     previewAnyway: '仍然預覽',
     truncated: '顯示前 512 KB。',
     noInlineTitle: '沒有行內預覽',
@@ -3667,11 +3667,11 @@ export const zhHant = defineLocale({
         '這個位址指向執行代理的那台機器，而不是本機。瀏覽器窗格會在本機載入頁面，因此遠端開發伺服器需要連接埠轉送或可連線的主機名稱。',
       failedToLoad: '預覽載入失敗',
       tryAgain: '重試',
-      restarting: 'Hermes 正在重新啟動...',
-      askRestart: '請 Hermes 重新啟動伺服器',
-      lookingRestart: taskId => `Hermes 正在尋找要重新啟動的預覽伺服器 (${taskId})`,
+      restarting: 'Qubit 正在重新啟動...',
+      askRestart: '請 Qubit 重新啟動伺服器',
+      lookingRestart: taskId => `Qubit 正在尋找要重新啟動的預覽伺服器 (${taskId})`,
       restartingTitle: '正在重新啟動預覽伺服器',
-      restartingMessage: 'Hermes 正在背景執行。可在預覽主控台查看進度。',
+      restartingMessage: 'Qubit 正在背景執行。可在預覽主控台查看進度。',
       startRestartFailed: message => `無法啟動伺服器重新啟動：${message}`,
       restartFailed: '伺服器重新啟動失敗',
       hideConsole: '隱藏預覽主控台',
@@ -3683,15 +3683,15 @@ export const zhHant = defineLocale({
       reload: '重新載入頁面',
       address: '網址',
       addressPlaceholder: '輸入網址',
-      blankPageBody: '在上方輸入網址開始瀏覽，或請 Hermes 開啟頁面。',
-      finishedRestarting: message => `Hermes 已完成預覽伺服器重新啟動${message ? `：${message}` : ''}`,
+      blankPageBody: '在上方輸入網址開始瀏覽，或請 Qubit 開啟頁面。',
+      finishedRestarting: message => `Qubit 已完成預覽伺服器重新啟動${message ? `：${message}` : ''}`,
       failedRestarting: message => `伺服器重新啟動失敗：${message}`,
       unknownError: '未知錯誤',
       restartedTitle: '預覽伺服器已重新啟動',
       reloadingNow: '正在重新載入預覽。',
       restartFailedTitle: '預覽重新啟動失敗',
-      restartFailedMessage: 'Hermes 無法重新啟動伺服器。',
-      stillWorking: 'Hermes 仍在執行，但尚未收到重新啟動結果。伺服器指令可能正在前台執行。',
+      restartFailedMessage: 'Qubit 無法重新啟動伺服器。',
+      stillWorking: 'Qubit 仍在執行，但尚未收到重新啟動結果。伺服器指令可能正在前台執行。',
       workspaceReloading: '工作區已變更，正在重新載入預覽',
       fileChanged: url => `檔案已變更，正在重新載入預覽：${url}`,
       filesChanged: (count, url) => `${count} 個檔案變更，正在重新載入預覽：${url}`,
@@ -3707,11 +3707,11 @@ export const zhHant = defineLocale({
 
   interfaceMode: {
     title: '介面模式',
-    hint: '只改變顯示的內容，不改變 Hermes 的能力。',
+    hint: '只改變顯示的內容，不改變 Qubit 的能力。',
     sessionNote: '由簡潔模式設定。此處的變更僅在本次工作階段內生效；切換到進階模式即可保留為你的設定。',
     simple: {
       label: '簡潔',
-      description: '用於與 Hermes 對話。只有側邊欄和聊天；沒有終端機、檔案或差異面板。'
+      description: '用於與 Qubit 對話。只有側邊欄和聊天；沒有終端機、檔案或差異面板。'
     },
     advanced: {
       label: '進階',
@@ -3815,7 +3815,7 @@ export const zhHant = defineLocale({
     thread: {
       loadingSession: '正在載入工作階段',
       showEarlier: '顯示較早的訊息',
-      loadingResponse: 'Hermes 正在載入回覆',
+      loadingResponse: 'Qubit 正在載入回覆',
       resumeWhenBackgroundDone: count =>
         count === 1 ? '背景工作完成後將自動繼續' : `${count} 個背景工作完成後將自動繼續`,
       thinking: '思考中',
@@ -3833,9 +3833,9 @@ export const zhHant = defineLocale({
       dismissError: '关闭错误',
       errorGenericProvider: 'AI 服務',
       errorLayerBodies: {
-        generic: 'Hermes 回覆時發生問題。請重試；若問題持續，請複製錯誤詳細資訊。',
+        generic: 'Qubit 回覆時發生問題。請重試；若問題持續，請複製錯誤詳細資訊。',
         provider: 'AI 服務無法完成此請求。請稍後重試或切換服務商。',
-        endpoint: 'Hermes 無法連線至你的自訂模型伺服器。請確認它正在執行，然後重新傳送訊息。',
+        endpoint: 'Qubit 無法連線至你的自訂模型伺服器。請確認它正在執行，然後重新傳送訊息。',
         streaming: '回覆完成前連線已中斷。請重試以重新傳送。'
       },
       errorCodes: {
@@ -3853,7 +3853,7 @@ export const zhHant = defineLocale({
         },
         invalid_response: {
           title: 'AI 服務傳回了無法讀取的回覆',
-          body: provider => `${provider} 傳回了 Hermes 無法讀取的內容。請稍後重試。`
+          body: provider => `${provider} 傳回了 Qubit 無法讀取的內容。請稍後重試。`
         },
         empty_response: {
           title: 'AI 服務傳回了空回覆',
@@ -3881,7 +3881,7 @@ export const zhHant = defineLocale({
         },
         ssl_cert_verification: {
           title: '安全連線失敗',
-          body: provider => `Hermes 無法驗證與 ${provider} 的安全連線。請檢查網路或代理設定，或切換服務商後重新傳送。`
+          body: provider => `Qubit 無法驗證與 ${provider} 的安全連線。請檢查網路或代理設定，或切換服務商後重新傳送。`
         }
       },
       errorLayers: {
@@ -3929,7 +3929,7 @@ export const zhHant = defineLocale({
       attachingFile: '正在附加…'
     },
     approval: {
-      gatewayDisconnected: 'Hermes 閘道未連線',
+      gatewayDisconnected: 'Qubit 閘道未連線',
       sendFailed: '無法傳送核准回應',
       run: '執行',
       command: '指令',
@@ -3940,12 +3940,12 @@ export const zhHant = defineLocale({
       reject: '拒絕',
       alwaysTitle: '一律允許此指令？',
       alwaysDescription: pattern =>
-        `這會將「${pattern}」模式加入永久允許清單（~/.hermes/config.yaml）。Hermes 對類似指令將不再詢問，包括目前工作階段和未來工作階段。`,
+        `這會將「${pattern}」模式加入永久允許清單（~/.hermes/config.yaml）。Qubit 對類似指令將不再詢問，包括目前工作階段和未來工作階段。`,
       alwaysAllow: '一律允許'
     },
     clarify: {
       notReady: '澄清請求尚未就緒',
-      gatewayDisconnected: 'Hermes 閘道未連線',
+      gatewayDisconnected: 'Qubit 閘道未連線',
       sendFailed: '無法傳送澄清回應',
       loadingQuestion: '正在載入問題…',
       other: '其他（輸入您的答案）',
@@ -4056,17 +4056,17 @@ export const zhHant = defineLocale({
   },
 
   prompts: {
-    gatewayDisconnected: 'Hermes 閘道未連線',
+    gatewayDisconnected: 'Qubit 閘道未連線',
     sudoSendFailed: '無法傳送 sudo 密碼',
     secretSendFailed: '無法傳送密鑰',
     sudoTitle: '管理員密碼',
     sudoDesc: '輸入 sudo 密碼前，請先確認指令。密碼會傳送給執行指令的代理，並在本次工作階段中快取。',
     sudoCommandUnavailable: '此代理未提供指令。如果無法在對話中確認，請取消。',
     sudoInstallDesc:
-      'Hermes 需要您的 sudo 密碼，以在閘道主機上安裝 Bot Screen 套件（TigerVNC + Xfce）。它只會傳送到該主機。',
+      'Qubit 需要您的 sudo 密碼，以在閘道主機上安裝 Bot Screen 套件（TigerVNC + Xfce）。它只會傳送到該主機。',
     sudoPlaceholder: 'sudo 密碼',
     secretTitle: '需要密鑰',
-    secretDesc: 'Hermes 需要一個憑證才能繼續。',
+    secretDesc: 'Qubit 需要一個憑證才能繼續。',
     secretPlaceholder: '密鑰值',
     vaultUnlockSendFailed: '無法傳送主密碼',
     vaultUnlockTitle: name => `解鎖 ${name}`,
@@ -4078,7 +4078,7 @@ export const zhHant = defineLocale({
     vaultSaveSendFailed: '無法儲存登入資訊',
     vaultSaveTitle: site => `儲存 ${site} 的登入資訊？`,
     vaultSaveDesc: origin =>
-      `Hermes 到達了 ${origin} 的登入頁，但沒有為它儲存的登入資訊。在此輸入一次；它會在本機加密儲存並直接填入頁面，模型永遠看不到密碼。`,
+      `Qubit 到達了 ${origin} 的登入頁，但沒有為它儲存的登入資訊。在此輸入一次；它會在本機加密儲存並直接填入頁面，模型永遠看不到密碼。`,
     vaultSaveIdentifierLabel: '電子郵件或使用者名稱',
     vaultSaveIdentifierPlaceholder: 'you@example.com',
     vaultSavePasswordPlaceholder: '密碼',
@@ -4088,9 +4088,9 @@ export const zhHant = defineLocale({
     vaultCodeSendFailed: '無法傳送驗證碼',
     vaultCodeTitle: site => `${site} 的驗證碼`,
     vaultCodeDesc: site =>
-      `${site} 要求輸入一次性驗證碼（簡訊、電子郵件或驗證器應用程式）。在此輸入，Hermes 會將其填入頁面；模型永遠看不到它。`,
+      `${site} 要求輸入一次性驗證碼（簡訊、電子郵件或驗證器應用程式）。在此輸入，Qubit 會將其填入頁面；模型永遠看不到它。`,
     vaultCodeLabel: '驗證碼',
-    vaultCodeFootnote: '提示：在「設定 → 密碼與登入」中為此登入儲存驗證器金鑰後，Hermes 會自動填寫驗證碼。',
+    vaultCodeFootnote: '提示：在「設定 → 密碼與登入」中為此登入儲存驗證器金鑰後，Qubit 會自動填寫驗證碼。',
     vaultCodeSkip: '略過',
     vaultCodeConfirm: '輸入驗證碼'
   },
@@ -4158,8 +4158,8 @@ export const zhHant = defineLocale({
     sessionExportFailed: '無法匯出工作階段',
     imageSaved: '圖片已儲存',
     downloadStarted: '下載已開始',
-    restartToUseSaveImage: '重新啟動 Hermes Desktop 後可使用儲存圖片。',
-    restartToSaveImages: '重新啟動 Hermes Desktop 以儲存圖片',
+    restartToUseSaveImage: '重新啟動 Qubit Desktop 後可使用儲存圖片。',
+    restartToSaveImages: '重新啟動 Qubit Desktop 以儲存圖片',
     imageDownloadFailed: '圖片下載失敗',
     openImage: '開啟圖片',
     downloadImage: '下載圖片',
@@ -4201,14 +4201,14 @@ export const zhHant = defineLocale({
       },
       skills: {
         title: '教一次就夠',
-        text: '技能是一組說明檔，Hermes 會在需要時自行載入。'
+        text: '技能是一組說明檔，Qubit 會在需要時自行載入。'
       },
       messaging: {
         title: '離開電腦也能用',
         text: '接上 Telegram、Discord、Slack 等 — 同一個代理，同一份記憶。'
       },
       artifacts: {
-        title: 'Hermes 做過的一切',
+        title: 'Qubit 做過的一切',
         text: '所有工作階段的圖片、檔案與連結，都彙整在這裡。'
       },
       cron: {
@@ -4221,7 +4221,7 @@ export const zhHant = defineLocale({
       },
       profiles: {
         title: '設定檔彼此獨立',
-        text: '每個都是獨立的 Hermes — 自己的金鑰、記憶與工作階段。'
+        text: '每個都是獨立的 Qubit — 自己的金鑰、記憶與工作階段。'
       },
       'composer-mentions': {
         title: '附件與指令',

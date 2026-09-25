@@ -1,4 +1,4 @@
-// Attach to the host's running Hermes backend (multiplex-only, Desktop half).
+// Attach to the host's running Qubit backend (multiplex-only, Desktop half).
 //
 // `backend-discovery.ts` owns the pure decision; this module performs the IO
 // ladder around it: read the machine-root ledger, validate a candidate at the
@@ -136,7 +136,7 @@ export async function attachToHostBackend(
 
     if (attached) {
       deps.log(
-        `[attach] attached to the running Hermes backend on ${attached.baseUrl} ` +
+        `[attach] attached to the running Qubit backend on ${attached.baseUrl} ` +
           `(pid ${attached.pid}, registered by profile "${record.profile || 'default'}"); spawning nothing`
       )
 

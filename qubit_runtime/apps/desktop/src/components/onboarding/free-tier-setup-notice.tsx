@@ -43,7 +43,7 @@ export function setupFailureCopy(failure: FreeTierSetupFailure, copy: SetupFaile
  * bootstrap tried, the account service refused or could not be reached, and
  * the user is looking at the provider picker with no idea why. Says what
  * happened in one sentence, offers the user's own retry when a later attempt
- * can succeed, and points at the Nous row below when signing in can help
+ * can succeed, and points at the Qubit row below when signing in can help
  * (never when the same service is the one that is unreachable).
  *
  * Renders nothing unless the backend reported a failure, so an older backend

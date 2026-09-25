@@ -62,12 +62,12 @@ export interface ElevenLabsVoicesResponse {
 }
 
 export interface OAuthProviderStatus {
-  /** Nous only: the tier name the token resolves to, when the backend knows
+  /** Qubit only: the tier name the token resolves to, when the backend knows
    *  one. Null for a free-tier identity and for older backends. */
   account_tier?: null | string
   error?: string
   expires_at?: null | string
-  /** Nous only: true when the stored token belongs to a free-tier identity
+  /** Qubit only: true when the stored token belongs to a free-tier identity
    *  rather than a signed-in account. `logged_in` stays true either way — a
    *  token exists — so this is the only way to tell the two apart. */
   free_tier?: boolean
@@ -82,7 +82,7 @@ export interface OAuthProviderStatus {
 export interface OAuthProvider {
   cli_command: string
   /** Shell command that clears an external provider's credentials, run in the
-   *  embedded terminal. Null when Hermes doesn't know how to remove it. */
+   *  embedded terminal. Null when Qubit doesn't know how to remove it. */
   disconnect_command?: null | string
   disconnect_hint?: null | string
   disconnectable?: boolean
@@ -153,7 +153,7 @@ export interface FreeTierStatus {
   available: boolean
   enabled: boolean
   has_guest: boolean
-  /** Display name for the route, e.g. "Nous · free tier". */
+  /** Display name for the route, e.g. "Qubit · free tier". */
   label: string
   model: string
   /** True until the one-time introduction has been acknowledged. */
@@ -360,7 +360,7 @@ export interface MessagingPlatformTestResponse {
 }
 
 // -- Telegram QR onboarding ---------------------------------------------------
-// The Nous pairing service mints a bot on the user's behalf: the desktop shows
+// The Qubit pairing service mints a bot on the user's behalf: the desktop shows
 // a QR/deep link, Telegram confirms, the backend receives the token and writes
 // it (plus the allowlist) into the target profile's .env, then restarts the
 // gateway best-effort.
@@ -1061,7 +1061,7 @@ export interface ProfileSetupCommand {
 
 // The desktop appearance/interface overlay bundled into a profile export as
 // `desktop.json`. Everything optional — an archive exported by an older (or
-// non-desktop) Hermes simply carries none of it. See store/profile-share.ts.
+// non-desktop) Qubit simply carries none of it. See store/profile-share.ts.
 export interface ProfileDesktopOverlay {
   /** Overlay schema version (1). */
   version?: number
@@ -1124,12 +1124,12 @@ export interface SkillInfo {
   name: string
   /** Total observed activity (use + view + patch). Absent on older backends. */
   usage?: number
-  /** 'agent' = learned/local (editable), 'bundled' = ships with Hermes, 'hub' = installed. */
+  /** 'agent' = learned/local (editable), 'bundled' = ships with Qubit, 'hub' = installed. */
   provenance?: 'agent' | 'bundled' | 'hub'
 }
 
 /** One entry of the built-in optional-skills catalog (optional-skills/ in the
- *  repo) — official skills that ship with Hermes but install on demand. */
+ *  repo) — official skills that ship with Qubit but install on demand. */
 export interface OfficialSkillInfo {
   category: string
   description: string
@@ -1170,7 +1170,7 @@ export interface ToolProvider {
   /** True when this is the provider currently written to config (mirrors the
    *  CLI `hermes tools` active-provider detection). */
   is_active: boolean
-  /** Honest readiness computed server-side (keys ∧ Nous entitlement ∧
+  /** Honest readiness computed server-side (keys ∧ Qubit entitlement ∧
    *  post-setup install state). Optional for older backends. */
   status?: ToolProviderStatus
   /** Web toolset only: the backend key written to web.*backend config
@@ -1252,7 +1252,7 @@ export interface ToolsetModelsResponse {
  *  cua-driver runs on macOS, Windows, and Linux. `ready` is the single OS-aware
  *  readiness signal: on macOS both TCC grants (Accessibility + Screen
  *  Recording, which attach to cua-driver's own `com.trycua.driver` identity,
- *  not Hermes); elsewhere, driver health from `cua-driver doctor`. `null`
+ *  not Qubit); elsewhere, driver health from `cua-driver doctor`. `null`
  *  means unknown (binary missing / probe failed). */
 export interface ComputerUsePermissionSource {
   attribution?: string
@@ -1495,7 +1495,7 @@ export interface BackendUpdateCommit {
   at: number
 }
 
-/** Shape of `GET /api/hermes/update/check` — the backend's own update state.
+/** Shape of `GET /api/qubit/update/check` — the backend's own update state.
  *  Used by the desktop's remote update overlay so the backend version (not the
  *  Electron client clone) drives "what's changed + Install" in remote mode. */
 export interface BackendUpdateCheckResponse {
@@ -1686,7 +1686,7 @@ export interface McpServerTestResponse {
   tools: { name: string; description: string }[]
 }
 
-/** One Nous-approved MCP catalog entry from `GET /api/mcp/catalog`. */
+/** One Qubit-approved MCP catalog entry from `GET /api/mcp/catalog`. */
 export interface McpCatalogEntry {
   name: string
   description: string
@@ -1756,8 +1756,8 @@ export interface DebugShareResponse {
 export interface ModelAssignmentResponse {
   /** Persisted endpoint URL for custom/local providers (echoed back). */
   base_url?: string
-  /** Toolset keys auto-routed through the Nous Tool Gateway as a result of
-   *  switching the main provider to Nous. Empty unless provider === 'nous'
+  /** Toolset keys auto-routed through the Qubit Tool Gateway as a result of
+   *  switching the main provider to Qubit. Empty unless provider === 'nous'
    *  and the user is a paid subscriber with unconfigured tools. */
   gateway_tools?: string[]
   confirm_message?: string

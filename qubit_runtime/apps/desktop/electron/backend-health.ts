@@ -52,7 +52,7 @@ export const REMOTE_SESSION_EXPIRED_MESSAGE =
   'Your remote gateway session has expired. Open Settings → Gateway and click "Sign in" again.'
 
 export const REMOTE_UNSIGNED_OAUTH_MESSAGE =
-  'Remote Hermes gateway uses OAuth, but you are not signed in. ' +
+  'Remote Qubit gateway uses OAuth, but you are not signed in. ' +
   'Open Settings → Gateway and click "Sign in", or switch back to Local.'
 
 /**
@@ -105,7 +105,7 @@ export function isServerSideHttpError(error: unknown): {
 }
 
 /**
- * The one factory for the actionable Nous Cloud agent-is-down error, shared by
+ * The one factory for the actionable Qubit Cloud agent-is-down error, shared by
  * both startup boundaries that can observe a server-side HTTP fault:
  *
  *  - OAuth WS-ticket mint (buildRemoteConnection → mintGatewayWsTicket), which
@@ -140,11 +140,11 @@ export function makeNousCloudBackendDownError(baseUrl: string, error: unknown): 
   const detail = error instanceof Error ? error.message : String(error ?? '')
 
   const err = new Error(
-    `Nous Cloud agent ${hostname} is down ` +
+    `Qubit Cloud agent ${hostname} is down ` +
       `(HTTP ${serverError.statusCode}: server-side fault). ` +
-      'Check https://portal.nousresearch.com for backend status, ' +
+      'Check https://github.com/cgraph-dev/qubit-voicebridge for backend status, ' +
       'or switch to Local mode in Settings → Gateway. ' +
-      'You can also reach out on Discord at discord.gg/NousResearch ' +
+      'You can also reach out on Discord at discord.gg/Qubit Labs ' +
       'for immediate assistance. ' +
       `Original detail: ${detail}`
   ) as any
@@ -158,7 +158,7 @@ export function makeNousCloudBackendDownError(baseUrl: string, error: unknown): 
 }
 
 /**
- * True when the backend URL points at a Nous-managed Hermes Cloud instance
+ * True when the backend URL points at a Qubit-managed Qubit Cloud instance
  * (e.g. ares-3009.agents.nousresearch.com). These are Fly.io-hosted machines
  * the user cannot restart themselves — a 503 from one means the server is down
  * and the recovery path is Portal/Discord/wait.
@@ -299,7 +299,7 @@ export async function waitForHermesReady(baseUrl: string, options: HermesReadyOp
       }
 
       if (options.alreadyBound && isConnectionRefusedError(error)) {
-        throw new Error(`Hermes backend did not become ready: ${(error as Error).message}`)
+        throw new Error(`Qubit backend did not become ready: ${(error as Error).message}`)
       }
 
       // An explicitly missing route means the backend predates /api/health.
@@ -320,7 +320,7 @@ export async function waitForHermesReady(baseUrl: string, options: HermesReadyOp
 
   const detail = lastError instanceof Error ? lastError.message : 'timeout'
 
-  // When a Nous-managed cloud agent returns a server-side HTTP error
+  // When a Qubit-managed cloud agent returns a server-side HTTP error
   // (502/503/504), the backend server itself is down — the user cannot
   // restart it and the generic "did not become ready" message is opaque.
   // Surface an actionable error instead (#85335). This is the SAME factory
@@ -332,5 +332,5 @@ export async function waitForHermesReady(baseUrl: string, options: HermesReadyOp
     throw cloudError
   }
 
-  throw new Error(`Hermes backend did not become ready: ${detail}`)
+  throw new Error(`Qubit backend did not become ready: ${detail}`)
 }

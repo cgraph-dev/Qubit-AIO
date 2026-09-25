@@ -35,7 +35,7 @@ export const introFr: Translations['intro'] = {
       'Posez une question sur un fichier, un concept ou une erreur. J’explique le pourquoi, pas seulement le correctif, avec un exemple détaillé.',
       'Collez du code à relire, un bug à traquer ou un concept à décortiquer. Je vous guide pas à pas.',
       'Partagez le problème. Je le découpe, explique chaque partie et vous laisse capable de résoudre le suivant seul.',
-      'Nous lirons le code ensemble, trouverons la cause racine et bâtirons un modèle mental réutilisable.',
+      'Qubit lirons le code ensemble, trouverons la cause racine et bâtirons un modèle mental réutilisable.',
       'Nommez le sujet ou collez l’extrait. Au programme : explications, schémas en prose et exercices.'
     ],
     kawaii: [

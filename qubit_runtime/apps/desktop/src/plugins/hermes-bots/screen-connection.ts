@@ -51,7 +51,7 @@ export function leaseHeldBy(lease: DisplayLease | null | undefined, viewer: Scre
   return lease.viewer_hash === viewer.hash
 }
 
-/** JSON-RPC method-not-found: the bot's Hermes predates the `display.*` surface. */
+/** JSON-RPC method-not-found: the bot's Qubit predates the `display.*` surface. */
 export function isDisplayUnavailable(error: unknown): boolean {
   const record = typeof error === 'object' && error !== null ? (error as { code?: unknown; message?: unknown }) : null
 

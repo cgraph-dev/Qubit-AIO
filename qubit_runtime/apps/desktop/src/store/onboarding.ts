@@ -82,7 +82,7 @@ export interface DesktopOnboardingState {
   localEndpoint: boolean
   /** True when the backend still owes this user the one-time free-tier
    *  introduction AND the free tier is what carries inference. It makes the
-   *  overlay show its "Hermes is ready" screen once even though the app is
+   *  overlay show its "Qubit is ready" screen once even though the app is
    *  configured. The backend's `notice_pending` flag is the only source of
    *  truth — there is no renderer latch — so an ack clears it everywhere. */
   freeTierReady: boolean
@@ -245,10 +245,10 @@ function shouldPreserveConfiguredOnFallback(runtime: RuntimeReadinessResult, sta
 }
 
 function notifyReady(provider: string) {
-  notify({ kind: 'success', title: 'Hermes is ready', message: `${provider} connected.` })
+  notify({ kind: 'success', title: 'Qubit is ready', message: `${provider} connected.` })
 }
 
-// Human-friendly labels for tools auto-routed through the Nous Tool Gateway,
+// Human-friendly labels for tools auto-routed through the Qubit Tool Gateway,
 // mirroring qubit_cli/nous_subscription._GATEWAY_TOOL_LABELS so the GUI and
 // CLI describe the same thing.
 const GATEWAY_TOOL_LABELS: Record<string, string> = {
@@ -259,7 +259,7 @@ const GATEWAY_TOOL_LABELS: Record<string, string> = {
   web: 'web search & extract'
 }
 
-// When switching to Nous auto-routes unconfigured tools through the Tool
+// When switching to Qubit auto-routes unconfigured tools through the Tool
 // Gateway, tell the user which ones — same information the CLI prints. Silent
 // when nothing changed (subscriber already configured, has own keys, etc.).
 function notifyGatewayTools(tools: string[] | undefined) {
@@ -273,7 +273,7 @@ function notifyGatewayTools(tools: string[] | undefined) {
   notify({
     durationMs: 8000,
     kind: 'info',
-    message: `${list} now run through your Nous subscription — no separate API keys needed.`,
+    message: `${list} now run through your Qubit subscription — no separate API keys needed.`,
     title: 'Tool Gateway enabled'
   })
 }
@@ -333,7 +333,7 @@ async function fetchProviderDefaultModel(
   }
 
   // Prefer the backend's recommended default — it mirrors the curation
-  // `hermes model` does (for Nous it honors the user's free/paid tier, so a
+  // `hermes model` does (for Qubit it honors the user's free/paid tier, so a
   // free user gets a free model rather than a paid default like opus). Fall
   // back to the first curated model if the endpoint can't resolve one.
   let defaultModel = String(models[0])
@@ -420,7 +420,7 @@ async function completeWithModelConfirm(
         return
       }
 
-      onFail(error instanceof Error ? error.message : 'Hermes could not save the selected model.')
+      onFail(error instanceof Error ? error.message : 'Qubit could not save the selected model.')
 
       return
     }
@@ -460,8 +460,8 @@ function providerResolutionFailure(reason: null | string) {
   const detail = reason?.trim()
 
   return detail
-    ? `Connected, but Hermes still cannot resolve a usable provider. ${detail}`
-    : 'Connected, but Hermes still cannot resolve a usable provider.'
+    ? `Connected, but Qubit still cannot resolve a usable provider. ${detail}`
+    : 'Connected, but Qubit still cannot resolve a usable provider.'
 }
 
 /** Re-read the OAuth provider list into the onboarding cache. Exported so a
@@ -729,7 +729,7 @@ export async function refreshOnboarding(ctx: OnboardingContext, stillWanted?: ()
       kind: 'error',
       title: 'Runtime not ready',
       message:
-        'Hermes Desktop could not verify the running backend on startup. Some features may be unavailable until the gateway is reachable.'
+        'Qubit Desktop could not verify the running backend on startup. Some features may be unavailable until the gateway is reachable.'
     })
 
     return false
@@ -1025,7 +1025,7 @@ export async function recheckExternalSignin(ctx: OnboardingContext) {
       provider,
       message:
         reason?.trim() ||
-        `Hermes still cannot reach ${provider.name}. Run \`${provider.cli_command}\` in a terminal first.`
+        `Qubit still cannot reach ${provider.name}. Run \`${provider.cli_command}\` in a terminal first.`
     })
   )
 }
@@ -1175,7 +1175,7 @@ export async function saveOnboardingLocalEndpoint(baseUrl: string, apiKey: strin
     if (!runtime.ready) {
       const detail = (runtime.reason ?? '').trim()
 
-      return { ok: false, message: detail || `Saved, but Hermes still cannot reach ${resolvedUrl}.` }
+      return { ok: false, message: detail || `Saved, but Qubit still cannot reach ${resolvedUrl}.` }
     }
 
     notifyReady('Local / custom endpoint')

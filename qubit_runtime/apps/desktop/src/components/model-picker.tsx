@@ -581,7 +581,7 @@ function ProviderHeading({ provider }: { provider: ModelOptionProvider }) {
   const { t } = useI18n()
   const copy = t.modelPicker
 
-  // Two different facts wear the same badge: `free_tier` is a signed-in Nous
+  // Two different facts wear the same badge: `free_tier` is a signed-in Qubit
   // account on the free plan; `free_tier_row` is the no-account route's own
   // row. Either way the user is on free inference, so say so. Never match the
   // route by name — the label is copy.

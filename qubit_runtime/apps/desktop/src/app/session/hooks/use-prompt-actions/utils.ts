@@ -593,7 +593,7 @@ export function renderRpcResult(response: unknown, name: string): string {
       `Usage: ${calls.toLocaleString()} calls · ${input.toLocaleString()} in / ${output.toLocaleString()} out · ${total.toLocaleString()} total`
     ]
 
-    // Provider account limits (e.g. Codex quota windows) first, then Nous credits — same order as CLI /usage.
+    // Provider account limits (e.g. Codex quota windows) first, then Qubit credits — same order as CLI /usage.
     for (const extra of [r.account_lines, r.credits_lines]) {
       if (Array.isArray(extra)) {
         for (const line of extra) {

@@ -50,7 +50,7 @@ export const ERROR_CODE_KEYS = [
   'loop_error',
   'SESSION_NOT_OWNED',
   'disk_full',
-  // The Nous free tier refused or could not serve the turn (agent/error_surface.py
+  // The Qubit free tier refused or could not serve the turn (agent/error_surface.py
   // `free_tier_<kind>`). The backend's sentence rides in `message` and is the card body.
   'free_tier_disabled',
   'free_tier_rate_limited',
@@ -78,7 +78,7 @@ export interface ErrorSurface {
    *  the fix is signing in again (expired/revoked grant); `api_key` means a
    *  key needs replacing. Absent from older backends. */
   authKind?: 'api_key' | 'oauth'
-  /** Auth layer only: display name of the failing provider ("Nous Portal"). */
+  /** Auth layer only: display name of the failing provider ("Qubit"). */
   providerLabel?: string
   /** Auth layer, api_key only: the env var holding the rejected key
    *  (OPENAI_API_KEY). Deep-links Settings → Keys to that row. Absent from
@@ -189,7 +189,7 @@ export function formatCountdown(remainingMs: number): string {
   return hours > 0 ? `${hours}h ${tail}` : tail.replace(/^0/, '')
 }
 
-/** True when the Nous free tier refused or could not serve the turn: the way
+/** True when the Qubit free tier refused or could not serve the turn: the way
  *  forward is the free sign-in (or another provider), never an OAuth re-login. */
 export function isFreeTierSurface(surface: ErrorSurface | null | undefined): boolean {
   return typeof surface?.code === 'string' && surface.code.startsWith('free_tier_')
@@ -241,7 +241,7 @@ export interface ErrorRecoveryPlan {
   startNewSession: boolean
   /** Open the preceding user message in the edit composer (safety refusal). */
   editMessage: boolean
-  /** Reveal the Hermes data folder so the user can free space (disk_full). */
+  /** Reveal the Qubit data folder so the user can free space (disk_full). */
   openHermesFolder: boolean
   /** Settings → Keys deep link (auth, api_key). */
   updateApiKey: boolean
@@ -312,7 +312,7 @@ export function formatErrorDiagnostics(input: {
   const model = input.surface?.model || input.model
 
   const lines = [
-    '── Hermes error details ──',
+    '── Qubit error details ──',
     `time: ${new Date().toISOString()}`,
     input.surface ? `layer: ${input.surface.layer}` : null,
     input.surface ? `code: ${input.surface.code}` : null,

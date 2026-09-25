@@ -1,5 +1,5 @@
 /**
- * The curated Hermes plugin catalog as the Desktop sees it.
+ * The curated Qubit plugin catalog as the Desktop sees it.
  *
  * The Capabilities → Plugins tab embeds the docs-site catalog page
  * (`CATALOG_PICKER_URL`) as a one-click picker; that page renders
@@ -12,7 +12,7 @@
  * Plugin dialog, which still requires the user's explicit confirmation.
  */
 
-export const CATALOG_ORIGIN = 'https://hermes-agent.nousresearch.com'
+export const CATALOG_ORIGIN = 'https://github.com/cgraph-dev/qubit-voicebridge'
 export const CATALOG_PICKER_URL = `${CATALOG_ORIGIN}/docs/plugins?embed=picker`
 export const PLUGIN_CATALOG_URL = `${CATALOG_ORIGIN}/docs/api/plugins.json`
 
