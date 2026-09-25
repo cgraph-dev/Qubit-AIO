@@ -237,6 +237,8 @@ def run_bucket(target: Path, base: Path, ours: Path, theirs: Path,
         rec["result_sha256"] = (
             _sha(_read(target, rel)) if apply else None
         )
+        # The raw merged bytes are only needed by the writer; never serialize.
+        rec.pop("data", None)
         records.append(rec)
     return records
 
