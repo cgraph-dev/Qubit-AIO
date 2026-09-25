@@ -72,6 +72,11 @@ def cross_check(records: list[dict]) -> list[str]:
         computed[r["bucket"]][r["class"]] = computed[r["bucket"]].get(r["class"], 0) + 1
     problems: list[str] = []
     for bucket, exp in expected.items():
+        # In ``--bucket`` mode the audit accumulates one bucket at a time; a
+        # bucket not yet merged legitimately has no computed records.  Only
+        # cross-check buckets that are present in the audit.
+        if bucket not in computed:
+            continue
         got = computed.get(bucket, {})
         for cls, n in exp.items():
             if cls == "IDENTICAL":
