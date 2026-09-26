@@ -41,6 +41,15 @@ def homes(tmp_path, monkeypatch):
     secondary = tmp_path / "profiles" / "scaleup"
     launch.mkdir()
     secondary.mkdir(parents=True)
+    # Complete any pending discovery BEFORE snapshotting the registry. A sibling
+    # test (e.g. ``test_plugin_discovery``) can leave ``_discovered=False`` with
+    # the registry cleared and the plugin modules evicted; if discovery then ran
+    # lazily inside this test it would import the plugin modules against the
+    # monkeypatched registry copy below, and restoring the canonical registry
+    # afterwards would leave it empty (the modules are already in sys.modules,
+    # so a later re-discovery never re-registers). Populate canonically first.
+    if not providers._discovered:
+        providers._discover_providers()
     monkeypatch.setenv("QUBIT_HOME", str(launch))
     monkeypatch.setattr(providers, "_REGISTRY", dict(providers._REGISTRY))
     monkeypatch.setattr(providers, "_ALIASES", dict(providers._ALIASES))
