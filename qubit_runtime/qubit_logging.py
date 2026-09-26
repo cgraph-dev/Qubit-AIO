@@ -589,7 +589,7 @@ class _ProfileRoutingFileHandler(logging.Handler):
             self.addFilter(log_filter)
 
     def _home_for_record(self, record: logging.LogRecord) -> Path:
-        raw_home = getattr(record, "hermes_home", "")
+        raw_home = getattr(record, "qubit_home", "")
         try:
             candidate = Path(raw_home).expanduser().resolve()
         except (TypeError, ValueError, OSError):

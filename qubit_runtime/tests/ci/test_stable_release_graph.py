@@ -233,7 +233,7 @@ def test_release_gates_extract_consumer_facing_versions():
         step["run"] for step in nix["flake-check"]["steps"]
         if step.get("name") == "Verify release package runtime identity"
     )
-    assert '"$package/bin/hermes" --version' in nix_check
+    assert '"$package/bin/qubit" --version' in nix_check
     assert "actual != expected" in nix_check
 
 

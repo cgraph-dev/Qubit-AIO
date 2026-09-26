@@ -39,13 +39,20 @@ def select_channel(publisher: ChannelPublisher, policy: str) -> str:
     return {"stable-release": "stable", "canary-release": "canary"}[policy]
 
 
+# Resolve the packager identity from the vendored runtime root (the rebase moved
+# the whole upstream tree under ``qubit_runtime/``), not the caller's cwd.
+_PRODUCT_IDENTITY = Path(__file__).resolve().parents[2] / "apps/desktop/product-identity.cjs"
+
+
 def product_identity(tag: str, run=subprocess.check_output) -> dict:
     """Consume the packager's identity, not a Python copy of its naming rules."""
     env = dict(os.environ, HERMES_DESKTOP_VARIANT="bundled", HERMES_PAYLOAD_TAG=tag)
     for key in ("HERMES_BUILD_COMMIT", "_HERMES_CHANNEL_REQUEST_JSON"):
         env.pop(key, None)
-    raw = run(["node", "-e", "console.log(JSON.stringify(require('./apps/desktop/product-identity.cjs')))"],
-              env=env, text=True, encoding="utf-8", timeout=30)
+    raw = run(
+        ["node", "-e",
+         f"console.log(JSON.stringify(require({json.dumps(str(_PRODUCT_IDENTITY))})))"],
+        env=env, text=True, encoding="utf-8", timeout=30)
     identity = json.loads(raw)
     # This token reserves existing native identity; it does not create a new app.
     identity = {key: value for key, value in identity.items() if key not in {"store", "light", "channel"}}
