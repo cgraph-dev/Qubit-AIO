@@ -54,22 +54,29 @@ def _clean(value: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Explicit expected set -- curated manifest rows whose OLD path still exists in
-# this worktree.
+# this worktree: the engine must still plan these renames.
 #
-# Only three curated rows remain unrenamed here:
-#   * ``hermes.png`` (desktop product asset; manifest desktop-entry row)
+# Only two curated rows remain unrenamed here:
 #   * ``scripts/rebuild_ledger_hermes.py`` (manifest generator row)
 #   * ``tests/test_ledger_hermes_build.py`` (manifest test-file row)
 #
 # The other curated rows were already applied when the current tree was
-# rebranded, so their old paths do not exist and are excluded from the
-# assertion (per the task note).  The pinned upstream source still carries the
-# camel/hyphen/product basenames; those are covered by the fixture test below.
+# rebranded, so their old paths do not exist and are excluded from this
+# assertion.  The pinned upstream source still carries the camel/hyphen/product
+# basenames; those are covered by the fixture test below.
 CURRENT_TREE_EXPECTED = {
-    "qubit_runtime/apps/desktop/public/hermes.png":
-        "qubit_runtime/apps/desktop/public/qubit.png",
     "scripts/rebuild_ledger_hermes.py": "scripts/rebuild_ledger_qubit.py",
     "tests/test_ledger_hermes_build.py": "tests/test_ledger_qubit_build.py",
+}
+
+# Curated manifest rows already applied in this worktree: the canonical name
+# exists and the legacy name is gone.  ``hermes.png`` was renamed to the
+# canonical ``qubit.png`` when the tree was rebranded (the frozen manifest still
+# carries the ``hermes.png -> qubit.png`` row), so it is pinned here rather than
+# in the still-pending set above.
+CURRENT_TREE_APPLIED = {
+    "qubit_runtime/apps/desktop/public/qubit.png":
+        "qubit_runtime/apps/desktop/public/hermes.png",
 }
 
 # Basenames present in the pinned upstream source (v0.21.5) that the curated
@@ -106,6 +113,16 @@ def test_curated_renames_planned_for_existing_paths():
         if (old, new) not in planned:
             missing.append((old, new))
     assert not missing, f"engine did not plan curated renames: {missing}"
+
+    # Already-applied curated rows: the canonical name is present, the legacy
+    # name is gone, and the row is genuinely curated by the frozen manifest.
+    for canonical, legacy in CURRENT_TREE_APPLIED.items():
+        assert (REPO / canonical).exists(), (
+            f"expected applied canonical path missing from tree: {canonical}")
+        assert not (REPO / legacy).exists(), (
+            f"legacy path still present after rename: {legacy}")
+        assert curated.get(legacy.rsplit("/", 1)[-1]) == canonical.rsplit("/", 1)[-1], (
+            f"{legacy} -> {canonical} is not a curated manifest basename row")
 
 
 def test_curated_product_basenames_renamed_on_staged_source(tmp_path, monkeypatch):
