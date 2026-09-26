@@ -37,7 +37,7 @@ _GATEWAY_LIFECYCLE_PATTERN = re.compile(
     # See #77173.
     # Windows spells the CLI with a launcher suffix (`hermes.exe`, npm-style `hermes.cmd`/`.ps1`);
     # same command, so the suffix is optional here.
-    r"(?:(?<![/\w.\-])qubit(?:\.(?:exe|cmd|bat|com|ps1))?\s+gateway\s+(?:restart|stop|uninstall)\b)"
+    r"(?:(?<![/\w.\-])(?:qubit|hermes)(?:\.(?:exe|cmd|bat|com|ps1))?\s+gateway\s+(?:restart|stop|uninstall)\b)"
     # Branch B: launchctl ops anchored on a hermes-gateway label so unrelated qubit services stay
     # unblocked. `submit`/`bootstrap` register a NEW keepalive job wrapping an arbitrary helper (a
     # laundered restart); neutral-label submissions are caught by
@@ -97,7 +97,11 @@ _KILL_VERB_RE = re.compile(r"(?i)\b(?:kill|taskkill|stop-process)\b")
 # (`python -m qubit_cli.main gateway run` / `qubit gateway run`) only through its own tokens;
 # an unrelated script that merely contains "hermes" (`hermes-polis/run.sh`, `my_qubit_bot.py`)
 # cannot match it. Same qubit+gateway pairing as Branch D, plus the module path.
-_GATEWAY_CMDLINE_TOKEN_RE = re.compile(r"(?i)qubit_cli|\bhermes\b[^\n]*\bgateway\b|\bgateway\b[^\n]*\bhermes\b")
+_GATEWAY_CMDLINE_TOKEN_RE = re.compile(
+    r"(?i)(?:qubit|hermes)_cli"
+    r"|\b(?:qubit|hermes)\b[^\n]*\bgateway\b"
+    r"|\bgateway\b[^\n]*\b(?:qubit|hermes)\b"
+)
 # Rejection text for Branch E, shared by every tool surface that runs the guard so the agent is
 # pointed at the ownership-scoped route (proc_* id / explicit PID) rather than the shell.
 HOST_INTERPRETER_KILL_REJECTION = (
@@ -140,7 +144,7 @@ def _pattern_reaches_host_interpreter(pattern: str, *, full_cmdline: bool, exact
         head = head[: match.start()]
     if not _is_interpreter_image(head, substring=not exact):
         return full_cmdline and bool(_GATEWAY_CMDLINE_TOKEN_RE.search(core))
-    return not rest.strip() or bool(_ERE_WILDCARD_ONLY.match(rest)) or "hermes" in rest.lower()
+    return not rest.strip() or bool(_ERE_WILDCARD_ONLY.match(rest)) or bool(_GATEWAY_CMDLINE_TOKEN_RE.search(rest))
 
 
 def _killer_targets_host_interpreter(name: str, args: list[str]) -> bool:
@@ -245,7 +249,7 @@ _ARGV_LIST_PUNCTUATION = re.compile(r"[\[\],]+")
 # the self-targeting shape (named profile == the profile running the guard). See #78028.
 _PROFILE_FLAG_LIFECYCLE_PATTERN = re.compile(
     r"(?i)"
-    r"qubit\s+"
+    r"(?:qubit|hermes)\s+"
     # Any global flags before the profile selector (each may carry a value).
     r"(?:-{1,2}\S+(?:\s+\S+)?\s+)*"
     # The selector: exactly the shapes the CLI's `_apply_profile_override` accepts.
