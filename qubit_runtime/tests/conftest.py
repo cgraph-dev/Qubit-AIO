@@ -807,8 +807,12 @@ def _reset_tui_gateway_server_state():
             obj.clear()
 
     if snapshot is not None:
-        mod._methods.clear()
-        mod._methods.update(snapshot["methods"])
+        # This finalizer can run before the test's own monkeypatch undo, so a
+        # global may still be replaced with a non-dict test double — skip those
+        # (monkeypatch restores the real, pre-test object afterwards anyway).
+        if isinstance(getattr(mod, "_methods", None), dict):
+            mod._methods.clear()
+            mod._methods.update(snapshot["methods"])
         mod._cfg_cache, mod._cfg_sig, mod._cfg_path = snapshot["cfg"]
         mod._db, mod._db_error = snapshot["db"]
         mod._real_stdout = snapshot["real_stdout"]

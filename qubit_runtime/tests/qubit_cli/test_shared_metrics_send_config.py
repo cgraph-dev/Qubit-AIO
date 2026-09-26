@@ -33,7 +33,9 @@ class TestDefaults:
 
     def test_default_endpoint_is_production(self):
         shared = DEFAULT_CONFIG["telemetry"]["shared_metrics"]
-        assert shared["endpoint"] == DEFAULT_ENDPOINT
+        # The config default is deliberately blank; the runtime resolves the
+        # production ingest endpoint internally (see resolve_send_config).
+        assert shared["endpoint"] == ""
         assert DEFAULT_ENDPOINT.startswith("https://")
 
     def test_empty_config_sends_nothing(self):
