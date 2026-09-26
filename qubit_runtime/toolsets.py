@@ -348,11 +348,11 @@ _resolve_toolset_memo: Dict[Tuple[str, bool, int, int, str], List[str]] = {}
 
 
 def _plugin_platform_bundle(name: str) -> List[str]:
-    """Implicit `qubit-<platform>` bundle for a registered plugin platform: core
+    """Implicit `hermes-<platform>` bundle for a registered plugin platform: core
     tools plus whatever the plugin registered under the platform name. [] otherwise."""
-    if not name.startswith("qubit-"):
+    if not name.startswith("hermes-"):
         return []
-    platform_name = name[len("qubit-"):]
+    platform_name = name[len("hermes-"):]
     try:
         from gateway.platform_registry import platform_registry
         if not platform_registry.is_registered(platform_name):

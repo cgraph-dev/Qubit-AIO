@@ -33,7 +33,7 @@ def stage2_text() -> str:
 
 
 def _sync_block(text: str) -> str:
-    start = text.index("# --- Sync deploy-injected Nous routing overrides")
+    start = text.index("# --- Sync deploy-injected Qubit routing overrides")
     end = text.index("# .env holds API keys and secrets", start)
     return text[start:end]
 

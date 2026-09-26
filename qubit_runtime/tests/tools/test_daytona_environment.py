@@ -143,7 +143,7 @@ class TestPersistence:
         env = make_env(get_side_effect=lambda name: existing, persistent=True,
                        task_id="mytask")
         existing.start.assert_called_once()
-        env._mock_client.get.assert_called_once_with("hermes-mytask")
+        env._mock_client.get.assert_called_once_with("qubit-mytask")
         env._mock_client.create.assert_not_called()
 
 
