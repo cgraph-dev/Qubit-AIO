@@ -91,6 +91,13 @@ def _env(root: Path, extra=None) -> dict:
     env = dict(os.environ)
     env["QUBIT_CANDIDATE_ROOT"] = str(root)
     env["QUBIT_DELTA_OUT"] = str(root / "V0_21_5_DELTA.json")
+    # The candidate smoke test imports the vendored v0.21.5 modules
+    # (``qubit_yaml`` -> ``ruamel.yaml``), so the build must run under an
+    # interpreter that carries the project's declared dependencies.  The script
+    # otherwise defaults to a bare ``python3`` on PATH, which is the system
+    # interpreter rather than the venv that runs this suite; pin it explicitly
+    # to the interpreter executing the tests.
+    env["QUBIT_PYTHON"] = sys.executable
     if extra:
         env.update(extra)
     return env

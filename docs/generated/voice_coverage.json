@@ -10914,17 +10914,233 @@
       "resolution": "real",
       "surface": "tools",
       "voice_intent": "qubit skills install yuanbao"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset a2a",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable a2a"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset browser",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable browser"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset clarify",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable clarify"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset code_execution",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable code_execution"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset computer_use",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable computer_use"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset connections",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable connections"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset context_engine",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable context_engine"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset cronjob",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable cronjob"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset delegation",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable delegation"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset file",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable file"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset homeassistant",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable homeassistant"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset image_gen",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable image_gen"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset kanban",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable kanban"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset memory",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable memory"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset session_search",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable session_search"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset skills",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable skills"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset spotify",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable spotify"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset stt",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable stt"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset terminal",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable terminal"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset todo",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable todo"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset tts",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable tts"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset video",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable video"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset video_gen",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable video_gen"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset vision",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable vision"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset web",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable web"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset x_search",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable x_search"
+    },
+    {
+      "entry": "cli_tools_enable",
+      "id": "toolset yuanbao",
+      "kind": "match",
+      "resolution": "real",
+      "surface": "tools",
+      "voice_intent": "qubit tools enable yuanbao"
     }
   ],
   "schema": "qubit-voice-coverage/1",
   "source": "docs/generated/parity_inventory.json",
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
-    "distinct_intents": 857,
+    "distinct_intents": 884,
     "guard": 193,
-    "real": 1161,
-    "real_pct": 85.18,
-    "rows": 1363,
+    "real": 1188,
+    "real_pct": 85.47,
+    "rows": 1390,
     "unresolved": 9
   },
   "surfaces": {
@@ -10958,9 +11174,9 @@
     },
     "tools": {
       "guard": 1,
-      "real": 94,
-      "real_pct": 98.95,
-      "total": 95,
+      "real": 121,
+      "real_pct": 99.18,
+      "total": 122,
       "unresolved": 0
     }
   }
