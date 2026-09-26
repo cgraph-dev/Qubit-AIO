@@ -77,8 +77,9 @@ def test_cron_bot_chat_delivery_defer_write_path_no_longer_raises():
 
 def test_anon_auth_guest_gate_and_route_predicates(monkeypatch):
     anon = __import__("qubit_cli.anon_auth", fromlist=["x"])
-    # Wire identifiers are preserved verbatim under the rename map.
-    assert anon.GUEST_MODEL == "nous/welcome"
+    # The guest model id follows the rebrand; the wire header/env identifiers
+    # (and the upstream welcome hostname) are preserved verbatim.
+    assert anon.GUEST_MODEL == "qubit/welcome"
     assert anon.MODEL_SWITCH_HEADER == "x-nous-model-switch"
     assert anon.GUEST_ONBOARDING_ENV == "HERMES_GUEST_ONBOARDING"
     # The launch gate is exact "1"; anything else keeps the free tier dark.
@@ -94,8 +95,8 @@ def test_anon_auth_guest_gate_and_route_predicates(monkeypatch):
     copy = anon.anon_failure_copy(anon.ANON_RATE_LIMITED, retry_after=120)
     assert "guest" not in copy.lower() and "anonymous" not in copy.lower()
     # Structured welcome refusals parse only the gateway's known shape.
-    parsed = anon.parse_welcome_refusal({"reason": "model_not_free", "retry_after": "3", "alternates": ["nous/welcome"]})
-    assert parsed == {"reason": "model_not_free", "retry_after": 3, "alternates": ["nous/welcome"], "upgrade_url": ""}
+    parsed = anon.parse_welcome_refusal({"reason": "model_not_free", "retry_after": "3", "alternates": ["qubit/welcome"]})
+    assert parsed == {"reason": "model_not_free", "retry_after": 3, "alternates": ["qubit/welcome"], "upgrade_url": ""}
     assert anon.parse_welcome_refusal({"reason": "unknown"}) is None
 
 

@@ -225,10 +225,10 @@ def test_static_fleet_manifest_mirrors_pinned_plugins():
             if bundle.read_bytes() == pinned_bytes:
                 continue
             # A divergent SPA-shipped asset must be a documented Qubit rebrand
-            # patch (exact hash + reason) in the provenance manifest.
+            # patch (exact hash + reason) in the canonical provenance manifest.
             import hashlib
             man = json.loads(
-                (REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_SOURCE_COMPARISON.json")
+                (REPO_ROOT / "docs/generated" / "HERMES_SOURCE_COMPARISON.json")
                 .read_text(encoding="utf-8"))
             q = (f"frontend/qubit-web/public/plugins/{name}/{rel}")
             row = next((r for r in man["rows"] if r.get("qubit") == q), None)

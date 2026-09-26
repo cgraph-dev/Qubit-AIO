@@ -23,7 +23,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 FORK = REPO / "qubit_runtime"
-PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
+PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 
 
 def _free_port() -> int:
