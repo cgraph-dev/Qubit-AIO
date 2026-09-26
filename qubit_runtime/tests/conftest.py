@@ -35,6 +35,20 @@ PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Children spawned by tests with ``env=dict(os.environ)`` import the vendored
+# runtime by bare name (``agent``, ``tui_gateway``, ``tests.…``). Upstream that
+# worked because the repo root WAS the package root and cwd sat on sys.path;
+# after the rebase moved the runtime under ``qubit_runtime/`` the process cwd is
+# the repo root, so bare-name imports in a child died with
+# ``ModuleNotFoundError: No module named 'agent'``. Export the runtime root on
+# the pytest process env so every inheriting child resolves it — the same effect
+# the runner used to get from cwd. Tests that build a clean child env still
+# override PYTHONPATH explicitly.
+_CHILD_IMPORT_ROOT = str(PROJECT_ROOT)
+_CHILD_PYTHONPATH = [p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]
+if _CHILD_IMPORT_ROOT not in _CHILD_PYTHONPATH:
+    os.environ["PYTHONPATH"] = os.pathsep.join([_CHILD_IMPORT_ROOT, *_CHILD_PYTHONPATH])
+
 
 # ── Sandbox QUBIT_HOME before ANY test module is imported ──────────────────
 # `qubit_cli/main.py` calls `setup_logging()` at MODULE level, which resolves

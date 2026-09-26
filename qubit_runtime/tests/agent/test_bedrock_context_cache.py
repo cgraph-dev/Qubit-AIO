@@ -172,6 +172,37 @@ assert mm.get_model_context_length(sys.argv[1], base_url=sys.argv[2], provider="
     subprocess.run([sys.executable, "-c", script, model, base_url], check=True, capture_output=True, text=True)
 
 
+def test_persisted_bedrock_window_is_reused_after_restart(isolated_home, monkeypatch):
+    """A provider-confirmed Bedrock window is read back by a fresh interpreter.
+
+    Focused regression for the restart path: once a probe has persisted a
+    provider-confirmed length, a restarted process must reuse it (and must not
+    re-probe). The child inherits this process's env, which is also what exposes
+    the rebase harness gap — child processes need the vendored runtime root on
+    ``PYTHONPATH`` (exported by ``qubit_runtime/tests/conftest.py``).
+    """
+    model = "global.xai.grok-4.6"
+    probe = Mock(return_value=128_000)
+    monkeypatch.setattr(ba, "probe_bedrock_context_length", probe)
+    assert mm.get_model_context_length(model, provider="bedrock", base_url="") == 128_000
+    probe.assert_called_once_with(model, "us-east-1")
+    # The probe is the only authoritative source, so its value carries provenance.
+    key = mm._context_cache_key(model, "bedrock://")
+    raw = yaml.safe_load((isolated_home / "context_length_cache.yaml").read_text())
+    assert raw["bedrock_confirmed_v1"][key] == 128_000
+    script = '''
+import json, sys
+from agent import bedrock_adapter as ba
+from agent.context_compressor import ContextCompressor
+ba.probe_bedrock_context_length = lambda *a, **k: (_ for _ in ()).throw(AssertionError("re-probed persisted bedrock window"))
+c = ContextCompressor(sys.argv[1], provider="bedrock", base_url=sys.argv[2], quiet_mode=True)
+print(json.dumps([c.context_length, c.threshold_tokens]))
+'''
+    result = subprocess.run([sys.executable, "-c", script, model, ""],
+                            env=dict(os.environ), text=True, capture_output=True, check=True)
+    assert json.loads(result.stdout) == [128_000, int(128_000 * 0.75)]
+
+
 @pytest.mark.parametrize("base_url", ["", "https://bedrock-runtime.us-east-1.amazonaws.com"])
 def test_readonly_legacy_cache_does_not_reset_probe_cooldown(isolated_home, monkeypatch, base_url):
     model = "global.xai.grok-4.6"
