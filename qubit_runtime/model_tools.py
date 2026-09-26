@@ -285,11 +285,11 @@ def _apply_toolset_selection(tools: set, names: List[str], quiet_mode: bool, *, 
     for name in names:
         if validate_toolset(name):
             label = f"{verb} toolset"
-            if disable and (name.startswith("qubit-") or (get_toolset(name) or {}).get("posture")):
+            if disable and (name.startswith("hermes-") or (get_toolset(name) or {}).get("posture")):
                 # Bundles/postures re-list the core tools without owning them;
                 # subtracting the whole set would empty the list — remove only the non-core delta.
                 resolved = sorted(bundle_non_core_tools(name))
-                if not quiet_mode and name.startswith("qubit-") and name not in _WARNED_DISABLED_BUNDLES:
+                if not quiet_mode and name.startswith("hermes-") and name not in _WARNED_DISABLED_BUNDLES:
                     _WARNED_DISABLED_BUNDLES.add(name)
                     logger.info(
                         "agent.disabled_toolsets contains platform-bundle name '%s'; core tools are "

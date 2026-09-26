@@ -251,7 +251,9 @@ print(json.dumps({"host_send": host_send, "cron": cron,
     env.update({
         "QUBIT_HOME": str(home),
         "HERMES_KANBAN_TASK": "fixture",
-        "PYTHONPATH": os.getcwd(),
+        # The vendored runtime lives under qubit_runtime/ after the rebase, so the
+        # package root is this file's third parent, not the pytest cwd.
+        "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     })
     completed = subprocess.run(
         [sys.executable, "-c", script],

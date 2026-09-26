@@ -444,7 +444,7 @@ def test_snap_compat_drops_only_init_and_no_new_privileges(monkeypatch):
     assert "--init" not in compat and "no-new-privileges" not in compat
 
     def strip(argv):  # everything except the two flags and the random container name
-        return [a for a in argv if a not in ("--init", "--security-opt", "no-new-privileges") and not a.startswith("hermes-")]
+        return [a for a in argv if a not in ("--init", "--security-opt", "no-new-privileges") and not a.startswith("qubit-")]
 
     assert strip(default) == strip(compat)
 
@@ -1053,7 +1053,7 @@ def test_failed_docker_run_cleans_up_orphaned_container(monkeypatch):
     assert len(cleanup_calls) == 1, "docker rm should be called once for the orphaned container"
     rm_cmd = cleanup_calls[0]
     assert rm_cmd[1] == "rm" and rm_cmd[2] == "-f"
-    assert rm_cmd[3].startswith("hermes-"), "should remove the container by its generated name"
+    assert rm_cmd[3].startswith("qubit-"), "should remove the container by its generated name"
 
 
 def test_docker_run_timeout_cleans_up_orphaned_container(monkeypatch):
@@ -1088,7 +1088,7 @@ def test_docker_run_timeout_cleans_up_orphaned_container(monkeypatch):
     assert len(cleanup_calls) == 1, "docker rm should be called once for the orphaned container"
     rm_cmd = cleanup_calls[0]
     assert rm_cmd[1] == "rm" and rm_cmd[2] == "-f"
-    assert rm_cmd[3].startswith("hermes-"), "should remove the container by its generated name"
+    assert rm_cmd[3].startswith("qubit-"), "should remove the container by its generated name"
 
 
 

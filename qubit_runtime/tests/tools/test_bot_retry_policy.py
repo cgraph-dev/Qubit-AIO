@@ -71,9 +71,10 @@ def _deliver(params):
 
 def _is_qubit_cli(argv) -> bool:
     """Match the delivery CLI by basename — local_delivery_command may
-    resolve the venv-relative hermes next to the interpreter (#93590)."""
+    resolve the venv-relative qubit next to the interpreter (#93590). The
+    legacy ``hermes`` entrypoint is accepted as a read-old fallback."""
     name = str(argv[0]).rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
-    return name in ("hermes", "hermes.exe")
+    return name in ("qubit", "qubit.exe", "hermes", "hermes.exe")
 
 
 def _transport_calls(calls):

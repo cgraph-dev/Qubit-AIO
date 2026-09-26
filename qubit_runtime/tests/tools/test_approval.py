@@ -114,7 +114,7 @@ class TestDetectDangerousRm:
     @pytest.mark.platforms("linux")
     def test_nonrecursive_verification_artifact_cleanup_is_not_dangerous(self):
         with mock_patch("tempfile.gettempdir", return_value="/tmp"):
-            for prefix in ("hermes-verify-", "hermes-ad-hoc-"):
+            for prefix in ("qubit-verify-", "qubit-ad-hoc-"):
                 assert detect_dangerous_command(f"rm -f /tmp/{prefix}example.py") == (
                     False,
                     None,
@@ -127,7 +127,7 @@ class TestDetectDangerousRm:
         real_temp.mkdir()
         linked_temp = tmp_path / "linked-temp"
         linked_temp.symlink_to(real_temp, target_is_directory=True)
-        basename = "hermes-verify-example.py"
+        basename = "qubit-verify-example.py"
 
         with mock_patch("tempfile.gettempdir", return_value=str(linked_temp)):
             assert detect_dangerous_command(f"rm -f {linked_temp / basename}")[0] is True
