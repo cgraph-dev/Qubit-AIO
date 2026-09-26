@@ -115,6 +115,10 @@ resolve_python() {
     printf '%s\n' "$REPO_ROOT/.venv/bin/python"
     return 0
   fi
+  if [ -x "/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/python" ]; then
+    printf '%s\n' "/home/trick/Projects/Repos/qubit-voicebridge/.venv/bin/python"
+    return 0
+  fi
   if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
     printf '%s\n' "$VIRTUAL_ENV/bin/python"
     return 0
