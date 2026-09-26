@@ -4,7 +4,7 @@
  "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
  "counts": {
   "production_referenced": 32,
-  "route_test_reachable": 32,
+  "route_test_reachable": 36,
   "registration_only": 2,
   "test_referenced": 2
  },
@@ -216,6 +216,18 @@
    "test_references": {}
   },
   {
+   "handler": "h_audio_voice_live_status",
+   "defined": true,
+   "routes": [
+    "GET /api/audio/voice-live/status"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
    "handler": "h_auth_me",
    "defined": true,
    "routes": [
@@ -337,6 +349,18 @@
    "test_references": {}
   },
   {
+   "handler": "h_gateway_migrate_plan",
+   "defined": true,
+   "routes": [
+    "GET /api/gateway/migrate/plan"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
    "handler": "h_git_base_branches",
    "defined": true,
    "routes": [
@@ -446,6 +470,18 @@
    "test_references": {}
   },
   {
+   "handler": "h_health_idle",
+   "defined": true,
+   "routes": [
+    "GET /api/health/idle"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
+   "script_references": {},
+   "test_references": {}
+  },
+  {
    "handler": "h_hooks_create",
    "defined": true,
    "routes": [
@@ -474,6 +510,18 @@
      "806: return HC.h_hooks_update(cfg, {}, {**dict(payload or {}),"
     ]
    },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "h_host_identity",
+   "defined": true,
+   "routes": [
+    "GET /api/host/identity"
+   ],
+   "classification": "route_test_reachable",
+   "route_test_reachable": true,
+   "production_references": {},
    "script_references": {},
    "test_references": {}
   },
