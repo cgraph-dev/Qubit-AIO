@@ -53,6 +53,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -75,13 +76,61 @@ REF_OPTIONAL_MCPS = REF_AGENT / "optional-mcps"
 REF_DASHBOARD = "http://127.0.0.1:9119/?profile=default"
 
 # --- Qubit (this worktree) -------------------------------------------------
-QUBIT_BIN = REPO_ROOT / ".venv" / "bin" / "qubit"
+# Resolve the Qubit CLI robustly instead of assuming a checkout-local
+# ``.venv``: the artifact and its evidence must not embed the absolute path of
+# whichever checkout/interpreter happened to render it (the stale committed
+# copy embedded ``/tmp/qubit-w4``). Preference order: explicit override env,
+# the running interpreter's sibling console script (a venv install), the
+# checkout venv, then ``$PATH``.
+def _resolve_qubit_bin() -> str:
+    candidates: List[Path] = []
+    for env_name in ("QUBIT_PARITY_QUBIT_BIN", "QUBIT_BIN"):
+        value = os.environ.get(env_name)
+        if value:
+            candidates.append(Path(value).expanduser())
+    candidates.append(Path(sys.executable).parent / "qubit")
+    candidates.append(REPO_ROOT / ".venv" / "bin" / "qubit")
+    which = shutil.which("qubit")
+    if which:
+        candidates.append(Path(which))
+    for cand in candidates:
+        try:
+            if (cand.is_file() and os.access(cand, os.X_OK)
+                    and cand.name.startswith("qubit")):
+                return str(cand)
+        except OSError:
+            continue
+    # Last-resort historical default; consumers see an empty CLI surface rather
+    # than a traceback if even this is absent.
+    return str(REPO_ROOT / ".venv" / "bin" / "qubit")
+
+
+QUBIT_BIN = _resolve_qubit_bin()
+# Checkout-neutral labels recorded in the artifact's evidence: the command name
+# is stable across machines, the resolved path is not.
+QUBIT_BIN_LABEL = "qubit"
+REF_HERMES_LABEL = "hermes"
+QUBIT_SKILLS_LABEL = "$QUBIT_HOME/skills"
 QUBIT_OPTIONAL_MCPS = REPO_ROOT / "qubit_runtime" / "optional-mcps"
 QUBIT_RUNTIME_SKILLS = (
     Path.home() / ".local" / "state" / "qubit-voicebridge" / "runtime" / "skills"
 )
 QUBIT_FRONTEND_APP = REPO_ROOT / "frontend" / "qubit-web" / "src" / "App.tsx"
 QUBIT_FRONTEND_PAGES = REPO_ROOT / "frontend" / "qubit-web" / "src" / "pages"
+
+
+def _home_relative(path: Path) -> str:
+    """Render *path* as ``~/...`` when it lives under ``$HOME``.
+
+    The artifact records where evidence was observed. Absolute host paths make
+    the artifact non-reproducible across machines, so user-scoped paths are
+    stored home-relative; an explicit out-of-home override is kept verbatim.
+    """
+    try:
+        return "~/" + Path(path).relative_to(Path.home()).as_posix()
+    except ValueError:
+        return str(path)
+
 
 DEFAULT_OUT = REPO_ROOT / "docs" / "generated" / "parity_inventory.json"
 SCHEMA = "qubit-parity-inventory/1"
@@ -116,14 +165,26 @@ _HELP_CACHE: Dict[Tuple[str, ...], str] = {}
 # --------------------------------------------------------------------------- io
 
 
-def _run(bin_argv: List[str], timeout: int = 30) -> str:
-    """Run a help command and return stdout+stderr ("" on any failure)."""
-    try:
-        p = subprocess.run(bin_argv, capture_output=True, text=True,
-                           timeout=timeout)
-        return p.stdout + p.stderr
-    except Exception:
-        return ""
+def _run(bin_argv: List[str], timeout: int = 45) -> str:
+    """Run a help command and return stdout+stderr ("" on persistent failure).
+
+    A transient subprocess failure (timeout under load, SIGKILL, empty I/O)
+    must not silently erase a command from the inventory, because the artifact
+    is compared byte-for-byte by ``--check`` and a single dropped ``--help``
+    would flip rows to MISSING non-deterministically. ``--help``/``tools list``
+    always produce output when they succeed, so an empty result is retried once
+    before it is accepted as a real absence.
+    """
+    for _attempt in range(2):
+        try:
+            p = subprocess.run(bin_argv, capture_output=True, text=True,
+                               timeout=timeout)
+            out = p.stdout + p.stderr
+            if out.strip():
+                return out
+        except Exception:
+            continue
+    return ""
 
 
 def _help(bin_argv: Tuple[str, ...]) -> str:
@@ -203,7 +264,7 @@ def ref_routes() -> List[Dict[str, Any]]:
             method = m.group(1).upper()
             path = m.group(2)
             line = text.count("\n", 0, m.start()) + 1
-            seen.setdefault((method, path), f"{f}:{line}")
+            seen.setdefault((method, path), f"{_home_relative(f)}:{line}")
     return [{"method": m, "path": p, "evidence": ev}
             for (m, p), ev in sorted(seen.items(), key=lambda kv: (kv[0][0], kv[0][1]))]
 
@@ -416,8 +477,8 @@ def build_cli() -> List[Dict[str, Any]]:
             "voice_intent": _cmd_from_counterpart(counterpart),
             "voice_intent_verified": False,
             "evidence": {
-                "reference": f"`{REF_HERMES} {' '.join(parts)} --help`",
-                "qubit": (f"`{QUBIT_BIN} agent {' '.join(parts)} --help`"
+                "reference": f"`{REF_HERMES_LABEL} {' '.join(parts)} --help`",
+                "qubit": (f"`{QUBIT_BIN_LABEL} agent {' '.join(parts)} --help`"
                           if classification != "MISSING" else "no counterpart"),
             },
         })
@@ -444,7 +505,7 @@ def build_controls(qc_unused=None) -> List[Dict[str, Any]]:
                 "voice_intent": "qubit " + path.strip("/").replace("-", " "),
                 "voice_intent_verified": False,
                 "evidence": {
-                    "reference": f"{REF_AGENT}/web/src/App.tsx",
+                    "reference": f"{_home_relative(REF_AGENT)}/web/src/App.tsx",
                     "qubit": "frontend/qubit-web/src/App.tsx" if present else "no counterpart",
                 },
             })
@@ -463,7 +524,7 @@ def build_controls(qc_unused=None) -> List[Dict[str, Any]]:
                 "voice_intent": "qubit " + name[:-4].lower(),
                 "voice_intent_verified": False,
                 "evidence": {
-                    "reference": f"{REF_AGENT}/web/src/pages/{name}",
+                    "reference": f"{_home_relative(REF_AGENT)}/web/src/pages/{name}",
                     "qubit": counterpart or "no counterpart",
                 },
             })
@@ -508,7 +569,7 @@ def build_tools() -> List[Dict[str, Any]]:
                 "qubit_counterpart": f"qubit_runtime/optional-mcps/{target}" if present else None,
                 "voice_intent": f"qubit mcp install {name}",
                 "voice_intent_verified": False,
-                "evidence": {"reference": str(p),
+                "evidence": {"reference": _home_relative(p),
                              "qubit": "qubit_runtime/optional-mcps/" if present else "no counterpart"},
             })
     q_skills = {p.name for p in _skill_dirs(QUBIT_RUNTIME_SKILLS)}
@@ -523,8 +584,8 @@ def build_tools() -> List[Dict[str, Any]]:
             "qubit_counterpart": f"skill dir {target}" if present else None,
             "voice_intent": f"qubit skills install {name}",
             "voice_intent_verified": False,
-            "evidence": {"reference": str(p),
-                         "qubit": str(QUBIT_RUNTIME_SKILLS / target) if present else "no counterpart"},
+            "evidence": {"reference": _home_relative(p),
+                         "qubit": f"{QUBIT_SKILLS_LABEL}/{target}" if present else "no counterpart"},
         })
     ref_ts = ref_toolsets()
     q_ts = qubit_toolsets()
@@ -544,8 +605,8 @@ def build_tools() -> List[Dict[str, Any]]:
             "voice_intent": f"qubit tools enable {name}",
             "voice_intent_verified": False,
             "evidence": {
-                "reference": f"`{REF_HERMES} tools list`",
-                "qubit": f"`{QUBIT_BIN} agent tools list` enabled={q_ts.get(name)}",
+                "reference": f"`{REF_HERMES_LABEL} tools list`",
+                "qubit": f"`{QUBIT_BIN_LABEL} agent tools list` enabled={q_ts.get(name)}",
             },
         })
     return rows
@@ -692,7 +753,8 @@ def build() -> Dict[str, Any]:
     return {
         "schema": SCHEMA,
         "generated_from": {
-            "reference": (f"hermes-agent {version} @ {sha} @ {REF_AGENT} (read-only); "
+            "reference": (f"hermes-agent {version} @ {sha} @ "
+                          f"{_home_relative(REF_AGENT)} (read-only); "
                           f"live dashboard {REF_DASHBOARD}"),
             "reference_route_sources": route_files,
             "reference_cli": "`hermes --help` + per-command `--help` (recursive)",
@@ -712,14 +774,14 @@ def build() -> Dict[str, Any]:
             "evidence_commands": [
                 f"curl -s -o /dev/null -w '%{{http_code}}' {REF_DASHBOARD}  # 200",
                 "rg '@\\w+\\.(get|post|put|delete|patch|websocket|route)\\(' "
-                f"{REF_AGENT}/hermes_cli/web_routers/*.py "
-                f"{REF_AGENT}/hermes_cli/web_server.py",
-                f"{REF_HERMES} --help  # recursive top + subcommands",
-                f"{REF_HERMES} tools list",
-                f"ls {REF_SKILLS}/",
-                f"ls {REF_OPTIONAL_MCPS}/",
-                f"{QUBIT_BIN} --help ; {QUBIT_BIN} agent --help",
-                f"{QUBIT_BIN} agent tools list",
+                f"{_home_relative(REF_AGENT)}/hermes_cli/web_routers/*.py "
+                f"{_home_relative(REF_AGENT)}/hermes_cli/web_server.py",
+                f"{REF_HERMES_LABEL} --help  # recursive top + subcommands",
+                f"{REF_HERMES_LABEL} tools list",
+                f"ls {_home_relative(REF_SKILLS)}/",
+                f"ls {_home_relative(REF_OPTIONAL_MCPS)}/",
+                f"{QUBIT_BIN_LABEL} --help ; {QUBIT_BIN_LABEL} agent --help",
+                f"{QUBIT_BIN_LABEL} agent tools list",
                 "python -c 'from voicebridge import qubit_compat as qc; qc.match(method,path)'"
                 "  # route classification",
             ],

@@ -224,6 +224,9 @@ _EXTRA_PATH_RENAMES: dict[str, str] = {
     "ui-tui/src/types/hermes-ink.d.ts": "ui-tui/src/types/qubit-ink.d.ts",
     "web/src/components/HermesConsoleModal.tsx":
         "web/src/components/QubitConsoleModal.tsx",
+    # desktop product asset renamed by the deep rebrand
+    # (scripts/qubit_rebrand.py CURATED_BASENAME_RENAMES: hermes.png -> qubit.png)
+    "apps/desktop/public/hermes.png": "apps/desktop/public/qubit.png",
 }
 #: Directory-prefix renames (upstream prefix -> shipped prefix).
 _EXTRA_PREFIX_RENAMES: tuple[tuple[str, str], ...] = (
@@ -282,8 +285,8 @@ def _is_deep_rebrand_path(rel: str) -> bool:
     return True
 
 
-def _local_from_upstream(rel: str) -> str:
-    """Translate one upstream path to its shipped Qubit path (identity if none).
+def _canonical_local_from_upstream(rel: str) -> str:
+    """Translate one upstream path to its canonical Qubit path (identity if none).
 
     Every path segment is considered: the structural rename moved both
     top-level modules and nested names such as ``tests/hermes_cli/`` and
@@ -310,6 +313,57 @@ def _local_from_upstream(rel: str) -> str:
         else:
             out.append(seg)
     return "/".join(out)
+
+
+def _is_curated_rename(rel: str) -> bool:
+    """True when *rel*'s own identity (path/prefix/basename) is rename-mapped.
+
+    A generic module-token pass (``_map_stem``) rewrites an upstream stem
+    anywhere it appears, including inside reference-only test filenames. Only a
+    curated rule (``_EXTRA_PATH_RENAMES`` / ``_EXTRA_PREFIX_RENAMES`` /
+    ``_EXTRA_NAME_RENAMES`` / ``_UPSTREAM_TO_LOCAL``) names a file the fork is
+    known to ship under a Qubit path, so only those are safe to resolve against
+    the on-disk set.
+    """
+    if rel in _EXTRA_PATH_RENAMES:
+        return True
+    for old_prefix, _new_prefix in _EXTRA_PREFIX_RENAMES:
+        if rel.startswith(old_prefix):
+            return True
+    parts = rel.split("/")
+    last = parts[-1]
+    stem, _ext = os.path.splitext(last)
+    if stem in _UPSTREAM_TO_LOCAL:
+        return True
+    if len(parts) == 1 and last in _EXTRA_NAME_RENAMES:
+        return True
+    return False
+
+
+def _local_from_upstream(rel: str, local_paths: set | None = None) -> str:
+    """Map an upstream path to the path the fork actually carries.
+
+    The canonical map (``_canonical_local_from_upstream``) assumes the fork
+    renamed every deep-rebrand path. That is not always true: a curated rename
+    may be unapplied (the fork kept the upstream name verbatim), so looking it
+    up at the canonical renamed path reports a phantom ``missing`` while the
+    verbatim file is a phantom ``extra``. When *local_paths* (the set of shipped
+    relative paths) is supplied, a curated rename is resolved against what
+    exists: prefer the canonical renamed path when present, otherwise keep the
+    upstream name when the fork carries it verbatim, otherwise fall back to the
+    canonical path (a real miss). Generic token renames are always applied, so
+    reference-only test filenames are not mistaken for product renames. Callers
+    that do not pass *local_paths* get the canonical map unchanged.
+    """
+    mapped = _canonical_local_from_upstream(rel)
+    if local_paths is None or mapped == rel:
+        return mapped
+    if mapped in local_paths:
+        return mapped
+    if _is_curated_rename(rel) and rel in local_paths:
+        return rel
+    return mapped
+
 
 # ---------------------------------------------------------------------------
 # Vendored-frontend comparison ledger (docs/archive/2026-09-21/HERMES_SOURCE_COMPARISON.json)
@@ -1363,7 +1417,9 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
 
     # Path-rename awareness: upstream rel -> shipped Qubit rel. A renamed file
     # is compared against its upstream original, never reported missing/extra.
-    upstream_local = {_local_from_upstream(rel): rel for rel in tree}
+    # Resolve against the shipped set so a verbatim (raw-copy) upstream name is
+    # recognized too, not only the canonical renamed path.
+    upstream_local = {_local_from_upstream(rel, local_set): rel for rel in tree}
     renamed: list[dict] = []
 
     def _blob_sha(blob_hash: str) -> str:
@@ -1719,11 +1775,49 @@ def build_comparison(upstream: Path, openclaw: Path) -> dict:
     }
 
 
+#: Read-only candidate sources for the pinned upstream tree, in preference
+#: order: the pristine pinned clones first (clean worktrees, no local edits),
+#: then the live reference install as the source of record. ``--check`` must
+#: work without an operator-supplied ephemeral path, so the first candidate
+#: whose HEAD equals PIN is selected; if none match, the first existing
+#: candidate is returned and ``_check_revision`` fails loudly with the mismatch.
+UPSTREAM_CANDIDATES = (
+    Path(f"/tmp/opencode/pinned/hermes-agent-{PIN[:10]}"),
+    Path(f"/tmp/qubit-pin-{PIN[:10]}"),
+    Path.home() / ".hermes" / "hermes-agent",
+    Path("/tmp/opencode/pinned/hermes-agent"),
+)
+
+
+def _resolve_upstream(explicit: str | None = None) -> Path:
+    if explicit:
+        return Path(explicit).expanduser()
+    fallback: Path | None = None
+    for candidate in UPSTREAM_CANDIDATES:
+        if not candidate.is_dir():
+            continue
+        if fallback is None:
+            fallback = candidate
+        try:
+            rev = _git(["rev-parse", "HEAD"], candidate).strip()
+        except Exception:  # noqa: BLE001 - not a git checkout; try the next
+            continue
+        if rev == PIN:
+            return candidate
+    if fallback is not None:
+        return fallback
+    return Path("/tmp/opencode/pinned/hermes-agent")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--upstream", default="/tmp/opencode/pinned/hermes-agent")
+    ap.add_argument("--upstream", default=None,
+                    help="pinned upstream git clone (default: auto-resolve a "
+                         "candidate whose HEAD equals the pin)")
     ap.add_argument("--local", default="qubit_runtime")
     ap.add_argument("--out", default="docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json")
+    ap.add_argument("--check", action="store_true",
+                    help="render in memory, compare with --out, write nothing")
     # Default to the owner-pinned OpenClaw clone that matches OPENCLAW_PIN
     # (tag OPENCLAW_TAG). The live pinned checkout is passed explicitly with
     # --openclaw; the default path is only a convenience fallback.
@@ -1733,7 +1827,7 @@ def main(argv=None) -> int:
                     default="docs/generated/HERMES_SOURCE_COMPARISON.json")
     args = ap.parse_args(argv)
 
-    upstream = Path(args.upstream)
+    upstream = _resolve_upstream(args.upstream)
     local = (REPO / args.local).resolve()
     out = (REPO / args.out).resolve()
 
@@ -1742,9 +1836,20 @@ def main(argv=None) -> int:
         return 2
 
     manifest = build_vendor_manifest(upstream, local, args.local)
+    payload = json.dumps(manifest, indent=1, sort_keys=True) + "\n"
+
+    if args.check:
+        if not out.is_file():
+            print(f"vendor manifest missing: {out}", file=sys.stderr)
+            return 1
+        if out.read_text(encoding="utf-8") != payload:
+            print(f"vendor manifest stale: {out}", file=sys.stderr)
+            return 1
+        print(f"vendor manifest up to date: {out}")
+        return 0
+
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n",
-                   encoding="utf-8")
+    out.write_text(payload, encoding="utf-8")
     counts = manifest["classification_counts"]
     print(f"wrote {_rel(out)}")
     print(f"  total={manifest['file_count']} identical={manifest['identical']} "
