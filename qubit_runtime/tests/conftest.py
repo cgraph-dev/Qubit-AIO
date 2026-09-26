@@ -60,7 +60,10 @@ _PRE_SANDBOX_KANBAN_OVERRIDE = os.environ.get("HERMES_KANBAN_HOME", "").strip()
 _PRE_SANDBOX_HERMES_HOME = os.environ.get("QUBIT_HOME", "")
 
 # Capture before any test fixture can override Path.home()/LOCALAPPDATA.
-from qubit_constants import _get_platform_default_qubit_home
+from qubit_constants import (
+    _get_platform_default_qubit_home,
+    _legacy_platform_default_qubit_home,
+)
 
 _NATIVE_HERMES_PARENT = _get_platform_default_qubit_home().parent
 
@@ -81,20 +84,29 @@ def _qubit_home_points_at_production(value: str) -> bool:
     if not value:
         return True
     try:
-        # The platform-default root, not a hardcoded ``~/.hermes``: Windows installs live under
-        # ``%LOCALAPPDATA%\hermes``, and a dev shell exporting that path used to be honored as
-        # "custom", pinning import-time paths (``tui_gateway.server._qubit_home``) to the live
-        # install so the state.db guard tripped on every store-touching test (#112692).
-        from qubit_state_guard import _real_platform_state_root
-
+        # Both platform-default homes are production-shaped: the Qubit-owned
+        # canonical ``~/.qubit`` and the legacy read-old ``~/.hermes``. A dev
+        # shell (or a test harness) that presets QUBIT_HOME to EITHER must be
+        # sandboxed, never honored — otherwise the session both runs against
+        # that home AND registers it as a guarded "real" root, so the very
+        # first read under it trips the tripwire. The rebrand moved the default
+        # from ``.hermes`` to ``.qubit``; checking only the legacy name let
+        # ``QUBIT_HOME=$HOME/.qubit`` slip through as "custom" (artifact: 606
+        # `REAL hermes home` failures when a harness presets that path).
         resolved = Path(value).expanduser().resolve()
-        real_root = _real_platform_state_root() or (Path.home() / ".hermes").resolve()
+        real_roots = {
+            _get_platform_default_qubit_home().resolve(),
+            _legacy_platform_default_qubit_home().resolve(),
+        }
     except Exception:
         return True
-    if resolved == real_root:
+    if resolved in real_roots:
         return True
-    # Profile home directly under the production root: <root>/profiles/<name>
-    return resolved.parent.name == "profiles" and resolved.parent.parent == real_root
+    # Profile home directly under a production root: <root>/profiles/<name>
+    return any(
+        resolved.parent.name == "profiles" and resolved.parent.parent == root
+        for root in real_roots
+    )
 
 
 # ``import qubit_bootstrap`` (transitively: any entry-point module) runs
@@ -1348,27 +1360,25 @@ _REAL_HERMES_ROOT_CANDIDATES: list[Path] = []
 
 
 def _capture_real_qubit_root() -> list[Path]:
-    """The real root(s) to refuse: the default ~/.hermes plus a pre-sandbox
-    custom QUBIT_HOME when one was set. Both are guarded — the default
-    because hardcoded restatements hit it; the custom one because
-    deployment-shaped tests (Docker /opt/data) must not touch the operator's
-    real custom root either."""
-    import platform
-
+    """The real root(s) to refuse: the platform-default home(s) plus a
+    pre-sandbox custom QUBIT_HOME when one was set. The defaults are guarded —
+    canonical ``~/.qubit`` because hardcoded restatements hit it, and legacy
+    ``~/.hermes`` because that external reference home must stay refused. A
+    custom QUBIT_HOME is guarded because deployment-shaped tests (Docker
+    /opt/data) must not touch the operator's real custom root either — but a
+    value matching a platform default is production-shaped, sandboxed by the
+    block above, and therefore never reaches this clause."""
     roots: list[Path] = []
-    try:
-        default_root = (Path.home() / ".hermes").resolve()
-        roots.append(default_root)
-    except Exception:
-        pass
-    # native-Windows default: %LOCALAPPDATA%\hermes (get_qubit_home's
-    # platform-native path) — guard it too
-    localappdata = os.environ.get("LOCALAPPDATA", "")
-    if localappdata:
+    # The resolvers already apply the Windows ``%LOCALAPPDATA%`` base and the
+    # data-directory suffix, so both the canonical and legacy homes are covered.
+    for resolver in (
+        _get_platform_default_qubit_home,
+        _legacy_platform_default_qubit_home,
+    ):
         try:
-            win_root = (Path(localappdata) / "hermes").resolve()
-            if win_root not in roots:
-                roots.append(win_root)
+            root = resolver().resolve()
+            if root not in roots:
+                roots.append(root)
         except Exception:
             pass
     if _PRE_SANDBOX_HERMES_HOME and not _qubit_home_points_at_production(
