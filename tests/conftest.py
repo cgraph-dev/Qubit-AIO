@@ -6,12 +6,85 @@ overrides also let tests force compiler mode (4b rollback path) and reset
 the module-level compiler cache between cases.
 """
 import os
+import shutil
 import tempfile
+from pathlib import Path
 
 import pytest
 
-os.environ["VOICE_BRIDGE_MEMORY_DB"] = os.path.join(
-    tempfile.mkdtemp(prefix="vb-mem-"), "mem.db")
+import tmp_policy
+
+
+def pytest_addoption(parser):  # noqa: D103
+    group = parser.getgroup("qubit-tmp")
+    group.addoption(
+        "--tmp-free-min-mb",
+        type=int,
+        default=tmp_policy.DEFAULT_MIN_FREE_MB,
+        help=(
+            "Refuse to start the session when free space on the filesystem "
+            "behind the test temp root is below this many MiB "
+            "(default: %(default)s)."
+        ),
+    )
+    group.addoption(
+        "--tmp-keep",
+        action="store_true",
+        default=False,
+        help="Keep the per-run test basetemp instead of removing it on exit.",
+    )
+
+
+def pytest_configure(config):  # noqa: D103
+    """Default ``--basetemp`` to a cleaned-up per-run dir and set ``TMPDIR``.
+
+    Runs before pytest's own ``tmpdir`` plugin builds its ``TempPathFactory``,
+    so ``config.option.basetemp`` set here is the one the session uses.
+    """
+    requested = config.option.basetemp
+    if requested:
+        base = Path(requested).expanduser()
+        config._qubit_owned_basetemp = False
+    else:
+        base = tmp_policy.per_run_dir(tmp_policy.temp_root())
+        config.option.basetemp = str(base)
+        config._qubit_owned_basetemp = True
+
+    min_free = int(config.getoption("tmp_free_min_mb")) * tmp_policy.MIB
+    try:
+        tmp_policy.enforce_space_guard(base, min_free)
+    except tmp_policy.TmpSpaceError as exc:
+        raise pytest.UsageError(str(exc)) from exc
+
+    base.mkdir(parents=True, exist_ok=True)
+    os.environ["TMPDIR"] = str(base)
+    tempfile.tempdir = str(base)
+    config._qubit_tmp_dir = str(base)
+
+
+def pytest_unconfigure(config):  # noqa: D103
+    """Remove the per-run basetemp we created; never a user-supplied one."""
+    if not getattr(config, "_qubit_owned_basetemp", False):
+        return
+    try:
+        if config.getoption("tmp_keep"):
+            return
+    except Exception:  # pragma: no cover - option may be absent on early exit
+        pass
+    shutil.rmtree(getattr(config, "_qubit_tmp_dir", ""), ignore_errors=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _isolate_voice_memory_db(tmp_path_factory):
+    """Scratch memory DB *inside* the cleaned basetemp, not ``/tmp/vb-mem-*``.
+
+    Created via ``tmp_path_factory`` so pytest has already materialized the
+    basetemp; the old module-import ``tempfile.mkdtemp`` left a ``/tmp/vb-mem-*``
+    directory behind on every run.
+    """
+    mem_dir = tmp_path_factory.mktemp("vb-mem")
+    os.environ["VOICE_BRIDGE_MEMORY_DB"] = str(mem_dir / "mem.db")
+    yield
 
 
 def pytest_runtest_setup(item):  # noqa: D103
