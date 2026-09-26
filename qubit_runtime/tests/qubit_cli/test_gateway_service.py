@@ -216,7 +216,7 @@ class TestServiceIdentityForForeignHome:
         assert gateway_cli.get_systemd_unit_path().parent == default_unit.parent
 
     def test_default_and_named_profile_homes_keep_their_names(self, machine_home, monkeypatch):
-        default_home = machine_home / ".hermes"
+        default_home = machine_home / ".qubit"
         (default_home / "profiles" / "alpha").mkdir(parents=True)
 
         monkeypatch.setenv("QUBIT_HOME", str(default_home))
@@ -1568,7 +1568,7 @@ class TestHermesHomeForTargetUser:
         monkeypatch.delenv("QUBIT_HOME", raising=False)
 
         result = gateway_cli._qubit_home_for_target_user("/home/alice")
-        assert result == "/home/alice/.hermes"
+        assert result == "/home/alice/.qubit"
 
 
 class TestGeneratedUnitIncludesLocalBin:

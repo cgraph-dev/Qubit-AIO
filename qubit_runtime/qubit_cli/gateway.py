@@ -2944,17 +2944,22 @@ def _ld_library_path_line(system: bool, target_home_dir: str | None = None) -> s
 
 def _qubit_home_for_target_user(target_home_dir: str) -> str:
     """Remap the current QUBIT_HOME (root's, under sudo) to the target user's equivalent:
-    ``/root/.hermes[/profiles/x]`` → ``/home/alice/.hermes[/profiles/x]``; custom paths kept as-is."""
+    ``/root/.qubit[/profiles/x]`` → ``/home/alice/.qubit[/profiles/x]``; custom paths kept as-is."""
+    from qubit_constants import _LEGACY_HOME_DIR, _QUBIT_HOME_DIR
     current_qubit_raw = os.environ.get("QUBIT_HOME", "").strip()
     current_hermes = Path(current_qubit_raw).expanduser() if current_qubit_raw else get_qubit_home()
     # Keep paths lexical: resolving a non-existent path can bake a different QUBIT_HOME into the unit.
-    current_default = Path.home() / ".hermes"
-    target_default = Path(target_home_dir) / ".hermes"
     try:
-        # Default ~/.hermes or a profile/subdir of it → preserve the relative structure under the target.
-        return str(target_default / current_hermes.relative_to(current_default))
+        # Default ~/.qubit or a profile/subdir of it → preserve the relative structure under the target.
+        return str((Path(target_home_dir) / _QUBIT_HOME_DIR)
+                   / current_hermes.relative_to(Path.home() / _QUBIT_HOME_DIR))
     except ValueError:
-        return str(current_hermes)  # Completely custom path (not under ~/.hermes) — keep as-is
+        try:
+            # Pre-rebrand ``~/.hermes`` home (read-old) keeps its relative structure too.
+            return str((Path(target_home_dir) / _LEGACY_HOME_DIR)
+                       / current_hermes.relative_to(Path.home() / _LEGACY_HOME_DIR))
+        except ValueError:
+            return str(current_hermes)  # Completely custom path — keep as-is
 
 
 def _build_service_path_dirs(project_root: Path | None = None) -> list[str]:

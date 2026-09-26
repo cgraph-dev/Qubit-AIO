@@ -185,7 +185,7 @@ class TestAuditVerdicts:
     def test_live_locked_tree_keeps(self, repo):
         tree, _ = _add_worktree(repo, "hermes-live")
         _git(["worktree", "lock", str(tree),
-              "--reason", f"hermes pid={os.getpid()}"], repo)
+              "--reason", f"qubit pid={os.getpid()}"], repo)
         records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
         record = _verdict(records, "hermes-live")
         assert record.verdict == "keep"

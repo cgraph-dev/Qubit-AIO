@@ -782,11 +782,11 @@ class TestSkillsHubScanEndpoint:
 
 
 class TestUpdateCheckEndpoint:
-    """``GET /api/hermes/update/check`` reports availability without applying.
+    """``GET /api/qubit/update/check`` reports availability without applying.
 
     Powers the dashboard's check-before-you-update flow: the System page
     shows the commit-behind count and asks the user to confirm before
-    ``POST /api/hermes/update`` runs ``hermes update``.
+    ``POST /api/qubit/update`` runs ``qubit update --apply``.
     """
 
     @pytest.fixture(autouse=True)
@@ -801,7 +801,7 @@ class TestUpdateCheckEndpoint:
 
         monkeypatch.setattr("qubit_cli.source_check.check_for_updates", lambda **kw: {"behind": 5, "commits": []})
 
-        r = self.client.get("/api/hermes/update/check")
+        r = self.client.get("/api/qubit/update/check")
         assert r.status_code == 200
         body = r.json()
         assert {
@@ -831,7 +831,7 @@ class TestUpdateCheckEndpoint:
             ),
         )
 
-        body = self.client.get("/api/hermes/update/check").json()
+        body = self.client.get("/api/qubit/update/check").json()
         assert body["install_method"] == "managed-runtime"
         assert body["can_apply"] is False
         assert body["update_available"] is False
