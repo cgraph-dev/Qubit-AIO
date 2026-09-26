@@ -140,6 +140,36 @@ systemctl --user status qubit-voicebridge
 Headless / SSH (no X11): `qubit run --no-hotkey` and press Enter to
 start/stop capture, or `qubit once` for a single utterance.
 
+## Tests and disk hygiene
+
+The hermetic gates run with the project venv; every session gets a **bounded,
+self-cleaning** basetemp and has `TMPDIR` pointed at it, so scratch never
+accumulates in `/tmp/pytest-of-*`:
+
+```bash
+.venv/bin/python -m pytest tests/            # per-run basetemp, removed on exit
+.venv/bin/python -m pytest tests/ --tmp-keep # keep it for debugging
+```
+
+A free-space guard refuses to start a session when the filesystem behind the
+temp root has less than `--tmp-free-min-mb` (default **2048** MiB):
+
+```bash
+.venv/bin/python -m pytest tests/ --tmp-free-min-mb=4096
+QUBIT_PYTEST_TMPROOT=/mnt/scratch .venv/bin/python -m pytest tests/  # bigger disk
+```
+
+If `/tmp` is already full (the 97% incident that killed a run), reclaim only
+disposable test scratch — it never touches the repo, `~/.hermes`, or
+`~/.local/state`:
+
+```bash
+scripts/tmp_reclaim.sh              # safe: pytest temp roots, throwaway homes
+scripts/tmp_reclaim.sh --aggressive # + seeded reference clones/audit logs
+```
+
+See `tests/README.md` for the policy's details.
+
 ## Usage
 
 - **Hold Ctrl, talk** — release to send. TTS speech stops the moment you
