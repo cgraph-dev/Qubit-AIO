@@ -21,7 +21,8 @@ from typing import Dict, Tuple
 
 import pytest
 
-_MODULE = Path("plugins/platforms/photon/sidecar/send-format.mjs").resolve()
+_RUNTIME_ROOT = Path(__file__).resolve().parents[4]
+_MODULE = _RUNTIME_ROOT / "plugins/platforms/photon/sidecar/send-format.mjs"
 
 _CASES: Dict[str, Tuple[str, str, str]] = {
     # name: (format, text, expected builder)

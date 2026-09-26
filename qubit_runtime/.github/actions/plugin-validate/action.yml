@@ -29,7 +29,11 @@ runs:
         git -C "$source" checkout --detach FETCH_HEAD
         printf 'source=%s\n' "$source" >> "$GITHUB_OUTPUT"
         if [ "$RUNNER_OS" = Windows ]; then bootstrap=python; else bootstrap=python3; fi
-        "$bootstrap" -S "$source/scripts/ci/setup_toolchain.py" prepare \
+        # The rebased runtime nests the upstream tree under qubit_runtime/; accept
+        # either layout so the action validates a plain upstream checkout or Qubit.
+        script="$source/scripts/ci/setup_toolchain.py"
+        [ -f "$script" ] || script="$source/qubit_runtime/scripts/ci/setup_toolchain.py"
+        "$bootstrap" -S "$script" prepare \
           --toolchain python --home "$source/.build/pm"
 
     - name: Prepare the locked Python toolchain

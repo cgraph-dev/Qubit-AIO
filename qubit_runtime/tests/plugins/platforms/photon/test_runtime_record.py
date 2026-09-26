@@ -228,6 +228,6 @@ async def test_standalone_send_consumes_record_when_env_missing(
     assert result == {"success": True, "message_id": "m1"}
     url, _body, headers = _SendClient.calls[0]
     assert ":9111/" in url
-    assert headers["X-Hermes-Sidecar-Token"] == "record-token"
+    assert headers["X-Qubit-Sidecar-Token"] == "record-token"
 
 

@@ -115,7 +115,7 @@ def test_invalid_pattern_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("caption, cached_calls, dispatched", [
     ("holiday pic", 0, 0),          # unmentioned group attachment: never persisted
-    ("hermes holiday pic", 1, 1),   # mentioned: cached and dispatched
+    ("qubit holiday pic", 1, 1),   # mentioned: cached and dispatched
 ])
 async def test_unmentioned_group_attachment_is_not_cached(
         monkeypatch: pytest.MonkeyPatch, caption: str, cached_calls: int, dispatched: int) -> None:

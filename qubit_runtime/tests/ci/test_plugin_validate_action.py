@@ -13,6 +13,10 @@ def test_external_validator_checkout_uses_requested_ref_and_preserves_caller(tmp
     action = yaml.safe_load((repo / ".github/actions/plugin-validate/action.yml").read_text())
     source_step = next(step for step in action["runs"]["steps"] if step.get("id") == "source")
     ref = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    # The rebase nests the vendored tree under qubit_runtime/, so the tree root
+    # that carries .github/ is not the git repository root. Fetch from the latter.
+    git_root = Path(subprocess.check_output(
+        ["git", "rev-parse", "--show-toplevel"], cwd=repo, text=True).strip())
     caller = tmp_path / "plugin"
     caller.mkdir()
     manifest = caller / "pyproject.toml"
@@ -24,7 +28,7 @@ def test_external_validator_checkout_uses_requested_ref_and_preserves_caller(tmp
     env_file = tmp_path / "env"
     env = {**os.environ, "RUNNER_TEMP": str(runner), "RUNNER_OS": "Linux",
            "GITHUB_OUTPUT": str(output), "GITHUB_ENV": str(env_file), "_HERMES_REF": ref,
-           "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": f"url.{repo.as_uri()}.insteadOf",
+           "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": f"url.{git_root.as_uri()}.insteadOf",
            "GIT_CONFIG_VALUE_0": "https://github.com/NousResearch/hermes-agent.git"}
     subprocess.run(["bash", "-c", source_step["run"]], cwd=caller, env=env, check=True,
                    capture_output=True, text=True, timeout=60)

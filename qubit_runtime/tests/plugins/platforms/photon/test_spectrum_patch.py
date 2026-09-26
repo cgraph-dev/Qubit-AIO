@@ -13,7 +13,8 @@ import urllib.request
 from pathlib import Path
 
 
-_PATCHER = Path("plugins/platforms/photon/sidecar/patch-spectrum-mixed-attachments.mjs")
+_RUNTIME_ROOT = Path(__file__).resolve().parents[4]
+_PATCHER = _RUNTIME_ROOT / "plugins/platforms/photon/sidecar/patch-spectrum-mixed-attachments.mjs"
 
 
 def _sidecar_env(port: int) -> dict[str, str]:
@@ -35,10 +36,10 @@ def _free_port() -> int:
 def _write_sidecar_fixture(tmp_path: Path, *, sdk_available: bool) -> Path:
     sidecar = tmp_path / "sidecar"
     sidecar.mkdir()
-    shutil.copyfile("plugins/platforms/photon/sidecar/index.mjs", sidecar / "index.mjs")
+    shutil.copyfile(_RUNTIME_ROOT / "plugins/platforms/photon/sidecar/index.mjs", sidecar / "index.mjs")
     # index.mjs imports sibling helper modules — copy every non-patch .mjs so
     # the fixture keeps working as helpers are extracted from index.mjs.
-    for helper in Path("plugins/platforms/photon/sidecar").glob("*.mjs"):
+    for helper in (_RUNTIME_ROOT / "plugins/platforms/photon/sidecar").glob("*.mjs"):
         if helper.name in ("index.mjs", "patch-spectrum-mixed-attachments.mjs"):
             continue
         shutil.copyfile(helper, sidecar / helper.name)
@@ -105,7 +106,7 @@ def test_sidecar_patch_failure_still_reaches_health_endpoint(tmp_path: Path) -> 
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/healthz",
         data=b"{}",
-        headers={"X-Hermes-Sidecar-Token": "test-token"},
+        headers={"X-Qubit-Sidecar-Token": "test-token"},
         method="POST",
     )
     try:
