@@ -23,7 +23,7 @@ def test_source_checkout_gets_venv_setup_hint():
 
 def test_git_install_gets_qubit_managed_hint():
     assert _hint_for("git") == (
-        "Hermes-managed installs can repair the embedded runtime with `CMD-git`"
+        "Qubit-managed installs can repair the embedded runtime with `CMD-git`"
     )
 
 

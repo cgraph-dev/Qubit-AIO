@@ -29,7 +29,7 @@ def secondary_profile(monkeypatch, tmp_path):
     own API keys (no identity/tenant/endpoint vars)."""
     for k, v in _DEFAULT_ENV.items():
         monkeypatch.setenv(k, v)
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".qubit"
     prof_b = home / "profiles" / "b"
     prof_b.mkdir(parents=True)
     (prof_b / "config.yaml").write_text("{}\n")
@@ -59,8 +59,8 @@ def test_secondary_profile_memory_identity_never_inherits_default_environ(second
     assert "default" not in supermemory._resolve_base_url("")
 
     provider = retaindb.RetainDBMemoryProvider()
-    provider.initialize("s1", qubit_home=str(secondary_profile))
-    assert provider._client.project == "hermes-b"
+    provider.initialize("s1", hermes_home=str(secondary_profile))
+    assert provider._client.project == "qubit-b"
     assert "default" not in provider._client.base_url
 
     settings = openviking._resolve_connection_settings({})

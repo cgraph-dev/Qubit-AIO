@@ -124,7 +124,7 @@ def test_a_failed_default_download_does_not_fail_the_install(install_spy, capsys
     install_spy["fail"] = {"agent-browser"}
     assert "agent-browser" in _bare_install(install_spy)
     assert install_spy["sync_extras"] == ["all"]
-    assert "hermes pm install agent-browser" in capsys.readouterr().out
+    assert "qubit pm install agent-browser" in capsys.readouterr().out
 
 
 def test_termux_has_no_pm_browser_default():

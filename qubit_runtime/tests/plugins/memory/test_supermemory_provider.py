@@ -452,7 +452,7 @@ def test_identity_template_resolved_in_container_tag(monkeypatch, tmp_path):
     monkeypatch.setattr("plugins.memory.supermemory._SupermemoryClient", FakeClient)
     _save_supermemory_config({"container_tag": "hermes-{identity}"}, str(tmp_path))
     p = SupermemoryMemoryProvider()
-    p.initialize("s1", qubit_home=str(tmp_path), platform="cli", agent_identity="coder")
+    p.initialize("s1", hermes_home=str(tmp_path), platform="cli", agent_identity="coder")
     assert p._container_tag == "hermes_coder"
 
 

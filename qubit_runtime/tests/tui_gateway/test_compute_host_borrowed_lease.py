@@ -166,7 +166,7 @@ def test_isolated_turn_without_matching_vouch_still_fails_closed(isolated_env):
             "s1", active_session_lease={"lease_id": parent.lease_id, "session_id": "stale-A"}))
         errors = [f["message"]["params"]["payload"]["message"] for f in frames
                   if f["type"] == "rpc" and (f["message"].get("params") or {}).get("type") == "error"]
-        assert errors and "open in another Hermes window" in errors[0]
+        assert errors and "open in another Qubit window" in errors[0]
         assert [e["lease_id"] for e in _registry()] == [parent.lease_id]
     finally:
         parent.release()
