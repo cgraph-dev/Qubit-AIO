@@ -705,7 +705,7 @@ stage_setup() {
         log "setup skipped (no terminal); run 'qubit setup' after install"
         return 0
     fi
-    "$INSTALL_DIR/.hermes/bin/qubit" setup </dev/tty || fail "setup failed"
+    "$INSTALL_DIR/.hermes/bin/hermes" setup </dev/tty || fail "setup failed"
 }
 
 stage_gateway() {
@@ -715,7 +715,7 @@ stage_gateway() {
         return 0
     fi
     # Setup installs the service when it handles the gateway; ask only if it did not.
-    "$INSTALL_DIR/.hermes/bin/qubit" gateway install --if-missing </dev/tty || fail "gateway installation failed"
+    "$INSTALL_DIR/.hermes/bin/hermes" gateway install --if-missing </dev/tty || fail "gateway installation failed"
 }
 
 stage_complete() {

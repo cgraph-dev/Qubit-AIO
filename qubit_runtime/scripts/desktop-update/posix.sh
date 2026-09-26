@@ -521,7 +521,7 @@ trap finish EXIT
 # a real-file `venv/bin/python` copy plus a `.tcc-anchor-source` marker, and
 # `python3`/`python3.N` aliases that die at interpreter init ("No module
 # named 'encodings'"). On those installs EVERY normal CLI entrypoint is dead
-# (`venv/bin/qubit` has a `python3` shebang), so no Python-side heal —
+# (`venv/bin/hermes` has a `python3` shebang), so no Python-side heal —
 # doctor OR in-update — can ever run. This shell is the last surface that
 # still executes, so the heal lives here (recovery design after @aeonsong's
 # #96231; heal-point observation by @ahrazzle / @tokenfires on #95759).
@@ -644,7 +644,7 @@ tcc_pick_update_invoke() { # sets UPDATE_INVOKE; safety net past a failed heal
   # launchd gateway proves `venv/bin/python -m qubit_cli.main` works when
   # every alias entrypoint is bricked — drive the update the same way.
   local bin="$1"
-  UPDATE_INVOKE=("$bin/qubit")
+  UPDATE_INVOKE=("$bin/hermes")
   if ! tcc_probe_python "$bin/python3" && tcc_probe_python "$bin/python"; then
     UPDATE_INVOKE=("$bin/python" -m qubit_cli.main)
   fi
@@ -759,7 +759,7 @@ start_ui
 LEGACY_INSTALL=0
 [ -d "$INSTALL_ROOT/pm" ] || LEGACY_INSTALL=1
 select_update_invoke() {
-  HERMES_BIN="$INSTALL_ROOT/.hermes/bin/qubit"
+  HERMES_BIN="$INSTALL_ROOT/.hermes/bin/hermes"
   if [ -x "$HERMES_BIN" ]; then
     UPDATE_INVOKE=("$HERMES_BIN")
     return 0
@@ -767,7 +767,7 @@ select_update_invoke() {
   if [ -f "$INSTALL_ROOT/qubit_cli/_launchers.py" ]; then
     local candidate version reported expected
     expected="$(cd "$INSTALL_ROOT" && pwd -P)" || return 1
-    for candidate in "$HOME/.local/bin/qubit" "$QUBIT_HOME/bin/qubit"; do
+    for candidate in "$HOME/.local/bin/hermes" "$QUBIT_HOME/bin/hermes"; do
       [ -x "$candidate" ] || continue
       version="$("$candidate" --version 2>/dev/null)" || continue
       reported="$(printf '%s\n' "$version" | sed -n 's/^Install directory: //p')"
@@ -779,7 +779,7 @@ select_update_invoke() {
     done
   fi
   if [ "$LEGACY_INSTALL" -eq 1 ] && [ ! -d "$INSTALL_ROOT/pm" ]; then
-    HERMES_BIN="$INSTALL_ROOT/venv/bin/qubit"
+    HERMES_BIN="$INSTALL_ROOT/venv/bin/hermes"
     [ -x "$HERMES_BIN" ] || return 1
     if [ "$(uname)" = Darwin ]; then
       tcc_anchor_heal "$INSTALL_ROOT/venv/bin" || log "TCC anchor rescue failed ($TCC_HEAL_STATE)"

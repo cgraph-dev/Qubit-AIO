@@ -37,7 +37,7 @@ SANDBOX_ROOT="$SANDBOX/hermes-agent"
 say() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
 
 ensure_sandbox_install() {
-  if [ -x "$SANDBOX_ROOT/venv/bin/qubit" ]; then
+  if [ -x "$SANDBOX_ROOT/venv/bin/hermes" ]; then
     say "reusing sandbox install at $SANDBOX_ROOT"
     return
   fi
@@ -62,7 +62,7 @@ case "$MODE" in
   fresh)
     rm -rf "$SANDBOX"
     ensure_sandbox_install
-    say "fresh install OK: $("$SANDBOX_ROOT/venv/bin/qubit" --version 2>/dev/null || echo '?')"
+    say "fresh install OK: $("$SANDBOX_ROOT/venv/bin/hermes" --version 2>/dev/null || echo '?')"
     ;;
   behind)
     N="${2:-25}"
@@ -147,8 +147,8 @@ case "$MODE" in
     }
     stub_install() { # creates a fake install whose qubit update succeeds
       rm -rf "$L"; mkdir -p "$L/hermes-agent/venv/bin"
-      printf '#!/bin/sh\nexit 0\n' > "$L/hermes-agent/venv/bin/qubit"
-      chmod +x "$L/hermes-agent/venv/bin/qubit"
+      printf '#!/bin/sh\nexit 0\n' > "$L/hermes-agent/venv/bin/hermes"
+      chmod +x "$L/hermes-agent/venv/bin/hermes"
     }
 
     # 1. linux relaunch target dies instantly -> manual downgrade in result
