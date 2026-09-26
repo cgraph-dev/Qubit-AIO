@@ -138,7 +138,7 @@ class TestHandleUpdateCommand:
         qubit_home.mkdir()
 
         with patch("gateway.run._qubit_home", qubit_home), \
-             patch("gateway.run.__file__", fake_file), \
+             patch("gateway.slash_commands.__file__", fake_file), \
              patch("qubit_cli.config.detect_install_method", return_value="git"), \
              patch("shutil.which", side_effect=lambda x: "/usr/bin/hermes" if x == "hermes" else "/usr/bin/setsid"), \
              patch("subprocess.Popen"):
@@ -181,7 +181,7 @@ class TestHandleUpdateCommand:
             return None
 
         with patch("gateway.run._qubit_home", qubit_home), \
-             patch("gateway.run.__file__", fake_file), \
+             patch("gateway.slash_commands.__file__", fake_file), \
              patch("qubit_cli.config.detect_install_method", return_value="git"), \
              patch("shutil.which", side_effect=which_no_setsid), \
              patch("subprocess.Popen", mock_popen):
@@ -539,7 +539,7 @@ class TestSendUpdateNotification:
         assert "ok before" in sent_text
         assert "invalid byte" in sent_text
         assert "continued after" in sent_text
-        assert "Hermes update finished" in sent_text
+        assert "Qubit update finished" in sent_text
         assert not pending_path.exists()
         assert not output_path.exists()
         assert not exit_code_path.exists()
@@ -599,7 +599,7 @@ class TestWatchUpdateProgress:
         sent = "\n".join(call.args[1] for call in mock_adapter.send.call_args_list)
         assert "ok before" in sent
         assert "continued after" in sent
-        assert "Hermes update finished" in sent
+        assert "Qubit update finished" in sent
         assert not (qubit_home / ".update_pending.json").exists()
 # ---------------------------------------------------------------------------
 # Install-method refusal gate

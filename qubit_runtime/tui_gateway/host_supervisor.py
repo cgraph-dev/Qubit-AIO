@@ -354,7 +354,9 @@ class HostSupervisor:
         hello = self._hello
         if not hello:
             raise RuntimeError("compute host missing hello")
-        got_home = str(hello.get("hermes_home") or "")
+        # N26: the child writes the Qubit-owned ``qubit_home`` key; read the pre-de-brand
+        # ``hermes_home`` too so a hello from an older child still validates (read-old/write-new).
+        got_home = str(hello.get("qubit_home") or hello.get("hermes_home") or "")
         if got_home and got_home != self.expected_qubit_home:
             raise RuntimeError(
                 f"compute host QUBIT_HOME mismatch: {got_home} != {self.expected_qubit_home}")
