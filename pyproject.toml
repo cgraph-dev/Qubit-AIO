@@ -99,7 +99,29 @@ kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model downl
 # `AIAgent(provider="anthropic", ...)` test dies at
 # `agent/anthropic_adapter.py:63` (PM cannot lazy-install: `pm-runtime` is not in
 # the product venv). Keep the pin identical to the vendored extra/test group.
-test = ["pytest>=8", "anthropic==0.87.0"]
+#
+# The v0.21.5 vendored suite also imports, at module import time, three deps
+# that are optional at runtime and therefore absent from `[project].dependencies`:
+#   * `mcp` -- the MCP SDK (`qubit_runtime/pyproject.toml` -> `mcp` extra and the
+#     upstream `dev` dependency-group). `tools/mcp_tool.py` binds the sampling
+#     types lazily, so `tests/tools/test_mcp_tool.py` needs the real package.
+#   * `jsonschema` -- `tools/schema_sanitizer.py` selectors validate with it
+#     (`tools/tool_search_validation.py` / `delegation_output_schema.py` import it
+#     lazily with a fallback); `tests/tools/test_schema_boolean_required.py`
+#     imports it directly. Upstream declares it nowhere; the pin matches the
+#     version `mcp==2.0.0` resolves against.
+#   * `fal-client` -- the optional Fal image/video provider SDK
+#     (`qubit_runtime/pyproject.toml` -> `fal` extra), imported directly by
+#     `tests/tools/test_fal_sdk.py`.
+# Declaring them here keeps the vendored suite collectible without weakening the
+# tests (no `importorskip`) to match upstream's unconditional imports.
+test = [
+    "pytest>=8",
+    "anthropic==0.87.0",
+    "mcp==2.0.0",
+    "jsonschema==4.26.0",
+    "fal-client==0.13.1",
+]
 
 [project.scripts]
 # Canonical public launcher: `qubit` (all user docs reference this name).
