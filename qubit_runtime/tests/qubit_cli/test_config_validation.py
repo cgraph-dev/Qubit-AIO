@@ -148,7 +148,7 @@ class TestUnknownTopLevelKeys:
     """Arbitrary top-level keys must NOT warn — they are bridged to os.environ.
 
     Top-level scalars in config.yaml are forwarded into the environment
-    (gateway/run.py, hermes send) so users can feed skills and external apps
+    (gateway/run.py, qubit send) so users can feed skills and external apps
     env-style keys like DISCORD_HOME_CHANNEL or MY_APP_TOKEN. A closed-world
     allowlist can never enumerate those, so no "Unknown top-level config key"
     warning may exist.
@@ -181,7 +181,7 @@ class TestQuotedContainerValues:
         })
         flagged = {i.message.split(" ", 1)[0]: i for i in issues if "quoted string" in i.message}
         assert set(flagged) == {"plugins.enabled", "model_catalog.excluded_providers"}
-        assert "hermes config set plugins.enabled '[\"a\",\"b\"]'" in flagged["plugins.enabled"].hint
+        assert "qubit config set plugins.enabled '[\"a\",\"b\"]'" in flagged["plugins.enabled"].hint
 
     def test_string_typed_and_tolerant_slots_are_not_flagged(self):
         """`approvals.mode` is a string in the schema; `model: name` is the documented shorthand;

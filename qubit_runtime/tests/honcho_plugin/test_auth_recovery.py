@@ -570,7 +570,7 @@ class TestAuthNotice:
         provider._base_context_cache = ""
 
         first = provider.prefetch("what did we decide about the schema?")
-        assert "hermes honcho setup" in first
+        assert "qubit honcho setup" in first
         assert "paused" in first
 
         second = provider.prefetch("and the follow-up question?")
@@ -890,7 +890,7 @@ class TestInitAuthFailureNotice:
         _wire_init(tmp_path, monkeypatch, client)
         provider = _initialized_provider()
 
-        assert "hermes honcho setup" in provider.prefetch("first question")
+        assert "qubit honcho setup" in provider.prefetch("first question")
         # Retries keep failing, but the same episode never re-arms the notice.
         for query in ("second question", "third question"):
             assert provider.prefetch(query) == ""
@@ -913,14 +913,14 @@ class TestInitAuthFailureNotice:
         assert provider._manager is None
         assert client.peer.called  # failure hit session setup, not peer setup
         notice = provider.prefetch("what happened before the grant died?")
-        assert "hermes honcho setup" in notice
+        assert "qubit honcho setup" in notice
 
     def test_relogin_resumes_init_and_clears_failure(self, tmp_path, monkeypatch):
         client = _healthy_client()
         client.peer.side_effect = Exception("HTTP 401 Unauthorized")
         path = _wire_init(tmp_path, monkeypatch, client)
         provider = _initialized_provider()
-        assert "hermes honcho setup" in provider.prefetch("first question")
+        assert "qubit honcho setup" in provider.prefetch("first question")
 
         _relogin(path)
         client.peer.side_effect = None

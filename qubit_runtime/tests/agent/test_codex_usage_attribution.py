@@ -142,7 +142,7 @@ def test_new_identity_is_limited_to_the_official_endpoint(base_url, attributed):
     assert headers["originator"] == ("hermes-agent" if attributed else "codex_cli_rs")
     assert headers["User-Agent"] == (
         f"HermesAgent/{get_version_info().base_version}"
-        if attributed else "codex_cli_rs/0.0.0 (Hermes Agent)"
+        if attributed else "codex_cli_rs/0.0.0 (Qubit Agent)"
     )
 
 
@@ -247,7 +247,7 @@ def test_credential_pool_custom_endpoint_keeps_existing_identity(
         )
         assert wire[-1].url.host == "proxy.example"
         assert wire[-1].headers["originator"] == "codex_cli_rs"
-        assert wire[-1].headers["user-agent"] == "codex_cli_rs/0.0.0 (Hermes Agent)"
+        assert wire[-1].headers["user-agent"] == "codex_cli_rs/0.0.0 (Qubit Agent)"
         assert wire[-1].headers["chatgpt-account-id"] == "acct-attribution-test"
     finally:
         client.close()

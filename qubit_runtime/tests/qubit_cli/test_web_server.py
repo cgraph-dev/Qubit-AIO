@@ -84,7 +84,7 @@ def _install_example_plugin(_isolate_qubit_home):
     # An installed-but-not-enabled user plugin has its API mount skipped
     # and its assets 404'd — which is the whole point of the gate. These
     # fixtures exist to exercise the *serving* paths, so opt the example
-    # plugin in exactly as a real operator would with `hermes plugins
+    # plugin in exactly as a real operator would with `qubit plugins
     # enable example`.
     from qubit_cli.config import load_config, save_config
     _cfg = load_config()
@@ -163,7 +163,7 @@ class TestReloadEnv:
 
 
     def test_removes_deleted_known_vars(self, tmp_path):
-        """reload_env() removes known Hermes vars not present in .env."""
+        """reload_env() removes known Qubit vars not present in .env."""
         env_file = tmp_path / ".env"
         env_file.write_text("")  # empty .env
         # Pick a known key from OPTIONAL_ENV_VARS
@@ -430,7 +430,7 @@ class TestWebServerEndpoints:
         The shipped regression (#72424 aftermath): a store predating
         ``sessions.last_activity_at`` made every per-profile read raise
         "no such column", which this endpoint swallowed into its ``errors``
-        array — the desktop rendered "No sessions yet" after `hermes update`
+        array — the desktop rendered "No sessions yet" after `qubit update`
         until the user's first message forced a writable open elsewhere.
         """
         import sqlite3
@@ -468,7 +468,7 @@ class TestWebServerEndpoints:
     def test_startup_eager_reconcile_heals_stale_store(self):
         """The lifespan's eager reconcile brings a stale store current.
 
-        #79531/#80037: after `hermes update` an old-schema state.db used to
+        #79531/#80037: after `qubit update` an old-schema state.db used to
         stay stale until the first NEW session forced a writable open —
         every /api/sessions poll 500ed with "no such column" in between.
         The lifespan now schedules one writable open at startup; this
@@ -938,7 +938,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         data = resp.json()
         pip_rows = [row for row in data["results"] if row["kind"] == "pip"]
         assert pip_rows and pip_rows[0]["status"] == "installed"
-        assert pip_rows[0]["command"] == "hermes pm install"
+        assert pip_rows[0]["command"] == "qubit pm install"
         assert prepared == ["honcho"]
 
 
@@ -1209,7 +1209,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         def fail_spawn(*_args, **_kwargs):
             nonlocal spawned
             spawned = True
-            raise AssertionError("docker update guard should not spawn hermes update")
+            raise AssertionError("docker update guard should not spawn qubit update")
 
         # Bypass the managed-externally gate so we reach the docker install check.
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
@@ -1223,7 +1223,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
         _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
 
-        resp = self.client.post("/api/hermes/update")
+        resp = self.client.post("/api/qubit/update")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -1247,7 +1247,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         def fail_spawn(*_args, **_kwargs):
             nonlocal spawned
             spawned = True
-            raise AssertionError("APT-managed update guard should not spawn hermes update")
+            raise AssertionError("APT-managed update guard should not spawn qubit update")
 
         monkeypatch.setattr(_web_server_files, "_dashboard_local_update_managed_externally", lambda: False)
         # The shared admission gate (#91277 Phase 3) resolves the install
@@ -1261,7 +1261,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
         _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
 
-        resp = self.client.post("/api/hermes/update")
+        resp = self.client.post("/api/qubit/update")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -1271,7 +1271,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         assert data["update_command"]
         assert spawned is False
 
-        check = self.client.get("/api/hermes/update/check")
+        check = self.client.get("/api/qubit/update/check")
         assert check.status_code == 200
         check_data = check.json()
         assert check_data["install_method"] == "apt"
@@ -1287,7 +1287,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
             encoding="utf-8",
         )
         (tmp_path / "update.log").write_text(
-            "=== hermes update started 2026-08-17T11:19:35 ===\n"
+            "=== qubit update started 2026-08-17T11:19:35 ===\n"
             "✓ Update complete!\n"
             f"=== hermes-update completed {action_id} ===\n",
             encoding="utf-8",
@@ -1326,7 +1326,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
         _web_server_gateway._ACTION_RESULTS.pop("hermes-update", None)
 
-        resp = self.client.post("/api/hermes/update")
+        resp = self.client.post("/api/qubit/update")
 
         assert resp.status_code == 200
         assert resp.json() == {
@@ -1358,7 +1358,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         _web_server_gateway._ACTION_IDS["hermes-update"] = "b" * 32
 
         try:
-            resp = self.client.post("/api/hermes/update")
+            resp = self.client.post("/api/qubit/update")
         finally:
             _web_server_gateway._ACTION_PROCS.pop("hermes-update", None)
             _web_server_gateway._ACTION_IDS.pop("hermes-update", None)
@@ -1375,7 +1375,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
 
     def test_model_set_maps_unknown_vendor_to_aggregator(self, monkeypatch):
         """A bare vendor name from analytics rows (no billing_provider) is not
-        a Hermes provider — keep the user's aggregator instead of writing a
+        a Qubit provider — keep the user's aggregator instead of writing a
         provider that can never resolve credentials."""
         monkeypatch.setattr(
             "qubit_cli.model_cost_guard.expensive_model_warning",
@@ -1635,7 +1635,7 @@ CONFIG_SCHEMA = ProviderConfigSchema(
         """A custom endpoint that requires auth must persist model.api_key (where
         the runtime reads it) AND register a named custom_providers entry so the
         endpoint reappears as a ready row in the picker — matching the
-        ``hermes model`` custom flow. Regression for the desktop loop where a
+        ``qubit model`` custom flow. Regression for the desktop loop where a
         keyed custom endpoint could never be configured from the GUI."""
         from qubit_cli.config import load_config
 
@@ -2976,7 +2976,7 @@ class TestNewEndpoints:
         import qubit_cli.tools_config as tools_config
         from qubit_cli.nous_account import NousPortalAccountInfo
 
-        # Logged out of Nous Portal → managed subscription rows need sign-in.
+        # Logged out of Qubit Labs → managed subscription rows need sign-in.
         monkeypatch.setattr(
             "qubit_cli.nous_subscription.get_nous_portal_account_info",
             lambda *a, **k: NousPortalAccountInfo(
@@ -3001,7 +3001,7 @@ class TestNewEndpoints:
         # Genuinely-free keyless row stays Ready.
         assert by_name["Microsoft Edge TTS"]["status"] == "ready"
         # Keyless ≠ ready for gated rows:
-        assert by_name["Nous Subscription"]["status"] == "needs_auth"
+        assert by_name["Qubit Subscription"]["status"] == "needs_auth"
         assert by_name["xAI TTS"]["status"] == "needs_auth"
         assert by_name["KittenTTS"]["status"] == "needs_setup"
         assert by_name["Piper"]["status"] == "needs_setup"
@@ -3029,7 +3029,7 @@ class TestNewEndpoints:
 
         resp = self.client.put(
             "/api/tools/toolsets/browser/provider",
-            json={"provider": "Nous Subscription (Browser Use cloud)"},
+            json={"provider": "Qubit Subscription (Browser Use cloud)"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -3234,7 +3234,7 @@ class TestDesktopHostRendezvousIsolation:
 
     def test_desktop_backend_does_not_claim_the_host_serve_record(self, monkeypatch, tmp_path):
         """A Desktop child must not block a separately supervised public dashboard, yet a
-        terminal `hermes plugins install` on a Desktop-only box must still find it (#119644):
+        terminal `qubit plugins install` on a Desktop-only box must still find it (#119644):
         it publishes under its OWN role, which the attach ladder never reads."""
         import io
         import urllib.request
@@ -3268,7 +3268,7 @@ class TestDesktopHostRendezvousIsolation:
             # Not a host owner: the supervised public dashboard's attach ladder sees nobody.
             assert hr.read_record(hr.ROLE_SERVE) is None
             assert _host_backend_attachment() is None
-            # ...but a terminal `hermes plugins install` still lights up its open chats.
+            # ...but a terminal `qubit plugins install` still lights up its open chats.
             assert notify_serve_backend("demo", tmp_path) == {"ok": True}
             assert dialed == [("http://127.0.0.1:9231/api/dashboard/agent-plugins/activate",
                                "desktop-spawn-token")]
@@ -3637,7 +3637,7 @@ class TestStatusInstallId:
     """Stable per-install identity on /api/status.
 
     Behaviour contracts: the id is minted once, persisted under the ROOT
-    Hermes home (not the profile home), survives a fresh process-cache read,
+    Qubit home (not the profile home), survives a fresh process-cache read,
     and is byte-identical for every profile served by the same install — the
     desktop uses it to collapse duplicate roster rows when one backend is
     registered under two addresses.
@@ -4431,7 +4431,7 @@ class TestDashboardPluginManifestExtensions:
     def test_user_plugins_found_under_profile_scoped_process(self, tmp_path, monkeypatch):
         """Regression #87197: a profile-scoped process (``--profile <name>``
         sets QUBIT_HOME=<root>/profiles/<name>) must still discover user
-        plugins installed in the hermes root's plugins/ directory."""
+        plugins installed in the qubit root's plugins/ directory."""
         root = tmp_path / "hermes-root"
         profile_home = root / "profiles" / "presale"
         profile_home.mkdir(parents=True)
@@ -4519,7 +4519,7 @@ class TestDashboardPluginManifestExtensions:
 # /api/pty WebSocket — terminal bridge for the dashboard "Chat" tab.
 #
 # These tests drive the endpoint with a tiny fake command (typically ``cat``
-# or ``sh -c 'printf …'``) instead of the real ``hermes --tui`` binary.  The
+# or ``sh -c 'printf …'``) instead of the real ``qubit --tui`` binary.  The
 # endpoint resolves its argv through ``_resolve_chat_argv``, so tests
 # monkeypatch that hook.
 # ---------------------------------------------------------------------------
@@ -5040,7 +5040,7 @@ class TestServeIndexMissingIndex:
 
 
 class TestHeadlessServeTokenPage:
-    """Headless `hermes serve` must serve the Desktop token handshake page
+    """Headless `qubit serve` must serve the Desktop token handshake page
     at `/` when the dashboard auth gate is off (#94227).
 
     The Electron renderer boots by fetching `/` and extracting
@@ -5166,12 +5166,12 @@ class TestHashedAssetCacheHeaders:
         # handling) must survive the header change.
         prefixed = client.get(
             "/assets/index-abc123.css",
-            headers={"X-Forwarded-Prefix": "/hermes"},
+            headers={"X-Forwarded-Prefix": "/qubit"},
         )
         assert prefixed.status_code == 200
         assert prefixed.headers["cache-control"] == self._IMMUTABLE
-        assert "url(/hermes/ds-assets/bg.png)" in prefixed.text
-        assert "url(/hermes/fonts-terminal/x.woff2)" in prefixed.text
+        assert "url(/qubit/ds-assets/bg.png)" in prefixed.text
+        assert "url(/qubit/fonts-terminal/x.woff2)" in prefixed.text
 
     def test_index_html_stays_no_store(self, tmp_path, monkeypatch):
         client = self._client(tmp_path, monkeypatch)

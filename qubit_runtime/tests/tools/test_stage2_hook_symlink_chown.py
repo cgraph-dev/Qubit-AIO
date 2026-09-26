@@ -50,7 +50,7 @@ def test_chown_helper_repairs_real_directories(stage2_text: str, tmp_path: Path)
 
     assert proc.returncode == 0, proc.stderr
     assert log_path.read_text().splitlines() == [
-        f"-R hermes:hermes {target}",
+        f"-R qubit:qubit {target}",
     ]
 
 def test_chown_helper_refuses_symlinked_directories(stage2_text: str, tmp_path: Path) -> None:

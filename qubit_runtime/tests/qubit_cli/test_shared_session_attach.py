@@ -75,7 +75,7 @@ def test_discovery_refuses_unsupported_owner_without_releasing_lease(tmp_path, m
         with pytest.raises(ValueError, match="not available in this build") as caught:
             discover_attach_url("old", registry_home=tmp_path)
         first, details = str(caught.value).splitlines()
-        assert "hermes --resume old" in first
+        assert "qubit --resume old" in first
         assert details.startswith("Details: ")
         assert active_session_registry_snapshot(tmp_path)[0]["lease_id"] == lease.lease_id
         registry = tmp_path / "runtime" / "active_sessions.json"
@@ -122,7 +122,7 @@ def test_discovery_failure_message_names_state_and_resume_path(tmp_path):
         with pytest.raises(ValueError, match="just failed") as caught:
             discover_attach_url("held", registry_home=tmp_path)
         first, details = str(caught.value).splitlines()
-        assert "hermes --resume held" in first
+        assert "qubit --resume held" in first
         assert details.startswith("Details: ")
     finally:
         lease.release()

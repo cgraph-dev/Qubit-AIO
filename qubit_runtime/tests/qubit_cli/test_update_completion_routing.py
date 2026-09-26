@@ -32,7 +32,7 @@ def test_historical_completion_hook_never_reports_success(hook, args, kwargs, fr
             hook(*args, **kwargs)
         assert error.value.code == 1
         assert fresh_child.requests == []
-        assert 'run `hermes update` again' in capsys.readouterr().err
+        assert 'run `qubit update` again' in capsys.readouterr().err
         return
     with fresh_child.exits():
         hook(*args, **kwargs)
@@ -49,7 +49,7 @@ def test_incomplete_handoff_requires_explicit_update_retry(tmp_path, monkeypatch
     assert error.value.code == 1
     completion.assert_not_called()
     output = capsys.readouterr()
-    assert "run `hermes update` again" in output.err
+    assert "run `qubit update` again" in output.err
     assert "Update complete" not in output.out
     assert not (tmp_path / ".update-incomplete").exists()
     assert not (tmp_path / ".lazy-refresh-incomplete").exists()

@@ -65,11 +65,11 @@ def _cli_nous_rows(config):
 
 def test_guest_identity_shows_free_tier_row_with_only_welcome_model(guest_home, monkeypatch):
     from qubit_cli.model_switch_providers import list_picker_providers
-    rows = _nous_rows(list_picker_providers("nous", "", None, None, 50, "nous/welcome"))
+    rows = _nous_rows(list_picker_providers("nous", "", None, None, 50, "qubit/welcome"))
     assert len(rows) == 1
     row = rows[0]
     assert "free tier" in row["name"]
-    assert row["models"] == ["nous/welcome"]
+    assert row["models"] == ["qubit/welcome"]
     assert row["total_models"] == 1
     rendered = repr(row).lower()
     assert "guest" not in rendered and "anonymous" not in rendered
@@ -87,7 +87,7 @@ def test_guest_identity_with_guest_off_hides_the_nous_row(guest_home, monkeypatc
     assert anon_auth.has_guest() and not anon_auth.guest_enabled()
 
     from qubit_cli.model_switch_providers import list_picker_providers
-    assert _nous_rows(list_picker_providers("nous", "", None, None, 50, "nous/welcome")) == []
+    assert _nous_rows(list_picker_providers("nous", "", None, None, 50, "qubit/welcome")) == []
     assert _cli_nous_rows({"nous": {"guest": False}}) == []
 
 
@@ -101,6 +101,6 @@ def test_desktop_picker_payload_never_locks_the_free_tier_row(guest_home, monkey
     assert len(rows) == 1
     row = rows[0]
     assert row["free_tier_row"] is True
-    assert row["models"] == ["nous/welcome"]
+    assert row["models"] == ["qubit/welcome"]
     assert row.get("unavailable_models", []) == []
     assert not row.get("free_tier_pending") and not row.get("pricing_pending")

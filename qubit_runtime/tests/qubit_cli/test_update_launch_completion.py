@@ -58,7 +58,7 @@ def _self_checkout(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("argv", [["--version"], ["-V"], ["--help"], ["-p", "work", "-h"]])
 def test_metadata_query_never_waits_on_source_completion(tmp_path, monkeypatch, argv):
-    """`hermes --version` offline must answer from the tree, not run a network-bound sync."""
+    """`qubit --version` offline must answer from the tree, not run a network-bound sync."""
     import pm
 
     root = _self_checkout(tmp_path, monkeypatch)
@@ -84,12 +84,12 @@ def test_failed_completion_tail_is_retried_without_rebuilding_dependencies(tmp_p
 
     monkeypatch.setattr(pm, "sync_venv", sync)
     completion_tail.exit_code = 1
-    with pytest.raises(RuntimeError, match="run `hermes update`"):
+    with pytest.raises(RuntimeError, match="run `qubit update`"):
         venv_sync.prepare_launch(root, [])
     assert len(syncs) == 1 and len(completion_tail) == 1
     assert pm.venv_is_current()
 
-    with pytest.raises(RuntimeError, match="run `hermes update`"):
+    with pytest.raises(RuntimeError, match="run `qubit update`"):
         venv_sync.prepare_launch(root, [])
     assert len(syncs) == 1, "current dependencies were rebuilt for a tail retry"
     assert len(completion_tail) == 2

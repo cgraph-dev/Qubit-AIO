@@ -34,7 +34,7 @@ class TestMenuLabel:
 
     def test_sending_state_names_the_destination(self):
         label = _shared_metrics_menu_label(_config(enabled=True, send=True))
-        assert "sending to Nous" in label
+        assert "sending to Qubit" in label
 
 
 class TestToggle:

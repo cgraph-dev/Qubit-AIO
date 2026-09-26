@@ -80,7 +80,7 @@ def test_local_delivery_falls_back_to_bare_name(tmp_path, monkeypatch):
     monkeypatch.setattr(bot_relay.shutil, "which", lambda name: None)
 
     argv = bot_relay.local_delivery_command("ops", "query.json")
-    assert argv[0] == "hermes"
+    assert argv[0] == "qubit"
     assert argv[1:3] == ["-p", "ops"]
 
 

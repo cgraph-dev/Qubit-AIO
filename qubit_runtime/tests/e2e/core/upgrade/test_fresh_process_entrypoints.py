@@ -1,6 +1,6 @@
 """C6: every shipped module and every entrypoint works in a FRESH process after an update.
 
-The ``hermes update`` failure class this guards (issue_classes.md C6): after the pull every
+The ``qubit update`` failure class this guards (issue_classes.md C6): after the pull every
 command dies with ``ImportError: cannot import name 'file_signature'`` (#111942, #111943,
 #112522, #114616), a module-level ``NameError``/circular import only shows up in a clean
 interpreter, or the restart phase of a pre-hand-off updater imports new code into a stale
@@ -116,7 +116,7 @@ _POST_PURGE_IMPORTS = (
     "qubit_cli.gateway_migrate", "qubit_cli.profiles", "qubit_cli.backup", "qubit_cli.model_catalog",
     "qubit_cli.plugin_compat", "agent.curator", "tools.skills_sync", "tools.browser_tool",
 )
-# What the pre-hand-off ``hermes update`` process had imported before the pull.
+# What the pre-hand-off ``qubit update`` process had imported before the pull.
 _OLD_UPDATER_GRAPH = ("qubit_cli.main", "qubit_cli.update_cmd", "qubit_cli.config", "qubit_cli.gateway")
 
 _READY_RE = re.compile(r"^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)", re.M)  # electron/backend-ready.ts
@@ -134,7 +134,7 @@ def _requirements():
 
     core = [Requirement(r) for r in PYPROJECT["project"]["dependencies"]]
     extras = {_canonical(Requirement(r).name) for reqs in PYPROJECT["project"]["optional-dependencies"].values()
-              for r in reqs if not r.startswith("hermes-agent")}
+              for r in reqs if not r.startswith("qubit-agent")}
     return core, extras
 
 
@@ -649,11 +649,11 @@ _ENTRIES = {
     "module-oneshot": Entry("module", ("-z",), frozenset({0}), turn=True),
     # The #111942 symptom: the interactive CLI died at startup whenever config.yaml existed.
     "module-interactive-cli": Entry("module", (), frozenset({0}), tty=True),
-    "hermes-version": Entry("hermes", ("--version",), frozenset({0}), prints_version=True),
-    "hermes-help": Entry("hermes", ("--help",), frozenset({0})),
-    "hermes-acp-version": Entry("hermes-acp", ("--version",), frozenset({0}), prints_version=True),
-    "hermes-acp-help": Entry("hermes-acp", ("--help",), frozenset({0})),
-    "hermes-agent-help": Entry("hermes-agent", ("--help",), frozenset({0})),
+    "qubit-version": Entry("qubit", ("--version",), frozenset({0}), prints_version=True),
+    "qubit-help": Entry("qubit", ("--help",), frozenset({0})),
+    "qubit-acp-version": Entry("qubit-acp", ("--version",), frozenset({0}), prints_version=True),
+    "qubit-acp-help": Entry("qubit-acp", ("--help",), frozenset({0})),
+    "qubit-agent-help": Entry("qubit-agent", ("--help",), frozenset({0})),
 }
 def _run_on_tty(argv: list[str], *, env: dict[str, str], cwd: Path, writable: list[Path],
                 timeout: float) -> subprocess.CompletedProcess:

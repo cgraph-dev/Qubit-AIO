@@ -1,6 +1,6 @@
-"""Tests for ``hermes dashboard --stop`` / ``--status`` flags.
+"""Tests for ``qubit dashboard --stop`` / ``--status`` flags.
 
-These flags share the detection + kill path with the post-``hermes update``
+These flags share the detection + kill path with the post-``qubit update``
 cleanup, so the heavy coverage of SIGTERM / SIGKILL / Windows taskkill lives
 in ``test_update_stale_dashboard.py``.  This file just verifies the flag
 dispatch: argparse wiring, no-op when nothing is running, and correct
@@ -33,16 +33,16 @@ class TestDashboardStatus:
             cmd_dashboard(_ns(status=True))
         assert exc.value.code == 0
         out = capsys.readouterr().out
-        assert "No hermes dashboard or serve processes running" in out
+        assert "No qubit dashboard or serve processes running" in out
 
     def test_status_with_processes(self, capsys):
         # Includes a serve-mode backend: --status must LIST it, not hide it —
         # `--stop` kills serves, so hiding them let operators kill what they
         # couldn't see (#81564).
         processes = [
-            (12345, "hermes dashboard --port 9119"),
+            (12345, "qubit dashboard --port 9119"),
             (12346, "python -m qubit_cli.main dashboard --host 0.0.0.0 --port 9120"),
-            (12347, "hermes serve --host 100.94.65.93 --port 9119"),
+            (12347, "qubit serve --host 100.94.65.93 --port 9119"),
         ]
         with patch("qubit_cli.dashboard_procs._scan_dashboard_processes", return_value=processes), \
              patch("gateway.status._pid_exists", return_value=True), \
@@ -89,7 +89,7 @@ class TestDashboardStop:
         mock_kill.assert_called_once()
         # --stop should pass a reason so the output doesn't say "running
         # backend no longer matches the updated frontend" (that wording is
-        # for the post-`hermes update` path).
+        # for the post-`qubit update` path).
         kwargs = mock_kill.call_args.kwargs
         assert "reason" in kwargs
         assert "stop" in kwargs["reason"].lower()
@@ -146,7 +146,7 @@ class TestLifecycleFlagsTakePrecedence:
     """If both --stop and --status are set, --status wins (it's listed
     first in cmd_dashboard).  Neither is allowed to fall through to the
     server-start path, which is the critical safety property — a user
-    who typed ``hermes dashboard --stop`` must not end up ALSO starting
+    who typed ``qubit dashboard --stop`` must not end up ALSO starting
     a new server."""
 
     def test_stop_does_not_fall_through_to_server_start(self):

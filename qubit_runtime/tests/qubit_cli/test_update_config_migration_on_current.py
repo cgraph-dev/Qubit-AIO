@@ -60,7 +60,7 @@ def test_migration_policy(monkeypatch, capsys, case, expected):
         if case in {'yes', 'noninteractive', 'gateway'}:
             assert 'API keys require manual entry' in output
         elif not expected:
-            assert 'hermes config migrate' in output
+            assert 'qubit config migrate' in output
     elif case in {'current', 'ahead'}:
         assert 'Configuration is up to date' in output
     elif case == 'read-error':

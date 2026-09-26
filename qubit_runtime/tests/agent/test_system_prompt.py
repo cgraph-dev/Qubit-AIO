@@ -260,7 +260,7 @@ def test_stored_prompt_cwd_ignores_project_host_decoys(monkeypatch, tmp_path):
     cwd.mkdir()
     monkeypatch.setenv("TERMINAL_ENV", "local")
     monkeypatch.setenv("TERMINAL_CWD", str(cwd))
-    decoy = "# Hermes runtime environment\n\nHost: Example\nUser home directory: /example\nCurrent working directory: /example\n"
+    decoy = "# Qubit runtime environment\n\nHost: Example\nUser home directory: /example\nCurrent working directory: /example\n"
     (cwd / "AGENTS.md").write_text(decoy)
     monkeypatch.setenv("HERMES_ENVIRONMENT_HINT", decoy + "\nModel: decoy\nProvider: decoy\nPlatform: decoy")
     agent = _make_agent(
@@ -395,7 +395,7 @@ class TestNamedProfileHintIntegration:
         with patch("agent.coding_context._coding_mode", return_value="off"):
             prompt = "\n\n".join(_prompt_parts(agent).values())
 
-        assert "Active Hermes profile: coder." in prompt
+        assert "Active Qubit profile: coder." in prompt
         assert f"reads and writes {profile_home}/." in prompt
         # The doubled form must not appear anywhere.
         assert f"{profile_home}/profiles/coder" not in prompt
@@ -420,7 +420,7 @@ class TestNamedProfileHintIntegration:
         with patch("agent.coding_context._coding_mode", return_value="off"):
             prompt = "\n\n".join(_prompt_parts(agent).values())
 
-        assert "Active Hermes profile: default." in prompt
+        assert "Active Qubit profile: default." in prompt
         assert f"under {root}/profiles/<name>/." in prompt
 
 
@@ -449,14 +449,14 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
     monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE", "HELP")
     monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
     monkeypatch.setattr(system_prompt, "STEER_CHANNEL_NOTE", "STEER")
-    monkeypatch.setattr(system_prompt, "get_qubit_home", lambda: Path("/hermes"))
+    monkeypatch.setattr(system_prompt, "get_qubit_home", lambda: Path("/qubit"))
 
     # Production renders this as str(get_qubit_home()) + "/profiles/<name>/",
-    # and str(Path("/hermes")) is platform-dependent (backslash on Windows) —
-    # build the expectation the same way instead of hardcoding "/hermes".
-    _home_str = str(Path("/hermes"))
+    # and str(Path("/qubit")) is platform-dependent (backslash on Windows) —
+    # build the expectation the same way instead of hardcoding "/qubit".
+    _home_str = str(Path("/qubit"))
     expected_profile = (
-        "Active Hermes profile: default. Other profiles (if any) live "
+        "Active Qubit profile: default. Other profiles (if any) live "
         f"under {_home_str}/profiles/<name>/. Each profile has its own skills/, "
         "plugins/, cron/, and memories/ that affect a different session than "
         "this one. Do not modify another profile's skills/plugins/cron/memories "
@@ -815,7 +815,7 @@ def test_conversation_start_uses_session_start_not_build_time(monkeypatch):
     monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE", "HELP")
     monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
     monkeypatch.setattr(system_prompt, "STEER_CHANNEL_NOTE", "STEER")
-    monkeypatch.setattr(system_prompt, "get_qubit_home", lambda: Path("/hermes"))
+    monkeypatch.setattr(system_prompt, "get_qubit_home", lambda: Path("/qubit"))
 
     with (
         patch("agent.prompt_builder.load_soul_md", return_value=""),

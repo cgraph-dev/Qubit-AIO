@@ -55,7 +55,7 @@ def test_settle_pending_delete_reports_partial_success(client, monkeypatch):
     assert body["ok"] is True
     assert body["settlement_pending"] is True
     assert body["identity_settled"] is False
-    assert body["retry_command"] == "hermes profile purge-identity gone"
+    assert body["retry_command"] == "qubit profile purge-identity gone"
     assert body["path"] == str(gone_dir)
     # Not lying about the filesystem half: the directory is really gone.
     assert not gone_dir.exists()

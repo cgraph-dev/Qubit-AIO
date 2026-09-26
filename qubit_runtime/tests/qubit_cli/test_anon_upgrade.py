@@ -239,4 +239,4 @@ class TestSignInCompletionSettlesTheModel:
         assert model_cfg["base_url"] == INFERENCE.rstrip("/")
         out = capsys.readouterr().out
         assert "Default model is now" not in out
-        assert "run `hermes model` to pick one" in out
+        assert "run `qubit model` to pick one" in out

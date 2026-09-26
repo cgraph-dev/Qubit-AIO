@@ -32,7 +32,7 @@ def fleet(monkeypatch, tmp_path):
     monkeypatch.setattr("gateway.status._pid_exists", lambda pid: pid in (100, 200))
     # A runtime is a VERIFIED gateway identity: live PID whose command line is a gateway's for that home.
     monkeypatch.setattr("gateway.status._read_process_cmdline", lambda pid: {
-        100: "hermes gateway run", 200: "hermes --profile work gateway run"}.get(pid))
+        100: "qubit gateway run", 200: "qubit --profile work gateway run"}.get(pid))
     monkeypatch.setattr("qubit_cli.gateway._get_service_pids", lambda all_profiles=False: {100})
     monkeypatch.setattr("qubit_cli.gateway.supports_systemd_services", lambda: True)
     monkeypatch.setattr("qubit_cli.gateway.find_profile_gateway_processes", lambda exclude_pids=None: [])
@@ -62,7 +62,7 @@ class TestCollectInventory:
         assert by_profile["work"].restart_via == "manual"
         from qubit_cli.update_inventory import describe_restart_mechanism
 
-        assert "hermes -p work gateway restart" in describe_restart_mechanism(
+        assert "qubit -p work gateway restart" in describe_restart_mechanism(
             by_profile["work"].restart_via, "work"
         )
 
@@ -84,11 +84,11 @@ class TestCollectInventory:
 
     def test_stopped_record_with_recycled_pid_is_not_a_runtime(self, fleet, monkeypatch):
         """#109680: a ``stopped`` record whose PID an unrelated process now holds must not fabricate a
-        gateway the restart phase can never touch (that phantom made `hermes update` exit partial)."""
+        gateway the restart phase can never touch (that phantom made `qubit update` exit partial)."""
         work_home = fleet / "home" / "profiles" / "work"
         _write_state(work_home, 200, gateway_state="stopped")
         monkeypatch.setattr("gateway.status._read_process_cmdline", lambda pid: {
-            100: "hermes gateway run", 200: "C:/Windows/system32/dllhost.exe /Processid:{X}"}.get(pid))
+            100: "qubit gateway run", 200: "C:/Windows/system32/dllhost.exe /Processid:{X}"}.get(pid))
         plan = ui.collect_runtime_inventory()
         assert [r.profile for r in plan.runtimes] == ["default"]
 

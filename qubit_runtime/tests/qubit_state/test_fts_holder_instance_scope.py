@@ -5,7 +5,7 @@ Hermes instances: a main gateway (user ``ubuntu``,
 QUBIT_HOME=/home/ubuntu/.hermes) and a demo gateway (user ``demo``,
 QUBIT_HOME=/home/demo/.hermes).  The demo gateway runs as another user, so
 its ``/proc/<pid>/fd`` table is unreadable from the main instance and the
-holder scan falls back to ``/proc/<pid>/cmdline`` + ``_looks_like_hermes``.
+holder scan falls back to ``/proc/<pid>/cmdline`` + ``_looks_like_qubit``.
 The demo process's argv matches the Hermes patterns exactly, so the fallback
 flagged it as an uninspectable holder of the MAIN instance's state.db even
 though ``lsof`` proved zero open handles on it.  Consequence: the stale-FTS
@@ -132,7 +132,7 @@ class TestUninspectableHolderInstanceScope:
             ["hermes", "checkpoint", f"{db_path}-wal"],
             ["hermes", "--home", our_home, "gateway"],
         ):
-            assert qubit_state_holders._looks_like_hermes(argv) or argv[0] == "hermes"
+            assert qubit_state_holders._looks_like_qubit(argv) or argv[0] == "qubit"
             _install_fake_proc(monkeypatch, tmp_path, unreadable_pids=(222,))
             _install_fake_argv(monkeypatch, {222: argv})
 

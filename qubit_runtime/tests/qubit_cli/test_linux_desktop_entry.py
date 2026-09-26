@@ -1,4 +1,4 @@
-"""Tests for the Linux XDG desktop entry installed by ``hermes desktop``."""
+"""Tests for the Linux XDG desktop entry installed by ``qubit desktop``."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def xdg_home(tmp_path, monkeypatch) -> Path:
     data_home = tmp_path / "xdg-data"
     monkeypatch.setenv("XDG_DATA_HOME", str(data_home))
     # Isolate the known-wrapper probe too: tests must never see the real
-    # ~/.local/bin/hermes on the dev machine.
+    # ~/.local/bin/qubit on the dev machine.
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(lde.sys, "platform", "linux")
     return data_home
@@ -84,7 +84,7 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     values = _parse(entry.read_text(encoding="utf-8"))
 
     # Exec must be the absolute path of the resolved binary. The launcher
-    # runs with a minimal PATH, so a bare `hermes` would not resolve.
+    # runs with a minimal PATH, so a bare `qubit` would not resolve.
     assert values["Exec"] == f"{hermes_bin} desktop"
     assert Path(values["Exec"].split(" ")[0]).is_absolute()
 
@@ -148,14 +148,14 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
     assert values["Icon"] == str(lde.icon_path(root))
 
     assert values["Type"] == "Application"
-    assert values["Name"] == "Hermes"
+    assert values["Name"] == "Qubit"
     assert values["Terminal"] == "false"
 
 
 def test_installed_entry_is_executable(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/hermes"
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/qubit"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -176,7 +176,7 @@ def test_exec_falls_back_to_interpreter_module(tmp_path, xdg_home, monkeypatch):
     assert Path(exec_line.split(" ")[0]).is_absolute()
 
 
-# #90292: the shell installer's bash wrapper makes argv[0] the repo `hermes`
+# #90292: the shell installer's bash wrapper makes argv[0] the repo `qubit`
 # python script whose `#!/usr/bin/env python3` shebang resolves to the SYSTEM
 # interpreter when the DE spawns the .desktop entry → ModuleNotFoundError,
 # silent (Terminal=false). The Exec line must prefix sys.executable for any
@@ -212,7 +212,7 @@ def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypat
     hermes_bin = tmp_path / "bin" / "hermes"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text(
-        '#!/usr/bin/env bash\nexec /opt/hermes/venv/bin/python "$@"\n', encoding="utf-8"
+        '#!/usr/bin/env bash\nexec /opt/qubit/venv/bin/python "$@"\n', encoding="utf-8"
     )
     hermes_bin.chmod(0o755)
     monkeypatch.setattr(
@@ -265,7 +265,7 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
 ):
     """A broken interpreter-form entry must self-heal to the wrapper form.
 
-    Launching with argv[0] = <checkout>/hermes (what the broken entry
+    Launching with argv[0] = <checkout>/qubit (what the broken entry
     itself spawns) previously re-persisted the same broken form forever —
     the bootstrap loop that kept #90492 from repairing existing installs.
     """
@@ -394,7 +394,7 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
 
     # The wrapper exists at the known location but is NOT on PATH.
     # Realistic installer shim: execs this checkout's venv python on the
-    # checkout's hermes script (the aidiyet check requires it to target
+    # checkout's qubit script (the aidiyet check requires it to target
     # the writing checkout).
     known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
     known_wrapper.parent.mkdir(parents=True)
@@ -482,7 +482,7 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     """`None` from the resolver must still probe known wrapper locations.
 
     A cold relaunch (argv[0] is not an executable file, e.g. `-c` under
-    `python -m`, and PATH has no `hermes`) makes resolve_qubit_bin return
+    `python -m`, and PATH has no `qubit`) makes resolve_qubit_bin return
     None outright. The early `return primary` that used to fire here skipped
     the durable-wrapper probe, so the persisted Exec flipped to the bare
     `<python> -m qubit_cli.main desktop` module form. Each flip between the
@@ -529,7 +529,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
 ):
     """A known-location wrapper that targets a DIFFERENT checkout is skipped.
 
-    On machines with multiple installs over time, ~/.local/bin/hermes may
+    On machines with multiple installs over time, ~/.local/bin/qubit may
     belong to another checkout. Persisting it would make the entry stable
     but silently point at that other installation — the failure class the
     aidiyet check exists to prevent. The runnable module fallback must win
@@ -580,25 +580,25 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
         pytest.param(
             "user",
             {},
-            "HOME-SET-BY-TEST/.local/bin/hermes",
+            "HOME-SET-BY-TEST/.local/bin/qubit",
             id="user-layout",
         ),
         pytest.param(
             "termux",
             {"PREFIX": "PREFIX-SET-BY-TEST"},
-            "PREFIX-SET-BY-TEST/bin/hermes",
+            "PREFIX-SET-BY-TEST/bin/qubit",
             id="termux-prefix-first",
         ),
         pytest.param(
             "root-fhs",
             {"__EUID0__": "1"},
-            "/usr/local/bin/hermes",
+            "/usr/local/bin/qubit",
             id="root-fhs",
         ),
         pytest.param(
             "non-root-no-fhs",
             {"__EUID0__": "0"},
-            "HOME-SET-BY-TEST/.local/bin/hermes",
+            "HOME-SET-BY-TEST/.local/bin/qubit",
             id="non-root-excludes-fhs",
         ),
     ],
@@ -631,18 +631,18 @@ def test_known_wrapper_candidates_cover_installer_layouts(
         assert candidates[0] == expected_resolved
     if layout == "root-fhs":
         # Root FHS outranks the user layout.
-        assert candidates.index("/usr/local/bin/hermes") < candidates.index(
-            f"{sentinel_home}/.local/bin/hermes"
+        assert candidates.index("/usr/local/bin/qubit") < candidates.index(
+            f"{sentinel_home}/.local/bin/qubit"
         )
     if layout == "non-root-no-fhs":
         # Non-root euid: /usr/local/bin must be excluded outright.
-        assert "/usr/local/bin/hermes" not in candidates
+        assert "/usr/local/bin/qubit" not in candidates
 
 
 def test_install_is_idempotent_and_skips_cache_refresh(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/hermes"
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/qubit"
     )
     calls: list[Path] = []
     monkeypatch.setattr(
@@ -661,14 +661,14 @@ def test_install_without_source_icon_uses_themed_name(tmp_path, xdg_home, monkey
     root = tmp_path / "hermes-agent"
     root.mkdir()
     monkeypatch.setattr(
-        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/hermes"
+        "qubit_cli.relaunch.resolve_qubit_bin", lambda: "/usr/bin/qubit"
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
     entry = lde.install_desktop_entry(root)
 
     # A broken absolute path renders as no icon. The themed name resolves
-    # when Hermes is installed some other way.
+    # when Qubit is installed some other way.
     assert _parse(entry.read_text(encoding="utf-8"))["Icon"] == "hermes"
 
 
@@ -836,7 +836,7 @@ def test_wrapper_ownership_rejects_sibling_extensions(suffix, tmp_path):
     evil.write_text(
         f"#!/usr/bin/env bash\n"
         f"exec {checkout}{suffix}/venv/bin/python "
-        f'{checkout}{suffix}/hermes "$@"\n',
+        f'{checkout}{suffix}/qubit "$@"\n',
         encoding="utf-8",
     )
     assert lde._wrapper_targets_checkout(evil, checkout) is False
@@ -864,7 +864,7 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     shim.write_text(
         f"#!/usr/bin/env bash\n"
         f"exec {lexical_checkout}/venv/bin/python "
-        f'{lexical_checkout}/hermes "$@"\n',
+        f'{lexical_checkout}/qubit "$@"\n',
         encoding="utf-8",
     )
     assert lde._wrapper_targets_checkout(shim, lexical_checkout) is True
@@ -1095,7 +1095,7 @@ def test_install_places_1024_png_in_256x256_not_scalable(
 
 
 def test_install_removes_stale_scalable_png(tmp_path, xdg_home, monkeypatch):
-    """v2026.8.31 wrote the PNG into scalable/. A later hermes desktop
+    """v2026.8.31 wrote the PNG into scalable/. A later qubit desktop
     must delete that leftover so Cinnamon does not keep using it."""
     root = _make_project(tmp_path)
     lde.icon_path(root).write_bytes(_png_ihdr(1024, 1024))

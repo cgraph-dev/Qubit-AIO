@@ -137,7 +137,7 @@ def test_deliver_validates_profile_and_runs_transport(home, monkeypatch):
     argv = calls["argv"]
     # argv[0] may be a resolved venv path (#93590) — match by basename.
     assert argv[1:3] == ["-p", "ops"]
-    assert argv[0].rsplit("\\", 1)[-1].rsplit("/", 1)[-1] in ("hermes", "hermes.exe")
+    assert argv[0].rsplit("\\", 1)[-1].rsplit("/", 1)[-1] in ("qubit", "qubit.exe")
     assert "Bot Chat" in argv and "--query-file" in argv
 
     # 'hermes' alias resolves to default
@@ -174,7 +174,7 @@ def test_deliver_restamps_relayed_sender_with_a_reply_safe_handle(home, monkeypa
 
     # The deliver child's runner, whichever this tree has: subprocess.run today, and
     # quiet_single_query.run_reported_turn once the relay books turns from their report
-    # (#114980) — patching only the first would spawn a real ``hermes chat -Q`` child there.
+    # (#114980) — patching only the first would spawn a real ``qubit chat -Q`` child there.
     monkeypatch.setattr("subprocess.run", _fake_run)
     monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", _fake_run, raising=False)
     bot_relay.write_remote_roster(home, [
@@ -221,7 +221,7 @@ def test_deliver_lands_in_live_bot_chat_instead_of_subprocess(home, monkeypatch)
 
     def _fake_run(argv, *a, **k):
         # The server module's import-time update prefetch runs `git ...` on a
-        # daemon thread; only the relay's `hermes` CLI spawn is under test.
+        # daemon thread; only the relay's `qubit` CLI spawn is under test.
         if argv and argv[0] != "git":
             spawned.append(argv)
         return _Proc()
@@ -277,7 +277,7 @@ def _no_cli_transport(monkeypatch, spawned):
 
     # Guard the deliver child's runner, whichever this tree has: subprocess.run today, and
     # quiet_single_query.run_reported_turn once the relay books turns from their report
-    # (#114980) — guarding only the first would let a real ``hermes chat -Q`` child spawn there.
+    # (#114980) — guarding only the first would let a real ``qubit chat -Q`` child spawn there.
     monkeypatch.setattr("subprocess.run", _fake_run)
     monkeypatch.setattr("qubit_cli.quiet_single_query.run_reported_turn", _fake_run, raising=False)
 
@@ -572,7 +572,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 
 
 def _child_argv(monkeypatch, body: str) -> dict:
-    """Stand in a Python child for the ``hermes`` transport; it imports ``qubit_cli`` from this checkout."""
+    """Stand in a Python child for the ``qubit`` transport; it imports ``qubit_cli`` from this checkout."""
     argv = [sys.executable, "-c", textwrap.dedent(body)]
     monkeypatch.setattr(bot_relay, "local_delivery_command", lambda prof, tmp: argv)
     return {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in (_REPO_ROOT, os.environ.get("PYTHONPATH")) if p)}

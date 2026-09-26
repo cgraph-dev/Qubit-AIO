@@ -190,7 +190,7 @@ class TestCodexOAuthBootstrapHook:
 
         tools_config_post_setup._POST_SETUP_HOOKS["openai_codex"]()
 
-        assert "hermes auth add openai-codex" in capsys.readouterr().out
+        assert "qubit auth add openai-codex" in capsys.readouterr().out
 
     def test_readiness_reports_codex_row_from_auth_store(self, monkeypatch):
         from qubit_cli import auth, tools_config

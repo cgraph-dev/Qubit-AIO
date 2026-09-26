@@ -1,6 +1,6 @@
-"""The `hermes profile purge-identity` retry path: dispatched, and honest about failure.
+"""The `qubit profile purge-identity` retry path: dispatched, and honest about failure.
 
-`hermes profile delete` reports a pending identity settlement when it cannot purge and names this
+`qubit profile delete` reports a pending identity settlement when it cannot purge and names this
 command as the retry — so the command must actually reach a handler, and must fail loudly when the
 settlement still cannot be made. Regression for the delete side of #111926.
 """
@@ -44,7 +44,7 @@ def test_purge_identity_exits_nonzero_when_settlement_stays_pending(
         profile_cmd.cmd_profile(Namespace(profile_action="purge-identity", profile_name="gone"))
 
     assert exc.value.code not in (0, None)
-    assert "hermes profile purge-identity gone" in capsys.readouterr().err
+    assert "qubit profile purge-identity gone" in capsys.readouterr().err
 
 
 def test_purge_identity_refuses_a_same_name_profile_created_after_the_delete(profile_env, capsys):

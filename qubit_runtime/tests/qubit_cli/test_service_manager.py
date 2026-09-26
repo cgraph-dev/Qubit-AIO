@@ -111,7 +111,7 @@ def fake_subprocess_run(monkeypatch: pytest.MonkeyPatch):
 #
 # The skeleton helper pre-creates the dirs and FIFOs that s6-supervise
 # would otherwise create as root mode 0700, locking out the
-# unprivileged hermes user from every lifecycle op. These tests run
+# unprivileged qubit user from every lifecycle op. These tests run
 # against tmp_path and assert the produced layout — the live-container
 # verification (against real s6-svc / s6-svstat) lives in
 # tests/docker/test_s6_profile_gateway_integration.py.
@@ -188,7 +188,7 @@ def test_render_run_script_uses_replace_to_take_over_stale_holder() -> None:
     """NS-505: the supervised gateway must exec ``gateway run --replace``.
 
     Without ``--replace`` a gateway started OUTSIDE s6 (a stray shell
-    ``hermes gateway run``, an agent action, the Open WebUI helper) holds
+    ``qubit gateway run``, an agent action, the Open WebUI helper) holds
     the per-QUBIT_HOME PID lock; the supervised slot then execs a bare
     ``gateway run``, hits the "Another gateway instance is already
     running" guard, exits non-zero, and s6 restarts it — a restart loop
@@ -199,9 +199,9 @@ def test_render_run_script_uses_replace_to_take_over_stale_holder() -> None:
     render paths.
     """
     default_text = S6ServiceManager._render_run_script("default", {})
-    # Root profile: bare `hermes gateway run --replace` (no -p flag).
-    assert "hermes gateway run --replace" in default_text
-    assert "hermes -p default" not in default_text
+    # Root profile: bare `qubit gateway run --replace` (no -p flag).
+    assert "qubit gateway run --replace" in default_text
+    assert "qubit -p default" not in default_text
     # Every exec line that launches the gateway must carry --replace, so
     # neither the non-root nor the privilege-drop branch can spin.
     gateway_execs = [
@@ -267,7 +267,7 @@ def test_render_finish_script_does_not_restart_on_clean_exit(tmp_path) -> None:
 # ---------------------------------------------------------------------------
 # S6 stop writes a planned-stop marker (issue #42675)
 #
-# `hermes gateway stop` inside a container dispatches through
+# `qubit gateway stop` inside a container dispatches through
 # S6ServiceManager.stop() -> `s6-svc -d`, which SIGTERMs the gateway.
 # That SIGTERM is indistinguishable from the one s6/Docker sends on a
 # container restart unless we mark the intentional stop first. Without
@@ -293,10 +293,10 @@ def _log_run_setup_fragment(rendered: str) -> str:
 def test_s6_log_run_creates_leaf_as_qubit_without_chown(
     s6_scandir, fake_subprocess_run,
 ) -> None:
-    """log/run must not root-chown/unlink volume paths; create leaf as hermes.
+    """log/run must not root-chown/unlink volume paths; create leaf as qubit.
 
     #45258 parent ownership is stage2's job (``logs/gateways`` seeded as
-    hermes). Restartable log/run must not pathname-chown or pathname-rm a
+    qubit). Restartable log/run must not pathname-chown or pathname-rm a
     hermes-writable tree from root — that is a symlink TOCTOU hole.
     """
     mgr = S6ServiceManager(scandir=s6_scandir)
@@ -308,15 +308,15 @@ def test_s6_log_run_creates_leaf_as_qubit_without_chown(
         "restartable log/run must not invoke chown on hermes-writable paths; "
         f"saw: {log_text!r}"
     )
-    assert 's6-setuidgid hermes mkdir -p "$log_dir"' in log_text
-    assert 's6-setuidgid hermes rm -f "$log_dir/lock"' in log_text
+    assert 's6-setuidgid qubit mkdir -p "$log_dir"' in log_text
+    assert 's6-setuidgid qubit rm -f "$log_dir/lock"' in log_text
     assert 'else\n  mkdir -p "$log_dir"\n  rm -f "$log_dir/lock"\nfi\n' in log_text
     # Lock cleanup must not remain a bare root-context pathname op after fi.
     after_fi = log_text.split("fi\n", 1)[-1]
     assert 'rm -f "$log_dir/lock"' not in after_fi
 
-    mkdir_as_qubit_idx = log_text.index('s6-setuidgid hermes mkdir -p "$log_dir"')
-    rm_as_qubit_idx = log_text.index('s6-setuidgid hermes rm -f "$log_dir/lock"')
+    mkdir_as_qubit_idx = log_text.index('s6-setuidgid qubit mkdir -p "$log_dir"')
+    rm_as_qubit_idx = log_text.index('s6-setuidgid qubit rm -f "$log_dir/lock"')
     exec_idx = log_text.index("s6-log 1 ")
     assert mkdir_as_qubit_idx < rm_as_qubit_idx < exec_idx
 
@@ -360,7 +360,7 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     )
     # Pretend we are root so the script takes the s6-setuidgid setup path.
     # Mark the drop so fake rm can refuse unlink outside QUBIT_HOME the way
-    # a real hermes uid cannot delete a foreign root-owned lock.
+    # a real qubit uid cannot delete a foreign root-owned lock.
     (bin_dir / "id").write_text(
         "#!/bin/sh\n"
         'if [ "$1" = "-u" ]; then echo 0; exit 0; fi\n'
@@ -376,7 +376,7 @@ def test_s6_log_run_never_invokes_chown_with_symlinked_log_dir(tmp_path) -> None
     real_rm = "/bin/rm"
     (bin_dir / "rm").write_text(
         "#!/bin/sh\n"
-        # Privilege-dropped: no-op. Models that hermes cannot unlink a foreign
+        # Privilege-dropped: no-op. Models that qubit cannot unlink a foreign
         # root-owned lock outside the volume; avoids a realpath/rm TOCTOU in
         # the test double itself. Root-context: real rm — a residual bare
         # ``rm -f "$log_dir/lock"`` would delete victim/lock via the symlink.

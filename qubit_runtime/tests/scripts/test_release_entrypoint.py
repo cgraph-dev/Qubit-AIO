@@ -115,7 +115,7 @@ def test_release_claims_the_first_attempt_creates_a_draft_and_dispatches(source)
     assert "--verify-tag" in create and "--draft" in create
     assert "--generate-notes" not in create
     assert "--notes-file" in create
-    assert create[-2:] == ["--title", "Hermes Agent v0.21.5"]
+    assert create[-2:] == ["--title", "Qubit Agent v0.21.5"]
     assert calls[1:] == [
         ["gh", "workflow", "run", "stable-release.yml", "--ref", "rc.1-v0.21.5",
          "--repo", "example/hermes-agent", "--raw-field", "tag=rc.1-v0.21.5"],

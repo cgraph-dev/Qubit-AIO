@@ -41,7 +41,7 @@ def test_db_unavailable_commands_are_pinned_to_the_failing_profile(monkeypatch, 
     finally:
         qubit_state._set_last_init_error(None)
     for text in (no_cause, network):
-        assert f"`hermes {selector}doctor`" in text and "`hermes doctor`" not in text
+        assert f"`qubit {selector}doctor`" in text and "`qubit doctor`" not in text
         assert "{profile_arg}" not in text
 
 
@@ -64,7 +64,7 @@ def test_db_unavailable_details_line_carries_raw_cause_only_below_the_lead():
 
 def test_db_unavailable_network_drive_cause_does_not_offer_doctor_fix():
     """A locking-protocol failure means the DB sits on a network filesystem that
-    cannot host SQLite's WAL; `hermes doctor --fix` cannot repair a mount, so it
+    cannot host SQLite's WAL; `qubit doctor --fix` cannot repair a mount, so it
     must not be the offered action (only moving the file helps)."""
     qubit_state._set_last_init_error("OperationalError: locking protocol")
     try:

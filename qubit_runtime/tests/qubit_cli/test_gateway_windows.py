@@ -25,7 +25,7 @@ def test_exec_schtasks_decodes_ansi_output_under_utf8_mode(monkeypatch):
     monkeypatch.setattr(gateway_windows.shutil, "which", lambda name: "schtasks.exe")
     monkeypatch.setattr(gateway_windows.locale, "getpreferredencoding", lambda *a, **k: "utf-8")
     monkeypatch.setattr(gateway_windows, "_windows_console_encodings", lambda: ["cp936"], raising=False)
-    xml = r'<Arguments>//B //Nologo "C:\Users\方舟\AppData\Local\hermes\gateway-service\Hermes_Gateway.vbs"</Arguments>'
+    xml = r'<Arguments>//B //Nologo "C:\Users\方舟\AppData\Local\qubit\gateway-service\Hermes_Gateway.vbs"</Arguments>'
 
     def fake_run(argv, **kwargs):
         # schtasks writes cp936 bytes; honour text/encoding like the real subprocess would.
@@ -286,7 +286,7 @@ def test_elevated_gateway_command_uses_hidden_console_python(monkeypatch):
         shell32 = FakeShell32()
 
     monkeypatch.setattr(gateway_windows, "_current_profile_cli_args", lambda: ["--profile", "alice"])
-    monkeypatch.setattr(gateway_windows.sys, "executable", r"C:\Hermes\venv\Scripts\python.exe")
+    monkeypatch.setattr(gateway_windows.sys, "executable", r"C:\Qubit\venv\Scripts\python.exe")
     monkeypatch.setattr(gateway_windows.ctypes, "windll", FakeWindll(), raising=False)
 
     assert gateway_windows._launch_elevated_gateway_command("install", ["--start-now", "--elevated-handoff"])
@@ -294,7 +294,7 @@ def test_elevated_gateway_command_uses_hidden_console_python(monkeypatch):
     assert len(calls) == 1
     _hwnd, verb, executable, params, cwd, show = calls[0]
     assert verb == "runas"
-    assert executable == r"C:\Hermes\venv\Scripts\python.exe"
+    assert executable == r"C:\Qubit\venv\Scripts\python.exe"
     assert "--profile alice gateway install --start-now --elevated-handoff" in params
     assert show == 0
     assert cwd
@@ -358,8 +358,8 @@ def test_gateway_vbs_script_is_console_less(monkeypatch):
     )
     content = gateway_windows._build_gateway_vbs_script(
         r"C:\venv\Scripts\python.exe",
-        r"C:\Hermes",
-        r"C:\Hermes",
+        r"C:\Qubit",
+        r"C:\Qubit",
         "--profile work",
     )
     assert "cmd.exe" not in content.lower()
@@ -531,7 +531,7 @@ _PRE_HARDENING_TASK_XML = """<?xml version="1.0" encoding="UTF-16"?>
 
 def test_scheduled_task_drift_names_missing_hardening_leaves(monkeypatch):
     """A pre-hardening registration is reported leaf by leaf, and the report is what
-    ``hermes gateway status`` prints together with the ``hermes gateway install`` repair hint."""
+    ``qubit gateway status`` prints together with the ``qubit gateway install`` repair hint."""
     launcher = Path(r"C:\Users\me\.hermes\gateway-service\Hermes_Gateway.vbs")
     template = gateway_windows._build_scheduled_task_xml("Hermes_Gateway", launcher, r"PC\me")
     drift = gateway_windows.compare_scheduled_task_drift(_PRE_HARDENING_TASK_XML, template)
@@ -548,7 +548,7 @@ def test_scheduled_task_drift_names_missing_hardening_leaves(monkeypatch):
     monkeypatch.setattr("builtins.print", lambda *a, **k: printed.append(" ".join(map(str, a))))
     gateway_windows._print_scheduled_task_drift("Hermes_Gateway")
     assert printed[0].startswith("⚠ Scheduled Task registration predates the current template (missing: RestartOnFailure")
-    assert "hermes gateway install" in printed[1]
+    assert "qubit gateway install" in printed[1]
 
 
 def test_scheduled_task_drift_is_silent_when_aligned_or_unqueryable(monkeypatch):
@@ -621,7 +621,7 @@ def _arrange_uninstalled_start(monkeypatch):
 
 
 def test_stdin_interactive_only_when_isatty_and_a_console_answers_get_console_mode():
-    """Windows CRT isatty() is True for the NUL device (`hermes gateway start < NUL`, stdin=DEVNULL), so
+    """Windows CRT isatty() is True for the NUL device (`qubit gateway start < NUL`, stdin=DEVNULL), so
     isatty alone must not open the prompt; off Windows (no console-mode fact) isatty decides (#113977)."""
     assert gateway_windows._stdin_is_interactive(isatty=True, console_mode_ok=False) is False   # NUL
     assert gateway_windows._stdin_is_interactive(isatty=True, console_mode_ok=True) is True     # console
@@ -639,7 +639,7 @@ def test_start_with_nul_stdin_starts_the_gateway_but_never_installs_login_persis
     gateway_windows.start()
 
     assert installs == [] and spawns == [1]
-    assert "hermes gateway install" in capsys.readouterr().out
+    assert "qubit gateway install" in capsys.readouterr().out
 
 
 def test_start_with_captured_stdout_never_asks_even_on_a_console_stdin(monkeypatch, capsys):
@@ -653,11 +653,11 @@ def test_start_with_captured_stdout_never_asks_even_on_a_console_stdin(monkeypat
     gateway_windows.start()
 
     assert installs == [] and spawns == [1]
-    assert "hermes gateway install" in capsys.readouterr().out
+    assert "qubit gateway install" in capsys.readouterr().out
 
 
 def test_start_without_tty_starts_the_gateway_but_never_installs_login_persistence(monkeypatch, capsys):
-    """`hermes gateway start < /dev/null` must not answer the persistence question with a default Yes
+    """`qubit gateway start < /dev/null` must not answer the persistence question with a default Yes
     (#113977); it starts the gateway once and points at the explicit install command."""
     installs, spawns = _arrange_uninstalled_start(monkeypatch)
     monkeypatch.setattr(setup, "is_interactive_stdin", lambda: False)
@@ -667,7 +667,7 @@ def test_start_without_tty_starts_the_gateway_but_never_installs_login_persisten
 
     assert installs == [] and spawns == [1]
     out = capsys.readouterr().out
-    assert "hermes gateway install" in out and "did not complete" not in out
+    assert "qubit gateway install" in out and "did not complete" not in out
 
 
 def test_start_on_tty_hands_both_answers_to_install_and_honours_the_env_opt_out(monkeypatch):
@@ -704,7 +704,7 @@ def test_start_on_tty_hands_both_answers_to_install_and_honours_the_env_opt_out(
 #
 # Background: on Windows, asyncio.add_signal_handler raises NotImplementedError,
 # so the gateway's SIGTERM handler (which drains in-flight agents and writes
-# resume_pending=True) never fires when `hermes gateway stop` kills the
+# resume_pending=True) never fires when `qubit gateway stop` kills the
 # process. The fix: stop() writes the planned_stop_marker first, waits for
 # the gateway's marker-watcher thread to drain + exit cleanly, then escalates
 # to taskkill if drain times out.
@@ -721,22 +721,22 @@ def test_start_on_tty_hands_both_answers_to_install_and_honours_the_env_opt_out(
 
 def test_qubit_owns_windows_service_requires_name_or_binary_under_a_qubit_root():
     """Task Scheduler (``Schedule`` in svchost) above a task-launched gateway is never its supervisor;
-    a service is Hermes-owned only by a ``hermes*`` name or a binary under the install (#97208)."""
+    a service is Qubit-owned only by a ``qubit*`` name or a binary under the install (#97208)."""
     roots = (
-        r"C:\Users\kaize\AppData\Local\hermes\hermes-agent",
-        r"C:\Users\kaize\AppData\Local\hermes\hermes-agent\venv\Scripts",
-        r"C:\Users\kaize\AppData\Local\hermes\gateway-service",
+        r"C:\Users\kaize\AppData\Local\qubit\hermes-agent",
+        r"C:\Users\kaize\AppData\Local\qubit\hermes-agent\venv\Scripts",
+        r"C:\Users\kaize\AppData\Local\qubit\gateway-service",
     )
     owns = gateway_windows.hermes_owns_windows_service
 
     assert not owns("Schedule", r"C:\Windows\system32\svchost.exe -k netsvcs -p -s Schedule", roots)
     assert not owns("BITS", r"C:\Windows\System32\svchost.exe -k netsvcs -p -s BITS", roots)
-    assert not owns("Other", r"C:\Users\kaize\AppData\Local\hermes\hermes-agent-fork\run.exe", roots)
+    assert not owns("Other", r"C:\Users\kaize\AppData\Local\qubit\hermes-agent-fork\run.exe", roots)
 
     assert owns("HermesGateway", r"C:\nssm\nssm.exe", roots)
     assert owns("Hermes_Gateway_derek", "", roots)
-    assert owns("gw", r'"C:\Users\KAIZE\AppData\Local\hermes\hermes-agent\venv\Scripts\hermes.exe" gateway run', roots)
-    assert owns("gw", r"C:\Users\kaize\AppData\Local\hermes\gateway-service\Hermes_Gateway.cmd", roots)
+    assert owns("gw", r'"C:\Users\KAIZE\AppData\Local\qubit\hermes-agent\venv\Scripts\hermes.exe" gateway run', roots)
+    assert owns("gw", r"C:\Users\kaize\AppData\Local\qubit\gateway-service\Hermes_Gateway.cmd", roots)
 
 
 def test_wizard_install_service_asks_once_and_never_starts_after_windows_install(monkeypatch):

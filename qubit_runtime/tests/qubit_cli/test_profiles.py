@@ -423,7 +423,7 @@ class TestCreateProfile:
 # ===================================================================
 
 class TestNoSkillsOptOut:
-    """Tests for `hermes profile create --no-skills` and the opt-out marker."""
+    """Tests for `qubit profile create --no-skills` and the opt-out marker."""
 
     def test_no_skills_writes_marker_and_skips_seeding(self, profile_env):
         profile_dir = create_profile("orchestrator", no_alias=True, no_skills=True)
@@ -448,7 +448,7 @@ class TestNoSkillsOptOut:
 # ===================================================================
 
 class TestBackfillProfileEnvs:
-    """Tests for backfill_profile_envs() — the `hermes update` pass that
+    """Tests for backfill_profile_envs() — the `qubit update` pass that
     gives pre-#44792 profiles (created before .env seeding) their own
     .env, copied from the default install so credentials don't break."""
 
@@ -589,11 +589,11 @@ class TestDeleteProfile:
         # Typed partial success: the filesystem delete completed, the identity did not, and the
         # payload carries what a surfacing caller needs to report it and retry.
         assert ei.value.profile == "gone"
-        assert ei.value.retry_command == "hermes profile purge-identity gone"
+        assert ei.value.retry_command == "qubit profile purge-identity gone"
         assert not ei.value.path.exists()
         assert isinstance(ei.value, RuntimeError)  # the CLI handler catches RuntimeError
 
-        assert "hermes profile purge-identity gone" in capsys.readouterr().err
+        assert "qubit profile purge-identity gone" in capsys.readouterr().err
         check = SessionDB(tmp_path / ".hermes" / "state.db")
         try:
             # The CLI left the identity alone rather than racing the live owner.
@@ -646,7 +646,7 @@ class TestDeleteProfile:
         assert pids == [101]
 
     def test_backend_scan_matches_shebang_exec_of_qubit_shim(self, profile_env, monkeypatch):
-        """A `hermes` console-script shim spawned directly (e.g. Electron's
+        """A `qubit` console-script shim spawned directly (e.g. Electron's
         findOnPath('hermes') resolution) reports argv[0] as the interpreter
         (python3) and argv[1] as the shim's path -- not "hermes" -- because
         the OS execs the shebang. The scanner must still recognize it so
@@ -674,11 +674,11 @@ class TestDeleteProfile:
         procs = [
             # Shebang-exec'd shim bound to coder → matched despite argv[0]
             # being the python interpreter, not "hermes".
-            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "coder", "serve",
+            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/qubit", "--profile", "coder", "serve",
                             "--host", "127.0.0.1", "--port", "0"]),
             # Same shape but a different profile → skipped.
-            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "other", "serve"]),
-            # Non-hermes script run by python3 → skipped.
+            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/qubit", "--profile", "other", "serve"]),
+            # Non-qubit script run by python3 → skipped.
             FakeProc(203, ["/usr/bin/python3", "/Users/x/some_script.py", "--profile", "coder", "serve"]),
         ]
 
@@ -699,7 +699,7 @@ class TestDeleteProfile:
         hermes-notes.py, hermes-unrelated-tool) must NOT be misidentified as
         the console-script shim just because argv[0] is a python interpreter
         and argv[1]'s basename starts with "hermes" -- only the actual known
-        console-script entry points (hermes, hermes-agent, hermes-acp) count.
+        console-script entry points (qubit, hermes-agent, hermes-acp) count.
         """
         create_profile("coder", no_alias=True)
         profile_dir = get_profile_dir("coder")
@@ -765,9 +765,9 @@ class TestDeleteProfile:
 
         self_pid = os.getpid()
         procs = [
-            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/hermes-agent",
+            FakeProc(401, ["/usr/bin/python3", "/Users/x/.local/bin/qubit-agent",
                             "--profile", "coder", "serve"]),
-            FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/hermes-acp",
+            FakeProc(402, ["/usr/bin/python3", "/Users/x/.local/bin/qubit-acp",
                             "--profile", "coder", "serve"]),
         ]
 
@@ -1000,14 +1000,14 @@ class TestWrapperScript:
     """Tests for create_wrapper_script() and remove_wrapper_script()."""
 
     def test_creates_sh_on_posix(self, profile_env, monkeypatch):
-        monkeypatch.setattr("qubit_cli.profiles.shutil.which", lambda name: "/opt/hermes/bin/hermes")
+        monkeypatch.setattr("qubit_cli.profiles.shutil.which", lambda name: "/opt/qubit/bin/qubit")
         from qubit_cli.profiles import create_wrapper_script
         wrapper = create_wrapper_script("mybot")
         assert wrapper is not None
         assert wrapper.name == "mybot"
         content = wrapper.read_text(encoding="utf-8-sig")
         assert content.startswith("#!/bin/sh")
-        assert "exec /opt/hermes/bin/hermes -p mybot" in content
+        assert "exec /opt/qubit/bin/qubit -p mybot" in content
 
 
     @pytest.mark.platforms("windows")
@@ -1114,7 +1114,7 @@ class TestRenameProfile:
         honcho_path = tmp_path / ".hermes" / "honcho.json"
         honcho_path.write_text(json.dumps({
             "hosts": {
-                "hermes.ssi_health": {
+                "qubit.ssi_health": {
                     "recallMode": "hybrid",
                     "writeFrequency": "async",
                     "sessionStrategy": "per-session",
@@ -1131,9 +1131,9 @@ class TestRenameProfile:
             rename_profile("ssi_health", "heimdall")
 
         cfg = json.loads(honcho_path.read_text(encoding="utf-8-sig"))
-        assert "hermes.ssi_health" not in cfg["hosts"]
-        assert cfg["hosts"]["hermes_heimdall"]["aiPeer"] == "ssi_health"
-        assert cfg["hosts"]["hermes_heimdall"]["peerName"] == "user-peer"
+        assert "qubit.ssi_health" not in cfg["hosts"]
+        assert cfg["hosts"]["qubit_heimdall"]["aiPeer"] == "ssi_health"
+        assert cfg["hosts"]["qubit_heimdall"]["peerName"] == "user-peer"
 
     def test_multiplexed_rename_unroutes_old_then_hot_serves_new(self, profile_env):
         """Under a live multiplexer the old name is tombstoned + unrouted BEFORE the directory
@@ -1243,7 +1243,7 @@ class TestRenameProfile:
 
 
     def test_migrate_identity_command_repairs_a_failed_live_migration(self, profile_env, capsys):
-        """The failed-live-migration end state must be recoverable: `hermes profile
+        """The failed-live-migration end state must be recoverable: `qubit profile
         migrate-identity <old> <new>` rekeys the durable rows once no gateway holds the store, and
         is idempotent (a second run has nothing left to rekey but still succeeds)."""
         from qubit_cli.profile_cmd import cmd_profile
@@ -1272,7 +1272,7 @@ class TestRenameProfile:
              patch("qubit_cli.profiles._notify_multiplexer"), \
              patch("gateway.control_socket.migrate_gateway_profile_identity", return_value=None):
             rename_profile("oldname", "newname")
-        assert "hermes profile migrate-identity oldname newname" in capsys.readouterr().err
+        assert "qubit profile migrate-identity oldname newname" in capsys.readouterr().err
 
         # Gateway restarted/stopped → the retry command repairs both stores.
         with patch("qubit_cli.profiles._live_default_multiplexer", return_value=False):
@@ -1596,7 +1596,7 @@ class TestEdgeCases:
         # runs the gateway with no profile flag).
         with patch("gateway.status.get_running_pid", return_value=None), patch(
             "gateway.status._read_process_cmdline",
-            return_value="hermes gateway run --replace",
+            return_value="qubit gateway run --replace",
         ):
             assert _check_gateway_running(default_home) is True
 
@@ -1755,7 +1755,7 @@ class TestResolveProfileEnvSpelling:
         never fall back to the platform default.
         """
         root = tmp_path / "configured-root"
-        custom = tmp_path / "custom-hermes"
+        custom = tmp_path / "custom-qubit"
         for profile_dir in (root / "profiles" / "beta", root / "profiles" / "coder", custom / "profiles" / "beta"):
             profile_dir.mkdir(parents=True)
             (profile_dir / "config.yaml").write_text("{}\n", encoding="utf-8")  # identity marker: a bare dir does not resolve

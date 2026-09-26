@@ -287,7 +287,7 @@ class TestConfigGetPhantomKeyNotice:
 # ---------------------------------------------------------------------------
 
 class TestListNavigation:
-    """hermes config set must preserve YAML list fields when using numeric
+    """qubit config set must preserve YAML list fields when using numeric
     indices.  Before #17876, _set_nested would silently replace the entire
     list with a dict, destroying every sibling entry.
     """
@@ -605,7 +605,7 @@ class TestDisplaySkinTouch:
 
     The gateway's skin watcher broadcasts ``skin.changed`` on a signature move
     of (active name, skin-file mtime). Re-affirming the already-configured skin
-    (`hermes config set display.skin X` while it is already X — the recovery
+    (`qubit config set display.skin X` while it is already X — the recovery
     path when a surface missed the original activation) moves NEITHER part, so
     without the touch the explicit apply is invisible to every live surface.
     """
@@ -647,7 +647,7 @@ class TestDisplaySkinTouch:
 # ---------------------------------------------------------------------------
 
 class TestMappingGuard:
-    """``hermes config set <section> <scalar>`` must not silently destroy an
+    """``qubit config set <section> <scalar>`` must not silently destroy an
     existing mapping.  Bare ``model`` is a documented shorthand — redirect to
     ``model.default``.  All other mapping sections are refused without --force.
     """
@@ -657,7 +657,7 @@ class TestMappingGuard:
         (tmp_path / "config.yaml").write_text(_yaml.safe_dump(data))
 
     def test_bare_model_shorthand_preserves_siblings(self, _isolated_qubit_home):
-        """hermes config set model <id> → model.default, siblings survive."""
+        """qubit config set model <id> → model.default, siblings survive."""
         self._write_config(_isolated_qubit_home, {
             "model": {
                 "default": "gpt-4o",
@@ -681,7 +681,7 @@ class TestMappingGuard:
         assert "gpt-5.6-sol" in _read_config(_isolated_qubit_home)
 
     def test_non_model_mapping_is_refused(self, _isolated_qubit_home):
-        """hermes config set terminal bash → refuse, terminal has sub-keys."""
+        """qubit config set terminal bash → refuse, terminal has sub-keys."""
         self._write_config(_isolated_qubit_home, {
             "terminal": {
                 "backend": "docker",
@@ -694,7 +694,7 @@ class TestMappingGuard:
         assert exc.value.code == 1
 
     def test_non_model_mapping_force_overwrites(self, _isolated_qubit_home):
-        """hermes config set --force terminal bash → proceed, section wiped."""
+        """qubit config set --force terminal bash → proceed, section wiped."""
         self._write_config(_isolated_qubit_home, {
             "terminal": {
                 "backend": "docker",
@@ -721,7 +721,7 @@ class TestMappingGuard:
         assert parsed["model"]["provider"] == "openai-api"
 
     def test_model_force_overwrites_entire_section(self, _isolated_qubit_home):
-        """hermes config set --force model <id> → overwrite entire section."""
+        """qubit config set --force model <id> → overwrite entire section."""
         self._write_config(_isolated_qubit_home, {
             "model": {
                 "default": "gpt-4o",
@@ -781,7 +781,7 @@ class TestMalformedYAMLConfigPreservation:
 
         captured = capsys.readouterr()
         combined = captured.out + captured.err
-        assert "formatting error" in combined and "`hermes config edit`" in combined
+        assert "formatting error" in combined and "`qubit config edit`" in combined
         # Original config must remain intact
         raw = _read_config(_isolated_qubit_home)
         assert raw == self.BROKEN_CONFIG, f"Config was overwritten:\n{raw}"
@@ -797,7 +797,7 @@ class TestMalformedYAMLConfigPreservation:
 
         captured = capsys.readouterr()
         combined = captured.out + captured.err
-        assert "formatting error" in combined and "`hermes config edit`" in combined
+        assert "formatting error" in combined and "`qubit config edit`" in combined
         raw = _read_config(_isolated_qubit_home)
         assert raw == self.BROKEN_CONFIG
 
@@ -807,7 +807,7 @@ class TestMalformedYAMLConfigPreservation:
 # ---------------------------------------------------------------------------
 
 class TestLiteralDotKeyEscaping:
-    """``hermes config set/unset/get`` must not split a key segment on a
+    """``qubit config set/unset/get`` must not split a key segment on a
     literal dot.  Provider names routinely embed version numbers
     (``qwen3.5-397b-wafer``), and before the backslash-escape (#84064)
     ``providers.qwen3.5-397b-wafer.api_key`` silently created a bogus nested

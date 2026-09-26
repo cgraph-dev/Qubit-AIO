@@ -156,7 +156,7 @@ class TestRuntimeFtsRebuild:
         ),
     )
     def test_uninspectable_non_qubit_process_is_not_a_holder(self, argv):
-        assert not qubit_state_holders._looks_like_hermes(argv)
+        assert not qubit_state_holders._looks_like_qubit(argv)
 
     @pytest.mark.parametrize(
         "argv",
@@ -180,7 +180,7 @@ class TestRuntimeFtsRebuild:
         ),
     )
     def test_uninspectable_qubit_process_remains_a_holder(self, argv):
-        assert qubit_state_holders._looks_like_hermes(argv)
+        assert qubit_state_holders._looks_like_qubit(argv)
 
     @pytest.mark.platforms("linux")
     def test_foreign_holder_detection_proc_readlink_deleted_wal(

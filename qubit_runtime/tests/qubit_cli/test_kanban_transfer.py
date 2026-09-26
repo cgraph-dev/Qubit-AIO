@@ -358,5 +358,5 @@ def test_import_rejects_a_future_format_version(kanban_root, tmp_path):
         tf.add(staged / "alpha", arcname="alpha")
 
     kanban_root("target")
-    with pytest.raises(ValueError, match="newer than this Hermes"):
+    with pytest.raises(ValueError, match="newer than this Qubit"):
         kt.import_board(str(bumped))

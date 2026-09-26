@@ -1,4 +1,4 @@
-"""Regression for #115702: a paid Nous model behind an empty credit balance answers HTTP 404
+"""Regression for #115702: a paid Qubit model behind an empty credit balance answers HTTP 404
 ``insufficient_credits_for_paid_model``. The code must classify as billing (fallback chain armed,
 no retry burn) and the resulting switch must be a WARNING naming the failing profile and remedy.
 """
@@ -48,7 +48,7 @@ def test_billing_fallback_warning_names_failing_profile_and_remedy(tmp_path, cap
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
         assert len(warnings) == 1
         seen[name] = warnings[0].getMessage()
-    assert "Profile alpha:" in seen["alpha"] and "hermes -p alpha model" in seen["alpha"]
+    assert "Profile alpha:" in seen["alpha"] and "qubit -p alpha model" in seen["alpha"]
     assert "Profile beta:" in seen["beta"] and "alpha" not in seen["beta"]
     for text in seen.values():
         assert "z-ai/glm-5.2" in text and "free/model" in text

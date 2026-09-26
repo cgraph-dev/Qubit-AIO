@@ -187,7 +187,7 @@ def test_save_refusal_for_bad_yaml_asks_for_an_edit_not_a_retry(home):
     cfg["display"]["skin"] = "ares"
     with pytest.raises(RuntimeError, match="has a formatting error") as refusal:
         save_config(cfg)
-    assert "hermes config edit" in str(refusal.value) and "Try again" not in str(refusal.value)
+    assert "qubit config edit" in str(refusal.value) and "Try again" not in str(refusal.value)
     assert (home / "config.yaml").read_text(encoding="utf-8") == "model: [unclosed\n"
 
 

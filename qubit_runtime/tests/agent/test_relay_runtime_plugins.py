@@ -465,7 +465,7 @@ def test_two_profile_hosts_initialize_once_and_clear_after_final_shutdown(
     assert (
         caplog.text.count(
             "Relay plugins are active process-wide and apply to all profiles "
-            "hosted by this Hermes process."
+            "hosted by this Qubit process."
         )
         == 1
     )
@@ -940,7 +940,7 @@ manifest_ref = "relay-plugin.toml"
             is relay_runtime._RelayPluginConfigurationState.FAILED
         )
         assert relay.events == []
-        assert "Hermes [[dynamic_plugins]] records are unsupported" in caplog.text
+        assert "Qubit [[dynamic_plugins]] records are unsupported" in caplog.text
         assert "use Relay [[plugins.dynamic]] records" in caplog.text
     finally:
         host.shutdown()
@@ -1169,7 +1169,7 @@ mode = "overwrite"
 enabled = true
 output_directory = "{atif_dir.as_posix()}"
 filename_template = "trajectory-{{session_id}}.json"
-agent_name = "Hermes Native Test"
+agent_name = "Qubit Native Test"
 agent_version = "test"
 """.strip(),
         encoding="utf-8",
