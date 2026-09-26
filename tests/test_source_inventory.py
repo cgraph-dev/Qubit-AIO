@@ -383,14 +383,15 @@ def test_achievements_plugin_represented_and_closed_in_ledger(inventory,
     assert "hermes_plugin_asset" in cats
     assert "hermes_plugin_test" in cats
 
-    # The example the directive named is now CLOSED: the live Hermes ledger
-    # carries a real plugin:hermes-achievements row with a backend and an
+    # The example the directive named is now CLOSED: the live parity ledger
+    # carries a real plugin:qubit-achievements row (the Qubit-owned identity
+    # for the upstream hermes-achievements plugin) with a backend and an
     # on-disk proving test, and the inventory surfaces reconcile to it.
     qubit_rows = json.loads(
         (GENERATED / "QUBIT_GAP_LEDGER.hermes.json").read_text(
             encoding="utf-8"))["rows"]
     row = next((r for r in qubit_rows
-                if r["id"] == "plugin:hermes-achievements"), None)
+                if r["id"] == "plugin:qubit-achievements"), None)
     assert row is not None, "achievements plugin has no live ledger row"
     assert row["status"] == "IMPLEMENTED", row
     assert row["qubit_backend"] and row["proving_test"], row

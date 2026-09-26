@@ -25,7 +25,7 @@ KEY_ROUTES = ["/", "/sessions", "/activity", "/reports", "/operations",
 
 ALLOWED_NOISE = ("ws://", "/api/ws", "/api/events?channel=", "/api/pty",
                  "/api/credentials/pool", "/api/portal",
-                 "/api/hermes/update/check", "Failed to load resource",
+                 "/api/qubit/update/check", "Failed to load resource",
                  "status of 403", "WebSocket")
 
 
