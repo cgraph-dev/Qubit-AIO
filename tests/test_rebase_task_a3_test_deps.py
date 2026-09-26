@@ -88,13 +88,24 @@ def test_product_test_extra_declares_the_vendored_test_only_deps():
         assert by_name.get(name) == pin, f"{name}: expected {pin!r}, got {by_name.get(name)!r} in {extra}"
 
 
-def test_runtime_deps_stay_declared_for_runtime_not_the_test_extra():
+def test_runtime_deps_stay_declared_for_runtime():
+    """`truststore`/`tomli-w` are runtime deps and stay declared as such.
+
+    They may additionally appear in `[test]` because the isolated PM worker is
+    spawned with `python -I` (no `PYTHONPATH`) and must import them from the
+    interpreter running the test suite (`tests/pm/test_security_consumers.py`).
+    A duplicate there must carry the identical reviewed pin -- never a
+    different version that would drift the worker away from the runtime.
+    """
     product = _load_toml(PRODUCT_PYPROJECT)
     runtime = _dep_map(product["project"]["dependencies"])
     test_extra = _dep_map(product["project"]["optional-dependencies"]["test"])
     for name, pin in RUNTIME_PINS.items():
         assert runtime.get(name) == pin, f"{name}: expected {pin!r} in runtime deps, got {runtime.get(name)!r}"
-        assert name not in test_extra, f"{name} is a runtime dep and must not be duplicated into [test]"
+        if name in test_extra:
+            assert test_extra[name] == pin, (
+                f"{name}: [test] duplicate {test_extra[name]!r} must match the runtime pin {pin!r}"
+            )
 
 
 def test_declared_pins_match_vendored_extras():

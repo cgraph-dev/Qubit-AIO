@@ -42,8 +42,11 @@ def _snapshot(paths):
 
 
 def test_activation_real_setup_pm_lifecycle(tmp_path, served):
+    from tests.pm._fixtures import require_pm_runtime_python
+
     bash, uv = shutil.which("bash"), shutil.which("uv")
     assert bash and uv, "this integration contract requires Bash and real uv"
+    require_pm_runtime_python()
     interpreter = str(Path(sys._base_executable).resolve())
     core = tmp_path / "checkout with spaces"
     core.mkdir()

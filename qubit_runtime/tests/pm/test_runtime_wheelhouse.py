@@ -59,6 +59,9 @@ def isolated_builder(tmp_path, monkeypatch):
 def test_offline_wheelhouse_runtime_survives_sealing_and_move(
     tmp_path, isolated_builder, locked_wheelhouse, monkeypatch,
 ):
+    from tests.pm._fixtures import require_pm_runtime_python
+
+    require_pm_runtime_python()
     wheelhouse, versions = locked_wheelhouse
     root = tmp_path / "payload"
     python = stage_host_python(root / "tools/python/bin/python")

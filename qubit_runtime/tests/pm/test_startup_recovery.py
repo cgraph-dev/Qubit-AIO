@@ -37,7 +37,9 @@ def isolated_machine_home(tmp_path, monkeypatch):
 def test_bootstrap_repairs_before_dependency_activation(tmp_path, monkeypatch, marker_name):
     import pm.paths as paths
     from pm.environments import selected_venv, site_packages
+    from tests.pm._fixtures import require_pm_runtime_python
 
+    require_pm_runtime_python()
     engine = importlib.import_module("pm.install")
     repo = Path(__file__).resolve().parents[2]
     core = tmp_path / "app"
