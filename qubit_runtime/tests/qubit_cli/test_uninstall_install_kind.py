@@ -51,7 +51,7 @@ def test_all_refusals_point_at_the_data_mode():
     # CLI stewards point at the CLI flag; desktop refusals deliberately
     # point at the app's own data path.
     for steward in (STEWARD_NIX, STEWARD_DOCKER, "somepkg"):
-        assert "hermes uninstall --data" in steward_uninstall_message(steward)
+        assert "qubit uninstall --data" in steward_uninstall_message(steward)
     for platform in ("win32", "darwin", "linux"):
         message = steward_uninstall_message(STEWARD_DESKTOP, platform=platform)
         assert "Settings -> About" in message

@@ -40,7 +40,7 @@ def _write_aux_config(task="compression", provider="gemini", model_name="gemini-
 
 
 def test_setup_model_provider_preserves_auxiliary_choices_written_by_picker(tmp_path, monkeypatch):
-    """Aux choices made inside hermes setup must survive the wizard's final save."""
+    """Aux choices made inside qubit setup must survive the wizard's final save."""
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path))
     _clear_provider_env(monkeypatch)
 
@@ -98,4 +98,4 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
     output = capsys.readouterr().out
 
     assert "Browser Automation (Local browser)" not in output
-    assert "hermes pm install agent-browser" in output
+    assert "qubit pm install agent-browser" in output

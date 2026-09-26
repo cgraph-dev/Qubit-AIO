@@ -110,10 +110,10 @@ def test_importable_sdk_does_not_bypass_pm_constraints(monkeypatch, capsys, key,
     output = capsys.readouterr().out
     if refused:
         assert "outside frozen feature set" in output
-        assert "Retry with: hermes tools" in output
-        assert "Restart Hermes" not in output
+        assert "Retry with: qubit tools" in output
+        assert "Restart Qubit" not in output
     else:
-        assert "Restart Hermes" in output
+        assert "Restart Qubit" in output
 
 
 @pytest.mark.parametrize("failure", [None, "sdk", "admission"])
@@ -160,7 +160,7 @@ def test_langfuse_setup_uses_plugin_admission_and_preserves_config_on_refusal(
         output = capsys.readouterr().out
         assert "refused" in output
         if failure == "sdk":
-            assert "Retry with: hermes tools" in output
+            assert "Retry with: qubit tools" in output
     else:
         plugin_config = read_raw_config()["plugins"]
         assert set(plugin_config["enabled"]) == {"other", "observability/langfuse"}

@@ -101,7 +101,7 @@ def test_oauth_plugin_status_follows_the_credential_pool(plugin):
 
     signed_out = auth.get_auth_status("example-oauth")
     assert signed_out["logged_in"] is False and signed_out["configured"] is True
-    assert "hermes auth add example-oauth" in signed_out["hint"]
+    assert "qubit auth add example-oauth" in signed_out["hint"]
     assert models._provider_has_credentials("example-oauth") is True  # registered = usable with provider:model
 
     _pool_entry("example-oauth", access_token="tok-1", refresh_token="rt-1")

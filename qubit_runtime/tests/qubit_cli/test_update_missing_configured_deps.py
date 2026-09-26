@@ -84,7 +84,7 @@ def test_update_names_missing_configured_features_from_selected_child(configured
     out = capfd.readouterr().out
     assert "fail to load them on restart" in out
     assert "Feishu / Lark" in out and "MCP servers" in out
-    assert "hermes setup" in out and "hermes pm" in out
+    assert "qubit setup" in out and "qubit pm" in out
     target = json.loads(next(line.removeprefix("TARGET=") for line in out.splitlines() if line.startswith("TARGET=")))
     assert Path(target["prefix"]) == selected
     assert Path(target["python"]).parent.parent == selected

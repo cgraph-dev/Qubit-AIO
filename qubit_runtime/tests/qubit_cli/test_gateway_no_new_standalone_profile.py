@@ -1,9 +1,9 @@
 """A named profile cannot create a NEW standalone gateway — multiplexer running or not (#109417).
 
-One gateway per host serves every profile. ``hermes -p X gateway install|start`` used to refuse only
+One gateway per host serves every profile. ``qubit -p X gateway install|start`` used to refuse only
 while a live multiplexer already served X; on a host with no multiplexer running (or one that had not
 rescanned yet) it wrote a brand-new per-profile unit. Now every named profile is refused without
-``--force`` and pointed at ``hermes gateway install`` (default) / ``hermes gateway migrate --multiplex``;
+``--force`` and pointed at ``qubit gateway install`` (default) / ``qubit gateway migrate --multiplex``;
 ``--force`` stays the one escape and a ``--force``-installed service stays startable without it. The
 dashboard ``/api/gateway/start`` twin (``multiplexed_profile_refusal``) applies the same rule.
 """
@@ -70,8 +70,8 @@ def test_named_profile_install_and_start_refuse_without_force_when_no_multiplexe
             code, out = _run(getattr(gw, f"_cmd_{verb}"), force=False)
             assert code == gw.GATEWAY_FATAL_CONFIG_EXIT_CODE, (profile, verb)
             assert f"Profile '{profile}' does not get a gateway of its own" in out
-            assert "hermes gateway install" in out and "hermes gateway migrate --multiplex" in out
-            assert f"hermes -p {profile} gateway install --force" in out
+            assert "qubit gateway install" in out and "qubit gateway migrate --multiplex" in out
+            assert f"qubit -p {profile} gateway install --force" in out
             assert "already serves" not in out  # nothing is running: this is the no-multiplexer form
         assert not gw.get_systemd_unit_path(system=False).exists()
         # Dashboard twin: same rule, same pointers, `stop` untouched (nothing serves the profile).

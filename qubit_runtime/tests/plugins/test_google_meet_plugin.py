@@ -410,7 +410,7 @@ def test_cmd_install_uses_declared_dependencies_and_pm_chromium(monkeypatch, cap
     from pm.features import declared_extras
 
     assert set(calls[0][1]) <= set(declared_extras(Path(__file__).resolve().parents[2]))
-    assert "hermes meet setup" in capsys.readouterr().out
+    assert "qubit meet setup" in capsys.readouterr().out
 
 
 @pytest.mark.platforms("linux", "macos")

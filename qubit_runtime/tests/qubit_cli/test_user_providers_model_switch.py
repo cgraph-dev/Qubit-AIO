@@ -71,11 +71,11 @@ def test_list_authenticated_providers_includes_full_models_list_from_user_provid
 
 def test_list_authenticated_providers_enumerates_dict_format_models(monkeypatch):
     """providers: dict entries with ``models:`` as a dict keyed by model id
-    (canonical Hermes write format) should surface every key in the picker.
+    (canonical Qubit write format) should surface every key in the picker.
 
     Regression: the ``providers:`` dict path previously only accepted
     list-format ``models:`` and silently dropped dict-format entries,
-    even though Hermes's own writer and downstream readers use dict format.
+    even though Qubit's own writer and downstream readers use dict format.
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr("qubit_cli.providers.HERMES_OVERLAYS", {})
@@ -176,12 +176,12 @@ def test_list_authenticated_providers_uses_live_models_for_user_provider(monkeyp
 
 
 def test_list_authenticated_providers_accepts_base_url_and_singular_model(monkeypatch):
-    """providers: dict entries written in canonical Hermes shape
+    """providers: dict entries written in canonical Qubit shape
     (``base_url`` + singular ``model``) should resolve the same as the
     legacy ``api`` + ``default_model`` shape.
 
     Regression: section 3 previously only read ``api``/``url`` and
-    ``default_model``, so new-shape entries written by Hermes's own writer
+    ``default_model``, so new-shape entries written by Qubit's own writer
     surfaced with empty ``api_url`` and no default.
     """
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
@@ -617,7 +617,7 @@ def test_current_custom_model_not_leaked_into_other_provider_rows(monkeypatch):
 
 
 def test_overlay_provider_row_merges_configured_models(monkeypatch):
-    """A ``providers.<overlay>.models`` block extends a Hermes-overlay row (azure-foundry) the way
+    """A ``providers.<overlay>.models`` block extends a Qubit-overlay row (azure-foundry) the way
     it already extends built-in rows; the picker used to show only the live/current id (#27989)."""
     from qubit_cli.providers import HERMES_OVERLAYS
 

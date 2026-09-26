@@ -859,7 +859,7 @@ class TestDebugSlashCommand:
 
     def test_bare_debug_defaults_to_paste(self):
         c = self._captured("/debug")
-        assert c["nous"] is False and c["local"] is False
+        assert c["qubit"] is False and c["local"] is False
         # The slash command IS the consent action → skip the [y/N] prompt
         # (input() would hang inside prompt_toolkit's event loop).
         assert c["yes"] is True
@@ -867,7 +867,7 @@ class TestDebugSlashCommand:
 
     def test_word_parsing_is_case_insensitive(self):
         c = self._captured("/debug NOUS")
-        assert c["nous"] is True
+        assert c["qubit"] is True
 
 
 

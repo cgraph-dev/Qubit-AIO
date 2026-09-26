@@ -170,7 +170,7 @@ class TestVersionRequires:
         if ok:
             check_qubit_requires(spec, cur)
         else:
-            with pytest.raises(DistributionError, match="requires Hermes"):
+            with pytest.raises(DistributionError, match="requires Qubit"):
                 check_qubit_requires(spec, cur)
 
     def test_parse_semver_handles_prerelease(self):
@@ -404,7 +404,7 @@ class TestInstall:
 
 
     def test_install_enforces_qubit_requires(self, profile_env, monkeypatch):
-        # Pin current Hermes version to something well below the requirement
+        # Pin current Qubit version to something well below the requirement
         monkeypatch.setattr(
             "qubit_cli.version_info.get_version_info",
             lambda: SimpleNamespace(base_version="0.1.0"),
@@ -416,7 +416,7 @@ class TestInstall:
             qubit_requires=">=99.0.0",
         )
         staged = _make_staging_dir(profile_env, "future", manifest=mf)
-        with pytest.raises(DistributionError, match="requires Hermes"):
+        with pytest.raises(DistributionError, match="requires Qubit"):
             install_distribution(str(staged), name="future")
 
 
@@ -632,7 +632,7 @@ class TestDescribe:
 
 
     def test_describe_missing_profile_raises(self, profile_env):
-        with pytest.raises(DistributionError, match="No profile named .*hermes profile list"):
+        with pytest.raises(DistributionError, match="No profile named .*qubit profile list"):
             describe_distribution("nonexistent")
 
 

@@ -140,14 +140,14 @@ def test_cli_entrypoint_registers_and_warns_once_for_live_shared_home(homes, tmp
                 _collect_ledger_runtimes(plan, set())
                 assert plan.runtimes == []
                 assert child.poll() is None
-        assert output["stderr"].count("Another Hermes installation") == 1
+        assert output["stderr"].count("Another Qubit installation") == 1
         assert shared_profile_warning(project_root=stable) == ""
 
     work = homes / "profiles" / "work"
     work.mkdir(parents=True)
     with running_install(homes, stable), running_cli(work, canary) as (_, output):
         assert shared_profile_warning(project_root=stable) == ""
-    assert "Another Hermes installation" not in output["stderr"]
+    assert "Another Qubit installation" not in output["stderr"]
 
 
 @pytest.mark.parametrize("corrupt", [b"{broken", b"\xff"])

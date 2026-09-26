@@ -5,7 +5,7 @@ A half-updated install can ship a newer ``cli.py`` that imports
 ``qubit_cli.config`` while the older ``config.py`` does not export them.
 Construction of ``HermesCLI`` then dies before the agent-setup mixin can
 print ``partial_update_hint``. ``cmd_chat`` is the load-bearing catch:
-bare ``hermes`` and ``hermes chat`` (including the fast-chat launch path)
+bare ``qubit`` and ``qubit chat`` (including the fast-chat launch path)
 all go through it.
 """
 
@@ -78,7 +78,7 @@ def test_emit_hint_for_missing_resolve_turn_limit():
     assert emit_partial_update_hint(exc, file=buf) is True
     text = buf.getvalue()
     assert "resolve_turn_limit" in text
-    assert "hermes update" in text
+    assert "qubit update" in text
 
 
 
@@ -109,7 +109,7 @@ def test_cmd_chat_prints_update_hint_when_config_helper_is_missing(
     assert excinfo.value.code == 1
     err = capsys.readouterr().err
     assert name in err
-    assert "hermes update" in err
+    assert "qubit update" in err
 
 
 def test_cmd_chat_still_reraises_unrelated_import_errors(main_mod, monkeypatch):

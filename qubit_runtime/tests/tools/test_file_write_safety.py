@@ -681,12 +681,12 @@ class TestProtectedInstructionFiles:
 
 
 class TestProfileHomeExemptsHermesRoot:
-    """issue #60: under ``hermes -p <name>`` (``QUBIT_HOME=<root>/profiles/<name>``)
+    """issue #60: under ``qubit -p <name>`` (``QUBIT_HOME=<root>/profiles/<name>``)
     the exemption used to cover ONLY the profile dir, so the ROOT's direct files
     (LEDGER.md / MEMORY.md / SOUL.md ...) fell through to the ``.hermes`` component
     rule, were read as project-local ``.hermes`` config, and — having no approval
     channel headless — failed closed. That blocked #54 (LEDGER.md edit). The gate
-    must exempt the whole Hermes tree, exactly like the default profile does.
+    must exempt the whole Qubit tree, exactly like the default profile does.
     """
 
     @pytest.fixture(autouse=True)
@@ -719,7 +719,7 @@ class TestProfileHomeExemptsHermesRoot:
         return json.loads(write_file_tool(str(path), content))
 
     def _profile_layout(self, tmp_path: Path):
-        """A real-shaped Hermes root: ``<tmp>/home/profiles/worker`` + root markers."""
+        """A real-shaped Qubit root: ``<tmp>/home/profiles/worker`` + root markers."""
         root = tmp_path / "home"
         profile = root / "profiles" / "worker"
         (profile / "workspace").mkdir(parents=True)
@@ -749,7 +749,7 @@ class TestProfileHomeExemptsHermesRoot:
     def test_only_a_real_qubit_root_is_exempt(self, tmp_path, monkeypatch, approvals):
         """Negatives hold with a named profile active: a checkout's ``.hermes/config.yaml`` and
         protected basenames stay gated (fail-closed, unwritten), and a coincidental
-        ``.../profiles/<name>`` tree that is NOT a Hermes root never exempts its parent."""
+        ``.../profiles/<name>`` tree that is NOT a Qubit root never exempts its parent."""
         import tools.file_tools_write_guards as ft
         from qubit_constants import reset_qubit_home_override, set_qubit_home_override
 
@@ -838,4 +838,4 @@ class TestMultiplexProfileWriteGuardsAreProfileScoped:
         finally:
             reset_qubit_home_override(tok)
         assert err is not None
-        assert "Refusing to write to Hermes config file" in err
+        assert "Refusing to write to Qubit config file" in err

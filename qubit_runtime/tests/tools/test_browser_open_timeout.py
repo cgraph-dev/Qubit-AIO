@@ -80,7 +80,7 @@ class TestTimeoutErrorFormatting:
         assert "playwright install-deps chromium" in err
         assert "agent-browser install" not in err
         if not stderr:
-            assert "hermes pm install chromium" in err
+            assert "qubit pm install chromium" in err
 
 
 

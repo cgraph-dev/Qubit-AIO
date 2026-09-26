@@ -15,7 +15,7 @@ def test_terminal_line_names_backend_reason_and_fix_commands():
     assert "Terminal tool disabled" in text
     assert "'docker'" in text
     assert "Docker daemon is not running" in text
-    assert "hermes doctor" in text and "hermes setup terminal" in text
+    assert "qubit doctor" in text and "qubit setup terminal" in text
     assert "TERMINAL_ENV" not in text
 
 
@@ -28,13 +28,13 @@ def test_web_collapses_env_dump_into_one_provider_sentence():
     lines = tool_availability_warning_lines([_WEB], terminal_reason=None, terminal_backend="local")
     text = "\n".join(lines)
     assert "EXA_API_KEY" not in text
-    assert "Web search is off" in text and "hermes setup tools" in text
+    assert "Web search is off" in text and "qubit setup tools" in text
 
 
 def test_generic_toolset_lists_vars_and_setup_hint():
     lines = tool_availability_warning_lines([_RL], terminal_reason=None, terminal_backend="local")
     text = "\n".join(lines)
-    assert "rl" in text and "TINKER_API_KEY" in text and "hermes setup" in text
+    assert "rl" in text and "TINKER_API_KEY" in text and "qubit setup" in text
 
 
 def test_nothing_to_report_returns_no_lines():

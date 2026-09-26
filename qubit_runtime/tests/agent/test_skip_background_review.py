@@ -106,7 +106,7 @@ def test_finalize_turn_fires_review_when_flag_unset() -> None:
 
 
 def test_persistence_failure_error_fallback_is_pinned_and_leaves_final_response_empty(monkeypatch, tmp_path) -> None:
-    """With no model text, result["error"] carries a profile-pinned `hermes doctor`, while the
+    """With no model text, result["error"] carries a profile-pinned `qubit doctor`, while the
     memory sync and the background-review gate still see the turn as having produced nothing."""
     from qubit_constants import profile_cli_selector
 
@@ -133,6 +133,6 @@ def test_persistence_failure_error_fallback_is_pinned_and_leaves_final_response_
         _should_review_memory=True,
         _turn_exit_reason="session_persistence_failed",
     )
-    assert f"`hermes {selector}doctor`" in result["error"]
+    assert f"`qubit {selector}doctor`" in result["error"]
     assert agent._sync_external_memory_for_turn.call_args.kwargs["final_response"] == ""
     agent._spawn_background_review.assert_not_called()

@@ -91,7 +91,7 @@ def test_scalar_platform_toolsets_fall_back_to_platform_default():
 
 
 def test_enable_on_string_platform_toolsets_keeps_listed_entries():
-    """#115866: `hermes tools enable` must operate on the selection a list-literal
+    """#115866: `qubit tools enable` must operate on the selection a list-literal
     string encodes — not re-baseline it on the platform default, which silently
     dropped the user's default-off entries (video, video_gen) on write."""
     config = {"platform_toolsets": {"telegram": '["browser", "terminal", "video", "video_gen"]'}}
@@ -422,7 +422,7 @@ class TestAgentBrowserPostSetup:
             _run_post_setup("agent_browser")
 
         assert any(str(error) in c.args[0] for c in warn.call_args_list)
-        assert any("hermes tools post-setup agent_browser" in c.args[0] for c in info.call_args_list)
+        assert any("qubit tools post-setup agent_browser" in c.args[0] for c in info.call_args_list)
 
 
 class TestBrowserUseCliInstalledForAllNonCamofoxBackends:
@@ -579,7 +579,7 @@ class TestImagegenModelPicker:
 def test_get_effective_configurable_toolsets_dedupes_bundled_plugins():
     """Bundled plugins (plugins/spotify) share their toolset key with the
     built-in CONFIGURABLE_TOOLSETS entry. The effective list must not list
-    them twice — otherwise `hermes tools` → "reconfigure existing" shows
+    them twice — otherwise `qubit tools` → "reconfigure existing" shows
     the same toolset two rows in a row.
     """
     from qubit_cli.tools_config import _get_effective_configurable_toolsets
@@ -770,7 +770,7 @@ def test_pool_only_account_is_offered_fal_models_only(monkeypatch):
     assert catalog and {meta["backend"] for meta in catalog.values()} == {"fal"}
 
 
-# ── Toolsets that shipped after a platform's last `hermes tools` save ────────
+# ── Toolsets that shipped after a platform's last `qubit tools` save ────────
 #
 # Saving the picker (or one toggle in the desktop Toolsets UI) replaces a
 # platform's composite (``[hermes-cli]``) with a frozen explicit list, and
@@ -853,7 +853,7 @@ def test_agent_disabled_toolsets_still_wins():
 @_requires_recently_shipped
 def test_agent_disabled_toolsets_json_array_string_form_still_wins():
     """#86661: the suppression list may arrive as a JSON-array string (e.g.
-    `hermes config set agent.disabled_toolsets '["memory"]'`). It must be
+    `qubit config set agent.disabled_toolsets '["memory"]'`). It must be
     parsed, not treated as one dead toolset name that filters nothing."""
     config = _saved_list_from_before()
     import json as _json
@@ -882,7 +882,7 @@ def test_agent_disabled_toolsets_python_literal_string_form_still_wins():
 
 def test_disabled_composite_debugging_prunes_constituent_platform_toolsets():
     """#97015: ``agent.disabled_toolsets: [debugging]`` must hide member
-    toolsets on ``hermes tools --summary``, not only strip them at runtime."""
+    toolsets on ``qubit tools --summary``, not only strip them at runtime."""
     config = {
         "platform_toolsets": {"cli": ["hermes-cli"]},
         "agent": {"disabled_toolsets": ["debugging"]},
@@ -920,10 +920,10 @@ def test_platforms_whose_composite_excludes_it_are_left_narrow():
     narrow = [
         platform
         for platform in ("acp", "webhook")
-        if f"hermes-{platform}" in TOOLSETS
+        if f"qubit-{platform}" in TOOLSETS
         and not any(
             set(resolve_toolset(ts, include_registry=False))
-            <= set(resolve_toolset(f"hermes-{platform}"))
+            <= set(resolve_toolset(f"qubit-{platform}"))
             for ts in _RECENTLY_SHIPPED_TOOLSETS
         )
     ]

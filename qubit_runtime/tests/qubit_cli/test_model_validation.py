@@ -692,7 +692,7 @@ class TestValidateRequestedModelNousPortalRecommendations:
         result = self._validate_nous("inclusionai/ling-3.0-flash:free")
         assert result["accepted"] is True
         assert result["persist"] is True
-        assert "Portal recommendation" in (result["message"] or "")
+        assert "Qubit Labs recommendation" in (result["message"] or "")
 
     def test_paid_portal_recommendation_accepted(self):
         result = self._validate_nous("inclusionai/ling-3.0-pro")

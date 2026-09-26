@@ -44,7 +44,7 @@ def main():
     (ambient / "browser-use").chmod(0o755)
     monkeypatch.setenv("PATH", str(ambient) + os.pathsep + os.environ["PATH"])
     assert bu._find_cli() is None
-    assert "hermes tools" in json.loads(bu.browser_exec("print(1)"))["error"]
+    assert "qubit tools" in json.loads(bu.browser_exec("print(1)"))["error"]
     ok, message = bu.install_cli(timeout_s=120)
     assert ok, message
     binary = pm.python_tool("browser-use", "browser-use")

@@ -144,4 +144,4 @@ def test_fleet_restart_repairs_a_system_unit_that_cannot_park_on_exit_78(monkeyp
     else:
         assert refreshed == []
         assert out.count("RestartPreventExitStatus=78") == 1 and "hermes-gateway lacks" in out
-        assert "sudo hermes gateway install --system" in out
+        assert "sudo qubit gateway install --system" in out

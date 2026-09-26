@@ -1,6 +1,6 @@
 """Tests for ``remove_path_from_shell_configs`` — the uninstaller's shell-rc rewrite.
 
-This rewrites files Hermes does not own (``~/.bashrc``, ``~/.zshrc``, ...) and
+This rewrites files Qubit does not own (``~/.bashrc``, ``~/.zshrc``, ...) and
 takes no backup of them, so the rewrite has to be atomic: a bare
 ``write_text()`` truncates the rc file before the new content lands, and the
 caller wraps everything in ``except Exception: log_warn(...)``, so a partial
@@ -22,7 +22,7 @@ ZSHRC = (
     "export EDITOR=vim\n"
     "alias ll='ls -la'\n"
     "\n"
-    "# Hermes Agent\n"
+    "# Qubit Agent\n"
     'export PATH="$HOME/.local/bin:$PATH"\n'
     "\n"
     "source ~/.work-profile\n"
@@ -48,7 +48,7 @@ class TestHappyPath:
 
         assert removed == [rc]
         text = rc.read_text(encoding="utf-8")
-        assert "# Hermes Agent" not in text
+        assert "# Qubit Agent" not in text
         # The user's own lines are untouched.
         assert "export EDITOR=vim" in text
         assert "source ~/.work-profile" in text
@@ -64,7 +64,7 @@ class TestHappyPath:
         """Every rc name the shell-config resolver knows gets the PATH sweep.
 
         Guards the single resolver's coverage: an rc the resolver misses keeps
-        a stale Hermes PATH entry after uninstall.
+        a stale Qubit PATH entry after uninstall.
         """
         names = (".bashrc", ".bash_profile", ".profile", ".zshrc", ".zprofile")
         for name in names:
@@ -117,7 +117,7 @@ class TestCrashDurability:
 
         assert removed == [rc]
         assert rc.is_symlink(), "the symlink was replaced by a regular file"
-        assert "# Hermes Agent" not in real.read_text(encoding="utf-8")
+        assert "# Qubit Agent" not in real.read_text(encoding="utf-8")
         assert "export EDITOR=vim" in real.read_text(encoding="utf-8")
 
     @pytest.mark.platforms("posix")  # POSIX permission bits

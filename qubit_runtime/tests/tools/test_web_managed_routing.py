@@ -116,7 +116,7 @@ def test_only_managed_search_may_use_billed_fallback(
             managed = path == "/perplexity/search"
             assert body.get("search_type") == ("fast" if managed else None)
             assert body["search_context_size"] == "low"
-            assert headers.get("X-Pplx-Integration") == (None if managed else "hermes-agent")
+            assert headers.get("X-Pplx-Integration") == (None if managed else "qubit-agent")
 
 
 def test_unentitled_managed_search_names_the_gateway(monkeypatch, tmp_path, local_gateway):
@@ -131,6 +131,6 @@ def test_unentitled_managed_search_names_the_gateway(monkeypatch, tmp_path, loca
     register_all_web_providers()
 
     error = json.loads(web_tools.web_search_tool("local fixture", limit=3))["error"]
-    assert "Nous Tool Gateway" in error and "hermes tools" in error
+    assert "Qubit Tool Gateway" in error and "qubit tools" in error
     assert "PERPLEXITY_API_KEY" not in error
     assert local_gateway == []

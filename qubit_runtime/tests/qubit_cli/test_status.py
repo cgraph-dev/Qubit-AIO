@@ -109,7 +109,7 @@ def _base_xai_mocks(monkeypatch, tmp_path):
 
 
 class TestShowStatusXaiOAuth:
-    """xAI OAuth row in hermes status."""
+    """xAI OAuth row in qubit status."""
 
     # ------------------------------------------------------------------
     # Logged-in branch
@@ -153,7 +153,7 @@ class TestShowStatusXaiOAuth:
         status_mod.show_status(SimpleNamespace(all=False, deep=False))
         out = capsys.readouterr().out
 
-        assert "Nous Portal" in out
+        assert "Qubit Labs" in out
         assert "MiniMax OAuth" in out
 
     def test_status_function_exception_does_not_crash(self, monkeypatch, capsys, tmp_path):
@@ -185,7 +185,7 @@ class TestShowStatusXaiOAuth:
 
 
 def test_show_status_reports_gateway_session_last_activity(monkeypatch, capsys, tmp_path):
-    """hermes status should surface freshest gateway last_active (#72016)."""
+    """qubit status should surface freshest gateway last_active (#72016)."""
     from qubit_cli import status as status_mod
     import qubit_cli.auth as auth_mod
     import qubit_cli.gateway as gateway_mod

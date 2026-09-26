@@ -364,7 +364,7 @@ class TestSensitivePathCheck:
         from tools.file_tools import write_file_tool
         result = json.loads(write_file_tool(str(fake_config), "approvals:\n  mode: off\n"))
         assert "error" in result
-        assert "Hermes config" in result["error"]
+        assert "Qubit config" in result["error"]
 
 
 
@@ -910,7 +910,7 @@ class TestSSHConfigWriteGate:
 
     def test_single_query_session_denies_with_the_q_mode_message(self, ssh_config, monkeypatch):
         monkeypatch.setenv("HERMES_SINGLE_QUERY_SESSION", "1")
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")  # `hermes chat -q` exports it too
+        monkeypatch.setenv("HERMES_INTERACTIVE", "1")  # `qubit chat -q` exports it too
         from tools.file_tools import write_file_tool
 
         result = json.loads(write_file_tool(str(ssh_config), "Host x\n  ProxyCommand evil\n"))
@@ -946,7 +946,7 @@ class TestSecretFileReadRedaction:
 
     @pytest.fixture
     def qubit_home(self, tmp_path, monkeypatch):
-        """A Hermes home with no ``.hermes`` segment, like ``%LOCALAPPDATA%\\hermes``."""
+        """A Qubit home with no ``.hermes`` segment, like ``%LOCALAPPDATA%\\qubit``."""
         import agent.file_safety as file_safety
 
         home = tmp_path / "hermes"

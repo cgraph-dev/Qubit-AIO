@@ -54,7 +54,7 @@ def test_manual_deferral_survives_receipt_rotation(monkeypatch, capsys, kind, co
     warning = capsys.readouterr().err
     assert f"{kind} [work] pid 900" in warning
     assert "relaunch" in warning
-    assert "hermes gateway restart" not in warning
+    assert "qubit gateway restart" not in warning
     monkeypatch.setattr(process_identity, "_pid_alive_matches", lambda *a: None)
     fleet._warn_pending_fleet_restart_on_startup()
     assert "900" in capsys.readouterr().err
@@ -94,7 +94,7 @@ def test_historical_manual_obligation_does_not_block_healthy_gateway(monkeypatch
     fleet._warn_pending_fleet_restart_on_startup()
     warning = capsys.readouterr().err
     assert ("serve [work] pid 900" in warning) is (alive is not False)
-    assert "hermes gateway restart" not in warning
+    assert "qubit gateway restart" not in warning
     assert json.loads((root / "latest.json").read_text()) == receipt
 
 
@@ -118,7 +118,7 @@ def test_stamped_manual_only_history_has_no_gateway_obligation(monkeypatch, caps
     fleet._warn_pending_fleet_restart_on_startup()
     warning = capsys.readouterr().err
     assert "serve [work] pid 900" in warning
-    assert "hermes gateway restart" not in warning
+    assert "qubit gateway restart" not in warning
 
 
 @pytest.mark.parametrize("manual_first", [True, False])

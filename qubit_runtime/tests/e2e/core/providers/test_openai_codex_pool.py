@@ -271,7 +271,7 @@ def test_dead_shared_grant_retires_every_row_of_it(tmp_path) -> None:
     assert posted and set(posted) == {"rt-S"}, posted
     for run, store, rows in zip(runs, stores, pools):
         assert run.proc.returncode != 0 and "NEVER" not in run.stdout, run.describe()
-        assert "hermes auth add openai-codex" in run.stdout, run.describe()
+        assert "qubit auth add openai-codex" in run.stdout, run.describe()
         singleton = store["providers"]["openai-codex"]
         assert not singleton.get("tokens", {}).get("refresh_token"), singleton
         assert (singleton.get("last_auth_error") or {}).get("relogin_required") is True, singleton

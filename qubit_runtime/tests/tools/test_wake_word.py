@@ -1,4 +1,4 @@
-"""Tests for tools.wake_word — the "Hey Hermes" hotword detector.
+"""Tests for tools.wake_word — the "Hey Qubit" hotword detector.
 
 No live audio or network: the sounddevice import is faked, engines are stubbed,
 and lazy-dep availability is monkeypatched. Covers config resolution, engine
@@ -39,8 +39,8 @@ def test_config_defaults_and_clamping():
     # Invalid input falls back to the configured default, not a hardcoded 0.5.
     assert ww._sensitivity({"sensitivity": "nope"}) == ww._DEFAULTS["sensitivity"]
     assert ww._sensitivity({}) == ww._DEFAULTS["sensitivity"]
-    assert ww.wake_phrase({"phrase": "hey hermes"}) == "hey hermes"
-    assert ww.wake_phrase({}) == "hey hermes"
+    assert ww.wake_phrase({"phrase": "hey qubit"}) == "hey qubit"
+    assert ww.wake_phrase({}) == "hey qubit"
 
 
 def test_wake_surface_enabled_gate():
@@ -268,11 +268,11 @@ def test_requirements_openwakeword_available(monkeypatch):
     monkeypatch.setattr(ww, "_audio_available", lambda: True)
     monkeypatch.setattr(pm, "available", lambda f: True)
     r = ww.check_wake_word_requirements(
-        {"provider": "openwakeword", "phrase": "hey hermes"}
+        {"provider": "openwakeword", "phrase": "hey qubit"}
     )
     assert r["available"] is True
     assert r["provider"] == "openwakeword"
-    assert r["phrase"] == "hey hermes"
+    assert r["phrase"] == "hey qubit"
 
 
 def test_tts_ready_is_a_probe_never_an_installer(monkeypatch):
@@ -373,7 +373,7 @@ def test_requirements_lazy_disabled_returns_remedy_not_nameerror(monkeypatch):
     r = ww.check_wake_word_requirements({"provider": "openwakeword"})
     assert r["available"] is False
     assert r["deps_available"] is False
-    assert "hermes pm install --extra wake-openwakeword" in r["hint"]
+    assert "qubit pm install --extra wake-openwakeword" in r["hint"]
 
 
 def test_requirements_deps_present_but_no_audio_hint(monkeypatch):
@@ -443,7 +443,7 @@ def test_openwakeword_custom_model_path_used(monkeypatch):
 
 
 def test_bundled_hey_qubit_model_ships_on_disk():
-    # The "hey hermes" wake word works out of the box only if the model is
+    # The "hey qubit" wake word works out of the box only if the model is
     # actually bundled. pyopen-wakeword runs TFLite only.
     path = ww._bundled_wakeword_path()
     assert os.path.exists(path), path

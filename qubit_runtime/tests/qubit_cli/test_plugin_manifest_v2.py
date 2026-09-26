@@ -350,7 +350,7 @@ class TestPythonDependenciesSeam:
             mgr.discover_and_load()
         assert mgr._plugins["pipful"].enabled
         assert "definitely-not-a-real-package-64165" in caplog.text
-        assert "hermes pm repair" in caplog.text
+        assert "qubit pm repair" in caplog.text
         assert calls == []
 
     def test_satisfied_pip_dep_is_quiet(self, qubit_home, caplog):
@@ -431,7 +431,7 @@ class TestRequiresHermes:
             mgr = PluginManager()
             mgr.discover_and_load()
             assert not hasattr(sys, "_rh_future")
-            assert "requires hermes >=99.0" in (mgr._plugins["future"].error or "")
+            assert "requires qubit >=99.0" in (mgr._plugins["future"].error or "")
             assert getattr(sys, "_rh_current", False) is True
         finally:
             for attr in ("_rh_future", "_rh_current"):
@@ -442,7 +442,7 @@ class TestRequiresHermes:
 class TestLoadIsolation:
     def test_sys_exit_in_plugin_is_isolated_and_named(self, qubit_home, caplog):
         """A plugin calling ``sys.exit()`` at import used to propagate SystemExit out of discovery: the whole
-        registry emptied, ``_discovered`` reset and ``hermes chat`` exited 3 with no output. It must be
+        registry emptied, ``_discovered`` reset and ``qubit chat`` exited 3 with no output. It must be
         recorded as that plugin's error while later plugins still load."""
         _write_plugin(qubit_home / "plugins", "b_exit")
         (qubit_home / "plugins" / "b_exit" / "__init__.py").write_text("import sys\nsys.exit(0)\n")
@@ -513,7 +513,7 @@ class TestLoadIsolation:
 class TestBundledKeyShadowing:
     def test_impostor_dir_cannot_claim_a_bundled_key(self, tmp_path, monkeypatch, caplog):
         """``~/.hermes/plugins/impostor_dir/plugin.yaml`` with ``name: <bundled key>`` used to displace the
-        bundled plugin silently, so ``hermes plugins enable <key>`` enabled unrelated code. The bundled
+        bundled plugin silently, so ``qubit plugins enable <key>`` enabled unrelated code. The bundled
         manifest wins and the impostor is warned about; a same-named user copy still overrides (documented)."""
         home = tmp_path / "home"
         (home / "plugins").mkdir(parents=True)

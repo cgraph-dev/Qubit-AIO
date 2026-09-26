@@ -55,7 +55,7 @@ class TestAuxiliaryOnWelcomeHost:
 
 # ── Model-switch header ───────────────────────────────────────────────────────────────────────────
 
-def _agent(model="nous/welcome", base_url=PAID):
+def _agent(model="qubit/welcome", base_url=PAID):
     return SimpleNamespace(model=model, base_url=base_url, provider="nous", statuses=[])
 
 
@@ -63,8 +63,8 @@ class TestModelSwitchHeader:
     def test_header_is_recorded_not_applied_on_the_streaming_response(self):
         agent = _agent()
         assert anon_auth.note_model_switch(agent, {"X-Nous-Model-Switch": "z-ai/glm-5.3-flash"}) == "z-ai/glm-5.3-flash"
-        assert agent.model == "nous/welcome"
-        assert agent._nous_pending_model_switch == ("nous/welcome", "z-ai/glm-5.3-flash")
+        assert agent.model == "qubit/welcome"
+        assert agent._nous_pending_model_switch == ("qubit/welcome", "z-ai/glm-5.3-flash")
 
     def test_no_header_records_nothing(self):
         agent = _agent()
@@ -76,12 +76,12 @@ class TestModelSwitchHeader:
         agent._buffer_status = agent.statuses.append
         anon_auth.note_model_switch(agent, {"x-nous-model-switch": "z-ai/glm-5.3-flash"})
         writes = []
-        monkeypatch.setattr("qubit_cli.config.load_config_readonly", lambda: {"model": {"default": "nous/welcome"}})
+        monkeypatch.setattr("qubit_cli.config.load_config_readonly", lambda: {"model": {"default": "qubit/welcome"}})
         monkeypatch.setattr("qubit_cli.auth._update_config_for_provider",
                             lambda provider, url, default_model=None, **kw: writes.append((provider, url, default_model)))
         assert anon_auth.apply_model_switch(agent) == "z-ai/glm-5.3-flash"
         assert agent.model == "z-ai/glm-5.3-flash"
-        assert agent._nous_model_switch == ("nous/welcome", "z-ai/glm-5.3-flash")   # what the gateway cache check reads
+        assert agent._nous_model_switch == ("qubit/welcome", "z-ai/glm-5.3-flash")   # what the gateway cache check reads
         assert writes == [("nous", PAID, "z-ai/glm-5.3-flash")]
         assert agent._nous_pending_model_switch is None
         assert agent.statuses and "z-ai/glm-5.3-flash" in agent.statuses[0]
@@ -108,11 +108,11 @@ class TestModelSwitchHeader:
         from agent.rate_limit_credits import RateLimitCreditsMixin
 
         class _Agent(RateLimitCreditsMixin):
-            model = "nous/welcome"
+            model = "qubit/welcome"
             provider = "nous"
         a = _Agent()
         a._capture_nous_model_switch(SimpleNamespace(headers={"x-nous-model-switch": "z-ai/glm-5.3-flash"}))
-        assert a._nous_pending_model_switch == ("nous/welcome", "z-ai/glm-5.3-flash")
+        assert a._nous_pending_model_switch == ("qubit/welcome", "z-ai/glm-5.3-flash")
         a._capture_nous_model_switch(None)   # fail-open
 
 
@@ -121,21 +121,21 @@ class TestModelSwitchHeader:
 class TestRefusalCopy:
     def test_parse_reads_the_gateway_shape(self):
         body = {"status": 429, "message": "m", "reason": "model_not_free", "retry_after": 0,
-                "alternates": ["nous/welcome"], "upgrade_url": "https://portal.example/upgrade"}
+                "alternates": ["qubit/welcome"], "upgrade_url": "https://portal.example/upgrade"}
         assert anon_auth.parse_welcome_refusal(body) == {
-            "reason": "model_not_free", "retry_after": 0, "alternates": ["nous/welcome"],
+            "reason": "model_not_free", "retry_after": 0, "alternates": ["qubit/welcome"],
             "upgrade_url": "https://portal.example/upgrade"}
         assert anon_auth.parse_welcome_refusal({"reason": "nope"}) is None
         assert anon_auth.parse_welcome_refusal("not a dict") is None
 
     def test_copy_names_the_served_model_and_the_sign_in(self):
-        refusal = anon_auth.parse_welcome_refusal({"reason": "model_not_free", "alternates": ["nous/welcome"]})
+        refusal = anon_auth.parse_welcome_refusal({"reason": "model_not_free", "alternates": ["qubit/welcome"]})
         chat = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=True)
-        assert "gpt-5" in chat and "nous/welcome" in chat and chat.endswith(anon_auth._SIGNIN_CHAT)
+        assert "gpt-5" in chat and "qubit/welcome" in chat and chat.endswith(anon_auth._SIGNIN_CHAT)
         card = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=True, door=False)
         assert chat == f"{card} {anon_auth._SIGNIN_CHAT}"   # door=False drops exactly the tail
         terminal = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=False)
-        assert "`hermes auth upgrade`" in terminal and "/login" not in terminal
+        assert "`qubit auth upgrade`" in terminal and "/login" not in terminal
 
 
     @pytest.mark.parametrize("copy_fn, args", [
@@ -156,7 +156,7 @@ class TestTurnRecoveryGuidance:
     def test_guidance_from_classified_context(self):
         from agent.turn_recovery import _welcome_tier_guidance
         classified = SimpleNamespace(error_context={"welcome_refusal": {"reason": "model_not_free", "retry_after": 0, "alternates": []}})
-        assert "nous/welcome" in _welcome_tier_guidance(classified, model="gpt-5", in_chat=True)
+        assert "qubit/welcome" in _welcome_tier_guidance(classified, model="gpt-5", in_chat=True)
         classified = SimpleNamespace(error_context={"welcome_route": "tier_disabled"})
         assert _welcome_tier_guidance(classified, model="", in_chat=True)
         assert _welcome_tier_guidance(SimpleNamespace(error_context={}), model="", in_chat=True) == ""

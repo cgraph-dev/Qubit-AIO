@@ -66,7 +66,7 @@ def test_disable_only_after_the_date_and_not_when_allowed(tmp_path, monkeypatch)
     monkeypatch.setattr(pc, "allow_deprecated_imports", lambda config=None: False)
     assert pc.disable_reason(m, today=before) is None
     reason = pc.disable_reason(m, today=after)
-    assert reason and pc.COMPAT_REMOVAL in reason and "hermes plugins compat" in reason
+    assert reason and pc.COMPAT_REMOVAL in reason and "qubit plugins compat" in reason
     monkeypatch.setattr(pc, "allow_deprecated_imports", lambda config=None: True)
     assert pc.disable_reason(m, today=after) is None
     good = tmp_path / "good"; good.mkdir(); (good / "__init__.py").write_text("x=1\n")

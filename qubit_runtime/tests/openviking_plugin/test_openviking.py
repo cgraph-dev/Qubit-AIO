@@ -136,10 +136,10 @@ def wait_prefetch(provider, query="What should we recall?", session_id="session-
 
 class TestOpenVikingSummaryUriNormalization:
     def test_normalize_summary_uri_maps_pseudo_files_to_parent_directory(self):
-        assert OpenVikingMemoryProvider._normalize_summary_uri("viking://user/hermes/.overview.md") == "viking://user/hermes"
+        assert OpenVikingMemoryProvider._normalize_summary_uri("viking://user/qubit/.overview.md") == "viking://user/qubit"
         assert OpenVikingMemoryProvider._normalize_summary_uri("viking://resources/.abstract.md") == "viking://resources"
         assert OpenVikingMemoryProvider._normalize_summary_uri("viking://") == "viking://"
-        assert OpenVikingMemoryProvider._normalize_summary_uri("viking://user/hermes/memories/profile.md") == "viking://user/hermes/memories/profile.md"
+        assert OpenVikingMemoryProvider._normalize_summary_uri("viking://user/qubit/memories/profile.md") == "viking://user/qubit/memories/profile.md"
 
 class TestOpenVikingSkillQuerySafety:
     def test_derive_returns_empty_string_for_non_string_input(self):
@@ -524,30 +524,30 @@ class TestOpenVikingRead:
             {
                 (
                     "/api/v1/content/overview",
-                    (("uri", "viking://user/hermes"),),
+                    (("uri", "viking://user/qubit"),),
                 ): {"result": {"content": "overview text"}},
             }
         )
 
-        result = json.loads(provider._tool_read({"uri": "viking://user/hermes/.overview.md", "level": "overview"}))
+        result = json.loads(provider._tool_read({"uri": "viking://user/qubit/.overview.md", "level": "overview"}))
 
-        assert result["uri"] == "viking://user/hermes/.overview.md"
-        assert result["resolved_uri"] == "viking://user/hermes"
+        assert result["uri"] == "viking://user/qubit/.overview.md"
+        assert result["resolved_uri"] == "viking://user/qubit"
         assert result["level"] == "overview"
         assert result["content"] == "overview text"
         assert provider._client.calls == [(
             "/api/v1/content/overview",
-            {"uri": "viking://user/hermes"},
+            {"uri": "viking://user/qubit"},
         )]
 
 
     def test_read_accepts_uri_batch_and_caps_batch_full_content(self):
         provider = OpenVikingMemoryProvider()
         uris = [
-            "viking://user/hermes/memories/a.md",
-            "viking://user/hermes/memories/b.md",
-            "viking://user/hermes/memories/c.md",
-            "viking://user/hermes/memories/d.md",
+            "viking://user/qubit/memories/a.md",
+            "viking://user/qubit/memories/b.md",
+            "viking://user/qubit/memories/c.md",
+            "viking://user/qubit/memories/d.md",
         ]
         provider._client = FakeVikingClient(
             {
@@ -589,19 +589,19 @@ class TestOpenVikingRead:
             {
                 (
                     "/api/v1/content/overview",
-                    (("uri", "viking://user/hermes"),),
+                    (("uri", "viking://user/qubit"),),
                 ): RuntimeError("500 Internal Server Error"),
             }
         )
 
         try:
-            provider._tool_read({"uri": "viking://user/hermes/.overview.md", "level": "overview"})
+            provider._tool_read({"uri": "viking://user/qubit/.overview.md", "level": "overview"})
             assert False, "Expected summary endpoint error to be raised"
         except RuntimeError:
             pass
 
         assert provider._client.calls == [
-            ("/api/v1/content/overview", {"uri": "viking://user/hermes"}),
+            ("/api/v1/content/overview", {"uri": "viking://user/qubit"}),
         ]
 
 
@@ -682,7 +682,7 @@ class TestOpenVikingAutoRecallPrefetch:
                             "result": {
                                 "memories": [
                                     {
-                                        "uri": "viking://user/user/peers/hermes/memories/e2e-full.md",
+                                        "uri": "viking://user/user/peers/qubit/memories/e2e-full.md",
                                         "score": 0.9,
                                         "level": 2,
                                         "category": "events",
@@ -733,7 +733,7 @@ class TestOpenVikingAutoRecallPrefetch:
         assert "people/ada.md — Ada is the project owner." in block
         assert "E2E full L2 memory content." in block
         assert "E2E abstract should not be injected." not in block
-        assert records["reads"] == ["viking://user/user/peers/hermes/memories/e2e-full.md"]
+        assert records["reads"] == ["viking://user/user/peers/qubit/memories/e2e-full.md"]
         assert [listing["uri"] for listing in records["listings"]] == [
             "viking://user/user/memories/preferences",
             "viking://user/user/memories/entities",
@@ -756,7 +756,7 @@ class TestOpenVikingAutoRecallPrefetch:
         ]
         assert all(headers.get("x-openviking-actor-peer", "") == peer for headers in normalized_headers)
         assert all(
-            headers.get("user-agent") == f"openviking-memory-hermes/{get_version_info().base_version}"
+            headers.get("user-agent") == f"openviking-memory-qubit/{get_version_info().base_version}"
             for headers in normalized_headers
         )
         assert all(headers.get("x-openviking-account") == "acct" for headers in normalized_headers)
@@ -770,28 +770,28 @@ class TestOpenVikingBrowse:
             {
                 (
                     "/api/v1/fs/ls",
-                    (("uri", "viking://user/hermes"),),
+                    (("uri", "viking://user/qubit"),),
                 ): {
                     "result": {
                         "entries": [
-                            {"name": "memories", "uri": "viking://user/hermes/memories", "type": "dir"},
-                            {"rel_path": "profile.md", "uri": "viking://user/hermes/memories/profile.md", "isDir": False, "abstract": "Profile"},
+                            {"name": "memories", "uri": "viking://user/qubit/memories", "type": "dir"},
+                            {"rel_path": "profile.md", "uri": "viking://user/qubit/memories/profile.md", "isDir": False, "abstract": "Profile"},
                         ]
                     }
                 },
             }
         )
 
-        result = json.loads(provider._tool_browse({"action": "list", "path": "viking://user/hermes"}))
+        result = json.loads(provider._tool_browse({"action": "list", "path": "viking://user/qubit"}))
 
-        assert result["path"] == "viking://user/hermes"
+        assert result["path"] == "viking://user/qubit"
         assert result["entries"] == [
-            {"name": "memories", "uri": "viking://user/hermes/memories", "type": "dir", "abstract": ""},
-            {"name": "profile.md", "uri": "viking://user/hermes/memories/profile.md", "type": "file", "abstract": "Profile"},
+            {"name": "memories", "uri": "viking://user/qubit/memories", "type": "dir", "abstract": ""},
+            {"name": "profile.md", "uri": "viking://user/qubit/memories/profile.md", "type": "file", "abstract": "Profile"},
         ]
         assert provider._client.calls == [(
             "/api/v1/fs/ls",
-            {"uri": "viking://user/hermes"},
+            {"uri": "viking://user/qubit"},
         )]
 
 
@@ -880,7 +880,7 @@ class TestEnsureClientReloadsEnv:
         monkeypatch.setenv("OPENVIKING_ENDPOINT", "http://srv:31933")
         monkeypatch.setenv("OPENVIKING_API_KEY", "")
         monkeypatch.setenv("OPENVIKING_USER", "alice")
-        monkeypatch.setenv("OPENVIKING_AGENT", "hermes")
+        monkeypatch.setenv("OPENVIKING_AGENT", "qubit")
 
         provider = OpenVikingMemoryProvider()
         provider._env_refresh_enabled = True
@@ -892,8 +892,8 @@ class TestEnsureClientReloadsEnv:
         bob_uri = provider._build_memory_uri("preferences")
 
         assert bob_client is not alice_client
-        assert alice_uri.startswith("viking://user/alice/peers/hermes/")
-        assert bob_uri.startswith("viking://user/bob/peers/hermes/")
+        assert alice_uri.startswith("viking://user/alice/peers/qubit/")
+        assert bob_uri.startswith("viking://user/bob/peers/qubit/")
 
 
     def test_handle_tool_call_reconnects_after_startup_health_failure(self, monkeypatch):
@@ -928,7 +928,7 @@ class TestEnsureClientReloadsEnv:
         monkeypatch.setattr("plugins.memory.openviking._VikingClient", _StubClient)
         monkeypatch.setenv("OPENVIKING_ENDPOINT", "https://openviking.example")
         monkeypatch.setenv("OPENVIKING_API_KEY", "sk-test")
-        monkeypatch.setenv("OPENVIKING_AGENT", "hermes")
+        monkeypatch.setenv("OPENVIKING_AGENT", "qubit")
 
         provider = OpenVikingMemoryProvider()
         provider.initialize("session-1")
@@ -1065,7 +1065,7 @@ class TestEnsureClientReloadsEnv:
         assert out["message_status"] == "accepted"
         assert out["session_uri"].endswith(f"/sessions/{out['session_id']}")
         assert out["recovery_command"] == f"ov session commit {out['session_id']}"
-        assert "same OpenViking profile and credentials as Hermes" in out["recovery_note"]
+        assert "same OpenViking profile and credentials as Qubit" in out["recovery_note"]
         assert len(posts) == 2
         assert posts[0][0].endswith("/messages")
         assert posts[1][0].endswith("/commit")

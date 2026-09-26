@@ -1,4 +1,4 @@
-"""Regression for #74973 — `hermes update` must not leave the gateway down.
+"""Regression for #74973 — `qubit update` must not leave the gateway down.
 
 On macOS the update's launchd branch guarded the restart behind
 ``launchctl list <label>`` exiting 0. A job that has been *booted out* of
@@ -6,7 +6,7 @@ launchd exits non-zero there, so the whole restart branch was skipped — with
 no ``else`` and no message. The update printed ``✓ Update complete!`` and
 exited 0 while the gateway was stopped *and* deregistered, which ``KeepAlive``
 cannot recover because the job definition is gone. Messaging adapters and
-cron stayed dark until someone manually ran ``hermes gateway restart``.
+cron stayed dark until someone manually ran ``qubit gateway restart``.
 
 ``launchctl list`` is also not a reliable loaded/unloaded classifier: it is
 session-scoped and can exit non-zero while the job is alive in its gui/user
@@ -89,7 +89,7 @@ class TestLaunchdRestartAfterUpdate:
         assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], ["ai.hermes.gateway"])
         out = capsys.readouterr().out
         assert "kickstart refused" in out
-        assert "hermes gateway restart" in out
+        assert "qubit gateway restart" in out
 
     @pytest.mark.parametrize(
         "exc",
@@ -106,7 +106,7 @@ class TestLaunchdRestartAfterUpdate:
         assert update_cmd._restart_launchd_gateway_after_update(supervision_verify=False) == ([], ["ai.hermes.gateway"])
         assert calls == []
         out = capsys.readouterr().out
-        assert "hermes gateway restart" in out
+        assert "qubit gateway restart" in out
 
     def test_no_plist_is_not_a_launchd_install(self, launchd, capsys):
         """No service definition → nothing to restart, and nothing to warn about."""
@@ -126,7 +126,7 @@ ai.hermes.gateway = {
 \tpath = /Users/u/Library/LaunchAgents/ai.hermes.gateway.plist
 \tstate = running
 \tpid = 59038
-\tprogram = /Users/u/.hermes/bin/hermes
+\tprogram = /Users/u/.hermes/bin/qubit
 }
 """
 

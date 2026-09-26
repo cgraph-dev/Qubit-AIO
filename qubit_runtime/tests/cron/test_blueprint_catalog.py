@@ -111,7 +111,7 @@ class TestRenderers:
 
     def test_deeplink_shape(self):
         url = blueprint_deeplink(get_blueprint("morning-brief"), {"time": "07:15"})
-        assert url.startswith("hermes://blueprint/morning-brief?")
+        assert url.startswith("qubit://blueprint/morning-brief?")
         assert "time=07" in url
 
 

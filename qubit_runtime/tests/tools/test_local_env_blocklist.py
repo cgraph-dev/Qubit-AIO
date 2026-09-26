@@ -76,7 +76,7 @@ def test_terminal_child_observes_declared_policy(child_env, monkeypatch):
     blocked.update(name for name, meta in OPTIONAL_ENV_VARS.items()
                    if meta.get("category") in {"tool", "messaging"}
                    or (meta.get("category") == "setting" and meta.get("password")))
-    blocked.discard("CLAUDE_CODE_OAUTH_TOKEN")  # operator's subscription, not Hermes inference
+    blocked.discard("CLAUDE_CODE_OAUTH_TOKEN")  # operator's subscription, not Qubit inference
     for name in blocked | set(OPERATOR_ALLOWED):
         monkeypatch.setenv(name, "fake-" + name)
     before = dict(os.environ)
@@ -329,11 +329,11 @@ def test_runtime_provenance_is_independent_of_aliases_and_virtual_env(child_env,
 
 
 @pytest.mark.parametrize("existing,expected", [
-    (["/usr/bin", "/bin"], ["/opt/hermes/bin", "/usr/bin", "/bin"]),
-    (["/usr/bin", "/opt/hermes/bin"], ["/usr/bin", "/opt/hermes/bin"]),
+    (["/usr/bin", "/bin"], ["/opt/qubit/bin", "/usr/bin", "/bin"]),
+    (["/usr/bin", "/opt/qubit/bin"], ["/usr/bin", "/opt/qubit/bin"]),
 ])
 def test_background_qubit_path_repair_is_idempotent(child_env, monkeypatch, existing, expected):
-    monkeypatch.setattr(local, "_QUBIT_BIN_DIR", "/opt/hermes/bin")
+    monkeypatch.setattr(local, "_QUBIT_BIN_DIR", "/opt/qubit/bin")
     result = local._sanitize_subprocess_env({"PATH": os.pathsep.join(existing)})
     assert result["PATH"].split(os.pathsep) == expected
     assert local._sanitize_subprocess_env(result)["PATH"] == result["PATH"]
@@ -351,10 +351,10 @@ def test_qubit_bin_resolution_and_unresolved_noop(child_env, monkeypatch):
 
 @pytest.mark.platforms("posix")
 def test_foreground_minimal_path_preserves_operator_precedence(child_env, monkeypatch):
-    monkeypatch.setattr(local, "_QUBIT_BIN_DIR", "/opt/hermes/bin")
+    monkeypatch.setattr(local, "_QUBIT_BIN_DIR", "/opt/qubit/bin")
     monkeypatch.setenv("PATH", "/custom/bin:/custom/bin::/usr/bin")
     result = local._make_run_env({})["PATH"].split(":")
-    assert result[:3] == ["/opt/hermes/bin", "/custom/bin", "/usr/bin"]
+    assert result[:3] == ["/opt/qubit/bin", "/custom/bin", "/usr/bin"]
     assert "/opt/homebrew/bin" in result and "/opt/homebrew/sbin" in result
     assert "" not in result
     assert result.count("/custom/bin") == 1
@@ -394,8 +394,8 @@ class TestNativeEnvironmentContracts:
 
     @pytest.mark.platforms("windows")
     def test_windows_qubit_owned_paths_stripped(self):
-        """On Windows, a Hermes venv site-packages entry written with
-        backslashes is stripped by the same Hermes-owned check, while a
+        """On Windows, a Qubit venv site-packages entry written with
+        backslashes is stripped by the same Qubit-owned check, while a
         user Windows path is preserved.  Windows-only: POSIX ``Path`` does
         not split on backslashes, so this cannot be meaningfully simulated
         on a POSIX host."""
@@ -455,9 +455,9 @@ class TestNativeEnvironmentContracts:
     def test_base_python_sanitizer_uses_validated_separate_runtime_venv(self, tmp_path, monkeypatch):
         """A base interpreter strips the exact Windows runtime site-packages.
 
-        This deliberately uses a synthetic Hermes venv separate from the test
+        This deliberately uses a synthetic Qubit venv separate from the test
         runner: sys.prefix represents base Python, while validated VIRTUAL_ENV
-        identifies ``<repo>/venv`` as the Hermes runtime producer contract.
+        identifies ``<repo>/venv`` as the Qubit runtime producer contract.
         """
         import tools.environments.local as local
         from tools.environments import local_pythonpath
@@ -527,7 +527,7 @@ class TestNativeEnvironmentContracts:
     ])
     def test_builders_strip_qubit_venv_pythonpath(self, builder):
         """Every subprocess env builder applies the same sanitation contract:
-        Hermes venv site-packages is stripped, user entries survive.
+        Qubit venv site-packages is stripped, user entries survive.
         """
         from tools.environments import local as local_mod
 
@@ -550,7 +550,7 @@ class TestNativeEnvironmentContracts:
         assert "/home/user/my-lib" in entries
 
     def test_scrub_child_env_strips_qubit_venv_pythonpath(self):
-        """execute_code's _scrub_child_env path: after scrubbing, Hermes venv
+        """execute_code's _scrub_child_env path: after scrubbing, Qubit venv
         site-packages entries should be stripped when
         _strip_qubit_owned_pythonpath is applied (as the spawn path does),
         while user entries (even for another Python version) are preserved.
@@ -580,12 +580,12 @@ class TestNativeEnvironmentContracts:
     def test_execute_code_composition_strips_inherited_qubit_entries(self, same_env):
         """Integration: execute_code's real spawn path composes a clean PYTHONPATH.
 
-        Seeds a contaminated inherited PYTHONPATH (Hermes repo root + Hermes
+        Seeds a contaminated inherited PYTHONPATH (Qubit repo root + Qubit
         venv site-packages + user entries) through os.environ and drives
         execute_code all the way to Popen.  Proves the #84500 conditional
         composition and the #82581 selective strip compose correctly:
 
-        * inherited Hermes venv site-packages never survive into the sandbox;
+        * inherited Qubit venv site-packages never survive into the sandbox;
         * the staging tmpdir stays the first entry;
         * the repo root is deliberately re-added exactly once for a same-env
           child (the single occurrence proves the inherited copy was stripped
@@ -651,7 +651,7 @@ class TestNativeEnvironmentContracts:
         assert norm_parts[0] == norm_staging, \
             "staging tmpdir must be the first PYTHONPATH entry"
         assert norm_venv not in norm_parts, \
-            "inherited Hermes venv site-packages must be stripped"
+            "inherited Qubit venv site-packages must be stripped"
         assert norm_user_a in norm_parts and norm_user_b in norm_parts, \
             "user PYTHONPATH entries must survive"
         assert norm_parts.index(norm_user_a) > norm_parts.index(norm_staging), \
@@ -794,7 +794,7 @@ class TestNativeEnvironmentContracts:
 
     def test_repo_level_junction_recovers_lexical_alias(self, tmp_path, monkeypatch):
         """The repo itself may be a junction under the configured root
-        (e.g. D:\\hermes\\hermes-agent -> C:\\...\\hermes-agent) while the
+        (e.g. D:\\qubit\\hermes-agent -> C:\\...\\hermes-agent) while the
         editable import spelling resolves to the physical location.  The
         alias builder must recover the lexical spelling via exact-identity
         proof (strict resolve), not a name-based guess.
@@ -933,11 +933,11 @@ class TestNativeEnvironmentContracts:
 
 
 class TestPythonhomeSanitized:
-    """PYTHONHOME must not leak from the Hermes runtime into subprocesses.
+    """PYTHONHOME must not leak from the Qubit runtime into subprocesses.
 
     The gateway inherits/sets PYTHONHOME in its process environment; a child
     interpreter (system Python, another venv, cron no_agent scripts) that
-    inherits it redirects its stdlib search to the Hermes venv and crashes
+    inherits it redirects its stdlib search to the Qubit venv and crashes
     with version-mismatch errors before importing anything (#75018).
     """
 
@@ -1045,7 +1045,7 @@ class TestBlocklistCoverage:
         must appear in the blocklist — ensures no drift.
 
         CLAUDE_CODE_OAUTH_TOKEN is the one deliberate exemption: it is owned
-        by the user's Claude Code install, not Hermes (#55878).
+        by the user's Claude Code install, not Qubit (#55878).
         """
         from qubit_cli.auth import PROVIDER_REGISTRY
 
@@ -1067,7 +1067,7 @@ class TestBlocklistCoverage:
     def test_general_aws_chain_not_in_blocklist(self):
         """The general AWS credential chain must NOT be in the blocklist —
         no-regression guard for #32314. These belong to the user's trusted
-        operator shell (SECURITY.md §3.2), not to Hermes, and blocklisting
+        operator shell (SECURITY.md §3.2), not to Qubit, and blocklisting
         them would be unrecoverable via env_passthrough (GHSA-rhgp-j443-p4rf).
         """
         general_chain = {
@@ -1091,7 +1091,7 @@ class TestBlocklistCoverage:
 
     def test_claude_code_oauth_token_is_inheritable(self):
         """CLAUDE_CODE_OAUTH_TOKEN is owned by the user's Claude Code install
-        (subscription OAuth), not a Hermes inference credential. Stripping it
+        (subscription OAuth), not a Qubit inference credential. Stripping it
         made agent-spawned ``claude`` fall through to the shared Keychain /
         ~/.claude credential store and clobber the user's interactive login
         on auth failure (#55878). It must stay inheritable."""
@@ -1181,7 +1181,7 @@ class TestSanePathIncludesHomebrew:
     def _disable_qubit_bin_injection(self):
         """These tests assert the sane-path merge in isolation. Disable the
         hermes-install-dir prepend (a separate concern, covered by
-        TestHermesBinDirOnPath) so a real ``hermes`` on the test runner's PATH
+        TestHermesBinDirOnPath) so a real ``qubit`` on the test runner's PATH
         doesn't shift the asserted PATH layout."""
         from tools.environments import local as local_mod
         saved = local_mod._QUBIT_BIN_DIR

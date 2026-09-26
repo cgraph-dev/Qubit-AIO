@@ -246,10 +246,10 @@ def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeyp
     out = home / ".local" / "bin"
     out.mkdir(parents=True)
     # Old venv and sibling-ACP wrappers, with an unrelated command sharing bin.
-    (out / "hermes").write_text(f'#!/bin/sh\nexec "{repo}/venv/bin/python" "{repo}/hermes" "$@"\n', encoding="utf-8")
+    (out / "hermes").write_text(f'#!/bin/sh\nexec "{repo}/venv/bin/python" "{repo}/qubit" "$@"\n', encoding="utf-8")
     (out / "hermes-acp").write_text(
-        '#!/usr/bin/env bash\n# Hermes Agent — ACP launcher (written by `hermes update`).\n'
-        f'exec "{out}/hermes" acp "$@"\n', encoding="utf-8")
+        '#!/usr/bin/env bash\n# Qubit Agent — ACP launcher (written by `qubit update`).\n'
+        f'exec "{out}/qubit" acp "$@"\n', encoding="utf-8")
     foreign = f'#!/bin/sh\n# user note about {repo}\nexit 19\n'
     (out / "hermes-agent").write_text(foreign, encoding="utf-8")
 

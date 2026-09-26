@@ -30,7 +30,7 @@ def _ring(monkeypatch, *, flag_on, env, **kwargs):
 
 def test_osc9_body_emitted_and_sanitized_only_when_flag_on(monkeypatch):
     out = _ring(monkeypatch, flag_on=True, env={}, context="approval\x1b\x07\x00\x7f!")
-    assert out == "\a\x1b]9;Hermes: approval!\x07"
+    assert out == "\a\x1b]9;Qubit: approval!\x07"
     assert _ring(monkeypatch, flag_on=False, env={}, context="approval") == ""
 
 
@@ -88,4 +88,4 @@ def test_running_app_gets_bell_and_osc9_on_its_loop_never_a_second_tty_writer(mo
     assert _Output.raw == []
     assert len(_Loop.queued) == 1
     _Loop.queued[0]()
-    assert _Output.raw == ["\a\x1b]9;Hermes: turn complete\x07", "<flush>"]
+    assert _Output.raw == ["\a\x1b]9;Qubit: turn complete\x07", "<flush>"]
