@@ -62,7 +62,7 @@ async def probe():
                     headers["X-Hermes-Session-Id"] = "parent"
                 response = await client.post("/v1/chat/completions", headers=headers, json={"messages": [{"role": "user", "content": "continue"}], "stream": stream})
                 body = await response.text()
-                records.append({"stream": stream, "explicit": explicit, "status": response.status, "header": response.headers.get("X-Hermes-Session-Id"), "runtime": captured[-1] if captured else None, "body": body[:120]})
+                records.append({"stream": stream, "explicit": explicit, "status": response.status, "header": response.headers.get("X-Qubit-Session-Id") or response.headers.get("X-Hermes-Session-Id"), "runtime": captured[-1] if captured else None, "body": body[:120]})
         calls_before = len(captured)
         evt = {"type": "async_delegation", "delegation_id": "unit-http"}
         delivery_error = None

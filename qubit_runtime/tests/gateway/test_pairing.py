@@ -564,7 +564,7 @@ class TestUnreadablePairingFile:
         # And the warning should include actionable advice
         msgs = " ".join(rec.getMessage() for rec in caplog.records)
         assert "docker exec" in msgs
-        assert "-u hermes" in msgs
+        assert "-u qubit" in msgs
 
 # Profile-scoped storage (multiplexing gateway isolation)
 # ---------------------------------------------------------------------------

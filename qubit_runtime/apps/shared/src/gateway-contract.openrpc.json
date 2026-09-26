@@ -1,7 +1,7 @@
 {
   "openrpc": "1.3.2",
   "info": {
-    "title": "Hermes TUI/Desktop gateway",
+    "title": "Qubit TUI/Desktop gateway",
     "version": "1",
     "description": "Generated from tui_gateway/contracts by scripts/gen_gateway_contracts.py."
   },
@@ -134,7 +134,7 @@
     },
     {
       "name": "billing.state",
-      "summary": "Read-only billing view (no scope); the Nous free tier is answered locally without a portal call.",
+      "summary": "Read-only billing view (no scope); the Qubit free tier is answered locally without a portal call.",
       "params": [
         {
           "name": "params",
@@ -350,7 +350,7 @@
     },
     {
       "name": "cli.exec",
-      "summary": "Run ``hermes <argv>`` non-interactively and capture its output; ``blocked`` explains a refusal.",
+      "summary": "Run ``qubit <argv>`` non-interactively and capture its output; ``blocked`` explains a refusal.",
       "params": [
         {
           "name": "params",
@@ -674,7 +674,7 @@
     },
     {
       "name": "connectors.operation.wake",
-      "summary": "The browser leg came back (hermes://connections/done): read the accounts now, not at the next tick.",
+      "summary": "The browser leg came back (qubit://connections/done): read the accounts now, not at the next tick.",
       "params": [
         {
           "name": "params",
@@ -800,7 +800,7 @@
     },
     {
       "name": "diagnostics.share_nous",
-      "summary": "Upload a force-redacted debug bundle to Nous-internal diagnostics storage.",
+      "summary": "Upload a force-redacted debug bundle to Qubit-internal diagnostics storage.",
       "params": [
         {
           "name": "params",
@@ -3482,7 +3482,7 @@
     },
     {
       "name": "session.usage",
-      "summary": "Token / context / cost counters for the session (+ Nous credit lines when available).",
+      "summary": "Token / context / cost counters for the session (+ Qubit credit lines when available).",
       "params": [
         {
           "name": "params",
@@ -18440,7 +18440,7 @@
       },
       "ModelPricing": {
         "additionalProperties": false,
-        "description": "``qubit_cli/inventory.py::_apply_pricing`` \u2014 formatted $/Mtok strings (``\"\"`` unknown,\n``\"free\"``); the sale fields are Nous Portal-only.",
+        "description": "``qubit_cli/inventory.py::_apply_pricing`` \u2014 formatted $/Mtok strings (``\"\"`` unknown,\n``\"free\"``); the sale fields are Qubit Labs-only.",
         "properties": {
           "input": {
             "title": "Input",
@@ -37837,7 +37837,7 @@
     },
     {
       "name": "display.status",
-      "summary": "This profile's screen started or stopped (also for transitions made outside hermes serve).",
+      "summary": "This profile's screen started or stopped (also for transitions made outside qubit serve).",
       "params": [
         {
           "name": "payload",

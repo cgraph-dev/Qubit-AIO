@@ -544,7 +544,7 @@ def run_host(stdin: Any = None, stdout: Any = None) -> None:
     host.emit({
         "type": "hello", "host_pid": os.getpid(), "boot_id": host._boot_id,
         "build_sha": _build_sha(), "cwd": os.getcwd(),
-        "hermes_home": os.environ.get("QUBIT_HOME", "")})
+        "qubit_home": os.environ.get("QUBIT_HOME", "")})
 
     def _reader() -> None:
         for raw in stdin:
