@@ -235,7 +235,7 @@ def evaluate_credits_notices(state: CreditsState, latch: dict, *, model_is_free:
 
 
 # Header contract: (field, kind[, default-when-absent]); a field is REQUIRED unless it has a default.
-# Header name = ``x-nous-credits-<field>`` (``x-qubit-<field>`` for tool_pool_*), underscores → dashes.
+# Header name = ``x-nous-credits-<field>`` (``x-nous-<field>`` for tool_pool_*), underscores → dashes.
 # micros: int >= 0 ("signed": may be negative); usd: the server's formatted string ^-?\d+\.\d{2}$
 # (never re-parsed); bool: "true"/"false" STRING. Handled inline: subscription-limit-* (PAIRED/optional),
 # denominator-kind ("subscription_cap" | "none"), disabled-reason (omitted when null).
@@ -249,7 +249,7 @@ _HEADER_FIELDS: tuple[tuple, ...] = (
 
 
 def _header_name(field: str) -> str:
-    return "x-qubit-" + ("" if field.startswith("tool_pool_") else "credits-") + field.replace("_", "-")
+    return "x-nous-" + ("" if field.startswith("tool_pool_") else "credits-") + field.replace("_", "-")
 
 
 def _parse_field(kind: str, raw: Optional[str], default: Any = _SENTINEL) -> Any:
