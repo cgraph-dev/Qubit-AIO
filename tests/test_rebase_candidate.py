@@ -34,6 +34,13 @@ DELTA_KEYS = ("identical", "differing", "only_candidate", "only_current")
 #: the candidate is the non-vacuity anchor for "the pin really is v0.21.5".
 NEW_MODULE = "qubit_state_health.py"
 
+#: Still-valid non-vacuity anchor for the delta shape.  The deterministic engine
+#: leaves the upstream-named plugin tree untouched, so the current tree (which
+#: ships it rebranded as ``qubit-achievements``) makes this path candidate-only.
+#: The former anchor ``qubit_state_health.py`` now exists in both trees and is no
+#: longer candidate-only.
+CANDIDATE_ONLY_ANCHOR = "plugins/hermes-achievements/README.md"
+
 EXPECTED_REVISION = "69948c005791d4d0e51670ca015238c2c7663749"
 
 PINNED_SOURCE = Path(os.environ.get(
@@ -176,9 +183,10 @@ def test_delta_manifest_shape(candidate):
     for key in DELTA_KEYS:
         assert key in delta, f"delta missing bucket {key!r}"
         assert isinstance(delta[key], list), f"bucket {key!r} must be a list"
-    # Non-vacuity: the v0.21.5-only module is a candidate-only file vs current.
-    assert NEW_MODULE in delta["only_candidate"], (
-        f"{NEW_MODULE} should be candidate-only; got "
+    # Non-vacuity: the candidate keeps the upstream-named plugin tree, which the
+    # current tree ships rebranded, so this path is candidate-only vs current.
+    assert CANDIDATE_ONLY_ANCHOR in delta["only_candidate"], (
+        f"{CANDIDATE_ONLY_ANCHOR} should be candidate-only; got "
         f"{delta['only_candidate'][:5]}")
     assert delta["identical"], "expected some byte-identical files"
     assert delta["differing"], "expected some differing files"

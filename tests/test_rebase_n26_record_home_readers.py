@@ -41,7 +41,10 @@ def test_replace_ownership_accepts_qubit_home_only_record(runtime_on_path, tmp_p
     from gateway.run import _replace_target_belongs_to_other_profile
 
     home = tmp_path / "home"
-    home.mkdir()
+    # ``runtime_on_path`` sets QUBIT_HOME to this path, and importing
+    # ``gateway.run`` eagerly ensures the home directory exists; tolerate the
+    # runtime-created directory rather than colliding with it.
+    home.mkdir(exist_ok=True)
     record = {
         "pid": 424242,
         "kind": "qubit-gateway",
