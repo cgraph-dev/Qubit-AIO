@@ -115,12 +115,24 @@ kokoro = []                   # Kokoro TTS ships inside sherpa-onnx; model downl
 #     `tests/tools/test_fal_sdk.py`.
 # Declaring them here keeps the vendored suite collectible without weakening the
 # tests (no `importorskip`) to match upstream's unconditional imports.
+#
+# The isolated PM worker (`qubit_runtime/pm/worker.py`) imports the PM runtime's
+# own dependency set at process start. `pm/client._request` spawns it with
+# `python -I` and `pm.runtime.runtime_environment()` strips every `PYTHON*`
+# variable, so the worker cannot see a `PYTHONPATH` test overlay and must import
+# `truststore`/`tomli-w` from the interpreter running the tests. They are
+# genuine runtime deps (`[project].dependencies`), but the raw worker-contract
+# test (`tests/pm/test_security_consumers.py`) executes under the *test*
+# interpreter, so the test environment must carry them too. Keep the pins
+# identical to the runtime declarations.
 test = [
     "pytest>=8",
     "anthropic==0.87.0",
     "mcp==2.0.0",
     "jsonschema==4.26.0",
     "fal-client==0.13.1",
+    "truststore==0.10.4",
+    "tomli-w==1.2.0",
 ]
 
 [project.scripts]

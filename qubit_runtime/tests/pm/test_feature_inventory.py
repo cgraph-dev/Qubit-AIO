@@ -14,6 +14,9 @@ from pm.environments import site_packages
 
 
 def test_inventory_uses_the_target_and_requires_every_anchor(tmp_path, monkeypatch):
+    from tests.pm._fixtures import require_pm_runtime_python
+
+    require_pm_runtime_python()
     target_root = tmp_path / "target"
     subprocess.run(
         [sys.executable, "-m", "venv", "--without-pip", str(target_root)],

@@ -11,10 +11,12 @@ import pytest
 
 def test_pm_runtime_discovers_plugins_without_application_dependencies(tmp_path, monkeypatch):
     from pm.runtime import prepare_runtime
+    from tests.pm._fixtures import require_pm_runtime_python
 
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv is required for the real dependency-runtime test")
+    require_pm_runtime_python()
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -58,9 +60,11 @@ def test_cold_worker_bootstrap_reuses_the_requests_cache(tmp_path, monkeypatch):
     from qubit_constants import get_default_qubit_root
     from pm import client, runtime
     from pm.runtime_stage import stage_runtime
+    from tests.pm._fixtures import require_pm_runtime_python
 
     uv = shutil.which("uv")
     assert uv, "the bootstrap cache contract requires real uv"
+    require_pm_runtime_python()
     tools = Path(uv), Path(sys.executable)
     cache = tmp_path / "shared-cache"
     monkeypatch.setenv("HOME", str(tmp_path / "home"))

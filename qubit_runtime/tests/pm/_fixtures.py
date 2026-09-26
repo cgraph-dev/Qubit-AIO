@@ -112,6 +112,20 @@ def served(tmp_path):
         yield docroot, f"http://127.0.0.1:{server.server_port}"
 
 
+def require_pm_runtime_python() -> None:
+    """Skip unless the host can build the checked-in PM runtime.
+
+    ``pm/uv.lock`` pins ``requires-python = "==3.14.*"``, so on an older host
+    ``uv sync`` exits 2 and every runtime-staging test becomes a setup error.
+    Upstream already gates the PM runtime E2E the same way
+    (``tests/pm/test_cold_runtime_e2e.py``). Skip rather than error so an
+    unsupported host reports the constraint, not a false failure; on 3.14 the
+    whole suite runs unchanged.
+    """
+    if sys.version_info[:2] != (3, 14):
+        pytest.skip("the checked-in PM runtime currently requires Python 3.14")
+
+
 @pytest.fixture(scope="module")
 def isolated_python(tmp_path_factory):
     from pm.runtime_stage import stage_runtime
@@ -119,6 +133,7 @@ def isolated_python(tmp_path_factory):
     root = tmp_path_factory.mktemp("pm-python")
     uv = shutil.which("uv")
     assert uv, "the worker contract requires real uv"
+    require_pm_runtime_python()
     python = stage_runtime(Path(uv), Path(sys.executable), root)
     _run([str(python), "-I", "-c", "import importlib.util; assert importlib.util.find_spec('yaml') is None"],
          cwd=root, env=dict(os.environ))

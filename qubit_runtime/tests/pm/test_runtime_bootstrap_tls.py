@@ -15,9 +15,11 @@ import pytest
 def test_staged_uv_prepares_pm_before_any_tool_download(tmp_path):
     from pm.packages import Uv
     from pm.store import current_target
+    from tests.pm._fixtures import require_pm_runtime_python
 
     uv = shutil.which("uv")
     assert uv, "this bootstrap contract requires real uv"
+    require_pm_runtime_python()
     repo = Path(__file__).resolve().parents[2]
     stage = tmp_path / "source"
     for name in ("pm", "qubit_cli"):
@@ -84,6 +86,7 @@ def test_pm_cli_verifies_tls_with_platform_trust(tmp_path, monkeypatch):
     from cryptography.x509.oid import NameOID
 
     from pm.runtime import prepare_runtime, runtime_environment
+    from tests.pm._fixtures import require_pm_runtime_python
     from tests.pm._range_server import RangeHandler
 
     home = tmp_path / "home"
@@ -92,6 +95,7 @@ def test_pm_cli_verifies_tls_with_platform_trust(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_RUNTIME_DIR", str(home / "tools"))
     uv = shutil.which("uv")
     assert uv
+    require_pm_runtime_python()
     python = prepare_runtime(Path(uv), Path(sys.executable), tmp_path / "runtime")
     source = Path(__file__).resolve().parents[2]
     repo = tmp_path / "source"

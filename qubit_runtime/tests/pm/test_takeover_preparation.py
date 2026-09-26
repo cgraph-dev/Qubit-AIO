@@ -17,6 +17,9 @@ from tests.pm._fixtures import _wheel
 
 @pytest.mark.platforms("linux")
 def test_fresh_takeover_prepares_generation_and_runs_selected_python(tmp_path):
+    from tests.pm._fixtures import require_pm_runtime_python
+
+    require_pm_runtime_python()
     source = Path(__file__).resolve().parents[2]
     root = tmp_path / "source with spaces"
     root.mkdir()
