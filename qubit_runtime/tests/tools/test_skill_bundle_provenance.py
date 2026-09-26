@@ -499,24 +499,40 @@ UPSTREAM_STUB_MD = """---
 name: upstream-demo
 description: Upstream-maintained catalog entry.
 metadata:
+  qubit:
+    upstream:
+      repo: acme/design-skill
+      path: skills/design
+---
+# Stub
+"""
+
+LEGACY_UPSTREAM_STUB_MD = """---
+name: upstream-demo
+description: Upstream-maintained catalog entry.
+metadata:
   hermes:
     upstream:
       repo: acme/design-skill
-      path: .hermes/skills/design
+      path: skills/design
 ---
 # Stub
 """
 
 
-def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monkeypatch):
-    """A catalog stub with metadata.hermes.upstream installs the upstream repo's
-    content (relabelled official/trusted), not the stub itself."""
+@pytest.mark.parametrize(
+    "stub_md", [UPSTREAM_STUB_MD, LEGACY_UPSTREAM_STUB_MD], ids=["qubit", "legacy-hermes"]
+)
+def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monkeypatch, stub_md):
+    """A catalog stub with metadata.qubit.upstream (read-old metadata.hermes.upstream)
+    installs the upstream repo's content (relabelled official/trusted), not the stub
+    itself."""
     from tools.skills_hub_official import OptionalSkillSource
 
     root = tmp_path / "optional-skills"
     skill = root / "creative" / "upstream-demo"
     skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text(UPSTREAM_STUB_MD)
+    (skill / "SKILL.md").write_text(stub_md)
 
     source = OptionalSkillSource()
     source._optional_dir = root
@@ -540,7 +556,7 @@ def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monk
 
     bundle = source.fetch("official/creative/upstream-demo")
 
-    assert fetched_ids == ["acme/design-skill/.hermes/skills/design"]
+    assert fetched_ids == ["acme/design-skill/skills/design"]
     assert bundle is not None
     assert bundle.source == "official"
     assert bundle.identifier == "official/creative/upstream-demo"
@@ -549,15 +565,16 @@ def test_optional_source_upstream_stub_fetches_from_external_repo(tmp_path, monk
     assert bundle.metadata["upstream_repo"] == "acme/design-skill"
 
 
-def test_optional_source_upstream_pointer_rejects_malformed(tmp_path):
+@pytest.mark.parametrize("key", ["qubit", "hermes"])
+def test_optional_source_upstream_pointer_rejects_malformed(tmp_path, key):
     from tools.skills_hub_official import OptionalSkillSource
 
     source = OptionalSkillSource()
     bad = [
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: acme\n      path: skills/x\n---\n",          # repo not owner/name
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: a/b/c\n      path: skills/x\n---\n",        # repo too deep
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: acme/skill\n      path: ../../etc\n---\n",  # traversal
-        "---\nname: x\nmetadata:\n  hermes:\n    upstream:\n      repo: acme/skill\n---\n",                          # missing path
+        f"---\nname: x\nmetadata:\n  {key}:\n    upstream:\n      repo: acme\n      path: skills/x\n---\n",          # repo not owner/name
+        f"---\nname: x\nmetadata:\n  {key}:\n    upstream:\n      repo: a/b/c\n      path: skills/x\n---\n",        # repo too deep
+        f"---\nname: x\nmetadata:\n  {key}:\n    upstream:\n      repo: acme/skill\n      path: ../../etc\n---\n",  # traversal
+        f"---\nname: x\nmetadata:\n  {key}:\n    upstream:\n      repo: acme/skill\n---\n",                          # missing path
         "---\nname: x\n---\n",                                                                                       # no pointer
     ]
     for content in bad:

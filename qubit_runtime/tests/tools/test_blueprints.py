@@ -1,6 +1,7 @@
 """Tests for the blueprints layer (skill frontmatter <-> cron automation bridge).
 
-A blueprint is a skill with a metadata.hermes.blueprint block. These verify parsing,
+A blueprint is a skill with a metadata.qubit.blueprint block (the legacy
+metadata.hermes.blueprint block stays readable). These verify parsing,
 the create-job bridge, and the export round-trip without touching the real
 cron store.
 """
@@ -26,7 +27,7 @@ name: morning-brief
 description: Summarize unread email and calendar every morning.
 version: 1.0.0
 metadata:
-  hermes:
+  qubit:
     tags: [blueprint, email]
     blueprint:
       schedule: "0 8 * * *"
@@ -39,11 +40,26 @@ metadata:
 Every morning, gather unread email and the day's calendar and send a digest.
 """
 
+LEGACY_BLUEPRINT_SKILL = """---
+name: morning-brief
+description: Summarize unread email and calendar every morning.
+version: 1.0.0
+metadata:
+  hermes:
+    tags: [blueprint, email]
+    blueprint:
+      schedule: "0 8 * * *"
+      deliver: telegram
+---
+
+# Morning Brief
+"""
+
 PLAIN_SKILL = """---
 name: not-a-blueprint
 description: Just a regular skill.
 metadata:
-  hermes:
+  qubit:
     tags: [misc]
 ---
 
@@ -54,7 +70,7 @@ MALFORMED_BLUEPRINT = """---
 name: broken
 description: Blueprint with no schedule.
 metadata:
-  hermes:
+  qubit:
     blueprint:
       deliver: origin
 ---
@@ -75,12 +91,24 @@ class TestParseBlueprint:
 
     def test_deliver_defaults_to_origin(self):
         skill = (
-            "---\nname: r\ndescription: d\nmetadata:\n  hermes:\n"
+            "---\nname: r\ndescription: d\nmetadata:\n  qubit:\n"
             '    blueprint:\n      schedule: "every 1h"\n---\n\nbody'
         )
         spec = parse_blueprint(skill)
         assert spec is not None
         assert spec.deliver == "origin"
+
+
+    def test_reads_legacy_hermes_blueprint(self):
+        spec = parse_blueprint(LEGACY_BLUEPRINT_SKILL)
+        assert spec is not None
+        assert spec.schedule == "0 8 * * *"
+        assert spec.deliver == "telegram"
+
+
+    def test_malformed_blueprint_raises(self):
+        with pytest.raises(BlueprintError):
+            parse_blueprint(MALFORMED_BLUEPRINT)
 
 
 class TestBlueprintSpecForInstalled:

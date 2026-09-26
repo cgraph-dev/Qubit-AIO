@@ -58,6 +58,13 @@ def _frontmatter(p: Path):
     assert isinstance(fm, dict), f"{_rel(p)}: frontmatter must be a YAML mapping"
     return fm, content
 
+def _skill_metadata(fm: dict) -> dict:
+    """The effective skill metadata: canonical ``metadata.qubit`` (read-old ``metadata.hermes``)."""
+    meta = fm.get("metadata")
+    if not isinstance(meta, dict):
+        return {}
+    return meta.get("qubit") or meta.get("hermes") or {}
+
 ALL_SKILL_NAMES = None
 
 def _all_names():
@@ -75,6 +82,13 @@ def test_at_least_the_expected_population():
     assert any("optional-skills" in str(p) for p in paths)
     assert any(str(p.parent).startswith(str(REPO / "skills")) for p in paths)
 
+def test_skill_metadata_prefers_canonical_and_reads_legacy():
+    both = {"metadata": {"qubit": {"tags": ["canonical"]}, "hermes": {"tags": ["legacy"]}}}
+    assert _skill_metadata(both) == {"tags": ["canonical"]}
+    assert _skill_metadata({"metadata": {"hermes": {"tags": ["legacy"]}}}) == {"tags": ["legacy"]}
+    assert _skill_metadata({}) == {}
+    assert _skill_metadata({"metadata": "not-a-mapping"}) == {}
+
 @pytest.mark.parametrize("p", _params())
 def test_required_frontmatter_fields(p):
     fm, _ = _frontmatter(p)
@@ -85,9 +99,9 @@ def test_required_frontmatter_fields(p):
     ]
     if missing and not _grandfathered(p, "fields"):
         pytest.fail(f"{_rel(p)}: missing frontmatter fields: {missing}")
-    hermes = (fm.get("metadata") or {}).get("hermes") or {}
-    if not (hermes.get("tags") or fm.get("tags")) and not _grandfathered(p, "tags"):
-        pytest.fail(f"{_rel(p)}: no tags (metadata.hermes.tags or top-level tags)")
+    qubit = _skill_metadata(fm)
+    if not (qubit.get("tags") or fm.get("tags")) and not _grandfathered(p, "tags"):
+        pytest.fail(f"{_rel(p)}: no tags (metadata.qubit.tags or top-level tags)")
 
 @pytest.mark.parametrize("p", _params())
 def test_name_matches_directory(p):
@@ -111,9 +125,9 @@ def test_description_hardline(p):
 @pytest.mark.parametrize("p", _params())
 def test_related_skills_resolve(p):
     fm, _ = _frontmatter(p)
-    hermes = (fm.get("metadata") or {}).get("hermes") or {}
+    qubit = _skill_metadata(fm)
     dangling = [
-        rs for rs in (hermes.get("related_skills") or []) if rs not in _all_names()
+        rs for rs in (qubit.get("related_skills") or []) if rs not in _all_names()
     ]
     if dangling and not _grandfathered(p, "related"):
         pytest.fail(f"{_rel(p)}: dangling related_skills: {dangling}")
