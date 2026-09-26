@@ -107,7 +107,7 @@ def test_resizes_keep_each_transcript_line_once_in_tmux_scrollback(tmp_path: Pat
         try:
             tmux("set", "-g", "window-size", "manual")
             tmux("set", "-g", "remain-on-exit", "on")  # keeps a crash or the diagnostics' dump readable
-            wait_for("Welcome to Hermes", timeout=120)
+            wait_for("Welcome to Qubit Agent", timeout=120)
             # The welcome line is printed before the input loop exists. Keys typed then land in the
             # still-cooked tty: the kernel echoes them (a plain transcript row) and hands the app
             # text + Enter in one read, which it takes for a pasted newline — the question sits

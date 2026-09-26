@@ -82,7 +82,7 @@ def test_broken_environment_keeps_explicit_repair_entry_reachable(tmp_path, monk
                             capture_output=True, text=True, timeout=30)
     assert (result.returncode == 0) is allowed, result.stderr
     if not allowed:
-        assert "hermes pm repair" in result.stderr
+        assert "qubit pm repair" in result.stderr
         assert "Traceback" not in result.stderr
 
 
@@ -107,7 +107,7 @@ def test_manual_repair_bypasses_damaged_generation_activation(tmp_path, monkeypa
     result = subprocess.run([sys.executable, "-S", "-m", "qubit_cli.main", "pm", "repair", "--help"],
                             cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
-    assert "hermes pm repair" in result.stdout
+    assert "qubit pm repair" in result.stdout
 
 
 @pytest.mark.parametrize("interpreter", ["store", "venv"])

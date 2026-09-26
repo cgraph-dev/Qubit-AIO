@@ -4,7 +4,7 @@ Regression test for https://github.com/NousResearch/hermes-agent/issues/18594.
 
 When QUBIT_HOME is unset but an active_profile file indicates a non-default
 profile is active, get_qubit_home() should:
-  1. STILL return ~/.hermes (raising would brick 30+ module-level callers)
+  1. STILL return ~/.qubit (raising would brick 30+ module-level callers)
   2. Emit a loud one-shot warning to stderr so operators can diagnose
      cross-profile data contamination after the fact.
 
@@ -34,9 +34,9 @@ class TestGetHermesHomeProfileWarning:
     def test_classic_mode_no_active_profile_no_warning(
         self, fresh_constants, tmp_path, capsys
     ):
-        """Classic mode: no active_profile file → silent, returns ~/.hermes."""
+        """Classic mode: no active_profile file → silent, returns ~/.qubit."""
         result = fresh_constants.get_qubit_home()
-        assert result == tmp_path / ".hermes"
+        assert result == tmp_path / ".qubit"
         assert "QUBIT_HOME fallback" not in capsys.readouterr().err
 
 
@@ -45,14 +45,14 @@ class TestGetHermesHomeProfileWarning:
         self, fresh_constants, tmp_path, capsys
     ):
         """active_profile=coder + QUBIT_HOME unset → warn loudly, still return fallback."""
-        hermes_dir = tmp_path / ".hermes"
+        hermes_dir = tmp_path / ".qubit"
         hermes_dir.mkdir()
         (hermes_dir / "active_profile").write_text("coder\n")
 
         result = fresh_constants.get_qubit_home()
 
         # 1. Still returns the fallback — no import-time crash
-        assert result == tmp_path / ".hermes"
+        assert result == tmp_path / ".qubit"
         # 2. Stderr got the warning exactly once
         err = capsys.readouterr().err
         assert err.count("QUBIT_HOME fallback") == 1
@@ -68,9 +68,9 @@ class TestGetHermesHomeProfileWarning:
         self, fresh_constants, tmp_path, capsys, monkeypatch
     ):
         """Even if active_profile is 'coder', setting QUBIT_HOME suppresses warning."""
-        profile_dir = tmp_path / ".hermes" / "profiles" / "coder"
+        profile_dir = tmp_path / ".qubit" / "profiles" / "coder"
         profile_dir.mkdir(parents=True)
-        (tmp_path / ".hermes" / "active_profile").write_text("coder\n")
+        (tmp_path / ".qubit" / "active_profile").write_text("coder\n")
         monkeypatch.setenv("QUBIT_HOME", str(profile_dir))
 
         result = fresh_constants.get_qubit_home()
@@ -83,14 +83,14 @@ class TestGetHermesHomeProfileWarning:
         self, fresh_constants, tmp_path, capsys
     ):
         """active_profile that can't be decoded → fall through silently."""
-        hermes_dir = tmp_path / ".hermes"
+        hermes_dir = tmp_path / ".qubit"
         hermes_dir.mkdir()
         # Write bytes that aren't valid utf-8
         (hermes_dir / "active_profile").write_bytes(b"\xff\xfe\x00\x00")
 
         result = fresh_constants.get_qubit_home()
 
-        assert result == tmp_path / ".hermes"
+        assert result == tmp_path / ".qubit"
         # Shouldn't crash; shouldn't warn either (can't tell what profile was intended)
         assert "QUBIT_HOME fallback" not in capsys.readouterr().err
 
@@ -102,7 +102,7 @@ class TestBootReadersBeforeProfileOverride:
     import, and ``main._apply_profile_override`` re-homes the process a few lines later. A
     caller that already resolved its home must not send the policy back through
     ``get_qubit_home()``: for a sticky-profile user with ``QUBIT_HOME`` unset in a plain
-    shell that lookup falls back to the default profile and warns, on every ``hermes``
+    shell that lookup falls back to the default profile and warns, on every ``qubit``
     command, while nothing lands in the wrong place. Same fix the parser's ``_cfg_path()``
     carries for the ``--no-config`` help string.
     """
@@ -111,7 +111,7 @@ class TestBootReadersBeforeProfileOverride:
         self, fresh_constants, tmp_path, capsys
     ):
         """Boot scratch setup: silent, and pointed at the home the bootstrap resolved."""
-        hermes_dir = tmp_path / ".hermes"
+        hermes_dir = tmp_path / ".qubit"
         (hermes_dir / "profiles" / "coder").mkdir(parents=True)
         (hermes_dir / "active_profile").write_text("coder\n")
         capsys.readouterr()  # drop anything the setup above printed
@@ -125,8 +125,8 @@ class TestBootReadersBeforeProfileOverride:
     def test_explicit_home_scratch_dir_never_reads_the_effective_home(
         self, fresh_constants, tmp_path, capsys
     ):
-        """A caller that passes a home (`hermes doctor` for another profile) stays silent."""
-        hermes_dir = tmp_path / ".hermes"
+        """A caller that passes a home (`qubit doctor` for another profile) stays silent."""
+        hermes_dir = tmp_path / ".qubit"
         profile_dir = hermes_dir / "profiles" / "coder"
         profile_dir.mkdir(parents=True)
         (hermes_dir / "active_profile").write_text("coder\n")

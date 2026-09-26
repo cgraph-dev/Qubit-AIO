@@ -37,7 +37,7 @@ def test_home_layout_joins_sibling_union(tmp_path, monkeypatch, layout):
     import qubit_constants
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    root = tmp_path / (".hermes" if layout == "default" else "data-root")
+    root = tmp_path / (".qubit" if layout == "default" else "data-root")
     active = root / "profiles/active" if layout == "profile" else root
     if layout == "default":
         monkeypatch.delenv("QUBIT_HOME", raising=False)
