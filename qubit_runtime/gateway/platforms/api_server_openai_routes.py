@@ -656,7 +656,11 @@ class OpenAICompatRoutesMixin:
             return key_err
         # X-Qubit-Session-Id continues an existing session (history from state.db, not the body);
         # requires a configured API key or any client could read history by guessing ids.
-        provided_session_id = request.headers.get("X-Qubit-Session-Id", "").strip()
+        # Read-old: clients written against the pre-rebrand API still send the legacy
+        # header; the canonical (write-new) name is X-Qubit-Session-Id.
+        provided_session_id = (
+            request.headers.get("X-Qubit-Session-Id")
+            or request.headers.get("X-Hermes-Session-Id", "")).strip()
         if provided_session_id:
             if not self._api_key:
                 logger.warning(

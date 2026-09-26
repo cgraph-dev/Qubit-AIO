@@ -902,7 +902,7 @@ class TestCapabilitiesEndpoint:
             assert data["features"]["runs_idempotency"]["supported"] is True
             assert data["features"]["runs_idempotency"]["durable"] is True
             assert data["features"]["model_options"] is True
-            assert data["features"]["session_continuity_header"] == "X-Hermes-Session-Id"
+            assert data["features"]["session_continuity_header"] == "X-Qubit-Session-Id"
             assert data["endpoints"]["run_status"]["path"] == "/v1/runs/{run_id}"
             assert data["endpoints"]["model_options"] == {"method": "GET", "path": "/api/model/options"}
             assert data["endpoints"]["skills"] == {"method": "GET", "path": "/v1/skills"}
@@ -2197,7 +2197,7 @@ class TestChatCompletionsAgentIncomplete:
             data = await resp.json()
             body = json.dumps(data)
             assert raw_secret not in body
-            assert raw_secret not in resp.headers.get("X-Hermes-Error", "")
+            assert raw_secret not in resp.headers.get("X-Qubit-Error", "")
             assert "OPENAI_API_KEY=" in body
             assert data["error"]["hermes"]["failed"] is True
 
@@ -2335,7 +2335,8 @@ class TestConversationParameter:
 
 
 # ---------------------------------------------------------------------------
-# X-Hermes-Session-Id header (session continuity)
+# X-Qubit-Session-Id header (session continuity); the legacy X-Hermes-Session-Id
+# name is still accepted read-old for pre-rebrand clients.
 # ---------------------------------------------------------------------------
 
 
@@ -2397,9 +2398,55 @@ class TestSessionIdHeader:
             assert call_kwargs["conversation_history"] == db_history
             assert call_kwargs["user_message"] == "new question"
 
+    @pytest.mark.asyncio
+    async def test_canonical_session_id_header_wins_and_legacy_is_read_old(self, auth_adapter):
+        """``X-Qubit-Session-Id`` is the canonical (write-new) name; a legacy
+        ``X-Hermes-Session-Id`` alone still continues the session (read-old), and the
+        canonical header takes precedence when both are present."""
+        mock_result = {"final_response": "OK", "messages": [], "api_calls": 1}
+        mock_db = MagicMock()
+        mock_db.get_messages_as_conversation.return_value = []
+        mock_db.resolve_resume_session_id.side_effect = lambda sid: sid
+        auth_adapter._session_db = mock_db
+        app = _create_app(auth_adapter)
+        async with TestClient(TestServer(app)) as cli:
+            with patch.object(auth_adapter, "_run_agent", new_callable=AsyncMock) as mock_run:
+                mock_run.return_value = (
+                    mock_result, {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0})
+                payload = {"model": "hermes-agent", "messages": [{"role": "user", "content": "hi"}]}
+
+                # legacy alone is still honored (read-old)
+                resp = await cli.post(
+                    "/v1/chat/completions",
+                    headers={"X-Hermes-Session-Id": "legacy-session",
+                             "Authorization": "Bearer sk-secret"},
+                    json=payload)
+                assert resp.status == 200
+                assert mock_db.resolve_resume_session_id.call_args[0][0] == "legacy-session"
+
+                # canonical alone works
+                resp = await cli.post(
+                    "/v1/chat/completions",
+                    headers={"X-Qubit-Session-Id": "canonical-session",
+                             "Authorization": "Bearer sk-secret"},
+                    json=payload)
+                assert resp.status == 200
+                assert mock_db.resolve_resume_session_id.call_args[0][0] == "canonical-session"
+
+                # canonical wins when both are sent
+                resp = await cli.post(
+                    "/v1/chat/completions",
+                    headers={"X-Qubit-Session-Id": "canonical-session",
+                             "X-Hermes-Session-Id": "legacy-session",
+                             "Authorization": "Bearer sk-secret"},
+                    json=payload)
+                assert resp.status == 200
+                assert mock_db.resolve_resume_session_id.call_args[0][0] == "canonical-session"
+
 
 # ---------------------------------------------------------------------------
-# X-Hermes-Session-Key header (long-term memory scoping)
+# X-Qubit-Session-Key header (long-term memory scoping); the legacy
+# X-Hermes-Session-Key name is still accepted read-old for pre-rebrand clients.
 # ---------------------------------------------------------------------------
 
 
@@ -2442,8 +2489,39 @@ class TestSessionKeyHeader:
             assert captured_kwargs.get("gateway_session_key") == "agent:main:webui:dm:user-7"
 
     @pytest.mark.asyncio
+    async def test_canonical_session_key_header_wins_over_legacy(self, auth_adapter):
+        """``X-Qubit-Session-Key`` is canonical; ``X-Hermes-Session-Key`` is read-old,
+        and the canonical name takes precedence when both are present."""
+        captured_kwargs = {}
+
+        def _fake_create_agent(**kwargs):
+            captured_kwargs.update(kwargs)
+            mock_agent = MagicMock()
+            mock_agent.run_conversation.return_value = {"final_response": "ok", "messages": []}
+            mock_agent.session_prompt_tokens = 0
+            mock_agent.session_completion_tokens = 0
+            mock_agent.session_total_tokens = 0
+            return mock_agent
+
+        app = _create_app(auth_adapter)
+        async with TestClient(TestServer(app)) as cli:
+            with patch.object(auth_adapter, "_create_agent", side_effect=_fake_create_agent):
+                resp = await cli.post(
+                    "/v1/chat/completions",
+                    headers={
+                        "X-Qubit-Session-Key": "canonical-key",
+                        "X-Hermes-Session-Key": "legacy-key",
+                        "Authorization": "Bearer sk-secret",
+                    },
+                    json={"model": "hermes-agent", "messages": [{"role": "user", "content": "hi"}]},
+                )
+            assert resp.status == 200
+            assert captured_kwargs.get("gateway_session_key") == "canonical-key"
+
+    @pytest.mark.asyncio
     async def test_responses_endpoint_accepts_session_key(self, auth_adapter):
-        """Responses API honors the same X-Hermes-Session-Key contract."""
+        """Responses API honors the session-key contract: the legacy header is read
+        (read-old) and the canonical X-Qubit-Session-Key is echoed back (write-new)."""
         mock_result = {"final_response": "ok", "messages": [], "api_calls": 1}
         app = _create_app(auth_adapter)
         async with TestClient(TestServer(app)) as cli:
@@ -2458,7 +2536,7 @@ class TestSessionKeyHeader:
                     json={"model": "hermes-agent", "input": "hello", "store": False},
                 )
             assert resp.status == 200
-            assert resp.headers.get("X-Hermes-Session-Key") == "webui:chan-1"
+            assert resp.headers.get("X-Qubit-Session-Key") == "webui:chan-1"
             call_kwargs = mock_run.call_args.kwargs
             assert call_kwargs["gateway_session_key"] == "webui:chan-1"
 

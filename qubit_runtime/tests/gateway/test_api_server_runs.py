@@ -1621,7 +1621,7 @@ class TestRunIdempotency:
                 assert replay.status == 202
                 assert replay_body["run_id"] == first_body["run_id"]
                 assert replay_body["replayed"] is True
-                assert replay.headers["X-Hermes-Session-Key"] == "memory-a"
+                assert replay.headers["X-Qubit-Session-Key"] == "memory-a"
 
     @pytest.mark.asyncio
     async def test_direct_status_hydrates_after_adapter_restart(

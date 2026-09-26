@@ -1703,8 +1703,14 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
     def _parse_session_key_header(
         self, request: "web.Request") -> tuple[Optional[str], Optional["web.Response"]]:
         """Validate ``X-Qubit-Session-Key`` (per-channel memory scope) -> ``(key_or_None, None)``
-        or ``(None, error)``. Requires API-key auth so a client can't guess another scope."""
-        raw = request.headers.get("X-Qubit-Session-Key", "").strip()
+        or ``(None, error)``. Requires API-key auth so a client can't guess another scope.
+
+        Read-old: clients written against the pre-rebrand API still send
+        ``X-Hermes-Session-Key``; the canonical header wins when both are present.
+        """
+        raw = (
+            request.headers.get("X-Qubit-Session-Key")
+            or request.headers.get("X-Hermes-Session-Key", "")).strip()
         if not raw:
             return None, None
         if not self._api_key:
