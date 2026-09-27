@@ -6652,14 +6652,14 @@ _E("update_check", "Check for updates",
    help="Read-only update check: version, install method, revision.")
 _E("update_apply", "Apply update",
    ("apply update", "install update", "update now", "run the update",
-    "apply the update"),
+    "apply the update", "update apply"),
    "update_apply", ("update/apply",), confirm=True,
    args=(_S("source"), _S("channel"), _S("tag")),
    examples=("qubit, apply update",),
    help="Apply a confirmed update (snapshot then fast-forward).")
 _E("update_rollback", "Roll back update",
    ("roll back update", "rollback update", "undo the update",
-    "restore previous version"),
+    "restore previous version", "update rollback"),
    "update_rollback", ("update/rollback",), confirm=True,
    args=(_S("backup_dir"),),
    examples=("qubit, roll back update",),
@@ -11862,7 +11862,10 @@ for _lit, (_guide, _code) in _CLI_GUARDS.items():
 #   Desktop host surface (not Qubit's Control-UI ``computer-use screen``);
 # * ``plugins {adopt,trust-update-url,check-updates}`` — vendored fork
 #   subcommands that write provenance / probe external feeds;
-# * ``WEBSOCKET /api/display/ws`` — the Qubit Desktop display stream.
+# * ``WEBSOCKET /api/display/ws`` — the Qubit Desktop display stream;
+# * ``POST /api/dashboard/agent-plugins/activate`` — the no-id bulk remote
+#   activate (gated namespace); refused with guidance naming the id-scoped
+#   ``plugins enable/disable`` counterparts (task 16b).
 _CB("chat_workspaces", "List chat workspaces",
     ("chat workspaces", "list chat workspaces", "show chat workspaces",
      "chat workspace picker"),
@@ -12018,6 +12021,27 @@ _CB("guard_display_ws",
     examples=("qubit, desktop display stream",),
     help="Typed refusal with guidance: the display websocket is Desktop-client-"
          "only; no voice semantics exist.")
+
+_CB("guard_agent_plugins_activate",
+    "Activate a plugin go-live (voice guard)",
+    ("activate plugin", "activate a plugin", "activate the plugin",
+     "activate plugins", "bulk activate plugins", "activate all plugins",
+     "go live with a plugin", "plugin go live", "agent plugins activate"),
+    "voice_unsupported",
+    fixed=(("op", "agent_plugins_activate"),
+           ("guidance", "the no-id bulk remote activate route "
+                        "(POST /api/dashboard/agent-plugins/activate) is not "
+                        "served by Qubit — the whole remote agent-plugins "
+                        "namespace is gated; to turn a specific installed "
+                        "plugin on or off use the id-scoped, voiced and "
+                        "confirm-gated `qubit plugins enable <id>` / `qubit "
+                        "plugins disable <id>` instead"),
+           ("code", "VOICE_REMOTE_UNSUPPORTED")),
+    summary="guidance",
+    examples=("qubit, activate plugin",),
+    help="Typed refusal with guidance: the no-id bulk remote activate has no "
+         "Qubit backend; the id-scoped `plugins enable/disable` is the real, "
+         "voiced counterpart.")
 
 
 # ------------------------------------------------- wave 4: plugin fleet
