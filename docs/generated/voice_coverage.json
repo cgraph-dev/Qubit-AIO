@@ -5,10 +5,10 @@
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
-    "bound_backends": 1151,
+    "bound_backends": 1152,
     "dead_backend_ids": [],
     "dead_backends": 0,
-    "total_entries": 1151
+    "total_entries": 1152
   },
   "rows": [
     {
@@ -7548,10 +7548,10 @@
       "voice_intent": "qubit tui help"
     },
     {
-      "entry": null,
+      "entry": "update_apply",
       "id": "op update_apply",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit update apply"
     },
@@ -7564,10 +7564,10 @@
       "voice_intent": "qubit update check"
     },
     {
-      "entry": null,
+      "entry": "update_rollback",
       "id": "op update_rollback",
-      "kind": "unknown",
-      "resolution": "unresolved",
+      "kind": "match",
+      "resolution": "real",
       "surface": "controls",
       "voice_intent": "qubit update rollback"
     },
@@ -11138,10 +11138,10 @@
   "summary": {
     "distinct_intents": 884,
     "guard": 193,
-    "real": 1188,
-    "real_pct": 85.47,
+    "real": 1190,
+    "real_pct": 85.61,
     "rows": 1390,
-    "unresolved": 9
+    "unresolved": 7
   },
   "surfaces": {
     "cli": {
@@ -11153,10 +11153,10 @@
     },
     "controls": {
       "guard": 36,
-      "real": 565,
-      "real_pct": 93.7,
+      "real": 567,
+      "real_pct": 94.03,
       "total": 603,
-      "unresolved": 2
+      "unresolved": 0
     },
     "other": {
       "guard": 0,
