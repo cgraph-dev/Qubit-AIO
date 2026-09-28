@@ -22,7 +22,7 @@ STREAM_REQUEST_EXPIRED_ERRCODE = 846604
 STREAM_NOT_SUBSCRIBED_ERRCODE = 846609
 STREAM_VERSION_CONFLICT_ERRCODE = 6000
 MAX_STREAM_CONTENT_LENGTH = 20480  # WeCom server-enforced byte limit per frame
-# SDK queue is 100 frames per reqId; cap intermediates (qubit uses 85) so finalize has room.
+# SDK queue is 100 frames per reqId; cap intermediates (openclaw uses 85) so finalize has room.
 MAX_INTERMEDIATE_FRAMES = 85
 
 # Two defences against the 6-min window (docs/wecom-stream-keepalive-*.md): Layer 2 clock

@@ -15,6 +15,7 @@ import time as _time
 from pathlib import Path
 from typing import Optional
 
+from qubit_cli import install_source
 from qubit_cli.update_cmd_common import _best_effort
 
 # Log-record parity with the origin module.
@@ -36,8 +37,8 @@ _PRE_UPDATE_SNAPSHOT_MAX_FILE_SIZE = 1 << 30  # 1 GiB
 #: Reinstalling through the official installer swaps in a Python whose SQLite is safe; the
 #: one-liner differs per OS (mirrors ``uninstall._REINSTALL_HINT``). windows -> command
 _REINSTALL_ONE_LINER = {
-    True: "iex (irm https://hermes-agent.nousresearch.com/install.ps1)",
-    False: "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
+    True: install_source.reinstall_one_liner(windows=True),
+    False: install_source.reinstall_one_liner(windows=False),
 }
 
 
@@ -102,7 +103,7 @@ def _print_curator_first_run_notice() -> None:
     )
     print("  Preview now:  qubit curator run --dry-run")
     print("  Pause it:     qubit curator pause")
-    print("  Docs:         https://hermes-agent.nousresearch.com/docs/user-guide/features/curator")
+    print(f"  Docs:         {install_source.docs_url('user-guide/features/curator')}")
 
 
 def _print_fts_optimize_available_notice() -> None:

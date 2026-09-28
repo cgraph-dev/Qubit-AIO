@@ -12,7 +12,7 @@ const generated = new Set(['node_modules', 'dist', 'build', 'release', '.cache',
 // buildTui bundles these source roots (including the Ink source alias), not
 // the workspaces' documentation, test runners or other product recipes.
 const tuiInputs = [
-  ...['ui-tui', 'ui-tui/packages/hermes-ink', 'apps/shared'].flatMap(root => [
+  ...['ui-tui', 'ui-tui/packages/qubit-ink', 'apps/shared'].flatMap(root => [
     `${root}/src`, `${root}/package.json`, `${root}/tsconfig.json`,
   ]),
   'tsconfig.json', 'package.json', 'package-lock.json', '.npmrc', 'pm/lock.json',

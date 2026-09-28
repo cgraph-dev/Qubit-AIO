@@ -131,17 +131,15 @@ class TestFetchFailure:
 
 class TestFallbackChain:
     """``_fetch_manifest_with_fallback`` walks ``DEFAULT_CATALOG_FALLBACK_URLS``
-    when the primary URL fails. Regression: the Docusaurus site behind Vercel
+    when the primary URL fails. Regression: the upstream docs host behind Vercel
     occasionally returns HTTP 403 + x-vercel-mitigated: challenge for urllib;
     without a fallback URL the user's disk cache freezes and new model
     releases (opus 4.8, etc.) never reach the picker.
-    """
 
-    PRIMARY = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
-    FALLBACK = (
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent"
-        "/main/website/static/api/model-catalog.json"
-    )
+    v0.21.5 rebrand finish (T1): the upstream Hermes docs host is gone; the
+    shipped primary/fallback are the Qubit-owned raw manifest. These tests use
+    explicit sentinel URLs so they exercise the walk without brand literals.
+    """
 
     def test_uses_primary_when_it_succeeds(self, isolated_home):
         from qubit_cli import model_catalog
@@ -151,39 +149,48 @@ class TestFallbackChain:
             calls.append(url)
             return _valid_manifest()
 
+        primary = model_catalog.DEFAULT_CATALOG_URL
         with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-            result = model_catalog._fetch_manifest_with_fallback(self.PRIMARY, 5.0)
+            result = model_catalog._fetch_manifest_with_fallback(primary, 5.0)
 
         assert result is not None
-        assert calls == [self.PRIMARY], "fallback URLs must not be touched on primary success"
+        assert calls == [primary], "fallback URLs must not be touched on primary success"
 
-    def test_falls_through_to_raw_github_on_primary_failure(self, isolated_home):
+    def test_falls_through_to_fallback_on_primary_failure(self, isolated_home):
         from qubit_cli import model_catalog
         calls: list[str] = []
+        primary = "https://primary.invalid/model-catalog.json"
 
         def fake_fetch(url, timeout):
             calls.append(url)
-            if url == self.PRIMARY:
-                return None  # simulate Vercel 403
+            if url == primary:
+                return None  # simulate the primary endpoint failing
             return _valid_manifest()
 
         with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-            result = model_catalog._fetch_manifest_with_fallback(self.PRIMARY, 5.0)
+            result = model_catalog._fetch_manifest_with_fallback(primary, 5.0)
 
         assert result is not None
-        assert calls == [self.PRIMARY, self.FALLBACK]
+        # The shipped fallback is the Qubit-owned raw manifest.
+        assert calls == [primary, model_catalog.DEFAULT_CATALOG_FALLBACK_URLS[0]]
 
-
-    def test_get_catalog_uses_fallback_chain(self, isolated_home):
+    def test_get_catalog_uses_fallback_chain(self, isolated_home, monkeypatch):
         """End-to-end: ``get_catalog`` routes through the fallback helper so
         a primary URL failure transparently produces a working catalog."""
         from qubit_cli import model_catalog
         manifest = _valid_manifest()
         calls: list[str] = []
+        primary = "https://primary.invalid/model-catalog.json"
+
+        monkeypatch.setattr(
+            model_catalog,
+            "_load_catalog_config",
+            lambda: {"enabled": True, "url": primary, "ttl_hours": 0.0, "providers": {}},
+        )
 
         def fake_fetch(url, timeout):
             calls.append(url)
-            if url == self.PRIMARY:
+            if url == primary:
                 return None
             return manifest
 
@@ -191,7 +198,7 @@ class TestFallbackChain:
             result = model_catalog.get_catalog(force_refresh=True)
 
         assert result == manifest
-        assert self.FALLBACK in calls
+        assert model_catalog.DEFAULT_CATALOG_FALLBACK_URLS[0] in calls
 
 
 class TestCuratedAccessors:

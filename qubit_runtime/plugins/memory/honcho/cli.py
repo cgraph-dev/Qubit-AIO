@@ -1672,8 +1672,8 @@ Honcho identity management
 
 
 def _find_memory_files(names: list[str]) -> list[Path]:
-    """Existing files named ``names`` in cwd then ~/.qubit, deduplicated."""
-    candidates = (d / name for name in names for d in (Path(os.getcwd()), Path.home() / ".qubit"))
+    """Existing files named ``names`` in cwd then ~/.openclaw, deduplicated."""
+    candidates = (d / name for name in names for d in (Path(os.getcwd()), Path.home() / ".openclaw"))
     return list(dict.fromkeys(p for p in candidates if p.exists()))
 
 
@@ -1705,15 +1705,15 @@ def _offer(question: str, action, files: list[Path]) -> None:
 
 
 def cmd_migrate(args) -> None:
-    """Step-by-step migration guide: Qubit native memory → Qubit + Honcho."""
+    """Step-by-step migration guide: OpenClaw native memory → Qubit + Honcho."""
     user_files = _find_memory_files(["USER.md", "MEMORY.md"])  # facts about the user
     agent_files = _find_memory_files(["SOUL.md", "IDENTITY.md", "AGENTS.md", "TOOLS.md", "BOOTSTRAP.md"])
     cfg = _read_config()
     has_key = bool(_resolve_api_key(cfg))
 
-    print("\nHoncho migration: Qubit native memory → Qubit\n" + "─" * 50)
+    print("\nHoncho migration: OpenClaw native memory → Qubit\n" + "─" * 50)
     print("""
-  Qubit's native memory stores context in local markdown files
+  OpenClaw's native memory stores context in local markdown files
   (USER.md, MEMORY.md, SOUL.md, ...) and injects them via QMD search.
   Honcho replaces that with a cloud-backed, LLM-observable memory layer:
   context is retrieved semantically, injected automatically each turn,
@@ -1738,7 +1738,7 @@ Step 1  Create a Honcho account
         else:
             print("\n  Run 'qubit honcho setup' when ready, then re-run this walkthrough.")
 
-    print("\nStep 2  Detected Qubit memory files\n")
+    print("\nStep 2  Detected OpenClaw memory files\n")
     if user_files or agent_files:
         for files, label in ((user_files, "User memory"), (agent_files, "Agent identity")):
             if files:
@@ -1746,7 +1746,7 @@ Step 1  Create a Honcho account
                 print(f"  {label} ({len(files)} file(s)) — will go to Honcho {peer} peer:")
                 print("\n".join(f"    {f}" for f in files))
     else:
-        print("  No Qubit native memory files found in cwd or ~/.qubit/.\n"
+        print("  No OpenClaw native memory files found in cwd or ~/.openclaw/.\n"
               "  If your files are elsewhere, copy them here before continuing,\n"
               "  or seed them manually:  qubit honcho identity <path/to/file>")
 
@@ -1777,7 +1777,7 @@ Step 3  Migrate user memory files → Honcho user peer
 Step 4  Seed AI identity files → Honcho AI peer
 
   SOUL.md, IDENTITY.md, AGENTS.md, TOOLS.md, BOOTSTRAP.md define the
-  agent's character, capabilities, and behavioral rules. In Qubit
+  agent's character, capabilities, and behavioral rules. In OpenClaw
   these are injected via file search at prompt-build time.
 
   In Qubit, they are seeded once into Honcho's AI peer through the
@@ -1797,20 +1797,20 @@ Step 4  Seed AI identity files → Honcho AI peer
         print("  No agent identity files detected.\n  To seed manually:  qubit honcho identity <path/to/SOUL.md>")
 
     print("""
-Step 5  What changes vs. Qubit native memory
+Step 5  What changes vs. OpenClaw native memory
 
   Storage
-    Qubit: markdown files on disk, searched via QMD at prompt-build time.
+    OpenClaw: markdown files on disk, searched via QMD at prompt-build time.
     Qubit:   cloud-backed Honcho peers. Files can stay on disk as source
               of truth; Honcho holds the live representation.
 
   Context injection
-    Qubit: file excerpts injected synchronously before each LLM call.
+    OpenClaw: file excerpts injected synchronously before each LLM call.
     Qubit:   Honcho context fetched async at turn end, injected next turn.
               First turn has no Honcho context; subsequent turns are loaded.
 
   Memory growth
-    Qubit: you edit files manually to update memory.
+    OpenClaw: you edit files manually to update memory.
     Qubit:   Honcho observes every message and updates representations
               automatically. Files become the seed, not the live store.
 
@@ -1822,7 +1822,7 @@ Step 5  What changes vs. Qubit native memory
     honcho_conclude      — write a conclusion/fact back to memory
 
   Session naming
-    Qubit: no persistent session concept — files are global.
+    OpenClaw: no persistent session concept — files are global.
     Qubit:   per-session by default — each run gets its own session
               Map a custom name:  qubit honcho map <session-name>
 

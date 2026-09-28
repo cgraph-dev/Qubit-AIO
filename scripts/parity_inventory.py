@@ -136,8 +136,68 @@ DEFAULT_OUT = REPO_ROOT / "docs" / "generated" / "parity_inventory.json"
 SCHEMA = "qubit-parity-inventory/1"
 
 # Reference->Qubit renames that are not identity but are real counterparts.
-OPTIONAL_MCP_RENAME = {"n8n-official": "n8n"}
+# ``n8n-official`` is an *identity* name: the tracked Qubit dir is
+# ``qubit_runtime/optional-mcps/n8n-official/`` (verified on disk), so the old
+# ``{"n8n-official": "n8n"}`` entry was stale -- it looked for a non-existent
+# ``n8n`` dir and reported the real counterpart MISSING.
+OPTIONAL_MCP_RENAME: Dict[str, str] = {}
 SKILL_RENAME = {"hermes-voice-mode": "qubit-voice-mode"}
+
+# Exact reference route -> canonical Qubit route for intentional brand renames.
+# The Qubit route table serves the canonical ``/api/qubit/update*`` path (owner
+# directive: the public ``/api/hermes/update.*`` alias was removed), so the
+# reference rows for the *renamed* paths have a real working counterpart. The
+# map is deliberately exact (not a ``/api/hermes/`` prefix rewrite): the
+# reference ``GET /api/hermes/update/receipt`` has no canonical full route (only
+# a typed gate), so it must stay MISSING rather than be reclassified.
+ROUTE_RENAME: Dict[Tuple[str, str], str] = {
+    ("GET", "/api/hermes/update/check"): "/api/qubit/update/check",
+    ("GET", "/api/hermes/update/receipt"): "/api/qubit/update/receipt",
+    ("POST", "/api/hermes/update"): "/api/qubit/update",
+}
+
+# Reference CLI command -> a real Qubit counterpart the ``qubit agent`` tree
+# walk cannot see: a subcommand registered on a different parser surface. Each
+# entry names backing source ``file``+``symbol`` pairs; the generator verifies
+# every pair still exists before classifying PORTED, so a hard-coded claim
+# cannot rot into a fabricated row.
+CLI_COUNTERPARTS: Dict[Tuple[str, ...], Dict[str, Any]] = {
+    ("computer-use", "screen"): {
+        "counterpart": "qubit agent computer-use screen",
+        "evidence": [
+            {"file": "qubit_runtime/qubit_cli/subcommands/computer_use.py",
+             "symbol": "build_screen_parser"},
+            {"file": "voicebridge/cli.py", "symbol": '_integ(cu_sub, "screen"'},
+        ],
+    },
+    ("plugins", "adopt"): {
+        "counterpart": "qubit agent plugins adopt",
+        "evidence": [
+            {"file": "qubit_runtime/qubit_cli/subcommands/plugins.py",
+             "symbol": '"adopt"'},
+            {"file": "qubit_runtime/qubit_cli/plugins_cmd.py",
+             "symbol": '"adopt":'},
+        ],
+    },
+    ("plugins", "check-updates"): {
+        "counterpart": "qubit agent plugins check-updates",
+        "evidence": [
+            {"file": "qubit_runtime/qubit_cli/subcommands/plugins.py",
+             "symbol": '"check-updates"'},
+            {"file": "qubit_runtime/qubit_cli/plugins_cmd.py",
+             "symbol": '"check-updates":'},
+        ],
+    },
+    ("plugins", "trust-update-url"): {
+        "counterpart": "qubit agent plugins trust-update-url",
+        "evidence": [
+            {"file": "qubit_runtime/qubit_cli/subcommands/plugins.py",
+             "symbol": '"trust-update-url"'},
+            {"file": "qubit_runtime/qubit_cli/plugins_cmd.py",
+             "symbol": '"trust-update-url":'},
+        ],
+    },
+}
 
 # Vendored fork commands whose parser exists but whose handler is an audited
 # operator-owned typed refusal (registered != working).
@@ -405,6 +465,28 @@ def _cmd_from_counterpart(counterpart: Optional[str]) -> str:
     return counterpart.split(" ->", 1)[0].strip()
 
 
+def _source_has_symbol(rel_path: str, symbol: str) -> bool:
+    """True when *rel_path* (repo-relative) exists and contains *symbol*."""
+    try:
+        p = REPO_ROOT / rel_path
+        return p.is_file() and symbol in p.read_text(
+            encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+
+def _verified_cli_counterpart(parts: Tuple[str, ...]) -> Optional[Dict[str, Any]]:
+    """Return the CLI counterpart entry for *parts* when every backing symbol
+    still exists on disk; otherwise ``None`` (so the row stays MISSING)."""
+    entry = CLI_COUNTERPARTS.get(parts)
+    if not entry:
+        return None
+    for ev in entry["evidence"]:
+        if not _source_has_symbol(ev["file"], ev["symbol"]):
+            return None
+    return entry
+
+
 # ----------------------------------------------------------------- classify
 
 
@@ -412,7 +494,8 @@ def build_routes(qc) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for ref in ref_routes():
         method, path = ref["method"], ref["path"]
-        probe = _probe(path)
+        canonical = ROUTE_RENAME.get((method, path))
+        probe = _probe(canonical if canonical else path)
         route, _params = qc.match(method, probe)
         if route is None and method == "WEBSOCKET":
             route, _params = qc.match("GET", probe)
@@ -426,6 +509,8 @@ def build_routes(qc) -> List[Dict[str, Any]]:
                            f"{route['handler']}")
             qev = ("voicebridge/qubit_compat.py ROUTES "
                    f"disposition={route['disposition']} handler={route['handler']}")
+            if canonical:
+                qev += f" (brand rename {path} -> {canonical})"
         rows.append({
             "surface": "route",
             "side": "reference",
@@ -447,6 +532,7 @@ def build_cli() -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for parts in ref_rows:
         cmd = parts[0]
+        verified: Optional[str] = None
         if cmd in native_refusals:
             code = native_refusals[cmd]
             classification = "GATED"
@@ -464,9 +550,19 @@ def build_cli() -> List[Dict[str, Any]]:
         elif parts in fork_rows:
             classification = "PORTED"
             counterpart = f"qubit agent {' '.join(parts)}"
+        elif (entry := _verified_cli_counterpart(parts)) is not None:
+            classification = "PORTED"
+            counterpart = entry["counterpart"]
+            verified = "; ".join(
+                f"{ev['file']}::{ev['symbol']}" for ev in entry["evidence"])
         else:
             classification = "MISSING"
             counterpart = None
+        qubit_evidence = (
+            f"`{QUBIT_BIN_LABEL} agent {' '.join(parts)} --help`"
+            if classification != "MISSING" else "no counterpart")
+        if classification == "PORTED" and verified:
+            qubit_evidence += f" (verified at {verified})"
         rows.append({
             "surface": "cli",
             "side": "reference",
@@ -478,8 +574,7 @@ def build_cli() -> List[Dict[str, Any]]:
             "voice_intent_verified": False,
             "evidence": {
                 "reference": f"`{REF_HERMES_LABEL} {' '.join(parts)} --help`",
-                "qubit": (f"`{QUBIT_BIN_LABEL} agent {' '.join(parts)} --help`"
-                          if classification != "MISSING" else "no counterpart"),
+                "qubit": qubit_evidence,
             },
         })
     return rows

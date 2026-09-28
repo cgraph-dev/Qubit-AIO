@@ -23,4 +23,7 @@ def test_get_logs_yields_while_reading_and_filtering(tmp_path, monkeypatch):
         asyncio.get_running_loop().call_soon(loop_ran.set)
         return await status.get_logs(file="agent", lines=100)
 
-    assert asyncio.run(exercise()) == {"file": "agent", "lines": ["fixture"]}
+    assert asyncio.run(exercise()) == {
+        "file": "agent", "lines": ["fixture"], "offset": 0, "limit": 100,
+        "returned": 1, "has_more": False, "next_offset": None,
+    }

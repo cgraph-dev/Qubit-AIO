@@ -109,7 +109,7 @@ class TestGenerateGeminiTts:
         assert data[44:] == fake_pcm_bytes
 
     def test_x_goog_api_client_header_is_set(self, tmp_path, monkeypatch, mock_gemini_response):
-        """Gemini TTS requests should include Hermes client context."""
+        """Gemini TTS requests should include Qubit client context."""
         from qubit_cli.version_info import get_version_info
         from tools.tts_tool import _generate_gemini_tts
 
@@ -119,7 +119,7 @@ class TestGenerateGeminiTts:
             _generate_gemini_tts("Hi", str(tmp_path / "test.wav"), {})
 
         headers = mock_post.call_args[1]["headers"]
-        assert headers["X-Goog-Api-Client"] == f"hermes-agent/{get_version_info().base_version}"
+        assert headers["X-Goog-Api-Client"] == f"qubit-agent/{get_version_info().base_version}"
 
     def test_default_voice_and_model(self, tmp_path, monkeypatch, mock_gemini_response):
         from tools.tts_tool import _generate_gemini_tts

@@ -476,7 +476,7 @@ class TeamsAdapter(BasePlatformAdapter):
         from gateway.platforms.base import _ssrf_redirect_guard, _read_httpx_body_with_limit
         if not is_safe_url(url):
             raise ValueError("Blocked unsafe attachment URL (SSRF protection)")
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; HermesAgent/1.0)"}
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; QubitAgent/1.0)"}
         if _is_botframework_attachment_url(url):
             try:
                 headers["Authorization"] = f"Bearer {await self._get_botframework_token()}"

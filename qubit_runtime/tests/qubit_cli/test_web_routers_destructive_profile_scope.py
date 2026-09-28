@@ -432,7 +432,7 @@ def test_forced_update_check_runs_in_the_named_profiles_scope(client, homes, mon
     monkeypatch.setattr(actions, "_dashboard_local_update_managed_externally", lambda: False)
     monkeypatch.setattr(actions, "detect_install_method", lambda _root: "git")
 
-    resp = client.get("/api/hermes/update/check?force=true&profile=worker_beta")
+    resp = client.get("/api/qubit/update/check?force=true&profile=worker_beta")
 
     assert resp.status_code == 200, resp.text
     assert resp.json()["behind"] == 0

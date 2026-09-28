@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional, Tuple, Union
 
 from agent.skill_utils import is_excluded_skill_path
+from qubit_cli import install_source
 from tools.skills_hub_github import GitHubAuth, GitHubSource, _skip_bundle_file, _tree_members
 from tools.skills_hub_models import (
     SkillBundle, SkillMeta, SkillSource, _qubit_tags, _matches_query, _memo_json, _parse_frontmatter, hub,
@@ -38,7 +39,9 @@ class OptionalSkillSource(SkillSource):
 
     SOURCE_ID = "official"
     TRUST_LEVEL = "builtin"
-    OFFICIAL_REPO = "NousResearch/hermes-agent"
+    #: The repo identity comes from the single configurable installer source
+    #: (``qubit_cli.install_source``) — never a hardcoded Hermes org/repo.
+    OFFICIAL_REPO = install_source.official_repository()
     OPTIONAL_SKILLS_PREFIX = "optional-skills"
 
     _parse_frontmatter = staticmethod(_parse_frontmatter)

@@ -164,7 +164,7 @@ def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None
         return (
             f"Refusing to write to Qubit config file: {filepath}\n"
             "Agent cannot modify security-sensitive configuration. "
-            "Edit ~/.hermes/config.yaml directly or use 'qubit config' instead.")
+            "Edit the Qubit home config.yaml directly or use 'qubit config' instead.")
     return None
 
 

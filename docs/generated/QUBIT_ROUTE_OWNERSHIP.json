@@ -4,10 +4,10 @@
  "fork_routes": 293,
  "catch_all_routes_excluded": 1,
  "classic_dispatch_routes": 90,
- "compat_routes": 448,
+ "compat_routes": 451,
  "counts": {
-  "qubit_addition": 154,
-  "qubit_policy": 293,
+  "qubit_addition": 155,
+  "qubit_policy": 292,
   "qubit_runtime": 44
  },
  "non_authoritative_handler_count": 42,
@@ -1528,6 +1528,19 @@
   },
   {
    "method": "GET",
+   "path": "/api/qubit/update/receipt",
+   "route": "/api/qubit/update/receipt",
+   "owner": "qubit_addition",
+   "reason": "Qubit-owned dashboard/ops prefix",
+   "disposition": "implemented",
+   "fork_declares": true,
+   "classic_served": false,
+   "qubit_handler": "h_qubit_update_receipt",
+   "source": "fork",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
    "path": "/api/qubit/usage",
    "route": "/api/qubit/usage",
    "owner": "qubit_addition",
@@ -3023,19 +3036,6 @@
   },
   {
    "method": "GET",
-   "path": "/api/qubit/update/receipt",
-   "route": "/api/qubit/update/receipt",
-   "owner": "qubit_policy",
-   "reason": "Qubit typed gate (operator/sensitive boundary)",
-   "disposition": "gated",
-   "fork_declares": true,
-   "classic_served": false,
-   "qubit_handler": "__gate__",
-   "source": "fork",
-   "sample_ok": true
-  },
-  {
-   "method": "GET",
    "path": "/api/qubit/updatex1",
    "route": "/api/qubit/update.*",
    "owner": "qubit_policy",
@@ -3953,7 +3953,7 @@
    "disposition": "implemented",
    "fork_declares": true,
    "classic_served": false,
-   "qubit_handler": "",
+   "qubit_handler": "h_local_models_download_pause",
    "source": "fork",
    "sample_ok": true
   },
@@ -3966,7 +3966,7 @@
    "disposition": "implemented",
    "fork_declares": true,
    "classic_served": false,
-   "qubit_handler": "",
+   "qubit_handler": "h_local_models_download_resume",
    "source": "fork",
    "sample_ok": true
   },

@@ -28,6 +28,8 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_current_installer_publishes_real_dependencies_and_warm_path(tmp_path, served, fault):
     uv = shutil.which("uv")
     assert uv, "fresh-install acceptance requires real uv"
+    if sys.version_info[:2] != (3, 14):
+        pytest.skip("the checked-in PM runtime pins Python 3.14 (pm/uv.lock requires-python ==3.14.*)")
     python = Path(sys._base_executable).resolve()
     version = ".".join(map(str, sys.version_info[:3]))
     minor = ".".join(map(str, sys.version_info[:2]))
@@ -75,7 +77,7 @@ def test_current_installer_publishes_real_dependencies_and_warm_path(tmp_path, s
     recipe = tomllib.loads((source / "pm/pyproject.toml").read_text())
     yaml_dep = next(d for d in recipe["project"]["dependencies"] if d.startswith("ruamel.yaml"))
     (source / "pyproject.toml").write_text(
-        '[project]\nname="installer-fixture"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="installer-fixture"\nversion="1"\nrequires-python=">=3.11"\n'
         f'dependencies=["installer-probe==1.0",{json.dumps(yaml_dep)}]\n'
         '[project.optional-dependencies]\nall=[]\n[dependency-groups]\ndev=[]\ntest=[]\n'
         '[tool.uv]\npackage=false\n'

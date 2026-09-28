@@ -10,7 +10,7 @@ logger = logging.getLogger("gateway.run")
 def _watched_homes(runner, default_home) -> list:
     """Every home the sweep's ``_profile_scope_for_source`` can resolve an origin to: the gateway home
     plus, under multiplex, the whole served set INCLUDING ``default`` — a ``-p work`` multiplexer's own
-    home is not ``~/.hermes``, so dropping ``default`` here would hide its heartbeats forever."""
+    home is not the process ``QUBIT_HOME``, so dropping ``default`` here would hide its heartbeats forever."""
     from gateway.run import _multiplex_profile_homes
 
     homes = [default_home]

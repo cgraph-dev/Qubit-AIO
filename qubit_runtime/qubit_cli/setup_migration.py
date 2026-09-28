@@ -1,4 +1,4 @@
-"""Post-migration section-skip logic and the Qubit first-run migration flow (setup.py
+"""Post-migration section-skip logic and the OpenClaw first-run migration flow (setup.py
 re-exports the names it still uses; setup helpers are imported lazily so test patches apply)."""
 
 import importlib.util
@@ -113,7 +113,7 @@ _SECTION_SUMMARIES = {
 
 
 def _get_section_config_summary(config: dict, section_key: str) -> Optional[str]:
-    """Short summary if a setup section is already configured (post-Qubit-migration skip
+    """Short summary if a setup section is already configured (post-OpenClaw-migration skip
     detection), else None. ``get_env_value`` is reached through qubit_cli.setup so test patches
     on ``setup_mod.get_env_value`` apply."""
     summarize = _SECTION_SUMMARIES.get(section_key)
@@ -131,7 +131,7 @@ def _skip_configured_section(config: dict, section_key: str, label: str) -> bool
     return not prompt_yes_no(f"  Reconfigure {label.lower()}?", default=False)
 
 
-# ── Qubit Migration ──
+# ── OpenClaw Migration ──
 
 _OPENCLAW_SCRIPT = (
     get_optional_skills_dir(PROJECT_ROOT / "optional-skills")
@@ -160,21 +160,21 @@ def _load_openclaw_migration_module():
 # Item kinds that warrant explicit warnings: gateway tokens/channels hijack the old agent's
 # platforms; config values and instruction/context .md files may not map 1:1 to Qubit.
 _HIGH_IMPACT_KIND_KEYWORDS = {
-    "gateway": "⚠ Gateway/messaging — this will configure Qubit to use your Qubit messaging channels",
-    "telegram": "⚠ Telegram — this will point Qubit at your Qubit Telegram bot",
-    "slack": "⚠ Slack — this will point Qubit at your Qubit Slack workspace",
-    "discord": "⚠ Discord — this will point Qubit at your Qubit Discord bot",
-    "whatsapp": "⚠ WhatsApp — this will point Qubit at your Qubit WhatsApp connection",
-    "config": "⚠ Config values — Qubit settings may not map 1:1 to Qubit equivalents",
-    "soul": "⚠ Instruction file — may contain Qubit-specific setup/restart procedures",
-    "memory": "⚠ Memory/context file — may reference Qubit-specific infrastructure",
-    "context": "⚠ Context file — may contain Qubit-specific instructions",
+    "gateway": "⚠ Gateway/messaging — this will configure Qubit to use your OpenClaw messaging channels",
+    "telegram": "⚠ Telegram — this will point Qubit at your OpenClaw Telegram bot",
+    "slack": "⚠ Slack — this will point Qubit at your OpenClaw Slack workspace",
+    "discord": "⚠ Discord — this will point Qubit at your OpenClaw Discord bot",
+    "whatsapp": "⚠ WhatsApp — this will point Qubit at your OpenClaw WhatsApp connection",
+    "config": "⚠ Config values — OpenClaw settings may not map 1:1 to Qubit equivalents",
+    "soul": "⚠ Instruction file — may contain OpenClaw-specific setup/restart procedures",
+    "memory": "⚠ Memory/context file — may reference OpenClaw-specific infrastructure",
+    "context": "⚠ Context file — may contain OpenClaw-specific instructions",
 }
 
 _MIGRATION_WARNING_NOTES = (
-    "  Note: Qubit config values may have different semantics in Qubit.",
-    "  For example, Qubit's tool_call_execution: \"auto\" ≠ Qubit's yolo mode.",
-    "  Instruction files (.md) from Qubit may contain incompatible procedures.",
+    "  Note: OpenClaw config values may have different semantics in Qubit.",
+    "  For example, OpenClaw's tool_call_execution: \"auto\" ≠ Qubit's yolo mode.",
+    "  Instruction files (.md) from OpenClaw may contain incompatible procedures.",
 )
 
 
@@ -252,17 +252,17 @@ def _migration_step(label: str, log_label: str, fn):
 
 
 def _offer_openclaw_migration(qubit_home: Path) -> bool:
-    """Detect ~/.qubit and offer to migrate during first-time setup: dry-run preview first,
+    """Detect ~/.openclaw and offer to migrate during first-time setup: dry-run preview first,
     execute only after explicit confirmation. Returns True iff migration ran successfully."""
     from qubit_cli.setup import (
         get_config_path, _info, load_config, print_header, print_info, print_success, print_warning, prompt_yes_no,
         save_config
     )
-    openclaw_dir = Path.home() / ".qubit"
+    openclaw_dir = Path.home() / ".openclaw"
     if not openclaw_dir.is_dir() or not _OPENCLAW_SCRIPT.exists():
         return False
-    print_header("Qubit Installation Detected", gap=True)
-    _info(f"Found Qubit data at {openclaw_dir}",
+    print_header("OpenClaw Installation Detected", gap=True)
+    _info(f"Found OpenClaw data at {openclaw_dir}",
           "Qubit can preview what would be imported before making any changes.", None)
     if not prompt_yes_no("Would you like to see what can be imported?", default=True):
         print_info("Skipping migration. You can run it later with: qubit claw migrate --dry-run")
@@ -271,7 +271,7 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
     # Ensure config.yaml exists before migration tries to read it
     if not get_config_path().exists():
         save_config(load_config())
-    mod = _migration_step("Could not load migration script", "Qubit migration module load error",
+    mod = _migration_step("Could not load migration script", "OpenClaw migration module load error",
                           _load_openclaw_migration_module)
     if mod is None:
         print_warning("Could not load migration script.")
@@ -283,13 +283,13 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
         selected = mod.resolve_selected_options(None, None, preset="full")
         return selected, _run_migrator(mod, openclaw_dir, qubit_home, selected, execute=False, overwrite=True)
 
-    previewed = _migration_step("Migration preview failed", "Qubit migration preview error", _preview)
+    previewed = _migration_step("Migration preview failed", "OpenClaw migration preview error", _preview)
     if previewed is _FAILED:
         return False
     selected, preview_report = previewed
     preview_count = preview_report.get("summary", {}).get("migrated", 0)
     if preview_count == 0:
-        _info(None, "Nothing to import from Qubit.")
+        _info(None, "Nothing to import from OpenClaw.")
         return False
     print_header(f"Migration Preview — {preview_count} item(s) would be imported", gap=True)
     _info("No changes have been made yet. Review the list below:", None)
@@ -303,14 +303,14 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
 
     # overwrite=False so existing Qubit configs are preserved. The user saw the preview;
     # conflicts are skipped by default.
-    report = _migration_step("Migration failed", "Qubit migration error", lambda: _run_migrator(
+    report = _migration_step("Migration failed", "OpenClaw migration error", lambda: _run_migrator(
         mod, openclaw_dir, qubit_home, selected, execute=True, overwrite=False))
     if report is _FAILED:
         return False
     summary = report.get("summary", {})
     print()
     for key, printer, text in (
-        ("migrated", print_success, "Imported {n} item(s) from Qubit."),
+        ("migrated", print_success, "Imported {n} item(s) from OpenClaw."),
         ("conflict", print_info,
          "Skipped {n} item(s) that already exist in Qubit (use qubit claw migrate --overwrite to force)."),
         ("skipped", print_info, "Skipped {n} item(s) (not found or unchanged)."),

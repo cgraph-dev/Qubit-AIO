@@ -53,6 +53,15 @@ PLAIN_MODEL = "fake-model"
 # providers.<id>.stale_timeout_seconds must still win over the floor (#115024).
 REASONING_MODEL = "deepseek-r1"
 
+# Each scenario boots a REAL gateway/driver that cold-imports the whole agent
+# stack (hundreds of MB). Letting every scenario in a lane boot at once starves
+# a loaded runner and the gateways time out before ``gateway.ready`` / the
+# first ``turn_start`` — an environment failure, not a liveness one. Bound the
+# project-wide boot pool to a fixed (override-able) width so the lanes are
+# deterministic in isolation and against a busy host. This does NOT relax any
+# liveness deadline or heartbeat assertion; it only serialises cold starts.
+SCENARIO_WORKERS = max(1, int(os.environ.get("CHAOS_SCENARIO_WORKERS", "4")))
+
 
 def new_tag() -> str:
     return f"chaos{uuid.uuid4().hex[:12]}"
@@ -285,11 +294,27 @@ def persisted_messages(state_db: Path, session_id: str | None = None) -> list[di
 
 
 def integrity_ok(state_db: Path) -> str:
-    conn = sqlite3.connect(f"file:{state_db}?mode=ro", uri=True, timeout=10)
+    """``PRAGMA integrity_check`` result for a state.db.
+
+    The check opens read-only, but a read-only connection cannot roll back a hot
+    journal a process killed mid-write (the SIGTERM/EOF exit scenarios) left
+    behind: SQLite raises ``attempt to write a readonly database`` instead of the
+    check result. That is a harness race around the exit assertion, not a corrupt
+    DB, so fall back to a writable connection — which performs the recovery —
+    and re-run the same check.
+    """
     try:
-        return conn.execute("PRAGMA integrity_check").fetchone()[0]
-    finally:
-        conn.close()
+        conn = sqlite3.connect(f"file:{state_db}?mode=ro", uri=True, timeout=10)
+        try:
+            return conn.execute("PRAGMA integrity_check").fetchone()[0]
+        finally:
+            conn.close()
+    except sqlite3.OperationalError:
+        conn = sqlite3.connect(str(state_db), timeout=10)
+        try:
+            return conn.execute("PRAGMA integrity_check").fetchone()[0]
+        finally:
+            conn.close()
 
 
 @dataclass

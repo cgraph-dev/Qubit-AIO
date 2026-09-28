@@ -102,14 +102,14 @@ def snapshot_shutdown_context(received_signal: Any = None) -> Dict[str, Any]:
     # --replace instance is killing us". Filenames mirror gateway.status; literals keep the signal-
     # handler path import-light.
     with contextlib.suppress(Exception):  # noqa: BLE001 — never raise from a signal handler
-        hermes_home_str = os.path.expanduser(os.environ.get("QUBIT_HOME", ""))
-        if hermes_home_str:
-            raw = _read_marker(Path(hermes_home_str) / ".gateway-takeover.json")
+        qubit_home_str = os.path.expanduser(os.environ.get("QUBIT_HOME", ""))
+        if qubit_home_str:
+            raw = _read_marker(Path(qubit_home_str) / ".gateway-takeover.json")
             if raw is not None:
                 ctx["takeover_marker"] = raw[:300]
                 ctx["takeover_marker_for_self"] = (f'"target_pid": {pid}' in raw
                                                    or f"'target_pid': {pid}" in raw)
-            raw = _read_marker(Path(hermes_home_str) / ".gateway-planned-stop.json")
+            raw = _read_marker(Path(qubit_home_str) / ".gateway-planned-stop.json")
             if raw is not None:
                 ctx["planned_stop_marker"] = raw[:300]
     return ctx
@@ -208,7 +208,7 @@ def check_systemd_timing_alignment(
     """
     if not os.environ.get("INVOCATION_ID"):
         return None  # Not running under systemd (or at least not directly)
-    # /proc/self/cgroup: "0::/user.slice/.../hermes-gateway.service"
+    # /proc/self/cgroup: "0::/user.slice/.../qubit-gateway.service"
     unit_name: Optional[str] = None
     with contextlib.suppress(OSError), open("/proc/self/cgroup", encoding="utf-8") as fh:
         for line in fh:

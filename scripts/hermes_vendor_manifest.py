@@ -48,9 +48,10 @@ _UPSTREAM_SKIP_DIRS = _SKIP_DIR_PARTS
 # from the local snapshot ONLY when it is untracked (gitignored build output /
 # installed packages); upstream-tracked files such as the plugin dashboard
 # ``dist/*`` bundles are real vendored source and stay in the manifest.
-_DISPOSABLE_DIR_PARTS = {"node_modules", "dist", "build", ".cache", ".venv",
-                         "venv"}
-_EXCLUDE_COMPARE_DIRS = {"node_modules", "dist", "build", ".git", "__pycache__"}
+_DISPOSABLE_DIR_PARTS = {"node_modules", "dist", "build", "release", ".cache",
+                         ".venv", "venv"}
+_EXCLUDE_COMPARE_DIRS = {"node_modules", "dist", "build", "release", ".git",
+                         "__pycache__"}
 
 UNCHANGED = "UNCHANGED"
 QUBIT_PATCHED = "QUBIT_PATCHED"

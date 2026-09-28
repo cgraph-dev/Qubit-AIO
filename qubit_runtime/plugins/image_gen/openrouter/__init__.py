@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from agent.image_gen_provider import (
     DEFAULT_ASPECT_RATIO, ImageGenProvider, error_response, resolve_aspect_ratio, save_b64_image,
     save_url_image, success_response)
+from qubit_cli import install_source
 from plugins.image_gen._common import error_factory, load_image_gen_config, post_json, record_token_usage
 
 logger = logging.getLogger(__name__)
@@ -171,8 +172,9 @@ _IMAGE_API_INTS = (
 
 _ATTRIBUTION_HEADERS = {
     "Content-Type": "application/json",
-    # OpenRouter attribution headers (harmless against Qubit Labs).
-    "HTTP-Referer": "https://github.com/NousResearch/hermes-agent",
+    # OpenRouter attribution headers (harmless against Qubit Labs); the referer
+    # is the Qubit repo from the single installer source, never a Hermes URL.
+    "HTTP-Referer": install_source.base_url(),
     "X-Title": "Qubit Agent",
 }
 

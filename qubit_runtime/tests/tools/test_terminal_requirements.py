@@ -79,8 +79,12 @@ def test_modal_backend_managed_mode_without_feature_flag_logs_clear_error(monkey
         ok = terminal_tool_module.check_terminal_requirements()
 
     assert ok is False
+    # Stale-brand reconciliation (class-b): the product was de-branded to "Qubit Tool
+    # Gateway" (tools/terminal_tool_backends.py:_modal_unavailable_reason); upstream's
+    # test still asserted the "Nous Tool Gateway" spelling. Assert the real emitted
+    # string so the message is still meaningfully checked.
     assert any(
-        "Nous Tool Gateway access is not currently available" in record.getMessage()
+        "Qubit Tool Gateway access is not currently available" in record.getMessage()
         for record in caplog.records
     )
 

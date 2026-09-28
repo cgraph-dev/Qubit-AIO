@@ -2,7 +2,7 @@
 
 Set via `qubit model` (picker) or `qubit setup`. 35+ provider profiles ship as
 plugins under `plugins/model-providers/`; user plugins of the same name override.
-Full docs: https://hermes-agent.nousresearch.com/docs/integrations/providers
+Full docs: https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/integrations/providers
 
 ### Providers
 

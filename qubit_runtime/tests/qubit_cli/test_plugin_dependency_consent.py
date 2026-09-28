@@ -23,7 +23,7 @@ def test_install_only_requests_relevant_python_consent(admission_env, monkeypatc
     (source / 'package.json').write_text(json.dumps({'name': 'sidecar-plugin', 'version': '1.0.0'}), encoding='utf-8')
     if python_surface == 'pyproject':
         (source / 'pyproject.toml').write_text(
-            '[project]\nname="sidecar-plugin"\nversion="1.0"\nrequires-python=">=3.14"\n', encoding='utf-8')
+            '[project]\nname="sidecar-plugin"\nversion="1.0"\nrequires-python=">=3.11"\n', encoding='utf-8')
     env = {k: v for k, v in os.environ.items() if k not in {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'}}
     for args in [('init', '-q'), ('add', '.'), ('-c', 'user.name=test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture')]:
         subprocess.run(['git', *args], cwd=source, env=env, check=True, capture_output=True, timeout=30)

@@ -18,7 +18,7 @@ BOOT_FILES = (
     "pm/environments.py", "pm/filesystem.py", "pm/paths.py", "qubit_cli/runtime_state.py",
     "qubit_cli/_early_recovery.py", "qubit_cli/_parser.py",
     "qubit_cli/venv_sync.py", "qubit_cli/steward.py",
-    "qubit_cli/stderr_timestamp.py",
+    "qubit_cli/stderr_timestamp.py", "qubit_cli/install_source.py",
     "scripts/hermes-gateway",
 )
 
@@ -45,7 +45,10 @@ def fixture_tree(tmp_path, monkeypatch):
     # Windows resolves its default under LOCALAPPDATA, not HOME.
     if os.name == "nt":
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    home = tmp_path / ("hermes" if os.name == "nt" else ".hermes")
+    # The Qubit-owned platform default is ``.qubit`` (``qubit_constants._QUBIT_HOME_DIR``;
+    # the pre-rebrand ``.hermes`` is read-old only). Launchers resolve this default at
+    # use, so the fixture home the selected generation is committed under must match it.
+    home = tmp_path / ("qubit" if os.name == "nt" else ".qubit")
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.delenv("HERMES_RUNTIME_DIR", raising=False)
@@ -116,16 +119,17 @@ def test_launcher_resolves_default_home_at_use_not_publication(tmp_path, monkeyp
     new_user_home = tmp_path / "second-user"
     new_user_home.mkdir()
     monkeypatch.setenv("HOME", str(new_user_home))
-    monkeypatch.setenv("QUBIT_HOME", str(new_user_home / ".hermes"))
+    # Qubit-owned default home (read-old ``.hermes`` is accepted but not the default).
+    monkeypatch.setenv("QUBIT_HOME", str(new_user_home / ".qubit"))
     select_generation(repo, "second", "from-second-user")
     env = dict(os.environ)
     env.pop("QUBIT_HOME")
     result = subprocess.run([str(launcher)], cwd=tmp_path, env=env,
                             capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert result.returncode == 7, result.stdout + result.stderr
-    assert json.loads(result.stdout)["home"] == str(new_user_home / ".hermes")
+    assert json.loads(result.stdout)["home"] == str(new_user_home / ".qubit")
     assert json.loads(result.stdout)["value"] == "from-second-user"
-    assert published_home != new_user_home / ".hermes"
+    assert published_home != new_user_home / ".qubit"
 
 
 @pytest.mark.parametrize("publisher", [
@@ -246,10 +250,14 @@ def test_boot_migrates_legacy_conveniences_to_selected_runtime(tmp_path, monkeyp
     out = home / ".local" / "bin"
     out.mkdir(parents=True)
     # Old venv and sibling-ACP wrappers, with an unrelated command sharing bin.
-    (out / "hermes").write_text(f'#!/bin/sh\nexec "{repo}/venv/bin/python" "{repo}/qubit" "$@"\n', encoding="utf-8")
+    # The historical ACP wrapper is a sibling-hermes forwarder: the launcher
+    # command names stay `hermes`/`hermes-acp` (WINDOWS_BIN_LAUNCHERS, the
+    # repo-root `hermes` script, install.sh), so _owns_launcher adopts it only
+    # when it execs the sibling `hermes` — not a rebranded `qubit`.
+    (out / "hermes").write_text(f'#!/bin/sh\nexec "{repo}/venv/bin/python" "{repo}/hermes" "$@"\n', encoding="utf-8")
     (out / "hermes-acp").write_text(
         '#!/usr/bin/env bash\n# Qubit Agent — ACP launcher (written by `qubit update`).\n'
-        f'exec "{out}/qubit" acp "$@"\n', encoding="utf-8")
+        f'exec "{out}/hermes" acp "$@"\n', encoding="utf-8")
     foreign = f'#!/bin/sh\n# user note about {repo}\nexit 19\n'
     (out / "hermes-agent").write_text(foreign, encoding="utf-8")
 

@@ -75,17 +75,17 @@ class TestRoundTrip:
         assert is_seen(loaded, TOOL_PROGRESS_FLAG) is True
 
 # ---------------------------------------------------------------------------
-# Qubit residue banner
+# OpenClaw residue banner
 # ---------------------------------------------------------------------------
 
 class TestDetectOpenclawResidue:
     def test_returns_true_when_openclaw_dir_present(self, tmp_path):
-        (tmp_path / ".qubit").mkdir()
+        (tmp_path / ".openclaw").mkdir()
         assert detect_openclaw_residue(home=tmp_path) is True
 
     def test_returns_false_when_path_is_a_file(self, tmp_path):
-        # A stray file named ``.qubit`` is NOT a workspace — skip the banner.
-        (tmp_path / ".qubit").write_text("oops")
+        # A stray file named ``.openclaw`` is NOT a workspace — skip the banner.
+        (tmp_path / ".openclaw").write_text("oops")
         assert detect_openclaw_residue(home=tmp_path) is False
 
 class TestProfileBuildMode:

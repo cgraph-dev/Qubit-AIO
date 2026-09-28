@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict, List, Optional
 
+from qubit_cli import install_source
 from qubit_cli.fallback_config import get_fallback_chain
 
 # Normalized fallback chain (merges legacy ``fallback_model``); always a fresh copy.
@@ -135,7 +136,7 @@ def cmd_fallback_list(args) -> None:  # noqa: ARG001
         print(f"  Primary:   {primary}\n")
     _print_chain("Fallback chain", chain)
     print("  Tried in order when the primary fails (rate-limit, 5xx, connection errors).")
-    print("  Docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers\n")
+    print(f"  Docs: {install_source.docs_url('user-guide/features/fallback-providers')}\n")
 
 
 def cmd_fallback_add(args) -> None:

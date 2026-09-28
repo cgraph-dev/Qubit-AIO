@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from typing import Optional
 
 from qubit_constants import get_qubit_home
+from qubit_cli import install_source
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
@@ -569,9 +570,10 @@ def _run_debug_share_nous(args, *, log_lines: int, redact: bool) -> None:
     print("\nShare this private link with the Qubit team — only Qubit staff "
           "(via Google login) can open it.\n"
           "\nPick up the discussion in:\n"
-          "  GitHub Issues        https://github.com/NousResearch/hermes-agent/issues\n"
-          "  Qubit Labs Support  https://portal.nousresearch.com/help\n"
-          "  Discord              https://discord.gg/NousResearch")
+          "  GitHub Issues        "
+          f"https://github.com/{install_source.official_repository()}/issues\n"
+          "  Qubit Repository     "
+          f"https://github.com/{install_source.official_repository()}")
 
 
 def run_debug_delete(args):

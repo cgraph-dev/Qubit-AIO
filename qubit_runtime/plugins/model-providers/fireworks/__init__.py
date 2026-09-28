@@ -34,9 +34,9 @@ fireworks = FireworksProfile(
     # Attribution headers (canonical Qubit set); via default_headers so they
     # survive switch_model and credential rotation.
     default_headers={
-        "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+        "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge",
         "X-Title": "Qubit Agent",
-        "User-Agent": f"HermesAgent/{get_version_info().base_version}",
+        "User-Agent": f"QubitAgent/{get_version_info().base_version}",
     },
     default_aux_model="accounts/fireworks/models/glm-5p2",
     # Picker safety net when the live catalog fetch fails.

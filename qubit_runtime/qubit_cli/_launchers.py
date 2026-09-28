@@ -327,13 +327,13 @@ def _owns_launcher(target: Path, root: Path) -> bool:
         return False
     paths = {str(root / p) for p in (
         "hermes", "run_agent.py", "venv/bin/python", "venv/bin/python3",
-        ".hermes/bin/qubit", ".hermes/bin/hermes-acp",
+        ".hermes/bin/hermes", ".hermes/bin/hermes-acp",
     )}
     # Current store launchers pass this Python bootstrap as one shell argument.
     bootstrap = f"sys.path.insert(0, {str(root)!r})"
     if paths.intersection(tokens) or any(bootstrap in token for token in tokens):
         return True
-    # The historical updater wrote ACP as a sibling-qubit forwarder. Adopt
+    # The historical updater wrote ACP as a sibling-hermes forwarder. Adopt
     # it only when that sibling demonstrably belongs to this installation.
     if target.name == "hermes-acp":
         sibling = target.with_name("hermes")
@@ -354,7 +354,7 @@ def _publish_conveniences(root: Path, out_dir: Path, names, *, create: bool = Tr
         if (not create or target.exists() or target.is_symlink()) and not _owns_launcher(target, root):
             continue
         before = target.lstat().st_mtime_ns if target.exists() or target.is_symlink() else None
-        command = ([str(root / ".hermes/bin/qubit"), "--run-module", "run_agent"]
+        command = ([str(root / ".hermes/bin/hermes"), "--run-module", "run_agent"]
                    if name == "hermes-agent" else [str(root / ".hermes/bin" / name)])
         if _write_shell(target, command) is None:
             raise OSError(f"could not publish launcher {target}")

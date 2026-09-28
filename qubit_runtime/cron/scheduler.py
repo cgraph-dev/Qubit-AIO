@@ -1,5 +1,5 @@
 """Cron job scheduler: tick() runs due jobs (gateway calls it every 60s from a background thread).
-A file lock (~/.hermes/cron/.tick.lock) keeps overlapping processes to one tick at a time.
+A file lock (<QUBIT_HOME>/cron/.tick.lock) keeps overlapping processes to one tick at a time.
 """
 
 import atexit

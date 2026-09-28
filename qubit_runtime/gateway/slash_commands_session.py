@@ -736,7 +736,7 @@ class GatewaySessionCommandsMixin:
         if redact:
             from qubit_cli.session_export_md import redact_session_data
             export_data = redact_session_data(export_data)
-        temp_dir = tempfile.mkdtemp(prefix="hermes_save_")
+        temp_dir = tempfile.mkdtemp(prefix="qubit_save_")
         temp_path = os.path.join(temp_dir, filename)
         try:
             # Off-loop: render + write scale with transcript size (multi-MB) and would stall the loop.

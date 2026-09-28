@@ -14,6 +14,8 @@ import json
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from qubit_cli import install_source
 from tools.skills_hub_clawhub import ClawHubSource
 from tools.skills_hub_github import GitHubAuth, GitHubSource, _filter_results_by_provider, _provider_filter_of
 from tools.skills_hub_models import SkillMeta, SkillSource, TRUST_RANK, _dedupe_by_trust, hub
@@ -24,7 +26,7 @@ from tools.skills_hub_sources import BrowseShSource, LobeHubSource, UrlSource, W
 # Log-record parity with the origin module.
 logger = logging.getLogger("tools.skills_hub")
 
-QUBIT_INDEX_URL = "https://hermes-agent.nousresearch.com/docs/api/skills-index.json"
+QUBIT_INDEX_URL = install_source.raw_asset_url("website/static/api/skills-index.json")
 QUBIT_INDEX_TTL = 6 * 3600  # 6 hours
 
 

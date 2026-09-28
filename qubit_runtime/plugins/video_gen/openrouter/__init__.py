@@ -171,8 +171,12 @@ class OpenRouterVideoGenProvider(VideoGenProvider):
                 (str(runtime.get("base_url") or "").strip() or DEFAULT_BASE_URL).rstrip("/"))
 
     def _headers(self, api_key: str) -> Dict[str, str]:
+        # The referer is the Qubit repo from the single installer source, never
+        # a hardcoded Hermes URL.
+        from qubit_cli import install_source
+
         return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/NousResearch/hermes-agent", "X-Title": "Qubit Agent"}
+                "HTTP-Referer": install_source.base_url(), "X-Title": "Qubit Agent"}
 
     def _session(self) -> Any:
         import requests

@@ -17,7 +17,7 @@ Usage::
 Output: ``website/static/api/model-catalog.json``
 
 Live URL (after ``deploy-site.yml`` runs on merge to main):
-``https://hermes-agent.nousresearch.com/docs/api/model-catalog.json``
+``https://raw.githubusercontent.com/cgraph-dev/qubit-voicebridge/main/website/static/api/model-catalog.json``
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ sys.path.insert(0, REPO_ROOT)
 # Ensure QUBIT_HOME is set for imports that touch it at module level.
 os.environ.setdefault("QUBIT_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
 
+from qubit_cli import install_source  # noqa: E402
 from qubit_cli.models import (  # noqa: E402
     OPENROUTER_MODELS,
     PREFERRED_SILENT_DEFAULT_MODEL,
@@ -64,7 +65,7 @@ def build_catalog() -> dict:
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
             "source": "hermes-agent repo",
-            "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog",
+            "docs": install_source.docs_url("reference/model-catalog"),
         },
         "providers": {
             "openrouter": {

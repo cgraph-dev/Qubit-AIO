@@ -11,7 +11,7 @@ import urllib.request
 NAS_BASE = os.environ.get("HERMES_DIAGNOSTICS_BASE_URL", "https://portal.nousresearch.com")
 _REQUEST_TIMEOUT = 30
 _UPLOAD_TIMEOUT = 120  # the PUT carries the gzipped log bundle, so a more generous window
-_USER_AGENT = "hermes-agent/debug-share"
+_USER_AGENT = "qubit-agent/debug-share"
 
 
 def _urlopen_checked(url: str, data: bytes, method: str, headers: dict, *, timeout: int, what: str):

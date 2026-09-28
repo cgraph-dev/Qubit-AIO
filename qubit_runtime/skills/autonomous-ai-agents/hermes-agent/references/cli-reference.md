@@ -1,7 +1,7 @@
 # Qubit CLI Reference
 
 Live sources when anything looks stale: `qubit --help`, `qubit <command> --help`,
-https://hermes-agent.nousresearch.com/docs/reference/cli-commands
+https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/cli-commands
 
 ### Global Flags
 
@@ -79,7 +79,7 @@ qubit gateway run|install|start|stop|restart|status|setup
 ```
 
 20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `qubit photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
-Docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
+Docs: https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/messaging/
 
 ### Sessions
 
@@ -142,10 +142,10 @@ Plugin- and provider-supplied subcommands (e.g. `qubit photon setup`) only appea
 
 | Looking for... | Location |
 |---|---|
-| Config options | `qubit config edit` · [Configuration docs](https://hermes-agent.nousresearch.com/docs/user-guide/configuration) |
-| Tools / toolsets | `qubit tools list` · [Tools reference](https://hermes-agent.nousresearch.com/docs/reference/tools-reference) |
-| Skills catalog | `qubit skills browse` · [Skills catalog](https://hermes-agent.nousresearch.com/docs/reference/skills-catalog) |
-| Provider setup | `qubit model` · [Providers guide](https://hermes-agent.nousresearch.com/docs/integrations/providers) |
-| Env variables | `qubit config env-path` · [Env vars reference](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) |
+| Config options | `qubit config edit` · [Configuration docs](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/configuration) |
+| Tools / toolsets | `qubit tools list` · [Tools reference](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/tools-reference) |
+| Skills catalog | `qubit skills browse` · [Skills catalog](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/skills-catalog) |
+| Provider setup | `qubit model` · [Providers guide](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/integrations/providers) |
+| Env variables | `qubit config env-path` · [Env vars reference](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/environment-variables) |
 | Gateway logs | `~/.hermes/logs/gateway.log` (or `qubit logs`) |
 | Sessions | `qubit sessions browse` (reads state.db) |

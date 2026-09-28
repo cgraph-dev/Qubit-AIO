@@ -4325,6 +4325,14 @@ def _b_local_models(ctx, args):
             return {"local_models": LM.download(
                 cfg, model=str(args.get("model", "") or ""),
                 requested_by="voice:user", confirmed=confirmed)}
+        if action == "download_pause":
+            return {"local_models": LM.download_pause(
+                cfg, job_id=str(args.get("job_id", "") or ""),
+                requested_by="voice:user", confirmed=confirmed)}
+        if action == "download_resume":
+            return {"local_models": LM.download_resume(
+                cfg, job_id=str(args.get("job_id", "") or ""),
+                requested_by="voice:user", confirmed=confirmed)}
         if action == "sideload":
             return {"local_models": LM.sideload(
                 cfg, path=str(args.get("path", "") or ""),

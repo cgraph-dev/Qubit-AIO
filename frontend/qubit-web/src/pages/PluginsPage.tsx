@@ -1543,16 +1543,6 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
               {"Capabilities"}: {entry.capabilities.join(", ")}
             </div>
           ) : null}
-          {Object.keys(entry.provenance).length ? (
-            <div>
-              {"Provenance"}:{" "}
-              <span className="font-mono">
-                {Object.entries(entry.provenance)
-                  .map(([k, v]) => `${k}=${v}`)
-                  .join(" · ")}
-              </span>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </li>
@@ -1728,9 +1718,6 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, t }: PluginCatalogC
                 <p className="mt-1 break-all font-mono text-[0.6875rem]">
                   {detail.manifest_path || detail.path || "—"}
                 </p>
-                {Object.entries(detail.provenance).map(([key, value]) =>
-                  value ? <p key={key}>{key}: {value}</p> : null,
-                )}
               </section>
             </>
           ) : null}

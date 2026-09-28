@@ -10780,14 +10780,6 @@
       "voice_intent": "qubit status"
     },
     {
-      "entry": "skills_install",
-      "id": "skill hermes-voice-mode",
-      "kind": "match",
-      "resolution": "real",
-      "surface": "tools",
-      "voice_intent": "qubit skills install hermes-voice-mode"
-    },
-    {
       "entry": "cli_mcp_list",
       "id": "skill mcp",
       "kind": "match",
@@ -11136,11 +11128,11 @@
   "source": "docs/generated/parity_inventory.json",
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
-    "distinct_intents": 884,
+    "distinct_intents": 883,
     "guard": 193,
-    "real": 1190,
-    "real_pct": 85.61,
-    "rows": 1390,
+    "real": 1189,
+    "real_pct": 85.6,
+    "rows": 1389,
     "unresolved": 7
   },
   "surfaces": {
@@ -11174,9 +11166,9 @@
     },
     "tools": {
       "guard": 1,
-      "real": 121,
-      "real_pct": 99.18,
-      "total": 122,
+      "real": 120,
+      "real_pct": 99.17,
+      "total": 121,
       "unresolved": 0
     }
   }

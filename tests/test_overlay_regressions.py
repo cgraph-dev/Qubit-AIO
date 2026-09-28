@@ -145,6 +145,32 @@ def test_b4_01_model_info_falls_back_without_vendored_metadata(tmp_path,
     assert out["effective_context_length"] == 4096
 
 
+def test_b4_01_model_info_unknown_caps_are_not_fabricated(tmp_path, monkeypatch):
+    """When the vendored resolver has no entry for the provider/model (e.g. an
+    aggregator models.dev does not catalogue), ``/api/model/info`` must report
+    the capability as UNKNOWN (``None``) rather than fabricating
+    ``supports_reasoning: false`` / ``max_output_tokens: 1024``. Fabricated
+    values are what permanently disabled the ``/chat`` reasoning selector and
+    misreported the output cap; the reference serves an empty capabilities
+    mapping for the same model."""
+    from voicebridge import qubit_compat as HC
+
+    monkeypatch.setattr(HC, "_resolved_model", lambda cfg: {
+        "model": "deepseek-v4-flash", "provider": "opencode-go", "ctx": 200000,
+        "kind": "api", "locality": "api", "base_url": "",
+        "profile_id": "default"})
+
+    def boom(cfg):
+        raise RuntimeError("no fork")
+
+    monkeypatch.setattr(HC, "_vendored_runtime", boom)
+    code, out = HC.h_model_info(_cfg(tmp_path, monkeypatch), {}, {}, {})
+    assert code == 200
+    caps = out["capabilities"]
+    assert caps["supports_reasoning"] is None, caps
+    assert caps["max_output_tokens"] is None, caps
+
+
 # --------------------------------------------------------------------------- #
 # B4-03 — /api/status advisory + platform + auth + components
 # --------------------------------------------------------------------------- #

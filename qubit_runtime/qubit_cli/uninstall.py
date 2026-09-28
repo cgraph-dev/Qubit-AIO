@@ -8,6 +8,7 @@ from pathlib import Path
 
 from qubit_constants import get_qubit_home
 
+from qubit_cli import install_source
 from qubit_cli.colors import Colors, color
 
 def _logger(mark: str, col: str):
@@ -919,8 +920,8 @@ def _perform_uninstall(
 
 
 _REINSTALL_HINT = {
-    True: "  iex (irm https://hermes-agent.nousresearch.com/install.ps1)",
-    False: "  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"}
+    True: f"  iex (irm {install_source.install_ps1_url()})",
+    False: f"  curl -fsSL {install_source.install_sh_url()} | bash"}
 # windows -> [(line, color or None)]
 _RELOAD_HINT = {
     True: [("Open a new terminal (PowerShell / Windows Terminal) to pick up", Colors.YELLOW),

@@ -73,7 +73,10 @@ def test_gateway_migrate_plan_is_real_read_only(tmp_path, monkeypatch):
     assert code == 200 and out["ok"] is True
     # The vendored MigrationPlan.to_dict() shape.
     assert isinstance(out["eligible"], bool)
-    assert out["command"] == "qubit gateway migrate"
+    # The vendored plan's command is the supported convergence path
+    # (``qubit_runtime/qubit_cli/gateway_migrate.MIGRATE_COMMAND``); the handler
+    # returns the plan dict verbatim.
+    assert out["command"] == "qubit gateway migrate --multiplex"
     assert isinstance(out["profiles"], list)
     assert "blockers" in out and "notices" in out
 

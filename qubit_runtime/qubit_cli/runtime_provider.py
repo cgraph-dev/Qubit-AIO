@@ -30,7 +30,7 @@ from qubit_cli.auth import (  # resolve_external_process_provider_credentials is
 )
 from qubit_cli import config as _config_mod
 from qubit_cli import models as _models  # attribute access keeps ``qubit_cli.models.<name>`` patches effective
-from qubit_constants import OPENROUTER_BASE_URL
+from qubit_constants import OPENROUTER_BASE_URL, display_qubit_home
 from qubit_cli.providers import determine_api_mode, get_provider, is_actual_route, is_official_openai_host, nous_api_mode
 from utils import base_url_host_matches, base_url_hostname, base_url_path, env_int
 
@@ -906,7 +906,7 @@ def _resolve_vertex_runtime(requested_provider: str) -> Dict[str, Any]:
     token, base_url = get_vertex_config()
     if not token or not base_url:
         raise AuthError("Vertex AI credentials could not be resolved. Vertex uses OAuth2 (not a static API key): provide a "
-                        "service-account JSON via GOOGLE_APPLICATION_CREDENTIALS (or VERTEX_CREDENTIALS_PATH) in ~/.hermes/.env, "
+                        f"service-account JSON via GOOGLE_APPLICATION_CREDENTIALS (or VERTEX_CREDENTIALS_PATH) in {display_qubit_home()}/.env, "
                         "or run 'gcloud auth application-default login' for ADC. Set the GCP project/region under vertex: in "
                         "config.yaml if they aren't embedded in the credentials. Run `qubit setup` to install Vertex support.")
     return _runtime("vertex", "chat_completions", base_url.rstrip("/"), token, source="vertex-oauth", requested_provider=requested_provider)

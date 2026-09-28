@@ -48,7 +48,7 @@ export async function buildTui(options) {
       //     bundle entirely — re-exporting them from entry-exports created a
       //     circular async chain that hung the TUI at startup with only ANSI
       //     reset bytes on screen (#31227).
-      alias: { '@hermes/ink': resolve(root, 'packages/hermes-ink/src/entry-exports.ts') },
+      alias: { '@hermes/ink': resolve(root, 'packages/qubit-ink/src/entry-exports.ts') },
       plugins: [stubDevtools],
       // Some transitive deps use CommonJS `require(...)` at runtime. ESM bundles
       // don't get a `require` binding automatically, so we inject one.

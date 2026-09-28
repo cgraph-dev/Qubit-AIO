@@ -254,7 +254,7 @@ class WhatsAppCloudAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         for ok, code, message in (
             (check_whatsapp_cloud_requirements(), "whatsapp_cloud_deps_missing",
-             "aiohttp and httpx are required for whatsapp_cloud — reinstall hermes-agent."),
+             "aiohttp and httpx are required for whatsapp_cloud — reinstall qubit-agent."),
             (self._phone_number_id and self._access_token, "whatsapp_cloud_unconfigured",
              "WHATSAPP_CLOUD_PHONE_NUMBER_ID and WHATSAPP_CLOUD_ACCESS_TOKEN are required."),
         ):

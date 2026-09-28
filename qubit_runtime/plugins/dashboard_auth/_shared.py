@@ -186,7 +186,7 @@ def make_jwks_client(jwks_url: str) -> Any:
 
     return PyJWKClient(
         jwks_url, cache_keys=True, lifespan=JWKS_CACHE_SECONDS,
-        headers={"Accept": "application/json", "User-Agent": "HermesAgent/1.0"})
+        headers={"Accept": "application/json", "User-Agent": "QubitAgent/1.0"})
 
 
 def verify_jwt(

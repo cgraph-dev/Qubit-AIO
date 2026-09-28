@@ -7,7 +7,7 @@ import sys
 import shlex
 from pathlib import Path
 
-from qubit_constants import get_qubit_home
+from qubit_constants import display_qubit_home, get_qubit_home
 from qubit_cli.secret_prompt import masked_secret_prompt
 
 _CANCELLED = -1
@@ -249,7 +249,7 @@ def cmd_setup(args) -> None:
     providers = _get_available_providers()
     if not providers:
         print("\n  No memory provider plugins detected.")
-        print("  Install a plugin to ~/.hermes/plugins/ and try again.\n")
+        print(f"  Install a plugin to {display_qubit_home()}/plugins/ and try again.\n")
         return
 
     items = [(name, f"— {desc}") for name, desc, _ in providers]
@@ -408,11 +408,11 @@ def cmd_status(args) -> None:
                         if url and not is_set:
                             line += f"  → {url}"
                         print(line)
-                print("  Note: systemd/gateway services do not inherit ~/.hermes/.env —")
+                print(f"  Note: systemd/gateway services do not inherit {display_qubit_home()}/.env —")
                 print("        set any variables above in the service environment.")
         else:
             print("\n  Plugin:    NOT installed ✗")
-            print(f"  Install the '{provider_name}' memory plugin to ~/.hermes/plugins/")
+            print(f"  Install the '{provider_name}' memory plugin to {display_qubit_home()}/plugins/")
 
     if providers:
         print("\n  Installed plugins:")

@@ -1465,9 +1465,17 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception:  # noqa: BLE001 - never 500 the read
         auto_ctx = 0
     if not isinstance(caps, dict):
-        caps = {"supports_tools": True, "supports_vision": False,
-                "supports_reasoning": False, "context_window": ctx,
-                "max_output_tokens": 1024,
+        # Reference-identical: when the vendored metadata resolver has no entry
+        # (e.g. an aggregator provider models.dev does not catalogue), report the
+        # capability as UNKNOWN ("None") instead of fabricating
+        # ``supports_reasoning: false`` / ``max_output_tokens: 1024``. Fabricated
+        # values are what permanently disabled the /chat reasoning selector and
+        # misreported the output cap; the reference serves an empty capabilities
+        # mapping for the same model. ``supports_tools`` and the known context
+        # window are honest defaults.
+        caps = {"supports_tools": True, "supports_vision": None,
+                "supports_reasoning": None, "context_window": ctx,
+                "max_output_tokens": None,
                 "model_family": ("qwen3-4b" if r.get("kind") == "local"
                                  else provider)}
     effective = ctx or auto_ctx
@@ -5907,6 +5915,40 @@ def h_local_models_download(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     confirmed=bool(b.get("confirm"))))
 
 
+def h_local_models_download_pause(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any],
+                                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/local-models/download/pause -> Qubit brokered gate.
+
+    The reference route (``web_routers/local_models.py:708
+    local_models_download_pause``) pauses a managed download job. Qubit's
+    authority path routes the same ``{"job_id": ...}`` contract through the real
+    ``voicebridge.local_models`` surface (e-stop -> confirmation -> broker), so
+    nothing is paused and no queue exists.
+    """
+    from . import local_models as LM
+    job_id = _query_text(q, b, "job_id", "job", "id")
+    return _local_model_refusal(
+        LM.download_pause(cfg, job_id=job_id, requested_by="dashboard:user",
+                          confirmed=bool(b.get("confirm"))))
+
+
+def h_local_models_download_resume(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any],
+                                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/local-models/download/resume -> Qubit brokered gate.
+
+    Counterpart to ``web_routers/local_models.py:721
+    local_models_download_resume`` on the canonical Qubit authority path; the
+    verb is gated/reused, never a fabricated success.
+    """
+    from . import local_models as LM
+    job_id = _query_text(q, b, "job_id", "job", "id")
+    return _local_model_refusal(
+        LM.download_resume(cfg, job_id=job_id, requested_by="dashboard:user",
+                           confirmed=bool(b.get("confirm"))))
+
+
 def h_local_models_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import local_models as LM
@@ -7525,6 +7567,10 @@ _r("GET", r"/api/local-models/jobs/(?P<id>[^/]+)", "h_local_models_job_show")
 _r("GET", r"/api/local-models/jobs", "h_local_models_jobs")
 _r("POST", r"/api/local-models/runtime/install", "h_local_models_runtime_install")
 _r("POST", r"/api/local-models/download", "h_local_models_download")
+_r("POST", r"/api/local-models/download/pause",
+   "h_local_models_download_pause")
+_r("POST", r"/api/local-models/download/resume",
+   "h_local_models_download_resume")
 _r("DELETE", r"/api/local-models/models/(?P<model_id>[^/]+)",
    "h_local_models_delete")
 _r("POST", r"/api/local-models/quickstart", "h_local_models_quickstart")
@@ -7640,6 +7686,7 @@ _r("GET", r"/api/qubit/local-models/fallback", "h_qubit_local_models_fallback")
 # precede the remaining GATED `GET /api/qubit/update.*` alias so the specific
 # rows win (audit A29 + objective C).
 _r("GET", r"/api/qubit/update/check", "h_qubit_update_check")
+_r("GET", r"/api/qubit/update/receipt", "h_qubit_update_receipt")
 _r("POST", r"/api/qubit/update/rollback", "h_qubit_update_rollback")
 _r("POST", r"/api/qubit/update", "h_qubit_update_apply")
 
@@ -11751,10 +11798,16 @@ def _update_resolve_source(cfg: Any, source: Any, channel: Any,
 
 
 def _update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                  p: Dict[str, str], source: Any = None) -> Dict[str, Any]:
+                  p: Dict[str, str], source: Any = None,
+                  channel: Any = None, tag: Any = None) -> Dict[str, Any]:
     """Read-only update check — the shared seam GET uses and voice calls."""
     from . import update_manager as UM
-    return UM.check(cfg, source=source)
+    kwargs: Dict[str, Any] = {"source": source}
+    if channel:
+        kwargs["channel"] = channel
+    if tag:
+        kwargs["tag"] = tag
+    return UM.check(cfg, **kwargs)
 
 
 def _update_apply(cfg: Any, b: Dict[str, Any], *, actor: str,
@@ -11818,10 +11871,35 @@ def h_qubit_update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     try:
         source = _update_resolve_source(cfg, q.get("source"),
                                         q.get("channel"), q.get("tag"))
-        out = _update_check(cfg, q, b, p, source=source)
+        out = _update_check(cfg, q, b, p, source=source,
+                            channel=(q.get("channel") or None),
+                            tag=(q.get("tag") or None))
     except Exception as exc:
         return _fail(exc)
     return _ok(**out)
+
+
+def h_qubit_update_receipt(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/qubit/update/receipt -> the most recent update receipt (read-only).
+
+    Returns the canonical :func:`update_receipt.latest_receipt` payload (already
+    redacted by the receipt writer) or a typed ``404 UPDATE_NO_RECEIPT`` when no
+    receipt exists yet — never a fabricated success. The mutating update verbs
+    stay confirmation/e-stop gated; this is a pure read.
+    """
+    try:
+        from . import update_receipt as UR
+
+        receipt = UR.latest_receipt(cfg)
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    if not isinstance(receipt, dict):
+        return 404, {"ok": False, "state": "NOT_FOUND",
+                     "code": "UPDATE_NO_RECEIPT",
+                     "detail": ("no update receipt has been written yet; run "
+                                "`qubit update --apply` first")}
+    return _ok(receipt=receipt)
 
 
 def _update_failure_http(code: str) -> int:
@@ -11883,6 +11961,14 @@ def h_qubit_update_rollback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     provided in the body to restore a specific snapshot.
     """
     try:
+        if not _truthy(b.get("confirm")):
+            return 409, {
+                "ok": False,
+                "state": "CONFIRM_REQUIRED",
+                "code": "CONFIRM_REQUIRED",
+                "detail": ("rolling back the update requires confirm=true; "
+                           "re-POST with the confirmation to proceed"),
+            }
         out = _update_rollback(cfg, backup_dir=(b.get("backup_dir") or None),
                                actor="dashboard:user")
     except Exception as exc:
@@ -13727,6 +13813,8 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_local_models_job_show": h_local_models_job_show,
     "h_local_models_runtime_install": h_local_models_runtime_install,
     "h_local_models_download": h_local_models_download,
+    "h_local_models_download_pause": h_local_models_download_pause,
+    "h_local_models_download_resume": h_local_models_download_resume,
     "h_local_models_delete": h_local_models_delete,
     "h_local_models_quickstart": h_local_models_quickstart,
     "h_local_models_server": h_local_models_server,
@@ -13779,6 +13867,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_qubit_runtime_history": h_qubit_runtime_history,
     "h_qubit_runtime_update_report": h_qubit_runtime_update_report,
      "h_qubit_update_check": h_qubit_update_check,
+     "h_qubit_update_receipt": h_qubit_update_receipt,
      "h_qubit_update_apply": h_qubit_update_apply,
      "h_qubit_update_rollback": h_qubit_update_rollback,
     "h_qubit_runtime_status": h_qubit_runtime_status,

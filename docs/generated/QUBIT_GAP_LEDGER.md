@@ -24,7 +24,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
 - `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 757 rows
-  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=94, qubit_compat.ROUTES=448, source_inventory.dispositioned=122, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=118, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1076, source_inventory.parented_uncovered=5, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
+  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=94, qubit_compat.ROUTES=450, source_inventory.dispositioned=122, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=118, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1076, source_inventory.parented_uncovered=5, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
@@ -45,10 +45,11 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 ### By status
 
 - IMPLEMENTED: 1289
-- MISSING: 9
+- MISSING: 7
 - OPERATOR_ONLY: 10
 - OPERATOR_ONLY_ARCHITECTURE: 1
 - SAFE_EQUIVALENT: 143
+- UNVERIFIED: 2
 
 ### By source
 
@@ -259,8 +260,8 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 | id | status | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
-| `api:POST /api/local-models/download/pause` | MISSING | owner | POST /api/local-models/download/pause | — |
-| `api:POST /api/local-models/download/resume` | MISSING | owner | POST /api/local-models/download/resume | — |
+| `api:POST /api/local-models/download/pause` | UNVERIFIED | owner | POST /api/local-models/download/pause | — |
+| `api:POST /api/local-models/download/resume` | UNVERIFIED | owner | POST /api/local-models/download/resume | — |
 
 ### source: openclaw (1 open)
 

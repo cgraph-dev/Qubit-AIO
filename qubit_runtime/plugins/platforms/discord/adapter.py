@@ -29,6 +29,7 @@ from contextlib import suppress
 from typing import Callable, Dict, List, Optional, Any, Tuple
 from urllib.parse import quote, urljoin
 
+from qubit_cli import install_source
 from agent.async_utils import (consume_detached_task_result as _consume_background_task_result)
 from agent.display import ToolPreview
 from agent.retry_utils import parse_retry_after_seconds
@@ -384,7 +385,7 @@ def _format_privileged_intents_guidance(*, needs_members: bool) -> str:
             "Fix: https://discord.com/developers/applications → your application "
             "→ Bot → Privileged Gateway Intents → enable the intent(s) listed "
             "above → Save Changes, then restart the gateway.",
-            "Docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/discord",
+            f"Docs: {install_source.docs_url('user-guide/messaging/discord')}",
         ]
     )
     return "\n".join(lines)
@@ -7179,7 +7180,7 @@ def interactive_setup() -> None:
         "  - Message Content Intent (required — without it Discord rejects the connection)",
         "  - Server Members Intent (required if you use usernames or role allowlists)",
         "Save Changes in the Developer Portal before starting the gateway.",
-        "Docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/discord",
+        f"Docs: {install_source.docs_url('user-guide/messaging/discord')}",
     )
     token = _prompt_discord_bot_token(prompt)
     if not token:

@@ -380,6 +380,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // terminal-input control. The side panel is collapsible; the terminal input
   // is a typed refusal because Qubit policy (PTY_NO_SHELL) refuses raw shells.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  // Bumped after a New-chat mint so `ChatSessionList` remounts and refetches,
+  // surfacing the freshly created session immediately.
+  const [sessionListNonce, setSessionListNonce] = useState(0);
   const [terminalNoticeOpen, setTerminalNoticeOpen] = useState(false);
   // A31: the side panel is one `role="complementary"` "Model & tools" wrapper
   // (the pinned Qubit structure) mounting the model box and session switcher.
@@ -652,19 +655,41 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     [input, send],
   );
 
+  // "New chat" mints a genuinely NEW session on the canonical store (the same
+  // store the sessions list and transcript read) and points the surface at it,
+  // so a fresh chat never re-opens the fixed canonical default
+  // (`dashboard-chat`). The implicit first load (no `?resume=`) still converges
+  // on the canonical default for continuity. A failed mint surfaces a typed
+  // error and leaves the current session untouched.
   const startFresh = useCallback(() => {
-    storageSet(SESSION_KEY, DEFAULT_SESSION);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("resume");
-        return next;
-      },
-      { replace: false },
-    );
     setMessages([]);
     setError(null);
     setRetryText(null);
+    api
+      .createChatSession()
+      .then((res) => {
+        const newId = res?.session?.id;
+        if (!newId) return;
+        // Persist first so a reload lands on the fresh session even before the
+        // URL effect runs; the `?resume=` param then drives the session memo.
+        storageSet(SESSION_KEY, newId);
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("resume", newId);
+            return next;
+          },
+          { replace: false },
+        );
+        setSessionListNonce((n) => n + 1);
+      })
+      .catch((err: unknown) => {
+        setError(
+          `[CHAT_SESSION_CREATE] ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      });
   }, [setSearchParams]);
 
   const copyLast = useCallback(() => {
@@ -1630,6 +1655,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <ChatSessionArtifacts key={session} sessionId={session} />
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
+                key={sessionListNonce}
                 activeSessionId={resumeParam}
                 profile={scopedProfile}
                 onNewChat={startFresh}

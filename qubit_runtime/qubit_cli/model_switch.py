@@ -105,9 +105,9 @@ _HERMES_MODEL_WARNING = (
 
 # Match only the real Qubit Labs Qubit 3 / 4 chat families; a bare substring check
 # false-positived on tool-capable local Modelfiles like ``hermes-brain:qwen3-14b-ctx16k``.
-#   match:    NousResearch/Qubit-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
+#   match:    NousResearch/Hermes-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
 #   no match: hermes-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
-_NOUS_HERMES_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])qubit[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
+_NOUS_HERMES_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])(?:hermes|qubit)[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
 
 
 # Opaque proxy model IDs (Palantir Foundry: ``ri.language-model-service..language-model.<slug>``)

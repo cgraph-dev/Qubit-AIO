@@ -8,6 +8,8 @@ import sys
 
 import pytest
 
+from qubit_cli import install_source
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -33,6 +35,11 @@ def fixture_repo(tmp_path):
     for relative in ('scripts/release.py', 'scripts/release-content-types.json',
                      'qubit_cli/__init__.py', 'qubit_cli/update_channel.py',
                      'qubit_cli/release_channels.py',
+                     # release.py and scripts/releases/r2.py now resolve the
+                     # Qubit repo/asset identity through install_source, so the
+                     # isolated fixture must stage that module like any other
+                     # product dependency.
+                     'qubit_cli/install_source.py',
                      'pm/paths.py', 'pm/environments.py', 'qubit_constants.py'):
         dest = repo / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -101,7 +108,7 @@ def test_commit_build_cli_dispatches_only_the_resolved_remote_commit(fixture_rep
         result, calls = invoke('--build-commit', revision)
         assert result.returncode == 0, result.stderr
         assert tip in result.stdout
-        assert f'https://hermes-assets.nousresearch.com/releases/commit/{tip}/index.html' in result.stdout
+        assert f'{install_source.DEFAULT_RELEASE_ASSETS_BASE_URL}/releases/commit/{tip}/index.html' in result.stdout
         assert not any(call[1:3] == ['workflow', 'run'] for call in calls)
     result, calls = invoke('--build-commit', tip, '--publish')
     assert result.returncode == 0, result.stderr

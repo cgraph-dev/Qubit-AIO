@@ -82,9 +82,15 @@ def test_requires_python_matches_the_code_and_the_installer():
     at import.
     """
     rp = _pyproject()["project"]["requires-python"]
-    m = re.fullmatch(r">=\s*3\.(\d+)", rp.strip())
+    m = re.fullmatch(r">=\s*3\.(\d+)(?:,<3\.(\d+))?", rp.strip())
     assert m, f"unexpected requires-python spec: {rp!r}"
+    # The floor stays 3.12 (PEP 701 f-strings; install.sh provisions it).
     assert int(m.group(1)) >= 12, rp
+    # The ceiling, when declared, must match the vendored runtime's upstream-
+    # aligned cap (`qubit_runtime/pyproject.toml` >=3.11,<3.15): the fork is
+    # force-included, so this distribution advertises the same supported window.
+    if m.group(2) is not None:
+        assert int(m.group(2)) == 15, rp
     install = INSTALL_SH.read_text(encoding="utf-8")
     assert "uv venv --python 3.12" in install, (
         "install.sh must pin the same interpreter floor as requires-python")

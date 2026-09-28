@@ -257,14 +257,10 @@ def get_default_qubit_root(*, home: str | Path | None = None) -> Path:
         return memo[2]
     result = native_home
     if env_path is not None:
-        for native in (native_home, _legacy_platform_default_qubit_home()):
-            try:
-                env_path.resolve().relative_to(native.resolve())  # under the native root (normal or profile mode)
-            except ValueError:  # not under this native root; try the next
-                continue
-            result = native
-            break
-        else:  # Docker/custom root: <root>/profiles/<name> -> <root>, else QUBIT_HOME itself
+        try:
+            env_path.resolve().relative_to(native_home.resolve())  # under the native root (normal or profile mode)
+            result = native_home
+        except ValueError:  # not under the Qubit-owned native root (incl. a legacy home): Docker/custom root
             result = env_path.parent.parent if env_path.parent.name == "profiles" else env_path
     _default_qubit_root_memo = (*memo_key, result)
     return result
@@ -1367,9 +1363,15 @@ FIRST_PARTY_MODULE_ROOTS = frozenset({
 
 
 def is_first_party_module(name: str | None) -> bool:
-    """True when *name* ships with Qubit (exact first segment; ``startswith`` would claim ``agentops``)."""
+    """True when *name* ships with Qubit (exact first segment; ``startswith`` would claim ``agentops``).
+
+    Mirrors upstream's ``hermes_`` prefix rule for the rebranded tree: the Qubit
+    first-party modules are ``qubit_*`` (``qubit_cli``, ``qubit_constants``,
+    ``qubit_state``, …), so the prefix must be recognized or a partial-update
+    ImportError from one of them is misread as third-party. The legacy ``hermes_``
+    prefix stays for read-old compatibility."""
     root = str(name).split(".")[0] if name else ""
-    return bool(root) and (root in FIRST_PARTY_MODULE_ROOTS or root.startswith("hermes_"))
+    return bool(root) and (root in FIRST_PARTY_MODULE_ROOTS or root.startswith("hermes_") or root.startswith("qubit_"))
 
 
 def partial_update_hint(exc: BaseException) -> list[str]:
@@ -1384,7 +1386,7 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "and a related one was not.",
         "Re-run the update to bring the whole tree to the same version:",
         "    qubit update",
-        "If that also fails, reinstall: https://hermes-agent.nousresearch.com",
+        "If that also fails, reinstall: https://github.com/cgraph-dev/qubit-voicebridge",
     ]
 
 

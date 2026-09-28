@@ -27,7 +27,7 @@ _OPTIONAL_VALUE_FLAGS_FALLBACK: frozenset[str] = frozenset({"-c", "--continue"})
 
 
 def _cfg_path() -> str:
-    """``~/.hermes/config.yaml`` spelled for the active profile, for help text.
+    """The active profile's ``config.yaml`` in the Qubit home, spelled for help text.
 
     ``main._apply_profile_override`` builds this parser (via ``top_level_value_flag_sets``) BEFORE
     it re-homes the process to the sticky ``active_profile``; ``get_qubit_home()`` would emit the

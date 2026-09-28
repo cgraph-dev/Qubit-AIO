@@ -139,15 +139,15 @@ class TestDetectDangerousRm:
 
     def test_verification_cleanup_exemption_rejects_broader_deletions(self):
         commands = (
-            "rm -rf /tmp/hermes-verify-example.py",
-            "rm -f /tmp/hermes-verify-example.py /tmp/other.py",
-            "rm -f /tmp/nested/../hermes-verify-example.py",
-            "rm -f /tmp/a/../../tmp/hermes-verify-example.py",
-            "rm -f /var/tmp/hermes-verify-example.py",
-            "rm -f /tmp/hermes-verify-*",
-            "rm -f /tmp/hermes-verify-$(touch>/tmp/pwned).py",
-            "rm -f /tmp/hermes-ad-hoc-`touch>/tmp/pwned`.py",
-            "rm -f /tmp/hermes-verify-example.py; touch /tmp/pwned",
+            "rm -rf /tmp/qubit-verify-example.py",
+            "rm -f /tmp/qubit-verify-example.py /tmp/other.py",
+            "rm -f /tmp/nested/../qubit-verify-example.py",
+            "rm -f /tmp/a/../../tmp/qubit-verify-example.py",
+            "rm -f /var/tmp/qubit-verify-example.py",
+            "rm -f /tmp/qubit-verify-*",
+            "rm -f /tmp/qubit-verify-$(touch>/tmp/pwned).py",
+            "rm -f /tmp/qubit-ad-hoc-`touch>/tmp/pwned`.py",
+            "rm -f /tmp/qubit-verify-example.py; touch /tmp/pwned",
         )
         with mock_patch("tempfile.gettempdir", return_value="/tmp"):
             for command in commands:

@@ -637,6 +637,31 @@ def legacy_entry() -> None:
     raise SystemExit(result if isinstance(result, int) else 0)
 
 
+def acp_entry() -> None:
+    """Console-script entry point for the vendored ACP adapter (``qubit-acp``).
+
+    Mirrors :func:`legacy_entry`'s Qubit-home/``sys.path`` pinning, then hands off
+    to the vendored ACP adapter (``acp_adapter.entry:main``), which speaks ACP
+    JSON-RPC on stdout. Upstream ships the same adapter as ``hermes-acp``.
+    """
+    args = list(sys.argv[1:])
+    prog = _launcher_prog()
+    saved_path = list(sys.path)
+    saved_env = dict(os.environ)
+    saved = sys.argv
+    sys.argv = [prog, *args]
+    try:
+        use_qubit_home()
+        ensure_path()
+        from acp_adapter.entry import main as _acp_main
+        _acp_main(args)
+    finally:
+        sys.argv = saved
+        sys.path[:] = saved_path
+        os.environ.clear()
+        os.environ.update(saved_env)
+
+
 __all__ = ["runtime_root", "manifest_path", "default_home", "use_qubit_home",
            "migrate_legacy_homes", "ensure_path", "run", "status", "entry",
-           "legacy_entry", "serve"]
+           "legacy_entry", "acp_entry", "serve"]

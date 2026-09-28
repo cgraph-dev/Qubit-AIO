@@ -86,20 +86,20 @@ def tool_progress_hint_cli() -> str:
 
 
 def openclaw_residue_hint_cli() -> str:
-    """Banner shown the first time Qubit finds ``~/.qubit/``: migrate first, cleanup (which breaks Qubit) after."""
+    """Banner shown the first time Qubit finds ``~/.openclaw/``: migrate first, cleanup (which breaks OpenClaw) after."""
     return (
-        "A legacy Qubit directory was detected at ~/.qubit/.\n"
+        "A legacy OpenClaw directory was detected at ~/.openclaw/.\n"
         "To port your config, memory, and skills over to Qubit, run `qubit claw migrate`.\n"
         "If you've already migrated and want to archive the old directory, run `qubit claw cleanup` "
-        "(renames it to ~/.openclaw.pre-migration — Qubit will stop working after this).\n"
+        "(renames it to ~/.openclaw.pre-migration — OpenClaw will stop working after this).\n"
         "This tip only shows once."
     )
 
 
 def detect_openclaw_residue(home: Optional[Path] = None) -> bool:
-    """True if ``$HOME/.qubit`` is a directory (``home`` override for tests)."""
+    """True if ``$HOME/.openclaw`` is a directory (``home`` override for tests)."""
     try:
-        return ((home or Path.home()) / ".qubit").is_dir()
+        return ((home or Path.home()) / ".openclaw").is_dir()
     except OSError:
         return False
 

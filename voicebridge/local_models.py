@@ -398,6 +398,36 @@ def download(cfg: Any, *, model: str, requested_by: str = "cli:user",
     return _provision_gate(cfg, "download", confirmed=confirmed)
 
 
+def download_pause(cfg: Any, *, job_id: str, requested_by: str = "cli:user",
+                   confirmed: bool = False) -> Dict[str, Any]:
+    """Pausing a download is brokered; Qubit keeps no download-job store.
+
+    Mirrors the vendored ``web_routers/local_models.py:local_models_download_pause``
+    request contract (``{"job_id": ...}``) on Qubit's authority path. Qubit runs
+    no managed local-runtime downloader, so every job is unknown here; the verb
+    still passes through the sibling e-stop -> confirmation -> broker gate and
+    never touches a job/queue.
+    """
+    clean = str(job_id or "").strip()
+    if not clean:
+        return _refusal("download.pause", BAD_INPUT_CODE, "job_id is required")
+    return _provision_gate(cfg, "download.pause", confirmed=confirmed)
+
+
+def download_resume(cfg: Any, *, job_id: str, requested_by: str = "cli:user",
+                    confirmed: bool = False) -> Dict[str, Any]:
+    """Resuming a download is brokered; Qubit keeps no download-job store.
+
+    Mirrors the vendored ``web_routers/local_models.py:local_models_download_resume``
+    request contract (``{"job_id": ...}``) on Qubit's authority path. No job is
+    restarted or resumed by this surface.
+    """
+    clean = str(job_id or "").strip()
+    if not clean:
+        return _refusal("download.resume", BAD_INPUT_CODE, "job_id is required")
+    return _provision_gate(cfg, "download.resume", confirmed=confirmed)
+
+
 def sideload(cfg: Any, *, path: str, requested_by: str = "cli:user",
              confirmed: bool = False) -> Dict[str, Any]:
     """Registering an on-disk GGUF is brokered; no filesystem access here."""

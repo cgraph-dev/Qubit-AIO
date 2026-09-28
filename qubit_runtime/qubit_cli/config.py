@@ -150,7 +150,7 @@ def validate_env_var_name_for_write(key: str) -> None:
             f"Environment variable {key!r} is on the writer denylist. "
             "Names that influence subprocess execution (LD_PRELOAD, PYTHONPATH, PATH, EDITOR, ...) "
             "or Qubit runtime location and security policy (QUBIT_HOME, HERMES_YOLO_MODE, ...) "
-            "cannot be persisted via the env writer. If you really need this, edit ~/.hermes/.env "
+            "cannot be persisted via the env writer. If you really need this, edit ~/.qubit/.env "
             "directly.")
 
 
@@ -1614,7 +1614,7 @@ def _env_expand_match(m: re.Match) -> str:
         return val
     if inner.startswith("env:"):
         logger.warning(
-            "Config ref %r: %s is not set (check ~/.hermes/.env); "
+            "Config ref %r: %s is not set (check ~/.qubit/.env); "
             "keeping the literal placeholder", raw, name)
     return raw
 

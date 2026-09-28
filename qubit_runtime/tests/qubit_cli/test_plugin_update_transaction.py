@@ -32,13 +32,13 @@ def _version(repo, version, *, broken=False, minimum="", libraries=("shared-libr
         library = repo.parent / name
         library.mkdir(exist_ok=True)
         (library / "pyproject.toml").write_text(
-            f'[project]\nname="{name}"\nversion="1"\nrequires-python=">=3.14"\n'
+            f'[project]\nname="{name}"\nversion="1"\nrequires-python=">=3.11"\n'
             '[tool.uv]\npackage=false\n', encoding="utf-8")
     if not broken:
         deps = json.dumps(list(libraries))
     sources = "".join(f'{name}={{path="../{name}"}}\n' for name in libraries)
     (repo / "pyproject.toml").write_text(
-        f'[project]\nname="transactional"\nversion="{version}"\nrequires-python=">=3.14"\n'
+        f'[project]\nname="transactional"\nversion="{version}"\nrequires-python=">=3.11"\n'
         f'dependencies={deps}\n[tool.uv]\npackage=false\n'
         f'[tool.uv.sources]\n{sources}', encoding="utf-8")
     return _commit(repo, version)

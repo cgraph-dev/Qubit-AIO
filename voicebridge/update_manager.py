@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -132,13 +133,46 @@ def _default_runner(argv: Sequence[str], timeout: float) -> Tuple[int, str, str]
         return 1, "", str(exc)
 
 
+#: ``scheme://userinfo@`` in free text — matches the token-only PAT form
+#: (``https://TOKEN@host``) as well as ``user:pass@``.
+_URL_USERINFO_RE = re.compile(r"([a-zA-Z][a-zA-Z0-9+.\-]*://)[^/@\s]+@")
+
+
 def _redact(text: Any) -> str:
+    """Redact secrets from a free-text diagnostic (git stderr, etc.).
+
+    Strips any ``scheme://userinfo@`` prefix first — including the token-only
+    ``https://TOKEN@host`` form (a GitHub PAT), which the generic
+    ``redact_text`` URL regex (it requires a ``user:pass@`` colon) misses — then
+    applies the shared secret redactor.
+    """
+    raw = str(text)
+    try:
+        raw = _URL_USERINFO_RE.sub(r"\1***@", raw)
+    except Exception:  # noqa: BLE001
+        pass
     try:
         from .redaction import redact_text
 
-        return redact_text(str(text))
+        return redact_text(raw)
     except Exception:  # noqa: BLE001
-        return str(text)
+        return raw
+
+
+def _safe_remote(remote: Any) -> str:
+    """A credential-free label for any *reported* remote in a receipt/message.
+
+    The raw remote (which may embed ``user:token@`` in an ``update.remote_url``)
+    is only ever handed to git; every receipt, audit record, and user message
+    uses this redacted form so credentials are never persisted or printed.
+    """
+    raw = str(remote or "")
+    try:
+        from .update_channel import redact_url
+
+        return redact_url(raw)
+    except Exception:  # noqa: BLE001
+        return _redact(raw)
 
 
 def _audit(op: str, **detail: Any) -> None:
@@ -203,30 +237,96 @@ def _is_clean(exec_: Runner, repo: Path) -> Tuple[Optional[bool], str]:
 
 
 def _remote_head(exec_: Runner, repo: Path, remote: str,
-                 branch: str) -> Tuple[Optional[str], str, str]:
-    """Resolve ``remote/branch`` to a bounded revision.
+                 branch: str, ref_kind: str = "branch") -> Tuple[Optional[str], str, str]:
+    """Resolve ``remote/branch`` (or a tag) to a bounded revision.
 
     Returns ``(sha, kind, detail)`` where ``kind`` is one of:
 
-    * ``"ok"``             — the branch head resolved to ``sha``;
-    * ``"branch_missing"`` — the remote answered, but has no such branch
-      (an empty ``ls-remote`` is a real, distinguishable answer, not a
-      network failure — reporting it as "couldn't reach" would be false);
+    * ``"ok"``             — the ref resolved to ``sha``;
+    * ``"branch_missing"`` / ``"tag_missing"`` — the remote answered, but has
+      no such ref (an empty ``ls-remote`` is a real, distinguishable answer,
+      not a network failure — reporting it as "couldn't reach" would be false);
     * ``"unreachable"``    — ``git ls-remote`` failed (network/remote missing);
     * ``"unresolved"``     — the remote answered but the head was not a
       bounded revision.
+
+    ``ref_kind="tag"`` resolves ``refs/tags/<branch>`` (used by an explicit
+    ``--tag`` / a tag-following channel); the default ``"branch"`` keeps the
+    historical ``refs/heads/<branch>`` behavior.
     """
-    rc, out, err = exec_(_git_argv(
-        repo, ["ls-remote", "--heads", remote, branch]), TIMEOUT_S)
+    if ref_kind == "tag":
+        refspec = f"refs/tags/{branch}"
+        argv = ["ls-remote", "--tags", remote, refspec]
+        missing_kind = "tag_missing"
+    else:
+        refspec = branch
+        argv = ["ls-remote", "--heads", remote, branch]
+        missing_kind = "branch_missing"
+    rc, out, err = exec_(_git_argv(repo, argv), TIMEOUT_S)
     if rc != 0:
         return None, "unreachable", err
     lines = [ln for ln in (out or "").strip().splitlines() if ln.strip()]
     if not lines:
-        return None, "branch_missing", f"{remote}/{branch} has no head"
+        return None, missing_kind, f"{remote}/{branch} has no head"
     sha = _sha(lines[0])
     if sha is None:
         return None, "unresolved", f"unparseable head for {remote}/{branch}"
     return sha, "ok", ""
+
+
+#: Strict SemVer prefix used to rank candidate release tags.
+_TAG_SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)")
+
+
+def _effective_ref(exec_: Runner, repo: Path, remote: str, branch: str,
+                   channel: Optional[str], tag: Optional[str]
+                   ) -> Tuple[str, str, Optional[str]]:
+    """The ref an *explicit* channel/tag update should track.
+
+    Explicit ``tag`` wins (``ref_kind="tag"``). Otherwise the channel policy
+    decides (:func:`update_channel.release_tag_support`): ``canary`` tracks the
+    branch head; ``stable``/``beta`` track the newest matching version tag,
+    resolved with ``git ls-remote --tags --refs``. A tag-following channel with
+    no matching tag falls back to the branch head. This is only consulted when
+    the caller explicitly selects a channel/tag — the default path keeps
+    tracking the configured branch so existing behavior is unchanged.
+    """
+    explicit = str(tag or "").strip()
+    if explicit:
+        return explicit, "tag", explicit
+    from . import update_channel as UC
+
+    ch = (str(channel or "").strip().lower() or UC.DEFAULT_CHANNEL)
+    try:
+        support = UC.release_tag_support(ch)
+    except Exception:  # noqa: BLE001 — unknown channel falls back to branch
+        return branch, "branch", None
+    if support.get("follow") != "tag":
+        return branch, "branch", None
+    rc, out, _err = exec_(
+        _git_argv(repo, ["ls-remote", "--tags", "--refs", remote]), TIMEOUT_S)
+    if rc != 0:
+        return branch, "branch", None
+    tags = []
+    for line in (out or "").splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[1].startswith("refs/tags/"):
+            name = parts[1][len("refs/tags/"):]
+            if name.endswith("^{}"):
+                continue
+            tags.append(name)
+    check = UC.is_stable_tag if ch == "stable" else UC.is_beta_tag
+    matching = [t for t in tags if check(t)]
+
+    def _key(name: str):
+        m = _TAG_SEMVER_RE.match(name)
+        return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+
+    if not matching:
+        return branch, "branch", None
+    best = max(matching, key=_key)
+    return best, "tag", best
+
 
 
 def _resolve_source_policy(cfg: Any, source: Optional[str],
@@ -309,11 +409,15 @@ def _resolve_source_policy(cfg: Any, source: Optional[str],
 
 def check(cfg: Any, *, runner: Optional[Runner] = None,
           git: Optional[Runner] = None,
-          source: Optional[str] = None) -> Dict[str, Any]:
+          source: Optional[str] = None, channel: Optional[str] = None,
+          tag: Optional[str] = None) -> Dict[str, Any]:
     """Read-only update status. Never raises; never fabricates "up to date".
 
     ``source`` overrides ``update.remote`` for this call (a git remote name or a
-    local repository/bundle path). It never changes the checkout.
+    local repository/bundle path). When ``channel``/``tag`` is supplied the
+    selected reference is resolved for real (a tag-following channel resolves
+    its newest matching tag), and the chosen channel/ref/tag are reported in
+    the output. It never changes the checkout.
     """
     repo = repo_root(cfg)
     is_checkout = (repo / ".git").exists()
@@ -389,23 +493,43 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
                              or "the configured update source was refused")
         out["detail"] = str((policy or {}).get("policy") or "")
         return out
-    out["remote"] = remote
+    safe_remote = _safe_remote(remote)
+    out["remote"] = safe_remote
     out["branch"] = branch
     if policy is not None:
         out["source_kind"] = policy.get("source_kind")
         out["source_url"] = str(policy.get("url") or "")
-    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, branch)
+    # Explicit channel/tag selection resolves a real reference (a tag-following
+    # channel picks its newest matching tag). The default path keeps tracking
+    # the configured branch so existing behavior is unchanged.
+    ref, ref_kind = branch, "branch"
+    if channel is not None or tag is not None:
+        from . import update_channel as UC
+
+        eff_ch = str(channel or "").strip().lower() or UC.resolve_channel(cfg)
+        ref, ref_kind, sel_tag = _effective_ref(
+            exec_, repo, remote, branch, eff_ch, tag)
+        out["channel"] = eff_ch
+        out["ref"] = ref
+        out["ref_kind"] = ref_kind
+        out["tag"] = sel_tag
+    ref_label = ref if ref_kind == "tag" else branch
+    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, ref, ref_kind)
     if remote_sha is None:
         out["state"] = "DEGRADED"
         out["remote_reachable"] = rkind != "unreachable"
         out["remote_branch_found"] = rkind == "unresolved"
         if rkind == "branch_missing":
             out["message"] = (f"the update source has no branch "
-                              f"{remote}/{branch}; check update.remote and "
-                              f"update.branch — not reporting up to date")
+                              f"{safe_remote}/{ref_label}; check the update "
+                              f"source — not reporting up to date")
+        elif rkind == "tag_missing":
+            out["message"] = (f"the update source has no tag "
+                              f"{safe_remote}/{ref_label}; check the update "
+                              f"source — not reporting up to date")
         else:
             out["message"] = (f"couldn't reach the update source "
-                              f"({remote}/{branch}); not reporting up to date")
+                              f"({safe_remote}/{ref_label}); not reporting up to date")
         out["detail"] = _redact(rerr)[:300]
     else:
         out["remote_reachable"] = True
@@ -419,7 +543,8 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
             # an unknown count" (never a fabricated exact number).
             out["behind"] = -1
             out["update_available"] = True
-            out["message"] = (f"an update is available on {remote}/{branch} "
+            out["message"] = (f"an update is available on "
+                              f"{safe_remote}/{ref_label} "
                               "(behind by an unknown count)")
 
     # ``can_apply`` means an ``apply`` turn is expected to be able to run: a
@@ -433,13 +558,16 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
 def apply(cfg: Any, *, confirm: bool = False,
           runner: Optional[Runner] = None, git: Optional[Runner] = None,
           actor: str = "dashboard:user",
-          source: Optional[str] = None) -> Dict[str, Any]:
+          source: Optional[str] = None, channel: Optional[str] = None,
+          tag: Optional[str] = None) -> Dict[str, Any]:
     """Perform one confirmed non-destructive ``git pull --ff-only``.
 
     Order: confirm -> e-stop -> test guard -> checkout -> clean worktree ->
     pull. Refuses (never executes) on any earlier failure. ``source`` overrides
     ``update.remote`` for this call (a git remote name or a local repository/
-    bundle path).
+    bundle path). When ``channel``/``tag`` is supplied the selected reference
+    (a tag-following channel's newest matching tag, or the explicit tag) is
+    what gets pulled, so channel/tag selection is real rather than echoed.
     """
     if not confirm:
         return {"ok": False, "state": "CONFIRM_REQUIRED", "code": CONFIRM_CODE,
@@ -499,10 +627,21 @@ def apply(cfg: Any, *, confirm: bool = False,
                 "detail": str((policy or {}).get("detail")
                               or "the configured update source was refused"),
                 "rollback_plan": "nothing changed; nothing to roll back"}
-    command = f"git pull --ff-only {remote} {branch}"
+    safe_remote = _safe_remote(remote)
+    # An explicit channel/tag selects the real reference to pull (a
+    # tag-following channel resolves its newest matching tag). The default path
+    # pulls the configured branch.
+    ref, ref_kind = branch, "branch"
+    if channel is not None or tag is not None:
+        from . import update_channel as UC
+
+        eff_ch = str(channel or "").strip().lower() or UC.resolve_channel(cfg)
+        ref, ref_kind, _sel_tag = _effective_ref(
+            exec_, repo, remote, branch, eff_ch, tag)
+    command = f"git pull --ff-only {safe_remote} {ref}"
 
     rc, pulled_out, pulled_err = exec_(
-        _git_argv(repo, ["pull", "--ff-only", remote, branch]), TIMEOUT_S)
+        _git_argv(repo, ["pull", "--ff-only", remote, ref]), TIMEOUT_S)
     rc_post, post_out, _post_err = exec_(
         _git_argv(repo, ["rev-parse", "HEAD"]), TIMEOUT_S)
     post_revision = _sha(post_out) if rc_post == 0 else pre_revision
@@ -527,25 +666,27 @@ def apply(cfg: Any, *, confirm: bool = False,
                rc=rc)
         return {"ok": False, "state": "FAILED", "code": FAILED_CODE,
                 "command": command, "install_method": "git-checkout",
-                "remote": remote, "branch": branch,
+                "remote": safe_remote, "branch": branch,
                 "pre_revision": pre_revision, "post_revision": post_revision,
                 "detail": _redact((pulled_err or pulled_out
                                    or "git pull failed").strip())[:300],
                 "rollback_plan": rollback_plan, "rollback": rollback}
 
-    # Confirm the checked-out revision now matches the configured remote branch
+    # Confirm the checked-out revision now matches the selected remote ref
     # (when the remote head is resolvable). A mismatch is reported, not hidden.
-    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, branch)
+    ref_label = ref if ref_kind == "tag" else branch
+    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, ref, ref_kind)
     if remote_sha is not None and post_revision and remote_sha != post_revision:
         _audit("apply_mismatch", actor=actor, command=command,
                expected=remote_sha, actual=post_revision)
         return {"ok": False, "state": "FAILED", "code": FAILED_CODE,
                 "command": command, "install_method": "git-checkout",
-                "remote": remote, "branch": branch,
+                "remote": safe_remote, "branch": branch, "ref": ref,
+                "ref_kind": ref_kind,
                 "pre_revision": pre_revision, "post_revision": post_revision,
                 "remote_verified": False,
                 "detail": (f"pulled revision {post_revision} does not match "
-                           f"{remote}/{branch} {remote_sha}"),
+                           f"{safe_remote}/{ref_label} {remote_sha}"),
                 "rollback_plan": rollback_plan, "rollback": rollback}
 
     changed = pre_revision != post_revision
@@ -555,7 +696,8 @@ def apply(cfg: Any, *, confirm: bool = False,
            changed=bool(changed), remote_verified=bool(remote_verified))
     receipt = {"ok": True, "state": "OK", "code": "",
                "command": command, "install_method": "git-checkout",
-               "remote": remote, "branch": branch,
+               "remote": safe_remote, "branch": branch, "ref": ref,
+               "ref_kind": ref_kind,
                "pre_revision": pre_revision, "post_revision": post_revision,
                "changed": bool(changed), "update_available": bool(changed),
                "remote_verified": bool(remote_verified),
@@ -565,7 +707,7 @@ def apply(cfg: Any, *, confirm: bool = False,
         # The pull returned success but the update source could not be re-read
         # to prove post == remote head. Say so; never imply a verified match.
         receipt["warning"] = (
-            f"pulled, but {remote}/{branch} could not be re-read to confirm "
+            f"pulled, but {safe_remote}/{ref_label} could not be re-read to confirm "
             f"the revision ({rkind}); verify with "
             f"'git -C {repo} rev-parse HEAD'")
         receipt["remote_check_detail"] = _redact(rerr)[:300]
@@ -701,7 +843,7 @@ def snapshot(cfg: Any, *, runner: Optional[Runner] = None,
         "product_version": _current_version(),
         "install_method": install_method,
         "pre_revision": pre_revision,
-        "remote": remote,
+        "remote": _safe_remote(remote),
         "branch": branch,
         "bundle": bundle_name,
         "actor": str(actor),
@@ -1239,7 +1381,8 @@ def full_apply(cfg: Any, *, confirm: bool = False,
     #    enforces the same guard) so the documented snapshot/apply seams stay
     #    the single backend; nothing runs while the guard is set.
     if runner is None and git is None and _real_control_disabled():
-        return apply(cfg, confirm=confirm, source=source, actor=actor)
+        return apply(cfg, confirm=confirm, source=source, channel=channel,
+                     tag=tag, actor=actor)
 
     # 4. install-method detection
     method = detect_install_method(cfg)
@@ -1320,7 +1463,7 @@ def full_apply(cfg: Any, *, confirm: bool = False,
 
             # 8. fast-forward pull ONLY (non-interactive, timeout-bounded)
             pull = apply(cfg, confirm=True, runner=runner, git=git, source=source,
-                         actor=actor)
+                         channel=channel, tag=tag, actor=actor)
             pre = pull.get("pre_revision") or receipt.get("previous_revision")
             post = pull.get("post_revision")
             receipt["previous_revision"] = pre or receipt.get("previous_revision")

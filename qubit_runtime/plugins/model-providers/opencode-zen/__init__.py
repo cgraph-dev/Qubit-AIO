@@ -14,9 +14,9 @@ from providers.base import ProviderProfile
 # Attribution headers (same values as OpenRouter / Vercel / Fireworks); via
 # default_headers so they survive model switches and credential rotation.
 _ATTRIBUTION_HEADERS = {
-    "HTTP-Referer": "https://hermes-agent.nousresearch.com",
+    "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge",
     "X-Title": "Qubit Agent",
-    "User-Agent": f"HermesAgent/{get_version_info().base_version}",
+    "User-Agent": f"QubitAgent/{get_version_info().base_version}",
 }
 
 

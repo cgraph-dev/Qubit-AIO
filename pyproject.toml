@@ -16,7 +16,7 @@ license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 # `uv venv --python 3.12`. Declaring 3.11 let pip/uv build a 3.11 environment
 # where `qubit run` dies at import with SyntaxError; the metadata now matches
 # the interpreter the product actually supports and installs.
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "sherpa-onnx>=1.13",      # Moonshine ASR + Silero VAD + eres2net voice-ID + Kokoro
     "sounddevice>=0.4",       # mic capture + playback (PortAudio)
@@ -146,6 +146,9 @@ qubit-dev = "voicebridge.terminal:main"
 # single-query runner (upstream `hermes-agent`) honors argv
 # (`--help`/`--version`/`--query`); `qubit` remains the full CLI.
 qubit-agent = "voicebridge.qubit_runtime:legacy_entry"
+# Direct launcher for the vendored ACP adapter (upstream `hermes-acp`
+# equivalent); pins QUBIT_HOME/sys.path before importing `acp_adapter.entry`.
+qubit-acp = "voicebridge.qubit_runtime:acp_entry"
 
 [build-system]
 requires = ["hatchling"]
@@ -222,6 +225,12 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/plugins" = "voicebridge/_data/qubit_runtime/plugins"
 "qubit_runtime/skills" = "voicebridge/_data/qubit_runtime/skills"
 "qubit_runtime/optional-skills" = "voicebridge/_data/qubit_runtime/optional-skills"
+# Optional MCP server packages (``qubit_cli.mcp_catalog``) and the shipped
+# plugin catalog (``qubit_cli.plugin_catalog``) are read from the installed
+# runtime tree; without these force-includes a clean wheel cannot list/install
+# optional MCPs or the plugin catalog and falls back (or degrades) silently.
+"qubit_runtime/optional-mcps" = "voicebridge/_data/qubit_runtime/optional-mcps"
+"qubit_runtime/plugin-catalog" = "voicebridge/_data/qubit_runtime/plugin-catalog"
 "qubit_runtime/cron" = "voicebridge/_data/qubit_runtime/cron"
 "qubit_runtime/providers" = "voicebridge/_data/qubit_runtime/providers"
 "qubit_runtime/ui-tui" = "voicebridge/_data/qubit_runtime/ui-tui"
@@ -229,12 +238,37 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/native" = "voicebridge/_data/qubit_runtime/native"
 "qubit_runtime/locales" = "voicebridge/_data/qubit_runtime/locales"
 "qubit_runtime/assets" = "voicebridge/_data/qubit_runtime/assets"
-"qubit_runtime/mcp-research-data" = "voicebridge/_data/qubit_runtime/mcp-research-data"
+# v0.21.5 runtime packages the rebase added. ``pm/`` is imported by
+# ``qubit_bootstrap`` at CLI startup and ``acp_adapter/`` backs the ``qubit-acp``
+# entry point; omitting either breaks a clean install (VERIFY_CLEAN_INSTALL).
+"qubit_runtime/acp_adapter" = "voicebridge/_data/qubit_runtime/acp_adapter"
+"qubit_runtime/pm" = "voicebridge/_data/qubit_runtime/pm"
+# ``qubit_platform`` is imported by ``qubit_constants`` (platform default home).
+"qubit_runtime/qubit_platform" = "voicebridge/_data/qubit_runtime/qubit_platform"
 "qubit_runtime/web" = "voicebridge/_data/qubit_runtime/web"
+# ``scripts/releases`` and ``scripts/bundles`` are imported at runtime by
+# production code — ``qubit_cli/release_channels.py`` imports
+# ``scripts.releases.versioning`` (which itself imports ``scripts.releases.semver``)
+# and ``pm/cli.py`` imports ``scripts.bundles.native`` for ``qubit pm bundle``.
+# Both are PEP 420 namespace packages (no ``__init__.py``) resolved off the fork
+# root that ``qubit_runtime.ensure_path()`` puts on ``sys.path``; without these
+# mappings a clean wheel cannot import either path.
+"qubit_runtime/scripts/releases" = "voicebridge/_data/qubit_runtime/scripts/releases"
+"qubit_runtime/scripts/bundles" = "voicebridge/_data/qubit_runtime/scripts/bundles"
+# ``voicebridge/communications/monitor.py`` imports ``scripts.browser_auto`` (the
+# guarded CDP launch helper) off the same fork root. In a checkout the repo root
+# precedes the fork root on ``sys.path`` so the module resolves from the repo
+# root; in a clean wheel it must ship under the installed fork root for
+# ``import scripts.browser_auto`` to resolve. A wheel-root ``scripts/``
+# destination is forbidden by the package-data contract
+# (tests/test_packaging_wave3.py::test_force_include_destinations_live_under_package_data).
+"scripts/browser_auto.py" = "voicebridge/_data/qubit_runtime/scripts/browser_auto.py"
 "qubit_runtime/batch_runner.py" = "voicebridge/_data/qubit_runtime/batch_runner.py"
 "qubit_runtime/cli.py" = "voicebridge/_data/qubit_runtime/cli.py"
 "qubit_runtime/qubit_bootstrap.py" = "voicebridge/_data/qubit_runtime/qubit_bootstrap.py"
 "qubit_runtime/qubit_constants.py" = "voicebridge/_data/qubit_runtime/qubit_constants.py"
+"qubit_runtime/qubit_constants_scratch.py" = "voicebridge/_data/qubit_runtime/qubit_constants_scratch.py"
+"qubit_runtime/qubit_yaml.py" = "voicebridge/_data/qubit_runtime/qubit_yaml.py"
 "qubit_runtime/qubit_logging.py" = "voicebridge/_data/qubit_runtime/qubit_logging.py"
 "qubit_runtime/qubit_startup_watchdog.py" = "voicebridge/_data/qubit_runtime/qubit_startup_watchdog.py"
 "qubit_runtime/qubit_state.py" = "voicebridge/_data/qubit_runtime/qubit_state.py"
@@ -245,6 +279,7 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/qubit_state_fts.py" = "voicebridge/_data/qubit_runtime/qubit_state_fts.py"
 "qubit_runtime/qubit_state_gateway.py" = "voicebridge/_data/qubit_runtime/qubit_state_gateway.py"
 "qubit_runtime/qubit_state_guard.py" = "voicebridge/_data/qubit_runtime/qubit_state_guard.py"
+"qubit_runtime/qubit_state_health.py" = "voicebridge/_data/qubit_runtime/qubit_state_health.py"
 "qubit_runtime/qubit_state_holders.py" = "voicebridge/_data/qubit_runtime/qubit_state_holders.py"
 "qubit_runtime/qubit_state_ids.py" = "voicebridge/_data/qubit_runtime/qubit_state_ids.py"
 "qubit_runtime/qubit_state_lockguard.py" = "voicebridge/_data/qubit_runtime/qubit_state_lockguard.py"
@@ -373,6 +408,12 @@ exclude = [
   "docs/generated/QUBIT_DASHBOARD_AUDIT_2026-09-23.json",
   "docs/generated/QUBIT_SOURCE_INVENTORY.json",
   "docs/generated/parity_inventory.json",
+  # Generated audit evidence and the reference-pinned byte manifest record the
+  # developer's real home path; they are internal provenance records, never
+  # shipped (Packet 8K sdist privacy — enforced by
+  # tests/test_qbpv2_agent5_packaging.py).
+  "docs/generated/audit",
+  "docs/differential/byte_manifest",
   # Newly generated controls E2E evidence (untracked working-tree artifact)
   # also records the developer home path; exclude it like the other generated
   # evidence (Packet 8K sdist privacy).
@@ -442,6 +483,11 @@ exclude = [
 "qubit_runtime/plugins" = "qubit_runtime/plugins"
 "qubit_runtime/skills" = "qubit_runtime/skills"
 "qubit_runtime/optional-skills" = "qubit_runtime/optional-skills"
+# Mirror the wheel force-include: the sdist's default tree walk excludes
+# ``qubit_runtime`` wholesale, so these must be force-included here too or a
+# wheel rebuilt from the sdist loses optional MCPs and the plugin catalog.
+"qubit_runtime/optional-mcps" = "qubit_runtime/optional-mcps"
+"qubit_runtime/plugin-catalog" = "qubit_runtime/plugin-catalog"
 "qubit_runtime/cron" = "qubit_runtime/cron"
 "qubit_runtime/providers" = "qubit_runtime/providers"
 "qubit_runtime/ui-tui" = "qubit_runtime/ui-tui"
@@ -449,12 +495,24 @@ exclude = [
 "qubit_runtime/native" = "qubit_runtime/native"
 "qubit_runtime/locales" = "qubit_runtime/locales"
 "qubit_runtime/assets" = "qubit_runtime/assets"
-"qubit_runtime/mcp-research-data" = "qubit_runtime/mcp-research-data"
+# v0.21.5 runtime packages the rebase added; see the wheel force-include note.
+"qubit_runtime/acp_adapter" = "qubit_runtime/acp_adapter"
+"qubit_runtime/pm" = "qubit_runtime/pm"
+# ``qubit_platform`` is imported by ``qubit_constants`` (platform default home).
+"qubit_runtime/qubit_platform" = "qubit_runtime/qubit_platform"
 "qubit_runtime/web" = "qubit_runtime/web"
+# Mirror the wheel's production ``scripts.releases``/``scripts.bundles``
+# imports (``release_channels.py`` and ``pm/cli.py``); the sdist excludes
+# ``qubit_runtime`` wholesale so these must be force-included here too or a
+# wheel rebuilt from the sdist loses both paths.
+"qubit_runtime/scripts/releases" = "qubit_runtime/scripts/releases"
+"qubit_runtime/scripts/bundles" = "qubit_runtime/scripts/bundles"
 "qubit_runtime/batch_runner.py" = "qubit_runtime/batch_runner.py"
 "qubit_runtime/cli.py" = "qubit_runtime/cli.py"
 "qubit_runtime/qubit_bootstrap.py" = "qubit_runtime/qubit_bootstrap.py"
 "qubit_runtime/qubit_constants.py" = "qubit_runtime/qubit_constants.py"
+"qubit_runtime/qubit_constants_scratch.py" = "qubit_runtime/qubit_constants_scratch.py"
+"qubit_runtime/qubit_yaml.py" = "qubit_runtime/qubit_yaml.py"
 "qubit_runtime/qubit_logging.py" = "qubit_runtime/qubit_logging.py"
 "qubit_runtime/qubit_startup_watchdog.py" = "qubit_runtime/qubit_startup_watchdog.py"
 "qubit_runtime/qubit_state.py" = "qubit_runtime/qubit_state.py"
@@ -465,6 +523,7 @@ exclude = [
 "qubit_runtime/qubit_state_fts.py" = "qubit_runtime/qubit_state_fts.py"
 "qubit_runtime/qubit_state_gateway.py" = "qubit_runtime/qubit_state_gateway.py"
 "qubit_runtime/qubit_state_guard.py" = "qubit_runtime/qubit_state_guard.py"
+"qubit_runtime/qubit_state_health.py" = "qubit_runtime/qubit_state_health.py"
 "qubit_runtime/qubit_state_holders.py" = "qubit_runtime/qubit_state_holders.py"
 "qubit_runtime/qubit_state_ids.py" = "qubit_runtime/qubit_state_ids.py"
 "qubit_runtime/qubit_state_lockguard.py" = "qubit_runtime/qubit_state_lockguard.py"

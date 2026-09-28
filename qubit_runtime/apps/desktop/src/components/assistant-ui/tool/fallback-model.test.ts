@@ -230,28 +230,28 @@ describe('buildToolView browser_navigate title', () => {
     const view = buildToolView(
       part({
         toolName: 'browser_navigate',
-        args: { url: 'https://hermes-agent.nousresearch.com/docs' },
+        args: { url: 'https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs' },
         result: { success: false, error: 'Command timed out after 60 seconds' }
       }),
       ''
     )
 
     expect(view.status).toBe('error')
-    expect(view.title).toContain('hermes-agent.nousresearch.com/docs')
+    expect(view.title).toContain('github.com/cgraph-dev/qubit-voicebridge/tree/main/docs')
   })
 
   it('shows opened title on success', () => {
     const view = buildToolView(
       part({
         toolName: 'browser_navigate',
-        args: { url: 'https://hermes-agent.nousresearch.com/docs' },
-        result: { success: true, url: 'https://hermes-agent.nousresearch.com/docs', title: 'Docs' }
+        args: { url: 'https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs' },
+        result: { success: true, url: 'https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs', title: 'Docs' }
       }),
       ''
     )
 
     expect(view.status).toBe('success')
-    expect(view.title).toContain('hermes-agent.nousresearch.com/docs')
+    expect(view.title).toContain('github.com/cgraph-dev/qubit-voicebridge/tree/main/docs')
   })
 })
 

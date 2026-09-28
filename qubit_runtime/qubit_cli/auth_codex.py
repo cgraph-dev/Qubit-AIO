@@ -19,6 +19,7 @@ import time
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple
+from qubit_cli import install_source
 from qubit_cli.auth_constants import (
     _decode_jwt_claims, AUTH_LOCK_TIMEOUT_SECONDS, AuthError,
     CODEX_ACCESS_TOKEN_REFRESH_SKEW_SECONDS, CODEX_OAUTH_CLIENT_ID, CODEX_OAUTH_TOKEN_URL,
@@ -293,7 +294,7 @@ def _ssl_interop_hint(exc: BaseException) -> str:
         " the larger TLS 1.3 ClientHello that OpenSSL 3.5+ sends by default (post-quantum hybrid"
         " groups). Workaround: point OPENSSL_CONF at a config restricting Groups to classic curves"
         " (x25519:secp256r1:secp384r1:x448), or test with TLS 1.2 — see the Codex note in"
-        " https://hermes-agent.nousresearch.com/docs/integrations/providers"
+        f" {install_source.docs_url('integrations/providers')}"
     )
 
 

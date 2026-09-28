@@ -5,9 +5,10 @@ import pytest
 
 from scripts.releases import r2, upload_summary
 from scripts.releases.r2_scope import R2Scope
+from qubit_cli import install_source
 
 
-BASE = "https://hermes-assets.nousresearch.com"
+BASE = install_source.release_assets_base_url()
 KEY = "releases/commit/" + "a" * 40 + "/HermesBundled-1.2.3-win-x64.msix"
 
 

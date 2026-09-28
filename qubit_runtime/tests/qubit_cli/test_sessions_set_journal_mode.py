@@ -91,8 +91,8 @@ def test_set_journal_mode_refuses_while_another_process_holds_the_store(
     ("wal", "delete", True, "cross-VM filesystems"),
     ("delete", "wal", True, None),
     # A garbage or unrecognised header is reported, never handed to sqlite3 for a raw traceback.
-    ("delete", "not-a-database", False, "not a Hermes SQLite store"),
-    ("delete", "unknown(3/3)", False, "not a Hermes SQLite store"),
+    ("delete", "not-a-database", False, "not a Qubit SQLite store"),
+    ("delete", "unknown(3/3)", False, "not a Qubit SQLite store"),
 ])
 def test_refusal_admission_invariants(target, current, cross_vm, expected):
     reason = _refusal(target, current, on_cross_vm_fs=cross_vm)

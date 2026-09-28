@@ -514,10 +514,10 @@ def main(argv: list | None = None) -> int:
     ap = argparse.ArgumentParser(description="Stage a static APT repo layout.")
     ap.add_argument("--pool", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
-    # hermes-nightly is the suite actually published today
-    # (https://hermes-assets.nousresearch.com/releases/termux/nightly/,
-    # verified 2026-09-06); hermes-stable/hermes-canary are what CI stages
-    # for the stable/canary channels.
+    # hermes-nightly is the suite actually published today (see the Qubit
+    # release-asset host's /releases/termux/nightly/, verified 2026-09-06);
+    # hermes-stable/hermes-canary are what CI stages for the stable/canary
+    # channels. The suite names are published wire values and are preserved.
     ap.add_argument(
         "--suite", required=True,
         choices=["hermes-stable", "hermes-canary", "hermes-nightly"],

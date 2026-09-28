@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from agent.secret_scope import get_secret
+from qubit_cli import install_source
 from tools.registry import registry, tool_error
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def _discord_request(
         url, data=None if body is None else json.dumps(body).encode("utf-8"), method=method,
         headers={
             "Authorization": f"Bot {token}", "Content-Type": "application/json",
-            "User-Agent": "Qubit-Agent (https://github.com/NousResearch/hermes-agent)"})
+            "User-Agent": f"Qubit-Agent ({install_source.base_url()})"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 204:

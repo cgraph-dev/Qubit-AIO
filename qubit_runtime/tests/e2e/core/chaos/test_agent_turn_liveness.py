@@ -47,6 +47,7 @@ from tests.e2e.core.chaos._helpers import (
     MAX_PROVIDER_CALLS_PER_FAILED_TURN,
     PROCESS_REAP_S,
     REASONING_MODEL,
+    SCENARIO_WORKERS,
     TOOL_TIMEOUT_S,
     TURN_DEADLINE_S,
     describe_pids,
@@ -80,7 +81,6 @@ BOOT_DEADLINE_S = 120.0  # cold import of the agent stack on a loaded runner
 PROBE_DEADLINE_S = 60.0
 EXIT_DEADLINE_S = 30.0
 SETTLE_DEADLINE_S = 60.0
-SCENARIO_WORKERS = 6
 PARALLEL_CALLS = 8
 HUGE_OUTPUT_BYTES = 30_000_000
 # What may be persisted / re-sent for a 30 MB tool output (it is truncated or spilled).

@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+from qubit_cli import install_source
+
 logger = logging.getLogger("qubit_cli.update_cmd")  # log-record parity with the origin module
 
 _ORPHAN_RESCUE_REFS_TO_KEEP = 10
@@ -190,13 +192,11 @@ def _print_parked_branch_kept_notice(current_branch: str, target_branch: str, un
     )
 
 
-OFFICIAL_REPO_URLS = {
-    "https://github.com/NousResearch/hermes-agent.git",
-    "git@github.com:NousResearch/hermes-agent.git",
-    "https://github.com/NousResearch/hermes-agent",
-    "git@github.com:NousResearch/hermes-agent",
-}
-OFFICIAL_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
+#: Origin spellings that identify the Qubit repository. Derived from the single
+#: configurable installer source (``qubit_cli.install_source``) so no Hermes/
+#: NousResearch repo URL is hardcoded here.
+OFFICIAL_REPO_URLS = install_source.official_repo_urls()
+OFFICIAL_REPO_URL = install_source.official_repo_url()
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
 
 
@@ -367,7 +367,7 @@ _FETCH_FAILURE_RULES = (
     # key (or lack of one) was the cause (#82169).
     (lambda s: "Permission denied (publickey)" in s or "Host key verification failed" in s,
      "✗ SSH authentication failed — check your SSH key is added to GitHub, or switch"
-     " `origin` to HTTPS: `git remote set-url origin https://github.com/NousResearch/hermes-agent.git`."),
+     f" `origin` to HTTPS: `git remote set-url origin {install_source.official_repo_url()}`."),
 )
 
 

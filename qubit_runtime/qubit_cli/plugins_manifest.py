@@ -435,8 +435,12 @@ def version_satisfies(spec: str, current: str) -> bool:
 
 
 def requires_qubit_error(manifest: "PluginManifest") -> Optional[str]:
-    """Load-blocking reason when the manifest's ``requires_hermes`` rejects the running version."""
-    spec = manifest.get("requires_hermes", "") if isinstance(manifest, Mapping) else manifest.requires_hermes
+    """Load-blocking reason when the manifest's ``requires_hermes`` (read-old ``requires_qubit``
+    spelling preferred) rejects the running version."""
+    spec = (
+        (manifest.get("requires_qubit") or manifest.get("requires_hermes") or "")
+        if isinstance(manifest, Mapping) else manifest.requires_hermes
+    )
     if not spec:
         return None
     current = running_qubit_version()
@@ -507,7 +511,8 @@ def parse_manifest_file(
             # ``hooks:`` is the spelling the bundled manifests carried for months; external copies of it
             # must keep declaring the same thing (#108371).
             provides_hooks=data.get("provides_hooks", data.get("hooks", [])), source=source, path=str(plugin_dir),
-            kind=kind, key=key, requires_hermes=str(data.get("requires_hermes") or "").strip(),
+            kind=kind, key=key,
+            requires_hermes=str(data.get("requires_qubit") or data.get("requires_hermes") or "").strip(),
             capabilities=_parse_declared_capabilities(data.get("capabilities"), name),
             **_parse_manifest_v2_fields(data, key), emits=data.get("emits") or [],
             listens=data.get("listens") or [],

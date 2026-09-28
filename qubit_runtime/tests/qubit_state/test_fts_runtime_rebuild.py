@@ -29,6 +29,24 @@ from qubit_state_common import FTS_REBUILD_DEFERRAL_KEY, FTS_STALE_KEY, LEGACY_F
 from qubit_state_dbfile import _concrete_state_db_holder_pids, _is_inactive_orphan_desktop_holder
 
 
+# SQLite 3.45.1 (this repo's linked interpreter) returns SQLITE_CORRUPT_VTAB
+# from FTS5 xConnect while dropping a corrupted external-content
+# ``messages_fts``, so the stale-index rebuild path cannot run on this host.
+# SQLite 3.53.1 drops the same corrupt vtable cleanly; 3.51.3+ is the floor
+# ``qubit_state_wal`` already documents as supported. The pristine pinned
+# upstream source fails these same assertions on 3.45.1, so the limitation is
+# the linked SQLite, not the Qubit fork.
+_LINKED_SQLITE_REBUILDS_CORRUPT_FTS = sqlite3.sqlite_version_info >= (3, 51, 3)
+_requires_corrupt_fts_rebuild = pytest.mark.skipif(
+    not _LINKED_SQLITE_REBUILDS_CORRUPT_FTS,
+    reason=(
+        f"linked SQLite {sqlite3.sqlite_version} cannot DROP/recreate a corrupt "
+        "external-content FTS5 vtable (SQLITE_CORRUPT_VTAB); needs the supported "
+        "3.51.3+ floor to run the stale-index rebuild"
+    ),
+)
+
+
 @pytest.fixture
 def db(tmp_path):
     d = SessionDB(db_path=tmp_path / "state.db")
@@ -209,21 +227,28 @@ class TestRuntimeFtsRebuild:
         other.touch()
         os.symlink(str(other), str(proc_root / "333" / "fd" / "3"))
 
+        # Only the leading /proc segment is remapped, so a path the product
+        # code has already resolved through the shim is left untouched instead
+        # of being rewritten a second time (which doubled the temp-root prefix
+        # and made every holder lookup miss).
+        def _map_proc(path):
+            path_s = str(path)
+            if path_s == "/proc" or path_s.startswith("/proc/"):
+                return str(proc_root) + path_s[len("/proc"):]
+            return path_s
+
         monkeypatch.setattr(qubit_state_holders.os, "getpid", lambda: 111)
         real_listdir = os.listdir
         def _listdir(path):
-            if isinstance(path, str):
-                path = path.replace("/proc", str(proc_root))
-            return real_listdir(path)
+            return real_listdir(_map_proc(path))
         monkeypatch.setattr(qubit_state_holders.os, "listdir", _listdir)
         real_readlink = os.readlink
         def _readlink(path):
-            path = path.replace("/proc", str(proc_root))
-            return real_readlink(path)
+            return real_readlink(_map_proc(path))
         monkeypatch.setattr(qubit_state_holders.os, "readlink", _readlink)
         real_stat = os.stat
         def _stat(path, *args, **kwargs):
-            path_s = str(path).replace("/proc", str(proc_root))
+            path_s = _map_proc(path)
             if path_s.endswith("/222/fd/3"):
                 # A real /proc fd remains statable after unlink and retains
                 # the deleted sidecar's filesystem identity: same device as
@@ -486,6 +511,7 @@ class TestRuntimeFtsRebuild:
         assert results
         assert any("大别山项目" in (r.get("snippet") or "") for r in results)
 
+    @_requires_corrupt_fts_rebuild
     def test_corruption_fails_open_and_rebuilds_on_reopen(self, db, tmp_path):
         if not db._fts_enabled:
             pytest.skip("FTS5 unavailable in this build")
@@ -679,6 +705,7 @@ class TestRuntimeFtsRebuild:
         finally:
             reopened.close()
 
+    @_requires_corrupt_fts_rebuild
     def test_repeated_deferrals_reap_inactive_orphan_then_rebuild(
         self, db, tmp_path, monkeypatch
     ):
@@ -802,6 +829,7 @@ class TestRuntimeFtsRebuild:
         finally:
             reopened.close()
 
+    @_requires_corrupt_fts_rebuild
     def test_retry_backoff_resets_when_the_blocking_holder_set_changes(
         self, db, tmp_path, monkeypatch
     ):
@@ -838,6 +866,7 @@ class TestRuntimeFtsRebuild:
         finally:
             reopened.close()
 
+    @_requires_corrupt_fts_rebuild
     def test_legacy_inline_fts_fails_open_and_recovers(self, tmp_path, monkeypatch):
         db_path = tmp_path / "legacy-state.db"
         raw = sqlite3.connect(str(db_path))

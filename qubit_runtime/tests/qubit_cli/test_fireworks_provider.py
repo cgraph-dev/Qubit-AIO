@@ -136,7 +136,7 @@ class TestFireworksAuxiliary:
         client, model, kwargs = self._resolve("fireworks")
         assert client is not None
         headers = kwargs.get("default_headers", {})
-        assert headers["HTTP-Referer"] == "https://hermes-agent.nousresearch.com"
+        assert headers["HTTP-Referer"] == "https://github.com/cgraph-dev/qubit-voicebridge"
         assert headers["X-Title"] == "Qubit Agent"
         assert kwargs["base_url"] == "https://api.fireworks.ai/inference/v1"
 
@@ -146,7 +146,7 @@ class TestFireworksAuxiliary:
         monkeypatch.setenv("FIREWORKS_API_KEY", "fw_test_key")
         _client, _model, kwargs = self._resolve("fireworks")
         headers = kwargs.get("default_headers", {})
-        assert headers["User-Agent"].startswith("HermesAgent/")
+        assert headers["User-Agent"].startswith("QubitAgent/")
 
 
 class TestFireworksModelMetadata:

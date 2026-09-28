@@ -472,7 +472,7 @@ def _rmtree_writable(path: Path) -> None:
 
 
 if __name__ == "__main__":
-    print("Syncing bundled skills into ~/.hermes/skills/ ...")
+    print("Syncing bundled skills into the Qubit home skills directory ...")
     result = sync_skills(quiet=False)
     parts = [f"{len(result['copied'])} new", f"{len(result['updated'])} updated", f"{result['skipped']} unchanged"]
     if names := result["user_modified"]:

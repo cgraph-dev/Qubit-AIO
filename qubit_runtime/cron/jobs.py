@@ -1,5 +1,5 @@
-"""Cron job storage: ~/.hermes/cron/jobs.json; output in
-~/.hermes/cron/output/{job_id}/{timestamp}.md"""
+"""Cron job storage: <QUBIT_HOME>/cron/jobs.json; output in
+<QUBIT_HOME>/cron/output/{job_id}/{timestamp}.md"""
 
 import contextlib
 import copy
@@ -64,7 +64,7 @@ def _ensure_croniter() -> bool:
 # and run them under the ticker's QUBIT_HOME, leaking config/credentials/skills across profiles.
 # Each profile owns its own cron store under its own QUBIT_HOME, and a profile-scoped gateway runs that
 # profile's jobs under that same QUBIT_HOME — so a job authored in profile `coder` lives in
-# `~/.hermes/profiles/coder/cron/jobs.json` and executes with `coder`'s `.env`, `config.yaml`, and skills.
+# `<QUBIT_HOME>/profiles/coder/cron/jobs.json` and executes with `coder`'s `.env`, `config.yaml`, and skills.
 # Do NOT change this to the default root: that re-breaks per-profile isolation. See also the dynamic
 # `_get_qubit_home()` / `_get_lock_paths()` resolution in cron/scheduler.py. See #4707.
 HERMES_DIR = get_qubit_home().resolve()
@@ -1185,7 +1185,7 @@ def compute_next_run(schedule: Dict[str, Any], last_run_at: Optional[str] = None
             logger.warning(
                 "Cannot compute next run for cron schedule %r: 'croniter' is "
                 "not installed. croniter is a core dependency as of v0.9.x; "
-                "reinstall hermes-agent or run 'pip install croniter' in your runtime env.",
+                "reinstall qubit-agent or run 'pip install croniter' in your runtime env.",
                 expr)
             return None
         # Anchor cron matching to the CONFIGURED IANA timezone's WALL CLOCK,

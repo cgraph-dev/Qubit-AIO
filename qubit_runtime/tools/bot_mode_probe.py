@@ -56,7 +56,7 @@ def _swallow(fn, default):
 
 
 def _qubit_root(home: Path) -> Path:
-    """Root ~/.hermes for both the default profile and named profiles."""
+    """Root of the Qubit home for both the default profile and named profiles."""
     return home.parent.parent if home.parent.name == "profiles" else home
 
 

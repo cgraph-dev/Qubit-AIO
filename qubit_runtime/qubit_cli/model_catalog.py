@@ -17,17 +17,19 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from qubit_cli import install_source
 from qubit_cli.version_info import get_version_info
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CATALOG_URL = (
-    "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json")
-# The Docusaurus site sits behind Vercel, which occasionally 403s non-browser clients (bot
-# challenge); the raw GitHub copy is the same manifest and is not bot-gated.
+DEFAULT_CATALOG_URL = install_source.raw_asset_url(
+    "website/static/api/model-catalog.json")
+# Qubit serves the same manifest from its own repository's raw copy; the primary
+# is already a non-bot-gated raw endpoint, so the fallback mirrors it (the fetch
+# helper skips a fallback equal to the primary).
 DEFAULT_CATALOG_FALLBACK_URLS: tuple[str, ...] = (
-    "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/static/api/model-catalog.json",
+    install_source.raw_asset_url("website/static/api/model-catalog.json"),
 )
 DEFAULT_TTL_MINUTES = 20
 # Legacy key, honoured only when the user set it explicitly; ``ttl_minutes`` is the shipped default.
@@ -35,7 +37,7 @@ DEFAULT_TTL_HOURS = DEFAULT_TTL_MINUTES / 60.0
 DEFAULT_FETCH_TIMEOUT = 8.0
 SUPPORTED_SCHEMA_VERSION = 1
 
-_HERMES_USER_AGENT = f"hermes-cli/{get_version_info().base_version}"
+_HERMES_USER_AGENT = f"qubit-cli/{get_version_info().base_version}"
 
 # In-process cache, invalidated against the disk file's path + mtime and TTL. The path matters:
 # under a multiplexed gateway each profile has its own ``<home>/cache/model_catalog.json``, and

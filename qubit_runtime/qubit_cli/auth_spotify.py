@@ -267,6 +267,7 @@ def _spotify_interactive_setup(redirect_uri_hint: str) -> str:
     """Walk the user through creating a Spotify developer app; persist the client_id to ~/.hermes/.env."""
     from qubit_cli.auth import _is_remote_session
     from qubit_cli.config import save_env_value
+    from qubit_constants import display_qubit_home
     print(
         f"\n{'=' * 70}\nSpotify first-time setup\n{'=' * 70}\n\n"
         "Spotify requires every user to register their own lightweight\n"
@@ -307,7 +308,7 @@ def _spotify_interactive_setup(redirect_uri_hint: str) -> str:
     if redirect_uri_hint and redirect_uri_hint != DEFAULT_SPOTIFY_REDIRECT_URI:
         save_env_value("HERMES_SPOTIFY_REDIRECT_URI", redirect_uri_hint)
 
-    print("\nSaved HERMES_SPOTIFY_CLIENT_ID to ~/.hermes/.env\n")
+    print(f"\nSaved HERMES_SPOTIFY_CLIENT_ID to {display_qubit_home()}/.env\n")
     return raw
 
 

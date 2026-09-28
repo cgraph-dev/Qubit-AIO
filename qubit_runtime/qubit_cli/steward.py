@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from qubit_cli import install_source
+
 UPDATE_MECHANISMS = ("self", "app-installer", "electron-updater", "external", "microsoft-store")
 
 STEWARD_DESKTOP = "desktop-app"
@@ -41,7 +43,7 @@ STEWARD_UPDATE_MESSAGES = {
         "\n"
         "Manage updates from within the desktop app.\n"
         "Prefer a self-managed source install? See:\n"
-        "  https://hermes-agent.nousresearch.com/docs/user-guide/switching-to-source"
+        f"  {install_source.docs_url('user-guide/switching-to-source')}"
     ),
     STEWARD_NIX: (
         "✗ This Qubit runs from the Nix store.\n"

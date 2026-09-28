@@ -84,12 +84,12 @@ def test_commit_backend_update_routes_refuse_before_checks_or_spawns(commit_buil
     cache.write_text("source checkout cache")
     client = TestClient(server.app)
     client.headers[server._SESSION_HEADER_NAME] = server._SESSION_TOKEN
-    result = client.get("/api/hermes/update/check?force=true")
+    result = client.get("/api/qubit/update/check?force=true")
     assert result.status_code == 200
     assert result.json()["message"] == MESSAGE
     assert result.json()["can_apply"] is False
     assert result.json()["current_version"] == "1.2.3+gabcdef12"
-    assert client.post("/api/hermes/update").json()["message"] == MESSAGE
+    assert client.post("/api/qubit/update").json()["message"] == MESSAGE
     assert cache.read_text() == "source checkout cache"
     check.assert_not_called()
     spawn.assert_not_called()

@@ -170,12 +170,12 @@ def test_runtime_marker_and_process_title_rebranded():
 
 
 def test_provenance_urls_are_not_falsified():
-    """Desktop public links point at the canonical repo; runtime provenance stays.
+    """Desktop public links point at the canonical repo; support copy is de-branded.
 
     Owner directive 2026-09-25: every user-facing desktop URL is the canonical
     Qubit repository — the upstream owner/repo must not appear on the desktop
-    surfaces. The runtime's own provenance/attribution records (outside the
-    desktop scope) are not rewritten.
+    surfaces. The debug-share support links printed to users are likewise the
+    canonical Qubit repo, never the upstream portal/discord.
     """
     electron = _read(sorted(
         p for p in ELECTRON.glob("*.ts") if ".test." not in p.name))
@@ -184,10 +184,11 @@ def test_provenance_urls_are_not_falsified():
     pkg = (DESKTOP / "package.json").read_text(encoding="utf-8")
     assert "git+https://github.com/cgraph-dev/qubit-voicebridge.git" in pkg
     assert "git+https://github.com/NousResearch/hermes-agent.git" not in pkg
-    legacy = (REPO / "qubit_runtime" / "qubit_cli" / "debug.py").read_text(
+    debug = (REPO / "qubit_runtime" / "qubit_cli" / "debug.py").read_text(
         encoding="utf-8")
-    assert "https://github.com/NousResearch/hermes-agent/issues" in legacy
-    assert "https://discord.gg/NousResearch" in legacy
+    assert "github.com/{install_source.official_repository()}/issues" in debug
+    assert "portal.nousresearch.com" not in debug
+    assert "https://discord.gg/NousResearch" not in debug
 
 
 @pytest.mark.parametrize("rel", [

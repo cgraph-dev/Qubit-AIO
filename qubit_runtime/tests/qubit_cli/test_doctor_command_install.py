@@ -49,6 +49,7 @@ def _pm_source(project, home):
         "pm/environments.py", "pm/filesystem.py", "qubit_cli/runtime_state.py",
         "qubit_cli/_early_recovery.py", "qubit_cli/_parser.py",
         "qubit_cli/venv_sync.py", "qubit_cli/steward.py", "qubit_cli/stderr_timestamp.py",
+        "qubit_cli/install_source.py",
     ):
         target = project / relative
         target.parent.mkdir(parents=True, exist_ok=True)

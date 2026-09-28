@@ -202,7 +202,7 @@ stdenv.mkDerivation {
 
   meta = with lib; {
     description = "Native Electron desktop shell for Qubit Agent";
-    homepage = "https://github.com/NousResearch/hermes-agent";
+    homepage = "https://github.com/cgraph-dev/qubit-voicebridge";
     license = licenses.mit;
     platforms = platforms.unix;
     mainProgram = "hermes-desktop";

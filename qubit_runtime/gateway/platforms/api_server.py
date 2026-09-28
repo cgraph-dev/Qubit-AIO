@@ -357,7 +357,8 @@ def _request_agent_overrides(
 
     The virtual model (``hermes-agent``) means "gateway default". A bare ``model`` without
     ``provider`` is honored only when ``allow_bare_model`` (generic clients hardcode "gpt-4o";
-    OpenAI-compatible handlers pass the ``direct_model_requests`` opt-in, Qubit-native
+    the canonical compat alias for this virtual name is ``qubit-agent``; OpenAI-compatible
+    handlers pass the ``direct_model_requests`` opt-in, Qubit-native
     endpoints always allow it). An explicit ``provider`` is always honored.
     """
     if not isinstance(body, dict):
@@ -1160,7 +1161,7 @@ def _run_route_delegate(name: str):
 
 
 class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
-    """aiohttp server routing OpenAI-format requests through hermes-agent's AIAgent."""
+    """aiohttp server routing OpenAI-format requests through Qubit's AIAgent."""
 
     # Stateless request/response (``send()`` is a stub): async-delivery tools must not promise
     # delivery here, and a resumed turn completes the work rather than asking.
@@ -1344,7 +1345,8 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
 
     @staticmethod
     def _resolve_model_name(explicit: str) -> str:
-        """Advertised /v1/models name: explicit override > active profile name > "hermes-agent"
+        """Advertised /v1/models name: explicit override > active profile name > the virtual
+        default model id (``hermes-agent``, retained as a compatibility alias).
         (precedence owned by ``qubit_cli.model_switch.resolve_effective_model``)."""
         from qubit_cli.model_switch import resolve_effective_model
         profile_name = ""

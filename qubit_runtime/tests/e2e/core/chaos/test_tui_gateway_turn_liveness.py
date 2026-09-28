@@ -48,6 +48,7 @@ from tests.e2e.core.chaos._helpers import (
     PLAIN_MODEL,
     PROCESS_REAP_S,
     REASONING_MODEL,
+    SCENARIO_WORKERS,
     TOOL_TIMEOUT_S,
     TURN_DEADLINE_S,
     describe_pids,
@@ -444,7 +445,7 @@ def scenario_futures(request: pytest.FixtureRequest, tmp_path_factory: pytest.Te
         if isinstance(getattr(getattr(item, "callspec", None), "params", {}).get("scn"), Scenario)
     }
     with FakeLLMServer(responder) as srv, ThreadPoolExecutor(
-            max_workers=max(1, len(selected)), thread_name_prefix="chaos-tui") as pool:
+            max_workers=min(max(1, len(selected)), SCENARIO_WORKERS), thread_name_prefix="chaos-tui") as pool:
         futures: dict[str, Future] = {
             scn.id: pool.submit(run_scenario, scn, srv, tmp_path_factory.mktemp(scn.id))
             for scn in SCENARIOS if scn.id in selected

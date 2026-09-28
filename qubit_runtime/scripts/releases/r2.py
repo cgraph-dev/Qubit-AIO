@@ -503,15 +503,32 @@ def commit_prefix_for(commit: str) -> str:
     return f"releases/commit/{commit}/"
 
 
-# Public download origin for object keys. CI supplies the authoritative
-# value as CLOUDFLARE_R2_PUBLIC_URL; the documented production origin is the
-# fallback so a local command can still name a page it is about to publish.
-DEFAULT_PUBLIC_URL = "https://hermes-assets.nousresearch.com"
+# Public download origin for object keys. CI supplies the authoritative value as
+# CLOUDFLARE_R2_PUBLIC_URL; the fallback is the Qubit release-asset root from the
+# single configurable installer source (qubit_cli.install_source), so a local
+# command can still name a page it is about to publish. Never a Hermes host.
+#
+# The in-tree literal is only the path-safe fallback for standalone script use
+# where qubit_cli is not importable (this module normally runs as
+# ``python -m scripts.releases.r2`` from the runtime root, where it is).
+_FALLBACK_PUBLIC_URL = "https://github.com/cgraph-dev/qubit-voicebridge"
+
+
+def default_public_url() -> str:
+    """Qubit release-asset root (``install_source.release_assets_base_url()``)."""
+    try:
+        from qubit_cli.install_source import release_assets_base_url
+    except ImportError:
+        return _FALLBACK_PUBLIC_URL
+    return release_assets_base_url()
+
+
+DEFAULT_PUBLIC_URL = default_public_url()
 
 
 def public_base_url(explicit: str | None = None) -> str:
     return R2Scope.configured().public_base(
-        explicit or os.environ.get("CLOUDFLARE_R2_PUBLIC_URL") or DEFAULT_PUBLIC_URL
+        explicit or os.environ.get("CLOUDFLARE_R2_PUBLIC_URL") or default_public_url()
     )
 
 

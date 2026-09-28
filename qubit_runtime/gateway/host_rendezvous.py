@@ -12,7 +12,7 @@ their own flock and none of them ever sees the others. This module adds the miss
 Both live in :func:`gateway.status._get_lock_dir` — the only cross-profile lock root already
 in the tree (``$HERMES_GATEWAY_LOCK_DIR`` else ``$XDG_STATE_HOME/qubit/gateway-locks``),
 which scopes to the **OS user**. That is the correct granularity: separate OS users have
-separate ``$HOME``s, separate ``~/.hermes`` profile roots, separate ports-by-convention and
+separate ``$HOME``s, separate ``<QUBIT_HOME>`` profile roots, separate ports-by-convention and
 separate credentials, so "one per host" means "one per host per OS user".
 
 **Staleness is proved, never assumed.** A record carries ``(pid, createTime)``; a record whose

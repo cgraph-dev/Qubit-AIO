@@ -18,6 +18,9 @@ def _stamp_probe(tmp_path, shell):
     for relative in (
         "scripts/write_install_stamp.py", "qubit_cli/__init__.py",
         "qubit_cli/update_channel.py", "qubit_cli/release_channels.py",
+        # qubit_cli.steward now resolves the Qubit-release docs/install identity
+        # through install_source; the isolated fixture must stage it too.
+        "qubit_cli/install_source.py",
         "pm/paths.py", "pm/environments.py",
         "qubit_cli/steward.py", "qubit_constants.py",
     ):

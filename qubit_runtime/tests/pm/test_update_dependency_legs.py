@@ -25,7 +25,7 @@ def project(tmp_path, monkeypatch):
     repo = tmp_path / 'repo'
     repo.mkdir()
     (repo / 'pyproject.toml').write_text(
-        '[project]\nname="update-proof"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="update-proof"\nversion="1"\nrequires-python=">=3.11"\n'
         '[tool.uv]\npackage=false\n', encoding='utf-8')
     caller = tmp_path / 'unrelated-project'
     caller.mkdir()

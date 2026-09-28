@@ -60,7 +60,7 @@ def test_warning_tracks_live_other_install_in_same_home(homes, tmp_path):
         assert warning and "profile" in warning.lower()
         assert shared_profile_warning(project_root=other) == ""
         entry = next(e for e in process_identity.ledger_entries(project_root=other) if e["pid"] == child.pid)
-        assert entry["hermes_home"] == qubit_home_key(homes)
+        assert entry["qubit_home"] == qubit_home_key(homes)
         assert shared_profile_warning(home=homes / "profiles" / "work", project_root=current) == ""
     # A stale file is not proof of concurrent use.
     assert process_identity._ledger_path().exists()
@@ -126,7 +126,7 @@ def test_cli_entrypoint_registers_and_warns_once_for_live_shared_home(homes, tmp
             own = [entry for entry in entries if entry["pid"] == child.pid]
             assert len(own) == 1
             assert own[0]["purpose"] == "cli"
-            assert own[0]["hermes_home"] == qubit_home_key(homes)
+            assert own[0]["qubit_home"] == qubit_home_key(homes)
             assert shared_profile_warning(project_root=stable)
             # A CLI record must not make a terminal process an update-owned backend.
             import qubit_constants
@@ -159,7 +159,7 @@ def test_cli_startup_quarantines_corrupt_ledger(homes, tmp_path, corrupt):
         assert ledger.with_suffix(".json.corrupt").read_bytes() == corrupt
         entries = process_identity.ledger_entries(project_root=install, verified_only=True)
         assert [entry["pid"] for entry in entries] == [child.pid]
-        assert entries[0]["hermes_home"] == qubit_home_key(homes)
+        assert entries[0]["qubit_home"] == qubit_home_key(homes)
 
 
 def test_status_surfaces_live_warning_without_host_details(homes, tmp_path, monkeypatch):
@@ -198,13 +198,13 @@ def test_warning_rejects_reused_or_unverifiable_process_identity(homes, tmp_path
             ledger.write_text(json.dumps(entries))
             assert shared_profile_warning(project_root=current) == ""
         entries[0]["create_time"] = original
-        entries[0].pop("hermes_home", None)
+        entries[0].pop("qubit_home", None)
         ledger.write_text(json.dumps(entries))
         assert shared_profile_warning(project_root=current) == ""
-        entries[0]["hermes_home"] = qubit_home_key(homes / "profiles" / "other")
+        entries[0]["qubit_home"] = qubit_home_key(homes / "profiles" / "other")
         ledger.write_text(json.dumps(entries))
         assert shared_profile_warning(project_root=current) == ""
-        entries[0]["hermes_home"] = qubit_home_key(homes)
+        entries[0]["qubit_home"] = qubit_home_key(homes)
         ledger.write_text(json.dumps(entries))
         assert shared_profile_warning(project_root=current)
 

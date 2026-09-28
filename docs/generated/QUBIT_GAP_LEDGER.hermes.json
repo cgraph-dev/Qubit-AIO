@@ -118,9 +118,10 @@
  "counts": {
   "total": 591,
   "by_status": {
-   "IMPLEMENTED": 482,
-   "MISSING": 4,
-   "SAFE_EQUIVALENT": 105
+   "IMPLEMENTED": 483,
+   "MISSING": 2,
+   "SAFE_EQUIVALENT": 104,
+   "UNVERIFIED": 2
   },
   "by_area": {
    "analytics-config": 4,
@@ -439,13 +440,13 @@
    "area": "gateway-actions",
    "capability": "GET /api/qubit/update/receipt",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/actions.py:427",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_qubit_update_receipt",
    "cli": "qubit gateway / product upgrade",
    "dashboard": "hermes-dist System",
    "voice": "voice gateway",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate UPDATE_OPERATOR_OWNED via compat dispatcher.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_update_lifecycle_gaps_wave21.py::test_successful_full_apply_receipt_schema_and_no_secret",
+   "note": "",
    "needs": "owner"
   },
   {
@@ -1965,13 +1966,13 @@
    "area": "local-models",
    "capability": "POST /api/local-models/download/pause",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/local_models.py:708",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_local_models_download_pause",
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "MISSING",
+   "status": "UNVERIFIED",
    "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
    "needs": "owner"
   },
   {
@@ -1979,13 +1980,13 @@
    "area": "local-models",
    "capability": "POST /api/local-models/download/resume",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/local_models.py:721",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_local_models_download_resume",
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "MISSING",
+   "status": "UNVERIFIED",
    "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
+   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
    "needs": "owner"
   },
   {

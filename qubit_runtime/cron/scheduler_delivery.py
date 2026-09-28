@@ -883,11 +883,11 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
     if found:
         argv = [sys.executable, "-m", "qubit_cli.main"]
     else:
-        hermes_bin = shutil.which("hermes")
-        if not hermes_bin:
+        qubit_bin = shutil.which("qubit")
+        if not qubit_bin:
             return ("Qubit could not deliver this result to Bot Chat: the `qubit` command was not found. "
                     "The result is saved; run `qubit cron runs` to see it, or `qubit doctor` if this keeps happening")
-        argv = [hermes_bin]
+        argv = [qubit_bin]
 
     def _fail(msg: str, **log_kwargs) -> str:
         logger.warning("Job '%s': %s", job_id, msg, **log_kwargs)
@@ -914,7 +914,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
     query_file = None
     try:
         with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", suffix=".txt", prefix="hermes-cron-botchat-", delete=False,
+            "w", encoding="utf-8", suffix=".txt", prefix="qubit-cron-botchat-", delete=False,
         ) as fh:
             fh.write(message)
             query_file = fh.name

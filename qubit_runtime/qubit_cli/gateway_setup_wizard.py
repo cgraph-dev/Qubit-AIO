@@ -413,12 +413,13 @@ _WEIXIN_GROUP_NOTE = (
 
 def _setup_weixin():
     """Interactive setup for Weixin / WeChat personal accounts."""
+    from qubit_constants import display_qubit_home as _dhh
     _print_setup_header("💬 Weixin / WeChat")
     print()
     _gw()._print_info_lines(
         "  1. Qubit will open Tencent iLink QR login in this terminal.",
         "  2. Use WeChat to scan and confirm the QR code.",
-        "  3. Qubit will store the returned account_id/token in ~/.hermes/.env.",
+        f"  3. Qubit will store the returned account_id/token in {_dhh()}/.env.",
         "  4. This adapter supports native text, image, video, and document delivery.",
     )
 
@@ -724,11 +725,12 @@ def _configure_platform(platform: dict) -> None:
         _gw()._setup_standard_platform(platform)
         return
 
+    from qubit_constants import display_qubit_home as _dhh
     label = platform.get("label", platform["key"])
     _print_setup_header(f"{platform.get('emoji', '🔌')} {label}")
     required = entry.required_env if entry else []
     if required:
-        _gw().print_info(f"  Set these env vars in ~/.hermes/.env: {', '.join(required)}")
+        _gw().print_info(f"  Set these env vars in {_dhh()}/.env: {', '.join(required)}")
     else:
         _gw().print_info(f"  Configure {label} in config.yaml under gateway.platforms.{platform['key']}")
     if platform.get("install_hint"):

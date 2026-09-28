@@ -66,6 +66,50 @@ CANONICAL_VENDOR_MANIFEST = f"{CANONICAL_DIR}/QUBIT_HERMES_VENDOR_MANIFEST.json"
 DEFAULT_HERMES = str(Path.home() / ".hermes" / "hermes-agent")
 DEFAULT_OPENCLAW = "/tmp/opencode/pinned/openclaw"
 
+#: Read-only candidate pinned trees, in preference order, so ``--check`` works
+#: without an operator-supplied ephemeral path: the first candidate whose HEAD
+#: equals the pin is selected (mirrors
+#: ``scripts/hermes_vendor_manifest.py::_resolve_upstream``). The first entry is
+#: the canonical pinned clone the committed inventory records, keeping the
+#: embedded ``pins.*.path`` reproducible.
+_HERMES_CANDIDATES = (
+    Path(f"/tmp/opencode/pinned/hermes-agent-{HERMES_PIN[:10]}"),
+    Path(f"/tmp/qubit-pin-{HERMES_PIN[:10]}"),
+    Path.home() / ".hermes" / "hermes-agent",
+    Path("/tmp/opencode/pinned/hermes-agent"),
+)
+_OPENCLAW_CANDIDATES = (
+    Path(f"/tmp/opencode/pinned/openclaw-{OPENCLAW_TAG}"),
+    Path("/tmp/opencode/pinned/openclaw"),
+)
+
+
+def _resolve_pin(explicit: str | None, pin: str,
+                 candidates: tuple[Path, ...], fallback: str) -> Path:
+    """Resolve a pinned tree: explicit path, else the first candidate at *pin*.
+
+    Falls back to the first existing candidate so the caller's revision check
+    can fail loudly with the mismatch instead of silently reading a wrong tree.
+    """
+    if explicit:
+        return Path(explicit).expanduser()
+    first_existing: Path | None = None
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        if first_existing is None:
+            first_existing = candidate
+        try:
+            rev = _git(candidate, "rev-parse", "HEAD").strip()
+        except Exception:  # noqa: BLE001 - not a git checkout; try the next
+            continue
+        if rev == pin:
+            return candidate
+    if first_existing is not None:
+        return first_existing
+    return Path(fallback)
+
+
 # Directories/files excluded from the byte diff, matching
 # scripts/hermes_vendor_manifest.py so counts reconcile.
 _BYTE_SKIP_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache", "MagicMock"}
@@ -498,6 +542,25 @@ def _git(repo: Path, *args: str) -> str:
         ["git", "-C", str(repo), *args],
         check=True, capture_output=True, text=True,
     ).stdout
+
+
+def _eol_map(repo: Path) -> dict[str, tuple[str, str]]:
+    """index/worktree EOL attributes per tracked upstream path.
+
+    Mirrors ``scripts/hermes_vendor_manifest.py::_eol_map`` so the inventory's
+    byte diff reproduces the manifest's EOL classification exactly.
+    """
+    out: dict[str, tuple[str, str]] = {}
+    try:
+        listing = _git(repo, "ls-files", "--eol")
+    except subprocess.CalledProcessError:
+        return out
+    for line in listing.splitlines():
+        meta, _, path = line.partition("\t")
+        fields = meta.split()
+        if len(fields) >= 2:
+            out[path] = (fields[0], fields[1])
+    return out
 
 
 def _read_text(path: Path) -> str:
@@ -1279,6 +1342,11 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
             continue
         upstream[path] = blob
 
+    # index/worktree EOL attributes per upstream path. Used to reproduce the
+    # vendor manifest's EOL classification exactly (an LF blob checked out CRLF
+    # is an EOL artifact; a CRLF blob is not).
+    eol_map = _eol_map(hermes)
+
     local_root = repo / "qubit_runtime"
     # Untracked disposable dependency/build/cache trees are not part of the
     # vendored source snapshot. Upstream-tracked files under the same directory
@@ -1312,13 +1380,19 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
     try:
         from hermes_vendor_manifest import _local_from_upstream
     except Exception:  # noqa: BLE001 - degrade to identity if unavailable
-        def _local_from_upstream(rel: str) -> str:  # type: ignore[misc]
+        def _local_from_upstream(rel: str,
+                                 local_paths: set | None = None) -> str:  # type: ignore[misc]
             return rel
 
     missing, extra, changed = [], [], []
     covered: set[str] = set()
+    local_paths = set(local)
     for rel, blob in upstream.items():
-        lrel = _local_from_upstream(rel)
+        # Resolve against the shipped set so a curated rename the fork left
+        # unapplied (verbatim upstream name) is recognized, exactly as the
+        # canonical vendor manifest now does. Without the set the canonical
+        # map would report a phantom missing + extra for those files.
+        lrel = _local_from_upstream(rel, local_paths)
         covered.add(lrel)
         if lrel not in local:
             missing.append({"path": rel, "expected_local": lrel,
@@ -1334,15 +1408,18 @@ def compute_hermes_byte_diff(repo: Path, hermes: Path,
         local_sha = local[lrel]
         if up_sha is not None and up_sha != local_sha:
             # The manifest compares the committed blob; this diff compares the
-            # pinned checkout. An EOL-only difference (upstream .gitattributes
-            # CRLF) is not a content change: normalizing the checkout bytes
-            # reproduces the blob, so it must be counted identical here too.
-            # Otherwise ``changed`` would disagree with the manifest's
-            # ``patched`` set and reconciliation would be False.
-            if up_bytes is not None and \
-                    _sha256_eol_normalized(up_bytes) == local_sha:
-                pass
-            else:
+            # pinned checkout. An EOL-only difference is real only when the
+            # CRLF in the checkout is git's conversion of an LF blob
+            # (``.gitattributes`` ``eol=crlf``): normalizing the checkout bytes
+            # reproduces the blob, so it is not a content change. When the
+            # committed blob is itself CRLF (index eol ``crlf``), the fork's LF
+            # is a genuine content change, not an EOL artifact. Reproducing the
+            # manifest's rule exactly keeps ``changed`` == ``patched``.
+            index_eol, _worktree_eol = eol_map.get(rel, (None, None))
+            eol_artifact = (index_eol == "lf"
+                            and up_bytes is not None
+                            and _sha256_eol_normalized(up_bytes) == local_sha)
+            if not eol_artifact:
                 changed.append({"path": lrel, "upstream_path": rel,
                                 "upstream_blob": blob,
                                 "upstream_sha256": up_sha,
@@ -2023,10 +2100,17 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--hermes", default=DEFAULT_HERMES)
-    ap.add_argument("--openclaw", default=DEFAULT_OPENCLAW)
+    ap.add_argument("--hermes", default=None,
+                    help="pinned Hermes git clone (default: auto-resolve a "
+                         "candidate whose HEAD equals the pin)")
+    ap.add_argument("--openclaw", default=None,
+                    help="pinned OpenClaw git clone (default: auto-resolve a "
+                         "candidate matching the pin)")
     ap.add_argument("--out", default=f"{CANONICAL_DIR}/QUBIT_SOURCE_INVENTORY.json")
     ap.add_argument("--omissions", default=f"{CANONICAL_DIR}/QUBIT_SOURCE_OMISSIONS.md")
+    ap.add_argument("--check", action="store_true",
+                    help="render in memory, compare with --out/--omissions, "
+                         "write nothing")
     ap.add_argument("--vendor-manifest", default=CANONICAL_VENDOR_MANIFEST,
                     help="canonical vendor manifest the byte diff reconciles "
                          "against (default: %(default)s)")
@@ -2037,8 +2121,10 @@ def main(argv=None) -> int:
                          "to compare against a historical baseline)")
     args = ap.parse_args(argv)
 
-    hermes = Path(args.hermes)
-    openclaw = Path(args.openclaw)
+    hermes = _resolve_pin(args.hermes, HERMES_PIN, _HERMES_CANDIDATES,
+                          DEFAULT_HERMES)
+    openclaw = _resolve_pin(args.openclaw, OPENCLAW_PIN, _OPENCLAW_CANDIDATES,
+                            DEFAULT_OPENCLAW)
     if not hermes.is_dir():
         print(f"hermes pin not found: {hermes}", file=sys.stderr)
         return 2
@@ -2072,20 +2158,38 @@ def main(argv=None) -> int:
         else Path(args.vendor_manifest)
     inv = build_inventory(REPO, hermes, openclaw, ledger_rev, vm)
 
-    out = (REPO / args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(inv, indent=1, sort_keys=False) + "\n",
-                   encoding="utf-8")
+    payload = json.dumps(inv, indent=1, sort_keys=False) + "\n"
+    omissions = render_omissions(inv)
 
+    out = (REPO / args.out)
     om = (REPO / args.omissions)
-    om.parent.mkdir(parents=True, exist_ok=True)
-    om.write_text(render_omissions(inv), encoding="utf-8")
 
     def _display(path: Path) -> str:
         try:
             return str(path.relative_to(REPO))
         except ValueError:
             return str(path)
+
+    if args.check:
+        stale = []
+        for path, expected in ((out, payload), (om, omissions)):
+            if not path.is_file():
+                stale.append(f"missing {path}")
+            elif path.read_text(encoding="utf-8") != expected:
+                stale.append(f"stale {path}")
+        if stale:
+            for line in stale:
+                print(line, file=sys.stderr)
+            return 1
+        print(f"source inventory up to date: {_display(out)}")
+        print(f"source omissions up to date: {_display(om)}")
+        return 0
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(payload, encoding="utf-8")
+
+    om.parent.mkdir(parents=True, exist_ok=True)
+    om.write_text(omissions, encoding="utf-8")
 
     print(f"wrote {_display(out)}")
     print(f"wrote {_display(om)}")

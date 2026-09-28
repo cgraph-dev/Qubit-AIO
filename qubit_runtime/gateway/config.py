@@ -827,7 +827,7 @@ class GatewayConfig:
 
 
 def load_gateway_config() -> GatewayConfig:
-    """Load gateway configuration. Priority: env > ~/.hermes/config.yaml > legacy gateway.json > defaults."""
+    """Load gateway configuration. Priority: env > <QUBIT_HOME>/config.yaml > legacy gateway.json > defaults."""
     from gateway import config_loader
 
     _home = get_qubit_home()

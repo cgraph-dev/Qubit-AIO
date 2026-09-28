@@ -326,7 +326,7 @@ class WebSocketRelayTransport:
         if not WEBSOCKETS_AVAILABLE:
             raise RuntimeError(
                 "WebSocketRelayTransport requires the 'websockets' package "
-                "(a hermes-agent core dependency)."
+                "(a qubit-agent core dependency)."
             )
         self._url = _ws_dial_url(url)
         self._platform = platform

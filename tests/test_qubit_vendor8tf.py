@@ -200,15 +200,28 @@ def test_vendor_canonical_classification_is_pinned_and_clean():
     # (or silent closure) fails here.
     assert man["missing_from_local"] == man["blockers"], (
         man["missing_from_local"], man["blockers"])
-    # Upstream test trees are reference-only by generator contract
-    # (scripts/hermes_vendor_manifest.py _INTENTIONALLY_OMITTED_PREFIXES);
-    # they are listed, never silently dropped, and absent locally.
+    # The rebase vendored the upstream tests/ tree into the fork
+    # (qubit_runtime/tests/), so the omission set is now the small remainder
+    # with no vendored counterpart -- not the whole >1000-file upstream tree
+    # as before the rebase. Assert both sides: the >1000 upstream tests are
+    # accounted for locally (vendored and/or recorded as extras), and the
+    # remainder is listed (never silently dropped) with no counterpart at its
+    # canonical de-branded path.
     omitted = man["intentionally_omitted"]
-    assert len(omitted) > 1000, len(omitted)
+    assert omitted, "the reference-only remainder must be listed, not dropped"
     assert any(r == "tests/" or r.startswith("tests/") for r in omitted)
+    vendored_tests = [rel for rel in man["files"]
+                      if rel.startswith("tests/") and rel.endswith(".py")]
+    assert len(vendored_tests) > 1000, len(vendored_tests)
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        import hermes_vendor_manifest as hvm
+    finally:
+        sys.path.pop(0)
     for rel in omitted:
-        assert not (REPO_ROOT / "qubit_runtime" / rel).exists(), rel
-        assert not (REPO_ROOT / rel).exists(), rel
+        canonical = hvm._canonical_local_from_upstream(rel)
+        assert not (REPO_ROOT / "qubit_runtime" / canonical).exists(), rel
+        assert not (REPO_ROOT / canonical).exists(), rel
 
 
 @requires_upstream

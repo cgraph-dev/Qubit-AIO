@@ -59,6 +59,9 @@ const apiMocks = vi.hoisted(() => ({
     },
   ]),
   wsTicket: vi.fn(() => new Promise(() => {})),
+  createChatSession: vi.fn(async () => ({
+    session: { id: "dashboard-abc123def456" },
+  })),
   setTerminalProfile: vi.fn(async () => ({
     profile_id: "qubit-model",
     meets_floor: true,
@@ -87,6 +90,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getTerminalProfiles: apiMocks.getTerminalProfiles,
     wsTicket: apiMocks.wsTicket,
+    createChatSession: apiMocks.createChatSession,
     setTerminalProfile: apiMocks.setTerminalProfile,
     listChatSessions: apiMocks.listChatSessions,
     getToolsets: apiMocks.getToolsets,
@@ -200,6 +204,10 @@ beforeEach(() => {
   apiMocks.getTerminalProfiles.mockClear();
   apiMocks.wsTicket.mockReset();
   apiMocks.wsTicket.mockImplementation(() => new Promise(() => {}));
+  apiMocks.createChatSession.mockReset();
+  apiMocks.createChatSession.mockResolvedValue({
+    session: { id: "dashboard-abc123def456" },
+  });
   apiMocks.listChatSessions.mockClear();
   sidebarMount.mockClear();
   FakeWebSocket.instances = [];
@@ -419,5 +427,44 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(first.onclose).toBeNull();
     expect(first.onopen).toBeNull();
     expect(first.onmessage).toBeNull();
+  });
+
+  it("mints a NEW canonical session id on New chat and resumes it", async () => {
+    // Regression (SESS-01/D1): New chat used to clear `?resume` and reconnect,
+    // which the server mapped to the fixed default `dashboard-chat`, so the
+    // SAME transcript reopened. It must mint a new id via the canonical store
+    // and resume that id into the PTY WebSocket.
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+    apiMocks.createChatSession.mockResolvedValueOnce({
+      session: { id: "dashboard-abc123def456" },
+    });
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+    expect(FakeWebSocket.instances[0].url).not.toContain("resume=");
+
+    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("New chat"),
+    );
+    expect(newChat).toBeDefined();
+    await act(async () => {
+      newChat!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await vi.waitFor(() =>
+      expect(apiMocks.createChatSession).toHaveBeenCalled(),
+    );
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
+    expect(FakeWebSocket.instances[1].url).toContain(
+      "resume=dashboard-abc123def456",
+    );
   });
 });

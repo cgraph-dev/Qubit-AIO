@@ -53,7 +53,7 @@ describe('widget SDK host', () => {
   it('a widget that throws in render shows an error chip, not a dead TUI', async () => {
     const { defineWidgetApp } = await import('../sdk/registry.js')
     const { AmbientDock } = await import('../sdk/host.js')
-    const { renderToScreen } = await import('../../packages/hermes-ink/src/ink/render-to-screen.js')
+    const { renderToScreen } = await import('../../packages/qubit-ink/src/ink/render-to-screen.js')
     const { createElement } = await import('react')
 
     defineWidgetApp({

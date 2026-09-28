@@ -27,7 +27,7 @@ def test_setup_requires_dependencies_and_keeps_the_existing_union(tmp_path, monk
     for name in ('existing_dep', 'provider_dep', 'modern_dep', 'other_dep'):
         _wheel(wheels, name, '1.0')
     (core / 'pyproject.toml').write_text(
-        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.11"\n'
         '[tool.uv]\npackage=false\nno-index=true\n'
         f'find-links=[{json.dumps(wheels.as_posix())}]\n', encoding='utf-8')
     env = {**os.environ, 'UV_OFFLINE': '1', 'UV_PYTHON_DOWNLOADS': 'never',
@@ -114,7 +114,7 @@ def test_setup_requires_dependencies_and_keeps_the_existing_union(tmp_path, monk
     (modern / '__init__.py').write_text('# MemoryProvider fixture\n', encoding='utf-8')
     (modern / 'plugin.yaml').write_text('name: modern\n', encoding='utf-8')
     (modern / 'pyproject.toml').write_text(
-        '[project]\nname="modern-provider"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="modern-provider"\nversion="1"\nrequires-python=">=3.11"\n'
         'dependencies=["modern_dep==1.0"]\n[tool.uv]\npackage=false\n', encoding='utf-8')
     monkeypatch.setattr(memory_setup, '_get_available_providers', lambda: [('modern', 'local', SimpleNamespace())])
     memory_setup.cmd_setup_provider('modern')

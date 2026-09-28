@@ -2,10 +2,10 @@
 
 > **Generated** by `scripts/forensic_audit/run_audit.py`. Do not hand-edit; edit the ledger or the triage overlay and re-run. The deep one-shot forensic pass is preserved at `docs/generated/audit/FORENSIC_BASELINE_2026-09-25.md`.
 
-- Ledger run: **6**
+- Ledger run: **9**
 - Upstream reference: `https://github.com/NousResearch/hermes-agent`
 - Qubit remote: `https://github.com/cgraph-dev/openclaw-voice-bridge.git`
-- **Verdict: `READY_FOR_REPAIR`** (234 open, 11 fixed/tracked-resolved, 0 triaged)
+- **Verdict: `READY_FOR_REPAIR`** (229 open, 15 fixed/tracked-resolved, 0 triaged)
 
 ## How to re-run
 
@@ -37,16 +37,14 @@
 
 ## Summary
 
-- By severity: `{'CRITICAL': 1, 'HIGH': 42, 'INFO': 8, 'LOW': 61, 'MEDIUM': 133}`
-- By status: `{'FIXED': 11, 'NEW': 7, 'OPEN': 227}`
+- By severity: `{'CRITICAL': 1, 'HIGH': 42, 'INFO': 8, 'LOW': 61, 'MEDIUM': 132}`
+- By status: `{'FIXED': 15, 'OPEN': 229}`
 
 ## Open findings (severity-ranked)
 
 | Sev | Status | Check | Finding | Location |
 |---|---|---|---|---|
 | CRITICAL | OPEN | `tier1_b2` | 9 imports of qubit_state_health resolve to a nonexistent module -> ImportError on any state/gateway/qubit_cli  | `engine output keeps file hermes_state_health.py but rewrites every reference to qubit_state_health via the embedded `hermes_state` prefix rule` |
-| HIGH | OPEN | `home_fallback` | vendored default home is the reference home (Path.home()/'.hermes') | `qubit_runtime/qubit_cli/env_loader.py:674` |
-| HIGH | OPEN | `model_capability_contract` | /api/model/info does not derive model capabilities from provider metadata | `voicebridge/qubit_compat.py` |
 | HIGH | OPEN | `tier1_a1` | differs | `qubit_runtime/qubit_cli/oneshot.py (no _oneshot_exit_code, no interrupted handling)` |
 | HIGH | OPEN | `tier1_a2` | DEFAULT_CONTEXT_LENGTHS missing 23 upstream keys; live model deepseek-v4.1-flash resolves to 128000 instead of | `qubit_runtime/agent/model_metadata.py:324-403 (100 keys; deepseek-v4.1-flash ABSENT)` |
 | HIGH | OPEN | `tier1_a2` | Default CLI bundle (hermes-cli) is missing 6 registered tools that upstream includes | `qubit_runtime/toolsets.py:11-36 _QUBIT_CORE_TOOLS (no browser_vault_* line after browser_dialog; no manage_connections)` |
@@ -84,8 +82,7 @@
 | HIGH | OPEN | `tier1_r-01` | Runtime error tells users to put credentials in ~/.hermes/.env (also the forbidden external home) | `qubit_runtime/qubit_cli/auth.py:1465-1466` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/gateway.py:176` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/gateway.py:192` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/memory_setup.py:411` |
-| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/env_loader.py:397` |
+| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/memory_setup.py:411` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/dashboard.py:110` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/peer.py:8` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/peer.py:179` |
@@ -103,16 +100,14 @@
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/config.py:2808` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/config.py:2823` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/mcp_catalog.py:470` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/tips.py:310` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/tips.py:326` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/dump.py:17` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/callbacks.py:53` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/plugins.py:1078` |
+| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/plugins.py:1078` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/gateway.py:2933` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/model_setup_flows.py:729` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/runtime_provider.py:909` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/main.py:1018` |
-| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/secrets.py:11` |
+| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/subcommands/secrets.py:13` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/auth_spotify.py:267` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/auth_spotify.py:310` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/gateway_setup_wizard.py:421` |
@@ -120,10 +115,10 @@
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/main_provider_setup.py:37` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/doctor_config.py:14` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/doctor_config.py:133` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/setup_tts.py:256` |
+| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/setup_tts.py:256` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/mcp_config.py:396` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/agent_import.py:626` |
-| MEDIUM | NEW | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/agent_import.py:660` |
+| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/agent_import.py:626` |
+| MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/agent_import.py:660` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/plugins_cmd.py:381` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/auth.py:275` |
 | MEDIUM | OPEN | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/auth.py:1526` |
@@ -285,15 +280,19 @@
 | Sev | Status | Check | Finding | Location |
 |---|---|---|---|---|
 | MEDIUM | FIXED | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/send_cmd.py:257` |
+| MEDIUM | FIXED | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/env_loader.py:397` |
 | HIGH | FIXED | `cli_exit_code_contract` | qubit oneshot does not map interrupted/failed turns to exit codes | `qubit_runtime/qubit_cli/oneshot.py` |
 | MEDIUM | FIXED | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/gateway_service_unit.py:37` |
 | MEDIUM | FIXED | `generated_staleness` | generated artifact is stale: page_coverage | `scripts/page_coverage.py` |
 | MEDIUM | FIXED | `generated_staleness` | generated artifact is stale: parity_inventory | `scripts/parity_inventory.py` |
+| MEDIUM | FIXED | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/tips.py:326` |
 | HIGH | FIXED | `home_fallback` | vendored default home is the reference home (Path.home()/'.hermes') | `qubit_runtime/qubit_constants.py:51` |
 | MEDIUM | FIXED | `credential_home_message` | user-facing credential guidance names the reference home | `qubit_runtime/qubit_cli/proxy_cli.py:573` |
 | HIGH | FIXED | `mcp_redaction_contract` | qubit mcp test partially discloses credential material | `qubit_runtime/qubit_cli/mcp_config.py` |
 | HIGH | FIXED | `home_fallback` | vendored default home is the reference home (QUBIT_HOME default -> .hermes) | `qubit_runtime/qubit_cli/env_loader.py:319` |
 | HIGH | FIXED | `home_fallback` | vendored default home is the reference home (QUBIT_HOME default -> .hermes) | `qubit_runtime/tools/mcp_tool_config.py:134` |
+| HIGH | FIXED | `model_capability_contract` | /api/model/info does not derive model capabilities from provider metadata | `voicebridge/qubit_compat.py` |
+| HIGH | FIXED | `home_fallback` | vendored default home is the reference home (Path.home()/'.hermes') | `qubit_runtime/qubit_cli/env_loader.py:674` |
 | MEDIUM | FIXED | `version_skew` | vendored runtime reports 0.21.1 but the pin is v0.21.4 | `qubit_runtime/pyproject.toml` |
 
 

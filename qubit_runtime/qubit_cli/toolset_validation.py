@@ -32,7 +32,9 @@ def parse_platform_toolsets_value(value: object) -> Optional[List[str]]:
 
 def _platform_default_toolset(platform: object) -> str:
     info = PLATFORMS.get(platform)
-    return info.default_toolset if info is not None else f"qubit-{platform}"
+    # Synthesized plugin-platform name must match ``toolsets.py``'s registered
+    # ``hermes-<platform>`` composites, not a ``qubit-`` spelling (unregistered).
+    return info.default_toolset if info is not None else f"hermes-{platform}"
 
 
 def _platform_default_is_valid(

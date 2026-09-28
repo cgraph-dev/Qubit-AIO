@@ -93,7 +93,7 @@ def resolve_qubit_bin() -> Optional[str]:
         abs_path = os.path.abspath(argv0)
         if os.access(abs_path, os.X_OK) and not _is_unsafe_python_launcher(abs_path):
             return abs_path
-    path_bin = shutil.which("hermes")
+    path_bin = shutil.which("qubit")
     if path_bin and not _is_unsafe_python_launcher(path_bin):
         return path_bin
     return None
@@ -132,7 +132,7 @@ def relaunch(
             # Raw ``[Errno 8] Exec format error`` is cryptic; usual causes are ``qubit`` not on
             # PATH yet (install hasn't propagated User PATH into this shell) or a stale shim.
             print(
-                f"\nHermes relaunch failed: {exc}\n"
+                f"\nQubit relaunch failed: {exc}\n"
                 f"Command: {' '.join(new_argv)}\n"
                 f"Fix: open a new terminal so PATH picks up, then re-run qubit.",
                 file=sys.stderr,

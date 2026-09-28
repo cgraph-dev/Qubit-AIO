@@ -1667,7 +1667,7 @@ class GatewayAdapterLifecycleMixin:
             val = getattr(obj, attr, None)
             if isinstance(val, str) and val.strip():
                 import hashlib
-                return hashlib.sha256(("hermes-mux:" + val.strip()).encode("utf-8")).hexdigest()[:16]
+                return hashlib.sha256(("qubit-mux:" + val.strip()).encode("utf-8")).hexdigest()[:16]
         return None
 
     def _create_adapter(self, platform: Platform, config: Any) -> Optional[BasePlatformAdapter]:

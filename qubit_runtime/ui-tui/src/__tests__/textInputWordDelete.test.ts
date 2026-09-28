@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { InputEvent } from '../../packages/hermes-ink/src/ink/events/input-event.js'
-import { INITIAL_STATE, parseMultipleKeypresses } from '../../packages/hermes-ink/src/ink/parse-keypress.js'
+import { InputEvent } from '../../packages/qubit-ink/src/ink/events/input-event.js'
+import { INITIAL_STATE, parseMultipleKeypresses } from '../../packages/qubit-ink/src/ink/parse-keypress.js'
 import { deleteWordForward } from '../components/textInput.js'
 
 function parseOne(sequence: string) {

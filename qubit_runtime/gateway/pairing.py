@@ -4,7 +4,7 @@ Unknown users receive a one-time pairing code that the bot owner approves via th
 CLI, instead of static user-ID allowlists. Security properties (OWASP + NIST SP
 800-63-4): 8-char codes from a 32-char unambiguous alphabet via ``secrets``, 1-hour
 expiry, max 3 pending per platform, 1 request per user per 10 min, lockout after 5
-failed approvals, chmod 0600 data files, codes never logged. Storage: ~/.hermes/pairing/
+failed approvals, chmod 0600 data files, codes never logged. Storage: <QUBIT_HOME>/pairing/
 """
 
 import contextlib

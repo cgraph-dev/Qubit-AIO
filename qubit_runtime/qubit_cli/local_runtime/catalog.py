@@ -16,6 +16,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
+from qubit_cli import install_source
 from qubit_cli.local_runtime.context_policy import (
     FLOOR, RUNTIME_OVERHEAD_BYTES, TARGET_WINDOW, LaunchPlan, plan_launch)
 from qubit_cli.local_runtime.estimator import HardwareBudget, LayerKind, ModelProfile, PhysicsRefusal
@@ -226,8 +227,10 @@ def recommended_entry(budget: HardwareBudget,
 # packaged copy remains the offline truth. A reverted commit on main heals every install on its
 # next fetch, and day-0 entries reach users without an app release.
 
-_CATALOG_URL = ("https://raw.githubusercontent.com/NousResearch/hermes-agent"
-                "/main/qubit_cli/local_runtime/catalog.json")
+# In-repo JSON manifest: the raw URL is derived from the single configurable
+# installer source (``qubit_cli.install_source``) so it follows the Qubit repo
+# and branch, never a hardcoded Hermes repo.
+_CATALOG_URL = install_source.raw_asset_url("qubit_cli/local_runtime/catalog.json")
 _SCHEMA_VERSION = 1
 _REFRESH_TTL_S = 6 * 3600
 _refresh_lock = threading.Lock()

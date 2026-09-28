@@ -109,8 +109,15 @@ def test_product_mirrors_vendored_security_and_platform_pins():
     assert "httptools" in product and "watchfiles" in product
     raw = PRODUCT_PYPROJECT.read_text(encoding="utf-8")
     assert "uvicorn[standard]" not in raw, "Android/Termux cannot build uvloop"
-    # The product resolves on 3.12+; pinned by the installer too.
-    assert _load_toml(PRODUCT_PYPROJECT)["project"]["requires-python"].startswith(">=3.12")
+    # The product resolves on 3.12+ (PEP 701 f-strings; installer-provisioned),
+    # and its declared window stays inside the vendored runtime's upstream-
+    # aligned range (`>=3.11,<3.15`): the fork is force-included, so the product
+    # advertisement must not exceed it.
+    product_rp = _load_toml(PRODUCT_PYPROJECT)["project"]["requires-python"]
+    vendored_rp = _load_toml(VENDORED_PYPROJECT)["project"]["requires-python"]
+    assert product_rp.startswith(">=3.12")
+    assert product_rp == ">=3.12,<3.15", product_rp
+    assert vendored_rp == ">=3.11,<3.15", vendored_rp
 
 
 # --------------------------------------------------------------- argv entry point

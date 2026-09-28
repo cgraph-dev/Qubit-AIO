@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
+from qubit_cli import install_source
 from qubit_constants import secure_parent_dir
 from utils import atomic_json_write
 from tools.mcp_dashboard_oauth import contextvar_set as _contextvar_set, get_dashboard_oauth_flow
@@ -759,7 +760,7 @@ _SSH_HINT_LOOPBACK = (
     "         ssh -N -L {port}:127.0.0.1:{port} <user>@<this-host>\n"
     "       then open the URL above and let it redirect normally.\n"
     "\n"
-    "  See: https://hermes-agent.nousresearch.com/docs/guides/oauth-over-ssh\n")
+    "  See: " + install_source.docs_url("guides/oauth-over-ssh") + "\n")
 
 
 def _announce_authorization_url(
@@ -923,7 +924,11 @@ def remove_oauth_tokens(server_name: str, *, qubit_home: str | Path | None = Non
 # CIMD (OAuth Client ID Metadata Documents): the client_id IS an HTTPS URL the server fetches for our
 # name/logo/redirect URIs, replacing per-install DCR. The SDK does the protocol; Qubit only decides
 # eligibility. Published from ``website/static/oauth/client-metadata.json``; the github.io origin is
-# deliberate — servers MUST NOT follow redirects when fetching it, and hermes-agent.nousresearch.com/docs/* 301s here.
+# deliberate — servers MUST NOT follow redirects when fetching it, and the upstream docs host 301s here.
+# NOTE: upstream-hosted client-metadata dependency. The document's canonical home is the upstream
+# ``nousresearch.github.io/hermes-agent`` origin (301s from the docs host). CIMD servers fetch this
+# client_id URL directly, so it cannot be Qubit-hosted until a Qubit-hosted client-metadata URL
+# exists. Do not fabricate a replacement origin — preserve this URL verbatim.
 _CIMD_CLIENT_METADATA_URL = "https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json"
 # Loopback ports/hosts declared in that document (exact match, so no ephemeral port under CIMD);
 # below Linux's 32768 ephemeral floor. tests/tools/test_mcp_cimd.py keeps them in sync.

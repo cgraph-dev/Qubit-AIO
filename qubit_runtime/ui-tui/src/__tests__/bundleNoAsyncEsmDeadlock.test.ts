@@ -46,7 +46,7 @@ function bundleIsFresh(): boolean {
   try {
     const bundleMtime = statSync(bundlePath).mtimeMs
 
-    const sourceMtime = statSync(resolve(uiTuiRoot, 'packages/hermes-ink/src/entry-exports.ts')).mtimeMs
+    const sourceMtime = statSync(resolve(uiTuiRoot, 'packages/qubit-ink/src/entry-exports.ts')).mtimeMs
 
     return bundleMtime >= sourceMtime
   } catch {

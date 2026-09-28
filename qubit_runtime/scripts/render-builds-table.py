@@ -54,10 +54,11 @@ from urllib.parse import quote
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.releases import handoff, r2, semver, stable, versioning  # noqa: E402
+from qubit_cli import install_source  # noqa: E402
 
 MARKER = "<!-- HERMES_BUILDS_TABLE -->"
 END_MARKER = "<!-- /HERMES_BUILDS_TABLE -->"
-DEFAULT_REPO = "NousResearch/hermes-agent"
+DEFAULT_REPO = install_source.official_repository()
 
 # Asset name shapes (electron-builder artifactName in
 # apps/desktop/electron-builder.config.cjs):

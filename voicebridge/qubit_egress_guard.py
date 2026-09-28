@@ -87,11 +87,19 @@ def _guard_connect(sock: "socket.socket", address) -> None:
 
 
 def _guard_connect_ex(sock: "socket.socket", address) -> int:
-    try:
-        _guard_connect(sock, address)
-    except EgressBlocked as exc:
-        return getattr(exc, "errno", None) or 1
-    return 0
+    """Non-raising twin of :func:`_guard_connect`.
+
+    It must delegate to the *original* ``connect_ex`` rather than the blocking
+    ``connect`` path: on a non-blocking socket the blocking ``connect`` raises
+    ``BlockingIOError`` (EINPROGRESS), which previously escaped the guard and
+    broke every non-blocking connect.  ``connect_ex`` reports that condition as
+    a return value instead.
+    """
+    if _in_fork() and isinstance(address, tuple) and len(address) >= 2:
+        if not _host_allowed(address[0]):
+            _record(address[0], address[1])
+            return 1  # EPERM — denied by the egress guard
+    return _original_connect_ex(sock, address)
 
 
 def _guard_getaddrinfo(host, *args, **kwargs):

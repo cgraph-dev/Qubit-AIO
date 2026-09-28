@@ -107,7 +107,7 @@ def build_dashboard_parser(
         help="Register a self-hosted dashboard with Qubit Labs (writes the OAuth client ID to .env)",
         description="Register this install as a self-hosted dashboard with your Qubit "
             "Portal account. Creates an OAuth client, writes "
-            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env, and prints "
+            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.qubit/.env, and prints "
             "how to engage the login gate. Requires being logged in (qubit setup).")
     dashboard_register_parser.add_argument(
         "--name", default=None,

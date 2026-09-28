@@ -6464,6 +6464,11 @@ def _update_resolve_channel(cfg, source, channel, tag):
             "update from a release source instead (--source)")
     from . import update_channel as UC
 
+    if channel and not UC.is_valid_channel(channel):
+        raise ValueError(
+            f"unknown update channel {channel!r} (valid: "
+            f"{', '.join(UC.CHANNELS)})")
+
     resolved = UC.resolve_source(cfg, src)
     if channel:
         resolved["channel"] = channel
@@ -6527,7 +6532,12 @@ def _cmd_update(cfg, args) -> int:
         return 2
 
     if verb == "check":
-        out = UM.check(cfg, source=source)
+        check_kwargs: dict = {"source": source}
+        if channel:
+            check_kwargs["channel"] = channel
+        if tag:
+            check_kwargs["tag"] = tag
+        out = UM.check(cfg, **check_kwargs)
         for key in ("channel", "tag"):
             value = locals().get(key)
             if value:
@@ -6560,6 +6570,16 @@ def _cmd_update(cfg, args) -> int:
         return 3
 
     if verb == "apply":
+        # Persist an explicitly selected channel so the *next* check/apply (and
+        # the dashboard/voice surfaces) track the same reference. A tag is
+        # per-invocation and not persisted. Validation already happened above.
+        if channel:
+            try:
+                from . import update_channel as UC
+
+                UC.set_channel(cfg, channel)
+            except Exception:  # noqa: BLE001 — persistence is best-effort
+                pass
         # Prefer the canonical full lifecycle when it lands; otherwise run the
         # identical snapshot -> apply(confirm=True) sequence on the same
         # manager. Both go through one backend/policy/e-stop/audit path. The
@@ -6570,6 +6590,8 @@ def _cmd_update(cfg, args) -> int:
             kwargs = {"confirm": True, "source": source, "actor": "cli:update"}
             if channel:
                 kwargs["channel"] = channel
+            if tag:
+                kwargs["tag"] = tag
             import inspect as _inspect
             try:
                 params = _inspect.signature(full).parameters
@@ -6591,7 +6613,7 @@ def _cmd_update(cfg, args) -> int:
                 _print_update_receipt(snap, as_json)
                 return _update_rc(snap)
             out = UM.apply(cfg, confirm=True, source=source,
-                           actor="cli:update")
+                           channel=channel, tag=tag, actor="cli:update")
             out["backup_dir"] = snap.get("backup_dir")
             out["backup_bundle"] = snap.get("bundle")
         _print_update_receipt(out, as_json)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from qubit_cli import install_source
+
 
 def build_worktree_parser(subparsers) -> None:
     """Attach the ``worktree`` subcommand to ``subparsers``."""
@@ -11,7 +13,7 @@ def build_worktree_parser(subparsers) -> None:
             "accumulate. Never deletes uncommitted tracked changes, unique "
             "unpushed commits, or in-use trees; untracked-only scratch is "
             "archived to ~/.hermes/archive/worktree-prune/ before removal. See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/cli#worktree-cleanup")
+            f"{install_source.docs_url('user-guide/cli#worktree-cleanup')}")
     worktree_subparsers = worktree_parser.add_subparsers(dest="worktree_action")
     worktree_list = worktree_subparsers.add_parser(
         "list", aliases=["ls", "audit"],

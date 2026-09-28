@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from qubit_cli import install_source
+
 
 def build_egress_parser(subparsers) -> None:
     """Attach the ``egress`` subcommand to ``subparsers``."""
@@ -12,7 +14,7 @@ def build_egress_parser(subparsers) -> None:
         description="Manage iron-proxy, the optional TLS-intercepting egress firewall "
             "that swaps proxy tokens for real API credentials before outbound "
             "requests leave a sandbox.  Disabled by default.  See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/egress/iron-proxy")
+            f"{install_source.docs_url('user-guide/egress/iron-proxy')}")
 
     from qubit_cli import proxy_cli as _proxy_cli
     _proxy_cli.register_cli(egress_parser)

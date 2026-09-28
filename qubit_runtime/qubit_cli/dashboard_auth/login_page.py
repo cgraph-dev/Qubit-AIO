@@ -14,6 +14,7 @@ from __future__ import annotations
 import html
 from urllib.parse import quote, urlencode
 
+from qubit_cli import install_source
 from qubit_cli.dashboard_auth import list_session_providers
 
 # Single curly braces are ``str.format`` placeholders; CSS curlies are doubled.
@@ -379,7 +380,7 @@ _EMPTY_HTML = """\
 <p>This dashboard is bound to a non-loopback host but no authentication
 providers are available.</p>
 <p>Configure the bundled username/password provider or an OAuth provider.
-See the <a href="https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard#authentication-gated-mode">dashboard
+See the <a href="__QUBIT_DOCS_WEB_DASHBOARD_AUTH__">dashboard
 authentication documentation</a> for setup instructions.</p>
 <p>For auth-free local use, bind to <code>127.0.0.1</code> and connect through
 an SSH tunnel or Tailscale.</p>
@@ -387,6 +388,11 @@ an SSH tunnel or Tailscale.</p>
 </body>
 </html>
 """
+
+_EMPTY_HTML = _EMPTY_HTML.replace(
+    "__QUBIT_DOCS_WEB_DASHBOARD_AUTH__",
+    install_source.docs_url("user-guide/features/web-dashboard#authentication-gated-mode"),
+)
 
 
 # Emitted ONLY when a ``supports_password`` provider is listed, so OAuth-only

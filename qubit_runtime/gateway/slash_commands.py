@@ -128,12 +128,12 @@ def _restart_notify_payload(event: MessageEvent) -> dict:
     return data
 
 
-def _spawn_detached_update(hermes_cmd, output_path, exit_code_path) -> None:
+def _spawn_detached_update(qubit_cmd, output_path, exit_code_path) -> None:
     """Spawn ``qubit update --gateway`` detached so it survives the gateway restart it may trigger.
     setsid is portable (works where ``systemd-run --user`` lacks a D-Bus session); ``--gateway``
     enables file-based IPC so interactive prompts are forwarded; PYTHONUNBUFFERED lets the gateway
     stream output live.  Windows has no setsid: an inline helper runs the updater as a module under
-    this interpreter (not venv\\Scripts\\hermes.exe — that shim holds its own file open, and the
+    this interpreter (not venv\\Scripts\\qubit.exe — that shim holds its own file open, and the
     update must replace it), redirects both outputs to one file and writes the exit code."""
     import shutil
     import subprocess
@@ -144,9 +144,9 @@ def _spawn_detached_update(hermes_cmd, output_path, exit_code_path) -> None:
              sys.executable, "-m", "qubit_cli.main", "update", "--gateway"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **windows_detach_popen_kwargs())
         return
-    hermes_cmd_str = " ".join(shlex.quote(part) for part in hermes_cmd)
+    qubit_cmd_str = " ".join(shlex.quote(part) for part in qubit_cmd)
     update_cmd = (
-        f"PYTHONUNBUFFERED=1 {hermes_cmd_str} update --gateway"
+        f"PYTHONUNBUFFERED=1 {qubit_cmd_str} update --gateway"
         f" > {shlex.quote(str(output_path))} 2>&1; "
         # Avoid `status=$?`: `status` is read-only in zsh and this template is reused in
         # macOS/zsh operator wrappers, so keep it zsh-safe even though bash runs it here.
@@ -930,7 +930,7 @@ class GatewaySlashCommandsMixin(
             pending_id = args[1] if len(args) > 1 else "<id>"
             out = (out[:3000]
                    + "\n… (truncated — full diff in "
-                     f"~/.hermes/pending/skills/{pending_id}.json)")
+                     f"<QUBIT_HOME>/pending/skills/{pending_id}.json)")
         return out
 
     async def _handle_approvals_command(self, event: MessageEvent) -> str:
@@ -1304,8 +1304,8 @@ class GatewaySlashCommandsMixin(
 
         if not git_dir.exists():
             return t("gateway.update.not_git_repo")
-        hermes_cmd = _resolve_qubit_bin()
-        if not hermes_cmd:
+        qubit_cmd = _resolve_qubit_bin()
+        if not qubit_cmd:
             return t("gateway.update.hermes_cmd_not_found")
         pending_path = _qubit_home / ".update_pending.json"
         output_path = _qubit_home / ".update_output.txt"
@@ -1323,7 +1323,7 @@ class GatewaySlashCommandsMixin(
         _tmp_pending.replace(pending_path)
         exit_code_path.unlink(missing_ok=True)
         try:
-            _spawn_detached_update(hermes_cmd, output_path, exit_code_path)
+            _spawn_detached_update(qubit_cmd, output_path, exit_code_path)
         except Exception as e:
             pending_path.unlink(missing_ok=True)
             exit_code_path.unlink(missing_ok=True)

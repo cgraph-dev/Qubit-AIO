@@ -10,11 +10,17 @@ import subprocess
 import urllib.error
 import urllib.request
 
+from qubit_cli import install_source
 from qubit_cli.update_channel import STABLE_TAG_RE, is_canary_tag
 
 logger = logging.getLogger(__name__)
-_PUBLIC_BASE = "https://hermes-assets.nousresearch.com"
-OFFICIAL_REPOSITORY = "NousResearch/hermes-agent"
+
+# Internal release-asset host and repository identity are owned in ONE place:
+# ``qubit_cli.install_source`` (a stdlib-only leaf module, so this import cannot
+# cycle with ``qubit_cli.update_channel``). Tests override ``_PUBLIC_BASE``
+# directly to serve a loopback archive.
+_PUBLIC_BASE = install_source.release_assets_base_url()
+OFFICIAL_REPOSITORY = install_source.official_repository()
 _GITHUB_ORIGIN = re.compile(
     r"^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)"
     r"([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$", re.IGNORECASE,

@@ -25,7 +25,7 @@ from qubit_constants import get_qubit_home
 logger = logging.getLogger(__name__)
 
 _DOWNLOAD_TIMEOUT = 60.0
-_HTTP_HEADERS = {"User-Agent": "hermes-agent-petdex"}
+_HTTP_HEADERS = {"User-Agent": "qubit-agent-petdex"}
 _THUMB_FRAME_W = 192
 _THUMB_FRAME_H = 208
 _THUMB_W = 96  # rendered ~40px; 2x+ keeps it crisp on HiDPI

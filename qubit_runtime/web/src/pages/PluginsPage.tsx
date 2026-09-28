@@ -904,7 +904,7 @@ export default function PluginsPage() {
               {t.pluginsPage.catalogEmpty ?? "No catalog entries match."}{" "}
               <a
                 className="underline"
-                href="https://hermes-agent.nousresearch.com/docs/plugins"
+                href="https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/plugins"
                 target="_blank"
                 rel="noreferrer"
               >

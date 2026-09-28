@@ -252,8 +252,9 @@ def _setup_tts_provider(config: dict):
         selected = "openai"
         _setup.print_info("OpenAI TTS will use the managed Qubit gateway and bill to your subscription.")
         if _setup.get_env_value("VOICE_TOOLS_OPENAI_KEY") or _setup.get_env_value("OPENAI_API_KEY"):
+            from qubit_constants import display_qubit_home as _dhh
             _setup.print_warning("Direct OpenAI credentials are still configured and may take precedence "
-                                 "until removed from ~/.hermes/.env.")
+                                 f"until removed from {_dhh()}/.env.")
     elif selected in _TTS_LOCAL_PROVIDERS:
         selected = _tts_local_install_step(selected)
     elif selected in _TTS_API_KEY_PROVIDERS:

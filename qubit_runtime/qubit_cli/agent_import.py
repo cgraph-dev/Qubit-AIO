@@ -524,7 +524,7 @@ class AgentImporter:
 def import_agent_command(args) -> None:
     """Handle ``qubit import-agent`` (invoked from qubit_cli.main)."""
     from qubit_cli.config import get_config_path, load_config, save_config
-    from qubit_constants import get_qubit_home
+    from qubit_constants import display_qubit_home, get_qubit_home
     from qubit_cli.setup import (Colors, color, print_header, print_info, print_success,
                                   print_error, prompt_yes_no)
 
@@ -623,12 +623,13 @@ def import_agent_command(args) -> None:
     print()
     print_success("Import complete.")
     print_info("API keys and credentials were NOT imported — run 'qubit setup' "
-               "to configure providers, or add them to ~/.hermes/.env.")
+               f"to configure providers, or add them to {display_qubit_home()}/.env.")
 
 
 def print_import_report(report: Dict[str, Any], dry_run: bool) -> None:
     """Print a formatted per-item import report (claw-migrate style)."""
     from qubit_cli.setup import Colors, color, print_header, print_info
+    from qubit_constants import display_qubit_home
 
     print()
     print_header("Dry Run Results" if dry_run else "Import Results")
@@ -657,7 +658,8 @@ def print_import_report(report: Dict[str, Any], dry_run: bool) -> None:
         print(color("  ⚷ Secrets stripped (never imported):", Colors.YELLOW))
         for name in stripped:
             print(f"      {name}")
-        print_info("Re-add credentials deliberately via 'qubit setup' or ~/.hermes/.env.")
+        print_info("Re-add credentials deliberately via 'qubit setup' or "
+                   f"{display_qubit_home()}/.env.")
         print()
     summary = report.get("summary", {})
     parts = [f"{summary[k]} {label}" for k, _, _, label in groups if summary.get(k)]

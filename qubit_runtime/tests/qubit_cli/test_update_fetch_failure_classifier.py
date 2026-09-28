@@ -8,6 +8,7 @@ stderr line must always be printed alongside the diagnosis.
 """
 
 from qubit_cli import update_cmd
+from qubit_cli import install_source
 
 
 RATE_LIMIT_STDERR = (
@@ -76,7 +77,7 @@ class TestClassifyFetchFailure:
             "fatal: Could not read from remote repository."
         )
         assert "SSH authentication failed" in msg
-        assert "https://github.com/NousResearch/hermes-agent.git" in msg
+        assert install_source.official_repo_url() in msg
 
     def test_ssh_host_key_failure_reports_ssh_auth(self):
         msg = update_cmd._classify_fetch_failure(

@@ -6,6 +6,7 @@ Intentionally does NOT smoke-test the webhook: the gateway and the tunnel both r
 processes the user starts AFTER this wizard exits, so any in-wizard probe would fail."""
 
 from __future__ import annotations
+from qubit_cli import install_source
 from qubit_cli.cli_output import line_input
 
 import re
@@ -374,6 +375,6 @@ def run_whatsapp_cloud_setup() -> int:
         "    • Verified badge (the green check):",
         "        Requires Meta's business verification process —",
         "        Business Manager → Security Center → Start Verification.", "",
-        "  Docs: https://hermes-agent.nousresearch.com/docs/user-guide/",
+        f"  Docs: {install_source.docs_url('user-guide/')}",
         "        messaging/whatsapp-cloud", "")
     return 0

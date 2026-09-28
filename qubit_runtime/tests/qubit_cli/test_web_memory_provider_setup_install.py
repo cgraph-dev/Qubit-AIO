@@ -29,7 +29,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
     for name in ("existing_dep", "provider_dep"):
         _wheel(wheels, name, "1.0")
     (core / "pyproject.toml").write_text(
-        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.11"\n'
         '[tool.uv]\npackage=false\nno-index=true\n'
         f'find-links=[{json.dumps(wheels.as_posix())}]\n')
     incumbent, candidate = (home / "plugins" / name for name in ("incumbent", "candidate"))
@@ -41,7 +41,7 @@ def test_setup_admits_real_provider_union_and_keeps_selection_on_failure(tmp_pat
         if declaration == "pyproject":
             manifest.write_text('name: candidate\n')
             (candidate / "pyproject.toml").write_text(
-                '[project]\nname="candidate"\nversion="1"\nrequires-python=">=3.14"\n'
+                '[project]\nname="candidate"\nversion="1"\nrequires-python=">=3.11"\n'
                 f'dependencies={json.dumps(requirements)}\n[tool.uv]\npackage=false\n')
         else:
             manifest.write_text(f'name: candidate\n{declaration}: {json.dumps(requirements)}\n')

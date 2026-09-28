@@ -185,8 +185,12 @@ def _checklist_toolset_keys(platform: str) -> Set[str]:
 
 
 def _platform_default_toolset(platform: str) -> str:
-    """Composite toolset a platform falls back to (plugin platforms derive ``qubit-<platform>``)."""
-    return PLATFORMS[platform]["default_toolset"] if platform in PLATFORMS else f"qubit-{platform}"
+    """Composite toolset a platform falls back to (plugin platforms derive ``hermes-<platform>``).
+
+    The synthesized name must match the registry's platform-composite keys
+    (``toolsets.py`` names them ``hermes-<platform>``); a ``qubit-`` spelling is
+    not registered and resolves to an empty tool surface."""
+    return PLATFORMS[platform]["default_toolset"] if platform in PLATFORMS else f"hermes-{platform}"
 
 
 def _cfg_section(config: dict, key: str) -> dict:

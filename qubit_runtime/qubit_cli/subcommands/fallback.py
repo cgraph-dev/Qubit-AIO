@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from qubit_cli import install_source
+
 
 def build_fallback_parser(subparsers) -> None:
     """Attach the ``fallback`` subcommand to ``subparsers``."""
@@ -12,7 +14,7 @@ def build_fallback_parser(subparsers) -> None:
         description="Manage the fallback provider chain.  Fallback providers are tried "
             "in order when the primary model fails with rate-limit, overload, or "
             "connection errors.  See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers")
+            f"{install_source.docs_url('user-guide/features/fallback-providers')}")
     fallback_subparsers = fallback_parser.add_subparsers(dest="fallback_command")
     fallback_subparsers.add_parser(
         "list", aliases=["ls"], help="Show the current fallback chain (default when no subcommand)")

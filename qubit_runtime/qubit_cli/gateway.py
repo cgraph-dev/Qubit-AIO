@@ -4332,7 +4332,7 @@ def _guard_official_docker_root_gateway() -> None:
 
     print_error("Refusing to run the Qubit gateway as root inside the official Docker image.")
     print(
-        "  The image entrypoint normally drops privileges to the 'hermes' user. "
+        "  The image entrypoint normally drops privileges to the 'qubit' user. "
         "If you override entrypoint in Docker Compose, include "
         "/opt/qubit/docker/entrypoint.sh before the Qubit command."
     )

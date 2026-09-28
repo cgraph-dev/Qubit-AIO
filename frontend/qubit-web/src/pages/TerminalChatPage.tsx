@@ -95,26 +95,60 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Right-side panel (model control + status + sessions), collapsible and open
   // by default, matching the Qubit `/qubit-chat` ChatPage panel.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  // Bumped after a New-chat mint so `ChatSessionList` remounts and refetches,
+  // surfacing the freshly created session immediately.
+  const [sessionListNonce, setSessionListNonce] = useState(0);
   const [channel] = useState<string>(generateTerminalChatChannel);
   // Stable indirection for the self-scheduled reconnect: `connect` cannot
   // reference itself inside its own initializer, so it schedules the latest
   // callback through this ref instead (assigned after each render).
   const connectRef = useRef<() => void>(() => {});
-  // Stable identity so ChatSidebar's SSE effect never re-subscribes per render.
-  // "New chat" starts a fresh PTY: clear the resume target first, then
-  // reconnect. Clearing the URL param keeps a later pick able to re-trigger the
-  // resume effect (resumeRef already equals the new "" so the effect no-ops).
+  // "New chat" mints a genuinely NEW session on the canonical store (the same
+  // store the sessions list and transcript read) and resumes it, so the
+  // terminal opens a fresh transcript instead of re-opening the fixed
+  // canonical default (`dashboard-chat`). The implicit first load (no
+  // `?resume=`) still converges on the canonical default for continuity.
+  // A failed mint falls back to a fresh canonical-default PTY with a notice.
   const handleNewChat = useCallback(() => {
-    resumeRef.current = "";
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("resume");
-        return next;
-      },
-      { replace: true },
-    );
-    connectRef.current();
+    setNotice(null);
+    api
+      .createChatSession()
+      .then((res) => {
+        if (disposedRef.current) return;
+        const newId = res?.session?.id;
+        // Seed the ref BEFORE the URL update so the resume effect no-ops and
+        // exactly one reconnect happens (no double-spawn / duplicate).
+        resumeRef.current = newId ?? "";
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            if (newId) next.set("resume", newId);
+            else next.delete("resume");
+            return next;
+          },
+          { replace: false },
+        );
+        connectRef.current();
+        if (newId) setSessionListNonce((n) => n + 1);
+      })
+      .catch((err: unknown) => {
+        if (disposedRef.current) return;
+        setNotice(
+          `[CHAT_SESSION_CREATE] ${
+            err instanceof Error ? err.message : String(err)
+          } — starting a fresh terminal instead`,
+        );
+        resumeRef.current = "";
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("resume");
+            return next;
+          },
+          { replace: false },
+        );
+        connectRef.current();
+      });
   }, [setSearchParams]);
 
   const connect = useCallback((profileId?: string) => {
@@ -523,6 +557,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             <ChatToolsSummary profile={scopedProfile} />
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
+                key={sessionListNonce}
                 activeSessionId={resumeParam || null}
                 profile={scopedProfile}
                 onNewChat={handleNewChat}

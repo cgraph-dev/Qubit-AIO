@@ -11,6 +11,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from qubit_cli import install_source
+
 # Same logger the code used before extraction (record parity).
 _log = logging.getLogger("qubit_cli.web_server")
 
@@ -151,7 +153,7 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
     # Device code works in remote shells/containers without a reachable 127.0.0.1 callback.
     {"id": "xai-oauth", "name": "xAI Grok OAuth (SuperGrok / Premium+)", "flow": "device_code",
      "cli_command": "qubit auth add xai-oauth",
-     "docs_url": "https://hermes-agent.nousresearch.com/docs/guides/xai-grok-oauth", "status_fn": None},
+     "docs_url": install_source.docs_url("guides/xai-grok-oauth"), "status_fn": None},
     # `copilot login` is the non-interactive subcommand; `copilot /login` is not valid
     # (slash-commands only exist inside an interactive session).
     {"id": "copilot-acp", "name": "GitHub Copilot (ACP)", "flow": "external", "cli_command": "copilot login",

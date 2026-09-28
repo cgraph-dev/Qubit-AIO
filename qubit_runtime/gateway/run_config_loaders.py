@@ -61,7 +61,7 @@ class GatewayConfigLoadersMixin:
         """Load ephemeral prefill messages from config or env var.
 
         HERMES_PREFILL_MESSAGES_FILE env wins, then top-level prefill_messages_file in config.yaml,
-        then legacy agent.prefill_messages_file. Relative paths resolve from ~/.hermes/.
+        then legacy agent.prefill_messages_file. Relative paths resolve from <QUBIT_HOME>/.
         """
         from gateway.run import _gateway_config_home, _load_gateway_config
         file_path = os.getenv("HERMES_PREFILL_MESSAGES_FILE", "")

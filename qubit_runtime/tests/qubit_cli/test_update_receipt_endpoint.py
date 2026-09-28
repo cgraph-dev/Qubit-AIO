@@ -3,7 +3,7 @@
 The update receipt (written by every `hermes update` run since #91283,
 `latest.json` pointer) is the durable outcome record. These tests pin:
 
-- GET /api/hermes/update/receipt returns the full receipt + summary; 404
+- GET /api/qubit/update/receipt returns the full receipt + summary; 404
   when none exists.
 - GET /api/actions/hermes-update/status attaches the receipt summary, and
   uses a finished receipt as the outcome when both in-memory registries AND
@@ -63,7 +63,7 @@ class TestUpdateReceiptEndpoint:
     def test_receipt_endpoint_returns_full_receipt_and_summary(self, client, tmp_path, monkeypatch):
         receipt = _write_receipt(tmp_path, monkeypatch)
 
-        resp = client.get("/api/hermes/update/receipt")
+        resp = client.get("/api/qubit/update/receipt")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -81,7 +81,7 @@ class TestUpdateReceiptEndpoint:
 
         monkeypatch.setattr(ur, "_receipt_dir", lambda: tmp_path / "none")
 
-        resp = client.get("/api/hermes/update/receipt")
+        resp = client.get("/api/qubit/update/receipt")
 
         assert resp.status_code == 404
 

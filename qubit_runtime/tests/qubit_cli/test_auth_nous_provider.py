@@ -871,7 +871,7 @@ def test_shared_store_seat_belt_refuses_real_home_under_pytest(monkeypatch):
 
     monkeypatch.delenv("HERMES_SHARED_AUTH_DIR", raising=False)
 
-    with pytest.raises(RuntimeError, match="shared Nous auth store"):
+    with pytest.raises(RuntimeError, match="shared Qubit auth store"):
         _nous_shared_store_path()
 
 @pytest.mark.platforms("linux")

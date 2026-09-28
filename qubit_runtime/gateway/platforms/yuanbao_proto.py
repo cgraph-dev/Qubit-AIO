@@ -31,7 +31,7 @@ BIZ_SERVICES = {
     )
 }
 
-HERMES_INSTANCE_ID = 17  # qubit instance_id（固定值）
+HERMES_INSTANCE_ID = 17  # openclaw instance_id（固定值）
 WS_HEARTBEAT_RUNNING = 1
 WS_HEARTBEAT_FINISH = 2
 

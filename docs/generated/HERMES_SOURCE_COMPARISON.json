@@ -151,7 +151,7 @@
    },
    {
     "qubit": "frontend/qubit-web/src/pages/TerminalChatPage.tsx",
-    "qubit_sha256": "3ded44511a611c621804d99ff947291fbb47a683df0176066ce86bbcb258e39a",
+    "qubit_sha256": "c9c04c3ed9b638d095bc519b5e82de3981ab3d6532cf11e2730c58a37a69bc85",
     "role": "Qubit-added `/chat` terminal frontend: mounts the vendored xterm terminal and streams the real vendor PTY over the single Qubit WebSocket upgrade path (`/agent/api/pty`) with a short-lived single-use scoped ticket. `/qubit-chat` keeps the Qubit-native ChatPage (owner decision 2026-09-17).",
     "affected_regression_test": "tests/test_pty_ws8u.py"
    }
@@ -1258,6 +1258,19 @@
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "57fbb15827ad04b172ab58cd914ba0101e733a673f6135310c95b43f4825d937",
    "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
+  },
+  {
+   "scope": "hermes-agent/web",
+   "category": "dashboard",
+   "upstream": "web/src/i18n/ro.ts",
+   "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
+   "upstream_sha256": "d4650c7f712929e4d77ab1eb10bd0e703d89e74a8dc60781ed8f4b0c9d0b1887",
+   "qubit": null,
+   "qubit_sha256": null,
+   "patch": null,
+   "reason": "not vendored locally: pinned upstream file web/src/i18n/ro.ts has no shipped Qubit counterpart at frontend/qubit-web/src/i18n/ro.ts (recorded missing, not drift).",
+   "upstream_blob_sha256": "d4650c7f712929e4d77ab1eb10bd0e703d89e74a8dc60781ed8f4b0c9d0b1887",
+   "affected_regression_test": null
   },
   {
    "scope": "hermes-agent/web",
@@ -2514,7 +2527,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "83f836d954a53edd2063cadc171a0858dc53d221b80f9af17bda7b0e0eb54cbf",
    "qubit": "frontend/qubit-web/src/pages/ChatPage.tsx",
-   "qubit_sha256": "a6960efee7174001b4ac5a47e51db00e38ccbf92e407bbfbd5d71d55bfd765a3",
+   "qubit_sha256": "ca805bc86d326e716720a3e0a18991ccfc98dde559c10789adedee9b37ac4a37",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "83f836d954a53edd2063cadc171a0858dc53d221b80f9af17bda7b0e0eb54cbf",
@@ -2657,7 +2670,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "2b76f7be012680671d733770dc9ce0b5289f1b21de3ee4a25cd89a7d1a4dd101",
    "qubit": "frontend/qubit-web/src/pages/PluginsPage.tsx",
-   "qubit_sha256": "2a36f4e3515c085f38527076dd5603f63c5eb8a3f3a78b48c5fc7bfe76c09988",
+   "qubit_sha256": "1a2613fb70b3ce0830b3c9f8658e81d34ebb9ed43fa613c1511a49e33df71fbd",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "2b76f7be012680671d733770dc9ce0b5289f1b21de3ee4a25cd89a7d1a4dd101",
@@ -29682,6 +29695,17 @@
    "upstream": "apps/desktop/src/i18n/profile-provider.tsx",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "06ffa345dd6a907b8941167d8989c5c19cb158c74486f14a1f8ba5ce7b723d0b",
+   "qubit": null,
+   "qubit_sha256": null,
+   "patch": null,
+   "reason": "Electron desktop shell hosting the same web UI; not shipped in this packet \u2014 Qubit serves the identical web UI from its own backend (frontend/qubit-web build). Desktop packaging is a follow-up build target; counterpart: Qubit distribution + web UI."
+  },
+  {
+   "scope": "hermes-agent/apps/desktop",
+   "category": "desktop-shell",
+   "upstream": "apps/desktop/src/i18n/ro.ts",
+   "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
+   "upstream_sha256": "66934d00da728d9547edb9df4969f340db0fcc4023c8f38af3de082111f23d39",
    "qubit": null,
    "qubit_sha256": null,
    "patch": null,

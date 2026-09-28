@@ -17,6 +17,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Callable
 
+from qubit_cli import install_source
 from qubit_cli.curses_ui import MenuNavigationEvent, MenuNavigationStart
 # Config helpers are re-exported (tests patch them on this module). display_qubit_home is
 # imported lazily at call sites (stale-module safety during qubit update).
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-_DOCS_BASE = "https://hermes-agent.nousresearch.com/docs"
+_DOCS_BASE = install_source.docs_base_url()
 _BRACKETED_PASTE_PATTERN = re.compile(r"\x1b\[\s*200~|\x1b\[\s*201~")
 
 

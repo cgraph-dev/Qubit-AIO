@@ -137,12 +137,9 @@ def test_repair_replays_saved_in_tree_build_backend(tmp_path):
 
 
 def test_source_refresh_does_not_need_metadata_change_and_refuses_live_root(tmp_path, monkeypatch):
-    from tests.pm._fixtures import require_pm_runtime_python
-
-    require_pm_runtime_python()
     core = tmp_path / "core"
     core.mkdir()
-    (core / "pyproject.toml").write_text('[project]\nname="x"\nversion="1"\nrequires-python=">=3.14"\n[tool.uv]\npackage=false\nno-index=true\n')
+    (core / "pyproject.toml").write_text('[project]\nname="x"\nversion="1"\nrequires-python=">=3.11"\n[tool.uv]\npackage=false\nno-index=true\n')
     (core / "code.py").write_text("VALUE = 1\n")
     monkeypatch.setattr(workspace.paths, "repo_root", lambda: core)
     staged = tmp_path / "staged"
@@ -167,16 +164,13 @@ def test_source_refresh_does_not_need_metadata_change_and_refuses_live_root(tmp_
 
 def test_legacy_member_is_generated_only_inside_workspace(tmp_path, monkeypatch):
     import tomllib
-    from tests.pm._fixtures import require_pm_runtime_python
-
-    require_pm_runtime_python()
     core, plugin = tmp_path / "core", tmp_path / "readonly-plugin"
     core.mkdir(); plugin.mkdir()
     wheels = tmp_path / "wheels"
     wheels.mkdir()
     _fixtures._wheel(wheels, "example", "1.0")
     (core / "pyproject.toml").write_text(
-        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="core"\nversion="1"\nrequires-python=">=3.11"\n'
         '[tool.uv]\npackage=false\nno-index=true\n'
         f'find-links=[{json.dumps(wheels.as_posix())}]\n')
     manifest = plugin / "plugin.yaml"

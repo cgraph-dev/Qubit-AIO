@@ -718,8 +718,10 @@ def _worktree_branch_pushed_exact(
 def _worktree_lock_is_live(repo_root: str, worktree_path: str, timeout: int = 10):
     """Lock state: ``"live"`` (owning pid runs), ``"dead"`` (pid gone / non-qubit reason), None (unlocked).
 
-    ``qubit -w`` locks with reason ``qubit pid=<pid>``; ``worktree remove --force`` refuses
-    locked trees, so a crashed session's lock would keep its tree forever. Fails SAFE toward "live".
+    ``qubit -w`` locks with reason ``qubit pid=<pid>``; a lock written before the
+    rebrand carries the legacy ``hermes pid=<pid>`` reason, so the reader accepts
+    both (read-old). ``worktree remove --force`` refuses locked trees, so a
+    crashed session's lock would keep its tree forever. Fails SAFE toward "live".
     """
     try:
         listing = _git_out(["worktree", "list", "--porcelain"], repo_root, timeout=timeout)
@@ -740,7 +742,7 @@ def _worktree_lock_is_live(repo_root: str, worktree_path: str, timeout: int = 10
             if current != target:
                 continue
             reason = line[len("locked"):].strip()
-            m = re.search(r"qubit pid=(\d+)", reason)
+            m = re.search(r"(?:qubit|hermes) pid=(\d+)", reason)
             if not m:
                 # A foreign lock here is a leftover; the age/dirty/unpushed gates already passed.
                 return "dead"

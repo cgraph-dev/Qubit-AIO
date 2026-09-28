@@ -21,7 +21,7 @@
   "dashboard_ops.catalog": 566,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
-  "qubit_compat.ROUTES": 448,
+  "qubit_compat.ROUTES": 451,
   "qubit_compat.GATED": 94,
   "cli_families": 114,
   "source_inventory.items": 6775,

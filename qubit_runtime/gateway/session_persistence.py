@@ -25,9 +25,9 @@ _DB_UNPINNED = object()
 # Self-documenting sentinel written first into sessions.json; "_" keys are skipped on load.
 _SESSIONS_JSON_README = (
     "LEGACY MIRROR of the gateway routing index (the primary copy lives in the gateway_routing "
-    "table in ~/.hermes/state.db). Maps messaging session keys (agent:main:<platform>:...) to "
+    "table in <QUBIT_HOME>/state.db). Maps messaging session keys (agent:main:<platform>:...) to "
     "active session IDs. This is NOT the session list. ALL sessions (CLI, TUI, and gateway) live "
-    "in ~/.hermes/state.db and are shown by `qubit sessions list` and `/sessions`. Disable this "
+    "in <QUBIT_HOME>/state.db and are shown by `qubit sessions list` and `/sessions`. Disable this "
     "file with `gateway.write_sessions_json: false` in config.yaml."
 )
 

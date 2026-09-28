@@ -292,18 +292,18 @@ def resolve_whatsapp_bridge_dir() -> Path:
     import shutil
     from qubit_constants import get_qubit_home
     install_bridge = Path(__file__).resolve().parents[2] / "scripts" / "whatsapp-bridge"
-    hermes_home_bridge = get_qubit_home() / "scripts" / "whatsapp-bridge"
+    qubit_home_bridge = get_qubit_home() / "scripts" / "whatsapp-bridge"
     try:
         (install_bridge / ".write_test").touch()
         (install_bridge / ".write_test").unlink()
         return install_bridge
     except OSError:
         pass
-    if hermes_home_bridge.exists():
-        return hermes_home_bridge
+    if qubit_home_bridge.exists():
+        return qubit_home_bridge
     try:
-        hermes_home_bridge.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(install_bridge, hermes_home_bridge, dirs_exist_ok=False)
-        return hermes_home_bridge
+        qubit_home_bridge.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(install_bridge, qubit_home_bridge, dirs_exist_ok=False)
+        return qubit_home_bridge
     except Exception:
         return install_bridge

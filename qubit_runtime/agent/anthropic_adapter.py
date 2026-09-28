@@ -343,8 +343,8 @@ def _beta_header(betas: list) -> Dict[str, str]:
 def _attribution_headers() -> Dict[str, str]:
     """Same client-attribution set sent to OpenRouter / Vercel AI Gateway / Fireworks."""
     return {
-        "HTTP-Referer": "https://hermes-agent.nousresearch.com", "X-Title": "Qubit Agent",
-        "User-Agent": f"HermesAgent/{get_version_info().base_version}",
+        "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge", "X-Title": "Qubit Agent",
+        "User-Agent": f"QubitAgent/{get_version_info().base_version}",
     }
 
 

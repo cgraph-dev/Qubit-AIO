@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from qubit_cli.config import get_qubit_home  # noqa: F401  (re-exported; patched via update_cmd)
+from qubit_cli import install_source
 from qubit_cli import update_handoff as _update_handoff
 from qubit_cli.update_cmd_common import _best_effort
 # Captured BEFORE a checkout swap: parent transport/lifecycle never imports new code.
@@ -1100,7 +1101,7 @@ def _prepare_git_command() -> tuple[bool, list, bool]:
     use_zip_update = not git_dir.exists()
     if use_zip_update and sys.platform != "win32":
         print("✗ Not a git repository. Please reinstall:")
-        print("  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash")
+        print(f"  {install_source.reinstall_one_liner(windows=False)}")
         sys.exit(1)
 
     git_cmd = _base_git_cmd()

@@ -15,16 +15,16 @@
       },
       "reference": {
         "gated": 76,
-        "missing": 12,
-        "ported": 736,
-        "total": 824
+        "missing": 2,
+        "ported": 745,
+        "total": 823
       }
     },
     "by_surface": {
       "cli": {
         "gated": 10,
-        "missing": 4,
-        "ported": 374,
+        "missing": 0,
+        "ported": 378,
         "total": 388
       },
       "control": {
@@ -35,21 +35,21 @@
       },
       "route": {
         "gated": 56,
-        "missing": 7,
-        "ported": 214,
+        "missing": 2,
+        "ported": 219,
         "total": 277
       },
       "tool": {
         "gated": 10,
-        "missing": 1,
+        "missing": 0,
         "ported": 111,
-        "total": 122
+        "total": 121
       }
     },
     "gated": 127,
-    "missing": 12,
-    "ported": 1251,
-    "total": 1390
+    "missing": 2,
+    "ported": 1260,
+    "total": 1389
   },
   "e2e_verified": false,
   "generated_from": {
@@ -110,10 +110,10 @@
     ]
   },
   "known_gaps": [
-    "routes: 7 reference routes have no qubit_compat counterpart (see MISSING rows).",
-    "cli: 4 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
+    "routes: 2 reference routes have no qubit_compat counterpart (see MISSING rows).",
+    "cli: 0 reference commands/subcommands absent; 10 are typed refusals on the Qubit-native surface.",
     "controls: Qubit dashboard_ops catalog rows lacking a voice interface are GATED under voice-for-everything.",
-    "tools: 1 reference tool(s) absent; 10 toolset(s) present but disabled in the Qubit cli scope.",
+    "tools: 0 reference tool(s) absent; 10 toolset(s) present but disabled in the Qubit cli scope.",
     "e2e_verified is false for every row: registration/dispatch is not behavioral proof."
   ],
   "qubit_surface_summary": {
@@ -123,13 +123,13 @@
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
     "qubit_compat.GATED": 68,
-    "qubit_compat.ROUTES": 448,
+    "qubit_compat.ROUTES": 451,
     "qubit_voice_top": 113,
     "reference_cli_sub": 317,
     "reference_cli_top": 71,
     "reference_optional_mcps": 65,
     "reference_routes": 277,
-    "reference_skills": 30,
+    "reference_skills": 29,
     "reference_toolsets": 27,
     "voice_commands.REGISTRY": 514,
     "voice_commands.VOICE_GUARDS": 18
@@ -710,14 +710,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`qubit agent computer-use screen --help` (verified at qubit_runtime/qubit_cli/subcommands/computer_use.py::build_screen_parser; voicebridge/cli.py::_integ(cu_sub, \"screen\")",
         "reference": "`hermes computer-use screen --help`"
       },
       "id": "hermes computer-use screen",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent computer-use screen",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -3496,14 +3496,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`qubit agent plugins adopt --help` (verified at qubit_runtime/qubit_cli/subcommands/plugins.py::\"adopt\"; qubit_runtime/qubit_cli/plugins_cmd.py::\"adopt\":)",
         "reference": "`hermes plugins adopt --help`"
       },
       "id": "hermes plugins adopt",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent plugins adopt",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -3538,14 +3538,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`qubit agent plugins check-updates --help` (verified at qubit_runtime/qubit_cli/subcommands/plugins.py::\"check-updates\"; qubit_runtime/qubit_cli/plugins_cmd.py::\"check-updates\":)",
         "reference": "`hermes plugins check-updates --help`"
       },
       "id": "hermes plugins check-updates",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent plugins check-updates",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -3692,14 +3692,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "`qubit agent plugins trust-update-url --help` (verified at qubit_runtime/qubit_cli/subcommands/plugins.py::\"trust-update-url\"; qubit_runtime/qubit_cli/plugins_cmd.py::\"trust-update-url\":)",
         "reference": "`hermes plugins trust-update-url --help`"
       },
       "id": "hermes plugins trust-update-url",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit agent plugins trust-update-url",
       "side": "reference",
       "surface": "cli",
       "voice_intent": "",
@@ -18314,28 +18314,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_qubit_update_check (brand rename /api/hermes/update/check -> /api/qubit/update/check)",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:262"
       },
       "id": "GET /api/hermes/update/check",
       "method": "GET",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "GET /api/qubit/update/check -> h_qubit_update_check",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit update status",
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_qubit_update_receipt (brand rename /api/hermes/update/receipt -> /api/qubit/update/receipt)",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:427"
       },
       "id": "GET /api/hermes/update/receipt",
       "method": "GET",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "GET /api/qubit/update/receipt -> h_qubit_update_receipt",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",
@@ -19896,14 +19896,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_qubit_update_apply (brand rename /api/hermes/update -> /api/qubit/update)",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/actions.py:220"
       },
       "id": "POST /api/hermes/update",
       "method": "POST",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "POST /api/qubit/update -> h_qubit_update_apply",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit update status",
@@ -19952,28 +19952,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_download_pause",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:708"
       },
       "id": "POST /api/local-models/download/pause",
       "method": "POST",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "POST /api/local-models/download/pause -> h_local_models_download_pause",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit local models",
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES: no match",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_local_models_download_resume",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/local_models.py:721"
       },
       "id": "POST /api/local-models/download/resume",
       "method": "POST",
-      "qubit_counterpart": null,
+      "qubit_counterpart": "POST /api/local-models/download/resume -> h_local_models_download_resume",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit local models",
@@ -21786,14 +21786,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "MISSING",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "no counterpart",
+        "qubit": "qubit_runtime/optional-mcps/",
         "reference": "~/.hermes/hermes-agent/optional-mcps/n8n-official"
       },
       "id": "optional-mcp n8n-official",
       "method": null,
-      "qubit_counterpart": null,
+      "qubit_counterpart": "qubit_runtime/optional-mcps/n8n-official",
       "side": "reference",
       "surface": "tool",
       "voice_intent": "qubit mcp install n8n-official",
@@ -22315,20 +22315,6 @@
       "side": "reference",
       "surface": "tool",
       "voice_intent": "qubit status",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "$QUBIT_HOME/skills/qubit-voice-mode",
-        "reference": "~/.hermes/skills/hermes-voice-mode"
-      },
-      "id": "skill hermes-voice-mode",
-      "method": null,
-      "qubit_counterpart": "skill dir qubit-voice-mode",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit skills install hermes-voice-mode",
       "voice_intent_verified": false
     },
     {

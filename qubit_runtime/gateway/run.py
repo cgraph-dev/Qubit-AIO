@@ -1561,7 +1561,7 @@ from qubit_constants import get_qubit_home, get_qubit_home_override, get_process
 # settings into the launch process env for every later launch-profile turn.
 _qubit_home = get_process_qubit_home()
 
-# Load ~/.hermes/.env first: user-managed env files must override stale shell exports on restart.
+# Load <QUBIT_HOME>/.env first: user-managed env files must override stale shell exports on restart.
 from qubit_cli.env_loader import load_qubit_dotenv
 _env_path = _qubit_home / '.env'
 load_qubit_dotenv(qubit_home=_qubit_home, project_env=Path(__file__).resolve().parents[1] / '.env')
@@ -1881,7 +1881,7 @@ def _platform_has_bot_credential(platform: "Platform", platform_config: "Platfor
     # transient failure — after which it stays down until the gateway is restarted by hand. Mirror the
     # adapter's own gate: homeserver + user_id + password. Read ONLY from extra, never os.getenv:
     # build_config() already copies all three env vars onto extra, and importing this module loads
-    # ~/.hermes/.env, so an env fallback would report "has credential" for every Matrix config on the box —
+    # <QUBIT_HOME>/.env, so an env fallback would report "has credential" for every Matrix config on the box —
     # including the empty-primary multiplex case (#64674) this check exists to evict.
     if platform is not Platform.MATRIX:
         return False
@@ -3308,7 +3308,7 @@ def _builtin_adapter_import(module: str, adapter_name: str, requirement: str):
 # platform -> (module, adapter class, requirements probe, warning on probe failure).
 _BUILTIN_ADAPTERS: dict[Platform, tuple[str, str, str, str]] = {
     Platform.WHATSAPP_CLOUD: ("whatsapp_cloud", "WhatsAppCloudAdapter", "check_whatsapp_cloud_requirements",
-                              "WhatsApp Cloud: aiohttp/httpx missing — reinstall hermes-agent"),
+                              "WhatsApp Cloud: aiohttp/httpx missing — reinstall qubit-agent"),
     Platform.SIGNAL: ("signal", "SignalAdapter", "check_signal_requirements",
                       "Signal: runtime requirements not met"),
     Platform.WEIXIN: ("weixin", "WeixinAdapter", "check_weixin_requirements",
@@ -4301,11 +4301,11 @@ class GatewayRunner(
 
     def _get_executor(self) -> concurrent.futures.ThreadPoolExecutor:
         """Return the gateway-owned executor for blocking agent work."""
-        return GatewayRunner._get_or_create_pool(self, "_executor", _TURN_MAX_WORKERS, "hermes-gateway")
+        return GatewayRunner._get_or_create_pool(self, "_executor", _TURN_MAX_WORKERS, "qubit-gateway")
 
     def _get_housekeeping_executor(self) -> concurrent.futures.ThreadPoolExecutor:
         """Return the gateway-owned executor for best-effort session housekeeping."""
-        return GatewayRunner._get_or_create_pool(self, "_housekeeping_executor", _HOUSEKEEPING_MAX_WORKERS, "hermes-gateway-hk")
+        return GatewayRunner._get_or_create_pool(self, "_housekeeping_executor", _HOUSEKEEPING_MAX_WORKERS, "qubit-gateway-hk")
 
     @staticmethod
     def _stop_pool(executor) -> list:

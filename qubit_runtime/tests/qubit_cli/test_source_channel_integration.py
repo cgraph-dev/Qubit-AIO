@@ -8,10 +8,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from qubit_cli import main, source_releases, update_cmd
+from qubit_cli import main, source_releases, update_cmd, install_source
 from qubit_cli.subcommands.update import build_update_parser
 from qubit_cli.update_channel import channel_record, set_install_channel
 from qubit_cli.config import require_readable_config_before_write
+
+# Channel archive fixtures carry the official repo identity the product derives
+# from the single installer source (never a hardcoded Hermes repo).
+OFFICIAL = install_source.official_repository()
 
 # These tests model channel archives and the reader's own transport.
 pytestmark = pytest.mark.real_release_channels
@@ -56,13 +60,13 @@ def source(tmp_path, monkeypatch):
     return SimpleNamespace(home=home, origin=origin, root=checkout, commits=commits, parser=parser)
 
 
-def record(name, *, repository="NousResearch/hermes-agent", state="active", destination=None):
+def record(name, *, repository=OFFICIAL, state="active", destination=None):
     return {"schema": 1, "name": name, "repository": repository, "policy": "preview",
             "state": state, "identity": {}, "nextSequence": 2, "head": None,
             **({"destination": destination} if destination else {})}
 
 
-def reader_result(source, name, destination=None, repository="NousResearch/hermes-agent"):
+def reader_result(source, name, destination=None, repository=OFFICIAL):
     requested = record(name, repository=repository,
                        state="retired" if destination else "active", destination=destination)
     terminal = record(destination or name, repository=repository)
@@ -71,7 +75,7 @@ def reader_result(source, name, destination=None, repository="NousResearch/herme
         "schema": 1, "request": {"buildId": "build-fixture", "channel": terminal["name"],
         "sequence": 1, "repository": repository, "commit": source.commits[1],
         "sourceVersion": "1.2.3", "version": "0.0.1", "identity": {}, "bundleEnv": {},
-        "publicBase": "https://hermes-assets.nousresearch.com"}, "packages": []})
+        "publicBase": install_source.release_assets_base_url()}, "packages": []})
 
 
 def install_reader(monkeypatch, result):
@@ -237,7 +241,7 @@ def publish_channel_build(channel_archive, name, build_id, commit, *, sequence=1
                 "windowsExecutableName": "Fixture"}
     version = f"1.2.{sequence}" if stable else f"0.0.{sequence}"
     request = {"schema": 1, "channel": name, "buildId": build_id, "sequence": sequence,
-               "repository": "NousResearch/hermes-agent", "commit": commit,
+               "repository": OFFICIAL, "commit": commit,
                "sourceVersion": f"1.2.{sequence}", "version": version, "windowsVersion": version + ".0",
                "identity": identity, "bundleEnv": {}, "publicBase": base}
     if stable:
@@ -394,7 +398,7 @@ def test_tagless_zip_apply_uses_pinned_source_archive(source, monkeypatch, dirty
         assert (source.root / "notes.txt").read_text() == "do not remove"
     else:
         update_cmd._cmd_update_impl(source.parser.parse_args(["update"]), False)
-        assert urls == [f"https://github.com/NousResearch/hermes-agent/archive/{source.commits[1]}.zip"]
+        assert urls == [f"https://github.com/{OFFICIAL}/archive/{source.commits[1]}.zip"]
         assert (source.root / "content.txt").read_text() == "published"
         assert completed[0]["expected_sha"] == source.commits[1]
         assert completed[0]["channel_retirement"]["destination"] == "stable"

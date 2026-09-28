@@ -31,6 +31,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.releases.authors import resolve_author  # noqa: E402
+from qubit_cli import install_source  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # AI assistants, bots, and machine accounts to exclude from contributor lists
@@ -122,7 +123,7 @@ def gh_pr_list():
         result = subprocess.run(
             [
                 "gh", "pr", "list",
-                "--repo", "NousResearch/hermes-agent",
+                "--repo", install_source.official_repository(),
                 "--state", "merged",
                 "--json", "number,title,body,author,mergedAt",
                 "--limit", "300",

@@ -17,9 +17,6 @@ from tests.pm._fixtures import _wheel
 
 @pytest.mark.platforms("linux")
 def test_fresh_takeover_prepares_generation_and_runs_selected_python(tmp_path):
-    from tests.pm._fixtures import require_pm_runtime_python
-
-    require_pm_runtime_python()
     source = Path(__file__).resolve().parents[2]
     root = tmp_path / "source with spaces"
     root.mkdir()
@@ -32,7 +29,7 @@ def test_fresh_takeover_prepares_generation_and_runs_selected_python(tmp_path):
         directory.mkdir()
     _wheel(wheels, "takeover_dep", "1.0")
     (root / "pyproject.toml").write_text(
-        '[project]\nname="takeover-fixture"\nversion="1"\nrequires-python=">=3.14"\n'
+        '[project]\nname="takeover-fixture"\nversion="1"\nrequires-python=">=3.11"\n'
         'dependencies=["takeover-dep==1.0"]\n[project.optional-dependencies]\nall=[]\nmatrix=[]\n'
         '[tool.hermes.extras-platforms]\nmatrix="sys_platform == \'no-such-platform\'"\n'
         '[tool.uv]\npackage=false\nno-index=true\n'
@@ -41,6 +38,8 @@ def test_fresh_takeover_prepares_generation_and_runs_selected_python(tmp_path):
     (root / "install-stamp.json").write_text('{"updateMechanism":"self"}', encoding="utf-8")
     uv = shutil.which("uv")
     assert uv
+    if sys.version_info[:2] != (3, 14):
+        pytest.skip("the checked-in PM runtime pins Python 3.14 (pm/uv.lock requires-python ==3.14.*)")
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(("HERMES_", "PYTHON", "UV_"))}
     env.update(HOME=str(home), QUBIT_HOME=str(home), HERMES_RUNTIME_DIR=str(store), UV_PYTHON_DOWNLOADS="never")

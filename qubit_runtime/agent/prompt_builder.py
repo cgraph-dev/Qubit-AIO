@@ -15,6 +15,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from qubit_cli import install_source
 from qubit_constants import (
     get_qubit_home, get_scratch_dir, get_skills_dir, is_wsl, reset_qubit_home_override, set_qubit_home_override,
 )
@@ -174,7 +175,7 @@ HERMES_AGENT_HELP_GUIDANCE = (
     # resolution). No "when the two differ" clause: docs-are-authoritative already carries the precedence.
     "You run on Qubit Agent (by Qubit Labs). When the user needs help with Qubit itself — configuring, "
     "setting up, using, extending, or troubleshooting it — or when you need to understand your own features, "
-    "tools, or capabilities, the documentation at https://hermes-agent.nousresearch.com/docs is your "
+    f"tools, or capabilities, the documentation at {install_source.docs_url()} is your "
     "authoritative reference and always holds the latest, most up-to-date information. The `hermes-agent` "
     "skill has the actual commands and proven workflows — load it with skill_view(name='hermes-agent') "
     "before configuring, modifying, or troubleshooting Qubit so you don't guess or invent workarounds."
@@ -184,7 +185,7 @@ HERMES_AGENT_HELP_GUIDANCE = (
 HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS = (
     "You run on Qubit Agent (by Qubit Labs). When the user needs help with Qubit itself — configuring, "
     "setting up, using, extending, or troubleshooting it — or when you need to understand your own features, "
-    "tools, or capabilities, the documentation at https://hermes-agent.nousresearch.com/docs is the "
+    f"tools, or capabilities, the documentation at {install_source.docs_url()} is the "
     "authoritative reference and always holds the latest, most up-to-date information. Point the user there "
     "(or read it yourself if you have a way to fetch web content)."
 )

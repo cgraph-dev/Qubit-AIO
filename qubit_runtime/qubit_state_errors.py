@@ -6,6 +6,8 @@ import errno
 import re
 import sqlite3
 
+from qubit_cli import install_source
+
 # Malformed schema: ``sqlite_master`` itself is inconsistent (typically a DUPLICATE
 # ``CREATE VIRTUAL TABLE messages_fts`` row). SQLite parses the whole schema while
 # preparing the FIRST statement, so EVERY statement raises (even ``PRAGMA
@@ -195,7 +197,7 @@ _STATE_DB_REPLACED_MSG = (
     "writes to this file. Divert transcripts to sessions/<id>.jsonl (and the "
     "gateway pending_messages spool) and restore or reopen after operator intervention."
 )
-STORAGE_RECOVERY_DOCS_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/session-storage-recovery"
+STORAGE_RECOVERY_DOCS_URL = install_source.docs_url("user-guide/session-storage-recovery")
 
 # Two layers (#110054): the first sentence is for the person reading a chat bubble or a banner (what
 # happened, nothing is lost, the one thing to do); the rest is the operator detail. The phrase

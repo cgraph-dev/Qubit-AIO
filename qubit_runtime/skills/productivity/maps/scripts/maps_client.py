@@ -28,7 +28,7 @@ import urllib.request
 # Constants
 # ---------------------------------------------------------------------------
 
-USER_AGENT = "HermesAgent/1.0 (contact: hermes@agent.ai)"
+USER_AGENT = "QubitAgent/1.0 (contact: hermes@agent.ai)"  # contact mailbox preserved; not a Qubit-owned address
 DATA_SOURCE = "OpenStreetMap/Nominatim"
 
 NOMINATIM_SEARCH  = "https://nominatim.openstreetmap.org/search"

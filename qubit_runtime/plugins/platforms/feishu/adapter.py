@@ -2737,7 +2737,7 @@ class FeishuAdapter(BasePlatformAdapter):
             timeout=30.0, follow_redirects=True, event_hooks={"response": [_ssrf_redirect_guard]},
         ) as client:
             response = await client.get(
-                file_url, headers={"User-Agent": "Mozilla/5.0 (compatible; HermesAgent/1.0)", "Accept": "*/*"},
+                file_url, headers={"User-Agent": "Mozilla/5.0 (compatible; QubitAgent/1.0)", "Accept": "*/*"},
             )
             response.raise_for_status()
             # Snapshot headers + body inside the context so pooled connections fully release.

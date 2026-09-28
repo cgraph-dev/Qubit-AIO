@@ -32,12 +32,21 @@ Called from `website/scripts/prebuild.mjs` on every `npm run start` /
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 WEBSITE = SCRIPT_DIR.parent
 DOCS = WEBSITE / "docs"
 STATIC = WEBSITE / "static"
+
+# Public installer/repo identity comes from the single configurable source
+# (qubit_cli.install_source). The docs SITE_BASE below stays owner-blocked
+# until a canonical docs domain exists.
+_RUNTIME = WEBSITE.parent
+if str(_RUNTIME) not in sys.path:
+    sys.path.insert(0, str(_RUNTIME))
+from qubit_cli import install_source  # noqa: E402
 
 SITE_BASE = "https://hermes-agent.nousresearch.com/docs"
 
@@ -305,12 +314,11 @@ def emit_llms_index() -> str:
     )
     lines.append("")
     lines.append(
-        "Install: `curl -fsSL https://raw.githubusercontent.com/NousResearch/"
-        "hermes-agent/main/scripts/install.sh | bash`  "
+        f"Install: `curl -fsSL {install_source.install_sh_url()} | bash`  "
         "(Linux, macOS, WSL2)"
     )
     lines.append("")
-    lines.append("Repo: https://github.com/NousResearch/hermes-agent")
+    lines.append(f"Repo: {install_source.base_url()}")
     lines.append("")
 
     for section, items in SECTIONS:

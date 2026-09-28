@@ -10,16 +10,16 @@ from .constants import QQBOT_VERSION
 
 
 def _get_qubit_version() -> str:
-    """Return the hermes-agent package version, or 'dev' if unavailable."""
+    """Return the Qubit runtime version, or 'dev' if unavailable."""
     try:
-        from importlib.metadata import version
-        return version("hermes-agent")
+        from qubit_cli.version_info import get_version_info
+        return get_version_info().base_version
     except Exception:
         return "dev"
 
 
 def build_user_agent() -> str:
-    """``QQBotAdapter/<qqbot_version> (Python/<py_version>; <os>; Qubit/<hermes_version>)``."""
+    """``QQBotAdapter/<qqbot_version> (Python/<py_version>; <os>; Qubit/<qubit_version>)``."""
     v = sys.version_info
     return (f"QQBotAdapter/{QQBOT_VERSION} (Python/{v.major}.{v.minor}.{v.micro}; "
             f"{platform.system().lower()}; Qubit/{_get_qubit_version()})")

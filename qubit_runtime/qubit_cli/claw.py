@@ -1,4 +1,4 @@
-"""qubit claw — Qubit migration commands."""
+"""qubit claw — OpenClaw migration commands."""
 
 import contextlib
 import importlib.util
@@ -25,13 +25,13 @@ _OPENCLAW_SCRIPT = get_optional_skills_dir(PROJECT_ROOT / "optional-skills") / _
 # Fallback: user may have installed the skill from the Hub
 _OPENCLAW_SCRIPT_INSTALLED = get_qubit_home() / "skills" / _SCRIPT_REL
 
-# Known Qubit directory names (current + legacy)
-_OPENCLAW_DIR_NAMES = (".qubit", ".clawdbot", ".moltbot")
-# pgrep -f ERE anchored on a node interpreter as argv[0] (``node /usr/local/bin/qubit gateway``).
-_OPENCLAW_NODE_CMDLINE_RE = r"^(\S*/)?node(js)?\s.*(qubit|clawd)"
+# Known OpenClaw directory names (current + legacy)
+_OPENCLAW_DIR_NAMES = (".openclaw", ".clawdbot", ".moltbot")
+# pgrep -f ERE anchored on a node interpreter as argv[0] (``node /usr/local/bin/openclaw gateway``).
+_OPENCLAW_NODE_CMDLINE_RE = r"^(\S*/)?node(js)?\s.*(openclaw|clawd)"
 
 # `qubit claw migrate` flags/defaults. Secrets are never included implicitly: --migrate-secrets
-# is required even under --preset full (Qubit's two-phase posture); no silent API-key import.
+# is required even under --preset full (OpenClaw's two-phase posture); no silent API-key import.
 _MIGRATE_ARG_DEFAULTS = (
     ("source", None), ("dry_run", False), ("preset", "full"), ("overwrite", False),
     ("migrate_secrets", False), ("workspace_target", None), ("skill_conflict", "skip"),
@@ -100,7 +100,7 @@ def _warn_running(auto_yes: bool, headline: str, running: list[str], lines: tupl
 
 
 def _detect_openclaw_processes() -> list[str]:
-    """Detect running Qubit processes and services."""
+    """Detect running OpenClaw processes and services."""
     found: list[str] = []
     if sys.platform == "win32":
         # bounded_probe_run: plain subprocess.run(timeout=...) can hang forever on Windows when a
@@ -112,23 +112,23 @@ def _detect_openclaw_processes() -> list[str]:
                 result = bounded_probe_run(["tasklist", "/FI", f"IMAGENAME eq {exe}"], timeout=5)
                 if result is not None and exe in (result.stdout or "").lower():
                     found.append(f"process: {exe}")
-            # Node.js-hosted Qubit — tasklist doesn't show command lines, so use PowerShell.
+            # Node.js-hosted OpenClaw — tasklist doesn't show command lines, so use PowerShell.
             ps_cmd = (
                 'Get-CimInstance Win32_Process -Filter "Name = \'node.exe\'" | '
-                'Where-Object { $_.CommandLine -match "qubit|clawd" } | '
+                'Where-Object { $_.CommandLine -match "openclaw|clawd" } | '
                 'Select-Object -First 1 ProcessId')
             result = bounded_probe_run(["powershell", "-NoProfile", "-Command", ps_cmd], timeout=5)
             pid = (result.stdout or "").strip() if result is not None else ""
             if pid:
-                found.append(f"node.exe process with qubit in command line (PID {pid})")
+                found.append(f"node.exe process with openclaw in command line (PID {pid})")
         except Exception:
             pass
         return found
     result = _posix_probe(["systemctl", "--user", "is-active", "openclaw-gateway.service"], 5)
     if result is not None and result.stdout.strip() == "active":
         found.append("systemd service: openclaw-gateway.service")
-    # Never a bare ``pgrep -f qubit``: it matches ANY argv containing the word (an editor on
-    # ~/.qubit/config.json, ``tail -f openclaw.log``) and aborted cleanup on idle hosts (#12648).
+    # Never a bare ``pgrep -f openclaw``: it matches ANY argv containing the word (an editor on
+    # ~/.openclaw/config.json, ``tail -f openclaw.log``) and aborted cleanup on idle hosts (#12648).
     # Mirror the Windows branch: exact binary names, plus node processes whose script mentions it.
     pids: list[str] = []
     # ``-x`` matches the 15-char comm: the gateway sets process.title="openclaw-gateway", which
@@ -139,7 +139,7 @@ def _detect_openclaw_processes() -> list[str]:
         if result is not None and result.returncode == 0:
             pids.extend(result.stdout.split())
     if pids:
-        found.append(f"qubit process(es) (PIDs: {', '.join(dict.fromkeys(pids))})")
+        found.append(f"openclaw process(es) (PIDs: {', '.join(dict.fromkeys(pids))})")
     return found
 
 
@@ -152,15 +152,15 @@ def _posix_probe(cmd: list[str], timeout: int):
 
 
 def _warn_if_openclaw_running(auto_yes: bool) -> None:
-    """Warn if Qubit is still running: Telegram/Discord/Slack allow one session per bot token."""
+    """Warn if OpenClaw is still running: Telegram/Discord/Slack allow one session per bot token."""
     running = _detect_openclaw_processes()
     if running and _warn_running(
-        auto_yes, "Qubit appears to be running:", running,
+        auto_yes, "OpenClaw appears to be running:", running,
         ("Messaging platforms (Telegram, Discord, Slack) only allow one "
-         "active session per bot token. If you continue, both Qubit and "
+         "active session per bot token. If you continue, both OpenClaw and "
          "Qubit may try to use the same token, causing disconnects.",
-         "Recommendation: stop Qubit before migrating."),
-        "Continue anyway?", declined="Migration cancelled. Stop Qubit and try again.",
+         "Recommendation: stop OpenClaw before migrating."),
+        "Continue anyway?", declined="Migration cancelled. Stop OpenClaw and try again.",
         non_tty=("Non-interactive session — continuing to preview only.",),
     ) is False:
         sys.exit(0)
@@ -222,12 +222,12 @@ def _load_migration_module(script_path: Path):
 
 
 def _find_openclaw_dirs() -> list[Path]:
-    """Find all Qubit directories on disk."""
+    """Find all OpenClaw directories on disk."""
     return [d for d in (Path.home() / name for name in _OPENCLAW_DIR_NAMES) if d.is_dir()]
 
 
 def _scan_workspace_state(source_dir: Path) -> list[tuple[Path, str]]:
-    """List state files in an Qubit directory root, then in its workspace-like subdirs."""
+    """List state files in an OpenClaw directory root, then in its workspace-like subdirs."""
     candidates = [(source_dir / name, "Root") for name in ("todo.json", "sessions", "logs")]
     try:
         children = sorted(source_dir.iterdir())
@@ -241,7 +241,7 @@ def _scan_workspace_state(source_dir: Path) -> list[tuple[Path, str]]:
 
 
 def _archive_directory(source_dir: Path, dry_run: bool = False) -> Path:
-    """Rename an Qubit directory to .pre-migration (date-stamped, then numbered, if taken)."""
+    """Rename an OpenClaw directory to .pre-migration (date-stamped, then numbered, if taken)."""
     base = f"{source_dir.name}.pre-migration"
     stamped = f"{base}-{datetime.now().strftime('%Y%m%d')}"
     names = itertools.chain((base, stamped), (f"{stamped}-{n}" for n in itertools.count(2)))
@@ -260,23 +260,23 @@ def claw_command(args):
         _cmd_cleanup(args)
     else:
         print("Usage: qubit claw <command> [options]\n\nCommands:\n"
-              "  migrate          Migrate settings from Qubit to Qubit\n"
-              "  cleanup          Archive leftover Qubit directories after migration\n\n"
+              "  migrate          Migrate settings from OpenClaw to Qubit\n"
+              "  cleanup          Archive leftover OpenClaw directories after migration\n\n"
               "Run 'qubit claw <command> --help' for options.")
 
 
 def _cmd_migrate(args):
-    """Run the Qubit → Qubit migration: preflight, preview, confirm, back up, apply."""
+    """Run the OpenClaw → Qubit migration: preflight, preview, confirm, back up, apply."""
     opts = SimpleNamespace(**{k: getattr(args, k, d) for k, d in _MIGRATE_ARG_DEFAULTS})
-    # Explicit --source, else first existing of current + legacy names; default to ~/.qubit.
+    # Explicit --source, else first existing of current + legacy names; default to ~/.openclaw.
     opts.source_dir = (Path(opts.source) if opts.source
-                       else next(iter(_find_openclaw_dirs()), Path.home() / ".qubit"))
-    _print_banner("Qubit Migration")
+                       else next(iter(_find_openclaw_dirs()), Path.home() / ".openclaw"))
+    _print_banner("OpenClaw Migration")
     if not opts.source_dir.is_dir():
         return _error_block(
-            f"Qubit directory not found: {opts.source_dir}",
-            "Make sure your Qubit installation is at the expected path.",
-            "You can specify a custom path: qubit claw migrate --source /path/to/.qubit")
+            f"OpenClaw directory not found: {opts.source_dir}",
+            "Make sure your OpenClaw installation is at the expected path.",
+            "You can specify a custom path: qubit claw migrate --source /path/to/.openclaw")
     script_path = _find_migration_script()
     if not script_path:
         return _error_block(
@@ -293,7 +293,7 @@ def _cmd_migrate(args):
           *([f"Skill conflicts: {opts.skill_conflict}"] if opts.skill_conflict != "skip" else []),
           *([f"Workspace:   {opts.workspace_target}"] if opts.workspace_target else []))
     print()
-    # Migrating tokens while Qubit or the gateway is active causes conflicts (e.g. Telegram 409).
+    # Migrating tokens while OpenClaw or the gateway is active causes conflicts (e.g. Telegram 409).
     _warn_if_openclaw_running(opts.yes)
     _warn_if_gateway_running(opts.yes)
     # Ensure config.yaml exists before migration tries to read it
@@ -316,7 +316,7 @@ def _load_migrator(script_path: Path, opts: SimpleNamespace) -> Optional[Callabl
         mod = _load_migration_module(script_path)
     except Exception as e:
         return _error_block(f"Could not load migration script: {e}",
-                            debug="Qubit migration error")
+                            debug="OpenClaw migration error")
     if mod is None:
         return print_error("Could not load migration script.")
     selected = mod.resolve_selected_options(None, None, preset=opts.preset)
@@ -333,7 +333,7 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
     try:
         preview_report = run_migrator(False)
     except Exception as e:
-        _error_block(f"Migration preview failed: {e}", debug="Qubit migration preview error")
+        _error_block(f"Migration preview failed: {e}", debug="OpenClaw migration preview error")
         return False
     summary = preview_report.get("summary", {})
     count, conflicts = summary.get("migrated", 0), summary.get("conflict", 0)
@@ -341,7 +341,7 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
     # conflicts, still show the plan and surface the --overwrite guidance instead of bailing.
     print()
     if count == 0 and conflicts == 0:
-        print_info("Nothing to migrate from Qubit.")
+        print_info("Nothing to migrate from OpenClaw.")
     else:
         what = (f"{count} item(s) would be imported" if count > 0
                 else f"{conflicts} conflict(s), nothing would be imported")
@@ -350,13 +350,13 @@ def _preview_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespa
     _print_migration_report(preview_report, dry_run=True)
     if opts.dry_run or (count == 0 and conflicts == 0):
         return False
-    # Modelled on Qubit's assertConflictFreePlan(): apply is a safe no-op on conflicts unless
+    # Modelled on OpenClaw's assertConflictFreePlan(): apply is a safe no-op on conflicts unless
     # the user opts in to overwriting — otherwise "yes, proceed" would silently skip every
     # conflicting item.
     if conflicts > 0 and not opts.overwrite:
         _error_block(
             f"Plan has {conflicts} conflict(s). Refusing to apply.",
-            "Each conflict is an item whose target already exists in ~/.hermes/. "
+            "Each conflict is an item whose target already exists in ~/.qubit/. "
             "Re-run with --overwrite to replace conflicting targets (item-level "
             "backups are written to the migration report directory).",
             "Or re-run with --dry-run to review the full plan.")
@@ -387,7 +387,7 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
     try:
         report = run_migrator(True)
     except Exception as e:
-        _error_block(f"Migration failed: {e}", debug="Qubit migration error")
+        _error_block(f"Migration failed: {e}", debug="OpenClaw migration error")
         if backup_archive:
             _info(f"A pre-migration backup is available at: {backup_archive}",
                   f"Restore with: qubit import {backup_archive.name}")
@@ -396,25 +396,25 @@ def _apply_migration(run_migrator: Callable[[bool], dict], opts: SimpleNamespace
 
 
 def _cmd_cleanup(args):
-    """Offer to rename leftover Qubit directories to .pre-migration to free disk space."""
+    """Offer to rename leftover OpenClaw directories to .pre-migration to free disk space."""
     dry_run, auto_yes = getattr(args, "dry_run", False), getattr(args, "yes", False)
-    _print_banner("Qubit Cleanup")
+    _print_banner("OpenClaw Cleanup")
     source = getattr(args, "source", None)
     dirs_to_check = [Path(source)] if source else _find_openclaw_dirs()
     if not dirs_to_check:
         print()
-        return print_success("No Qubit directories found. Nothing to clean up.")
+        return print_success("No OpenClaw directories found. Nothing to clean up.")
     # Archiving while the service is active makes it recreate an empty skeleton directory.
     # See #8502.
     running = _detect_openclaw_processes()
     if running and not _warn_running(
-        auto_yes, "Qubit appears to be still running:", running,
-        ("Archiving .qubit/ while the service is active may cause it to "
+        auto_yes, "OpenClaw appears to be still running:", running,
+        ("Archiving .openclaw/ while the service is active may cause it to "
          "immediately recreate an empty skeleton directory, destroying your config.",
-         "Stop Qubit first: systemctl --user stop openclaw-gateway.service"),
+         "Stop OpenClaw first: systemctl --user stop openclaw-gateway.service"),
         "Proceed anyway?",
-        declined="Aborted. Stop Qubit first, then re-run: qubit claw cleanup",
-        non_tty=("Non-interactive session — aborting. Stop Qubit and re-run.",)):
+        declined="Aborted. Stop OpenClaw first, then re-run: qubit claw cleanup",
+        non_tty=("Non-interactive session — aborting. Stop OpenClaw and re-run.",)):
         return
     total_archived = 0
     for source_dir in dirs_to_check:
@@ -438,14 +438,14 @@ def _cmd_cleanup(args):
         _info(f"Dry run complete. {len(dirs_to_check)} {word} would be archived.",
               "Run without --dry-run to archive them.")
     elif total_archived:
-        print_success(f"Cleaned up {total_archived} Qubit {word}.")
+        print_success(f"Cleaned up {total_archived} OpenClaw {word}.")
         print_info("Directories were renamed, not deleted. You can undo by renaming them back.")
     else:
         print_info("No directories were archived.")
 
 
 def _describe_openclaw_dir(source_dir: Path) -> None:
-    """Print the workspace directories (first 5) and state files (first 8) of one Qubit dir."""
+    """Print the workspace directories (first 5) and state files (first 8) of one OpenClaw dir."""
     print()
     print_header(f"Found: {source_dir}")
     state_files = _scan_workspace_state(source_dir)

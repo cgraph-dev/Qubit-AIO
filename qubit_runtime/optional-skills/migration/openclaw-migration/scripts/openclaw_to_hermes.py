@@ -511,13 +511,13 @@ def backup_existing(path: Path, backup_root: Path) -> Optional[Path]:
 
 
 # ── Brand rewriting ─────────────────────────────────────────
-# Replace Qubit brand names with Qubit in migrated text so that
+# Replace OpenClaw brand names with Qubit in migrated text so that
 # memory entries, user profiles, SOUL.md, and workspace instructions
 # read as self-referential to the new agent identity.
 #
-# Case-preserving: ``Qubit`` → ``Qubit`` (prose), but lowercase matches
-# like ``qubit`` → ``qubit`` (so filesystem paths like ``~/.qubit``
-# become ``~/.hermes`` — the real Qubit home — not the broken ``~/.Qubit``).
+# Case-preserving: ``OpenClaw`` → ``Qubit`` (prose), but lowercase matches
+# like ``openclaw`` → ``qubit`` (so filesystem paths like ``~/.openclaw``
+# become ``~/.qubit`` — the real Qubit home — not the broken ``~/.Qubit``).
 _REBRAND_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r'\bOpen[\s-]?Claw\b', re.IGNORECASE), 'Qubit'),
     (re.compile(r'\bClawdBot\b', re.IGNORECASE), 'Qubit'),
@@ -529,9 +529,9 @@ def _case_preserving_replacement(replacement: str):
     """Return a re.sub replacement fn that lowercases the result when the
     matched text was all-lowercase.
 
-    Keeps ``Qubit`` → ``Qubit`` but maps ``qubit`` → ``qubit`` so a
-    filesystem path like ``~/.qubit/config.yaml`` rewrites to
-    ``~/.hermes/config.yaml`` (the real Qubit home) instead of the broken
+    Keeps ``Qubit`` capitalized but maps an all-lowercase match to ``qubit`` so
+    a filesystem path like ``~/.openclaw/config.yaml`` rewrites to
+    ``~/.qubit/config.yaml`` (the real Qubit home) instead of the broken
     ``~/.Qubit/config.yaml``.
     """
     def _sub(match: "re.Match[str]") -> str:

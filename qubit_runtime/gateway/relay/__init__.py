@@ -491,7 +491,7 @@ def self_provision_relay() -> bool:
     identity token, POSTs ``/relay/provision`` for EACH fronted platform and sets
     ``GATEWAY_RELAY_ID`` / ``_SECRET`` / ``_DELIVERY_KEY`` in ``os.environ`` for
     ``register_relay_adapter()``. Creds live ONLY in process memory (never
-    ``~/.hermes/.env``), so a hosted container re-provisions every boot; the
+    ``<QUBIT_HOME>/.env``), so a hosted container re-provisions every boot; the
     connector's rotation window covers a still-connected prior instance. The trigger
     is deliberately NOT ``is_managed()`` (False on a NAS-hosted Fly agent): "pointed
     at a connector without a pinned secret" is the real signal and self-guards (an
