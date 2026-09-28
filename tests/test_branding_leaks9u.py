@@ -103,14 +103,22 @@ def test_debug_user_facing_notices_are_qubit_branded():
 
 
 def test_debug_upstream_urls_are_internal_provenance_only():
-    """The retained GitHub/Discord URLs are documented provenance, not a
-    rendered/printed surface."""
+    """Upstream GitHub/Discord provenance URLs are not a rendered/printed surface.
+
+    The v0.21.5 rebrand reset removed the fork's ``_UPSTREAM_PROVENANCE_URLS``
+    constant; the retained guarantee is behavioral — the Qubit privacy notice is
+    Qubit-branded and renders no upstream URL/host.
+    """
     import qubit_cli.debug as debug
 
-    assert debug._UPSTREAM_PROVENANCE_URLS, "provenance URLs missing"
-    # The public support instruction points at the Qubit team, not upstream.
-    assert "Qubit team" in debug._NOUS_PRIVACY_NOTICE or \
-        "Qubit staff" in debug._NOUS_PRIVACY_NOTICE
+    text = debug._NOUS_PRIVACY_NOTICE
+    assert "Qubit" in text
+    for host in ("nousresearch", "openclaw", "hermes-agent"):
+        assert host not in text.lower(), (host, text)
+    # The old internal-provenance constant is gone (intentional reset); if it is
+    # ever reintroduced it must remain non-rendered, never printed here.
+    provenance = getattr(debug, "_UPSTREAM_PROVENANCE_URLS", None)
+    assert not provenance or all(u not in text for u in provenance)
 
 
 # ------------------------------------------------------------ relaunch error

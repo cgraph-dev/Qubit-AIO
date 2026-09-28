@@ -5,7 +5,7 @@ JSON-RPC), and starts the ACP agent server.
 
 Usage::
 
-    python -m acp_adapter.entry   # or: qubit acp / hermes-acp
+    python -m acp_adapter.entry   # or: qubit acp
 """
 
 # IMPORTANT: qubit_bootstrap must be the very first import — UTF-8 stdio
@@ -92,7 +92,7 @@ def _load_env() -> None:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="hermes-acp", description="Run Qubit Agent as an ACP stdio server.")
+    parser = argparse.ArgumentParser(prog="qubit-acp", description="Run Qubit Agent as an ACP stdio server.")
     parser.add_argument("--version", action="store_true", help="Print Qubit version and exit")
     parser.add_argument("--check", action="store_true", help="Verify ACP dependencies and adapter imports, then exit")
     parser.add_argument("--setup", action="store_true",

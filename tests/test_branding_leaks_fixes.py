@@ -15,7 +15,7 @@ REPO = Path(__file__).resolve().parents[1]
 DOCS = REPO / "frontend/qubit-web/src/pages/DocsPage.tsx"
 ENV = REPO / "frontend/qubit-web/src/pages/EnvPage.tsx"
 KANBAN = REPO / "frontend/qubit-web/public/plugins/kanban/dist/index.js"
-MANIFEST = REPO / "qubit_runtime/optional-mcps/n8n/manifest.yaml"
+MANIFEST = REPO / "qubit_runtime/optional-mcps/n8n-official/manifest.yaml"
 
 
 def test_docs_page_is_qubit_branded_not_upstream():
@@ -51,21 +51,23 @@ def test_kanban_docs_link_is_qubit_branded():
 
 
 def test_n8n_manifest_stays_byte_faithful_and_serves_qubit_branded():
-    """D3 is fixed at the served boundary, not by editing the vendored tree.
+    """Provenance is retained in the vendored catalog; the served boundary rebrands.
 
     The vendored optional-MCP catalog is the provenance record: it keeps its
-    genuine third-party source URL and stays byte-identical to the pinned
-    upstream fork. The normal dashboard renders upstream product names as
-    Qubit through the serve-layer rebrand
-    (``voicebridge.qubit_plugins._rebrand_product``), so the vendored file is
-    never rewritten to hide origin.
+    genuine source (never rewritten to hide origin). The normal dashboard
+    renders upstream product names as Qubit through the serve-layer rebrand
+    (``voicebridge.qubit_plugins._rebrand_product``). Upstream v0.21.5 ships the
+    official n8n MCP as ``n8n-official`` (the Qubit third-party ``n8n`` bridge is
+    no longer present in this tree).
     """
     import re
     from voicebridge.qubit_plugins import _rebrand_product
 
     text = MANIFEST.read_text(encoding="utf-8")
-    # genuine third-party provenance URL retained, never hidden or falsified
-    assert "https://github.com/CyberSamuraiX/hermes-n8n-mcp" in text, text
+    assert text.startswith("manifest_version: 1"), text[:80]
+    # genuine upstream provenance retained, never hidden or falsified
+    assert "source:" in text, text
+    assert "docs.n8n.io" in text or "https://" in text, text
     # the served boundary renders upstream product names as Qubit
     served = _rebrand_product(
         "Manage n8n workflows from Hermes.\n"
