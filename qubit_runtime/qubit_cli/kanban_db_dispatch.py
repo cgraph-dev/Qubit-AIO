@@ -2536,7 +2536,9 @@ def _resolve_qubit_argv() -> list[str]:
     except Exception:
         pass
 
-    hermes_bin = _safe_which_no_cwd("hermes") if _kb._IS_WINDOWS else shutil.which("hermes")
+    hermes_bin = ((_safe_which_no_cwd("qubit") or _safe_which_no_cwd("hermes"))
+                  if _kb._IS_WINDOWS
+                  else (shutil.which("qubit") or shutil.which("hermes")))
     if hermes_bin:
         return _qubit_path_argv(hermes_bin)
     return _module_qubit_argv()

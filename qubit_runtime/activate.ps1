@@ -18,7 +18,7 @@ try {
     $shell = (Get-Process -Id $PID).Path
     $testArgs = @()
     if ($TestExtras) { $testArgs = @('-TestExtras', $TestExtras) }
-    & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$repo\setup-hermes.ps1" -RuntimeOnly @testArgs | Out-Host
+    & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$repo\setup-qubit.ps1" -RuntimeOnly @testArgs | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'activate: setup failed; shell environment unchanged' }
 } finally {
     foreach ($key in $bootstrapSaved.Keys) {
@@ -44,7 +44,7 @@ if (-not $py) {
         if ($py) { break }
     }
 }
-if (-not $py) { throw 'activate: no bootstrap Python found; run setup-hermes.ps1' }
+if (-not $py) { throw 'activate: no bootstrap Python found; run setup-qubit.ps1' }
 $priorPath = $env:PYTHONPATH
 $priorHome = $env:PYTHONHOME
 try {

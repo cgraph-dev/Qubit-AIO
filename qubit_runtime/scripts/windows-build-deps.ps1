@@ -4,7 +4,7 @@
 # full output in $script:HermesBuildLog; CI and a redirected stdout (pm under
 # the installer, which logs that itself) keep the full stream. install.ps1
 # has its own copy: this file is dot-sourced by the build entry point and
-# setup-hermes.ps1, which never load the installer.
+# setup-qubit.ps1, which never load the installer.
 function Test-HermesBuildQuiet {
     if ($env:CI -or $env:GITHUB_ACTIONS -or $env:HERMES_INSTALL_VERBOSE -or -not $script:HermesBuildLog) { return $false }
     try { return -not [Console]::IsOutputRedirected } catch { return $false }
@@ -124,7 +124,7 @@ function Initialize-HermesArm64BuildTools {
         # runs would block on it, so they keep the explicit instruction.
         $canPrompt = [Environment]::UserInteractive -and -not $env:CI -and -not $env:GITHUB_ACTIONS -and
             -not $env:SSH_CONNECTION -and -not $env:SSH_CLIENT
-        $needsAdmin = 'ARM64 C++ or Clang build tools are missing. Run setup-hermes.ps1 once in an Administrator PowerShell to install them.'
+        $needsAdmin = 'ARM64 C++ or Clang build tools are missing. Run setup-qubit.ps1 once in an Administrator PowerShell to install them.'
         if (-not $elevated -and -not $canPrompt) { throw $needsAdmin }
         $installer = Join-Path $buildRoot 'vs-buildtools.exe'
         Write-Host '-> Installing Visual Studio Build Tools (ARM64 C++ and Clang) to compile dependencies that have no ARM64 Windows wheel (such as cryptography).'

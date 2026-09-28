@@ -447,7 +447,7 @@ selected generation.
 ### Test and editor environments
 
 `source ./activate` (or `. .\activate.ps1` in PowerShell) and both direct
-`setup-hermes` scripts prepare an isolated test interpreter from the locked
+`setup-qubit` scripts prepare an isolated test interpreter from the locked
 `dev` and `test` dependency groups. `scripts/run_tests.sh` uses that interpreter,
 re-activating if the checkout or its dependency inputs changed. The application
 venv, installers, and bundles select neither group. The developer default

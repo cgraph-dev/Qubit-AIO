@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PS1_SCRIPTS = sorted(
     list(REPO_ROOT.glob("scripts/*.ps1"))
     + list(REPO_ROOT.glob("tests/install/*.ps1"))
-    + list(REPO_ROOT.glob("*.ps1"))  # repo-root scripts (setup-hermes.ps1, activate.ps1)
+    + list(REPO_ROOT.glob("*.ps1"))  # repo-root scripts (setup-qubit.ps1, activate.ps1)
 )
 
 _HARNESS = """\

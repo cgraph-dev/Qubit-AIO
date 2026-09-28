@@ -246,14 +246,64 @@ TOOLSETS = {
         "Gateway toolset - union of all messaging platform tools",
         [],
         includes=[
-            "hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack",
-            "hermes-signal", "hermes-bluebubbles", "hermes-homeassistant", "hermes-email",
-            "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk",
-            "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin",
-            "hermes-qqbot", "hermes-webhook", "hermes-yuanbao",
+            "qubit-telegram", "qubit-discord", "qubit-whatsapp", "qubit-slack",
+            "qubit-signal", "qubit-bluebubbles", "qubit-homeassistant", "qubit-email",
+            "qubit-sms", "qubit-mattermost", "qubit-matrix", "qubit-dingtalk",
+            "qubit-feishu", "qubit-wecom", "qubit-wecom-callback", "qubit-weixin",
+            "qubit-qqbot", "qubit-webhook", "qubit-yuanbao",
         ],
     ),
 }
+
+
+def _register_qubit_platform_aliases() -> None:
+    """Register the Qubit-owned ``qubit-*`` spelling for every upstream
+    ``hermes-*`` platform bundle.
+
+    ``qubit-*`` is the canonical identity for defaults and menus; ``hermes-*``
+    stays a read-old alias (existing configs, the dashboard overlay and the
+    plugin-platform registry name it) and is never deleted. A lookup of either
+    spelling resolves to the same tool list.
+
+    The canonical alias carries the same bundle definition plus ``posture=True``:
+    that is the registry's existing marker for a bundle that re-lists the core
+    tools without owning them, so disabling it removes only the platform-specific
+    delta instead of emptying the list (``model_tools._apply_toolset_selection``)
+    and the blank-slate minimiser leaves it out of ``disabled_toolsets``
+    (``qubit_cli.setup_quick``). Its legacy source already gets that treatment by
+    the ``hermes-`` name prefix.
+    """
+    for legacy_name, legacy_def in list(TOOLSETS.items()):
+        if not legacy_name.startswith("hermes-"):
+            continue
+        canonical = "qubit-" + legacy_name[len("hermes-"):]
+        if canonical in TOOLSETS:
+            continue
+        TOOLSETS[canonical] = {**legacy_def, "posture": True}
+
+
+_register_qubit_platform_aliases()
+
+
+def _canonical_toolset_name(name: str) -> str:
+    """Preferred ``TOOLSETS`` key for *name* (read-old resolver).
+
+    Exact key wins. Otherwise the name is matched case-insensitively (a careless
+    string rebrand produced ``Qubit-cli``), then ``hermes-*`` is swapped to its
+    canonical ``qubit-*`` spelling. Unknown names are returned unchanged so
+    plugin/MCP toolsets and error paths are unaffected.
+    """
+    if not isinstance(name, str) or name in TOOLSETS:
+        return name
+    folded = name.lower()
+    for key in TOOLSETS:
+        if key.lower() == folded:
+            return key
+    if folded.startswith("hermes-"):
+        candidate = "qubit-" + folded[len("hermes-"):]
+        if candidate in TOOLSETS:
+            return candidate
+    return name
 
 
 def _registry():
@@ -291,6 +341,7 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
     ``_get_platform_tools`` uses False so that a tool registered into a toolset but absent from a platform's
     static composite does not drop the whole toolset from inference. See issue #49622.
     """
+    name = _canonical_toolset_name(name)
     toolset = TOOLSETS.get(name)
     if not include_registry:
         return {**toolset, "tools": list(toolset.get("tools", [])), "includes": list(toolset.get("includes", []))} if toolset else None
@@ -348,11 +399,16 @@ _resolve_toolset_memo: Dict[Tuple[str, bool, int, int, str], List[str]] = {}
 
 
 def _plugin_platform_bundle(name: str) -> List[str]:
-    """Implicit `hermes-<platform>` bundle for a registered plugin platform: core
-    tools plus whatever the plugin registered under the platform name. [] otherwise."""
-    if not name.startswith("hermes-"):
+    """Implicit platform bundle for a registered plugin platform: core tools plus
+    whatever the plugin registered under the platform name. Accepts either the
+    canonical ``qubit-<platform>`` or the read-old ``hermes-<platform>`` spelling.
+    [] otherwise."""
+    for prefix in ("qubit-", "hermes-"):
+        if name.startswith(prefix):
+            platform_name = name[len(prefix):]
+            break
+    else:
         return []
-    platform_name = name[len("hermes-"):]
     try:
         from gateway.platform_registry import platform_registry
         if not platform_registry.is_registered(platform_name):
@@ -376,6 +432,7 @@ def resolve_toolset(name: str, visited: Set[str] = None, *, include_registry: bo
     registered into a toolset. Platform reverse-mapping uses False so a registry-added tool cannot drop the
     whole toolset from inference (see #49622 and ``_get_platform_tools``).
     """
+    name = _canonical_toolset_name(name)
     external_call = visited is None
     if external_call:
         memo_key = (name, include_registry, *_registry_generation(), _registry_call("current_scope_key", ""))
@@ -464,6 +521,7 @@ def profile_role_toolsets(profile_home: Optional[Path] = None) -> Tuple[Set[str]
 
 
 def validate_toolset(name: str) -> bool:
+    name = _canonical_toolset_name(name)
     return (name in {"all", "*"} or name in TOOLSETS
             or name in _get_plugin_toolset_names() or name in _get_registry_toolset_aliases())
 
@@ -475,6 +533,7 @@ def create_custom_toolset(name: str, description: str, tools: List[str] = None, 
 
 def get_toolset_info(name: str) -> Dict[str, Any]:
     """Toolset definition plus its resolved tools, or None if unknown."""
+    name = _canonical_toolset_name(name)
     toolset = get_toolset(name)
     if not toolset:
         return None

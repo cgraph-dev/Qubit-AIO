@@ -63,12 +63,12 @@ def _sync_checkout(tmp_path: Path):
         binary.chmod(0o755)
     # Activation's contract with setup is the runtime-only switch; setup
     # itself maps that to PM's --trust-recorded install.
-    (root / "setup-hermes.sh").write_text(
+    (root / "setup-qubit.sh").write_text(
         'test "$#" = 2 && test "$1" = --runtime-only && test "$2" = --test-environment || exit 2\n'
         f'cd {shlex.quote(str(root))} || exit 3\n'
         f'exec {shlex.quote(str(python))} sync.py runtime-only --trust-recorded --test-environment\n', encoding="utf-8",
     )
-    (root / "setup-hermes.ps1").write_text(
+    (root / "setup-qubit.ps1").write_text(
         "param([switch]$RuntimeOnly)\n"
         "if (-not $RuntimeOnly) { exit 2 }\n"
         "$ErrorActionPreference = 'Stop'\n"
@@ -217,5 +217,5 @@ def test_powershell_cold_sync_changed_input_warm_and_failure(tmp_path):
         assert Path(call["executable"]).samefile(ps)
         assert [arg.lower() for arg in call["argv"][1:]] == [
             "-noprofile", "-noninteractive", "-executionpolicy", "bypass", "-file",
-            str(root / "setup-hermes.ps1").lower(), "-runtimeonly",
+            str(root / "setup-qubit.ps1").lower(), "-runtimeonly",
         ]

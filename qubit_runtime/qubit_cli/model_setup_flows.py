@@ -726,7 +726,7 @@ def _model_flow_vertex(config, current_model=""):
         _say("  Vertex credentials: Application Default Credentials (ADC)",
              "    Vertex uses OAuth2, not a static API key. Either:",
              "      • run 'gcloud auth application-default login', or",
-             "      • set VERTEX_CREDENTIALS_PATH in ~/.hermes/.env to a service account JSON")
+             "      • set VERTEX_CREDENTIALS_PATH in ~/.qubit/.env to a service account JSON")
     print()
 
     vertex_cfg = load_config().get("vertex")

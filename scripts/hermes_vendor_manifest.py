@@ -42,6 +42,10 @@ OPENCLAW_REPO = "https://github.com/openclaw/openclaw"
 OPENCLAW_LICENSE = "MIT (Copyright (c) 2026 OpenClaw Foundation)"
 
 _SKIP_DIR_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache", "MagicMock"}
+# Gitignored pytest/tooling artifacts that a local dev tree carries but a clean
+# checkout does not. They must never enter the manifest, or the committed
+# artifact becomes non-reproducible on a clean clone (16,083 vs 16,082).
+_SKIP_FILE_NAMES = {"test_durations.json", ".coverage", "coverage.xml"}
 _SKIP_SUFFIX = (".pyc", ".pyo")
 _UPSTREAM_SKIP_DIRS = _SKIP_DIR_PARTS
 # Disposable dependency/build/cache trees. A path under one of these is skipped
@@ -217,6 +221,7 @@ _UPSTREAM_TO_LOCAL: dict[str, str] = {
 _EXTRA_NAME_RENAMES: dict[str, str] = {
     "hermes": "qubit",
     "setup-hermes.sh": "setup-qubit.sh",
+    "setup-hermes.ps1": "setup-qubit.ps1",
 }
 #: Exact full-path renames that are not module basenames.
 _EXTRA_PATH_RENAMES: dict[str, str] = {
@@ -1310,6 +1315,8 @@ def _is_skipped(rel: str) -> bool:
     parts = set(Path(rel).parts)
     if parts & _SKIP_DIR_PARTS:
         return True
+    if Path(rel).name in _SKIP_FILE_NAMES:
+        return True
     return rel.endswith(_SKIP_SUFFIX)
 
 
@@ -1789,25 +1796,72 @@ UPSTREAM_CANDIDATES = (
     Path("/tmp/opencode/pinned/hermes-agent"),
 )
 
+#: Read-only candidate sources for the pinned OpenClaw tree, in preference
+#: order. ``--openclaw`` accepts an explicit path; otherwise the first
+#: candidate whose HEAD equals OPENCLAW_PIN wins, else the first existing.
+OPENCLAW_CANDIDATES = (
+    Path(f"/tmp/opencode/pinned/openclaw-{OPENCLAW_TAG}"),
+    Path("/tmp/opencode/pinned/openclaw"),
+)
 
-def _resolve_upstream(explicit: str | None = None) -> Path:
+ENV_UPSTREAM_CANDIDATE_VARS = ("QUBIT_PINNED_HERMES", "QUBIT_REFERENCE_HOME")
+ENV_OPENCLAW_CANDIDATE_VARS = ("QUBIT_PINNED_OPENCLAW", "QUBIT_OPENCLAW_HOME")
+
+FALLBACK_UPSTREAM = Path("/tmp/opencode/pinned/hermes-agent")
+FALLBACK_OPENCLAW = Path("/tmp/opencode/pinned/openclaw")
+
+
+def _env_candidate_paths(*var_names: str) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    for name in var_names:
+        value = os.environ.get(name)
+        if value:
+            paths.append(Path(value).expanduser())
+    return tuple(paths)
+
+
+def _resolve_pinned(explicit: str | None, pin: str, candidates: tuple[Path, ...],
+                    label: str, fallback: Path) -> Path:
+    """Resolve a pinned tree: explicit path, else the first candidate at *pin*.
+
+    Falls back to the first existing candidate (with a loud warning) so the
+    caller's revision check fails closed instead of silently reading a wrong
+    tree. Kept in lockstep with ``scripts/source_inventory.py::_resolve_pin``.
+    """
     if explicit:
         return Path(explicit).expanduser()
-    fallback: Path | None = None
-    for candidate in UPSTREAM_CANDIDATES:
+    first_existing: Path | None = None
+    for candidate in candidates:
         if not candidate.is_dir():
             continue
-        if fallback is None:
-            fallback = candidate
+        if first_existing is None:
+            first_existing = candidate
         try:
             rev = _git(["rev-parse", "HEAD"], candidate).strip()
         except Exception:  # noqa: BLE001 - not a git checkout; try the next
             continue
-        if rev == PIN:
+        if rev == pin:
             return candidate
-    if fallback is not None:
-        return fallback
-    return Path("/tmp/opencode/pinned/hermes-agent")
+    if first_existing is not None:
+        print(f"WARNING: no {label} clone at pin {pin}; using first existing "
+              f"{first_existing}. Pass the explicit flag or set the env override.",
+              file=sys.stderr)
+        return first_existing
+    return fallback
+
+
+def _resolve_upstream(explicit: str | None = None) -> Path:
+    candidates = (_env_candidate_paths(*ENV_UPSTREAM_CANDIDATE_VARS)
+                  + UPSTREAM_CANDIDATES)
+    return _resolve_pinned(explicit, PIN, candidates, "upstream (Hermes)",
+                           FALLBACK_UPSTREAM)
+
+
+def _resolve_openclaw(explicit: str | None = None) -> Path:
+    candidates = (_env_candidate_paths(*ENV_OPENCLAW_CANDIDATE_VARS)
+                  + OPENCLAW_CANDIDATES)
+    return _resolve_pinned(explicit, OPENCLAW_PIN, candidates, "openclaw",
+                           FALLBACK_OPENCLAW)
 
 
 def main(argv=None) -> int:
@@ -1819,11 +1873,13 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default="docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json")
     ap.add_argument("--check", action="store_true",
                     help="render in memory, compare with --out, write nothing")
-    # Default to the owner-pinned OpenClaw clone that matches OPENCLAW_PIN
-    # (tag OPENCLAW_TAG). The live pinned checkout is passed explicitly with
-    # --openclaw; the default path is only a convenience fallback.
-    ap.add_argument("--openclaw",
-                    default=f"/tmp/opencode/pinned/openclaw-{OPENCLAW_TAG}")
+    # OpenClaw is resolved the same way as upstream: an explicit --openclaw
+    # wins, else the first candidate whose HEAD equals OPENCLAW_PIN, else the
+    # first existing candidate (with a loud warning). The default is therefore
+    # not a single ephemeral path.
+    ap.add_argument("--openclaw", default=None,
+                    help="pinned OpenClaw git clone (default: auto-resolve a "
+                         "candidate whose HEAD equals the pin)")
     ap.add_argument("--comparison-out",
                     default="docs/generated/HERMES_SOURCE_COMPARISON.json")
     args = ap.parse_args(argv)
@@ -1871,7 +1927,7 @@ def main(argv=None) -> int:
           f"git_index_gaps={len(manifest['git_index_gaps'])}")
 
     if args.comparison_out:
-        comparison = build_comparison(upstream, Path(args.openclaw))
+        comparison = build_comparison(upstream, _resolve_openclaw(args.openclaw))
         comp_out = (REPO / args.comparison_out).resolve()
         comp_out.parent.mkdir(parents=True, exist_ok=True)
         comp_out.write_text(

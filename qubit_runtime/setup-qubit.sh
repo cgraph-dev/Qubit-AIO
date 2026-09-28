@@ -11,6 +11,9 @@
 #   3. Point you at `source ./activate` — the venv-style way to put the pm
 #      env (PATH + tool vars) into your current shell.
 # There is no pip fallback tier here on purpose.
+# Renamed from the upstream name ``setup-hermes.sh``; the vendor-manifest
+# rename map (scripts/hermes_vendor_manifest.py::_EXTRA_NAME_RENAMES) keeps the
+# old name accepted read-old for the pinned-source byte comparison.
 # ============================================================================
 
 set -e
@@ -174,7 +177,7 @@ fi
 boot_py="$("$uv" python find --managed-python "$py_request")"
 boot_py="${boot_py%$'\r'}"
 # Activation trusts the recorded tool digest; a direct setup re-checks it
-# (setup-hermes.ps1 draws the same line).
+# (setup-qubit.ps1 draws the same line).
 pm_args=("$test_environment")
 [ "$runtime_only" = true ] && pm_args+=(--trust-recorded)
 if ! "$boot_py" -m pm.cli install "${pm_args[@]}"; then

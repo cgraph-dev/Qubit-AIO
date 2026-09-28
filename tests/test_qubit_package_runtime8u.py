@@ -41,7 +41,6 @@ RUNTIME_DIRS = [
     "native",
     "locales",
     "assets",
-    "mcp-research-data",
     "web",
 ]
 

@@ -69,7 +69,7 @@ def test_current_installer_publishes_real_dependencies_and_warm_path(tmp_path, s
     source.mkdir()
     for name in ("pm", "qubit_cli", "qubit_platform"):
         shutil.copytree(ROOT / name, source / name, ignore=shutil.ignore_patterns("__pycache__"))
-    for name in ("utils.py", "qubit_constants.py", "qubit_yaml.py", "qubit_bootstrap.py", "setup-hermes.sh"):
+    for name in ("utils.py", "qubit_constants.py", "qubit_yaml.py", "qubit_bootstrap.py", "setup-qubit.sh"):
         shutil.copy2(ROOT / name, source / name)
     wheels = source / "wheels"
     wheels.mkdir()
@@ -141,7 +141,7 @@ def test_current_installer_publishes_real_dependencies_and_warm_path(tmp_path, s
     assert not (install / "venv").exists()
     # The developer setup path publishes through the same writer after real PM.
     launcher.unlink()
-    run(["bash", str(install / "setup-hermes.sh")])
+    run(["bash", str(install / "setup-qubit.sh")])
     assert json.loads(run([str(launcher), "from setup"]).stdout)["argv"] == ["from setup"]
     # Warm path publication must work with all acquisition inputs unavailable.
     shutil.rmtree(docroot)

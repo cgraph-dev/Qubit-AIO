@@ -55,10 +55,26 @@ DEFAULT_OUT = (
     REPO / "docs" / "differential" / "byte_manifest" / "hermes"
     / "HERMES_BYTE_MANIFEST.json"
 )
+#: Read-only candidate pinned trees, in preference order, so ``--check`` works
+#: on a fresh checkout without an operator-supplied ephemeral path: the first
+#: candidate whose HEAD equals the pin is selected (mirrors
+#: ``scripts/source_inventory.py::_resolve_pin``). Env overrides
+#: ``QUBIT_PINNED_HERMES`` / ``QUBIT_REFERENCE_HOME`` are tried first; if no
+#: candidate matches, the first existing one is used and a loud warning names
+#: the mismatch (the caller's revision check then fails closed).
+#:
+#: The durable reference install is listed first because the committed manifest
+#: embeds ``source.path``; selecting it keeps ``--check`` reproducible and a
+#: write byte-identical to the frozen artifact. The pristine ``/tmp`` clones are
+#: the fallbacks for a checkout with no reference install present.
 DEFAULT_UPSTREAM_CANDIDATES = (
     Path.home() / ".hermes" / "hermes-agent",
-    Path("/tmp/qubit-pin-69948c0057"),
+    Path(f"/tmp/opencode/pinned/hermes-agent-{PIN[:10]}"),
+    Path(f"/tmp/qubit-pin-{PIN[:10]}"),
+    Path("/tmp/opencode/pinned/hermes-agent"),
 )
+
+ENV_CANDIDATE_VARS = ("QUBIT_PINNED_HERMES", "QUBIT_REFERENCE_HOME")
 
 ARTIFACT = "HERMES_BYTE_MANIFEST"
 SCHEMA_VERSION = 1
@@ -98,21 +114,50 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def discover_upstream(explicit: str | None) -> Path:
+def _candidate_paths() -> tuple[Path, ...]:
+    """Env overrides first, then the ephemeral-then-durable default candidates."""
+    env: list[Path] = []
+    for var in ENV_CANDIDATE_VARS:
+        value = os.environ.get(var)
+        if value:
+            env.append(Path(value).expanduser())
+    return tuple(env) + DEFAULT_UPSTREAM_CANDIDATES
+
+
+def discover_upstream(explicit: str | None, pin: str = PIN) -> Path:
+    """Resolve the pinned clone: explicit path, else a candidate whose HEAD == pin.
+
+    Falls back to the first existing candidate with a loud warning so the
+    caller's revision check fails closed on a mismatch rather than silently
+    reading a wrong tree.
+    """
     if explicit:
-        candidates = (Path(explicit),)
-    elif os.environ.get("QUBIT_PINNED_HERMES"):
-        candidates = (Path(os.environ["QUBIT_PINNED_HERMES"]),)
-    else:
-        candidates = DEFAULT_UPSTREAM_CANDIDATES
-    found = next((p for p in candidates if (p / ".git").exists()), None)
-    if found is None:
-        raise Blocked(
-            "a read-only git clone of the pinned Hermes source at "
-            f"{PIN} ({UPSTREAM_TAG}); checked {[str(p) for p in candidates]}. "
-            "Set QUBIT_PINNED_HERMES or pass --upstream."
+        return Path(explicit).expanduser()
+    candidates = _candidate_paths()
+    first_existing: Path | None = None
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        if first_existing is None:
+            first_existing = candidate
+        try:
+            rev = _run(candidate, "rev-parse", "HEAD").strip()
+        except Exception:  # noqa: BLE001 - not a git checkout; try the next
+            continue
+        if rev == pin:
+            return candidate
+    if first_existing is not None:
+        print(
+            f"WARNING: no candidate clone at pin {pin}; using first existing "
+            f"{first_existing}. Pass --upstream or set QUBIT_PINNED_HERMES.",
+            file=sys.stderr,
         )
-    return found
+        return first_existing
+    raise Blocked(
+        "a read-only git clone of the pinned Hermes source at "
+        f"{pin} ({UPSTREAM_TAG}); checked {[str(p) for p in candidates]}. "
+        "Set QUBIT_PINNED_HERMES/QUBIT_REFERENCE_HOME or pass --upstream."
+    )
 
 
 def _require_revision(upstream: Path, pin: str) -> str:
@@ -263,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
 
     out = Path(args.out)
     try:
-        upstream = discover_upstream(args.upstream)
+        upstream = discover_upstream(args.upstream, args.pin)
         doc, payload = build_manifest(upstream, args.pin)
     except Blocked as exc:
         print(f"{BLOCKED}: {exc}", file=sys.stderr)

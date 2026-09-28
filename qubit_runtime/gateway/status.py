@@ -358,7 +358,7 @@ def _get_lock_dir() -> Path:
     # lock dir CWD-relative, so two serves started from different directories shared no singleton.
     state_home_env = os.getenv("XDG_STATE_HOME") or ""
     state_home = Path(state_home_env) if os.path.isabs(state_home_env) else Path.home() / ".local" / "state"
-    return state_home / "hermes" / _LOCKS_DIRNAME
+    return state_home / "qubit" / _LOCKS_DIRNAME
 
 
 def _utc_now_iso() -> str:

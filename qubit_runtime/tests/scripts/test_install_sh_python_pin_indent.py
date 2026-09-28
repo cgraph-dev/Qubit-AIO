@@ -1,7 +1,7 @@
 """install.sh reads the python pin from pm/lock.json by structure, not layout.
 
 bootstrap_python's pre-Python awk reader must follow object names and braces
-(the same contract setup-hermes.sh's pin() established), so any indentation the
+(the same contract setup-qubit.sh's pin() established), so any indentation the
 lock writer produces resolves the same pinned version.
 """
 import json

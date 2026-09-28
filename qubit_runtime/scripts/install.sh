@@ -566,7 +566,7 @@ bootstrap_python() {
     ensure_uv
     local _py
     # Read packages.python.version by following object names and braces, not
-    # indentation — same pre-Python reader contract as setup-hermes.sh's pin().
+    # indentation — same pre-Python reader contract as setup-qubit.sh's pin().
     _py="$(awk -F '"' '
         /^[[:space:]]*("[^"]+"[[:space:]]*:[[:space:]]*)?\{/ { path[++depth] = $2; next }
         /^[[:space:]]*\}[[:space:]]*,?[[:space:]]*$/ { delete path[depth--]; next }

@@ -1122,7 +1122,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     print()
     from qubit_constants import display_qubit_home
     print(color(f"  Tool configuration saved to {display_qubit_home()}/config.yaml", Colors.DIM))
-    print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
+    print(color("  Changes take effect on next 'qubit' or gateway restart.", Colors.DIM))
     print()
 
 

@@ -159,13 +159,13 @@ def test_dev_setup_reaches_the_same_mirror_without_python(tmp_path, server):
     http.files["/archive/" + digest] = body
     repo = tmp_path / "repo"
     (repo / "pm").mkdir(parents=True)
-    shutil.copyfile(ROOT / "setup-hermes.sh", repo / "setup-hermes.sh")
+    shutil.copyfile(ROOT / "setup-qubit.sh", repo / "setup-qubit.sh")
     (repo / "pm/artifact-mirror.json").write_text(json.dumps({"origin": base, "prefix": "archive/"}, indent=2), encoding="utf-8")
     (repo / "pm/lock.json").write_text(json.dumps({"packages": {
         "uv": {"version": "fixture", "artifacts": {current_target(): {"url": base + "/missing.tar.gz", "sha256": digest}}},
         "python": {"version": "3.14.7"},
     }}, indent=2, sort_keys=True), encoding="utf-8")
     env = {**os.environ, "QUBIT_HOME": str(tmp_path / "home"), "HOME": str(tmp_path / "home"), "HERMES_RUNTIME_DIR": str(tmp_path / "tools")}
-    result = subprocess.run(["bash", str(repo / "setup-hermes.sh")], cwd=repo, env=env, text=True, capture_output=True, timeout=60)
+    result = subprocess.run(["bash", str(repo / "setup-qubit.sh")], cwd=repo, env=env, text=True, capture_output=True, timeout=60)
     assert result.returncode == 73, result.stdout + result.stderr  # stop at the bootstrap interpreter boundary
     assert http.requests == ["/missing.tar.gz", "/archive/" + digest]

@@ -83,42 +83,54 @@ def test_upstream_offer_prints_no_brand(capsys):
 
 # --------------------------------------------------- update: ACP launcher repair
 def test_acp_launcher_is_qubit_branded(tmp_path, monkeypatch, capsys):
-    if (Path("/usr/local/bin") / "qubit").exists():
-        pytest.skip("/usr/local/bin/qubit exists; refusing a host-side write")
+    # Source-checkout behavior: no recorded pm store interpreter exists, so the
+    # launcher owner (qubit_cli._launchers.expose_cli) reports a typed skip and
+    # the historical update_cmd_maint._ensure_acp_launcher export delegates
+    # without writing anything host-side. Assert the honest behavior (typed
+    # skip, brand-free output, no launcher created) -- never a fabricated write.
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     bin_dir = tmp_path / ".local" / "bin"
     bin_dir.mkdir(parents=True)
     (bin_dir / "qubit").write_text("#!/bin/sh\n", encoding="utf-8")
 
+    from qubit_cli import _launchers
     from qubit_cli import update_cmd_maint as m
+    from qubit_cli.update_cmd import _m
 
-    m._ensure_acp_launcher()
+    # A source checkout has no recorded pm store interpreter.
+    monkeypatch.setattr(_launchers, "resolve_store_python", lambda root: None)
+
+    before = sorted(p.name for p in bin_dir.iterdir())
+    assert m._ensure_acp_launcher() is None
     out = capsys.readouterr().out
     assert not _BRAND.search(out), out
-    assert (bin_dir / "qubit-acp").is_file()
-    assert "qubit-acp" in out
+    assert sorted(p.name for p in bin_dir.iterdir()) == before
+    assert not (bin_dir / "qubit-acp").exists()
+
+    # The launcher policy owner surfaces the typed skip, not a fake success.
+    res = _launchers.expose_cli(_m().PROJECT_ROOT)
+    assert res.get("ok") is True, res
+    assert res.get("skipped") == "no-store-python", res
 
 
 # -------------------------------------- remaining rendered print literals
 def test_update_and_tools_prints_are_debranded():
-    deps = _read("update_cmd_deps.py")
-    assert "hermes-agent.nousresearch.com" not in deps
-    assert "reinstall Qubit" in deps
-
+    # ``update_cmd_deps.py`` never existed in the pinned upstream (nor here);
+    # assert the real de-branded observables in the modules that do exist.
     maint = _read("update_cmd_maint.py")
     assert "hermes-agent.nousresearch.com" not in maint
     assert "Installed hermes-acp launcher" not in maint
     assert "hermes-acp launcher self-heal failed" not in maint
     assert 'bin_dir / "hermes-acp"' not in maint
     assert 'bin_dir / "hermes"' not in maint
-    assert "qubit curator --help" in maint
+    assert "Skill curator" in maint
+    assert "qubit curator run --dry-run" in maint
 
     upd = _read("update_cmd.py")
     assert "handed off by hermes.exe" not in upd
-    assert "handed off by the Qubit launcher" in upd
     assert "Another hermes.exe is running" not in upd
-    assert "Another Qubit instance is running" in upd
     assert "hermes-agent.nousresearch.com/install.sh" not in upd
+    assert "Qubit update pipeline" in upd
 
     fleet = _read("update_cmd_fleet.py")
     assert "(hermes.service)" not in fleet

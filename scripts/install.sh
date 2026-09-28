@@ -155,40 +155,129 @@ fi
 
 # ------------------------------------------------------------------ models
 mkdir -p "$MODELS"
-dl() { # dl <dest> <url>
-  local dest="$1" url="$2"
-  if [ ! -f "$dest" ]; then
-    echo "==> downloading $(basename "$dest")"
-    curl -sL -o "$dest" "$url"
+
+# ---------------------------------------------------- download integrity
+# Every network download is verified against a PINNED sha256 before it is
+# installed. A mismatch (including a truncated download) is a TYPED failure
+# (exit 9) and the partial file is removed — never a silent continue.
+#
+# The digests below are pinned constants per asset, NOT fetched at install time
+# from the same host, so a compromised mirror cannot satisfy both the download
+# and the check. Provenance per asset is named in the comments below:
+#   * sherpa-onnx assets: the release `checksum.txt` (upstream-published);
+#   * the piper `.onnx`: the HuggingFace LFS sha256 oid (upstream-published);
+#   * piper `.onnx.json` and silero VAD v6: sha256 observed on the pinned
+#     upstream URL at authoring time (upstream publishes no digest for them).
+#
+# Assets for which upstream publishes no checksum at all are still handled by
+# `dl <dest> <url> -`: they download to a temp file, print the OBSERVED sha256
+# as a loud WARNING, and are explicitly NOT claimed as verified. No current
+# asset uses that fallback path.
+VOICE_SHA256="b3a6e47b57b8c7fbe6a0ce2518161a50f59a9cdd8a50835c02cb02bdd6206c18"
+VOICE_JSON_SHA256="95a23eb4d42909d38df73bb9ac7f45f597dbfcde2d1bf9526fdeaf5466977d77"
+MOON_SHA256="43232c1d13013d37317163baec3135bd771a186a4356f28c889bab453bb0e891"
+PKT_SHA256="5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf"
+SILERO_V5_SHA256="6b99cbfd39246b6706f98ec13c7c50c6b299181f2474fa05cbc8046acc274396"
+SILERO_V6_SHA256="1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+ERES2NET_SHA256="c59158379255ad66e161679cca6af8d52d51e389e3224ab7d7a7baae295c2db5"
+
+_sha256_hex() { # _sha256_hex <file> -> lowercase sha256 hex on stdout
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d' ' -f1
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$1" | sed 's/.*= *//'
   else
-    echo "    have   $(basename "$dest")"
+    echo "ASSET_HASH_TOOL_MISSING: need sha256sum, shasum, or openssl" >&2
+    return 1
   fi
+}
+
+verify_sha256() { # verify_sha256 <file> <expected_hex> -> 0 ok / non-zero mismatch
+  local file="$1" expected="$2" actual=""
+  if command -v sha256sum >/dev/null 2>&1; then
+    if printf '%s  %s\n' "$expected" "$file" | sha256sum -c - >/dev/null 2>&1; then
+      return 0
+    fi
+  else
+    actual="$(_sha256_hex "$file" 2>/dev/null || true)"
+    if [ -n "$actual" ] && [ "$actual" = "$expected" ]; then
+      return 0
+    fi
+  fi
+  [ -n "$actual" ] || actual="$(_sha256_hex "$file" 2>/dev/null || echo '<unavailable>')"
+  echo "ASSET_CHECKSUM_MISMATCH: $(basename "$file")" >&2
+  echo "  expected sha256: $expected" >&2
+  echo "  actual   sha256: $actual" >&2
+  return 1
+}
+
+dl() { # dl <dest> <url> <expected_sha256|-> [<source-label>]
+  local dest="$1" url="$2" expected="$3" label="${4:-}"
+  if [ -f "$dest" ]; then
+    if [ "$expected" = "-" ]; then
+      echo "    have   $(basename "$dest")"
+      return 0
+    fi
+    if verify_sha256 "$dest" "$expected"; then
+      echo "    have   $(basename "$dest") (sha256 verified)"
+      return 0
+    fi
+    echo "    WARNING: existing $(basename "$dest") failed its pinned sha256 — re-downloading" >&2
+  fi
+  echo "==> downloading $(basename "$dest")${label:+ [$label]}"
+  local tmp="$dest.tmp.$$"
+  curl -sL -o "$tmp" "$url" || {
+    rm -f "$tmp"
+    echo "ASSET_DOWNLOAD_FAILED: $(basename "$dest") from $url" >&2
+    exit 9
+  }
+  if [ "$expected" = "-" ]; then
+    local observed
+    observed="$(_sha256_hex "$tmp")" || { rm -f "$tmp"; exit 9; }
+    echo "    WARNING: upstream publishes no checksum for $(basename "$dest");" >&2
+    echo "             observed sha256=$observed (recorded, NOT verified)" >&2
+  elif ! verify_sha256 "$tmp" "$expected"; then
+    rm -f "$tmp"
+    echo "ASSET_CHECKSUM_MISMATCH: refusing to install $(basename "$dest") (exit 9)" >&2
+    exit 9
+  fi
+  mv -f "$tmp" "$dest"
 }
 
 # piper voice (TTS)
 VOICE="en_US-amy-medium"
+# sha256: .onnx = HuggingFace LFS oid (v1.0.0); .onnx.json = observed on the
+# pinned v1.0.0 URL (HuggingFace publishes no sha256 for the small JSON).
 dl "$MODELS/$VOICE.onnx" \
-   "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx"
+   "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx" \
+   "$VOICE_SHA256" "piper-voices v1.0.0"
 dl "$MODELS/$VOICE.onnx.json" \
-   "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx.json"
+   "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx.json" \
+   "$VOICE_JSON_SHA256" "piper-voices v1.0.0"
 
 # sherpa-onnx ASR: Moonshine base (CPU, 0 VRAM) — fallback engine
+# sha256 from the sherpa-onnx `asr-models` release checksum.txt.
 MOON="sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
+MOON_TAR="$MODELS/.$MOON.tar.bz2"
 if [ ! -d "$MODELS/$MOON" ]; then
   echo "==> downloading Moonshine ASR (~200 MB)"
-  curl -sL -o /tmp/moonshine.tar.bz2 "$SR/asr-models/$MOON.tar.bz2"
-  (cd "$MODELS" && tar xjf /tmp/moonshine.tar.bz2 && rm /tmp/moonshine.tar.bz2)
+  dl "$MOON_TAR" "$SR/asr-models/$MOON.tar.bz2" "$MOON_SHA256" "sherpa-onnx asr-models"
+  (cd "$MODELS" && tar xjf "$MOON_TAR" && rm -f "$MOON_TAR")
 else
   echo "    have   $MOON"
 fi
 
 # sherpa-onnx ASR: Parakeet-TDT 0.6B v3 int8 (CPU, 0 VRAM) — DEFAULT engine
 # (asr.engine: parakeet). 25 European languages incl. Romanian, max accuracy.
+# sha256 from the sherpa-onnx `asr-models` release checksum.txt.
 PKT="sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+PKT_TAR="$MODELS/.$PKT.tar.bz2"
 if [ ! -d "$MODELS/$PKT" ]; then
   echo "==> downloading Parakeet-TDT ASR (~640 MB)"
-  curl -sL -o /tmp/parakeet.tar.bz2 "$SR/asr-models/$PKT.tar.bz2"
-  (cd "$MODELS" && tar xjf /tmp/parakeet.tar.bz2 && rm /tmp/parakeet.tar.bz2)
+  dl "$PKT_TAR" "$SR/asr-models/$PKT.tar.bz2" "$PKT_SHA256" "sherpa-onnx asr-models"
+  (cd "$MODELS" && tar xjf "$PKT_TAR" && rm -f "$PKT_TAR")
 else
   echo "    have   $PKT"
 fi
@@ -223,16 +312,21 @@ for fname in ("decoder.int8.onnx", "joiner.int8.onnx"):
 PYEOF
 fi
 
-# Silero VAD v5 (sherpa-onnx)
-dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx"
+# Silero VAD v5 (sherpa-onnx) — sha256 from that release's checksum.txt.
+dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx" \
+   "$SILERO_V5_SHA256" "sherpa-onnx asr-models"
 # Silero VAD v6 (Aug 2025: ~16% fewer errors than v5 on noisy real data) —
 # the bridge prefers v6 and falls back to v5 automatically.
+# sha256 observed on the pinned v6.2.1 raw URL (upstream publishes no digest).
 dl "$MODELS/silero_vad_v6.onnx" \
-   "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.1/src/silero_vad/data/silero_vad.onnx"
+   "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.1/src/silero_vad/data/silero_vad.onnx" \
+   "$SILERO_V6_SHA256" "silero-vad v6.2.1"
 
 # Speaker verification (voice-ID): eres2net English
+# sha256 from the sherpa-onnx `speaker-recongition-models` checksum.txt.
 dl "$MODELS/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
-   "$SR/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx"
+   "$SR/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
+   "$ERES2NET_SHA256" "sherpa-onnx speaker-recongition-models"
 
 # Optional: Parakeet-TDT (max ASR accuracy) and Kokoro (quality TTS) —
 # uncomment if you want them; config knobs: asr.engine / tts.provider.

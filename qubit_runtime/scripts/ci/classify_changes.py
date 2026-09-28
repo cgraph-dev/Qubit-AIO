@@ -130,7 +130,7 @@ _MCP_CATALOG_FILES = {"qubit_cli/mcp_catalog.py"}
 # (the .rs/Cargo files are the ``rust`` lane's job). Changes here get the
 # bootstrap-installer.yml lane — a real sandboxed install + stamp check.
 _BOOTSTRAP_PATHS = ("apps/bootstrap-installer/",)
-_BOOTSTRAP_FILES = {"scripts/install.sh", "setup-hermes.sh"}
+_BOOTSTRAP_FILES = {"scripts/install.sh", "setup-qubit.sh"}
 # Windows desktop-update hand-off (scripts/desktop-update/windows.ps1 + the
 # Electron side that launches it) and the pytest files that spawn it.
 # tests/_fixtures/ holds the conftest's platform gating, so it re-arms the lane too.

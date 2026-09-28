@@ -9,6 +9,9 @@
 #      PM owns the final interpreter, tool store, and dependency generation.
 #   3. Point you at `.\activate.ps1` - the venv-style way to put the pm env
 #      (PATH + tool vars) into your current session.
+# Renamed from the upstream name ``setup-hermes.ps1``; the vendor-manifest
+# rename map (scripts/hermes_vendor_manifest.py::_EXTRA_NAME_RENAMES) keeps the
+# old name accepted read-old for the pinned-source byte comparison.
 # ============================================================================
 # Setup and activation both prepare the isolated test interpreter; installers
 # invoke pm.cli directly and do not select it. -TestExtras overrides coverage.

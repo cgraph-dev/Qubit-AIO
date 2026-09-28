@@ -1,4 +1,4 @@
-# Build-only prerequisites; setup-hermes.ps1 uses the same installer functions.
+# Build-only prerequisites; setup-qubit.ps1 uses the same installer functions.
 param(
     [Parameter(Mandatory = $true)][string]$StateRoot,
     [string]$OpenSSLRoot,

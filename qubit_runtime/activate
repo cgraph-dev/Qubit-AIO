@@ -46,7 +46,7 @@ fi
 # caller's shell, and activation must not republish launchers or shell config.
 if ! (
     unset PYTHONHOME PYTHONPATH VIRTUAL_ENV
-    bash "$_HERMES_REPO/setup-hermes.sh" --runtime-only "$_hermes_test_env"
+    bash "$_HERMES_REPO/setup-qubit.sh" --runtime-only "$_hermes_test_env"
 ) >&2; then
     printf '%s\n' 'activate: setup failed; shell environment unchanged' >&2
     unset _hermes_arg _hermes_test_env _hermes_expect_extras
@@ -79,14 +79,14 @@ if [ -z "$_hermes_py" ]; then
     done
 fi
 if [ -z "$_hermes_py" ]; then
-    echo "activate: no bootstrap Python found; run setup-hermes.sh" >&2
+    echo "activate: no bootstrap Python found; run setup-qubit.sh" >&2
     return 1 2>/dev/null || exit 1
 fi
 
 # --- emit export lines from `pm env` ---
 _hermes_json="$(PYTHONHOME= PYTHONPATH="$_hermes_repo" "$_hermes_py" -m pm.environments)"
 if [ -z "$_hermes_json" ] || [ "${_hermes_json#*{}" = "$_hermes_json" ]; then
-    echo "activate: could not read pm env (run ./setup-hermes.sh first)" >&2
+    echo "activate: could not read pm env (run ./setup-qubit.sh first)" >&2
     unset _hermes_repo _hermes_os _hermes_arch _hermes_target _hermes_store _hermes_py _hermes_json
     return 1 2>/dev/null || exit 1
 fi

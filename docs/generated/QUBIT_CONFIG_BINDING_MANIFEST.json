@@ -12231,7 +12231,7 @@
   {
    "cli_path": "qubit config get/set <path> (CLI) + /api/config (dashboard)",
    "default": [
-    "hermes-cli"
+    "qubit-cli"
    ],
    "disposition": "BOUND",
    "error_behavior": "invalid value refused by the config loader; no silent ignore",

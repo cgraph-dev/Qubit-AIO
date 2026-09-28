@@ -56,10 +56,10 @@
   "counts": {
    "upstream_files": 16078,
    "local_files": 16083,
-   "identical": 9646,
+   "identical": 9638,
    "missing": 22,
    "extra": 27,
-   "changed": 6410
+   "changed": 6418
   },
   "missing": [
    {
@@ -212,7 +212,7 @@
    },
    {
     "path": "tests/qubit_cli/test_setup_hermes_script.py",
-    "local_sha256": "bbb0ce3bd726bdc59b920f4004c97591c10c7d23d27c3ebcaae1ca0bf7102c29"
+    "local_sha256": "c80d32de9d36543fc162033c5ab3db492a4b307500e72a2a2465b924fa35cbf4"
    },
    {
     "path": "tests/qubit_state/test_hermes_state.py",
@@ -670,11 +670,18 @@
     "local_sha256": "ba7cb9548055108bc4d4f416f3b3a25e40c482adac68e6c7189ddb3fdb18c979"
    },
    {
+    "path": "activate",
+    "upstream_path": "activate",
+    "upstream_blob": "ce5a7938b4c36989ec448e470425ed383dd9ae3a",
+    "upstream_sha256": "7d7f8e58fd9ec2a4571e09c4d0e59c8e01ad6b08f8ebaa53b2846ce4f9f9efe8",
+    "local_sha256": "5280fe0a77c54a9b6d24cb28e45b86c51f2d67bf180b1108a10cdc67082b380d"
+   },
+   {
     "path": "activate.ps1",
     "upstream_path": "activate.ps1",
     "upstream_blob": "e58ed04c91a3e61d1dac481a8642f6ded946d056",
     "upstream_sha256": "bd910cbfd387a20e05f8b4faea8e5e96373dfca397358887cebb3af7c34b04e0",
-    "local_sha256": "470b52b0d8906b37e3585d3f0780f48b35ad4749c9cefb875342f2c2ab9a58cd"
+    "local_sha256": "82e816e294e6a5b5d2c207c3910bd15482d01e77345c9c7a84c123df6a70bdf4"
    },
    {
     "path": "agent/AGENTS.md",
@@ -7156,7 +7163,7 @@
     "upstream_path": "gateway/status.py",
     "upstream_blob": "9a1a3bce2be33873e597cd4794168438d1347ec4",
     "upstream_sha256": "d7d3c61cd1f2e56ce9b55936d5b2550558da1c4f12a7476024839bad9e9dc0a6",
-    "local_sha256": "c3b5f6fe6328b1274657477c6a55f536ebc5487b68316d14f4dec9792ceac108"
+    "local_sha256": "d214748628903762577fe20793e4a215c0b100044017967bbba79de68b0ded4a"
    },
    {
     "path": "gateway/status_phrases.py",
@@ -7409,6 +7416,13 @@
     "upstream_blob": "cbffaffce7894652db29b70862d5daa98a515a55",
     "upstream_sha256": "19546b4b098cbae2ded56746f8448e0901549c75c8fe0c2b8215e88f8c665d19",
     "local_sha256": "91cf2c778cef994866ac64b592944d0c83c15a1f0af796c84d0fd9cfdf5c6998"
+   },
+   {
+    "path": "nix/lib.nix",
+    "upstream_path": "nix/lib.nix",
+    "upstream_blob": "45f08a9bef1cd898d1602749cdb18ca601215ffb",
+    "upstream_sha256": "58ece452f7dd545666f4aa7e876c90b861466ea6e1fabbb1338a2fb11012c632",
+    "local_sha256": "fc6637143220125626d3f84b8e31d22e01803111e1a0763fb2cdac15fe5c214e"
    },
    {
     "path": "nix/moduleCommon.nix",
@@ -12833,7 +12847,7 @@
     "upstream_path": "hermes_cli/config_defaults.py",
     "upstream_blob": "6a22cf6a780d5cf48bb699aea26006eec03a2a6c",
     "upstream_sha256": "03162b08ad0733b5d63bddd4364dcca655f3fb7c01b1dc0f7047bee3be149d98",
-    "local_sha256": "1292724644a568a90a43792b26c98b46feadb149caa554261daee6e2fdd556f0"
+    "local_sha256": "a42ae539a3365f728dd3dae4b2340c6f4fc45fad68c40840b1cb9c0e75559d39"
    },
    {
     "path": "qubit_cli/config_effective.py",
@@ -13421,7 +13435,7 @@
     "upstream_path": "hermes_cli/kanban_db_dispatch.py",
     "upstream_blob": "7b71be5569ef00b660b602e2420705b909fb83be",
     "upstream_sha256": "cae1e2eaa7d95083a2c94e13f6e01a25cc307e88c64be89b123504a2aa80c3f8",
-    "local_sha256": "3d2edc4e0ea85d11b1357dd159ed22fa8e392416f664c0cba17f5b4bc5168297"
+    "local_sha256": "db0be41633c8294e0d264cd7adfbbc0e759dbb3156f29160076dcf9279fb62d3"
    },
    {
     "path": "qubit_cli/kanban_db_graph.py",
@@ -13848,7 +13862,7 @@
     "upstream_path": "hermes_cli/model_setup_flows.py",
     "upstream_blob": "f461eed1723f0ad88f44e270646b51d51044b5d2",
     "upstream_sha256": "ee03f881699db443791668e38dc4ca43faf8509145997aa389682dd3227597c5",
-    "local_sha256": "0a06ed1975e72587254681938a7aed1dcf26176fdb28a94e3bda4f01305903fe"
+    "local_sha256": "2fa1aa75d75611869c2f80f84035cd5bac5a63edecb637bf0ba1a3b72cda4986"
    },
    {
     "path": "qubit_cli/model_setup_flows_azure.py",
@@ -14079,7 +14093,7 @@
     "upstream_path": "hermes_cli/pairing.py",
     "upstream_blob": "0a154835f9a2d1390370dc2dc376a780070ecfe5",
     "upstream_sha256": "e0a86a0348eefec395a93c34480797647e79d772896434bc3e4aef29e315cba7",
-    "local_sha256": "46de27512094822fd20e9b32702ab5f8a307bd4cc644f2eca8aabef9d53623dd"
+    "local_sha256": "424e6891ccb586235ce58d62c44b0b29cbdd30fb4c9ef2e517d3507e98924aa1"
    },
    {
     "path": "qubit_cli/personality.py",
@@ -14107,7 +14121,7 @@
     "upstream_path": "hermes_cli/platforms.py",
     "upstream_blob": "222cfdeeaa7b02bbab59bb62ea5b90e615aba2fd",
     "upstream_sha256": "38d76702a8e6745ddc2abaf2fc7367b325af222bd5d479e120a4a67c6a89e33d",
-    "local_sha256": "5f135a0c4c8cef2a506cc5508d0e90603178d42f11399a6c4fb30e01198adf43"
+    "local_sha256": "349cb6cb73caf56e23bd082ff3c6e8250a31416e8e3495916099e98254a3f250"
    },
    {
     "path": "qubit_cli/plugin_capabilities.py",
@@ -15451,7 +15465,7 @@
     "upstream_path": "hermes_cli/tools_config.py",
     "upstream_blob": "95ded5341f4037fd01f4ef637ad4dd0cfa119906",
     "upstream_sha256": "463dde823201d3c88ed1a426ad460155a6b7789ef0e29e1ec68b8b4bab4508ab",
-    "local_sha256": "a40d2274df92d12cedfdc3e5605d696b0e5d9dfee27afcf308cfef3a6f24755e"
+    "local_sha256": "6d9d4cb0c434ecd78d26230c659f5c0d418f3e109f3148bf1d519424c29a4678"
    },
    {
     "path": "qubit_cli/tools_config_cua.py",
@@ -16469,6 +16483,13 @@
     "local_sha256": "039fae5c1d61ed00c72a3deb0b17d4c949e426c41fe3e58ecebba00271a4f4b0"
    },
    {
+    "path": "scripts/build/windows-deps.ps1",
+    "upstream_path": "scripts/build/windows-deps.ps1",
+    "upstream_blob": "35c5c171937ce54260a6eb2176c3d4096d317682",
+    "upstream_sha256": "1be19c44cf9195161b51e7535287632c2f164532793cb1c5d32a25795e8f6973",
+    "local_sha256": "16cd14361af4e61f9694b0872695ba8287d951bbea0903f0cc490be48bdc9689"
+   },
+   {
     "path": "scripts/build_model_catalog.py",
     "upstream_path": "scripts/build_model_catalog.py",
     "upstream_blob": "2f8ed642fd6402a9d30185225cf35447ff41e232",
@@ -16599,7 +16620,7 @@
     "upstream_path": "scripts/ci/classify_changes.py",
     "upstream_blob": "2b0b830b05213f554dfb1efff79950b90e164dc0",
     "upstream_sha256": "db370b2da95122f6455a6bfa29a1100590db1ae7534faba407f9846741b5bd11",
-    "local_sha256": "72077517de1fee1c00df46affd233ca08e21a1091262aba4648ec4bd6212c8bb"
+    "local_sha256": "6280c6ecc3716be0379506af515fdf492f358d5092ad02fab29cc0f3e1486741"
    },
    {
     "path": "scripts/ci/desktop_build_cache.py",
@@ -16728,6 +16749,13 @@
     "local_sha256": "af7f3536942bb259d3dc11e4462ebbbe9ce124eaaa39f61ea55030e11214244d"
    },
    {
+    "path": "scripts/gen-bootstrap-pins.py",
+    "upstream_path": "scripts/gen-bootstrap-pins.py",
+    "upstream_blob": "7a0ed9836baf18d2099690d8a2cfba2d16f444c2",
+    "upstream_sha256": "1c7d71b725e57e1f65781758fabfa5c94d92891b8c1cf06456a67da37dfeaa2e",
+    "local_sha256": "5c1097bece1c843ba342fc3061ae3932cc27f0673cba6aad170d53723399fa2f"
+   },
+   {
     "path": "scripts/gen_gateway_contracts.py",
     "upstream_path": "scripts/gen_gateway_contracts.py",
     "upstream_blob": "d95520d3f8e0c4ee2b094920a26f058e144fe32b",
@@ -16781,7 +16809,7 @@
     "upstream_path": "scripts/install.sh",
     "upstream_blob": "1911f63e16dbe7be3e2e7d3bd42cf5b655f60ad9",
     "upstream_sha256": "b6d77a3491ab1d8e842071a8d92f76ae118836479b1ac69436e00f85f541d5a1",
-    "local_sha256": "0b3a1b64ceb556e7e3b24022a2555a3d9397d8ca516855e690b38c63e03a47d9"
+    "local_sha256": "f1b50698667446cc88afe3c0a21003a10191dd30388f78e5bd8538c88d4c8780"
    },
    {
     "path": "scripts/iso-certify.py",
@@ -17134,6 +17162,13 @@
     "local_sha256": "c80931a6ccbbeb8eb412d49bdb1d9e64aa6264f52a53cf601a835bcd2b6c6812"
    },
    {
+    "path": "scripts/windows-build-deps.ps1",
+    "upstream_path": "scripts/windows-build-deps.ps1",
+    "upstream_blob": "92371454b603f8ed46fa089cfdccffdf4140bdd3",
+    "upstream_sha256": "387d9cf46a5bbf4b0d1a9e7e4ef3abf0cc861ce3b739824f444934127c50a210",
+    "local_sha256": "298b8803ac7754f59929d3e56513de20fa6f4361a506f8ef824c21c6368554f7"
+   },
+   {
     "path": "scripts/write_install_stamp.py",
     "upstream_path": "scripts/write_install_stamp.py",
     "upstream_blob": "1ead30ca3765682a9b94e704e8eb21a52149c01d",
@@ -17141,18 +17176,18 @@
     "local_sha256": "01f0d2f7fe354b5082cd0d8eff998e55d29ff575019f932579fe1a1584b55c8e"
    },
    {
-    "path": "setup-hermes.ps1",
+    "path": "setup-qubit.ps1",
     "upstream_path": "setup-hermes.ps1",
     "upstream_blob": "b96b8bd77ae254946f26e0c59e9da22abda7114d",
     "upstream_sha256": "47ca171f1ed82e4dc492a0bf051f29c5b59f412bd1b9481ea3e39effc585b530",
-    "local_sha256": "59a13ffd1242adaab7a55391bf295f3b5a768c05f43c8fc7e78efaabd7f4eb95"
+    "local_sha256": "83862e33fba90bcb91252aa4b96f47265524a176948f91a940a65995b5ef5baa"
    },
    {
-    "path": "setup-hermes.sh",
+    "path": "setup-qubit.sh",
     "upstream_path": "setup-hermes.sh",
     "upstream_blob": "b169bedc091ef31e46fe6a8bdc63893420dd698a",
     "upstream_sha256": "ca5617453b0c60a97b2ca3dc9d3289f47a9c12f83ff108fa13773603fe57d836",
-    "local_sha256": "78de14f0dde74b2982e7fb4cb069e960405822d8ff657b11981426135e52fb03"
+    "local_sha256": "94eb624dda7a1cd6a0072a1bce1182b8aedb4a22d68c692a26f9f89d81ac6af9"
    },
    {
     "path": "setup.py",
@@ -21660,7 +21695,7 @@
     "upstream_path": "tests/ci/test_classify_changes.py",
     "upstream_blob": "c676b6892c3cbe7028e91a5aadd1a7764545230b",
     "upstream_sha256": "c0f0db25a53189a8146318f3ab5c462a87bc28d2b91e0318a6e7ba6621f3b7b2",
-    "local_sha256": "bdb570b4745d81987fbf7a9972c07f85a349bfd37c1258afe32091028096e98a"
+    "local_sha256": "a9dd7824650116d490ed2d6e7d777355884bf735b93f78f4f68ec9483900239f"
    },
    {
     "path": "tests/ci/test_commit_build_staging.py",
@@ -27351,14 +27386,21 @@
     "upstream_path": "tests/pm/test_activate_scripts.py",
     "upstream_blob": "f93ea56f17f0895df27dbe6f3b24a19eacd8b4a9",
     "upstream_sha256": "1f73372bb76e77bc7e8fbaabc4c0c0a5f14adbc3cf7a37eaa511c25dafdf6528",
-    "local_sha256": "93a1374d9f1356f3b5eb471bf770a766e64941659f68391c2292f25daaa32f57"
+    "local_sha256": "8fde484148f170feb32755643f6253c852d3e356c51a8cd70542278433e6047d"
+   },
+   {
+    "path": "tests/pm/test_activation_runtime.py",
+    "upstream_path": "tests/pm/test_activation_runtime.py",
+    "upstream_blob": "38ededa64059cd7ea1d38af273035c41697329bd",
+    "upstream_sha256": "802749093039f25cc67b226f1f950cc6c18decd6fea181ce6eacad35a9894853",
+    "local_sha256": "29638703592899f3e33a0ac54a17be13858302ebe6157daca16e8342a547f167"
    },
    {
     "path": "tests/pm/test_activation_setup.py",
     "upstream_path": "tests/pm/test_activation_setup.py",
     "upstream_blob": "515383cfd47a8c719d09d4f8c16bd0575129f0e3",
     "upstream_sha256": "4260f18506d5b597a498c56e99b86c404837709e23ad05847c25356b64d34534",
-    "local_sha256": "a131cee153ec171920edca00b552a9ec801d75f5c8243b341904f3a1c83d9bfa"
+    "local_sha256": "40f5783084788629d6f54f00650b561db27a5e1e0f643e84ee789e46d84fab8e"
    },
    {
     "path": "tests/pm/test_bootstrap_import_closure.py",
@@ -27589,7 +27631,7 @@
     "upstream_path": "tests/pm/test_setup_lock_format.py",
     "upstream_blob": "76171dbf74208e7260681b4e073ef39af6e16e8a",
     "upstream_sha256": "d5166ceca0ea1f3a9118cec07c59d76685cc4218746b66cf2abc3ce9b322987f",
-    "local_sha256": "04552daf09badc39cd24505b2bd181a754c7328cd62e83de9c3ac593a602f74e"
+    "local_sha256": "92595876e3326995d6ed69b2c5021b6ba0133b5502a05f283df8af5c2d5c8398"
    },
    {
     "path": "tests/pm/test_source_launcher_stages.py",
@@ -34519,7 +34561,7 @@
     "upstream_path": "tests/hermes_cli/test_setup_pin_values.py",
     "upstream_blob": "9e7a8930ef8c2d32effeb74c8cda3fabc7095927",
     "upstream_sha256": "7b282085287797cc3da04df358038b38e882c4adbb7c980b27f037a81d230a69",
-    "local_sha256": "3645e82065bb817dce060e85fe9d1ee52c094bb3e229c0483477be97d6b85341"
+    "local_sha256": "8cb184285ce7894144fda635ac5acb987f3fbe6fcf3d92f3716192f847a16681"
    },
    {
     "path": "tests/qubit_cli/test_setup_prompt_menus.py",
@@ -37802,7 +37844,7 @@
     "upstream_path": "tests/scripts/test_bootstrap_mirror.py",
     "upstream_blob": "2360f36e82222e95d7bfb38dbd1ae072375ed656",
     "upstream_sha256": "7398cef7d2b0b18e7bc8529bd9df7debf9bfe0debc2b184668d1f1f4977579be",
-    "local_sha256": "6568ba4c3068503d8dbb178bec9da7dfb33d05fcba156166f17bdbb5df697104"
+    "local_sha256": "7fb3218006eedb56ae4bbf132d19603e76d69e46f9b838a0a95e8f835ab432db"
    },
    {
     "path": "tests/scripts/test_bundle_native.py",
@@ -37893,7 +37935,7 @@
     "upstream_path": "tests/scripts/test_fresh_source_install.py",
     "upstream_blob": "12aa5c3eac5411196d31731a3205693238c19b35",
     "upstream_sha256": "5b93fbdd1e88b1eed3ea7f3c5a569d6ae5b5c28a54a183e80a6b52c7fed6d64a",
-    "local_sha256": "7ff7284d67fc889031a9f491133a916b3380ac1adfc421a5c5b0c156c757a345"
+    "local_sha256": "8f56b6a040c0c9b161b616033cefe591b0637880270de24e047ddd904dee79a7"
    },
    {
     "path": "tests/scripts/test_icon_flavors.py",
@@ -37921,7 +37963,7 @@
     "upstream_path": "tests/scripts/test_install_sh_python_pin_indent.py",
     "upstream_blob": "9c32dc58191ac721cf47e79fa9f333be59b07bea",
     "upstream_sha256": "d7ace934134b894de643c2c16e2a44568bafdf17682b2c07d7a7bc87d3193af8",
-    "local_sha256": "101daccbebb7a9e913360b2c1b0e31f45c3baff58b205376a5417b975c4a4d02"
+    "local_sha256": "d9824698ee05adcec92b95eee2f079613db01653591170c1c1439bd1410a2fb2"
    },
    {
     "path": "tests/scripts/test_install_stage_frames.py",
@@ -37950,6 +37992,13 @@
     "upstream_blob": "8327da6429bd5e708976fb4acc4f392e9bbfb6e6",
     "upstream_sha256": "4333c7a7da848055543d7d465948647038f73b9ec68679c4f355e661e2f45b40",
     "local_sha256": "f1f2bf1b5dc57e4389360deb518d0ebd03b563d524fca2c9f3f9c6503287b859"
+   },
+   {
+    "path": "tests/scripts/test_powershell_script_syntax.py",
+    "upstream_path": "tests/scripts/test_powershell_script_syntax.py",
+    "upstream_blob": "eff889b9887487f9b94610c78e28adf0dc7c982e",
+    "upstream_sha256": "4987a36e617158d16470820394ac2f040aa7b5767ec5cf9d7e286b3730a854f5",
+    "local_sha256": "81d15c8d142666da2c3adfd22154bbcb7074ae6702f5db127547023ddeca26b4"
    },
    {
     "path": "tests/scripts/test_release_artifacts.py",
@@ -43598,7 +43647,7 @@
     "upstream_path": "toolsets.py",
     "upstream_blob": "89386334b9c452b4006d30f24586ecff6e9e8f4b",
     "upstream_sha256": "48ba8bea0b9bcd5821747f480055a224639fd83565d9b14d6134bbe7d433aa43",
-    "local_sha256": "b6b2c978555970de1484561279a03a2080d2d7fe974906c2c33041b7341a5bd9"
+    "local_sha256": "cbf97699bfd88568924c0f6592a2fa958f9a2b163d9f69a794b8beefedccbc1a"
    },
    {
     "path": "trajectory_compressor.py",
@@ -45113,6 +45162,13 @@
     "local_sha256": "453ec57dafe87d39007b1c97faaaf0e75688e57c09e8a7fd00d595cf3dce5a5f"
    },
    {
+    "path": "website/docs/reference/package-management.md",
+    "upstream_path": "website/docs/reference/package-management.md",
+    "upstream_blob": "52f6a72adf787eaa0ad5698abf76a4411b5f0349",
+    "upstream_sha256": "91c420da22e2d1e023acf29f5afbede2cb4e4d59874d3937ef6b224418dafb0b",
+    "local_sha256": "a37326a6c7d031dbf3377331c5c443f7092b569439069d95108be519846d4e5d"
+   },
+   {
     "path": "website/scripts/extract-plugins.py",
     "upstream_path": "website/scripts/extract-plugins.py",
     "upstream_blob": "a751462f9e802ea5d87e61ae62138ed89cabb779",
@@ -45158,8 +45214,8 @@
   "manifest_reconciliation": {
    "vendor_manifest": "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
    "vendor_manifest_revision": "69948c005791d4d0e51670ca015238c2c7663749",
-   "changed_equals_patched": false,
-   "extra_equals_extra_local": true
+   "changed_equals_patched": true,
+   "extra_equals_extra_local": false
   }
  },
  "ledger_comparison": {

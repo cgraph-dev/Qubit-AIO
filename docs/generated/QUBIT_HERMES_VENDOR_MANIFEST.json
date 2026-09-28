@@ -1,14 +1,14 @@
 {
  "blockers": [],
- "byte_identical_to_blob": 9625,
+ "byte_identical_to_blob": 9619,
  "classification_counts": {
-  "EOL_NORMALIZED": 21,
+  "EOL_NORMALIZED": 19,
   "INTENTIONALLY_OMITTED": 22,
   "MISSING": 0,
   "OPENCLAW_OVERLAY": 0,
-  "QUBIT_ADDED": 27,
-  "QUBIT_PATCHED": 6410,
-  "UNCHANGED": 9625,
+  "QUBIT_ADDED": 26,
+  "QUBIT_PATCHED": 6418,
+  "UNCHANGED": 9619,
   "UNEXPLAINED": 0
  },
  "eol_normalized": [
@@ -64,16 +64,6 @@
   },
   {
    "affected_regression_test": "tests/test_surface_reachability8u.py",
-   "blob_sha256": "47506484c41193a61bce7ae816e4107b2a5dab424ac02da90f5273fcbc604eb0",
-   "local_sha256": "1be19c44cf9195161b51e7535287632c2f164532793cb1c5d32a25795e8f6973",
-   "path": "scripts/build/windows-deps.ps1",
-   "provenance": "https://github.com/NousResearch/hermes-agent@69948c005791d4d0e51670ca015238c2c7663749 (MIT License, Copyright (c) 2025 Nous Research)",
-   "reason": "Upstream .gitattributes pins this file to eol=crlf, so the pinned index blob stores LF while the checkout writes CRLF. The fork is byte-identical to the pinned checkout and differs from the committed blob only by line endings.",
-   "upstream_blob": "35c5c171937ce54260a6eb2176c3d4096d317682",
-   "upstream_worktree_sha256": "1be19c44cf9195161b51e7535287632c2f164532793cb1c5d32a25795e8f6973"
-  },
-  {
-   "affected_regression_test": "tests/test_surface_reachability8u.py",
    "blob_sha256": "2f20226d88ec3f57077d1c47155bf0025fd91943e81a52b7f695b795f90c8c44",
    "local_sha256": "536022db56a4fb2f95f3dc46016810997f099db11a5239bed286b278e5f57c47",
    "path": "scripts/tests/test-install-ps1-node-compatibility.ps1",
@@ -81,16 +71,6 @@
    "reason": "Upstream .gitattributes pins this file to eol=crlf, so the pinned index blob stores LF while the checkout writes CRLF. The fork is byte-identical to the pinned checkout and differs from the committed blob only by line endings.",
    "upstream_blob": "c6f4ca32fef1b99ec23afc960050058ab0021c39",
    "upstream_worktree_sha256": "536022db56a4fb2f95f3dc46016810997f099db11a5239bed286b278e5f57c47"
-  },
-  {
-   "affected_regression_test": "tests/test_surface_reachability8u.py",
-   "blob_sha256": "333d0f709e41cc2e1c5f1fd542aa01c6ddd59171185fdfde8b5555669be0e1e8",
-   "local_sha256": "387d9cf46a5bbf4b0d1a9e7e4ef3abf0cc861ce3b739824f444934127c50a210",
-   "path": "scripts/windows-build-deps.ps1",
-   "provenance": "https://github.com/NousResearch/hermes-agent@69948c005791d4d0e51670ca015238c2c7663749 (MIT License, Copyright (c) 2025 Nous Research)",
-   "reason": "Upstream .gitattributes pins this file to eol=crlf, so the pinned index blob stores LF while the checkout writes CRLF. The fork is byte-identical to the pinned checkout and differs from the committed blob only by line endings.",
-   "upstream_blob": "92371454b603f8ed46fa089cfdccffdf4140bdd3",
-   "upstream_worktree_sha256": "387d9cf46a5bbf4b0d1a9e7e4ef3abf0cc861ce3b739824f444934127c50a210"
   },
   {
    "affected_regression_test": "tests/test_surface_reachability8u.py",
@@ -223,11 +203,10 @@
    "upstream_worktree_sha256": "4c1b744ba9204fa72115316a93e8b257c333da3b4efd6b77b74afda9f475d4a6"
   }
  ],
- "eol_normalized_count": 21,
+ "eol_normalized_count": 19,
  "extra_local": [
   "qubit_cli/install_source.py",
   "qubit_cli/qubit_state_profile_repair.py",
-  "test_durations.json",
   "tests/agent/transports/test_hermes_tools_mcp_server.py",
   "tests/e2e/core/chaos/conftest.py",
   "tests/gateway/test_process_hermes_home_expansion.py",
@@ -253,7 +232,7 @@
   "tests/tools/test_code_execution_hermes_home.py",
   "tests/tools/test_hermes_subprocess_env.py"
  ],
- "file_count": 16083,
+ "file_count": 16082,
  "files": {
   ".coderabbit.yaml": {
    "classification": "UNCHANGED",
@@ -1686,12 +1665,12 @@
    "upstream_sha256": "eccffd6797703288bbbcfdd7acee4bde8a1455403c4358543da97fdb8d0d55f7"
   },
   "activate": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100755",
    "local_git_mode": "100755",
-   "patched": false,
-   "sha256": "7d7f8e58fd9ec2a4571e09c4d0e59c8e01ad6b08f8ebaa53b2846ce4f9f9efe8",
+   "patched": true,
+   "sha256": "5280fe0a77c54a9b6d24cb28e45b86c51f2d67bf180b1108a10cdc67082b380d",
    "symlink": false,
    "upstream_blob": "ce5a7938b4c36989ec448e470425ed383dd9ae3a",
    "upstream_blob_sha256": "7d7f8e58fd9ec2a4571e09c4d0e59c8e01ad6b08f8ebaa53b2846ce4f9f9efe8",
@@ -1704,7 +1683,7 @@
    "local_fs_mode": "100755",
    "local_git_mode": "100755",
    "patched": true,
-   "sha256": "470b52b0d8906b37e3585d3f0780f48b35ad4749c9cefb875342f2c2ab9a58cd",
+   "sha256": "82e816e294e6a5b5d2c207c3910bd15482d01e77345c9c7a84c123df6a70bdf4",
    "symlink": false,
    "upstream_blob": "e58ed04c91a3e61d1dac481a8642f6ded946d056",
    "upstream_blob_sha256": "d1511a1faaea3174db65cb834e75c93cf66e4561da49c00bb1625b250535d432",
@@ -75895,7 +75874,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "c3b5f6fe6328b1274657477c6a55f536ebc5487b68316d14f4dec9792ceac108",
+   "sha256": "d214748628903762577fe20793e4a215c0b100044017967bbba79de68b0ded4a",
    "symlink": false,
    "upstream_blob": "9a1a3bce2be33873e597cd4794168438d1347ec4",
    "upstream_blob_sha256": "d7d3c61cd1f2e56ce9b55936d5b2550558da1c4f12a7476024839bad9e9dc0a6",
@@ -76540,12 +76519,12 @@
    "upstream_sha256": "da19c9775f805fd7e7f130fe1b780b9ce98057dea449704e2aa2e1901cd91ab4"
   },
   "nix/lib.nix": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "58ece452f7dd545666f4aa7e876c90b861466ea6e1fabbb1338a2fb11012c632",
+   "patched": true,
+   "sha256": "fc6637143220125626d3f84b8e31d22e01803111e1a0763fb2cdac15fe5c214e",
    "symlink": false,
    "upstream_blob": "45f08a9bef1cd898d1602749cdb18ca601215ffb",
    "upstream_blob_sha256": "58ece452f7dd545666f4aa7e876c90b861466ea6e1fabbb1338a2fb11012c632",
@@ -98801,7 +98780,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "1292724644a568a90a43792b26c98b46feadb149caa554261daee6e2fdd556f0",
+   "sha256": "a42ae539a3365f728dd3dae4b2340c6f4fc45fad68c40840b1cb9c0e75559d39",
    "symlink": false,
    "upstream_blob": "6a22cf6a780d5cf48bb699aea26006eec03a2a6c",
    "upstream_blob_sha256": "03162b08ad0733b5d63bddd4364dcca655f3fb7c01b1dc0f7047bee3be149d98",
@@ -99984,7 +99963,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "3d2edc4e0ea85d11b1357dd159ed22fa8e392416f664c0cba17f5b4bc5168297",
+   "sha256": "db0be41633c8294e0d264cd7adfbbc0e759dbb3156f29160076dcf9279fb62d3",
    "symlink": false,
    "upstream_blob": "7b71be5569ef00b660b602e2420705b909fb83be",
    "upstream_blob_sha256": "cae1e2eaa7d95083a2c94e13f6e01a25cc307e88c64be89b123504a2aa80c3f8",
@@ -100907,7 +100886,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "0a06ed1975e72587254681938a7aed1dcf26176fdb28a94e3bda4f01305903fe",
+   "sha256": "2fa1aa75d75611869c2f80f84035cd5bac5a63edecb637bf0ba1a3b72cda4986",
    "symlink": false,
    "upstream_blob": "f461eed1723f0ad88f44e270646b51d51044b5d2",
    "upstream_blob_sha256": "ee03f881699db443791668e38dc4ca43faf8509145997aa389682dd3227597c5",
@@ -101349,7 +101328,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "46de27512094822fd20e9b32702ab5f8a307bd4cc644f2eca8aabef9d53623dd",
+   "sha256": "424e6891ccb586235ce58d62c44b0b29cbdd30fb4c9ef2e517d3507e98924aa1",
    "symlink": false,
    "upstream_blob": "0a154835f9a2d1390370dc2dc376a780070ecfe5",
    "upstream_blob_sha256": "e0a86a0348eefec395a93c34480797647e79d772896434bc3e4aef29e315cba7",
@@ -101414,7 +101393,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "5f135a0c4c8cef2a506cc5508d0e90603178d42f11399a6c4fb30e01198adf43",
+   "sha256": "349cb6cb73caf56e23bd082ff3c6e8250a31416e8e3495916099e98254a3f250",
    "symlink": false,
    "upstream_blob": "222cfdeeaa7b02bbab59bb62ea5b90e615aba2fd",
    "upstream_blob_sha256": "38d76702a8e6745ddc2abaf2fc7367b325af222bd5d479e120a4a67c6a89e33d",
@@ -104092,7 +104071,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "a40d2274df92d12cedfdc3e5605d696b0e5d9dfee27afcf308cfef3a6f24755e",
+   "sha256": "6d9d4cb0c434ecd78d26230c659f5c0d418f3e109f3148bf1d519424c29a4678",
    "symlink": false,
    "upstream_blob": "95ded5341f4037fd01f4ef637ad4dd0cfa119906",
    "upstream_blob_sha256": "463dde823201d3c88ed1a426ad460155a6b7789ef0e29e1ec68b8b4bab4508ab",
@@ -106297,12 +106276,12 @@
    "upstream_sha256": "784d13fdc59d9236b21d63a30661e92111b535fc10a9bad095522733d849d1fe"
   },
   "scripts/build/windows-deps.ps1": {
-   "classification": "EOL_NORMALIZED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "1be19c44cf9195161b51e7535287632c2f164532793cb1c5d32a25795e8f6973",
+   "patched": true,
+   "sha256": "16cd14361af4e61f9694b0872695ba8287d951bbea0903f0cc490be48bdc9689",
    "symlink": false,
    "upstream_blob": "35c5c171937ce54260a6eb2176c3d4096d317682",
    "upstream_blob_sha256": "47506484c41193a61bce7ae816e4107b2a5dab424ac02da90f5273fcbc604eb0",
@@ -106718,7 +106697,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "72077517de1fee1c00df46affd233ca08e21a1091262aba4648ec4bd6212c8bb",
+   "sha256": "6280c6ecc3716be0379506af515fdf492f358d5092ad02fab29cc0f3e1486741",
    "symlink": false,
    "upstream_blob": "2b0b830b05213f554dfb1efff79950b90e164dc0",
    "upstream_blob_sha256": "db370b2da95122f6455a6bfa29a1100590db1ae7534faba407f9846741b5bd11",
@@ -107090,12 +107069,12 @@
    "upstream_sha256": "c464e0cc4778802f197bd3868e62f6c6605b258d51c605b8534e31add3e06717"
   },
   "scripts/gen-bootstrap-pins.py": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100755",
    "local_git_mode": "100755",
-   "patched": false,
-   "sha256": "1c7d71b725e57e1f65781758fabfa5c94d92891b8c1cf06456a67da37dfeaa2e",
+   "patched": true,
+   "sha256": "5c1097bece1c843ba342fc3061ae3932cc27f0673cba6aad170d53723399fa2f",
    "symlink": false,
    "upstream_blob": "7a0ed9836baf18d2099690d8a2cfba2d16f444c2",
    "upstream_blob_sha256": "1c7d71b725e57e1f65781758fabfa5c94d92891b8c1cf06456a67da37dfeaa2e",
@@ -107199,7 +107178,7 @@
    "local_fs_mode": "100755",
    "local_git_mode": "100755",
    "patched": true,
-   "sha256": "0b3a1b64ceb556e7e3b24022a2555a3d9397d8ca516855e690b38c63e03a47d9",
+   "sha256": "f1b50698667446cc88afe3c0a21003a10191dd30388f78e5bd8538c88d4c8780",
    "symlink": false,
    "upstream_blob": "1911f63e16dbe7be3e2e7d3bd42cf5b655f60ad9",
    "upstream_blob_sha256": "b6d77a3491ab1d8e842071a8d92f76ae118836479b1ac69436e00f85f541d5a1",
@@ -108442,12 +108421,12 @@
    "upstream_sha256": "9c5eb2f59af8bfba4582ba1c9f50eda11a2e67c771fcf1e9a65dd8a7f2dc6f27"
   },
   "scripts/windows-build-deps.ps1": {
-   "classification": "EOL_NORMALIZED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "387d9cf46a5bbf4b0d1a9e7e4ef3abf0cc861ce3b739824f444934127c50a210",
+   "patched": true,
+   "sha256": "298b8803ac7754f59929d3e56513de20fa6f4361a506f8ef824c21c6368554f7",
    "symlink": false,
    "upstream_blob": "92371454b603f8ed46fa089cfdccffdf4140bdd3",
    "upstream_blob_sha256": "333d0f709e41cc2e1c5f1fd542aa01c6ddd59171185fdfde8b5555669be0e1e8",
@@ -108480,26 +108459,26 @@
    "upstream_mode": "100644",
    "upstream_sha256": "4f7100e5487f31f9a26671e4b9a7619a2762e115ba580504ee99735fa8b27025"
   },
-  "setup-hermes.ps1": {
+  "setup-qubit.ps1": {
    "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "59a13ffd1242adaab7a55391bf295f3b5a768c05f43c8fc7e78efaabd7f4eb95",
+   "sha256": "83862e33fba90bcb91252aa4b96f47265524a176948f91a940a65995b5ef5baa",
    "symlink": false,
    "upstream_blob": "b96b8bd77ae254946f26e0c59e9da22abda7114d",
    "upstream_blob_sha256": "4dfd89f7f8e3d4ec658c3317cf23e84f4b43602a156aa25420315ab38f701ea7",
    "upstream_mode": "100644",
    "upstream_sha256": "47ca171f1ed82e4dc492a0bf051f29c5b59f412bd1b9481ea3e39effc585b530"
   },
-  "setup-hermes.sh": {
+  "setup-qubit.sh": {
    "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100755",
    "local_git_mode": "100755",
    "patched": true,
-   "sha256": "78de14f0dde74b2982e7fb4cb069e960405822d8ff657b11981426135e52fb03",
+   "sha256": "94eb624dda7a1cd6a0072a1bce1182b8aedb4a22d68c692a26f9f89d81ac6af9",
    "symlink": false,
    "upstream_blob": "b169bedc091ef31e46fe6a8bdc63893420dd698a",
    "upstream_blob_sha256": "ca5617453b0c60a97b2ca3dc9d3289f47a9c12f83ff108fa13773603fe57d836",
@@ -112821,19 +112800,6 @@
    "upstream_blob_sha256": "22b996996ae2bf252b31cfd2636231f08936729a381dce7ba8bfa4afb8ffe8c6",
    "upstream_mode": "100644",
    "upstream_sha256": "22b996996ae2bf252b31cfd2636231f08936729a381dce7ba8bfa4afb8ffe8c6"
-  },
-  "test_durations.json": {
-   "classification": "QUBIT_ADDED",
-   "git_tracked": false,
-   "local_fs_mode": "100644",
-   "local_git_mode": null,
-   "patched": false,
-   "sha256": "58fafbc23bf59d60c368fbdcaaf3eb5c8a575a29071856a199bffe47ddc9b872",
-   "symlink": false,
-   "upstream_blob": null,
-   "upstream_blob_sha256": null,
-   "upstream_mode": null,
-   "upstream_sha256": null
   },
   "tests-js/allow-scripts-sync.test.ts": {
    "classification": "UNCHANGED",
@@ -125815,7 +125781,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "bdb570b4745d81987fbf7a9972c07f85a349bfd37c1258afe32091028096e98a",
+   "sha256": "a9dd7824650116d490ed2d6e7d777355884bf735b93f78f4f68ec9483900239f",
    "symlink": false,
    "upstream_blob": "c676b6892c3cbe7028e91a5aadd1a7764545230b",
    "upstream_blob_sha256": "c0f0db25a53189a8146318f3ab5c462a87bc28d2b91e0318a6e7ba6621f3b7b2",
@@ -147486,7 +147452,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "93a1374d9f1356f3b5eb471bf770a766e64941659f68391c2292f25daaa32f57",
+   "sha256": "8fde484148f170feb32755643f6253c852d3e356c51a8cd70542278433e6047d",
    "symlink": false,
    "upstream_blob": "f93ea56f17f0895df27dbe6f3b24a19eacd8b4a9",
    "upstream_blob_sha256": "1f73372bb76e77bc7e8fbaabc4c0c0a5f14adbc3cf7a37eaa511c25dafdf6528",
@@ -147494,12 +147460,12 @@
    "upstream_sha256": "1f73372bb76e77bc7e8fbaabc4c0c0a5f14adbc3cf7a37eaa511c25dafdf6528"
   },
   "tests/pm/test_activation_runtime.py": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "802749093039f25cc67b226f1f950cc6c18decd6fea181ce6eacad35a9894853",
+   "patched": true,
+   "sha256": "29638703592899f3e33a0ac54a17be13858302ebe6157daca16e8342a547f167",
    "symlink": false,
    "upstream_blob": "38ededa64059cd7ea1d38af273035c41697329bd",
    "upstream_blob_sha256": "802749093039f25cc67b226f1f950cc6c18decd6fea181ce6eacad35a9894853",
@@ -147512,7 +147478,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "a131cee153ec171920edca00b552a9ec801d75f5c8243b341904f3a1c83d9bfa",
+   "sha256": "40f5783084788629d6f54f00650b561db27a5e1e0f643e84ee789e46d84fab8e",
    "symlink": false,
    "upstream_blob": "515383cfd47a8c719d09d4f8c16bd0575129f0e3",
    "upstream_blob_sha256": "4260f18506d5b597a498c56e99b86c404837709e23ad05847c25356b64d34534",
@@ -148422,7 +148388,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "04552daf09badc39cd24505b2bd181a754c7328cd62e83de9c3ac593a602f74e",
+   "sha256": "92595876e3326995d6ed69b2c5021b6ba0133b5502a05f283df8af5c2d5c8398",
    "symlink": false,
    "upstream_blob": "76171dbf74208e7260681b4e073ef39af6e16e8a",
    "upstream_blob_sha256": "d5166ceca0ea1f3a9118cec07c59d76685cc4218746b66cf2abc3ce9b322987f",
@@ -162202,7 +162168,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": false,
-   "sha256": "bbb0ce3bd726bdc59b920f4004c97591c10c7d23d27c3ebcaae1ca0bf7102c29",
+   "sha256": "c80d32de9d36543fc162033c5ab3db492a4b307500e72a2a2465b924fa35cbf4",
    "symlink": false,
    "upstream_blob": null,
    "upstream_blob_sha256": null,
@@ -162280,7 +162246,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "3645e82065bb817dce060e85fe9d1ee52c094bb3e229c0483477be97d6b85341",
+   "sha256": "8cb184285ce7894144fda635ac5acb987f3fbe6fcf3d92f3716192f847a16681",
    "symlink": false,
    "upstream_blob": "9e7a8930ef8c2d32effeb74c8cda3fabc7095927",
    "upstream_blob_sha256": "7b282085287797cc3da04df358038b38e882c4adbb7c980b27f037a81d230a69",
@@ -168858,7 +168824,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "6568ba4c3068503d8dbb178bec9da7dfb33d05fcba156166f17bdbb5df697104",
+   "sha256": "7fb3218006eedb56ae4bbf132d19603e76d69e46f9b838a0a95e8f835ab432db",
    "symlink": false,
    "upstream_blob": "2360f36e82222e95d7bfb38dbd1ae072375ed656",
    "upstream_blob_sha256": "7398cef7d2b0b18e7bc8529bd9df7debf9bfe0debc2b184668d1f1f4977579be",
@@ -169209,7 +169175,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "7ff7284d67fc889031a9f491133a916b3380ac1adfc421a5c5b0c156c757a345",
+   "sha256": "8f56b6a040c0c9b161b616033cefe591b0637880270de24e047ddd904dee79a7",
    "symlink": false,
    "upstream_blob": "12aa5c3eac5411196d31731a3205693238c19b35",
    "upstream_blob_sha256": "5b93fbdd1e88b1eed3ea7f3c5a569d6ae5b5c28a54a183e80a6b52c7fed6d64a",
@@ -169287,7 +169253,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "101daccbebb7a9e913360b2c1b0e31f45c3baff58b205376a5417b975c4a4d02",
+   "sha256": "d9824698ee05adcec92b95eee2f079613db01653591170c1c1439bd1410a2fb2",
    "symlink": false,
    "upstream_blob": "9c32dc58191ac721cf47e79fa9f333be59b07bea",
    "upstream_blob_sha256": "d7ace934134b894de643c2c16e2a44568bafdf17682b2c07d7a7bc87d3193af8",
@@ -169399,12 +169365,12 @@
    "upstream_sha256": "4333c7a7da848055543d7d465948647038f73b9ec68679c4f355e661e2f45b40"
   },
   "tests/scripts/test_powershell_script_syntax.py": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "4987a36e617158d16470820394ac2f040aa7b5767ec5cf9d7e286b3730a854f5",
+   "patched": true,
+   "sha256": "81d15c8d142666da2c3adfd22154bbcb7074ae6702f5db127547023ddeca26b4",
    "symlink": false,
    "upstream_blob": "eff889b9887487f9b94610c78e28adf0dc7c982e",
    "upstream_blob_sha256": "4987a36e617158d16470820394ac2f040aa7b5767ec5cf9d7e286b3730a854f5",
@@ -188111,7 +188077,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "b6b2c978555970de1484561279a03a2080d2d7fe974906c2c33041b7341a5bd9",
+   "sha256": "cbf97699bfd88568924c0f6592a2fa958f9a2b163d9f69a794b8beefedccbc1a",
    "symlink": false,
    "upstream_blob": "89386334b9c452b4006d30f24586ecff6e9e8f4b",
    "upstream_blob_sha256": "48ba8bea0b9bcd5821747f480055a224639fd83565d9b14d6134bbe7d433aa43",
@@ -200157,12 +200123,12 @@
    "upstream_sha256": "da629b5af55a6125485dc921790cbb3f5392cb5bb0f917d2e00feed0fd286bcb"
   },
   "website/docs/reference/package-management.md": {
-   "classification": "UNCHANGED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
-   "sha256": "91c420da22e2d1e023acf29f5afbede2cb4e4d59874d3937ef6b224418dafb0b",
+   "patched": true,
+   "sha256": "a37326a6c7d031dbf3377331c5c443f7092b569439069d95108be519846d4e5d",
    "symlink": false,
    "upstream_blob": "52f6a72adf787eaa0ad5698abf76a4411b5f0349",
    "upstream_blob_sha256": "91c420da22e2d1e023acf29f5afbede2cb4e4d59874d3937ef6b224418dafb0b",
@@ -209336,7 +209302,7 @@
   }
  },
  "git_index_gaps": [],
- "identical": 9646,
+ "identical": 9638,
  "intentionally_omitted": [
   "tests/agent/transports/test_hermes_tools_mcp_server.py",
   "tests/gateway/test_process_hermes_home_expansion.py",
@@ -209362,7 +209328,7 @@
   "tests/tools/test_hermes_subprocess_env.py"
  ],
  "local_fs_mode_counts": {
-  "100644": 15985,
+  "100644": 15984,
   "100755": 98
  },
  "local_git_file_count": 16082,
@@ -209645,6 +209611,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "acp_adapter/tools.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "activate": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -214460,6 +214431,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "nix/homeManagerModules.nix": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "nix/lib.nix": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -220934,6 +220910,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "scripts/build/windows-deps.ps1": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "scripts/build_model_catalog.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -221115,6 +221096,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "scripts/e2e_shared_metrics_staging.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "scripts/gen-bootstrap-pins.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -221409,17 +221395,22 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "scripts/windows-build-deps.ps1": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "scripts/write_install_stamp.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
-  "setup-hermes.ps1": {
+  "setup-qubit.ps1": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
-  "setup-hermes.sh": {
+  "setup-qubit.sh": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -228705,6 +228696,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "tests/pm/test_activate_scripts.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "tests/pm/test_activation_runtime.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -236279,6 +236275,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "tests/scripts/test_powershell_script_syntax.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "tests/scripts/test_release_artifacts.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -241394,6 +241395,11 @@
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
+  "website/docs/reference/package-management.md": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
   "website/scripts/extract-plugins.py": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
@@ -241481,6 +241487,7 @@
   "acp_adapter/server.py",
   "acp_adapter/session.py",
   "acp_adapter/tools.py",
+  "activate",
   "activate.ps1",
   "agent/AGENTS.md",
   "agent/account_usage.py",
@@ -242444,6 +242451,7 @@
   "nix/desktop.nix",
   "nix/devShell.nix",
   "nix/homeManagerModules.nix",
+  "nix/lib.nix",
   "nix/moduleCommon.nix",
   "nix/nixosModules.nix",
   "nix/packages.nix",
@@ -243738,6 +243746,7 @@
   "scripts/audit-old-updater-imports.py",
   "scripts/build/freshness.mjs",
   "scripts/build/tui.mjs",
+  "scripts/build/windows-deps.ps1",
   "scripts/build_model_catalog.py",
   "scripts/build_skills_index.py",
   "scripts/bundles/bytecode.py",
@@ -243775,6 +243784,7 @@
   "scripts/docker_rebootstrap_nous_session.py",
   "scripts/dump_desktop_slash_registry.py",
   "scripts/e2e_shared_metrics_staging.py",
+  "scripts/gen-bootstrap-pins.py",
   "scripts/gen_gateway_contracts.py",
   "scripts/generate-icons.mjs",
   "scripts/generate_conformance_vectors.py",
@@ -243833,9 +243843,10 @@
   "scripts/whatsapp-bridge/bridge.js",
   "scripts/whatsapp-bridge/owner_message_gate.js",
   "scripts/whatsapp-bridge/package.json",
+  "scripts/windows-build-deps.ps1",
   "scripts/write_install_stamp.py",
-  "setup-hermes.ps1",
-  "setup-hermes.sh",
+  "setup-qubit.ps1",
+  "setup-qubit.sh",
   "setup.py",
   "skills/AGENTS.md",
   "skills/apple/apple-notes/SKILL.md",
@@ -245293,6 +245304,7 @@
   "tests/pm/_fixtures.py",
   "tests/pm/conftest.py",
   "tests/pm/test_activate_scripts.py",
+  "tests/pm/test_activation_runtime.py",
   "tests/pm/test_activation_setup.py",
   "tests/pm/test_bootstrap_import_closure.py",
   "tests/pm/test_build_operations.py",
@@ -246807,6 +246819,7 @@
   "tests/scripts/test_mint_launchers.py",
   "tests/scripts/test_native_build.py",
   "tests/scripts/test_pm_runtime_bundle.py",
+  "tests/scripts/test_powershell_script_syntax.py",
   "tests/scripts/test_release_artifacts.py",
   "tests/scripts/test_release_build_commit.py",
   "tests/scripts/test_release_channel_build.py",
@@ -247830,6 +247843,7 @@
   "web/src/themes/presets.ts",
   "web/src/themes/types.ts",
   "web/vite.config.ts",
+  "website/docs/reference/package-management.md",
   "website/scripts/extract-plugins.py",
   "website/scripts/extract-skills.py",
   "website/scripts/fetch-plugin-stars.py",
@@ -250501,6 +250515,14 @@
   {
    "from": "plugins/hermes-achievements/tests/test_achievement_engine.py",
    "to": "plugins/qubit-achievements/tests/test_achievement_engine.py"
+  },
+  {
+   "from": "setup-hermes.ps1",
+   "to": "setup-qubit.ps1"
+  },
+  {
+   "from": "setup-hermes.sh",
+   "to": "setup-qubit.sh"
   },
   {
    "from": "skills/productivity/google-workspace/scripts/_hermes_home.py",
@@ -257063,7 +257085,7 @@
    "to": "web/src/components/QubitConsoleModal.tsx"
   }
  ],
- "renamed_count": 2306,
+ "renamed_count": 2308,
  "symlink_count_local": 0,
  "symlink_count_upstream": 0,
  "symlink_divergences": [],
