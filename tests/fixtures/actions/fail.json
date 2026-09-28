@@ -1,7 +1,0 @@
-{
-  "_comment": "Packet 8F synthetic FAILED adapter outcome (simulation only). Proves typed failed states and the retry path without live services.",
-  "act.browser.fill": {
-    "state": "FAILED",
-    "detail": "adapter reported a transient failure; nothing was written"
-  }
-}
