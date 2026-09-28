@@ -1948,7 +1948,7 @@ export const deOverrides = {
       sshErrHostKey:
         'Der Host-Key hat sich seit Ihrer letzten Verbindung GEÄNDERT. Prüfen Sie, ob das erwartet ist, führen Sie dann ssh-keygen -R <host> aus und verbinden Sie sich erneut.',
       sshErrNotInstalled:
-        'Qubit ist auf dem Remote-Host nicht installiert. Installieren Sie es dort (curl -fsSL https://raw.githubusercontent.com/cgraph-dev/qubit-voicebridge/main/scripts/install.sh | sh) oder legen Sie den Qubit-Pfad fest.',
+        'Qubit ist auf dem Remote-Host nicht installiert. Installieren Sie es dort (curl -fsSL https://raw.githubusercontent.com/cgraph-dev/Qubit-AIO/main/scripts/install.sh | sh) oder legen Sie den Qubit-Pfad fest.',
       sshErrPlatform:
         'Nicht unterstützte Remote-Plattform. Der Desktop-SSH-Modus von Qubit unterstützt Linux-, macOS- und Windows-Remote-Hosts.',
       sshErrTimeout: 'SSH-Verbindung ist ausgelaufen. Der Host ist möglicherweise nicht erreichbar oder schläft.',

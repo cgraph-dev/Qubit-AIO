@@ -254,6 +254,24 @@ def _seed_vendored_src_root_pythonpath(env: dict[str, str]) -> dict[str, str]:
     return env
 
 
+def _slash_worker_env(profile_home: str | None = None) -> dict[str, str]:
+    """Sanitized env for the persistent slash worker with the vendored package root seeded.
+
+    The worker runs the Qubit agent, so provider credentials are inherited (tier-1
+    secrets still stripped); a multi-profile session resolves against its own profile
+    home via ``target_home`` (the served-profile child env factory applies it last,
+    so it always wins). The package-root seed is added AFTER the sanitizer strips
+    Qubit-owned PYTHONPATH entries — see
+    :func:`_seed_vendored_src_root_pythonpath`.
+    """
+    from tools.environments.local import served_profile_child_env
+    from agent.secret_scope import is_multiplex_active
+    env = _prepend_tool_paths(served_profile_child_env(
+        target_home=profile_home or (_qubit_home if is_multiplex_active() else None),
+        inherit_credentials=True))
+    return _seed_vendored_src_root_pythonpath(env)
+
+
 class _SlashWorker:
     """Persistent HermesCLI subprocess for slash commands."""
 
@@ -269,28 +287,24 @@ class _SlashWorker:
         # (gateway/GitHub/infra) are still stripped (#29157). Global-remote / multi-profile sessions: the
         # worker must resolve config/skills/state against the session's profile home, not the gateway's
         # launch QUBIT_HOME (#40677).
-        from tools.environments.local import served_profile_child_env
-        from agent.secret_scope import is_multiplex_active
-
+        #
         # The worker runs the agent → needs provider credentials; tier-1 secrets (gateway/GitHub/
         # infra) are still stripped. A served profile's worker gets THAT profile's home + secrets and
         # none of the launch profile's .env / TERMINAL_* residue, exactly what a standalone
         # `qubit -p X` would load itself. The launch profile is a profile too: once the process hosts
         # a second home (multiplex flipped), its worker must name its own home or the fail-closed
         # no-target/no-scope path raises UnscopedSecretError (#115427).
-        env = _prepend_tool_paths(served_profile_child_env(
-            target_home=profile_home or (_qubit_home if is_multiplex_active() else None),
-            inherit_credentials=True))
-        # Internal slash workers must import the same checkout as their parent. Seed the
-        # vendored package root on PYTHONPATH AND the shared import guard's env after the
+        #
+        # Internal slash workers must import the same checkout as their parent: :func:`_slash_worker_env`
+        # seeds the vendored package root on PYTHONPATH AND the shared import guard's env after the
         # sanitizer stripped Qubit-owned PYTHONPATH entries (dashboard audit D-1).
-        _seed_vendored_src_root_pythonpath(env)
+        env = _slash_worker_env(profile_home)
         # start_new_session: otherwise the worker inherits the gateway's pgid and mcp_tool's orphan
         # sweep, racing the spawn, killpg()s the TUI parent itself. errors="replace": bytes invalid
         # in the system locale (GBK Windows) must not raise UnicodeDecodeError in the drain threads.
-        # Prepend the Qubit venv bin dir and the user-local bin dir to PATH so slash_worker child processes
-        # can resolve Qubit-managed CLIs (browser-use, uvx) even when the parent gateway was launched with
-        # a minimal PATH (e.g. by the Desktop/Dashboard app). See #83845.
+        # :func:`_slash_worker_env` prepends the Qubit venv bin dir and the user-local bin dir to PATH
+        # so slash_worker child processes can resolve Qubit-managed CLIs (browser-use, uvx) even when
+        # the parent gateway was launched with a minimal PATH (e.g. by the Desktop/Dashboard app). See #83845.
         self.proc = subprocess.Popen(
             argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             encoding="utf-8", errors="replace", bufsize=1, cwd=os.getcwd(), env=env,

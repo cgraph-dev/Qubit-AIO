@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "negative",
+  "fixture_id": "negative.api.state_unapproved_difference",
+  "family": "api",
+  "description": "Intentional NON-approved difference. This is NOT a positive fixture and MUST NOT appear in MANIFEST.json. Tests feed `expected` and `actual` to differential_parity.compare_expected_actual and require a non-empty diagnostic list containing the paths below.",
+  "expected": {
+    "http_status": 200,
+    "json": {
+      "route": "/agent/api/status",
+      "state": "OK",
+      "scopes": ["read", "session:read"]
+    }
+  },
+  "actual": {
+    "http_status": 200,
+    "json": {
+      "route": "/agent/api/status",
+      "state": "REFUSED",
+      "scopes": ["read"]
+    }
+  },
+  "failing_paths": [
+    "$.json.scopes[\"session:read\"]",
+    "$.json.state"
+  ],
+  "expected_failures": [
+    {
+      "path": "$.json.scopes[\"session:read\"]",
+      "kind": "missing_scope",
+      "detail": "actual scope set lacks 'session:read'"
+    },
+    {
+      "path": "$.json.state",
+      "kind": "value",
+      "detail": "expected=\"OK\" actual=\"REFUSED\""
+    }
+  ],
+  "intentional_path": "$.json.state",
+  "notes": "The exact failing JSON path that proves comparison works is $.json.state: the actual backend returned state=\"REFUSED\" where the expected contract requires state=\"OK\". That is an unapproved behavioral difference and compare_expected_actual must emit a Diagnostic with path=$.json.state and kind=value. A second difference is asserted at $.json.scopes[\"session:read\"] (missing_scope) because the actual payload dropped a scope; the quoted segment is how _child_path renders a non-identifier set member. A correct runner reports FAIL (exit 1) for this row, never PASS/SAFE_EQUIVALENT; the refusal must not be counted as success. This file is deliberately excluded from MANIFEST.json so it cannot be mistaken for a positive fixture."
+}

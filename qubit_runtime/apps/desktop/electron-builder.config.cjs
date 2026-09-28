@@ -55,7 +55,7 @@ const channelRequest = channelBuildRequest()
 
 /** @typedef {import("app-builder-lib").Configuration} Configuration */
 
-const [owner, repo] = (process.env.GITHUB_REPOSITORY || 'cgraph-dev/qubit-voicebridge').split('/')
+const [owner, repo] = (process.env.GITHUB_REPOSITORY || 'cgraph-dev/Qubit-AIO').split('/')
 if (!owner || !repo) {
   throw new Error(`invalid GITHUB_REPOSITORY ${process.env.GITHUB_REPOSITORY}`)
 }

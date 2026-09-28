@@ -6,7 +6,7 @@ before the full config machinery loads, and it never imports the vendored fork.
 
 What it decides
 ---------------
-* **Repository identity.** :data:`QUBIT_REPOSITORY` (``cgraph-dev/qubit-voicebridge``)
+* **Repository identity.** :data:`QUBIT_REPOSITORY` (``cgraph-dev/Qubit-AIO``)
   is the intended public Qubit repo — the *default destination*, never a
   hard requirement. A user's own clone may track its own ``origin`` (which for
   a public user *is* the Qubit repo), a mirror, or a private fork.
@@ -61,13 +61,13 @@ from urllib.parse import urlsplit
 # ---------------------------------------------------------------------------
 #: The intended public Qubit repository identity. Default destination only —
 #: overridable per install via ``update.remote`` / ``update.remote_url``.
-QUBIT_REPOSITORY = "cgraph-dev/qubit-voicebridge"
+QUBIT_REPOSITORY = "cgraph-dev/Qubit-AIO"
 QUBIT_REPOSITORY_URL = f"https://github.com/{QUBIT_REPOSITORY}.git"
 #: The canonical public Qubit update URL. :func:`resolve_source` prefers this
 #: when no explicit Qubit source is configured, or when the configured clone's
 #: origin is legacy-branded. Its value is exactly :data:`QUBIT_REPOSITORY_URL`;
 #: callers must never point the updater at Hermes or OpenClaw.
-QUBIT_UPDATE_URL = "https://github.com/cgraph-dev/qubit-voicebridge.git"
+QUBIT_UPDATE_URL = "https://github.com/cgraph-dev/Qubit-AIO.git"
 
 DEFAULT_REMOTE_NAME = "origin"
 DEFAULT_BRANCH = "main"
@@ -566,7 +566,7 @@ def resolve_source(cfg: Any = None, override: Any = None, *,
     """Resolve the effective update source/ref policy.
 
     The canonical public repository is :data:`QUBIT_UPDATE_URL`
-    (``https://github.com/cgraph-dev/qubit-voicebridge.git``), channel
+    (``https://github.com/cgraph-dev/Qubit-AIO.git``), channel
     ``stable``, branch ``main``. Resolution order (first non-empty wins):
 
     1. explicit ``override`` (a local **path**, a **URL**, or a remote **name**);

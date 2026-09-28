@@ -1,8 +1,14 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
+*.pyo
 .pytest_cache/
+.pytest-cache/
+.mypy_cache/
+.ruff_cache/
 *.egg-info/
+*.tsbuildinfo
 
 # browser automation persistent state (real logins — NEVER commit)
 browser_profiles
@@ -36,9 +42,9 @@ config/task-templates.yaml
 /dist/
 
 # Vendored dashboard build artifacts (regenerable; see
-# frontend/qubit-app/README.md). Vendored SOURCES are committed.
+# frontend/qubit-app/README.md). Vendored SOURCES are committed; the prebuilt
+# served bundle under frontend/qubit-dist is tracked as a release input.
 frontend/qubit-web/node_modules/
-frontend/qubit-dist/
 
 # Runtime state artifacts that must never be committed (created under CWD by
 # some tests when no state dir is injected).
@@ -49,13 +55,10 @@ chat_comments.json
 approvals.jsonl
 power-control.json
 
-# pytest scratch cache (never committed).
-.pytest-cache/
-
 # pytest MagicMock residue (never committed).
 MagicMock/
 
-# --- Qubit-AIO lean release: exclude dev/docs/tests and sensitive state -------
+# --- secrets, credentials, and local runtime state (NEVER commit) ------------
 .env
 .env.*
 !.env.example
@@ -71,38 +74,8 @@ state.db*
 *.sqlite3
 .hermes_history
 *.log
-rebase_v0215_run.log
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.pytest-cache/
-.mypy_cache/
-.ruff_cache/
 node_modules/
-.venv/
-venv/
-*.tsbuildinfo
-dist/
 build/
 coverage/
 htmlcov/
 .frontend-build/
-/tests/
-/qubit_runtime/tests/
-/qubit_runtime/website/
-/qubit_runtime/evals/
-/qubit_runtime/contributors/
-/benchmarks/
-/docs/
-/.cursor/
-/.github/
-/.claude/
-/.kiro/
-/.gemini/
-/.opencode/
-/.vscode/
-/.windsurf/
-/.superpowers/
-/graft/
-/rebase_v0215_run.log
-/scripts/run_task6_redo.py

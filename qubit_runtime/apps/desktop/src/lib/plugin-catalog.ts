@@ -12,7 +12,7 @@
  * Plugin dialog, which still requires the user's explicit confirmation.
  */
 
-export const CATALOG_ORIGIN = 'https://github.com/cgraph-dev/qubit-voicebridge'
+export const CATALOG_ORIGIN = 'https://github.com/cgraph-dev/Qubit-AIO'
 export const CATALOG_PICKER_URL = `${CATALOG_ORIGIN}/docs/plugins?embed=picker`
 export const PLUGIN_CATALOG_URL = `${CATALOG_ORIGIN}/docs/api/plugins.json`
 

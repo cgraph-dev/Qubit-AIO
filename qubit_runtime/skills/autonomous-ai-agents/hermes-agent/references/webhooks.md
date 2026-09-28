@@ -83,7 +83,7 @@ qubit webhook subscribe todoist-qubit \
   --deliver telegram --deliver-chat-id "12345"
 ```
 
-Full filter syntax: https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/messaging/webhooks#payload-filters
+Full filter syntax: https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/messaging/webhooks#payload-filters
 
 ### List subscriptions
 ```bash

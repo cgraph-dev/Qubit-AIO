@@ -120,7 +120,7 @@ const API_KEY_OPTIONS: ApiKeyOption[] = [
     id: 'local',
     name: 'Local / custom endpoint',
     envKey: 'OPENAI_BASE_URL',
-    docsUrl: 'https://github.com/cgraph-dev/qubit-voicebridge#bring-your-own-endpoint',
+    docsUrl: 'https://github.com/cgraph-dev/Qubit-AIO#bring-your-own-endpoint',
     placeholder: 'http://127.0.0.1:8000/v1'
   }
 ]

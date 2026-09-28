@@ -511,7 +511,7 @@ def commit_prefix_for(commit: str) -> str:
 # The in-tree literal is only the path-safe fallback for standalone script use
 # where qubit_cli is not importable (this module normally runs as
 # ``python -m scripts.releases.r2`` from the runtime root, where it is).
-_FALLBACK_PUBLIC_URL = "https://github.com/cgraph-dev/qubit-voicebridge"
+_FALLBACK_PUBLIC_URL = "https://github.com/cgraph-dev/Qubit-AIO"
 
 
 def default_public_url() -> str:

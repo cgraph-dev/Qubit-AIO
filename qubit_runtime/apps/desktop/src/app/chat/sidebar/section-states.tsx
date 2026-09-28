@@ -81,7 +81,7 @@ export function SidebarLoadErrorState({ onRetry }: { onRetry: () => void }) {
 }
 
 const SESSION_STORAGE_RECOVERY_URL =
-  'https://github.com/cgraph-dev/qubit-voicebridge/docs/user-guide/session-storage-recovery#when-the-three-steps-do-not-work'
+  'https://github.com/cgraph-dev/Qubit-AIO/docs/user-guide/session-storage-recovery#when-the-three-steps-do-not-work'
 
 interface SidebarStorageCorruptNoticeProps {
   openRecoveryGuide?: (url: string) => void

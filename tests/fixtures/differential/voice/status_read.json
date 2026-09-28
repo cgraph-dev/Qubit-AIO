@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "fixture_id": "voice.status.read",
+  "family": "voice",
+  "command": null,
+  "request": {
+    "kind": "voice",
+    "method": "POST",
+    "path": "/api/type",
+    "headers": {},
+    "body": {
+      "text": "system status"
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "voice",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "voice": {
+    "utterance": "system status",
+    "registry": "voicebridge.voice_commands.REGISTRY",
+    "canonical_operation_id": "status",
+    "canonical_title": "System status",
+    "backend": "status",
+    "matched_alias": "system status",
+    "resolution_kind": "match",
+    "extracted_args": {},
+    "fixed_args": {},
+    "confirmation": {
+      "required": false,
+      "staged": false,
+      "journal": null,
+      "ttl_s": null,
+      "single_use": null
+    },
+    "cancel": {
+      "required": false,
+      "decision": null,
+      "executes": false
+    },
+    "expiry": {
+      "ttl_s": null,
+      "on_expiry": null
+    },
+    "replay": {
+      "second_settle": null,
+      "revalidate_args_from_journal": false
+    },
+    "source": "voicebridge/voice_commands.py:4722-4726",
+    "resolve_source": "voicebridge/voice_commands.py:329-405",
+    "execute_source": "voicebridge/voice_commands.py:8829-8844"
+  },
+  "normalizers": [
+    "timestamp",
+    "temp_path",
+    "pid",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "voice_operation": {
+      "entry_id": "status",
+      "backend": "status"
+    },
+    "confirmation": {
+      "required": false,
+      "staged": false
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/voice_commands.py:4722",
+    "caller": "resolve",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/web_routers/status.py:378",
+    "symbol": "get_status",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/health.ts:115",
+    "symbol": "healthHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_URL and QUBIT_DIFFERENTIAL_QUBIT_TOKEN. The real voice path is POST /api/type (webui.py:3125) -> orch.process_web_utterance -> GET /api/result/<id> (webui.py:1733); there is no synchronous voice-intent JSON route. Reference-side (hermes/openclaw) voice resolution is unavailable offline, so this row never claims PASS.",
+  "notes": "Read-only voice op. The canonical utterance 'system status' resolves in voicebridge.voice_commands.resolve (voice_commands.py:329-405) to REGISTRY entry 'status' (voice_commands.py:4722-4726, alias 'system status' at :4723), backend 'status', summary 'status'. The entry is not confirm-tier, so execute() runs backend 'status' immediately (voice_commands.py:8829-8844) and any live host metrics are collapsed by the runner's volatile-metric canonicalization, not fabricated. No qubit/upstream side-effect-free equivalent exists for voice resolution, so the row is OPERATOR_ONLY and can never claim PASS. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/status.py:378 (get_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/health.ts:115 (healthHandlers).",
+  "evidence": {
+    "voice_utterance": "system status",
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "POST",
+      "path": "/api/type",
+      "body": {
+        "text": "string"
+      }
+    },
+    "broker_policy_decision": "read-only entry (confirm=false) executes immediately; source must be user/cli/dashboard",
+    "runtime_provider": null,
+    "store_state_assertion": "resolved op is canonical entry 'status'; no state mutated",
+    "output_event_assertion": "EXECUTED outcome with status summary",
+    "error_codes": [],
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": "executed audit event names entry 'status'",
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  },
+  "read_only": true,
+  "state_changing": false
+}

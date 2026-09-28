@@ -52,7 +52,7 @@ _KEY_URL = "https://www.perplexity.ai/account/api"
 # Perplexity's integration header. No per-user identifier and no separate
 # request; the call already carries the user's own API key.
 _HEADERS = {
-    "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge",
+    "HTTP-Referer": "https://github.com/cgraph-dev/Qubit-AIO",
     "X-Title": "Qubit Agent",
     "User-Agent": f"Qubit-Agent/{get_version_info().base_version}",
     "X-Pplx-Integration": "qubit-agent",

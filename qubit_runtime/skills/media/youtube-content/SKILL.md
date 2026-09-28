@@ -26,7 +26,7 @@ Use `terminal` with the Python from a PM-prepared Qubit source checkout. The
 Qubit with raw pip or project-discovering `uv run`.
 
 From that checkout, first follow the isolated development-home setup in
-[Package Management](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/package-management#developer-workflow),
+[Package Management](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/reference/package-management#developer-workflow),
 then prepare the extra and reactivate before running the helper:
 
 ```bash

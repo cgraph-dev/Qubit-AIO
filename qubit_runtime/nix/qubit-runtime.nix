@@ -346,7 +346,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = with lib; {
     description = "AI agent with advanced tool-calling capabilities";
-    homepage = "https://github.com/cgraph-dev/qubit-voicebridge";
+    homepage = "https://github.com/cgraph-dev/Qubit-AIO";
     mainProgram = "hermes";
     license = licenses.mit;
     platforms = platforms.unix;

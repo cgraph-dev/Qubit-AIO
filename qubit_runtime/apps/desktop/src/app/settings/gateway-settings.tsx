@@ -1240,7 +1240,7 @@ function GatewayConnectionSettings({ embedded, standalone }: { embedded: boolean
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     <span>
                       {g.cloudNoAgents.before}
-                      <ExternalLink href="https://github.com/cgraph-dev/qubit-voicebridge/agents" showExternalIcon={false}>
+                      <ExternalLink href="https://github.com/cgraph-dev/Qubit-AIO/agents" showExternalIcon={false}>
                         {g.cloudNoAgents.linkText}
                       </ExternalLink>
                       {g.cloudNoAgents.after}

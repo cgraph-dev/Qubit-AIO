@@ -1386,7 +1386,7 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "and a related one was not.",
         "Re-run the update to bring the whole tree to the same version:",
         "    qubit update",
-        "If that also fails, reinstall: https://github.com/cgraph-dev/qubit-voicebridge",
+        "If that also fails, reinstall: https://github.com/cgraph-dev/Qubit-AIO",
     ]
 
 

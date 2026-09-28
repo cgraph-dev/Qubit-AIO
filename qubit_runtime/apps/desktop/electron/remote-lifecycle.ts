@@ -177,7 +177,7 @@ async function locateHermes(ssh, remoteHermesPath) {
     //   - version checking: `<python> --version` printed "Python x.y.z" instead of
     //     the Qubit version, and
     //   - capability probing: `<python> serve --help` failed entirely.
-    // See https://github.com/cgraph-dev/qubit-voicebridge/issues/74411
+    // See https://github.com/cgraph-dev/Qubit-AIO/issues/74411
     return candidate
   }
 
@@ -237,7 +237,7 @@ async function locateHermes(ssh, remoteHermesPath) {
 
   const err: any = new Error(
     'Qubit is not installed on the remote host (could not find a `hermes` executable). ' +
-      'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/cgraph-dev/qubit-voicebridge/main/scripts/install.sh | sh  ' +
+      'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/cgraph-dev/Qubit-AIO/main/scripts/install.sh | sh  ' +
       '— or set the Qubit path explicitly in the SSH connection settings.'
   )
 

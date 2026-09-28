@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "fixture_id": "voice.intent.canonical_op",
+  "family": "voice",
+  "command": null,
+  "request": {
+    "kind": "voice",
+    "method": "POST",
+    "path": "/api/type",
+    "headers": {},
+    "body": {
+      "text": "pause everything"
+    },
+    "event": null,
+    "argv": []
+  },
+  "transport": "voice",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "voice": {
+    "utterance": "pause everything",
+    "registry": "voicebridge.voice_commands.REGISTRY",
+    "canonical_operation_id": "pause",
+    "canonical_title": "Pause all work",
+    "backend": "pause",
+    "matched_alias": "pause everything",
+    "resolution_kind": "match",
+    "extracted_args": {},
+    "fixed_args": {},
+    "confirmation": {
+      "required": true,
+      "staged": true,
+      "stage_operation": "voice.pause",
+      "journal": "shared approval journal",
+      "ttl_s": 120.0,
+      "single_use": true
+    },
+    "cancel": {
+      "required": false,
+      "decision": "deny",
+      "executes": false
+    },
+    "expiry": {
+      "ttl_s": 120.0,
+      "on_expiry": "aborted"
+    },
+    "replay": {
+      "second_settle": "idempotent_noop",
+      "revalidate_args_from_journal": true
+    },
+    "source": "voicebridge/voice_commands.py:4727-4731",
+    "resolve_source": "voicebridge/voice_commands.py:329-405",
+    "execute_source": "voicebridge/voice_commands.py:8789-8828"
+  },
+  "persisted_state_schema": {
+    "type": "object",
+    "properties": {
+      "resolved_entry_id": {
+        "type": "string"
+      },
+      "journal_staged": {
+        "type": "boolean"
+      },
+      "confirmation": {
+        "type": [
+          "object",
+          "null"
+        ]
+      }
+    }
+  },
+  "normalizers": [
+    "timestamp",
+    "uuid",
+    "session_token",
+    "product_branding"
+  ],
+  "expected": {
+    "voice_operation": {
+      "entry_id": "pause",
+      "backend": "pause"
+    },
+    "confirmation": {
+      "required": true,
+      "staged": true
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/voice_commands.py:4727",
+    "caller": "resolve",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/web_routers/audio.py:78",
+    "symbol": "transcribe_audio_upload",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/talk.ts:827",
+    "symbol": "talkHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "No synchronous voice-intent JSON route exists. The real path is the native POST /api/type (webui.py:3125 -> submit_text at webui.py:3623 -> orch.process_web_utterance) followed by GET /api/result/<request_id> (webui.py:1733); requires QUBIT_DIFFERENTIAL_QUBIT_URL and QUBIT_DIFFERENTIAL_QUBIT_TOKEN. Reference-side (hermes/openclaw) voice resolution is unavailable offline: the pinned programs expose no side-effect-free utterance->operation resolver, so this row can never claim PASS.",
+  "notes": "Voice intent -> canonical operation contract. A voice turn resolves to exactly the same op the CLI/dashboard use: voicebridge.voice_commands.resolve (voice_commands.py:329-405) matches the canonical utterance 'pause everything' to REGISTRY entry 'pause' (voice_commands.py:4727-4731, alias at :4728), backend 'pause'. Because entry.confirm is true, execute() does NOT run the backend; it stages a single-use confirmation in the shared approval journal via journal.create('voice.pause', ttl_s=CONFIRM_TTL_S) (voice_commands.py:8789-8828; CONFIRM_TTL_S=120.0 at voice_commands.py:49) and returns NEEDS_CONFIRM. Cancel denies without executing (cancel_pending, voice_commands.py:8905-8924); an unsettled confirmation expires (expires_at) and a later respond on it is ABORTED (approvals.py:120-149); a second settle is an idempotent no-op and confirmed args are re-validated from the journal record (voice_commands.py:8879-8885). voice_backend_mismatch is a fail-closed gate. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/audio.py:78 (transcribe_audio_upload); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/talk.ts:827 (talkHandlers). No side-effect-free pinned reference resolver exists for this fixture: the capability surface is Qubit-specific and the upstream operation requires a running Gateway, credentials, or mutates state; it is therefore classified OPERATOR_ONLY and can never claim PASS.",
+  "evidence": {
+    "voice_utterance": "pause everything",
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "POST",
+      "path": "/api/type",
+      "body": {
+        "text": "string"
+      }
+    },
+    "broker_policy_decision": "confirm-required op (pause) stages the shared approval journal; source must be user/cli/dashboard",
+    "runtime_provider": null,
+    "store_state_assertion": "resolved op equals the CLI/dashboard canonical op 'pause'",
+    "output_event_assertion": "NEEDS_CONFIRM outcome with confirmation_id",
+    "error_codes": [],
+    "retry_recovery_proof": "expired confirmation is ABORTED; second settle is an idempotent no-op",
+    "audit_receipt_proof": "needs_confirm audit event names entry + confirmation_id",
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  },
+  "state_changing": true
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "fixture_id": "api.route.status_headers",
+  "family": "api",
+  "command": null,
+  "request": {
+    "kind": null,
+    "method": "GET",
+    "path": "/agent/api/status",
+    "headers": {},
+    "body": null,
+    "event": null,
+    "argv": []
+  },
+  "transport": "http",
+  "base_url_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_URL",
+  "auth": {
+    "header": "X-Api-Token",
+    "value_ref": "env:QUBIT_DIFFERENTIAL_QUBIT_TOKEN"
+  },
+  "normalizers": [
+    "timestamp",
+    "temp_path",
+    "pid",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "http_status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "json_schema": {
+      "gateway_running": false
+    }
+  },
+  "disposition": "OPERATOR_ONLY",
+  "operator_prerequisite": "Requires QUBIT_DIFFERENTIAL_QUBIT_TOKEN (X-Api-Token) and a live instance; /agent/api/status is 401 without the token. The body is served by the vendored-fork proxy (fork declares GET /api/status), not the compat qubit-runtime-status/1 handler.",
+  "qubit": {
+    "path": "voicebridge/webui.py:1192",
+    "caller": "_hermes_api",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/web_routers/status.py:378",
+    "symbol": "get_status",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/health.ts:115",
+    "symbol": "healthHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "notes": "P0 api.route.status_headers: GET /agent/api/status -> 200 with content-type application/json, and gateway supervision stays the honest GATEWAY_NO_SUPERVISION negative (gateway_running=false; never a fabricated 200). Authority note from the transport recon: the vendored fork wins for /agent/api/status, so the served body is the rebranded fork StatusResponse and the compat qubit-runtime-status/1 handler (qubit_compat.py:4380 h_status) is shadowed/dead here. This fixture therefore asserts the served fork shape, not the dead compat schema. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/status.py:378 (get_status); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/health.ts:115 (healthHandlers). No reference declared: the pinned side-effect-free upstream surface here is only a nearest/non-equivalent read-only analogue (or a transport-shaped contract a CLI reference cannot satisfy); a nearest-surface-only match must never be counted as PASS.",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": "/agent/api/status",
+    "dashboard_control": null,
+    "request_schema": {
+      "method": "GET",
+      "path": "/agent/api/status"
+    },
+    "broker_policy_decision": "fork proxy authority for /agent/api/status; gateway supervision GATEWAY_NO_SUPERVISION",
+    "runtime_provider": null,
+    "store_state_assertion": null,
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": {
+      "content-type": "application/json"
+    },
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "store_state_assertion": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface"
+    }
+  }
+}

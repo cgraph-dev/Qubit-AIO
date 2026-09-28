@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "fixture_id": "cli.model_profile.list_json",
+  "family": "cli",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "profile",
+      "model",
+      "list",
+      "--json"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "product_branding",
+    "temp_path",
+    "generated_hash"
+  ],
+  "expected": {
+    "exit_code": 0,
+    "stdout_schema": {
+      "schema": "qubit-model-profile/1",
+      "profiles": [
+        {
+          "id": "qubit-brain4",
+          "kind": "local",
+          "provider": "ollama",
+          "gate": "OK"
+        }
+      ]
+    }
+  },
+  "qubit": {
+    "path": "voicebridge/cli.py:4745",
+    "caller": "_cmd_profile_model",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/subcommands/model.py:8",
+    "symbol": "build_model_parser",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/models-list-result.ts:246",
+    "symbol": "buildModelsListResult",
+    "mapping_status": "VERIFIED"
+  },
+  "references": {
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "models",
+        "list",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "JSON model catalog list.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "CLI JSON contract for the canonical model-profile registry (resolver.list_profiles). Template list asserts the shipped Qubit-Brain4 default record. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/subcommands/model.py:8 (build_model_parser); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/models-list-result.ts:246 (buildModelsListResult). Pinned side-effect-free reference invocation(s) declared: `openclaw models list --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, direct_readonly).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "profile",
+        "model",
+        "list",
+        "--json"
+      ]
+    },
+    "broker_policy_decision": null,
+    "runtime_provider": "ollama",
+    "store_state_assertion": "resolver.list_profiles reads profile registry",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": null,
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "broker_policy_decision": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "security_resource_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

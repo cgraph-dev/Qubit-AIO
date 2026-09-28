@@ -1,0 +1,11 @@
+{
+  "_comment": "Packet 8F synthetic AUTH_REQUIRED adapter outcomes (simulation only). Proves typed auth/2FA/CAPTCHA failure states without touching a real account.",
+  "act.browser.read": {
+    "state": "AUTH_REQUIRED",
+    "detail": "login/2FA screen detected; read refused"
+  },
+  "act.mail.send": {
+    "state": "AUTH_REQUIRED",
+    "detail": "account requires re-authentication; nothing was sent"
+  }
+}

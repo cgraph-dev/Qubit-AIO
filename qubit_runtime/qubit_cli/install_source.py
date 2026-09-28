@@ -19,22 +19,22 @@ import os
 #: Public Qubit GitHub repository (owner decision 2026-09-27). Override with
 #: ``QUBIT_INSTALL_BASE_URL`` for the future canonical domain or a pinned release
 #: asset; override the ref with ``QUBIT_INSTALL_BRANCH``.
-DEFAULT_BASE_URL = "https://github.com/cgraph-dev/qubit-voicebridge"
+DEFAULT_BASE_URL = "https://github.com/cgraph-dev/Qubit-AIO"
 DEFAULT_BRANCH = "main"
 
 #: GitHub ``owner/name`` for the Qubit project (one configurable place). Used by
 #: update/channel identity checks; override with ``QUBIT_REPOSITORY``.
-DEFAULT_REPOSITORY = "cgraph-dev/qubit-voicebridge"
+DEFAULT_REPOSITORY = "cgraph-dev/Qubit-AIO"
 
 #: Documentation root printed in help/setup/provider text. The public GitHub
 #: repository's ``docs`` tree until a canonical docs domain exists; override
 #: with ``QUBIT_DOCS_BASE_URL``.
-DEFAULT_DOCS_BASE_URL = "https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs"
+DEFAULT_DOCS_BASE_URL = "https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs"
 
 #: Release-asset host used for internal update-channel metadata (never printed).
 #: Override with ``QUBIT_RELEASE_ASSETS_BASE_URL`` once a Qubit asset host or
 #: final release URL is supplied by the owner.
-DEFAULT_RELEASE_ASSETS_BASE_URL = "https://github.com/cgraph-dev/qubit-voicebridge"
+DEFAULT_RELEASE_ASSETS_BASE_URL = "https://github.com/cgraph-dev/Qubit-AIO"
 
 _BASE_ENV = "QUBIT_INSTALL_BASE_URL"
 _BRANCH_ENV = "QUBIT_INSTALL_BRANCH"

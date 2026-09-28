@@ -399,7 +399,7 @@ export function BootFailureOverlay() {
       {
         key: 'portal',
         label: copy.cloudDownCheckPortal,
-        onClick: () => openExternalLink('https://github.com/cgraph-dev/qubit-voicebridge'),
+        onClick: () => openExternalLink('https://github.com/cgraph-dev/Qubit-AIO'),
         icon: <ExternalLink />
       },
       localAction,
@@ -407,7 +407,7 @@ export function BootFailureOverlay() {
       {
         key: 'discord',
         label: copy.cloudDownDiscord,
-        onClick: () => openExternalLink('https://github.com/cgraph-dev/qubit-voicebridge'),
+        onClick: () => openExternalLink('https://github.com/cgraph-dev/Qubit-AIO'),
         variant: 'ghost'
       },
       { ...settingsAction, variant: 'ghost' }

@@ -26,9 +26,9 @@ import { ExternalLink, Loader2Icon, Lock } from '@/lib/icons'
 import { $sendDiagnostics, confirmSendDiagnostics, dismissSendDiagnostics } from '@/store/send-diagnostics'
 
 const SUPPORT_LINKS = [
-  { key: 'github', url: 'https://github.com/cgraph-dev/qubit-voicebridge/issues' },
-  { key: 'portal', url: 'https://github.com/cgraph-dev/qubit-voicebridge/help' },
-  { key: 'discord', url: 'https://github.com/cgraph-dev/qubit-voicebridge' }
+  { key: 'github', url: 'https://github.com/cgraph-dev/Qubit-AIO/issues' },
+  { key: 'portal', url: 'https://github.com/cgraph-dev/Qubit-AIO/help' },
+  { key: 'discord', url: 'https://github.com/cgraph-dev/Qubit-AIO' }
 ] as const
 
 export function SendDiagnosticsHost() {

@@ -95,8 +95,8 @@ qubit product migrate --apply  # backed-up migration + compat alias
 For a developer checkout the classic scripted installer remains available:
 
 ```bash
-git clone https://github.com/cgraph-dev/qubit-voicebridge.git
-cd qubit-voicebridge
+git clone https://github.com/cgraph-dev/Qubit-AIO.git
+cd Qubit-AIO
 
 # prereqs (one-time): uv, ollama
 curl -LsSf https://astral.sh/uv/install.sh | sh

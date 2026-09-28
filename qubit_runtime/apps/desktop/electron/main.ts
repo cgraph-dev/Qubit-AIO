@@ -7682,7 +7682,7 @@ async function freshGatewayWsUrl(profile) {
 // Canonical Qubit portal base URL, overridable for staging/dev. Mirrors the CLI
 // convention (qubit_cli/auth.py DEFAULT_NOUS_PORTAL_URL + the same env names)
 // so a single override flips every Qubit surface to the same portal.
-const DEFAULT_NOUS_PORTAL_URL = 'https://github.com/cgraph-dev/qubit-voicebridge'
+const DEFAULT_NOUS_PORTAL_URL = 'https://github.com/cgraph-dev/Qubit-AIO'
 
 function resolvePortalBaseUrl() {
   const raw = process.env.HERMES_PORTAL_BASE_URL || process.env.NOUS_PORTAL_BASE_URL || DEFAULT_NOUS_PORTAL_URL

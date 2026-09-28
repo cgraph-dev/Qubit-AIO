@@ -1,0 +1,38 @@
+{
+  "_synthetic": true,
+  "_comment": "Synthetic sanitized Messenger rows for Packet 8A contract tests.",
+  "platform": "messenger",
+  "adapter": "messenger_cdp",
+  "adapter_version": "8a-1",
+  "account_scope": "synth-messenger-a",
+  "items": [
+    {
+      "source_item_id": "syn-msgr-thread-3001",
+      "thread_id": "syn-msgr-thread-3001",
+      "sender": "Synthetic Messenger Sender Foxtrot",
+      "display_name": "Foxtrot (synthetic)",
+      "subject": "",
+      "preview": "Synthetic messenger conversation from foxtrot.",
+      "time_raw": "2026-08-06T14:20:00+03:00",
+      "ts_normalized": "2026-08-06T11:20:00Z",
+      "unread": true,
+      "read_state": "unread",
+      "safe_url": "https://www.messenger.com/t/syn-msgr-thread-3001",
+      "evidence_status": "not_available"
+    },
+    {
+      "source_item_id": "syn-msgr-thread-3002",
+      "thread_id": "syn-msgr-thread-3002",
+      "sender": "Synthetic Messenger Sender Golf",
+      "display_name": "Golf (synthetic)",
+      "subject": "",
+      "preview": "Synthetic messenger conversation from golf.",
+      "time_raw": "2026-08-07T09:05:00+03:00",
+      "ts_normalized": "2026-08-07T06:05:00Z",
+      "unread": null,
+      "read_state": "unknown",
+      "safe_url": "https://www.messenger.com/t/syn-msgr-thread-3002",
+      "evidence_status": "not_available"
+    }
+  ]
+}

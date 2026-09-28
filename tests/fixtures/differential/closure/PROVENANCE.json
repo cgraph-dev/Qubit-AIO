@@ -1,0 +1,51 @@
+{
+  "files": [
+    {
+      "dispositions": {
+        "DEFECT": 10,
+        "OPERATOR_ONLY": 10,
+        "SAFE_EQUIVALENT": 1219
+      },
+      "name": "QUBIT_OPEN_CLOSURE.json",
+      "rows": 1239,
+      "sha256": "sha256:b5dab3caf99755f4306c7189a7c6413d409694e25f34e396c2224e6bb2f3c182"
+    },
+    {
+      "dispositions": {
+        "IMPLEMENTED": 438,
+        "NOT_APPLICABLE": 30,
+        "OPEN": 431,
+        "OPERATOR_ONLY": 42,
+        "SAFE_EQUIVALENT": 250
+      },
+      "name": "HERMES_OPEN_CLOSURE.json",
+      "rows": 1191,
+      "sha256": "sha256:2d875529e4fcc56ddfdcf98814ee4a7ce92c8a617ed498c16531694c2d069ae9"
+    },
+    {
+      "dispositions": {
+        "ADAPTED": 600,
+        "IMPLEMENTABLE": 368,
+        "MISSING": 3,
+        "OPERATOR_ONLY": 163
+      },
+      "name": "OPENCLAW_OPEN_CLOSURE.json",
+      "rows": 1134,
+      "sha256": "sha256:8957a0cfe318440299cd1e051127652344c9a1a358b3d6aa727737e513824365"
+    }
+  ],
+  "generated_by": "scripts/differential_parity.py (frozen from read-only analyst manifests)",
+  "note": "Read-only analyst closure overlays. The runner consumes a success disposition as SAFE_EQUIVALENT ONLY with a genuinely row-linked resolvable test; every other disposition is a typed OPERATOR_ONLY hold (or FAIL for a recorded defect). NEVER edited in place.",
+  "runner_consumers": [
+    "load_open_closures",
+    "apply_open_closures"
+  ],
+  "schema_version": 1,
+  "source_dir": "/tmp/qubit-differential/inventory/dispositions/",
+  "source_report": "/tmp/qubit-differential/runner/REP_W22.json",
+  "source_report_sha256": "sha256:6bd89c01e076d0e8deeb0a31e545a6723498d2e3200beb2d4a5a276464c71f62",
+  "upstream_pins": {
+    "hermes": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "openclaw": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+  }
+}

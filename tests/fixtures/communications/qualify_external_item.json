@@ -1,0 +1,47 @@
+{
+  "_synthetic": true,
+  "_comment": "Synthetic external-item fixture for Packet 8G qualification: the three baseline Gmail rows PLUS one new synthetic row (syn-g4). The operator-arranged real external test item must NEVER be sent by Qubit; this fixture only simulates the deterministic new-item contract hermetically.",
+  "platform": "gmail",
+  "rows": [
+    {
+      "sourceItemId": "syn-g1",
+      "threadId": "syn-g1",
+      "sender": "Synthetic Sender Alpha",
+      "subject": "Synthetic subject alpha",
+      "preview": "Synthetic preview body alpha.",
+      "timeText": "Aug 1",
+      "href": "https://mail.google.com/mail/u/0/#inbox",
+      "unread": true
+    },
+    {
+      "sourceItemId": "syn-g2",
+      "threadId": "syn-g2",
+      "sender": "Synthetic Sender Bravo",
+      "subject": "Synthetic subject bravo",
+      "preview": "Synthetic preview body bravo.",
+      "timeText": "Aug 2",
+      "href": "https://mail.google.com/mail/u/0/#inbox",
+      "unread": false
+    },
+    {
+      "sourceItemId": "syn-g3",
+      "threadId": "syn-g3",
+      "sender": "Synthetic Sender Charlie",
+      "subject": "Synthetic subject charlie",
+      "preview": "Synthetic preview body charlie.",
+      "timeText": "Aug 3",
+      "href": "https://mail.google.com/mail/u/0/#inbox",
+      "unread": null
+    },
+    {
+      "sourceItemId": "syn-g4",
+      "threadId": "syn-g4",
+      "sender": "Synthetic Sender Delta",
+      "subject": "Synthetic external test item delta",
+      "preview": "Synthetic preview body delta.",
+      "timeText": "Aug 4",
+      "href": "https://mail.google.com/mail/u/0/#inbox",
+      "unread": true
+    }
+  ]
+}

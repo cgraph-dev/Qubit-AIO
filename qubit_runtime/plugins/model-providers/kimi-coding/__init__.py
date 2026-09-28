@@ -10,7 +10,7 @@ from providers import register_provider
 from providers.base import OMIT_TEMPERATURE, ProviderProfile
 
 _HEADERS = {
-    "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge",
+    "HTTP-Referer": "https://github.com/cgraph-dev/Qubit-AIO",
     "X-Title": "Qubit Agent",
     "User-Agent": f"QubitAgent/{get_version_info().base_version}",
     # Exclude brotli: httpx's brotlicffi backend has a streaming decode bug on

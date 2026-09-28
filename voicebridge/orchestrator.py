@@ -2645,7 +2645,12 @@ class VoiceOrchestrator:
             return ""
         url = self.cfg.get("intent", "deepseek_url",
                            default="https://api.deepseek.com/chat/completions")
-        ctx = self._voice_conv_prompt(text)
+        # Canonical-store context so a voice turn sees prior /qubit-chat turns (and
+        # vice versa); a caller/test double that does not provide the canonical
+        # builder falls back to the in-memory conversation.
+        _ctx_builder = getattr(self, "_voice_conv_prompt", None)
+        ctx = (_ctx_builder(text) if _ctx_builder is not None
+               else self.conversation.as_prompt())
         system = ("You are a concise, warm voice assistant. Answer briefly in "
                   "1-3 short sentences unless asked for detail. Be direct: "
                   "no emojis, no pleasantries, no filler words — say only "

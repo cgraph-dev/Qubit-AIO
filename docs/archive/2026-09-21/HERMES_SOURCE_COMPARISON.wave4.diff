@@ -1,0 +1,601 @@
+# HERMES_SOURCE_COMPARISON — Wave 4 (agent F: dashboard UI parity + placeholder removal)
+
+Status: **PENDING MERGE** — agent H owns
+`docs/HERMES_SOURCE_COMPARISON.json`; this file holds the exact
+`wave3.overlay` hash replacements for the Wave 4 Qubit overlay edits so
+they can be merged without an agent F edit to the JSON.
+
+Wave 4 made **no edits to vendored `frontend/hermes-web/**` source** (the
+vendored dashboard is byte-clean for the pinned revision except for the
+already-documented Wave 1–3 patches). The only changed files are the
+Qubit-owned overlay (`frontend/hermes-qubit/**`), whose hashes live under
+`wave3.overlay` in the manifest.
+
+Until the rows below are merged, 
+`tests/test_branding_parity_wave3.py::test_overlay_manifest_hashes_are_valid`
+reports the edited files as stale. That is expected provenance handoff, not
+a functional regression; all Wave 1–3 functional/route/behaviour tests stay
+green (`test_dashboard_plugin_fleet.py`, `test_dashboard_page_closure_wave2.py`,
+`test_dashboard_branding_wave1.py`, `test_dashboard_ops8tf.py`,
+`test_dashboard_agent3_plugins.py`, `test_hermes_vendor8tf.py`).
+
+## Rows to replace in `docs/HERMES_SOURCE_COMPARISON.json` → `wave3.overlay`
+
+Each row keeps its Wave 3 `role`; only `qubit_sha256` changes. Exact unified
+diffs are in the final section.
+
+```json
+[
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js",
+  "qubit_sha256": "ef89b674e8e2bf16b190d2d8c18a11610ce591b25b9f675154272ddee268c31d",
+  "previous_qubit_sha256": "0ef83377f3a274005bad833753a234f7d887c0751cc511e3d49c1672c1d37c5f",
+  "reason": "Wave 4 state typing: pending-confirmation banner/page surfaces carry data-state=pending, the empty state data-state=empty, and errors data-state=degraded on the shared /api/ops/approvals + confirm/cancel journal. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js",
+  "qubit_sha256": "d357c0fab302fe3d78296b66510c9c6b430e1e95f65379d7a484279c493a4d7a",
+  "previous_qubit_sha256": "12e3ed940077a2bcc7ddc36cf220e1a3b0afb7e47a8c08978b1a3c8dd149b377",
+  "reason": "Wave 4 state typing: board pending/empty/error surfaces carry data-state (pending/empty/degraded) on the /api/ops broker. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js",
+  "qubit_sha256": "9b094d10ecd130a813f767dd3b200c75d86031fbf4fa37511ab0dd2cb0972a1b",
+  "previous_qubit_sha256": "ff772a4e2f25bbec5db79312a95979e65b09b9b8d2fed68b2412264c3dc877c8",
+  "reason": "Wave 4 dead-control removal: the docs:top notice linked `Open the Qubit operator guide` to /docs, but the notice renders on /docs itself \u2014 a self-referential no-op control. The link is removed and replaced with accurate guidance (`qubit --help`, the checkout docs/ directory). Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js",
+  "qubit_sha256": "b67c94699d3f75b099cc56310ff84a8bdeedbb6f8dcd566d66ee3ee9ca0f3d6b",
+  "previous_qubit_sha256": "57fd2fccfc794e582130b832d4530d4447b74e45653666ca7214146e31853d55",
+  "reason": "Wave 4 state typing: the transcript panel and empty/error surfaces carry data-state/aria-busy reflecting typed/voice/busy state. Same POST /api/qubit/chat backend. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js",
+  "qubit_sha256": "c09b7f8710d18bd3ca0f65cc0fe7953999194812c043d696400725db1df3695b",
+  "previous_qubit_sha256": "d7c6d5207a50e83bda96eaaa6f1c7d934536d5151ac0cc5c4067eeb4ff63c879",
+  "reason": "Wave 4 state typing: runtime inventory and device-op loading/empty surfaces carry data-state/aria-busy; errors carry data-state=degraded. Same /api/ops/runtime + /api/ops backend. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js",
+  "qubit_sha256": "a295bf62c00daf6fff3d7e2db7685fbc4daa65b23abc37ca087ca4aa29de6d9b",
+  "previous_qubit_sha256": "d55ef2119cefd6eab69515558b6af7e3bb47bdbb05dbbcf8a11a4c52f13bb437",
+  "reason": "Wave 4 state typing: gateway pending/empty/error surfaces carry data-state (pending/empty/degraded). Same /api/ops/msg-accounts, /api/ops/gateways, gateway-link and add/remove broker backend. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js",
+  "qubit_sha256": "388039b3302fa9b29401cfab1e5a48eb8f20b22e743ea109a247e8a13552d1fb",
+  "previous_qubit_sha256": "229bf93d677d7c9531db25931cde170607072de68a68596ee8c7b5eecb428ac1",
+  "reason": "Wave 4 state typing: provider list, memory-search result, and learning-ledger surfaces carry data-state/aria-busy (loading/empty/degraded). Same /api/memory + /api/curator + /api/ops/run backend. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js",
+  "qubit_sha256": "fa88810b8df7b54d013f013b8a9a0b250b098caea1ed2c398dba5204b66727f7",
+  "previous_qubit_sha256": "9219d309769e928f3d79d0619abc39f7d183b79285806fb3ef9a573d10b05fed",
+  "reason": "Wave 4 label + state typing: the per-op badge said `voice: refusal` for any op with a `voice_guard`, which is wrong (a voice_guard names the canonical spoken entry that shares the backend; it is not a refusal). Badge now reads `voice: linked` with the guard in the tooltip; `interface_reason` no longer double-prefixes `Voice:`; catalog/result/empty surfaces carry typed data-state (loading/degraded/pending/empty/ready) for the Qubit state styles. Same /api/ops broker endpoints. Regression: tests/test_dashboard_agent3_plugins.py, tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js",
+  "qubit_sha256": "e6343ef361132c602e869b1f7ef50c07288729fdd8e7cb61bd31581c21b9a431",
+  "previous_qubit_sha256": "2920111b8edea4e85a74d00543fc5fcd1bd9c0f34f2a4e747aa8a248b0f8a4a3",
+  "reason": "Wave 4 state typing: reports/analytics/log lines load and empty surfaces carry data-state (loading/empty/degraded) and aria-busy so the Qubit state styles and screen readers reflect the real backend state. Same /api/logs + /api/analytics + /api/ops/run backend. Regression: tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js",
+  "qubit_sha256": "ae1b072dedc783c9936824cc3be37e4bd71fda5d16501e2afcd8f6a41965706c",
+  "previous_qubit_sha256": "bf28f7075f5e352094f01fc42c19117b30a287cc557d30ae2746a5ba9a6b6c6e",
+  "reason": "Wave 4 placeholder-box removal: the Runtime tab was a raw JSON status box. It now renders the real pinned-runtime inventory as a typed table (name/pin/state/effective) with explicit loading / empty / degraded / error states, and keeps the raw payload behind a disclosure. Same GET /api/ops/runtime backend. Regression: tests/test_dashboard_agent3_plugins.py, tests/test_dashboard_ui_parity_wave4.py."
+ },
+ {
+  "qubit": "frontend/hermes-qubit/qubit-theme.json",
+  "qubit_sha256": "7402f5dfbf4c7229b44cfc74cf667e1822d1686294772ec91b6a954386811d27",
+  "previous_qubit_sha256": "041c776771ed380a1bf35ba1c7b3185e9c50145cfa4458160fa6f228d029cd9d",
+  "reason": "Wave 4 mobile-brand fix: stop hiding the mobile top-bar wordmark. The old `header span.text-midground.font-bold{display:none}` rule blanked the Qubit wordmark in the lg:hidden top bar while the sidebar wordmark is already hidden (the Qubit brand plugin renders the mark in the sidebar header-left slot). Keeping only the sidebar-scoped rule restores mobile branding with no duplicate. No behaviour removed; accessibility/motion/state rules unchanged. Regression: tests/test_dashboard_ui_parity_wave4.py, tests/test_dashboard_branding_wave1.py::test_theme_overlay_hides_any_residual_wordmark."
+ }
+]
+```
+
+## `git diff` of the patched overlay files (HEAD → wave 4)
+
+```diff
+diff --git a/frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js b/frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js
+index 750ef91c..558633a6 100644
+--- a/frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js
++++ b/frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js
+@@ -68,6 +68,7 @@
+ 
+     if (!items.length) return null;
+     return e("div", {role: "region", "aria-label": "Pending confirmations",
++      "data-state": "pending",
+       style: {margin: "8px 12px 0", padding: "8px 12px",
+         border: "1px solid #b7791f", borderRadius: 8, fontSize: 13,
+         background: "rgba(183,121,31,0.08)"}},
+@@ -93,7 +94,8 @@
+             "aria-label": "Cancel " + String(a.capability || a.id),
+           }, "Cancel"));
+       }),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d", marginTop: 6}}, err) : null);
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d", marginTop: 6}}, err) : null);
+   }
+ 
+   function ApprovalsPage() {
+@@ -144,9 +146,9 @@
+         "Pending confirmations on the shared journal — the same records CLI ",
+         "`qubit approvals`, voice yes/no, and the operations console settle. ",
+         "Confirm executes once with a redacted audit receipt."),
+-      err ? e("div", {role: "alert",
++      err ? e("div", {role: "alert", "data-state": "degraded",
+         style: {color: "#e5484d", marginBottom: 10}}, err) : null,
+-      !items.length ? e("p", {style: {opacity: 0.7}},
++      !items.length ? e("p", {"data-state": "empty", style: {opacity: 0.7}},
+           "No pending confirmations.") :
+         e("div", {role: "list", style: {border: "1px solid #2a3443",
+           borderRadius: 8}},
+diff --git a/frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js b/frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js
+index f7592958..c2007f4f 100644
+--- a/frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js
++++ b/frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js
+@@ -346,8 +346,10 @@
+         "Kanban boards on the canonical store — same backend as `qubit kanban` CLI and voice. ",
+         "Tables, tabs, and widgets run on the Tier-1 ops broker; mutations confirm ",
+         "through the shared journal (inline below, or the shell banner)."),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d"}}, err) : null,
+       pending ? e("div", {role: "region", "aria-label": "Pending board confirmation",
++        "data-state": "pending",
+         style: {marginTop: 8, padding: "8px 12px", border: "1px solid #b7791f",
+           borderRadius: 8, fontSize: 13}},
+         e("strong", null, "Confirm " + pending.what + ": "),
+@@ -380,7 +382,8 @@
+       e("h3", {style: {marginTop: 18}},
+         "Tabs" + (selBoard ? " on " + selBoard : "") + " (" + tabList.length + ")"),
+       !tabList.length
+-        ? e("p", {style: {opacity: 0.6}}, "No tabs (create a board first).")
++        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
++            "No tabs (create a board first).")
+         : e("div", {role: "tablist", "aria-label": "Board tabs",
+             style: {display: "flex", gap: 6, flexWrap: "wrap"}},
+             tabList.map(function (t) {
+@@ -446,7 +449,8 @@
+         e(C.Button || "button", {"aria-label": "Add card", disabled: busy,
+           onClick: addCard}, "Add card")),
+       !list.length
+-        ? e("p", {style: {opacity: 0.6}}, "No cards here yet.")
++        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
++            "No cards here yet.")
+         : e("ul", null, list.map(function (c) {
+             var id = c.id;
+             return e("li", {key: id, style: {marginBottom: 8}},
+@@ -510,7 +514,7 @@
+             background: "#0c1118", color: "inherit", border: "1px solid #2a3443",
+             borderRadius: 6, fontFamily: "inherit"}})),
+       !visible.length
+-        ? e("p", {style: {opacity: 0.6}},
++        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
+             "No widgets on this tab yet.")
+         : e("ul", {style: {listStyle: "none", padding: 0}},
+             visible.map(function (w) {
+diff --git a/frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js b/frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js
+index 88b33ff8..89a58bb6 100644
+--- a/frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js
++++ b/frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js
+@@ -26,12 +26,16 @@
+   }
+ 
+   /* Docs page notice: the built-in Docs tab embeds the upstream docs site
+-   * (third-party reference content). Point operators at Qubit docs. */
++   * (third-party reference content). The Qubit operator guide lives in the
++   * checkout (`docs/`) and the CLI (`qubit --help`); we deliberately do NOT
++   * link to /docs here — the notice is rendered on /docs, so that link would
++   * be a dead (self-referential) control. */
+   function DocsNotice() {
+     return e("div", {role: "note", style: {margin: 12, padding: 10,
+       border: "1px solid", borderRadius: 8, fontSize: 13}},
+       e("strong", null, "Qubit docs: "),
+       e("span", null, "the frame below is the upstream reference site. "),
+-      e("a", {href: "/docs"}, "Open the Qubit operator guide"));
++      e("span", null, "For Qubit-specific operation, run `qubit --help` or " +
++        "read the docs/ directory in the Qubit checkout."));
+   }
+ })();
+diff --git a/frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js b/frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js
+index 11b04608..353043d7 100644
+--- a/frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js
++++ b/frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js
+@@ -201,16 +201,21 @@
+       e("label", null, "Session ",
+         e(C.Input || "input", {value: session, onChange: function (ev) { setSession(ev.target.value); },
+           style: {maxWidth: 260}})),
+-      e("div", {style: {display: "flex", flexDirection: "column", gap: 8, minHeight: 120}},
++      e("div", {style: {display: "flex", flexDirection: "column", gap: 8, minHeight: 120},
++        "data-state": voiceState === "listening" ? "pending"
++          : (busy ? "loading" : "ready"),
++        "aria-busy": busy || voiceState === "listening" ? "true" : "false"},
+         msgs.length === 0
+-          ? e("p", {style: {opacity: 0.6}}, "No messages yet — ask something.")
++          ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
++              "No messages yet — ask something.")
+           : msgs.map(function (m, i) {
+               return e("div", {key: i, style: {whiteSpace: "pre-wrap"}},
+                 e("strong", null, m.role === "user" ? "You: " : "Qubit: "),
+                 e("span", null, m.text),
+                 m.meta ? e("div", {style: {fontSize: 12, opacity: 0.6}}, m.meta) : null);
+             })),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d"}}, err) : null,
+       e("div", {style: {display: "flex", gap: 8}},
+         e(C.Input || "input", {value: input, disabled: busy,
+           "aria-label": "Message Qubit",
+diff --git a/frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js b/frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js
+index 83dac820..62a1f597 100644
+--- a/frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js
++++ b/frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js
+@@ -90,8 +90,8 @@
+       e("p", {style: S.sub},
+         "Truthful availability for browser, desktop, IDE, vision, and pinned ",
+         "runtimes — same backend as CLI `qubit runtime` / device ops and voice."),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d"}},
+-        err) : null,
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d"}}, err) : null,
+       e("div", {style: S.card},
+         e("strong", null, "Pinned runtimes"),
+         images.length ? images.map(function (img, i) {
+@@ -100,10 +100,13 @@
+             e("span", {style: S.badge}, img.state || "?") ,
+             " pin " + (img.pin || "?") +
+             (img.observed && img.observed.effective ? " · effective" : ""));
+-        }) : e("div", {style: {opacity: 0.7, fontSize: 13, marginTop: 4}},
++        }) : e("div", {"data-state": runtime ? "empty" : "loading",
++          "aria-busy": runtime ? "false" : "true",
++          style: {opacity: 0.7, fontSize: 13, marginTop: 4}},
+           runtime ? "No runtimes staged." : "Loading runtime inventory…")),
+       e("h2", {style: {fontSize: 15, marginTop: 18}}, "Device operations"),
+-      !ops ? e("p", null, "Loading device operations…") :
++      !ops ? e("p", {"data-state": "loading", "aria-busy": "true"},
++          "Loading device operations…") :
+         ops.map(function (op) {
+           var r = results[op.id];
+           return e("div", {key: op.id, style: S.card},
+diff --git a/frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js b/frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js
+index 21c3d2f6..414058f9 100644
+--- a/frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js
++++ b/frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js
+@@ -140,8 +140,10 @@
+       e("p", {style: {opacity: 0.75}},
+         "Account-bound records with typed link states — same backend as CLI and voice. ",
+         "Process supervision is refused by policy; key references only (env:VAR/file:PATH)."),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d"}}, err) : null,
+       pending ? e("div", {role: "region", "aria-label": "Pending gateway confirmation",
++        "data-state": "pending",
+         style: {marginTop: 8, padding: "8px 12px", border: "1px solid #b7791f",
+           borderRadius: 8, fontSize: 13}},
+         e("strong", null, "Confirm " + pending.what + ": "),
+@@ -186,7 +188,8 @@
+           }}, "Add account")),
+       e("h3", {style: {marginTop: 16}}, "Gateways (" + gateways.length + ")"),
+       !gateways.length
+-        ? e("p", {style: {opacity: 0.6}}, "No gateway records yet.")
++        ? e("p", {"data-state": "empty", style: {opacity: 0.6}},
++            "No gateway records yet.")
+         : e("table", {style: {borderCollapse: "collapse", width: "100%"}},
+             e("thead", null, e("tr", null,
+               ["ID", "Provider", "Account", "Channel", "Link", ""].map(function (h) {
+diff --git a/frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js b/frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js
+index d38185ef..180659ba 100644
+--- a/frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js
++++ b/frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js
+@@ -72,7 +72,8 @@
+       e("p", {style: S.sub},
+         "Local memory provider, grounded search, and the learning ledger — ",
+         "same store as CLI `qubit memory`/`qubit lessons` and voice."),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d"}}, err) : null,
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d"}}, err) : null,
+       e("div", {style: S.card},
+         e("strong", null, "Providers"),
+         providers.length ? providers.map(function (p, i) {
+@@ -80,7 +81,9 @@
+             e("strong", null, p.name || p.id || "provider"),
+             e("span", {style: S.badge}, p.status || (p.available ? "ready" : "?")),
+             " " + (p.description || ""));
+-        }) : e("div", {style: {opacity: 0.7, fontSize: 13}},
++        }) : e("div", {"data-state": mem ? "empty" : "loading",
++          "aria-busy": mem ? "false" : "true",
++          style: {opacity: 0.7, fontSize: 13}},
+           mem ? "No providers." : "Loading provider status…")),
+       e("div", {style: S.card},
+         e("strong", null, "Search memory"),
+@@ -95,7 +98,10 @@
+             "aria-label": "Search memory", onClick: search},
+             busy ? "Searching…" : "Search")),
+         result ? e("pre", {style: Object.assign({}, S.code, {marginTop: 8})},
+-          JSON.stringify(result.body, null, 2).slice(0, 4000)) : null),
++          JSON.stringify(result.body, null, 2).slice(0, 4000)) :
++          e("div", {"data-state": "empty", style: {opacity: 0.7,
++            fontSize: 13, marginTop: 8}},
++            "No search yet — enter a query above.")),
+       e("div", {style: S.card},
+         e("strong", null, "Learning ledger"),
+         summary ? e("pre", {style: {marginTop: 8, fontSize: 12,
+@@ -105,7 +111,9 @@
+             pinned: summary.verified && summary.verified.pinned,
+             journal: summary.verified && summary.verified.journal},
+             null, 2)) :
+-          e("div", {style: {opacity: 0.7, fontSize: 13}},
++          e("div", {"data-state": curator ? "empty" : "loading",
++            "aria-busy": curator ? "false" : "true",
++            style: {opacity: 0.7, fontSize: 13}},
+             curator ? "No ledger data." : "Loading ledger…")));
+   }
+ 
+diff --git a/frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js b/frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js
+index 51dd7d9c..624d5f7f 100644
+--- a/frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js
++++ b/frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js
+@@ -87,11 +87,13 @@
+ 
+     if (err && !catalog) {
+       return e("div", {style: S.wrap}, e("h1", {style: S.h}, "Operations"),
+-        e("div", {role: "alert", style: {color: "#e5484d"}}, err));
++        e("div", {role: "alert", "data-state": "degraded",
++          style: {color: "#e5484d"}}, err));
+     }
+     if (!catalog) {
+       return e("div", {style: S.wrap}, e("h1", {style: S.h}, "Operations"),
+-        e("p", null, "Loading operations catalog…"));
++        e("p", {"data-state": "loading", "aria-busy": "true"},
++          "Loading operations catalog…"));
+     }
+ 
+     var groups = ["all"];
+@@ -164,6 +166,7 @@
+ 
+       pending.length ? e("div", {role: "region",
+           "aria-label": "Pending confirmations",
++          "data-state": "pending",
+           style: {border: "1px solid #b7791f", borderRadius: 8,
+                   padding: "8px 12px", marginBottom: 14,
+                   background: "rgba(183,121,31,0.08)"}},
+@@ -212,15 +215,16 @@
+                 e("div", {style: {fontSize: 13}},
+                   e("strong", null, op.title || op.id),
+                   op.confirm ? e("span", {style: S.badge}, "confirm") : null,
+-                  op.voice_guard ? e("span", {style: S.badge},
+-                    "voice: refusal") : null,
++                  op.voice_guard ? e("span", {style: S.badge,
++                    title: "spoken form: " + op.voice_guard}, "voice: linked")
++                    : null,
+                   e("span", {style: S.badge}, groupOf(op))),
+                 e("div", {style: {opacity: 0.65, fontSize: 12}},
+                   op.id + " — " + (op.help || "").slice(0, 90)));
+             }))),
+ 
+         e("div", {style: S.panel},
+-          !sel ? e("p", {style: {opacity: 0.7}},
++          !sel ? e("p", {"data-state": "empty", style: {opacity: 0.7}},
+               "Select an operation to configure and run it.") :
+           e("div", null,
+             e("h2", {style: {fontSize: 16, margin: "0 0 2px"}},
+@@ -228,7 +232,9 @@
+             e("p", {style: {opacity: 0.7, fontSize: 12, marginTop: 0}},
+               sel.id, " · group ", groupOf(sel)),
+             sel.interface_reason ? e("p", {style: {fontSize: 12,
+-                color: "#d29922", marginTop: 0}}, "Voice: " +
++                color: "#d29922", marginTop: 0},
++              "data-state": "degraded"},
++              (/^voice\b/i.test(sel.interface_reason) ? "" : "Voice: ") +
+               sel.interface_reason) : null,
+             (sel.args || []).length ? (sel.args || []).map(function (arg) {
+               return e("label", {key: arg.name, style: {display: "block"}},
+@@ -245,14 +251,17 @@
+                     next[arg.name] = ev.target.value;
+                     setArgs(next);
+                   }}));
+-            }) : e("p", {style: {opacity: 0.7, fontSize: 13}},
+-              "No arguments."),
++            }) : e("p", {"data-state": "empty",
++              style: {opacity: 0.7, fontSize: 13}}, "No arguments."),
+             e("button", {style: S.btn, disabled: working === "run",
+               "aria-label": "Run " + sel.id,
+               onClick: runOp},
+               working === "run" ? "Running…" : "Run operation"),
+-            result ? e("div", {style: {marginTop: 12}},
++            result ? e("div", {style: {marginTop: 12},
++              "data-state": result.status === 409 ? "pending"
++                : (result.status >= 400 ? "degraded" : "ready")},
+               e("div", {role: result.status >= 400 ? "alert" : "status",
++                  "aria-live": "polite",
+                   style: {fontSize: 13, marginBottom: 6,
+                     color: result.status >= 400 ? "#e5484d" : "#3fb950"}},
+                 "HTTP " + result.status + " · " +
+diff --git a/frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js b/frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js
+index 8c405cfc..a7a38f98 100644
+--- a/frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js
++++ b/frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js
+@@ -63,8 +63,8 @@
+       e("p", {style: S.sub},
+         "Live event log, usage totals, generated reports, and insights — ",
+         "all journal-derived on the shared Qubit backend (CLI/voice parity)."),
+-      err ? e("div", {role: "alert", style: {color: "#e5484d"}},
+-        err) : null,
++      err ? e("div", {role: "alert", "data-state": "degraded",
++        style: {color: "#e5484d"}}, err) : null,
+       e("div", {style: S.card},
+         e("strong", null, "Usage totals"),
+         analytics ? e("div", {style: {display: "flex", gap: 18,
+@@ -74,8 +74,8 @@
+           spanKV("Input tokens", totals.total_input),
+           spanKV("Output tokens", totals.total_output),
+           spanKV("Cost", totals.total_estimated_cost)) :
+-          e("div", {style: {opacity: 0.7, fontSize: 13}},
+-            "Loading analytics…")),
++          e("div", {"data-state": "loading", "aria-busy": "true",
++            style: {opacity: 0.7, fontSize: 13}}, "Loading analytics…")),
+       e("div", {style: S.card},
+         e("strong", null, "Recent activity"),
+         lines.length ? e("pre", {style: {marginTop: 8, fontSize: 12,
+@@ -83,19 +83,23 @@
+           lines.slice(-60).map(function (ln) {
+             return typeof ln === "string" ? ln : JSON.stringify(ln);
+           }).join("\n")) :
+-          e("div", {style: {opacity: 0.7, fontSize: 13}},
++          e("div", {"data-state": logs ? "empty" : "loading",
++            "aria-busy": logs ? "false" : "true",
++            style: {opacity: 0.7, fontSize: 13}},
+             logs ? "No events yet." : "Loading events…")),
+       e("div", {style: S.card},
+         e("strong", null, "Generated reports"),
+         reports ? e("pre", {style: S.code},
+           JSON.stringify(reports.body, null, 2).slice(0, 4000)) :
+-          e("div", {style: {opacity: 0.7, fontSize: 13}},
++          e("div", {"data-state": "loading", "aria-busy": "true",
++            style: {opacity: 0.7, fontSize: 13}},
+             "Loading reports…")),
+       e("div", {style: S.card},
+         e("strong", null, "Insights"),
+         insights ? e("pre", {style: S.code},
+           JSON.stringify(insights.body, null, 2).slice(0, 4000)) :
+-          e("div", {style: {opacity: 0.7, fontSize: 13}},
++          e("div", {"data-state": "loading", "aria-busy": "true",
++            style: {opacity: 0.7, fontSize: 13}},
+             "Loading insights…")));
+   }
+ 
+diff --git a/frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js b/frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js
+index 2ab34e50..35acf97f 100644
+--- a/frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js
++++ b/frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js
+@@ -1,34 +1,84 @@
+ /* Qubit Runtime — overlay plugin bundle (OpenClaw addition).
+- * Backend: GET /api/ops/runtime -> pinned runtime inventory. */
++ * Backend: GET /api/ops/runtime -> pinned runtime inventory. Renders the
++ * real typed inventory (name, pin, state) with explicit loading / empty /
++ * degraded / error states; the raw backend payload stays available behind a
++ * disclosure instead of being the whole page (no status-only tile). */
+ (function () {
+   var SDK = window.__HERMES_PLUGIN_SDK__;
+-  if (!SDK) return;
++  if (!SDK || !window.__HERMES_PLUGINS__) return;
+   var React = SDK.React, hooks = SDK.hooks, fetchJSON = SDK.fetchJSON;
+   var e = React.createElement;
+ 
++  var S = {
++    wrap: {padding: "16px 20px", maxWidth: 960},
++    table: {borderCollapse: "collapse", width: "100%", marginTop: 8,
++            fontSize: 13},
++    th: {textAlign: "left", borderBottom: "1px solid #33445a",
++         padding: "6px 8px"},
++    td: {borderBottom: "1px solid #222c39", padding: "6px 8px"},
++    code: {background: "#0c1118", border: "1px solid #2a3443",
++           borderRadius: 6, padding: 8, overflowX: "auto",
++           whiteSpace: "pre-wrap", fontSize: 12, maxHeight: 260},
++  };
++
+   function Runtime() {
+     var st = hooks.useState(null);
+     var data = st[0], setData = st[1];
+     var est = hooks.useState("");
+     var err = est[0], setErr = est[1];
++
+     hooks.useEffect(function () {
+-      fetchJSON("/api/ops/runtime").then(setData).catch(function (ex) {
++      fetchJSON("/api/ops/runtime").then(function (res) {
++        setData((res && (res.result || res)) || {});
++        setErr("");
++      }).catch(function (ex) {
+         setErr(String((ex && ex.message) || ex));
+       });
+     }, []);
+-    if (err) return e("div", {style: {padding: 16}},
+-      e("h2", null, "Runtime"), e("div", {role: "alert"}, err));
+-    if (!data) return e("div", {style: {padding: 16}},
+-      e("h2", null, "Runtime"), e("p", null, "Loading…"));
+-    var rt = data.result || data;
+-    var images = rt.images || rt.runtimes || [];
+-    return e("div", {style: {padding: 16, maxWidth: 960}},
+-      e("h2", null, "Runtime"),
+-      e("p", {style: {opacity: 0.75}},
++
++    var heading = e("h1", {style: {margin: "0 0 4px", fontSize: 20}},
++      "Runtime");
++    if (err) {
++      return e("div", {style: S.wrap}, heading,
++        e("div", {role: "alert", "data-state": "degraded",
++          style: {color: "#e5484d"}}, err));
++    }
++    if (!data) {
++      return e("div", {style: S.wrap}, heading,
++        e("p", {"data-state": "loading", "aria-busy": "true"},
++          "Loading runtime inventory…"));
++    }
++    var images = data.images || data.runtimes || [];
++    return e("div", {style: S.wrap}, heading,
++      e("p", {style: {opacity: 0.75, margin: "0 0 8px"}},
+         "Digest-pinned confined runtimes — same backend as `qubit runtime` CLI and voice. ",
+         "No container daemon, no pulls."),
+-      e("pre", {style: {whiteSpace: "pre-wrap"}},
+-        JSON.stringify({state: data.state, images: images}, null, 2).slice(0, 4000)));
++      e("div", {style: {fontSize: 12, opacity: 0.7}},
++        "state " + (data.state || "unknown") + " · " + images.length +
++        " runtime" + (images.length === 1 ? "" : "s")),
++      !images.length
++        ? e("p", {"data-state": "empty"}, "No runtimes staged.")
++        : e("table", {style: S.table},
++            e("thead", null, e("tr", null,
++              ["Runtime", "Pin", "State", "Effective"].map(function (hdr) {
++                return e("th", {key: hdr, scope: "col", style: S.th}, hdr);
++              }))),
++            e("tbody", null, images.map(function (img, i) {
++              var name = img.name || img.id || "runtime";
++              return e("tr", {key: i},
++                e("td", {style: S.td}, e("code", null, name)),
++                e("td", {style: S.td}, e("code", null, img.pin || "—")),
++                e("td", {style: S.td},
++                  e("span", {style: {opacity: 0.85}},
++                    img.state || "unknown")),
++                e("td", {style: S.td},
++                  img.observed && img.observed.effective ? "yes" : "no"));
++            }))),
++      e("details", {style: {marginTop: 12}},
++        e("summary", {style: {cursor: "pointer", opacity: 0.75,
++          fontSize: 13}}, "Raw backend payload"),
++        e("pre", {style: Object.assign({}, S.code, {marginTop: 8})},
++          JSON.stringify(data, null, 2).slice(0, 4000))));
+   }
+   window.__HERMES_PLUGINS__.register("qubit-runtime", Runtime);
+ })();
+diff --git a/frontend/hermes-qubit/qubit-theme.json b/frontend/hermes-qubit/qubit-theme.json
+index bb1d166e..030cd233 100644
+--- a/frontend/hermes-qubit/qubit-theme.json
++++ b/frontend/hermes-qubit/qubit-theme.json
+@@ -77,5 +77,5 @@
+     "#2a3342",
+     "#a3e635"
+   ],
+-  "customCSS": "/* Qubit Command visual system - overlay theme (no vendored file is edited).\n   Loaded through the dashboard's own theming API: applyTheme() injects this\n   string into a single <style id=\"hermes-theme-custom-css\"> tag. Static\n   import inspection reads it textually, never executing it. */\n:root{\n  --qubit-lime:#a3e635;--qubit-cyan:#22d3ee;--qubit-graphite:#10141c;\n  --qubit-navy:#0b0e13;--qubit-panel:#161b24;\n  --qubit-hairline:rgba(163,230,53,.16);\n  --qubit-glow:0 0 0 1px rgba(163,230,53,.25),0 8px 32px rgba(0,0,0,.45);\n  --qubit-ease:cubic-bezier(.23,1,.32,1);\n}\n.qubit-brandmark{font-weight:800;letter-spacing:.045em}\n/* Hide the vendored wordmark; the Qubit brand plugin renders the Qubit mark. */\nheader span.text-midground.font-bold{display:none!important}\ndiv.flex.h-14.shrink-0 span.text-midground.font-bold{display:none!important}\n::selection{background:rgba(163,230,53,.30);color:#fff}\nhtml{scrollbar-color:rgba(163,230,53,.35) transparent}\n*::-webkit-scrollbar{width:10px;height:10px}\n*::-webkit-scrollbar-thumb{background:rgba(163,230,53,.28);border-radius:999px;border:2px solid transparent;background-clip:padding-box}\n*::-webkit-scrollbar-thumb:hover{background:rgba(163,230,53,.45);background-clip:padding-box}\n/* Accessibility: always-visible keyboard focus, no mouse-only surprise outlines. */\n:where(a,button,[role=\"button\"],input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--qubit-lime);outline-offset:2px;border-radius:6px}\n:where(a,button,[role=\"button\"]):focus:not(:focus-visible){outline:none}\n/* Motion: purposeful easing, and fully disabled for reduced-motion users. */\n@media (prefers-reduced-motion:no-preference){\n  a,button,[role=\"button\"],.transition{transition-timing-function:var(--qubit-ease)}\n  .qubit-live-dot{animation:qubit-pulse 1.6s ease-in-out infinite}\n}\n@keyframes qubit-pulse{0%,100%{opacity:.35}50%{opacity:1}}\n@keyframes qubit-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}\n@keyframes qubit-recover{0%{transform:translateY(2px);opacity:.4}100%{transform:none;opacity:1}}\n/* Loading / streaming state. */\n[aria-busy=\"true\"],[data-state=\"loading\"],.qubit-loading{position:relative}\n[aria-busy=\"true\"]::after,[data-state=\"loading\"]::after,.qubit-loading::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(163,230,53,.10),transparent);background-size:200% 100%;animation:qubit-shimmer 1.4s linear infinite;pointer-events:none}\n/* Empty state - dashed Qubit surface, never a dead blank box. */\n[data-state=\"empty\"],.qubit-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;min-height:8rem;color:var(--color-muted-foreground);border:1px dashed var(--qubit-hairline);border-radius:var(--radius);padding:1.25rem;text-align:center}\n/* Degraded / unavailable - cyan informational rail. */\n[data-state=\"degraded\"],[data-state=\"unavailable\"],.qubit-degraded{border-left:3px solid var(--qubit-cyan);background:rgba(34,211,238,.06);padding-left:.75rem}\n/* Approval / pending confirmation - lime attention rail + glow. */\n[data-state=\"pending\"],[data-state=\"awaiting-approval\"],.qubit-approval{border-left:3px solid var(--qubit-lime);background:rgba(163,230,53,.08);box-shadow:var(--qubit-glow)}\n/* Cancellation / emergency stop - red rail. */\n[data-state=\"cancelled\"],[data-state=\"estop\"],.qubit-cancelled{border-left:3px solid #e5484d;background:rgba(229,72,77,.08)}\n/* Recovery / retry - amber rail with an entrance that respects motion settings. */\n[data-state=\"recovering\"],[data-state=\"retry\"],.qubit-recovering{border-left:3px solid #f5a524;background:rgba(245,165,36,.08);animation:qubit-recover .3s var(--qubit-ease)}\n/* Outcome chips. */\n.qubit-success{color:#4ade80}.qubit-warning{color:#f5a524}.qubit-danger{color:#e5484d}\n/* Responsive: keep desktop density, enlarge targets + text on narrow / touch. */\n@media (max-width:768px){\n  :root{--theme-base-size:15.5px}\n  aside#app-sidebar{width:min(18rem,86vw)}\n}\n@media (pointer:coarse){\n  button,[role=\"button\"],a[href],input[type=\"checkbox\"],input[type=\"radio\"],select{min-height:44px;min-width:44px}\n  nav a{padding-top:.5rem;padding-bottom:.5rem}\n}\n@media (prefers-contrast:more){\n  :root{--qubit-hairline:rgba(163,230,53,.55);--color-border:rgba(232,240,228,.45)}\n}\n@media (forced-colors:active){\n  :where(a,button,[role=\"button\"]):focus-visible{outline:2px solid Highlight}\n}\n@media (min-width:1600px){main{max-width:none}}"
++  "customCSS": "/* Qubit Command visual system - overlay theme (no vendored file is edited).\n   Loaded through the dashboard's own theming API: applyTheme() injects this\n   string into a single <style id=\"hermes-theme-custom-css\"> tag. Static\n   import inspection reads it textually, never executing it. */\n:root{\n  --qubit-lime:#a3e635;--qubit-cyan:#22d3ee;--qubit-graphite:#10141c;\n  --qubit-navy:#0b0e13;--qubit-panel:#161b24;\n  --qubit-hairline:rgba(163,230,53,.16);\n  --qubit-glow:0 0 0 1px rgba(163,230,53,.25),0 8px 32px rgba(0,0,0,.45);\n  --qubit-ease:cubic-bezier(.23,1,.32,1);\n}\n.qubit-brandmark{font-weight:800;letter-spacing:.045em}\n/* Hide the sidebar's built-in wordmark; the Qubit brand plugin renders the Qubit mark in that header slot. The mobile top bar keeps its own Qubit wordmark (no duplicate: the brand plugin slot only renders inside the sidebar header, not the lg:hidden top bar). */\ndiv.flex.h-14.shrink-0 span.text-midground.font-bold{display:none!important}\n::selection{background:rgba(163,230,53,.30);color:#fff}\nhtml{scrollbar-color:rgba(163,230,53,.35) transparent}\n*::-webkit-scrollbar{width:10px;height:10px}\n*::-webkit-scrollbar-thumb{background:rgba(163,230,53,.28);border-radius:999px;border:2px solid transparent;background-clip:padding-box}\n*::-webkit-scrollbar-thumb:hover{background:rgba(163,230,53,.45);background-clip:padding-box}\n/* Accessibility: always-visible keyboard focus, no mouse-only surprise outlines. */\n:where(a,button,[role=\"button\"],input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--qubit-lime);outline-offset:2px;border-radius:6px}\n:where(a,button,[role=\"button\"]):focus:not(:focus-visible){outline:none}\n/* Motion: purposeful easing, and fully disabled for reduced-motion users. */\n@media (prefers-reduced-motion:no-preference){\n  a,button,[role=\"button\"],.transition{transition-timing-function:var(--qubit-ease)}\n  .qubit-live-dot{animation:qubit-pulse 1.6s ease-in-out infinite}\n}\n@keyframes qubit-pulse{0%,100%{opacity:.35}50%{opacity:1}}\n@keyframes qubit-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}\n@keyframes qubit-recover{0%{transform:translateY(2px);opacity:.4}100%{transform:none;opacity:1}}\n/* Loading / streaming state. */\n[aria-busy=\"true\"],[data-state=\"loading\"],.qubit-loading{position:relative}\n[aria-busy=\"true\"]::after,[data-state=\"loading\"]::after,.qubit-loading::after{content:\"\";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,transparent,rgba(163,230,53,.10),transparent);background-size:200% 100%;animation:qubit-shimmer 1.4s linear infinite;pointer-events:none}\n/* Empty state - dashed Qubit surface, never a dead blank box. */\n[data-state=\"empty\"],.qubit-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;min-height:8rem;color:var(--color-muted-foreground);border:1px dashed var(--qubit-hairline);border-radius:var(--radius);padding:1.25rem;text-align:center}\n/* Degraded / unavailable - cyan informational rail. */\n[data-state=\"degraded\"],[data-state=\"unavailable\"],.qubit-degraded{border-left:3px solid var(--qubit-cyan);background:rgba(34,211,238,.06);padding-left:.75rem}\n/* Approval / pending confirmation - lime attention rail + glow. */\n[data-state=\"pending\"],[data-state=\"awaiting-approval\"],.qubit-approval{border-left:3px solid var(--qubit-lime);background:rgba(163,230,53,.08);box-shadow:var(--qubit-glow)}\n/* Cancellation / emergency stop - red rail. */\n[data-state=\"cancelled\"],[data-state=\"estop\"],.qubit-cancelled{border-left:3px solid #e5484d;background:rgba(229,72,77,.08)}\n/* Recovery / retry - amber rail with an entrance that respects motion settings. */\n[data-state=\"recovering\"],[data-state=\"retry\"],.qubit-recovering{border-left:3px solid #f5a524;background:rgba(245,165,36,.08);animation:qubit-recover .3s var(--qubit-ease)}\n/* Outcome chips. */\n.qubit-success{color:#4ade80}.qubit-warning{color:#f5a524}.qubit-danger{color:#e5484d}\n/* Responsive: keep desktop density, enlarge targets + text on narrow / touch. */\n@media (max-width:768px){\n  :root{--theme-base-size:15.5px}\n  aside#app-sidebar{width:min(18rem,86vw)}\n}\n@media (pointer:coarse){\n  button,[role=\"button\"],a[href],input[type=\"checkbox\"],input[type=\"radio\"],select{min-height:44px;min-width:44px}\n  nav a{padding-top:.5rem;padding-bottom:.5rem}\n}\n@media (prefers-contrast:more){\n  :root{--qubit-hairline:rgba(163,230,53,.55);--color-border:rgba(232,240,228,.45)}\n}\n@media (forced-colors:active){\n  :where(a,button,[role=\"button\"]):focus-visible{outline:2px solid Highlight}\n}\n@media (min-width:1600px){main{max-width:none}}"
+ }
+```
+
+## Rollback
+
+```sh
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-approvals/qubit-approvals.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-boards/qubit-boards.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-brand/qubit-brand.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-chat/qubit-chat.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-devices/qubit-devices.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-gateway/qubit-gateway.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-memory/qubit-memory.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-ops/qubit-ops.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-reports/qubit-reports.js
+git checkout HEAD -- frontend/hermes-qubit/plugins/qubit-runtime/qubit-runtime.js
+git checkout HEAD -- frontend/hermes-qubit/qubit-theme.json
+rm -f tests/test_dashboard_ui_parity_wave4.py docs/DASHBOARD_AUDIT_WAVE4.md docs/HERMES_SOURCE_COMPARISON.wave4.diff
+```

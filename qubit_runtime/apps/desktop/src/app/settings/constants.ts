@@ -49,7 +49,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
     prefix: 'NOUS_',
     name: 'Qubit',
     description: 'Hosted Qubit & Qubit-trained models',
-    docsUrl: 'https://github.com/cgraph-dev/qubit-voicebridge',
+    docsUrl: 'https://github.com/cgraph-dev/Qubit-AIO',
     priority: 0
   },
   {

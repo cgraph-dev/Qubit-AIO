@@ -142,7 +142,7 @@ export function makeNousCloudBackendDownError(baseUrl: string, error: unknown): 
   const err = new Error(
     `Qubit Cloud agent ${hostname} is down ` +
       `(HTTP ${serverError.statusCode}: server-side fault). ` +
-      'Check https://github.com/cgraph-dev/qubit-voicebridge for backend status, ' +
+      'Check https://github.com/cgraph-dev/Qubit-AIO for backend status, ' +
       'or switch to Local mode in Settings → Gateway. ' +
       'You can also reach out on Discord at discord.gg/Qubit Labs ' +
       'for immediate assistance. ' +

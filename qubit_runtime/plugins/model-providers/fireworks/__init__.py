@@ -34,7 +34,7 @@ fireworks = FireworksProfile(
     # Attribution headers (canonical Qubit set); via default_headers so they
     # survive switch_model and credential rotation.
     default_headers={
-        "HTTP-Referer": "https://github.com/cgraph-dev/qubit-voicebridge",
+        "HTTP-Referer": "https://github.com/cgraph-dev/Qubit-AIO",
         "X-Title": "Qubit Agent",
         "User-Agent": f"QubitAgent/{get_version_info().base_version}",
     },

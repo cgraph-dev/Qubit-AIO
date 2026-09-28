@@ -1,6 +1,6 @@
 # Contributor Quick Reference
 
-For occasional contributors and PR authors. Full developer docs: https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/developer-guide/
+For occasional contributors and PR authors. Full developer docs: https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/developer-guide/
 
 ### Project Layout
 

@@ -7,7 +7,7 @@
   <a href="https://hermes-agent.nousresearch.com/">Qubit Agent</a> | <a href="https://hermes-agent.nousresearch.com/">Qubit Desktop</a>
 </p>
 <p align="center">
-  <a href="https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
+  <a href="https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
   <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
   <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Qubit Labs"></a>
@@ -18,7 +18,7 @@
 
 **The self-improving AI agent built by [Qubit Labs](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
 
-Use any model you want — [Qubit Labs](https://portal.nousresearch.com), OpenRouter, OpenAI, your own endpoint, and [many others](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/integrations/providers). Switch with `qubit model` — no code changes, no lock-in.
+Use any model you want — [Qubit Labs](https://portal.nousresearch.com), OpenRouter, OpenAI, your own endpoint, and [many others](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/integrations/providers). Switch with `qubit model` — no code changes, no lock-in.
 
 <table>
 <tr><td><b>A real terminal interface</b></td><td>Full TUI with multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output.</td></tr>
@@ -53,10 +53,10 @@ iex (irm https://hermes-agent.nousresearch.com/install.ps1)
 The source installer delegates Python 3.14, Node.js, npm, ripgrep, FFmpeg,
 and Python dependencies to PM. If Git is absent, it stages the verified Git
 for Windows archive in Qubit' tool store. It does not replace your system Git.
-See [installation methods](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/getting-started/installation)
+See [installation methods](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/getting-started/installation)
 for the separate MSIX/App Installer package and its update ownership.
 
-> **Android / Termux:** A signed APT repository is available for aarch64 devices, with a `stable` channel (tagged releases) and a prerelease `canary` channel. The package includes Python, Node.js, and the TUI. Use the [Termux guide](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/getting-started/termux), not the desktop/server installer script.
+> **Android / Termux:** A signed APT repository is available for aarch64 devices, with a `stable` channel (tagged releases) and a prerelease `canary` channel. The package includes Python, Node.js, and the TUI. Use the [Termux guide](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/getting-started/termux), not the desktop/server installer script.
 >
 > **Windows:** Native Windows is fully supported — the PowerShell one-liner above installs everything. If you'd rather use WSL2, the Linux command works there too. Native Windows install lives under `%LOCALAPPDATA%\qubit`; WSL2 installs under `~/.hermes` as on Linux.
 
@@ -119,7 +119,7 @@ qubit update       # Update to the latest version
 qubit doctor       # Diagnose any issues
 ```
 
-📖 **[Full documentation →](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/)**
+📖 **[Full documentation →](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/)**
 
 ---
 
@@ -136,7 +136,7 @@ One command from a fresh install:
 qubit setup --portal
 ```
 
-That logs you in via OAuth, sets Qubit as your provider, and turns on the Tool Gateway. Check what's wired up any time with `qubit portal info`. Full details on the [Tool Gateway docs page](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/tool-gateway).
+That logs you in via OAuth, sets Qubit as your provider, and turns on the Tool Gateway. Check what's wired up any time with `qubit portal info`. Full details on the [Tool Gateway docs page](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/tool-gateway).
 
 You can still bring your own keys per-tool whenever you want — the gateway is per-backend, not all-or-nothing.
 
@@ -158,31 +158,31 @@ Qubit has two entry points: start the terminal UI with `qubit`, or run the gatew
 | Interrupt current work         | `Ctrl+C` or send a new message                | `/stop` or send a new message                                                    |
 | Platform-specific status       | `/platforms`                                  | `/status`, `/sethome`                                                            |
 
-For the full command lists, see the [CLI guide](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/cli) and the [Messaging Gateway guide](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/messaging).
+For the full command lists, see the [CLI guide](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/cli) and the [Messaging Gateway guide](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/messaging).
 
 ---
 
 ## Documentation
 
-All documentation lives at **[Qubit documentation](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/)**:
+All documentation lives at **[Qubit documentation](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/)**:
 
 | Section                                                                                             | What's Covered                                             |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [Quickstart](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/getting-started/quickstart)                 | Install → setup → first conversation in 2 minutes          |
-| [CLI Usage](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/cli)                              | Commands, keybindings, personalities, sessions             |
-| [Configuration](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/configuration)                | Config file, providers, models, all options                |
-| [Messaging Gateway](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/messaging)                | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant |
-| [Security](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/security)                          | Command approval, DM pairing, container isolation          |
-| [Tools & Toolsets](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/tools)            | 40+ tools, toolset system, terminal backends               |
-| [Skills System](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/skills)              | Procedural memory, Skills Hub, creating skills             |
-| [Memory](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/memory)                     | Persistent memory, user profiles, best practices           |
-| [MCP Integration](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/mcp)               | Connect any MCP server for extended capabilities           |
-| [Cron Scheduling](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/cron)              | Scheduled tasks with platform delivery                     |
-| [Context Files](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/features/context-files)       | Project context that shapes every conversation             |
-| [Architecture](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/developer-guide/architecture)             | Project structure, agent loop, key classes                 |
-| [Contributing](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/developer-guide/contributing)             | Development setup, PR process, code style                  |
-| [CLI Reference](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/cli-commands)                  | All commands and flags                                     |
-| [Environment Variables](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/reference/environment-variables) | Complete env var reference                                 |
+| [Quickstart](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/getting-started/quickstart)                 | Install → setup → first conversation in 2 minutes          |
+| [CLI Usage](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/cli)                              | Commands, keybindings, personalities, sessions             |
+| [Configuration](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/configuration)                | Config file, providers, models, all options                |
+| [Messaging Gateway](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/messaging)                | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant |
+| [Security](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/security)                          | Command approval, DM pairing, container isolation          |
+| [Tools & Toolsets](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/tools)            | 40+ tools, toolset system, terminal backends               |
+| [Skills System](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/skills)              | Procedural memory, Skills Hub, creating skills             |
+| [Memory](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/memory)                     | Persistent memory, user profiles, best practices           |
+| [MCP Integration](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/mcp)               | Connect any MCP server for extended capabilities           |
+| [Cron Scheduling](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/cron)              | Scheduled tasks with platform delivery                     |
+| [Context Files](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/features/context-files)       | Project context that shapes every conversation             |
+| [Architecture](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/developer-guide/architecture)             | Project structure, agent loop, key classes                 |
+| [Contributing](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/developer-guide/contributing)             | Development setup, PR process, code style                  |
+| [CLI Reference](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/reference/cli-commands)                  | All commands and flags                                     |
+| [Environment Variables](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/reference/environment-variables) | Complete env var reference                                 |
 
 ---
 
@@ -218,7 +218,7 @@ See `qubit claw migrate --help` for all options, or use the `openclaw-migration`
 
 ## Contributing
 
-We welcome contributions! See the [Contributing Guide](https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/developer-guide/contributing) for development setup, code style, and PR process.
+We welcome contributions! See the [Contributing Guide](https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/developer-guide/contributing) for development setup, code style, and PR process.
 
 Start with the [PM developer workflow](website/docs/reference/package-management.md#developer-workflow)
 for activation, daily use, dependency changes, and leaving the environment.

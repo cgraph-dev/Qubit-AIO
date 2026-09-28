@@ -1,7 +1,7 @@
 # Configuration, Toolsets & Voice
 
 Edit with `qubit config edit` or `qubit config set section.key value`.
-Full reference: https://github.com/cgraph-dev/qubit-voicebridge/tree/main/docs/user-guide/configuration
+Full reference: https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs/user-guide/configuration
 
 ### Config Sections (most-used keys)
 

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "fixture_id": "messaging.accounts.list",
+  "family": "messaging",
+  "command": {
+    "argv": [
+      "voicebridge",
+      "msg",
+      "account-list"
+    ],
+    "stdin": null,
+    "env": {}
+  },
+  "request": null,
+  "normalizers": [
+    "timestamp",
+    "session_token",
+    "generated_hash",
+    "product_branding"
+  ],
+  "expected": {
+    "exit_code": 0
+  },
+  "qubit": {
+    "path": "voicebridge/messaging.py:364",
+    "caller": "account_list",
+    "approval": null
+  },
+  "hermes": {
+    "path": "qubit_cli/web_routers/messaging.py:766",
+    "symbol": "get_messaging_platforms",
+    "mapping_status": "VERIFIED"
+  },
+  "openclaw": {
+    "path": "src/gateway/server-methods/channels.ts:363",
+    "symbol": "channelsHandlers",
+    "mapping_status": "VERIFIED"
+  },
+  "references": {
+    "openclaw": {
+      "kind": "cli",
+      "argv": [
+        "openclaw",
+        "channels",
+        "list",
+        "--json"
+      ],
+      "env": {},
+      "equivalent_kind": "direct_readonly",
+      "expectation": "PASS",
+      "notes": "Lists configured chat channels.",
+      "pinned_commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
+    }
+  },
+  "disposition": "PASS",
+  "notes": "Brokered messaging account inventory contract. Credentials are reference-only; sends are credential-gated and e-stop aware. Upstream hermes mapping VERIFIED against pinned commit 2237be355906fbe6065ce1815711eee52b2d646e: qubit_cli/web_routers/messaging.py:766 (get_messaging_platforms); openclaw mapping VERIFIED against pinned commit 3a9d69db306cd7f081e06254cb89c4bcc14a7107: src/gateway/server-methods/channels.ts:363 (channelsHandlers). Pinned side-effect-free reference invocation(s) declared: `openclaw channels list --json` (3a9d69db306cd7f081e06254cb89c4bcc14a7107, direct_readonly).",
+  "evidence": {
+    "voice_utterance": null,
+    "dashboard_route": null,
+    "dashboard_control": null,
+    "request_schema": {
+      "argv": [
+        "voicebridge",
+        "msg",
+        "account-list"
+      ]
+    },
+    "broker_policy_decision": "sends credential-gated and e-stop aware",
+    "runtime_provider": null,
+    "store_state_assertion": "brokered account inventory",
+    "output_event_assertion": null,
+    "error_codes": null,
+    "retry_recovery_proof": null,
+    "audit_receipt_proof": null,
+    "security_resource_proof": "credentials reference-only",
+    "package_proof": null,
+    "response_headers": null,
+    "evidence_notes": {
+      "voice_utterance": "not exposed by this fixture's surface",
+      "dashboard_route": "not exposed by this fixture's surface",
+      "dashboard_control": "not exposed by this fixture's surface",
+      "runtime_provider": "not exposed by this fixture's surface",
+      "output_event_assertion": "not exposed by this fixture's surface",
+      "error_codes": "not exposed by this fixture's surface",
+      "retry_recovery_proof": "not exposed by this fixture's surface",
+      "audit_receipt_proof": "not exposed by this fixture's surface",
+      "package_proof": "not exposed by this fixture's surface",
+      "response_headers": "not exposed by this fixture's surface"
+    }
+  }
+}

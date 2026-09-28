@@ -1620,7 +1620,7 @@ export const en: Translations = {
       sshErrHostKey:
         'The host key has CHANGED since you last connected. Verify this is expected, then run ssh-keygen -R <host> and reconnect.',
       sshErrNotInstalled:
-        'Qubit is not installed on the remote host. Install it there (curl -fsSL https://raw.githubusercontent.com/cgraph-dev/qubit-voicebridge/main/scripts/install.sh | sh) or set the Qubit path.',
+        'Qubit is not installed on the remote host. Install it there (curl -fsSL https://raw.githubusercontent.com/cgraph-dev/Qubit-AIO/main/scripts/install.sh | sh) or set the Qubit path.',
       sshErrPlatform:
         'Unsupported remote platform. Qubit Desktop SSH mode supports Linux, macOS, and Windows remote hosts.',
       sshErrTimeout: 'SSH connection timed out. The host may be unreachable or asleep.',

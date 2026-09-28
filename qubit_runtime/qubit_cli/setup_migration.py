@@ -131,19 +131,31 @@ def _skip_configured_section(config: dict, section_key: str, label: str) -> bool
     return not prompt_yes_no(f"  Reconfigure {label.lower()}?", default=False)
 
 
-# ── OpenClaw Migration ──
-
+# ── Qubit Migration (owner decision #21) ──
+# `qubit-migration` is the canonical migration skill; the retired
+# `openclaw-migration` frame is a read-old compatibility alias only (never
+# deleted), consulted only when no canonical copy exists.
 _OPENCLAW_SCRIPT = (
+    get_optional_skills_dir(PROJECT_ROOT / "optional-skills")
+    / "migration" / "qubit-migration" / "scripts" / "openclaw_to_hermes.py"
+)
+_LEGACY_OPENCLAW_SCRIPT = (
     get_optional_skills_dir(PROJECT_ROOT / "optional-skills")
     / "migration" / "openclaw-migration" / "scripts" / "openclaw_to_hermes.py"
 )
 
 
+def _migration_script_path() -> Optional[Path]:
+    """Canonical `qubit-migration` script, else the retired frame; None if absent."""
+    return next((p for p in (_OPENCLAW_SCRIPT, _LEGACY_OPENCLAW_SCRIPT) if p.exists()), None)
+
+
 def _load_openclaw_migration_module():
     """Load the openclaw_to_hermes migration script as a module; None if it can't be loaded."""
-    if not _OPENCLAW_SCRIPT.exists():
+    script = _migration_script_path()
+    if script is None:
         return None
-    spec = importlib.util.spec_from_file_location("openclaw_to_hermes", _OPENCLAW_SCRIPT)
+    spec = importlib.util.spec_from_file_location("openclaw_to_hermes", script)
     if spec is None or spec.loader is None:
         return None
     mod = importlib.util.module_from_spec(spec)
@@ -259,7 +271,7 @@ def _offer_openclaw_migration(qubit_home: Path) -> bool:
         save_config
     )
     openclaw_dir = Path.home() / ".openclaw"
-    if not openclaw_dir.is_dir() or not _OPENCLAW_SCRIPT.exists():
+    if not openclaw_dir.is_dir() or _migration_script_path() is None:
         return False
     print_header("OpenClaw Installation Detected", gap=True)
     _info(f"Found OpenClaw data at {openclaw_dir}",

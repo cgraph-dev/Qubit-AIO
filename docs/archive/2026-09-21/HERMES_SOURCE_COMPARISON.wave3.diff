@@ -1,0 +1,234 @@
+# HERMES_SOURCE_COMPARISON — Wave 3 (agent C: dashboard pages + plugin tabs)
+
+Status: **PENDING MERGE** — agent F / orchestrator owns
+`docs/HERMES_SOURCE_COMPARISON.json`; this file holds the exact patch entries
+for the Wave 3 frontend plugin-fleet work so they can be merged without an
+agent C edit to the JSON.
+
+Upstream pin: `2237be355906fbe6065ce1815711eee52b2d646e` (tag `v2026.9.7`,
+MIT, Copyright (c) 2025 Nous Research).
+Baseline: `frontend/hermes-web/src/plugins/*` was byte-identical to upstream
+`web/src/plugins/*` before this change (see the existing rows in
+`docs/HERMES_SOURCE_COMPARISON.json`).
+
+## Rows to append to `docs/HERMES_SOURCE_COMPARISON.json` → `rows[]`
+
+```json
+[
+  {
+    "scope": "hermes-agent/web",
+    "category": "dashboard",
+    "upstream": "web/src/plugins/usePlugins.ts",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "9e5eb67012f67a2e21b5684160c86c504dbbf91c90753b0aff2611420c0f0f52",
+    "qubit": "frontend/hermes-web/src/plugins/usePlugins.ts",
+    "qubit_sha256": "2b9e339a98b7c36c719d4f3ef36654b738bc1fdc45cfee6a4884c501e1534d83",
+    "patch": "wave3/usePlugins-static-fleet",
+    "reason": "Merge the SPA-shipped static plugin fleet (pinned achievements + kanban manifests) with the compat overlay manifests the Qubit backend advertises, and resolve each manifest's entry/css bundles against its assetBase (fleet bundles ship under <base>/plugins/<name>; overlay bundles keep <base>/dashboard-plugins/<name>). Backend + auth behaviour unchanged (SDK fetch/ws helpers still apply the base path and session token). Regression: tests/test_dashboard_plugin_fleet.py."
+  },
+  {
+    "scope": "hermes-agent/web",
+    "category": "dashboard",
+    "upstream": "web/src/plugins/types.ts",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "be44d4d046e335ee34a696cc13177a78807cf25f67f2347c7fcaab9085640942",
+    "qubit": "frontend/hermes-web/src/plugins/types.ts",
+    "qubit_sha256": "75d4f2e8d8cd1e7d76716804690f5d78d66378a74901f948676215f43c6138f8",
+    "patch": "wave3/plugins-manifest-assetBase",
+    "reason": "Add the optional PluginManifest.assetBase field consumed by usePlugins for static fleet bundles; when absent the host keeps the upstream overlay asset root. Regression: tests/test_dashboard_plugin_fleet.py."
+  },
+  {
+    "scope": "hermes-agent/web",
+    "category": "dashboard",
+    "upstream": "web/src/plugins/index.ts",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "f393530f9a2f7113f80d802b0ff0e71d46935d527108cd7550b6983bf16bf10d",
+    "qubit": "frontend/hermes-web/src/plugins/index.ts",
+    "qubit_sha256": "acf2d286e924ab280450d586b2b0f8192a32eeafcb231b7c2a3290ef5315979f",
+    "patch": "wave3/plugins-fleet-exports",
+    "reason": "Re-export the new fleet discovery helpers from the plugin barrel. Regression: tests/test_dashboard_plugin_fleet.py."
+  },
+  {
+    "scope": "hermes-agent/web",
+    "category": "dashboard",
+    "upstream": null,
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": null,
+    "qubit": "frontend/hermes-web/src/plugins/fleet.ts",
+    "qubit_sha256": "acce8c2f3ae1b285413c21c8c0f63c662b03db73b58d903455213a57fca848c5",
+    "patch": "wave3/QUBIT_ADDED",
+    "reason": "Qubit-added static plugin-fleet discovery: fetch <base>/plugins/fleet.json (SPA-shipped manifests) and resolve each manifest's asset root. Keeps the vendored compatibility backend as the operation authority while surfacing the real pinned plugin tabs."
+  },
+  {
+    "scope": "hermes-agent/plugins",
+    "category": "dashboard",
+    "upstream": "plugins/hermes-achievements/dashboard/dist/index.js",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010",
+    "qubit": "frontend/hermes-web/public/plugins/hermes-achievements/dist/index.js",
+    "qubit_sha256": "0ea5a80415ce7ee66b6910d75a36aede0278f1ace63ae22617aa9105b8e4d010",
+    "patch": "wave3/QUBIT_ADDED:byte-identical",
+    "reason": "Vendored pinned achievements dashboard bundle copied byte-identical into the SPA static root so the real plugin tab loads; the bundle calls the Qubit compat plugin API (/api/plugins/hermes-achievements/*) through the SDK base-path/auth helpers. MIT notice retained in the bundle header."
+  },
+  {
+    "scope": "hermes-agent/plugins",
+    "category": "dashboard",
+    "upstream": "plugins/hermes-achievements/dashboard/dist/style.css",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
+    "qubit": "frontend/hermes-web/public/plugins/hermes-achievements/dist/style.css",
+    "qubit_sha256": "7033c780b78734082d991f2fecd7aa4f030e4ed206f6c301e6a13292c8b7e08b",
+    "patch": "wave3/QUBIT_ADDED:byte-identical",
+    "reason": "Vendored pinned achievements stylesheet copied byte-identical into the SPA static root."
+  },
+  {
+    "scope": "hermes-agent/plugins",
+    "category": "dashboard",
+    "upstream": "plugins/kanban/dashboard/dist/index.js",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "61143313ba6ff6529f9a62cc2a615851a45c29f87db17b009392bad6f3fe1c6c",
+    "qubit": "frontend/hermes-web/public/plugins/kanban/dist/index.js",
+    "qubit_sha256": "61143313ba6ff6529f9a62cc2a615851a45c29f87db17b009392bad6f3fe1c6c",
+    "patch": "wave3/QUBIT_ADDED:byte-identical",
+    "reason": "Vendored pinned kanban dashboard bundle copied byte-identical into the SPA static root; reads hit the Qubit compat plugin API and writes stay behind the KANBAN_WRITE_BROKERED gate. MIT notice retained in the bundle header."
+  },
+  {
+    "scope": "hermes-agent/plugins",
+    "category": "dashboard",
+    "upstream": "plugins/kanban/dashboard/dist/style.css",
+    "upstream_rev": "2237be355906fbe6065ce1815711eee52b2d646e",
+    "upstream_sha256": "35b4a8088f3ebd478ae7326cf476eab513d0bf40397463a16fa7c213d62269fe",
+    "qubit": "frontend/hermes-web/public/plugins/kanban/dist/style.css",
+    "qubit_sha256": "35b4a8088f3ebd478ae7326cf476eab513d0bf40397463a16fa7c213d62269fe",
+    "patch": "wave3/QUBIT_ADDED:byte-identical",
+    "reason": "Vendored pinned kanban stylesheet copied byte-identical into the SPA static root."
+  }
+]
+```
+
+`frontend/hermes-web/public/plugins/fleet.json`
+(sha256 `1d92e5557a8ed3dd3e1e8be594a103eb3f7c504571346579831944727642ba02`)
+is a Qubit-authored manifest aggregate mirroring the two pinned dashboard
+manifests (tab paths/positions, entry, css) with a Qubit-neutral description.
+It is verified against the pinned manifests by
+`tests/test_dashboard_plugin_fleet.py::test_static_fleet_manifest_mirrors_pinned_plugins`.
+
+## `git diff` of the patched vendored source
+
+```diff
+diff --git a/frontend/hermes-web/src/plugins/index.ts b/frontend/hermes-web/src/plugins/index.ts
+index da9c1bde..c5532442 100644
+--- a/frontend/hermes-web/src/plugins/index.ts
++++ b/frontend/hermes-web/src/plugins/index.ts
+@@ -1,6 +1,7 @@
+ export { exposePluginSDK, getPluginComponent, onPluginRegistered, getRegisteredCount } from "./registry";
+ export { PluginPage } from "./PluginPage";
+ export { usePlugins } from "./usePlugins";
++export { loadFleetManifests, pluginAssetRoot, FLEET_MANIFEST_PATH } from "./fleet";
+ export { PluginSlot, KNOWN_SLOT_NAMES, registerSlot, getSlotEntries, onSlotRegistered, unregisterPluginSlots } from "./slots";
+ export type { KnownSlotName } from "./slots";
+ export type { PluginManifest, RegisteredPlugin } from "./types";
+diff --git a/frontend/hermes-web/src/plugins/types.ts b/frontend/hermes-web/src/plugins/types.ts
+index 51fecffb..c79b09d5 100644
+--- a/frontend/hermes-web/src/plugins/types.ts
++++ b/frontend/hermes-web/src/plugins/types.ts
+@@ -29,6 +29,13 @@ export interface PluginManifest {
+    */
+   integrity?: string;
+   source: string;
++  /**
++   * Dashboard-relative asset root for the plugin's ``entry``/``css`` files.
++   * When omitted, the host loads them from the compat overlay root
++   * (``/dashboard-plugins/<name>``). Static fleet plugins ship their bundles
++   * inside the served SPA and set this to e.g. ``/plugins/<name>``.
++   */
++  assetBase?: string;
+ }
+ 
+ export interface RegisteredPlugin {
+diff --git a/frontend/hermes-web/src/plugins/usePlugins.ts b/frontend/hermes-web/src/plugins/usePlugins.ts
+index f03a0698..89c5b142 100644
+--- a/frontend/hermes-web/src/plugins/usePlugins.ts
++++ b/frontend/hermes-web/src/plugins/usePlugins.ts
+@@ -16,6 +16,7 @@ import {
+   notifyPluginRegistry,
+   setPluginLoadError,
+ } from "./registry";
++import { loadFleetManifests, pluginAssetRoot } from "./fleet";
+ 
+ export const MANIFEST_CACHE_KEY = "hermes:plugin-manifests";
+ 
+@@ -82,15 +83,33 @@ export function usePlugins() {
+   // Always re-fetch in the background to keep the cache fresh.
+   // This handles: new plugins added, plugins removed, manifest changes.
+   // setManifests(list) will update routes if the server list differs from cache.
++  // The SPA-shipped static fleet (pinned plugin tabs) merges with the compat
++  // overlay manifests the backend advertises; same-name entries never double.
+   useEffect(() => {
+-    api
+-      .getPlugins()
+-      .then((list) => {
+-        cacheManifests(list);
+-        setManifests(list);
+-        if (list.length === 0) setLoading(false);
++    let alive = true;
++    const apply = (apiList: PluginManifest[], fleet: PluginManifest[]) => {
++      const byName = new Map<string, PluginManifest>();
++      for (const m of [...fleet, ...apiList]) {
++        if (!byName.has(m.name)) byName.set(m.name, m);
++      }
++      const list = [...byName.values()];
++      cacheManifests(list);
++      setManifests(list);
++      if (list.length === 0) setLoading(false);
++    };
++    Promise.all([
++      api.getPlugins().catch(() => [] as PluginManifest[]),
++      loadFleetManifests(),
++    ])
++      .then(([apiList, fleet]) => {
++        if (alive) apply(apiList, fleet);
+       })
+-      .catch(() => setLoading(false));
++      .catch(() => {
++        if (alive) setLoading(false);
++      });
++    return () => {
++      alive = false;
++    };
+   }, []);
+ 
+   // Load plugin assets when manifests arrive.
+@@ -100,9 +119,12 @@ export function usePlugins() {
+     const injectedScripts: HTMLScriptElement[] = [];
+ 
+     for (const manifest of manifests) {
++      // Static fleet plugins ship inside the served SPA (`/plugins/<name>`);
++      // compat overlay plugins are served by the backend overlay root.
++      const assetRoot = `${HERMES_BASE_PATH}${pluginAssetRoot(manifest)}`;
+       // Inject CSS if specified.
+       if (manifest.css) {
+-        const cssUrl = `${HERMES_BASE_PATH}/dashboard-plugins/${manifest.name}/${manifest.css}`;
++        const cssUrl = `${assetRoot}/${manifest.css}`;
+         if (!document.querySelector(`link[href="${cssUrl}"]`)) {
+           const link = document.createElement("link");
+           link.rel = "stylesheet";
+@@ -114,7 +136,7 @@ export function usePlugins() {
+       // Load JS bundle. In dev, cache-bust so Vite HMR can clear the
+       // in-memory registry while the browser would otherwise never
+       // re-execute a previously cached <script> URL.
+-      const baseUrl = `${HERMES_BASE_PATH}/dashboard-plugins/${manifest.name}/${manifest.entry}`;
++      const baseUrl = `${assetRoot}/${manifest.entry}`;
+       const scriptSrc = import.meta.env.DEV
+         ? `${baseUrl}?hermes_dv=${Date.now()}`
+         : baseUrl;
+```
+
+## Rollback
+
+- Revert the three source files to their byte-identical upstream content:
+  `git checkout HEAD -- frontend/hermes-web/src/plugins/usePlugins.ts frontend/hermes-web/src/plugins/types.ts frontend/hermes-web/src/plugins/index.ts`
+- Delete the Qubit-added assets:
+  `rm -rf frontend/hermes-web/src/plugins/fleet.ts frontend/hermes-web/public/plugins`
+- Delete the regression test: `rm tests/test_dashboard_plugin_fleet.py`
+- Rebuild: `cd frontend/hermes-web && npx vite build --base=/hermes/ --outDir ../hermes-dist --emptyOutDir`

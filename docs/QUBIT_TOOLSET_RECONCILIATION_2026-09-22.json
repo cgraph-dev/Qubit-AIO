@@ -1,0 +1,1035 @@
+{
+  "counts": {
+    "hermes": 60,
+    "qubit": 60,
+    "shared": 60
+  },
+  "dispositions": {
+    "connections": {
+      "kind": "toolset",
+      "qubit_mapping": {
+        "local_mcp_half": {
+          "note": "install/enable/authorize are implemented canonically for CLI and dashboard (confirm-gated /api/mcp/*), and as the desktop-only setup_mcp tool. Not exposed as a model toolset for non-desktop sessions, so a migrated platform_toolsets entry named 'connections' resolves zero tools.",
+          "qubit_names": [
+            "McpPage.tsx",
+            "voicebridge/qubit_compat.py: h_mcp_servers / mcp_create / mcp_set_enabled / mcp_auth / h_mcp_catalog_live",
+            "qubit_runtime/qubit_cli/mcp_config.py",
+            "qubit_runtime/qubit_cli/mcp_catalog.py",
+            "qubit_runtime/tools/setup_mcp_tool.py (setup_mcp, desktop only)"
+          ],
+          "status": "SAFE_EQUIVALENT"
+        },
+        "managed_connector_half": {
+          "prerequisite": "external Qubit/Hermes tool-gateway service + account auth",
+          "reason": "status/connect/reconnect require the upstream tool gateway (gateway.sock / portal account authorization) that Qubit deliberately does not run; no local counterpart exists.",
+          "status": "OPERATOR_ONLY"
+        }
+      },
+      "qubit_name": null,
+      "status": "OPEN_PARTIAL",
+      "upstream_definition": {
+        "actions_managed": [
+          "status",
+          "connect",
+          "reconnect"
+        ],
+        "actions_mcp": [
+          "install",
+          "enable",
+          "authorize"
+        ],
+        "backing_module": "hermes-agent/tools/connectors/",
+        "description": "Remote connector discovery, execution, and account authorization",
+        "file": "hermes-agent/toolsets.py",
+        "tools": [
+          "manage_connections"
+        ]
+      },
+      "upstream_name": "connections"
+    },
+    "moa": {
+      "config_only": true,
+      "kind": "not_a_toolset",
+      "note": "'moa' appears in the live ~/.hermes platform_toolsets.cli list but is absent from both TOOLSETS dicts; Hermes _get_platform_tools('cli') drops it. It is the virtual Mixture-of-Agents provider, not a toolset.",
+      "qubit_mapping": {
+        "qubit_names": [
+          "qubit_runtime/qubit_cli/moa_config.py",
+          "qubit_runtime/qubit_cli/providers.py (moa virtual provider)"
+        ],
+        "status": "SAFE_EQUIVALENT"
+      },
+      "qubit_name": "moa",
+      "status": "NOT_A_TOOLSET",
+      "upstream_evidence": [
+        "hermes-agent/hermes_cli/providers.py: 'moa': HermesOverlay(auth_type='virtual', base_url_override='moa://local')",
+        "hermes-agent/hermes_cli/commands.py: CommandDef('moa', ...)",
+        "hermes-agent/hermes_cli/tools_config.py: no 'moa' entry in CONFIGURABLE_TOOLSETS"
+      ],
+      "upstream_name": "moa"
+    }
+  },
+  "generated": "2026-09-22",
+  "hermes_only": [],
+  "hermes_toolset_detail": {
+    "bot_room": {
+      "description": "Verified text-only Group Chat turn capabilities",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "browser": {
+      "description": "Browser automation for web interaction (navigate, click, type, scroll, iframes, hold-click)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "clarify": {
+      "description": "Ask the user clarifying questions (multiple-choice or open-ended)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "clarify"
+      ]
+    },
+    "code_execution": {
+      "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "execute_code"
+      ]
+    },
+    "coding": {
+      "description": "Coding-focused toolset: files, terminal, search, web docs, skills, todo, delegate, vision, browser",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "computer_use": {
+      "description": "Background desktop control via cua-driver (macOS/Windows/Linux) — screenshots, mouse, keyboard, scroll, drag. Does NOT steal the user's cursor or keyboard focus. Works with any tool-capable model.",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "computer_use"
+      ]
+    },
+    "connections": {
+      "description": "Remote connector discovery, execution, and account authorization",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "manage_connections"
+      ]
+    },
+    "context_engine": {
+      "description": "Runtime tools exposed by the active context engine",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "cronjob": {
+      "description": "Cronjob management tool - create, list, update, pause, resume, remove, and trigger scheduled tasks",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "cronjob_manage"
+      ]
+    },
+    "debugging": {
+      "description": "Debugging and troubleshooting toolkit",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "process_manage",
+        "terminal"
+      ]
+    },
+    "delegation": {
+      "description": "Spawn subagents with isolated context for complex subtasks",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "delegate_task"
+      ]
+    },
+    "desktop_ui": {
+      "description": "Desktop GUI affordances — in-app terminal/browser panes, pane focus, reactions (GUI sessions only)",
+      "includes": [],
+      "tool_count": 10,
+      "tools": [
+        "annotate_preview",
+        "close_terminal",
+        "desktop_preview",
+        "drive_preview",
+        "focus_pane",
+        "gui_tour",
+        "react_to_message",
+        "read_terminal",
+        "read_window_below",
+        "show_tip"
+      ]
+    },
+    "discord": {
+      "description": "Discord read and participate tools (fetch messages, search members, create threads)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "discord"
+      ]
+    },
+    "discord_admin": {
+      "description": "Discord server management (list channels/roles, pin messages, assign roles)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "discord_admin"
+      ]
+    },
+    "feishu_doc": {
+      "description": "Read Feishu/Lark document content",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "feishu_doc_read"
+      ]
+    },
+    "feishu_drive": {
+      "description": "Feishu/Lark document comment operations (list, reply, add)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "file": {
+      "description": "File manipulation tools: read, write, patch (with fuzzy matching), and search (content + files)",
+      "includes": [],
+      "tool_count": 4,
+      "tools": [
+        "patch",
+        "read_file",
+        "search_files",
+        "write_file"
+      ]
+    },
+    "hermes-acp": {
+      "description": "Editor integration (VS Code, Zed, JetBrains) — coding-focused tools without messaging, audio, or clarify UI",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-api-server": {
+      "description": "OpenAI-compatible API server — full agent tools accessible via HTTP (no interactive UI tools like clarify or send_message)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-bluebubbles": {
+      "description": "BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-cli": {
+      "description": "Full interactive CLI toolset - all default tools plus cronjob management",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-cron": {
+      "description": "Default cron toolset - same core tools as hermes-cli; gated by `hermes tools`",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-dingtalk": {
+      "description": "DingTalk bot toolset - enterprise messaging platform (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-discord": {
+      "description": "Discord bot toolset - full access (terminal has safety checks via dangerous command approval)",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "discord",
+        "discord_admin"
+      ]
+    },
+    "hermes-email": {
+      "description": "Email bot toolset - interact with Hermes via email (IMAP/SMTP)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-feishu": {
+      "description": "Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-gateway": {
+      "description": "Gateway toolset - union of all messaging platform tools",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-homeassistant": {
+      "description": "Home Assistant bot toolset - smart home event monitoring and control",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-matrix": {
+      "description": "Matrix bot toolset - decentralized encrypted messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-mattermost": {
+      "description": "Mattermost bot toolset - self-hosted team messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-qqbot": {
+      "description": "QQBot toolset - QQ messaging via Official Bot API v2 (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-signal": {
+      "description": "Signal bot toolset - encrypted messaging platform (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-slack": {
+      "description": "Slack bot toolset - full access for workspace use (terminal has safety checks)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-sms": {
+      "description": "SMS bot toolset - interact with Hermes via SMS (Twilio)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-telegram": {
+      "description": "Telegram bot toolset - full access for personal use (terminal has safety checks)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-webhook": {
+      "description": "Webhook toolset - receive and process external webhook events",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-wecom": {
+      "description": "WeCom bot toolset - enterprise WeChat messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-wecom-callback": {
+      "description": "WeCom callback toolset - enterprise self-built app messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-weixin": {
+      "description": "Weixin bot toolset - personal WeChat messaging via iLink (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-whatsapp": {
+      "description": "WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-yuanbao": {
+      "description": "",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "homeassistant": {
+      "description": "Home Assistant smart home control and monitoring",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "image_gen": {
+      "description": "Creative generation tools (images)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "image_generate"
+      ]
+    },
+    "kanban": {
+      "description": "Kanban multi-agent coordination — only active when the agent is spawned by the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs inside the gateway by default; see `kanban.dispatch_in_gateway` in config.yaml. Lets workers mark tasks done with structured handoffs, enter first-class review (request_review — not a block), return review changes, block for human input, heartbeat during long ops, comment on threads, attach files, and (for orchestrators) list, unblock, and fan out tasks.",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "memory": {
+      "description": "Persistent memory across sessions (personal notes + user profile)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "memory"
+      ]
+    },
+    "project": {
+      "description": "Desktop Projects — create/switch named workspaces (GUI sessions only)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "desktop_project"
+      ]
+    },
+    "safe": {
+      "description": "Safe toolkit without terminal access",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "search": {
+      "description": "Web search only (no content extraction/scraping)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "web_search"
+      ]
+    },
+    "session_search": {
+      "description": "Search and recall past conversations with summarization",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "session_search"
+      ]
+    },
+    "skills": {
+      "description": "Access, create, edit, and manage skill documents with specialized instructions and knowledge",
+      "includes": [],
+      "tool_count": 3,
+      "tools": [
+        "skill_manage",
+        "skill_view",
+        "skills_list"
+      ]
+    },
+    "spotify": {
+      "description": "Native Spotify playback, search, playlist, album, and library tools",
+      "includes": [],
+      "tool_count": 7,
+      "tools": [
+        "spotify_albums",
+        "spotify_devices",
+        "spotify_library",
+        "spotify_playback",
+        "spotify_playlists",
+        "spotify_queue",
+        "spotify_search"
+      ]
+    },
+    "terminal": {
+      "description": "Terminal/command execution and process management tools",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "process_manage",
+        "terminal"
+      ]
+    },
+    "todo": {
+      "description": "Task planning and tracking for multi-step work",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "todo_list"
+      ]
+    },
+    "tts": {
+      "description": "Text-to-speech: convert text to audio with Edge TTS (free), ElevenLabs, OpenAI, or xAI",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "text_to_speech"
+      ]
+    },
+    "video": {
+      "description": "Video analysis and understanding tools (opt-in, not in default toolset)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "video_analyze"
+      ]
+    },
+    "video_gen": {
+      "description": "Video generation tools. Single ``video_generate`` tool covers text-to-video (prompt only) and image-to-video (prompt + image_url), plus reference-to-video. Provider-specific edit/extend workflows may appear as separate tools. Configure via ``hermes tools`` → Video Generation.",
+      "includes": [],
+      "tool_count": 3,
+      "tools": [
+        "video_generate",
+        "xai_video_edit",
+        "xai_video_extend"
+      ]
+    },
+    "vision": {
+      "description": "Image analysis and vision tools",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "vision_analyze"
+      ]
+    },
+    "web": {
+      "description": "Web research and content extraction tools",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "web_extract",
+        "web_search"
+      ]
+    },
+    "x_search": {
+      "description": "Search X (Twitter) posts and threads via xAI's built-in x_search Responses tool. Read-only public X discovery; use the xurl skill for authenticated X API reads and account actions. Available when xAI credentials are configured (SuperGrok OAuth or XAI_API_KEY). Off by default; enable in `hermes tools` → X (Twitter) Search.",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "x_search"
+      ]
+    },
+    "yuanbao": {
+      "description": "Yuanbao platform tools - group info, member queries, DM, stickers",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    }
+  },
+  "notes": [
+    "Mechanical diff only; name equality is not behavioral parity.",
+    "Dispositions are curated editorial annotations with cited evidence.",
+    "No Hermes config secrets are read or emitted by this generator."
+  ],
+  "qubit_only": [],
+  "qubit_toolset_detail": {
+    "bot_room": {
+      "description": "Verified text-only Group Chat turn capabilities",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "browser": {
+      "description": "Browser automation for web interaction (navigate, click, type, scroll, iframes, hold-click)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "clarify": {
+      "description": "Ask the user clarifying questions (multiple-choice or open-ended)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "clarify"
+      ]
+    },
+    "code_execution": {
+      "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "execute_code"
+      ]
+    },
+    "coding": {
+      "description": "Coding-focused toolset: files, terminal, search, web docs, skills, todo, delegate, vision, browser",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "computer_use": {
+      "description": "Background desktop control via cua-driver (macOS/Windows/Linux) — screenshots, mouse, keyboard, scroll, drag. Does NOT steal the user's cursor or keyboard focus. Works with any tool-capable model.",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "computer_use"
+      ]
+    },
+    "connections": {
+      "description": "Remote connector discovery, execution, and account authorization",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "manage_connections"
+      ]
+    },
+    "context_engine": {
+      "description": "Runtime tools exposed by the active context engine",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "cronjob": {
+      "description": "Cronjob management tool - create, list, update, pause, resume, remove, and trigger scheduled tasks",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "cronjob_manage"
+      ]
+    },
+    "debugging": {
+      "description": "Debugging and troubleshooting toolkit",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "process_manage",
+        "terminal"
+      ]
+    },
+    "delegation": {
+      "description": "Spawn subagents with isolated context for complex subtasks",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "delegate_task"
+      ]
+    },
+    "desktop_ui": {
+      "description": "Desktop GUI affordances — in-app terminal/browser panes, pane focus, reactions (GUI sessions only)",
+      "includes": [],
+      "tool_count": 11,
+      "tools": [
+        "annotate_preview",
+        "close_terminal",
+        "desktop_preview",
+        "drive_preview",
+        "focus_pane",
+        "gui_tour",
+        "react_to_message",
+        "read_terminal",
+        "read_window_below",
+        "setup_mcp",
+        "show_tip"
+      ]
+    },
+    "discord": {
+      "description": "Discord read and participate tools (fetch messages, search members, create threads)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "discord"
+      ]
+    },
+    "discord_admin": {
+      "description": "Discord server management (list channels/roles, pin messages, assign roles)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "discord_admin"
+      ]
+    },
+    "feishu_doc": {
+      "description": "Read Feishu/Lark document content",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "feishu_doc_read"
+      ]
+    },
+    "feishu_drive": {
+      "description": "Feishu/Lark document comment operations (list, reply, add)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "file": {
+      "description": "File manipulation tools: read, write, patch (with fuzzy matching), and search (content + files)",
+      "includes": [],
+      "tool_count": 4,
+      "tools": [
+        "patch",
+        "read_file",
+        "search_files",
+        "write_file"
+      ]
+    },
+    "hermes-acp": {
+      "description": "Editor integration (VS Code, Zed, JetBrains) — coding-focused tools without messaging, audio, or clarify UI",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-api-server": {
+      "description": "OpenAI-compatible API server — full agent tools accessible via HTTP (no interactive UI tools like clarify or send_message)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-bluebubbles": {
+      "description": "BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-cli": {
+      "description": "Full interactive CLI toolset - all default tools plus cronjob management",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-cron": {
+      "description": "Default cron toolset - same core tools as hermes-cli; gated by `qubit tools`",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-dingtalk": {
+      "description": "DingTalk bot toolset - enterprise messaging platform (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-discord": {
+      "description": "Discord bot toolset - full access (terminal has safety checks via dangerous command approval)",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "discord",
+        "discord_admin"
+      ]
+    },
+    "hermes-email": {
+      "description": "Email bot toolset - interact with Qubit via email (IMAP/SMTP)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-feishu": {
+      "description": "Feishu/Lark bot toolset - enterprise messaging via Feishu/Lark (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-gateway": {
+      "description": "Gateway toolset - union of all messaging platform tools",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-homeassistant": {
+      "description": "Home Assistant bot toolset - smart home event monitoring and control",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-matrix": {
+      "description": "Matrix bot toolset - decentralized encrypted messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-mattermost": {
+      "description": "Mattermost bot toolset - self-hosted team messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-qqbot": {
+      "description": "QQBot toolset - QQ messaging via Official Bot API v2 (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-signal": {
+      "description": "Signal bot toolset - encrypted messaging platform (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-slack": {
+      "description": "Slack bot toolset - full access for workspace use (terminal has safety checks)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-sms": {
+      "description": "SMS bot toolset - interact with Qubit via SMS (Twilio)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-telegram": {
+      "description": "Telegram bot toolset - full access for personal use (terminal has safety checks)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-webhook": {
+      "description": "Webhook toolset - receive and process external webhook events",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-wecom": {
+      "description": "WeCom bot toolset - enterprise WeChat messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-wecom-callback": {
+      "description": "WeCom callback toolset - enterprise self-built app messaging (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-weixin": {
+      "description": "Weixin bot toolset - personal WeChat messaging via iLink (full access)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-whatsapp": {
+      "description": "WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "hermes-yuanbao": {
+      "description": "",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "homeassistant": {
+      "description": "Home Assistant smart home control and monitoring",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "image_gen": {
+      "description": "Creative generation tools (images)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "image_generate"
+      ]
+    },
+    "kanban": {
+      "description": "Kanban multi-agent coordination — only active when the agent is spawned by the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs inside the gateway by default; see `kanban.dispatch_in_gateway` in config.yaml. Lets workers mark tasks done with structured handoffs, enter first-class review (request_review — not a block), return review changes, block for human input, heartbeat during long ops, comment on threads, attach files, and (for orchestrators) list, unblock, and fan out tasks.",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "memory": {
+      "description": "Persistent memory across sessions (personal notes + user profile)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "memory"
+      ]
+    },
+    "project": {
+      "description": "Desktop Projects — create/switch named workspaces (GUI sessions only)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "desktop_project"
+      ]
+    },
+    "safe": {
+      "description": "Safe toolkit without terminal access",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    },
+    "search": {
+      "description": "Web search only (no content extraction/scraping)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "web_search"
+      ]
+    },
+    "session_search": {
+      "description": "Search and recall past conversations with summarization",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "session_search"
+      ]
+    },
+    "skills": {
+      "description": "Access, create, edit, and manage skill documents with specialized instructions and knowledge",
+      "includes": [],
+      "tool_count": 3,
+      "tools": [
+        "skill_manage",
+        "skill_view",
+        "skills_list"
+      ]
+    },
+    "spotify": {
+      "description": "Native Spotify playback, search, playlist, album, and library tools",
+      "includes": [],
+      "tool_count": 7,
+      "tools": [
+        "spotify_albums",
+        "spotify_devices",
+        "spotify_library",
+        "spotify_playback",
+        "spotify_playlists",
+        "spotify_queue",
+        "spotify_search"
+      ]
+    },
+    "terminal": {
+      "description": "Terminal/command execution and process management tools",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "process_manage",
+        "terminal"
+      ]
+    },
+    "todo": {
+      "description": "Task planning and tracking for multi-step work",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "todo_list"
+      ]
+    },
+    "tts": {
+      "description": "Text-to-speech: convert text to audio with Edge TTS (free), ElevenLabs, OpenAI, or xAI",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "text_to_speech"
+      ]
+    },
+    "video": {
+      "description": "Video analysis and understanding tools (opt-in, not in default toolset)",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "video_analyze"
+      ]
+    },
+    "video_gen": {
+      "description": "Video generation tools. Single ``video_generate`` tool covers text-to-video (prompt only) and image-to-video (prompt + image_url), plus reference-to-video. Provider-specific edit/extend workflows may appear as separate tools. Configure via ``qubit tools`` → Video Generation.",
+      "includes": [],
+      "tool_count": 3,
+      "tools": [
+        "video_generate",
+        "xai_video_edit",
+        "xai_video_extend"
+      ]
+    },
+    "vision": {
+      "description": "Image analysis and vision tools",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "vision_analyze"
+      ]
+    },
+    "web": {
+      "description": "Web research and content extraction tools",
+      "includes": [],
+      "tool_count": 2,
+      "tools": [
+        "web_extract",
+        "web_search"
+      ]
+    },
+    "x_search": {
+      "description": "Search X (Twitter) posts and threads via xAI's built-in x_search Responses tool. Read-only public X discovery; use the xurl skill for authenticated X API reads and account actions. Available when xAI credentials are configured (SuperGrok OAuth or XAI_API_KEY). Off by default; enable in `qubit tools` → X (Twitter) Search.",
+      "includes": [],
+      "tool_count": 1,
+      "tools": [
+        "x_search"
+      ]
+    },
+    "yuanbao": {
+      "description": "Yuanbao platform tools - group info, member queries, DM, stickers",
+      "includes": [],
+      "tool_count": 0,
+      "tools": []
+    }
+  },
+  "schema": "qubit.toolset_reconciliation/1",
+  "shared_names": [
+    "bot_room",
+    "browser",
+    "clarify",
+    "code_execution",
+    "coding",
+    "computer_use",
+    "connections",
+    "context_engine",
+    "cronjob",
+    "debugging",
+    "delegation",
+    "desktop_ui",
+    "discord",
+    "discord_admin",
+    "feishu_doc",
+    "feishu_drive",
+    "file",
+    "hermes-acp",
+    "hermes-api-server",
+    "hermes-bluebubbles",
+    "hermes-cli",
+    "hermes-cron",
+    "hermes-dingtalk",
+    "hermes-discord",
+    "hermes-email",
+    "hermes-feishu",
+    "hermes-gateway",
+    "hermes-homeassistant",
+    "hermes-matrix",
+    "hermes-mattermost",
+    "hermes-qqbot",
+    "hermes-signal",
+    "hermes-slack",
+    "hermes-sms",
+    "hermes-telegram",
+    "hermes-webhook",
+    "hermes-wecom",
+    "hermes-wecom-callback",
+    "hermes-weixin",
+    "hermes-whatsapp",
+    "hermes-yuanbao",
+    "homeassistant",
+    "image_gen",
+    "kanban",
+    "memory",
+    "project",
+    "safe",
+    "search",
+    "session_search",
+    "skills",
+    "spotify",
+    "terminal",
+    "todo",
+    "tts",
+    "video",
+    "video_gen",
+    "vision",
+    "web",
+    "x_search",
+    "yuanbao"
+  ],
+  "sources": {
+    "hermes": "hermes-agent/toolsets.py (static TOOLSETS)",
+    "qubit": "qubit_runtime/toolsets.py (static TOOLSETS)"
+  }
+}
