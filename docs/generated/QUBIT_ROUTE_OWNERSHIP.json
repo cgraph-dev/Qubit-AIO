@@ -6,11 +6,11 @@
  "classic_dispatch_routes": 90,
  "compat_routes": 451,
  "counts": {
-  "qubit_addition": 155,
+  "qubit_addition": 156,
   "qubit_policy": 292,
-  "qubit_runtime": 44
+  "qubit_runtime": 43
  },
- "non_authoritative_handler_count": 42,
+ "non_authoritative_handler_count": 41,
  "non_authoritative_handlers": [
   "GET /api/analytics/models -> h_analytics_models",
   "GET /api/analytics/usage -> h_analytics",
@@ -46,7 +46,6 @@
   "GET /api/logs -> h_logs",
   "GET /api/memory -> h_memory",
   "GET /api/model/auxiliary -> h_model_auxiliary",
-  "GET /api/model/moa -> h_model_moa",
   "GET /api/model/recommended-default -> h_model_recommended_default",
   "GET /api/system/stats -> h_system_stats",
   "GET /api/tools/computer-use/status -> h_computer_use_status",
@@ -548,6 +547,19 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_model_info",
+   "source": "fork",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/model/moa",
+   "route": "/api/model/moa",
+   "owner": "qubit_addition",
+   "reason": "single-store read-authority quarantine (avoids split-brain against the matching Qubit write)",
+   "disposition": "implemented",
+   "fork_declares": true,
+   "classic_served": false,
+   "qubit_handler": "h_model_moa",
    "source": "fork",
    "sample_ok": true
   },
@@ -6320,19 +6332,6 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_model_auxiliary",
-   "source": "fork",
-   "sample_ok": true
-  },
-  {
-   "method": "GET",
-   "path": "/api/model/moa",
-   "route": "/api/model/moa",
-   "owner": "qubit_runtime",
-   "reason": "safe vendor-compatible route; the vendored runtime is the canonical implementation",
-   "disposition": "implemented",
-   "fork_declares": true,
-   "classic_served": false,
-   "qubit_handler": "h_model_moa",
    "source": "fork",
    "sample_ok": true
   },

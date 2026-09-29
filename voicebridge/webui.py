@@ -886,6 +886,13 @@ QUBIT_READ_AUTHORITY: tuple = (
     # blank model to /chat and /qubit-chat, so the model line renders "—".
     "/api/model/info",
     "/api/model/options",
+    # MoA: after the v0.21.5 1:1 pin rebase the vendored ``GET /api/model/moa``
+    # serves the upstream curation defaults (``openai-codex``/``openrouter``)
+    # that Qubit does not ship. The proxy would fabricate providers on the
+    # Models page; serve the Qubit compat ``h_model_moa`` (no fan-out, enabled
+    # false) instead. Pinned by
+    # tests/test_dashboard_audit_truthfulness9u.py::test_moa_defaults_do_not_fabricate_providers.
+    "/api/model/moa",
     # The canonical conversation history lives in the ONE chat-session
     # authority (state.db via QubitSessionStore, C7). Serving the Sessions
     # surface from a separate store split-brained the dashboard: 26 Qubit chats

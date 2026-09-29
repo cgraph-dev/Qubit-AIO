@@ -182,17 +182,18 @@ def platform_toolset_states(cfg: Any) -> Dict[str, bool]:
             qubit_runtime.use_qubit_home(cfg)
         except Exception:  # noqa: BLE001 - keep the fallback on a resolution miss
             pass
-        from qubit_cli.tools_config import (  # type: ignore
-            _get_effective_configurable_toolsets,
-            _get_platform_tools,
-        )
-        from qubit_cli.config import load_config as _load_qubit_config  # type: ignore
+        with qubit_runtime.profile_secret_scope(cfg):
+            from qubit_cli.tools_config import (  # type: ignore
+                _get_effective_configurable_toolsets,
+                _get_platform_tools,
+            )
+            from qubit_cli.config import load_config as _load_qubit_config  # type: ignore
 
-        platform_on = set(_get_platform_tools(_load_qubit_config(), "cli"))
-        return {
-            str(name): (str(name) in platform_on)
-            for name, _label, _desc in _get_effective_configurable_toolsets()
-        }
+            platform_on = set(_get_platform_tools(_load_qubit_config(), "cli"))
+            return {
+                str(name): (str(name) in platform_on)
+                for name, _label, _desc in _get_effective_configurable_toolsets()
+            }
     except Exception:  # noqa: BLE001 - vendored catalog unavailable
         return {}
 

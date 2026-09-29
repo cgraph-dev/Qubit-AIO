@@ -115,6 +115,23 @@ def _top_level_families():
     return set()
 
 
+def test_usage_family_is_not_shadowed_by_the_fork_forward():
+    """Regression: `usage` is a Qubit-native top-level family.
+
+    Routing it through the fork-forward layer shadowed the native parser +
+    ``_INTEGRATION`` handlers and turned ``qubit usage telemetry`` into a
+    ``FORK_SUB_UNCLASSIFIED`` refusal. The fork layer must return ``None`` for
+    the family (native parser owns it); the ported vendored account-usage
+    report remains reachable as ``qubit agent usage``.
+    """
+    from voicebridge import cli_qubit_forward as HF
+
+    assert HF.route(["usage"]) is None
+    assert HF.route(["usage", "telemetry"]) is None
+    assert HF.route(["usage", "analytics"]) is None
+    assert "usage" not in HF.FAMILY_FORWARD_WAVE6
+
+
 def test_browser_managed_profile_lifecycle(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
 

@@ -7,6 +7,7 @@ engine. No network.
 from __future__ import annotations
 
 import base64
+import json
 import sys
 from pathlib import Path
 
@@ -92,12 +93,24 @@ def test_config_put_applies_nested_body_and_reads_back(tmp_path, monkeypatch):
 
 
 def test_config_put_secret_never_persisted(tmp_path, monkeypatch):
+    """An unknown secret-shaped key is refused before it can be persisted.
+
+    The typo is surfaced first as ``UNKNOWN_CONFIG_KEY`` so a bogus key is not
+    misreported as a secret write (AI9 D-13; pinned by
+    tests/test_qubit_routes_agent2b_wiring.py:1254-1259). A *known*
+    secret-shaped leaf with a changed value is still refused as
+    ``SECRET_WRITE_REFUSED``
+    (tests/test_config_secret_skip.py::test_changed_served_secret_leaf_is_still_refused).
+    Either way the secret never enters the store.
+    """
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
                             {"api_key": "sk-live", "confirm": True})
-    assert (code, out["code"]) == (403, "SECRET_WRITE_REFUSED"), (code, out)
+    assert (code, out["code"]) == (403, "UNKNOWN_CONFIG_KEY"), (code, out)
+    code, live = HC.dispatch(cfg, "GET", "/api/config", {}, {})
+    assert "sk-live" not in json.dumps(live), live
 
 
 # ---------------------------------------------------------------------------

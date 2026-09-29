@@ -67,6 +67,43 @@ def test_pinned_gateway_catalog_agrees_with_read_path(tmp_path, monkeypatch):
     assert pinned[name] is True
 
 
+def test_provider_catalog_read_survives_multiplexing(tmp_path, monkeypatch):
+    """Regression: under profile multiplexing the vendored platform-catalog read
+    probes credentials through ``agent.secret_scope.get_secret`` (``XAI_API_KEY``,
+    ``HERMES_INFERENCE_PROVIDER``), which fails closed with ``UnscopedSecretError``
+    when no profile scope is installed. That error, swallowed by the broad
+    ``except`` in ``platform_toolset_states``, emptied the catalog and reported
+    every platform-disabled toolset as enabled. The overlay must bind the serving
+    home's secret scope around the read (``qubit_runtime.profile_secret_scope``).
+    """
+    from voicebridge import qubit_compat as QC
+    from voicebridge import qubit_runtime
+    from voicebridge import toolsets as TS
+    from voicebridge.gateway import rpc
+
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qhome"))
+    qubit_runtime.ensure_path()
+    from agent import secret_scope
+
+    cfg = _cfg(tmp_path, monkeypatch)
+
+    secret_scope.set_multiplex_active(True)
+    try:
+        read = {r["name"]: r["enabled"]
+                for r in QC.h_toolsets(cfg, {}, {}, {})[1]}
+        assert read, "catalog must not degrade to empty under multiplexing"
+        disabled = [n for n, on in read.items() if not on]
+        assert disabled, "platform-disabled toolsets must stay visible"
+        name = disabled[0]
+        pinned = {r["name"]: r["enabled"] for r in rpc._pin_toolset_rows(cfg)}
+        assert pinned[name] is False, pinned
+        assert pinned[name] == TS.effective_toolset_enabled(cfg, name)
+        assert name not in {r["name"]
+                            for r in rpc._pinned_tools_effective(cfg, {})["tools"]}
+    finally:
+        secret_scope.set_multiplex_active(False)
+
+
 # --------------------------------------------------- truthful op envelopes
 def test_confirmed_refused_mutation_is_not_reported_executed(tmp_path,
                                                              monkeypatch):
@@ -180,20 +217,41 @@ def test_cancel_all_includes_skill_pending(tmp_path, monkeypatch):
 
 # --------------------------------------------------- honest MoA defaults
 def test_moa_defaults_do_not_fabricate_providers(tmp_path, monkeypatch):
-    from voicebridge import qubit_runtime
+    """The Qubit-served MoA surface fabricates no providers.
 
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qhome"))
-    qubit_runtime.ensure_path()
-    from qubit_cli.moa_config import (DEFAULT_MOA_AGGREGATOR,
-                                      DEFAULT_MOA_REFERENCE_MODELS,
-                                      normalize_moa_config)
+    The v0.21.5 1:1 pin rebase (Owner Decision #25: "rebrand the exact pinned
+    source with the deterministic engine rather than manual porting") restored
+    the upstream ``qubit_cli.moa_config`` curation defaults. Qubit's
+    truthfulness policy is an overlay at the boundary -- ``h_model_moa`` returns
+    no fan-out and ``moa_put`` is a typed refusal
+    (voicebridge/qubit_compat.py; docs/QubitVSupstream.md records that
+    ``h_model_moa`` always returns ``enabled:false, presets:{}``). Assert on the
+    surface the dashboard/SPA actually serves, not the vendored internals.
+    """
+    from voicebridge import qubit_compat as QC
+    from voicebridge import webui
 
-    assert DEFAULT_MOA_REFERENCE_MODELS == []
-    assert DEFAULT_MOA_AGGREGATOR == {}
+    # The SPA reads /agent/api/model/moa; it must be served by the Qubit compat
+    # handler, never proxied to the vendored fork whose upstream defaults
+    # fabricate providers Qubit does not ship.
+    assert webui.qubit_read_authority("/api/model/moa") is True
+    assert "/api/model/moa" in webui.QUBIT_READ_AUTHORITY
 
-    cfg = normalize_moa_config({})
-    assert cfg["reference_models"] == []
-    assert cfg["aggregator"] == {}
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, served = QC.h_model_moa(cfg, {}, {}, {})
+    assert code == 200 and served["ok"] is True, served
+    assert served["reference_models"] == [], served
+    assert served["presets"] == {}, served
+    assert served["enabled"] is False, served
+    assert served["aggregator"] == {"provider": "", "model": "",
+                                    "enabled": False}, served
     # No fabricated provider/model anywhere in the rendered payload.
-    assert "openai-codex" not in str(cfg)
-    assert "openrouter" not in str(cfg)
+    blob = str(served)
+    assert "openai-codex" not in blob and "openrouter" not in blob
+
+    # The write path is a typed refusal: no fabricated preset can be stored.
+    code, refused = QC.moa_put(cfg, {}, {
+        "reference_models": [{"provider": "openai-codex", "model": "gpt-5.5"}]},
+        {})
+    assert code == 501 and refused["ok"] is False, refused
+    assert refused["code"] == "MOA_SUPERSEDED", refused

@@ -108,10 +108,11 @@ def test_qubit_api_auth_and_status(tmp_path):
                                     qubit_token=True)
         assert status == 200, (status, body[:200])
         out = json.loads(body)
-        # Corrected cutover: /api/status is a fork-declared, non-sensitive read,
-        # so the fork's real status shape is served (rebranded), not the empty
-        # Qubit compat envelope.
-        assert out.get("schema") is None, out
+        # /api/status is a QUBIT_READ_AUTHORITY path, so the SPA prefix serves
+        # the Qubit compat h_status document (schema "qubit-runtime-status/1"),
+        # not the fork proxy's status. Pinned by
+        # tests/test_dashboard_controls9u.py::test_status_carries_gateway_fields.
+        assert out.get("schema") == "qubit-runtime-status/1", out
         assert out.get("version") and out.get("release_date"), out
         assert "overall" in out and "components" in out, out
         status, _, body = _http(port, "GET", "/agent/api/dashboard/themes",

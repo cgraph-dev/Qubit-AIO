@@ -1224,13 +1224,29 @@ def _merge_config_overrides(cfg: Any, data: Any) -> Any:
     return data
 
 
+# Keyboard/input bindings that end in ``_key`` but are settings, not secrets.
+# Kept as exact dotted paths so a credential leaf can never be allowlisted by a
+# broad suffix tweak.
+_NON_SECRET_CONFIG_KEYS = frozenset({
+    "hotkey.hold_key", "hotkey.alt_hold_key",
+})
+
+
 def _is_secret_config_key(key: str) -> bool:
     """True when a dotted config path names a secret-shaped leaf.
 
     Matches both underscore and dotted paths (``dashboard.basic_auth.password``
     and ``webui.token``), so the read side can redact exactly the leaves the
     write side refuses.
+
+    Exempt: keyboard/input bindings also end in ``_key`` but are settings, not
+    credentials. ``hotkey.hold_key``/``hotkey.alt_hold_key`` are key names
+    (``ctrl_r``) the Settings form must display and round-trip; treating them as
+    secrets redacted the served leaf and (with the unchanged-leaf skip) left the
+    whole-tree Save unable to recognise its own value.
     """
+    if str(key).lower() in _NON_SECRET_CONFIG_KEYS:
+        return False
     leaf = str(key).rsplit(".", 1)[-1].lower()
     return leaf in {
         "password", "passwd", "secret", "token", "api_key", "apikey",
@@ -1532,8 +1548,16 @@ def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """
     slug = str(q.get("provider", "") or "").strip().lower()
     if not slug:
-        return _ok(provider="", model="", free_tier=None,
-                   detail="no provider requested")
+        # No provider named: resolve the configured Qubit brain through the
+        # canonical resolver (the same effective selection ``/api/model/info``,
+        # the CLI, voice, and ``/chat`` report). A blank ``model`` here would
+        # leave the Models page with no recommended default; it is never a
+        # silently-picked paid cloud default (the resolver is the operator's
+        # own configured provider/model).
+        eff = _resolved_model(cfg)
+        return _ok(provider=str(eff.get("provider") or ""),
+                   model=str(eff.get("model") or ""), free_tier=None,
+                   detail="recommended default = configured Qubit brain profile")
     try:
         _vendored_runtime(cfg)
         from qubit_cli.inventory import build_models_payload, load_picker_context  # type: ignore
@@ -2038,21 +2062,26 @@ def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             qubit_runtime.use_qubit_home(cfg)
         except Exception:  # noqa: BLE001 - keep serving the catalog on a resolution miss
             pass
-        from qubit_cli.tools_config import (  # type: ignore
-            _get_effective_configurable_toolsets,
-            _get_platform_tools,
-        )
-        from qubit_cli.config import load_config as _load_qubit_config  # type: ignore
-        from toolsets import resolve_toolset  # type: ignore
+        # Bind the serving profile's secret scope around the vendored catalog
+        # read: under multiplexing its credential probes (``XAI_API_KEY``,
+        # ``HERMES_INFERENCE_PROVIDER``) fail closed with ``UnscopedSecretError``
+        # and this broad except would otherwise degrade the catalog to empty.
+        with qubit_runtime.profile_secret_scope(cfg):
+            from qubit_cli.tools_config import (  # type: ignore
+                _get_effective_configurable_toolsets,
+                _get_platform_tools,
+            )
+            from qubit_cli.config import load_config as _load_qubit_config  # type: ignore
+            from toolsets import resolve_toolset  # type: ignore
 
-        resolve = resolve_toolset
-        platform_on = set(_get_platform_tools(_load_qubit_config(), "cli"))
-        for name, label, desc in _get_effective_configurable_toolsets():
-            key = str(name)
-            meta[key] = {"label": str(label or name),
-                         "description": str(desc or "")}
-            enabled[key] = key in platform_on
-            names.append(key)
+            resolve = resolve_toolset
+            platform_on = set(_get_platform_tools(_load_qubit_config(), "cli"))
+            for name, label, desc in _get_effective_configurable_toolsets():
+                key = str(name)
+                meta[key] = {"label": str(label or name),
+                             "description": str(desc or "")}
+                enabled[key] = key in platform_on
+                names.append(key)
     except Exception:
         meta = {}
         enabled = {}
@@ -11025,23 +11054,33 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "unknown settings key(s): " + ", ".join(unknown[:5]) +
                      "; see GET /api/config/schema",
                      "GET /api/config/schema")
+    # A whole-tree Save round-trips every leaf it read. Drop ANY leaf whose
+    # value already equals a served record, so an unchanged leaf never re-enters
+    # the override store and the reported change set is the real edit only; then
+    # refuse a *changed* secret-shaped leaf. Dropping only secret-shaped
+    # unchanged leaves left every ordinary unchanged setting (e.g.
+    # ``hotkey.hold_key``) applied on a whole-tree Save.
     changed_secrets: list = []
-    for key in [k for k in values if _is_secret_key(k)]:
-        if any(values[key] == served for served in served_values.get(key, ())):
-            values.pop(key, None)
-        else:
+    remaining: Dict[str, Any] = {}
+    for key, value in values.items():
+        if any(value == served for served in served_values.get(key, ())):
+            continue
+        if _is_secret_key(key):
             changed_secrets.append(key)
+        else:
+            remaining[key] = value
     if changed_secrets:
         return _gate("SECRET_WRITE_REFUSED",
                      "The dashboard never writes secret values; reference "
                      "names only (" + ", ".join(sorted(changed_secrets)[:5])
                      + ")",
                      "CLI `qubit auth login` (vault references, manual handoff)")
-    if not values:
+    if not remaining:
         return _gate("CONFIG_NO_FIELDS",
-                     "config write carried only unchanged secret-shaped "
-                     "leaves; nothing to apply",
+                     "config write carried only unchanged leaves; nothing "
+                     "to apply",
                      "GET /api/config + PUT the changed keys")
+    values = remaining
     mistyped = []
     for key, value in values.items():
         default = known[key]

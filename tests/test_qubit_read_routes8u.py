@@ -152,6 +152,9 @@ def test_model_recommended_default_shape(tmp_path, monkeypatch):
     for key in ("ok", "provider", "model", "free_tier"):
         assert key in out, (key, out)
     assert out["model"], out
+    # The configured brain resolves with a real provider too (never a blank
+    # recommendation); regression for the vendored-only empty-provider branch.
+    assert out["provider"], out
     assert out["free_tier"] is None
 
     # A requested cloud provider is echoed honestly, never silently faked.

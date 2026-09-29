@@ -186,10 +186,17 @@ FAMILY_FORWARD_WAVE6 = {
     # and the shared dispatch guard. Secrets are never printed by any subcommand.
     "vault": ("vault", frozenset({"list", "sources", ""}),
               frozenset({"add", "rm"})),
-    # Wave 6 owner-decision follow-up: `usage` is a read-only account-usage
-    # report; `codex-runtime migrate` rewrites ~/.codex/config.toml, so it is
-    # confirm-gated (bare `codex-runtime` only prints help).
-    "usage": ("usage", frozenset({""}), frozenset()),
+    # Wave 6 owner-decision follow-up: `codex-runtime migrate` rewrites
+    # ~/.codex/config.toml, so it is confirm-gated (bare `codex-runtime` only
+    # prints help).
+    #
+    # `usage` is deliberately ABSENT: it is a Qubit-native top-level family
+    # (``voicebridge/cli.py`` declares ``usage`` with ``analytics``/``telemetry``
+    # and ``_INTEGRATION`` routes it to the local, redacted usage ledger +
+    # telemetry gate). Routing it here shadowed that native family and turned
+    # ``qubit usage telemetry`` into ``FORK_SUB_UNCLASSIFIED``. The ported
+    # vendored account-usage report stays reachable as ``qubit agent usage``
+    # (and is covered by tests/test_cli_ports_wave6.py).
     "codex-runtime": ("codex-runtime", frozenset({""}),
                       frozenset({"migrate"})),
 }

@@ -19,12 +19,43 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 
 _PROVIDER = "acme"
 _PROVIDER_ENV = "ACME_API_KEY"
+
+
+@pytest.fixture(autouse=True)
+def _stub_model_validation(monkeypatch):
+    """Hermetic model-pick validation.
+
+    ``PUT /api/profiles/{name}/model`` (compat ``profile_model``) validates the
+    pick through the real reference ``switch_model`` — which probes provider
+    catalogs and credentials. This temp home has neither and the suite is
+    offline, so the credential *rejection* path is not what this parity suite
+    guards; it is covered by the vendored
+    ``qubit_runtime/tests/qubit_cli/test_web_profiles_model_scope.py`` and
+    pinned by ``tests/test_profiles_registry9u.py`` (same stub). Stub the
+    validation so the route's real persistence contract is exercised. The
+    handler change to the real reference ``_write_profile_model`` landed in
+    commit 32fd917a2; this suite predates it.
+    """
+    vendored = REPO_ROOT / "qubit_runtime"
+    if str(vendored) not in sys.path:
+        sys.path.insert(0, str(vendored))
+    from qubit_cli import model_switch
+
+    def _fake(**kw):
+        return model_switch.ModelSwitchResult(
+            success=True, new_model=kw.get("raw_input", ""),
+            target_provider=kw.get("explicit_provider", ""),
+            provider_changed=True, base_url="https://example.invalid/v1")
+
+    monkeypatch.setattr(model_switch, "switch_model", _fake)
 
 
 def _cfg(tmp_path, monkeypatch):

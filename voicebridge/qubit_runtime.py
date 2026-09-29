@@ -16,6 +16,7 @@ import argparse
 import os
 import shutil
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Optional
 
@@ -464,6 +465,39 @@ def use_qubit_home(cfg: Any = None) -> Path:
     return home
 
 
+@contextmanager
+def profile_secret_scope(cfg: Any = None):
+    """Bind the serving profile's secret scope around a vendored catalog read.
+
+    Vendored credential probes (e.g. ``qubit_cli.tools_config._get_platform_tools``
+    -> ``_xai_credentials_present`` -> ``config.get_env_value`` ->
+    ``agent.secret_scope.get_secret``, and ``runtime_provider`` reading
+    ``HERMES_INFERENCE_PROVIDER``) fail closed with ``UnscopedSecretError`` when
+    the process is a multiplexer and no profile scope is installed. That error,
+    swallowed by a broad ``except``, degraded the dashboard's provider/toolset
+    catalog to an empty map (a truthfulness failure: every platform-disabled
+    toolset was then reported enabled). The Qubit dashboard is a single-authority
+    reader for its serving home, so bind that home's scope -- the SAME
+    ``build_profile_secret_scope`` the vendored per-turn/per-adapter path uses --
+    for the duration of the read. Outside multiplexing a scope is a ``.env``
+    overlay: a miss still falls through to ``os.environ`` exactly as before, so
+    single-profile behaviour is unchanged.
+    """
+    home = use_qubit_home(cfg)
+    try:
+        from agent.secret_scope import (
+            build_profile_secret_scope, reset_secret_scope, set_secret_scope)
+    except Exception:  # noqa: BLE001 - vendored runtime unavailable
+        yield home
+        return
+    token = set_secret_scope(build_profile_secret_scope(Path(home)),
+                             profile_home=str(home))
+    try:
+        yield home
+    finally:
+        reset_secret_scope(token)
+
+
 def _cache_repo_tests_namespace() -> None:
     """Cache the Qubit checkout's namespace ``tests`` package.
 
@@ -663,5 +697,6 @@ def acp_entry() -> None:
 
 
 __all__ = ["runtime_root", "manifest_path", "default_home", "use_qubit_home",
+           "profile_secret_scope",
            "migrate_legacy_homes", "ensure_path", "run", "status", "entry",
            "legacy_entry", "acp_entry", "serve"]

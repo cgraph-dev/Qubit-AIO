@@ -79,9 +79,11 @@ def test_every_normal_route_serves_the_spa_shell(tmp_path):
     from voicebridge.webui import qubit_alias_target
     ui, port = _start(tmp_path)
     try:
-        # root is the SPA, reached via the public /sessions route
+        # root is the SPA; Ruling 3 -> Option A lands on the Qubit chat
+        # workspace (pinned by tests/test_webui.py:343 and
+        # tests/test_dashboard_families8u.py:155; docs/DECISIONS.md #5)
         status, loc = _http_status_location(port, "/")
-        assert (status, loc) == (302, "/sessions"), (status, loc)
+        assert (status, loc) == (302, "/chat"), (status, loc)
         for page in PAGES:
             if page in ("/classic/", "/token-setup"):
                 continue

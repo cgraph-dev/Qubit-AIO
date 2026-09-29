@@ -4,7 +4,7 @@
  "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
  "counts": {
   "production_referenced": 32,
-  "route_test_reachable": 36,
+  "route_test_reachable": 35,
   "registration_only": 2,
   "test_referenced": 2
  },
@@ -85,8 +85,8 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/schedules.py": [
-     "1484: delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,",
-     "1489: \"delivery\": delivery})"
+     "1490: delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,",
+     "1495: \"delivery\": delivery})"
     ]
    },
    "script_references": {},
@@ -253,7 +253,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "1697: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+     "1704: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
     ]
    },
    "script_references": {},
@@ -687,18 +687,6 @@
    }
   },
   {
-   "handler": "h_model_moa",
-   "defined": true,
-   "routes": [
-    "GET /api/model/moa"
-   ],
-   "classification": "route_test_reachable",
-   "route_test_reachable": true,
-   "production_references": {},
-   "script_references": {},
-   "test_references": {}
-  },
-  {
    "handler": "h_model_recommended_default",
    "defined": true,
    "routes": [
@@ -785,7 +773,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "2692: code, out = _HC.h_power(self.app.orch.cfg,"
+     "2699: code, out = _HC.h_power(self.app.orch.cfg,"
     ]
    },
    "script_references": {},
@@ -979,7 +967,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "3316: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+     "3323: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
     ]
    },
    "script_references": {},
