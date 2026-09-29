@@ -120,8 +120,7 @@
   "by_status": {
    "IMPLEMENTED": 483,
    "MISSING": 2,
-   "SAFE_EQUIVALENT": 104,
-   "UNVERIFIED": 2
+   "SAFE_EQUIVALENT": 106
   },
   "by_area": {
    "analytics-config": 4,
@@ -1970,10 +1969,10 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_v0215_rebase_finish.py::test_t3b_pause_resume_dispatch_to_real_typed_handler",
+   "note": "Download pause is brokered (no managed download queue exists): e-stop -> confirmation -> broker, typed refusal by default.",
+   "needs": "hardware"
   },
   {
    "id": "api:POST /api/local-models/download/resume",
@@ -1984,10 +1983,10 @@
    "cli": "qubit local-models * / runtime *",
    "dashboard": "hermes-dist Models",
    "voice": "voice local-models",
-   "status": "UNVERIFIED",
-   "proving_test": "",
-   "note": "No on-disk test exercises the non-refusal path; downgraded to UNVERIFIED.",
-   "needs": "owner"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_v0215_rebase_finish.py::test_t3b_pause_resume_dispatch_to_real_typed_handler",
+   "note": "Download resume is brokered (no managed download queue exists): e-stop -> confirmation -> broker, typed refusal by default.",
+   "needs": "hardware"
   },
   {
    "id": "api:DELETE /api/local-models/models/{model_id}",

@@ -11,18 +11,17 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
 - Inventory items (all categories): **8197**
-- Candidate omissions (uncovered surface items): **125**
+- Candidate omissions (uncovered surface items): **123**
 - Distinct capability gaps (no parent row): **116**
-- Parented surfaces needing parent closure (parent not IMPLEMENTED): **9**
-- Parented surfaces covered by an IMPLEMENTED parent: **1028**
+- Parented surfaces needing parent closure (parent not IMPLEMENTED): **7**
+- Parented surfaces covered by an IMPLEMENTED parent: **1030**
 - Distinct capabilities total: **899**; parented surfaces total: **1037**
 - Fork-runtime dispositions (tools/skills/plugins): **176** (IMPLEMENTED 158, GATED 18)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
-- Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=16085 identical=9630 missing=25 extra=32 changed=6423
+- Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=16084 identical=9630 missing=25 extra=31 changed=6423
 
 ### Omission counts by category (all uncovered)
 
-- `hermes_plugin_asset`: 2
 - `openclaw_extension`: 96
 - `qubit_cli_command`: 4
 - `qubit_cli_option`: 7
@@ -163,7 +162,7 @@ No parent capability row exists; these remain explicit open rows.
 - `hermes sessions repair-profiles` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions repair-profiles`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
 - `hermes sessions set-journal-mode` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions set-journal-mode`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
 
-## Parented surfaces needing parent closure (9)
+## Parented surfaces needing parent closure (7)
 
 These belong to a parent capability row that is missing or not IMPLEMENTED; close the parent (or wire the surface) to resolve them. They are not distinct capabilities.
 
@@ -186,12 +185,7 @@ These belong to a parent capability row that is missing or not IMPLEMENTED; clos
 - `hermes usage --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/usage.py`; parent `cli:usage` status `absent`.
 - `hermes usage --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/usage.py`; parent `cli:usage` status `absent`.
 
-### parent `plugin:hermes-achievements` (2; status=absent)
-
-- `plugin-asset:hermes-achievements:index.js` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/dist/index.js`; parent `plugin:hermes-achievements` status `absent`.
-- `plugin-asset:hermes-achievements:style.css` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/dist/style.css`; parent `plugin:hermes-achievements` status `absent`.
-
-## Parented surfaces covered by an IMPLEMENTED parent (1028)
+## Parented surfaces covered by an IMPLEMENTED parent (1030)
 
 These are coverage evidence for their parent, not separate gaps.
 
@@ -377,8 +371,8 @@ These are coverage evidence for their parent, not separate gaps.
 - `memory_search`: 32 surface(s) — coverage `workflow-surface`
 - `model`: 232 surface(s) — coverage `model-entry`
 - `opencode_status`: 7 surface(s) — coverage `workflow-surface`
-- `plugin:hermes-achievements`: 3 surface(s) — coverage `plugin-surface`
 - `plugin:kanban`: 4 surface(s) — coverage `plugin-surface`
+- `plugin:qubit-achievements`: 5 surface(s) — coverage `plugin-surface`
 - `proxy_providers`: 39 surface(s) — coverage `provider-entry`
 - `reports_list`: 3 surface(s) — coverage `workflow-surface`
 - `runtime_status`: 21 surface(s) — coverage `workflow-surface`

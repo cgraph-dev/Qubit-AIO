@@ -1145,6 +1145,15 @@ OTHER_SECTIONS = ("hermes", "openclaw")
 EVIDENCE_CATEGORIES = frozenset({
     "hermes_i18n_key", "hermes_locale_key", "hermes_upstream_test",
 })
+#: Upstream plugin ids the deep source rebrand renamed to Qubit identity. An
+#: inventory (canonical or the read-only frozen fallback) enumerates the pinned
+#: upstream plugin directory (``plugin:hermes-achievements``) while the shipped
+#: ledger keys the Qubit-owned row (``plugin:qubit-achievements``); the mapping
+#: is applied at ingestion so a renamed plugin and its manifest/api/asset/test
+#: surfaces reconcile with the live ledger instead of reading as open rows.
+_INVENTORY_ID_RENAMES = {
+    "plugin:hermes-achievements": "plugin:qubit-achievements",
+}
 _HARDWARE_TOKENS = (
     "device", "audio", "camera", "screen", "desktop", "browser",
     "local_model", "local-model", "computer", "gpu", "mic", "vision",
@@ -1352,9 +1361,11 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
                 unidentified += 1
                 continue
             item_id = fallback
+        item_id = _INVENTORY_ID_RENAMES.get(item_id, item_id)
 
         parent_id = item.get("parent_id")
         parent_id = parent_id if isinstance(parent_id, str) and parent_id else ""
+        parent_id = _INVENTORY_ID_RENAMES.get(parent_id, parent_id)
         is_parented = bool(parent_id)
         if is_parented:
             parented_total += 1
@@ -1363,6 +1374,7 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
 
         match = item.get("ledger_match")
         match_id = match if isinstance(match, str) and match else ""
+        match_id = _INVENTORY_ID_RENAMES.get(match_id, match_id)
         resolved = ""
         parent_status = str(item.get("parent_status") or "")
         covered = bool((match_id and match_id in known_ids)
@@ -1370,6 +1382,7 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
         if is_parented:
             declared = item.get("parent_resolved")
             resolved = declared if isinstance(declared, str) else ""
+            resolved = _INVENTORY_ID_RENAMES.get(resolved, resolved)
             resolved = resolved or _resolve_parent_id(parent_id, status_by_id)
             if status_by_id:
                 # The live merged ledger is authoritative for parent status.

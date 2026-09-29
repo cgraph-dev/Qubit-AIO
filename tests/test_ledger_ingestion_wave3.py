@@ -407,8 +407,9 @@ def test_committed_inventory_is_at_the_terminal_fixed_point() -> None:
 
     The committed inventory is reconciled against the working-tree ledger, so
     every recorded status is a declared ledger status.  All recorded statuses
-    are terminal; the vendored ``skills/index-cache`` asset cache is excluded
-    from the surface inventory as a non-capability, so there is no open row.
+    are terminal except the two documented-open v0.21.5 routes pinned ``MISSING``
+    by the parity inventory; the vendored ``skills/index-cache`` asset cache is
+    excluded from the surface inventory as a non-capability.
     """
     data = _read_inventory()
     comparison = data.get("ledger_comparison") or {}
@@ -423,10 +424,11 @@ def test_committed_inventory_is_at_the_terminal_fixed_point() -> None:
             if value is not None:
                 assert value in statuses, (item.get("id"), key, value)
                 recorded.add(value)
-                if value not in terminal:
+                if value not in terminal and (
+                        item.get("id") not in DOCUMENTED_OPEN_ROW_IDS):
                     non_terminal_items.append((item.get("id"), key, value))
     assert recorded, "inventory records no ledger statuses at all"
-    # No non-terminal status may be recorded: every surface is terminal.
+    # No non-terminal status may be recorded outside the documented-open set.
     assert non_terminal_items == [], non_terminal_items
 
 
@@ -504,16 +506,26 @@ def test_require_inventory_complete_fails_when_inventory_absent(tmp_path) -> Non
 # gap_ledger --require-code-ready
 # ---------------------------------------------------------------------------
 # The vendored ``skills/index-cache`` JSON asset cache is excluded from the
-# surface inventory as a non-capability, so the committed ledger has no open row.
-DOCUMENTED_OPEN_ROW = None
+# surface inventory as a non-capability, so the committed ledger has no open row
+# for it. The remaining documented-open rows are the owner-gated architecture
+# row (OC-48) plus the two genuine v0.21.5 routes Qubit does not implement yet
+# -- pinned ``MISSING`` by the parity inventory
+# (tests/test_parity_inventory_reclass_wave2b.py) -- so they stay visible open
+# rows, never silently closed.
+DOCUMENTED_OPEN_ROW_IDS = (
+    "OC-48",
+    "api:GET /api/chat/workspaces",
+    "api:WEBSOCKET /api/display/ws",
+)
 
 
 def test_committed_ledgers_carry_the_documented_open_row() -> None:
-    """The committed sections carry exactly the one owner-gated architecture row.
+    """The committed sections carry exactly the documented-open rows.
 
     Owner amendment 2026-09-22: ``OPERATOR_ONLY_ARCHITECTURE`` rows are OPEN
-    until individually approved, so ``OC-48`` is the single non-terminal row and
-    the code-ready gate is correctly closed.
+    until individually approved, so ``OC-48`` stays open; the chat-workspaces
+    backend and the raw-RFB display viewer are documented-open v0.21.5 gaps.
+    The code-ready gate is correctly closed.
     """
     sections, missing, _ = gap_ledger.load_sections(
         REPO_ROOT / "docs" / "generated")
@@ -522,8 +534,9 @@ def test_committed_ledgers_carry_the_documented_open_row() -> None:
     open_ids = sorted(
         row["id"] for section in sections for row in section["rows"]
         if row["status"] not in gap_ledger.TERMINAL_STATUSES)
-    assert open_ids == ["OC-48"], open_ids
-    assert summary["open_rows"] == 1, summary["by_status"]
+    assert open_ids == sorted(DOCUMENTED_OPEN_ROW_IDS), open_ids
+    assert summary["open_rows"] == len(DOCUMENTED_OPEN_ROW_IDS), \
+        summary["by_status"]
     assert summary["code_ready"] is False
     assert summary["safe_equivalent_rows"] > 0
     assert summary["operator_qualification_rows"] > 0
