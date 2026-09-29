@@ -165,6 +165,10 @@ export const fr: Translations = {
     failedToDeleteSelected: "Échec de la suppression des sessions sélectionnées",
     resumeInChat: "Reprendre dans le chat",
     newChat: "Nouveau chat",
+    workspace: "espace de travail",
+    workspaceDefault: "Par défaut",
+    workspaceRescan: "Réanalyser les dépôts",
+    workspaceCustom: "Autre chemin…",
     previousPage: "Page précédente",
     nextPage: "Page suivante",
     roles: {

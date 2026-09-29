@@ -8,7 +8,6 @@ import type {
   MemoryProviderConfig,
   MemoryProviderField,
   MemoryProviderInfo,
-  MemoryProviderSetupInfo,
   MemoryProviderSetupResult,
   PluginCatalogDetail,
   PluginCatalogEntry,
@@ -16,6 +15,7 @@ import type {
   PluginPinnedIndexEntry,
   PluginsHubResponse,
 } from "@/lib/api";
+import { setupHasDetails, setupHasInstallableSteps } from "@/lib/memory-provider-setup";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
@@ -79,23 +79,6 @@ function fieldIsVisible(field: MemoryProviderField, values: Record<string, Memor
     const current = values[key];
     return String(current ?? "") === String(expected);
   });
-}
-
-function setupHasDetails(setup?: MemoryProviderSetupInfo) {
-  if (!setup) return false;
-  return Boolean(
-    setup.external_dependencies?.length ||
-      setup.pip_dependencies?.length ||
-      setup.required_env?.length,
-  );
-}
-
-function setupHasInstallableSteps(setup?: MemoryProviderSetupInfo) {
-  if (!setup) return false;
-  return Boolean(
-    setup.external_dependencies?.some((dep) => dep.install) ||
-      setup.pip_dependencies?.length,
-  );
 }
 
 function SetupCommandBlock({ code, label }: { code: string; label: string }) {
