@@ -37,13 +37,29 @@ REPO = Path(__file__).resolve().parents[1]
 #: Expected upstream revision of the pinned source (v0.21.5 @ 69948c0057).
 EXPECTED_REVISION = "69948c005791d4d0e51670ca015238c2c7663749"
 
+def _first_existing(*candidates: str) -> Path:
+    """First candidate path that exists, else the first (for the error text)."""
+    paths = [Path(c) for c in candidates]
+    for path in paths:
+        if path.is_dir():
+            return path
+    return paths[0]
+
+
 #: Read-only pinned upstream source.  Overridable for a relocated checkout.
-PINNED_SOURCE = Path(os.environ.get(
-    "QUBIT_PINNED_SOURCE", "/tmp/qubit-1to1-20260925-082150/ref"))
+#: The durable restoration lives under ``.cache/qubit-pins``; the ephemeral
+#: ``/tmp`` path is retained only as a legacy fallback.
+PINNED_SOURCE = Path(os.environ["QUBIT_PINNED_SOURCE"]) if os.environ.get(
+    "QUBIT_PINNED_SOURCE") else _first_existing(
+        "/home/trick/.cache/qubit-pins/hermes-agent",
+        "/tmp/qubit-1to1-20260925-082150/ref",
+        "/tmp/opencode/pinned/hermes-agent")
 
 #: Read-only source of record for the pin (a git checkout at EXPECTED_REVISION).
-REFERENCE_HOME = Path(os.environ.get(
-    "QUBIT_REFERENCE_HOME", "/home/trick/.hermes/hermes-agent"))
+REFERENCE_HOME = Path(os.environ["QUBIT_REFERENCE_HOME"]) if os.environ.get(
+    "QUBIT_REFERENCE_HOME") else _first_existing(
+        "/home/trick/.cache/qubit-pins/hermes-agent",
+        "/home/trick/.hermes/hermes-agent")
 
 #: Representative pin files checked blob-for-blob against EXPECTED_REVISION.
 REVISION_SAMPLE = ("pyproject.toml", "cli.py", "agent/__init__.py", "README.md")
@@ -108,9 +124,15 @@ def _assert_pinned_revision() -> None:
 
 
 def _stage(dest: Path) -> None:
-    """Copy the pinned source as ``qubit_hermes/`` plus the two engines."""
+    """Copy the pinned source as ``qubit_hermes/`` plus the two engines.
+
+    A git checkout pin (the durable ``.cache/qubit-pins`` restoration) carries a
+    ~1 GB ``.git`` directory that is irrelevant to the engine run and must not be
+    copied twice; only the working tree is staged.
+    """
     dest.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(PINNED_SOURCE, dest / "qubit_hermes")
+    shutil.copytree(PINNED_SOURCE, dest / "qubit_hermes",
+                    ignore=shutil.ignore_patterns(".git"))
     (dest / "scripts").mkdir()
     for name in ("qubit_rebrand.py", "qubit_debrand.py"):
         shutil.copy2(REPO / "scripts" / name, dest / "scripts" / name)

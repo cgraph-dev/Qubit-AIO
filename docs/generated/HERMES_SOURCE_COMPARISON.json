@@ -589,12 +589,12 @@
    "upstream": "web/src/components/ChatWorkspacePicker.tsx",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "1c5ee88507ad559694010cb91a097aa7862432647c5b89bad27aa9329d6862e6",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/components/ChatWorkspacePicker.tsx has no shipped Qubit counterpart at frontend/qubit-web/src/components/ChatWorkspacePicker.tsx (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/components/ChatWorkspacePicker.tsx",
+   "qubit_sha256": "4c3565bf45bec8bc3a724a5c46990f8188eed79d42a51ff0d6576d071797379b",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "1c5ee88507ad559694010cb91a097aa7862432647c5b89bad27aa9329d6862e6",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -745,12 +745,12 @@
    "upstream": "web/src/components/MultiplexStandaloneBanner.tsx",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "6e7fdfde872549fb0999e89ea8cff7068af3932a3a71ec830e615986958e225f",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/components/MultiplexStandaloneBanner.tsx has no shipped Qubit counterpart at frontend/qubit-web/src/components/MultiplexStandaloneBanner.tsx (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/components/MultiplexStandaloneBanner.tsx",
+   "qubit_sha256": "d9173e763cd8f8945768556003108d8babd46a90bc866e80e6dabc4846d6a76d",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "6e7fdfde872549fb0999e89ea8cff7068af3932a3a71ec830e615986958e225f",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1136,7 +1136,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "17e2f2d82aab2d7fee534d29059e1983216e7b8058718f5260d87eeed77ce4e9",
    "qubit": "frontend/qubit-web/src/i18n/en.ts",
-   "qubit_sha256": "6d2cc2ca2a581b19d57e8fa74182494607525c2bddb2b6dbbdac13b701f47426",
+   "qubit_sha256": "ed9eb9ed66d1751f5e669d351e19c5b9d5a76ab41b65a8fa0873c8feaa781149",
    "patch": "product-string rebrand: 'Update Hermes'/'Updating Hermes'/'Update Hermes?' -> Qubit; confirm text hermes->qubit (owner rebrand)",
    "reason": "Qubit rebrand of product-facing English dashboard strings; translation keys unchanged; no logic or route change.",
    "upstream_blob_sha256": "17e2f2d82aab2d7fee534d29059e1983216e7b8058718f5260d87eeed77ce4e9",
@@ -1262,19 +1262,6 @@
   {
    "scope": "hermes-agent/web",
    "category": "dashboard",
-   "upstream": "web/src/i18n/ro.ts",
-   "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
-   "upstream_sha256": "d4650c7f712929e4d77ab1eb10bd0e703d89e74a8dc60781ed8f4b0c9d0b1887",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/i18n/ro.ts has no shipped Qubit counterpart at frontend/qubit-web/src/i18n/ro.ts (recorded missing, not drift).",
-   "upstream_blob_sha256": "d4650c7f712929e4d77ab1eb10bd0e703d89e74a8dc60781ed8f4b0c9d0b1887",
-   "affected_regression_test": null
-  },
-  {
-   "scope": "hermes-agent/web",
-   "category": "dashboard",
    "upstream": "web/src/i18n/ru.ts",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "5533c13cf2c20c1592e6a1c1f3474d5bda364403b2e8cf4b52236cbdbd668022",
@@ -1305,7 +1292,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "6ea777623aad4cc1f022779a2eef6748dfef688ca448ef460fdc68c5270a4a64",
    "qubit": "frontend/qubit-web/src/i18n/types.ts",
-   "qubit_sha256": "31e42b874b835096faa77da7f36fa84c0b570b86d33a49b1bd452b8b39f01610",
+   "qubit_sha256": "f88141a21dec99c73c2fd00d3ae218351d746b1325e7d86f2ef9dd52a5e8ccfa",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "6ea777623aad4cc1f022779a2eef6748dfef688ca448ef460fdc68c5270a4a64",
@@ -1409,7 +1396,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
    "qubit": "frontend/qubit-web/src/lib/api.ts",
-   "qubit_sha256": "bf2c65efb915b4dd432c737b557456295994a52f666c77b1ce992ab98fbac8f9",
+   "qubit_sha256": "379c3f66f6aa5ed61af7c27605d89b7ce78d6b8f729e3dccc8bc4a11ba131e70",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
@@ -1525,12 +1512,12 @@
    "upstream": "web/src/lib/chat-workspaces.ts",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "517ae8feac78726292e55e506d07a7f073e4a5ce767c1db3dd23b111104fab0e",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/chat-workspaces.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/chat-workspaces.ts (recorded missing, not drift).",
+   "qubit": "frontend/qubit-web/src/lib/chat-workspaces.ts",
+   "qubit_sha256": "349625e40e1c1e418971bab212a85f47f0ea9d3bb2a5a5eaa2eea13a1bdba59e",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "517ae8feac78726292e55e506d07a7f073e4a5ce767c1db3dd23b111104fab0e",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1902,12 +1889,12 @@
    "upstream": "web/src/lib/memory-provider-setup.ts",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "4620ff37edc3f91779cc431f3af886ece229655f1aaca0c1190ea1aad060cea9",
-   "qubit": null,
-   "qubit_sha256": null,
+   "qubit": "frontend/qubit-web/src/lib/memory-provider-setup.ts",
+   "qubit_sha256": "4620ff37edc3f91779cc431f3af886ece229655f1aaca0c1190ea1aad060cea9",
    "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/memory-provider-setup.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/memory-provider-setup.ts (recorded missing, not drift).",
+   "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline.",
    "upstream_blob_sha256": "4620ff37edc3f91779cc431f3af886ece229655f1aaca0c1190ea1aad060cea9",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_qubit_vendor8tf.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -2422,12 +2409,12 @@
    "upstream": "web/src/lib/terminal-font-refit.ts",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "220361a4c21bd8b094efa21bb2e9218c8a50465c86438a9478e26e16296b04c8",
-   "qubit": null,
-   "qubit_sha256": null,
+   "qubit": "frontend/qubit-web/src/lib/terminal-font-refit.ts",
+   "qubit_sha256": "220361a4c21bd8b094efa21bb2e9218c8a50465c86438a9478e26e16296b04c8",
    "patch": null,
-   "reason": "not vendored locally: pinned upstream file web/src/lib/terminal-font-refit.ts has no shipped Qubit counterpart at frontend/qubit-web/src/lib/terminal-font-refit.ts (recorded missing, not drift).",
+   "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline.",
    "upstream_blob_sha256": "220361a4c21bd8b094efa21bb2e9218c8a50465c86438a9478e26e16296b04c8",
-   "affected_regression_test": null
+   "affected_regression_test": "tests/test_qubit_vendor8tf.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -29695,17 +29682,6 @@
    "upstream": "apps/desktop/src/i18n/profile-provider.tsx",
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "06ffa345dd6a907b8941167d8989c5c19cb158c74486f14a1f8ba5ce7b723d0b",
-   "qubit": null,
-   "qubit_sha256": null,
-   "patch": null,
-   "reason": "Electron desktop shell hosting the same web UI; not shipped in this packet \u2014 Qubit serves the identical web UI from its own backend (frontend/qubit-web build). Desktop packaging is a follow-up build target; counterpart: Qubit distribution + web UI."
-  },
-  {
-   "scope": "hermes-agent/apps/desktop",
-   "category": "desktop-shell",
-   "upstream": "apps/desktop/src/i18n/ro.ts",
-   "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
-   "upstream_sha256": "66934d00da728d9547edb9df4969f340db0fcc4023c8f38af3de082111f23d39",
    "qubit": null,
    "qubit_sha256": null,
    "patch": null,

@@ -5,13 +5,13 @@
    "repo": "https://github.com/NousResearch/hermes-agent",
    "revision": "69948c005791d4d0e51670ca015238c2c7663749",
    "tag": "v0.21.5",
-   "path": "/home/trick/.hermes/hermes-agent"
+   "path": "/tmp/opencode/pinned/hermes-agent-69948c0057"
   },
   "openclaw": {
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/tmp/opencode/pinned/openclaw"
+   "path": "/tmp/opencode/pinned/openclaw-v2026.4.19-beta.2-28254-gda03996ab7"
   }
  },
  "counts_by_category": {
@@ -25,7 +25,7 @@
   "hermes_i18n_key": 746,
   "hermes_locale_key": 370,
   "hermes_model": 232,
-  "hermes_plugin": 19,
+  "hermes_plugin": 18,
   "hermes_plugin_api": 2,
   "hermes_plugin_asset": 4,
   "hermes_plugin_test": 1,
@@ -42,7 +42,7 @@
   "qubit_cli_subcommand": 245
  },
  "counts_by_source": {
-  "hermes": 8059,
+  "hermes": 8058,
   "openclaw": 138
  },
  "openclaw_extension_categories": {
@@ -45288,9 +45288,9 @@
   "ledger_revision": "working-tree",
   "hermes": {
    "ledger_rows": 591,
-   "inventory_items": 1798,
+   "inventory_items": 1797,
    "matched": 886,
-   "unmatched": 912,
+   "unmatched": 911,
    "evidence": 6261
   },
   "openclaw": {
@@ -46757,11 +46757,11 @@
   "parented_surfaces": 1037,
   "parented_covered": 1030,
   "parented_uncovered": 7,
-  "distinct_surfaces": 899,
-  "distinct_covered": 783,
+  "distinct_surfaces": 898,
+  "distinct_covered": 782,
   "distinct_uncovered": 116,
   "by_coverage": {
-   "(distinct)": 769,
+   "(distinct)": 768,
    "cli-alias": 33,
    "cli-option": 536,
    "dashboard-surface": 47,
@@ -68565,29 +68565,6 @@
    "parent_resolved": "model",
    "parent_status": "IMPLEMENTED",
    "parent_covered": true
-  },
-  {
-   "id": "plugin:__pycache__",
-   "source": "hermes",
-   "category": "hermes_plugin",
-   "name": "__pycache__",
-   "path": "plugins/__pycache__",
-   "ledger_match": null,
-   "ledger_source": null,
-   "ledger_status": null,
-   "parent_id": null,
-   "coverage": "",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
-   "fork_disposition": {
-    "status": "GATED",
-    "capability": "fork_plugin_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "plugin '__pycache__' is not present in the vendored fork plugin fleet; no Qubit wrapper.",
-    "needs": "owner"
-   }
   },
   {
    "id": "plugin:browser",

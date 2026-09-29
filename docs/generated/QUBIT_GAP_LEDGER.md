@@ -337,7 +337,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:POST /api/providers/validate` | hermes | creds | POST /api/providers/validate | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/sessions/owner-backfill` | hermes | owner | POST /api/sessions/owner-backfill | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:PUT /api/config/raw` | hermes | creds | PUT /api/config/raw | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:PUT /api/model/moa` | hermes | owner | PUT /api/model/moa | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
+| `api:PUT /api/model/moa` | hermes | owner | PUT /api/model/moa | tests/test_dashboard_audit_truthfulness9u.py::test_moa_defaults_do_not_fabricate_providers |
 | `api:WEBSOCKET /api/audio/speak-stream` | hermes | hardware | WEBSOCKET /api/audio/speak-stream | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:WEBSOCKET /api/console` | hermes | owner | WEBSOCKET /api/console | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:WEBSOCKET /api/events` | hermes | owner | WEBSOCKET /api/events | tests/test_dashboard_matrix9u.py::test_read_control_is_backend_verified |
