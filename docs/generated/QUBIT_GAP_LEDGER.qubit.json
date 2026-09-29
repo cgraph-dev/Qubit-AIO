@@ -21,8 +21,8 @@
   "dashboard_ops.catalog": 566,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
-  "qubit_compat.ROUTES": 451,
-  "qubit_compat.GATED": 94,
+  "qubit_compat.ROUTES": 453,
+  "qubit_compat.GATED": 95,
   "cli_families": 114,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
@@ -36,7 +36,7 @@
  "counts_by_status": {
   "IMPLEMENTED": 712,
   "OPERATOR_ONLY": 3,
-  "SAFE_EQUIVALENT": 36
+  "SAFE_EQUIVALENT": 37
  },
  "counts_by_area": {
   "acp": 3,
@@ -94,7 +94,7 @@
   "gateway": 10,
   "ghost": 20,
   "git": 4,
-  "hermes_gated": 30,
+  "hermes_gated": 31,
   "hermes_plugin": 9,
   "hermes_skill": 28,
   "hermes_tool": 73,
@@ -185,12 +185,12 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 751
+  "qubit-surface": 752
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
   "has-cli has-dashboard has-voice": 510,
-  "has-dashboard": 65,
+  "has-dashboard": 66,
   "has-dashboard has-voice": 4,
   "no-surface": 124
  },
@@ -8886,6 +8886,20 @@
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
    "note": "GPT-Live session creation exchanges an SDP offer with the vendor's /v1/live/sessions using a direct project key; Qubit makes no direct vendor call from the dashboard and never exports the key. routes=1",
+   "needs": "owner"
+  },
+  {
+   "id": "hermes_gate_ws_desktop_client_only",
+   "area": "hermes_gated",
+   "capability": "Gated upstream route: WS_DESKTOP_CLIENT_ONLY",
+   "upstream_ref": "hermes-agent",
+   "qubit_backend": "voicebridge.qubit_compat",
+   "cli": "",
+   "dashboard": "Qubit Desktop Bot-screen viewer (display.observe + bot-desktop lease)",
+   "voice": "",
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
+   "note": "The raw RFB display stream is a Qubit Desktop client surface: it needs a single-use `display.observe` ticket and a live Xvnc host bridge, neither of which this web listener runs. View a bot's screen in Qubit Desktop. routes=1",
    "needs": "owner"
   },
   {

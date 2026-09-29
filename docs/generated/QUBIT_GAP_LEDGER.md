@@ -23,8 +23,8 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
   - upstream_pin: 3a9d69db306cd7f081e06254cb89c4bcc14a7107
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
-- `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 751 rows
-  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=94, qubit_compat.ROUTES=451, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
+- `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 752 rows
+  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=95, qubit_compat.ROUTES=453, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
@@ -35,26 +35,25 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 ## Counts
 
-- Total rows: **1446**
-- Code-side open rows (not terminal): **3**
-- SAFE_EQUIVALENT (closed for code readiness): **144**
+- Total rows: **1447**
+- Code-side open rows (not terminal): **1**
+- SAFE_EQUIVALENT (closed for code readiness): **146**
 - OPERATOR_ONLY (manual/operator qualification): **10**
 - OPERATOR_ONLY_ARCHITECTURE (OPEN, architecture-gated; needs individual owner approval): **1**
 - Code-ready: **False**; fully complete (all manual qualified): **False**
 
 ### By status
 
-- IMPLEMENTED: 1289
-- MISSING: 2
+- IMPLEMENTED: 1290
 - OPERATOR_ONLY: 10
 - OPERATOR_ONLY_ARCHITECTURE: 1
-- SAFE_EQUIVALENT: 144
+- SAFE_EQUIVALENT: 146
 
 ### By source
 
 - hermes: 591
 - openclaw: 104
-- qubit: 751
+- qubit: 752
 
 ### By area
 
@@ -130,7 +129,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 - gateway-actions: 8
 - ghost: 20
 - git: 25
-- hermes_gated: 30
+- hermes_gated: 31
 - hermes_plugin: 9
 - hermes_skill: 28
 - hermes_tool: 73
@@ -237,20 +236,6 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 ## Code-side open rows (not IMPLEMENTED/SAFE_EQUIVALENT/OPERATOR_ONLY)
 
-### source: hermes (2 open)
-
-#### hermes / chat_workspaces (1)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `api:GET /api/chat/workspaces` | MISSING | owner | GET /api/chat/workspaces | — |
-
-#### hermes / display (1)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `api:WEBSOCKET /api/display/ws` | MISSING | owner | WEBSOCKET /api/display/ws | — |
-
 ### source: openclaw (1 open)
 
 #### openclaw / sessions (1)
@@ -261,7 +246,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 ## Terminal gate rows (SAFE_EQUIVALENT / OPERATOR_ONLY)
 
-### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (144)
+### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (146)
 
 | id | source | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -340,6 +325,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:PUT /api/model/moa` | hermes | owner | PUT /api/model/moa | tests/test_dashboard_audit_truthfulness9u.py::test_moa_defaults_do_not_fabricate_providers |
 | `api:WEBSOCKET /api/audio/speak-stream` | hermes | hardware | WEBSOCKET /api/audio/speak-stream | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:WEBSOCKET /api/console` | hermes | owner | WEBSOCKET /api/console | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
+| `api:WEBSOCKET /api/display/ws` | hermes | hardware | WEBSOCKET /api/display/ws | tests/test_route_gaps_wave22.py::test_display_ws_upgrade_is_a_typed_desktop_only_gate |
 | `api:WEBSOCKET /api/events` | hermes | owner | WEBSOCKET /api/events | tests/test_dashboard_matrix9u.py::test_read_control_is_backend_verified |
 | `api:WEBSOCKET /api/pty` | hermes | owner | WEBSOCKET /api/pty | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:WEBSOCKET /api/pub` | hermes | owner | WEBSOCKET /api/pub | tests/test_dashboard_matrix9u.py::test_safe_mutation_is_backend_verified |
@@ -403,6 +389,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `hermes_gate_ssh_ownership_operator` | qubit | owner | Gated upstream route: SSH_OWNERSHIP_OPERATOR | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_update_operator_owned` | qubit | owner | Gated upstream route: UPDATE_OPERATOR_OWNED | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_voice_live_vendor_direct` | qubit | owner | Gated upstream route: VOICE_LIVE_VENDOR_DIRECT | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
+| `hermes_gate_ws_desktop_client_only` | qubit | owner | Gated upstream route: WS_DESKTOP_CLIENT_ONLY | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_ws_single_path` | qubit | owner | Gated upstream route: WS_SINGLE_PATH | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `inv:openclaw-ext:cua-computer` | qubit | hardware | cua-computer | tests/test_openclaw_extensions_wave5.py |
 | `inv:openclaw-ext:image-generation-core` | qubit | creds | image-generation-core | tests/test_openclaw_closure_wave2_webmedia.py |

@@ -118,9 +118,8 @@
  "counts": {
   "total": 591,
   "by_status": {
-   "IMPLEMENTED": 483,
-   "MISSING": 2,
-   "SAFE_EQUIVALENT": 106
+   "IMPLEMENTED": 484,
+   "SAFE_EQUIVALENT": 107
   },
   "by_area": {
    "analytics-config": 4,
@@ -621,14 +620,14 @@
    "area": "chat_workspaces",
    "capability": "GET /api/chat/workspaces",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/chat_workspaces.py:64",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_chat_workspaces",
    "cli": "",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_route_gaps_wave22.py::test_chat_workspaces_reads_the_real_project_registry",
+   "note": "Read-only projection of voicebridge/projects.py (the same store CLI `qubit project` and voice `chat_workspaces` read). Qubit runs no git-root scanner, so repos=[] and scan_enabled=false rather than a fabricated discovered-repo list.",
+   "needs": "none"
   },
   {
    "id": "api:WEBSOCKET /api/console",
@@ -1335,14 +1334,14 @@
    "area": "display",
    "capability": "WEBSOCKET /api/display/ws",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/display.py:74",
-   "qubit_backend": "",
+   "qubit_backend": "voicebridge/qubit_compat.py:_NO_DISPLAY_WS",
    "cli": "",
    "dashboard": "",
    "voice": "",
-   "status": "MISSING",
-   "proving_test": "",
-   "note": "No Qubit compat row; route 404s.",
-   "needs": "owner"
+   "status": "SAFE_EQUIVALENT",
+   "proving_test": "tests/test_route_gaps_wave22.py::test_display_ws_upgrade_is_a_typed_desktop_only_gate",
+   "note": "The vendored bridge needs a single-use display.observe ticket and a live Xvnc host bridge; this listener runs neither, so the upgrade is refused with typed HTTP 426 WS_DESKTOP_CLIENT_ONLY (webui.py QUBIT_WS_GATE_CODES). Counterpart: the Qubit Desktop Bot-screen viewer.",
+   "needs": "hardware"
   },
   {
    "id": "api:GET /api/media",

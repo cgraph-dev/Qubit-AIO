@@ -4,11 +4,11 @@
  "fork_routes": 293,
  "catch_all_routes_excluded": 1,
  "classic_dispatch_routes": 90,
- "compat_routes": 451,
+ "compat_routes": 453,
  "counts": {
-  "qubit_addition": 156,
+  "qubit_addition": 157,
   "qubit_policy": 292,
-  "qubit_runtime": 43
+  "qubit_runtime": 42
  },
  "non_authoritative_handler_count": 41,
  "non_authoritative_handlers": [
@@ -132,6 +132,19 @@
    "classic_served": true,
    "qubit_handler": "h_audio_status",
    "source": "compat",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/chat/workspaces",
+   "route": "/api/chat/workspaces",
+   "owner": "qubit_addition",
+   "reason": "single-store read-authority quarantine (avoids split-brain against the matching Qubit write)",
+   "disposition": "implemented",
+   "fork_declares": true,
+   "classic_served": false,
+   "qubit_handler": "h_chat_workspaces",
+   "source": "fork",
    "sample_ok": true
   },
   {
@@ -5821,10 +5834,10 @@
    "route": "/api/display/ws",
    "owner": "qubit_policy",
    "reason": "WebSockets are refused with the typed WS_SINGLE_PATH policy; Qubit runs one SSE event path",
-   "disposition": "implemented",
+   "disposition": "gated",
    "fork_declares": true,
    "classic_served": false,
-   "qubit_handler": "",
+   "qubit_handler": "__gate__",
    "source": "fork",
    "sample_ok": true
   },
@@ -5929,19 +5942,6 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_audio_voice_live_status",
-   "source": "fork",
-   "sample_ok": true
-  },
-  {
-   "method": "GET",
-   "path": "/api/chat/workspaces",
-   "route": "/api/chat/workspaces",
-   "owner": "qubit_runtime",
-   "reason": "safe vendor-compatible route; the vendored runtime is the canonical implementation",
-   "disposition": "implemented",
-   "fork_declares": true,
-   "classic_served": false,
-   "qubit_handler": "",
    "source": "fork",
    "sample_ok": true
   },
