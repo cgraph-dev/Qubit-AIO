@@ -163,7 +163,13 @@ class VoiceCommand:
 
 def _norm(text: str) -> str:
     lowered = (text or "").strip().lower()
-    lowered = _WAKE_RE.sub(" ", lowered)
+    # A wake word is a PREFIX ("qubit, ...", "hey qubit ...", optionally after
+    # "please"). Strip only a leading run: the previous global substitution also
+    # removed "qubit" inside arguments, corrupting a path like
+    # ``/var/lib/qubit-.../ws`` before arg extraction saw it.
+    lowered = re.sub(
+        r"^\s*(?:please\s+)?(?:(?:hey|ok)\s+)?qubit\b[\s,.:;\-\u2013\u2014/]*",
+        " ", lowered)
     lowered = _PLEASE_RE.sub(" ", lowered)
     lowered = re.sub(r"[?.!,;:]+$", "", lowered)
     lowered = _WS_RE.sub(" ", lowered).strip()

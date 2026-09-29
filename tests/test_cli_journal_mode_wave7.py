@@ -291,7 +291,7 @@ def test_junk_file_is_not_a_convertible_sqlite_store(tmp_path, capsys):
 
     out = capsys.readouterr().out
     assert rc == 1, out
-    assert "not a Hermes SQLite store" in out, out
+    assert "not a Qubit SQLite store" in out, out
 
 
 def test_missing_database_reports_nothing_to_convert(tmp_path, capsys):

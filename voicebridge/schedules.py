@@ -1312,6 +1312,12 @@ def _contract_dispatch(cfg: Any, task_text: str, *, session: str,
         if isinstance(result, dict):
             return result
         return {"state": "OK", "code": "OK", "detail": str(result)[:300]}
+    # A settled confirmation that failed (e.g. a directive parse error) still
+    # carries the real per-job outcome under receipt.result; surface it instead
+    # of masking a typed FAILED as UNAVAILABLE.
+    result = (out.get("receipt") or {}).get("result")
+    if isinstance(result, dict) and result.get("state"):
+        return result
     return {"state": "UNAVAILABLE",
             "code": str(out.get("code")
                         or "SCHEDULE_DISPATCH_UNAVAILABLE"),

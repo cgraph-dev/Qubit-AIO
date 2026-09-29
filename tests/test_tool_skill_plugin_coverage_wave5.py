@@ -177,7 +177,11 @@ def test_fork_tool_registry_exposes_inventory_tools(inventory, fork_path):
                         if it["category"] == "hermes_tool")
     assert tool_names, "no hermes_tool inventory items"
 
-    missing = sorted(set(tool_names) - exposed)
+    # ``setup_mcp`` was folded into ``manage_connections``; only a replay shim
+    # remains (qubit_runtime/agent/inline_tool_executors.py:_setup_mcp_shim), so
+    # it is intentionally not an exposed tool. Every other inventory tool must be.
+    RETIRED_WITH_REPLAY_SHIM = {"setup_mcp"}
+    missing = sorted(set(tool_names) - exposed - RETIRED_WITH_REPLAY_SHIM)
     assert missing == [], f"fork runtime does not expose: {missing}"
 
     # Every directly-registered tool must be dispatchable (callable handler).

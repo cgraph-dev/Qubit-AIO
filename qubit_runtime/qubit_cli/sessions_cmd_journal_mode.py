@@ -10,6 +10,7 @@ ANY foreign process holds the file or a sidecar (``foreign_state_db_holders``), 
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -27,8 +28,15 @@ def _header_mode(db_path: Path) -> str:
     return _MODE_BY_HEADER_VERSION.get((head[18], head[19]), f"unknown({head[18]}/{head[19]})")
 
 
-def _refusal(target: str, current: str, *, on_cross_vm_fs: bool) -> Optional[str]:
-    """Admission checks independent of holder discovery, which is enforced for every platform."""
+def _refusal(target: str, current: str, platform: Optional[str] = None, *,
+              on_cross_vm_fs: bool, force: bool = False) -> Optional[str]:
+    """Admission checks independent of holder discovery, which is enforced for every platform.
+
+    ``platform`` is data (defaults to the host) so the policy is host-independent
+    and testable: changing the journal mode on Windows can corrupt a store other
+    processes hold open, so it requires ``--force`` there."""
+    if platform is None:
+        platform = sys.platform
     if current == "not-a-database" or current.startswith("unknown("):
         return (f"its file header reads {current}, so it is not a Qubit SQLite store this command can convert "
                 "(pass --db PATH to point at one).")
@@ -36,6 +44,9 @@ def _refusal(target: str, current: str, *, on_cross_vm_fs: bool) -> Optional[str
         return ("WAL shared memory silently corrupts on cross-VM filesystems (virtiofs/9p — Docker Desktop, "
                 "OrbStack, Lima bind mounts). Keep this store on journal_mode=delete or move it to a native "
                 "filesystem.")
+    if platform == "win32" and not force:
+        return ("changing journal_mode on Windows can corrupt a store another process holds open; "
+                "re-run with --force to override.")
     return None
 
 
@@ -59,7 +70,9 @@ def cmd_set_journal_mode(args) -> int:
         print(f"✓ {db_path} is already journal_mode={target}.")
         return 0
     refusal = _refusal(
-        target, current, on_cross_vm_fs=target == "wal" and _path_on_cross_vm_fs(str(db_path))
+        target, current,
+        on_cross_vm_fs=target == "wal" and _path_on_cross_vm_fs(str(db_path)),
+        force=getattr(args, "force", False),
     )
     if refusal:
         print(f"✗ Refusing to change the journal mode of {db_path}: {refusal}")

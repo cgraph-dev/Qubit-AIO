@@ -594,6 +594,17 @@ def skill_view(
         error, skill_dir, skill_md = _locate_skill(
             name, local_category_name, project_dirs, all_dirs)
         if error is not None:
+            # Read-old fallback: a legacy (pre-rename) skill name resolves to its
+            # Qubit name (e.g. ``hermes-agent`` -> ``qubit-agent``), so a cached
+            # caller or an old reference keeps working after the rename.
+            from agent.skill_utils import resolve_legacy_skill_name
+            legacy = resolve_legacy_skill_name(name)
+            if legacy != name:
+                error2, skill_dir2, skill_md2 = _locate_skill(
+                    legacy, local_category_name, project_dirs, all_dirs)
+                if error2 is None:
+                    error, skill_dir, skill_md, name = None, skill_dir2, skill_md2, legacy
+        if error is not None:
             return error
         try:  # read once — reused for platform check and main content
             content = _read_skill_text(skill_md)
