@@ -969,6 +969,15 @@ QUBIT_READ_AUTHORITY: tuple = (
     # while the Qubit POST/CLI/voice drive the Qubit manager — the read/write
     # split-brain this workstream exists to remove.
     "/api/qubit/update",
+    # Chat workspace picker (v0.21.5). The canonical Qubit project registry
+    # (voicebridge.projects, the store ``qubit project`` + the voice
+    # ``chat_workspaces`` entry manage) must back the picker: proxied to the
+    # fork's per-profile ``projects.db``, a workspace created through the CLI
+    # or voice never appeared on /chat — the same read/write split-brain as the
+    # entries above. Serve GET from ``h_chat_workspaces``; the handler honestly
+    # reports ``repos=[]`` / ``scan_enabled=false`` because Qubit runs no
+    # git-root scanner.
+    "/api/chat/workspaces",
 )
 
 
@@ -1100,6 +1109,9 @@ QUBIT_WS_GATE_CODES: Dict[str, str] = {
     "/api/pub": "WS_SINGLE_PATH",
     "/api/audio/speak-stream": "WS_SINGLE_PATH",
     "/api/plugins/kanban/events": "WS_SINGLE_PATH",
+    # Raw RFB Bot Desktop viewer: needs a display.observe ticket + an Xvnc host
+    # bridge this listener does not run. Typed refusal, never a fake stream.
+    "/api/display/ws": "WS_DESKTOP_CLIENT_ONLY",
 }
 
 QUBIT_WS_GATE_DETAIL: Dict[str, str] = {
@@ -1109,11 +1121,17 @@ QUBIT_WS_GATE_DETAIL: Dict[str, str] = {
     "WS_SINGLE_PATH": (
         "The upstream tui_gateway WebSocket dialect is not served; Qubit keeps "
         "one event path (SSE feed + ops). Chat uses Qubit Chat."),
+    "WS_DESKTOP_CLIENT_ONLY": (
+        "The raw RFB display stream is a Qubit Desktop client surface: it "
+        "needs a single-use display.observe ticket and a live Xvnc host "
+        "bridge, neither of which this web listener runs."),
 }
 
 QUBIT_WS_GATE_COUNTERPART: Dict[str, str] = {
     "PTY_NO_SHELL": "overlay Qubit Chat tab (POST /api/qubit/chat) + CLI `qubit tui`",
     "WS_SINGLE_PATH": "GET /api/events/stream (SSE) + POST /api/qubit/chat",
+    "WS_DESKTOP_CLIENT_ONLY": (
+        "Qubit Desktop Bot-screen viewer (display.observe + bot-desktop lease)"),
 }
 
 QUBIT_WS_OWNER = "qubit-policy"
