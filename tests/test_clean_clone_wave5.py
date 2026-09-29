@@ -182,6 +182,11 @@ def test_clean_clone_wheel_without_dashboard_is_a_typed_fail(clean_clone, tmp_pa
 
 
 def test_tree_with_built_dashboard_produces_a_shipping_wheel(clean_clone, tmp_path):
+    # ``frontend/qubit-dist`` is a gitignored build input; without a build there
+    # is nothing to ship, so the release path is only exercised when it exists.
+    if not (REPO / "frontend" / "qubit-dist").is_dir():
+        import pytest
+        pytest.skip("dashboard bundle not built (frontend/qubit-dist absent)")
     # simulate the release-tree path: the tree already carries the built bundle
     shutil.copytree(REPO / "frontend" / "qubit-dist",
                     clean_clone / "frontend" / "qubit-dist")

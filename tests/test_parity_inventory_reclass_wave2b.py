@@ -16,8 +16,9 @@ rename map / CLI surface could not see the working Qubit counterpart:
 * ``GET /api/hermes/update/check`` / ``POST /api/hermes/update`` -- intentional
   brand renames to ``/api/qubit/update*`` (real handlers).
 
-Genuinely missing (stay MISSING): ``GET /api/chat/workspaces``,
-``GET /api/hermes/update/receipt``, ``WEBSOCKET /api/display/ws``.
+Formerly missing routes, now closed (wave 22): ``GET /api/chat/workspaces``
+(real project-registry read) and ``WEBSOCKET /api/display/ws`` (typed 426
+``WS_DESKTOP_CLIENT_ONLY`` gate). No reference route stays MISSING.
 
 These tests pin the corrected classification and prove the counterpart map is
 validated against the real source, so it cannot rot into a fabricated row.
@@ -39,10 +40,7 @@ RECLASSIFIED_CLI = (
     "hermes plugins check-updates",
     "hermes plugins trust-update-url",
 )
-STILL_MISSING = (
-    ("route", "GET /api/chat/workspaces"),
-    ("route", "WEBSOCKET /api/display/ws"),
-)
+STILL_MISSING = ()
 
 
 # ------------------------------------------------------------- source backing
@@ -157,5 +155,8 @@ def test_committed_artifact_reflects_reclassifications():
                 ("route", "GET /api/hermes/update/receipt"),
                 ("route", "POST /api/hermes/update")):
         assert rows[key]["classification"] == "PORTED", key
-    for key in STILL_MISSING:
-        assert rows[key]["classification"] == "MISSING", key
+    # Both v0.21.5 route gaps are now CLOSED (no longer MISSING): the chat
+    # workspaces backend is a real read (PORTED); the raw-RFB display WS is a
+    # typed 426 WS_DESKTOP_CLIENT_ONLY gate (GATED, not a missing route).
+    assert rows[("route", "GET /api/chat/workspaces")]["classification"] == "PORTED"
+    assert rows[("route", "WEBSOCKET /api/display/ws")]["classification"] == "GATED"

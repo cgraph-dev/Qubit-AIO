@@ -241,16 +241,11 @@ def test_implemented_api_rows_use_real_handlers_and_evidence() -> None:
     assert offenders == [], offenders
 
 
-#: Genuine v0.21.5 reference routes Qubit does not implement yet, recorded as
-#: documented-open rather than claimed terminal: the chat workspace picker's
-#: backend (``GET /api/chat/workspaces``) and the raw-RFB Bot Desktop viewer
-#: (``WEBSOCKET /api/display/ws``). The parity inventory independently pins
-#: both ``MISSING`` (tests/test_parity_inventory_reclass_wave2b.py), so the
-#: ledger must not pretend they are served.
-DOCUMENTED_OPEN_ROWS = {
-    "api:GET /api/chat/workspaces": "MISSING",
-    "api:WEBSOCKET /api/display/ws": "MISSING",
-}
+#: Genuine v0.21.5 reference routes that were documented-open are now CLOSED
+#: (wave 22): ``GET /api/chat/workspaces`` is a real read of the canonical
+#: project registry, and ``WEBSOCKET /api/display/ws`` is a typed 426
+#: ``WS_DESKTOP_CLIENT_ONLY`` gate. No hermes-ledger row remains open.
+DOCUMENTED_OPEN_ROWS = {}
 
 
 def test_all_rows_are_terminal_or_open() -> None:
@@ -258,13 +253,13 @@ def test_all_rows_are_terminal_or_open() -> None:
 
     ``skills/index-cache`` is a vendored JSON asset cache with no loadable
     ``SKILL.md``; it is a non-capability and is excluded from the surface
-    inventory entirely. The two documented-open routes above stay visible as
-    ``MISSING`` -- never silently closed.
+    inventory entirely. The two v0.21.5 route gaps are now closed, so every
+    committed row is terminal.
     """
     rows = _section()["rows"]
     non_terminal = [(r["id"], r["status"]) for r in rows
                     if r["status"] not in gap_ledger.TERMINAL_STATUSES]
-    assert non_terminal == sorted(DOCUMENTED_OPEN_ROWS.items())
+    assert non_terminal == sorted(DOCUMENTED_OPEN_ROWS.items()) == []
     # The pre-2026-09-13 gate statuses must not leak into the committed section.
     for stale in ("GATED", "PARTIAL", "UNVERIFIED", "CLI_ONLY",
                   "DASHBOARD_ONLY", "VOICE_ONLY"):

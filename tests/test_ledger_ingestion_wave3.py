@@ -507,25 +507,17 @@ def test_require_inventory_complete_fails_when_inventory_absent(tmp_path) -> Non
 # ---------------------------------------------------------------------------
 # The vendored ``skills/index-cache`` JSON asset cache is excluded from the
 # surface inventory as a non-capability, so the committed ledger has no open row
-# for it. The remaining documented-open rows are the owner-gated architecture
-# row (OC-48) plus the two genuine v0.21.5 routes Qubit does not implement yet
-# -- pinned ``MISSING`` by the parity inventory
-# (tests/test_parity_inventory_reclass_wave2b.py) -- so they stay visible open
-# rows, never silently closed.
-DOCUMENTED_OPEN_ROW_IDS = (
-    "OC-48",
-    "api:GET /api/chat/workspaces",
-    "api:WEBSOCKET /api/display/ws",
-)
+# for it. The two v0.21.5 route gaps (chat workspaces, raw-RFB display) are now
+# CLOSED (wave 22), leaving only the owner-gated architecture row (OC-48) open.
+DOCUMENTED_OPEN_ROW_IDS = ("OC-48",)
 
 
 def test_committed_ledgers_carry_the_documented_open_row() -> None:
     """The committed sections carry exactly the documented-open rows.
 
     Owner amendment 2026-09-22: ``OPERATOR_ONLY_ARCHITECTURE`` rows are OPEN
-    until individually approved, so ``OC-48`` stays open; the chat-workspaces
-    backend and the raw-RFB display viewer are documented-open v0.21.5 gaps.
-    The code-ready gate is correctly closed.
+    until individually approved, so ``OC-48`` stays open; the two v0.21.5 route
+    gaps are now closed (wave 22). The code-ready gate is correctly closed.
     """
     sections, missing, _ = gap_ledger.load_sections(
         REPO_ROOT / "docs" / "generated")
