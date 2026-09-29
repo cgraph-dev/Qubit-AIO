@@ -1,1 +1,0 @@
-var e=e=>{try{return atob(e)}catch{return``}},t=e(`SGVybWVz`),n=e(`T3BlbkNsYXc=`),r=RegExp(`\\b(`+t+`|`+n+`)\\b`,`gi`);function i(e){return e.replace(r,`Qubit`)}function a(e){return e?i(String(e)):``}export{a as n,i as t};

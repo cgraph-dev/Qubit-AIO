@@ -607,14 +607,25 @@ def test_api_profiles_requires_auth(tmp_path, monkeypatch):
 
 
 def test_api_profiles_list_and_show(tmp_path, monkeypatch):
-    ui, _, _ = _make_ui(tmp_path, monkeypatch)
+    # `/api/profiles` serves the reference profile registry (one authority:
+    # qubit_cli.profiles), not the provider/brain registry -- see
+    # tests/test_qubit_api_parity_wave1.py::_seed_profile ("the one registry
+    # /api/profiles serves") and the reference web_routers/profiles.py
+    # list_profiles_endpoint. `voicebridge.profiles` remains the provider
+    # manifest registry (asserted directly by test_profile_list_resolves_active).
+    ui, _, cfg = _make_ui(tmp_path, monkeypatch)
     try:
+        from voicebridge import qubit_compat as HC
+        active = HC._profiles_module(cfg).get_active_profile() or "default"
+
         st, body = _get(ui, "/api/profiles")
         assert st == 200
-        assert body["active"]["brain"] == "qubit-brain4"
+        assert isinstance(body["profiles"], list)
+        assert body["active"]["id"] == active
+
         st, body = _get(ui, "/api/profiles?kind=brain")
         assert st == 200
-        assert body["active"]["id"] == "qubit-brain4"
+        assert body["active"]["id"] == active
     finally:
         ui.stop()
 

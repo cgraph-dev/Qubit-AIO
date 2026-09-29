@@ -43,7 +43,7 @@ CANDIDATE_ROOT="${QUBIT_CANDIDATE_ROOT:-/tmp/qubit-v0215-candidate}"
 CURRENT_ROOT="${QUBIT_CURRENT_ROOT:-$REPO_ROOT}"
 DELTA_OUT="${QUBIT_DELTA_OUT:-$REPO_ROOT/docs/generated/audit/V0_21_5_DELTA.json}"
 PYTHON="${QUBIT_PYTHON:-python3}"
-LIVE_ROOT="${QUBIT_LIVE_ROOT:-/home/trick/Projects/Repos/qubit-voicebridge}"
+LIVE_ROOT="${QUBIT_LIVE_ROOT:-$HOME/Projects/Repos/qubit-voicebridge}"
 MARKER_NAME=".rebase_v0215_state.json"
 #: Modules the candidate must contain and import (the v0.21.5 token additions).
 NEW_MODULES=(qubit_state_health qubit_yaml)

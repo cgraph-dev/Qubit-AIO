@@ -349,6 +349,14 @@ def secret_scan(root: Path, *, include_py: bool = True,
     # 4A/6B): sample utterances intentionally carry FAKE credential-shaped
     # strings. Recorded separately, never treated as live secrets.
     skip.add("voicebridge/evaluation")
+    # docs/generated and docs/archive are generated/historical evidence, not
+    # shipped product surfaces (owner decision #24: docs/archive is
+    # historical-only). They intentionally carry repro strings with FAKE
+    # credential shapes (e.g. the forensic-baseline ``sk-…`` probe) and
+    # generated audit/ledger records keyed ``secret``; the shipped-secret gate
+    # applies to product code, not these non-shipped records.
+    skip.add("docs/generated")
+    skip.add("docs/archive")
     patterns = ["*.py"] if include_py else []
     if include_yaml:
         patterns += ["*.yaml", "*.yml", "*.service", "*.timer", "*.json",

@@ -53,8 +53,14 @@ LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
              "qubit_cli", "toolsets", "providers",
              # Other vendored fork top-level modules imported lazily after
              # ``qubit_runtime.ensure_path()``: ``agent`` (credential pool /
-             # runtime), ``tools`` (skills), and ``qubit_state`` (SessionDB).
-             "agent", "tools", "qubit_state"}
+             # runtime), ``tools`` (skills), ``qubit_state`` (SessionDB),
+             # ``gateway`` (control plane), ``plugins`` (plugin runtime),
+             # ``cron`` (scheduler), ``utils`` (atomic writes),
+             # ``qubit_state_timeline`` (session timeline reads),
+             # ``qubit_constants`` (home resolution), and ``acp_adapter``
+             # (ACP entry). All are local fork source, not PyPI distributions.
+             "agent", "tools", "qubit_state", "gateway", "plugins", "cron",
+             "utils", "qubit_state_timeline", "qubit_constants", "acp_adapter"}
 
 
 # Distribution-name -> import-name corrections (pip name differs from module).

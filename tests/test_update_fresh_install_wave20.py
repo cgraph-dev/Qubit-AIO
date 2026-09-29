@@ -31,7 +31,11 @@ sys.path.insert(0, str(REPO_ROOT))
 
 # Captured before any test patches HOME: the read-only reference home.
 REAL_HOME = Path(os.path.expanduser("~")).resolve()
-VENV_PY = REPO_ROOT / ".venv" / "bin" / "python"
+# A linked worktree has no repo-local ``.venv``; fall back to the interpreter
+# running the suite (the shared venv), the same worktree-tolerant pattern as
+# tests/test_update_branding_help_wave21.py.
+_VENV_PY = REPO_ROOT / ".venv" / "bin" / "python"
+VENV_PY = _VENV_PY if _VENV_PY.is_file() else Path(sys.executable)
 
 FAKE_OPENAI = "sk-FAKEOPENAI0123456789abcdef"
 FAKE_DEEPSEEK = "sk-FAKEDEEPSEEK0123456789abcdef"

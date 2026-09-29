@@ -46,12 +46,9 @@ PRESENT_VENDORED_UPDATE_MODULES = (
     "qubit_cli.update_receipt",
     "qubit_cli.update_handoff",
     "qubit_cli.service_manager",
-)
-
-#: Reference update modules with no vendored counterpart because the
-#: Qubit-owned updater supersedes them. Documented, not a broken import: the
-#: vendored update path does not reference them.
-SUPERSEDED_VENDORED_MODULES = (
+    # The v0.21.5+ pin (69948c0057) vendors the full reference update path again;
+    # these were absent under the earlier pin and are now import-complete. The
+    # Qubit-owned updater still fronts them (voicebridge.update_manager).
     "qubit_cli.update_cmd_check",
     "qubit_cli.update_channel",
     "qubit_cli.update_completion",
@@ -94,8 +91,9 @@ def test_vendored_update_modules_import_or_are_documented_absent():
     """(c) vendored rebranded update path is import-complete.
 
     The vendored modules are top-level (``qubit_cli.*``); the product puts the
-    fork on ``sys.path`` via ``ensure_path()``. Superseded reference modules
-    must genuinely be absent (and are not referenced by the vendored path).
+    fork on ``sys.path`` via ``ensure_path()``. Under the current pin every
+    reference update module is vendored and must import; the Qubit-owned
+    updater still fronts the surface (see OWNED_UPDATE_MODULES).
     """
     from voicebridge import qubit_runtime
 
@@ -105,9 +103,6 @@ def test_vendored_update_modules_import_or_are_documented_absent():
         qubit_runtime.ensure_path()
         for name in PRESENT_VENDORED_UPDATE_MODULES:
             importlib.import_module(name)
-        for name in SUPERSEDED_VENDORED_MODULES:
-            with pytest.raises(ModuleNotFoundError):
-                importlib.import_module(name)
     finally:
         sys.path[:] = saved_path
         for mod in [m for m in sys.modules if m == "qubit_cli" or m.startswith("qubit_cli.")]:

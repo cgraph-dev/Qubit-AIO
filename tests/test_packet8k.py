@@ -163,13 +163,20 @@ def test_scan_text_machine_paths_prose_not_path():
     assert "/home/example" in hits
 
 
-def test_machine_path_scan_classifies_personalization():
+def test_machine_path_scan_classifies_personalization(tmp_path):
     res = R.machine_path_scan(REPO)
     assert res["core"] == {}   # portable core has no machine paths
     # Packet 8K: personal launcher targets moved OUT of actions.py into the
     # operator-local override; actions.py is now portable core, not personalization.
     assert "voicebridge/local/actions.py" not in res["personalization"]
-    assert "config/task-templates.yaml" in res["personalization"]
+    # config/task-templates.yaml is the operator's PERSONAL, git-ignored file
+    # (PII rule; absent in a clean checkout), so exercise the classification on
+    # a constructed fixture rather than depending on the developer's machine.
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "task-templates.yaml").write_text(
+        "templates:\n- script: ~/Projects/Repos/example-app/.venv/bin/python\n")
+    fixture = R.machine_path_scan(tmp_path)
+    assert "config/task-templates.yaml" in fixture["personalization"]
 
 
 def test_secret_scan_excludes_tests_and_eval_fixtures():

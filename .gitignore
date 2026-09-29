@@ -42,9 +42,15 @@ config/task-templates.yaml
 /dist/
 
 # Vendored dashboard build artifacts (regenerable; see
-# frontend/qubit-app/README.md). Vendored SOURCES are committed; the prebuilt
-# served bundle under frontend/qubit-dist is tracked as a release input.
+# frontend/qubit-app/README.md). The vendored SOURCES (frontend/qubit-web,
+# frontend/qubit-app) are committed; the generated bundle under
+# frontend/qubit-dist is NOT — scripts/build_dashboard.sh rebuilds it, and
+# pyproject force-includes it at build time so a release tree that carries it
+# ships the dashboard (see scripts/hatch_build_qubit.py). Keeping it untracked
+# means a fresh clone omits it, exactly as tests/test_clean_clone_wave5.py
+# requires.
 frontend/qubit-web/node_modules/
+frontend/qubit-dist/
 
 # Runtime state artifacts that must never be committed (created under CWD by
 # some tests when no state dir is injected).
