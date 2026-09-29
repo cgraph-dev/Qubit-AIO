@@ -5,13 +5,13 @@
    "repo": "https://github.com/NousResearch/hermes-agent",
    "revision": "69948c005791d4d0e51670ca015238c2c7663749",
    "tag": "v0.21.5",
-   "path": "/home/trick/.cache/qubit-pins/hermes-agent"
+   "path": "/tmp/opencode/pinned/hermes-agent-69948c0057"
   },
   "openclaw": {
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/home/trick/.cache/qubit-pins/openclaw"
+   "path": "/tmp/opencode/pinned/openclaw-v2026.4.19-beta.2-28254-gda03996ab7"
   }
  },
  "counts_by_category": {
