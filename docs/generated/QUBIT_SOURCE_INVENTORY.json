@@ -11772,7 +11772,7 @@
     "upstream_path": "plugins/hermes-achievements/dashboard/plugin_api.py",
     "upstream_blob": "887293666d7b0feb3673df65dc1b04d746858940",
     "upstream_sha256": "b7f0003cfd8316480bced95af3bc7559b909d8d344f62287d9cd7ba0ada8b061",
-    "local_sha256": "2c93b25bc174e8b2f301874e9dfaf2c67aa6a527077e7d3d4c4de691ca7d2294"
+    "local_sha256": "27cd550350d479f097a7cbd9375da1ca5af3c167ed92ef69453392ebaaace82b"
    },
    {
     "path": "plugins/qubit-achievements/tests/test_achievement_engine.py",

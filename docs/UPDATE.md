@@ -9,7 +9,7 @@ Everything here is Qubit. No legacy assistant name appears in this document;
 legal/provenance attribution lives only in `LICENSE` and
 `THIRD_PARTY_NOTICES.md`.
 
-**Canonical repository:** `https://github.com/cgraph-dev/qubit-voicebridge`.
+**Canonical repository:** `https://github.com/cgraph-dev/Qubit-AIO`.
 The default remote is `origin`, the default branch is `main`, and the default
 channel is `stable`.
 
@@ -17,7 +17,7 @@ channel is `stable`.
 
 | Setting | Default | Config key | Notes |
 |---|---|---|---|
-| Repository identity | `https://github.com/cgraph-dev/qubit-voicebridge` | — | The canonical public Qubit repo (`cgraph-dev/qubit-voicebridge`). A **default destination only**, never a hard requirement. |
+| Repository identity | `https://github.com/cgraph-dev/Qubit-AIO` | — | The canonical public Qubit repo (`cgraph-dev/Qubit-AIO`). A **default destination only**, never a hard requirement. |
 | Remote name | `origin` | `update.remote` | A git remote *name*. The clone's own `origin` is always allowed — a public user's `origin` **is** the Qubit repo. |
 | Branch | `main` | `update.branch` | Tracked when a channel follows the branch head. |
 | Tag | *(none)* | `update.tag` | Optional explicit version tag (e.g. `v1.2.3`). |
@@ -157,7 +157,7 @@ Related locations:
 PYTHONPATH=. .venv/bin/python -c \
   "from voicebridge import update_channel as C; \
    print(C.resolve_source({}, None)); print(C.resolve_channel({})); \
-   print(C.validate_remote_url('https://github.com/cgraph-dev/qubit-voicebridge.git'))"
+   print(C.validate_remote_url('https://github.com/cgraph-dev/Qubit-AIO.git'))"
 ```
 
 ## Provenance (legal note — do not remove from the license/notices)

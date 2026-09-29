@@ -590,8 +590,12 @@ def scan_sessions(limit: Optional[int] = None, progress_callback: Optional[Any] 
         # A fresh QUBIT_HOME has no state.db yet: an absent store is an empty
         # history (a successful zero-session scan), not a scan failure. Only a
         # genuine open error is reported as "failed".
-        message = str(exc).lower()
-        if isinstance(exc, FileNotFoundError) or "unable to open database file" in message:
+        try:
+            from qubit_constants import get_process_qubit_home
+            store_missing = not (get_process_qubit_home() / "state.db").exists()
+        except Exception:
+            store_missing = isinstance(exc, FileNotFoundError)
+        if store_missing:
             return {"sessions": [], "aggregate": {}, "error": None,
                     "scan_meta": _scan_meta("full", 0)}
         return {"sessions": [], "aggregate": {}, "error": f"Could not open SessionDB: {exc}", "scan_meta": _scan_meta("failed", 0)}
