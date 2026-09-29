@@ -10,13 +10,13 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 ## Summary
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
-- Inventory items (all categories): **8197**
+- Inventory items (all categories): **8196**
 - Candidate omissions (uncovered surface items): **123**
 - Distinct capability gaps (no parent row): **116**
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **7**
 - Parented surfaces covered by an IMPLEMENTED parent: **1030**
-- Distinct capabilities total: **899**; parented surfaces total: **1037**
-- Fork-runtime dispositions (tools/skills/plugins): **176** (IMPLEMENTED 158, GATED 18)
+- Distinct capabilities total: **898**; parented surfaces total: **1037**
+- Fork-runtime dispositions (tools/skills/plugins): **175** (IMPLEMENTED 158, GATED 17)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=16084 identical=9630 missing=25 extra=31 changed=6423
 
@@ -379,13 +379,12 @@ These are coverage evidence for their parent, not separate gaps.
 - `schedules_list`: 32 surface(s) — coverage `workflow-surface`
 - `webui_status`: 48 surface(s) — coverage `dashboard-surface`
 
-## Fork-runtime dispositions for tools / skills / plugins (176)
+## Fork-runtime dispositions for tools / skills / plugins (175)
 
 Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
 
-### `fork_plugin_runtime` (19; IMPLEMENTED 17, GATED 2)
+### `fork_plugin_runtime` (18; IMPLEMENTED 17, GATED 1)
 
-- `plugin:__pycache__` — **GATED**; backend `—`; plugin '__pycache__' is not present in the vendored fork plugin fleet; no Qubit wrapper.
 - `plugin:browser` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:context_engine` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:cron_providers` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
