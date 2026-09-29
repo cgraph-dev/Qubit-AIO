@@ -270,3 +270,16 @@ lineage. Newly surfaced typed refusal codes that are not in the frozen copy:
 - `RETIREMENT_OPERATOR_OWNED` — `POST /api/health/retirement` is an
   operator-owned backend retirement; the read-only `GET /api/health/idle`
   diagnostic is the safe counterpart.
+
+### Wave 22 additions
+
+- `WS_DESKTOP_CLIENT_ONLY` — `WEBSOCKET /api/display/ws` streams raw RFB from
+  a profile's Xvnc to the Qubit Desktop viewer through a single-use
+  `display.observe` ticket plus the bot-desktop lease. This listener runs
+  neither the tui_gateway dialect that mints the ticket nor an Xvnc host, so
+  the upgrade is answered with a typed HTTP 426 (the same single-event-path WS
+  gate as `PTY_NO_SHELL` / `WS_SINGLE_PATH`) rather than a fabricated byte
+  stream. Counterpart: the Qubit Desktop Bot-screen viewer
+  (`display.observe` + bot-desktop lease). Declared in
+  `voicebridge/qubit_compat.py` (`_NO_DISPLAY_WS`) and enforced in
+  `voicebridge/webui.py` (`QUBIT_WS_GATE_CODES`).

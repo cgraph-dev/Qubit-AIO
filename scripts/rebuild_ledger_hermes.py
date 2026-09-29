@@ -154,6 +154,7 @@ _GATE_CODE_NEEDS = {
     "BACKUP_PASSPHRASE": "creds",
     "AUDIO_LEASE_DESKTOP": "hardware",
     "AUDIO_STREAM_LOCAL": "hardware",
+    "WS_DESKTOP_CLIENT_ONLY": "hardware",
     "AUDIO_ACTION_LOCAL": "hardware",
     "LOCAL_MODEL_BROKERED": "hardware",
     "LOCAL_MODEL_UNAVAILABLE": "hardware",
@@ -576,6 +577,31 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
               "re-supplied at confirm.")),
     ("POST", "/api/ops/security-audit"): dict(status="IMPLEMENTED", note=(
         "Runs the Qubit security posture op (local read).")),
+    # v0.21.5 chat workspace picker backend: a real read over the ONE canonical
+    # Qubit project registry (no per-profile projects.db + repo scanner), so
+    # `repos` is empty and `scan_enabled` false by design.
+    ("GET", "/api/chat/workspaces"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_chat_workspaces",
+        test=("tests/test_route_gaps_wave22.py::"
+              "test_chat_workspaces_reads_the_real_project_registry"),
+        note=("Read-only projection of voicebridge/projects.py (the same store "
+              "CLI `qubit project` and voice `chat_workspaces` read). Qubit "
+              "runs no git-root scanner, so repos=[] and scan_enabled=false "
+              "rather than a fabricated discovered-repo list.")),
+    # Raw RFB Bot Desktop viewer: a typed 426 gate on webui.py (no display
+    # bridge / no Xvnc host on this listener), never a fabricated stream.
+    ("WEBSOCKET", "/api/display/ws"): dict(
+        status="GATED", code="WS_DESKTOP_CLIENT_ONLY",
+        backend="voicebridge/qubit_compat.py:_NO_DISPLAY_WS",
+        needs="hardware",
+        test=("tests/test_route_gaps_wave22.py::"
+              "test_display_ws_upgrade_is_a_typed_desktop_only_gate"),
+        note=("The vendored bridge needs a single-use display.observe ticket "
+              "and a live Xvnc host bridge; this listener runs neither, so the "
+              "upgrade is refused with typed HTTP 426 WS_DESKTOP_CLIENT_ONLY "
+              "(webui.py QUBIT_WS_GATE_CODES). Counterpart: the Qubit Desktop "
+              "Bot-screen viewer.")),
 }
 
 

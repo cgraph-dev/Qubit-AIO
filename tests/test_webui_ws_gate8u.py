@@ -41,6 +41,9 @@ WS_API_PATHS = [
     ("/api/audio/speak-stream", "WS_SINGLE_PATH"),
     # Vendored Kanban plugin live-update socket: typed refusal, not a bare 401.
     ("/api/plugins/kanban/events", "WS_SINGLE_PATH"),
+    # Raw RFB Bot Desktop viewer: needs a display.observe ticket + an Xvnc host
+    # bridge this listener does not run; typed refusal, never a fake stream.
+    ("/api/display/ws", "WS_DESKTOP_CLIENT_ONLY"),
 ]
 
 # The refused upgrade endpoints (all but the supported Qubit PTY terminal).
@@ -118,7 +121,7 @@ def _http(port, method, path, body=None, token="test-token"):
 
 def test_ws_gate_mapping_is_exactly_the_gated_endpoints():
     from voicebridge.webui import QUBIT_WS_GATE_CODES, qubit_ws_gate_code
-    assert len(QUBIT_WS_GATE_CODES) == len(WS_API_PATHS) == 7
+    assert len(QUBIT_WS_GATE_CODES) == len(WS_API_PATHS) == 8
     assert set(QUBIT_WS_GATE_CODES) == {p for p, _ in WS_API_PATHS}
     for path, code in WS_API_PATHS:
         assert qubit_ws_gate_code(path) == code, path

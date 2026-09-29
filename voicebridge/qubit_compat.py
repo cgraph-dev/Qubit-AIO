@@ -6289,6 +6289,55 @@ def h_profiles_projects_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                errors=[])
 
 
+def h_chat_workspaces(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/chat/workspaces -> real dirs a fresh ``/chat`` may start in.
+
+    Ported wire shape from the v0.21.5 vendored router
+    (``qubit_runtime/qubit_cli/web_routers/chat_workspaces.py:64``); Qubit has
+    no per-profile ``projects.db`` + repo-discovery scanner, so this is a
+    read-only projection of the ONE canonical Qubit project registry
+    (:mod:`voicebridge.projects`) — the same store the CLI ``qubit project``,
+    the dashboard Projects page, and the voice ``chat_workspaces`` entry read.
+
+    ``repos`` is the honest empty list and ``scan_enabled`` is ``False``:
+    Qubit runs no background git-root scanner, so it never fabricates a
+    discovered-repo list. ``scan=1`` is accepted and is a no-op for the same
+    reason. ``default_cwd`` is the active project's primary folder when one is
+    set, else the process home — the real fallback a fresh chat lands in.
+    """
+    from . import projects as PJ
+    try:
+        res = PJ.list_projects(cfg)
+        active = PJ.active_project(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    projects: List[Dict[str, Any]] = []
+    for rec in res.get("projects", []) if isinstance(res, dict) else []:
+        if not isinstance(rec, dict):
+            continue
+        primary = rec.get("primary")
+        folders = [{"path": str(f), "label": None,
+                    "is_primary": bool(f == primary)}
+                   for f in (rec.get("folders") or [])]
+        projects.append({
+            "id": str(rec.get("slug", "")),
+            "slug": str(rec.get("slug", "")),
+            "name": str(rec.get("name", "") or ""),
+            "primary_path": primary,
+            "archived": bool(rec.get("archived", False)),
+            "folders": folders,
+        })
+    default_cwd = ""
+    if isinstance(active, dict) and active.get("state") == "OK":
+        default_cwd = str((active.get("project") or {}).get("primary") or "")
+    if not default_cwd:
+        default_cwd = str(Path.home())
+    return _ok(projects=projects, repos=[], default_cwd=default_cwd,
+               home=str(Path.home()), scan_enabled=False,
+               qubit_counterpart="CLI `qubit project list` + dashboard Projects")
+
+
 def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """POST /api/profiles -> create a real reference profile (one registry).
@@ -7174,6 +7223,20 @@ _NO_AUDIO_STREAM = _g("AUDIO_STREAM_LOCAL",
                       "Streaming PCM TTS is served by the local voice "
                       "pipeline, not as a compat WebSocket.",
                       "classic Qubit voice playback + Qubit Chat")
+# ``/api/display/ws`` streams raw RFB from a profile's Xvnc to the Qubit
+# Desktop viewer, gated by a single-use ``display.observe`` ticket + the
+# bot-desktop lease (vendored ``web_routers/display.py``). This listener runs
+# no tui_gateway dialect (so no ``display.observe`` mints a ticket) and hosts
+# no Xvnc/RFB socket, so the honest answer is a typed refusal — the viewer is a
+# Qubit Desktop client surface, and a fabricated byte stream is never served.
+_NO_DISPLAY_WS = _g(
+    "WS_DESKTOP_CLIENT_ONLY",
+    "The raw RFB display stream is a Qubit Desktop client surface: it needs a "
+    "single-use `display.observe` ticket and a live Xvnc host bridge, neither "
+    "of which this web listener runs. View a bot's screen in Qubit Desktop.",
+    "Qubit Desktop Bot-screen viewer (display.observe + bot-desktop lease)",
+    owner="qubit-policy",
+    rollback="nothing started; nothing to roll back")
 # GPT-Live session creation is the one reference audio route that performs a
 # DIRECT vendor call (POST https://api.openai.com/v1/live/sessions) with a
 # project key. Qubit forbids direct vendor calls from the dashboard and never
@@ -7620,6 +7683,10 @@ _r("GET", r"/api/providers/custom-endpoints", "h_custom_endpoints")
 _r("GET", r"/api/profiles/sessions/sidebar", "h_profiles_sessions_sidebar")
 _r("GET", r"/api/profiles/sessions", "h_profiles_sessions")
 _r("GET", r"/api/profiles/projects/tree", "h_profiles_projects_tree")
+# v0.21.5 chat workspace picker backend: real read over the canonical Qubit
+# project registry (the vendored router read per-profile projects.db; Qubit's
+# one registry is the same authority). Read-only, never a fabricated list.
+_r("GET", r"/api/chat/workspaces", "h_chat_workspaces")
 _r("POST", r"/api/profiles", "h_profile_create")
 _r("GET", r"/api/tools/terminal/backends", "h_terminal_backends")
 _r("GET", r"/api/tools/computer-use/status", "h_computer_use_status")
@@ -7945,6 +8012,10 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/audio/tts-lease", _NO_AUDIO_LEASE),
     ("GET", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
     ("POST", r"/api/audio/speak-stream", _NO_AUDIO_STREAM),
+    # Raw RFB Bot Desktop viewer: the webui.py WS gate enforces the typed 426
+    # ``WS_DESKTOP_CLIENT_ONLY``; this row keeps the route declared on the ONE
+    # authority table (no fabricated RFB stream, no second WS server).
+    ("WEBSOCKET", r"/api/display/ws", _NO_DISPLAY_WS),
     # GPT-Live session creation is direct-vendor-key only; typed refusal. The
     # read-only readiness route is implemented above.
     ("POST", r"/api/audio/voice-live/session", _GATE_VOICE_LIVE_SESSION),
@@ -13878,6 +13949,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_profiles_sessions": h_profiles_sessions,
     "h_profiles_sessions_sidebar": h_profiles_sessions_sidebar,
     "h_profiles_projects_tree": h_profiles_projects_tree,
+    "h_chat_workspaces": h_chat_workspaces,
     "h_profile_create": h_profile_create,
     "h_terminal_backends": h_terminal_backends,
     "h_computer_use_status": h_computer_use_status,
