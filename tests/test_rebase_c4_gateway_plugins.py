@@ -74,7 +74,7 @@ def test_run_shutdown_uses_qubit_cmd_local():
 
 def test_perplexity_headers_are_debranded(runtime_on_path):
     provider = importlib.import_module("plugins.web.perplexity.provider")
-    assert provider._HEADERS["HTTP-Referer"] == "https://github.com/cgraph-dev/qubit-voicebridge"
+    assert provider._HEADERS["HTTP-Referer"] == "https://github.com/cgraph-dev/Qubit-AIO"
     assert provider._HEADERS["X-Pplx-Integration"] == "qubit-agent"
     assert provider._HEADERS["User-Agent"].startswith("Qubit-Agent/")
     assert "Her" "mesAgent/" not in provider._HEADERS["User-Agent"]

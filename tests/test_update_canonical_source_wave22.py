@@ -1,7 +1,7 @@
 """Wave 22 — canonical Qubit update source resolution.
 
-The canonical public repository is ``cgraph-dev/qubit-voicebridge``
-(``https://github.com/cgraph-dev/qubit-voicebridge.git``), channel ``stable``,
+The canonical public repository is ``cgraph-dev/Qubit-AIO``
+(``https://github.com/cgraph-dev/Qubit-AIO.git``), channel ``stable``,
 branch ``main``. This suite proves, hermetically (injected git runners and
 injected remote-URL lookups — no network, no real checkout, no ``~/.hermes``):
 
@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 LOCAL_SHA = "a" * 40
 REMOTE_SHA = "b" * 40
-CANONICAL = "https://github.com/cgraph-dev/qubit-voicebridge.git"
+CANONICAL = "https://github.com/cgraph-dev/Qubit-AIO.git"
 OPENCLAW_ORIGIN = "https://github.com/cgraph-dev/openclaw-voice-bridge.git"
 HERMES_ORIGIN = "https://github.com/NousResearch/hermes-agent.git"
 

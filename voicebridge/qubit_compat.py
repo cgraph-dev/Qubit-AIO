@@ -6338,7 +6338,12 @@ def h_profile_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if provider and model:
         try:
             from qubit_cli.web_routers.profiles import _write_profile_model
-            _write_profile_model(path, provider, model)
+            from qubit_constants import get_process_qubit_home
+            # Validate against THIS dashboard's home (the catalog the picker
+            # offered), not the just-created empty profile; the write still lands
+            # in the new profile (parity with web_routers/profiles.py).
+            _write_profile_model(path, provider, model,
+                                 validate_in=get_process_qubit_home())
             model_set = True
         except Exception as exc:  # noqa: BLE001 - reported, not fatal
             model_error = _redact(str(exc))[:200]
@@ -9217,6 +9222,12 @@ def profile_model(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         from qubit_cli.web_routers.profiles import _write_profile_model
         _write_profile_model(prof_dir, provider, model)
     except Exception as exc:
+        from fastapi import HTTPException
+        if isinstance(exc, HTTPException):
+            return int(exc.status_code), {
+                "ok": False, "code": "MODEL_REJECTED",
+                "detail": _redact(str(getattr(exc, "detail", exc)))[:300],
+                "qubit_counterpart": "CLI `qubit agent profile model`"}
         return _fail(exc)
     _audit("profile.model", "dashboard:user",
            {"name": name, "provider": provider, "model": model})

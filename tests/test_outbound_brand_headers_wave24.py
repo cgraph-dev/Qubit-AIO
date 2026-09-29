@@ -6,7 +6,7 @@ carry the legacy brand:
 
 * ``User-Agent: HermesAgent/<version>`` -> ``User-Agent: QubitAgent/<version>``
 * ``HTTP-Referer: https://hermes-agent.nousresearch.com`` ->
-  ``https://github.com/cgraph-dev/qubit-voicebridge`` (the canonical Qubit source)
+  ``https://github.com/cgraph-dev/Qubit-AIO`` (the canonical Qubit source)
 
 Deliberately NOT covered (preserved by rule):
 
@@ -56,7 +56,7 @@ ATTRIBUTION_CLIENT_FILES = (
 
 LEGACY_USER_AGENT_TOKEN = "HermesAgent/"
 LEGACY_REFERER_HOST = "hermes-agent.nousresearch.com"
-CANONICAL_REFERER = "https://github.com/cgraph-dev/qubit-voicebridge"
+CANONICAL_REFERER = "https://github.com/cgraph-dev/Qubit-AIO"
 
 # A dict/JSON ``HTTP-Referer`` entry whose value is the legacy upstream host.
 LEGACY_REFERER_PATTERN = re.compile(

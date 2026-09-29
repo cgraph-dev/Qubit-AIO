@@ -12,6 +12,32 @@ temp HOME so no operator bin dir is touched.
 """
 from __future__ import annotations
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _stub_model_validation(monkeypatch):
+    """Hermetic: the real ``switch_model`` probes provider catalogs/credentials.
+    This tmp home has neither, so stub it to the accepted result and exercise the
+    create/set *persistence* contract the suite actually guards (the credential
+    rejection path is covered by the vendored
+    ``qubit_runtime/tests/qubit_cli/test_web_profiles_model_scope.py``)."""
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    if str(root / "qubit_runtime") not in sys.path:
+        sys.path.insert(0, str(root / "qubit_runtime"))
+    from qubit_cli import model_switch
+
+    def _fake(**kw):
+        return model_switch.ModelSwitchResult(
+            success=True, new_model=kw.get("raw_input", ""),
+            target_provider=kw.get("explicit_provider", ""),
+            provider_changed=True, base_url="https://example.invalid/v1")
+
+    monkeypatch.setattr(model_switch, "switch_model", _fake)
+
 
 def _cfg(tmp_path, monkeypatch):
     from voicebridge import config as C

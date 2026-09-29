@@ -123,11 +123,11 @@ def test_installer_source_is_qubit_owned_and_configurable(runtime_on_path, monke
     """Owner decision 2026-09-27: one configurable, Qubit-owned installer source."""
     from qubit_cli import install_source as s
 
-    assert "cgraph-dev/qubit-voicebridge" in s.DEFAULT_BASE_URL
+    assert "cgraph-dev/Qubit-AIO" in s.DEFAULT_BASE_URL
     assert "hermes" not in s.base_url().lower()
     assert "openclaw" not in s.base_url().lower()
     assert s.install_sh_url().endswith("/raw/main/scripts/install.sh")
-    assert "/qubit-voicebridge/" in s.install_sh_url()
+    assert "/Qubit-AIO/" in s.install_sh_url()
     assert s.releases_base_url() == f"{s.base_url()}/releases"
 
     # A single override changes every derived URL.

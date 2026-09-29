@@ -213,7 +213,9 @@ def test_flag_off_keeps_compat_behavior_and_rollback(tmp_path):
             out = json.loads(r.read())
         # Qubit compat status shape, not the fork's raw /api/status.
         assert out.get("schema") == "qubit-runtime-status/1", out
-        assert "overall" not in out, "flag off must not serve the fork"
+        # h_status also serves the reference components/overall rollup (B4-03,
+        # pinned by tests/test_overlay_regressions.py); the compat-only
+        # discriminator is the schema string, which the fork's /api/status lacks.
     finally:
         ui.stop()
 
@@ -273,8 +275,11 @@ def test_flag_on_serves_fork_reads_and_gates_sensitive(tmp_path):
         "  'reads': reads}))\n")
     assert out["status"] == 200
     served = json.loads(out["body"])
-    # Fork status document, never the empty Qubit compat envelope.
-    assert served.get("schema") is None, served
+    # /api/status is on webui.QUBIT_READ_AUTHORITY (gateway-supervision
+    # authority, pinned by tests/test_dashboard_control_confirm9u.py), so this
+    # read stays on the Qubit compat status document. Fork-read proof is the
+    # non-quarantined reads below (/api/health, /api/env, openapi).
+    assert served.get("schema") == "qubit-runtime-status/1", served
     assert served.get("version") and served.get("release_date"), served
     assert "overall" in served and "components" in served, served
     # The env read is the fork's real (non-empty) environment document.
@@ -336,13 +341,15 @@ def test_write_policy_is_fail_closed_and_never_bypasses_a_gate(
     assert HA.safe_write_to_proxy("POST", "/api/sessions/import") is False
 
     # Allowlisted, but a Qubit-typed gate still refuses; the fork is never used.
+    # (sessions/import is a real confirm-gated handler now; the receipt-store
+    # gate lives on sessions/owner-backfill — tests/test_sessions_mutations_wave18.py.)
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
-                        {("POST", "/api/sessions/import")})
-    allowed, refusal = HA.write_policy(cfg, "POST", "/api/sessions/import")
+                        {("POST", "/api/sessions/owner-backfill")})
+    allowed, refusal = HA.write_policy(cfg, "POST", "/api/sessions/owner-backfill")
     assert allowed is False and refusal is not None, (allowed, refusal)
     assert refusal[0] == 501 and \
         refusal[1]["code"] == "SESSIONS_RECEIPT_STORE", refusal
-    assert HA.safe_write_to_proxy("POST", "/api/sessions/import") is False
+    assert HA.safe_write_to_proxy("POST", "/api/sessions/owner-backfill") is False
 
     # The one Qubit emergency stop refuses an allowlisted write.
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
@@ -378,7 +385,7 @@ def test_webui_write_middleware_proxies_only_allowlisted_writes(
     monkeypatch.setattr(HA, "known_route", lambda _p: True)
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
                         {("POST", "/api/cron/jobs"),
-                         ("POST", "/api/sessions/import")})
+                         ("POST", "/api/sessions/owner-backfill")})
 
     class _FakeOrch:
         _route = "local"
@@ -411,7 +418,7 @@ def test_webui_write_middleware_proxies_only_allowlisted_writes(
         assert st == 200 and out.get("proxied_by_fork") is True, (st, out)
         assert calls == [("POST", "/api/cron/jobs")], calls
         # Allowlisted but Qubit-gated: the typed gate wins; no fork call.
-        st, out = _post("/agent/api/sessions/import")
+        st, out = _post("/agent/api/sessions/owner-backfill")
         assert st == 501 and out.get("code") == "SESSIONS_RECEIPT_STORE", out
         assert calls == [("POST", "/api/cron/jobs")], calls
     finally:

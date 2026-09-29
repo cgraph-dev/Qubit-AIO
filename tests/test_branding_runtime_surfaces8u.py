@@ -179,10 +179,10 @@ def test_provenance_urls_are_not_falsified():
     """
     electron = _read(sorted(
         p for p in ELECTRON.glob("*.ts") if ".test." not in p.name))
-    assert "github.com/cgraph-dev/qubit-voicebridge" in electron
+    assert "github.com/cgraph-dev/Qubit-AIO" in electron
     assert "github.com/NousResearch/hermes-agent" not in electron
     pkg = (DESKTOP / "package.json").read_text(encoding="utf-8")
-    assert "git+https://github.com/cgraph-dev/qubit-voicebridge.git" in pkg
+    assert "git+https://github.com/cgraph-dev/Qubit-AIO.git" in pkg
     assert "git+https://github.com/NousResearch/hermes-agent.git" not in pkg
     debug = (REPO / "qubit_runtime" / "qubit_cli" / "debug.py").read_text(
         encoding="utf-8")

@@ -35,6 +35,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
+from qubit_cli.gateway_multiplex_mode import (
+    default_gateway_multiplexes,
+    live_gateway_pid_for_home,
+)
+
 logger = logging.getLogger(__name__)
 
 _LEGACY_MAIN_CHOICES = ("report", "rekey", "move")
@@ -137,7 +142,6 @@ def _gateway_multiplexes(root: Path) -> bool:
     """Does the default gateway serve every profile? Same reader as every other CLI surface: the live
     record, else the explicit flag, else False — an unset flag is a verdict only the gateway reaches,
     and guessing "yes" would uproot a standalone gateway's own routing index."""
-    from qubit_cli.gateway_multiplex_mode import default_gateway_multiplexes
     try:
         return default_gateway_multiplexes(root)
     except Exception:
@@ -145,7 +149,6 @@ def _gateway_multiplexes(root: Path) -> bool:
 
 
 def live_gateway_homes(stores: Iterable[Store]) -> List[Tuple[str, int]]:
-    from gateway.status import live_gateway_pid_for_home
     live = []
     for store in stores:
         pid = live_gateway_pid_for_home(store.home)

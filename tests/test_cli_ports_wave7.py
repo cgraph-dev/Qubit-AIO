@@ -175,7 +175,11 @@ def test_profile_migrate_identity_temp_dir_is_a_noop_and_idempotent(tmp_path):
 def test_profile_purge_identity_refuses_a_live_profile(tmp_path):
     home = tmp_path / "home"
     qh = tmp_path / "qh"
-    (qh / "profiles" / "live").mkdir(parents=True)
+    live = qh / "profiles" / "live"
+    live.mkdir(parents=True)
+    # A resolvable profile carries identity (qubit_constants.named_profile_has_identity);
+    # a bare directory is not "live" and must be purgeable.
+    (live / "config.yaml").write_text("model: {}\n", encoding="utf-8")
 
     r = _run_agent(tmp_path, ["profile", "purge-identity", "live"],
                    home=home, qubit_home=qh)

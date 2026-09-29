@@ -7725,7 +7725,7 @@ _E("actions_receipt", "Show action receipt",
    examples=("qubit, show action receipt",),
    help="One execution receipt.")
 _E("ghost_list", "List Ghost capabilities",
-   ("list ghost capabilities", "ghost capabilities", "ghost list"),
+   ("list ghost capabilities", "ghost capabilities"),
    "ghost", ("ghost",), fixed=(("action", "list"),),
    examples=("qubit, list ghost capabilities",),
    help="Supervised adapter inventory.")
@@ -7927,7 +7927,7 @@ _E("opencode_receipts", "Coding receipts",
    examples=("qubit, list coding runs",),
    help="Recent coding-run receipts.")
 _E("verified_list", "List verified skills",
-   ("list verified skills", "verified skills", "curated skills"),
+   ("list verified skills", "curated skills"),
    "verified", ("skills",), args=(_C("action", ("list",), required=False),
                                   _S("status")),
    fixed=(("action", "list"),),

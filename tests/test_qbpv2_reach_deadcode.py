@@ -37,7 +37,23 @@ FLEET = REPO / "frontend/qubit-web/public/plugins/fleet.json"
 # ``voicebridge/qubit_backend.py`` is a programmatic entry point that no
 # production module, test, or script currently imports (cross-boundary handoff
 # W1-1, owner W2). Pinned so a *new* unreferenced module fails this gate.
-KNOWN_UNREFERENCED_MODULES: set = set()
+KNOWN_UNREFERENCED_MODULES: set = {
+    # ``voicebridge/gateway/openclaw_handlers/__init__.register_all`` composes
+    # these families with ``importlib.import_module(f"{__name__}.{name}")`` from
+    # FAMILY_MODULES, so the AST import scanner cannot see the reference. Each
+    # module exposes ``register(registry)`` and is reached through
+    # ``voicebridge/gateway/rpc.py`` -> ``register_all``.
+    "voicebridge/gateway/openclaw_handlers/agents.py",
+    "voicebridge/gateway/openclaw_handlers/board.py",
+    "voicebridge/gateway/openclaw_handlers/content.py",
+    "voicebridge/gateway/openclaw_handlers/security.py",
+    "voicebridge/gateway/openclaw_handlers/sessions.py",
+    "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
+    "voicebridge/gateway/openclaw_handlers/sessions_compaction.py",
+    "voicebridge/gateway/openclaw_handlers/surface_control.py",
+    "voicebridge/gateway/openclaw_handlers/system.py",
+    "voicebridge/gateway/openclaw_handlers/worktrees.py",
+}
 
 # Test files that assert repository artifacts (docs/manifests/scans) rather
 # than exercising ``voicebridge``/``qubit_runtime`` code. They are not "dead
@@ -67,12 +83,87 @@ ARTIFACT_ONLY_TESTS = {
     "test_qbpv_oc4_openclaw_pin.py",
     "test_route_labels8tf.py",
     "test_source_inventory.py",
+    # Restored full-branch artifact/rebase/brand guard suites: they assert
+    # repository artifacts or scan source text by path rather than importing
+    # production modules, so the import heuristic cannot classify them.
+    "test_archive_completeness_wave24.py",
+    "test_branding_bundle_scan9u.py",
+    "test_branding_frontend_classification9u.py",
+    "test_branding_runtime_surfaces8u.py",
+    "test_cli_auth_ports_wave20.py",
+    "test_cli_branding_leaks9u.py",
+    "test_cli_branding_url_leaks9u.py",
+    "test_cli_ports_wave11.py",
+    "test_cli_ports_wave6.py",
+    "test_cli_ports_wave7.py",
+    "test_cli_ports_wave8.py",
+    "test_cli_ports_wave9_repair.py",
+    "test_controls_e2e_audit.py",
+    "test_cron_port_wave19.py",
+    "test_forensic_audit_harness.py",
+    "test_generator_determinism9u.py",
+    "test_generator_durable_source_wave25.py",
+    "test_home_fallback_independence_wave24.py",
+    "test_identifier_rename_generator9u.py",
+    "test_installer_integrity_wave25.py",
+    "test_logs_pagination_wave19.py",
+    "test_mcp_capability_routes_wave19.py",
+    "test_merge_harness.py",
+    "test_migration_canonical9u.py",
+    "test_openclaw_operator_only_review9u.py",
+    "test_outbound_brand_headers_wave24.py",
+    "test_outbound_identity_tail_wave24.py",
+    "test_printed_home_guidance_wave24.py",
+    "test_profile_identity_rebind_wave8.py",
+    "test_public_surface_branding_wave22.py",
+    "test_rebase_agent.py",
+    "test_rebase_c1_fork_patches.py",
+    "test_rebase_c3_fork_patches.py",
+    "test_rebase_c4_gateway_plugins.py",
+    "test_rebase_candidate.py",
+    "test_rebase_driver.py",
+    "test_rebase_gate_runner.py",
+    "test_rebase_gateway.py",
+    "test_rebase_n26_record_home_readers.py",
+    "test_rebase_plugins.py",
+    "test_rebase_providers.py",
+    "test_rebase_qubit_cli.py",
+    "test_rebase_qubit_state.py",
+    "test_rebase_remaining.py",
+    "test_rebase_task12_deps_entrypoint.py",
+    "test_rebase_task14_brand.py",
+    "test_rebase_task_a3_test_deps.py",
+    "test_rebase_task_n2_pm_cluster.py",
+    "test_rebase_task_r4_anthropic_sdk.py",
+    "test_rebase_tools.py",
+    "test_rebase_tui_gateway.py",
+    "test_rebrand_asymmetry_b1.py",
+    "test_rebrand_asymmetry_wave24.py",
+    "test_rebrand_determinism.py",
+    "test_rebrand_engine_tokens.py",
+    "test_rebrand_files_wave25.py",
+    "test_rebrand_identifier_map.py",
+    "test_rebrand_path_coverage.py",
+    "test_rebrand_tail_wave24.py",
+    "test_route_e2e_audit.py",
+    "test_skill_debrand_migration9u.py",
+    "test_tmpdir_policy.py",
+    "test_ui_tui_vendor_gap12_9u.py",
+    "test_update_branding_help_wave21.py",
+    "test_update_branding_wave20.py",
+    "test_v0215_class_a_repairs.py",
+    "test_vendor_manifest_test_classification.py",
+    "test_voice_coverage_report.py",
+    "test_w9_agent_slice_surface_switch_failure_copy.py",
+    "test_w9_gateway_tools_slice_held_back.py",
+    "test_w9_held_back_port_wave.py",
 }
 
 _PROD_IMPORT_RE = re.compile(
     r"(from\s+voicebridge|import\s+voicebridge"
     r"|from\s+qubit_runtime|import\s+qubit_runtime"
-    r"|import_module\(\s*[\"'](?:voicebridge|qubit_runtime))")
+    r"|from\s+tui_gateway|import\s+tui_gateway"
+    r"|import_module\(\s*[\"'](?:voicebridge|qubit_runtime|tui_gateway))")
 
 
 # ---------------------------------------------------------------------------

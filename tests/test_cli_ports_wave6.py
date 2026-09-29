@@ -128,7 +128,9 @@ def test_plugins_browse_renders_index_without_error(tmp_path):
     assert r.returncode == 0, (r.returncode, r.stderr[-600:])
     assert "Traceback" not in r.stderr, r.stderr[-600:]
     assert r.stdout.strip(), "browse produced no output"
-    assert "index source" in r.stdout.lower(), r.stdout[:400]
+    # The community index was retired for the curated pinned catalog
+    # (owner decision #19); browse renders the curated table.
+    assert "plugin catalog" in r.stdout.lower(), r.stdout[:400]
 
 
 def test_ported_commands_are_registered_in_the_vendored_parser(tmp_path):

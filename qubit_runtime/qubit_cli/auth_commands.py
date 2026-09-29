@@ -887,11 +887,18 @@ def _interactive_strategy() -> None:
 
 
 def auth_upgrade_command(args) -> None:
-    """``qubit auth upgrade``: sign the free tier into a Qubit account, keeping its connectors."""
-    from qubit_cli.anon_auth import upgrade_guest
-    code = upgrade_guest(args)
-    if code:
-        raise SystemExit(code)
+    """``qubit auth upgrade``: OPERATOR-OWNED EXTERNAL.
+
+    Upgrading the free tier into a registered Qubit/Nous account needs a real
+    account plus network round-trips — not a local capability. Typed refusal,
+    never a silent success; use ``qubit auth add nous`` / ``qubit setup`` once
+    Qubit-owned credentials are provided out-of-band.
+    """
+    print("\u2717 qubit auth upgrade is operator-owned (no local account upgrade to perform).")
+    print("  Provide Qubit-owned credentials out-of-band, then use "
+          "`qubit auth add nous` / `qubit setup`.")
+    print("  (code: AUTH_UPGRADE_OPERATOR_OWNED)")
+    raise SystemExit(3)
 
 
 _AUTH_ACTIONS = {

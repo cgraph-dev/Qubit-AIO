@@ -67,7 +67,7 @@ def test_install_source_docs_helpers_are_qubit_owned_and_configurable(
     monkeypatch.delenv("QUBIT_RAW_ASSET_BASE_URL", raising=False)
 
     docs_base = s.docs_base_url()
-    assert "qubit-voicebridge" in docs_base
+    assert "qubit-aio" in docs_base.lower()
     assert "hermes" not in docs_base.lower()
     assert "nousresearch" not in docs_base.lower()
 
@@ -77,7 +77,7 @@ def test_install_source_docs_helpers_are_qubit_owned_and_configurable(
     assert s.docs_url() == docs_base
 
     raw = s.raw_asset_url("website/static/api/model-catalog.json")
-    assert "qubit-voicebridge" in raw
+    assert "qubit-aio" in raw.lower()
     assert "hermes" not in raw.lower()
     assert "nousresearch" not in raw.lower()
 
@@ -104,7 +104,7 @@ def test_install_source_docs_helpers_are_qubit_owned_and_configurable(
 
 def _assert_t2_qubit_owned(value: str) -> None:
     lowered = value.lower()
-    assert "qubit-voicebridge" in lowered, value
+    assert "qubit-aio" in lowered, value
     for legacy in ("hermes", "nousresearch", "nousresearch.com", "openclaw"):
         assert legacy not in lowered, (value, legacy)
 
@@ -227,7 +227,7 @@ def test_t2_installer_repo_identity_is_qubit_owned():
         text = path.read_text(encoding="utf-8")
         assert "NousResearch/hermes-agent" not in text, path
         assert "hermes-agent.git" not in text, path
-        assert "cgraph-dev/qubit-voicebridge" in text, path
+        assert "cgraph-dev/Qubit-AIO" in text, path
 
 
 

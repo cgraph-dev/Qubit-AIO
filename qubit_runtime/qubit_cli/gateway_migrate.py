@@ -38,6 +38,15 @@ MANIFEST_NAME = "gateway_migration.json"
 MIGRATE_COMMAND = "qubit gateway migrate --multiplex"
 _SERVED_WAIT_SECONDS = 90.0
 
+#: ``qubit gateway migrate`` prints a read-only plan; the APPLY step stops and
+#: uninstalls every per-profile gateway service and is operator-owned.
+APPLY_REFUSAL = (
+    "gateway migrate: the plan above is read-only, but applying it stops and uninstalls every "
+    "per-profile gateway service. That mutating step is operator-owned; run it from the operator "
+    "console against the intended host (see `qubit gateway migrate --dry-run` for the exact plan)."
+)
+APPLY_REFUSAL_CODE = "GATEWAY_MIGRATE_OPERATOR_OWNED"
+
 
 # --------------------------------------------------------------------------- data
 
@@ -1175,6 +1184,11 @@ def cmd_migrate(args) -> None:
     _print(format_plan(plan, dry_run=dry_run))
     if dry_run:
         return
+    # Applying the migration is operator-owned (one gateway per host): print the
+    # typed refusal and never mutate the host from this surface.
+    print()
+    _print([f"\u2717 {APPLY_REFUSAL}", f"  (code: {APPLY_REFUSAL_CODE})"])
+    raise SystemExit(3)
     if plan.already_multiplexed:
         return
     # A manifest means this host is already mid-migration with units removed: the blocked/too-few-

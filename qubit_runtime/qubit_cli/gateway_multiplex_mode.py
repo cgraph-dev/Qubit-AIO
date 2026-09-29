@@ -50,6 +50,17 @@ RETIRED_OPT_OUT_REASON = (
 REWRITTEN_MARKER_NAME = ".multiplex_opt_out_rewritten"
 
 
+def live_gateway_pid_for_home(home: Path) -> Optional[int]:
+    """Compat delegate to ``gateway.status.live_gateway_pid_for_home`` (native in 0.21.5).
+
+    This module carried the 0.21.1 stand-in for that helper before the v0.21.5
+    rebase. ``qubit_cli.sessions_repair_profiles`` still imports it from here, so
+    keep one Qubit-owned seam that delegates to the native identity reader.
+    """
+    from gateway.status import live_gateway_pid_for_home as _live
+    return _live(Path(home))
+
+
 def explicit_multiplex_flag(default_home: Path) -> Optional[bool]:
     """The operator's explicit choice for the DEFAULT profile's gateway: a recognized
     ``GATEWAY_MULTIPLEX_PROFILES``, else ``gateway.multiplex_profiles`` (or the top-level alias) as
