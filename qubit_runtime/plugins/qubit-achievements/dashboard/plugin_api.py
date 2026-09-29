@@ -587,6 +587,13 @@ def scan_sessions(limit: Optional[int] = None, progress_callback: Optional[Any] 
         # scan, and counted toward the "live SessionDB handles" precursor (#100896).
         db = SessionDB(read_only=True)
     except Exception as exc:
+        # A fresh QUBIT_HOME has no state.db yet: an absent store is an empty
+        # history (a successful zero-session scan), not a scan failure. Only a
+        # genuine open error is reported as "failed".
+        message = str(exc).lower()
+        if isinstance(exc, FileNotFoundError) or "unable to open database file" in message:
+            return {"sessions": [], "aggregate": {}, "error": None,
+                    "scan_meta": _scan_meta("full", 0)}
         return {"sessions": [], "aggregate": {}, "error": f"Could not open SessionDB: {exc}", "scan_meta": _scan_meta("failed", 0)}
 
     previous_checkpoint = load_checkpoint()

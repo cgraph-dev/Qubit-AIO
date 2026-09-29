@@ -2614,7 +2614,7 @@
    "dashboard": "hermes-dist Models",
    "voice": "voice model",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_dashboard_matrix9u.py::test_read_control_is_backend_verified",
+   "proving_test": "tests/test_dashboard_audit_truthfulness9u.py::test_moa_defaults_do_not_fabricate_providers",
    "note": "Served wire shape: MoA fan-out is not shipped and the config reports disabled (ordered fallback is the counterpart).",
    "needs": "none"
   },
@@ -2628,7 +2628,7 @@
    "dashboard": "hermes-dist Models",
    "voice": "voice model",
    "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
+   "proving_test": "tests/test_dashboard_audit_truthfulness9u.py::test_moa_defaults_do_not_fabricate_providers",
    "note": "Typed policy gate MOA_SUPERSEDED via compat dispatcher.",
    "needs": "owner"
   },

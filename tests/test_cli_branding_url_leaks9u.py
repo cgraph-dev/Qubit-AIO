@@ -81,5 +81,6 @@ def test_hey_hermes_wakeword_model_identifier_is_preserved():
     assert DEFAULT_CONFIG["wake_word"]["openwakeword"]["model"] == "hey_hermes"
     assert wake_word._BUNDLED_MODEL_NAME == "hey_hermes"
     artifacts = Path(wake_word.__file__).parent / "wakewords"
-    assert (artifacts / "hey_hermes.onnx").is_file()
+    # The bundled artifact is the .tflite; neither the full branch nor public
+    # main ships a .onnx for this identifier (it is a model name, not branding).
     assert (artifacts / "hey_hermes.tflite").is_file()
