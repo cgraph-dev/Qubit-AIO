@@ -16,8 +16,8 @@
       "reference": {
         "gated": 76,
         "missing": 11,
-        "ported": 737,
-        "total": 824
+        "ported": 736,
+        "total": 823
       }
     },
     "by_surface": {
@@ -42,14 +42,14 @@
       "tool": {
         "gated": 10,
         "missing": 0,
-        "ported": 112,
-        "total": 122
+        "ported": 111,
+        "total": 121
       }
     },
     "gated": 127,
     "missing": 11,
-    "ported": 1252,
-    "total": 1390
+    "ported": 1251,
+    "total": 1389
   },
   "e2e_verified": false,
   "generated_from": {
@@ -123,13 +123,13 @@
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
     "qubit_compat.GATED": 68,
-    "qubit_compat.ROUTES": 448,
+    "qubit_compat.ROUTES": 449,
     "qubit_voice_top": 113,
     "reference_cli_sub": 317,
     "reference_cli_top": 71,
     "reference_optional_mcps": 65,
     "reference_routes": 277,
-    "reference_skills": 30,
+    "reference_skills": 29,
     "reference_toolsets": 27,
     "voice_commands.REGISTRY": 514,
     "voice_commands.VOICE_GUARDS": 18
@@ -17372,7 +17372,7 @@
       "qubit_counterpart": "DELETE /api/cron/jobs/(?P<id>[^/]+) -> cron_delete",
       "side": "reference",
       "surface": "route",
-      "voice_intent": "qubit schedules run due",
+      "voice_intent": "qubit schedules delete",
       "voice_intent_verified": false
     },
     {
@@ -17470,7 +17470,7 @@
       "qubit_counterpart": "DELETE /api/mcp/servers/(?P<id>[^/]+) -> mcp_delete",
       "side": "reference",
       "surface": "route",
-      "voice_intent": "qubit mcp",
+      "voice_intent": "qubit mcp remove",
       "voice_intent_verified": false
     },
     {
@@ -22315,20 +22315,6 @@
       "side": "reference",
       "surface": "tool",
       "voice_intent": "qubit status",
-      "voice_intent_verified": false
-    },
-    {
-      "classification": "PORTED",
-      "evidence": {
-        "qubit": "/home/trick/.local/state/qubit-voicebridge/runtime/skills/qubit-voice-mode",
-        "reference": "/home/trick/.hermes/skills/hermes-voice-mode"
-      },
-      "id": "skill hermes-voice-mode",
-      "method": null,
-      "qubit_counterpart": "skill dir qubit-voice-mode",
-      "side": "reference",
-      "surface": "tool",
-      "voice_intent": "qubit skills install hermes-voice-mode",
       "voice_intent_verified": false
     },
     {

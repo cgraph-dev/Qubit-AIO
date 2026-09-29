@@ -59,6 +59,24 @@ BOARD_AUTHORITY = {
 VENDORED_WRITE_CODE = BOARD_AUTHORITY["vendored_write_code"]
 _VENDORED_COUNTERPART = "CLI `qubit kanban` + dashboard /qubit-boards"
 
+#: The single READ authority contract. Every kanban read route (board, task
+#: detail, task log, task attachments, diagnostics, stats, assignees) must
+#: resolve this same Qubit-native database. A read that binds the legacy
+#: vendored store is the split-brain defect: a task created on the board then
+#: 404s in the drawer's log/attachment tabs because those handlers read the
+#: other (empty) file. ``hermes-vendored`` is read ONLY by an explicit
+#: :func:`migrate`, never by a served route.
+READ_AUTHORITY = {
+    "schema": "qubit-store-authority/1",
+    "domain": "boards",
+    "read_store": "qubit-native",
+    "write_store": "qubit-native",
+    "legacy_read_store": "hermes-vendored",
+    "legacy_read_via": "kanban_bridge.migrate",
+    "note": ("every kanban read resolves the authoritative Qubit-native store; "
+             "the legacy store is never a served read authority"),
+}
+
 
 def _priority(raw: str) -> str:
     value = str(raw or "normal").strip().lower()
@@ -81,6 +99,33 @@ def native_store(cfg: Any) -> Dict[str, Any]:
         "default_board": "main",
         "statuses": list(N.STATUSES),
     }
+
+
+def read_store(cfg: Any) -> Dict[str, Any]:
+    """The one database every kanban read handler must resolve.
+
+    Returned under the same authority schema as :data:`BOARD_AUTHORITY` so a
+    test or a caller can assert that the read handlers and the write handlers
+    agree on ``db_path``.
+    """
+    return {**dict(READ_AUTHORITY), "db_path": str(N._db_path(cfg))}
+
+
+def native_task_attachments(cfg: Any, task_id: Any) -> Dict[str, Any]:
+    """Native-store task attachments (read authority, not the vendored store)."""
+    return N.task_attachments(cfg, int(task_id))
+
+
+def native_task_log(cfg: Any, task_id: Any, *,
+                    tail: Any = None) -> Dict[str, Any]:
+    """Native-store task timeline rendered as the drawer's worker log."""
+    return N.task_log(cfg, int(task_id), tail=tail)
+
+
+def native_diagnostics(cfg: Any, *, board: str = "main",
+                       severity: Any = None) -> Dict[str, Any]:
+    """Native-store diagnostics for a board (the same store board reads use)."""
+    return N.diagnostics(cfg, board=board or "main", severity=severity)
 
 
 def vendored_store(cfg: Any) -> Dict[str, Any]:

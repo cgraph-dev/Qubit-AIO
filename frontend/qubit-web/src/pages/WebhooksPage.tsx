@@ -201,7 +201,8 @@ export default function WebhooksPage() {
     setRestartNeeded(false);
     setRestartError(null);
     try {
-      const result = await api.enableWebhooks();
+      // Button press is the explicit confirmation; settle the staged gate.
+      const result = await api.enableWebhooks(() => true);
       await loadWebhooks();
       if (result.restart_started) {
         setRestartMessage("Webhooks enabled; gateway restarting…");
@@ -273,12 +274,16 @@ export default function WebhooksPage() {
     }
     setCreating(true);
     try {
-      const res = await api.createWebhook({
-        name: subId,
-        url: deliveryUrl,
-        events: eventsList,
-        secret_ref: secretReference,
-      });
+      // The New-subscription modal is the confirmation; settle the staged gate.
+      const res = await api.createWebhook(
+        {
+          name: subId,
+          url: deliveryUrl,
+          events: eventsList,
+          secret_ref: secretReference,
+        },
+        () => true,
+      );
       showToast("Created ✓", "success");
       setCreated({ url: res.url, secret: res.secret });
       resetForm();

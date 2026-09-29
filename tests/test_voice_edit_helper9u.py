@@ -1,0 +1,424 @@
+"""Desktop helper state-machine tests (no X, mic, socket, or model)."""
+from __future__ import annotations
+
+import sys
+import threading
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import voicebridge.desktop_helper as dh
+from voicebridge.voice_edit.schema import SelectionSnapshot
+
+
+class FakeCfg:
+    def __init__(self, data=None):
+        self._data = data or {"voice_edit": {"enabled": True}}
+
+    def get(self, *path, default=None):
+        node = self._data
+        for p in path:
+            if isinstance(node, dict) and p in node:
+                node = node[p]
+            else:
+                return default
+        return node
+
+
+class FakeOverlay:
+    def __init__(self):
+        self.statuses = []
+        self.previews = []
+        self.errors = []
+
+    def set_status(self, state, detail=""):
+        self.statuses.append((state, detail))
+
+    def show_preview(self, payload):
+        self.previews.append(payload)
+
+    def show_error(self, code, detail):
+        self.errors.append((code, detail))
+
+    def close(self):
+        pass
+
+
+class FakeClient:
+    def __init__(self, *, available=True, mode="preview", estop=False,
+                 enabled=True):
+        self.calls = []
+        self._available = available
+        self._mode = mode
+        self._estop = estop
+        self._enabled = enabled
+
+    def status(self):
+        return {"enabled": self._enabled, "estop": self._estop}
+
+    def begin(self):
+        self.calls.append(("begin",))
+        return {"ok": True, "request_id": "req-1"}
+
+    def capture(self, rid):
+        self.calls.append(("capture", rid))
+        return {"ok": True, "selection": {
+            "available": self._available, "captured_via": "clipboard",
+            "app_class": "code"}}
+
+    def mint_stt_ticket(self):
+        self.calls.append(("ticket",))
+        return "ticket-123"
+
+    def transform(self, rid, transcript):
+        self.calls.append(("transform", rid, transcript))
+        if self._mode == "dictate":
+            return {"ok": True, "mode": "dictate", "transcript": transcript}
+        if self._mode == "answer":
+            return {"ok": True, "mode": "answer", "question": transcript}
+        if self._mode == "ignore":
+            return {"ok": True, "mode": "ignore"}
+        if self._mode == "clarify":
+            return {"ok": True, "mode": "clarify", "question": "Which change?"}
+        return {"ok": True, "mode": "preview", "original": "hello world",
+                "proposed": "NEW TEXT", "model": "qubit-brain4",
+                "provider": "ollama", "privacy_mode": "local",
+                "detected": {"action": "shorten", "style": ""}}
+
+    def edit(self, rid, text):
+        self.calls.append(("edit", rid, text))
+        return {"proposed": text}
+
+    def retry(self, rid, transcript=""):
+        self.calls.append(("retry", rid))
+        return {"mode": "preview", "original": "hello world",
+                "proposed": "NEW TEXT", "detected": {"action": "shorten"}}
+
+    def apply(self, rid, *, confirm=True, method=""):
+        self.calls.append(("apply", rid, confirm))
+        return {"ok": True, "applied": "NEW TEXT"}
+
+    def revert(self, rid):
+        self.calls.append(("revert", rid))
+        return {"ok": True}
+
+    def cancel(self, rid):
+        self.calls.append(("cancel", rid))
+        return {"ok": True, "cancelled": True}
+
+
+class FakeDesktop:
+    def __init__(self):
+        self.inserted = []
+        self.activated = []
+        self.clipboard = None
+
+    def session(self):
+        return {"session_type": "x11", "x11": True, "wayland": False}
+
+    def focused_window(self):
+        return {"window_id": "42", "app_class": "code", "app_name": "code",
+                "window_title": ""}
+
+    def insert_text(self, text, snapshot, cfg=None, method=""):
+        from voicebridge.voice_edit.schema import InsertionResult
+        self.inserted.append(text)
+        return InsertionResult(ok=True, method="clipboard_paste",
+                               app_class="code", focus_restored=True)
+
+    def activate_window(self, window_id):
+        self.activated.append(window_id)
+        return True
+
+    def set_clipboard(self, text):
+        self.clipboard = text
+        return True
+
+    def is_fullscreen(self, window_id=""):
+        return False
+
+
+class FakeMic:
+    def start(self):
+        pass
+
+    def read_frame(self, timeout=0.2):
+        return None
+
+    def stop(self):
+        pass
+
+
+class FakeStt:
+    error = None
+
+
+def _helper(monkeypatch, *, final="make it shorter", **client_kw):
+    monkeypatch.setattr(dh, "transcribe_once",
+                        lambda client, mic, stop, **kw: (
+                            kw.get("on_partial") and
+                            kw["on_partial"]("make it shor"), final)[1])
+    overlay = FakeOverlay()
+    client = FakeClient(**client_kw)
+    desktop = FakeDesktop()
+    helper = dh.DesktopHelper(
+        FakeCfg(), client=client, overlay=overlay, desktop=desktop,
+        mic_factory=lambda: FakeMic(), stt_factory=lambda t: FakeStt())
+    return helper, overlay, client, desktop
+
+
+def _run(helper, *, hold=True):
+    helper.on_hotkey("ptt_start")
+    if helper._worker is not None:
+        helper._worker.join(timeout=5)
+    if hold:
+        helper.on_hotkey("ptt_end")
+
+
+def test_helper_disabled_refuses(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.cfg = FakeCfg({"voice_edit": {"enabled": False}})
+    assert h.start() is False
+
+
+def test_helper_selection_flow_shows_preview(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._start_listening()
+    h._worker.join(timeout=5)
+    assert overlay.previews and overlay.previews[-1]["proposed"] == "NEW TEXT"
+    assert ("capture", "req-1") in client.calls
+    assert ("transform", "req-1", "make it shorter") in client.calls
+    assert desktop.inserted == []
+
+
+def test_wake_command_runs_the_same_session_and_transform(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.on_wake_command("type this for me: hello world")
+    assert ("begin",) in client.calls
+    assert ("capture", "req-1") in client.calls
+    assert ("transform", "req-1", "type this for me: hello world") in client.calls
+    # Wake dictation flows through the same path: the service returns dictate.
+    h2, overlay2, client2, desktop2 = _helper(monkeypatch, available=False,
+                                              mode="dictate",
+                                              final="")
+    h2.on_wake_command("hello world")
+    assert desktop2.inserted == ["hello world"]
+
+
+def test_wake_command_ignored_while_busy(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.state = h.LISTENING
+    h.on_wake_command("type this for me: nope")
+    assert ("begin",) not in client.calls
+
+
+def test_helper_apply_inserts(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._start_listening()
+    h._worker.join(timeout=5)
+    h.on_overlay_action("apply", {})
+    assert ("apply", "req-1", True) in client.calls
+    assert desktop.activated == ["42"]
+
+
+def test_helper_question_reaches_brain_not_the_field(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, available=False,
+                                          mode="answer",
+                                          final="what's my name")
+    client.ask = lambda text, rid="": "Your name is Trick."
+    h._start_listening()
+    h._worker.join(timeout=5)
+    # The question must NOT be typed into the field.
+    assert desktop.inserted == []
+    # The answer is shown in the preview/overlay.
+    assert overlay.previews and any(
+        "Trick" in str(p.get("proposed", "")) for p in overlay.previews)
+
+
+def test_helper_dictation_still_inserts_non_question(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, available=False,
+                                          mode="dictate",
+                                          final="hello there friend")
+    client.ask = lambda text, rid="": "SHOULD NOT BE CALLED"
+    h._start_listening()
+    h._worker.join(timeout=5)
+    assert desktop.inserted == ["hello there friend"]
+
+
+def test_helper_no_selection_dictates(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, available=False,
+                                          mode="dictate",
+                                          final="hello dictated words")
+    h._start_listening()
+    h._worker.join(timeout=5)
+    assert desktop.inserted == ["hello dictated words"]
+
+
+def test_helper_dictation_refuses_fullscreen(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, available=False,
+                                          mode="dictate", final="hello there")
+    desktop.is_fullscreen = lambda window_id="": True
+    h._start_listening()
+    h._worker.join(timeout=5)
+    assert desktop.inserted == []
+    assert desktop.clipboard == "hello there"  # copied instead of injected
+    assert any(s[0] == "error" for s in overlay.statuses)
+
+
+def test_helper_clarify_does_not_insert(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, mode="clarify")
+    h._start_listening()
+    h._worker.join(timeout=5)
+    assert desktop.inserted == []
+    assert any(s[0] == "clarify" for s in overlay.statuses)
+
+
+def test_helper_escape_cancels(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._start_listening()
+    h._worker.join(timeout=5)
+    h.on_hotkey("cancel")
+    assert any(c[0] == "cancel" for c in client.calls)
+
+
+def test_helper_estop_refuses(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch, estop=True)
+    h._start_listening()
+    assert h._worker is None
+    assert any(s[0] == "error" for s in overlay.statuses)
+
+
+def test_helper_toggle_mode(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h.toggle = True
+    h.on_hotkey("ptt_start")
+    h._worker.join(timeout=5)
+    assert h.state == dh.DesktopHelper.PREVIEW
+    # second press cancels
+    h.on_hotkey("ptt_start")
+    assert any(c[0] == "cancel" for c in client.calls)
+
+
+def test_helper_copy_action(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    # add the result endpoint behaviour
+    client._request = lambda method, path, payload=None, timeout=90: {
+        "proposed": "NEW TEXT"}
+    h._start_listening()
+    h._worker.join(timeout=5)
+    h.on_overlay_action("copy", {})
+    assert desktop.clipboard == "NEW TEXT"
+
+
+def test_helper_retry(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._start_listening()
+    h._worker.join(timeout=5)
+    h.on_overlay_action("retry", {})
+    assert any(c[0] == "retry" for c in client.calls)
+
+
+def test_helper_revert(monkeypatch):
+    h, overlay, client, desktop = _helper(monkeypatch)
+    h._start_listening()
+    h._worker.join(timeout=5)
+    h.on_overlay_action("revert", {})
+    assert any(c[0] == "revert" for c in client.calls)
+
+
+# -- accurate-model warm readiness (no real model) ---------------------------
+
+def _warm_helper(monkeypatch, *, state="pending", timeout=0.2, mode="accurate",
+                 event_set=False):
+    cfg = FakeCfg({"voice_edit": {"enabled": True, "stt_mode": mode,
+                                  "warm_timeout_s": timeout}})
+    overlay = FakeOverlay()
+    client = FakeClient()
+    desktop = FakeDesktop()
+    h = dh.DesktopHelper(
+        cfg, client=client, overlay=overlay, desktop=desktop,
+        mic_factory=lambda: FakeMic(), stt_factory=lambda t: FakeStt())
+    # Injectable seams: a test sets the event/state directly (no model).
+    h._warm_state = state
+    h._warm_event = threading.Event()
+    if event_set:
+        h._warm_event.set()
+    return h, overlay
+
+
+def _warming(overlay):
+    return [s for s in overlay.statuses if s[0] == "warming"]
+
+
+def test_open_request_returns_immediately_when_already_warm(monkeypatch):
+    h, overlay = _warm_helper(monkeypatch, state="pending", timeout=5.0,
+                              event_set=True)
+    t0 = time.monotonic()
+    assert h._open_request() is True
+    assert time.monotonic() - t0 < 0.5
+    assert _warming(overlay) == []
+
+
+def test_open_request_waits_for_warm_event_then_returns(monkeypatch):
+    h, overlay = _warm_helper(monkeypatch, state="pending", timeout=5.0,
+                              event_set=False)
+
+    def _set_soon():
+        time.sleep(0.05)
+        h._warm_event.set()
+
+    threading.Thread(target=_set_soon, daemon=True).start()
+    t0 = time.monotonic()
+    assert h._open_request() is True
+    elapsed = time.monotonic() - t0
+    assert 0.02 <= elapsed < 2.0
+    assert _warming(overlay)
+
+
+def test_open_request_warm_timeout_proceeds_with_cue(monkeypatch):
+    h, overlay = _warm_helper(monkeypatch, state="pending", timeout=0.2,
+                              event_set=False)
+    t0 = time.monotonic()
+    assert h._open_request() is True
+    assert time.monotonic() - t0 < 2.0
+    # The user is not left blind: a warming cue was shown before proceeding.
+    assert _warming(overlay)
+
+
+def test_open_request_no_wait_when_unavailable_or_skipped(monkeypatch):
+    for state in ("unavailable", "skipped"):
+        h, overlay = _warm_helper(monkeypatch, state=state, timeout=5.0,
+                                  event_set=False)
+        t0 = time.monotonic()
+        assert h._open_request() is True
+        assert time.monotonic() - t0 < 0.5
+        assert _warming(overlay) == []
+
+
+def test_open_request_streaming_mode_does_not_wait(monkeypatch):
+    h, overlay = _warm_helper(monkeypatch, state="pending", timeout=5.0,
+                              mode="streaming", event_set=False)
+    t0 = time.monotonic()
+    assert h._open_request() is True
+    assert time.monotonic() - t0 < 0.5
+    assert _warming(overlay) == []
+
+
+def test_start_heartbeat_reports_stt_warm(monkeypatch):
+    import voicebridge.voice_edit.heartbeat as hb
+    import voicebridge.voice_edit.asr_accurate as acc
+    captured = {}
+    monkeypatch.setattr(hb, "write", lambda **kw: captured.update(kw))
+    monkeypatch.setattr(acc, "is_available", lambda cfg: False)
+    monkeypatch.setattr(dh.DesktopHelper, "_tame_key_repeat", lambda self: None)
+    h, overlay = _warm_helper(monkeypatch, state="pending", timeout=5.0)
+    assert h.start() is True
+    try:
+        extra = captured.get("extra", {})
+        assert "stt_warm" in extra
+        assert extra["stt_warm"] in ("pending", "warming", "warm",
+                                     "unavailable", "skipped")
+    finally:
+        h.shutdown()
+

@@ -113,7 +113,9 @@ def test_chat_lifecycle_reads_through_the_authority(tmp_path, monkeypatch):
     listed = CT.store(cfg).list()
     assert listed["total"] == 1
     assert listed["sessions"][0]["id"] == sid
-    assert listed["sessions"][0]["source"] == "qubit-chat"
+    # The list surface passes through the REAL state.db source; the native
+    # create path records ``dashboard`` (never the retired hardcoded label).
+    assert listed["sessions"][0]["source"] == "dashboard"
 
     assert CT.store(cfg).rename(sid, "Renamed")["state"] == "OK"
     assert CT.store(cfg).show(sid)["session"]["name"] == "Renamed"

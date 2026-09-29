@@ -176,6 +176,42 @@ function buildCronJobPayloadFromEditor(form: CronJobEditorState) {
   });
 }
 
+const LOCAL_DELIVERY_TARGETS: CronDeliveryTarget[] = [
+  { id: "local", name: "Local", home_target_set: true, home_env_var: null },
+];
+
+interface DeliveryTargetsWire {
+  targets?: CronDeliveryTarget[];
+  delivery_targets?: { accounts?: Array<Record<string, unknown>> };
+}
+
+/**
+ * The canonical endpoint serves ``{targets: CronDeliveryTarget[]}`` (the
+ * reference shape). Older Qubit builds returned the messaging envelope
+ * ``{delivery_targets: {accounts: [...]}}``; accept both so the dropdown
+ * degrades to the local-only seed rather than ``undefined`` if the shape
+ * regresses again.
+ */
+function normalizeDeliveryTargets(
+  res: DeliveryTargetsWire | undefined,
+): CronDeliveryTarget[] {
+  if (Array.isArray(res?.targets) && res.targets.length > 0) return res.targets;
+  const accounts = res?.delivery_targets?.accounts;
+  if (Array.isArray(accounts)) {
+    const mapped = accounts
+      .map((a) => ({
+        id: String(a.id ?? a.account ?? ""),
+        name: String(a.name ?? a.account ?? a.id ?? ""),
+        home_target_set: Boolean(a.home_target_set),
+        home_env_var:
+          typeof a.home_env_var === "string" ? a.home_env_var : null,
+      }))
+      .filter((t) => t.id);
+    if (mapped.length > 0) return mapped;
+  }
+  return LOCAL_DELIVERY_TARGETS;
+}
+
 function selectOptions(
   current: string,
   options: Array<{ value: string; label: string }>,
@@ -603,9 +639,9 @@ export default function CronPage() {
     open: createModalOpen,
     onClose: closeCreateModal,
   });
-  const [deliveryTargets, setDeliveryTargets] = useState<CronDeliveryTarget[]>([
-    { id: "local", name: "Local", home_target_set: true, home_env_var: null },
-  ]);
+  const [deliveryTargets, setDeliveryTargets] = useState<CronDeliveryTarget[]>(
+    LOCAL_DELIVERY_TARGETS,
+  );
   const [creating, setCreating] = useState(false);
 
   // Edit job modal state
@@ -678,12 +714,10 @@ export default function CronPage() {
   useEffect(() => {
     api
       .getCronDeliveryTargets()
-      .then((res) => setDeliveryTargets(res.targets))
+      .then((res) => setDeliveryTargets(normalizeDeliveryTargets(res)))
       .catch(() =>
         // Fall back to local-only so the modal still works if the endpoint fails.
-        setDeliveryTargets([
-          { id: "local", name: "Local", home_target_set: true, home_env_var: null },
-        ]),
+        setDeliveryTargets(LOCAL_DELIVERY_TARGETS),
       );
   }, []);
 
@@ -763,9 +797,14 @@ export default function CronPage() {
     }
     setSaving(true);
     try {
+      // ``cron_update`` requires the ``enabled`` field (it repurposed PUT for
+      // the enable/disable transition); the edit form does not change it, so
+      // carry the current value through. The store then applies the editable
+      // fields in place.
+      const update = { ...payload, enabled: editJob.enabled };
       await api.updateCronJob(
         editJob.id,
-        payload,
+        update,
         getJobProfile(editJob),
       );
       showToast("Saved changes ✓", "success");

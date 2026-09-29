@@ -178,11 +178,11 @@ def test_sessions_surface_reads_the_canonical_chat_transcript(tmp_path,
     assert code == 200, listed
     rows = {r["id"]: r for r in listed["sessions"]}
     assert sid in rows, listed
-    assert rows[sid]["source"] == "qubit-chat"
+    assert rows[sid]["source"] == "dashboard"
     assert rows[sid]["message_count"] == 2
 
     code, detail = _dispatch(cfg, "GET", f"/api/sessions/{sid}")
-    assert code == 200 and detail["source"] == "qubit-chat", detail
+    assert code == 200 and detail["source"] == "dashboard", detail
     assert detail["message_count"] == 2
 
     code, msgs = _dispatch(cfg, "GET", f"/api/sessions/{sid}/messages")

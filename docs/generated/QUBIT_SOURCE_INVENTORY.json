@@ -11,7 +11,7 @@
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/tmp/opencode/pinned/openclaw-v2026.4.19-beta.2-28254-gda03996ab7"
+   "path": "/tmp/opencode/pinned/openclaw"
   }
  },
  "counts_by_category": {
@@ -13820,7 +13820,7 @@
     "upstream_path": "apps/desktop/src/app/chat/composer/hooks/use-slash-completions.ts",
     "upstream_blob": "e8ef02110b5c2a9737794baa6cc3b33cace475ff",
     "upstream_sha256": "1690d3ee5ab22cc7891d44c9d6716d2f43d2785eb1261fa2c60c0b57f36c1ecc",
-    "local_sha256": "50157e9c0088485265d83205d9d012c2ef2a539515d14a588ffd93a9e680e92b"
+    "local_sha256": "de2b202b5a6aa3f1549d57ffed5fda8614cb0dd947e0f42738653daff960251b"
    },
    {
     "path": "apps/desktop/src/app/chat/composer/hooks/use-voice-conversation-boundary.test.tsx",
@@ -16571,14 +16571,14 @@
     "upstream_path": "apps/desktop/src/components/assistant-ui/directive-text.test.ts",
     "upstream_blob": "0c065725b35e15ec77bb5e485452b61004011c6a",
     "upstream_sha256": "427adfe5a83ae28408896f0eff1bec775259c335b92e11b9ac593ed78cd09235",
-    "local_sha256": "e9d1c54a2beffad1aea85fd006fe3dfcfb837409f23ff41a282c6378ce30133b"
+    "local_sha256": "917a62a10db8e08ea5a70a3b25878ae425a430f78eadde901836151e8cdaf59c"
    },
    {
     "path": "apps/desktop/src/components/assistant-ui/directive-text.tsx",
     "upstream_path": "apps/desktop/src/components/assistant-ui/directive-text.tsx",
     "upstream_blob": "98fc0467c579c03a30e15494bb38451fb2952d5a",
     "upstream_sha256": "c8c64191e2e44db77fe6d6c03360cac31bc9d33a89c9fa70118ea9ff130700e0",
-    "local_sha256": "ffb283d99306fff5c4c032237b7cba9eb6baf9dbc02fc054e24543daee4bf7da"
+    "local_sha256": "8e7af945edbddb46f3c239ec271c1e9490c46529eab5d7e4b6633e3b33d39d9b"
    },
    {
     "path": "apps/desktop/src/components/assistant-ui/embeds/providers/detect.test.ts",

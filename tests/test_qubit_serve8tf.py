@@ -108,12 +108,16 @@ def test_qubit_api_auth_and_status(tmp_path):
                                     qubit_token=True)
         assert status == 200, (status, body[:200])
         out = json.loads(body)
-        # Corrected cutover: /api/status is a fork-declared, non-sensitive read,
-        # so the fork's real status shape is served (rebranded), not the empty
-        # Qubit compat envelope.
-        assert out.get("schema") is None, out
-        assert out.get("version") and out.get("release_date"), out
-        assert "overall" in out and "components" in out, out
+        # Owner decisions #10/#12: the SPA prefix ``/agent/api/status`` is the
+        # Qubit gateway-supervision authority surface. It serves the Qubit
+        # compat status envelope (real gateway_service_unit/gateway_running/
+        # gateway_state from ``gateway_supervisor.status``), not the vendored
+        # fork's raw status document. The classic raw ``/api/status`` remains
+        # the fork/bridge health branch.
+        assert out.get("schema") == "qubit-runtime-status/1", out
+        assert out.get("model"), out
+        assert "gateway_running" in out, out
+        assert "gateway_service_unit" in out, out
         status, _, body = _http(port, "GET", "/agent/api/dashboard/themes",
                                 qubit_token=True)
         assert status == 200

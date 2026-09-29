@@ -74,7 +74,10 @@ def test_session_lifecycle_roundtrip(tmp_path, monkeypatch):
     assert listed["total"] == 1
     row = listed["sessions"][0]
     assert row["id"] == sid and row["message_count"] == 2
-    assert row["source"] == "qubit-chat"
+    # ``list`` now reports the REAL state.db source; the canonical native
+    # create path writes ``dashboard`` (the old ``qubit-chat`` label was a
+    # hardcoded mask over the DB column).
+    assert row["source"] == "dashboard"
 
     shown = st.show(sid)
     assert shown["state"] == "OK" and len(shown["messages"]) == 2

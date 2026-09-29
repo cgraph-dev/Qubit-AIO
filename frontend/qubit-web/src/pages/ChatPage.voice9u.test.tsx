@@ -37,6 +37,8 @@ const apiMocks = vi.hoisted(() => ({
     total: 0,
   })),
   getConfig: vi.fn(async () => ({ voice: { input_engine: "auto" } })),
+  sttWsUrl: vi.fn(async () => "ws://127.0.0.1/agent/api/audio/stt/ws?ticket=t"),
+  saveConfig: vi.fn(async () => ({ ok: true })),
   transcribeAudio: vi.fn(async () => ({ transcript: "spoken text" })),
   describeChatImage: vi.fn(async () => ({ description: "described" })),
   getStatus: vi.fn(async () => ({ gateway_state: "stopped" })),
@@ -55,6 +57,8 @@ vi.mock("@/lib/api", () => ({
     listChatSessions: apiMocks.listChatSessions,
     getChatSessionMessages: apiMocks.getChatSessionMessages,
     getConfig: apiMocks.getConfig,
+    sttWsUrl: apiMocks.sttWsUrl,
+    saveConfig: apiMocks.saveConfig,
     transcribeAudio: apiMocks.transcribeAudio,
     describeChatImage: apiMocks.describeChatImage,
     getStatus: apiMocks.getStatus,
@@ -120,24 +124,43 @@ class FakeSR {
   }
 }
 
-class FakeMR {
-  static instances: FakeMR[] = [];
-  state = "inactive";
-  mimeType = "audio/webm";
-  stream: unknown;
-  ondataavailable: ((event: { data: Blob }) => void) | null = null;
-  onerror: (() => void) | null = null;
-  onstop: (() => void) | null = null;
-  constructor(stream: unknown) {
-    this.stream = stream;
-    FakeMR.instances.push(this);
+class FakeWS {
+  static instances: FakeWS[] = [];
+  binaryType = "";
+  sent: unknown[] = [];
+  onopen: ((ev: unknown) => void) | null = null;
+  onmessage: ((ev: { data: unknown }) => void) | null = null;
+  onerror: ((ev: unknown) => void) | null = null;
+  onclose: ((ev: { code?: number }) => void) | null = null;
+  url: string;
+  constructor(url: string) {
+    this.url = url;
+    FakeWS.instances.push(this);
+    queueMicrotask(() => this.onopen?.({}));
   }
-  start() {
-    this.state = "recording";
+  send(data: unknown) {
+    this.sent.push(data);
   }
-  stop() {
-    this.state = "inactive";
-    this.onstop?.();
+  close() {
+    this.onclose?.({ code: 1000 });
+  }
+}
+
+class FakeAudioContext {
+  sampleRate = 16000;
+  destination = {};
+  createMediaStreamSource() {
+    return { connect: () => undefined, disconnect: () => undefined };
+  }
+  createScriptProcessor() {
+    return {
+      onaudioprocess: null,
+      connect: () => undefined,
+      disconnect: () => undefined,
+    };
+  }
+  close() {
+    return Promise.resolve();
   }
 }
 
@@ -202,7 +225,7 @@ function pressRightCtrl(type: "keydown" | "keyup") {
 
 beforeEach(() => {
   FakeSR.instances = [];
-  FakeMR.instances = [];
+  FakeWS.instances = [];
   engine = "auto";
   apiMocks.getConfig.mockReset();
   apiMocks.getConfig.mockImplementation(async () => ({
@@ -210,6 +233,8 @@ beforeEach(() => {
   }));
   apiMocks.transcribeAudio.mockReset();
   apiMocks.transcribeAudio.mockResolvedValue({ transcript: "spoken text" });
+  apiMocks.saveConfig.mockReset();
+  apiMocks.saveConfig.mockResolvedValue({ ok: true });
   streamChatTurn.mockReset();
   vi.stubGlobal("localStorage", localStorageMock);
   localStorageMock.clear();
@@ -236,7 +261,9 @@ function installSr() {
 }
 
 function installLocal() {
-  vi.stubGlobal("MediaRecorder", FakeMR);
+  FakeWS.instances = [];
+  vi.stubGlobal("WebSocket", FakeWS);
+  vi.stubGlobal("AudioContext", FakeAudioContext);
   Object.defineProperty(window.navigator, "mediaDevices", {
     configurable: true,
     value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [] })) },
@@ -290,7 +317,15 @@ describe("Qubit ChatPage voice engine", () => {
       "browser speech recognition unavailable — using local Qubit STT",
     );
     expect(statusText()).toContain("privacy: local STT");
-    expect(FakeMR.instances).toHaveLength(1);
+    // The local engine now streams over the authenticated STT WebSocket.
+    await vi.waitFor(() => expect(FakeWS.instances).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect(
+        FakeWS.instances[0].sent.some(
+          (m) => typeof m === "string" && m.includes('"type":"start"'),
+        ),
+      ).toBe(true),
+    );
   });
 
   it("Right-Ctrl is inert when /qubit-chat is not the active route", async () => {
@@ -314,5 +349,49 @@ describe("Qubit ChatPage voice engine", () => {
       pressRightCtrl("keyup");
     });
     expect(FakeSR.instances[0].stopped).toBe(true);
+  });
+
+  it("shows live interim text, then commits the final into the editable composer", async () => {
+    engine = "browser";
+    installSr();
+    await renderChat();
+    await vi.waitFor(() => expect(statusText()).toContain("engine: browser"));
+    await clickVoice();
+    await vi.waitFor(() => expect(FakeSR.instances).toHaveLength(1));
+    const rec = FakeSR.instances[0];
+    await act(async () => {
+      rec.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: false, 0: { transcript: "hello wor" } }],
+      });
+    });
+    const interim = container.querySelector('[data-testid="voice-interim"]');
+    expect(interim?.textContent).toBe("hello wor");
+    // Interim is not committed to the composer textarea yet.
+    const textarea = container.querySelector<HTMLTextAreaElement>(
+      "#qubit-chat-input",
+    );
+    expect(textarea?.value ?? "").not.toContain("hello wor");
+  });
+
+  it("persists a changed voice engine on the canonical config", async () => {
+    installSr();
+    await renderChat();
+    await vi.waitFor(() => expect(statusText()).toContain("engine: auto"));
+    const select = container.querySelector<HTMLSelectElement>(
+      '[data-testid="voice-engine-picker"]',
+    );
+    expect(select).not.toBeNull();
+    await act(async () => {
+      if (select) {
+        select.value = "local";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    await vi.waitFor(() => expect(apiMocks.saveConfig).toHaveBeenCalled());
+    const [saved] = apiMocks.saveConfig.mock.calls[0] as unknown as [
+      { voice?: { input_engine?: string } },
+    ];
+    expect(saved.voice?.input_engine).toBe("local");
   });
 });

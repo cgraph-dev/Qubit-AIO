@@ -291,7 +291,7 @@ def test_backend_normalize_input_engine_current_source():
     """The canonical normalizer on the current source: unknown/missing -> auto."""
     from voicebridge.config import VOICE_INPUT_ENGINES, normalize_input_engine
 
-    assert VOICE_INPUT_ENGINES == ("browser", "local", "auto")
+    assert VOICE_INPUT_ENGINES == ("browser", "local", "terminal", "auto")
     for value in VOICE_INPUT_ENGINES:
         assert normalize_input_engine(value) == value
     for bad in (None, "", "BROWSER", "remote", 3):

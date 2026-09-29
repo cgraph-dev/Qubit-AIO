@@ -33,8 +33,16 @@ SYSTEM_PROMPT = (
 # only — runner options (num_ctx, placement, keep-alive) are never touched,
 # so selecting a level cannot evict or reload the resident model. Unknown
 # levels fail closed to the default budget.
+#
+# The accepted set MUST match the canonical ladder the reference/vendored
+# runtime exposes — ``qubit_constants.VALID_REASONING_EFFORTS`` plus ``none``
+# (thinking off): none, minimal, low, medium, high, xhigh, max, ultra. The
+# dashboard picker offers exactly that ladder, so a level it offers is always
+# accepted here and an unsupported level is rejected truthfully. Budgets stay
+# monotonic along the ladder (xhigh between high and max; ultra above max).
 REASONING_BUDGETS = {"none": 64, "minimal": 128, "low": 256,
-                     "medium": 512, "high": 1024, "max": 2048}
+                     "medium": 512, "high": 1024, "xhigh": 1536,
+                     "max": 2048, "ultra": 4096}
 DEFAULT_REASONING_BUDGET = 100
 
 

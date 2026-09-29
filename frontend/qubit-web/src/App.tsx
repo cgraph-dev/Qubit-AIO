@@ -98,6 +98,7 @@ const SystemPage = lazy(() => import("@/pages/SystemPage"));
 const AgentsPage = lazy(() => import("@/pages/AgentsPage"));
 const ChatPage = lazy(() => import("@/pages/ChatPage"));
 const TerminalChatPage = lazy(() => import("@/pages/TerminalChatPage"));
+const VoiceEditPage = lazy(() => import("@/pages/VoiceEditPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -194,6 +195,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/config": ConfigPage,
   "/env": EnvPage,
   "/docs": DocsPage,
+  "/voice-edit": VoiceEditPage,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
@@ -243,6 +245,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
     label: "Documentation",
     icon: BookOpen,
   },
+  { path: "/voice-edit", label: "Voice Editing", icon: Sparkles },
 ];
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -446,23 +449,6 @@ export default function App() {
     );
   }, [isNativeChatRoute]);
 
-  // `dashboard.show_token_analytics` gates the Analytics nav item.  The
-  // page itself remains reachable by URL (it renders an explanation when
-  // the flag is off — see AnalyticsPage), but hiding the nav entry avoids
-  // surfacing misleading token/cost numbers in the sidebar.  Default off.
-  const [showTokenAnalytics, setShowTokenAnalytics] = useState(false);
-  useEffect(() => {
-    api
-      .getConfig()
-      .then((cfg) => {
-        const dash = (cfg?.dashboard ?? {}) as {
-          show_token_analytics?: unknown;
-        };
-        setShowTokenAnalytics(dash.show_token_analytics === true);
-      })
-      .catch(() => setShowTokenAnalytics(false));
-  }, []);
-
   // A plugin can replace the built-in /chat page via `tab.override: "/chat"`
   // in its manifest.  When one does, `buildRoutes` already swaps the route
   // element for <PluginPage /> — but we also have to suppress the
@@ -495,14 +481,17 @@ export default function App() {
     [embeddedChat],
   );
 
-  const builtinNav = useMemo(() => {
-    const base = embeddedChat
-      ? [CHAT_NAV_ITEM, QUBIT_CHAT_NAV_ITEM, ...BUILTIN_NAV_REST]
-      : BUILTIN_NAV_REST;
-    return showTokenAnalytics
-      ? base
-      : base.filter((n) => n.path !== "/analytics");
-  }, [embeddedChat, showTokenAnalytics]);
+  // `/analytics` stays in the builtin nav: the route is mounted and reachable
+  // regardless of `dashboard.show_token_analytics` (the page itself renders an
+  // explanation when the flag is off), so the nav entry must always be present
+  // rather than hiding a live route from the sidebar.
+  const builtinNav = useMemo(
+    () =>
+      embeddedChat
+        ? [CHAT_NAV_ITEM, QUBIT_CHAT_NAV_ITEM, ...BUILTIN_NAV_REST]
+        : BUILTIN_NAV_REST,
+    [embeddedChat],
+  );
 
   const sidebarNav = useMemo(
     () => partitionSidebarNav(builtinNav, manifests),

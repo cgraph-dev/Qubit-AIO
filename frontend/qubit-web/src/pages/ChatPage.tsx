@@ -65,6 +65,16 @@ import {
   type ChatStoreMessage,
   type ChatStreamEvent,
 } from "@/lib/api";
+import {
+  asSpeechRecognition,
+  BROWSER_PRIVACY_NOTICE,
+  joinTranscript,
+  LOCAL_PRIVACY_NOTICE,
+  terminalCaptureAvailable,
+  type ActiveVoiceEngine as ControllerActiveEngine,
+} from "@/lib/voice";
+import { useTranscriptionController } from "@/hooks/useTranscriptionController";
+import { useDesktopVoiceHelper } from "@/hooks/useDesktopVoiceHelper";
 import { cn } from "@/lib/utils";
 import { PluginSlot } from "@/plugins";
 
@@ -153,30 +163,10 @@ function normalizeReasoning(value: unknown): string | null {
   return CHAT_REASONING_LEVELS.some((l) => l.id === key) ? key : null;
 }
 
-interface SpeechRecognitionLike {
-  lang: string;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-}
-
-interface SpeechRecognitionEventLike {
-  resultIndex: number;
-  results: ArrayLike<{
-    isFinal: boolean;
-    0: { transcript: string };
-  }>;
-}
-
 const STORAGE_PREFIX = "qubit.chat.transcript.";
 const SESSION_KEY = "qubit.chat.session";
 const DEFAULT_SESSION = "dashboard-chat";
-const VOICE_WATCHDOG_MS = 60_000;
+
 
 /**
  * Stable per-mount channel id for the A31 side panel. Qubit ties this to the
@@ -259,19 +249,9 @@ function parseTurnError(err: unknown): string {
   return body || raw;
 }
 
-function asSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
+type VoiceEngine = "browser" | "local" | "terminal" | "auto";
 
-type VoiceEngine = "browser" | "local" | "auto";
-type ActiveVoiceEngine = "browser" | "local" | null;
-
-const VOICE_ENGINES = ["browser", "local", "auto"] as const;
+const VOICE_ENGINES = ["auto", "browser", "local", "terminal"] as const;
 
 /** Canonical `voice.input_engine` semantics; unknown/missing fails to `auto`. */
 function normalizeVoiceEngine(value: unknown): VoiceEngine {
@@ -281,20 +261,8 @@ function normalizeVoiceEngine(value: unknown): VoiceEngine {
     : "auto";
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("audio read failed"));
-    reader.onload = () =>
-      resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.readAsDataURL(blob);
-  });
-}
-
 function localCaptureAvailable(): boolean {
-  if (typeof navigator === "undefined" || typeof MediaRecorder === "undefined") {
-    return false;
-  }
+  if (typeof navigator === "undefined") return false;
   const md = navigator.mediaDevices as MediaDevices | undefined;
   return typeof md?.getUserMedia === "function";
 }
@@ -341,6 +309,13 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     () => (resumeParam || storageGet(SESSION_KEY) || DEFAULT_SESSION).slice(0, 80),
     [resumeParam],
   );
+  // The transcription controller is created once; this ref lets the local/
+  // terminal adapter read the *current* session id for the STT request without
+  // recreating the controller on every session change.
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
     loadTranscript(session),
@@ -353,17 +328,21 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryText, setRetryText] = useState<string | null>(null);
-  const [voiceState, setVoiceState] = useState<
-    "idle" | "listening" | "unsupported"
-  >("idle");
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  // `voice.input_engine` (browser | local | auto) and the engine actually
-  // running the current utterance (browser SpeechRecognition vs local STT).
+  // Live transcription (one controller for browser/local/terminal). The
+  // snapshot drives the composer, status strip and Right-Ctrl/push-to-talk.
+  const { controller, snapshot: voice } = useTranscriptionController({
+    sessionId: () => sessionRef.current,
+  });
+  // True when the system-wide desktop helper is running and owns Right-Ctrl;
+  // then this page yields the hotkey to it (still types into this composer).
+  const desktopHelperLive = useDesktopVoiceHelper(isActive);
+  // `voice.input_engine` (auto | browser | local | terminal) is the persisted
+  // selection; it never changes the model, session, tools, policy, audit,
+  // confirmation, or e-stop path.
   const [inputEngine, setInputEngine] = useState<VoiceEngine>("auto");
-  const [activeEngine, setActiveEngine] = useState<ActiveVoiceEngine>(null);
-  const [voiceFallback, setVoiceFallback] = useState<string | null>(null);
   // Informational (non-error) status, e.g. a backend-cancelled turn. Kept
-  // separate from `voiceError` so a cancellation is not styled as a failure.
+  // separate from the transcription error so a cancellation is not styled as
+  // a failure.
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [model, setModel] = useState<string>("");
   // Whether the active model actually supports a reasoning budget, served by
@@ -381,6 +360,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // is a typed refusal because Qubit policy (PTY_NO_SHELL) refuses raw shells.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [terminalNoticeOpen, setTerminalNoticeOpen] = useState(false);
+  // Bumped after a New chat mint so `ChatSessionList` remounts and refetches,
+  // surfacing the freshly created session immediately (its internal fetch only
+  // runs on mount / manual Refresh).
+  const [sessionListNonce, setSessionListNonce] = useState(0);
   // A31: the side panel is one `role="complementary"` "Model & tools" wrapper
   // (the pinned Qubit structure) mounting the model box and session switcher.
   const [channel] = useState<string>(generateChatChannel);
@@ -407,12 +390,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [attachError, setAttachError] = useState<string | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
 
-  const recRef = useRef<SpeechRecognitionLike | null>(null);
-  const heardRef = useRef("");
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
   const rightCtrlHeldRef = useRef(false);
-  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Controller text projection: the last committed string already merged into
+  // the composer, and the last browser final already auto-sent (Chrome keeps
+  // its proven send-on-final behavior).
+  const lastCommittedRef = useRef("");
+  const browserSentRef = useRef("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -528,23 +511,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
 
   useEffect(() => {
     return () => {
-      if (watchdogRef.current) clearTimeout(watchdogRef.current);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-      try {
-        recRef.current?.abort();
-      } catch {
-        /* already stopped */
-      }
-      const stream = mediaStreamRef.current;
-      if (stream) {
-        try {
-          stream.getTracks().forEach((track) => track.stop());
-        } catch {
-          /* already stopped */
-        }
-      }
-      mediaStreamRef.current = null;
-      mediaRecorderRef.current = null;
+      // The transcription controller (and its adapter/capture) is disposed by
+      // the hook's own unmount effect.
       abortRef.current?.abort();
     };
   }, []);
@@ -634,6 +603,33 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     [session],
   );
 
+  // Persist the voice engine selection on the canonical config
+  // (`voice.input_engine`). A minimal slice is PUT: `config_save` flattens it
+  // to the `voice.input_engine` override, so sibling keys are never clobbered
+  // (and an unrelated rejected key can never revert the selection). Optimistic,
+  // reverted on failure.
+  const handleEngineChange = useCallback(
+    (next: VoiceEngine) => {
+      if (next === inputEngine) return;
+      const prev = inputEngine;
+      setInputEngine(next);
+      controller.setRequestedEngine(next);
+      void api
+        .saveConfig({ voice: { input_engine: next } }, scopedProfile)
+        .catch(() => {
+          setInputEngine(prev);
+          controller.setRequestedEngine(prev);
+        });
+    },
+    [controller, inputEngine, scopedProfile],
+  );
+
+  const voiceEngineTitle =
+    "Voice engine. " +
+    `browser — ${BROWSER_PRIVACY_NOTICE}. ` +
+    `local — ${LOCAL_PRIVACY_NOTICE}. ` +
+    "terminal — uses the local desktop audio path through the same local STT backend.";
+
   const onSubmit = useCallback(
     (event: FormEvent) => {
       event.preventDefault();
@@ -652,19 +648,41 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     [input, send],
   );
 
+  // "New chat" mints a genuinely NEW session on the canonical store (the same
+  // store the sessions list and transcript read) and points the surface at it,
+  // so a fresh chat never re-opens the fixed canonical default
+  // (`dashboard-chat`). The implicit first load (no `?resume=`) still converges
+  // on the canonical default for continuity. A failed mint surfaces a typed
+  // error and leaves the current session untouched.
   const startFresh = useCallback(() => {
-    storageSet(SESSION_KEY, DEFAULT_SESSION);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("resume");
-        return next;
-      },
-      { replace: false },
-    );
     setMessages([]);
     setError(null);
     setRetryText(null);
+    api
+      .createChatSession()
+      .then((res) => {
+        const newId = res?.session?.id;
+        if (!newId) return;
+        // Persist first so a reload lands on the fresh session even before the
+        // URL effect runs; the `?resume=` param then drives the session memo.
+        storageSet(SESSION_KEY, newId);
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("resume", newId);
+            return next;
+          },
+          { replace: false },
+        );
+        setSessionListNonce((n) => n + 1);
+      })
+      .catch((err: unknown) => {
+        setError(
+          `[CHAT_SESSION_CREATE] ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      });
   }, [setSearchParams]);
 
   const copyLast = useCallback(() => {
@@ -780,287 +798,83 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       });
   }, [messages, selectedMessages]);
 
-  const clearWatchdog = useCallback(() => {
-    if (watchdogRef.current) {
-      clearTimeout(watchdogRef.current);
-      watchdogRef.current = null;
-    }
-  }, []);
+  // The controller owns the committed text; the composer keeps what was typed
+  // before the utterance. On each new final we append only the delta.
+  useEffect(() => {
+    controller.setRequestedEngine(inputEngine);
+  }, [controller, inputEngine]);
 
-  const cleanupLocalCapture = useCallback(() => {
-    const stream = mediaStreamRef.current;
-    mediaStreamRef.current = null;
-    mediaRecorderRef.current = null;
-    if (stream) {
-      try {
-        stream.getTracks().forEach((track) => track.stop());
-      } catch {
-        /* already stopped */
+  useEffect(() => {
+    const committed = voice.committedText;
+    if (committed !== lastCommittedRef.current) {
+      const delta = committed.slice(lastCommittedRef.current.length);
+      lastCommittedRef.current = committed;
+      if (delta.trim()) {
+        setInput((prev) => joinTranscript(prev, delta));
       }
     }
-  }, []);
+  }, [voice.committedText]);
 
-  const stopLocalCapture = useCallback(() => {
-    const rec = mediaRecorderRef.current;
-    if (rec && rec.state !== "inactive") {
-      try {
-        rec.stop();
-      } catch {
-        /* already stopped */
-      }
-    }
-  }, []);
-
-  /**
-   * Local input engine: capture the mic in the browser and transcribe through
-   * the canonical Qubit local ASR adapter (`POST /api/audio/transcribe`). The
-   * resulting transcript enters the SAME `send()` turn path as typed input.
-   */
-  const startLocalCapture = useCallback(() => {
-    if (!localCaptureAvailable()) {
-      setVoiceState("unsupported");
-      setActiveEngine(null);
-      setVoiceError(
-        "[VOICE_UNSUPPORTED] This browser has no microphone capture for local " +
-          "STT. Type below, or use CLI `qubit` voice instead.",
-      );
-      return;
-    }
-    setVoiceError(null);
-    setVoiceNotice(null);
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        mediaStreamRef.current = stream;
-        const chunks: Blob[] = [];
-        let recorder: MediaRecorder;
-        try {
-          recorder = new MediaRecorder(stream);
-        } catch (err) {
-          cleanupLocalCapture();
-          setVoiceState("idle");
-          setActiveEngine(null);
-          setVoiceError(
-            "[VOICE_UNSUPPORTED] Could not start local capture: " +
-              (err instanceof Error ? err.message : String(err)),
-          );
-          return;
-        }
-        mediaRecorderRef.current = recorder;
-        setVoiceState("listening");
-        setActiveEngine("local");
-        recorder.ondataavailable = (event: BlobEvent) => {
-          if (event.data && event.data.size) chunks.push(event.data);
-        };
-        recorder.onerror = () => {
-          cleanupLocalCapture();
-          setVoiceState("idle");
-          setActiveEngine(null);
-          setVoiceError("[VOICE_ERROR] Local capture failed.");
-        };
-        recorder.onstop = () => {
-          const mime = recorder.mimeType || "audio/webm";
-          cleanupLocalCapture();
-          setVoiceState("idle");
-          setActiveEngine(null);
-          const blob = new Blob(chunks, { type: mime });
-          if (!blob.size) {
-            setVoiceError(
-              "[VOICE_NO_SPEECH] No audio captured — try again, or type.",
-            );
-            return;
-          }
-          blobToDataUrl(blob)
-            .then((dataUrl) => {
-              if (!dataUrl) throw new Error("audio read failed");
-              return api.transcribeAudio(dataUrl, mime.split(";", 1)[0]);
-            })
-            .then((res) => {
-              const text = (res.transcript ?? "").trim();
-              if (!text) {
-                setVoiceError(
-                  "[VOICE_NO_SPEECH] No speech heard — try again, or type.",
-                );
-                return;
-              }
-              setInput("");
-              send(text);
-            })
-            .catch((err: unknown) => {
-              setVoiceError(parseTurnError(err));
-            });
-        };
-        recorder.start();
-      })
-      .catch(() => {
-        cleanupLocalCapture();
-        setVoiceState("idle");
-        setActiveEngine(null);
-        setVoiceError(
-          "[VOICE_DENIED] Microphone blocked. Allow mic access, or type below.",
-        );
-      });
-  }, [cleanupLocalCapture, send]);
-
-  const stopVoice = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      stopLocalCapture();
-      return;
-    }
-    try {
-      recRef.current?.stop();
-    } catch {
-      /* already stopped */
-    }
-  }, [stopLocalCapture]);
-
-  const armWatchdog = useCallback(
-    (rec: SpeechRecognitionLike) => {
-      clearWatchdog();
-      watchdogRef.current = setTimeout(() => {
-        watchdogRef.current = null;
-        try {
-          rec.stop();
-        } catch {
-          /* noop */
-        }
-        recRef.current = null;
-        setVoiceState("idle");
-        setVoiceError(
-          "[VOICE_TIMEOUT] No speech heard within 60s — the microphone may be " +
-            "unavailable. Type below, or use CLI `qubit` voice instead.",
-        );
-      }, VOICE_WATCHDOG_MS);
-    },
-    [clearWatchdog],
-  );
+  // Chrome's proven behavior is preserved: the `browser` engine still sends the
+  // final utterance automatically. local/terminal finalize into the composer and
+  // stay editable (no auto-send).
+  useEffect(() => {
+    if (voice.engine !== "browser" || voice.state !== "idle" || busy) return;
+    const text = voice.committedText.trim();
+    if (!text || browserSentRef.current === text) return;
+    browserSentRef.current = text;
+    lastCommittedRef.current = "";
+    controller.setCommittedText("");
+    setInput("");
+    send(text);
+  }, [busy, controller, send, voice.committedText, voice.engine, voice.state]);
 
   const startVoice = useCallback(() => {
-    if (busy || voiceState === "listening") return;
-    const SR = asSpeechRecognition();
-    const wantsBrowser =
-      inputEngine === "browser" || (inputEngine === "auto" && SR !== null);
-    if (!wantsBrowser) {
-      // Explicit `local`, or `auto` after browser recognition was unavailable:
-      // use local Qubit STT, with the fallback reason visible in the UI.
-      setVoiceFallback(
-        inputEngine === "auto"
-          ? "browser speech recognition unavailable — using local Qubit STT"
-          : null,
-      );
-      startLocalCapture();
-      return;
-    }
-    if (!SR) {
-      setVoiceState("unsupported");
-      setActiveEngine(null);
-      setVoiceError(
-        "[VOICE_UNSUPPORTED] This browser offers no speech recognition. " +
-          "Type below, or use CLI `qubit` voice instead.",
-      );
-      return;
-    }
-    setVoiceError(null);
-    setVoiceFallback(null);
+    if (busy || controller.active) return;
     setVoiceNotice(null);
-    let rec: SpeechRecognitionLike;
-    try {
-      rec = new SR();
-    } catch (err) {
-      setVoiceState("unsupported");
-      setVoiceError(
-        "[VOICE_UNSUPPORTED] Could not start speech recognition: " +
-          (err instanceof Error ? err.message : String(err)),
-      );
-      return;
-    }
-    rec.lang = "en-US";
-    rec.interimResults = true;
-    rec.maxAlternatives = 1;
-    recRef.current = rec;
-    heardRef.current = "";
-    setVoiceState("listening");
-    setActiveEngine("browser");
-    armWatchdog(rec);
-    rec.onresult = (event) => {
-      armWatchdog(rec);
-      let interim = "";
-      let final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) final += result[0].transcript;
-        else interim += result[0].transcript;
-      }
-      const heard = (final || interim).trim();
-      if (heard) {
-        heardRef.current = heard;
-        setInput(heard);
-      }
-      if (final.trim()) {
-        try {
-          rec.stop();
-        } catch {
-          /* noop */
-        }
-      }
-    };
-    rec.onerror = (event) => {
-      const code = event?.error;
-      clearWatchdog();
-      recRef.current = null;
-      setVoiceState("idle");
-      setActiveEngine(null);
-      if (code === "not-allowed" || code === "service-not-allowed") {
-        setVoiceError(
-          "[VOICE_DENIED] Microphone blocked. Allow mic access, or type below.",
-        );
-      } else if (code === "no-speech" || code === "aborted") {
-        setVoiceError("[VOICE_NO_SPEECH] No speech heard — try again, or type.");
-      } else {
-        setVoiceError(`[VOICE_ERROR] Speech recognition failed (${code}).`);
-      }
-    };
-    rec.onend = () => {
-      clearWatchdog();
-      recRef.current = null;
-      const said = (heardRef.current || "").trim();
-      heardRef.current = "";
-      setVoiceState("idle");
-      setActiveEngine(null);
-      if (said) {
-        setInput("");
-        send(said);
-      }
-    };
-    try {
-      rec.start();
-    } catch (err) {
-      recRef.current = null;
-      setVoiceState("idle");
-      setActiveEngine(null);
-      setVoiceError(
-        "[VOICE_ERROR] Could not start the microphone: " +
-          (err instanceof Error ? err.message : String(err)),
-      );
-    }
-  }, [armWatchdog, busy, clearWatchdog, inputEngine, send, startLocalCapture,
-      voiceState]);
+    lastCommittedRef.current = "";
+    browserSentRef.current = "";
+    controller.setCommittedText("");
+    void controller.start(inputEngine);
+  }, [busy, controller, inputEngine]);
+
+  const stopVoice = useCallback(() => {
+    void controller.stop();
+  }, [controller]);
+
+  const cancelVoice = useCallback(() => {
+    void controller.cancel();
+    setVoiceNotice("recognition cancelled — interim text discarded");
+  }, [controller]);
+
+  const voiceActive =
+    voice.state === "starting" ||
+    voice.state === "listening" ||
+    voice.state === "stopping";
 
   const toggleVoice = useCallback(() => {
-    if (voiceState === "listening") stopVoice();
+    if (voiceActive) stopVoice();
     else startVoice();
-  }, [startVoice, stopVoice, voiceState]);
+  }, [startVoice, stopVoice, voiceActive]);
 
   // Right-Ctrl is a first-class push-to-talk control for this same `/qubit-chat`
-  // surface. Press starts the selected input engine; release stops it and the
-  // transcript enters the same `send()` canonical turn path as typed input.
-  // It is a control trigger, never a private runtime/session/broker/action path.
+  // surface. Press starts the selected input engine; hold shows the live interim
+  // text; release finalizes; Escape cancels the active recognition. It drives the
+  // SAME transcription controller as the Voice button and the SAME canonical
+  // turn path as typed input — never a private runtime/session/broker path.
   // The listener is gated on `isActive`: the ChatPage host is mounted
   // persistently by the SPA shell, so without the gate Right-Ctrl would hijack
   // the key on every other dashboard route.
   useEffect(() => {
-    if (!isActive) return;
+    // When the system-wide desktop helper is live it owns Right-Ctrl, so this
+    // page must not also react (double handling). It still types into this
+    // composer because the helper pastes at the focused cursor.
+    if (!isActive || desktopHelperLive) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Escape") {
+        if (controller.active) cancelVoice();
+        return;
+      }
       if (event.code !== "ControlRight" || event.repeat) return;
       if (rightCtrlHeldRef.current) return;
       rightCtrlHeldRef.current = true;
@@ -1078,47 +892,72 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("keyup", onKeyUp, true);
     };
-  }, [isActive, startVoice, stopVoice]);
+  }, [cancelVoice, controller, desktopHelperLive, isActive, startVoice, stopVoice]);
 
+  const voiceState: "idle" | "listening" | "unsupported" | "error" =
+    voice.state === "starting" || voice.state === "listening"
+      ? "listening"
+      : voice.state === "error"
+        ? "error"
+        : "idle";
+  const activeEngine = voice.engine;
+  const voiceError = voice.error;
+  const voiceFallback = voice.fallbackReason;
   const browserSrAvailable = asSpeechRecognition() !== null;
   const localAvailable = localCaptureAvailable();
-  const voiceAvailable = browserSrAvailable || localAvailable;
+  const terminalAvailable = terminalCaptureAvailable();
+  const voiceAvailable = browserSrAvailable || localAvailable || terminalAvailable;
   const rightCtrlState =
     (inputEngine === "browser" && !browserSrAvailable) ||
     (inputEngine === "local" && !localAvailable) ||
+    // `terminal` falls back to local capture, so it is only unavailable when
+    // there is no desktop bridge AND no local capture either.
+    (inputEngine === "terminal" && !terminalAvailable && !localAvailable) ||
     !voiceAvailable
       ? "unavailable"
       : "ready";
-  // The engine a press would actually use (mirrors `startVoice`): the live
-  // engine while listening, otherwise the selected engine resolved against
-  // browser availability. Surfaced so the operator can see browser vs local
-  // STT and the privacy/network consequence, not just the config value.
-  const effectiveEngine: ActiveVoiceEngine =
+  // The engine a press would actually use (mirrors the controller's resolver):
+  // the live engine while listening, otherwise the selected engine resolved
+  // against availability. Surfaced so the operator can see browser vs local STT
+  // and the privacy/network consequence, not just the config value.
+  const effectiveEngine: ControllerActiveEngine | null =
     activeEngine ??
     (inputEngine === "browser" && browserSrAvailable
       ? "browser"
       : inputEngine === "local" && localAvailable
         ? "local"
-        : inputEngine === "auto"
-          ? browserSrAvailable
-            ? "browser"
+        : inputEngine === "terminal"
+          ? terminalAvailable
+            ? "terminal"
             : localAvailable
               ? "local"
               : null
-          : null);
+          : inputEngine === "auto"
+            ? browserSrAvailable
+              ? "browser"
+              : localAvailable
+                ? "local"
+                : terminalAvailable
+                  ? "terminal"
+                  : null
+            : null);
   const voicePrivacy =
     effectiveEngine === "browser"
       ? "network: browser speech recognition may use the browser vendor's service"
       : effectiveEngine === "local"
         ? "privacy: local STT — audio is transcribed on this machine"
-        : "unavailable: no speech input engine";
+        : effectiveEngine === "terminal"
+          ? "privacy: terminal capture — audio stays on this machine via the local desktop path"
+          : "unavailable: no speech input engine";
   const rightCtrlReason =
     rightCtrlState === "unavailable"
       ? inputEngine === "browser" && !browserSrAvailable
         ? "browser speech recognition unavailable"
         : inputEngine === "local" && !localAvailable
           ? "microphone capture unavailable"
-          : "no speech input engine available"
+          : inputEngine === "terminal" && !terminalAvailable && !localAvailable
+            ? "desktop/terminal audio bridge unavailable"
+            : "no speech input engine available"
       : null;
 
   const hasMessages = messages.length > 0 || streamingText.length > 0;
@@ -1214,6 +1053,23 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <span>
               mic: <span className="font-mono">{voiceState}</span>
             </span>
+            <span data-testid="voice-engine-label">
+              stt: <span className="font-mono">{voice.engineLabel || "—"}</span>
+            </span>
+            <span data-testid="voice-latency">
+              ttfp:{" "}
+              <span className="font-mono">
+                {voice.metrics.timeToFirstPartialMs == null
+                  ? "—"
+                  : `${Math.round(voice.metrics.timeToFirstPartialMs)}ms`}
+              </span>
+            </span>
+            <span data-testid="voice-connected">
+              link:{" "}
+              <span className="font-mono">
+                {voice.connected ? "connected" : "—"}
+              </span>
+            </span>
             <span
               data-testid="right-ctrl-status"
               data-state={rightCtrlState}
@@ -1223,8 +1079,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   : "Right-Ctrl push-to-talk is ready"
               }
             >
-              Right-Ctrl: <span className="font-mono">{rightCtrlState}</span>
-              {rightCtrlReason ? ` (${rightCtrlReason})` : ""}
+              Right-Ctrl:{" "}
+              <span className="font-mono">
+                {desktopHelperLive ? "desktop helper" : rightCtrlState}
+              </span>
+              {desktopHelperLive
+                ? " (system-wide)"
+                : rightCtrlReason
+                  ? ` (${rightCtrlReason})`
+                  : ""}
             </span>
             <span data-testid="voice-privacy">{voicePrivacy}</span>
             {voiceFallback ? (
@@ -1500,6 +1363,24 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <label className="sr-only" htmlFor="qubit-chat-input">
               Message Qubit
             </label>
+            <label className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary">
+              <span className="sr-only">Voice engine</span>
+              <select
+                aria-label="Voice engine"
+                data-testid="voice-engine-picker"
+                className="rounded border border-current/15 bg-background-base/60 px-1 py-1 text-xs text-text-secondary"
+                title={voiceEngineTitle}
+                value={inputEngine}
+                onChange={(e) =>
+                  handleEngineChange(normalizeVoiceEngine(e.target.value))
+                }
+              >
+                <option value="auto">Voice: auto</option>
+                <option value="browser">Voice: browser</option>
+                <option value="local">Voice: local STT</option>
+                <option value="terminal">Voice: terminal</option>
+              </select>
+            </label>
             {supportsReasoning ? (
               <label className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary">
                 <span className="sr-only">Reasoning effort</span>
@@ -1519,6 +1400,16 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   ))}
                 </select>
               </label>
+            ) : null}
+            {voice.interimText ? (
+              <div
+                data-testid="voice-interim"
+                aria-live="polite"
+                title="Live interim transcription — replaced as you speak, not yet committed"
+                className="min-w-full rounded-md border border-dashed border-accent/40 bg-accent/5 px-3 py-1.5 text-sm italic text-text-secondary"
+              >
+                {voice.interimText}
+              </div>
             ) : null}
             <textarea
               id="qubit-chat-input"
@@ -1630,6 +1521,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             <ChatSessionArtifacts key={session} sessionId={session} />
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatSessionList
+                key={sessionListNonce}
                 activeSessionId={resumeParam}
                 profile={scopedProfile}
                 onNewChat={startFresh}

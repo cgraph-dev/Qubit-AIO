@@ -136,3 +136,28 @@ def test_terminal_profile_set_persists_to_voice_yaml(tmp_path, monkeypatch):
     # The guard reads the same key: one authority, no shadow default.
     fresh = type(cfg).load(tmp_path / "voice.yaml")
     assert fresh.get("terminal", "profile", default="") == "big"
+
+
+def test_terminal_profile_set_refreshes_running_config(tmp_path, monkeypatch):
+    """The picker must take effect on the RUNNING service, not only on disk.
+
+    ``terminal_context_guard`` reads ``cfg["terminal"]["profile"]`` from the
+    in-memory config; before the fix the PUT persisted voice.yaml but the
+    running guard kept the old value (observed live as a stale ``qubit-go`` /
+    ``UNKNOWN_PROFILE`` refusal on /chat until a restart).
+    """
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _make_api_profile(cfg)
+    assert (cfg.get("terminal", "profile", default="") or "") == ""
+
+    code, staged = HC.terminal_profile_set(cfg, {}, {"profile_id": "big"}, {})
+    assert code == 409 and staged["confirmation_id"], staged
+    code, done = HC.terminal_profile_set(
+        cfg, {},
+        {"profile_id": "big",
+         "confirmation_id": staged["confirmation_id"]}, {})
+    assert code == 200 and done["profile_id"] == "big", done
+    # Live effect: the same in-memory object the guard reads is updated.
+    assert cfg.get("terminal", "profile", default="") == "big"

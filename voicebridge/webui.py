@@ -76,31 +76,77 @@ _SERVED_REDACT_DEPTH = 12
 
 
 def _redact_served(obj: Any, _depth: int = 0,
-                   _seen: Optional[set] = None) -> Any:
-    """Recursively mask secret-shaped strings for a served response."""
+                   _path: Optional[set] = None) -> Any:
+    """Recursively mask secret-shaped strings for a served response.
+
+    ``_path`` tracks the ``id()`` of the containers on the *current* recursion
+    path (added before descending, discarded after), so only a true
+    ancestor/descendant cycle is redacted. A global seen-set would redact
+    acyclic *aliased* data — e.g. the MCP capability reader serves the same
+    list under both its ``result.<key>`` and top-level ``<key>`` names, which
+    is a legitimate sharing, not a cycle.
+    """
     if _depth > _SERVED_REDACT_DEPTH:
         return "[REDACTED]"
     if isinstance(obj, str):
         return redact_text(obj) if _SERVED_SECRET_GATE.search(obj) else obj
     if isinstance(obj, dict):
-        if _seen is None:
-            _seen = set()
-        if id(obj) in _seen:
+        if _path is None:
+            _path = set()
+        oid = id(obj)
+        if oid in _path:
             return "[REDACTED]"
-        _seen.add(id(obj))
-        out: Dict[Any, Any] = {}
-        for key, value in obj.items():
-            if (isinstance(key, str) and isinstance(value, str)
-                    and _SERVED_SECRET_KEY.search(key)):
-                out[key] = "[REDACTED]"
-            else:
-                out[key] = _redact_served(value, _depth + 1, _seen)
-        return out
+        _path.add(oid)
+        try:
+            out: Dict[Any, Any] = {}
+            for key, value in obj.items():
+                if (isinstance(key, str) and isinstance(value, str)
+                        and _SERVED_SECRET_KEY.search(key)):
+                    out[key] = "[REDACTED]"
+                else:
+                    out[key] = _redact_served(value, _depth + 1, _path)
+            return out
+        finally:
+            _path.discard(oid)
     if isinstance(obj, (list, tuple)):
         # Return a plain list: JSON treats tuples as arrays, and a tuple
         # subclass (namedtuple) cannot be rebuilt from a single iterable.
-        return [_redact_served(v, _depth + 1, _seen) for v in obj]
+        if _path is None:
+            _path = set()
+        oid = id(obj)
+        if oid in _path:
+            return "[REDACTED]"
+        _path.add(oid)
+        try:
+            return [_redact_served(v, _depth + 1, _path) for v in obj]
+        finally:
+            _path.discard(oid)
     return obj
+
+
+def correct_mcp_test_verdict(method: str, api_path: str, code: int,
+                             out: Any) -> Any:
+    """Serve the honest MCP test verdict (audit 2026-09-29, fix-mcp).
+
+    The compat handler ``h_mcp_test_local`` wraps the canonical probe result in
+    ``_ok(ok=True)`` unconditionally, so an unreachable server (``connected:
+    false`` / ``state: UNREACHABLE`` / code ``MCP_CONNECT_FAILED``) still served
+    ``ok: true`` and McpPage's toast keyed on ``result.ok`` reported a
+    fabricated "0 tool(s)" success. Re-derive the verdict here from the probe's
+    own truth fields — the same boundary-correction pattern as the ``/api/env``
+    ``is_set`` upgrade in ``_qubit_api``. The canonical one-line handler fix is
+    filed as a patch-spec (``qubit_compat.py`` is coordinator-owned); this keeps
+    the served payload honest either way and is idempotent with that fix.
+    """
+    if method == "POST" and code == 200 and isinstance(out, dict) \
+            and api_path.startswith("/api/mcp/servers/") \
+            and api_path.rstrip("/").endswith("/test"):
+        if not bool(out.get("connected")):
+            out["ok"] = False
+            if not out.get("error"):
+                out["error"] = str(out.get("detail") or out.get("code")
+                                   or "MCP connection failed")
+    return out
 
 
 def _fill_config_defaults(served: Any) -> Any:
@@ -802,7 +848,7 @@ SPA_ROUTE_PATHS = (
     "/chat", "/sessions", "/files", "/models", "/analytics", "/logs",
     "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
     "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
-    "/agents",
+    "/agents", "/voice-edit",
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
@@ -962,6 +1008,19 @@ QUBIT_READ_AUTHORITY: tuple = (
     # while the Qubit POST/CLI/voice drive the Qubit manager — the read/write
     # split-brain this workstream exists to remove.
     "/api/qubit/update",
+    # Curator pause/run read/write split-brain (UI audit 2026-09-29): PUT
+    # /api/curator/paused writes ``curator_control.json`` (the compat store),
+    # but GET was fork-proxied and always reported paused:false, so the badge
+    # reset on reload while run correctly refused CURATOR_PAUSED. Serve GET from
+    # the same Qubit handler (``h_curator``) the write uses.
+    "/api/curator",
+    # Host version read (UI audit 2026-09-29): the fork-proxied
+    # ``/api/system/stats`` emitted only ``hermes_version`` (a legacy label),
+    # so ``SystemPage``'s ``v{stats.qubit_version}`` row rendered blank and a
+    # legacy token reached the served surface. The compat handler emits the
+    # Qubit product version (``qubit_version``); serve it from the Qubit
+    # boundary.
+    "/api/system/stats",
 )
 
 
@@ -1132,6 +1191,26 @@ def qubit_ws_gate_code(path: str) -> Optional[str]:
 # --------------------------------------------------------------------------
 # HTTP server
 # --------------------------------------------------------------------------
+
+# The dashboard theme's customCSS is injected client-side into a single
+# ``<style>`` tag whose canonical Qubit id is ``qubit-theme-custom-css``. A
+# legacy comment inside the overlay theme asset still names the old
+# ``hermes-theme-custom-css`` id; normalize it in the served shell so no
+# dashboard response carries a stale legacy visual reference. Wire/API
+# identifiers (``__HERMES_SESSION_TOKEN__``, ``__HERMES_BASE_PATH__``,
+# ``X-Hermes-Session-Token``) are load-bearing and are NOT touched here.
+LEGACY_THEME_CSS_STYLE_ID = "hermes-theme-custom-css"
+QUBIT_THEME_CSS_STYLE_ID = "qubit-theme-custom-css"
+
+
+def debrand_theme_style_id(markup: str) -> str:
+    """Rewrite the stale legacy theme ``<style>`` id to the canonical Qubit id.
+
+    Only the theme style id is rewritten; every ``__HERMES_*`` wire identifier
+    is preserved verbatim.
+    """
+    return markup.replace(LEGACY_THEME_CSS_STYLE_ID, QUBIT_THEME_CSS_STYLE_ID)
+
 
 class WebUIHandler(BaseHTTPRequestHandler):
     server_version = "VoiceDashboard/1.0"
@@ -1388,6 +1467,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
                        "<title>Qubit Agent - Command Center</title>", html,
                        count=1, flags=_re.S)
         html = html.replace('"/hermes/', '"/')
+        html = debrand_theme_style_id(html)
         self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _serve_qubit_static(self, sub: str) -> None:
@@ -1534,6 +1614,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         return
                     if not isinstance(body, dict):
                         body = {"_list": body}
+        # System-wide voice typing / edit surface (additive). Reuses the one
+        # provider gateway, e-stop, audit, and session authority; adds no
+        # listener. Authenticated by the checks above (SPA session token or
+        # X-Api-Token). Disabled by default at the feature-flag level.
+        if api_path.rstrip("/") == "/api/voice-edit" or \
+                api_path.startswith("/api/voice-edit/"):
+            from .voice_edit import routes as _VE
+            routed = _VE.handle(self.app.orch.cfg, method, api_path, body)
+            if routed is not None:
+                status, payload = routed
+                self._json(payload, status)
+                return
         # Qubit device surface (audit 2026-09-23 item 6): the classic
         # ``/api/device/*`` handlers are X-Api-Token gated and unreachable from
         # the SPA prefix, so ``/agent/api/device*`` 404'd. Serve the SAME device
@@ -1584,8 +1676,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if method == "POST" and api_path.rstrip("/") == "/api/auth/ws-ticket":
             from .pty_ws import SCOPE_PTY
             from .gateway.rpc_ws import SCOPE_RPC
+            from .stt_ws import SCOPE_STT
             scope = str(body.get("scope", "") or SCOPE_PTY).strip().lower()
-            if scope not in (SCOPE_PTY, SCOPE_RPC):
+            if scope not in (SCOPE_PTY, SCOPE_RPC, SCOPE_STT):
                 scope = SCOPE_PTY
             # /chat context floor: surface the typed configuration error here so
             # the terminal UI can display it (a WS-upgrade body is not visible
@@ -1810,16 +1903,25 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # Upgrade presence here at the Qubit read boundary using names only
         # (never a value); a provider-derived true is never downgraded and no
         # secret material is read or returned.
+        #
+        # UI audit 2026-09-29 D1: this upgrade must use ``resolved_names`` (the
+        # credential actually resolves), NOT ``present_names`` (a registry row
+        # merely exists). ``present_names`` forced ``is_set:true`` for an
+        # ``env:``/``file:`` reference whose target is absent — a dishonest Keys
+        # surface. ``resolved_names`` preserves the D-4 intent (a real runtime
+        # ``.env``/process key is present) without advertising unresolvable
+        # references as set.
         if method in ("GET", "HEAD") and api_path.rstrip("/") == "/api/env" \
                 and code == 200 and isinstance(out, dict):
             try:
                 from . import env_store as _ES
-                present = _ES.present_names(self.app.orch.cfg)
+                resolved = _ES.resolved_names(self.app.orch.cfg)
                 for _k, _v in out.items():
-                    if isinstance(_v, dict) and _k in present:
+                    if isinstance(_v, dict) and _k in resolved:
                         _v["is_set"] = True
             except Exception:
                 pass
+        out = correct_mcp_test_verdict(method, api_path, code, out)
         self._json(out, code)
 
     def _qubit_backend_enabled(self) -> bool:
@@ -2019,6 +2121,41 @@ class WebUIHandler(BaseHTTPRequestHandler):
             peer_ok=P.peer_allowed(self))
         return True
 
+    def _maybe_stt_upgrade(self) -> bool:
+        """Serve the streaming-STT WebSocket: ``/agent/api/audio/stt/ws``.
+
+        One more upgrade path on the existing listener, sharing the same
+        single-use ticket authority (scope ``stt``) and origin/peer/e-stop
+        checks as the PTY and RPC sockets. No second listener, no second
+        speech backend. Returns True when handled (accepted or typed-rejected).
+        """
+        if self.headers.get("Upgrade", "").strip().lower() != "websocket":
+            return False
+        api_path = self.path.split("?")[0]
+        if api_path.startswith("/agent"):
+            api_path = api_path[len("/agent"):]
+        if api_path.rstrip("/") != "/api/audio/stt/ws":
+            return False
+        # Honour the canonical switch: when streaming STT is turned off, the
+        # socket is not served (the legacy whole-utterance transcribe route
+        # stays available).
+        orch = getattr(self.app, "orch", None)
+        cfg = getattr(orch, "cfg", None)
+        try:
+            enabled = cfg.get("voice", "stt_streaming", "enabled",
+                              default=True) if cfg is not None else True
+        except Exception:
+            enabled = True
+        if not enabled:
+            return False
+        from . import pty_ws as P
+        q = query_params(self.path)
+        self.app.stt_ws.serve(
+            self, ticket_value=q.get("ticket", ""),
+            origin_ok=P.origin_allowed(self, self.app.allowed_origins),
+            peer_ok=P.peer_allowed(self))
+        return True
+
     def _maybe_gateway_rpc_upgrade(self) -> bool:
         """Serve the Qubit-dialect RPC WebSocket: ``/agent/api/gateway/ws``.
 
@@ -2092,6 +2229,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
     # -- routes ----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
         if self._maybe_pty_upgrade():
+            return
+        if self._maybe_stt_upgrade():
             return
         if self._maybe_gateway_rpc_upgrade():
             return
@@ -3892,6 +4031,9 @@ class WebUI:
         # Qubit-dialect RPC WebSocket (/agent/api/gateway/ws): the D2 adapter
         # on the SAME listener, sharing the one ticket authority. Lazy.
         self._rpc_ws: Optional[Any] = None
+        # Streaming-STT WebSocket (/agent/api/audio/stt/ws): live local
+        # transcription on the SAME listener + ticket authority. Lazy.
+        self._stt_ws: Optional[Any] = None
         _sd = state_dir or Path("/tmp")
         try:
             from .approvals import ApprovalJournal
@@ -4002,6 +4144,22 @@ class WebUI:
             self._rpc_ws = srv
         return srv
 
+    @property
+    def stt_ws(self) -> Any:
+        """The single streaming-STT WebSocket authority for this listener.
+
+        Shares the listener's one ticket store (single-use, single authority);
+        the socket drives the same local ASR backend as the HTTP transcribe
+        route, so there is no second speech authority."""
+        srv = getattr(self, "_stt_ws", None)
+        if srv is None:
+            from .stt_ws import SttWsServer
+            srv = SttWsServer(
+                cfg=(self.orch.cfg if self.orch is not None else None),
+                tickets=self.pty_ws.tickets)
+            self._stt_ws = srv
+        return srv
+
     # -- lifecycle --------------------------------------------------------
     def start(self) -> None:
         loopback = self.host in ("127.0.0.1", "localhost", "::1")
@@ -4021,6 +4179,38 @@ class WebUI:
         self._thread.start()
         log_event("webui.started", host=self.host, port=self.port)
         log.info("voice dashboard listening on http://%s:%s", self.host, self.port)
+        self._prewarm_stt()
+
+    def _prewarm_stt(self) -> None:
+        """Warm the configured STT engine in the background (non-blocking).
+
+        Loading a streaming model is a one-time cost (Moonshine ~1 s,
+        Nemotron 0.6B ~8 s); doing it at startup keeps the first utterance warm
+        without delaying the listener. Policy: ``asr.prewarm`` (auto|false|<engine>).
+        """
+        orch = self.orch
+        if orch is None:
+            return
+        try:
+            policy = orch.cfg.get("asr", "prewarm", default="auto")
+        except Exception:
+            policy = "auto"
+        if policy in (False, "false", "off", "none", ""):
+            return
+
+        def _run() -> None:
+            try:
+                from .asr.streaming import prewarm
+                engine = None if policy in (True, "true", "auto") else str(policy)
+                result = prewarm(orch.cfg, engine)
+                log_event("stt.prewarm", ok=bool(result.get("ok")),
+                          engine=str(result.get("engine") or engine or "auto"),
+                          load_ms=result.get("load_ms"),
+                          code=str(result.get("code") or ""))
+            except Exception:
+                log.exception("stt prewarm failed (non-fatal)")
+
+        threading.Thread(target=_run, daemon=True, name="stt-prewarm").start()
 
     def stop(self) -> None:
         # Packet 8K closure: wake and close every event-stream subscriber FIRST

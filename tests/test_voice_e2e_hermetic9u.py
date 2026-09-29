@@ -226,7 +226,7 @@ def test_right_ctrl_press_release_debounce_reaches_canonical_turn():
 def test_input_engine_values_and_default():
     from voicebridge.config import VOICE_INPUT_ENGINES, normalize_input_engine
 
-    assert VOICE_INPUT_ENGINES == ("browser", "local", "auto")
+    assert VOICE_INPUT_ENGINES == ("browser", "local", "terminal", "auto")
     for value in VOICE_INPUT_ENGINES:
         assert normalize_input_engine(value) == value
     # Unknown/missing/wrong-case fails closed to the documented default.
@@ -261,7 +261,7 @@ def test_input_engine_never_changes_the_canonical_operation(
     from voicebridge import qubit_compat as HC
 
     receipts = {}
-    for engine in ("browser", "local", "auto"):
+    for engine in ("browser", "local", "terminal", "auto"):
         cfg = _cfg(tmp_path / engine, monkeypatch,
                    f"voice:\n  input_engine: {engine}\n")
         assert cfg.get("voice", "input_engine") == engine

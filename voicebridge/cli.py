@@ -6464,11 +6464,20 @@ def _update_resolve_channel(cfg, source, channel, tag):
             "update from a release source instead (--source)")
     from . import update_channel as UC
 
+    if channel and not UC.is_valid_channel(channel):
+        raise ValueError(f"unknown update channel: {channel!r} "
+                         f"(valid: {', '.join(UC.CHANNELS)})")
     resolved = UC.resolve_source(cfg, src)
     if channel:
         resolved["channel"] = channel
     if tag:
+        # An explicit tag is a pin: it wins over the channel's tag policy and is
+        # threaded to the manager so the effective git ref is that tag.
         resolved["tag"] = tag
+        resolved["ref"] = tag
+        resolved["ref_kind"] = "tag"
+        resolved["pinned"] = True
+        resolved["resolve_latest_tag"] = False
     if not resolved.get("ok", True):
         raise ValueError(str(resolved.get("detail")
                              or resolved.get("code") or "update source refused"))
@@ -6527,7 +6536,16 @@ def _cmd_update(cfg, args) -> int:
         return 2
 
     if verb == "check":
-        out = UM.check(cfg, source=source)
+        # Thread the selected channel/tag into the manager so the effective ref
+        # it reports is the ref `--apply` will actually fetch. Only pass them
+        # when supplied, so a bare `qubit update --check` keeps the historical
+        # configured-branch behavior (and remains call-compatible).
+        check_kwargs = {"source": source}
+        if channel:
+            check_kwargs["channel"] = channel
+        if tag:
+            check_kwargs["tag"] = tag
+        out = UM.check(cfg, **check_kwargs)
         for key in ("channel", "tag"):
             value = locals().get(key)
             if value:
@@ -6570,6 +6588,8 @@ def _cmd_update(cfg, args) -> int:
             kwargs = {"confirm": True, "source": source, "actor": "cli:update"}
             if channel:
                 kwargs["channel"] = channel
+            if tag:
+                kwargs["tag"] = tag
             import inspect as _inspect
             try:
                 params = _inspect.signature(full).parameters
@@ -6585,13 +6605,19 @@ def _cmd_update(cfg, args) -> int:
                          {k: v for k, v in kwargs.items() if k in accepted})
             out = full(cfg, **forwarded)
         else:
+            extra = {}
+            if channel:
+                extra["channel"] = channel
+            if tag:
+                extra["tag"] = tag
             snap = UM.snapshot(cfg, reason="pre-apply", source=source,
-                               backup_dir=backup_dir, actor="cli:update")
+                               backup_dir=backup_dir, actor="cli:update",
+                               **extra)
             if not snap.get("ok"):
                 _print_update_receipt(snap, as_json)
                 return _update_rc(snap)
             out = UM.apply(cfg, confirm=True, source=source,
-                           actor="cli:update")
+                           actor="cli:update", **extra)
             out["backup_dir"] = snap.get("backup_dir")
             out["backup_bundle"] = snap.get("bundle")
         _print_update_receipt(out, as_json)

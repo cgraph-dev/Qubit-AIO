@@ -19,7 +19,7 @@
   "added": [
    {
     "qubit": "frontend/qubit-web/src/pages/ChatPage.voice9u.test.tsx",
-    "qubit_sha256": "68c865602c61299c8d99e528d413bc46dbe94c5c9e8f5181ba4f01a235cf16a3",
+    "qubit_sha256": "76de9fe40c6c5ecb9bd40fcd3b4a429b0462a63de8865f4d3ae9b74373ffd205",
     "role": "Qubit-added contract test for the /qubit-chat voice-status strip (active engine, Right-Ctrl state, privacy/fallback reason); no upstream counterpart.",
     "affected_regression_test": "tests/test_branding_parity_wave3.py"
    },
@@ -1383,7 +1383,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "fd019205925a6eadb9518902d0ae0e0d88a7cab41454b6e80dcfdb442e515a52",
    "qubit": "frontend/qubit-web/src/lib/api.ts",
-   "qubit_sha256": "bf2c65efb915b4dd432c737b557456295994a52f666c77b1ce992ab98fbac8f9",
+   "qubit_sha256": "342c5f36c30e1c0064f67410d09f20dee5a4b11f63bbb5d1081db4f5878f0d31",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "fd019205925a6eadb9518902d0ae0e0d88a7cab41454b6e80dcfdb442e515a52",
@@ -2475,7 +2475,7 @@
    "upstream_rev": "d337b736aa1e8ebecfab043842d13e4a2d2f48a3",
    "upstream_sha256": "c638d207d6219011f7d1d3ac35062a244b84b0b47875ae11ad7f97e37d7110bd",
    "qubit": "frontend/qubit-web/src/pages/ChatPage.tsx",
-   "qubit_sha256": "a6960efee7174001b4ac5a47e51db00e38ccbf92e407bbfbd5d71d55bfd765a3",
+   "qubit_sha256": "cf48d638edbc8506abafbae86f927efe5baf21774496480d344139e500e9df5a",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "c638d207d6219011f7d1d3ac35062a244b84b0b47875ae11ad7f97e37d7110bd",

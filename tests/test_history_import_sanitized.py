@@ -74,6 +74,67 @@ def test_sanitizer_redacts_secret_shapes_and_preserves_safe_lines():
     assert SK_KEY not in json.dumps(report)
 
 
+ALL_LETTER_TOKENS = [
+    "hf_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",        # HuggingFace (all letters)
+    "tskey-auth-kXYZnopqrstuvwxyz1234567890",        # Tailscale
+    "pplx-AbCdEfGhIjKlMnOpQrStUvWxYz012345",         # Perplexity
+    "glpat-AbCdEfGhIjKlMnOpQrSt",
+    "ya29.a0AfH6SMBxAbCdEfGhIjKlMnOpQrStUvWxYz",
+    "ATATT3xFfGF0AbCdEfGhIjKlMnOpQrStUvWxYz0123456789",
+]
+
+
+def test_all_letter_provider_tokens_are_redacted_and_fail_closed():
+    """Regression: an all-letter provider token (``hf_...``) escaped the
+    entropy fallback because it has no digit; the explicit shapes and the
+    independent residual scanner must catch it."""
+    from voicebridge import qubit_migration as HM
+
+    text = "\n".join(ALL_LETTER_TOKENS) + "\n"
+    report = HM.sanitize_cli_history(text)
+    assert report["redactions"] == len(ALL_LETTER_TOKENS), report
+    assert HM._history_residual_secret(report["text"]) == 0, report
+    for tok in ALL_LETTER_TOKENS:
+        assert tok not in report["text"], tok
+    # The independent scanner sees the raw secrets, so a missed replacement
+    # cannot pass the fail-closed write gate (it may count a token under more
+    # than one shape, so only the presence matters).
+    assert HM._history_residual_secret(text) >= len(ALL_LETTER_TOKENS)
+    # Sanitizing the sanitized output is a no-op.
+    again = HM.sanitize_cli_history(report["text"])
+    assert again["redactions"] == 0, again
+
+
+def test_all_letter_token_import_refuses_when_a_secret_would_survive(tmp_path):
+    """If a value-shape secret survived, apply must refuse and write nothing."""
+    from voicebridge import qubit_migration as HM
+
+    token = ALL_LETTER_TOKENS[0]
+    src = _source(tmp_path, f"+use {token}\n")
+    # Force the per-line sanitizer to miss the token, leaving it for the
+    # independent residual scanner to catch and refuse.
+    original = HM._HISTORY_SECRET_PATTERNS
+    original_residual = HM._HISTORY_RESIDUAL_PATTERNS
+    original_entropy = HM._HISTORY_ENTROPY_TOKEN
+    try:
+        # The per-line sanitizer loses the huggingface shape, but the residual
+        # scanner keeps its import-time snapshot, so the write must still refuse.
+        HM._HISTORY_SECRET_PATTERNS = tuple(
+            p for p in original if p[0] not in ("huggingface_token",))
+        HM._HISTORY_ENTROPY_TOKEN = __import__("re").compile(r"(?!x)x")
+        dest = tmp_path / "dest" / ".hermes_history"
+        out = HM.import_cli_history_sanitized(
+            home=src, dest=dest, confirm=True,
+            backup_dir=tmp_path / "backup")
+        assert out["state"] == "REFUSED", out
+        assert out["code"] == "HISTORY_SECRET_ASSERT_FAILED", out
+        assert not dest.exists(), "refused import must not write"
+    finally:
+        HM._HISTORY_SECRET_PATTERNS = original
+        HM._HISTORY_RESIDUAL_PATTERNS = original_residual
+        HM._HISTORY_ENTROPY_TOKEN = original_entropy
+
+
 def test_sanitizer_is_idempotent_and_placeholder_safe():
     from voicebridge import qubit_migration as HM
 

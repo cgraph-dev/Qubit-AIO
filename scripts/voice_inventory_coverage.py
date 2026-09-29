@@ -9,10 +9,12 @@ the real voice registry (``voicebridge.voice_commands``) and resolves every
 row's intent through the production ``resolve()`` pipeline, classifying it:
 
 * ``real``       -- resolves to an entry whose ``backend`` is a bound
-                    ``_BACKENDS`` callable and is not the audited
-                    ``voice_unsupported`` guard;
-* ``guard``      -- resolves to a ``voice_unsupported`` audited refusal (a real
-                    execution of Qubit's safety policy, not a working path);
+                    ``_BACKENDS`` callable that performs the capability;
+* ``guard``      -- resolves to an audited refusal/guidance: the
+                    ``voice_unsupported`` backend, a ``*_refusal`` entry whose
+                    bound backend returns a typed refusal, a ``*_help`` /
+                    ``*_guidance`` entry, or a ``guard_*`` entry. These execute
+                    Qubit's safety policy, not the capability;
 * ``unresolved`` -- no unique entry (unknown/ambiguous) or an entry bound to a
                     dead backend.
 
@@ -65,6 +67,27 @@ _OTHER_KEY = "other"
 
 _RESOLUTIONS = ("real", "guard", "unresolved")
 
+# A resolved entry names a typed refusal/guidance -- not a working capability --
+# when its id or its bound backend carries one of these tokens. ``*_refusal``
+# entries (e.g. ``cli_import_refusal``) and ``*_help`` / ``*_guidance`` entries
+# bind genuinely callable backends that only return a refusal/guidance payload,
+# so the backend name alone is not enough.
+_GUARD_TOKENS: Tuple[str, ...] = ("refusal", "unsupported", "help", "guidance")
+_GUARD_ID_PREFIXES: Tuple[str, ...] = ("guard_", "cli_guard_")
+
+
+def _is_guard(entry_id: Optional[str], backend: Optional[str]) -> bool:
+    """True when the resolved entry is an audited refusal/guidance, not a
+    working voice path."""
+    if backend == "voice_unsupported":
+        return True
+    if any(token in (backend or "").lower() for token in _GUARD_TOKENS):
+        return True
+    low_id = (entry_id or "").lower()
+    if low_id.startswith(_GUARD_ID_PREFIXES):
+        return True
+    return any(token in low_id for token in _GUARD_TOKENS)
+
 
 def _surface_key(surface: str) -> str:
     for raw, key in _SURFACE_KEYS:
@@ -90,7 +113,7 @@ def _classify(VC: Any, intent: str) -> Tuple[str, Optional[str], str]:
     if entry is None:
         return "unresolved", None, res.kind
     backend = entry.backend
-    if backend == "voice_unsupported":
+    if _is_guard(entry.id, backend):
         return "guard", entry.id, res.kind
     bound = bool(backend) and backend in VC._BACKENDS \
         and callable(VC._BACKENDS[backend])
@@ -166,9 +189,11 @@ def build_report(inventory: Dict[str, Any]) -> Dict[str, Any]:
         "source": DEFAULT_INVENTORY,
         "source_schema": inventory.get("schema"),
         "classification": {
-            "real": ("resolves to an entry with a bound _BACKENDS backend "
-                     "(not voice_unsupported)"),
-            "guard": "resolves to an audited voice_unsupported refusal",
+            "real": ("resolves to an entry with a bound _BACKENDS backend that "
+                     "is not a refusal/guidance"),
+            "guard": ("resolves to an audited refusal/guidance: voice_unsupported, "
+                      "a *_refusal entry, a *_help/*_guidance entry, or a guard_* "
+                      "entry"),
             "unresolved": ("no unique entry, or an entry with a dead backend"),
         },
         "summary": {

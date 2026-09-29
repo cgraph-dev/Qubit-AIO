@@ -45,6 +45,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/qubit-brand": "Qubit Brand",
   "/qubit-boards": "Qubit Boards",
   "/qubit-runtime": "Runtime Inventory",
+  "/voice-edit": "Voice Editing",
 };
 
 export function resolvePageTitle(

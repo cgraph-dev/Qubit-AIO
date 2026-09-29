@@ -796,9 +796,17 @@ export default function EnvPage() {
 
     // Custom keys: user-added vars the backend flagged as not in any catalog.
     // Sorted alphabetically; an in-flight (just-added, unsaved) row carries the
-    // custom category locally so it shows here immediately.
+    // custom category locally so it shows here immediately. The server projects
+    // persisted user references back under `category:"references"` (with
+    // `custom:true`) — accept both or an added key vanishes on reload.
     const customEntries = Object.entries(vars)
-      .filter(([, info]) => info.category === "custom" && !info.channel_managed)
+      .filter(
+        ([, info]) =>
+          (info.category === "custom" ||
+            info.category === "references" ||
+            info.custom === true) &&
+          !info.channel_managed,
+      )
       .sort(([a], [b]) => a.localeCompare(b));
 
     return {

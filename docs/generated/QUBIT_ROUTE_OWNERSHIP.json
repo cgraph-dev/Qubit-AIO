@@ -4,13 +4,13 @@
  "fork_routes": 278,
  "catch_all_routes_excluded": 1,
  "classic_dispatch_routes": 90,
- "compat_routes": 448,
+ "compat_routes": 449,
  "counts": {
-  "qubit_addition": 158,
+  "qubit_addition": 161,
   "qubit_policy": 289,
-  "qubit_runtime": 39
+  "qubit_runtime": 37
  },
- "non_authoritative_handler_count": 38,
+ "non_authoritative_handler_count": 36,
  "non_authoritative_handlers": [
   "GET /api/analytics/models -> h_analytics_models",
   "GET /api/analytics/usage -> h_analytics",
@@ -18,7 +18,6 @@
   "GET /api/config -> h_config",
   "GET /api/config/defaults -> h_config_defaults",
   "GET /api/config/schema -> h_config_schema",
-  "GET /api/curator -> h_curator",
   "GET /api/egress/status -> h_egress_status",
   "GET /api/git/base-branches -> h_git_base_branches",
   "GET /api/git/branches -> h_git_branches",
@@ -44,7 +43,6 @@
   "GET /api/model/auxiliary -> h_model_auxiliary",
   "GET /api/model/moa -> h_model_moa",
   "GET /api/model/recommended-default -> h_model_recommended_default",
-  "GET /api/system/stats -> h_system_stats",
   "GET /api/tools/computer-use/status -> h_computer_use_status",
   "GET /api/tools/terminal/backends -> h_terminal_backends",
   "GET /dashboard-plugins/x1/a/b -> h_plugin_asset",
@@ -133,6 +131,19 @@
   },
   {
    "method": "GET",
+   "path": "/api/audio/stt/status",
+   "route": "/api/audio/stt/status",
+   "owner": "qubit_addition",
+   "reason": "Qubit addition the foundation does not declare",
+   "disposition": "implemented",
+   "fork_declares": false,
+   "classic_served": false,
+   "qubit_handler": "h_audio_stt_status",
+   "source": "compat",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
    "path": "/api/audio/voice-live/status",
    "route": "/api/audio/voice-live/status",
    "owner": "qubit_addition",
@@ -180,6 +191,19 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_cron_job_runs",
+   "source": "fork",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/curator",
+   "route": "/api/curator",
+   "owner": "qubit_addition",
+   "reason": "single-store read-authority quarantine (avoids split-brain against the matching Qubit write)",
+   "disposition": "implemented",
+   "fork_declares": true,
+   "classic_served": false,
+   "qubit_handler": "h_curator",
    "source": "fork",
    "sample_ok": true
   },
@@ -1935,6 +1959,19 @@
    "fork_declares": true,
    "classic_served": true,
    "qubit_handler": "h_status",
+   "source": "fork",
+   "sample_ok": true
+  },
+  {
+   "method": "GET",
+   "path": "/api/system/stats",
+   "route": "/api/system/stats",
+   "owner": "qubit_addition",
+   "reason": "single-store read-authority quarantine (avoids split-brain against the matching Qubit write)",
+   "disposition": "implemented",
+   "fork_declares": true,
+   "classic_served": false,
+   "qubit_handler": "h_system_stats",
    "source": "fork",
    "sample_ok": true
   },
@@ -5944,19 +5981,6 @@
   },
   {
    "method": "GET",
-   "path": "/api/curator",
-   "route": "/api/curator",
-   "owner": "qubit_runtime",
-   "reason": "safe vendor-compatible route; the vendored runtime is the canonical implementation",
-   "disposition": "implemented",
-   "fork_declares": true,
-   "classic_served": false,
-   "qubit_handler": "h_curator",
-   "source": "fork",
-   "sample_ok": true
-  },
-  {
-   "method": "GET",
    "path": "/api/egress/status",
    "route": "/api/egress/status",
    "owner": "qubit_runtime",
@@ -6277,19 +6301,6 @@
    "fork_declares": true,
    "classic_served": false,
    "qubit_handler": "h_model_recommended_default",
-   "source": "fork",
-   "sample_ok": true
-  },
-  {
-   "method": "GET",
-   "path": "/api/system/stats",
-   "route": "/api/system/stats",
-   "owner": "qubit_runtime",
-   "reason": "safe vendor-compatible route; the vendored runtime is the canonical implementation",
-   "disposition": "implemented",
-   "fork_declares": true,
-   "classic_served": false,
-   "qubit_handler": "h_system_stats",
    "source": "fork",
    "sample_ok": true
   },

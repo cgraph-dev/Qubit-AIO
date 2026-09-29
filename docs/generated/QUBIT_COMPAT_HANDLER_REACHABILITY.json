@@ -241,7 +241,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "1697: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+     "1719: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
     ]
    },
    "script_references": {},
@@ -737,7 +737,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "2692: code, out = _HC.h_power(self.app.orch.cfg,"
+     "2751: code, out = _HC.h_power(self.app.orch.cfg,"
     ]
    },
    "script_references": {},
@@ -931,7 +931,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "3316: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+     "3375: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
     ]
    },
    "script_references": {},

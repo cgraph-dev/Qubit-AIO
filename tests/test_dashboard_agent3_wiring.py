@@ -598,6 +598,8 @@ PAGE_ROWS = [
      "status"),
     ("page_webhookspage", "WebhooksPage", "/webhooks", "GET", "/api/webhooks",
      "webhooks"),
+    ("page_voiceeditpage", "VoiceEditPage", "/voice-edit", None, None,
+     "status"),
 ]
 
 
@@ -616,7 +618,7 @@ def test_every_qubit_web_page_served_through_real_route(tmp_path,
 
     cfg = _cfg(tmp_path, monkeypatch)
     pages_dir = REPO_ROOT / "frontend" / "qubit-web" / "src" / "pages"
-    assert len(PAGE_ROWS) == 21
+    assert len(PAGE_ROWS) == 22
     for row_id, component, alias, method, api, op_id in PAGE_ROWS:
         assert row_id  # ledger row id literal for the proving-test index
         assert (pages_dir / f"{component}.tsx").is_file(), component

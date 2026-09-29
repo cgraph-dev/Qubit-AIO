@@ -231,6 +231,12 @@ def test_production_modules_bake_no_operator_identity():
         # which is not an operator identity.
         if "Europe/Bucharest" in line:
             continue
+        # Owner decision #25: ``cgraph-dev/qubit-voicebridge`` is the canonical
+        # public Qubit repository identity (the sanctioned update source), not
+        # the operator's personal handle. A bare ``cgraph-dev`` is still
+        # rejected below.
+        if "cgraph-dev/qubit-voicebridge" in line:
+            continue
         assert not bad.search(line), f"baked operator identity: {line}"
 
 

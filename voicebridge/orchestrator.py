@@ -611,7 +611,9 @@ class VoiceOrchestrator:
             if tts.available():
                 return tts
             log_event("tts.kokoro.unavailable", fallback="piper")
-        return PiperTTS(model_dir=self.cfg.model_dir(), voice=voice)
+        return PiperTTS(
+            model_dir=self.cfg.model_dir(), voice=voice,
+            backend=self.cfg.get("tts", "piper_backend", default="sherpa"))
 
     def _resolve_silero_model(self) -> Path:
         """Silero v6 preferred (Aug 2025, ~16% fewer errors than v5 on noisy
@@ -663,6 +665,30 @@ class VoiceOrchestrator:
         except Exception as exc:
             log_event("audio.output_volume.failed", error=str(exc)[:120])
 
+    def _prewarm_streaming_stt(self) -> None:
+        """Load the configured streaming STT recognizer early (best-effort).
+
+        Runs before TTS so the sherpa-onnx ORT (and its CUDA provider) is
+        initialised before piper-tts imports the Python ``onnxruntime``; see the
+        call site for why the order matters. Never fatal.
+        """
+        try:
+            policy = self.cfg.get("asr", "prewarm", default="auto")
+        except Exception:
+            policy = "auto"
+        if policy in (False, "false", "off", "none", ""):
+            return
+        try:
+            from .asr.streaming import prewarm
+            engine = None if policy in (True, "true", "auto") else str(policy)
+            result = prewarm(self.cfg, engine)
+            log_event("stt.prewarm", ok=bool(result.get("ok")),
+                      engine=str(result.get("engine") or engine or "auto"),
+                      load_ms=result.get("load_ms"),
+                      code=str(result.get("code") or ""))
+        except Exception:
+            log_event("stt.prewarm.failed")
+
     def start(self) -> None:
         # worker lane first (may inform TTS choice)
         self._connect_worker()
@@ -672,6 +698,13 @@ class VoiceOrchestrator:
             self._asr.load()
         except Exception as exc:
             log_event("asr.load.failed", error=str(exc)[:200])
+        # Warm the streaming STT recognizer early so the first utterance is
+        # hot. (Historically this also had to run before TTS: the third-party
+        # piper-tts backend imported its own onnxruntime at load(), which made
+        # sherpa-onnx's CUDA provider mis-bind. The default TTS backend now
+        # renders the piper voice through sherpa_onnx.OfflineTts, i.e. the SAME
+        # ONNX Runtime as ASR, so there is one ORT and no load-order coupling.)
+        self._prewarm_streaming_stt()
         # TTS
         self._tts = self._make_tts()
         try:
@@ -750,8 +783,15 @@ class VoiceOrchestrator:
                       started=False,
                       detail="PersonaPlex removed by user; using local voice")
 
-        # hotkeys
-        if not self.no_hotkey:
+        # hotkeys — but ONLY when the system-wide desktop helper is not running.
+        # The helper owns Right-Ctrl when it is live (it types into the focused
+        # app and shows the preview). Two listeners on the same key made one
+        # press start two sessions and fire two beeps ("starts twice / two
+        # voices"). The helper publishes a heartbeat; yield to it.
+        _hk_yield = (not self.no_hotkey) and self._desktop_helper_live()
+        log_event("hotkey.decision", no_hotkey=self.no_hotkey,
+                  helper_live=self._desktop_helper_live(), yield_to_helper=_hk_yield)
+        if not self.no_hotkey and not _hk_yield:
             hk = HotkeyListener(hold_key=self.cfg.get("hotkey", "hold_key", default="ctrl_r"),
                                 tap_cancel=self.cfg.get("hotkey", "tap_cancel", default="esc"),
                                 alt_hold_key=self.cfg.get("hotkey", "alt_hold_key", default=""))
@@ -759,7 +799,14 @@ class VoiceOrchestrator:
             if self._ptt_supported:
                 log_event("hotkey.active", hold=self.cfg.get("hotkey", "hold_key", default="ctrl_r"))
             self.hotkey = hk
-        # voice dashboard (web UI): talk from the phone + live activity feed
+        else:
+            self.hotkey = None
+            if not self.no_hotkey:
+                log_event("hotkey.yielded_to_helper")
+
+        # voice dashboard (web UI): talk from the phone + live activity feed.
+        # Started regardless of whether the helper owns the PTT hotkey, so the
+        # dashboard/API stays up while the helper handles Right-Ctrl.
         try:
             wu_cfg = self.cfg.section("webui")
             if wu_cfg.get("enabled", True):
@@ -773,6 +820,14 @@ class VoiceOrchestrator:
         except Exception as exc:
             self._webui = None
             log_event("webui.start.failed", error=str(exc)[:200])
+
+    @staticmethod
+    def _desktop_helper_live() -> bool:
+        try:
+            from .voice_edit import heartbeat
+            return bool(heartbeat.live())
+        except Exception:
+            return False
 
 
         # mic
@@ -3360,6 +3415,13 @@ class VoiceOrchestrator:
         # hotkey mode
         if self._ptt_supported:
             self._run_hotkey_loop()
+        elif self.hotkey is None and self._webui is not None:
+            # The desktop helper owns Right-Ctrl, so the service has no PTT
+            # hotkey -- but it is still the API/dashboard backend. Do not drop
+            # into the interactive manual loop (which never serves HTTP);
+            # idle while the web server thread handles requests.
+            while not self._stop.is_set():
+                time.sleep(0.5)
         else:
             self._run_manual_loop()
 
@@ -3576,6 +3638,10 @@ class VoiceOrchestrator:
 
     def _play_beep(self, which: str) -> None:
         if not self.cfg.get("feedback", "beeps", default=True):
+            return
+        # The desktop helper is the Right-Ctrl authority when it is live and
+        # plays its own cue; a second one from the service is the "beeps twice".
+        if self._desktop_helper_live():
             return
         path = self._beep_start if which == "start" else self._beep_end
         try:

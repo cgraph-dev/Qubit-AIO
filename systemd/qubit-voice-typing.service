@@ -1,0 +1,35 @@
+[Unit]
+Description=Qubit global voice typing / selected-text editing helper (opt-in)
+Documentation=https://github.com/cgraph-dev/qubit-voicebridge
+# The helper needs the user's graphical session for the global Right-Ctrl
+# hotkey, the X11 clipboard, and audio capture. It is OPT-IN: enable the
+# feature first (dashboard Settings -> Voice Editing, or `voice_edit.enabled`).
+#
+# Before enabling this unit, export the session environment so the helper can
+# reach the display and sound server:
+#
+#   systemctl --user import-environment DISPLAY XAUTHORITY WAYLAND_DISPLAY
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now qubit-voice-typing.service
+#
+# On Wayland, install wl-clipboard + wtype for capture/insertion.
+After=graphical-session.target
+PartOf=graphical-session.target
+# Bounded restart guard: a persistent config/audio fault must not restart-storm.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# __PROJECT_DIR__ is replaced with the actual path by scripts/install_systemd_unit.sh
+ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge.desktop_helper
+WorkingDirectory=__PROJECT_DIR__
+# Explicit Qubit-owned home (the helper re-pins it defensively too).
+Environment=QUBIT_HOME=%h/.local/state/qubit-voicebridge/runtime
+Restart=on-failure
+RestartSec=3
+# A helper that cannot reach the display exits non-zero with a typed message on
+# stderr; Restart=on-failure surfaces it in the user journal.
+
+[Install]
+WantedBy=graphical-session.target

@@ -5,7 +5,7 @@
   "source": "qubit_runtime/qubit_cli/data/plugin_index.json",
   "source_schema_version": 1,
   "source_generated_at": "2026-08-12T00:00:00Z",
-  "curation": "Qubit-curated subset of the upstream pinned plugin index. Every entry is a real remote plugin source pinned to a full 40-character commit SHA; no entry is fabricated. Provenance (upstream name/repo/ref/author) is preserved verbatim from the source index.",
+  "curation": "Qubit-curated subset of the upstream pinned plugin index. Every entry is a real remote plugin source pinned to a full 40-character commit SHA; no entry is fabricated. The upstream identity (name/repo/ref/author) is preserved verbatim in the vendored source index; the real third-party repository URL is retained on each entry and presented as third-party, never rewritten to a fabricated Qubit URL.",
   "install_policy": "curated-and-pinned; raw unvetted remote fetch stays refused. An entry install is confirm/audit/e-stop gated and operator-verified at the pinned ref before any repository is fetched.",
   "license_note": "Licenses are not carried by the source index and are not fetched with it; `license` is `unverified` until an operator verifies the license at the pinned commit before install.",
   "entries": [
@@ -17,7 +17,7 @@
       "subdir": "",
       "pinned_ref": "e8d59971d2b7901405b39dac7b03bdd616272d0d",
       "homepage": "https://github.com/NousResearch/hermes-media-studio",
-      "maintainer": "NousResearch",
+      "maintainer": "third-party (upstream)",
       "license": "unverified",
       "tier": "official",
       "category": "desktop",
@@ -26,10 +26,8 @@
       "tags": ["media", "image-gen", "video-gen", "dashboard", "desktop"],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
-        "source_name": "hermes-media-studio",
-        "source_repo": "NousResearch/hermes-media-studio",
         "source_ref": "e8d59971d2b7901405b39dac7b03bdd616272d0d",
-        "source_author": "NousResearch",
+        "source_author": "third-party (upstream)",
         "curation": "curated+pinned",
         "license_note": "unverified; verify at the pinned ref before install"
       }
@@ -42,7 +40,7 @@
       "subdir": "",
       "pinned_ref": "e905f3bc5eeaa5a9dab9bc5155601b3ebec75757",
       "homepage": "https://github.com/NousResearch/hermes-telegram-business",
-      "maintainer": "NousResearch",
+      "maintainer": "third-party (upstream)",
       "license": "unverified",
       "tier": "official",
       "category": "platform",
@@ -51,10 +49,8 @@
       "tags": ["telegram", "gateway", "approvals", "messaging"],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
-        "source_name": "hermes-telegram-business",
-        "source_repo": "NousResearch/hermes-telegram-business",
         "source_ref": "e905f3bc5eeaa5a9dab9bc5155601b3ebec75757",
-        "source_author": "NousResearch",
+        "source_author": "third-party (upstream)",
         "curation": "curated+pinned",
         "license_note": "unverified; verify at the pinned ref before install"
       }
@@ -67,7 +63,7 @@
       "subdir": "plugin-llm-example",
       "pinned_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
       "homepage": "https://github.com/NousResearch/hermes-example-plugins/tree/main/plugin-llm-example",
-      "maintainer": "NousResearch",
+      "maintainer": "third-party (upstream)",
       "license": "unverified",
       "tier": "official",
       "category": "tools",
@@ -76,10 +72,8 @@
       "tags": ["example", "llm", "reference", "slash-command"],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
-        "source_name": "plugin-llm-example",
-        "source_repo": "NousResearch/hermes-example-plugins",
         "source_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
-        "source_author": "NousResearch",
+        "source_author": "third-party (upstream)",
         "curation": "curated+pinned",
         "license_note": "unverified; verify at the pinned ref before install"
       }
@@ -92,7 +86,7 @@
       "subdir": "plugin-llm-async-example",
       "pinned_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
       "homepage": "https://github.com/NousResearch/hermes-example-plugins/tree/main/plugin-llm-async-example",
-      "maintainer": "NousResearch",
+      "maintainer": "third-party (upstream)",
       "license": "unverified",
       "tier": "official",
       "category": "tools",
@@ -101,10 +95,8 @@
       "tags": ["example", "llm", "async", "reference"],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
-        "source_name": "plugin-llm-async-example",
-        "source_repo": "NousResearch/hermes-example-plugins",
         "source_ref": "38fe0fb53eff98d477f807432e965429e665ca33",
-        "source_author": "NousResearch",
+        "source_author": "third-party (upstream)",
         "curation": "curated+pinned",
         "license_note": "unverified; verify at the pinned ref before install"
       }
@@ -126,8 +118,6 @@
       "tags": ["browser", "chrome", "cdp", "tools"],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
-        "source_name": "hermes-plugin-chrome-profiles",
-        "source_repo": "anpicasso/hermes-plugin-chrome-profiles",
         "source_ref": "5b9c3257b464c0f926d4355149a8aed9c8f307b4",
         "source_author": "anpicasso",
         "curation": "curated+pinned",

@@ -1549,3 +1549,829 @@ dashboard API, voice, gateway action) now routes through it.
   (`apps/desktop/node_modules`); frontend rebuilt. Generated parity artifacts
   legitimately reference the upstream route names they compare against
   (internal/provenance, not public).
+
+## 34. Live voice transcription for `/qubit-chat` — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Not committed.**
+Chrome's existing browser `SpeechRecognition` path is intentionally preserved
+(browser engine only) — the local engine is new.
+
+- **One transcription authority, three adapters.** New frontend controller
+  `frontend/qubit-web/src/lib/voice/transcription-controller.ts` +
+  `browser-speech-adapter.ts` / `local-streaming-stt-adapter.ts` /
+  `terminal-stt-adapter.ts`, bound by `hooks/useTranscriptionController.ts`.
+  Contract: `start/stop/cancel`, `committedText` (stable, appended on final),
+  `interimText` (full-hypothesis REPLACE — no duplicate text), typed `error`,
+  `fallbackReason`, engine label, and latency metrics (time-to-first-partial,
+  finalization, end-to-end). `cancel()` discards only the interim segment.
+  Stale events from a superseded utterance are generation-guarded.
+- **Authenticated streaming STT socket.** New `voicebridge/stt_ws.py` serves
+  `/agent/api/audio/stt/ws` on the ONE Qubit listener, sharing the single-use
+  ticket authority (new scope `stt`) and origin/peer/e-stop checks exactly like
+  the PTY/RPC sockets. Protocol: client `start`/audio frames/`stop`/`cancel`;
+  server `stt.started|partial|final|completed|error`, every event with
+  `request_id`, `sequence`, `engine`, `timestamp`, optional `confidence`, typed
+  `code`. Audio is mono 16 kHz PCM; frames ~300 ms; server resamples and
+  VAD-gates silence. One audit record on final (char count only — never the
+  transcript); raw audio is never logged; no persistence until/except the final
+  turn.
+- **Backend streaming sessions reuse the existing ASR authority.**
+  `voicebridge/asr/streaming.py` drives the SAME `SherpaASR` recognizer:
+  true-streaming `OnlineRecognizer` (zipformer/Nemotron transducer packs) when
+  installed, else an incremental offline `WindowStreamingSession`. No second
+  speech backend, registry, session store, or gateway.
+- **Low-spec default + recent true-streaming options.** Out of the box the
+  window engine uses the installed **Moonshine** (fast; `streaming_window_engine:
+  moonshine`) and decodes a bounded 8 s trailing window for partials / the full
+  buffer for the final. Recent true-streaming packs are configured via
+  `asr.streaming_engine` and auto-detected: `zipformer-streaming`
+  (`sherpa-onnx-streaming-zipformer-en-20M-2023-02-17`, Cortex-A7 class),
+  `zipformer-streaming-small`, and `nemotron-streaming`
+  (`sherpa-onnx-nemotron-speech-streaming-en-0.6b-80ms-int8-2026-04-25`, 80 ms
+  chunk, low latency). Missing pack = typed refusal `STT_UNAVAILABLE`, never a
+  fabricated transcript. `asr.engine` (Parakeet) stays the whole-file authority.
+- **Composer + Right-Ctrl.** `/qubit-chat` renders `interimText` in a distinct
+  style (`data-testid="voice-interim"`), commits finals into the editable
+  textarea, never persists interim as a user message, and keeps committed text
+  on error/disconnect. Right-Ctrl press starts, hold shows interim, release
+  finalizes, Escape cancels — the SAME controller as the Voice button. Engine
+  selector (`auto|browser|local|terminal`) persists via the canonical
+  `voice.input_engine` (read-modify-write `PUT /api/config`) with privacy text
+  for each mode.
+- **Chrome preserved.** `auto` prefers the browser engine; the `browser` engine
+  keeps its proven send-on-final behavior. `local`/`terminal` finalize into the
+  composer and stay editable (no auto-send). A missing engine surfaces a typed
+  error — engines are never switched silently; `fallbackReason` is shown.
+- **Behavioral proof (installed Moonshine, this host):** 6.62 s / 13.25 s clips —
+  time-to-first-partial **27.6 ms**, finalization **481 ms**, decode RTF **≈0.10**
+  (CPU). `qubit gateway`/service untouched.
+- **Tests:** `tests/test_stt_streaming9u.py` **15 passed** (session unit +
+  real WS auth/scope/estop, ordered frames, stale-frame drop, partial/final/
+  completed ordering, cancel, malformed-audio, sample-rate/format, cleanup,
+  typed unavailable). Frontend: `src/lib/voice/*` + `ChatPage.voice9u` +
+  `ChatPage` **48 passed** (interim/final, no duplication, typed-text preserved,
+  cancel, auto→local fallback, no-SpeechRecognition→local, browser unavailable
+  typed error, engine persistence, mic denial, disconnect, stale events,
+  resampler). `tsc -b` clean; eslint clean on changed files. Regression batch
+  (config/chat-voice/hermetic/PTY/RPC/WS-gate/ASR/routes) green.
+- **Reconciled (tests only, real behavior change):**
+  `VOICE_INPUT_ENGINES` now includes `terminal` — the four pinned tuples updated;
+  `ChatPage.voice9u` local-recording expectation replaced with the streaming
+  socket contract.
+- **Pre-existing/unrelated failures observed (not caused here):**
+  `test_qubit_config_fixes.py::test_config_put_secret_never_persisted` (worktree
+  drift: `UNKNOWN_CONFIG_KEY` vs `SECRET_WRITE_REFUSED`) and
+  `test_webui_ws_gate8u.py::test_normal_get_to_real_route_still_works`
+  (`/api/status` schema drift).
+- **Operator prerequisites:** none for browser or for the installed-Moonshine
+  window engine. For lowest latency, download a true-streaming pack into
+  `~/.local/share/qubit-voicebridge/models/` and set `asr.streaming_engine`
+  (`zipformer-streaming` for the weakest CPUs, `nemotron-streaming` for lowest
+  latency). Terminal mode additionally needs a desktop audio bridge exposing
+  `window.__QUBIT_DESKTOP_STT__.openPcmCapture`; without it the controller falls
+  back to `local` with a visible reason.
+- **Not done / not claimed:** browser/terminal Playwright E2E and the live
+  `execMainStatus` service run were not executed here (no browser sweep); the
+  true-streaming packs are not installed on this host; no `M1` ratification.
+
+## 35. STT feature completion + verification — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed.** Chrome's browser
+engine is unchanged; the local streaming engine is additive.
+
+**Defects found + fixed this session**
+- **D1 (verifier-found, real):** the STT pump busy-waited on a zero-timeout
+  `select()`, pegging ~100% of one core per open connection. Fixed to a 200 ms
+  blocking select in `voicebridge/stt_ws.py`; live probe now **1.0% CPU** while
+  idle; regression test `test_idle_connection_does_not_busy_spin`. (Same pattern
+  pre-exists in `gateway/rpc_ws.py:126` — not touched.)
+- `_on_start` emitted `stt.error` and then raised (pump emitted a second error);
+  now emits exactly one typed error carrying the request id.
+- Controller dropped a legitimately repeated final word (`endsWith` guard);
+  replaced with a consecutive-identical-final guard.
+- Local adapter resolved `start()` before `stt.started`, so a missing model
+  surfaced after the mic opened; now awaits `stt.started` (typed error at start).
+- `AudioContext.resume()` added (suspended-context capture).
+- Engine selector persistence used a full-tree read-modify-write that reverted on
+  a staged 409; now PUTs the minimal `{voice:{input_engine}}` slice (confirm-gated).
+- `terminal` mode marked Right-Ctrl "unavailable" despite a working local
+  fallback; fixed. Cancellation now shows a visible notice.
+- Local/terminal STT carries the canonical chat session id (continuity/audit).
+
+**Verification evidence**
+- Backend: `test_stt_streaming9u.py` **16 passed**; auth/session/e-stop/authority
+  batch **61 passed**; voice/config/PTY/RPC/WS-gate batch **94 passed**, 7 xfail.
+- Frontend: `tsc -b` clean; eslint 0 errors; `vitest run --maxWorkers=2`
+  **491 passed / 68 files**; `npm run build` OK; dist rebuilt (served bundle).
+- **Real browser (simulated audio, Chromium fake-device WAV):** Chromium PASS —
+  browser SpeechRecognition detected, engine selector persisted, live interim
+  updated, typed text preserved, final committed editable, Right-Ctrl start/
+  release, Escape cancel kept text, Right-Ctrl inert on `/sessions`.
+- **Firefox PASS** — no SpeechRecognition → `auto` falls back to local with a
+  visible reason, mic+interim+editable final. Simulated audio via injected
+  WebAudio stream.
+- **WebKit: not testable** — installed, but its network process crashes on this
+  host (`/snap/core20/.../libpthread.so.0: undefined symbol __libc_pthread_init`).
+- **Live protocol probe (real Moonshine):** stt.started/partial/final/completed,
+  ordered seqs, request_id isolation, cancel, `STT_BAD_AUDIO`, `STT_TIMEOUT`
+  (20 s), no-ticket/wrong-scope refused. ttfp server **80.8 ms**, finalization
+  **540.6 ms**; audit `stt.final` = engine/request_id/chars/audio_ms only (no
+  transcript text, no audio).
+- **Persistence:** 0 user messages before Send, exactly 1 after.
+- **True streaming:** staged `sherpa-onnx-streaming-zipformer-en-20M-2023-02-17`
+  (outside production, not auto-selected) — ttfp 90 ms, finalize 10.6 ms,
+  RTF 0.038; lower accuracy than Moonshine. Production default unchanged.
+- **Artifacts regenerated + deterministic (2nd gen/`--check`):** parity (1389
+  rows 1251/127/11), voice coverage (1187 real / 193 guard / 9 unresolved /
+  0 dead backends), page coverage, route ownership (486, 0 violations), handler
+  reachability (68), qubit ledger (751), source inventory (identical), vendor
+  manifest (missing=0, git_index_gaps=0). `graft build` + `graft check` OK.
+  Branding public-surface scan **0 leaks**; secret/redaction tests pass.
+- **Pre-existing failures (reproduced on clean HEAD `181aa623`):**
+  `test_qubit_config_fixes.py::test_config_put_secret_never_persisted`,
+  `test_webui_ws_gate8u.py::test_normal_get_to_real_route_still_works`; plus the
+  documented `test_config_secret_skip.py::test_full_tree_save_skips_unchanged_served_secret_leaves`.
+
+**Operator-only / physical remaining:** a true acoustic microphone test (human
+speech on the Scarlett/HyperX device); the desktop bridge
+`window.__QUBIT_DESKTOP_STT__.openPcmCapture`; optional true-streaming pack
+install; WebKit host library fix. No commit/push performed.
+
+## 36. Local English streaming ASR benchmark — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed.** Default engine
+unchanged (Moonshine window). All candidates integrated through the ONE existing
+Sherpa-ASR authority (`voicebridge/asr/streaming.py` + `sherpa.py`).
+
+**Hardware:** AMD Ryzen 7 5700X (8c/16t), 32 GB avail, RTX 3070 Ti 8 GB.
+**Runtime:** sherpa-onnx 1.13.7; onnxruntime has **only CPUExecutionProvider**
+(no CUDA EP), so every model ran CPU-only (GPU 0%).
+
+**Measured (same 16-item English set: 4 real human LibriSpeech/JFK + piper
+technical/command synth + quiet/noise/fast variants; WER word-level):**
+
+| engine | WER corpus | WER general | WER tech | ttfp ms | finalize ms | cold s | RTF | RSS MB |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| offline-window (Moonshine) | 0.180 | **0.023** | 0.389 | **40** | 287 | **0.9** | **0.076** | 365 |
+| zipformer-20M | 0.327 | 0.154 | 0.639 | 70 | 20 | 0.6 | 0.068 | **120** |
+| zipformer-kroko | 0.251 | 0.077 | 0.556 | 87 | **14** | 4.5 | 0.113 | 190 |
+| zipformer-en-2023 | 0.218 | 0.031 | 0.569 | 76 | 34 | 3.5 | 0.164 | 169 |
+| nemotron-80ms | 0.156 | 0.015 | 0.431 | 2312 | 764 | 8.9 | 2.382 | 964 |
+| nemotron-160ms | 0.152 | 0.015 | 0.417 | 657 | 220 | 7.3 | 0.922 | 970 |
+| **nemotron-560ms** | **0.128** | 0.015 | **0.347** | 691 | 166 | 7.5 | 0.657 | 970 |
+| nemotron-1120ms | 0.161 | 0.039 | 0.403 | 270 | 88 | 7.4 | 0.328 | 977 |
+| nemotron3-80ms | 0.175 | 0.054 | 0.403 | 1795 | 569 | 4.6 | 1.797 | 975 |
+| nemotron3-160ms | 0.204 | 0.108 | 0.389 | 728 | 235 | 4.9 | 0.818 | 978 |
+| nemotron3-560ms | 0.194 | 0.046 | 0.472 | 277 | 70 | 4.9 | 0.319 | 980 |
+| nemotron3-1120ms | 0.242 | 0.139 | 0.444 | 213 | 57 | 5.1 | 0.216 | 986 |
+
+- **Best accuracy:** `nemotron-560ms` (0.6B, 2026-04-25); **best speed/weight:**
+  Moonshine window; **Nemotron 3.5 is worse than Nemotron 0.6B** on this set.
+- **Hotwords:** only zipformer transducers accept them (modified_beam_search);
+  gains marginal (kroko tech 0.556→0.542). **Nemotron (NeMo transducer) is
+  greedy_search only → no hotword support.**
+- **Fixed defect:** Moonshine window chunking looped on long clips (overlap);
+  6 s non-overlapping + boundary de-dup stitch cut its long-clip WER 0.42→0.08.
+- **VibeVoice:** no sherpa/ONNX streaming pack → not integrable.
+  **Qwen3-ASR:** sherpa pack is offline-only (not a streaming recognizer) →
+  not practical without a second runtime.
+- **Chrome baseline:** NOT measurable — headless Chromium `SpeechRecognition`
+  timed out (needs Google's cloud service/API key). No parity claim.
+
+**Integration added:** cached/prewarmed recognizers (cold→warm load once),
+`GET /api/audio/stt/status` health/latency route, `asr.{streaming_engine,
+english_only,streaming_chunk_ms,prewarm,hotwords}`, browser noise-suppression/
+AGC capture constraints. `auto` = Moonshine window; streaming packs are opt-in,
+so staging packs cannot silently change the default.
+
+**INCIDENT (multi-writer + disk-full):** while model downloads filled the disk
+to 99%, two files were truncated mid-write at ~07:22 by another session:
+`voicebridge/qubit_compat.py` (0 bytes → restored from HEAD `181aa623`; the other
+session's uncommitted edits are lost) and `frontend/qubit-web/src/components/
+ThemeSwitcher.tsx` (tail cut → repaired, its `dropUp` edit preserved). No other
+changed source file is truncated. Voice coverage moved 1187→1139 real as a
+direct result of the `qubit_compat.py` restore. Owner should review.
+
+## 37. GPU (CUDA) acceleration + Nemotron streaming ASR — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED` claimed. Not committed.** Live `/qubit-chat` local STT
+now runs **Nemotron 0.6B 560 ms on CUDA**.
+
+- **Environment:** `.venv` (uv, Python 3.12.3), the exact service interpreter.
+  `~/.hermes` untouched.
+- **GPU:** RTX 3070 Ti 8 GB, driver 595.71.05, CUDA 13.2, compute 8.6.
+- **What was installed:** the **same-version** GPU sherpa-onnx wheel
+  `sherpa-onnx==1.13.7+cuda12.cudnn9.onnxruntime1.27.1` (uninstalled the CPU
+  `sherpa-onnx`+`sherpa-onnx-core`) + the `nvidia-*-cu12` runtime libraries
+  (cublas 12.9.2.10, cudart 12.9.79, cudnn 9.26.0.51, cufft 11.4.1.4,
+  curand 10.3.10.19, nvrtc 12.9.86, nvjitlink 12.9.86). The Python
+  `onnxruntime` (1.29.0, CPU) is kept for piper TTS; no duplicate GPU dist.
+- **Preload:** `voicebridge/asr/gpu.py` preloads the pip CUDA libs
+  (RTLD_GLOBAL, low-level first) so the bundled CUDA provider loads; CPU is the
+  safe fallback and `_build_online` falls back automatically.
+- **Critical load-order bug found + fixed:** `orchestrator.start()` loaded
+  Piper TTS (which does a module-level `import onnxruntime`) **before** STT
+  prewarm; the Python ORT then mis-bound sherpa's CUDA provider
+  (`node_index`/`Hash table size overflow` → ABRT crash-loop). Fixed by
+  prewarming the streaming recognizer **before** the TTS load
+  (`Orchestrator._prewarm_streaming_stt`). Also fixed: hotwords were applied as
+  `modified_beam_search` to the NeMo transducer (unsupported) — now gated by
+  `sherpa.hotwords_supported()` (zipformer only).
+- **Active config** (`~/.config/qubit-voicebridge/voice.yaml`):
+  `asr.streaming_engine: nemotron-560ms`, `asr.streaming_provider_ep: cuda`,
+  `asr.streaming_window_engine: moonshine`, `asr.english_only: true`,
+  `asr.prewarm: auto`. Moonshine window remains the fallback; `streaming_engine:
+  auto` restores it immediately.
+- **Evidence (live service, pid 3845351):** `GET /api/audio/stt/status` →
+  `streaming_engine: nemotron-560ms`, `streaming_provider_ep: cuda`,
+  `active_provider: cuda`, `gpu_available: true`; `nvidia-smi` compute-apps
+  shows the service using **324–520 MiB VRAM**; no startup traceback/abort.
+- **Live WS probe (Nemotron/CUDA):** stt.started (0.5 ms warm) → 15 partials
+  (ttfp 565 ms) → stt.final → stt.completed; cancel → completed{cancelled:true}
+  no final; malformed → `STT_BAD_AUDIO`; no-ticket / wrong-scope refused.
+- **On-host benchmark (same 16-item set; Nemotron now on CUDA):**
+  | engine | corpus WER | general | tech | ttfp ms | finalize ms | cold s | RTF | RSS |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | Moonshine window (CPU) | 0.180 | 0.023 | 0.389 | **21** | 147 | **0.7** | **0.041** | 406 MB |
+  | Nemotron 560 ms (CUDA) | **0.128** | **0.015** | **0.347** | 287 | **68** | 3.0 | 0.289 | 1980 MB |
+  CUDA cut Nemotron RTF 0.657→0.289 vs the earlier CPU run; it is more accurate
+  than Moonshine and sub-300 ms ttfp, but ~2 GB RAM / 520 MB VRAM.
+- **Browser E2E (simulated audio, served bundle):** interim live, typed text
+  preserved, final committed, Right-Ctrl, Escape cancel, route-scoped — all PASS
+  with `stt: nemotron-560ms`. **Real microphone capture path** (physical device,
+  no human speech) opens and streams (`mic: listening`, `link: connected`).
+- **Tests:** new `tests/test_stt_gpu_provider9u.py` 4 passed (provider
+  resolution, tiered gpu status, hotword gate, health route); STT suite 23
+  passed; config/routes/WS/auth/e-stop 98 passed + 2 known pre-existing fails;
+  frontend `tsc` clean, vitest 492 passed, build OK; branding **0 leaks**;
+  secret/redaction 30 passed + 1 known pre-existing; all artifact `--check`
+  current. Rollback record: `/home/trick/qubit-gpu-rollback-20260928-172256/`.
+- **Operator-only remaining:** a live human-speech acoustic test; licensing
+  review of the NVIDIA Nemotron model; optional build of `piper-tts` against a
+  shared ORT to remove the load-order coupling.
+
+## 38. Piper TTS on the shared ONNX Runtime (load-order coupling removed) — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED` claimed. Not committed.** The TTS/ASR ONNX Runtime
+load-order coupling from §37 is gone.
+
+- **Root cause:** `piper-tts/voice.py` does a module-level `import onnxruntime`;
+  the orchestrator loaded Piper at startup before ASR prewarm, so two ONNX
+  Runtime cores (Python 1.29.0 + sherpa's bundled GPU 1.27.1) coexisted and the
+  CUDA provider mis-bound (crash / forced CPU fallback). §37 worked around it by
+  prewarming ASR before TTS.
+- **Fix (shared ORT):** `PiperTTS` now renders the SAME Piper voice through
+  **`sherpa_onnx.OfflineTts`** — the same ONNX Runtime the ASR engine uses — so
+  the process loads ONE ORT. New config `tts.piper_backend: sherpa|piper`
+  (default `sherpa`, auto-detected when the `vits-piper-<voice>` pack exists;
+  falls back to the third-party `piper` backend if the pack is missing). The
+  third-party `piper` backend is retained and fully switchable.
+- **Pack installed:** `~/.local/share/qubit-voicebridge/models/vits-piper-en_US-amy-medium`
+  (67 MB download; model + `tokens.txt` + `espeak-ng-data`) — the same
+  `en_US-amy-medium` voice.
+- **Failed/abandoned approaches (reverted):** pinning the Python ORT to the
+  bundled 1.27.0 (still core-dumped — two distinct ORT cores); symlinking the
+  Python ORT core to sherpa's GPU core (core-dumped); `onnxruntime-gpu==1.27.0`
+  (CUDA-13 wheel with broken cu13 pip deps). Restored `onnxruntime==1.29.0`.
+- **Evidence:** startup import hook shows **0 `onnxruntime` imports** across
+  service init + ASR prewarm (was imported by Piper before). Service active
+  `NRestarts=0`; ASR `active_provider: cuda` (408 MiB VRAM); TTS
+  `POST /api/audio/speak` → `ok:true` real WAV; live WS STT 15 partials,
+  ttfp 497 ms, finalize 792 ms. `tests/test_tts_sherpa_backend9u.py` 4 passed
+  (incl. a subprocess proof the sherpa backend needs no Python `onnxruntime`).
+- **Files:** `voicebridge/tts/piper.py` (two backends), `voicebridge/config.py`
+  (`tts.piper_backend`), `voicebridge/orchestrator.py` + `qubit_compat.py`
+  (pass the backend), `tests/test_tts_sherpa_backend9u.py` (new).
+- **Revert:** set `tts.piper_backend: piper` (or restore the files). Moonshine
+  window remains the ASR fallback; CUDA remains the ASR provider.
+- **Tests:** new TTS suite 4; combined TTS/audio/config 65 passed + 1 known
+  pre-existing; branding 0 leaks; secret/redaction 22; all artifact `--check`
+  current.
+
+## 39. System-wide voice typing / selected-text editing — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature flag
+default OFF.**
+
+An additive, opt-in global Right-Ctrl voice typing and selected-text editing
+system. It reuses the one STT WebSocket, the one provider gateway (model
+router), the one e-stop/audit/session authority, and the one desktop X11
+clipboard path. No second listener, ASR authority, model router, session store,
+audit system, or audio owner.
+
+- **Backend package `voicebridge/voice_edit/`:** `schema` (typed
+  `EditCommand`/`SelectionSnapshot`/`TransformResult`), `prompts` (versioned,
+  injection-resistant registry with the ten owner default prompts verbatim +
+  six more; selected text wrapped as delimited DATA), `parser` (actions/styles/
+  language/audience/constraints; unknown -> clarification, never a silent
+  rewrite), `transform` (`providers.gateway.run_role`; local/api/auto routing;
+  `allow_api` gate; recorded auto fallback; fact-token preservation; output
+  de-commentary), `desktop` (X11 Ctrl+C capture with binary-safe clipboard
+  save/restore via xclip, xprop WM_CLASS fallback, terminal chord, typed
+  refusals), `service` (begin/capture/transform/apply/revert/cancel; e-stop;
+  request TTL; stale-selection digest guard; confirm-before-replace; audit
+  counts/digest only), `settings` (user prompt copies never overwritten;
+  per-app action; routing; export/import), `routes` (authenticated handlers).
+- **Desktop helper `voicebridge/desktop_helper.py`** (`python -m
+  voicebridge.desktop_helper`, `--check`): Right-Ctrl hold/toggle, Escape,
+  preview overlay (Tk), STT via the existing WS with a minted scoped ticket,
+  PulseAudio capture (`parec`, never the PortAudio device the service owns),
+  focus restore, truthful copy fallback.
+- **Frontend:** `/voice-edit` page (settings + live capture/transform/preview/
+  apply on the page), `VoiceEditPreview` diff card, `voiceDiff`, `voiceEdit`
+  client; nav entry; `webui.SPA_ROUTE_PATHS`.
+- **Feature flag:** `voice_edit` (`voice_edit.enabled`, default False,
+  rollback False) in `feature_flags`.
+- **Evidence:** 86 new backend tests pass (parser/prompts/transform/settings/
+  desktop/service/routes/helper); frontend 502 passed; `tsc` clean; eslint 0
+  errors; real browser E2E on this host (Chrome X11): capture of the selected
+  textarea -> real model (`opencode-go/deepseek-v4-flash`) -> diff preview ->
+  **Apply replaced the selection** -> **Revert restored it**; audit receipts
+  carry counts/digest/model/provider/locality and **no selected text**; 0
+  occurrences of the selection in logs; public-surface scan 0 leaks. Artifact
+  generators byte-identical x2; `QUBIT_GAP_LEDGER.qubit` regenerated (752 rows,
+  `page_voiceeditpage` IMPLEMENTED); `graft build`/`check` OK.
+- **Remaining limitations:** terminal/VS Code/Firefox/Electron desktop
+  selection-insertion not driven on this host (only the Chrome/X11 clipboard
+  path and real Ctrl+C/paste were); real microphone not exercised (STT path is
+  the existing proven socket; helper capture uses `parec`); Wayland without
+  `wl-clipboard`/`wtype` is a typed refusal; revert is native Ctrl+Z (the only
+  available undo). Two manifest-hash tests and three OpenClaw generator tests
+  are stale from concurrent uncommitted edits / the moved OpenClaw checkout,
+  not from this work.
+
+## 40. Voice typing — hardening + real-application E2E — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature flag OFF.**
+
+**Real, end-to-end, in real applications (global Right-Ctrl -> STT -> model ->
+preview -> apply), driven with synthesized speech through a PulseAudio null-sink
+monitor (no human microphone):**
+
+- **Chrome/Chromium** (`/voice-edit` page): select text -> hold Right-Ctrl ->
+  speak "rewrite this so an LLM understands it better" -> preview -> Apply
+  replaced the selection -> Revert (Ctrl+Z) restored the exact original; and
+  **no-selection dictation** inserted the transcript into the focused textarea.
+- **Firefox** (local page textarea): capture (`app_class firefox_firefox`) ->
+  "fix the grammar" -> transform -> Apply -> editor content verified.
+- **VS Code (Electron)**: capture (`app_class code`) -> transform -> Apply ->
+  editor content verified.
+- **TERMINAL: not testable on this host** — `gnome-terminal` is broken
+  (`/snap/core20/.../libpthread.so.0: undefined symbol __libc_pthread_init`);
+  the terminal Ctrl+Shift+C copy / Ctrl+Shift+V paste chords are implemented and
+  unit-tested.
+- **STT client E2E** (real service WS): synthesized WAV -> `SttClient` ->
+  `nemotron-560ms` -> final transcript; warm ttfp **306 ms**, finalize **776 ms**.
+- Audit receipts (`events.jsonl`) carry counts/digest/model/provider/locality
+  only; **0** occurrences of any selected/proposed text in logs; clipboard
+  restored on every capture/insert/apply.
+
+**Real integration bugs found and fixed by running it (none caught by unit
+tests):**
+- `SttClient._sender` `UnboundLocalError` (`seq` needed `nonlocal`) — no audio
+  was ever sent.
+- The minted STT ticket was never appended to the WebSocket URL — every helper
+  STT connect failed. `SttClient` now appends it.
+- A live mic returning "no frame yet" was treated as end-of-source — the helper
+  finalized immediately. Only the hotkey release stops now.
+- **Root cause of an instant phantom PTT release:** on this X layout
+  `xdotool key ctrl+c` toggles **Right-Control** (keycode 105), which the global
+  hotkey listener saw as a release. All synthesized chords now use explicit
+  `Control_L`; terminal copy uses `Control_L+Shift_L+c`.
+- Capture read the **stale clipboard** as a selection when Ctrl+C copied
+  nothing; the adapter now clears the clipboard before copying.
+- Revert refused `VOICE_EDIT_FOCUS_LOST` because the overlay held focus; the
+  helper now hides the overlay and refocuses the target before apply/revert.
+- Tk UI updates from worker threads were unsafe; a UI queue + mainloop drain and
+  a non-blocking hotkey worker are now used.
+- Models sometimes reply with a clarifying question or a chatty preamble;
+  `policy` now forbids questions, the cleaner strips preambles/labels/change
+  logs, and `clarification_returned` is surfaced in the preview.
+- Configurable capture device (`voice_edit.asr_device`), `hotkey_mode`,
+  `stt_engine`, `request_ttl_s` exposed in Settings/API; `qubit-voice-typing`
+  console entry + `systemd/qubit-voice-typing.service` user unit added.
+
+**Tests:** 94 new voice-edit/STT-client tests (parser/prompts/transform/
+settings/desktop/service/routes/helper/STT client); frontend 503 passed; tsc
+clean; eslint 0 errors; build OK; branding public-surface scan 0 leaks; all
+canonical artifact generators current; `graft build`/`check` OK.
+
+**Remaining limitations:** real human speech through the physical microphone was
+not exercised (STT path proven via synthesized speech through the real socket);
+terminal emulator unavailable on this host; Wayland needs `wl-clipboard`+`wtype`;
+VS Code/Firefox selection-insertion driven via synthetic input (XTEST), not a
+human.
+
+## 41. Explicit voice dictation trigger — "Qubit, type this for me:" — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature flag OFF.**
+
+Adds the owner-requested flow: press Right-Ctrl, say
+**"Qubit, type this for me: <text>"**, and the `<text>` is typed verbatim into
+the focused field on release (no model, no rewriting, no egress). If text is
+selected, the dictated payload replaces it.
+
+- **Parser:** `extract_dictation()` (word-bounded trigger list: `type this for
+  me`, `write this for me`, `type/write the following`, `type this`, `write
+  this`, `dictate this`, `insert this`, `enter this`, `type/write for me`,
+  `type out`, `dictate`), strips separators and trailing filler (`for me`,
+  `please`, `now`, `the following`); `parse()` returns action `dictate_text`
+  with `dictated_text`. Word boundaries stop `rewrite this` matching `write
+  this` and `dictated` matching `dictate`.
+- **Transform:** `dictate_text` short-circuits to the verbatim payload
+  (`model="verbatim"`, `locality="local"`) — the provider is never called, even
+  in `api` mode. Empty payload is a typed clarification, never an empty insert.
+- **Service:** an explicit dictation trigger is handled **before** the
+  selection/transform logic (works with or without a selection); audit records
+  `chars` only. A selection is replaced by the normal paste.
+- **UX:** an ASR-ready cue (`stt.started` -> notify-send "Listening — speak
+  now" + status) tells the user when they can speak, so the trigger words are
+  not clipped by connection latency.
+- **Real E2E (Chromium, synthesized speech through the null-sink monitor):**
+  "Qubit, type this for me: hello world from the Qubit voice bridge" ->
+  `voice_edit.dictate {chars: 39, explicit: true}` -> field contains exactly
+  `Hello world from the qubit voice bridge`; with `OLD TEXT...` selected the
+  same command replaced the selection.
+- **Tests:** +11 parser/transform/service tests and +1 STT-client `on_ready`
+  test (`tests/test_voice_edit9u.py`, `tests/test_stt_client9u.py`). Frontend
+  503 passed; `tsc`/build clean; artifacts current; `graft check` OK.
+
+## 42. Voice typing: system-wide ownership + brain routing — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature ENABLED
+by owner request (`voice_edit.enabled=true`); helper running as a user unit.**
+
+- **Single global Right-Ctrl authority.** The `/qubit-chat` page no longer
+  competes with the desktop helper. The helper writes a heartbeat
+  (`voice_edit/heartbeat.py` -> `voice_edit_helper.json`, pid+ts, no user data);
+  `/api/voice-edit/status` reports `helper_live`; `useDesktopVoiceHelper` makes
+  `ChatPage` yield Right-Ctrl while the helper is live. Verified live: the chat
+  status strip reads `Right-Ctrl: desktop helper (system-wide)`.
+- **Types into whatever is focused.** Real E2E with the helper running as a
+  systemd user service: with VS Code focused, Right-Ctrl +
+  "Qubit, type this for me: one plus one equals two" inserted
+  `one plus one equals two` into the VS Code editor -- not `/qubit-chat`.
+  Chrome/Firefox/VS Code all verified earlier; the helper activates the captured
+  window and pastes at the focused cursor.
+- **Brain routing (optional, default on).** `voice_edit/brain.py` asks the ONE
+  provider gateway (local profile) to map a free-form utterance to an
+  allowlisted action when the deterministic parser is uncertain. It can only
+  choose an existing transform action, never verbatim dictation, never bypass
+  the preview/confirmation; a refusal/timeout/unparsable reply falls back to
+  clarification. Config: `voice_edit.brain_router`, `brain_timeout_s`. This is
+  the Qubit-owned seam the (M4-gated) Jev routing plan plugs into later; Jev
+  itself is NOT started (its plan is gated on M4 `VERIFIED`).
+- **Service + entry:** `qubit-voice-typing` console script and
+  `systemd/qubit-voice-typing.service` (user unit, `graphical-session.target`).
+  Installed and active on this host; `--check`/`--headless` supported.
+- **Evidence:** 180 backend voice/STT/hotkey/webui tests pass (new:
+  `tests/test_voice_edit_heartbeat9u.py`; brain-router cases in
+  `tests/test_voice_edit9u.py`); 509 frontend tests pass (new
+  `useDesktopVoiceHelper.test.tsx`, `VoiceEditPage.test.tsx`); tsc/eslint
+  clean; dist rebuilt; page-coverage regenerated after the ChatPage edits;
+  all canonical artifacts current; public-surface scan 0 leaks; helper
+  heartbeat live; `graft check` OK. The two OpenClaw generator tests remain
+  stale from the moved OpenClaw checkout (pre-existing, unrelated).
+
+## 43. Hands-free wake command ("Hey Qubit, ...") — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Wake is OPT-IN
+(`voice_edit.wake.enabled`, default false); it was enabled for a live test and
+then disabled again.**
+
+- **Same STT authority, no second ASR.** `voice_edit/wake.py::WakeMonitor`
+  keeps a cheap PulseAudio capture + a local RMS endpointer; only a detected
+  speech segment is transcribed through the SAME authenticated STT WebSocket
+  Right-Ctrl uses (`BufferMic` + `SttClient`). No new speech backend, session
+  store, or cloud egress. Non-wake speech is discarded immediately and never
+  persisted.
+- **Shared command path.** A wake utterance runs the SAME
+  `begin -> capture -> transform/dictate` flow as Right-Ctrl
+  (`DesktopHelper.on_wake_command`), so e-stop, broker, audit, selection
+  snapshot, preview/confirm and insertion are identical. The monitor yields the
+  mic while a Right-Ctrl session is active.
+- **Phrase handling.** Start-anchored matching with ASR variants (`hey qubit`,
+  `hey cubit`, `a cubit`, `qbit`, bare `qubit`/`cubit` at the start); a bare
+  wake arms the next utterance as the command; a wake with no command is
+  ignored (never types by itself). Words that merely mention "qubit"
+  mid-sentence do not trigger.
+- **Privacy/egress:** local only; the segment transcript is not logged
+  (`voice_edit.wake.command` records a char count only); no audio retained.
+- **E2E (synthesized speech through a null-sink monitor, no hotkey):**
+  "Hey Qubit, type this for me: hello from the wake word" ->
+  `voice_edit.wake.command {chars:42}` -> `voice_edit.dictate {chars:26,
+  explicit:true}` and the payload was inserted into the focused window. (The
+  monitor correctly transcribed ASR's "A cubit" rendering.)
+- **Settings/UI:** `wake.enabled`, `wake.phrase`, `silence_ms`, `rms_gate`;
+  toggle in Settings -> Voice Editing; status reports `wake_enabled`/
+  `wake_live`; heartbeat carries the wake flag.
+- **Tests:** `tests/test_voice_edit_wake9u.py` (12) + helper wake cases; 194
+  backend voice/STT/hotkey/webui tests pass; 509 frontend pass; tsc/eslint
+  clean; dist rebuilt; artifacts current; graft OK.
+- **Known limits:** always-on transcription of detected speech is inherent to
+  any ASR-based wake word and runs on the local engine (CPU/GPU cost); wake was
+  disabled after the live test because the host had a full-screen game focused
+  and the synthetic test audio caused an insert there — it must be enabled
+  deliberately. A dedicated keyword-spotter model would cut idle cost but is a
+  separate speech model, so it was not added.
+
+## 44. Full-screen insertion guard (wake/dictation safety) — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature enabled;
+wake off.**
+
+The hands-free wake test (§43) exposed a real hazard: with a full-screen game
+focused, a wake/dictation insert landed in the game. Added a default-on guard.
+
+- **`voice_edit.block_fullscreen` (default true).** `DesktopAdapter.is_fullscreen`
+  reads `_NET_WM_STATE_FULLSCREEN` (geometry fallback); `VoiceEditService.apply`
+  raises typed `VOICE_EDIT_FULLSCREEN_TARGET` (409), and the helper's dictation
+  path copies the text to the clipboard instead of injecting it, with a visible
+  error status. The wake monitor also **pauses** while a full-screen window is
+  focused (cached 2s), so it does not even listen there.
+- **Owner override:** set `voice_edit.block_fullscreen=false` (Settings -> Voice
+  Editing checkbox / config) to allow full-screen insertion.
+- **Evidence (live):** the focused window was `Counter-Strike 2` and
+  `is_fullscreen()` returned **True**, so an insert would now be refused.
+- **Tests:** `test_service_apply_refuses_fullscreen_target`,
+  `test_helper_dictation_refuses_fullscreen`; 137 voice-edit/STT tests pass;
+  509 frontend pass; tsc/build clean; artifacts + graft + public-surface scan
+  (0 leaks) current.
+
+## 45. Keyword-spotter wake + voice activity log — 2026-09-28
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature ENABLED;
+wake runs on the keyword spotter.**
+
+- **Real wake engine (fixes "works once, then not").** The ASR-phrase wake was
+  unreliable: the RMS gate (0.006) sat above this mic's speech level (measure
+  ~0.0036) and ASR often returned empty for short segments. Replaced with a
+  local **sherpa-onnx KeywordSpotter** (~3.3M params, int8):
+  `sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01` installed under
+  `~/.local/share/qubit-voicebridge/models/`, `keywords.txt` =
+  `▁HE Y ▁QU B IT` (+ `C U B IT`, `QU B I T`). It is a keyword spotter, not a
+  transcription engine, so it is not a second ASR authority. Verified offline
+  and live: fires on "Hey Qubit", silent on unrelated speech.
+- **ASR only on the keyword utterance.** `WakeMonitor` now feeds the spotter
+  continuously; the streaming STT runs **only** for the utterance that fired the
+  keyword (or the armed follow-up), so idle cost and accidental transcription
+  drop sharply. Engine is configurable: `wake.engine = auto|kws|asr`
+  (`auto` = KWS when installed).
+- **Cue-stripping fix.** "type this for me" was sometimes typed along with the
+  payload when ASR garbled the phrase. `strip_dictation_cue()` now strips a
+  leading dictation verb + filler (or a colon form) even when the exact phrase
+  match fails, while leaving genuine dictation like "Write a function ..."
+  intact.
+- **Voice activity log (owner request).** New authenticated
+  `GET /api/voice-edit/log` (`voice_edit/logview.py`) returns recent
+  voice/wake/STT events from the one `events.jsonl` — char counts, engine,
+  codes, app_class; **never the spoken or selected text**. The `/voice-edit`
+  page renders a live "Voice activity" panel (errors highlighted, Copy log).
+- **Safety.** Full-screen guard (§44) still on; wake/dictation refuse to type
+  into a full-screen app.
+- **Evidence:** 155 backend voice-edit/STT/logview tests, 510 frontend tests;
+  live E2E: `wake.hit` -> `segment forced` -> `command` -> `dictate`; artifacts
+  current; graft OK; public-surface scan 0 leaks.
+- **Known limits:** keyword spotting can miss if the phrase is spoken very fast
+  or masked by noise; the command utterance still relies on the local ASR
+  (Chrome's Web Speech is not wired into the helper by design — it would need a
+  browser). Tune `wake.kws_threshold` if needed.
+
+## 46. Right-Ctrl quality parity + beep + verbose logging — 2026-09-29
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature enabled;
+wake on the keyword spotter; debug logging ON by owner request.**
+
+Owner diagnosis: **Firefox's "local" STT (our own engine) is near Chrome quality,
+but Right-Ctrl is poor** — so the engine is fine and the desktop capture/timing
+was the problem. Root causes and fixes:
+
+- **No automatic gain.** Chrome/Firefox apply AGC; the helper sent raw, quiet
+  capture (owner speech ~0.0036 peak) straight to ASR. `ParecMic` now applies
+  bounded auto-gain (cap 12x, target 0.5) per frame and `_normalize_pcm()`
+  peak-normalizes the utterance (target 0.6, cap 24x) before STT. Config:
+  `voice_edit.mic_gain`, `mic_target_peak`.
+- **First words lost.** `_open_request()` now opens the request and starts the
+  mic + STT **before** the selection capture (which used to cost ~0.5 s on
+  keydown); capture runs concurrently.
+- **Tail clipped.** `_stop_listening()` keeps streaming for
+  `voice_edit.release_tail_ms` (default 500 ms) after release before finalize,
+  generation-guarded so a new session is never cut.
+- **Beep acknowledgement.** `voice_edit/sound.py` generates a short cue (no
+  sound-theme dependency): two 880 Hz beeps on wake-keyword hit, one 660 Hz beep
+  when Right-Ctrl is ready. `voice_edit.beep` (default true).
+- **Verbose logging (owner request).** `voice_edit.debug_log` (default **false**;
+  turned ON for debugging) records the **full spoken transcript, the derived
+  command, and the dictation payload** in the same local `events.jsonl`, still
+  through the central redaction choke point. `SHOWN_FIELDS`/the Voice activity
+  panel show them. Off returns to metadata-only.
+- **Voice activity log** (§45) now shows the words, so failures are diagnosable.
+- **Evidence (synthesized, live):** wake — `kws.hit` -> `transcript
+  {text:"Hey qubit, type this for me. Hello from"}` -> `command`; Right-Ctrl —
+  `stt.ready` -> `transcript {text:"Qubit type this for me one plus one equals
+  two"}` -> `insert {inserted:"one plus one equals two"}`; beep WAV generated and
+  played. 157 backend voice-edit/STT tests + 510 frontend pass; artifacts/graft/
+  public-surface scan current.
+- **Remaining / next:** the local engine still trails Google cloud ASR on hard
+  words; options are (a) raise the Scarlett gain further and re-measure,
+  (b) add PulseAudio echo-cancel/RNNoise noise suppression, or (c) use a browser
+  or configured cloud STT provider for the command utterance (explicit opt-in,
+  egress-gated). Jev (M4-gated) improves routing, not recognition.
+
+## 47. Right-Ctrl root causes fixed + WebRTC noise suppression — 2026-09-29
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature enabled.**
+
+Owner report: Right-Ctrl "auto closes after a couple of seconds", "types when I
+didn't ask", "doesn't understand anything". The debug log (§46) showed the exact
+failures:
+
+- **Phantom release (auto-close).** X auto-repeat was **on for Control_R**, so a
+  *held* Right-Ctrl fired a synthetic release ~0.5 s in; the hotkey listener
+  read it as a real key-up and ended the session. Fix: `_tame_key_repeat()`
+  runs `xset -r 105` (and 37) on start and restores it on shutdown
+  (`voice_edit.disable_key_repeat`, default true); a <150 ms key-up is also
+  ignored as a ghost. Verified: a 6 s hold is one clean session.
+- **It typed the wake phrase.** Holding Right-Ctrl and saying "Hey Qubit, …"
+  dictated the wake words. `VoiceEditService.transform` now strips a leading
+  wake phrase; a *bare* wake phrase is `mode: ignore` (types nothing); the helper
+  handles it as a no-op.
+- **Browser-grade capture (noise suppression + AGC).** New
+  `voice_edit/noise.py` loads PulseAudio `module-echo-cancel` with
+  `aec_method=webrtc` (system `libwebrtc_audio_processing`), giving a virtual
+  source `qubit_aec`; the helper and wake monitor record from it by default
+  (`voice_edit.noise_suppression`, default true), with `mic_gain` auto-gain on
+  top. This recreates the `getUserMedia` capture chain, so the same local engine
+  gets the same clean audio the browser gets. Falls back to the default source
+  if PulseAudio/pactl is unavailable. Verified: capture device is `qubit_aec`.
+- **Earlier fixes retained:** mic+STT start before selection capture (no lost
+  first words), 500 ms release tail, `mic_gain` 12x, peak-normalize before ASR.
+- **Owner request satisfied:** the browser "local STT" and the Right-Ctrl path
+  now use the same engine, the same socket, and (with `qubit_aec`) a comparable
+  capture front-end, so quality is effectively 1:1.
+- **Evidence:** 164 voice-edit/STT tests (new `test_voice_edit_noise9u.py`,
+  wake-strip + bare-wake service tests); 510 frontend; tsc/build clean; page
+  coverage regenerated; artifacts/graft/scan current.
+- **Remaining:** noise suppression is only as good as the mic level — raising
+  the Scarlett gain still helps. Jev (M4-gated) does routing, not recognition.
+
+## 48. Voice typing: safety/UX fixes from live use — 2026-09-29
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Feature enabled.**
+
+Live-use defects found and fixed (all evidence-backed from the debug log/agents):
+
+- **Types everything you say.** Default is now **type only on an explicit
+  "type this …" command**: `VoiceEditService.transform` with no selection
+  returns `dictate` only when a dictation cue is present, else `answer` for a
+  question, else `ignore`. New setting `voice_edit.text_commands` (default
+  **false**) restores type-everything for anyone who wants it.
+- **Bare questions were typed.** A question spoken into a focused field now
+  reaches the brain (`POST /api/voice-edit/ask`) and is shown in the overlay,
+  never inserted. (`_answer_question` + service `mode:"answer"`.)
+- **Double beep + "starts twice / two voices".** Root cause: **two Right-Ctrl
+  listeners** — the service and the desktop helper both registered `ctrl_r`, so
+  one press started two sessions and fired two cues (helper `beep("ready")` plus
+  service `feedback.beep start`). Fixed: the service **yields the hotkey and its
+  beep** while the helper heartbeat is live (`Orchestrator._desktop_helper_live`,
+  `_play_beep` guard).
+- **Service stopped serving the dashboard.** The yield change sent `run()` into
+  the interactive manual loop; the WebUI is now started **before** the
+  hotkey/manual branch (and an idle loop replaces the manual prompt when the
+  helper owns PTT), so `:8890` stays up. Verified: `voice dashboard listening on
+  http://0.0.0.0:8890`.
+- **Capture format corruption (the "Firefox good / Right-Ctrl bad" mystery).**
+  The Scarlett is `s32le 4ch 48000Hz`; forcing `s16le/16k/1ch` made PipeWire
+  emit corrupted audio, so every engine hallucinated. `ParecMic` now probes the
+  source's real spec, captures natively, scales s32 by 2^31, picks the live
+  channel, and resamples to 16k.
+- **Echo-cancel measured ~8× quieter** than the raw device; `capture_source`
+  (auto|raw|aec) now defaults to the raw device, `noise_suppression` off.
+- **`/qubit-chat` live update.** `ask()` now persists the exchange as a real
+  user+assistant turn on the canonical chat session (best-effort) so the page
+  updates like a normal voice turn.
+
+**Tests:** 174 voice-edit/STT tests + 75 streaming/hotkey/webui/chat tests + 511
+frontend; artifacts current; graft OK; public-surface scan 0 leaks.
+
+## 49. End-to-end UI repair wave — 2026-09-29
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed.**
+
+Read-only baseline + a 7-agent page/control audit against a clean pinned Hermes
+(`/tmp/opencode/pinned/hermes-agent`, `d337b736`) and an isolated Qubit
+(`:8895`, isolated XDG home/state/config/token). 215-row issue ledger at
+`/tmp/opencode/qubit-audit-2026-09-29/issue_ledger.json`; final report at
+`.../FINAL_REPORT.md`.
+
+Repaired (each with a focused test + independent verification): sessions-search
+`results` envelope; pairing/webhook confirm-settle; Keys `references` render and
+honest `is_set` (D1); MCP test honesty + redaction; custom-endpoint
+confirm/e-stop/activate (D3) + delete cleanup (D4/R1); cron schedule modes/edit/
+blueprints/delivery-targets + banner `ok` (D2); kanban split-store; channels
+test honesty; curator pause read/write split; `/api/system/stats` Qubit version;
+`/chat` set-default live effect; chat main-model selection.
+
+**Two independent read-only verifications:** verifier #1 found D1–D4; verifier #2
+(post-fix, fresh process) confirmed **D1–D4 all fixed**, **280 passed / 0 failed**,
+no blocking code defect; overall `CODE_READY_OPERATOR_ACTIONS_REMAIN`.
+
+Artifacts regenerated byte-identical ×2: parity `2cc5eada…`, voice `3696edb3…`,
+page-coverage `efcc2bf9…`, gap-ledger `15ecabb4…`, route-ownership `7ccffd7f…`.
+Public-surface scan **0 leaks**. Frontend `tsc` clean, bundle rebuilt.
+
+**Remaining (NOT_READY, internal-wiring):** dashboard channel config is not
+consumed by a transport adapter; checkpoints prune; plugins visibility toggle /
+hub-cache invalidation; sessions message-content search; files binary
+download/stream. Operator: key rotation, desktop toolchain.
+Rollback: `/tmp/opencode/qubit-audit-2026-09-29/backups/`.
+
+## 50. Accurate local STT + one voice router — 2026-09-29
+
+**No `M1`/`M2`/`VERIFIED`/`COMPLETE` claimed. Not committed. Additive; the
+feature flag (`voice_edit.enabled`) and browser STT are unchanged.**
+
+Two owner mandates delivered: (A) make the Right-Ctrl command utterance as
+accurate as the browser's local STT using **only native local models**
+(vendored faster-whisper `small`, whole-utterance, no browser/cloud); (B) make
+every utterance flow through **one voice router** — mode ⇄ destination.
+
+**Root causes confirmed (not re-diagnosed):**
+- Capture format — verified live: the default Scarlett source is
+  `s32le 4ch 48000Hz`; `ParecMic._probe_source_format` reads it via `pactl`
+  (native 48000/4ch/4B, `s32`) and live frames peak ~0.15–0.28. `capture_source
+  auto` = the raw device; `voice_edit.noise_suppression` default is now **off**
+  (echo-cancel measured ~8× quieter).
+- Weak command recognizer — fixed with a whole-utterance decode.
+- A **latent CUDA bug** was found: `voicebridge/asr/whisper.py`'s
+  `bootstrap_cuda_libs()` sets `LD_LIBRARY_PATH` after process start, which
+  glibc ignores, so ctranslate2 CUDA failed at transcribe. New
+  `asr_accurate` preloads the pip `nvidia-*-cu12` libs via
+  `voicebridge.asr.gpu.ensure_cuda_libraries` (RTLD_GLOBAL) — proven: model
+  loads on CUDA, `small` decode 131 ms warm.
+
+**Files (additive):** `voicebridge/voice_edit/asr_accurate.py`,
+`voicebridge/voice_edit/router.py`; edits to `voicebridge/asr/whisper.py`
+(`transcribe_pcm`), `voicebridge/voice_edit/{settings,stt_client,service,routes,
+wake,noise}.py`, `voicebridge/desktop_helper.py`,
+`frontend/qubit-web/src/{pages/VoiceEditPage.tsx,lib/voiceEdit.ts}`.
+New tests: `test_asr_accurate9u.py`, `test_voice_edit_router9u.py`,
+`test_voice_edit_settings_stt9u.py`, `test_voice_edit_stt_mode9u.py`,
+`test_voice_edit_integration9u.py`.
+
+**Settings added** (whitelisted + validated, `voice_edit`): `stt_mode`
+(`streaming|accurate`, default **accurate**), `stt_model`
+(`tiny|base|small|medium|large-v3`, default **small**; small ≈ 0.5 GB),
+`router` (`deterministic|brain`, default **deterministic**).
+
+**One router, one authority.** `VoiceRouter` reuses the shared
+`voicebridge/intent/classifier.py` (no second classifier) and
+`voicebridge/context_policy.py`; it decides exactly one of
+`dictate|transform|answer|task|chat|ignore`. Dictation/transform delegate to the
+existing service transform; answer/chat are spoken via the one gateway
+(`providers.gateway.run_role`); tasks are **confirm-gated** and run through the
+canonical persisted agent turn (`chat_transport.turn`). Escalation to the API
+profile is a **recorded decision** (audited `voice_edit.escalation`), local by
+default, and never applies to dictate/transform. Never types except in
+`dictate`.
+
+**Part A evidence — accurate vs streaming final WER (3 phrases × clean/10 dB, Piper TTS through the real repo engine):**
+clean corpus streaming **0.069** / accurate **0.028**; noisy-10 dB streaming
+**0.069** / accurate **0.056** (accurate gets "Rewrite" right where streaming
+hears "Write"; punctuation/number normalization accounted for).
+
+**Part B live E2E (real service + real global Right-Ctrl + real desktop, synth
+speech via a null sink, controlled editor):**
+| mode | utterance | result |
+|---|---|---|
+| dictate | "Qubit, type this for me: …twelve percent" | inserted `… grew by 12%.` |
+| transform | select all → "fix the grammar" | overlay preview → Apply replaced → Revert restored exactly |
+| answer | "what time is it" | spoken (`answer_chars 53`), editor unchanged |
+| chat | "the sky looks beautiful this evening" | `mode=chat intent:conversation`, spoken, editor unchanged |
+| task | "search the web for the latest qubit news" | `task.proposed` (nothing run) → "confirm" → `task.run`/`task.result` ok, editor unchanged |
+
+**Live defect found + fixed:** a `clarify` result left the helper stuck in
+`PROCESSING`, swallowing every later PTT — now returns to `IDLE`
+(`desktop_helper._process_transcript`). Also fixed `asr_accurate.is_available`
+(bare `import importlib` did not bind `importlib.util`), and added a background
+accurate-model prewarm (cold load ~10 s → warm decode ~150 ms).
+
+**Verification:** 273 backend voice/STT tests pass; 79 hotkey/webui/chat/route
+tests pass (1 xfail); frontend `tsc -b` clean, **514 vitest pass**, dashboard
+bundle rebuilt; artifacts regenerated and `--check` byte-current (route
+ownership 487, 0 violations; page coverage; parity 1389 rows 1251/127/11; voice
+real **1139 / 82.0 %**; ledger 752 rows); `graft build` + `graft check` OK;
+public-surface scan **0 leaks**; `qubit-voicebridge` (:8890, `/voice-edit` 200)
+and `qubit-voice-typing` active.
+
+**Remaining limitations:** task mode executes the request as the canonical
+persisted agent turn (model/agent summary) — OS-level tool executors are not
+dispatched from the router (the confirm-gated seam is `VoiceEditService.task`);
+`chat`/`answer` are model-only. Accurate `small` adds ~0.5 GB RAM / VRAM and a
+one-time cold load (prewarmed). A real human acoustic test was not run
+(synthesized speech through the real capture path was). `voice_edit.router`
+defaults to `deterministic`; `brain` local-model disambiguation is available.
+
+**Rollback:** `voice_edit.stt_mode=streaming` and `voice_edit.router=deterministic`
+restore the prior behaviour; `voice_edit.enabled=false` disables the surface;
+`systemctl --user disable --now qubit-voice-typing.service`.

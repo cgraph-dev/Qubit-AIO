@@ -330,6 +330,7 @@ class QubitSessionStore:
                                 or s.get("started_at") or 0),
             "archived": bool(s.get("archived")),
             "message_count": int(s.get("message_count") or 0),
+            "source": s.get("source"),
             "identity": "qubit-session",
         }
 
@@ -471,10 +472,13 @@ class QubitSessionStore:
                 "messages": self._messages(sid)}
 
     def list(self, *, limit: int = 50, offset: int = 0, query: str = "",
-             include_archived: bool = True) -> Dict[str, Any]:
+             include_archived: bool = False) -> Dict[str, Any]:
         # The page cap mirrors ``messages`` (1000) so a read surface can page
         # through the whole canonical store instead of silently hiding rows
         # past the first 100 (the state.db holds the real agent history).
+        # Archived rows are EXCLUDED by default to match the reference
+        # dashboard (`archived="exclude"`); recovery callers pass
+        # ``include_archived=True`` explicitly (``restore`` is the write path).
         limit = max(1, min(int(limit), 1000))
         offset = max(0, int(offset))
         rows = self._db.list_sessions_rich(
@@ -485,7 +489,7 @@ class QubitSessionStore:
         for s in rows:
             title = s.get("title") or s.get("display_name")
             out.append({
-                "id": s.get("id"), "source": "qubit-chat",
+                "id": s.get("id"), "source": s.get("source"),
                 "model": s.get("model"),
                 "title": title or s.get("id"),
                 "name": title,

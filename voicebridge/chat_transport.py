@@ -535,6 +535,30 @@ def configured_model(cfg: Any) -> str:
         return DEFAULT_MODEL
 
 
+def _pinned_session_model(cfg: Any, session: Optional[str]) -> Optional[str]:
+    """The model recorded on a chat session, if any (the ``/chat`` authority).
+
+    The vendored ``/chat`` terminal resumes one long-lived session and honours
+    that session's stored model, and the ``/qubit-chat`` header
+    (:class:`AgentPtySession.banner`) reads the same row. Returning it lets the
+    resolver, the dashboard picker and the stream receipt agree on the ONE
+    model the conversation actually uses instead of the configured default.
+    Read-only and fail-safe: any error (including a store without ``show``)
+    yields ``None`` so a broken store can never brick a turn.
+    """
+    try:
+        sid = str(session or "").strip()[:80]
+        if not sid:
+            return None
+        shown = store(cfg).show(sid)
+        if not isinstance(shown, dict) or shown.get("state") != "OK":
+            return None
+        model = str((shown.get("session") or {}).get("model") or "").strip()
+        return model or None
+    except Exception:  # noqa: BLE001 - a preference, never fatal
+        return None
+
+
 def resolve_route(cfg: Any, requested: Optional[str] = None, *,
                   session: Optional[str] = None,
                   role: str = "chat") -> Dict[str, Any]:
@@ -547,6 +571,13 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
     approved API) or the configured/default local model; anything else is a
     typed ``MODEL_NOT_ALLOWED`` refusal so a bad model can never be silently
     swallowed into a wrong-model turn.
+
+    When no model is explicitly requested and the session already records a
+    model (the ``/chat`` terminal's stored selection, which the ``/qubit-chat``
+    header also shows), that recorded model is pinned onto the resolved
+    external profile — the endpoint, credential and policy still come from the
+    resolved profile. This keeps ``/chat``, ``/qubit-chat``, ``model/options``
+    and ``model/info`` on one effective model.
     """
     from .providers import resolver as _resolver
 
@@ -567,6 +598,15 @@ def resolve_route(cfg: Any, requested: Optional[str] = None, *,
             detail = routed.get("detail") or (
                 f"model {requested!r} refused: {code}")
         return {"ok": False, "code": code, "detail": detail}
+    if req is None:
+        pinned = _pinned_session_model(cfg, session)
+        if (pinned and pinned != DEFAULT_MODEL
+                and pinned != routed.get("model")
+                and str(routed.get("kind") or "") in
+                ("api", "realtime", "plugin")):
+            routed = dict(routed)
+            routed["model"] = pinned
+            routed["session_pinned_model"] = pinned
     return routed
 
 
@@ -860,6 +900,13 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
     elif reasoning is not None:
         receipt["reasoning_applied"] = {"level": reasoning,
                                         "max_tokens": None}
+    # Truthful audit trail when the provider needed a repaired output budget
+    # (reasoning consumed the requested one and the answer did not fit).
+    _repairs = (res.details or {}).get("output_budget_repairs")
+    if _repairs:
+        receipt["output_budget_repairs"] = int(_repairs)
+        receipt["effective_max_tokens"] = int(
+            (res.details or {}).get("effective_max_tokens") or 0)
     if context_meta is not None:
         receipt["context"] = dict(context_meta)
         if decision is not None:

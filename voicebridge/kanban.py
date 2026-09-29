@@ -781,6 +781,128 @@ def log(cfg: Any, *, board: str = "", limit: int = LIST_DEFAULT) -> Dict[str, An
         conn.close()
 
 
+def task_attachments(cfg: Any, task_id: int) -> Dict[str, Any]:
+    """List a task's attachments from the authoritative native store.
+
+    The Qubit-native board owns tasks/comments/events; it does not own
+    attachment blobs (the vendored plugin's write-only extension is a typed
+    policy gate). This still validates the task against the SAME database the
+    board/task reads use, so an existing task is an empty list — never the
+    vendored store's ``task not found``.
+    """
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        task = _task_dict(_get_task(conn, int(task_id)))
+        # The task EXISTS in the authoritative store, so the read is a real
+        # success with an empty list and an explicit typed marker that the
+        # native board owns no attachment blobs — never a "board does not
+        # exist" / "task not found" 404 borrowed from the empty legacy store.
+        return {"state": "OK", "ok": True, "task_id": task["id"],
+                "board": task["board"], "attachments": [],
+                "supported": False,
+                "unsupported_code": "KANBAN_ATTACHMENTS_UNSUPPORTED",
+                "qubit_counterpart": ("CLI `qubit kanban` (the native board "
+                                      "store owns no attachment blobs)")}
+    finally:
+        conn.close()
+
+
+def task_log(cfg: Any, task_id: int, *,
+             tail: Optional[int] = None) -> Dict[str, Any]:
+    """Render a task's real timeline as the kanban drawer's worker log.
+
+    The native store keeps no worker stdout file; its durable record of a task
+    is the audited event stream. Rendering that stream means the log tab reads
+    the SAME store as the board/task handlers instead of the empty vendored
+    database (which is why the tab used to 404 for a live task).
+    """
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        task = _task_dict(_get_task(conn, int(task_id)))
+        rows = conn.execute(
+            "SELECT kind, detail, created_at FROM events WHERE task_id=?"
+            " ORDER BY id", (task["id"],)).fetchall()
+        lines = []
+        for r in rows:
+            stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                  time.gmtime(float(r["created_at"] or 0)))
+            detail = redact_spec(r["detail"] or "")
+            lines.append(f"{stamp} {r['kind']}: {detail}".rstrip())
+        content = "\n".join(lines)
+        raw = content.encode("utf-8")
+        truncated = bool(tail and int(tail) > 0 and len(raw) > int(tail))
+        if truncated:
+            content = raw[-int(tail):].decode("utf-8", "ignore")
+        return {"state": "OK", "task_id": task["id"],
+                "path": f"kanban.db#tasks/{task['id']}/events",
+                "exists": bool(rows), "size_bytes": len(raw),
+                "content": content, "truncated": truncated}
+    finally:
+        conn.close()
+
+
+#: Least -> most urgent, mirroring the vendored diagnostics contract so a
+#: ``severity`` filter means the same thing on the Qubit-native surface.
+DIAG_SEVERITIES = ("warning", "error", "critical")
+
+
+def diagnostics(cfg: Any, *, board: str = "main",
+                severity: Optional[str] = None) -> Dict[str, Any]:
+    """Operator-actionable distress signals from the authoritative store.
+
+    Only the honest native signal is computed: tasks parked in ``blocked``.
+    Unknown non-default boards are a typed NOT_FOUND; the synthetic default
+    ``main`` board is an empty board, not a missing one.
+    """
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        slug = _check_board_slug(board or "main")
+        try:
+            _get_board(conn, slug)
+        except KanbanError as exc:
+            if exc.code == NOT_FOUND_CODE and slug == "main":
+                return {"state": "OK", "diagnostics": [], "count": 0}
+            raise
+        rows = conn.execute(
+            "SELECT id, title, body, status, assignee, updated_at FROM tasks"
+            " WHERE board=? AND status='blocked' ORDER BY id",
+            (slug,)).fetchall()
+        now = int(_now())
+        out = []
+        threshold = (str(severity).strip().lower() if severity else None)
+        for r in rows:
+            if threshold in DIAG_SEVERITIES and \
+                    DIAG_SEVERITIES.index("warning") < \
+                    DIAG_SEVERITIES.index(threshold):
+                continue
+            reason = redact_spec((r["body"] or "").strip())[:280]
+            out.append({
+                "task_id": int(r["id"]),
+                "task_title": redact_spec(r["title"]),
+                "task_status": r["status"],
+                "task_assignee": redact_spec(r["assignee"] or "") or None,
+                "diagnostics": [{
+                    "kind": "blocked",
+                    "severity": "warning",
+                    "title": "Task is blocked",
+                    "detail": reason or "task is parked in the blocked column",
+                    "actions": [],
+                    "first_seen_at": int(r["updated_at"] or now),
+                    "last_seen_at": now,
+                    "count": 1,
+                    "run_id": None,
+                    "data": {},
+                }],
+            })
+        return {"state": "OK", "diagnostics": out,
+                "count": sum(len(row["diagnostics"]) for row in out)}
+    finally:
+        conn.close()
+
+
 def export(cfg: Any) -> Dict[str, Any]:
     """Dump boards+tasks+comments+events as JSON (rollback snapshots)."""
     conn = _connect(cfg)

@@ -202,31 +202,119 @@ def _is_clean(exec_: Runner, repo: Path) -> Tuple[Optional[bool], str]:
     return (out.strip() == ""), ""
 
 
+def _ref_sha(lines: Sequence[str], ref: str, ref_kind: str) -> Optional[str]:
+    """Bounded revision for *ref* among ``ls-remote`` output *lines*.
+
+    For a tag, the peeled ``refs/tags/<ref>^{}`` commit is preferred over the
+    (annotated) tag object, so a checkout's commit is compared to the right
+    revision. A single-line answer whose ref name does not match is tolerated
+    (a minimal/injected runner), mirroring the historical branch behavior.
+    """
+    wanted = f"refs/tags/{ref}" if ref_kind == "tag" else f"refs/heads/{ref}"
+    by_ref: Dict[str, str] = {}
+    for ln in lines:
+        parts = ln.split()
+        if len(parts) >= 2:
+            by_ref[parts[1]] = parts[0]
+    if ref_kind == "tag" and f"{wanted}^{{}}" in by_ref:
+        return _sha(by_ref[f"{wanted}^{{}}"])
+    if wanted in by_ref:
+        return _sha(by_ref[wanted])
+    if len(lines) == 1:
+        return _sha(lines[0])
+    return None
+
+
 def _remote_head(exec_: Runner, repo: Path, remote: str,
-                 branch: str) -> Tuple[Optional[str], str, str]:
-    """Resolve ``remote/branch`` to a bounded revision.
+                 ref: str, ref_kind: str = "branch"
+                 ) -> Tuple[Optional[str], str, str]:
+    """Resolve ``remote/ref`` (a branch or tag) to a bounded revision.
 
     Returns ``(sha, kind, detail)`` where ``kind`` is one of:
 
-    * ``"ok"``             — the branch head resolved to ``sha``;
-    * ``"branch_missing"`` — the remote answered, but has no such branch
-      (an empty ``ls-remote`` is a real, distinguishable answer, not a
-      network failure — reporting it as "couldn't reach" would be false);
+    * ``"ok"``             — the ref resolved to ``sha``;
+    * ``"branch_missing"`` / ``"tag_missing"`` — the remote answered, but has
+      no such ref (an empty ``ls-remote`` is a real, distinguishable answer,
+      not a network failure — reporting it as "couldn't reach" would be false);
     * ``"unreachable"``    — ``git ls-remote`` failed (network/remote missing);
     * ``"unresolved"``     — the remote answered but the head was not a
       bounded revision.
     """
+    flag = "--tags" if ref_kind == "tag" else "--heads"
     rc, out, err = exec_(_git_argv(
-        repo, ["ls-remote", "--heads", remote, branch]), TIMEOUT_S)
+        repo, ["ls-remote", flag, remote, ref]), TIMEOUT_S)
     if rc != 0:
         return None, "unreachable", err
     lines = [ln for ln in (out or "").strip().splitlines() if ln.strip()]
     if not lines:
-        return None, "branch_missing", f"{remote}/{branch} has no head"
-    sha = _sha(lines[0])
+        missing = "tag_missing" if ref_kind == "tag" else "branch_missing"
+        return None, missing, f"{remote}/{ref} has no head"
+    sha = _ref_sha(lines, ref, ref_kind)
     if sha is None:
-        return None, "unresolved", f"unparseable head for {remote}/{branch}"
+        return None, "unresolved", f"unparseable head for {remote}/{ref}"
     return sha, "ok", ""
+
+
+def _remote_tag_names(exec_: Runner, repo: Path,
+                      remote: str) -> Tuple[list, str]:
+    """Every tag name the update source advertises (``ls-remote --tags``).
+
+    Returns ``(tags, detail)``. A failure to list tags is not fatal: the caller
+    falls back to the branch head, exactly as the documented channel policy
+    requires when no release tag is available. ``detail`` names the failure so
+    the fallback is never silent.
+    """
+    try:
+        rc, out, _err = exec_(
+            _git_argv(repo, ["ls-remote", "--tags", remote]), TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 — a failed probe is "no tags"
+        return [], f"could not list remote tags: {exc}"[:200]
+    if rc != 0:
+        return [], "could not list remote tags"
+    try:
+        from . import update_channel as UC
+
+        return UC.parse_remote_tags(out), ""
+    except Exception:  # noqa: BLE001
+        return [], "update_channel unavailable; using the branch head"
+
+
+def _select_effective_ref(cfg: Any, exec_: Runner, repo: Path, remote: str,
+                          branch: str, *, channel: Optional[str] = None,
+                          tag: Optional[str] = None
+                          ) -> Tuple[str, str, str, Optional[str]]:
+    """Resolve the effective ref (tag or branch) that check/apply must use.
+
+    Default (neither *channel* nor *tag* supplied) preserves the historical
+    behavior: the effective ref is the configured *branch*. An explicit *tag*
+    wins; otherwise an explicit *channel* selects the newest matching remote
+    tag (``stable``/``beta``) or the branch head (``canary``), per the
+    documented channel model in ``docs/UPDATE.md``.
+
+    Returns ``(ref, ref_kind, detail, source_channel)``. Raises ``ValueError``
+    for an unknown channel (the caller turns it into a typed refusal).
+    """
+    ch = str(channel or "").strip().lower()
+    tg = str(tag or "").strip()
+    if not ch and not tg:
+        return branch, "branch", "", None
+    try:
+        from . import update_channel as UC
+    except Exception:  # noqa: BLE001 — resolver absent; keep branch behavior
+        return branch, "branch", "update_channel unavailable; using the branch head", ch or None
+    if ch and not UC.is_valid_channel(ch):
+        raise ValueError(f"unknown update channel: {channel!r} "
+                         f"(valid: {', '.join(UC.CHANNELS)})")
+    tags, tag_detail = ([], "")
+    if ch in ("stable", "beta") and not tg:
+        tags, tag_detail = _remote_tag_names(exec_, repo, remote)
+    sel = UC.select_ref(ch or None, tg or None, tags, branch=branch)
+    detail = str(sel.get("detail") or "")
+    if tag_detail:
+        detail = f"{detail}; {tag_detail}".strip("; ")
+    if sel.get("ref_kind") == "tag" and sel.get("ref"):
+        return str(sel["ref"]), "tag", detail, ch or None
+    return branch, "branch", detail, ch or None
 
 
 def _resolve_source_policy(cfg: Any, source: Optional[str],
@@ -309,11 +397,17 @@ def _resolve_source_policy(cfg: Any, source: Optional[str],
 
 def check(cfg: Any, *, runner: Optional[Runner] = None,
           git: Optional[Runner] = None,
-          source: Optional[str] = None) -> Dict[str, Any]:
+          source: Optional[str] = None,
+          channel: Optional[str] = None,
+          tag: Optional[str] = None) -> Dict[str, Any]:
     """Read-only update status. Never raises; never fabricates "up to date".
 
     ``source`` overrides ``update.remote`` for this call (a git remote name or a
-    local repository/bundle path). It never changes the checkout.
+    local repository/bundle path). ``channel``/``tag`` select the effective ref
+    the same way ``--apply`` does (an explicit ``tag`` wins; ``stable``/``beta``
+    select the newest matching release tag; ``canary`` the branch head). With
+    neither supplied the configured branch is used unchanged. Never changes the
+    checkout.
     """
     repo = repo_root(cfg)
     is_checkout = (repo / ".git").exists()
@@ -394,18 +488,36 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
     if policy is not None:
         out["source_kind"] = policy.get("source_kind")
         out["source_url"] = str(policy.get("url") or "")
-    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, branch)
+    try:
+        ref, ref_kind, ref_detail, src_channel = _select_effective_ref(
+            cfg, exec_, repo, remote, branch, channel=channel, tag=tag)
+    except ValueError as exc:
+        out["state"] = "DEGRADED"
+        out["code"] = "UPDATE_CHANNEL_INVALID"
+        out["message"] = str(exc)
+        return out
+    out["ref"] = ref
+    out["ref_kind"] = ref_kind
+    out["ref_detail"] = ref_detail
+    if src_channel:
+        out["channel"] = src_channel
+    if tag:
+        out["tag"] = str(tag).strip()
+    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, ref, ref_kind)
     if remote_sha is None:
         out["state"] = "DEGRADED"
         out["remote_reachable"] = rkind != "unreachable"
         out["remote_branch_found"] = rkind == "unresolved"
         if rkind == "branch_missing":
             out["message"] = (f"the update source has no branch "
-                              f"{remote}/{branch}; check update.remote and "
+                              f"{remote}/{ref}; check update.remote and "
                               f"update.branch — not reporting up to date")
+        elif rkind == "tag_missing":
+            out["message"] = (f"the update source has no tag {ref!r}; check "
+                              f"the requested --tag — not reporting up to date")
         else:
             out["message"] = (f"couldn't reach the update source "
-                              f"({remote}/{branch}); not reporting up to date")
+                              f"({remote}/{ref}); not reporting up to date")
         out["detail"] = _redact(rerr)[:300]
     else:
         out["remote_reachable"] = True
@@ -419,7 +531,9 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
             # an unknown count" (never a fabricated exact number).
             out["behind"] = -1
             out["update_available"] = True
-            out["message"] = (f"an update is available on {remote}/{branch} "
+            label = f"{remote}/{ref}" if ref_kind == "branch" else (
+                f"tag {ref!r}")
+            out["message"] = (f"an update is available on {label} "
                               "(behind by an unknown count)")
 
     # ``can_apply`` means an ``apply`` turn is expected to be able to run: a
@@ -433,13 +547,18 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
 def apply(cfg: Any, *, confirm: bool = False,
           runner: Optional[Runner] = None, git: Optional[Runner] = None,
           actor: str = "dashboard:user",
-          source: Optional[str] = None) -> Dict[str, Any]:
+          source: Optional[str] = None,
+          channel: Optional[str] = None,
+          tag: Optional[str] = None) -> Dict[str, Any]:
     """Perform one confirmed non-destructive ``git pull --ff-only``.
 
     Order: confirm -> e-stop -> test guard -> checkout -> clean worktree ->
     pull. Refuses (never executes) on any earlier failure. ``source`` overrides
     ``update.remote`` for this call (a git remote name or a local repository/
-    bundle path).
+    bundle path). ``channel``/``tag`` select the effective ref exactly as
+    :func:`check` reports it (an explicit ``tag`` wins; ``stable``/``beta`` the
+    newest matching release tag; ``canary`` the branch head). With neither
+    supplied the configured branch is pulled, unchanged.
     """
     if not confirm:
         return {"ok": False, "state": "CONFIRM_REQUIRED", "code": CONFIRM_CODE,
@@ -499,10 +618,18 @@ def apply(cfg: Any, *, confirm: bool = False,
                 "detail": str((policy or {}).get("detail")
                               or "the configured update source was refused"),
                 "rollback_plan": "nothing changed; nothing to roll back"}
-    command = f"git pull --ff-only {remote} {branch}"
+    try:
+        ref, ref_kind, ref_detail, _src_channel = _select_effective_ref(
+            cfg, exec_, repo, remote, branch, channel=channel, tag=tag)
+    except ValueError as exc:
+        _audit("refused", actor=actor, reason="channel_invalid")
+        return {"ok": False, "state": "CONFLICT", "code": "UPDATE_CHANNEL_INVALID",
+                "detail": str(exc),
+                "rollback_plan": "nothing changed; nothing to roll back"}
+    command = f"git pull --ff-only {remote} {ref}"
 
     rc, pulled_out, pulled_err = exec_(
-        _git_argv(repo, ["pull", "--ff-only", remote, branch]), TIMEOUT_S)
+        _git_argv(repo, ["pull", "--ff-only", remote, ref]), TIMEOUT_S)
     rc_post, post_out, _post_err = exec_(
         _git_argv(repo, ["rev-parse", "HEAD"]), TIMEOUT_S)
     post_revision = _sha(post_out) if rc_post == 0 else pre_revision
@@ -535,17 +662,18 @@ def apply(cfg: Any, *, confirm: bool = False,
 
     # Confirm the checked-out revision now matches the configured remote branch
     # (when the remote head is resolvable). A mismatch is reported, not hidden.
-    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, branch)
+    remote_sha, rkind, rerr = _remote_head(exec_, repo, remote, ref, ref_kind)
     if remote_sha is not None and post_revision and remote_sha != post_revision:
         _audit("apply_mismatch", actor=actor, command=command,
                expected=remote_sha, actual=post_revision)
         return {"ok": False, "state": "FAILED", "code": FAILED_CODE,
                 "command": command, "install_method": "git-checkout",
                 "remote": remote, "branch": branch,
+                "ref": ref, "ref_kind": ref_kind,
                 "pre_revision": pre_revision, "post_revision": post_revision,
                 "remote_verified": False,
                 "detail": (f"pulled revision {post_revision} does not match "
-                           f"{remote}/{branch} {remote_sha}"),
+                           f"{remote}/{ref} {remote_sha}"),
                 "rollback_plan": rollback_plan, "rollback": rollback}
 
     changed = pre_revision != post_revision
@@ -556,6 +684,7 @@ def apply(cfg: Any, *, confirm: bool = False,
     receipt = {"ok": True, "state": "OK", "code": "",
                "command": command, "install_method": "git-checkout",
                "remote": remote, "branch": branch,
+               "ref": ref, "ref_kind": ref_kind,
                "pre_revision": pre_revision, "post_revision": post_revision,
                "changed": bool(changed), "update_available": bool(changed),
                "remote_verified": bool(remote_verified),
@@ -565,7 +694,7 @@ def apply(cfg: Any, *, confirm: bool = False,
         # The pull returned success but the update source could not be re-read
         # to prove post == remote head. Say so; never imply a verified match.
         receipt["warning"] = (
-            f"pulled, but {remote}/{branch} could not be re-read to confirm "
+            f"pulled, but {remote}/{ref} could not be re-read to confirm "
             f"the revision ({rkind}); verify with "
             f"'git -C {repo} rev-parse HEAD'")
         receipt["remote_check_detail"] = _redact(rerr)[:300]
@@ -639,6 +768,7 @@ def _load_snapshot_manifest(bdir: Path) -> Dict[str, Any]:
 def snapshot(cfg: Any, *, runner: Optional[Runner] = None,
              git: Optional[Runner] = None, reason: str = "pre-apply",
              source: Optional[str] = None, backup_dir: Any = None,
+             channel: Optional[str] = None, tag: Optional[str] = None,
              actor: str = "cli:update") -> Dict[str, Any]:
     """Write a timestamped update backup: ``manifest.json`` + ``code.bundle``.
 
@@ -703,6 +833,8 @@ def snapshot(cfg: Any, *, runner: Optional[Runner] = None,
         "pre_revision": pre_revision,
         "remote": remote,
         "branch": branch,
+        "channel": (str(channel).strip() or None) if channel else None,
+        "tag": (str(tag).strip() or None) if tag else None,
         "bundle": bundle_name,
         "actor": str(actor),
     }
@@ -1310,7 +1442,8 @@ def full_apply(cfg: Any, *, confirm: bool = False,
 
             # 7. snapshot / backup
             snap = snapshot(cfg, runner=runner, git=git, reason="pre-apply",
-                            actor=actor, source=source)
+                            actor=actor, source=source, channel=channel,
+                            tag=tag)
             receipt["backup_dir"] = snap.get("backup_dir")
             receipt["previous_revision"] = snap.get("pre_revision")
             if not snap.get("ok"):
@@ -1320,13 +1453,15 @@ def full_apply(cfg: Any, *, confirm: bool = False,
 
             # 8. fast-forward pull ONLY (non-interactive, timeout-bounded)
             pull = apply(cfg, confirm=True, runner=runner, git=git, source=source,
-                         actor=actor)
+                         actor=actor, channel=channel, tag=tag)
             pre = pull.get("pre_revision") or receipt.get("previous_revision")
             post = pull.get("post_revision")
             receipt["previous_revision"] = pre or receipt.get("previous_revision")
             receipt["new_revision"] = post
             receipt["remote"] = pull.get("remote")
             receipt["branch"] = pull.get("branch")
+            receipt["ref"] = pull.get("ref")
+            receipt["ref_kind"] = pull.get("ref_kind")
             receipt["pull_result"] = {k: pull.get(k) for k in (
                 "ok", "state", "code", "command", "changed", "remote_verified",
                 "detail")}

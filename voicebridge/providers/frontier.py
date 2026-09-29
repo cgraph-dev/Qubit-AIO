@@ -81,17 +81,43 @@ def _looks_like_refusal(body: Dict[str, Any]) -> bool:
     return any(m in hay for m in _REFUSAL_MARKERS)
 
 
-def _extract_text(body: Dict[str, Any]) -> tuple[str, int, int]:
-    """Returns (text, prompt_tokens, completion_tokens) or raises ValueError."""
+def _extract_text(body: Dict[str, Any]) -> tuple[str, int, int, str, bool]:
+    """Returns (text, prompt_tokens, completion_tokens, finish_reason,
+    has_reasoning) or raises ValueError.
+
+    ``finish_reason`` and whether the provider emitted chain-of-thought
+    (``reasoning_content``/``reasoning``) are needed to tell a genuinely
+    malformed empty completion apart from a reasoning model that spent the
+    whole output budget on its reasoning and stopped (``finish_reason ==
+    "length"``) before writing any answer.
+    """
     choices = body.get("choices")
     if not isinstance(choices, list) or not choices:
         raise ValueError("missing choices")
-    msg = (choices[0].get("message") or {}) if isinstance(choices[0], dict) else {}
+    choice = choices[0] if isinstance(choices[0], dict) else {}
+    msg = choice.get("message") or {}
     text = str(msg.get("content") or "").strip()
+    reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+    finish_reason = str(choice.get("finish_reason") or "")
     usage = body.get("usage") or {}
     pt = int(usage.get("prompt_tokens") or 0)
     ct = int(usage.get("completion_tokens") or 0)
-    return text, pt, ct
+    return text, pt, ct, finish_reason, bool(str(reasoning).strip())
+
+
+def _bumped_max_tokens(current: Any, *, ceiling: int = 8192) -> int:
+    """Next output budget for a length-truncated completion.
+
+    The vendored agent retries a ``finish_reason="length"`` turn with a larger
+    ``max_tokens`` (``agent.turn_iteration_prep`` length-continue); this is the
+    same bounded escalation. Doubling from a floor of 1024 keeps the repair
+    modest and finite; ``ceiling`` prevents an unbounded spend.
+    """
+    try:
+        cur = int(current or 0)
+    except (TypeError, ValueError):
+        cur = 0
+    return min(max(cur * 2, 1024), ceiling)
 
 
 class FrontierClient:
@@ -99,7 +125,8 @@ class FrontierClient:
                  timeout_s: float = 20.0, max_retries: int = 1,
                  transport: Optional[Transport] = None,
                  cancel: Optional[Callable[[], bool]] = None,
-                 max_response_chars: int = 4000) -> None:
+                 max_response_chars: int = 4000,
+                 max_length_retries: int = 2) -> None:
         self.base_url = base_url.rstrip("/")
         self._key = api_key  # never logged
         self.provider = provider
@@ -109,6 +136,9 @@ class FrontierClient:
         self.transport = transport or urllib_transport
         self.cancel = cancel
         self.max_response_chars = max_response_chars
+        # Bounded output-budget repairs for a length-truncated empty completion
+        # (reasoning models count reasoning tokens against ``max_tokens``).
+        self.max_length_retries = max(0, max_length_retries)
 
     def complete(self, req: ProviderRequest, prompt_text: str,
                  est_cost: float = 0.0) -> ProviderResult:
@@ -135,7 +165,9 @@ class FrontierClient:
         url = f"{self.base_url}/chat/completions"
         last_code, last_msg = "PROVIDER_OUTAGE", "no attempts"
         t0 = time.time()
-        for attempt in range(self.max_retries + 1):
+        transport_retries = 0
+        length_retries = 0
+        for attempt in range(self.max_retries + 1 + self.max_length_retries):
             if self.cancel is not None and self.cancel():
                 return ProviderResult(ok=False, code="CANCELLED",
                                       message="cancelled during retry",
@@ -153,6 +185,9 @@ class FrontierClient:
                     last_code, last_msg = "PROVIDER_OUTAGE", err
                 log_event("frontier.attempt", provider=self.provider,
                           attempt=attempt, code=last_code)
+                transport_retries += 1
+                if transport_retries > self.max_retries:
+                    break
                 continue  # retry (idempotent: no external tool action here)
             if _looks_like_refusal(body):
                 return ProviderResult(ok=False, code="CONTENT_REFUSED",
@@ -172,6 +207,9 @@ class FrontierClient:
                                       identity=f"{self.provider}/{self.model}")
             if status == 429:
                 last_code, last_msg = "RATE_LIMITED", f"http 429"
+                transport_retries += 1
+                if transport_retries > self.max_retries:
+                    break
                 continue
             if status == 400 and "tool" in json.dumps(body)[:500].lower():
                 return ProviderResult(ok=False, code="UNSUPPORTED_CAPABILITY",
@@ -185,15 +223,47 @@ class FrontierClient:
                                       identity=f"{self.provider}/{self.model}")
             if status != 200:
                 last_code, last_msg = "PROVIDER_OUTAGE", f"http {status}"
+                transport_retries += 1
+                if transport_retries > self.max_retries:
+                    break
                 continue
             try:
-                text, pt, ct = _extract_text(body)
+                text, pt, ct, finish_reason, has_reasoning = _extract_text(body)
             except Exception as exc:
                 return ProviderResult(ok=False, code="MALFORMED_RESPONSE",
                                       message=str(exc)[:200],
                                       provider=self.provider, model=self.model,
                                       identity=f"{self.provider}/{self.model}")
             if not text:
+                # A reasoning model can spend the entire output budget on its
+                # chain-of-thought and stop at the cap with no visible answer
+                # (finish_reason == "length"). That is output truncation, not a
+                # malformed response: repair it once with a larger budget
+                # before surfacing a truthful, actionable failure.
+                if finish_reason == "length" \
+                        and length_retries < self.max_length_retries:
+                    bumped = _bumped_max_tokens(payload.get("max_tokens"))
+                    if bumped > int(payload.get("max_tokens") or 0):
+                        payload["max_tokens"] = bumped
+                        length_retries += 1
+                        log_event("frontier.length_retry",
+                                  provider=self.provider, max_tokens=bumped,
+                                  reasoned=has_reasoning,
+                                  completion_tokens=ct)
+                        continue
+                if finish_reason == "length":
+                    return ProviderResult(
+                        ok=False, code="OUTPUT_TRUNCATED",
+                        message=(
+                            f"provider stopped at max_tokens="
+                            f"{int(payload.get('max_tokens') or 0)} with no "
+                            f"visible content after {ct} completion tokens "
+                            f"({'reasoning consumed the output budget'
+                              if has_reasoning else 'output cap reached'}); "
+                            "lower the reasoning level or raise the output "
+                            "budget"),
+                        provider=self.provider, model=self.model,
+                        identity=f"{self.provider}/{self.model}")
                 return ProviderResult(ok=False, code="MALFORMED_RESPONSE",
                                       message="empty content",
                                       provider=self.provider, model=self.model,
@@ -218,10 +288,17 @@ class FrontierClient:
                                 latency_ms=ms, cost_usd_est=est_cost)
             log_event("frontier.ok", provider=self.provider, model=self.model,
                       ms=ms)
+            details: Dict[str, Any] = {}
+            if length_retries:
+                # Truthful audit trail: the answer needed a repaired (larger)
+                # output budget because reasoning exhausted the requested one.
+                details["output_budget_repairs"] = length_retries
+                details["effective_max_tokens"] = int(
+                    payload.get("max_tokens") or 0)
             return ProviderResult(ok=True, text=text,
                                   provider=self.provider, model=self.model,
                                   identity=f"{self.provider}/{self.model}",
-                                  usage=usage)
+                                  usage=usage, details=details)
         return ProviderResult(ok=False, code=last_code, message=last_msg,
                               provider=self.provider, model=self.model,
                               identity=f"{self.provider}/{self.model}")

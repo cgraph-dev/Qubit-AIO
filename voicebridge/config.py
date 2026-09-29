@@ -228,11 +228,13 @@ def resolve_model_file(relative: Path | str) -> Path:
 
 #: Allowed values for ``voice.input_engine`` (Qubit speech-INPUT selection).
 #: ``browser`` = supported Chrome SpeechRecognition, when available and
-#: permitted; ``local`` = Qubit's STT profile (``voicebridge/asr``); ``auto`` =
-#: prefer browser and fall back to local only with an explicit visible reason.
-#: Any other value is out of contract and normalizes to ``auto`` (the
-#: frontend ``normalizeVoiceEngine`` applies the same rule).
-VOICE_INPUT_ENGINES: tuple = ("browser", "local", "auto")
+#: permitted; ``local`` = Qubit's streaming local STT (``voicebridge/asr``,
+#: live partials over the authenticated STT WebSocket); ``terminal`` = the
+#: local desktop/terminal capture path through the same local STT backend;
+#: ``auto`` = prefer browser and fall back to local only with an explicit
+#: visible reason. Any other value is out of contract and normalizes to
+#: ``auto`` (the frontend ``normalizeVoiceEngine`` applies the same rule).
+VOICE_INPUT_ENGINES: tuple = ("browser", "local", "terminal", "auto")
 
 
 def normalize_input_engine(value: Any) -> str:
@@ -313,7 +315,18 @@ DEFAULTS: Dict[str, Any] = {
     # (browser with a visible local fallback reason). It never changes the
     # model, session, tools, policy, audit, confirmation, or e-stop path.
     "voice": {
-        "input_engine": "auto",   # browser | local | auto
+        "input_engine": "auto",   # browser | local | terminal | auto
+        # Streaming STT socket (live interim text). Tunables only affect the
+        # local/terminal engine; the browser engine is the browser's own.
+        "stt_streaming": {
+            "enabled": True,           # serve /agent/api/audio/stt/ws
+            "partial_interval_ms": 300,  # hint; the session also rate-limits decodes
+            "max_seconds": 120,        # per-request audio cap (server enforces)
+            # Browser-side capture conditioning (getUserMedia constraints).
+            "noise_suppression": True,
+            "echo_cancellation": True,
+            "auto_gain_control": True,
+        },
     },
     "audio": {
         "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default
@@ -365,7 +378,33 @@ DEFAULTS: Dict[str, Any] = {
     "asr": {
         "provider": "sherpa",         # sherpa (Moonshine/Parakeet, 0 VRAM CPU) | whisper | personaplex
         "engine": "parakeet",        # sherpa engine: parakeet v3 (max accuracy, 25 langs) | moonshine (fastest)
+        # Streaming STT engine for live /qubit-chat transcription (the STT
+        # WebSocket). `auto` prefers an installed true-streaming pack and
+        # otherwise decodes incrementally with the offline `engine` above --
+        # no second backend. True-streaming packs (int8, CPU real-time):
+        #   zipformer-streaming        -> sherpa-onnx-streaming-zipformer-en-20M-2023-02-17 (low-spec)
+        #   zipformer-streaming-small  -> sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16
+        #   nemotron-streaming         -> sherpa-onnx-nemotron-speech-streaming-en-0.6b-80ms-int8-2026-04-25 (low latency)
+        "streaming_engine": "auto",
+        # Offline fallback model for live partials: the fast one (Moonshine)
+        # even when the accurate `engine` above is Parakeet. Whole-file
+        # transcription still uses `engine`.
+        "streaming_window_engine": "moonshine",
+        # English-only: the local streaming candidates are English models; pin
+        # the language and never route non-English audio to them.
+        "english_only": True,
+        # 0 = use the model pack's built-in chunk size; a nonzero value is a
+        # request hint (only the window engine's frame size honours it).
+        "streaming_chunk_ms": 0,
+        # Prewarm policy at service start: auto|offline-window|<engine>|false.
+        "prewarm": "auto",
+        "streaming_partial_min_interval_s": 0.25,  # min gap between window decodes (bounds CPU)
+        "streaming_silence_rms": 0.004,            # frames below this are not fed to the recognizer
         "provider_ep": "cpu",         # sherpa onnxruntime EP: cpu (0 VRAM) | cuda
+        # Execution provider for LIVE streaming only (empty = inherit
+        # provider_ep). cuda requires the GPU-enabled sherpa-onnx wheel plus the
+        # nvidia-*-cu12 pip libraries; it falls back to cpu automatically.
+        "streaming_provider_ep": "",
         "num_threads": 4,            # sherpa/parakeet CPU threads (honoured by mic + fallback path)
         "model": "base",            # tiny|base|small|medium (whisper only)
         "device": "auto",           # auto|cuda|cpu (whisper only)
@@ -438,6 +477,10 @@ DEFAULTS: Dict[str, Any] = {
         "provider": "piper",        # piper (fast, cheap, local) | hybrid (piper short, openai nova long) | kokoro | edge | gateway | openai
         "voice": "en_US-amy-medium",
         "sample_rate": 22050,
+        # Piper voice renderer: sherpa (sherpa-onnx OfflineTts — shares the ASR
+        # ONNX Runtime, no load-order coupling) | piper (third-party piper-tts).
+        # Empty = auto (sherpa when the vits-piper pack is present).
+        "piper_backend": "sherpa",
         "kokoro": {"voice_sid": 0},  # Kokoro v0.19 EN: 11 voices, sid 0..10
         "interrupt": True,          # allow barge-in / stop speaking
         "edge": {"voice": "en-US-JennyNeural", "rate": "+0%"},

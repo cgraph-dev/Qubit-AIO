@@ -800,13 +800,17 @@ export const api = {
    * carries the non-secret active Qubit model profile so a model switch is
    * visible in the terminal chrome.
    */
-  wsTicket: async (profileId?: string): Promise<WsTicketGrant> => {
+  wsTicket: async (
+    profileId?: string,
+    scope?: "pty" | "rpc" | "stt",
+  ): Promise<WsTicketGrant> => {
     const res = await authedFetch("/api/auth/ws-ticket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        profileId ? { profile: profileId } : {},
-      ),
+      body: JSON.stringify({
+        ...(profileId ? { profile: profileId } : {}),
+        ...(scope ? { scope } : {}),
+      }),
     });
     let body: Record<string, unknown> = {};
     try {
@@ -828,6 +832,21 @@ export const api = {
       throw new WsTicketError("WS_TICKET_MISSING", "ws-ticket response had no ticket");
     }
     return body as unknown as WsTicketGrant;
+  },
+  /**
+   * WebSocket URL for the authenticated streaming-STT socket
+   * (`/api/audio/stt/ws`). Mints a short-lived, single-use, scoped (`stt`)
+   * ticket over the authenticated HTTP route — the long-lived session token is
+   * never placed on the WebSocket URL. Used by the local/terminal voice engine
+   * for live interim transcription.
+   */
+  sttWsUrl: async (): Promise<string> => {
+    const grant = await api.wsTicket(undefined, "stt");
+    return buildQubitWebSocketUrl({
+      authParam: ["ticket", grant.ticket],
+      basePath: BASE,
+      path: withApiPrefix("/api/audio/stt/ws"),
+    });
   },
   /**
    * Model profiles eligible for the `/chat` terminal, with the per-profile
@@ -1226,15 +1245,17 @@ export const api = {
       body: JSON.stringify(body),
     }),
   /**
-   * Assign the "main" model. Qubit has ONE model authority — the model-profile
-   * registry (`<state_dir>/profiles.json` model_profiles) served by
-   * `GET /api/terminal/profiles` and persisted by `PUT /api/terminal/profile`.
-   * The compat `/api/model/set` handler treats `model` as a *brain profile*
-   * name (provider ignored), so posting a provider/model pair there always
-   * failed ("unknown brain profile"). Resolve the pair to a real profile id
-   * first, then persist through the confirm-gated registry.
+   * Assign the "main" model. Posts the provider/model straight to the canonical
+   * `POST /api/model/set` (the reference's route: `web/src/lib/api.ts:623`),
+   * which resolves the pair into the real runtime model — registering and
+   * activating a model profile and mirroring the runtime `config.yaml` model.
    *
-   * Auxiliary task pins are not offered by the compat layer
+   * The previous implementation resolved the pair against
+   * `GET /api/terminal/profiles`, whose registry held only the single local
+   * default, so every one of the ~54 catalog providers threw
+   * `UNKNOWN_MODEL_PROFILE` and could never be selected.
+   *
+   * Auxiliary task pins are still not offered by the compat layer
    * (`AUX_PIN_REFUSED`); surface that typed refusal instead of a fake success.
    */
   setModelAssignment: async (
@@ -1242,6 +1263,7 @@ export const api = {
     profile = getManagementProfile(),
     confirm?: (detail: string) => boolean | Promise<boolean>,
   ): Promise<ModelAssignmentResponse> => {
+    void confirm;
     const scope = (body.scope || "main").toLowerCase();
     if (scope !== "main") {
       throw new ModelAssignmentError(
@@ -1249,24 +1271,47 @@ export const api = {
         "auxiliary task pins are not offered; the main model profile owns routing",
       );
     }
-    const profiles = await fetchJSON<TerminalProfileInfo[]>(
-      appendProfileParam("/api/terminal/profiles", profile),
-    );
-    const match = resolveModelProfile(profiles, body.provider, body.model);
-    if (!match) {
+    const res = await fetchJSON<
+      ModelAssignmentResponse & { code?: string; detail?: string }
+    >(appendProfileParam("/api/model/set", profile), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, scope: "main" }),
+    }).catch((err: unknown) => {
+      // fetchJSON throws a plain `"<status>: <json>"` Error on a typed 4xx.
+      // Re-surface the backend's typed code so callers can discriminate a
+      // real refusal from a network failure.
+      const message = err instanceof Error ? err.message : String(err);
+      const match = message.match(/^\d+:\s*(\{[\s\S]*\})$/);
+      if (match) {
+        try {
+          const envelope = JSON.parse(match[1]) as {
+            code?: string;
+            detail?: string;
+          };
+          if (envelope.code) {
+            throw new ModelAssignmentError(
+              envelope.code,
+              envelope.detail || message,
+            );
+          }
+        } catch (parseErr) {
+          if (parseErr instanceof ModelAssignmentError) throw parseErr;
+        }
+      }
+      throw err;
+    });
+    // The expensive-model prompt is a 200 confirm_required envelope (upstream
+    // shape); pass it through so the picker shows it and re-calls with
+    // confirm_expensive_model=true.
+    if (res.confirm_required) return res;
+    if (!res.ok) {
       throw new ModelAssignmentError(
-        "UNKNOWN_MODEL_PROFILE",
-        `no model profile matches ${body.provider || "?"}/${body.model || "?"}; ` +
-          "add one under Models & Providers",
+        res.code || "MODEL_SET_FAILED",
+        res.detail || `could not set ${body.provider}/${body.model}`,
       );
     }
-    await api.setTerminalProfile(match.id, confirm);
-    return {
-      ok: true,
-      scope: "main",
-      provider: match.provider,
-      model: match.model,
-    };
+    return res;
   },
   saveConfig: (
     config: Record<string, unknown>,
@@ -2161,49 +2206,92 @@ export const api = {
   // rewrite in withManagementProfile doesn't reach them — send it explicitly
   // or an approval lands in the wrong profile's whitelist.
   getPairing: () => fetchJSON<PairingResponse>("/api/pairing"),
-  approvePairing: (platform: string, request_id: string) =>
-    fetchJSON<{ ok: boolean; user: PairingUser }>("/api/pairing/approve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        platform,
-        request_id,
-        profile: getManagementProfile() || undefined,
-      }),
-    }),
-  revokePairing: (platform: string, user_id: string) =>
-    fetchJSON<{ ok: boolean }>("/api/pairing/revoke", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        platform,
-        user_id,
-        profile: getManagementProfile() || undefined,
-      }),
-    }),
-  clearPendingPairing: () =>
-    fetchJSON<{ ok: boolean; cleared: number }>("/api/pairing/clear-pending", {
-      method: "POST",
-    }),
+  // approve/revoke/clear are staged 409 confirm-gated on the backend; settle
+  // through the shared round-trip so the badges are working controls rather
+  // than dead ends (the button press is the explicit user confirmation).
+  approvePairing: (
+    platform: string,
+    request_id: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean; user: PairingUser }>("/api/pairing/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platform,
+            request_id,
+            profile: getManagementProfile() || undefined,
+          }),
+        }),
+      confirm,
+    ),
+  revokePairing: (
+    platform: string,
+    user_id: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean }>("/api/pairing/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platform,
+            user_id,
+            profile: getManagementProfile() || undefined,
+          }),
+        }),
+      confirm,
+    ),
+  clearPendingPairing: (
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean; cleared: number }>(
+          "/api/pairing/clear-pending",
+          { method: "POST" },
+        ),
+      confirm,
+    ),
 
   // ── Admin: Webhooks ─────────────────────────────────────────────────
   getWebhooks: () => fetchJSON<WebhooksResponse>("/api/webhooks"),
-  enableWebhooks: () =>
-    fetchJSON<WebhookEnableResponse>("/api/webhooks/enable", { method: "POST" }),
+  // Store-wide enable is staged 409 confirm-gated; settle via the shared
+  // round-trip (the toggle press is the explicit user confirmation).
+  enableWebhooks: (
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<WebhookEnableResponse>("/api/webhooks/enable", {
+          method: "POST",
+        }),
+      confirm,
+    ),
   // The canonical store keys subscriptions by ``id`` and validates a real
   // delivery ``url`` + ``secret_ref``; send exactly that shape so the create
   // lands in the same store the CLI/voice use (no proxy/store split-brain).
-  createWebhook: (body: WebhookCreate) =>
-    fetchJSON<WebhookRoute & { secret: string }>("/api/webhooks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: body.name,
-        url: body.url,
-        events: body.events,
-        secret_ref: body.secret_ref,
-      }),
-    }),
+  createWebhook: (
+    body: WebhookCreate,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<WebhookRoute & { secret: string }>("/api/webhooks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: body.name,
+            url: body.url,
+            events: body.events,
+            secret_ref: body.secret_ref,
+          }),
+        }),
+      confirm,
+    ),
   deleteWebhook: (
     name: string,
     confirm?: (detail: string) => boolean | Promise<boolean>,
@@ -4089,6 +4177,9 @@ export interface SessionSearchResult extends SessionInfo {
 
 export interface SessionSearchResponse {
   results: SessionSearchResult[];
+  // The compat search route reuses the sessions list handler, which also
+  // emits `sessions`; tolerate either envelope so the page never goes blank.
+  sessions?: SessionSearchResult[];
 }
 
 // ── Model info types ──────────────────────────────────────────────────

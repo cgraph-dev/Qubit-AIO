@@ -123,6 +123,71 @@ def is_present(cfg: Any, name: str) -> bool:
     return str(name or "").strip() in present_names(cfg)
 
 
+def reference_present(cfg: Any, ref: str) -> bool:
+    """True when *ref*'s target actually resolves (not merely registered).
+
+    ``is_set`` must reflect whether the credential the reference names can
+    actually be resolved, never only that a row exists in the registry. A
+    resolvable kind is checked against the ONE canonical resolver
+    (:func:`voicebridge.providers.credentials.resolve_key`): ``env:NAME`` is
+    present only when ``NAME`` is in the process environment or the runtime
+    ``.env``, and ``file:PATH`` only when the file exists and is non-empty.
+    ``vault:``/``ref:`` name an external secret-manager entry for which Qubit
+    has no resolver, so the declared registration is the only presence signal
+    available and they remain present.
+
+    The resolved value is never returned, logged, or cached here; only the
+    boolean presence leaves this function. An unreadable/malformed reference
+    fails closed to ``False``.
+    """
+    text = str(ref or "").strip()
+    kind = reference_kind(text)
+    if not kind:
+        return False
+    if kind in RESOLVABLE_REF_KINDS:
+        try:
+            from .providers.credentials import resolve_key
+
+            _value, code = resolve_key("env-reference", text)
+            return code == ""
+        except Exception:  # noqa: BLE001 - presence check must fail closed
+            return False
+    return True
+
+
+def is_resolved(ref: str) -> bool:
+    """True when a credential reference resolves to a non-empty secret.
+
+    Delegates to the shared credential authority
+    (:func:`voicebridge.providers.credentials.resolve_key`): ``env:``/``file:``
+    resolve locally, ``vault:``/``ref:`` have no Qubit-side resolver and are
+    honestly not-set. Only the boolean is returned — the resolved value is
+    never read out, cached, logged, or returned. Fail-closed on any error.
+    """
+    try:
+        from .providers.credentials import resolve_key
+
+        value, code = resolve_key("env-ref", str(ref or ""))
+        return code == "" and bool(value)
+    except Exception:  # noqa: BLE001 - resolution must fail closed
+        return False
+
+
+def resolved_names(cfg: Any) -> set:
+    """Names whose credential actually resolves (names only, never values).
+
+    The union of the process environment, the canonical runtime ``.env``, and
+    registry references that truly resolve. This is the honest replacement for
+    conflating "a registry row exists" with "the credential is present".
+    """
+    out = set(runtime_env_names(cfg))
+    out |= set(os.environ.keys())
+    for name, ref in load(cfg).items():
+        if is_resolved(ref):
+            out.add(str(name))
+    return out
+
+
 def _save(cfg: Any, data: Dict[str, str]) -> None:
     path = store_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -208,6 +273,11 @@ def is_reference(value: str) -> bool:
     return validate_reference(value)[0]
 
 
+def valid_name(name: str) -> bool:
+    """True when *name* is an acceptable reference name (env-var shaped)."""
+    return bool(_ENV_VAR_RE.match(str(name or "").strip()))
+
+
 def is_resolvable_reference(value: str) -> bool:
     """True when *value* is a reference the runtime client can resolve.
 
@@ -220,10 +290,13 @@ def is_resolvable_reference(value: str) -> bool:
 
 
 def set_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
-    """Persist one reference. Raises ``ValueError`` for a raw secret."""
+    """Persist one reference. Raises ``ValueError`` for a bad name or secret."""
     clean = str(name or "").strip()
     if not clean:
         raise ValueError("env reference name required")
+    if not _ENV_VAR_RE.match(clean):
+        raise ValueError(
+            "env reference name must match ^[A-Za-z_][A-Za-z0-9_]*$")
     value = str(ref or "").strip()
     ok, detail = validate_reference(value)
     if not ok:

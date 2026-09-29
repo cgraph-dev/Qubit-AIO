@@ -21,7 +21,7 @@
   "dashboard_ops.catalog": 566,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
-  "qubit_compat.ROUTES": 448,
+  "qubit_compat.ROUTES": 449,
   "qubit_compat.GATED": 94,
   "cli_families": 114,
   "source_inventory.items": 6775,
@@ -34,7 +34,7 @@
   "source_inventory.dispositioned_gated": 4
  },
  "counts_by_status": {
-  "IMPLEMENTED": 712,
+  "IMPLEMENTED": 713,
   "OPERATOR_ONLY": 3,
   "SAFE_EQUIVALENT": 36
  },
@@ -98,7 +98,7 @@
   "hermes_plugin": 9,
   "hermes_skill": 28,
   "hermes_tool": 73,
-  "hermes_web_page": 21,
+  "hermes_web_page": 22,
   "hooks": 10,
   "ide": 2,
   "import_agent": 2,
@@ -185,12 +185,12 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 751
+  "qubit-surface": 752
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
   "has-cli has-dashboard has-voice": 510,
-  "has-dashboard": 65,
+  "has-dashboard": 66,
   "has-dashboard has-voice": 4,
   "no-surface": 124
  },
@@ -2094,7 +2094,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "chat_session_search",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_backend_routes_integration8u.py::test_chat_projection_reads_are_real",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_terminal_session_model",
    "note": "Search canonical chat sessions by title/preview.",
    "needs": "none"
   },
@@ -2108,7 +2108,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "chat_session_show",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_backend_routes_integration8u.py::test_chat_projection_reads_are_real",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_terminal_session_model",
    "note": "One canonical chat session with its transcript.",
    "needs": "none"
   },
@@ -2122,7 +2122,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "chat_sessions",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_backend_routes_integration8u.py::test_chat_projection_reads_are_real",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_terminal_session_model",
    "note": "Canonical chat sessions (state.db), including migrated legacy history.",
    "needs": "none"
   },
@@ -5272,7 +5272,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "msg_link",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_messaging8tf.py::test_retry_backoff_and_link_states",
+   "proving_test": "tests/test_channels_test_honesty9u.py::test_link_known_platform_without_account_is_no_account",
    "note": "Typed link state.",
    "needs": "creds"
   },
@@ -5916,7 +5916,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "plugins_catalog",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_use_qubit_home_migrates_once",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
    "note": "Installable rows: built-ins, registered, reviewed local manifests (remote entries stay a typed refusal).",
    "needs": "none"
   },
@@ -5972,7 +5972,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "plugins_list",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_use_qubit_home_migrates_once",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
    "note": "Registered manifests + built-ins (redacted).",
    "needs": "none"
   },
@@ -6042,7 +6042,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "plugins_show",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_use_qubit_home_migrates_once",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
    "note": "One plugin record (redacted).",
    "needs": "none"
   },
@@ -6084,7 +6084,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "policy_attest",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_use_qubit_home_migrates_once",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
    "note": "Content-addressed conformance attestation (confirmed).",
    "needs": "none"
   },
@@ -6098,7 +6098,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "policy_conformance",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_use_qubit_home_migrates_once",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
    "note": "Workspace policy conformance findings (read-only).",
    "needs": "none"
   },
@@ -7834,7 +7834,7 @@
    "dashboard": "qubit-chat:/qubit-chat",
    "voice": "task_run",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_packet8s.py::test_startup_binds_power_policy_without_nameerror",
+   "proving_test": "tests/test_frontier_length_repair9u.py::test_explicit_model_request_wins_over_the_session_pin",
    "note": "Dispatch one task to the agent runtime (confirmed).",
    "needs": "none"
   },
@@ -7848,7 +7848,7 @@
    "dashboard": "qubit-chat:/qubit-chat",
    "voice": "task_run_current",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_packet8s.py::test_startup_binds_power_policy_without_nameerror",
+   "proving_test": "tests/test_frontier_length_repair9u.py::test_explicit_model_request_wins_over_the_session_pin",
    "note": "Dispatch the current kanban task to the agent runtime (confirmed; typed empty state when nothing is actionable).",
    "needs": "none"
   },
@@ -7960,7 +7960,7 @@
    "dashboard": "qubit-ops:/operations",
    "voice": "tools",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_authority_unification8u.py::test_use_qubit_home_migrates_once",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
    "note": "Toolset catalog (same source as the dashboard and CLI).",
    "needs": "none"
   },
@@ -9358,6 +9358,20 @@
    "qubit_backend": "voicebridge.qubit_compat",
    "cli": "",
    "dashboard": "qubit-web:/terminalchatpage",
+   "voice": "",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",
+   "note": "vendored upstream baseline page served by the Qubit compat backend",
+   "needs": "none"
+  },
+  {
+   "id": "page_voiceeditpage",
+   "area": "hermes_web_page",
+   "capability": "Qubit web page VoiceEditPage",
+   "upstream_ref": "hermes-agent@2237be3",
+   "qubit_backend": "voicebridge.qubit_compat",
+   "cli": "",
+   "dashboard": "qubit-web:/voiceeditpage",
    "voice": "",
    "status": "IMPLEMENTED",
    "proving_test": "tests/test_dashboard_agent3_wiring.py::test_every_qubit_web_page_served_through_real_route",

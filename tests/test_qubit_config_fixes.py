@@ -195,7 +195,7 @@ def test_voice_input_engine_is_a_real_served_setting(tmp_path, monkeypatch):
 def test_voice_input_engine_normalizes_out_of_contract_values():
     from voicebridge.config import VOICE_INPUT_ENGINES, normalize_input_engine
 
-    assert VOICE_INPUT_ENGINES == ("browser", "local", "auto")
+    assert VOICE_INPUT_ENGINES == ("browser", "local", "terminal", "auto")
     for value in VOICE_INPUT_ENGINES:
         assert normalize_input_engine(value) == value
     for bad in (None, "", "BROWSER", "remote", 3):

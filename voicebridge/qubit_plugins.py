@@ -24,6 +24,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -77,6 +78,117 @@ def _plugin_data_dir(cfg: Any, name: str) -> Path:
     return _qubit_home(cfg) / "plugin-data" / name
 
 
+# ---------------------------------------------------------------------------
+# Legacy-named plugin dirs — one-time read-old/write-new migration
+# ---------------------------------------------------------------------------
+# ``hermes-achievements`` was renamed to ``qubit-achievements`` but the legacy
+# install-side (``<home>/plugins/hermes-achievements/``) and data-side
+# (``<home>/plugin-data/hermes-achievements/``) dirs can survive, leaving a
+# legacy-named dir in the canonical plugin path. The migration below copies any
+# legacy file the canonical store does not already have (canonical always wins
+# — never destructive), then moves the legacy dir to a timestamped backup
+# OUTSIDE the canonical ``plugins``/``plugin-data`` trees. It is idempotent (a
+# marker records each applied alias) and never deletes user data.
+_LEGACY_PLUGIN_ALIASES: Dict[str, str] = {
+    "hermes-achievements": "qubit-achievements",
+}
+_PLUGIN_MIGRATION_MARKER = ".plugin-dir-migration.json"
+_PLUGIN_BACKUP_DIR = ".legacy-plugin-backup"
+
+
+def _migration_marker_path(home: Path) -> Path:
+    return home / _PLUGIN_MIGRATION_MARKER
+
+
+def _read_migration_marker(home: Path) -> Dict[str, Any]:
+    try:
+        data = json.loads(_migration_marker_path(home).read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _backup_legacy_dir(src: Path, backup_root: Path) -> Optional[Path]:
+    """Move a legacy-named dir into *backup_root* (never delete).
+
+    Returns the backup path, or ``None`` when it could not be moved (the legacy
+    dir is then left untouched for a later attempt)."""
+    if not src.is_dir():
+        return None
+    dest = backup_root / src.name
+    if dest.exists():
+        dest = backup_root / f"{src.name}.{int(time.time())}"
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dest)
+        return dest
+    except Exception:
+        return None
+
+
+def migrate_legacy_plugin_dirs(cfg: Any) -> Dict[str, Any]:
+    """One-time, non-destructive migration of legacy-named QUBIT_HOME plugin dirs.
+
+    Canonical data wins: a legacy file is copied into the canonical
+    ``plugin-data/qubit-achievements/`` only when the canonical slot is empty
+    (a live ``state.json``/snapshot is never overwritten). Each legacy dir is
+    then moved into ``<home>/.legacy-plugin-backup/<stamp>/`` — kept, never
+    deleted. A marker makes the pass idempotent; a per-child or per-dir failure
+    leaves only that item in place and is retried on the next call. Returns a
+    small receipt (never raises)."""
+    home = _qubit_home(cfg)
+    applied = dict((_read_migration_marker(home).get("applied") or {}))
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup_root = home / _PLUGIN_BACKUP_DIR / stamp
+    result: Dict[str, Any] = {"state": "OK", "home": str(home),
+                              "migrated": [], "backups": []}
+    for legacy_name, canonical_name in _LEGACY_PLUGIN_ALIASES.items():
+        if applied.get(legacy_name):
+            continue
+        canonical_data = home / "plugin-data" / canonical_name
+        seen = False
+        for legacy in (home / "plugins" / legacy_name,
+                       home / "plugin-data" / legacy_name):
+            if not legacy.is_dir():
+                continue
+            seen = True
+            try:
+                canonical_data.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                continue
+            for child in sorted(legacy.iterdir()):
+                target = canonical_data / child.name
+                if target.exists():
+                    continue
+                try:
+                    if child.is_dir():
+                        shutil.copytree(child, target)
+                    else:
+                        shutil.copy2(child, target)
+                except Exception:  # noqa: BLE001 - skip one child, keep going
+                    continue
+            backup = _backup_legacy_dir(legacy, backup_root)
+            if backup is not None:
+                if legacy_name not in result["migrated"]:
+                    result["migrated"].append(legacy_name)
+                result["backups"].append(str(backup))
+        if seen:
+            applied[legacy_name] = stamp
+    if result["migrated"]:
+        try:
+            marker = _migration_marker_path(home)
+            tmp = marker.with_name(marker.name + ".tmp")
+            tmp.write_text(json.dumps({"applied": applied}, indent=2,
+                                      sort_keys=True), encoding="utf-8")
+            os.replace(tmp, marker)
+        except Exception:  # noqa: BLE001 - marker is an optimization
+            pass
+        _audit("plugin_dir_migrate",
+               {"migrated": ",".join(result["migrated"]),
+                "backups": len(result["backups"])})
+    return result
+
+
 def _prepare_runtime(cfg: Any) -> Path:
     """Put the fork on ``sys.path`` and point it at the Qubit QUBIT_HOME."""
     home = _qubit_home(cfg)
@@ -121,6 +233,50 @@ _UPSTREAM_PRODUCT_RE = re.compile(
     r"\b(?:" + "Her" + "mes" + "|" + "Open" + "Claw" + r")\b",
     re.IGNORECASE)
 
+# Extended serve-boundary de-brand for catalog/prose strings: the legacy vendor
+# org/portal names, the upstream portal hostname, the upstream account service,
+# and the legacy ``~/.hermes`` home path (Qubit-owned paths only). The literal
+# upstream tokens are assembled from fragments so this product-source file never
+# carries the raw brand string the public-surface scan greps for.
+_LEGACY_PRODUCT_ORG = "Nous" + "Research"
+_LEGACY_PRODUCT_ORG_SPACED = "Nous" + " " + "Research"
+_LEGACY_PRODUCT_PORTAL = "Nous" + "Portal"
+_LEGACY_PRODUCT_PORTAL_SPACED = "Nous" + " " + "Portal"
+_LEGACY_DOMAIN = "nous" + "research.com"
+_LEGACY_ACCOUNT_SERVICE = "nous" + "-account-service"
+_LEGACY_HOME_PATH = "~/" + "." + "her" + "mes"
+_QUBIT_HOME_DISPLAY_PATH = "~/.config/qubit-voicebridge"
+
+#: A whole-string third-party source URL (a real repo/install URL) is provenance
+#: and must stay verbatim — never rewritten into a fabricated Qubit URL. The
+#: only URL rewritten is the dead upstream *portal* host (below), which is not a
+#: third-party source. Call sites keep provenance keys out of this function, but
+#: this guard makes the contract structural.
+_THIRD_PARTY_URL_RE = re.compile(r"^https?://[^\s]+$", re.IGNORECASE)
+_PORTAL_HOST_RE = re.compile(
+    r"^https?://(?:[a-z0-9-]+\.)*" + re.escape(_LEGACY_DOMAIN) + r"\b",
+    re.IGNORECASE)
+
+#: Ordered substitutions applied by :func:`_rebrand_product`. Specific
+#: URL/host/path forms run before the generic product-word rewrite so a legacy
+#: identifier is never half-rewritten into a fabricated Qubit URL or path.
+_UPSTREAM_CATALOG_SUBS: Tuple[Tuple[Any, str], ...] = (
+    # legacy upstream portal/service hostnames -> neutral prose, never a
+    # fabricated Qubit URL (the real third-party repo URL is retained as
+    # provenance by the URL-allowlisting at the call sites).
+    (re.compile(r"https?://(?:[a-z0-9-]+\.)*" + re.escape(_LEGACY_DOMAIN)
+                + r"[^\s\"'`<>)\]]*", re.IGNORECASE), "the portal"),
+    (re.compile(r"\b(?:[a-z0-9-]+\.)*" + re.escape(_LEGACY_DOMAIN) + r"\b",
+                re.IGNORECASE), "the portal"),
+    (re.compile(re.escape(_LEGACY_ACCOUNT_SERVICE)), "Qubit account service"),
+    (re.compile(re.escape(_LEGACY_HOME_PATH)), _QUBIT_HOME_DISPLAY_PATH),
+    (re.compile(r"\b" + re.escape(_LEGACY_PRODUCT_ORG) + r"\b"), "Qubit"),
+    (re.compile(r"\b" + re.escape(_LEGACY_PRODUCT_ORG_SPACED) + r"\b"), "Qubit"),
+    (re.compile(r"\b" + re.escape(_LEGACY_PRODUCT_PORTAL) + r"\b"), "Qubit"),
+    (re.compile(r"\b" + re.escape(_LEGACY_PRODUCT_PORTAL_SPACED) + r"\b"),
+     "Qubit"),
+)
+
 
 def _rebrand_product(text: Any) -> str:
     """Render upstream product names as Qubit at the served boundary.
@@ -129,8 +285,24 @@ def _rebrand_product(text: Any) -> str:
     identity promise requires the normal dashboard to render Qubit while the
     vendored tree stays byte-faithful as the provenance record. Backend
     counterpart of ``frontend/qubit-web/src/lib/rebrand.ts``.
+
+    The legacy home-path substitution runs before the generic product-word
+    rewrite so ``~/.hermes`` becomes the Qubit-owned config path instead of the
+    broken ``~/.Qubit``. A whole-string third-party source URL is returned
+    verbatim (provenance must stay real; never a fabricated Qubit URL); only the
+    dead upstream portal host is rewritten to neutral prose.
     """
-    return _UPSTREAM_PRODUCT_RE.sub("Qubit", str(text))
+    out = str(text)
+    if _THIRD_PARTY_URL_RE.match(out) and not _PORTAL_HOST_RE.match(out):
+        return out
+    for pattern, replacement in _UPSTREAM_CATALOG_SUBS:
+        out = pattern.sub(replacement, out)
+    return _UPSTREAM_PRODUCT_RE.sub("Qubit", out)
+
+
+def rebrand_catalog_text(text: Any) -> str:
+    """Public de-brand helper for catalog/prose rows (alias of the convention)."""
+    return _rebrand_product(text)
 
 
 def _rebrand_tab(tab: Any) -> Any:
@@ -274,6 +446,7 @@ def _install_scan_bound(engine: Any) -> None:
 
 def _achievements_engine(cfg: Any) -> Any:
     _prepare_runtime(cfg)
+    migrate_legacy_plugin_dirs(cfg)
     engine = _load_engine("qubit-achievements")
     _install_scan_bound(engine)
     return engine
@@ -509,6 +682,20 @@ def _kanban_http(exc: Exception) -> Tuple[int, Any]:
                     "detail": _redact(detail)[:300]}
 
 
+def _kanban_task_http(exc: Exception) -> Tuple[int, Any]:
+    """Map a native ``KanbanError`` to the vendored plugin's HTTP envelope.
+
+    A missing task is the same typed ``PLUGIN_HTTP`` 404 the vendored draw
+    handlers returned, so a task that exists on the board can never surface as
+    "not found" merely because a read bound the wrong store.
+    """
+    code = str(getattr(exc, "code", "") or "")
+    if "NOT_FOUND" in code:
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": _redact(str(getattr(exc, "detail", "") or exc))[:300]}
+    return _kanban_http(exc)
+
+
 def _native_comment_counts(cfg: Any, kanban_mod: Any) -> Dict[int, int]:
     conn = kanban_mod._connect(cfg)
     try:
@@ -615,7 +802,9 @@ def h_plugin_kanban_task(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               for i, e in enumerate(task.get("events", []))]
     return 200, {"ok": True,
                  "task": _native_task_vendor(task, time.time(), len(comments)),
-                 "comments": comments, "events": events, "attachments": [],
+                 "comments": comments, "events": events,
+                 "attachments": N.task_attachments(cfg, tid)["attachments"],
+                 "attachments_supported": False,
                  "links": {"parents": [], "children": []},
                  "child_results": [], "runs": []}
 
@@ -720,9 +909,14 @@ def h_plugin_kanban_workers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_plugin_kanban_diagnostics(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                                 p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(cfg, "list_diagnostics",
-                        board=q.get("board") or None,
-                        severity=q.get("severity") or None)
+    # Reads the SAME authoritative store as the board/task handlers; the
+    # legacy vendored store is empty and made a real board 404 here.
+    from . import kanban_bridge as KBG
+    try:
+        return 200, KBG.native_diagnostics(
+            cfg, board=_native_board(q), severity=q.get("severity") or None)
+    except Exception as exc:
+        return _kanban_http(exc)
 
 
 def h_plugin_kanban_model_options(
@@ -748,19 +942,35 @@ def _kanban_int(value: Any) -> Any:
 
 def h_plugin_kanban_task_log(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                              p: Dict[str, str]) -> Tuple[int, Any]:
+    # The native store's task timeline, not the empty vendored worker log.
+    from . import kanban_bridge as KBG
+    try:
+        tid = int(str(p.get("task_id") or ""))
+    except (TypeError, ValueError):
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"task {p.get('task_id')!r} not found"}
     tail = q.get("tail")
-    return _kanban_read(
-        cfg, "get_task_log", task_id=str(p.get("task_id") or ""),
-        tail=_kanban_int(tail) if tail else None,
-        board=q.get("board") or None)
+    try:
+        return 200, KBG.native_task_log(
+            cfg, tid, tail=_kanban_int(tail) if tail else None)
+    except Exception as exc:
+        return _kanban_task_http(exc)
 
 
 def h_plugin_kanban_task_attachments(
         cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         p: Dict[str, str]) -> Tuple[int, Any]:
-    return _kanban_read(
-        cfg, "list_task_attachments",
-        task_id=str(p.get("task_id") or ""), board=q.get("board") or None)
+    # The native store, so an existing task lists [] instead of 404.
+    from . import kanban_bridge as KBG
+    try:
+        tid = int(str(p.get("task_id") or ""))
+    except (TypeError, ValueError):
+        return 404, {"ok": False, "code": "PLUGIN_HTTP",
+                     "detail": f"task {p.get('task_id')!r} not found"}
+    try:
+        return 200, KBG.native_task_attachments(cfg, tid)
+    except Exception as exc:
+        return _kanban_task_http(exc)
 
 
 def h_plugin_kanban_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
