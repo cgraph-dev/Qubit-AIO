@@ -5,13 +5,13 @@
    "repo": "https://github.com/NousResearch/hermes-agent",
    "revision": "69948c005791d4d0e51670ca015238c2c7663749",
    "tag": "v0.21.5",
-   "path": "/tmp/opencode/pinned/hermes-agent-69948c0057"
+   "path": "/home/trick/.cache/qubit-pins/hermes-agent"
   },
   "openclaw": {
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/tmp/opencode/pinned/openclaw-v2026.4.19-beta.2-28254-gda03996ab7"
+   "path": "/home/trick/.cache/qubit-pins/openclaw"
   }
  },
  "counts_by_category": {
@@ -45300,7 +45300,7 @@
    "unmatched": 84
   },
   "qubit": {
-   "ledger_rows": 751
+   "ledger_rows": 752
   },
   "ledger_ids": [
    "OC-01",
@@ -46247,6 +46247,7 @@
    "hermes_gate_ssh_ownership_operator",
    "hermes_gate_update_operator_owned",
    "hermes_gate_voice_live_vendor_direct",
+   "hermes_gate_ws_desktop_client_only",
    "hermes_gate_ws_single_path",
    "hooks_declare",
    "hooks_doctor",
@@ -157718,7 +157719,7 @@
    "route": "/api/chat/workspaces",
    "ledger_match": "api:GET /api/chat/workspaces",
    "ledger_source": "hermes",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -162121,7 +162122,7 @@
    "route": "/api/display/ws",
    "ledger_match": "api:WEBSOCKET /api/display/ws",
    "ledger_source": "hermes",
-   "ledger_status": "MISSING",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -171936,7 +171937,7 @@
    "command": "hermes project use",
    "path": "hermes_cli/projects_cmd.py",
    "help": "Project id or slug (omit to clear)",
-   "ledger_match": "cli:project",
+   "ledger_match": "api:GET /api/chat/workspaces",
    "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:project use",
@@ -172293,8 +172294,8 @@
    "command": "hermes skills tap add",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "GitHub repo (e.g. owner/repo)",
-   "ledger_match": "git_log",
-   "ledger_source": "qubit",
+   "ledger_match": "api:GET /api/chat/workspaces",
+   "ledger_source": "hermes",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills tap add",
    "coverage": "cli-option",
