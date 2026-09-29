@@ -23,21 +23,21 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
   - upstream_pin: 3a9d69db306cd7f081e06254cb89c4bcc14a7107
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
-- `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 757 rows
-  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=94, qubit_compat.ROUTES=450, source_inventory.dispositioned=122, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=118, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1076, source_inventory.parented_uncovered=5, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
+- `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 751 rows
+  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=94, qubit_compat.ROUTES=451, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
   - generated: 2026-09-12
-  - inventory: {"by_category": {"hermes_dashboard_plugin": 1, "hermes_plugin_api": 1, "hermes_plugin_asset": 2, "hermes_plugin_test": 1}, "by_parent": {"plugin:hermes-achievements": 5}, "covered": 1691, "covered_by_parent": {"OC-02": 5, "OC-16": 1, "OC-19": 24, "OC-30": 1, "OC-34": 1, "OC-35": 1, "OC-46": 5, "OC-53": 10, "OC-63": 10, "OC-64": 4, "OC-66": 10, "OC-67": 1, "OC-D01": 1, "OC-D03": 1, "OC-D08": 5, "OC
+  - inventory: {"by_category": {}, "by_parent": {}, "covered": 1697, "covered_by_parent": {"OC-02": 5, "OC-16": 1, "OC-19": 24, "OC-30": 1, "OC-34": 1, "OC-35": 1, "OC-46": 5, "OC-53": 10, "OC-63": 10, "OC-64": 4, "OC-66": 10, "OC-67": 1, "OC-D01": 1, "OC-D03": 1, "OC-D08": 5, "OC-D12": 1, "OC-D15": 1, "OC-D16": 1, "OC-D20": 1, "OC-D28": 58, "browser_status": 24, "channels_status": 8, "cli:acp": 6, "cli:approval
   - method: Evidence-based regeneration. Catalog rows derive their status from the live production backend (voice_commands.REGISTRY / _BACKENDS + dashboard_ops.EXTRA_OPS), the declared interfaces (catalog), the live CLI parser tree, the registry voice surface, and an AST scan of tests/ for a proving caller. A plugin/page row declares only the dashboard surface (no CLI/voice by design); it is IMPLEMENTED when
   - sources_reconciled: ["voicebridge/voice_commands.py (REGISTRY/_BACKENDS/CLI_COVERAGE)", "voicebridge/dashboard_ops.py (catalog/EXTRA_OPS)", "voicebridge/cli.py (build_parser)", "voicebridge/qubit_compat.py (ROUTES/GATED)", "voicebridge/qubit_plugins.py (vendored plugin fleet wrapper)", "qubit_runtime/toolsets.py + tools/registry.py (fork tool runtime)", "qubit_runtime/skills + optional-skills (fork skill runtime)", "
 
 ## Counts
 
-- Total rows: **1452**
-- Code-side open rows (not terminal): **10**
-- SAFE_EQUIVALENT (closed for code readiness): **143**
+- Total rows: **1446**
+- Code-side open rows (not terminal): **3**
+- SAFE_EQUIVALENT (closed for code readiness): **144**
 - OPERATOR_ONLY (manual/operator qualification): **10**
 - OPERATOR_ONLY_ARCHITECTURE (OPEN, architecture-gated; needs individual owner approval): **1**
 - Code-ready: **False**; fully complete (all manual qualified): **False**
@@ -45,17 +45,16 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 ### By status
 
 - IMPLEMENTED: 1289
-- MISSING: 7
+- MISSING: 2
 - OPERATOR_ONLY: 10
 - OPERATOR_ONLY_ARCHITECTURE: 1
-- SAFE_EQUIVALENT: 143
-- UNVERIFIED: 2
+- SAFE_EQUIVALENT: 144
 
 ### By source
 
 - hermes: 591
 - openclaw: 104
-- qubit: 757
+- qubit: 751
 
 ### By area
 
@@ -131,12 +130,8 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 - gateway-actions: 8
 - ghost: 20
 - git: 25
-- hermes_dashboard_plugin: 1
 - hermes_gated: 30
-- hermes_plugin: 10
-- hermes_plugin_api: 1
-- hermes_plugin_asset: 2
-- hermes_plugin_test: 1
+- hermes_plugin: 9
 - hermes_skill: 28
 - hermes_tool: 73
 - hermes_web_page: 21
@@ -237,12 +232,12 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 ## Source-inventory reconciliation
 
 - Inventory present: **True**
-- Unexplained omissions: **5**
-- `qubit`: present=True, items=6775, matched=1813, unmatched=5, unexplained=5
+- Unexplained omissions: **0**
+- `qubit`: present=True, items=6775, matched=1818, unmatched=0, unexplained=0
 
 ## Code-side open rows (not IMPLEMENTED/SAFE_EQUIVALENT/OPERATOR_ONLY)
 
-### source: hermes (4 open)
+### source: hermes (2 open)
 
 #### hermes / chat_workspaces (1)
 
@@ -256,13 +251,6 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | --- | --- | --- | --- | --- |
 | `api:WEBSOCKET /api/display/ws` | MISSING | owner | WEBSOCKET /api/display/ws | — |
 
-#### hermes / local-models (2)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `api:POST /api/local-models/download/pause` | UNVERIFIED | owner | POST /api/local-models/download/pause | — |
-| `api:POST /api/local-models/download/resume` | UNVERIFIED | owner | POST /api/local-models/download/resume | — |
-
 ### source: openclaw (1 open)
 
 #### openclaw / sessions (1)
@@ -271,36 +259,9 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | --- | --- | --- | --- | --- |
 | `OC-48` | OPERATOR_ONLY_ARCHITECTURE | creds | Markdown workspace memory / dreaming / external providers (LanceDB/Wiki/Honcho) | tests/test_openclaw_closure_wave2_webmedia.py |
 
-### source: qubit (5 open)
-
-#### qubit / hermes_dashboard_plugin (1)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:plugin-manifest:hermes-achievements` | MISSING | owner | hermes-achievements | — |
-
-#### qubit / hermes_plugin_api (1)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:plugin-api:hermes-achievements` | MISSING | owner | hermes-achievements | — |
-
-#### qubit / hermes_plugin_asset (2)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:plugin-asset:hermes-achievements:index.js` | MISSING | owner | index.js | — |
-| `inv:plugin-asset:hermes-achievements:style.css` | MISSING | owner | style.css | — |
-
-#### qubit / hermes_plugin_test (1)
-
-| id | status | needs | capability | proving test |
-| --- | --- | --- | --- | --- |
-| `inv:plugin-test:hermes-achievements:test_achievement_engine.py` | MISSING | owner | test_achievement_engine.py | — |
-
 ## Terminal gate rows (SAFE_EQUIVALENT / OPERATOR_ONLY)
 
-### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (143)
+### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (144)
 
 | id | source | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -333,7 +294,6 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:GET /api/ops/backup/download` | hermes | creds | GET /api/ops/backup/download | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/profiles/{name}/desktop-overlay` | hermes | owner | GET /api/profiles/{name}/desktop-overlay | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/providers/oauth/{provider_id}/poll/{session_id}` | hermes | creds | GET /api/providers/oauth/{provider_id}/poll/{session_id} | tests/test_route_parity_p0_wave13.py::test_oauth_poll_is_manual_handoff_refusal |
-| `api:GET /api/qubit/update/receipt` | hermes | owner | GET /api/qubit/update/receipt | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/ssh/ownership` | hermes | owner | GET /api/ssh/ownership | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:HEAD /api/files/stream` | hermes | owner | HEAD /api/files/stream | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/audio/tts-lease` | hermes | hardware | POST /api/audio/tts-lease | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
@@ -353,6 +313,8 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:POST /api/local-models/activate` | hermes | hardware | POST /api/local-models/activate | tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing |
 | `api:POST /api/local-models/download` | hermes | hardware | POST /api/local-models/download | tests/test_local_models8u.py::test_confirmation_gate_precedes_broker |
 | `api:POST /api/local-models/download-browsed` | hermes | hardware | POST /api/local-models/download-browsed | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
+| `api:POST /api/local-models/download/pause` | hermes | hardware | POST /api/local-models/download/pause | tests/test_v0215_rebase_finish.py::test_t3b_pause_resume_dispatch_to_real_typed_handler |
+| `api:POST /api/local-models/download/resume` | hermes | hardware | POST /api/local-models/download/resume | tests/test_v0215_rebase_finish.py::test_t3b_pause_resume_dispatch_to_real_typed_handler |
 | `api:POST /api/local-models/eject` | hermes | hardware | POST /api/local-models/eject | tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing |
 | `api:POST /api/local-models/quickstart` | hermes | hardware | POST /api/local-models/quickstart | tests/test_local_models8u.py::test_confirmation_gate_precedes_broker |
 | `api:POST /api/local-models/runtime/install` | hermes | hardware | POST /api/local-models/runtime/install | tests/test_local_models8u.py::test_confirmation_gate_precedes_broker |

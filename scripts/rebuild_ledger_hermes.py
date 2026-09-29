@@ -522,6 +522,24 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
     ("POST", "/api/local-models/download"): dict(status="GATED",
         code="LOCAL_MODEL_BROKERED", note=(
             "Model download is brokered; typed refusal by default.")),
+    # v0.21.5 download controls: the vendored pause/resume handlers are served
+    # by Qubit's real brokered gate on the canonical authority path; the T3b
+    # rebase tests dispatch the compat route end-to-end and prove the typed
+    # refusal (never a fabricated pause/resume success).
+    ("POST", "/api/local-models/download/pause"): dict(status="GATED",
+        code="LOCAL_MODEL_BROKERED",
+        backend="voicebridge/qubit_compat.py:h_local_models_download_pause",
+        test="tests/test_v0215_rebase_finish.py::"
+             "test_t3b_pause_resume_dispatch_to_real_typed_handler",
+        note=("Download pause is brokered (no managed download queue exists): "
+              "e-stop -> confirmation -> broker, typed refusal by default.")),
+    ("POST", "/api/local-models/download/resume"): dict(status="GATED",
+        code="LOCAL_MODEL_BROKERED",
+        backend="voicebridge/qubit_compat.py:h_local_models_download_resume",
+        test="tests/test_v0215_rebase_finish.py::"
+             "test_t3b_pause_resume_dispatch_to_real_typed_handler",
+        note=("Download resume is brokered (no managed download queue exists): "
+              "e-stop -> confirmation -> broker, typed refusal by default.")),
     ("POST", "/api/local-models/download-browsed"): dict(status="GATED",
         code="LOCAL_MODEL_BROKERED", note=(
             "Browsed download is brokered; nothing downloaded or queued.")),

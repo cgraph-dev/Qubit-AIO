@@ -5,13 +5,13 @@
    "repo": "https://github.com/NousResearch/hermes-agent",
    "revision": "69948c005791d4d0e51670ca015238c2c7663749",
    "tag": "v0.21.5",
-   "path": "/tmp/opencode/pinned/hermes-agent-69948c0057"
+   "path": "/home/trick/.hermes/hermes-agent"
   },
   "openclaw": {
    "repo": "https://github.com/openclaw/openclaw",
    "revision": "da03996ab7203fe6b9b4d8edb2b54726e4394c9c",
    "tag": "v2026.4.19-beta.2-28254-gda03996ab7",
-   "path": "/tmp/opencode/pinned/openclaw-v2026.4.19-beta.2-28254-gda03996ab7"
+   "path": "/tmp/opencode/pinned/openclaw"
   }
  },
  "counts_by_category": {
@@ -55,10 +55,10 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 16078,
-   "local_files": 16085,
+   "local_files": 16084,
    "identical": 9630,
    "missing": 25,
-   "extra": 32,
+   "extra": 31,
    "changed": 6423
   },
   "missing": [
@@ -204,10 +204,6 @@
    {
     "path": "qubit_cli/qubit_state_profile_repair.py",
     "local_sha256": "b42fef865faf8bfca2deeee9e6497dd8a7caa13e9d411c27df921b408648c53f"
-   },
-   {
-    "path": "test_durations.json",
-    "local_sha256": "58fafbc23bf59d60c368fbdcaaf3eb5c8a575a29071856a199bffe47ddc9b872"
    },
    {
     "path": "tests/agent/transports/test_hermes_tools_mcp_server.py",
@@ -716,7 +712,7 @@
     "upstream_path": "activate.ps1",
     "upstream_blob": "e58ed04c91a3e61d1dac481a8642f6ded946d056",
     "upstream_sha256": "bd910cbfd387a20e05f8b4faea8e5e96373dfca397358887cebb3af7c34b04e0",
-    "local_sha256": "82e816e294e6a5b5d2c207c3910bd15482d01e77345c9c7a84c123df6a70bdf4"
+    "local_sha256": "0941fe0bcfdac68a9691ed2d866f25e89639d0604f969334eca5993eab217c39"
    },
    {
     "path": "agent/AGENTS.md",
@@ -14744,7 +14740,7 @@
     "upstream_path": "hermes_cli/sessions_cmd_journal_mode.py",
     "upstream_blob": "bb3e59457e5317273d334d27f85d762d5f691598",
     "upstream_sha256": "f5737627a9e22860c84af1bea5401b8dc248ec6f3d982091f1f6dd5f382ea5ab",
-    "local_sha256": "027c5946718cb31e1b2b12899b8c70d57b9598ed6750778080161d042b17057a"
+    "local_sha256": "1479b4f9ba0f34c68d0ac115c5c1b39e583d937936acb10107815f605cc49c06"
    },
    {
     "path": "qubit_cli/sessions_cmd_repair_profiles.py",
@@ -16529,7 +16525,7 @@
     "upstream_path": "scripts/build/windows-deps.ps1",
     "upstream_blob": "35c5c171937ce54260a6eb2176c3d4096d317682",
     "upstream_sha256": "1be19c44cf9195161b51e7535287632c2f164532793cb1c5d32a25795e8f6973",
-    "local_sha256": "16cd14361af4e61f9694b0872695ba8287d951bbea0903f0cc490be48bdc9689"
+    "local_sha256": "457d9b0e4368f0a7994b0c23f137d40e087eb0141fda78cb1a3bad59e06fb05f"
    },
    {
     "path": "scripts/build_model_catalog.py",
@@ -16704,7 +16700,7 @@
     "upstream_path": "scripts/desktop-update.ps1",
     "upstream_blob": "7b9647873d96278e95f233429d80bff6a269d327",
     "upstream_sha256": "63cdce628baf5022f1c851885af5289df884581f7ca7cc732a979f07893b5d9a",
-    "local_sha256": "fcce1d21eb5fe7c8e45ddafc79acfd4e9355ccc858d4202fb2f929429c90ff30"
+    "local_sha256": "26c4f64a9b9e332b848522b52dfdfbb0911c6822b13e83f9518bc84ce92bd7de"
    },
    {
     "path": "scripts/desktop-update/posix.sh",
@@ -16725,7 +16721,7 @@
     "upstream_path": "scripts/desktop-update/runtime.ps1",
     "upstream_blob": "283b02b0db8a0e539ab39232312376e8e8eaad16",
     "upstream_sha256": "0ca1996f7d12341cb710a1d43242b362da10d6f832cd6fa9a1b7da4886118ebe",
-    "local_sha256": "e9ebe2517e9b71da115f7eae72000cebb540d283037abae3bd189bc076f79686"
+    "local_sha256": "c8e3449627d5f2406da0441a4b2d7d55e923b52b8f93283b077b220d1e23f2c1"
    },
    {
     "path": "scripts/desktop-update/ui.html",
@@ -16746,7 +16742,7 @@
     "upstream_path": "scripts/desktop-update/windows.ps1",
     "upstream_blob": "b4645aac156d81836ab517b1339f28e4c69e9730",
     "upstream_sha256": "35c24c4021745f295a6fd25df09824ef95ee0f3b4341c0a223bb38e761bc0fce",
-    "local_sha256": "8ad67aaa7933006a9238f7c8394c7e4529a00e465dcc4fd8e32f22f2e16d1c3b"
+    "local_sha256": "9c6f98e177812084a991ac120a813e7d54625aea43dabd975f3e5cfe4ac5370e"
    },
    {
     "path": "scripts/dev-sandbox.sh",
@@ -16844,7 +16840,7 @@
     "upstream_path": "scripts/install.ps1",
     "upstream_blob": "637cb22a2ea3293e9f05a4eda0f7711715bd7580",
     "upstream_sha256": "576199bd8c48c5199d5ccf6b8abcd8da3a4f3302787d49c1173bdc78b14e1852",
-    "local_sha256": "6ae6f6e6afe0a31f1cd3d552289db23910db1c7988082f8fc1fe02c96d955176"
+    "local_sha256": "1d3904cd723bfeb63c4f60605f7c09640a30c52dc982e8547ee314ea0e2d1478"
    },
    {
     "path": "scripts/install.sh",
@@ -17152,7 +17148,7 @@
     "upstream_path": "scripts/update-test/hermes-update-rehearsal.ps1",
     "upstream_blob": "7c193027c500dae552797cf917422d7cd9ba73e4",
     "upstream_sha256": "50bad819abe441ecb4c7079e6405243833cee534baf7132452558f31a2eba1b1",
-    "local_sha256": "6912c9e2d6c9aacf9ba613796bf4fb233c3e4b3ab5bab1436722d76fe78e69bc"
+    "local_sha256": "6a6e57f40b9563fd1e2970e5e20dc72f021edaa2c64c7bfc4641bec6eaad1d9b"
    },
    {
     "path": "scripts/update-test/hermes-update-rehearsal.sh",
@@ -17166,7 +17162,7 @@
     "upstream_path": "scripts/update-test/smoke-test.ps1",
     "upstream_blob": "d875454651b4c42669ed53b2a712d9d00e4b07f1",
     "upstream_sha256": "5da7b660d049f3f03403f67df1b6dc5e0ee8df758508adf681808930771f49a3",
-    "local_sha256": "cb120608a48ec59da6056cc882ea7dd79a58f7ab6a4e7622c03969e9d5de61c0"
+    "local_sha256": "16abd3ea8cf314989b7b315d36207ea8505c6981b436e07499aee246aea0e397"
    },
    {
     "path": "scripts/update-test/smoke-test.sh",
@@ -17208,7 +17204,7 @@
     "upstream_path": "scripts/windows-build-deps.ps1",
     "upstream_blob": "92371454b603f8ed46fa089cfdccffdf4140bdd3",
     "upstream_sha256": "387d9cf46a5bbf4b0d1a9e7e4ef3abf0cc861ce3b739824f444934127c50a210",
-    "local_sha256": "298b8803ac7754f59929d3e56513de20fa6f4361a506f8ef824c21c6368554f7"
+    "local_sha256": "1f675498047a1f0c4b3c00002c60ef1f3530295f7569bf6fd7a7d7e08ad5e6a4"
    },
    {
     "path": "scripts/write_install_stamp.py",
@@ -17222,7 +17218,7 @@
     "upstream_path": "setup-hermes.ps1",
     "upstream_blob": "b96b8bd77ae254946f26e0c59e9da22abda7114d",
     "upstream_sha256": "47ca171f1ed82e4dc492a0bf051f29c5b59f412bd1b9481ea3e39effc585b530",
-    "local_sha256": "83862e33fba90bcb91252aa4b96f47265524a176948f91a940a65995b5ef5baa"
+    "local_sha256": "90feee2c213ba4c3bca13fece699afef0a5c83be40a99601a337f0916b264acd"
    },
    {
     "path": "setup-qubit.sh",
@@ -43269,7 +43265,7 @@
     "upstream_path": "tools/skills_tool.py",
     "upstream_blob": "7e1260239da01b820052f1964ceade15828f0834",
     "upstream_sha256": "61219f9ccdccd700a98a681ad7786e24308634379d29a128440f08a3d8533a06",
-    "local_sha256": "b14b4d48d83c6d120c2407fb7cc5f4deee1b1e32dde2017d11c87c098379c6db"
+    "local_sha256": "c5ed371e26ecc0644ff0b7a4b34f8cb6ee5dfc6c834dc59b4bb0715a7dec1097"
    },
    {
     "path": "tools/skills_tool_plugin.py",
@@ -45285,7 +45281,7 @@
    "vendor_manifest": "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
    "vendor_manifest_revision": "69948c005791d4d0e51670ca015238c2c7663749",
    "changed_equals_patched": true,
-   "extra_equals_extra_local": false
+   "extra_equals_extra_local": true
   }
  },
  "ledger_comparison": {
@@ -45293,8 +45289,8 @@
   "hermes": {
    "ledger_rows": 591,
    "inventory_items": 1798,
-   "matched": 887,
-   "unmatched": 911,
+   "matched": 886,
+   "unmatched": 912,
    "evidence": 6261
   },
   "openclaw": {
@@ -45304,7 +45300,7 @@
    "unmatched": 84
   },
   "qubit": {
-   "ledger_rows": 757
+   "ledger_rows": 751
   },
   "ledger_ids": [
    "OC-01",
@@ -46281,16 +46277,10 @@
    "inv:openclaw-ext:oc-path",
    "inv:openclaw-ext:test-support",
    "inv:openclaw-ext:visitor-access",
-   "inv:plugin-api:hermes-achievements",
-   "inv:plugin-asset:hermes-achievements:index.js",
-   "inv:plugin-asset:hermes-achievements:style.css",
-   "inv:plugin-manifest:hermes-achievements",
-   "inv:plugin-test:hermes-achievements:test_achievement_engine.py",
    "inv:plugin:context_engine",
    "inv:plugin:cron_providers",
    "inv:plugin:disk-cleanup",
    "inv:plugin:google_meet",
-   "inv:plugin:hermes-achievements",
    "inv:plugin:image_gen",
    "inv:plugin:observability",
    "inv:plugin:security-guidance",
@@ -46765,8 +46755,8 @@
  "parent_mapping": {
   "method": "Mechanical parent mapping: a CLI option/positional belongs to its command family (nearest existing cli: row); a CLI alias to its target; a model/provider entry to model/proxy_providers; a plugin asset/API/test/manifest to its plugin; an OpenClaw extension to the audited OC-* capability of its name or first mapped manifest category; a workflow source file to its area capability; a dashboard component/dialog/form/nav to webui_status.  A surface is covered when it matches its own ledger row or its resolved parent row is IMPLEMENTED in the live ledger, so it must not create a standalone MISSING row.  Parented and distinct uncovered items are counted and listed separately.",
   "parented_surfaces": 1037,
-  "parented_covered": 1028,
-  "parented_uncovered": 9,
+  "parented_covered": 1030,
+  "parented_uncovered": 7,
   "distinct_surfaces": 899,
   "distinct_covered": 783,
   "distinct_uncovered": 116,
@@ -46967,8 +46957,8 @@
    "memory_search": 32,
    "model": 232,
    "opencode_status": 7,
-   "plugin:hermes-achievements": 3,
    "plugin:kanban": 4,
+   "plugin:qubit-achievements": 5,
    "proxy_providers": 39,
    "reports_list": 3,
    "runtime_status": 21,
@@ -46979,8 +46969,7 @@
    "cli:codex-runtime migrate": 2,
    "cli:screen install": 2,
    "cli:screen stop": 1,
-   "cli:usage": 2,
-   "plugin:hermes-achievements": 2
+   "cli:usage": 2
   },
   "uncovered_by_category": {
    "distinct": {
@@ -46989,18 +46978,16 @@
     "qubit_cli_subcommand": 16
    },
    "parented": {
-    "hermes_plugin_asset": 2,
     "qubit_cli_option": 7
    }
   }
  },
  "omissions": {
-  "total": 125,
+  "total": 123,
   "distinct_total": 116,
-  "parented_uncovered": 9,
-  "parented_covered": 1028,
+  "parented_uncovered": 7,
+  "parented_covered": 1030,
   "by_category": {
-   "hermes_plugin_asset": 2,
    "openclaw_extension": 96,
    "qubit_cli_command": 4,
    "qubit_cli_option": 7,
@@ -47012,15 +46999,13 @@
    "qubit_cli_subcommand": 16
   },
   "parented_by_category": {
-   "hermes_plugin_asset": 2,
    "qubit_cli_option": 7
   },
   "by_parent": {
    "cli:codex-runtime migrate": 2,
    "cli:screen install": 2,
    "cli:screen stop": 1,
-   "cli:usage": 2,
-   "plugin:hermes-achievements": 2
+   "cli:usage": 2
   },
   "unreproducible_evidence": []
  },
@@ -48044,14 +48029,14 @@
    "tab_path": "/achievements",
    "entry": "dist/index.js",
    "api": "plugin_api.py",
-   "ledger_match": "inv:plugin-manifest:hermes-achievements",
-   "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_match": "plugin:qubit-achievements",
+   "ledger_source": "hermes",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
-   "parent_resolved": "plugin:hermes-achievements",
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "plugin:qubit-achievements",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "plugin-manifest:kanban",
@@ -68748,9 +68733,9 @@
    "category": "hermes_plugin",
    "name": "hermes-achievements",
    "path": "plugins/hermes-achievements",
-   "ledger_match": "inv:plugin-manifest:hermes-achievements",
-   "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_match": "plugin:qubit-achievements",
+   "ledger_source": "hermes",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -69025,14 +69010,14 @@
    "name": "hermes-achievements",
    "path": "plugins/hermes-achievements/dashboard/plugin_api.py",
    "plugin": "hermes-achievements",
-   "ledger_match": "inv:plugin-manifest:hermes-achievements",
-   "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_match": "plugin:qubit-achievements",
+   "ledger_source": "hermes",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
-   "parent_resolved": "plugin:hermes-achievements",
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "plugin:qubit-achievements",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "plugin-api:kanban",
@@ -69062,9 +69047,9 @@
    "ledger_status": null,
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
-   "parent_resolved": "plugin:hermes-achievements",
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "plugin:qubit-achievements",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "plugin-asset:hermes-achievements:style.css",
@@ -69078,9 +69063,9 @@
    "ledger_status": null,
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
-   "parent_resolved": "plugin:hermes-achievements",
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "plugin:qubit-achievements",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "plugin-asset:kanban:index.js",
@@ -69121,14 +69106,14 @@
    "name": "test_achievement_engine.py",
    "path": "plugins/hermes-achievements/tests/test_achievement_engine.py",
    "plugin": "hermes-achievements",
-   "ledger_match": "inv:plugin-test:hermes-achievements:test_achievement_engine.py",
-   "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_match": null,
+   "ledger_source": null,
+   "ledger_status": null,
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
-   "parent_resolved": "plugin:hermes-achievements",
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "plugin:qubit-achievements",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "provider:ai-gateway",
@@ -160629,7 +160614,7 @@
    "route": "/api/local-models/download/pause",
    "ledger_match": "api:POST /api/local-models/download/pause",
    "ledger_source": "hermes",
-   "ledger_status": "UNVERIFIED",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -160646,7 +160631,7 @@
    "route": "/api/local-models/download/resume",
    "ledger_match": "api:POST /api/local-models/download/resume",
    "ledger_source": "hermes",
-   "ledger_status": "UNVERIFIED",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,

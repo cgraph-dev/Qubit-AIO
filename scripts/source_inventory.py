@@ -113,6 +113,11 @@ def _resolve_pin(explicit: str | None, pin: str,
 # Directories/files excluded from the byte diff, matching
 # scripts/hermes_vendor_manifest.py so counts reconcile.
 _BYTE_SKIP_PARTS = {"__pycache__", ".git", ".pytest_cache", ".pytest-cache", "MagicMock"}
+#: Disposable test/coverage artifacts the vendor manifest ignores; the byte
+#: scan must skip them too or ``extra`` drifts past the manifest's
+#: ``extra_local`` (e.g. a stale ``test_durations.json`` counted as a product
+#: file).
+_BYTE_SKIP_FILE_NAMES = {"test_durations.json", ".coverage", "coverage.xml"}
 _BYTE_SKIP_SUFFIX = (".pyc", ".pyo")
 
 # Categories whose items are cross-cutting evidence rather than a capability
@@ -495,6 +500,7 @@ def _resolve_parent(parent_id: str | None,
     """
     if not parent_id:
         return None
+    parent_id = _UPSTREAM_PLUGIN_RENAMES.get(parent_id, parent_id)
     if parent_id in status_by_id:
         return parent_id
     if parent_id.startswith("cli:"):
@@ -1329,6 +1335,8 @@ def _byte_skipped(rel: str) -> bool:
     parts = set(Path(rel).parts)
     if parts & _BYTE_SKIP_PARTS:
         return True
+    if Path(rel).name in _BYTE_SKIP_FILE_NAMES:
+        return True
     return rel.endswith(_BYTE_SKIP_SUFFIX)
 
 
@@ -1561,6 +1569,16 @@ _UPSTREAM_ROUTE_RENAMES = {
     "/api/hermes/update/receipt": "/api/qubit/update/receipt",
 }
 
+#: Upstream plugin ids the deep rebrand renamed to Qubit identity. The
+#: inventory enumerates the pinned upstream plugin directory
+#: (``plugins/hermes-achievements``), while the shipped ledger keys the
+#: Qubit-owned plugin row (``plugin:qubit-achievements``); the mapping is
+#: applied before matching/parent resolution so a renamed plugin and its
+#: manifest/API/asset/test surfaces reconcile instead of reading as open.
+_UPSTREAM_PLUGIN_RENAMES = {
+    "plugin:hermes-achievements": "plugin:qubit-achievements",
+}
+
 
 def _match_hermes_item(item: dict, all_ids: set, find_by_name):
     cat = item["category"]
@@ -1594,6 +1612,11 @@ def _match_hermes_item(item: dict, all_ids: set, find_by_name):
     name = item["name"].split(":")[-1]
     if cat == "hermes_plugin_asset":
         return None  # generic filenames (index.js/style.css) cause noise
+    renamed = _UPSTREAM_PLUGIN_RENAMES.get(f"plugin:{name}")
+    if renamed and renamed in all_ids:
+        # A renamed upstream plugin and its manifest/api/test surfaces resolve
+        # to the shipped Qubit-owned plugin row.
+        return renamed
     if cat in ("hermes_tool", "hermes_skill") and name in all_ids:
         # The agent tool / skill name is the capability op id (e.g. the
         # ``kanban_create`` tool is the ``kanban_create`` capability); the
