@@ -824,14 +824,18 @@ class VoiceEditService:
             # for a fuller answer. A per-turn style hint discourages repeating
             # stock openers/closers.
             max_tokens, reasoning, style = self._style_for(question)
-            # Simple chat runs on the fast small model (default brain); an
-            # explicit "explain/in detail/report" gets the stronger 4B for
-            # quality. Both are local; `voice_edit.detail_model` overrides.
-            model_override = ""
+            # The provider resolver pins the chat profile; pick the spoken
+            # model explicitly so simple turns use the fast small model and an
+            # explicit "explain/in detail/report" gets the stronger 4B.
+            # Override with voice_edit.chat_model / voice_edit.detail_model.
             if reasoning == "medium":
                 model_override = str(_read_cfg(
                     self.cfg, "voice_edit", "detail_model",
                     default="qubit-spark4") or "")
+            else:
+                model_override = str(_read_cfg(
+                    self.cfg, "voice_edit", "chat_model",
+                    default="qubit-spark17") or "")
             ctx = self._personal_context()
             if style:
                 ctx = f"{ctx}\n\nSTYLE: {style}" if ctx else f"STYLE: {style}"
