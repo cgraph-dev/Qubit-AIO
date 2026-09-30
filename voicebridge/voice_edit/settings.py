@@ -84,24 +84,49 @@ def _deep_merge(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _sync_live_cfg(cfg: Any, clean: Dict[str, Any], *,
-                   remove: tuple = ()) -> None:
-    """Reflect a persisted change on the live Config so a running service sees
-    the new value without a restart (the file remains the authority)."""
+def _sync_live_cfg(cfg: Any, patch: Dict[str, Any]) -> None:
+    """Reflect persisted section changes on the live Config so a running
+    service sees the new value without a restart (the file remains the
+    authority). ``patch`` is ``{section: {key: value}}`` (e.g. voice_edit /
+    tts / intent)."""
     data = getattr(cfg, "data", None)
     if not isinstance(data, dict):
         return
-    ve = data.setdefault("voice_edit", {})
-    if not isinstance(ve, dict):
-        ve = {}
-        data["voice_edit"] = ve
-    for key in remove:
-        ve.pop(key, None)
-    for k, v in clean.items():
-        if isinstance(v, dict) and isinstance(ve.get(k), dict):
-            ve[k] = {**ve[k], **v}
-        else:
-            ve[k] = v
+    for section, values in patch.items():
+        if not isinstance(values, dict):
+            continue
+        node = data.setdefault(section, {})
+        if not isinstance(node, dict):
+            node = {}
+            data[section] = node
+        for k, v in values.items():
+            if isinstance(v, dict) and isinstance(node.get(k), dict):
+                node[k] = {**node[k], **v}
+            else:
+                node[k] = v
+
+
+def list_local_models(cfg: Any) -> list:
+    """Installed local Ollama models (name + size) for the settings UI.
+
+    So a user on any machine sees what THEY can pick (a weak PC's small models,
+    a strong PC's bigger ones) instead of a hardcoded list. Best-effort: an
+    unreachable runner returns []."""
+    try:
+        import json
+        import urllib.request
+        from ..runner_contract import resolve as _rc
+        base = (_rc(cfg).url or "http://127.0.0.1:11434").rstrip("/")
+        with urllib.request.urlopen(base + "/api/tags", timeout=3) as r:
+            data = json.loads(r.read().decode())
+        out = []
+        for m in data.get("models") or []:
+            name = str(m.get("name", "") or "")
+            if name:
+                out.append({"name": name, "size_bytes": int(m.get("size") or 0)})
+        return sorted(out, key=lambda x: x["size_bytes"])
+    except Exception:  # noqa: BLE001 - UI convenience, never fatal
+        return []
 
 
 def settings_view(cfg: Any) -> Dict[str, Any]:
@@ -198,6 +223,20 @@ def settings_view(cfg: Any) -> Dict[str, Any]:
         "voice_recent_turns": int(_read_cfg(cfg, "voice_edit",
                                             "voice_recent_turns",
                                             default=4) or 4),
+        # Cross-section knobs exposed on this form (stored under tts.* /
+        # intent.local_llm.* so they are portable config, not code).
+        "tts_provider": str(_read_cfg(cfg, "tts", "provider",
+                                      default="piper") or "piper"),
+        "tts_voice": str(_read_cfg(cfg, "tts", "voice",
+                                   default="en_US-amy-medium") or ""),
+        "tts_kokoro_voice_sid": int(_read_cfg(
+            cfg, "tts", "kokoro", "voice_sid", default=1) or 1),
+        "local_model": str(_read_cfg(cfg, "intent", "local_llm", "model",
+                                     default="") or ""),
+        "local_temperature": float(_read_cfg(
+            cfg, "intent", "local_llm", "temperature", default=0.7) or 0.7),
+        "local_think": bool(_read_cfg(cfg, "intent", "local_llm", "think",
+                                      default=False)),
         "wake": {
             "enabled": bool(_read_cfg(cfg, "voice_edit", "wake", "enabled",
                                       default=False)),
@@ -313,10 +352,41 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                  "per_app must be an object")
         clean["per_app"] = {str(k).lower(): (_validate_action(v) if v else "")
                             for k, v in per_app.items()}
-    if not clean:
-        from .schema import VoiceEditError
+    from .schema import VoiceEditError
+    # Cross-section knobs (models + TTS + local wording). These live under
+    # tts.* / intent.local_llm.* in the config (portable, not Qubit-specific),
+    # but are edited here so the dashboard can present one Voice settings form.
+    tts_patch: Dict[str, Any] = {}
+    if "tts_provider" in update:
+        prov = str(update["tts_provider"] or "").strip().lower()
+        if prov not in ("piper", "kokoro", "edge", "hybrid", "openai"):
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "tts_provider must be piper|kokoro|edge|hybrid|openai")
+        tts_patch["provider"] = prov
+    if "tts_voice" in update:
+        tts_patch["voice"] = str(update["tts_voice"] or "").strip()[:80]
+    if "tts_kokoro_voice_sid" in update:
+        try:
+            tts_patch["kokoro"] = {
+                "voice_sid": int(max(0, min(int(update["tts_kokoro_voice_sid"]), 10)))}
+        except (TypeError, ValueError):
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "tts_kokoro_voice_sid must be an integer 0..10")
+    llm_patch: Dict[str, Any] = {}
+    if "local_model" in update:
+        llm_patch["model"] = str(update["local_model"] or "").strip()[:120]
+    if "local_temperature" in update:
+        try:
+            llm_patch["temperature"] = max(
+                0.0, min(float(update["local_temperature"]), 2.0))
+        except (TypeError, ValueError):
+            raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
+                                 "local_temperature must be a number")
+    if "local_think" in update:
+        llm_patch["think"] = bool(update["local_think"])
+    if not clean and not tts_patch and not llm_patch:
         raise VoiceEditError("VOICE_EDIT_BAD_SETTINGS",
-                             "no recognised voice_edit settings in request")
+                             "no recognised settings in request")
     for key in ("beep", "debug_log", "block_fullscreen", "noise_suppression",
                 "disable_key_repeat", "answer_questions", "text_commands",
                 "speak_answers", "history_panel"):
@@ -406,9 +476,16 @@ def update_voice_edit(cfg: Any, update: Dict[str, Any]) -> Path:
                                  "voice_recent_turns must be a number")
     path = _config_path(cfg)
     data = _load_yaml(path)
-    merged = _deep_merge(data, {"voice_edit": clean})
+    patch: Dict[str, Any] = {}
+    if clean:
+        patch["voice_edit"] = clean
+    if tts_patch:
+        patch["tts"] = tts_patch
+    if llm_patch:
+        patch["intent"] = {"local_llm": llm_patch}
+    merged = _deep_merge(data, patch)
     bak = _write_yaml(path, merged)
-    _sync_live_cfg(cfg, clean)
+    _sync_live_cfg(cfg, patch)
     return bak
 
 

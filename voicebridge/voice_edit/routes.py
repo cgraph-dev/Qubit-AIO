@@ -14,7 +14,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from .schema import VoiceEditError
 from .service import VoiceEditService
-from .settings import (export_settings, import_settings, restore_all_defaults,
+from .settings import (export_settings, import_settings, list_local_models,
+                       restore_all_defaults,
                        restore_default_prompt, settings_view, update_voice_edit)
 
 _LOCK = threading.Lock()
@@ -81,6 +82,8 @@ def handle(cfg: Any, method: str, api_path: str,
             return _ok(events=events, summary=logview.summary(events))
         if path == "/api/voice-edit/prompts" and method in ("GET", "HEAD"):
             return _ok(prompts=settings_view(cfg)["prompts"])
+        if path == "/api/voice-edit/models" and method in ("GET", "HEAD"):
+            return _ok(models=list_local_models(cfg))
         if path == "/api/voice-edit/settings" and method in ("GET", "HEAD"):
             return _ok(settings=settings_view(cfg))
         if path == "/api/voice-edit/settings" and method == "PUT":

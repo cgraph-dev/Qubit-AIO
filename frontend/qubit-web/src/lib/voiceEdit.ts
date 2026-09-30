@@ -39,6 +39,18 @@ export type SttMode = "streaming" | "accurate";
 export type SttModel = "tiny" | "base" | "small" | "medium" | "large-v3";
 /** How an uncertain spoken command is resolved. */
 export type VoiceRouter = "deterministic" | "brain";
+/** How the local microphone capture is pre-processed before STT. */
+export type CaptureSource = "auto" | "raw" | "aec";
+/** Which local model answers voice questions, and how. */
+export type VoiceRouting = "local" | "api" | "auto";
+/** Text-to-speech provider for spoken answers. */
+export type TtsProvider = "piper" | "kokoro" | "edge" | "hybrid" | "openai";
+
+/** One installed local model reported by `GET /api/voice-edit/models`. */
+export interface LocalModel {
+  name: string;
+  size_bytes: number;
+}
 
 export interface VoiceEditSettings {
   enabled: boolean;
@@ -66,8 +78,35 @@ export interface VoiceEditSettings {
   noise_suppression?: boolean;
   answer_questions?: boolean;
   text_commands?: boolean;
-  capture_source?: string;
+  /** How the captured microphone signal is pre-processed before STT. */
+  capture_source?: CaptureSource;
+  /** Automatic gain control on the captured mic signal. */
+  agc?: boolean;
   release_tail_ms?: number;
+  // ── Brain / model (per-machine local model + API routing) ──────────
+  /** The machine's configured local model (`intent.local_llm.model`); "" = auto. */
+  local_model?: string;
+  /** Model that answers voice questions; "" = use the configured model. */
+  chat_model?: string;
+  /** Model used for "more detail" answers; "" = use the configured model. */
+  detail_model?: string;
+  /** Phrases that trigger a "give me more detail" answer. */
+  detail_cues?: string[];
+  /** How many recent turns of context the voice brain sees (2..40). */
+  voice_recent_turns?: number;
+  /** Sampling temperature for the local voice brain (0..2). */
+  local_temperature?: number;
+  /** Let the local model "think" before answering. */
+  local_think?: boolean;
+  // ── Voice responses (TTS) ──────────────────────────────────────────
+  /** Speak answers aloud instead of only showing them. */
+  speak_answers?: boolean;
+  tts_provider?: TtsProvider;
+  tts_voice?: string;
+  /** Kokoro speaker id (0..10); only used when tts_provider is "kokoro". */
+  tts_kokoro_voice_sid?: number;
+  /** Show the on-screen voice history panel. */
+  history_panel?: boolean;
   wake?: {
     enabled: boolean;
     phrase: string;
@@ -142,6 +181,9 @@ export const voiceEdit = {
     fetchJSON<VoiceLogResponse>(`/api/voice-edit/log?limit=${limit}`),
   settings: () =>
     fetchJSON<{ settings: VoiceEditSettings }>("/api/voice-edit/settings"),
+  /** Locally installed models on THIS machine (Ollama) for the model pickers. */
+  models: () =>
+    fetchJSON<{ models: LocalModel[] }>("/api/voice-edit/models"),
   saveSettings: (update: Record<string, unknown>) =>
     fetchJSON<{ settings: VoiceEditSettings }>("/api/voice-edit/settings", {
       method: "PUT",
