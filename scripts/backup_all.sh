@@ -21,6 +21,7 @@ REPO="$(git -C "$SELF_DIR/.." rev-parse --show-toplevel 2>/dev/null || git -C "$
 REMOTE="${QUBIT_BACKUP_REMOTE:-canonical}"
 BRANCH="${QUBIT_BACKUP_BRANCH:-autobackup}"
 RUNTIME="${QUBIT_RUNTIME_HOME:-$HOME/.local/state/qubit-voicebridge/runtime}"
+SRC="${QUBIT_BACKUP_SRC:-$REPO}"   # workspace to snapshot (default: this checkout)
 LOG="${QUBIT_BACKUP_LOG:-$HOME/.cache/qubit-autobackup.log}"
 
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"; }
@@ -50,7 +51,7 @@ rsync -a --delete \
   --exclude '__pycache__/' --exclude '.pytest_cache/' --exclude '.pytest-cache/' \
   --exclude 'MagicMock/' --exclude 'graft/' --exclude 'dist/' --exclude '.cache/' \
   --exclude 'sandboxes/' --exclude '*.sock' --exclude '*.lock' \
-  "$REPO"/ "$TMP/wt"/ 2>/dev/null || true
+  "$SRC"/ "$TMP/wt"/ 2>/dev/null || true
 
 # 2) private runtime snapshot -- only on a private repo.
 if [ "$PRIVATE" = "yes" ] && [ -d "$RUNTIME" ]; then
@@ -60,7 +61,7 @@ if [ "$PRIVATE" = "yes" ] && [ -d "$RUNTIME" ]; then
     --exclude 'bin/' --exclude 'sandboxes/' --exclude '*.sock' --exclude '*.lock' \
     "$RUNTIME"/ "$TMP/wt/_private_backup/runtime/" 2>/dev/null || true
   for f in config/personal-knowledge.md config/task-templates.yaml; do
-    [ -f "$REPO/$f" ] && cp -a "$REPO/$f" "$TMP/wt/_private_backup/$(basename "$f")"
+    [ -f "$SRC/$f" ] && cp -a "$SRC/$f" "$TMP/wt/_private_backup/$(basename "$f")"
   done
 fi
 
