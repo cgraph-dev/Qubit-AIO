@@ -546,6 +546,11 @@ export default function ConfigPage() {
                 systemctl --user restart qubit-voicebridge
               </code>{" "}
               to apply everywhere.
+              {verifyNote && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {verifyNote}
+                </div>
+              )}
             </div>
             <Button
               size="sm"
