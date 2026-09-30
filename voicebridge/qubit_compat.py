@@ -1322,16 +1322,56 @@ def _config_live(cfg: Any) -> Dict[str, Any]:
     return _redact_config_tree(data)
 
 
+def _terminal_live_block() -> Dict[str, Any]:
+    """Live terminal (/chat) model slot, read from the runtime config file.
+
+    The terminal TUI and the dashboard main slot are separate model slots by
+    design (different contexts: terminal API pin vs main/local tiers), so a
+    /chat model switch never rewrites the main `model` leaf — which made
+    /config look stale. This read-only block exposes the terminal slot live
+    so surfaces can show both honestly. Fail-closed to {} (callers hide).
+    Served only by h_config, never accepted by PUT (unknown-key refusal).
+    """
+    try:
+        from . import qubit_runtime as QR
+        import yaml as _yaml
+        path = QR.default_home() / "config.yaml"
+        data = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    model = data.get("model")
+    if not isinstance(model, dict):
+        return {}
+    out = {
+        "provider": str(model.get("provider") or ""),
+        "model": str(model.get("model") or model.get("default") or ""),
+    }
+    base_url = str(model.get("base_url") or "")
+    if base_url:
+        out["base_url"] = base_url
+    if not out["model"]:
+        return {}
+    return out
+
+
 def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/config -> the live Qubit settings record (``Record<string, unknown>``).
 
     The served ConfigPage binds ``getConfig()`` to this nested record; returning
     the real tree (defaults + YAML + applied overrides) is what makes the form
-    render actual values rather than an empty shell.
+    render actual values rather than an empty shell. Carries the read-only
+    ``terminal`` block (live /chat model slot) so the page can show both
+    model slots honestly.
     """
     try:
-        return 200, _config_live(cfg)
+        data = _config_live(cfg)
+        terminal = _terminal_live_block()
+        if terminal:
+            data["terminal"] = terminal
+        return 200, data
     except Exception as exc:
         return _fail(exc)
 
@@ -12381,6 +12421,16 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "unknown settings key(s): " + ", ".join(unknown[:5]) +
                      "; see GET /api/config/schema",
                      "GET /api/config/schema")
+    # The served record carries a read-only `terminal` block (live /chat model
+    # slot). It is display-only by contract: the terminal slot is owned by the
+    # /chat + Models surfaces, so a PUT carrying it is refused, never stored.
+    readonly = sorted(k for k in values
+                      if k == "terminal" or k.startswith("terminal."))
+    if readonly:
+        return _gate("READ_ONLY_SECTION",
+                     "terminal.* is read-only here; switch the /chat model "
+                     "from /chat or the Models page",
+                     "/chat + Models page")
     # A whole-tree Save round-trips every leaf it read. Drop ANY leaf whose
     # value already equals a served record, so an unchanged leaf never re-enters
     # the override store and the reported change set is the real edit only; then

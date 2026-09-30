@@ -501,6 +501,38 @@ export default function ConfigPage() {
       <PluginSlot name="config:top" />
       <Toast toast={toast} />
 
+      {(() => {
+        // Two model slots by design (terminal /chat pin vs main agent slot):
+        // a /chat switch never rewrites the main leaf, so show both live
+        // instead of letting the main value look stale.
+        const terminalModel = String(
+          getNestedValue(config ?? {}, "terminal.model") ?? "",
+        );
+        const mainModel = String(getNestedValue(config ?? {}, "model") ?? "");
+        if (!terminalModel) return null;
+        return (
+          <Card>
+            <CardContent className="flex flex-col gap-1 p-4 text-sm">
+              <div>
+                Main model (this page):{" "}
+                <span className="font-medium">{mainModel || "-"}</span>
+              </div>
+              <div>
+                Terminal (/chat, live):{" "}
+                <span className="font-medium">{terminalModel}</span>
+                {terminalModel !== mainModel && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    - separate slots by design; switch /chat from /chat or
+                    the Models page
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {restartNeeded && (
         <Card className="border-warning/50">
           <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
