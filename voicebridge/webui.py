@@ -89,6 +89,11 @@ def _redact_served(obj: Any, _depth: int = 0,
     if _depth > _SERVED_REDACT_DEPTH:
         return "[REDACTED]"
     if isinstance(obj, str):
+        # A binary data URL (base64 audio/image) is a payload, not user text:
+        # the secret-shaped substrings base64 randomly contains must not be
+        # redacted (which also truncated long audio at the 10k text cap).
+        if obj[:5] == "data:" and ";base64," in obj[:64]:
+            return obj
         return redact_text(obj) if _SERVED_SECRET_GATE.search(obj) else obj
     if isinstance(obj, dict):
         if _path is None:
