@@ -6483,7 +6483,7 @@ _E("browser_tabs", "List open tabs",
    help="Page tabs with the Qubit-current marker (read-only).")
 _E("browser_read", "Read the current tab",
    ("read the current tab", "read this tab", "read current tab",
-    "what is on this page", "read the page"),
+    "what is on this page", "read the page", "read that tab"),
    "browser_tabs", ("browser",),
    fixed=(("action", "read"),),
    summary="tabread",
@@ -6522,7 +6522,12 @@ _E("browser_activate", "Activate a tab",
    examples=("qubit, switch to tab inbox",),
    help="Bring a tab to front by id or title (confirmed).")
 _E("browser_open", "Open a URL",
-   ("open url", "open page", "open website", "open link"),
+   ("open url", "open page", "open website", "open link",
+    # (?<!\w) is a left word-boundary that also matches inside this alias'
+    # own literal text, keeping the alias self-binding probe green
+    # (a plain \b is spelled backslash-b, a word char, in the probe).
+    "rx:(?<!\\w)open (.+) in the browser\\b",
+    "rx:(?<!\\w)open (.+) in browser\\b"),
    "browser_tabs", ("browser",),
    args=(_R("url"),), fixed=(("action", "open"),), confirm=True,
    summary="tabs_action",
@@ -6551,7 +6556,8 @@ _E("browser_click", "Click an element",
    examples=("qubit, click sign in",),
    help="Click by CSS selector or label (confirmed).")
 _E("browser_close_tab", "Close a tab",
-   ("close tab", "close this tab", "close the tab", "close current tab"),
+   ("close tab", "close this tab", "close the tab", "close current tab",
+    "close that tab"),
    "browser_tabs", ("browser",),
    fixed=(("action", "close"),), confirm=True,
    summary="tabs_action",
