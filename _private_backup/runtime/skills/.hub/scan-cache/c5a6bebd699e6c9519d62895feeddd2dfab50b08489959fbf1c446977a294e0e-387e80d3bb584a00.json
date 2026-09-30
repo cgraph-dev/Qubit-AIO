@@ -1,0 +1,44 @@
+{
+  "bundle_hash": "sha256:c5a6bebd699e6c9519d62895feeddd2dfab50b08489959fbf1c446977a294e0e",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/obliteratus",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 53,
+      "match": "pip install -e .",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 55,
+      "match": "# pip install -e \".[spaces]\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 51,
+      "match": "git clone https://github.com/elder-plinius/OBLITERATUS.git",
+      "description": "clones a git repository at runtime"
+    }
+  ],
+  "rules": [
+    "git_clone",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:50.268676+00:00",
+  "summary": "obliteratus: safe \u2014 3 finding(s) in supply_chain",
+  "fresh": true
+}

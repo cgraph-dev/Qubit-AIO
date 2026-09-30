@@ -1,0 +1,90 @@
+{
+  "bundle_hash": "sha256:b4967573b2f79c1dff887df3e09d1485c417c10e12bd888315aba9af00e17898",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/accelerate",
+  "verdict": "caution",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 23,
+      "match": "pip install accelerate",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 338,
+      "match": "- **DeepSpeed**: `deepspeed` (pip install deepspeed)",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/megatron-integration.md",
+      "line": 21,
+      "match": "pip install -e .",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/megatron-integration.md",
+      "line": 26,
+      "match": "pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/megatron-integration.md",
+      "line": 19,
+      "match": "git clone https://github.com/NVIDIA/Megatron-LM.git",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/megatron-integration.md",
+      "line": 24,
+      "match": "git clone https://github.com/NVIDIA/apex",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/performance.md",
+      "line": 303,
+      "match": "os.environ[\"TOKENIZERS_PARALLELISM\"] = \"true\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/performance.md",
+      "line": 180,
+      "match": "# pip install flash-attn",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "git_clone",
+    "python_os_environ",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:46.732588+00:00",
+  "summary": "accelerate: caution \u2014 8 finding(s) in exfiltration, supply_chain",
+  "fresh": true
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "pid": 263808,
+    "create_time": 1790666492.37,
+    "purpose": "gateway",
+    "install": "143427b2be3b",
+    "spawner_pid": null,
+    "spawner_create": null,
+    "registered_at": 1790666493.937485,
+    "argv": "qubit-gateway",
+    "host": "",
+    "port": null,
+    "profile": ""
+  },
+  {
+    "pid": 264074,
+    "create_time": 1790666497.87,
+    "purpose": "mcp-helper",
+    "install": "143427b2be3b",
+    "spawner_pid": 263808,
+    "spawner_create": 1790666492.37,
+    "registered_at": 1790666498.81311,
+    "argv": "node /home/trick/.local/share/mise/installs/node/22.22.3/bin/graft mcp /home/trick/Projects/Repos/CGraph Umbrella",
+    "host": "",
+    "port": null,
+    "profile": ""
+  },
+  {
+    "pid": 3449585,
+    "create_time": 1790740868.19,
+    "purpose": "mcp-helper",
+    "install": "143427b2be3b",
+    "spawner_pid": 3449397,
+    "spawner_create": 1790740866.41,
+    "registered_at": 1790740869.1511726,
+    "argv": "node /home/trick/.local/share/mise/installs/node/22.22.3/bin/graft mcp /home/trick/Projects/Repos/CGraph Umbrella",
+    "host": "",
+    "port": null,
+    "profile": ""
+  }
+]

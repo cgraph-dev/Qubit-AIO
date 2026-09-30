@@ -1,0 +1,53 @@
+{
+  "bundle_hash": "sha256:888878d7ad4a0d27446a1de3b53e8460503c699f328876ab4a1ccde9c4c53eda",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/email/agentmail",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 43,
+      "match": "npm install -g agentmail-cli@latest",
+      "description": "npm install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/websockets.md",
+      "line": 11,
+      "match": "pip install agentmail",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/core.md",
+      "line": 11,
+      "match": "npm install -g agentmail-cli@latest",
+      "description": "npm install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/signup.md",
+      "line": 9,
+      "match": "npm install -g agentmail-cli@latest",
+      "description": "npm install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_npm_install",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:42.148118+00:00",
+  "summary": "agentmail: safe \u2014 4 finding(s) in supply_chain",
+  "fresh": true
+}

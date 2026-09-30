@@ -1,0 +1,79 @@
+{
+  "bundle_hash": "sha256:665b7c37511ea803064302ce155dfdb64fcff114c554030a97d61fab022abae0",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/stable-diffusion",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 48,
+      "match": "pip install diffusers transformers accelerate torch",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 49,
+      "match": "pip install xformers  # Optional: memory-efficient attention",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 12,
+      "match": "pip install --upgrade huggingface_hub",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 15,
+      "match": "pip install --upgrade diffusers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 28,
+      "match": "pip install xformers --index-url https://download.pytorch.org/whl/cu121  # For CUDA 12.1",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 31,
+      "match": "pip install -v -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 45,
+      "match": "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:54.453439+00:00",
+  "summary": "stable-diffusion: safe \u2014 7 finding(s) in supply_chain",
+  "fresh": true
+}

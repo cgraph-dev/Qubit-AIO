@@ -1,0 +1,216 @@
+{
+  "unlocks": {
+    "actually_read_the_logs": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "autonomous_avalanche": {
+      "evidence": null,
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "background_process_enjoyer": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "claude_confidant": {
+      "evidence": null,
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "codex_conjurer": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "config_surgeon": {
+      "evidence": null,
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "context_dragon": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "dependency_hell_tourist": {
+      "evidence": null,
+      "first_tier": null,
+      "unlocked_at": 1790029537
+    },
+    "file_archaeologist": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "five_model_flight": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1789772298
+    },
+    "gateway_dweller": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "gemini_cartographer": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "let_him_cook": {
+      "evidence": {
+        "session_id": "20260822_002345_41dfda",
+        "title": "Local Voice Control for OpenClaw #15",
+        "value": 777
+      },
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "marathon_operator": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "memory_keeper": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "memory_palace": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "model_hopper": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "model_sommelier": {
+      "evidence": null,
+      "first_tier": "Olympian",
+      "unlocked_at": 1790029537
+    },
+    "multi_model_mage": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "night_shift_operator": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1789772298
+    },
+    "one_character_fix": {
+      "evidence": null,
+      "first_tier": null,
+      "unlocked_at": 1790029537
+    },
+    "one_more_small_change": {
+      "evidence": {
+        "session_id": "20260822_002345_41dfda",
+        "title": "Local Voice Control for OpenClaw #15",
+        "value": 221
+      },
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "patch_wizard": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "permission_denied_any_percent": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "plugin_goblin": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "provider_polyglot": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1789689227
+    },
+    "rebase_acrobat": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "red_text_connoisseur": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "rollback_wizard": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    },
+    "screenshot_hunter": {
+      "evidence": null,
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "ship_first_ask_later": {
+      "evidence": null,
+      "first_tier": null,
+      "unlocked_at": 1790029537
+    },
+    "skill_issue_skill_created": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "stack_trace_sommelier": {
+      "evidence": null,
+      "first_tier": "Silver",
+      "unlocked_at": 1790029537
+    },
+    "supposed_to_be_quick": {
+      "evidence": {
+        "session_id": "20260822_002345_41dfda",
+        "title": "Local Voice Control for OpenClaw #15",
+        "value": 1605
+      },
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "terminal_goblin": {
+      "evidence": null,
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "test_suite_tamer": {
+      "evidence": null,
+      "first_tier": "Diamond",
+      "unlocked_at": 1790029537
+    },
+    "the_fix_was_restarting": {
+      "evidence": null,
+      "first_tier": null,
+      "unlocked_at": 1790029537
+    },
+    "toolset_cartographer": {
+      "evidence": null,
+      "first_tier": "Gold",
+      "unlocked_at": 1790029537
+    },
+    "weekend_warrior": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1789772298
+    },
+    "yaml_colon_incident": {
+      "evidence": null,
+      "first_tier": "Copper",
+      "unlocked_at": 1790029537
+    }
+  }
+}

@@ -1,0 +1,3635 @@
+{
+  "bundle_hash": "sha256:50517f1790c878f625484f02e7ab03f21091200b947028918ae0c0ce1aed4b18",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/training/unsloth",
+  "verdict": "dangerous",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "oversized_file",
+      "severity": "medium",
+      "category": "structural",
+      "file": "references/llms-txt.md",
+      "line": 0,
+      "match": "794KB",
+      "description": "file is 794KB (limit: 256KB)"
+    },
+    {
+      "pattern_id": "oversized_file",
+      "severity": "medium",
+      "category": "structural",
+      "file": "references/llms-full.md",
+      "line": 0,
+      "match": "1052KB",
+      "description": "file is 1052KB (limit: 256KB)"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 1331,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\"",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 1352,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 4127,
+      "match": "ssh -i ~/.ssh/container_key -p 2222 unsloth@localhost",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 4135,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 4708,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 9868,
+      "match": "ssh -i ~/.ssh/container_key -p 2222 unsloth@localhost",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 9876,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 11793,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 11960,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 12,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 1882,
+      "match": "os.environ[\"UNSLOTH_VLLM_STANDBY\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 1899,
+      "match": "os.environ[\"UNSLOTH_VLLM_STANDBY\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 3427,
+      "match": "os.environ['UNSLOTH_VLLM_STANDBY'] = '1' # To enable memory efficient GRPO with vLLM",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 3510,
+      "match": "<table><thead><tr><th width=\"397.4666748046875\">Environment variable</th><th>Purpose</th><th data-hidden></th></tr></...",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 3873,
+      "match": "os.environ[\"CUDA_VISIBLE_DEVICES\"] = \"0\" # Optional set GPU device ID",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 5965,
+      "match": "os.environ[\"WANDB_PROJECT\"] = \"<name>\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 5966,
+      "match": "os.environ[\"WANDB_LOG_MODEL\"] = \"checkpoint\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 7935,
+      "match": "os.environ[\"UNSLOTH_STABLE_DOWNLOADS\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 7940,
+      "match": "os.environ[\"UNSLOTH_COMPILE_DISABLE\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 7941,
+      "match": "os.environ[\"UNSLOTH_DISABLE_FAST_GENERATION\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-txt.md",
+      "line": 10634,
+      "match": "os.environ[\"UNSLOTH_WARN_UNINITIALIZED\"] = '0'",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/llms-txt.md",
+      "line": 1352,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/llms-txt.md",
+      "line": 11960,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "path_traversal",
+      "severity": "medium",
+      "category": "traversal",
+      "file": "references/llms-txt.md",
+      "line": 9373,
+      "match": "{% content-ref url=\"../../get-started/fine-tuning-llms-guide/tutorial-how-to-finetune-llama-3-and-use-in-ollama\" %}",
+      "description": "relative path traversal (2+ levels up)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 188,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1263,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3543,
+      "match": "curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3754,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3975,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4475,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4594,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5291,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5927,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7141,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7814,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11481,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7,
+      "match": "## !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 151,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD\\_Q4\\_K\\_XL...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 745,
+      "match": "For Windows, `pip install unsloth` now works, however you must have Pytorch previously installed.",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 857,
+      "match": "1. Install `torch` and `triton`. Go to <https://pytorch.org> to install it. For example `pip install torch torchvisio...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 958,
+      "match": "pip install \"unsloth[windows] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1047,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-IQ1_S`(dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1244,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD\\_Q4\\_K\\_XL...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1593,
+      "match": "uv pip install -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 2188,
+      "match": "pip install --no-deps unsloth unsloth-zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 2189,
+      "match": "pip install --no-deps git+https://github.com/unslothai/unsloth-zoo.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 2190,
+      "match": "pip install \"unsloth[amd] @ git+https://github.com/unslothai/unsloth\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3106,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-TQ1_0`(dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3353,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3454,
+      "match": "<pre class=\"language-bash\"><code class=\"lang-bash\">pip install --upgrade --force-reinstall --no-cache-dir --no-deps g...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3455,
+      "match": "<strong>pip install --upgrade --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth-zoo...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3466,
+      "match": "pip install --upgrade unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3536,
+      "match": "pip install ninja",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3541,
+      "match": "uv pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3549,
+      "match": "uv pip install -U vllm --torch-backend=cu128",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3551,
+      "match": "uv pip install unsloth unsloth_zoo bitsandbytes",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3553,
+      "match": "uv pip install -qqq \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3561,
+      "match": "pip install ninja",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3566,
+      "match": "uv pip install -U transformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3576,
+      "match": "pip install -U vllm --extra-index-url https://download.pytorch.org/whl/cu128",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3578,
+      "match": "pip install unsloth unsloth_zoo bitsandbytes",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3584,
+      "match": "pip install ninja",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3589,
+      "match": "pip install -U triton>=3.3.1",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3591,
+      "match": "uv pip install -U transformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3609,
+      "match": "pip install -v --no-build-isolation -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3728,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3821,
+      "match": "!pip install --upgrade -qqq uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3824,
+      "match": "!uv pip install -qqq \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3955,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4005,
+      "match": "pip install . && \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4280,
+      "match": "`pip install --upgrade --force-reinstall --no-cache-dir --no-deps unsloth unsloth_zoo`",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4455,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-IQ1_S`(dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4586,
+      "match": "Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-`Q2\\_K\\_XL (...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5087,
+      "match": "* If you have different versions of torch, transformers etc., `pip install unsloth` will automatically install all th...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5262,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5415,
+      "match": "12. You can also download the model via (after installing `pip install huggingface_hub hf_transfer` ) HuggingFace's `...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5912,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 6707,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ).",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 6897,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q4\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7123,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7598,
+      "match": "!pip install --upgrade -qqq uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7601,
+      "match": "!uv pip install -qqq \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 7801,
+      "match": "Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-`Q2\\_K\\_XL (...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 8341,
+      "match": "Note that `pip install unsloth` will not work for this setup, as we need to use the latest PyTorch, Triton and relate...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 9137,
+      "match": "We would recommend beginners to utilise our pre-made [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebook...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 9933,
+      "match": "pip install --upgrade --no-cache-dir --force-reinstall unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 9999,
+      "match": "If installing locally, ensure you have the correct [requirements](https://docs.unsloth.ai/get-started/beginner-start-...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10138,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10419,
+      "match": "Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-Q3_K_XL` (dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10452,
+      "match": "## pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10513,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10514,
+      "match": "pip install uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10515,
+      "match": "uv pip install \"sglang\" --prerelease=allow",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10581,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10751,
+      "match": "1. Obtain the latest `unsloth` via `pip install --upgrade unsloth` . If you already have Unsloth, update it via `pip ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10994,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11001,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11462,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11606,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11692,
+      "match": "!pip install wandb --upgrade",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11886,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 12024,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 12029,
+      "match": "pip uninstall unsloth unsloth_zoo -y && pip install --no-deps git+https://github.com/unslothai/unsloth_zoo.git && pip...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 12034,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 12035,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth-zoo.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 12040,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 12041,
+      "match": "pip install \"unsloth[cu121-torch240] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1057,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1275,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 1718,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3538,
+      "match": "git clone --depth=1 https://github.com/facebookresearch/xformers --recursive",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3563,
+      "match": "git clone --depth=1 https://github.com/facebookresearch/xformers --recursive",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3586,
+      "match": "git clone --depth=1 https://github.com/facebookresearch/xformers --recursive",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3806,
+      "match": "RUN git clone --depth=1 https://github.com/facebookresearch/xformers --recursive && \\",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 3988,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4001,
+      "match": "RUN git clone https://github.com/triton-lang/triton.git && \\",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 4322,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5456,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 5939,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 6984,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 6996,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 8927,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 9619,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10427,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 10609,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-txt.md",
+      "line": 11493,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 761,
+      "match": "</strong>sudo apt-get update &#x26;&#x26; sudo apt-get install -y \\",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 4146,
+      "match": "* Use `USER_PASSWORD` for sudo operations inside container",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 4160,
+      "match": "| `USER_PASSWORD`    | Password for `unsloth` user (sudo) | `unsloth` |",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 4647,
+      "match": "</strong>sudo apt-get update &#x26;&#x26; sudo apt-get install -y \\",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 8109,
+      "match": "sudo apt update && sudo apt install -y wget",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 9887,
+      "match": "* Use `USER_PASSWORD` for sudo operations inside container",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 9899,
+      "match": "| `USER_PASSWORD`    | Password for `unsloth` user (sudo) | `unsloth` |",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-txt.md",
+      "line": 11732,
+      "match": "</strong>sudo apt-get update &#x26;&#x26; sudo apt-get install -y \\",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "invisible_unicode",
+      "severity": "high",
+      "category": "injection",
+      "file": "references/llms-txt.md",
+      "line": 400,
+      "match": "U+200B (zero-width space)",
+      "description": "invisible unicode character zero-width space (possible text hiding/injection)"
+    },
+    {
+      "pattern_id": "invisible_unicode",
+      "severity": "high",
+      "category": "injection",
+      "file": "references/llms-txt.md",
+      "line": 9050,
+      "match": "U+200B (zero-width space)",
+      "description": "invisible unicode character zero-width space (possible text hiding/injection)"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1141,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1155,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1158,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\"",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1161,
+      "match": "ssh -i ~/.ssh/container_key -p 2222 unsloth@localhost",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1175,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1178,
+      "match": "ssh -i ~/.ssh/container_key -p 2222 unsloth@localhost",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 1206,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4867,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4881,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4884,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\"",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4887,
+      "match": "ssh -i ~/.ssh/container_key -p 2222 unsloth@localhost",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4917,
+      "match": "-e \"SSH_KEY=$(cat ~/.ssh/container_key.pub)\" \\",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4111,
+      "match": "os.environ[\"UNSLOTH_VLLM_STANDBY\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4186,
+      "match": "os.environ[\"UNSLOTH_VLLM_STANDBY\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4471,
+      "match": "os.environ[\"CUDA_VISIBLE_DEVICES\"] = \"0\" # Optional set GPU device ID",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4632,
+      "match": "os.environ[\"UNSLOTH_WARN_UNINITIALIZED\"] = '0'",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 4953,
+      "match": "os.environ['UNSLOTH_VLLM_STANDBY'] = '1' # To enable memory efficient GRPO with vLLM",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 6100,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 6154,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 6450,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 6515,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 7679,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 7878,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 8156,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 8421,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 8485,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 8743,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 8967,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 9315,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 9359,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 9593,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 9661,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 9730,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 9824,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 10120,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 10359,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 11671,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 11718,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 11905,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 12118,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"0\" # Can sometimes rate limit, so set to 0 to disable",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 12292,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 12438,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 13686,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 14307,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 15300,
+      "match": "os.environ[\"HF_HUB_ENABLE_HF_TRANSFER\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 15965,
+      "match": "os.environ[\"WANDB_PROJECT\"] = \"<name>\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 15966,
+      "match": "os.environ[\"WANDB_LOG_MODEL\"] = \"checkpoint\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 16225,
+      "match": "os.environ[\"UNSLOTH_STABLE_DOWNLOADS\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 16236,
+      "match": "os.environ[\"UNSLOTH_COMPILE_DISABLE\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 16237,
+      "match": "os.environ[\"UNSLOTH_DISABLE_FAST_GENERATION\"] = \"1\"",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/llms-full.md",
+      "line": 16683,
+      "match": "<table><thead><tr><th width=\"397.4666748046875\">Environment variable</th><th>Purpose</th><th data-hidden></th></tr></...",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/llms-full.md",
+      "line": 1155,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/llms-full.md",
+      "line": 1175,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/llms-full.md",
+      "line": 4881,
+      "match": "ssh-keygen -t rsa -b 4096 -f ~/.ssh/container_key",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "references/llms-full.md",
+      "line": 7743,
+      "match": "base_url = \"http://127.0.0.1:8001/v1\",",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "references/llms-full.md",
+      "line": 8233,
+      "match": "base_url = \"http://127.0.0.1:8001/v1\",",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "path_traversal",
+      "severity": "medium",
+      "category": "traversal",
+      "file": "references/llms-full.md",
+      "line": 14498,
+      "match": "{% content-ref url=\"../../get-started/fine-tuning-llms-guide/tutorial-how-to-finetune-llama-3-and-use-in-ollama\" %}",
+      "description": "relative path traversal (2+ levels up)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7590,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7843,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8062,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8385,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8708,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8929,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9277,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9557,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9625,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10012,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10312,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12256,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 13658,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14275,
+      "match": "curl -fsSL https://ollama.com/install.sh | sh",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15729,
+      "match": "curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 62,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 126,
+      "match": "* If you have different versions of torch, transformers etc., `pip install unsloth` will automatically install all th...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 921,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 934,
+      "match": "pip install --upgrade unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 939,
+      "match": "<pre class=\"language-bash\"><code class=\"lang-bash\">pip install --upgrade --force-reinstall --no-cache-dir --no-deps g...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 940,
+      "match": "<strong>pip install --upgrade --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth-zoo...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 961,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 967,
+      "match": "pip uninstall unsloth unsloth_zoo -y && pip install --no-deps git+https://github.com/unslothai/unsloth_zoo.git && pip...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 981,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 982,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir --no-deps git+https://github.com/unslothai/unsloth-zoo.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1000,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1001,
+      "match": "pip install \"unsloth[cu121-torch240] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1007,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1008,
+      "match": "pip install \"unsloth[cu124-torch250] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1014,
+      "match": "pip install \"unsloth[cu121-ampere-torch240] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1015,
+      "match": "pip install \"unsloth[cu118-ampere-torch240] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1016,
+      "match": "pip install \"unsloth[cu121-torch240] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1017,
+      "match": "pip install \"unsloth[cu118-torch240] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1019,
+      "match": "pip install \"unsloth[cu121-torch230] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1020,
+      "match": "pip install \"unsloth[cu121-ampere-torch230] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1022,
+      "match": "pip install \"unsloth[cu121-torch250] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1023,
+      "match": "pip install \"unsloth[cu124-ampere-torch250] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1036,
+      "match": "except: raise ImportError('Install torch via `pip install torch`')",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1051,
+      "match": "print(f'pip install --upgrade pip && pip install \"unsloth[{x}] @ git+https://github.com/unslothai/unsloth.git\"')",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1225,
+      "match": "For Windows, `pip install unsloth` now works, however you must have Pytorch previously installed.",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1361,
+      "match": "pip install \"unsloth[windows] @ git+https://github.com/unslothai/unsloth.git\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1389,
+      "match": "1. Install `torch` and `triton`. Go to <https://pytorch.org> to install it. For example `pip install torch torchvisio...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1483,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1546,
+      "match": "pip install --no-deps unsloth unsloth-zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1547,
+      "match": "pip install --no-deps git+https://github.com/unslothai/unsloth-zoo.git",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1548,
+      "match": "pip install \"unsloth[amd] @ git+https://github.com/unslothai/unsloth\"",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1639,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 1841,
+      "match": "We would recommend beginners to utilise our pre-made [notebooks](https://docs.unsloth.ai/get-started/unsloth-notebook...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 3444,
+      "match": "* If you're using GRPO with Unsloth locally, please \"pip install diffusers\" as well if you get an error. Please also ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 3546,
+      "match": "pip install unsloth vllm",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 3612,
+      "match": "If installing locally, ensure you have the correct [requirements](https://docs.unsloth.ai/get-started/beginner-start-...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 4563,
+      "match": "uv pip install -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 4622,
+      "match": "1. Obtain the latest `unsloth` via `pip install --upgrade unsloth` . If you already have Unsloth, update it via `pip ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 5308,
+      "match": "!pip install --upgrade -qqq uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 5311,
+      "match": "!uv pip install -qqq \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6095,
+      "match": "12. You can also download the model via (after installing `pip install huggingface_hub hf_transfer` ) HuggingFace's `...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6098,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6149,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q2\\_K\\_XL,...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6152,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6445,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ).",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6448,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6510,
+      "match": "3. Or, download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q2\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6513,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6581,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6856,
+      "match": "Note that `pip install unsloth` will not work for this setup, as we need to use the latest PyTorch, Triton and relate...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6860,
+      "match": "!pip install --upgrade -qqq uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6863,
+      "match": "!uv pip install -qqq \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7674,
+      "match": "Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-`Q2\\_K\\_XL (...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7677,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7737,
+      "match": "Then use OpenAI's Python library after `pip install openai` :",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7873,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7876,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7929,
+      "match": "!pip install --upgrade unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7945,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8151,
+      "match": "Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-`Q2\\_K\\_XL (...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8154,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8227,
+      "match": "Then use OpenAI's Python library after `pip install openai` :",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8416,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD\\_Q4\\_K\\_XL...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8419,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8480,
+      "match": "3. Or, download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q2\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8483,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8738,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8741,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8962,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8965,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9310,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9313,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9354,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q2\\_K\\_XL,...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9357,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9412,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9588,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD\\_Q4\\_K\\_XL...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9591,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9656,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD\\_Q4\\_K\\_XL...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9659,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9725,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q2\\_K\\_XL,...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9728,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9819,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q2\\_K\\_XL,...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9822,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9893,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10113,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-IQ1_S`(dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10118,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10354,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose UD-Q4\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10357,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11545,
+      "match": "!pip install --upgrade unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11562,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11666,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11669,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11716,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11898,
+      "match": "3. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-TQ1_0`(dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11903,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12113,
+      "match": "Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-Q3_K_XL` (dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12116,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12287,
+      "match": "3. **OR** download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12290,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12376,
+      "match": "pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12431,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose `UD-IQ1_S`(dy...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12436,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 13323,
+      "match": "# pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 13681,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 13684,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14302,
+      "match": "2. Download the model via (after installing `pip install huggingface_hub hf_transfer` ). You can choose Q4\\_K\\_M, or ...",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14305,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14607,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14608,
+      "match": "pip install uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14609,
+      "match": "uv pip install -U vllm --torch-backend=auto",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14617,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14618,
+      "match": "pip install uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14619,
+      "match": "uv pip install -U vllm",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14669,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14670,
+      "match": "pip install uv",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14671,
+      "match": "uv pip install \"sglang\" --prerelease=allow",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15298,
+      "match": "# !pip install huggingface_hub hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15581,
+      "match": "pip install . && \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15678,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15686,
+      "match": "pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15700,
+      "match": "pip install ninja",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15717,
+      "match": "uv pip install unsloth",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15742,
+      "match": "uv pip install -U vllm --torch-backend=cu128",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15749,
+      "match": "uv pip install unsloth unsloth_zoo bitsandbytes",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15755,
+      "match": "uv pip install -qqq \\",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15768,
+      "match": "pip install ninja",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15778,
+      "match": "uv pip install -U transformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15811,
+      "match": "pip install -U vllm --extra-index-url https://download.pytorch.org/whl/cu128",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15820,
+      "match": "pip install unsloth unsloth_zoo bitsandbytes",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15833,
+      "match": "pip install ninja",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15845,
+      "match": "pip install -U triton>=3.3.1",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15852,
+      "match": "uv pip install -U transformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15887,
+      "match": "pip install -v --no-build-isolation -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15958,
+      "match": "!pip install wandb --upgrade",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 16044,
+      "match": "`pip install --upgrade --force-reinstall --no-cache-dir --no-deps unsloth unsloth_zoo`",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 16270,
+      "match": "`pip install --upgrade --force-reinstall --no-cache-dir --no-deps unsloth unsloth_zoo`&#x20;",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 16274,
+      "match": "`pip install --upgrade --force-reinstall --no-cache-dir --no-deps transformers timm`",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 16668,
+      "match": "pip install --upgrade --no-cache-dir --force-reinstall unsloth unsloth_zoo",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 5879,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6009,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6430,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6484,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 6817,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7096,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7341,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7369,
+      "match": "git clone https://github.com/sgl-project/sglang",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7376,
+      "match": "git clone https://github.com/triton-lang/triton",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7633,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 7859,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8109,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8401,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8453,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8724,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 8949,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9303,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9573,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9641,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9702,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 9796,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10056,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10076,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 10333,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11659,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 11863,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12071,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12274,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 12424,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 13312,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 13674,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14295,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14419,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 14466,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15288,
+      "match": "git clone https://github.com/ggml-org/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15577,
+      "match": "RUN git clone https://github.com/triton-lang/triton.git && \\",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15585,
+      "match": "RUN git clone --depth=1 https://github.com/facebookresearch/xformers --recursive && \\",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15702,
+      "match": "git clone --depth=1 https://github.com/facebookresearch/xformers --recursive",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15770,
+      "match": "git clone --depth=1 https://github.com/facebookresearch/xformers --recursive",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 15835,
+      "match": "git clone --depth=1 https://github.com/facebookresearch/xformers --recursive",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/llms-full.md",
+      "line": 16080,
+      "match": "git clone https://github.com/ggerganov/llama.cpp",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 1078,
+      "match": "</strong>sudo apt-get update &#x26;&#x26; sudo apt-get install -y \\",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 1186,
+      "match": "| `USER_PASSWORD`    | Password for `unsloth` user (sudo) | `unsloth` |",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 1217,
+      "match": "* Use `USER_PASSWORD` for sudo operations inside container",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 1241,
+      "match": "</strong>sudo apt-get update &#x26;&#x26; sudo apt-get install -y \\",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 1471,
+      "match": "sudo apt update && sudo apt upgrade -y",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 1477,
+      "match": "sudo apt install python3-pip",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 4804,
+      "match": "</strong>sudo apt-get update &#x26;&#x26; sudo apt-get install -y \\",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 4897,
+      "match": "| `USER_PASSWORD`    | Password for `unsloth` user (sudo) | `unsloth` |",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 4928,
+      "match": "* Use `USER_PASSWORD` for sudo operations inside container",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/llms-full.md",
+      "line": 15549,
+      "match": "sudo apt update && sudo apt install -y wget",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "invisible_unicode",
+      "severity": "high",
+      "category": "injection",
+      "file": "references/llms-full.md",
+      "line": 556,
+      "match": "U+200B (zero-width space)",
+      "description": "invisible unicode character zero-width space (possible text hiding/injection)"
+    },
+    {
+      "pattern_id": "invisible_unicode",
+      "severity": "high",
+      "category": "injection",
+      "file": "references/llms-full.md",
+      "line": 1752,
+      "match": "U+200B (zero-width space)",
+      "description": "invisible unicode character zero-width space (possible text hiding/injection)"
+    }
+  ],
+  "rules": [
+    "curl_pipe_shell",
+    "git_clone",
+    "hardcoded_ip_port",
+    "invisible_unicode",
+    "oversized_file",
+    "path_traversal",
+    "python_os_environ",
+    "ssh_dir_access",
+    "ssh_keygen",
+    "sudo_usage",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:59.859335+00:00",
+  "summary": "unsloth: dangerous \u2014 401 finding(s) in exfiltration, injection, network, persistence, privilege_escalation, structural, supply_chain, traversal",
+  "fresh": true
+}

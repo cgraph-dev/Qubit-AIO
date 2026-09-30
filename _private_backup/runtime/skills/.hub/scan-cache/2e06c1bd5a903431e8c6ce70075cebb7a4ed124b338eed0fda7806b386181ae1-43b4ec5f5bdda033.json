@@ -1,0 +1,34 @@
+{
+  "bundle_hash": "sha256:2e06c1bd5a903431e8c6ce70075cebb7a4ed124b338eed0fda7806b386181ae1",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/software-development/code-wiki",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 47,
+      "match": "| 1 | Resolve target \u2014 local cwd, given path, or `git clone --depth 50 <url>` to a temp dir |",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 68,
+      "match": "git clone --depth 50 <url> \"$WIKI_TMP/repo\"",
+      "description": "clones a git repository at runtime"
+    }
+  ],
+  "rules": [
+    "git_clone"
+  ],
+  "scanned_at": "2026-09-23T02:51:08.960500+00:00",
+  "summary": "code-wiki: safe \u2014 2 finding(s) in supply_chain",
+  "fresh": true
+}

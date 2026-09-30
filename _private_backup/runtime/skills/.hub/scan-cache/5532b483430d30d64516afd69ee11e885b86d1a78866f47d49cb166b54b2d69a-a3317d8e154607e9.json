@@ -1,0 +1,13 @@
+{
+  "bundle_hash": "sha256:5532b483430d30d64516afd69ee11e885b86d1a78866f47d49cb166b54b2d69a",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/blockchain/evm",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [],
+  "rules": [],
+  "scanned_at": "2026-09-23T02:50:37.647979+00:00",
+  "summary": "evm: clean scan, no threats detected",
+  "fresh": true
+}

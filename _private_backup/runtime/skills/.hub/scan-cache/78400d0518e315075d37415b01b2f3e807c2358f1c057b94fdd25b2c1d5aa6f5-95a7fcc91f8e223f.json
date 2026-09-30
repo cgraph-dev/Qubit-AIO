@@ -1,0 +1,34 @@
+{
+  "bundle_hash": "sha256:78400d0518e315075d37415b01b2f3e807c2358f1c057b94fdd25b2c1d5aa6f5",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/health/neuroskill-bci",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "references/api.md",
+      "line": 28,
+      "match": "curl -s -X POST http://127.0.0.1:8375/ \\",
+      "description": "hardcoded IP address with port"
+    },
+    {
+      "pattern_id": "hardcoded_ip_port",
+      "severity": "medium",
+      "category": "network",
+      "file": "references/api.md",
+      "line": 58,
+      "match": "Connect to `ws://127.0.0.1:8375/` to receive real-time events:",
+      "description": "hardcoded IP address with port"
+    }
+  ],
+  "rules": [
+    "hardcoded_ip_port"
+  ],
+  "scanned_at": "2026-09-23T02:50:45.264988+00:00",
+  "summary": "neuroskill-bci: safe \u2014 2 finding(s) in network",
+  "fresh": true
+}

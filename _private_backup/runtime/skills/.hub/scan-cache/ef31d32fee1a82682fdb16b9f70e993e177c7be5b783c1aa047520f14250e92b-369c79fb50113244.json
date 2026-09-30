@@ -1,0 +1,448 @@
+{
+  "bundle_hash": "sha256:ef31d32fee1a82682fdb16b9f70e993e177c7be5b783c1aa047520f14250e92b",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/lambda-labs",
+  "verdict": "dangerous",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 225,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 232,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 245,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 68,
+      "match": "ssh -i ~/.ssh/lambda_key ubuntu@<INSTANCE-IP>",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 299,
+      "match": "ssh-keygen -t ed25519 -f ~/.ssh/lambda_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 309,
+      "match": "echo 'ssh-rsa AAAA...' >> ~/.ssh/authorized_keys",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 148,
+      "match": "access_token=os.environ[\"LAMBDA_API_KEY\"]",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "ssh_backdoor",
+      "severity": "critical",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 309,
+      "match": "echo 'ssh-rsa AAAA...' >> ~/.ssh/authorized_keys",
+      "description": "modifies SSH authorized keys"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 299,
+      "match": "ssh-keygen -t ed25519 -f ~/.ssh/lambda_key",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 136,
+      "match": "pip install lambda-cloud-client",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 476,
+      "match": "pip install transformers accelerate peft",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 360,
+      "match": "git clone https://github.com/user/project",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 12,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 50,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 82,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "env_exfil_curl",
+      "severity": "critical",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 479,
+      "match": "curl -u $LAMBDA_API_KEY: \\",
+      "description": "curl command interpolating secret environment variable"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 93,
+      "match": "ssh -v -i ~/.ssh/lambda_key ubuntu@<IP>",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 96,
+      "match": "chmod 600 ~/.ssh/lambda_key",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 97,
+      "match": "chmod 644 ~/.ssh/lambda_key.pub",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 103,
+      "match": "cat ~/.ssh/authorized_keys",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "dump_all_env",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 513,
+      "match": "| `Module not found` | Wrong Python env | Activate correct virtualenv |",
+      "description": "dumps all environment variables"
+    },
+    {
+      "pattern_id": "ssh_backdoor",
+      "severity": "critical",
+      "category": "persistence",
+      "file": "references/troubleshooting.md",
+      "line": 102,
+      "match": "# Check authorized_keys on instance (if you have another way in)",
+      "description": "modifies SSH authorized keys"
+    },
+    {
+      "pattern_id": "ssh_backdoor",
+      "severity": "critical",
+      "category": "persistence",
+      "file": "references/troubleshooting.md",
+      "line": 103,
+      "match": "cat ~/.ssh/authorized_keys",
+      "description": "modifies SSH authorized keys"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/troubleshooting.md",
+      "line": 114,
+      "match": "ssh-keygen -R <IP>",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 328,
+      "match": "pip install hf_transfer",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 364,
+      "match": "pip install <package>",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 367,
+      "match": "pip install torch --index-url https://download.pytorch.org/whl/cu121",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 402,
+      "match": "pip install <package>",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/troubleshooting.md",
+      "line": 145,
+      "match": "sudo reboot",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/troubleshooting.md",
+      "line": 149,
+      "match": "sudo reboot",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/troubleshooting.md",
+      "line": 197,
+      "match": "sudo reboot",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "references/troubleshooting.md",
+      "line": 380,
+      "match": "sudo apt install python3.11 python3.11-venv python3.11-dev",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 253,
+      "match": "run_remote_job(instance[\"ip\"], \"~/.ssh/lambda_key\", commands)",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 575,
+      "match": "ssh-keygen -t ed25519 -f ~/.ssh/lambda_key_new -C \"lambda-$(date +%Y%m)\"",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 579,
+      "match": "ssh ubuntu@<IP> \"echo '$(cat ~/.ssh/lambda_key_new.pub)' >> ~/.ssh/authorized_keys\"",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "ssh_dir_access",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 582,
+      "match": "ssh -i ~/.ssh/lambda_key_new ubuntu@<IP>",
+      "description": "references user SSH directory"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 16,
+      "match": "rank = int(os.environ[\"RANK\"])",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 17,
+      "match": "world_size = int(os.environ[\"WORLD_SIZE\"])",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 18,
+      "match": "local_rank = int(os.environ[\"LOCAL_RANK\"])",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 208,
+      "match": "manager = LambdaJobManager(os.environ[\"LAMBDA_API_KEY\"])",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "references/advanced-usage.md",
+      "line": 474,
+      "match": "wandb.login(key=os.environ[\"WANDB_API_KEY\"])",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "shell_rc_mod",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/advanced-usage.md",
+      "line": 609,
+      "match": "# On instance, store in ~/.bashrc",
+      "description": "references shell startup file"
+    },
+    {
+      "pattern_id": "shell_rc_mod",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/advanced-usage.md",
+      "line": 610,
+      "match": "echo 'export HF_TOKEN=\"...\"' >> ~/.bashrc",
+      "description": "references shell startup file"
+    },
+    {
+      "pattern_id": "ssh_backdoor",
+      "severity": "critical",
+      "category": "persistence",
+      "file": "references/advanced-usage.md",
+      "line": 578,
+      "match": "# Update authorized_keys on running instances",
+      "description": "modifies SSH authorized keys"
+    },
+    {
+      "pattern_id": "ssh_backdoor",
+      "severity": "critical",
+      "category": "persistence",
+      "file": "references/advanced-usage.md",
+      "line": 579,
+      "match": "ssh ubuntu@<IP> \"echo '$(cat ~/.ssh/lambda_key_new.pub)' >> ~/.ssh/authorized_keys\"",
+      "description": "modifies SSH authorized keys"
+    },
+    {
+      "pattern_id": "ssh_keygen",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "references/advanced-usage.md",
+      "line": 575,
+      "match": "ssh-keygen -t ed25519 -f ~/.ssh/lambda_key_new -C \"lambda-$(date +%Y%m)\"",
+      "description": "generates SSH keys"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/advanced-usage.md",
+      "line": 389,
+      "match": "pip install torch transformers accelerate",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "dump_all_env",
+    "env_exfil_curl",
+    "git_clone",
+    "python_os_environ",
+    "shell_rc_mod",
+    "ssh_backdoor",
+    "ssh_dir_access",
+    "ssh_keygen",
+    "sudo_usage",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:49.228039+00:00",
+  "summary": "lambda-labs: dangerous \u2014 47 finding(s) in exfiltration, persistence, privilege_escalation, supply_chain",
+  "fresh": true
+}

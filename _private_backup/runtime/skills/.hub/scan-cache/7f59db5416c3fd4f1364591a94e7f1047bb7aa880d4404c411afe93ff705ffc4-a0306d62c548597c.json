@@ -1,0 +1,13 @@
+{
+  "bundle_hash": "sha256:7f59db5416c3fd4f1364591a94e7f1047bb7aa880d4404c411afe93ff705ffc4",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/blockchain/hyperliquid",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [],
+  "rules": [],
+  "scanned_at": "2026-09-23T02:50:38.368132+00:00",
+  "summary": "hyperliquid: clean scan, no threats detected",
+  "fresh": true
+}

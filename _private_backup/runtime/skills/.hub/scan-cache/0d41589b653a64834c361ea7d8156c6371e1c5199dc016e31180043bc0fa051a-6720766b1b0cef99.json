@@ -1,0 +1,25 @@
+{
+  "bundle_hash": "sha256:0d41589b653a64834c361ea7d8156c6371e1c5199dc016e31180043bc0fa051a",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/autonomous-ai-agents/openhands",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 126,
+      "match": "- **`pip install openhands-ai` is the wrong package.** That's the legacy V0 SDK. The new CLI is `uv tool install open...",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:37.367261+00:00",
+  "summary": "openhands: safe \u2014 1 finding(s) in supply_chain",
+  "fresh": true
+}
