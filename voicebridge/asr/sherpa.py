@@ -40,6 +40,138 @@ _ENGINES = {
     },
 }
 
+# True-streaming transducers (OnlineRecognizer). These are NOT used for the
+# offline file path; they power the live /qubit-chat streaming STT socket. All
+# are int8-quantized and CPU-real-time; the zipformer-20M is the low-spec
+# champion, the 2026-04 Nemotron pack is the low-latency accuracy option.
+_STREAMING_ENGINES = {
+    # NVIDIA Nemotron Streaming 0.6B (2026-04-25), 4 chunk variants.
+    "nemotron-streaming": {
+        "dir": "sherpa-onnx-nemotron-speech-streaming-en-0.6b-80ms-int8-2026-04-25",
+        "chunk_ms": 80,
+    },
+    "nemotron-80ms": {
+        "dir": "sherpa-onnx-nemotron-speech-streaming-en-0.6b-80ms-int8-2026-04-25",
+        "chunk_ms": 80,
+    },
+    "nemotron-160ms": {
+        "dir": "sherpa-onnx-nemotron-speech-streaming-en-0.6b-160ms-int8-2026-04-25",
+        "chunk_ms": 160,
+    },
+    "nemotron-560ms": {
+        "dir": "sherpa-onnx-nemotron-speech-streaming-en-0.6b-560ms-int8-2026-04-25",
+        "chunk_ms": 560,
+    },
+    "nemotron-1120ms": {
+        "dir": "sherpa-onnx-nemotron-speech-streaming-en-0.6b-1120ms-int8-2026-04-25",
+        "chunk_ms": 1120,
+    },
+    # NVIDIA Nemotron 3.5 ASR Streaming 0.6B (2026-06-11), 4 chunk variants.
+    "nemotron3-80ms": {
+        "dir": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-80ms-int8-2026-06-11",
+        "chunk_ms": 80,
+    },
+    "nemotron3-160ms": {
+        "dir": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-160ms-int8-2026-06-11",
+        "chunk_ms": 160,
+    },
+    "nemotron3-560ms": {
+        "dir": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11",
+        "chunk_ms": 560,
+    },
+    "nemotron3-1120ms": {
+        "dir": "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11",
+        "chunk_ms": 1120,
+    },
+    # Ultra-light English zipformer; suitable for Cortex-A7 class CPUs.
+    "zipformer-streaming": {
+        "dir": "sherpa-onnx-streaming-zipformer-en-20M-2023-02-17",
+    },
+    # Kroko English streaming zipformer (2025-08-06) — small, newer.
+    "zipformer-streaming-kroko": {
+        "dir": "sherpa-onnx-streaming-zipformer-en-kroko-2025-08-06",
+    },
+    # Higher-accuracy English streaming zipformer (2023-06-26).
+    "zipformer-streaming-en-2023": {
+        "dir": "sherpa-onnx-streaming-zipformer-en-2023-06-26",
+    },
+    # Small bilingual (zh/en) streaming zipformer.
+    "zipformer-streaming-small": {
+        "dir": "sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16",
+    },
+}
+
+
+def streaming_engines() -> tuple:
+    return tuple(_STREAMING_ENGINES)
+
+
+def hotwords_supported(engine: str) -> bool:
+    """True when a streaming engine's runtime accepts hotword biasing.
+
+    Hotwords force ``modified_beam_search``; the NeMo transducer streaming impl
+    (Nemotron) supports only ``greedy_search`` and must fall back to greedy with
+    hotwords ignored.
+    """
+    return isinstance(engine, str) and engine.startswith("zipformer")
+
+
+def _pick_weight(base: Path, stem: str) -> Optional[Path]:
+    """Best ``<stem>*.onnx`` under *base* (int8 preferred, then any)."""
+    cands = sorted(base.glob(f"{stem}*.onnx"))
+    if not cands:
+        return None
+    int8 = [c for c in cands if "int8" in c.name]
+    return (int8 or cands)[0]
+
+
+def _stitch_chunks(parts: list) -> str:
+    """Join per-chunk transcripts, dropping a repeated leading overlap.
+
+    Chunked long-form decode can repeat the tail of the previous chunk at the
+    start of the next; this removes up to 6 duplicated leading words so the
+    joined text does not double-count them.
+    """
+    words: list = []
+    for part in parts:
+        w = part.split()
+        if not w:
+            continue
+        if words:
+            k = 0
+            for cand in range(min(6, len(words), len(w)), 0, -1):
+                if words[-cand:] == w[:cand]:
+                    k = cand
+                    break
+            w = w[k:]
+        words.extend(w)
+    return " ".join(words).strip()
+
+
+def online_model_paths(model_dir: Path | str, engine: str) -> dict:
+    """Resolve encoder/decoder/joiner/tokens for a streaming transducer engine.
+
+    Raises :class:`ASRUnavailable` when the pack is absent so the caller can
+    fall back to the offline sliding-window decoder. File names differ across
+    sherpa releases, so each weight is discovered by glob (int8 preferred).
+    """
+    if engine not in _STREAMING_ENGINES:
+        raise ASRUnavailable(f"unknown streaming engine: {engine}")
+    base = Path(model_dir) / _STREAMING_ENGINES[engine]["dir"]
+    if not base.is_dir():
+        raise ASRUnavailable(f"streaming model not installed: {base}")
+    out = {
+        "encoder": _pick_weight(base, "encoder"),
+        "decoder": _pick_weight(base, "decoder"),
+        "joiner": _pick_weight(base, "joiner"),
+        "tokens": base / "tokens.txt",
+    }
+    missing = [k for k, v in out.items() if v is None or not Path(v).exists()]
+    if missing:
+        raise ASRUnavailable(
+            f"streaming model incomplete under {base}: missing {missing}")
+    return {k: Path(v) for k, v in out.items()}
+
 
 class SherpaASR(ASRProvider):
     name = "sherpa"
@@ -170,31 +302,29 @@ class SherpaASR(ASRProvider):
                       hotwords=len([w for w in self.hotwords.split(",")
                                     if w.strip()]) if self.hotwords else 0)
 
-    def transcribe(self, audio_path: Path | str) -> Transcript:
-        self.load()
-        audio_path = Path(audio_path)
-        with wave.open(str(audio_path), "rb") as wf:
-            sr = wf.getframerate()
-            sampwidth = wf.getsampwidth()
-            frames = wf.readframes(wf.getnframes())
-        if sampwidth != 2:
-            raise ASRUnavailable(f"sherpa needs 16-bit PCM, got {sampwidth*8}-bit")
-        audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
-        dur_s = len(audio) / sr if sr else 0.0
-        if len(audio) == 0:
-            return Transcript(text="", provider=f"sherpa-{self.engine}", duration_s=0.0)
+    def decode_pcm(self, audio: "np.ndarray", sr: int = 16000) -> str:
+        """Decode a mono float32 [-1, 1] buffer; shared by file + streaming.
 
-        # Moonshine's decoder has a fixed sequence window (~20s, tokens ~1241)
-        # and CRASHES (onnxruntime broadcast "4 by <n>") on longer audio instead
-        # of returning empty. Chunk long clips into overlapping windows and
-        # concat the per-chunk text so continuous speech up to the VAD cap
-        # (~30s) transcribes reliably. Parakeet handles long clips natively.
-        MAX_CHUNK_S = 20.0
-        OVERLAP_S = 1.0
+        Moonshine's decoder has a fixed sequence window (~20s, tokens ~1241)
+        and CRASHES (onnxruntime broadcast "4 by <n>") on longer audio instead
+        of returning empty. Chunk long clips into overlapping windows and
+        concat the per-chunk text so continuous speech up to the VAD cap
+        (~30s) transcribes reliably. Parakeet handles long clips natively.
+        """
+        self.load()
+        audio = np.asarray(audio, dtype=np.float32)
+        if len(audio) == 0:
+            return ""
+        # Moonshine's decoder mis-broadcasts (onnxruntime "N by M") on longer
+        # sequences, and OVERLAPPING chunks make it loop ("a blessing, a
+        # blessing, ..."). Measured on the LibriSpeech long clip: 6 s
+        # non-overlapping windows with a boundary de-dup stitch give WER 0.04
+        # vs 0.42 with the old 8 s/1 s-overlap chunking. Parakeet handles long
+        # clips natively (no chunking).
+        MAX_CHUNK_S = 6.0
         if self.engine == "moonshine" and len(audio) / max(sr, 1) > MAX_CHUNK_S:
             parts = []
             n = len(audio)
-            step = int(sr * (MAX_CHUNK_S - OVERLAP_S))
             width = int(sr * MAX_CHUNK_S)
             pos = 0
             while pos < n:
@@ -208,14 +338,28 @@ class SherpaASR(ASRProvider):
                     txt = stream.result.text.strip()
                     if txt:
                         parts.append(txt)
-                pos += step
-            text = " ".join(parts).strip()
-        else:
-            with self._lock:
-                stream = self._recognizer.create_stream()
-                stream.accept_waveform(sample_rate=sr, waveform=audio)
-                self._recognizer.decode_stream(stream)
-                text = stream.result.text.strip()
+                pos += width
+            return _stitch_chunks(parts)
+        with self._lock:
+            stream = self._recognizer.create_stream()
+            stream.accept_waveform(sample_rate=sr, waveform=audio)
+            self._recognizer.decode_stream(stream)
+            return stream.result.text.strip()
+
+    def transcribe(self, audio_path: Path | str) -> Transcript:
+        self.load()
+        audio_path = Path(audio_path)
+        with wave.open(str(audio_path), "rb") as wf:
+            sr = wf.getframerate()
+            sampwidth = wf.getsampwidth()
+            frames = wf.readframes(wf.getnframes())
+        if sampwidth != 2:
+            raise ASRUnavailable(f"sherpa needs 16-bit PCM, got {sampwidth*8}-bit")
+        audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+        dur_s = len(audio) / sr if sr else 0.0
+        if len(audio) == 0:
+            return Transcript(text="", provider=f"sherpa-{self.engine}", duration_s=0.0)
+        text = self.decode_pcm(audio, sr)
         log_event("asr.transcribe", provider=self.name, engine=self.engine,
                   device=self.provider, chars=len(text), raw_dur_s=round(dur_s, 2))
         # sherpa exposes no per-segment confidence; 1.0 = unknown-ok.

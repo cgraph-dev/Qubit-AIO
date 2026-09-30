@@ -111,8 +111,11 @@ READ_MATRIX = [
      ["agent", "audio", "intent", "logging", "voice", "webui"]),
     ("config", "GET", "/api/config/schema", ["category_order", "fields"]),
     ("cron", "GET", "/api/cron/blueprints", ["blueprints", "ok"]),
+    # Reference parity: ``web_routers/cron.py`` returns ``{targets: [...]}``
+    # (the SPA's ``CronDeliveryTarget[]`` contract). Reconciled 2026-09-29 when
+    # the compat handler was corrected from the legacy ``delivery_targets``.
     ("cron", "GET", "/api/cron/delivery-targets",
-     ["delivery_targets", "ok"]),
+     ["targets", "ok"]),
     ("cron", "GET", "/api/cron/jobs", []),
     ("cron", "GET", "/api/cron/jobs/probe/runs",
      ["count", "runs", "limit"]),
@@ -393,7 +396,9 @@ SAFE_MUTATION_MATRIX = [
      ["alive", "output", "session_id", "ok"]),
     ("achievements", "POST", "/api/plugins/qubit-achievements/rescan", {},
      ["achievements", "sessions", "total_count", "ok"]),
-    ("channels", "POST", "/api/messaging/platforms/probe/test", {},
+    # Use a REAL catalog platform: after the 2026-09-29 honesty fix an unknown
+    # platform id is a typed 404 (MSG_NOT_FOUND), never a fabricated 200.
+    ("channels", "POST", "/api/messaging/platforms/telegram/test", {},
      ["platform", "reachable", "state", "ok"]),
     ("memory", "PUT", "/api/memory/provider", {},
      ["active", "config", "qubit_counterpart", "ok"]),

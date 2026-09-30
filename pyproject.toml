@@ -25,7 +25,7 @@ dependencies = [
     "cloudpickle>=3.0",       # serialize broker callable-tool closures for forkserver isolation
     "pyyaml>=6",
     "piper-tts>=1.2",         # default TTS
-    "faster-whisper>=1.1",    # optional ASR fallback (asr.provider: whisper)
+    "faster-whisper>=1.1,<2",  # ASR fallback (asr.provider: whisper) + accurate local STT (voice_edit)
     "webrtcvad>=2.0.10",      # optional VAD fallback (vad.backend: webrtc)
     # webrtcvad imports the legacy pkg_resources API at import time. The
     # default VAD backend is silero, but when the silero model is absent (a
@@ -134,6 +134,26 @@ test = [
     "truststore==0.10.4",
     "tomli-w==1.2.0",
 ]
+# ACP (Agent Client Protocol) server backend — mirrors the vendored
+# qubit-agent ``acp`` extra. The adapter is packaged in the runtime subset
+# (see force-include); the SDK only installs on demand.
+acp = ["agent-client-protocol==0.9.0"]
+# OPTIONAL GPU acceleration for the accurate local STT path
+# (voicebridge/voice_edit/asr_accurate.py preloads these via
+# voicebridge/asr/gpu.py::ensure_cuda_libraries before ctranslate2 imports).
+# NOT a core dependency: CPU-only installs work without this extra — the
+# accurate decoder stays on CPU and reports a typed fallback reason if a
+# library is missing. GPU here is best-effort. Install with: ``pip install
+# "qubit-voicebridge[accel]"``. Bounded on the cu12 line (<13).
+accel = [
+    "nvidia-cublas-cu12>=12.4,<13",
+    "nvidia-cudnn-cu12>=9,<13",
+    "nvidia-cuda-runtime-cu12>=12.4,<13",
+    "nvidia-cufft-cu12>=11.2,<13",
+    "nvidia-curand-cu12>=10.3,<13",
+    "nvidia-cuda-nvrtc-cu12>=12.4,<13",
+    "nvidia-nvjitlink-cu12>=12.4,<13",
+]
 
 [project.scripts]
 # Canonical public launcher: `qubit` (all user docs reference this name).
@@ -149,6 +169,9 @@ qubit-agent = "voicebridge.qubit_runtime:legacy_entry"
 # Direct launcher for the vendored ACP adapter (upstream `hermes-acp`
 # equivalent); pins QUBIT_HOME/sys.path before importing `acp_adapter.entry`.
 qubit-acp = "voicebridge.qubit_runtime:acp_entry"
+# Global desktop voice typing / selected-text editing helper (opt-in; disabled
+# by default via the `voice_edit` feature flag).
+qubit-voice-typing = "voicebridge.desktop_helper:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -164,6 +164,29 @@ PROVIDER_CAPS: Dict[str, Dict[str, Any]] = {
 # Single source of truth for provider membership (order preserved).
 PROVIDERS = tuple(PROVIDER_CAPS)
 
+# Gateway/dashboard catalog spellings that differ from the Qubit provider ids
+# in :data:`PROVIDER_CAPS`. The dashboard Channels page and the vendored
+# gateway catalog address platforms by these ids, while the Qubit transport
+# registry (and therefore ``msg-accounts.json``) keys accounts by the provider
+# id. ``link``/``test_platform`` translate through this map so the test path
+# probes the platform's real bound account instead of looking for an account
+# whose id literally equals the platform id (which never matched).
+PLATFORM_ALIASES: Dict[str, str] = {
+    "whatsapp_cloud": "whatsapp-cloud",
+    "teams": "msteams",
+    "bluebubbles": "imessage",
+}
+
+
+def resolve_platform_provider(platform_id: str) -> str:
+    """Map a catalog/gateway platform id to a Qubit provider id (``""`` if none)."""
+    pid = (platform_id or "").strip().lower()
+    if not pid:
+        return ""
+    if pid in PROVIDER_CAPS:
+        return pid
+    return PLATFORM_ALIASES.get(pid, "")
+
 CONFIRM_CODE = "MSG_CONFIRM_REQUIRED"
 ESTOP_CODE = "MSG_ESTOP"
 NOT_FOUND_CODE = "MSG_NOT_FOUND"
@@ -437,6 +460,91 @@ def account_update(cfg: Any, account_id: str, *, label: str = "",
                                        if not k.startswith("_key")}}
 
 
+def bridge_platform_to_gateway(cfg: Any, platform_id: str, *,
+                               enabled: Optional[bool] = None,
+                               env_refs: Optional[Dict[str, Any]] = None
+                               ) -> Dict[str, Any]:
+    """Mirror a dashboard channel config into the REAL vendored gateway store.
+
+    The dashboard persists channel state in ``msg-platforms.json``, which the
+    vendored gateway daemon does not read: the daemon reads
+    ``platforms.<id>.enabled`` from ``config.yaml`` and each credential env var
+    from ``.env`` (``gateway.config_env._apply_env_overrides``). This writes
+    those SAME stores through the vendored writers
+    (``qubit_cli.config.write_platform_config_field`` / ``save_env_value``),
+    resolving each ``env:``/``file:`` reference server-side via the ONE
+    credential resolver. A reference that does not resolve never seeds a bogus
+    token (the key is removed instead). No value is returned, logged, or
+    audited here — only the key names and the enable flag.
+
+    Best-effort by contract: the Qubit store remains authoritative and a
+    writer failure returns a typed ``UNAVAILABLE`` rather than a fake success.
+    """
+    from . import qubit_runtime as QR
+
+    QR.ensure_path()
+    try:
+        QR.use_qubit_home(cfg)
+    except Exception:  # noqa: BLE001 - cfg-scoped home is best-effort
+        pass
+    try:
+        from qubit_cli.config import (  # type: ignore
+            remove_env_value, save_env_value, write_platform_config_field,
+        )
+        from .providers.credentials import resolve_key
+    except Exception as exc:  # noqa: BLE001 - the vendored writers are required
+        return {"state": "UNAVAILABLE", "code": "GATEWAY_STORE_UNAVAILABLE",
+                "detail": type(exc).__name__, "platform": platform_id}
+
+    written: List[str] = []
+    cleared: List[str] = []
+    unresolved: List[str] = []
+    errors: List[str] = []
+    for key, ref in (env_refs or {}).items():
+        name = str(key or "").strip()
+        if not name:
+            continue
+        text = str(ref or "").strip()
+        try:
+            if not text:
+                if remove_env_value(name):
+                    cleared.append(name)
+                continue
+            value, _code = resolve_key(platform_id, text)
+            if not value:
+                # A non-resolving reference must not become a placeholder token
+                # the gateway would reject (or worse, use).
+                if remove_env_value(name):
+                    cleared.append(name)
+                unresolved.append(name)
+                continue
+            save_env_value(name, value)
+            written.append(name)
+        except Exception as exc:  # noqa: BLE001 - collect, never abort the batch
+            errors.append(f"{name}:{type(exc).__name__}")
+    enabled_applied = False
+    if enabled is not None:
+        try:
+            write_platform_config_field(platform_id, "enabled", bool(enabled))
+            enabled_applied = True
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"enabled:{type(exc).__name__}")
+    _audit("platform.bridge", "dashboard:user",
+           {"platform": platform_id, "enabled": enabled,
+            "env_keys": sorted(written), "cleared": sorted(cleared),
+            "unresolved": sorted(unresolved)})
+    out: Dict[str, Any] = {
+        "state": "OK" if not errors else "DEGRADED",
+        "platform": platform_id, "enabled": enabled,
+        "enabled_applied": enabled_applied,
+        "env_written": sorted(written), "cleared": sorted(cleared),
+        "unresolved": sorted(unresolved)}
+    if errors:
+        out["errors"] = sorted(errors)
+        out["code"] = "GATEWAY_BRIDGE_PARTIAL"
+    return out
+
+
 def provider_catalog() -> Dict[str, Any]:
     """Typed capability view of every known channel (no credential read).
 
@@ -463,15 +571,48 @@ def provider_catalog() -> Dict[str, Any]:
                             if r["state"] == "UNAVAILABLE"]}
 
 
-def link(cfg: Any, account_id: str) -> Dict[str, Any]:
-    """Typed link state: credential presence + transport + history."""
+def _accounts_for_provider(cfg: Any, provider: str) -> List[Dict[str, Any]]:
+    """Every recorded account bound to one provider (redacted records)."""
+    if not provider:
+        return []
+    state = _load_json(_accounts_path(cfg), _blank_accounts, "accounts")
+    return [rec for rec in state["accounts"].values()
+            if isinstance(rec, dict) and rec.get("provider") == provider]
+
+
+def link(cfg: Any, platform_id: str) -> Dict[str, Any]:
+    """Typed link state: credential presence + transport + history.
+
+    ``platform_id`` is first resolved as a Qubit account id (the CLI shape);
+    when no such account exists it is resolved as a catalog/gateway *platform*
+    id and probed against the accounts bound to that provider. A platform with
+    no bound account is an honest typed ``NO_ACCOUNT`` (never a fabricated
+    LINKED), and an id that is neither a known account nor a known platform is
+    also ``NO_ACCOUNT``. No active network probing is performed: ``LINKED``
+    means the credential reference resolves *and* Qubit ships a transport
+    adapter for the provider (slack / whatsapp-cloud); every other provider
+    resolves to the typed ``UNAVAILABLE`` state.
+    """
     from .providers.credentials import resolve_key
 
+    rec: Optional[Dict[str, Any]] = None
     try:
-        rec = _get_account(cfg, account_id)
+        rec = _get_account(cfg, platform_id)
     except MessagingError as exc:
-        return {"state": "NO_ACCOUNT", "code": NOT_FOUND_CODE,
-                "detail": exc.detail[:160]}
+        provider = resolve_platform_provider(platform_id)
+        if provider:
+            accounts = _accounts_for_provider(cfg, provider)
+            if accounts:
+                rec = accounts[0]
+            else:
+                return {"state": "NO_ACCOUNT", "code": NOT_FOUND_CODE,
+                        "provider": provider, "platform": platform_id,
+                        "detail": f"no Qubit account is bound to platform "
+                                  f"{platform_id!r}; configure it before a "
+                                  "connection can be tested"}
+        else:
+            return {"state": "NO_ACCOUNT", "code": NOT_FOUND_CODE,
+                    "detail": exc.detail[:160]}
     _, code = resolve_key(rec["provider"], _resolve_account_ref(rec))
     if code:
         return {"state": "NO_CREDENTIAL", "account": rec["id"],
@@ -490,6 +631,75 @@ def link(cfg: Any, account_id: str) -> Dict[str, Any]:
     return {"state": state, "account": rec["id"], "provider": rec["provider"],
             "endpoint": rec.get("endpoint", "") or "(session-based)",
             "last_outcome": last}
+
+
+# ------------------------------------------------- connection test (dashboard)
+def platform_test_verdict(info: Dict[str, Any]) -> Dict[str, Any]:
+    """Honest connection-test verdict for one channel (reference contract).
+
+    Ported from the vendored reference ``test_messaging_platform``
+    (``web_routers/messaging.py:916``): a channel is reported ``ok`` **only**
+    when a real connection is proven (``state == "connected"``). Every other
+    outcome -- disabled, missing setup, gateway down, or a configured channel
+    with no Qubit transport adapter -- is ``ok: false`` with an operator-facing
+    ``message``. Nothing is sent and no provider socket is opened here.
+    """
+    name = str(info.get("name") or info.get("id") or "This channel")
+    if not info.get("enabled"):
+        return {"ok": False,
+                "message": f"{name} is disabled. Enable it, then restart the "
+                           "gateway."}
+    if not info.get("configured"):
+        missing = [str(k) for k in (info.get("missing_env") or ()) if k]
+        if missing:
+            return {"ok": False,
+                    "message": "Missing required setup: " + ", ".join(missing)}
+        return {"ok": False, "message": "Platform setup is incomplete."}
+    if not info.get("gateway_running"):
+        return {"ok": False,
+                "message": "Gateway is not running. Restart the gateway to "
+                           "connect this platform."}
+    if str(info.get("state", "")) == "connected":
+        return {"ok": True, "message": f"{name} is connected."}
+    error_message = str(info.get("error_message") or "").strip()
+    if error_message:
+        return {"ok": False, "message": error_message}
+    return {"ok": False,
+            "message": "Setup looks complete, but the gateway has not reported "
+                       "a connection yet. Restart the gateway."}
+
+
+def platform_connection_test(cfg: Any, platform_id: str,
+                             resolve: Any) -> tuple[int, Dict[str, Any]]:
+    """Run the dashboard channel test with an honest, non-fabricated result.
+
+    ``resolve(cfg, platform_id)`` returns the SAME payload the platform list
+    serves (``name``/``enabled``/``configured``/``gateway_running``/``state``/
+    ``error_message``/``missing_env``/``error_code``) or ``None`` for an unknown
+    id. An unknown id is a typed ``404 MSG_NOT_FOUND``; a known id is ``200``
+    with ``ok`` true **only** when the resolved state is a real ``connected``.
+    The wire field is ``message`` (the shape the SPA and the reference use).
+    """
+    pid = str(platform_id or "").strip()
+    if not pid:
+        return 400, {"ok": False, "code": BAD_INPUT_CODE,
+                     "detail": "platform_id required",
+                     "qubit_counterpart": "CLI `qubit messaging accounts`"}
+    info = resolve(cfg, pid) if callable(resolve) else None
+    if not isinstance(info, dict):
+        return 404, {"ok": False, "code": NOT_FOUND_CODE,
+                     "detail": f"no channel {pid!r}",
+                     "qubit_counterpart": "GET /api/messaging/platforms "
+                                          "(real catalog)"}
+    verdict = platform_test_verdict(info)
+    state = str(info.get("state", "") or "")
+    return 200, {
+        "ok": bool(verdict["ok"]), "platform": pid, "state": state,
+        "reachable": state == "connected", "message": verdict["message"],
+        "error_code": info.get("error_code"),
+        "link": info.get("link") if isinstance(info.get("link"), dict) else {},
+        "detail": verdict["message"],
+    }
 
 
 # ---------------------------------------------------------------- outbox

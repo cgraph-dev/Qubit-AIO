@@ -100,7 +100,7 @@ def test_invalid_persisted_reasoning_degrades_not_brick(
     cfg = _cfg(tmp_path, monkeypatch)
     st = CT.store(cfg)
     st.ensure("voice-corrupt", model="qubit-brain4")
-    st.meta_patch("voice-corrupt", {"reasoning": "ultra"})
+    st.meta_patch("voice-corrupt", {"reasoning": "definitely-not-a-level"})
 
     capture = _stub_gateway(monkeypatch)
     _no_plan(monkeypatch)

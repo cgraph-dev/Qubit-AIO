@@ -915,33 +915,18 @@ describe("resolveModelProfile", () => {
 });
 
 describe("api.setModelAssignment", () => {
-  it("resolves the main provider/model to a real profile and persists it", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        jsonResponse(
-          [
-            {
-              id: "qubit-go",
-              kind: "api",
-              provider: "opencode-go",
-              model: "deepseek-v4-flash",
-              locality: "external",
-              enabled: true,
-              default: true,
-              context_tokens: 200000,
-              min_context_tokens: 65536,
-              meets_floor: true,
-              code: "OK",
-              has_credential: true,
-            },
-          ],
-          200,
-        ),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ ok: true, profile_id: "qubit-go", meets_floor: true }, 200),
-      );
+  it("posts the main provider/model to the canonical /api/model/set route", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ok: true,
+          scope: "main",
+          provider: "opencode-go",
+          model: "deepseek-v4-flash",
+        },
+        200,
+      ),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await api.setModelAssignment({
@@ -952,31 +937,54 @@ describe("api.setModelAssignment", () => {
 
     expect(result.ok).toBe(true);
     expect(result.model).toBe("deepseek-v4-flash");
-    // Reads the real registry, then writes the profile — never the compat
-    // `/api/model/set` brain-profile path.
-    expect(String(fetchMock.mock.calls[0][0])).toContain(
-      "/agent/api/terminal/profiles",
-    );
-    const [url, init] = fetchMock.mock.calls[1];
-    expect(url).toBe("/agent/api/terminal/profile");
-    expect(JSON.parse(String(init?.body))).toEqual({ profile_id: "qubit-go" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/agent/api/model/set");
+    expect(url).not.toContain("/terminal/profiles");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      scope: "main",
+      provider: "opencode-go",
+      model: "deepseek-v4-flash",
+    });
   });
 
-  it("refuses an unknown provider/model with a typed error", async () => {
+  it("passes through the confirm_required envelope", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>(async () =>
-        jsonResponse([], 200),
+        jsonResponse(
+          { ok: false, confirm_required: true, confirm_message: "expensive" },
+          200,
+        ),
+      ),
+    );
+
+    const result = await api.setModelAssignment({
+      scope: "main",
+      provider: "openai-api",
+      model: "o1",
+    });
+    expect(result.confirm_required).toBe(true);
+  });
+
+  it("surfaces the backend's typed refusal instead of a fabricated success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        jsonResponse(
+          { ok: false, code: "MODEL_ENDPOINT_REQUIRED", detail: "no endpoint" },
+          400,
+        ),
       ),
     );
 
     await expect(
       api.setModelAssignment({
         scope: "main",
-        provider: "opencode-go",
-        model: "nope",
+        provider: "openrouter",
+        model: "x/y",
       }),
-    ).rejects.toMatchObject({ code: "UNKNOWN_MODEL_PROFILE" });
+    ).rejects.toMatchObject({ code: "MODEL_ENDPOINT_REQUIRED" });
   });
 
   it("refuses auxiliary task pins with a typed error", async () => {

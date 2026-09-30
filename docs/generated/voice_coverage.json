@@ -1,7 +1,7 @@
 {
   "classification": {
-    "guard": "resolves to an audited voice_unsupported refusal",
-    "real": "resolves to an entry with a bound _BACKENDS backend (not voice_unsupported)",
+    "guard": "resolves to an audited refusal/guidance: voice_unsupported, a *_refusal entry, a *_help/*_guidance entry, or a guard_* entry",
+    "real": "resolves to an entry with a bound _BACKENDS backend that is not a refusal/guidance",
     "unresolved": "no unique entry, or an entry with a dead backend"
   },
   "registry": {
@@ -151,7 +151,7 @@
       "entry": "cli_browser_close_refusal",
       "id": "hermes browser close-profile",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit browser close-profile"
     },
@@ -295,7 +295,7 @@
       "entry": "cli_import_refusal",
       "id": "hermes codex-runtime migrate",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
@@ -327,7 +327,7 @@
       "entry": "cli_computer_install_refusal",
       "id": "hermes computer-use install",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit computer-use install"
     },
@@ -439,7 +439,7 @@
       "entry": "cli_console_root",
       "id": "hermes console",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit console"
     },
@@ -703,7 +703,7 @@
       "entry": "cli_tui_help",
       "id": "hermes dashboard",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit tui help"
     },
@@ -711,7 +711,7 @@
       "entry": "cli_tui_help",
       "id": "hermes dashboard register",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit tui help"
     },
@@ -1479,7 +1479,7 @@
       "entry": "cli_lsp_install_refusal",
       "id": "hermes lsp install",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit lsp install"
     },
@@ -1487,7 +1487,7 @@
       "entry": "cli_lsp_install_refusal",
       "id": "hermes lsp install-all",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit lsp install-all"
     },
@@ -1663,7 +1663,7 @@
       "entry": "cli_import_refusal",
       "id": "hermes migrate",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
@@ -1671,7 +1671,7 @@
       "entry": "cli_import_refusal",
       "id": "hermes migrate relay",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
@@ -1679,7 +1679,7 @@
       "entry": "cli_import_refusal",
       "id": "hermes migrate xai",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit import refusal"
     },
@@ -1855,7 +1855,7 @@
       "entry": "cli_pets_refusal",
       "id": "hermes pets",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -1871,7 +1871,7 @@
       "entry": "cli_pets_refusal",
       "id": "hermes pets install",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -1903,7 +1903,7 @@
       "entry": "cli_pets_refusal",
       "id": "hermes pets scale",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -1911,7 +1911,7 @@
       "entry": "cli_pets_refusal",
       "id": "hermes pets select",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -2359,7 +2359,7 @@
       "entry": "cli_proxy_start_refusal",
       "id": "hermes proxy start",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit proxy start"
     },
@@ -2431,7 +2431,7 @@
       "entry": "cli_acp_serve_refusal",
       "id": "hermes serve",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "cli",
       "voice_intent": "qubit acp serve refusal"
     },
@@ -3271,7 +3271,7 @@
       "entry": "acp_accept_hooks_refusal",
       "id": "op acp_accept_hooks",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit acp accept hooks refusal"
     },
@@ -3279,7 +3279,7 @@
       "entry": "acp_accept_hooks_refusal",
       "id": "op acp_accept_hooks_refusal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit acp accept hooks refusal"
     },
@@ -3343,7 +3343,7 @@
       "entry": "cli_acp_serve_refusal",
       "id": "op acp_serve",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit acp serve refusal"
     },
@@ -3351,7 +3351,7 @@
       "entry": "cli_acp_serve_refusal",
       "id": "op acp_serve_refusal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit acp serve refusal"
     },
@@ -4231,7 +4231,7 @@
       "entry": "cli_computer_install_refusal",
       "id": "op computer_install",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit computer install refusal"
     },
@@ -4239,7 +4239,7 @@
       "entry": "cli_computer_install_refusal",
       "id": "op computer_install_refusal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit computer install refusal"
     },
@@ -4335,7 +4335,7 @@
       "entry": "cli_console_help",
       "id": "op console_help",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit console help"
     },
@@ -4671,7 +4671,7 @@
       "entry": "cli_gateway_supervision_refusal",
       "id": "op gateway_supervision",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit gateway supervision refusal"
     },
@@ -4679,7 +4679,7 @@
       "entry": "cli_gateway_supervision_refusal",
       "id": "op gateway_supervision_refusal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit gateway supervision refusal"
     },
@@ -5135,7 +5135,7 @@
       "entry": "cli_import_refusal",
       "id": "op import_agent_import",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit import refusal"
     },
@@ -5847,7 +5847,7 @@
       "entry": "cli_mic_help",
       "id": "op mic_help",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit mic help"
     },
@@ -5855,7 +5855,7 @@
       "entry": "cli_mic_help",
       "id": "op mic_test",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit mic help"
     },
@@ -6303,7 +6303,7 @@
       "entry": "cli_pets_refusal",
       "id": "op pets_downloads",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -6311,7 +6311,7 @@
       "entry": "cli_pets_refusal",
       "id": "op pets_downloads_refusal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit pets downloads refusal"
     },
@@ -6679,7 +6679,7 @@
       "entry": "cli_proxy_start_refusal",
       "id": "op proxy_start",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit proxy start refusal"
     },
@@ -6687,7 +6687,7 @@
       "entry": "cli_proxy_start_refusal",
       "id": "op proxy_start_refusal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit proxy start refusal"
     },
@@ -7543,7 +7543,7 @@
       "entry": "cli_tui_help",
       "id": "op tui_help",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "controls",
       "voice_intent": "qubit tui help"
     },
@@ -8239,7 +8239,7 @@
       "entry": "cli_tui_help",
       "id": "GET /api/dashboard/font",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit tui help"
     },
@@ -8247,7 +8247,7 @@
       "entry": "cli_tui_help",
       "id": "GET /api/dashboard/plugins",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit tui help"
     },
@@ -8263,7 +8263,7 @@
       "entry": "cli_tui_help",
       "id": "GET /api/dashboard/plugins/hub",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit tui help"
     },
@@ -8271,7 +8271,7 @@
       "entry": "cli_tui_help",
       "id": "GET /api/dashboard/plugins/rescan",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit tui help"
     },
@@ -8383,7 +8383,7 @@
       "entry": "cli_import_refusal",
       "id": "GET /api/gateway/migrate/plan",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit import refusal"
     },
@@ -9279,7 +9279,7 @@
       "entry": "cli_import_refusal",
       "id": "POST /api/gateway/migrate",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit import refusal"
     },
@@ -9287,7 +9287,7 @@
       "entry": "cli_gateway_supervision_refusal",
       "id": "POST /api/gateway/restart",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit gateway supervision refusal"
     },
@@ -9295,7 +9295,7 @@
       "entry": "cli_gateway_supervision_refusal",
       "id": "POST /api/gateway/start",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit gateway supervision refusal"
     },
@@ -9599,7 +9599,7 @@
       "entry": "cli_import_refusal",
       "id": "POST /api/ops/config-migrate",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit import refusal"
     },
@@ -9743,7 +9743,7 @@
       "entry": "cli_console_help",
       "id": "POST /api/profiles/{name}/open-terminal",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit console help"
     },
@@ -9927,7 +9927,7 @@
       "entry": "cli_tui_help",
       "id": "PUT /api/dashboard/font",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit tui help"
     },
@@ -9935,7 +9935,7 @@
       "entry": "cli_tui_help",
       "id": "PUT /api/dashboard/plugin-providers",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit tui help"
     },
@@ -10111,7 +10111,7 @@
       "entry": "cli_console_help",
       "id": "WEBSOCKET /api/console",
       "kind": "match",
-      "resolution": "real",
+      "resolution": "guard",
       "surface": "routes",
       "voice_intent": "qubit console help"
     },
@@ -11129,24 +11129,24 @@
   "source_schema": "qubit-parity-inventory/1",
   "summary": {
     "distinct_intents": 883,
-    "guard": 193,
-    "real": 1189,
-    "real_pct": 85.6,
+    "guard": 240,
+    "real": 1142,
+    "real_pct": 82.22,
     "rows": 1389,
     "unresolved": 7
   },
   "surfaces": {
     "cli": {
-      "guard": 135,
-      "real": 249,
-      "real_pct": 64.18,
+      "guard": 152,
+      "real": 232,
+      "real_pct": 59.79,
       "total": 388,
       "unresolved": 4
     },
     "controls": {
-      "guard": 36,
-      "real": 567,
-      "real_pct": 94.03,
+      "guard": 53,
+      "real": 550,
+      "real_pct": 91.21,
       "total": 603,
       "unresolved": 0
     },
@@ -11158,9 +11158,9 @@
       "unresolved": 0
     },
     "routes": {
-      "guard": 21,
-      "real": 253,
-      "real_pct": 91.34,
+      "guard": 34,
+      "real": 240,
+      "real_pct": 86.64,
       "total": 277,
       "unresolved": 3
     },

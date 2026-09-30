@@ -43,7 +43,8 @@ import os
 import re
 import sqlite3
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, time as dt_time, timedelta
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -130,6 +131,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   hour INTEGER NOT NULL DEFAULT -1,
   minute INTEGER NOT NULL DEFAULT 0,
   at_ts REAL NOT NULL DEFAULT 0,
+  cron_expr TEXT NOT NULL DEFAULT '',
   enabled INTEGER NOT NULL DEFAULT 1,
   created_by TEXT NOT NULL DEFAULT '',
   created_at REAL NOT NULL,
@@ -138,6 +140,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   last_state TEXT NOT NULL DEFAULT '',
   run_count INTEGER NOT NULL DEFAULT 0,
   deliver_to TEXT NOT NULL DEFAULT '',
+  deliver_pref TEXT NOT NULL DEFAULT '',
   retry_at REAL NOT NULL DEFAULT 0,
   retry_attempt INTEGER NOT NULL DEFAULT 0,
   last_error TEXT NOT NULL DEFAULT ''
@@ -326,6 +329,11 @@ def _natural_next_run_at(job: Dict[str, Any], *, cfg: Any = None,
         except (TypeError, ValueError):
             return None
         return at if at > 0 and base <= 0 else None
+    if kind == "cron":
+        parsed = _parse_cron(str(job.get("cron_expr", "") or ""))
+        if parsed is None:
+            return None
+        return _cron_next(parsed, moment, zone)
     return None
 
 
@@ -482,6 +490,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "deliver_to" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN deliver_to TEXT "
                      "NOT NULL DEFAULT ''")
+    if "cron_expr" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN cron_expr TEXT "
+                     "NOT NULL DEFAULT ''")
+    if "deliver_pref" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN deliver_pref TEXT "
+                     "NOT NULL DEFAULT ''")
     if "retry_at" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN retry_at REAL "
                      "NOT NULL DEFAULT 0")
@@ -507,6 +521,8 @@ def _job_dict(row: sqlite3.Row) -> Dict[str, Any]:
             "task_text": row["task_text"][:500], "kind": row["kind"],
             "interval_min": row["interval_min"], "hour": row["hour"],
             "minute": row["minute"], "at_ts": row["at_ts"],
+            "cron_expr": row["cron_expr"],
+            "deliver_pref": row["deliver_pref"],
             "enabled": bool(row["enabled"]),
             "created_by": row["created_by"],
             "created_at": row["created_at"],
@@ -587,12 +603,141 @@ def extract_when(text: str) -> tuple:
     return task, when
 
 
+# --- 5-field cron + ISO datetime (dashboard schedule builder) ----------------
+# The dashboard's ScheduleBuilder emits cron expressions (daily/weekly/monthly)
+# and an ISO timestamp (once); the reference cron surface accepts them, so the
+# Qubit store must too. A small standard 5-field matcher is enough here: the
+# store still owns exactly one scheduling authority.
+_ISO_WHEN_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$")
+_CRON_BOUNDS: Tuple[Tuple[str, int, int], ...] = (
+    ("minute", 0, 59), ("hour", 0, 23), ("dom", 1, 31), ("month", 1, 12),
+    ("dow", 0, 7))
+
+
+def _cron_field_values(field: str, lo: int, hi: int) -> frozenset:
+    """Expand one cron field (``*``, ``a,b``, ``a-b``, ``*/n``, ``a-b/n``)."""
+    values = set()
+    for part in str(field or "").split(","):
+        part = part.strip()
+        if not part:
+            raise ValueError("empty cron field")
+        step = 1
+        if "/" in part:
+            base, _, step_s = part.partition("/")
+            if not step_s.isdigit() or int(step_s) <= 0:
+                raise ValueError("bad cron step")
+            step = int(step_s)
+        else:
+            base = part
+        if base == "*":
+            start, end = lo, hi
+        elif "-" in base:
+            a, _, b = base.partition("-")
+            if not (a.isdigit() and b.isdigit()):
+                raise ValueError("bad cron range")
+            start, end = int(a), int(b)
+        else:
+            if not base.isdigit():
+                raise ValueError("bad cron value")
+            start = end = int(base)
+        if start < lo or end > hi or start > end:
+            raise ValueError("cron value out of range")
+        values.update(range(start, end + 1, step))
+    if not values:
+        raise ValueError("empty cron field")
+    return frozenset(values)
+
+
+@lru_cache(maxsize=256)
+def _parse_cron(text: str) -> Optional[Dict[str, Any]]:
+    """Parse a 5-field cron expression; ``None`` when it is not valid.
+
+    Cached because ``_due``/``next_run_at`` run per tick per job.
+    """
+    fields = str(text or "").split()
+    if len(fields) != 5:
+        return None
+    parsed: Dict[str, Any] = {}
+    try:
+        for field, (name, lo, hi) in zip(fields, _CRON_BOUNDS):
+            parsed[name] = _cron_field_values(field, lo, hi)
+    except ValueError:
+        return None
+    return parsed
+
+
+def _cron_dow_values(parsed: Dict[str, Any]) -> frozenset:
+    """Normalize the day-of-week set to 0..6 (Sunday=0, 7 -> 0)."""
+    days = {0 if d == 7 else d for d in parsed["dow"]}
+    return frozenset(days)
+
+
+def _cron_day_matches(parsed: Dict[str, Any], day: Any) -> bool:
+    dom_all = parsed["dom"] == frozenset(range(1, 32))
+    dow_all = parsed["dow"] == frozenset(range(0, 8))
+    dom_ok = day.day in parsed["dom"]
+    cron_dow = (day.weekday() + 1) % 7  # Mon=0..Sun=6 -> Sun=0..Sat=6
+    dow_ok = cron_dow in _cron_dow_values(parsed)
+    if not dom_all and not dow_all:
+        # Vixie cron: with both day fields restricted, either may match.
+        return dom_ok or dow_ok
+    return dom_ok and dow_ok
+
+
+def _cron_next(parsed: Dict[str, Any], after: float,
+               zone: Any) -> Optional[float]:
+    """Epoch of the first matching wall-clock minute strictly after ``after``."""
+    start = _local(after, zone).replace(second=0, microsecond=0)
+    start = start + timedelta(minutes=1)
+    hours = sorted(parsed["hour"])
+    minutes = sorted(parsed["minute"])
+    for offset in range(0, 366 * 5 + 2):
+        day = (start + timedelta(days=offset)).date()
+        if day.month not in parsed["month"]:
+            continue
+        if not _cron_day_matches(parsed, day):
+            continue
+        for hour in hours:
+            for minute in minutes:
+                cand = datetime.combine(day, dt_time(hour, minute))
+                if zone is not None:
+                    cand = cand.replace(tzinfo=zone)
+                if cand >= start:
+                    return cand.timestamp()
+    return None
+
+
+def _cron_prev(parsed: Dict[str, Any], at: float,
+               zone: Any) -> Optional[float]:
+    """Epoch of the last matching wall-clock minute at or before ``at``."""
+    start = _local(at, zone).replace(second=0, microsecond=0)
+    hours = sorted(parsed["hour"], reverse=True)
+    minutes = sorted(parsed["minute"], reverse=True)
+    for offset in range(0, 366 * 5 + 2):
+        day = (start - timedelta(days=offset)).date()
+        if day.month not in parsed["month"]:
+            continue
+        if not _cron_day_matches(parsed, day):
+            continue
+        for hour in hours:
+            for minute in minutes:
+                cand = datetime.combine(day, dt_time(hour, minute))
+                if zone is not None:
+                    cand = cand.replace(tzinfo=zone)
+                if cand <= start:
+                    return cand.timestamp()
+    return None
+
+
 def parse_when(spec: str, *, now: Optional[float] = None) -> Dict[str, Any]:
     """Parse a schedule phrase into a job spec dict.
 
-    Accepts ``every N minutes|hours``, ``daily HH[:MM][am|pm]``, and
-    ``once in N minutes|hours``. Anything else raises BAD_INPUT with the
-    accepted shapes (voice turns this into a clarification question).
+    Accepts ``every N minutes|hours``, ``daily HH[:MM][am|pm]``,
+    ``once in N minutes|hours``, an ISO datetime (``YYYY-MM-DDTHH:MM[:SS]``),
+    and a 5-field cron expression (``0 9 * * *``, ``30 14 * * 1,3,5``,
+    ``0 9 1 * *``). Anything else raises BAD_INPUT with the accepted shapes
+    (voice turns this into a clarification question).
     """
     text = str(spec or "").strip()
     if not text:
@@ -634,10 +779,22 @@ def parse_when(spec: str, *, now: Optional[float] = None) -> Dict[str, Any]:
                                  "once-in delay must be 1..10080 minutes")
         base = now if now is not None else _now()
         return {"kind": "once", "at_ts": base + minutes * 60.0}
+    # ISO datetime (the dashboard's "Once" mode emits a local wall-clock value).
+    if _ISO_WHEN_RE.match(text):
+        try:
+            moment = datetime.fromisoformat(text)
+        except ValueError:
+            moment = None
+        if moment is not None:
+            return {"kind": "once", "at_ts": float(moment.timestamp())}
+    # 5-field cron (daily/weekly/monthly; the custom escape hatch).
+    if _parse_cron(text) is not None:
+        return {"kind": "cron", "cron_expr": " ".join(text.split())}
     raise SchedulesError(
         BAD_INPUT_CODE,
         f"unknown schedule {text[:60]!r}: say 'every 30 minutes', "
-        f"'daily 9am', or 'once in 10 minutes'")
+        f"'daily 9am', 'once in 10 minutes', an ISO datetime, or a 5-field "
+        f"cron expression")
 
 
 def _missed_windows(job: Dict[str, Any], now: float) -> int:
@@ -687,6 +844,13 @@ def _due(job: Dict[str, Any], now: float, cfg: Any = None) -> bool:
         return job["last_run_at"] < target <= now
     if kind == "once":
         return job["last_run_at"] <= 0 < job["at_ts"] <= now
+    if kind == "cron":
+        parsed = _parse_cron(str(job.get("cron_expr", "") or ""))
+        if parsed is None:
+            return False
+        zone, _name = _zone(cfg)
+        prev = _cron_prev(parsed, now, zone)
+        return prev is not None and job["last_run_at"] < prev <= now
     return False
 
 
@@ -810,8 +974,25 @@ def confirm_requested(body: Optional[Dict[str, Any]] = None,
 
 
 # ------------------------------------------------------------------ CRUD
+def _deliver_canonical(cfg: Any, pref: str) -> str:
+    """Map a stored delivery preference to a real transport spec (or ``""``).
+
+    The dashboard's deliver dropdown offers ``local``/``origin`` and connected
+    platform names; only explicit ``channel:``/``webhook:`` specs name a
+    concrete transport here. A bare platform id is persisted as the display
+    preference but yields no fabricated transport target.
+    """
+    text = str(pref or "").strip()
+    if not text or text.lower() in ("local", "origin", "none", "save"):
+        return ""
+    if text.startswith(("channel:", "webhook:")):
+        return _check_targets(cfg, parse_delivery_spec(text))
+    return ""
+
+
 def create_job(cfg: Any, name: str, task_text: str, when: str, *,
-               deliver_to: str = "", requested_by: str = "cli:user",
+               deliver_to: str = "", deliver_pref: str = "",
+               requested_by: str = "cli:user",
                confirmed: bool = False,
                body: Optional[Dict[str, Any]] = None,
                query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -821,8 +1002,10 @@ def create_job(cfg: Any, name: str, task_text: str, when: str, *,
     compat handlers, CLI, dashboard, and voice all read. ``deliver_to`` names
     zero or more delivery targets to receive the run's bounded, redacted
     result: ``channel:<account>:<recipient>`` and/or ``webhook:<sub_id>``,
-    comma separated. Only configuration is stored here (the reference must
-    already exist); nothing is delivered at create time.
+    comma separated. ``deliver_pref`` is the dashboard's raw deliver choice
+    (``local``/``origin``/platform), preserved for display. Only configuration
+    is stored here (the reference must already exist); nothing is delivered at
+    create time.
     """
     if not (confirmed or confirm_requested(body=body, query=query)):
         raise SchedulesError(CONFIRM_CODE,
@@ -831,18 +1014,21 @@ def create_job(cfg: Any, name: str, task_text: str, when: str, *,
     clean_name = _check_name(name)
     clean_task = _check_task(task_text)
     spec = parse_when(when)
-    canonical = _check_targets(cfg, parse_delivery_spec(deliver_to))
+    pref = str(deliver_pref or deliver_to or "").strip()[:MAX_TARGET_LEN]
+    canonical = _deliver_canonical(cfg, pref)
     conn = _connect(cfg)
     try:
         _migrate(conn)
         cur = conn.execute(
             "INSERT INTO jobs (name, task_text, kind, interval_min, hour, "
-            "minute, at_ts, enabled, created_by, created_at, updated_at, "
-            "deliver_to) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "minute, at_ts, cron_expr, enabled, created_by, created_at, "
+            "updated_at, deliver_to, deliver_pref) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (clean_name, clean_task, spec["kind"],
              int(spec.get("interval_min", 0)), int(spec.get("hour", -1)),
              int(spec.get("minute", 0)), float(spec.get("at_ts", 0.0)),
-             1, requested_by, _now(), _now(), canonical))
+             str(spec.get("cron_expr", "")), 1, requested_by, _now(), _now(),
+             canonical, pref))
         conn.commit()
         job_id = int(cur.lastrowid)
         row = conn.execute("SELECT * FROM jobs WHERE id=?",
@@ -856,11 +1042,13 @@ def create_job(cfg: Any, name: str, task_text: str, when: str, *,
 
 
 def create(cfg: Any, name: str, task_text: str, when: str, *,
-           deliver_to: str = "", requested_by: str = "cli:user",
+           deliver_to: str = "", deliver_pref: str = "",
+           requested_by: str = "cli:user",
            confirmed: bool = False) -> Dict[str, Any]:
     """Back-compat alias for :func:`create_job` (CLI/voice call site)."""
     return create_job(cfg, name, task_text, when, deliver_to=deliver_to,
-                      requested_by=requested_by, confirmed=confirmed)
+                      deliver_pref=deliver_pref, requested_by=requested_by,
+                      confirmed=confirmed)
 
 
 def list_jobs(cfg: Any, *, include_disabled: bool = True,
@@ -941,6 +1129,82 @@ def _set_enabled(cfg: Any, job_id: int, enabled: bool, *,
         conn.close()
 
 
+_EDIT_FIELDS = ("name", "task_text", "prompt", "when", "schedule",
+                "deliver", "deliver_to")
+
+
+def _body_has_edit_fields(body: Any) -> bool:
+    """True when a request body carries an in-place job edit.
+
+    The dashboard's PUT /api/cron/jobs/{id} (edit modal) sends the full
+    mutation through the same store setter pause/resume use; a bare
+    ``{"confirm": true}`` (the row pause/resume actions) never trips this.
+    """
+    if not isinstance(body, dict):
+        return False
+    return any(body.get(key) not in (None, "") for key in _EDIT_FIELDS)
+
+
+def update_job(cfg: Any, job_id: int, *, name: Optional[str] = None,
+               task_text: Optional[str] = None, when: Optional[str] = None,
+               deliver_to: Optional[str] = None,
+               deliver_pref: Optional[str] = None,
+               enabled: Optional[bool] = None,
+               requested_by: str = "cli:user", confirmed: bool = False,
+               body: Optional[Dict[str, Any]] = None,
+               query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Update a job's editable fields in the single store (confirm required).
+
+    Only the fields explicitly supplied change; task text, schedule, name,
+    delivery preference, and enabled state are all mutable here (matching the
+    reference edit contract, which is not immutable in place). Re-parsing
+    ``when`` re-derives the schedule kind/fields in the same row so run history
+    is retained.
+    """
+    if not (confirmed or confirm_requested(body=body, query=query)):
+        raise SchedulesError(CONFIRM_CODE,
+                             "schedule update requires explicit --confirm")
+    conn = _connect(cfg)
+    try:
+        _migrate(conn)
+        _get(conn, job_id)
+        sets: List[str] = []
+        params: List[Any] = []
+        if name not in (None, ""):
+            sets.append("name=?")
+            params.append(_check_name(str(name)))
+        if task_text not in (None, ""):
+            sets.append("task_text=?")
+            params.append(_check_task(str(task_text)))
+        if when not in (None, ""):
+            spec = parse_when(str(when))
+            sets += ["kind=?", "interval_min=?", "hour=?", "minute=?",
+                     "at_ts=?", "cron_expr=?"]
+            params += [spec["kind"], int(spec.get("interval_min", 0)),
+                       int(spec.get("hour", -1)), int(spec.get("minute", 0)),
+                       float(spec.get("at_ts", 0.0)),
+                       str(spec.get("cron_expr", ""))]
+        if deliver_pref is not None or deliver_to is not None:
+            pref = str(deliver_pref if deliver_pref is not None
+                       else deliver_to or "").strip()[:MAX_TARGET_LEN]
+            sets += ["deliver_pref=?", "deliver_to=?"]
+            params += [pref, _deliver_canonical(cfg, pref)]
+        if enabled is not None:
+            sets.append("enabled=?")
+            params.append(1 if enabled else 0)
+        if sets:
+            sets.append("updated_at=?")
+            params.append(_now())
+            conn.execute("UPDATE jobs SET " + ", ".join(sets) + " WHERE id=?",
+                         (*params, int(job_id)))
+            conn.commit()
+            _audit("update", requested_by, {"job_id": str(int(job_id))})
+        return {"state": "OK",
+                "job": _job_view(cfg, _job_dict(_get(conn, job_id)))}
+    finally:
+        conn.close()
+
+
 def set_paused(cfg: Any, job_id: int, paused: bool, *,
                requested_by: str = "cli:user", confirmed: bool = False,
                body: Optional[Dict[str, Any]] = None,
@@ -951,11 +1215,26 @@ def set_paused(cfg: Any, job_id: int, paused: bool, *,
     argument or in the request ``body``/``query`` (both are accepted so the
     route layer never has to special-case a verb). The enabled-state transition
     and its audit receipt are the same as the CLI/voice path.
+
+    The dashboard edit modal routes its full mutation through this same
+    setter (the compat PUT handler); when the body carries editable fields the
+    edit is applied in place via :func:`update_job` so "Save changes" is real
+    rather than an enabled no-op.
     """
+    settled = bool(confirmed or confirm_requested(body=body, query=query))
+    if settled and _body_has_edit_fields(body):
+        assert isinstance(body, dict)
+        return update_job(
+            cfg, job_id,
+            name=body.get("name"),
+            task_text=body.get("task_text", body.get("prompt")),
+            when=(body.get("when") or body.get("schedule")),
+            deliver_pref=body.get("deliver", body.get("deliver_to")),
+            enabled=not paused,
+            requested_by=requested_by, confirmed=True)
     return _set_enabled(
         cfg, job_id, not paused, requested_by=requested_by,
-        confirmed=bool(confirmed or confirm_requested(body=body, query=query)),
-        op="pause" if paused else "resume")
+        confirmed=settled, op="pause" if paused else "resume")
 
 
 def pause(cfg: Any, job_id: int, *, requested_by: str = "cli:user",

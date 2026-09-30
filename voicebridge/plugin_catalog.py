@@ -603,6 +603,16 @@ def local_catalog(cfg: Any, *, query: str = "", source: str = "",
         if not pid:
             continue
         src = str(r.get("source") or "")
+        # Only a runtime entry with an on-disk source directory can be
+        # enable/disable-able: ``plugin_runtime.enable_plugin``/``disable_plugin``
+        # refuse a record whose ``source_kind`` is not ``directory``
+        # (PLUGIN_REFUSED, "no loadable source directory"). A manifest-only
+        # record therefore must not advertise Enable/Disable (a dead control).
+        # Removal is the real action for any installed, non-builtin store record.
+        installed = bool(r.get("installed", True))
+        enabled = bool(r.get("enabled", True))
+        builtin = bool(r.get("builtin", False))
+        is_dir = str(r.get("source_kind") or "") == "directory"
         _add(_base_row(
             id=pid, name=pid,
             label=str(r.get("label") or pid),
@@ -611,10 +621,10 @@ def local_catalog(cfg: Any, *, query: str = "", source: str = "",
             source=src or "registered", kind=str(r.get("kind") or "tool"),
             path=str(r.get("install_dir") or ""),
             manifest_path="",
-            installed=bool(r.get("installed", True)),
-            enabled=bool(r.get("enabled", True)),
-            runtime_status="enabled" if r.get("enabled", True) else "disabled",
-            loadable=bool(r.get("installed", True)),
+            installed=installed,
+            enabled=enabled,
+            runtime_status="enabled" if enabled else "disabled",
+            loadable=installed,
             load_state=str(r.get("load_state") or ""),
             provides={"tools": list((r.get("provides") or {}).get("tools", [])),
                       "hooks": list((r.get("provides") or {}).get("hooks", [])),
@@ -626,8 +636,9 @@ def local_catalog(cfg: Any, *, query: str = "", source: str = "",
                 "registry": "QUBIT_HOME plugin store",
                 "manifest": "",
             },
-            can_enable=bool(r.get("installed")) and not r.get("enabled", True),
-            can_disable=bool(r.get("installed")) and bool(r.get("enabled", True)),
+            can_enable=installed and not enabled and is_dir,
+            can_disable=installed and enabled and is_dir,
+            can_remove=installed and not builtin,
             can_install=bool(r.get("can_install")),
             install_capability=PR.INSTALL_CAPABILITY,
         ))

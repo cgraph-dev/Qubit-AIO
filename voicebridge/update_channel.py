@@ -474,6 +474,122 @@ def is_beta_tag(tag: Any) -> bool:
     return bool(BETA_TAG_RE.fullmatch(_clean(tag)))
 
 
+def _prerelease_key(pre: str) -> tuple:
+    """SemVer pre-release ordering key (build metadata is ignored)."""
+    parts = []
+    for ident in str(pre or "").split("."):
+        if ident.isdigit():
+            parts.append((0, int(ident), ""))
+        else:
+            parts.append((1, 0, ident))
+    return tuple(parts)
+
+
+def tag_sort_key(tag: Any) -> tuple:
+    """A total-order key for a version tag.
+
+    ``vMAJOR.MINOR.PATCH`` numerically, then a release sorts above a
+    pre-release of the same core (SemVer §11); build metadata is ignored.
+    """
+    t = _clean(tag)
+    if t[:1].lower() == "v":
+        t = t[1:]
+    core = t.split("+", 1)[0]
+    pre = ""
+    if "-" in core:
+        core, pre = core.split("-", 1)
+    nums = core.split(".")
+
+    def _int(i: int) -> int:
+        return int(nums[i]) if len(nums) > i and nums[i].isdigit() else 0
+
+    return (_int(0), _int(1), _int(2), 0 if pre else 1, _prerelease_key(pre))
+
+
+def parse_remote_tags(output: Any) -> list:
+    """Tag names from ``git ls-remote --tags`` output.
+
+    Strips the ``refs/tags/`` prefix and an annotated-tag ``^{}`` peel marker,
+    de-duplicates, and preserves the remote's ordering. Non-tag refs (for
+    example a ``refs/heads/`` line a tolerant runner returns) are ignored.
+    """
+    tags: list = []
+    seen = set()
+    for line in str(output or "").splitlines():
+        parts = line.strip().split()
+        if len(parts) < 2:
+            continue
+        ref = parts[1]
+        if not ref.startswith("refs/tags/"):
+            continue
+        name = ref[len("refs/tags/"):]
+        if name.endswith("^{}"):
+            name = name[:-3]
+        if name and name not in seen:
+            seen.add(name)
+            tags.append(name)
+    return tags
+
+
+def select_latest_tag(channel: Any, tags: Any) -> Optional[str]:
+    """Newest tag for *channel* among *tags*, or ``None`` when none match.
+
+    ``stable`` matches only strict ``vMAJOR.MINOR.PATCH`` tags; ``beta`` also
+    accepts a pre-release/build suffix; ``canary`` follows the branch head, so
+    this returns ``None`` by policy.
+    """
+    ch = _clean(channel).lower() or DEFAULT_CHANNEL
+    if ch == "canary":
+        return None
+    pattern = BETA_TAG_RE if ch == "beta" else STABLE_TAG_RE
+    matched = [str(t) for t in (tags or []) if pattern.fullmatch(_clean(t))]
+    if not matched:
+        return None
+    return max(matched, key=tag_sort_key)
+
+
+def select_ref(channel: Any = None, tag: Any = None, tags: Any = None,
+               branch: Any = None) -> Dict[str, Any]:
+    """Select the effective git ref for a channel (or an explicit tag).
+
+    Precedence: an explicit *tag* always wins; ``canary`` follows the branch
+    head; ``stable``/``beta`` select the newest tag matching the channel's
+    pattern. When the channel follows tags but none match, the concrete ref
+    falls back to *branch* (so updates remain possible until a release tag
+    exists), with ``ref_kind == "branch"`` and ``resolve_latest_tag`` true.
+
+    Pure for a valid channel; an unknown channel propagates the ``ValueError``
+    from :func:`release_tag_support`.
+    """
+    support = release_tag_support(channel or DEFAULT_CHANNEL)
+    resolved_branch = (_clean(branch) or str(support.get("branch") or "")
+                       or DEFAULT_BRANCH)
+    explicit = _clean(tag)
+    if explicit:
+        return {"ref": explicit, "ref_kind": "tag", "pinned": True,
+                "channel": support["channel"], "resolve_latest_tag": False,
+                "matched_tag": None,
+                "detail": f"explicit tag {explicit!r} selected"}
+    if support["follow"] != "tag":
+        return {"ref": resolved_branch, "ref_kind": "branch", "pinned": False,
+                "channel": support["channel"], "resolve_latest_tag": False,
+                "matched_tag": None,
+                "detail": (f"channel {support['channel']!r} follows the branch "
+                           f"head {resolved_branch!r}")}
+    latest = select_latest_tag(support["channel"], tags)
+    if latest:
+        return {"ref": latest, "ref_kind": "tag", "pinned": False,
+                "channel": support["channel"], "resolve_latest_tag": True,
+                "matched_tag": latest,
+                "detail": (f"channel {support['channel']!r} selected the newest "
+                           f"matching tag {latest!r}")}
+    return {"ref": resolved_branch, "ref_kind": "branch", "pinned": False,
+            "channel": support["channel"], "resolve_latest_tag": True,
+            "matched_tag": None,
+            "detail": (f"channel {support['channel']!r} found no matching tag; "
+                       f"falling back to the branch head {resolved_branch!r}")}
+
+
 def _channel_paths(cfg: Any) -> Tuple[Path, list]:
     home = qubit_home(cfg)
     return home, [home / CHANNEL_FILE,
@@ -729,6 +845,7 @@ __all__ = [
     "CHANNEL_FILE", "READ_OLD_CHANNEL_FILES",
     "classify_source", "redact_url", "validate_remote_url",
     "anonymous_update_supported", "release_tag_support", "is_stable_tag",
-    "is_beta_tag", "is_valid_channel", "qubit_home", "channel_record",
+    "is_beta_tag", "tag_sort_key", "parse_remote_tags", "select_latest_tag",
+    "select_ref", "is_valid_channel", "qubit_home", "channel_record",
     "resolve_channel", "set_channel", "resolve_source",
 ]

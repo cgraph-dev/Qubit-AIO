@@ -110,9 +110,9 @@ GATED = [
     ("POST", "/api/git/review/push", "GIT_WRITE_BROKERED"),
     ("POST", "/api/git/review/create-pr", "GIT_WRITE_BROKERED"),
     ("GET", "/api/media", "MEDIA_NOT_SERVED"),
-    ("GET", "/api/files/download", "FILES_BINARY_STREAM"),
-    ("GET", "/api/files/stream", "FILES_BINARY_STREAM"),
-    ("GET", "/api/fs/download", "FILES_BINARY_STREAM"),
+    # D5: /api/files/download, /api/files/stream, /api/fs/download are now real
+    # brokered binary downloads (voicebridge.qubit_compat.h_files_download);
+    # covered by tests/test_audit_remaining_repair9u.py, not this gate table.
     ("GET", "/api/audio/elevenlabs/voices", "PROVIDER_EXTERNAL"),
     ("POST", "/api/audio/tts-lease", "AUDIO_LEASE_DESKTOP"),
     ("GET", "/api/audio/speak-stream", "AUDIO_STREAM_LOCAL"),

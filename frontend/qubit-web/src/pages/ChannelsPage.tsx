@@ -59,6 +59,9 @@ const STATE_BADGE: Record<
   startup_failed: { tone: "destructive", label: "Start failed" },
   disconnected: { tone: "warning", label: "Disconnected" },
   not_configured: { tone: "outline", label: "Not configured" },
+  unconfigured: { tone: "outline", label: "Not configured" },
+  unavailable: { tone: "outline", label: "Unavailable" },
+  degraded: { tone: "warning", label: "Degraded" },
   disabled: { tone: "secondary", label: "Disabled" },
   fatal: { tone: "destructive", label: "Error" },
 };
@@ -283,7 +286,14 @@ export default function ChannelsPage() {
     setTestingId(platform.id);
     try {
       const res = await api.testMessagingPlatform(platform.id);
-      showToast(`${platform.name}: ${res.message}`, res.ok ? "success" : "error");
+      // The honest test contract puts the operator-facing reason in `message`
+      // (the reference shape); tolerate a legacy `detail` and never render the
+      // string "undefined" for a refusal.
+      const detail =
+        res.message ||
+        (res as { detail?: string }).detail ||
+        (res.ok ? "Connection verified." : "Not connected.");
+      showToast(`${platform.name}: ${detail}`, res.ok ? "success" : "error");
     } catch (e) {
       showToast(`Error: ${e}`, "error");
     } finally {
@@ -964,6 +974,13 @@ function WhatsAppOnboardingPanel({
           )}
         </div>
 
+        <p className="text-xs text-muted-foreground">
+          QR pairing needs the operator-guided WhatsApp onboarding bridge, which
+          is not enabled in this installation; selecting it returns the operator
+          prerequisite. Configure the WhatsApp credential reference manually
+          until the operator enables the bridge.
+        </p>
+
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <div className="grid gap-1.5">
             <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
@@ -1341,13 +1358,17 @@ function TelegramOnboardingPanel({
         <div className="grid content-start gap-3 sm:pr-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium uppercase text-foreground">
-              Quick setup
+              Automatic QR setup
             </span>
-            <Badge tone="success">recommended</Badge>
+            <Badge tone="warning">operator prerequisite</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Scan a QR code and confirm in Telegram. Qubit creates the bot and
-            detects your Telegram user ID automatically.
+            Automatic bot creation needs the operator-guided Telegram onboarding
+            bridge, which is not enabled in this installation. Selecting it
+            returns the operator prerequisite instead of connecting. Use{" "}
+            <span className="font-medium text-foreground">Manual setup</span>{" "}
+            with a <code className="font-courier">@BotFather</code> token
+            reference to connect a bot now.
           </p>
           <Button
             size="sm"

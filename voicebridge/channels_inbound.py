@@ -242,6 +242,28 @@ LISTENER = {
               "already-authenticated payload",
 }
 
+# Documented root cause for "no catalog channel can reach connected" (audit
+# fix-channels defect 3): the dashboard writes channel config to
+# ``msg-platforms.json`` (``voicebridge.qubit_compat``), but NO transport
+# adapter reads it. The outbound transport resolves accounts from
+# ``msg-accounts.json`` (``voicebridge.messaging``) and the vendored gateway
+# reads its own ``config.yaml``/``.env``; ``channels_inbound`` starts no
+# listener. Until an operator/architecture bridge joins the dashboard store to
+# a real transport, a dashboard-configured channel honestly stays
+# ``UNAVAILABLE`` rather than a fabricated ``connected``.
+DASHBOARD_CONFIG_WIRING = {
+    "dashboard_store": "msg-platforms.json",
+    "dashboard_store_writer": "voicebridge.qubit_compat.msg_update",
+    "transport_store": "msg-accounts.json",
+    "transport_reader": "voicebridge.messaging",
+    "consumed_by_adapter": False,
+    "operator_prerequisite": "bridge the dashboard channel config "
+                             "(msg-platforms.json) to the transport account "
+                             "store / gateway config, or make the gateway read "
+                             "msg-platforms.json; no Qubit transport reads it "
+                             "today",
+}
+
 
 class ChannelError(Exception):
     """Typed inbound-channel failure (never a traceback on the CLI)."""
@@ -508,6 +530,7 @@ def status(cfg: Any) -> Dict[str, Any]:
             "configured": configured, "connected": 0,
             "listener": LISTENER["state"],
             "listener_detail": LISTENER["detail"],
+            "dashboard_config_wiring": dict(DASHBOARD_CONFIG_WIRING),
             "estop": latched,
             "detail": "real registry/contract with typed CHANNEL_UNAVAILABLE "
                       "until a listener transport is configured"}

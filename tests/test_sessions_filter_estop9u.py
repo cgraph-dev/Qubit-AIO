@@ -49,13 +49,13 @@ def test_list_honors_source_sources_and_exclude_sources(tmp_path, monkeypatch):
     code, out = HC.h_sessions_list(cfg, {}, {}, {})
     assert code == 200 and out["total"] == 2, out
 
-    code, out = HC.h_sessions_list(cfg, {"source": "qubit-chat"}, {}, {})
+    code, out = HC.h_sessions_list(cfg, {"source": "dashboard"}, {}, {})
     assert out["total"] == 2, out
 
     code, out = HC.h_sessions_list(cfg, {"sources": "qubit-receipts"}, {}, {})
     assert out["total"] == 0, out
 
-    code, out = HC.h_sessions_list(cfg, {"exclude_sources": "qubit-chat"}, {},
+    code, out = HC.h_sessions_list(cfg, {"exclude_sources": "dashboard"}, {},
                                    {})
     assert out["total"] == 0, out
 

@@ -114,6 +114,18 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
 
       {open && !useMobileSheet && (() => {
         const rect = wrapperRef.current?.getBoundingClientRect();
+        // `dropUp` is used by the sidebar rail. Anchor the flyout to the RIGHT
+        // edge of the sidebar (not over it) so the open listbox never covers
+        // the sidebar's own controls (e.g. Restart Gateway). While it is open
+        // the rest of the sidebar stays clickable, and a click anywhere outside
+        // dismisses it through the document mousedown handler above.
+        const sidebarRight =
+          document.getElementById("app-sidebar")?.getBoundingClientRect().right;
+        const flyoutLeft = dropUp
+          ? sidebarRight !== undefined && sidebarRight > 0
+            ? sidebarRight + 8
+            : (rect?.right ?? 0) + 8
+          : undefined;
         const dropdown = (
           <div
             ref={dropdownRef}
@@ -127,7 +139,10 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
             role="listbox"
             style={
               dropUp && rect
-                ? { bottom: window.innerHeight - rect.top + 4, left: rect.left }
+                ? {
+                    bottom: window.innerHeight - rect.top + 4,
+                    left: flyoutLeft,
+                  }
                 : undefined
             }
           >

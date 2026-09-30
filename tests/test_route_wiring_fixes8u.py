@@ -6,7 +6,8 @@ dispatcher where the transport is not under test):
 
 1. every ``/agent/`` write (not just ``/agent/api/``) reaches the compat
    dispatcher (POST/PUT/PATCH/DELETE);
-2. ``HEAD /agent/api/files/stream`` returns the typed gate, never a bare 404;
+2. ``HEAD /agent/api/files/stream`` reaches the real download handler (its
+   typed ``path required`` refusal when no path is given), never a bare 404;
 3. the SPA e-stop alias ``/agent/api/power`` reaches the one power authority;
 4. cron GET and POST read/write the SAME schedules store (no split-brain);
 5. the skill/toolset/cron confirmation contracts carry a POPULATED,
@@ -113,12 +114,14 @@ def test_all_agent_writes_reach_compat_not_bare_404(tmp_path, monkeypatch):
 def test_head_agent_route_returns_typed_gate_no_body(tmp_path, monkeypatch):
     ui, port = _live(tmp_path, monkeypatch)
     try:
+        # D5: /api/files/stream is a real brokered binary download now, so a
+        # request with no ``path`` is a typed 400 (never a bare 404); HEAD
+        # carries headers only.
         st, raw = _req(port, "HEAD", "/agent/api/files/stream")
-        assert st == 403, (st, raw[:200])
+        assert st == 400, (st, raw[:200])
         assert raw == b"", raw[:200]  # HEAD carries headers only
-        # The GET sibling still answers the same typed gate.
         st, raw = _req(port, "GET", "/agent/api/files/stream")
-        assert st == 403 and _json_body(raw)["code"] == "FILES_BINARY_STREAM"
+        assert st == 400 and _json_body(raw)["code"] == "MALFORMED"
     finally:
         ui.stop()
 

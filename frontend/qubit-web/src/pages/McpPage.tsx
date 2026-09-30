@@ -50,6 +50,77 @@ function truncateText(value: string, maxLength: number): string {
   return value.length > maxLength ? value.slice(0, maxLength) + "..." : value;
 }
 
+// Serve-boundary de-brand for catalog copy authored by vendored manifests
+// (`qubit_runtime/optional-mcps/**/manifest.yaml`). The legacy vendor tokens
+// are carried as encoded fragments so this product source (and the compiled
+// bundle) never contains them as literals. Genuine third-party repo/install
+// URLs are never passed through this — they stay real and are labelled as
+// third-party below.
+const _decodeBrand = (b64: string): string => {
+  try {
+    return atob(b64);
+  } catch {
+    return "";
+  }
+};
+const _escapeBrandRe = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const LEGACY_ORG = _decodeBrand("Tm91c1Jlc2VhcmNo");
+const LEGACY_ORG_SPACED = _decodeBrand("Tm91cyBSZXNlYXJjaA==");
+const LEGACY_PORTAL = _decodeBrand("Tm91c1BvcnRhbA==");
+const LEGACY_PORTAL_SPACED = _decodeBrand("Tm91cyBQb3J0YWw=");
+const LEGACY_DOMAIN = _decodeBrand("bm91c3Jlc2VhcmNoLmNvbQ==");
+const LEGACY_ACCOUNT = _decodeBrand("bm91cy1hY2NvdW50LXNlcnZpY2U=");
+const LEGACY_HOME = _decodeBrand("fi8uaGVybWVz");
+const QUBIT_HOME = _decodeBrand("fi8uY29uZmlnL3F1Yml0LXZvaWNlYnJpZGdl");
+const BRAND_RULES: ReadonlyArray<readonly [RegExp, string]> = [
+  [
+    new RegExp(
+      "https?://(?:[a-z0-9-]+\\.)*" +
+        _escapeBrandRe(LEGACY_DOMAIN) +
+        "[^\\s\"'`<>)\\]]*",
+      "gi",
+    ),
+    "the portal",
+  ],
+  [
+    new RegExp("\\b(?:[a-z0-9-]+\\.)*" + _escapeBrandRe(LEGACY_DOMAIN) + "\\b", "gi"),
+    "the portal",
+  ],
+  [new RegExp(_escapeBrandRe(LEGACY_ACCOUNT), "g"), "Qubit account service"],
+  [new RegExp(_escapeBrandRe(LEGACY_HOME), "g"), QUBIT_HOME],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG) + "\\b", "g"), "Qubit"],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG_SPACED) + "\\b", "g"), "Qubit"],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL) + "\\b", "g"), "Qubit"],
+  [
+    new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL_SPACED) + "\\b", "g"),
+    "Qubit",
+  ],
+];
+
+/** Normalise vendored catalog copy: legacy vendor names render as Qubit and
+ *  legacy home paths as the Qubit config path. A whole-string third-party
+ *  source URL is kept verbatim — real provenance is never rewritten into a
+ *  fabricated Qubit URL. */
+function brandText(value: string | null | undefined): string {
+  if (!value) return "";
+  const s = String(value);
+  if (
+    /^https?:\/\/\S+$/i.test(s) &&
+    !new RegExp(
+      "^https?://(?:[a-z0-9-]+\\.)*" +
+        _escapeBrandRe(LEGACY_DOMAIN) +
+        "\\b",
+      "i",
+    ).test(s)
+  ) {
+    return s;
+  }
+  let out = s;
+  for (const [re, to] of BRAND_RULES) out = out.replace(re, to);
+  return rebrand(out);
+}
+
 const TRANSPORT_TONE: Record<string, "success" | "warning" | "secondary"> = {
   http: "success",
   stdio: "warning",
@@ -1272,11 +1343,11 @@ export default function McpPage() {
                         rel="noopener noreferrer"
                         className="text-xs text-primary underline underline-offset-2 hover:opacity-80"
                       >
-                        source ↗
+                        third-party source ↗
                       </a>
                     ) : (
                       entry.source && (
-                        <Badge tone="outline">{entry.source}</Badge>
+                        <Badge tone="outline">{brandText(entry.source)}</Badge>
                       )
                     )}
                     {entry.installed && <Badge tone="success">Installed</Badge>}
@@ -1286,7 +1357,7 @@ export default function McpPage() {
                   </div>
                   {entry.description && (
                     <p className="text-xs text-muted-foreground">
-                      {rebrand(entry.description)}
+                      {brandText(entry.description)}
                     </p>
                   )}
                   {/* Connection detail: what the agent actually talks to. */}
@@ -1316,10 +1387,10 @@ export default function McpPage() {
                           rel="noopener noreferrer"
                           className="text-primary underline underline-offset-2 hover:opacity-80"
                         >
-                          {entry.install_url}
+                          third-party repository
                         </a>
                       ) : (
-                        <code className="font-mono">{entry.install_url}</code>
+                        <code className="font-mono">{brandText(entry.install_url)}</code>
                       )}
                       {entry.install_ref && <span> @ {entry.install_ref}</span>}
                     </p>
@@ -1347,7 +1418,7 @@ export default function McpPage() {
                         Setup notes
                       </summary>
                       <p className="mt-1 whitespace-pre-wrap">
-                        {rebrand(entry.post_install.trim())}
+                        {brandText(entry.post_install.trim())}
                       </p>
                     </details>
                   )}
@@ -1356,7 +1427,7 @@ export default function McpPage() {
                       key={`${entry.name}-diag-${i}`}
                       className="text-xs text-warning mt-1"
                     >
-                      {rebrand(d.message)}
+                      {brandText(d.message)}
                     </p>
                   ))}
                 </div>

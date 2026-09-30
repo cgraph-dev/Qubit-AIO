@@ -15,6 +15,8 @@ divergence are recorded in ``docs/archive/2026-09-21/UPSTREAM_REUSE.md``.
 """
 from __future__ import annotations
 
+import hashlib
+import mimetypes
 import os
 import stat
 from pathlib import Path
@@ -249,6 +251,43 @@ def read_file(cfg: Any, path: str, *, max_chars: int = MAX_READ_CHARS
     return {"state": "OK", "file": redact_spec(str(target))[:300],
             "size": size, "clipped": clipped, "text": body,
             "trust": "untrusted-file-text"}
+
+
+def read_bytes(cfg: Any, path: str, *,
+               max_bytes: int = MAX_FILE_BYTES) -> Dict[str, Any]:
+    """Read a file's raw bytes inside the approved roots (path-confined).
+
+    The binary counterpart to :func:`read_file` (which refuses binary content
+    with :data:`BINARY_CODE`). Used by the brokered dashboard download/stream
+    path and by the ``/api/files/read`` binary branch so a genuinely-binary
+    file can be downloaded byte-for-byte instead of refused. Confinement
+    (approved roots, special-file refusal) and the size cap are unchanged;
+    bytes are returned verbatim and audited by metadata only (never content).
+    """
+    target = _resolve_inside(cfg, path)
+    _refuse_special(target)
+    if target.is_dir():
+        raise FilesError(BAD_INPUT_CODE, "not a file; use `files list`")
+    try:
+        size = target.stat().st_size
+    except OSError as exc:
+        raise FilesError(IO_CODE, f"cannot stat file ({exc})")
+    cap = max(1, min(int(max_bytes or MAX_FILE_BYTES), MAX_FILE_BYTES))
+    if size > cap:
+        raise FilesError(TOO_LARGE_CODE,
+                         f"file is {size} bytes (limit {cap})")
+    try:
+        data = target.read_bytes()
+    except OSError as exc:
+        raise FilesError(IO_CODE, f"cannot read file ({exc})")
+    mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+    digest = hashlib.sha256(data).hexdigest()
+    _audit("download", "qubit", {"path": redact_spec(str(target))[:120],
+                                 "bytes": str(len(data)),
+                                 "sha256": digest[:16]})
+    return {"state": "OK", "file": redact_spec(str(target))[:300],
+            "name": target.name, "size": len(data), "mime": mime,
+            "sha256": digest, "data": data}
 
 
 def inspect(cfg: Any, path: str = "") -> Dict[str, Any]:

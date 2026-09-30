@@ -468,7 +468,7 @@ def test_right_ctrl_has_a_hermetic_server_side_entry_point():
 def test_voice_input_engine_normalization():
     from voicebridge.config import VOICE_INPUT_ENGINES, normalize_input_engine
 
-    assert VOICE_INPUT_ENGINES == ("browser", "local", "auto")
+    assert VOICE_INPUT_ENGINES == ("browser", "local", "terminal", "auto")
     for value in VOICE_INPUT_ENGINES:
         assert normalize_input_engine(value) == value
     # Unknown/missing/wrong-case values fail closed to the auto engine.

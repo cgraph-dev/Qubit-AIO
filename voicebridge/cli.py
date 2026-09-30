@@ -6473,7 +6473,13 @@ def _update_resolve_channel(cfg, source, channel, tag):
     if channel:
         resolved["channel"] = channel
     if tag:
+        # An explicit tag is a pin: it wins over the channel's tag policy and is
+        # threaded to the manager so the effective git ref is that tag.
         resolved["tag"] = tag
+        resolved["ref"] = tag
+        resolved["ref_kind"] = "tag"
+        resolved["pinned"] = True
+        resolved["resolve_latest_tag"] = False
     if not resolved.get("ok", True):
         raise ValueError(str(resolved.get("detail")
                              or resolved.get("code") or "update source refused"))
@@ -6532,6 +6538,10 @@ def _cmd_update(cfg, args) -> int:
         return 2
 
     if verb == "check":
+        # Thread the selected channel/tag into the manager so the effective ref
+        # it reports is the ref `--apply` will actually fetch. Only pass them
+        # when supplied, so a bare `qubit update --check` keeps the historical
+        # configured-branch behavior (and remains call-compatible).
         check_kwargs: dict = {"source": source}
         if channel:
             check_kwargs["channel"] = channel

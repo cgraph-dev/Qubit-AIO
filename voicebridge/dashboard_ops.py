@@ -895,6 +895,34 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
             return HC._cron_mutate(fn_name, cfg, {}, {"confirm": True},
                                    {"id": str(staged.get("id", "") or "")})
         return _run
+    if action in ("cron.create", "cron.update", "cron.delete"):
+        # Cron create/edit/delete stage through ``_compat_confirm`` with the
+        # validated scalar payload recorded at stage time. The pending-approvals
+        # banner's id-only Confirm re-enters the SAME compat handler so the
+        # schedule write applies exactly once (previously only pause/resume/
+        # trigger had a runner and create answered ``CONFIRM_UNSUPPORTED``).
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            if action == "cron.create":
+                if not staged.get("name") or not staged.get("when"):
+                    return 400, {
+                        "ok": False, "code": "CONFIRM_UNSUPPORTED",
+                        "detail": "cron.create confirmation is missing its "
+                                  "staged payload; cancel and retry."}
+                body = {"confirm": True,
+                        **{k: v for k, v in staged.items() if k != "id"}}
+                return HC.cron_create(cfg, {}, body, {})
+            if action == "cron.update":
+                body = {"confirm": True,
+                        **{k: v for k, v in staged.items() if k != "id"}}
+                return HC.cron_update(
+                    cfg, {}, body,
+                    {"id": str(staged.get("id", "") or "")})
+            return HC.cron_delete(cfg, {}, {"confirm": True},
+                                  {"id": str(staged.get("id", "") or "")})
+        return _run
     if action.startswith("webhook_"):
         # Webhook create/enable/delete/rotate/test/retry are staged by
         # ``_compat_confirm`` as ``webhook_*``; the pending-approvals banner's
@@ -928,6 +956,21 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                 return handler(cfg, {}, {"confirm": True, "id": sid},
                                {"id": sid})
             return None
+        return _run
+    if action in ("kanban.create", "kanban.boards_create", "kanban.update"):
+        def _run(cfg, payload):
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            if action == "kanban.boards_create":
+                return HC.h_plugin_kanban_boards_create(
+                    cfg, {}, {**staged, "confirm": True}, {})
+            if action == "kanban.create":
+                return HC.h_plugin_kanban_tasks_create(
+                    cfg, {}, {**staged, "confirm": True}, {})
+            tid = str(staged.get("task_id", "") or "")
+            return HC.h_plugin_kanban_tasks_patch(
+                cfg, {}, {**staged, "confirm": True}, {"task_id": tid})
         return _run
     return None
 

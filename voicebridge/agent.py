@@ -380,7 +380,7 @@ def run_session(cfg: Any, task_text: str, *, session: str,
     try:
         from .planner import plan as _plan
 
-        proposal = _plan(clean)
+        proposal = _plan(clean, cfg=cfg)
     except Exception as exc:
         _audit("session_plan_error", session=sid,
                error=str(exc)[:160])

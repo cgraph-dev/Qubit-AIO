@@ -3,8 +3,8 @@
  "decision": "owner architecture decision 2026-09-17",
  "matrix": "docs/generated/QUBIT_ROUTE_OWNERSHIP.json",
  "counts": {
-  "production_referenced": 32,
-  "route_test_reachable": 35,
+  "production_referenced": 38,
+  "route_test_reachable": 33,
   "registration_only": 2,
   "test_referenced": 2
  },
@@ -76,6 +76,62 @@
    "test_references": {}
   },
   {
+   "handler": "cron_create",
+   "defined": true,
+   "routes": [
+    "POST /api/cron/jobs"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "916: return HC.cron_create(cfg, {}, body, {})"
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_cron_banner_settle9u.py": [
+     "44: code, out = HC.cron_create(cfg, {},"
+    ],
+    "tests/test_ui_audit_followups9u.py": [
+     "56: staged = HC.cron_create(",
+     "60: code, done = HC.cron_create("
+    ]
+   }
+  },
+  {
+   "handler": "cron_delete",
+   "defined": true,
+   "routes": [
+    "DELETE /api/cron/jobs/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "923: return HC.cron_delete(cfg, {}, {\"confirm\": True},"
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
+   "handler": "cron_update",
+   "defined": true,
+   "routes": [
+    "PUT /api/cron/jobs/(?P<id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "920: return HC.cron_update("
+    ]
+   },
+   "script_references": {},
+   "test_references": {}
+  },
+  {
    "handler": "delivery",
    "defined": false,
    "routes": [
@@ -85,8 +141,8 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/schedules.py": [
-     "1490: delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,",
-     "1495: \"delivery\": delivery})"
+     "1769: delivery = _deliver_result(cfg, conn, job, run_id, outcome, stop,",
+     "1774: \"delivery\": delivery})"
     ]
    },
    "script_references": {},
@@ -159,7 +215,16 @@
     ]
    },
    "script_references": {},
-   "test_references": {}
+   "test_references": {
+    "tests/test_models_repair9u.py": [
+     "286: patched_qc.env_write(",
+     "293: patched_qc.env_write(",
+     "302: code, out = patched_qc.env_write("
+    ],
+    "tests/test_custom_endpoints_authority9u.py": [
+     "150: code, out = HC.env_write("
+    ]
+   }
   },
   {
    "handler": "font",
@@ -253,7 +318,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "1722: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+     "1815: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
     ]
    },
    "script_references": {},
@@ -317,18 +382,6 @@
    "defined": true,
    "routes": [
     "GET /api/config/schema"
-   ],
-   "classification": "route_test_reachable",
-   "route_test_reachable": true,
-   "production_references": {},
-   "script_references": {},
-   "test_references": {}
-  },
-  {
-   "handler": "h_curator",
-   "defined": true,
-   "routes": [
-    "GET /api/curator"
    ],
    "classification": "route_test_reachable",
    "route_test_reachable": true,
@@ -764,6 +817,74 @@
    "test_references": {}
   },
   {
+   "handler": "h_plugin_kanban_boards_create",
+   "defined": true,
+   "routes": [
+    "POST /api/plugins/kanban/boards"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "966: return HC.h_plugin_kanban_boards_create("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_kanban_native_write9u.py": [
+     "38: code, out = QC.h_plugin_kanban_boards_create(",
+     "44: code, out = QC.h_plugin_kanban_boards_create("
+    ]
+   }
+  },
+  {
+   "handler": "h_plugin_kanban_tasks_create",
+   "defined": true,
+   "routes": [
+    "POST /api/plugins/kanban/tasks"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": true,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "969: return HC.h_plugin_kanban_tasks_create("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_kanban_native_write9u.py": [
+     "58: code, out = QC.h_plugin_kanban_tasks_create(",
+     "73: code, out = QC.h_plugin_kanban_tasks_create(",
+     "104: _, out = QC.h_plugin_kanban_tasks_create(",
+     "126: code, out = QC.h_plugin_kanban_tasks_create("
+    ],
+    "tests/test_kanban_split_store9u.py": [
+     "46: code, out = HC.h_plugin_kanban_tasks_create("
+    ]
+   }
+  },
+  {
+   "handler": "h_plugin_kanban_tasks_patch",
+   "defined": true,
+   "routes": [
+    "PATCH /api/plugins/kanban/tasks/(?P<task_id>[^/]+)"
+   ],
+   "classification": "production_referenced",
+   "route_test_reachable": false,
+   "production_references": {
+    "voicebridge/dashboard_ops.py": [
+     "972: return HC.h_plugin_kanban_tasks_patch("
+    ]
+   },
+   "script_references": {},
+   "test_references": {
+    "tests/test_kanban_native_write9u.py": [
+     "77: code, out = QC.h_plugin_kanban_tasks_patch(",
+     "82: code, out = QC.h_plugin_kanban_tasks_patch("
+    ]
+   }
+  },
+  {
    "handler": "h_power",
    "defined": true,
    "routes": [
@@ -773,21 +894,9 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "2717: code, out = _HC.h_power(self.app.orch.cfg,"
+     "2856: code, out = _HC.h_power(self.app.orch.cfg,"
     ]
    },
-   "script_references": {},
-   "test_references": {}
-  },
-  {
-   "handler": "h_system_stats",
-   "defined": true,
-   "routes": [
-    "GET /api/system/stats"
-   ],
-   "classification": "route_test_reachable",
-   "route_test_reachable": true,
-   "production_references": {},
    "script_references": {},
    "test_references": {}
   },
@@ -951,6 +1060,11 @@
    },
    "script_references": {},
    "test_references": {
+    "tests/test_audit_remaining_repair9u.py": [
+     "243: code, staged = HC.msg_update(cfg, {}, dict(body), {\"id\": \"telegram\"})",
+     "246: code, done = HC.msg_update(cfg, {}, {**body, \"confirm\": True},",
+     "282: code, done = HC.msg_update("
+    ],
     "tests/test_audit_wave_2026_09_23_messaging_device.py": [
      "64: code, staged = HC.msg_update(cfg, {}, {\"enabled\": True},",
      "96: code, staged = HC.msg_update("
@@ -967,7 +1081,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "3341: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+     "3480: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
     ]
    },
    "script_references": {},
@@ -1054,7 +1168,7 @@
    "route_test_reachable": false,
    "production_references": {
     "voicebridge/dashboard_ops.py": [
-     "922: return HC.webhooks_delete(cfg, {}, {\"confirm\": True, \"id\": sid},"
+     "950: return HC.webhooks_delete(cfg, {}, {\"confirm\": True, \"id\": sid},"
     ]
    },
    "script_references": {},
@@ -1070,7 +1184,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/dashboard_ops.py": [
-     "917: return HC.webhooks_enable(cfg, {}, {\"confirm\": True}, {})"
+     "945: return HC.webhooks_enable(cfg, {}, {\"confirm\": True}, {})"
     ]
    },
    "script_references": {},
@@ -1086,7 +1200,7 @@
    "route_test_reachable": false,
    "production_references": {
     "voicebridge/dashboard_ops.py": [
-     "919: return HC.webhooks_enabled(cfg, {}, {\"confirm\": True, \"id\": sid},"
+     "947: return HC.webhooks_enabled(cfg, {}, {\"confirm\": True, \"id\": sid},"
     ]
    },
    "script_references": {},
@@ -1102,7 +1216,7 @@
    "route_test_reachable": false,
    "production_references": {
     "voicebridge/dashboard_ops.py": [
-     "926: \"webhook_retry\": HC.webhooks_retry}.get(action)"
+     "954: \"webhook_retry\": HC.webhooks_retry}.get(action)"
     ]
    },
    "script_references": {},
@@ -1118,7 +1232,7 @@
    "route_test_reachable": false,
    "production_references": {
     "voicebridge/dashboard_ops.py": [
-     "924: handler = {\"webhook_rotate\": HC.webhooks_rotate,"
+     "952: handler = {\"webhook_rotate\": HC.webhooks_rotate,"
     ]
    },
    "script_references": {},
@@ -1134,7 +1248,7 @@
    "route_test_reachable": false,
    "production_references": {
     "voicebridge/dashboard_ops.py": [
-     "925: \"webhook_test\": HC.webhooks_test,"
+     "953: \"webhook_test\": HC.webhooks_test,"
     ]
    },
    "script_references": {},

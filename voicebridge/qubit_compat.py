@@ -606,7 +606,8 @@ def h_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         detail = "installation-health inventory unavailable: " + \
             _redact(str(exc))[:160]
     return _ok(version=status_out.get("version", "qubit-1.0.0"),
-               auth_required=False, state=state, detail=detail)
+               auth_required=bool(status_out.get("auth_required", False)),
+               state=state, detail=detail)
 
 
 def h_auth_me(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -738,18 +739,22 @@ def _receipt_session_store(cfg: Any) -> Any:
 
 def _chat_session_rows(cfg: Any, *, query: str = "",
                        limit: int = _SESSIONS_CHAT_PAGE_MAX,
-                       offset: int = 0) -> Dict[str, Any]:
+                       offset: int = 0,
+                       include_archived: bool = False) -> Dict[str, Any]:
     """Canonical chat-transcript sessions (single authority: ChatSessionStore).
 
     The store already returns the ``SessionInfo`` shape (``source="qubit-chat"``)
     so the dashboard Sessions surface reflects the same rows ``/qubit-chat``
     writes. ``limit`` defaults to the full page bound so a read cannot silently
-    hide canonical sessions behind the adapter's per-call page. A read failure
+    hide canonical sessions behind the adapter's per-call page. Archived rows
+    are excluded by default (the store's own default, mirroring the reference
+    ``archived="exclude"``); recovery callers opt in explicitly. A read failure
     degrades to an empty list; it never fabricates rows.
     """
     try:
         res = _chat_session_store(cfg).list(limit=limit, offset=offset,
-                                            query=query)
+                                            query=query,
+                                            include_archived=include_archived)
     except Exception:
         return {"sessions": [], "total": 0}
     rows = [_rebrand_chat_record(r) for r in res.get("sessions", [])]
@@ -777,11 +782,23 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     exclude = [s.strip() for s in str(q.get("exclude_sources", "") or "")
                .split(",") if s.strip()]
     order = str(q.get("order", "") or "").strip().lower()
+    # Archived rows are excluded by default, matching the reference sessions
+    # route (``web_routers/sessions.py:176`` ``archived: str = "exclude"``).
+    # ``archived=include`` recovers them and ``archived=only`` shows them alone;
+    # an unknown value falls back to the safe default (exclude), never listing
+    # archived rows as if they were live.
+    archived = str(q.get("archived", "exclude") or "exclude").strip().lower()
+    if archived not in ("exclude", "only", "include"):
+        archived = "exclude"
+    # Both ``include`` and ``only`` need the archived rows fetched before the
+    # post-filter narrows them; ``exclude`` (the default) never fetches them.
+    include_archived = archived in ("include", "only")
     # The canonical chat transcripts (the single session authority) come first,
     # then the receipt-lifecycle rows the automation lane writes. Both are real
     # store reads; neither is synthesized, and a shared id is never duplicated.
     merged: Dict[str, Dict[str, Any]] = {}
-    for row in _chat_session_rows(cfg, query=query)["sessions"]:
+    for row in _chat_session_rows(cfg, query=query,
+                                  include_archived=include_archived)["sessions"]:
         rid = str(row.get("id", ""))
         if rid:
             merged[rid] = row
@@ -789,7 +806,7 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if query:
         res = store.search(query, 200)
     else:
-        res = store.list(200)
+        res = store.list(200, include_archived=include_archived)
     for r in res.get("sessions", []):
         rid = str(r.get("receipt_id") or r.get("action_id") or r.get("id", ""))
         if not rid or rid in merged:
@@ -816,6 +833,10 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "action_id": r.get("action_id"),
         }
     rows = list(merged.values())
+    if archived == "exclude":
+        rows = [r for r in rows if not r.get("archived")]
+    elif archived == "only":
+        rows = [r for r in rows if r.get("archived")]
     if source:
         rows = [r for r in rows if str(r.get("source", "")) == source]
     if sources:
@@ -828,7 +849,13 @@ def h_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         rows.sort(key=lambda r: r.get("started_at") or 0, reverse=True)
     else:
         rows.sort(key=lambda r: r.get("last_active") or 0, reverse=True)
-    return _ok(sessions=rows[offset:offset + limit], total=len(rows),
+    page_rows = rows[offset:offset + limit]
+    # Reference envelope parity: ``web_routers/sessions.py::search_sessions``
+    # returns ``{"results": [...]}``. The search route reuses this handler, so
+    # emit the alias the SPA's ``SessionSearchResponse`` reads; ``sessions``
+    # stays for the list route. Without this the Sessions search box set an
+    # undefined result list and the table stayed unfiltered.
+    return _ok(sessions=page_rows, results=page_rows, total=len(rows),
                limit=limit, offset=offset, store_state=res.get("state", "OK"),
                store_authority=CHAT_SESSION_AUTHORITY + "+"
                                + RECEIPT_SESSION_AUTHORITY)
@@ -848,9 +875,13 @@ def h_sessions_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     total = len(chat_items) + len(items)
     # SessionStoreStats wire shape (web/src/lib/api.ts): total, active_store,
     # archived, messages, by_source. Receipts are append-only: archived=0.
+    by_source: Dict[str, int] = {}
+    for r in chat_items:
+        key = str(r.get("source") or "dashboard")
+        by_source[key] = by_source.get(key, 0) + 1
     return _ok(total=total, active_store=total - archived, archived=archived,
                messages=messages,
-               by_source={"qubit-chat": len(chat_items),
+               by_source={**by_source,
                           "qubit-receipts": len(items)},
                by_state=by_state,
                store_authority=CHAT_SESSION_AUTHORITY + "+"
@@ -873,8 +904,8 @@ def h_session_show(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             if m.get("role") == "assistant" and m.get("content"):
                 preview = str(m["content"])[:200]
                 break
-        return _ok(id=rec.get("id", rid), source="qubit-chat",
-                   model=rec.get("model"),
+        return _ok(id=rec.get("id", rid),
+                   source=str(rec.get("source") or "dashboard"),                   model=rec.get("model"),
                    title=rec.get("name") or (preview[:80] if preview else rid),
                    name=rec.get("name"),
                    archived=bool(rec.get("archived", False)),
@@ -1452,9 +1483,53 @@ def _auto_context_length(model: str, base_url: str, provider: str) -> int:
     return 0
 
 
+def _terminal_session_model(cfg: Any) -> Optional[str]:
+    """The model stored on the canonical ``/chat`` session, or ``None``.
+
+    The vendored terminal resumes one canonical conversation and honours that
+    session's stored model; the dashboard ``model/info`` must report the same
+    value the terminal actually uses rather than only the configured default.
+    Read-only: an absent session or unset model returns ``None`` (never creates
+    a session).
+    """
+    try:
+        from . import agent as AG
+        from . import chat_transport as CT
+
+        sid = AG.canonical_session_id(cfg)
+        res = CT.store(cfg).show(sid)
+        if str(res.get("state")) != "OK":
+            return None
+        sess = res.get("session") or {}
+        model = str(sess.get("model") or "").strip()
+        return model or None
+    except Exception:  # noqa: BLE001 - reporting must never raise
+        return None
+
+
 def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     r = _resolved_model(cfg)
+    # D3 (UI audit 2026-09-29): the /chat terminal resumes its canonical
+    # session and honours that session's stored model. When the stored model is
+    # a registered model-profile id (e.g. the default ``qubit-brain4``), take
+    # that profile's provider too — otherwise model/info reported the
+    # configured default/endpoint while /chat used the session's model. An
+    # unset/stale session model resolves through the profile registry and
+    # changes nothing when there is no session.
+    sess_model = _terminal_session_model(cfg)
+    if sess_model:
+        try:
+            from .providers import resolver as _R
+
+            _prof = _R.get_profile(cfg, sess_model)
+        except Exception:  # noqa: BLE001 - reporting must never raise
+            _prof = None
+        if _prof is not None:
+            r = dict(r, model=_prof.model, provider=_prof.provider,
+                     base_url=str(getattr(_prof, "base_url", "") or ""))
+        else:
+            r = dict(r, model=sess_model)
     ctx = int(r["ctx"] or 0)
     model = str(r["model"])
     provider = str(r["provider"])
@@ -1641,6 +1716,39 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not model:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "model assignment needs a model name"}
+    provider = str(b.get("provider") or "").strip()
+    if provider:
+        # Catalog/settings pick: a provider+model pair from the model picker is
+        # applied through the canonical resolver (find-or-create a model profile
+        # and activate it) — the Qubit counterpart to the reference
+        # ``POST /api/model/set`` writing ``cfg["model"]``. The SPA previously
+        # resolved the pick against the terminal-profile registry and threw
+        # UNKNOWN_MODEL_PROFILE for every catalog entry; here it is a real apply
+        # or a typed refusal, never a fabricated success.
+        if not (_truthy(b.get("confirm")) or _truthy(b.get("confirmed"))
+                or _truthy(b.get("confirm_expensive_model"))):
+            return 200, {"ok": False, "scope": "main", "provider": provider,
+                         "model": model, "confirm_required": True,
+                         "confirm_message": (f"Set the main model to "
+                                             f"{provider}/{model}?")}
+        from .providers import endpoints as EP
+
+        try:
+            applied = EP.select_model(
+                cfg, provider, model,
+                base_url=str(b.get("base_url") or "").strip(),
+                key_ref=str(b.get("key_ref") or b.get("key_env") or "").strip(),
+                confirm=True)
+        except Exception as exc:
+            return _fail(exc)
+        if not applied.get("ok"):
+            return 400, {"ok": False, "scope": "main",
+                         "provider": provider, "model": model,
+                         "code": str(applied.get("code", "MODEL_SET_FAILED")),
+                         "detail": str(applied.get("detail", ""))}
+        return 200, {"ok": True, "scope": "main",
+                     "provider": str(applied.get("provider", provider)),
+                     "model": str(applied.get("model", model))}
     if b.get("confirm_expensive_model") or b.get("confirmed"):
         # Upstream retry shape: the Models dialog re-POSTs with the flag
         # after showing confirm_required. Settle the staged journal
@@ -2027,6 +2135,17 @@ def terminal_profile_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         tmp.write_text(yaml.safe_dump(data, sort_keys=False),
                        encoding="utf-8")
         tmp.replace(target)
+        # Refresh the RUNNING config so the change is live, not just on disk.
+        # ``terminal_context_guard`` reads ``cfg[terminal][profile]`` from the
+        # in-memory object; without this the picker persisted to voice.yaml but
+        # the still-running guard kept resolving the old profile until a
+        # restart (observed as a stale ``qubit-go`` / UNKNOWN_PROFILE on /chat).
+        if hasattr(cfg, "data") and isinstance(getattr(cfg, "data"), dict):
+            node = cfg.data.get("terminal")
+            if not isinstance(node, dict):
+                node = {}
+                cfg.data["terminal"] = node
+            node["profile"] = pid
         _audit("terminal_profile_set", "dashboard:user", {"profile_id": pid})
     except Exception as exc:
         return _fail(exc)
@@ -2166,6 +2285,13 @@ def _cron_next_run(j: Dict[str, Any]) -> Optional[float]:
         except (TypeError, ValueError):
             return None
         return at if at > 0 and base <= 0 else None
+    if kind == "cron":
+        from . import schedules as S
+
+        parsed = S._parse_cron(str(j.get("cron_expr", "") or ""))
+        if parsed is None:
+            return None
+        return S._cron_next(parsed, now, None)
     return None
 
 
@@ -2181,6 +2307,53 @@ def _cron_timezone(cfg: Any) -> str:
         return str(S.list_jobs(cfg, limit=1).get("timezone", "") or "")
     except Exception:  # noqa: BLE001 — a read must never break the page
         return ""
+
+
+def _cron_schedule_parts(j: Dict[str, Any]) -> Dict[str, Any]:
+    """The frontend ``schedule`` object (kind/expr/run_at/minutes/display).
+
+    The SPA's ScheduleBuilder reads ``schedule.expr`` and recognises the
+    ``every Nm|h|d`` shorthand, a 5-field cron expression, and an ISO
+    timestamp; ``schedule.minutes`` drives the human-readable interval label.
+    The store keeps typed columns, so map them back here — the previous
+    numeric ``interval_min`` string could not round-trip through the editor.
+    """
+    kind = str(j.get("kind", "") or "")
+
+    def _int(key: str, default: int) -> int:
+        try:
+            return int(j.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    expr = ""
+    run_at = None
+    minutes = None
+    if kind == "cron":
+        expr = str(j.get("cron_expr", "") or "")
+    elif kind == "interval":
+        minutes = _int("interval_min", 0)
+        if minutes > 0:
+            if minutes % 1440 == 0:
+                expr = f"every {minutes // 1440}d"
+            elif minutes % 60 == 0:
+                expr = f"every {minutes // 60}h"
+            else:
+                expr = f"every {minutes}m"
+    elif kind == "daily":
+        hour = _int("hour", -1)
+        if hour >= 0:
+            expr = f"{_int('minute', 0)} {hour} * * *"
+    elif kind == "once":
+        try:
+            at = float(j.get("at_ts") or 0.0)
+        except (TypeError, ValueError):
+            at = 0.0
+        if at > 0:
+            expr = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(at))
+            run_at = _epoch_to_iso(at)
+    return {"kind": kind, "expr": expr, "run_at": run_at,
+            "minutes": minutes, "display": kind}
 
 
 def _cron_shape(j: Dict[str, Any], *, cfg: Any = None,
@@ -2205,16 +2378,14 @@ def _cron_shape(j: Dict[str, Any], *, cfg: Any = None,
             retry_enabled = None
     return {
         "id": str(j.get("id", "")), "profile": None, "profile_name": None,
-        "hermes_home": None, "is_default_profile": True,
+        "qubit_home": None, "is_default_profile": True,
         "name": j.get("name"), "prompt": j.get("task_text"),
         "script": None, "skills": None,
-        "schedule": {"kind": str(j.get("kind", "")),
-                     "expr": str(j.get("interval_min") or j.get("at_ts") or ""),
-                     "display": str(j.get("kind", ""))},
+        "schedule": _cron_schedule_parts(j),
         "schedule_display": str(j.get("kind", "")),
         "repeat": None, "enabled": bool(j.get("enabled", False)),
         "state": str(j.get("last_state", "") or ""),
-        "deliver": j.get("deliver_to") or None,
+        "deliver": (j.get("deliver_pref") or j.get("deliver_to") or None),
         "model": None, "provider": None, "base_url": None,
         "no_agent": None, "context_from": None, "enabled_toolsets": None,
         "workdir": None,
@@ -2546,13 +2717,22 @@ def h_mcp_test_local(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         out = MS.test(cfg, name)
     except Exception as exc:
         return _mcp_error(exc)
-    return _ok(ok=True, name=out["name"], tools=out["tools"],
-               connected=bool(out.get("connected", False)),
+    # Honest success flag: a probe that did not connect is NOT a success. The
+    # dashboard keys its toast/panel on ``ok`` (McpPage.tsx), so hardcoding
+    # ``ok=True`` rendered a green "Connected -- no tools" for an unreachable
+    # server. The reference returns ``ok:False`` on a failed probe
+    # (hermes_cli/web_routers/mcp.py:190). ``mcp_servers.test`` now carries the
+    # honest ``ok``; ``connected`` remains the fallback for older callers.
+    connected = bool(out.get("connected", False))
+    ok = bool(out.get("ok", connected))
+    extra = {} if ok else {"error": out["detail"]}
+    return _ok(ok=ok, name=out["name"], tools=out["tools"],
+               connected=connected,
                valid=out["valid"], errors=out["errors"],
                code=out["code"], state=out["state"],
                probe=str(out.get("probe", "local-validation")),
                network_probe=bool(out.get("network_probe", False)),
-               detail=out["detail"])
+               detail=out["detail"], **extra)
 
 
 #: Read-only MCP capability reads (resources / prompts / resource templates).
@@ -3543,6 +3723,23 @@ def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             res = FI.read_file(cfg, path)
         except Exception as exc:
             code = getattr(exc, "code", "FILES_ERROR")
+            # Binary file (D5): read_file refuses binary content; serve the raw
+            # bytes as a typed data URL so the Files page Download works for a
+            # genuinely-binary file instead of failing. Reads stay confined and
+            # size-bounded; text reads keep the redacted path below.
+            if code == FI.BINARY_CODE:
+                try:
+                    raw = FI.read_bytes(cfg, path)
+                except FI.FilesError as bexc:
+                    return 400, {"ok": False, "code": bexc.code,
+                                 "detail": _redact(bexc.detail)[:300]}
+                data = raw["data"]
+                data_url = (f"data:{raw['mime']};base64,"
+                            + base64.b64encode(data).decode())
+                return _ok(name=raw["name"], path=path, size=raw["size"],
+                           mime_type=raw["mime"], data_url=data_url,
+                           root=_files_root(cfg) or None, locked_root=None,
+                           can_change_path=False, sha256=raw["sha256"])
             return 400, {"ok": False, "code": code,
                          "detail": _redact(str(exc))[:300]}
         text = res.get("text", res.get("content", "")) if isinstance(res, dict) else ""
@@ -3942,13 +4139,24 @@ def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         from . import env_store as _env_store
 
         refs = _env_store.load(cfg)
-        present_names = set(_env_store.present_names(cfg)) | set(os.environ.keys())
+        # ``is_set`` must reflect whether the referenced secret can actually
+        # resolve, not merely that a registry row exists (the old code hard-coded
+        # True). ``resolved_names`` is the honest union of process env, the
+        # runtime .env, and references that truly resolve; values are never read
+        # out. This mirrors the reference ``is_set=bool(value)`` from disk.
+        resolved = _env_store.resolved_names(cfg)
+
+        def _ref_is_set(ref: Any) -> bool:
+            return bool(_env_store.is_resolved(ref))
     except Exception:
         refs = _load_json_store(_env_refs_path(cfg))
-        present_names = set(refs) | set(os.environ.keys())
+        resolved = set(refs) | set(os.environ.keys())
+
+        def _ref_is_set(ref: Any) -> bool:
+            return str(ref) in resolved
     for key, ref in sorted(refs.items()):
         env[str(key)] = {
-            "is_set": True,
+            "is_set": _ref_is_set(ref),
             "redacted_value": None,
             "description": f"Qubit vault reference ({ref})",
             "url": None, "category": "references",
@@ -3971,7 +4179,7 @@ def h_env(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 continue
             info = info if isinstance(info, dict) else {}
             env[str(var)] = {
-                "is_set": var in refs or var in present_names,
+                "is_set": var in resolved,
                 "redacted_value": None,
                 "description": _rebrand_product(
                     info.get("description", "") or ""),
@@ -5662,8 +5870,10 @@ def _tts_from_cfg(cfg: Any):
                                               default=0)))
         if tts.available():
             return tts
-    return PiperTTS(model_dir=cfg.model_dir(),
-                    voice=cfg.get("tts", "voice", default="en_US-amy-medium"))
+    return PiperTTS(
+        model_dir=cfg.model_dir(),
+        voice=cfg.get("tts", "voice", default="en_US-amy-medium"),
+        backend=cfg.get("tts", "piper_backend", default="sherpa"))
 
 
 def h_audio_voice_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5791,6 +6001,39 @@ def h_audio_transcribe(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 os.unlink(temp_path)
             except OSError:
                 pass
+
+
+def h_audio_stt_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/audio/stt/status -> read-only streaming-STT health + config.
+
+    Reports the configured engines, whether the warm model cache is loaded, the
+    execution provider, and whether GPU acceleration is actually available
+    (onnxruntime CUDA EP). No secrets, no audio, no transcript.
+    """
+    from .asr.streaming import (cached_engines, _configured_streaming_engine,
+                                _streaming_provider, last_provider)
+    try:
+        asr = cfg.section("asr")
+    except Exception:
+        asr = {}
+    health = cached_engines()
+    hotwords = [w.strip() for w in str(asr.get("hotwords", "") or "").split(",")
+                if w.strip()]
+    return _ok(schema="qubit-stt-status/1",
+               engine=str(asr.get("engine", "") or ""),
+               streaming_engine=_configured_streaming_engine(cfg),
+               streaming_window_engine=str(
+                   asr.get("streaming_window_engine", "moonshine") or "moonshine"),
+               english_only=bool(asr.get("english_only", True)),
+               chunk_ms=int(asr.get("streaming_chunk_ms", 0) or 0),
+               provider_ep=str(asr.get("provider_ep", "cpu") or "cpu"),
+               streaming_provider_ep=_streaming_provider(cfg),
+               active_provider=last_provider() or "",
+               num_threads=int(asr.get("num_threads", 4) or 4),
+               hotword_count=len(hotwords),
+               cached=health,
+               detail="read-only streaming STT health; no secrets or audio")
 
 
 def h_audio_speak(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -6148,15 +6391,19 @@ def h_custom_endpoints_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "endpoint id/name required",
                      "qubit_counterpart": "dashboard Settings (classic)"}
-    if not b.get("confirm"):
-        return _staged(
-            f"custom endpoint {ident!r} is a settings write: re-POST with "
-            "{\"confirm\": true} plus a fresh approval", "",
-            {"qubit_counterpart": "CLI `qubit config` profiles + dashboard "
-                                  "Settings (classic)"})
     values = {k: v for k, v in b.items()
               if k != "confirm" and isinstance(v, (str, int, float, bool))}
     values["id"] = ident
+    # Shared one-path gate: e-stop-first, wire-truth confirm parsing, and a real
+    # single-use journal approval (usable by the pending-approvals id-only
+    # Confirm). The old hand-rolled ``if not b.get("confirm")`` bypassed the
+    # e-stop and treated the string "false"/"0" as confirmation.
+    guard = _compat_confirm(
+        cfg, "custom_endpoints_write",
+        f"custom endpoint {ident!r} is a settings write: re-POST with "
+        "{\"confirm\": true} plus a fresh approval", q, b, payload=values)
+    if guard is not None:
+        return guard
     path = _custom_endpoints_path(cfg)
     try:
         store = _load_json_store(_custom_endpoints_read_path(cfg))
@@ -6179,22 +6426,48 @@ def h_custom_endpoints_activate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "endpoint id required",
                      "qubit_counterpart": "dashboard Settings (classic)"}
-    if not b.get("confirm"):
-        return _staged(
-            f"activating custom endpoint {ident!r} requires confirmation: "
-            "re-POST with {\"confirm\": true}", "")
+    # Confirmation (and e-stop) is the FIRST gate, before we reveal whether the
+    # id exists: an unconfirmed request is a typed 409, never a 404 (and it
+    # keeps e-stop-first ordering consistent with the other writes).
+    guard = _compat_confirm(
+        cfg, "custom_endpoints_activate",
+        f"activating custom endpoint {ident!r} requires confirmation: "
+        "re-POST with {\"confirm\": true}", q, b, payload={"id": ident})
+    if guard is not None:
+        return guard
     path = _custom_endpoints_path(cfg)
     store = _load_json_store(_custom_endpoints_read_path(cfg))
     if ident not in store:
         return 404, {"ok": False, "code": "ENDPOINT_NOT_FOUND",
                      "detail": f"no staged endpoint {ident!r}",
                      "qubit_counterpart": "dashboard Settings (classic)"}
+    record = store.get(ident)
+    record = record if isinstance(record, dict) else {}
+    # Real apply: register the endpoint as a model profile, allow that profile
+    # (explicit confirm-gated activation, never a global widening), make it the
+    # active selection, and mirror the runtime ``config.yaml`` model slot the
+    # reference writes. The old body only wrote ``_active`` — a flag no runtime
+    # consumer reads, so /model/info stayed on the old model (fabricated state).
+    from .providers import endpoints as EP
+
+    try:
+        out = EP.activate_endpoint(cfg, ident, record, confirm=True)
+    except Exception as exc:
+        return _fail(exc)
+    if not out.get("ok"):
+        return 400, {"ok": False, "id": ident,
+                     "code": str(out.get("code", "ACTIVATE_FAILED")),
+                     "detail": str(out.get("detail", "")),
+                     "qubit_counterpart": "dashboard Settings (classic) + CLI "
+                                          "config profiles"}
     try:
         store["_active"] = ident
         _save_json_store(path, store)
     except Exception as exc:
         return _fail(exc)
     return _ok(ok=True, id=ident, active=ident,
+               provider=str(out.get("provider", "")),
+               model=str(out.get("model", "")),
                qubit_counterpart="dashboard Settings (classic) + CLI config "
                                  "profiles")
 
@@ -6207,10 +6480,12 @@ def h_custom_endpoints_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "endpoint id required",
                      "qubit_counterpart": "dashboard Settings (classic)"}
-    if not b.get("confirm"):
-        return _staged(
-            f"removing custom endpoint {ident!r} requires confirmation: "
-            "re-POST with {\"confirm\": true}", "")
+    guard = _compat_confirm(
+        cfg, "custom_endpoints_delete",
+        f"removing custom endpoint {ident!r} requires confirmation: "
+        "re-POST with {\"confirm\": true}", q, b, payload={"id": ident})
+    if guard is not None:
+        return guard
     path = _custom_endpoints_path(cfg)
     try:
         store = _load_json_store(_custom_endpoints_read_path(cfg))
@@ -6221,7 +6496,19 @@ def h_custom_endpoints_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         _save_json_store(path, store)
     except Exception as exc:
         return _fail(exc)
+    # Remove the endpoint's registered model profile + active pointer too, so a
+    # deleted endpoint is not still reported as the effective model (D4). The
+    # shipped default profile is never touched.
+    cleanup: Dict[str, Any] = {}
+    try:
+        from .providers import endpoints as EP
+
+        cleanup = EP.remove_endpoint(cfg, ident, confirm=True)
+    except Exception:  # noqa: BLE001 - the JSON removal already succeeded
+        cleanup = {}
     return _ok(ok=True, id=ident, removed=existed, count=len(store),
+               profile_removed=bool(cleanup.get("profile_removed")),
+               active_cleared=bool(cleanup.get("active_cleared")),
                qubit_counterpart="dashboard Settings (classic) + CLI config "
                                  "profiles")
 
@@ -7653,6 +7940,7 @@ _r("GET", r"/api/audio/voice-config", "h_audio_voice_config")
 # POST stays a typed vendor-direct refusal in the GATED table.
 _r("GET", r"/api/audio/voice-live/status", "h_audio_voice_live_status")
 _r("POST", r"/api/audio/transcribe", "h_audio_transcribe")
+_r("GET", r"/api/audio/stt/status", "h_audio_stt_status")
 _r("POST", r"/api/audio/speak", "h_audio_speak")
 
 # Packet 8U closure: local-models reads, custom endpoints, profile reads,
@@ -7986,7 +8274,7 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/dashboard/plugins/(?P<id>.+)/visibility", "h_plugin_visibility_set"),
     # debug-share and import-upload are registered above (ahead of the generic
     # /api/ops/<name> dispatch) so their real op / typed gate answers.
-    ("POST", r"/api/ops/checkpoints/prune", _GATE_CKPT_PRUNE),
+    ("POST", r"/api/ops/checkpoints/prune", "h_checkpoints_prune"),
     ("GET", r"/api/ops/checkpoints.*", "ckpt"),
     ("GET", r"/api/actions/(?P<name>[^/]+)/status", "action_status"),
     ("GET", r"/api/actions/.*", "actions_read"),
@@ -8003,10 +8291,12 @@ GATED: List[Dict[str, Any]] = [
     ("POST", r"/api/git/review/create-pr", _NO_GIT_WRITE),
     # --- Packet 8U: Files/FS binary + writes stay typed ---
     ("GET", r"/api/media", _NO_MEDIA),
-    ("GET", r"/api/files/download", _NO_BINARY),
-    ("GET", r"/api/files/stream", _NO_BINARY),
-    ("HEAD", r"/api/files/stream", _NO_BINARY),
-    ("GET", r"/api/fs/download", _NO_BINARY),
+    # D5: binary download/stream is now real (brokered, confined read ->
+    # base64 envelope); the read path is served by /api/files/read too.
+    ("GET", r"/api/files/download", "h_files_download"),
+    ("GET", r"/api/files/stream", "h_files_download"),
+    ("HEAD", r"/api/files/stream", "h_files_download"),
+    ("GET", r"/api/fs/download", "h_files_download"),
     # --- Packet 8U: external catalog / desktop lease / WS stay typed ---
     ("GET", r"/api/audio/elevenlabs/voices", _NO_AUDIO_EXTERNAL),
     ("POST", r"/api/audio/tts-lease", _NO_AUDIO_LEASE),
@@ -8107,12 +8397,30 @@ def h_blueprints(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def h_delivery_targets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import messaging as M
+    """GET /api/cron/delivery-targets -> the reference ``{targets: [...]}``.
+
+    Ported from the vendored ``cron/scheduler_delivery.py::cron_delivery_targets``
+    (the same source ``h_blueprints`` rewrites its deliver options from), with
+    the implicit ``local`` option prepended exactly like upstream. The previous
+    compat shape (``{delivery_targets: {accounts: [...]}}``) did not match the
+    dashboard's ``CronDeliveryTarget[]`` contract, so the dropdown silently
+    collapsed to no options.
+    """
+    targets: List[Dict[str, Any]] = [
+        {"id": "local", "name": "Local (save only)",
+         "home_target_set": True, "home_env_var": None}]
     try:
-        res = M.account_list(cfg)
-    except Exception as exc:
-        return _fail(exc)
-    return _ok(delivery_targets=res)
+        from . import qubit_runtime
+        qubit_runtime.ensure_path()
+        try:
+            qubit_runtime.use_qubit_home(cfg)
+        except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
+            pass
+        from cron.scheduler_delivery import cron_delivery_targets  # type: ignore
+        targets.extend(cron_delivery_targets())
+    except Exception:  # noqa: BLE001 - keep the implicit local target
+        pass
+    return _ok(targets=targets)
 
 
 def _chat_session_db(cfg: Any) -> Tuple[Any, Any, Any]:
@@ -8430,31 +8738,50 @@ def h_mem_provider(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "by policy")
 
 
+def _platform_test_resolve(cfg: Any, platform_id: str
+                           ) -> Optional[Dict[str, Any]]:
+    """Resolve a channel id to the SAME honest payload the platform list serves.
+
+    Returns ``None`` for an unknown id. Keeps the connection test on one store:
+    it reuses :func:`_platform_rows` (the ``h_platforms`` GET source) instead of
+    probing the disjoint ``msg-accounts.json`` account registry, so a catalog
+    platform's real state (configured / transport / unavailable) is what the
+    Test button reports.
+    """
+    kind, _entry, _account = _platform_resolve(cfg, platform_id)
+    if kind is None:
+        return None
+    for row in _platform_rows(cfg):
+        if str(row.get("id", "")) == platform_id:
+            return {
+                "name": row.get("name", platform_id),
+                "enabled": bool(row.get("enabled")),
+                "configured": bool(row.get("configured")),
+                "gateway_running": bool(row.get("gateway_running")),
+                "state": str(row.get("state", "") or ""),
+                "error_message": str(row.get("error_message") or ""),
+                "missing_env": [f["key"] for f in row.get("env_vars", [])
+                                if f.get("required") and not f.get("is_set")],
+                "error_code": row.get("error_code"),
+                "link": {},
+            }
+    return None
+
+
 def h_msg_test_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/messaging/platforms/{platform_id}/test -> real link state.
+    """POST /api/messaging/platforms/{platform_id}/test -> honest test verdict.
 
-    Runs the same ``messaging.link`` credential/transport probe the CLI and
-    dashboard platform list use: it reports LINKED / DEGRADED /
-    NO_CREDENTIAL / UNAVAILABLE from the vault reference and transport
-    availability. It never sends a message and never opens a provider socket.
+    Ported from the vendored ``web_routers/messaging.py:test_messaging_platform``
+    (``:916``): an unknown id is a typed ``404`` and ``ok`` is true **only** when
+    a real connection is proven. It resolves the id against the SAME catalog and
+    store :func:`h_platforms` serves, so a configured channel with no Qubit
+    transport reports ``ok: false`` with the operator-facing ``message`` instead
+    of a fabricated success. Never sends a message or opens a provider socket.
     """
     from . import messaging as M
     platform_id = str(p.get("id", p.get("platform_id", "")) or "")
-    if not platform_id:
-        return 400, {"ok": False, "code": "MALFORMED",
-                     "detail": "platform_id required",
-                     "qubit_counterpart": "CLI `qubit msg accounts`"}
-    try:
-        linked = M.link(cfg, platform_id)
-    except Exception as exc:
-        return _fail(exc)
-    state = str(linked.get("state", "UNAVAILABLE") or "UNAVAILABLE")
-    reachable = state in ("LINKED", "DEGRADED")
-    return _ok(ok=True, platform=platform_id, state=state.lower(),
-               reachable=reachable, link=linked,
-               error_code=linked.get("code"),
-               detail="credential/transport link state; no message sent")
+    return M.platform_connection_test(cfg, platform_id, _platform_test_resolve)
 
 
 def h_toolset_toggle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -8788,11 +9115,58 @@ def h_plugin_visibility(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         _hidden_save(cfg, hidden)
     except Exception as exc:
         return _fail(exc)
+    # The dashboard's plugin hub is served by the vendored
+    # ``_merged_plugins_hub`` (a 5s memo) whose ``user_hidden`` comes from
+    # ``dashboard.hidden_plugins`` in the runtime config; the eye toggle writes
+    # Qubit's own ``qubit_hidden.json`` and so was never consumed. Mirror the
+    # set into the runtime config AND invalidate the hub memo so the change
+    # takes effect on the very next hub fetch (the reference route does the
+    # same, persisting ``dashboard.hidden_plugins`` + invalidating). Both are
+    # best-effort: the Qubit store remains the authority and the Qubit
+    # ``plugins_hub`` override reads it directly.
+    mirrored = _mirror_hidden_plugins(cfg, hidden)
+    try:
+        from qubit_cli.web_server_dashboard import (
+            _invalidate_plugins_hub_cache,
+        )
+        _invalidate_plugins_hub_cache()
+    except Exception:
+        pass
     _audit("plugin_visibility", "dashboard:user",
-           {"name": name, "visible": name not in hidden})
+           {"name": name, "visible": name not in hidden,
+            "runtime_mirrored": mirrored})
     return _ok(name=name, visible=name not in hidden,
-               hidden=sorted(hidden),
+               hidden=name in hidden, hidden_names=sorted(hidden),
                detail="persisted per-user visibility")
+
+
+def _mirror_hidden_plugins(cfg: Any, hidden: set) -> bool:
+    """Mirror the hidden set into the vendored ``dashboard.hidden_plugins``.
+
+    The vendored plugin hub/tab filter reads this config key; without the
+    mirror the Qubit eye toggle split-brained (write ``qubit_hidden.json``,
+    read the vendored config). Best-effort and canonical-writer based: a
+    managed/read-only config leaves the Qubit store as the sole authority.
+    """
+    try:
+        from . import qubit_runtime as QR
+        QR.ensure_path()
+        try:
+            QR.use_qubit_home(cfg)
+        except Exception:  # noqa: BLE001 - config-scoped home is best-effort
+            pass
+        from qubit_cli.config import load_config, save_config  # type: ignore
+
+        conf = load_config()
+        dash = conf.get("dashboard")
+        if not isinstance(dash, dict):
+            dash = {}
+            conf["dashboard"] = dash
+        dash["hidden_plugins"] = sorted(hidden)
+        save_config(conf, preserve_keys={("dashboard", "hidden_plugins")})
+        return True
+    except Exception:  # noqa: BLE001 - the Qubit store stays authoritative
+        return False
 
 
 def h_debug_share(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -8878,24 +9252,149 @@ def h_hooks_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                command="", approved=False)
 
 
+def _checkpoint_base(cfg: Any) -> Path:
+    """The canonical checkpoint shadow-store base (``<qubit_home>/checkpoints``).
+
+    Resolved through :func:`voicebridge.qubit_runtime.runtime_home_for_cfg` so
+    the read and the prune operate on the SAME cfg-scoped store the vendored
+    ``tools.checkpoint_maintenance`` uses; passing it explicitly also binds the
+    vendored ``CHECKPOINT_BASE`` (an import-time global) to this config.
+    """
+    from . import qubit_runtime as QR
+
+    return Path(QR.runtime_home_for_cfg(cfg)) / "checkpoints"
+
+
 def h_ckpt(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    from . import dashboard_ops as OPS
-    out = OPS.run_op(cfg, "checkpoints_list", {}, actor="dashboard:user",
-                     session="dashboard")
-    res = _res(out) or {}
-    recs = res.get("checkpoints", []) if isinstance(res, dict) else []
-    sessions = []
-    total = 0
-    for r in recs if isinstance(recs, list) else []:
-        if not isinstance(r, dict):
-            continue
-        size = int(r.get("bytes", r.get("size", 0)) or 0)
-        total += size
-        sessions.append({"session": str(r.get("name", r.get("session", ""))),
-                         "files": int(r.get("files", 0) or 0), "bytes": size})
+    """GET /api/ops/checkpoints -> real per-session checkpoint size.
+
+    Ported from the vendored ``web_routers/ops.py::list_checkpoints`` (the
+    ``/rollback`` shadow store): one directory per session under
+    ``<qubit_home>/checkpoints`` with its file count and byte size, so the
+    dashboard shows exactly what a prune reclaims. Replaces the previous
+    ``dashboard_ops.run_op("checkpoints_list")`` call, which was an UNKNOWN_OP
+    — so the surface always rendered an empty placeholder.
+    """
+    try:
+        cp_dir = _checkpoint_base(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    sessions: List[Dict[str, Any]] = []
+    total_bytes = 0
+    try:
+        if cp_dir.is_dir():
+            with os.scandir(cp_dir) as scan:
+                children = sorted((Path(e.path) for e in scan),
+                                  key=lambda x: x.name)
+            for child in children:
+                if not child.is_dir():
+                    continue
+                size = count = 0
+                for f in child.rglob("*"):
+                    if f.is_file():
+                        try:
+                            size += f.stat().st_size
+                            count += 1
+                        except OSError:
+                            pass
+                total_bytes += size
+                sessions.append({"session": child.name, "files": count,
+                                 "bytes": size})
+    except OSError as exc:
+        return _fail(exc)
     # CheckpointsResponse wire shape.
-    return _ok(sessions=sessions, total_bytes=total)
+    return _ok(sessions=sessions, total_bytes=total_bytes)
+
+
+def h_checkpoints_prune(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/ops/checkpoints/prune -> real retention/policy prune.
+
+    Ported from the vendored ``web_routers/ops.py::prune_checkpoints`` (which
+    spawns ``qubit checkpoints prune`` -> ``tools.checkpoint_maintenance
+    .prune_checkpoints``). Qubit executes it synchronously through the one
+    authority path: e-stop -> journal confirmation (``checkpoints.prune``) ->
+    audit -> the real prune, with the metadata-only outcome recorded for the
+    ``/api/actions/checkpoints-prune/status`` poll the SPA performs. Deletes
+    stale entries past ``retention_days``, unreachable-workdir orphans (bounded
+    to the previewed identities unless ``delete_orphans:false``), and shrinks
+    the store to ``max_total_size_mb`` when given. A client boolean is never
+    authority; the durable ``confirmation_id`` is.
+    """
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; prune refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing deleted; store unchanged"}
+
+    def _int_in(name: str, default: int, lo: int, hi: int) -> int:
+        raw = b.get(name, q.get(name, default))
+        try:
+            return max(lo, min(int(raw), hi))
+        except (TypeError, ValueError):
+            return default
+
+    retention_days = _int_in("retention_days", 7, 0, 3650)
+    max_size_mb = _int_in("max_total_size_mb", 0, 0, 1_000_000)
+    if "delete_orphans" in b or "delete_orphans" in q:
+        delete_orphans = _truthy(b.get("delete_orphans",
+                                       q.get("delete_orphans")))
+    else:
+        delete_orphans = True
+    try:
+        base = _checkpoint_base(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    guard = _compat_confirm(
+        cfg, "checkpoints.prune",
+        ("pruning the checkpoint store is metadata-destructive and "
+         "irreversible; re-POST with confirm=true"),
+        query=q, body=b,
+        payload={"retention_days": retention_days,
+                 "delete_orphans": delete_orphans,
+                 "max_total_size_mb": max_size_mb})
+    if guard is not None:
+        return guard
+    try:
+        from . import qubit_runtime as QR
+        QR.ensure_path()
+        from tools.checkpoint_maintenance import (  # type: ignore
+            prune_checkpoints, store_status,
+        )
+        info = store_status(base)
+        # Bind orphan deletion to exactly the identities the pre-prune store
+        # status exposes, mirroring the CLI's non-force preview contract so a
+        # project that orphans *after* this snapshot is not swept up.
+        orphans = [p for p in info.get("projects", []) if not p.get("exists")]
+        pre_v2 = [p for p in info.get("pre_v2_projects", []) if not p.get("exists")]
+        allowlist = {str(p.get("hash") or "") for p in orphans} | {
+            str(p.get("path") or "") for p in pre_v2}
+        result = prune_checkpoints(
+            retention_days=retention_days,
+            delete_orphans=delete_orphans,
+            checkpoint_base=base,
+            max_total_size_mb=max_size_mb,
+            orphan_allowlist=allowlist)
+    except Exception as exc:
+        return _fail(exc)
+    _audit("checkpoints.prune", "dashboard:user",
+           {"retention_days": retention_days,
+            "delete_orphans": delete_orphans,
+            "max_total_size_mb": max_size_mb,
+            "deleted_orphan": result.get("deleted_orphan"),
+            "deleted_stale": result.get("deleted_stale"),
+            "bytes_freed": result.get("bytes_freed")})
+    speech = (f"Pruned {int(result.get('deleted_orphan', 0)) + int(result.get('deleted_stale', 0))} "
+              f"checkpoint entr{'y' if int(result.get('deleted_orphan', 0)) + int(result.get('deleted_stale', 0)) == 1 else 'ies'}; "
+              f"reclaimed {int(result.get('bytes_freed', 0))} bytes")
+    record_action_status("checkpoints-prune",
+                         {"state": "executed", "result": result,
+                          "speech": speech})
+    return _ok(ok=True, name="checkpoints-prune", pruned=True,
+               result=result, speech=speech,
+               qubit_counterpart="CLI `qubit checkpoints prune`")
 
 
 def h_actions_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -9491,13 +9990,17 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not when and isinstance(b.get("repeat"), dict):
         when = str(b["repeat"].get("expr", "") or "")
     when = _normalize_schedule_expr(when)
+    deliver = str(b.get("deliver", b.get("deliver_to", "")) or "")
     detail = ("schedule create (unattended work) requires explicit "
               "confirmation: re-POST with {\"confirm\": true}")
-    guard = _compat_confirm(cfg, "cron.create", detail, q, b)
+    guard = _compat_confirm(cfg, "cron.create", detail, q, b,
+                            payload={"name": name, "task_text": task_text,
+                                     "when": when, "deliver": deliver})
     if guard is not None:
         return guard
     try:
         res = S.create(cfg, name, task_text, when,
+                       deliver_to=deliver,
                        requested_by="dashboard:user", confirmed=True)
     except Exception as exc:
         code = getattr(exc, "code", None) or type(exc).__name__
@@ -9513,19 +10016,25 @@ def cron_create(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 job = viewed["job"]
         except Exception:  # noqa: BLE001 — a read must never break the create
             pass
-    return 200, _cron_shape(job if isinstance(job, dict) else {},
-                            cfg=cfg, tz_name=_cron_timezone(cfg))
+    # Carry ``ok:True``: the pending-approvals banner settles cron.create via
+    # ``dashboard_ops.confirm_compat_op``, which requires ``body["ok"]``. Without
+    # it the job WAS created but the banner reported BACKEND_REFUSED (a false
+    # failure receipt). The direct POST response also gains the standard ok.
+    shape = _cron_shape(job if isinstance(job, dict) else {},
+                        cfg=cfg, tz_name=_cron_timezone(cfg))
+    return _ok(**shape)
 
 
 def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """PUT /api/cron/jobs/{job_id} -> real enabled-state transition.
+    """PUT /api/cron/jobs/{job_id} -> real in-place schedule edit.
 
-    The only in-place schedule mutation Qubit offers is enable/disable (pause
-    or resume); task text/schedule are immutable (delete + recreate retains
-    run history). Without ``confirm`` the write stages a typed 409 on the
-    shared journal; with it the same ``schedules`` store the CLI/voice use
-    performs the transition and records an audit receipt.
+    The edit modal posts the full mutation (name/prompt/schedule/deliver/
+    skills/...) plus the current ``enabled`` flag. Without ``confirm`` the
+    write stages a typed 409 on the shared journal; with it the same
+    ``schedules`` store the CLI/voice use applies the editable fields in place
+    (``set_paused`` delegates body-carrying edits to ``schedules.update_job``)
+    and records an audit receipt.
     """
     from . import schedules as S
     try:
@@ -9536,13 +10045,18 @@ def cron_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     enabled = b.get("enabled")
     if enabled is None:
         return _gate("CRON_UPDATE_IMMUTABLE",
-                     "Task text and schedule timing are immutable in place; "
-                     "disable, delete, and recreate to change them.",
-                     "DELETE then POST /api/cron/jobs (same schedules store)")
+                     "schedule update requires the current enabled flag; "
+                     "re-POST the full mutation including enabled.",
+                     "CLI `qubit schedules` (same schedules store)")
     enabled = bool(enabled)
     detail = (f"schedule {'resume' if enabled else 'pause'} requires explicit "
               "confirmation: re-POST with {\"confirm\": true}")
-    guard = _compat_confirm(cfg, "cron.update", detail, q, b)
+    guard = _compat_confirm(
+        cfg, "cron.update", detail, q, b,
+        payload={"id": job_id, "enabled": enabled,
+                 **{k: v for k, v in b.items()
+                    if k != "confirm" and isinstance(v, (str, int, float,
+                                                         bool))}})
     if guard is not None:
         return guard
     try:
@@ -9570,7 +10084,12 @@ def cron_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # Read the confirm/id from BOTH the parsed body and the query string, so
     # ``DELETE .../1?confirm=true`` and ``DELETE .../1 {"confirm": true}`` both
     # settle (previously only a body was read and it was never parsed).
-    guard = _compat_confirm(cfg, "cron.delete", detail, q, b)
+    try:
+        _job_id = int(p.get("id", "0"))
+    except (TypeError, ValueError):
+        _job_id = 0
+    guard = _compat_confirm(cfg, "cron.delete", detail, q, b,
+                            payload={"id": _job_id})
     if guard is not None:
         return guard
     try:
@@ -10196,11 +10715,29 @@ def msg_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         code = getattr(exc, "code", None) or type(exc).__name__
         return 400, {"ok": False, "code": code,
                      "detail": _redact(str(exc))[:300]}
+    # Bridge the dashboard config into the REAL vendored gateway store the
+    # daemon reads (config.yaml ``platforms.<id>.enabled`` + credential env in
+    # ``.env``), so a configured channel actually connects instead of living
+    # only in ``msg-platforms.json``. Catalog platforms only; credential values
+    # are resolved server-side and never returned here.
+    bridge: Dict[str, Any] = {}
+    if kind == "catalog":
+        refs: Dict[str, Any] = {str(k): v for k, v in env_in.items()}
+        for k in clear_in:
+            refs.setdefault(str(k), "")
+        try:
+            bridge = M.bridge_platform_to_gateway(cfg, pid, enabled=enabled,
+                                                  env_refs=refs)
+        except Exception as exc:  # noqa: BLE001 - report, never fake success
+            bridge = {"state": "UNAVAILABLE",
+                      "code": getattr(exc, "code", type(exc).__name__),
+                      "platform": pid}
     _audit("msg.platform_update", "dashboard:user",
            {"platform": pid, "enabled": enabled,
             "ref_keys": sorted(str(k) for k in env_in),
-            "clear_keys": sorted(str(k) for k in clear_in)})
-    return _ok(ok=True, platform=pid,
+            "clear_keys": sorted(str(k) for k in clear_in),
+            "bridge_state": bridge.get("state")})
+    return _ok(ok=True, platform=pid, bridge=bridge,
                qubit_counterpart="CLI `qubit messaging accounts` / "
                                  "`qubit channels catalog`")
 
@@ -10213,6 +10750,90 @@ def h_analytics_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 def h_files_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     return h_files(cfg, q, b, {**p, "kind": "read"})
+
+
+_FILES_HTTP = {
+    "FILES_NOT_FOUND": 404, "FILES_TOO_LARGE": 413,
+    "FILES_OUTSIDE_ROOT": 403, "FILES_BAD_INPUT": 400,
+    "FILES_IO": 500, "EMERGENCY_STOP": 403, "POWER_DISABLED": 403,
+    "POWER_UNAVAILABLE": 403, "CIRCUIT_OPEN": 403, "OUT_OF_SCOPE": 403,
+    "MALFORMED_INPUT": 400,
+}
+
+
+def h_files_download(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/files/download|stream, GET/HEAD /api/fs/download -> real bytes.
+
+    A genuinely-binary download/stream (not text-only). The read is
+    authorized, path-confined, e-stop-checked and audited through the broker's
+    READ_ONLY ``local.files_download`` capability — a read needs no
+    confirmation, but it still runs the shared e-stop latch and broker audit.
+    The JSON dispatcher cannot stream, so the confined bytes are returned as a
+    typed base64 envelope (the same contract the kanban attachment download
+    uses); the SPA's Files download consumes ``/api/files/read`` which now
+    serves binary files as a data URL directly.
+    """
+    import base64
+    from . import file_patch as FP
+    from . import files as FI
+
+    path = str(q.get("path", b.get("path", "")) or "").strip()
+    counterpart = "GET /api/files/read + CLI `qubit files read`"
+    if not path:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "path required",
+                     "qubit_counterpart": counterpart}
+    if _estop(cfg):
+        return 403, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "EMERGENCY_STOP",
+                     "detail": "emergency stop latched; download refused",
+                     "owner": "qubit-policy",
+                     "rollback": "nothing read; nothing to roll back",
+                     "qubit_counterpart": counterpart}
+    try:
+        broker = _file_write_broker(cfg)
+        res = broker.execute(
+            FP.download_capability_name(),
+            {"target_path": path, "requested_by": "dashboard:user",
+             "project_root": ""},
+            source="user", target=path)
+    except Exception as exc:
+        return _fail(exc)
+    payload: Dict[str, Any] = {}
+    if res.ok and str(res.output or "").strip():
+        try:
+            parsed = json.loads(res.output)
+            payload = parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            payload = {}
+    if not payload.get("ok"):
+        code = str(payload.get("code") or res.denied or "FILES_IO")
+        detail = str(payload.get("detail") or res.error
+                     or "file read refused")
+        return _FILES_HTTP.get(code, 400), {
+            "ok": False, "code": _redact(code)[:80],
+            "detail": _redact(detail)[:300], "owner": "qubit-policy",
+            "rollback": "nothing read; nothing to roll back",
+            "qubit_counterpart": counterpart}
+    info = payload.get("file") if isinstance(payload.get("file"), dict) else {}
+    try:
+        raw = FI.read_bytes(cfg, str(info.get("path") or path))
+    except FI.FilesError as exc:
+        return _FILES_HTTP.get(exc.code, 400), {
+            "ok": False, "code": exc.code, "detail": _redact(exc.detail)[:300],
+            "owner": "qubit-policy",
+            "rollback": "nothing read; nothing to roll back",
+            "qubit_counterpart": counterpart}
+    data = raw["data"]
+    _audit("files.download", "dashboard:user",
+           {"path": str(raw["file"]), "bytes": len(data),
+            "sha256": raw["sha256"][:16]})
+    return _ok(ok=True, name=raw["name"], path=raw["file"],
+               size=raw["size"], mime_type=raw["mime"],
+               sha256=raw["sha256"],
+               content_base64=base64.b64encode(data).decode("ascii"),
+               qubit_counterpart=counterpart)
 
 
 def files_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -11233,6 +11854,11 @@ def env_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if not name:
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "env reference name required"}
+    if not env_store.valid_name(name):
+        return 400, {"ok": False, "code": "ENV_NAME_INVALID",
+                     "detail": "env reference name must match "
+                               "^[A-Za-z_][A-Za-z0-9_]*$",
+                     "qubit_counterpart": "CLI `qubit auth set <NAME> <ref>`"}
     if deleting:
         try:
             res = env_store.remove_ref(cfg, name)
@@ -11287,6 +11913,11 @@ def env_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      "detail": "env reference name required"}
     from . import env_store
 
+    if not env_store.valid_name(name):
+        return 400, {"ok": False, "code": "ENV_NAME_INVALID",
+                     "detail": "env reference name must match "
+                               "^[A-Za-z_][A-Za-z0-9_]*$",
+                     "qubit_counterpart": "CLI `qubit auth unset <NAME>`"}
     try:
         res = env_store.remove_ref(cfg, name)
     except Exception as exc:
@@ -11921,7 +12552,13 @@ def _update_resolve_source(cfg: Any, source: Any, channel: Any,
 def _update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str], source: Any = None,
                   channel: Any = None, tag: Any = None) -> Dict[str, Any]:
-    """Read-only update check — the shared seam GET uses and voice calls."""
+    """Read-only update check — the shared seam GET uses and voice calls.
+
+    ``channel``/``tag`` select the effective ref the same way ``--apply`` does
+    (explicit ``tag`` wins; ``stable``/``beta`` pick the newest matching release
+    tag; ``canary`` the branch head). Forwarded only when supplied so a bare
+    check stays call-compatible with an older manager stub.
+    """
     from . import update_manager as UM
     kwargs: Dict[str, Any] = {"source": source}
     if channel:
@@ -13078,6 +13715,36 @@ def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     merged = {**{k: v for k, v in b.items() if k != "values"}, **values}
     if "blueprint" in merged and "name" not in merged:
         merged["name"] = merged["blueprint"]
+    # Fill the blueprint's schedule TEMPLATE server-side (the SPA sends only the
+    # blueprint key + slot values, exactly like the reference; it never sends a
+    # ``when``). ``fill_blueprint`` validates the slots and returns the resolved
+    # cron expression + prompt/name/deliver.
+    blueprint_key = str(merged.get("blueprint") or "").strip()
+    if blueprint_key:
+        try:
+            from . import qubit_runtime
+            qubit_runtime.ensure_path()
+            try:
+                qubit_runtime.use_qubit_home(cfg)
+            except Exception:  # noqa: BLE001
+                pass
+            from cron.blueprint_catalog import (  # type: ignore
+                BlueprintFillError, fill_blueprint, get_blueprint,
+            )
+            blueprint = get_blueprint(blueprint_key)
+            if blueprint is None:
+                return 404, {"ok": False, "code": "BLUEPRINT_NOT_FOUND",
+                             "detail": f"unknown blueprint {blueprint_key!r}",
+                             "qubit_counterpart": "CLI `qubit schedules`"}
+            try:
+                spec = fill_blueprint(blueprint, values)
+            except BlueprintFillError as exc:
+                return 400, {"ok": False, "code": "BLUEPRINT_BAD_FILL",
+                             "detail": _redact(str(exc))[:300],
+                             "qubit_counterpart": "CLI `qubit schedules create`"}
+            merged = {**spec, **merged, "name": spec.get("name", merged.get("name"))}
+        except Exception:  # noqa: BLE001 - fall through to the legacy path
+            pass
     if not merged.get("name"):
         return 400, {"ok": False, "code": "MALFORMED",
                      "detail": "blueprint name required",
@@ -13086,9 +13753,9 @@ def h_blueprint_instantiate(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 400, {"ok": False, "code": "BLUEPRINT_BAD_FILL",
                      "detail": "a schedule expression (when) is required",
                      "qubit_counterpart": "CLI `qubit schedules create`"}
-    values = {k: v for k, v in merged.items()
+    scalar = {k: v for k, v in merged.items()
               if k != "confirm" and isinstance(v, (str, int, float, bool))}
-    return cron_create(cfg, q, {**values, "confirm": bool(b.get("confirm"))}, p)
+    return cron_create(cfg, q, {**scalar, "confirm": bool(b.get("confirm"))}, p)
 
 
 def h_plugin_kanban_attachment_download(
@@ -13860,6 +14527,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "debug_share": h_debug_share,
     "ckpt": h_ckpt,
     "h_ckpt": h_ckpt,
+    "h_checkpoints_prune": h_checkpoints_prune,
     "actions_read": h_actions_read,
     "action_status": h_action_status,
     "font": lambda cfg, q, b, p: h_font(cfg, q, b, p, False),
@@ -13898,6 +14566,7 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "msg_update": msg_update,
     "h_analytics_models": h_analytics_models,
     "h_files_read": h_files_read,
+    "h_files_download": h_files_download,
     "files_delete": files_delete,
     "hooks_delete": hooks_delete,
     "plugins_hub": plugins_hub,
@@ -14162,6 +14831,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_health_idle": h_health_idle,
     "h_audio_transcribe": h_audio_transcribe,
     "h_audio_speak": h_audio_speak,
+    "h_audio_stt_status": h_audio_stt_status,
 }
 HANDLERS.update(_EXTRA_HANDLERS)
 

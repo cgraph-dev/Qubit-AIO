@@ -141,6 +141,25 @@ class FasterWhisperASR(ASRProvider):
             str(audio_path), beam_size=self.beam_size, language=self.language)
         return list(segments_iter), info
 
+    def transcribe_pcm(self, pcm: bytes, sample_rate: int = 16000) -> str:
+        """Whole-utterance decode of mono int16 PCM at sample_rate (resampled to 16k)."""
+        import numpy as np
+        self.load()
+        audio = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
+        rate = int(sample_rate or 16000)
+        if rate != 16000 and audio.size:
+            n = int(round(audio.size * 16000 / rate))
+            if n > 0:
+                x_old = np.arange(audio.size, dtype=np.float64)
+                x_new = np.linspace(0.0, audio.size - 1, num=n, dtype=np.float64)
+                audio = np.interp(x_new, x_old, audio).astype(np.float32)
+        with self._lock:
+            segments, _info = self._model.transcribe(
+                np.ascontiguousarray(audio), beam_size=self.beam_size,
+                language=self.language, vad_filter=True,
+                condition_on_previous_text=False)
+            return "".join(s.text for s in segments).strip()
+
     def transcribe(self, audio_path: Path | str) -> Transcript:
         self.load()
         with self._lock:

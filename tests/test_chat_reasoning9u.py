@@ -35,8 +35,12 @@ def test_normalize_reasoning_levels():
     assert normalize_reasoning_level(None) is None
     assert normalize_reasoning_level("high") == "high"
     assert normalize_reasoning_level(" High ") == "high"
+    # xhigh/ultra are real levels in the canonical vendored ladder
+    # (``qubit_constants.VALID_REASONING_EFFORTS``) the picker mirrors.
+    assert normalize_reasoning_level("xhigh") == "xhigh"
+    assert normalize_reasoning_level("ultra") == "ultra"
     with pytest.raises(ReasoningInvalidError):
-        normalize_reasoning_level("ultra")
+        normalize_reasoning_level("bogus")
     with pytest.raises(ReasoningInvalidError):
         normalize_reasoning_level("")
 
@@ -46,7 +50,7 @@ def test_turn_rejects_unknown_reasoning_before_session_write(tmp_path,
     from voicebridge import chat_transport as CT
 
     cfg = _cfg(tmp_path, monkeypatch)
-    res = CT.turn(cfg, "hello", session="s-reason", reasoning="ultra")
+    res = CT.turn(cfg, "hello", session="s-reason", reasoning="bogus")
     assert res.get("code") == "REASONING_INVALID", res
     assert res.get("state") == "FAILED", res
     # No partial write: the session was never created.
@@ -99,7 +103,7 @@ def test_stream_turn_rejects_unknown_reasoning_first(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     events = list(CT.stream_turn(cfg, "hello", session="s-stream-bad",
-                                 reasoning="ultra"))
+                                 reasoning="bogus"))
     assert events and events[0].get("event") == "error", events
     assert events[0].get("code") == "REASONING_INVALID", events
 
@@ -222,7 +226,7 @@ def test_session_reasoning_persist_and_effective(tmp_path, monkeypatch):
     assert code == 200 and out.get("ok") is True, (code, out)
 
     code, out = HC.dispatch(cfg, "PATCH", "/api/qubit/chat/sessions/s-pref",
-                            {}, {"reasoning": "ultra"})
+                            {}, {"reasoning": "bogus"})
     assert (code, out.get("code")) == (400, "REASONING_INVALID"), (code, out)
 
     shown = CT.store(cfg).show("s-pref")
@@ -250,6 +254,6 @@ def test_chat_turn_handler_reasoning_codes(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    code, out = HC.h_chat_turn(cfg, {}, {"text": "hi", "reasoning": "ultra",
+    code, out = HC.h_chat_turn(cfg, {}, {"text": "hi", "reasoning": "bogus",
                                          "session": "s-h"}, {})
     assert (code, out.get("code")) == (400, "REASONING_INVALID"), (code, out)

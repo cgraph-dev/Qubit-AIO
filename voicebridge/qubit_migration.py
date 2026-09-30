@@ -57,6 +57,18 @@ _STATE_ITEM_DIRS = ("memories", "checkpoints", "pairing")
 _STATE_ITEM_FILES = ("channel_directory.json", "gateway_state.json",
                      ".hermes_history")
 
+# Qubit-owned destination names. Earlier versions wrote these paths with a
+# legacy brand; they are read-old/write-new: the new name is always written,
+# and any legacy-named file/dir is mirrored once onto the new name when the
+# new one does not exist, so nothing is lost. The legacy copy is never
+# deleted. NOTE: ``_LEGACY_HISTORY_NAME`` below is the *Qubit-owned* legacy
+# destination name — the reference source ``~/.hermes/.hermes_history`` is a
+# different (read-only) input and keeps its name.
+_QUBIT_HISTORY_NAME = ".qubit_history"
+_LEGACY_HISTORY_NAME = ".hermes_history"
+_QUBIT_MIGRATION_DIR = "qubit-migration"
+_LEGACY_MIGRATION_DIR = "hermes-migration"
+
 
 # ---------------------------------------------------------------------------
 # source resolution
@@ -1203,12 +1215,35 @@ def _snapshot_sqlite(src: Path, dst: Path) -> None:
             shutil.copy2(p, target)
 
 
+def _state_dir_path(cfg: Any) -> Path:
+    return Path(cfg.state_dir()) if hasattr(cfg, "state_dir") else Path(".")
+
+
+def _migration_base_dir(cfg: Any) -> Path:
+    """The Qubit-owned migration backup root (read-old/write-new).
+
+    A legacy-branded ``hermes-migration/`` directory written by an earlier
+    version is mirrored once into ``qubit-migration/`` when the new directory
+    does not yet exist. The legacy directory is left in place (never deleted)
+    so every existing backup survives.
+    """
+    base = _state_dir_path(cfg)
+    new = base / _QUBIT_MIGRATION_DIR
+    legacy = base / _LEGACY_MIGRATION_DIR
+    if not new.exists() and legacy.is_dir():
+        try:
+            new.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(legacy, new, dirs_exist_ok=True)
+        except OSError:
+            pass
+    return base
+
+
 def _backup_dir(cfg: Any, backup_dir: Optional[Path], home: Path) -> Path:
     if backup_dir is not None:
         return Path(backup_dir)
-    base = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(".")
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    return Path(base) / "hermes-migration" / stamp
+    return _migration_base_dir(cfg) / _QUBIT_MIGRATION_DIR / stamp
 
 
 def apply(cfg: Any = None, *, confirm: bool = False,
@@ -1443,9 +1478,24 @@ HISTORY_PLACEHOLDER = "«REDACTED:SECRET»"
 # length-floored so ordinary prose is never masked.
 _HISTORY_SECRET_PATTERNS: tuple = (
     ("openai_sk", re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]{11,}\b"), "value"),
+    ("anthropic_key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b"), "value"),
+    ("openrouter_key", re.compile(r"\bsk-or-[A-Za-z0-9]{20,}\b"), "value"),
     ("stripe_secret", re.compile(r"\bsk_live_[A-Za-z0-9]{10,}\b"), "value"),
     ("github_token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), "value"),
     ("slack_token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "value"),
+    # Provider tokens whose value is entirely alphabetic (no digit) — these
+    # escaped the entropy fallback, so they need explicit shapes.
+    ("huggingface_token", re.compile(r"\bhf_[A-Za-z0-9]{20,}\b"), "value"),
+    ("tailscale_key", re.compile(r"\btskey-[A-Za-z0-9-]{16,}\b"), "value"),
+    ("perplexity_key", re.compile(r"\bpplx-[A-Za-z0-9]{20,}\b"), "value"),
+    ("replicate_token", re.compile(r"\br8_[A-Za-z0-9]{20,}\b"), "value"),
+    ("gitlab_token", re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}\b"), "value"),
+    ("npm_token", re.compile(r"\bnpm_[A-Za-z0-9]{20,}\b"), "value"),
+    ("digitalocean_token", re.compile(r"\bdop_v1_[A-Za-z0-9]{40,}\b"), "value"),
+    ("shopify_token", re.compile(r"\bshpat_[A-Za-z0-9]{20,}\b"), "value"),
+    ("google_oauth_token", re.compile(r"\bya29\.[A-Za-z0-9_-]{20,}\b"), "value"),
+    ("atlassian_token", re.compile(r"\bATATT[A-Za-z0-9_=-]{20,}\b"), "value"),
+    ("linear_key", re.compile(r"\blin_api_[A-Za-z0-9]{20,}\b"), "value"),
     ("aws_access_key", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "value"),
     ("google_api_key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"), "value"),
     ("jwt", re.compile(
@@ -1461,10 +1511,11 @@ _HISTORY_SECRET_PATTERNS: tuple = (
         r"pwd|secret|token)\b(\s*[=:]\s*)(\"?)([^\s\"'&,;]+)"), "keyvalue"),
 )
 
-# An unkeyed opaque token: base64/hex-ish, length-floored, at least three
-# character classes (lower + upper + digit) and Shannon entropy >= 3.5
-# bits/char. Plain lowercase hex (a git SHA) and single-case path fragments are
-# deliberately excluded, so safe history lines keep working.
+# An unkeyed opaque token: base64/hex-ish, length-floored, at least two
+# character classes (lower + upper) and Shannon entropy >= 3.5 bits/char. Plain
+# lowercase hex (a git SHA) and single-case path fragments are deliberately
+# excluded, so safe history lines keep working. A digit is NOT required because
+# provider tokens such as ``hf_...`` can be all letters.
 _HISTORY_ENTROPY_TOKEN = re.compile(r"[A-Za-z0-9_+=\-]{32,}")
 _HISTORY_ENTROPY_MIN = 3.5
 
@@ -1481,15 +1532,48 @@ def _shannon_entropy(token: str) -> float:
 
 
 def _high_entropy_token(token: str) -> bool:
-    """True for an opaque credential-shaped token, never for ordinary prose."""
+    """True for an opaque credential-shaped token, never for ordinary prose.
+
+    Requires mixed lower+upper case, length >= 32, >= 12 distinct characters and
+    entropy >= 3.5 bits/char. Mixed case excludes lowercase hex git SHAs and
+    single-case path fragments; a digit is not required because some provider
+    tokens (``hf_...``) are entirely alphabetic.
+    """
     if len(token) < 32:
         return False
-    if not (re.search(r"[a-z]", token) and re.search(r"[A-Z]", token)
-            and re.search(r"[0-9]", token)):
+    if not (re.search(r"[a-z]", token) and re.search(r"[A-Z]", token)):
         return False
     if len(set(token)) < 12:
         return False
     return _shannon_entropy(token) >= _HISTORY_ENTROPY_MIN
+
+
+# Independent, non-circular safety net for the fail-closed write gate: matches
+# the credential *value shape* only (never a ``key=`` context), so the
+# redaction placeholder can never satisfy it. ``key_value``/``bearer`` are
+# excluded because their sanitized output legitimately keeps the key word.
+_HISTORY_RESIDUAL_PATTERNS = tuple(
+    rx for name, rx, kind in _HISTORY_SECRET_PATTERNS
+    if name not in ("key_value", "bearer")
+)
+
+
+def _history_residual_secret(text: str) -> int:
+    """Count secret-shaped values still present in FINAL output.
+
+    This re-scans the bytes about to be written with the value-shape patterns
+    and the entropy detector, independent of the per-line replacement counters,
+    so a sanitizer that silently failed to apply a pattern cannot pass the
+    fail-closed gate.
+    """
+    probe = text.replace(HISTORY_PLACEHOLDER, "R")
+    hits = 0
+    for rx in _HISTORY_RESIDUAL_PATTERNS:
+        hits += len(rx.findall(probe))
+    for m in _HISTORY_ENTROPY_TOKEN.finditer(probe):
+        if _high_entropy_token(m.group(0)):
+            hits += 1
+    return hits
 
 
 def _apply_history_pattern(rx: "re.Pattern[str]", line: str, repl) -> tuple:
@@ -1586,15 +1670,32 @@ def _history_source_path(home: Path) -> Path:
 def _history_dest_path(cfg: Any, dest: Optional[Path]) -> Path:
     if dest is not None:
         return Path(dest)
-    return _qubit_home(cfg) / ".hermes_history"
+    return _qubit_home(cfg) / _QUBIT_HISTORY_NAME
+
+
+def _legacy_history_dest(dest: Path) -> Optional[Path]:
+    """The Qubit-owned legacy-named history file to read-old from, if any.
+
+    Returns the legacy-branded ``<qubit_home>/.hermes_history`` only when
+    ``dest`` is the Qubit-owned default ``.qubit_history``, the new path does
+    not exist yet, and the legacy file does. Pure (never writes); the reference
+    source ``~/.hermes/.hermes_history`` is a different, read-only home and is
+    never returned.
+    """
+    if dest.name != _QUBIT_HISTORY_NAME:
+        return None
+    legacy = dest.with_name(_LEGACY_HISTORY_NAME)
+    if dest.exists() or not legacy.is_file():
+        return None
+    return legacy
 
 
 def _history_backup_dir(cfg: Any, backup_dir: Optional[Path]) -> Path:
     if backup_dir is not None:
         return Path(backup_dir)
-    base = cfg.state_dir() if hasattr(cfg, "state_dir") else Path(".")
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    return Path(base) / "hermes-migration" / f"history-{stamp}"
+    return (_migration_base_dir(cfg) / _QUBIT_MIGRATION_DIR
+            / f"history-{stamp}")
 
 
 def _write_history_review(review: Dict[str, Any], path: Path) -> None:
@@ -1620,6 +1721,14 @@ def import_cli_history_sanitized(
     """
     src = _history_source_path(Path(home) if home else source_home(cfg))
     dst = _history_dest_path(cfg, dest)
+    # Read-old/write-new: when the new Qubit-owned destination does not exist
+    # yet but a legacy-branded Qubit-owned sibling does, read the legacy file
+    # as the pre-existing destination. It is mirrored onto the new name only on
+    # a confirmed apply, so a dry run writes nothing. The legacy file is never
+    # deleted, and the reference source ``~/.hermes/.hermes_history`` (a
+    # different home) is never involved.
+    legacy_dst = _legacy_history_dest(dst)
+    read_dst = dst if dst.is_file() else legacy_dst
     review: Dict[str, Any] = {
         "schema": HISTORY_SCHEMA,
         "source": str(src),
@@ -1631,7 +1740,9 @@ def import_cli_history_sanitized(
         "patterns": {},
         "existing_lines": 0,
         "added_lines": 0,
-        "destination_existed": dst.is_file(),
+        "destination_existed": bool(read_dst is not None and read_dst.is_file()),
+        "destination_migrated_from": (str(legacy_dst)
+                                      if read_dst is legacy_dst else None),
         "dry_run": not confirm,
     }
     if not src.is_file():
@@ -1654,10 +1765,10 @@ def import_cli_history_sanitized(
     review["patterns"] = sanitized["patterns"]
 
     existing: List[str] = []
-    if dst.is_file():
+    if read_dst is not None and read_dst.is_file():
         try:
-            existing = dst.read_text(encoding="utf-8",
-                                     errors="replace").splitlines()
+            existing = read_dst.read_text(encoding="utf-8",
+                                          errors="replace").splitlines()
         except OSError as exc:
             review.update(
                 state="UNREADABLE",
@@ -1689,13 +1800,16 @@ def import_cli_history_sanitized(
     if final_lines:
         merged += "\n"
 
-    # Fail closed: the text about to be written must contain zero secrets. A
-    # match here means the sanitizer missed a shape, so we write nothing.
-    if sanitize_cli_history(merged)["redactions"]:
+    # Fail closed: the text about to be written must contain zero secrets. Two
+    # independent checks: (1) the sanitizer is idempotent on its own output, and
+    # (2) an independent value-shape scan finds no residual secret. Either one
+    # tripping means the sanitizer missed a shape, so we write nothing.
+    residual = _history_residual_secret(merged)
+    if sanitize_cli_history(merged)["redactions"] or residual:
         review.update(
             state="REFUSED", code="HISTORY_SECRET_ASSERT_FAILED",
-            detail="sanitized output still matched a secret pattern; nothing "
-                   "written")
+            detail=f"sanitized output still matched a secret pattern "
+                   f"(residual={residual}); nothing written")
         return review
 
     if not confirm:
@@ -1706,6 +1820,13 @@ def import_cli_history_sanitized(
             _write_history_review(review, Path(review_path))
             review["review_path"] = str(review_path)
         return review
+
+    # Confirmed apply: mirror the legacy Qubit-owned destination onto the new
+    # name once (the legacy file is preserved). Done after the dry-run gate so
+    # a dry run still writes nothing.
+    if read_dst is legacy_dst and legacy_dst is not None:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(legacy_dst, dst)
 
     if not incoming and not existing_sanitized["redactions"]:
         review.update(state="NOOP",

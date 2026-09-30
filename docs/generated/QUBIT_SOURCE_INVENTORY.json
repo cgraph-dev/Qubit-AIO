@@ -56,10 +56,10 @@
   "counts": {
    "upstream_files": 16078,
    "local_files": 16084,
-   "identical": 9630,
+   "identical": 9629,
    "missing": 25,
    "extra": 31,
-   "changed": 6423
+   "changed": 6424
   },
   "missing": [
    {
@@ -44738,6 +44738,13 @@
     "local_sha256": "4c6171177cec1d49d6d4cc19974ff53140dd6646467518bb428933264b3589c5"
    },
    {
+    "path": "uv.lock",
+    "upstream_path": "uv.lock",
+    "upstream_blob": "953221d85bd0dc70e5ff2c929e5c7245f5f4d235",
+    "upstream_sha256": "bd27ac91236fa57f9eeffea8d4a324f3ca7f9b218525d74bec14a67fc1163887",
+    "local_sha256": "7743dd854de2f9e31694ea1cfb68254a356b4dee32f5878d28479b2a21fe5e03"
+   },
+   {
     "path": "web/AGENTS.md",
     "upstream_path": "web/AGENTS.md",
     "upstream_blob": "265fb75cd9a26ab286b932bd18ba54602c17aa3f",
@@ -45300,7 +45307,7 @@
    "unmatched": 84
   },
   "qubit": {
-   "ledger_rows": 752
+   "ledger_rows": 751
   },
   "ledger_ids": [
    "OC-01",
@@ -46223,10 +46230,8 @@
    "hermes_gate_backup_passphrase",
    "hermes_gate_blocked_remote_source",
    "hermes_gate_chat_image_overlay",
-   "hermes_gate_checkpoint_confirm_required",
    "hermes_gate_cron_fire_external",
    "hermes_gate_desktop_overlay_only",
-   "hermes_gate_files_binary_stream",
    "hermes_gate_gateway_migrate_operator_owned",
    "hermes_gate_gh_auth_operator",
    "hermes_gate_gh_pr_external",
@@ -46533,6 +46538,7 @@
    "page_skillspage",
    "page_systempage",
    "page_terminalchatpage",
+   "page_voiceeditpage",
    "page_webhookspage",
    "pairing_accept",
    "pairing_approve",
@@ -158076,7 +158082,7 @@
    "route": "/api/files/download",
    "ledger_match": "api:GET /api/files/download",
    "ledger_source": "hermes",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -158110,7 +158116,7 @@
    "route": "/api/files/stream",
    "ledger_match": "api:GET /api/files/stream",
    "ledger_source": "hermes",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -158144,7 +158150,7 @@
    "route": "/api/fs/download",
    "ledger_match": "api:GET /api/fs/download",
    "ledger_source": "hermes",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -159776,7 +159782,7 @@
    "route": "/api/files/stream",
    "ledger_match": "api:HEAD /api/files/stream",
    "ledger_source": "hermes",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -160932,7 +160938,7 @@
    "route": "/api/ops/checkpoints/prune",
    "ledger_match": "api:POST /api/ops/checkpoints/prune",
    "ledger_source": "hermes",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,

@@ -118,8 +118,8 @@
  "counts": {
   "total": 591,
   "by_status": {
-   "IMPLEMENTED": 484,
-   "SAFE_EQUIVALENT": 107
+   "IMPLEMENTED": 489,
+   "SAFE_EQUIVALENT": 102
   },
   "by_area": {
    "analytics-config": 4,
@@ -1404,42 +1404,42 @@
    "area": "files-fs",
    "capability": "GET /api/files/download",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/files.py:453",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_files_download",
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_audit_remaining_repair9u.py::test_download_capability_registered_read_only",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/files/stream",
    "area": "files-fs",
    "capability": "GET /api/files/stream",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/files.py:473",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_files_download",
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_audit_remaining_repair9u.py::test_download_capability_registered_read_only",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:HEAD /api/files/stream",
    "area": "files-fs",
    "capability": "HEAD /api/files/stream",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/files.py:474",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_files_download",
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_audit_remaining_repair9u.py::test_download_capability_registered_read_only",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:POST /api/files/upload",
@@ -1558,14 +1558,14 @@
    "area": "files-fs",
    "capability": "GET /api/fs/download",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/files.py:733",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_files_download",
    "cli": "qubit files list|read|inspect",
    "dashboard": "hermes-dist Files",
    "voice": "qubit voice files",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate FILES_BINARY_STREAM via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_audit_remaining_repair9u.py::test_download_capability_registered_read_only",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/fs/git-root",
@@ -2221,7 +2221,7 @@
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_mcp_capability_compat_wave20.py::test_disabled_server_returns_honest_disposition_without_spawning",
+   "proving_test": "tests/test_mcp_capabilities_redaction9u.py::test_capability_route_list_survives_transport_redaction",
    "note": "",
    "needs": "owner"
   },
@@ -3112,14 +3112,14 @@
    "area": "ops",
    "capability": "POST /api/ops/checkpoints/prune",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/ops.py:821",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_checkpoints_prune",
    "cli": "qubit checkpoints / hooks / product",
    "dashboard": "hermes-dist System",
    "voice": "voice ops",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate CHECKPOINT_CONFIRM_REQUIRED via compat dispatcher.",
-   "needs": "owner"
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_agentz_consistency.py::test_model_info_reports_reasoning_capability_truthfully",
+   "note": "",
+   "needs": "none"
   },
   {
    "id": "api:GET /api/profiles/sessions",

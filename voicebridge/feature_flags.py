@@ -89,6 +89,16 @@ FLAGS: List[FeatureFlag] = [
         category="phase0",
         description="Local-LLM intent classifier for ambiguous taps (True = "
                     "heuristic + LLM; False = heuristic only)."),
+    FeatureFlag(
+        name="voice_edit",
+        config_path=("voice_edit", "enabled"),
+        default=False,
+        rollback_value=False,
+        category="voice",
+        description="System-wide voice typing / selected-text editing via the "
+                    "authenticated desktop helper. Disabled by default; flip "
+                    "False to roll the whole feature off (ordinary dictation "
+                    "and the browser STT path are unaffected either way)."),
 ]
 
 

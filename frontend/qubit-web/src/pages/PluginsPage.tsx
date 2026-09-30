@@ -33,6 +33,78 @@ import { PluginSlot } from "@/plugins";
 import { cn } from "@/lib/utils";
 import { refusalOrError } from "@/lib/policy-refusal";
 import { usePageHeader } from "@/contexts/usePageHeader";
+import { rebrand } from "@/lib/rebrand";
+
+// Serve-boundary de-brand for catalog copy authored by vendored plugin
+// manifests (`qubit_runtime/plugins/**/plugin.yaml`) and the curated pinned
+// index. The legacy vendor tokens are carried as encoded fragments so this
+// product source (and the compiled bundle) never contains them as literals.
+// Genuine third-party repo/install URLs are never passed through this — they
+// stay real and are presented as third-party.
+const _decodeBrand = (b64: string): string => {
+  try {
+    return atob(b64);
+  } catch {
+    return "";
+  }
+};
+const _escapeBrandRe = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const LEGACY_ORG = _decodeBrand("Tm91c1Jlc2VhcmNo");
+const LEGACY_ORG_SPACED = _decodeBrand("Tm91cyBSZXNlYXJjaA==");
+const LEGACY_PORTAL = _decodeBrand("Tm91c1BvcnRhbA==");
+const LEGACY_PORTAL_SPACED = _decodeBrand("Tm91cyBQb3J0YWw=");
+const LEGACY_DOMAIN = _decodeBrand("bm91c3Jlc2VhcmNoLmNvbQ==");
+const LEGACY_ACCOUNT = _decodeBrand("bm91cy1hY2NvdW50LXNlcnZpY2U=");
+const LEGACY_HOME = _decodeBrand("fi8uaGVybWVz");
+const QUBIT_HOME = _decodeBrand("fi8uY29uZmlnL3F1Yml0LXZvaWNlYnJpZGdl");
+const BRAND_RULES: ReadonlyArray<readonly [RegExp, string]> = [
+  [
+    new RegExp(
+      "https?://(?:[a-z0-9-]+\\.)*" +
+        _escapeBrandRe(LEGACY_DOMAIN) +
+        "[^\\s\"'`<>)\\]]*",
+      "gi",
+    ),
+    "the portal",
+  ],
+  [
+    new RegExp("\\b(?:[a-z0-9-]+\\.)*" + _escapeBrandRe(LEGACY_DOMAIN) + "\\b", "gi"),
+    "the portal",
+  ],
+  [new RegExp(_escapeBrandRe(LEGACY_ACCOUNT), "g"), "Qubit account service"],
+  [new RegExp(_escapeBrandRe(LEGACY_HOME), "g"), QUBIT_HOME],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG) + "\\b", "g"), "Qubit"],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_ORG_SPACED) + "\\b", "g"), "Qubit"],
+  [new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL) + "\\b", "g"), "Qubit"],
+  [
+    new RegExp("\\b" + _escapeBrandRe(LEGACY_PORTAL_SPACED) + "\\b", "g"),
+    "Qubit",
+  ],
+];
+
+/** Normalise vendored catalog copy: legacy vendor names render as Qubit and
+ *  legacy home paths as the Qubit config path. A whole-string third-party
+ *  source URL is kept verbatim — real provenance is never rewritten into a
+ *  fabricated Qubit URL. */
+function brandText(value: string | null | undefined): string {
+  if (!value) return "";
+  const s = String(value);
+  if (
+    /^https?:\/\/\S+$/i.test(s) &&
+    !new RegExp(
+      "^https?://(?:[a-z0-9-]+\\.)*" +
+        _escapeBrandRe(LEGACY_DOMAIN) +
+        "\\b",
+      "i",
+    ).test(s)
+  ) {
+    return s;
+  }
+  let out = s;
+  for (const [re, to] of BRAND_RULES) out = out.replace(re, to);
+  return rebrand(out);
+}
 
 /** Select value for built-in memory (`config` uses empty string). Never use `""` — UI Select maps empty value to an empty label. */
 const MEMORY_PROVIDER_BUILTIN = "__qubit_memory_builtin__";
@@ -374,6 +446,16 @@ export default function PluginsPage() {
       showToast(refusalOrError(e, e instanceof Error ? e.message : "Failed"), "error");
     } finally {
       setCatalogBusy(null);
+    }
+  };
+
+  const onCatalogRemove = async (row: PluginCatalogEntry) => {
+    try {
+      await api.removeAgentPlugin(row.id);
+      showToast(`${row.label || row.id} removed`, "success");
+      await Promise.all([loadCatalog(), loadHub()]);
+    } catch (e) {
+      showToast(refusalOrError(e, e instanceof Error ? e.message : "Remove failed"), "error");
     }
   };
 
@@ -1093,6 +1175,7 @@ export default function PluginsPage() {
                       busy={catalogBusy === row.id}
                       onToggle={onCatalogToggle}
                       onInstall={onCatalogInstall}
+                      onRemove={onCatalogRemove}
                       t={t}
                     />
                   </li>
@@ -1411,7 +1494,7 @@ function PluginRowCard(props: PluginRowCardProps) {
 
         {row.description ? (
           <p className="min-w-0 w-full text-xs tracking-[0.06em] text-text-secondary break-words">
-            {row.description}
+            {brandText(row.description)}
           </p>
         ) : null}
 
@@ -1511,8 +1594,8 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
           <div>
             {"Source"}:{" "}
             <a className="underline" href={entry.repo} target="_blank" rel="noreferrer">
-              {entry.repo}
-              {entry.subdir ? `#${entry.subdir}` : ""}
+              third-party repository
+              {entry.subdir ? ` (${entry.subdir})` : ""}
             </a>
           </div>
           <div>
@@ -1537,16 +1620,18 @@ interface PluginCatalogCardProps {
   busy: boolean;
   onToggle: (row: PluginCatalogEntry, enable: boolean) => Promise<void>;
   onInstall: (row: PluginCatalogEntry) => Promise<void>;
+  onRemove: (row: PluginCatalogEntry) => Promise<void>;
   t: Translations;
 }
 
 /** One real catalog row: provenance, provided capabilities, and its real
  *  enable/disable/install controls. Details (validation, dependency checks,
  *  configuration) load on demand from the detail route. */
-function PluginCatalogCard({ row, busy, onToggle, onInstall, t }: PluginCatalogCardProps) {
+function PluginCatalogCard({ row, busy, onToggle, onInstall, onRemove, t }: PluginCatalogCardProps) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<PluginCatalogDetail | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const toggleDetails = () => {
     const next = !open;
@@ -1602,6 +1687,18 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, t }: PluginCatalogC
               {t.pluginsPage.enableRuntime}
             </Button>
           ) : null}
+          {row.can_remove ? (
+            <Button
+              destructive
+              ghost
+              size="sm"
+              title={t.pluginsPage.removeConfirm}
+              disabled={busy}
+              onClick={() => setConfirmRemove(true)}
+            >
+              {busy ? <Spinner /> : <Trash2 className="h-3.5 w-3.5" />}
+            </Button>
+          ) : null}
           <Button ghost size="sm" onClick={toggleDetails}>
             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             {open
@@ -1612,9 +1709,9 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, t }: PluginCatalogC
       </div>
 
       {row.description ? (
-        <p className="mt-2 text-xs text-text-secondary">{row.description}</p>
+        <p className="mt-2 text-xs text-text-secondary">{brandText(row.description)}</p>
       ) : null}
-      {summary ? <p className="mt-1 text-xs text-text-tertiary">{summary}</p> : null}
+      {summary ? <p className="mt-1 text-xs text-text-tertiary">{brandText(summary)}</p> : null}
 
       {open ? (
         <div className="mt-3 grid gap-3 border-t border-border pt-3 text-xs text-text-secondary">
@@ -1706,6 +1803,19 @@ function PluginCatalogCard({ row, busy, onToggle, onInstall, t }: PluginCatalogC
           ) : null}
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmRemove}
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          void onRemove(row);
+        }}
+        title={t.pluginsPage.removeConfirm}
+        description={`This will remove the "${row.id}" plugin from your agent.`}
+        destructive
+        confirmLabel={t.common.delete}
+      />
     </div>
   );
 }

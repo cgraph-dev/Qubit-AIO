@@ -1105,3 +1105,8 @@ def delete_capability_name() -> str:
 def write_bytes_capability_name() -> str:
     """Broker capability id for the confined, reversible binary upload."""
     return "local.files_upload"
+
+
+def download_capability_name() -> str:
+    """Broker capability id for the confined, bounded binary download/read."""
+    return "local.files_download"

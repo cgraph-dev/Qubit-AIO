@@ -125,8 +125,11 @@ def test_no_per_call_model_options():
                                        REASONING_BUDGETS,
                                        resolve_reasoning_budget)
 
-    assert resolve_reasoning_budget("ultra") == DEFAULT_REASONING_BUDGET
-    assert set(REASONING_BUDGETS) >= {"none", "low", "medium", "high"}
+    assert resolve_reasoning_budget("bogus-level") == DEFAULT_REASONING_BUDGET
+    # xhigh/ultra are real canonical levels now, not defaults.
+    assert resolve_reasoning_budget("ultra") == REASONING_BUDGETS["ultra"]
+    assert set(REASONING_BUDGETS) >= {"none", "low", "medium", "high",
+                                      "xhigh", "max", "ultra"}
 
 
 def test_completion_matches_parser(tmp_path):

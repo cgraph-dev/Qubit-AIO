@@ -1456,7 +1456,7 @@ export default function SessionsPage() {
       setSearchResults(null);
       api
         .searchSessions(search.trim(), sessionQueryOptions)
-        .then((resp) => setSearchResults(resp.results))
+        .then((resp) => setSearchResults(resp.results ?? resp.sessions ?? []))
         .catch(() => setSearchResults(null))
         .finally(() => setSearching(false));
     }, 300);

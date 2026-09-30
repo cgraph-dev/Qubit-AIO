@@ -1106,6 +1106,26 @@ def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
             return json.dumps({"ok": False, "code": exc.code,
                                "detail": exc.detail}, default=str)
 
+    def _download(args: Dict[str, Any]) -> str:
+        """Confined, bounded read for the binary download/stream transport.
+
+        Returns metadata + sha256 only (the raw bytes are transferred by the
+        HTTP boundary, never put through the broker's redaction/truncation
+        output). This keeps the read path-confined, e-stop-checked and audited
+        through the SAME broker/junction as the file writes.
+        """
+        from . import files as _files
+
+        try:
+            res = _files.read_bytes(cfg, str(args.get("target_path", "")),
+                                    max_bytes=_files.MAX_FILE_BYTES)
+        except _files.FilesError as exc:
+            return json.dumps({"ok": False, "code": exc.code,
+                               "detail": exc.detail}, default=str)
+        return json.dumps({"ok": True, "file": {
+            "path": res["file"], "name": res["name"], "size": res["size"],
+            "sha256": res["sha256"], "mime": res["mime"]}}, default=str)
+
     specs = (
         (_fp.capability_name(), _apply,
          frozenset({"target_path", "patch_text", "requested_by",
@@ -1135,6 +1155,20 @@ def register_file_patch(broker: CapabilityBroker, cfg: Any = None) -> tuple:
             spec=spec, side_effects=effects, fn=fn,
             output_cap=_FILE_PATCH_OUTPUT_CAP))
         registered.append(name)
+    # READ_ONLY: a download needs no confirmation, but it is still authorized,
+    # e-stop-checked, path-confined and audited through the same broker.
+    read_spec = CapabilitySpec(
+        name=_fp.download_capability_name(), version="1.0.0",
+        tier=Tier.READ_ONLY,
+        summary="confined bounded binary file read for download/stream"[:200],
+        scopes=("local",), timeout_s=30.0,
+        arg_validator=_file_patch_validator(
+            frozenset({"target_path", "requested_by", "project_root"})))
+    broker.register(ToolBinding(
+        spec=read_spec,
+        side_effects="confined read of a project file (no side effects)",
+        fn=_download, output_cap=_FILE_PATCH_OUTPUT_CAP))
+    registered.append(_fp.download_capability_name())
     return tuple(registered)
 
 

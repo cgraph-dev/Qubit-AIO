@@ -55,12 +55,20 @@ def test_register_file_patch_registers_mutating_capabilities():
     names = register_file_patch(broker)
     assert FP.capability_name() in names
     assert FP.mkdir_capability_name() in names
+    # D5: the confined binary download read is registered alongside the writes
+    # but is READ_ONLY (a download needs no confirmation) — e-stop/audit/confinement
+    # still apply through the shared broker.
+    read_name = FP.download_capability_name()
     for name in names:
         spec = broker.registry.get(name)
         assert spec is not None, name
-        assert spec.tier is Tier.MUTATING, name
-        assert spec.needs_confirmation is True, name
         assert "local" in spec.scopes, name
+        if name == read_name:
+            assert spec.tier is Tier.READ_ONLY, name
+            assert spec.needs_confirmation is False, name
+        else:
+            assert spec.tier is Tier.MUTATING, name
+            assert spec.needs_confirmation is True, name
     assert set(broker.names()) >= set(names)
 
 

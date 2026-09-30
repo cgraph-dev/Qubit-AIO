@@ -17,7 +17,9 @@ def test_budget_mapping_bounded_and_closed():
     assert resolve_reasoning_budget("nonsense-level") == DEFAULT_REASONING_BUDGET
     assert resolve_reasoning_budget("  HIGH ") == REASONING_BUDGETS["high"]
     budgets = [resolve_reasoning_budget(k) for k in REASONING_BUDGETS]
-    assert budgets == sorted(budgets) and all(b <= 2048 for b in budgets)
+    # Monotonic along the canonical ladder, bounded by the top level (ultra).
+    assert budgets == sorted(budgets)
+    assert all(b <= REASONING_BUDGETS["ultra"] for b in budgets)
 
 
 def test_reasoning_kwarg_only_touches_num_predict(monkeypatch):

@@ -323,6 +323,35 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
     return {"schema": SCHEMA, "servers": rows, "total": len(rows)}
 
 
+def sanitize_catalog_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """De-brand one MCP catalog entry at the served boundary (overlay).
+
+    The catalog is authored by the vendored ``qubit_runtime/optional-mcps/
+    **/manifest.yaml`` files, which are the provenance record and stay
+    byte-faithful. This normalizes only the *visible* prose fields
+    (``name`` / ``description`` / ``post_install``) for the dashboard, so the
+    MCP page never renders a legacy vendor name as product copy.
+
+    The real third-party install source (``source`` / ``install_url``) is
+    retained verbatim — it is genuine provenance and must never be fabricated
+    into a Qubit URL. The dashboard presents those links as third-party with
+    neutral link text (``frontend/qubit-web/src/pages/McpPage.tsx``).
+
+    NOTE (rebase debt): the served catalog comes from
+    ``qubit_compat.h_mcp_catalog_live`` (not owned here); that handler should
+    route its entries through this normalizer. Until then the MCP page applies
+    the equivalent de-brand at the React render boundary.
+    """
+    from .qubit_plugins import _rebrand_product
+
+    out = dict(entry)
+    for key in ("name", "description", "post_install"):
+        value = out.get(key)
+        if isinstance(value, str):
+            out[key] = _rebrand_product(value)
+    return out
+
+
 def upsert(cfg: Any, name: str, fields: Dict[str, Any],
            confirmed: bool = False) -> Dict[str, Any]:
     clean = _check_name(name)
@@ -485,7 +514,8 @@ def test(cfg: Any, name: str, *, probe: bool = True,
             raise McpServerError("MCP_NOT_FOUND",
                                  f"no registered server {clean!r}")
         return {"state": "OK", "code": "MCP_NOT_CONNECTED", "name": clean,
-                "valid": True, "connected": False, "tools": [], "errors": [],
+                "valid": True, "ok": False, "connected": False, "tools": [],
+                "errors": [],
                 "probe": "local-validation", "network_probe": False,
                 "detail": "config-declared server; inventory is locally valid; "
                           "Qubit does not open an unauthenticated connection"}
@@ -499,6 +529,10 @@ def test(cfg: Any, name: str, *, probe: bool = True,
         "code": "MCP_NOT_CONNECTED",
         "name": clean,
         "valid": not errors,
+        # Honest success flag: only a probe that actually connected is a
+        # success. The dashboard keys its success toast/panel on ``ok``; a
+        # locally-valid but unconnected server must not read as connected.
+        "ok": False,
         "connected": False,
         "tools": [],
         "errors": errors,
@@ -519,6 +553,7 @@ def test(cfg: Any, name: str, *, probe: bool = True,
         return out
     result = _probe(cfg, rec, timeout_s=timeout_s)
     out.update({
+        "ok": bool(result["connected"]),
         "connected": bool(result["connected"]),
         "tools": list(result["tools"]),
         "code": str(result["code"]),

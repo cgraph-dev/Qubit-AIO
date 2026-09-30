@@ -95,8 +95,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // Right-side panel (model control + status + sessions), collapsible and open
   // by default, matching the Qubit `/qubit-chat` ChatPage panel.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
-  // Bumped after a New-chat mint so `ChatSessionList` remounts and refetches,
-  // surfacing the freshly created session immediately.
+  // Bumped after a New chat mint so `ChatSessionList` remounts and refetches,
+  // surfacing the freshly created session immediately (its internal fetch only
+  // runs on mount / manual Refresh).
   const [sessionListNonce, setSessionListNonce] = useState(0);
   const [channel] = useState<string>(generateTerminalChatChannel);
   // Stable indirection for the self-scheduled reconnect: `connect` cannot

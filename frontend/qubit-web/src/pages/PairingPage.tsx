@@ -59,7 +59,8 @@ export default function PairingPage() {
     const key = getUserKey(user);
     setApproving(key);
     try {
-      await api.approvePairing(user.platform, user.request_id);
+      // The button press is the explicit confirmation; settle the staged gate.
+      await api.approvePairing(user.platform, user.request_id, () => true);
       showToast(`Approved: "${getUserLabel(user)}"`, "success");
       loadPairing();
     } catch (e) {
@@ -73,7 +74,8 @@ export default function PairingPage() {
     if (!window.confirm("Clear all pending pairing requests?")) return;
     setClearing(true);
     try {
-      const res = await api.clearPendingPairing();
+      // The dialog above is the confirmation; settle the staged gate.
+      const res = await api.clearPendingPairing(() => true);
       showToast(`Cleared ${res.cleared} pending request(s)`, "success");
       loadPairing();
     } catch (e) {
@@ -89,7 +91,8 @@ export default function PairingPage() {
         const { platform, user_id } = splitUserKey(key);
         const user = approved.find((u) => getUserKey(u) === key);
         try {
-          await api.revokePairing(platform, user_id);
+          // DeleteConfirmDialog above is the confirmation; settle the staged gate.
+          await api.revokePairing(platform, user_id, () => true);
           showToast(
             `Revoked: "${user ? getUserLabel(user) : user_id}"`,
             "success",

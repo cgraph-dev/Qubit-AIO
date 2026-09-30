@@ -772,10 +772,9 @@ REMAINING_TYPED = [
      "NETWORK_PROBE_BLOCKED", 403),
     ("GET", "/api/media", "MEDIA_NOT_SERVED", 403),
     ("POST", "/api/chat/image-upload", "CHAT_IMAGE_OVERLAY", 403),
-    ("GET", "/api/files/download", "FILES_BINARY_STREAM", 403),
-    ("GET", "/api/files/stream", "FILES_BINARY_STREAM", 403),
-    ("HEAD", "/api/files/stream", "FILES_BINARY_STREAM", 403),
-    ("GET", "/api/fs/download", "FILES_BINARY_STREAM", 403),
+    # D5: the file download/stream routes are now real brokered binary reads
+    # (voicebridge.qubit_compat.h_files_download); covered by
+    # tests/test_audit_remaining_repair9u.py, not this typed-refusal table.
     ("GET", "/api/git/gh-auth", "GH_AUTH_OPERATOR", 403),
     ("GET", "/api/git/review/ship-info", "GIT_SHIP_GH_EXTERNAL", 403),
     ("POST", "/api/git/review/pr-list", "GIT_WRITE_BROKERED", 403),

@@ -330,6 +330,7 @@ class QubitSessionStore:
                                 or s.get("started_at") or 0),
             "archived": bool(s.get("archived")),
             "message_count": int(s.get("message_count") or 0),
+            "source": s.get("source"),
             "identity": "qubit-session",
         }
 
@@ -471,21 +472,45 @@ class QubitSessionStore:
                 "messages": self._messages(sid)}
 
     def list(self, *, limit: int = 50, offset: int = 0, query: str = "",
-             include_archived: bool = True) -> Dict[str, Any]:
+             include_archived: bool = False) -> Dict[str, Any]:
         # The page cap mirrors ``messages`` (1000) so a read surface can page
         # through the whole canonical store instead of silently hiding rows
         # past the first 100 (the state.db holds the real agent history).
+        # Archived rows are EXCLUDED by default to match the reference
+        # dashboard (`archived="exclude"`); recovery callers pass
+        # ``include_archived=True`` explicitly (``restore`` is the write path).
         limit = max(1, min(int(limit), 1000))
         offset = max(0, int(offset))
+        needle = (query or "").strip()
         rows = self._db.list_sessions_rich(
             limit=limit, offset=offset, include_archived=include_archived,
             order_by_last_active=True, compact_rows=True,
-            search_query=(query or "").strip() or None)
-        out = []
-        for s in rows:
+            search_query=needle or None)
+        # Message-CONTENT search (reference ``web_routers/sessions.py::
+        # search_sessions``). ``list_sessions_rich(search_query=...)`` only
+        # matches session ids/titles, so a query appearing solely inside a
+        # transcript returned nothing. Search the vendored FTS index for
+        # content hits and merge the sessions a title search missed (with a
+        # snippet), so `/api/sessions?q=` and the Sessions page search the
+        # actual conversation.
+        content_hits: Dict[str, Dict[str, Any]] = {}
+        if needle:
+            try:
+                hits = self._db.search_messages(
+                    query=needle, limit=max(limit * 5, 50),
+                    fields=("session_id", "role", "snippet")) or []
+            except Exception:
+                hits = []
+            for hit in hits:
+                sid = str(hit.get("session_id") or "")
+                if sid and sid not in content_hits:
+                    content_hits[sid] = {"snippet": hit.get("snippet"),
+                                         "role": hit.get("role")}
+
+        def _entry(s: Dict[str, Any]) -> Dict[str, Any]:
             title = s.get("title") or s.get("display_name")
-            out.append({
-                "id": s.get("id"), "source": "qubit-chat",
+            return {
+                "id": s.get("id"), "source": s.get("source"),
                 "model": s.get("model"),
                 "title": title or s.get("id"),
                 "name": title,
@@ -499,8 +524,40 @@ class QubitSessionStore:
                 "input_tokens": int(s.get("input_tokens") or 0),
                 "output_tokens": int(s.get("output_tokens") or 0),
                 "preview": s.get("preview") or None,
-            })
-        if (query or "").strip():
+            }
+
+        out = []
+        seen: set = set()
+        for s in rows:
+            entry = _entry(s)
+            sid = str(entry.get("id") or "")
+            seen.add(sid)
+            if sid in content_hits:
+                entry["snippet"] = content_hits[sid]["snippet"]
+                entry["match_role"] = content_hits[sid]["role"]
+            out.append(entry)
+        # Sessions matched only by transcript content (not id/title). The page
+        # cap is preserved: title matches come first, content hits fill up to
+        # ``limit`` (the caller may still page/slice).
+        for sid in content_hits:
+            if sid in seen:
+                continue
+            if len(out) >= limit:
+                break
+            try:
+                s = self._db.get_session_rich_row(sid)
+            except Exception:
+                s = self._session(sid)
+            if not isinstance(s, dict) or not s.get("id"):
+                continue
+            if not include_archived and s.get("archived"):
+                continue
+            entry = _entry(s)
+            entry["snippet"] = content_hits[sid]["snippet"]
+            entry["match_role"] = content_hits[sid]["role"]
+            out.append(entry)
+            seen.add(sid)
+        if needle:
             total = len(out)
         else:
             # ``list_sessions_rich`` defaults to ``include_children=False``, so
