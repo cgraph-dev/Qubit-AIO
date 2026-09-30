@@ -1,0 +1,7 @@
+[Unit]
+Description=Qubit rolling full backup (private GitHub snapshot)
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=__SCRIPT__
