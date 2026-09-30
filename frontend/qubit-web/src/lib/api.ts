@@ -3040,6 +3040,7 @@ export interface MessagingPlatform {
   whatsapp_setup?: {
     mode?: string;
     allowed_users_set?: boolean;
+    allowed_users?: string;
     home_channel_set?: boolean;
   } | null;
   env_vars: MessagingPlatformEnvVar[];

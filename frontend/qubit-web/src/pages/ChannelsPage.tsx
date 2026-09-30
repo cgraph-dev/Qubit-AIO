@@ -758,6 +758,16 @@ function WhatsAppOnboardingPanel({
     }
   }, [configuredMode, phase, setup]);
 
+  // Prefill the allowlist from the saved backend value (it renders empty
+  // otherwise: the input never loads saved config). Only fills an untouched
+  // input so typing is never clobbered.
+  const savedAllowedUsers = platform.whatsapp_setup?.allowed_users ?? "";
+  useEffect(() => {
+    if (!setup && phase === "idle" && savedAllowedUsers && !allowedUsers) {
+      setAllowedUsers(savedAllowedUsers);
+    }
+  }, [savedAllowedUsers, phase, setup, allowedUsers]);
+
   const updateQr = useCallback(async (payload?: string | null) => {
     if (!payload) return;
     const dataUrl = await QRCode.toDataURL(payload, {

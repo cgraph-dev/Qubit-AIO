@@ -3549,12 +3549,38 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
         "env_vars": _platform_env_payload(entry, refs, required, account_ok),
     }
     if pid == "whatsapp":
+        saved_allowed = _saved_whatsapp_allowed_users()
         payload["whatsapp_setup"] = {
             "mode": "",
-            "allowed_users_set": bool(refs.get("WHATSAPP_ALLOWED_USERS")),
+            "allowed_users_set": bool(refs.get("WHATSAPP_ALLOWED_USERS") or saved_allowed),
+            "allowed_users": saved_allowed,
             "home_channel_set": False,
         }
     return payload
+
+
+def _saved_whatsapp_allowed_users() -> str:
+    """Saved WhatsApp allowlist from the runtime ``.env`` (read-only).
+
+    The allowlist is dial-plan config, not a credential — the Channels panel
+    already renders it in a plaintext input — so returning it lets the panel
+    prefill instead of always rendering empty after refresh. Fail-closed to
+    ``""``; secret values are never read here.
+    """
+    try:
+        from .gateway_supervisor import _daemon_home
+        env_path = _daemon_home(None) / ".env"
+        text = env_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        if key.strip() == "WHATSAPP_ALLOWED_USERS":
+            return value.strip().strip("\"'").strip()
+    return ""
 
 
 def _account_platform_payload(cfg: Any, account: Dict[str, Any],
