@@ -29,8 +29,11 @@ from __future__ import annotations
 import os
 import re
 import time
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+_logger = logging.getLogger("qubit.providers.endpoints")
 
 from . import resolver as R
 from .resolver import API, LOCAL, PLUGIN, ModelProfile
@@ -262,6 +265,15 @@ def _persist_runtime_model(cfg: Any, *, provider: str, model: str,
         if key_ref:
             node["key_env"] = key_ref
         data["model"] = node
+        # Tripwire: every slot write names its author. A repeat of the
+        # split-slot corruption names the rogue writer in the journal.
+        try:
+            import traceback as _tb
+            _frames = [f.name for f in _tb.extract_stack()[-6:-1]]
+        except Exception:
+            _frames = []
+        _logger.info("runtime model slot <- %s/%s via %s",
+                     provider, model, ">".join(_frames))
         tmp = path.with_name(path.name + ".qubit-tmp")
         tmp.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
         tmp.replace(path)

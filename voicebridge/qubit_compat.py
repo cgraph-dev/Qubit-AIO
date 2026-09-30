@@ -1899,6 +1899,34 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     payload["providers"] = [*rows, ollama_row]
     except Exception:  # noqa: BLE001 - additive row never breaks options
         pass
+    # Single CURRENT authority: the canonical active profile. The vendored
+    # builder marks current from the config slot while the Ollama row marks
+    # from the active record — a slot/active disagreement (e.g. a slot-only
+    # write) showed two CURRENT providers at once. The active record wins;
+    # exactly one row (or none, when it names an unlisted model) is current.
+    try:
+        from .providers import resolver as _R
+        _active = _R.get_active_profile(cfg).get("profile") or {}
+        _am = str(_active.get("model") or "")
+        _ap = str(_active.get("provider") or "").lower()
+        if _am:
+            # The payload top-level is the dialog's "current:" line: the same
+            # authority applies, or header and markers disagree.
+            payload["model"] = _am
+            if _ap:
+                payload["provider"] = _ap
+            _marked = False
+            for _r in payload.get("providers") or []:
+                if not isinstance(_r, dict):
+                    continue
+                _models = [str(_m) for _m in (_r.get("models") or [])]
+                _hit = (not _marked
+                        and str(_r.get("slug") or "").lower() == _ap
+                        and _am in _models)
+                _r["is_current"] = _hit
+                _marked = _marked or _hit
+    except Exception:  # noqa: BLE001 - markers stay as built on failure
+        pass
     return _ok(**_strip_provider_secret_fields(payload))
 
 
