@@ -2282,3 +2282,27 @@ double-beep (cue-audio path healthy) but "hey qubit" still silent.
   no suppression path; candidate fixes are a service→helper speaking
   signal or the `aec` capture source for the wake mic (both unbuilt —
   owner decision first, no code written).
+
+## 53. Rumble, not feedback: broadband drone as loud as speech — 2026-10-01
+
+**No milestone claimed. No code changed.** Owner clean test still silent;
+hands off Right-Ctrl confirmed (busy_skips stopped) but 25 s blobs
+continued back-to-back.
+
+- **Measured:** 10 s room capture (same ParecMic settings as the live
+  loop): RMS **0.11–0.26 sustained, peaks clipping at 1.0**, spectrum a
+  smeared ~120/290/515 Hz cluster + sub-50 Hz — broadband mechanical/
+  bassy, intermittent (seconds 7/9/10 quiet at 0.007). NOT TTS feedback
+  (no speak events in the window) and not a clean mains hum.
+- **Software fix ruled out by measurement:** per-frame medians —
+  rumble 0.091 raw / 0.055 hp400, speech 0.084 / 0.025, quiet 0.0027 /
+  0.0012. The rumble is as loud as speech in every band; no gate and no
+  high-pass separates them. Gain changes can't help either (ratio, not
+  level). This also explains KWS 3-hits-ever and parakeet-empty live
+  captures all along.
+- **Owner action (physical source):** something loud cycles in the room —
+  fan/AC/appliance, bassy playback, or desk vibration into the AT2020.
+  Mute all playback + still the fan/AC for 30 s and say "hey qubit" in a
+  gap; if the drone persists with everything off, it's the hardware
+  chain (then gain staging: peaks already clip at 1.0). Report what you
+  hear vs what the mic hears.
