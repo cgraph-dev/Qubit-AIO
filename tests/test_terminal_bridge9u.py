@@ -234,20 +234,22 @@ def test_merge_write_failure_is_degraded(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # One canonical conversation
 # ---------------------------------------------------------------------------
-def test_session_defaults_to_canonical_conversation(tmp_path, monkeypatch):
-    from voicebridge import agent
+def test_session_empty_means_fresh_not_canonical(tmp_path, monkeypatch):
     from voicebridge import chat_transport as CT
     from voicebridge import terminal_bridge as TB
 
     cfg = _cfg(tmp_path, monkeypatch)
-    canonical = agent.canonical_session_id(cfg)
-    assert canonical == CT.DEFAULT_SESSION
 
+    # Hermes parity: opening /chat with no ?resume= is FRESH — no row is
+    # ensured and no resume id is returned, so the TUI forges a new session
+    # instead of reopening the old dashboard-chat transcript.
     out = TB.canonical_terminal_session(cfg)
-    assert out["session_id"] == canonical
-    assert out["ensured"] is True, out
-    shown = CT.store(cfg).show(canonical)
-    assert shown["state"] == "OK", shown
+    assert out["session_id"] == ""
+    assert out["ensured"] is False, out
+    assert CT.store(cfg).list()["sessions"] == []
+    out2 = TB.canonical_terminal_session(cfg, "")
+    assert out2["session_id"] == ""
+    assert out2["ensured"] is False, out2
 
 
 def test_session_explicit_id_is_kept_and_ensured(tmp_path, monkeypatch):
@@ -261,13 +263,14 @@ def test_session_explicit_id_is_kept_and_ensured(tmp_path, monkeypatch):
     assert CT.store(cfg).show("terminal-abc")["state"] == "OK"
 
 
-def test_session_voice_alias_converges(tmp_path, monkeypatch):
-    from voicebridge import agent
+def test_session_explicit_id_kept_verbatim(tmp_path, monkeypatch):
     from voicebridge import terminal_bridge as TB
 
     cfg = _cfg(tmp_path, monkeypatch)
+    # Any explicit non-empty id (including "voice") is kept verbatim for the
+    # terminal surface — only an empty resume means fresh.
     out = TB.canonical_terminal_session(cfg, "voice")
-    assert out["session_id"] == agent.canonical_session_id(cfg)
+    assert out["session_id"] == "voice"
 
 
 def test_terminal_resume_env_sets_both_vendored_names():
@@ -307,7 +310,7 @@ def test_default_spawn_wires_bridge_and_resume(tmp_path, monkeypatch):
         return {"session_id": "canon-session", "ensured": True, "detail": ""}
 
     def fake_argv(resume=None, sidecar_url=None, profile=None,
-                  active_session_file=None):
+                  active_session_file=None, workspace_cwd=None):
         calls["resume"] = resume
         return ["qubit", "--tui"], str(home), {"BASE": "1"}
 
@@ -351,7 +354,7 @@ def test_default_spawn_never_blocks_on_bridge_fault(tmp_path, monkeypatch):
         raise RuntimeError("bridge fault")
 
     def fake_argv(resume=None, sidecar_url=None, profile=None,
-                  active_session_file=None):
+                  active_session_file=None, workspace_cwd=None):
         return ["qubit", "--tui"], str(home), {}
 
     class _FakePty:

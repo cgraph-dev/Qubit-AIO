@@ -12,13 +12,11 @@ surface before that terminal is spawned:
   raw value is refused rather than written. The merge is additive (an existing
   operator entry wins by name), atomic (temp file + ``os.replace``), backed up
   (``config.yaml.qubit-bak``), and idempotent (a no-op when nothing changed).
-* **One conversation** — terminal chat, ``/qubit-chat``, and voice converge on
-  the one canonical conversation id
-  (:func:`voicebridge.agent.canonical_session_id`). :func:`canonical_terminal_session`
-  resolves the requested terminal session through
-  :func:`voicebridge.agent.resolve_session_id` and ensures its row exists in the
-  canonical store, so the vendored TUI resumes the transcript the other
-  surfaces write.
+* **One conversation** — an explicit ``?resume=<id>`` terminal session is
+  ensured in the canonical store (:func:`voicebridge.agent.resolve_session_id`
+  verbatim path) so the vendored TUI resumes the transcript the other
+  surfaces write. An empty resume means FRESH (Hermes parity): no row is
+  ensured and no resume env is emitted, so the TUI forges a new session.
 
 No PTY is created, no server is connected, and no credential is resolved here.
 Everything is a filesystem/store operation, so it is hermetically testable.
@@ -219,21 +217,20 @@ def merge_mcp_servers(qubit_home: Any, cfg: Any) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 def canonical_terminal_session(cfg: Any, requested: Optional[str] = None
                                ) -> Dict[str, Any]:
-    """Resolve the ``/chat`` session to the canonical conversation id and ensure it.
+    """Resolve the ``/chat`` session to a resume target, or fresh when empty.
 
-    An empty or voice-default alias converges on
-    :func:`voicebridge.agent.canonical_session_id` (the same default
-    ``/qubit-chat`` and voice use); an explicit id is kept verbatim. The row is
-    created in the canonical store when absent so the vendored TUI can resume a
-    real transcript rather than forging a private one. Best-effort: a store
-    fault is reported, never raised.
+    Hermes parity (``hermes_cli/web_routers/chat_ws.py`` + ``web_server_chat``):
+    an empty ``resume`` means a FRESH chat — no ``HERMES_TUI_RESUME`` env, so
+    the vendored TUI forges a brand-new session via ``session.create``. Only an
+    explicit non-empty id is kept verbatim (and ensured in the canonical store
+    so the TUI resumes a real transcript). This matches the reference: opening
+    ``/chat`` with no ``?resume=`` never reopens the old ``dashboard-chat``
+    transcript.
     """
-    try:
-        from .agent import resolve_session_id
-
-        sid = resolve_session_id(cfg, requested, surface="terminal")
-    except Exception:  # noqa: BLE001 - never lose the requested id
-        sid = str(requested or "").strip()[:80]
+    sid = str(requested or "").strip()[:80]
+    if not sid:
+        return {"session_id": "", "ensured": False, "detail": "fresh",
+                "authority": "voicebridge.agent.canonical_session_id"}
     ensured = False
     detail = ""
     try:

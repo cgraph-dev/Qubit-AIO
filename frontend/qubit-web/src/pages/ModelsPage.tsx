@@ -708,6 +708,7 @@ function ModelSettingsPanel({
   const [pendingReloadModel, setPendingReloadModel] = useState<string | null>(
     null,
   );
+  const [mainNotice, setMainNotice] = useState<string | null>(null);
 
   const mainProv = activeProfile?.provider ?? aux?.main.provider ?? "";
   const mainModel = activeProfile?.model ?? aux?.main.model ?? "";
@@ -818,7 +819,18 @@ function ModelSettingsPanel({
                 model,
               });
               if (!result.confirm_required) {
-                setPendingReloadModel(model.split("/").slice(-1)[0]);
+                // /chat only follows the pick when it meets its context
+                // floor; otherwise say which model /chat keeps instead of
+                // prompting a reload that would change nothing there.
+                if (result.terminal_follows === false) {
+                  setMainNotice(
+                    result.terminal_detail ||
+                      "Main model set. /chat keeps its current model.",
+                  );
+                } else {
+                  setMainNotice(null);
+                  setPendingReloadModel(model.split("/").slice(-1)[0]);
+                }
               }
               return result;
             }}
@@ -839,6 +851,11 @@ function ModelSettingsPanel({
           model={pendingReloadModel}
           onCancel={() => setPendingReloadModel(null)}
         />
+        {mainNotice && (
+          <div className="rounded border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-text-secondary">
+            {mainNotice}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

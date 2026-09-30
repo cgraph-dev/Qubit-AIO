@@ -331,10 +331,10 @@ def _default_spawn(cols: int, rows: int, resume: str, profile: str,
     # Terminal bridge (best-effort, never blocks a terminal open):
     #  (1) merge the ONE Qubit MCP registry into the runtime home config.yaml so
     #      the TUI sees the same configured servers (additive/atomic/backed up);
-    #  (2) map this session onto the canonical conversation id so terminal chat,
-    #      /qubit-chat and voice share one transcript. The TUI reads
-    #      QUBIT_TUI_RESUME while the vendored launch path only sets the
-    #      HERMES_ name, so both are seeded below.
+    #  (2) ensure an explicit resume target in the canonical store so the TUI
+    #      resumes a real transcript; an empty resume means FRESH (Hermes
+    #      parity — no RESUME env, the TUI forges a new session via
+    #      session.create instead of reopening dashboard-chat).
     from . import terminal_bridge as TB
 
     meta: Dict[str, Any] = {}

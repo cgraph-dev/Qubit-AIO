@@ -203,27 +203,35 @@ def test_compat_confirm_estop_and_truthiness(tmp_path):
 
 @pytest.fixture(scope="module")
 def patched_qc(tmp_path_factory):
-    if not _PATCH.is_file():
-        pytest.skip(f"patch spec not present: {_PATCH}")
-    work = tmp_path_factory.mktemp("patched")
-    (work / "voicebridge").mkdir(parents=True)
-    shutil.copy(_REPO_ROOT / "voicebridge" / "qubit_compat.py",
+    if _PATCH.is_file():
+        work = tmp_path_factory.mktemp("patched")
+        (work / "voicebridge").mkdir(parents=True)
+        shutil.copy(_REPO_ROOT / "voicebridge" / "qubit_compat.py",
+                    work / "voicebridge" / "qubit_compat.py")
+        proc = subprocess.run(["patch", "-p1", "-i", str(_PATCH)], cwd=work,
+                              capture_output=True, text=True)
+        if proc.returncode == 0:
+            spec = importlib.util.spec_from_file_location(
+                "voicebridge.qubit_compat_patched",
                 work / "voicebridge" / "qubit_compat.py")
-    proc = subprocess.run(["patch", "-p1", "-i", str(_PATCH)], cwd=work,
-                          capture_output=True, text=True)
-    if proc.returncode != 0:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
         # The coordinator may have already applied the spec to the live tree;
         # in that case the copied source already carries the fix and ``patch``
         # has nothing to do. Only a genuinely unapplied spec is an error.
         already = "activate_endpoint" in (
             work / "voicebridge" / "qubit_compat.py").read_text()
         assert already, proc.stderr
-    spec = importlib.util.spec_from_file_location(
-        "voicebridge.qubit_compat_patched",
-        work / "voicebridge" / "qubit_compat.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    # The 2026-09-29 audit workspace is gone and its spec lives in the tree:
+    # exercise the live handlers directly. A skip here hid 5 real tests; if
+    # the live tree ever loses these handlers, fail loudly instead.
+    from voicebridge import qubit_compat as live
+
+    for _name in ("h_custom_endpoints_write", "h_custom_endpoints_activate",
+                  "env_write", "h_env", "h_model_info", "h_model_set"):
+        assert hasattr(live, _name), f"live qubit_compat lost {_name}"
+    return live
 
 
 def _patched_cfg(tmp_path):

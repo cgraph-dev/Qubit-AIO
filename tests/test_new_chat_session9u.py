@@ -11,9 +11,9 @@ This module pins the fixed contract on the canonical store
 (:class:`voicebridge.qubit_session_store.QubitSessionStore`) and the terminal
 session mapping (:mod:`voicebridge.terminal_bridge`): an explicit New Chat mints
 a genuinely NEW id (via the store ``create`` call the
-``POST /api/qubit/chat/sessions`` route makes), an implicit first load still
-converges on the canonical default, refresh/re-ensure preserves the current
-session (no duplicate), the real DB ``source`` is passed through, and archived
+``POST /api/qubit/chat/sessions`` route makes), an implicit first load is
+FRESH (Hermes parity — no resume env, the TUI forges a new session),
+refresh/re-ensure preserves the current session (no duplicate), the real DB ``source`` is passed through, and archived
 rows are excluded unless explicitly requested.
 
 Hermetic: isolated XDG dirs + QUBIT_HOME, no network, no live services.
@@ -69,20 +69,22 @@ def test_explicit_new_chat_mints_a_new_canonical_session_id(tmp_path,
     assert CT.DEFAULT_SESSION not in listed
 
 
-# ------------------------------------------- implicit load keeps the default
-def test_implicit_load_still_converges_on_the_canonical_default(tmp_path,
-                                                                monkeypatch):
+# ------------------------------------------- implicit load is fresh (Hermes)
+def test_implicit_load_is_fresh_not_canonical_default(tmp_path,
+                                                      monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
-    # Reference behavior (clean Hermes / qubit_cli web_server_chat): an empty or
-    # voice-default resume keeps the canonical default for continuity; only an
-    # explicit, non-alias id is kept verbatim. A resume env is emitted only for
-    # a non-empty explicit id.
+    # Hermes parity (hermes_cli/web_routers/chat_ws.py): an empty resume means
+    # a FRESH chat — the TUI forges a new session via session.create. Only an
+    # explicit, non-empty id is kept verbatim. A resume env is emitted only
+    # for a non-empty explicit id.
     assert resolve_session_id(cfg, "") == canonical_session_id(cfg)
     assert resolve_session_id(cfg, None) == CT.DEFAULT_SESSION
     assert resolve_session_id(cfg, "voice") == CT.DEFAULT_SESSION
 
     explicit = "dashboard-abcdef012345"
-    assert resolve_session_id(cfg, explicit) == explicit
+    assert TB.canonical_terminal_session(cfg, explicit)["session_id"] == explicit
+    assert TB.canonical_terminal_session(cfg, "")["session_id"] == ""
+    assert TB.canonical_terminal_session(cfg, None)["session_id"] == ""
 
     assert TB.terminal_resume_env("") == {}
     assert TB.terminal_resume_env(explicit) == {
@@ -102,12 +104,13 @@ def test_refresh_reensures_the_same_session_without_a_duplicate(tmp_path,
     assert mapping["ensured"] is True
     assert [s["id"] for s in store.list()["sessions"]] == [sid]
 
-    # An implicit (empty) load converges on the canonical default and creates at
-    # most that one row — never a random new id.
+    # An implicit (empty) load is FRESH: no row is ensured and no resume id
+    # is returned — the TUI forges a new session instead of reopening the
+    # old canonical default.
     implicit = TB.canonical_terminal_session(cfg, "")
-    assert implicit["session_id"] == CT.DEFAULT_SESSION
-    assert {s["id"] for s in store.list()["sessions"]} == {
-        sid, CT.DEFAULT_SESSION}
+    assert implicit["session_id"] == ""
+    assert implicit["ensured"] is False
+    assert {s["id"] for s in store.list()["sessions"]} == {sid}
 
 
 # ------------------------------------------------------- real source passthrough

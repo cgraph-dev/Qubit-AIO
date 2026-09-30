@@ -163,6 +163,15 @@ def register_and_activate(cfg: Any, ident: str,
         rollback_to=ident,
         provenance=f"custom-endpoint://{ident}")
     try:
+        from . import endpoints as _EP
+
+        # Same stale-default guard as the settings activation path: a fresh
+        # record defaults to 4096, which /chat's context floor would refuse
+        # even when the model is capable. Best-effort; keeps 4096 offline.
+        _EP.backfill_profile_context(profile)
+    except Exception:  # noqa: BLE001 - backfill never blocks activation
+        pass
+    try:
         written = R.upsert_model_profile(cfg, profile, confirm=True)
     except Exception as exc:  # noqa: BLE001 - typed failure, never fabricated
         return {"state": "FAILED", "code": "PROFILE_WRITE_FAILED",

@@ -324,7 +324,7 @@ def test_session_open_audit_records_verified_window(tmp_path, monkeypatch):
                         lambda ev, **f: events.append((ev, f)))
 
     def fake_spawn(cols, rows, resume, profile, *, env_overrides=None,
-                   home_config=None, cfg=None):
+                   home_config=None, cfg=None, workspace_cwd=""):
         return _FakeBridge(), {"cwd": "/tmp/qubit"}
 
     monkeypatch.setattr(P, "_default_spawn", fake_spawn)

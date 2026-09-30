@@ -1741,3 +1741,148 @@ section records the repairs.
   archives (legal/historical, must stay); Meta `hermes-estree`/`hermes-parser`
   + `@nous-research/ui` registry deps (cannot rename); dev-only test names;
   git history.
+
+## 37. Voice-edit fantasy-UI fix wave — 2026-09-30 (3 agents + orchestrator follow-up)
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed. Not committed.** Fixed
+every dead/persist-only control from the /voice-edit verification report (§36
+audit). No `~/.hermes` touch, `:9119` untouched (hermes pid 19994).
+
+- **Agent 1 (capture backend):** `noise_suppression` now consumed on the wake
+  path (`wake.py::_maybe_ns_filter` + call in `_do_transcribe`); `mic_target_peak`
+  proven wired (wake mic factory + both normalize sites + `SttClient`, clamped
+  0.05–0.95); `auto_send` proven wired (`maybe_auto_send` post-insert only);
+  `noise.py::resolve_capture_device` docstring corrected (auto keeps raw source;
+  the flag layers a software stage). New/extended
+  `tests/test_voice_edit_capture_fix9u.py` **22 passed** (incl. 4 orchestrator
+  Right-Ctrl regression tests below).
+- **Agent 2 (routing/ask/cache):** `ask()` non-escalated turns pass explicit
+  `profile_id=<local_profile>` (default `qubit-brain4`) instead of the resolver
+  API fall-through (stock-config `MALFORMED_RESPONSE` fixed); escalated-without-
+  target degrades to local (`no_api_profile`); `_sync_live_cfg` invalidates
+  `local_llm._STYLE_CACHE` + `runner_contract` caches (temp/think/model apply
+  without restart); `PUT per_app:{}` deletes the node (file + live cfg);
+  `default_action` gained a real consumer (`_default_action_fallback` on empty-
+  transcript clarify); `answer_questions` **removed** from `SETTINGS_KEYS`/view
+  (honest-UI invariant; stored keys tolerated). New
+  `tests/test_voice_edit_routing_cache_fix9u.py` **29 passed**. Reconciled 2
+  `test_voice_edit_integration9u` assertions pinning the old `profile_id is None`
+  fall-through (now `== "qubit-brain4"`).
+- **Agent 3 (frontend):** audit "0 hits" was stale — wake sub-keys, per_app, and
+  most silent knobs were already rendered; added the genuinely missing
+  `service_url`/`stt_ws_url` inputs + restart hints (wake, hotkey_mode) and
+  rewrote the Advanced intro. `tsc` clean, 7 vitest pass, `qubit-dist` rebuilt;
+  stale "browser-grade" Auto label gone from the served bundle (0 hits).
+- **Orchestrator follow-up (this session):** closed Agent 1's flagged gap in
+  `voicebridge/desktop_helper.py` — Right-Ctrl `_transcribe` wraps the mic in
+  `_NsFilterMic` when NS is on (covers streaming + accurate paths), and both
+  `_default_mic_factory` + `_stt_factory` pass configured `target_peak`.
+- **Live proof (restarted `qubit-voicebridge` + `qubit-voice-typing`):**
+  `PUT answer_questions` → `VOICE_EDIT_BAD_SETTINGS` (was accepted);
+  `PUT per_app:{}` → `{}` + YAML node deleted (Agent-3 `firefox_firefox` residue
+  cleaned); `qubit agent -z` → `QUBIT_OK`; all 3 services active, helper fresh
+  (pid 172263, hold/kws/idle).
+- **Focused sweeps:** 63 (new+integration) + 22 (capture) + 307 (voice-edit
+  family) passed. `test_packet7d` 2 failures triaged: branding
+  `pyproject.toml` assertion is pre-existing brand scope (file untouched);
+  profiles rollback Timeout is flaky (passes solo, 0.81 s).
+
+## 38. /chat stale-session fix — empty resume is FRESH (Hermes parity) — 2026-09-30
+
+**No milestone claimed. Not committed.** User report: every open of `/chat`
+reopened a 219-message fossil transcript (`dashboard-chat`, 06:49).
+
+- **Root cause:** `voicebridge/terminal_bridge.py::canonical_terminal_session`
+  mapped an empty `?resume=` onto `dashboard-chat` ("converges on the canonical
+  default for continuity"), and `pty_ws._default_spawn` passed that through as
+  the TUI resume target. The reference (`hermes_cli/web_routers/chat_ws.py` +
+  `web_server_chat._resolve_chat_argv`) does the opposite: no `?resume=` and no
+  per-tab active-session file means NO resume env, so the TUI forges a fresh
+  session via `session.create`. Two tests pinned the buggy behavior as
+  "reference behavior" — wrongly.
+- **Fix (backend + comments):** empty/None resume → `{"session_id": "",
+  "ensured": False}` (no store write, no RESUME env → fresh TUI); any explicit
+  non-empty id kept verbatim + ensured. `pty_ws.py` + `TerminalChatPage.tsx`
+  comments updated to match. Voice/`/qubit-chat` canonical default untouched
+  (`agent.resolve_session_id` unchanged).
+- **Tests:** `test_terminal_bridge9u` + `test_new_chat_session9u` updated to
+  the fresh contract; fixed 4 pre-existing stale doubles missing the
+  `workspace_cwd` kwarg production already sends (`test_terminal_bridge9u` ×2,
+  `test_terminal_context_floor` ×2 — all proven failing on pristine HEAD).
+  Focused: **59 passed** (bridge/new-chat/pty-ws/profiles/context-floor).
+  `test_chat_terminal_parity9u::test_session_open_audit_records_verified_window`
+  fails identically on pristine HEAD (live-provider 503) — unrelated.
+- **Hermetic proof:** empty → `resume=None`, zero `*_TUI_RESUME` env;
+  explicit id → resume + both env names set. Service restarted,
+  `qubit-voicebridge` active, `/chat` HTTP 200, reference `:9119` untouched.
+  Browser re-verification blocked (Playwright profile locked by another session).
+
+## 39. /chat model switch now applies (muse live) — 2026-09-30
+
+**No milestone claimed. Not committed.** User report: switched to Muse, /chat
+still ran deepseek.
+
+- **Root causes (two, compounded).** (1) `POST /api/model/set` scope=main
+  never touched the pinned `terminal.profile` (`qubit-go`), so a MODEL-card
+  pick + reload still booted deepseek while the copy promised "Reload now to
+  apply it". (2) Fresh endpoint profiles default to a 4096 declared window,
+  so the muse profile failed /chat's 64k floor on stale data — while the
+  live probe consistently resolves its real window as **1048576** (`resolved`,
+  generic-fallback filtered).
+- **Fixes (backend).** `providers/endpoints.py`: `resolve_real_context_tokens`
+  / `backfill_profile_context` (bounded vendored probe; only replaces the
+  4096 creation default; explicit windows untouched) + `ensure_path` before
+  probing (raw probe failed with `resolver-unavailable` off the vendored
+  path); `activate_endpoint` backfills (both activation paths);
+  `select_model` reuse carries the recorded window (re-pick no longer
+  clobbers 200k→4096 — found live). `qubit_compat.py`: extracted
+  `_write_terminal_profile_locked` (used by both writers);
+  `_terminal_follow_main_model` moves the pin when the pick meets the floor,
+  keeps it with a naming reason when below; `h_model_set` returns
+  `terminal_profile_id`/`terminal_follows`/`terminal_detail`.
+- **Frontend (rebuilt).** `ModelAssignmentResponse` + `ChatSidebar`/`ModelsPage`
+  show the keep reason instead of a reload prompt that would change nothing;
+  `tsc -b` clean; 21 vitest pass; `frontend/qubit-dist` rebuilt.
+- **Tests.** New `tests/test_model_set_terminal_follow9u.py` **5 passed**
+  (backfill×3, follow-moves, follow-keeps); neighbors green (41 passed /
+  5 skipped across follow/repair/bridge/new-chat/ops-confirm).
+- **Live proof.** Backups `/tmp/opencode/profiles.json.pre-musectx-*` +
+  `voice.yaml.pre-musectx-*`. Muse record backfilled 4096→1048576; guard
+  `ok=True verified`; `_terminal_follow_main_model` moved
+  `terminal.profile: qubit-go → opencode-go-muse-spark-1.3-contributor`
+  (operator's explicit intent); service restarted; ws-ticket grant resolves
+  **muse-spark-1.3-contributor, ctx 1048576, verified**; `qubit agent -z`
+  → `MUSE_OK` (rc 0). Reference `:9119` untouched.
+- **Note:** a below-floor pick still keeps /chat on its pin by design (it
+  would otherwise be a typed refusal); the UI now says so.
+
+## 40. Spark local tier in /qubit-chat + zero-skip tests — 2026-09-30
+
+**No milestone claimed.** Follow-up to §39 (model switch) + owner "no skips".
+
+- **Spark tier registered.** Last night's Ollama models (`qubit-spark17` 1.7B
+  + `qubit-spark4` 4B, abliterated Spark-X2.5, `ollama show` reports 1M ctx
+  for both) are now registered LOCAL resolver profiles (roles `chat`,
+  ctx 1048576). Voice already pointed at them (`local_llm.model` /
+  `runner.alias` / `summarizer` = spark17, `detail_model` = spark4,
+  `chat_model`/`local_profile` = brain4, `allow_api` escalation on).
+- **Local picks enabled in the MODEL card.** `POST /api/model/set` refused
+  every local model (`MODEL_ENDPOINT_REQUIRED` — the endpoint resolution is
+  remote-only). `select_model` now activates a matching registered LOCAL
+  profile directly (no endpoint/credential; shipped-default local included).
+  Live: spark17/spark4/brain4 all switch via the card; `/chat` pin stays on
+  the API model with a naming reason (local tier runs /qubit-chat + voice).
+- **Live proof (canonical gateway path):** `agent.turn(model=qubit-spark17)`
+  → `SPARK17_OK` (identity `local/qubit-spark17`); spark4 → `SPARK4_OK`.
+  Main slot restored to `qubit-brain4` (local default); terminal pin stays
+  muse. Both chats, different LLMs, one backend (broker/policy/audit,
+  one `state.db`).
+- **Zero skips.** `test_models_repair9u.patched_qc` no longer skips on the
+  dead `/tmp` patch path — the 2026-09-29 spec lives in-tree, so the fixture
+  exercises the live handlers (fails loudly if they ever regress): 15 passed.
+  Same stale-double drift as §38 fixed in
+  `test_chat_terminal_parity9u` (missing `workspace_cwd` → server answered
+  503): 23 passed.
+- **Combined: 112 passed / 0 failed / 0 skipped** across follow/repair/
+  bridge/new-chat/context-floor/profiles/pty-ws/ops-confirm/parity.
+  Service restarted (local-pick path live); `/chat` HTTP 200; `:9119` untouched.

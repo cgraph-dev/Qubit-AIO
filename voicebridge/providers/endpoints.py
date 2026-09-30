@@ -121,6 +121,53 @@ def build_endpoint_profile(ident: str, record: Dict[str, Any]) -> ModelProfile:
     )
 
 
+def resolve_real_context_tokens(model: str, base_url: str = "",
+                                provider: str = "") -> Optional[int]:
+    """Best-effort real context window for *model*; ``None`` when unknown.
+
+    Thin wrapper over the bounded vendored probe
+    (:func:`resolver._probe_real_context_window`, daemon thread, hard timeout):
+    a genuine resolution (never the generic fallback — the probe filters it)
+    is returned, anything else (offline, unknown model, timeout) is ``None``.
+    Never raises, never writes. Lets activation record the window the runtime
+    will actually use instead of the 4096 creation default.
+    """
+    try:
+        from .. import qubit_runtime as _QR
+
+        # The vendored probe imports ``agent.model_metadata``: without the
+        # runtime on sys.path it degrades to resolver-unavailable (the same
+        # binding ``_real_context_window`` applies before probing).
+        _QR.ensure_path()
+    except Exception:  # noqa: BLE001 - probe still runs, may just miss
+        pass
+    try:
+        value, _source = R._probe_real_context_window(
+            str(model or ""), str(base_url or ""), str(provider or ""))
+    except Exception:  # noqa: BLE001 - probe is best-effort by contract
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    return None
+
+
+def backfill_profile_context(profile: ModelProfile) -> bool:
+    """Fill a defaulted ``context_tokens`` from the real window; ``True`` if set.
+
+    Only fires when the profile still carries the ``4096`` creation default —
+    an explicitly recorded window (larger OR smaller) is never overwritten.
+    A failed/unknown probe keeps the default (today's behavior).
+    """
+    if int(getattr(profile, "context_tokens", 0) or 0) != 4096:
+        return False
+    real = resolve_real_context_tokens(
+        profile.model, profile.base_url, profile.provider)
+    if real is None:
+        return False
+    profile.context_tokens = real
+    return True
+
+
 def _voice_config_path(cfg: Any) -> Path:
     from .. import config as C
 
@@ -225,6 +272,10 @@ def activate_endpoint(cfg: Any, ident: str, record: Dict[str, Any], *,
         return {"ok": False, "code": "MALFORMED",
                 "detail": "endpoint id required"}
     profile = build_endpoint_profile(ident, record)
+    # A record without an explicit window gets the 4096 creation default;
+    # replace it with the real window when the vendored metadata resolves one
+    # (otherwise /chat's context floor refuses a capable model on stale data).
+    backfill_profile_context(profile)
     gate = profile.validate(cfg)
     if gate.get("state") != "OK":
         return {"ok": False, "code": gate.get("code", "PROFILE_INVALID"),
@@ -358,14 +409,54 @@ def select_model(cfg: Any, provider: str, model: str, *,
         return {"ok": False, "code": "MALFORMED",
                 "detail": "model assignment needs a provider"}
     pid = ""
+    reuse_context = 0
+    reuse_profile = None
     for existing in R.load_profiles(cfg):
         if existing.default:
+            # The shipped default is still a valid local pick (switching back
+            # to the brain from the card must work); it just never counts as
+            # a regular endpoint reuse below.
+            if (existing.kind == R.LOCAL
+                    and existing.model == model
+                    and existing.provider == provider):
+                reuse_profile = existing
+                pid = existing.id
+                break
             continue
         if existing.model == model and existing.provider == provider:
             pid = existing.id
+            reuse_profile = existing
             base_url = base_url or existing.base_url
             key_ref = key_ref or existing.key_ref
+            # A re-pick rebuilds the profile from this record: carry the
+            # recorded window so re-selecting never clobbers a known-good
+            # value (e.g. 200k) back to the 4096 creation default.
+            try:
+                reuse_context = int(existing.context_tokens or 0)
+            except (TypeError, ValueError):
+                reuse_context = 0
             break
+    if reuse_profile is not None and reuse_profile.kind == R.LOCAL:
+        # A registered local model (ollama) needs no endpoint or credential:
+        # activate it directly. (The endpoint resolution below is for remote
+        # API models only; requiring a base_url here refused every local
+        # pick, so /qubit-chat could never switch to the Spark tier.)
+        if not confirm:
+            return {"ok": True, "dry_run": True, "profile_id": pid,
+                    "provider": reuse_profile.provider,
+                    "model": reuse_profile.model}
+        try:
+            active = R.set_active_profile(cfg, pid, confirm=True)
+        except Exception as exc:  # noqa: BLE001 - typed failure
+            return {"ok": False, "code": getattr(exc, "code", "ACTIVATE_FAILED"),
+                    "detail": str(exc)[:300]}
+        if active.get("state") != "OK":
+            return {"ok": False, "code": active.get("code", "ACTIVATE_FAILED"),
+                    "detail": active.get("detail", "could not activate profile")}
+        return {"ok": True, "active": pid, "profile_id": pid,
+                "provider": reuse_profile.provider,
+                "model": reuse_profile.model, "kind": R.LOCAL,
+                "rollback": f"select another profile"}
     if not pid:
         pid = _slug_model_id(provider, model)
     local = _is_local_url(base_url)
@@ -396,6 +487,8 @@ def select_model(cfg: Any, provider: str, model: str, *,
                 "provider": provider, "model": model}
     record = {"provider": provider, "model": model, "base_url": base_url,
               "key_ref": key_ref}
+    if reuse_context > 0:
+        record["context_length"] = reuse_context
     return activate_endpoint(cfg, pid, record, confirm=confirm)
 
 

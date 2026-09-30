@@ -1756,9 +1756,18 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                          "provider": provider, "model": model,
                          "code": str(applied.get("code", "MODEL_SET_FAILED")),
                          "detail": str(applied.get("detail", ""))}
+        # The /chat terminal boots the pinned ``terminal.profile``, not the
+        # main slot — without this a MODEL-card pick + reload still boots the
+        # old model. The pin follows the pick when it meets /chat's context
+        # floor, and honestly stays (with the reason) when it cannot run it.
+        follow = _terminal_follow_main_model(
+            cfg, str(applied.get("profile_id") or ""))
         return 200, {"ok": True, "scope": "main",
                      "provider": str(applied.get("provider", provider)),
-                     "model": str(applied.get("model", model))}
+                     "model": str(applied.get("model", model)),
+                     "terminal_profile_id": follow["terminal_profile_id"],
+                     "terminal_follows": follow["terminal_follows"],
+                     "terminal_detail": follow["terminal_detail"]}
     if b.get("confirm_expensive_model") or b.get("confirmed"):
         # Upstream retry shape: the Models dialog re-POSTs with the flag
         # after showing confirm_required. Settle the staged journal
@@ -2118,45 +2127,9 @@ def terminal_profile_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if guard is not None:
         return guard
     try:
-        from . import config as C
-
-        path = getattr(cfg, "path", None) or C.resolve_config_path()
-        target = Path(path)
-        data: Dict[str, Any] = {}
-        if target.is_file():
-            import yaml
-
-            loaded = yaml.safe_load(target.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                data = loaded
-        node = data.get("terminal")
-        if not isinstance(node, dict):
-            node = {}
-        node["profile"] = pid
-        data["terminal"] = node
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.is_file():
-            bak = target.with_name(
-                f"{target.name}.terminal-profile.{int(time.time())}.bak")
-            bak.write_bytes(target.read_bytes())
-        tmp = target.with_name(target.name + ".qubit-tmp")
-        import yaml
-
-        tmp.write_text(yaml.safe_dump(data, sort_keys=False),
-                       encoding="utf-8")
-        tmp.replace(target)
-        # Refresh the RUNNING config so the change is live, not just on disk.
-        # ``terminal_context_guard`` reads ``cfg[terminal][profile]`` from the
-        # in-memory object; without this the picker persisted to voice.yaml but
-        # the still-running guard kept resolving the old profile until a
-        # restart (observed as a stale ``qubit-go`` / UNKNOWN_PROFILE on /chat).
-        if hasattr(cfg, "data") and isinstance(getattr(cfg, "data"), dict):
-            node = cfg.data.get("terminal")
-            if not isinstance(node, dict):
-                node = {}
-                cfg.data["terminal"] = node
-            node["profile"] = pid
-        _audit("terminal_profile_set", "dashboard:user", {"profile_id": pid})
+        _write_terminal_profile_locked(
+            cfg, pid, actor="dashboard:user",
+            audit_action="terminal_profile_set")
     except Exception as exc:
         return _fail(exc)
     try:
@@ -2168,6 +2141,118 @@ def terminal_profile_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                code=str(verdict.get("code") or "OK"),
                detail=_redact(str(verdict.get("detail") or ""))[:300],
                qubit_counterpart="CLI `qubit profile model list`")
+
+
+def _write_terminal_profile_locked(cfg: Any, pid: str, *, actor: str,
+                                   audit_action: str) -> None:
+    """Persist ``terminal.profile = pid`` to disk AND the running config.
+
+    Atomic write (timestamped backup) plus the in-memory refresh
+    ``terminal_context_guard`` reads — without the refresh the picker
+    persisted to voice.yaml but the still-running guard kept resolving the
+    old profile until a restart (observed as a stale ``qubit-go`` /
+    UNKNOWN_PROFILE on /chat). Raises on failure; the caller maps it.
+    """
+    from . import config as C
+
+    path = getattr(cfg, "path", None) or C.resolve_config_path()
+    target = Path(path)
+    data: Dict[str, Any] = {}
+    if target.is_file():
+        import yaml
+
+        loaded = yaml.safe_load(target.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            data = loaded
+    node = data.get("terminal")
+    if not isinstance(node, dict):
+        node = {}
+    node["profile"] = pid
+    data["terminal"] = node
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_file():
+        bak = target.with_name(
+            f"{target.name}.terminal-profile.{int(time.time())}.bak")
+        bak.write_bytes(target.read_bytes())
+    tmp = target.with_name(target.name + ".qubit-tmp")
+    import yaml
+
+    tmp.write_text(yaml.safe_dump(data, sort_keys=False),
+                   encoding="utf-8")
+    tmp.replace(target)
+    if hasattr(cfg, "data") and isinstance(getattr(cfg, "data"), dict):
+        node = cfg.data.get("terminal")
+        if not isinstance(node, dict):
+            node = {}
+            cfg.data["terminal"] = node
+        node["profile"] = pid
+    _audit(audit_action, actor, {"profile_id": pid})
+
+
+def _terminal_follow_main_model(cfg: Any, profile_id: str, *,
+                                actor: str = "dashboard:user"
+                                ) -> Dict[str, Any]:
+    """Point ``/chat`` at a freshly picked main profile when it can run it.
+
+    A main-slot switch (``POST /api/model/set``) otherwise leaves /chat on
+    the pinned ``terminal.profile``: the operator picks Muse, reloads, and
+    the terminal still boots deepseek. When the picked profile meets /chat's
+    context floor the pin follows it (same atomic write as the terminal
+    picker, audited as ``terminal_profile_follow``), so reload really applies
+    the pick. When it is below the floor the pin is kept — opening /chat on
+    it would be a typed refusal — and the detail names the kept profile and
+    why, so the UI can say so instead of silently keeping deepseek.
+    """
+    from .providers import resolver as R
+
+    pid = str(profile_id or "").strip()
+    try:
+        current = str(cfg.get("terminal", "profile", default="") or "")
+    except Exception:  # noqa: BLE001 - config-less read keeps the pin
+        current = ""
+    if not pid:
+        return {"terminal_follows": False, "terminal_profile_id": current,
+                "terminal_detail": "no profile to follow"}
+    if pid == current:
+        return {"terminal_follows": True, "terminal_profile_id": current,
+                "terminal_detail": ""}
+    try:
+        from .providers import resolver as _R
+
+        picked = _R.get_profile(cfg, pid)
+    except Exception:  # noqa: BLE001 - unknown below; guard reports it
+        picked = None
+    if picked is not None and picked.kind == _R.LOCAL:
+        # A local pick (Spark tier, brain) runs on /qubit-chat and voice —
+        # it never moves the /chat pin off the big API model. Pin /chat to a
+        # local model explicitly via Models → Use as when that is wanted.
+        return {"terminal_follows": False, "terminal_profile_id": current,
+                "terminal_detail": (
+                    f"/chat keeps {current or 'its current model'}: "
+                    f"{picked.model} is a local model for /qubit-chat and "
+                    f"voice")}
+    try:
+        verdict = R.terminal_context_guard(cfg, profile_id=pid)
+    except Exception as exc:  # noqa: BLE001 - guard fault keeps the pin
+        return {"terminal_follows": False, "terminal_profile_id": current,
+                "terminal_detail": (
+                    f"/chat keeps {current or 'its current model'} "
+                    f"(profile check failed: {type(exc).__name__})")}
+    if not verdict.get("ok"):
+        return {"terminal_follows": False, "terminal_profile_id": current,
+                "terminal_detail": (
+                    f"/chat keeps {current or 'its current model'}: "
+                    f"{verdict.get('detail') or verdict.get('code') or 'below the /chat context floor'}")}
+    try:
+        _write_terminal_profile_locked(
+            cfg, pid, actor=actor, audit_action="terminal_profile_follow")
+    except Exception as exc:  # noqa: BLE001 - persist fault keeps the pin
+        return {"terminal_follows": False, "terminal_profile_id": current,
+                "terminal_detail": (
+                    f"/chat keeps {current or 'its current model'} "
+                    f"(could not persist: {type(exc).__name__})")}
+    return {"terminal_follows": True, "terminal_profile_id": pid,
+            "terminal_detail": ""}
 
 
 def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2594,6 +2679,116 @@ def h_mcp(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ``/api/mcp/servers`` with a hardcoded empty list.
     """
     return h_mcp_servers(cfg, q, b, p)
+
+
+def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/mcp/catalog/install -> register a catalog server (real).
+
+    A catalog install fetches no code — it registers the reviewed entry's
+    transport (http URL or stdio command) in the canonical Qubit MCP registry
+    and stores declared credentials. Closed credential schema (mirroring the
+    reference): only env vars the entry declares are accepted, names are
+    validated before the first write, and values enter the canonical runtime
+    ``.env`` (secrets-only, ``chmod 600``, never echoed) while the registry
+    keeps ``env:NAME`` references only. Confirm-gated like every registry
+    mutation; audited. OAuth-type entries register the same way — the actual
+    browser authorization stays the user's own manual step (post_install).
+    """
+    from . import env_store as ES
+    from . import mcp_servers as MS
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli import mcp_catalog as _MC  # type: ignore
+    except Exception as exc:
+        return _fail(exc)
+    name = str(b.get("name", "") or "").strip()
+    if not name:
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "catalog entry name required",
+                     "qubit_counterpart": "GET /api/mcp/catalog"}
+    try:
+        entry = _MC.get_entry(name)
+    except Exception as exc:
+        return _fail(exc)
+    if entry is None:
+        return 404, {"ok": False, "code": "MCP_CATALOG_NOT_FOUND",
+                     "detail": f"No catalog entry {name!r}",
+                     "qubit_counterpart": "GET /api/mcp/catalog"}
+    given = b.get("env") or {}
+    if not isinstance(given, dict):
+        return 400, {"ok": False, "code": "MALFORMED",
+                     "detail": "env must be an object of NAME: value",
+                     "qubit_counterpart": "GET /api/mcp/catalog"}
+    specs = list(getattr(entry.auth, "env", None) or [])
+    declared = {str(s.name) for s in specs}
+    undeclared = sorted(set(str(k) for k in given) - declared)
+    if undeclared:
+        return 400, {"ok": False, "code": "MCP_ENV_UNDECLARED",
+                     "detail": f"Catalog entry {name!r} does not declare "
+                               f"environment variable(s): "
+                               f"{', '.join(undeclared)}",
+                     "qubit_counterpart": "GET /api/mcp/catalog"}
+    missing = sorted(str(s.name) for s in specs
+                     if getattr(s, "required", False)
+                     and not str(given.get(s.name) or "").strip())
+    if missing:
+        return 400, {"ok": False, "code": "MCP_ENV_REQUIRED",
+                     "detail": f"Catalog entry {name!r} requires "
+                               f"{', '.join(missing)}",
+                     "qubit_counterpart": "GET /api/mcp/catalog"}
+    for key in given:
+        if not ES._ENV_VAR_RE.match(str(key)):
+            return 400, {"ok": False, "code": "MCP_ENV_REQUIRED",
+                         "detail": f"invalid env name {str(key)[:60]!r}",
+                         "qubit_counterpart": "GET /api/mcp/catalog"}
+    guard = _compat_confirm(
+        cfg, "mcp.catalog_install",
+        f"Install catalog MCP server {name!r}: register its transport and "
+        f"store {len(given)} credential(s) in the runtime .env?",
+        q, b)
+    if guard is not None:
+        return guard
+    refs: Dict[str, str] = {}
+    try:
+        for key, value in given.items():
+            ES.write_secret(cfg, str(key), str(value or ""))
+            refs[str(key)] = f"env:{key}"
+    except ValueError as exc:
+        return 400, {"ok": False, "code": "MCP_ENV_REQUIRED",
+                     "detail": _redact(str(exc))[:200],
+                     "qubit_counterpart": "GET /api/mcp/catalog"}
+    transport = str(getattr(entry.transport, "type", "") or "").lower()
+    fields: Dict[str, Any] = {"transport": transport, "enabled": True,
+                              "source": "mcp-catalog"}
+    if transport == "http":
+        fields["url"] = str(getattr(entry.transport, "url", "") or "")
+    else:
+        fields["command"] = str(
+            getattr(entry.transport, "command", "") or "")
+        fields["args"] = list(getattr(entry.transport, "args", None) or [])
+    if refs:
+        fields["env"] = refs
+    if _truthy(b.get("enable", True)) is False:
+        fields["enabled"] = False
+    try:
+        out = MS.upsert(cfg, name, fields, confirmed=True)
+    except Exception as exc:
+        code = getattr(exc, "code", None) or "MCP_BAD_INPUT"
+        return 400, {"ok": False, "code": code,
+                     "detail": _redact(str(exc))[:300],
+                     "qubit_counterpart": "dashboard /mcp ADD SERVER"}
+    _audit("mcp_catalog_install", "dashboard:user",
+           {"server": name, "transport": transport,
+            "credentials": sorted(refs)})
+    result: Dict[str, Any] = {"ok": True, "name": name,
+                              "background": False,
+                              "enabled": bool(fields["enabled"]),
+                              "credentials_stored": sorted(refs)}
+    post = str(getattr(entry, "post_install", "") or "").strip()
+    if post:
+        result["post_install"] = post[:600]
+    return 200, result
 
 
 def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -3505,8 +3700,8 @@ def _live_gateway_platform_state(platform_id: str) -> Optional[str]:
 
 
 def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
-                      accounts: List[Dict[str, Any]], gateway_running: bool
-                      ) -> Dict[str, Any]:
+                       accounts: List[Dict[Any, Any]], gateway_running: bool
+                       ) -> Dict[str, Any]:
     pub = _platform_public_entry(entry)
     pid = pub["id"]
     required = pub["required_env"]
@@ -7888,6 +8083,10 @@ _r("PUT", r"/api/mcp/servers/(?P<id>[^/]+)/enabled", "mcp_set_enabled")
 _r("GET", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth_status")
 _r("POST", r"/api/mcp/servers/(?P<id>[^/]+)/auth", "mcp_auth")
 _r("GET", r"/api/mcp/catalog", "h_mcp_catalog_live")
+# Catalog install registers the reviewed entry's transport + declared
+# credentials (closed schema, secrets to the runtime .env only) — no code is
+# fetched, so the remote-source blanket gate does not apply here.
+_r("POST", r"/api/mcp/catalog/install", "h_mcp_catalog_install")
 # Read-only capability reads (resources/prompts/resource-templates). The
 # vendored router serves them over the fork's MCP config registry; the
 # dashboard ``/agent/api/mcp/servers`` prefix is quarantined to this table, so
@@ -8414,7 +8613,6 @@ GATED: List[Dict[str, Any]] = [
         "dashboard /ops backup_create + CLI backup (passphrase resupply)")),
     ("POST", r"/api/skills/hub/.*", _NO_REMOTE),
     ("GET", r"/api/skills/hub/.*", _NO_REMOTE),
-    ("POST", r"/api/mcp/catalog/install", _NO_REMOTE),
     ("POST", r"/api/dashboard/agent-plugins/.*", _NO_REMOTE),
     ("GET", r"/api/dashboard/plugin-providers", _g("PLUGIN_PROVIDERS_QUBIT",
         "Plugin providers resolve through the Qubit skill manifest registry.",
@@ -11516,7 +11714,8 @@ def plugins_hub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     providers = base.get("providers") or {}
     try:
         from . import plugin_catalog as PC
-        catalog_index = PC.pinned_index_block()
+        catalog_index = PC.pinned_index_block(
+            known_bad=PC._known_bad_map(cfg))
     except Exception as exc:
         catalog_index = {"ok": False, "state": "UNAVAILABLE",
                          "detail": _redact(str(exc))[:240], "entries": []}
@@ -15251,6 +15450,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_cron_jobs": h_cron_jobs, "h_cron_job_show": h_cron_job_show,
     "h_cron_job_runs": h_cron_job_runs,
     "h_logs": h_logs, "h_system_stats": h_system_stats, "h_mcp": h_mcp,
+    "h_mcp_catalog_install": h_mcp_catalog_install,
     "h_pairing_list": h_pairing_list, "h_webhooks_list": h_webhooks_list,
     "h_platforms": h_platforms,
     "h_wa_ob_start": h_wa_ob_start, "h_wa_ob_status": h_wa_ob_status,

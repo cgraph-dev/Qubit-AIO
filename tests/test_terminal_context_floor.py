@@ -125,7 +125,7 @@ def test_production_spawn_passes_profile_env(tmp_path, monkeypatch):
     captured: dict = {}
 
     def fake(cols, rows, resume, profile, *, env_overrides=None,
-             home_config=None, cfg=None):
+             home_config=None, cfg=None, workspace_cwd=""):
         captured["env"] = env_overrides
         captured["home_config"] = home_config
         captured["cfg"] = cfg
@@ -379,7 +379,7 @@ def test_session_open_audit_names_model_and_profile(tmp_path, monkeypatch):
     spawned: dict = {}
 
     def fake_spawn(cols, rows, resume, profile, *, env_overrides=None,
-                   home_config=None, cfg=None):
+                   home_config=None, cfg=None, workspace_cwd=""):
         spawned["profile"] = profile
         return _FakeBridge(), {"cwd": "/tmp/qubit", "argv_head": ["qubit"]}
 

@@ -544,8 +544,19 @@ export function ChatSidebar({
             // and calls back; don't announce until the user confirms.
             if (!result.confirm_required) {
               refreshEffectiveModel();
-              // Ask before reloading: applying the model starts a fresh chat.
-              setPendingReloadModel(model.split("/").slice(-1)[0]);
+              // The backend reports whether /chat follows the pick: when it
+              // kept its pinned model (pick below the /chat context floor),
+              // say so instead of prompting a reload that would change
+              // nothing in this terminal.
+              if (result.terminal_follows === false) {
+                setModelNotice(
+                  result.terminal_detail ||
+                    "Main model set. /chat keeps its current model.",
+                );
+              } else {
+                // Ask before reloading: applying the model starts a fresh chat.
+                setPendingReloadModel(model.split("/").slice(-1)[0]);
+              }
             }
             return result;
           }}

@@ -2198,7 +2198,10 @@ export const api = {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, env, enable }),
+        // The user pressed this entry's Install control, so confirm the
+        // registry write directly (same pattern as plugin installs); the
+        // backend still stages a typed 409 for callers without confirm.
+        body: JSON.stringify({ name, env, enable, confirm: true }),
       },
     ),
   // ``mcp_invoke`` is confirm-gated: without ``confirm`` it stages a real
@@ -4372,6 +4375,12 @@ export interface ModelAssignmentResponse {
    *  Switching main never clears aux pins; this lets the UI warn the user
    *  their helper tasks aren't following the switch. Only set on scope:'main'. */
   stale_aux?: StaleAuxAssignment[];
+  /** /chat terminal profile after a scope:'main' switch: its id, whether it
+   *  now boots the picked model, and the honest reason when it kept the old
+   *  one (e.g. the pick is below /chat's context floor). */
+  terminal_profile_id?: string;
+  terminal_follows?: boolean;
+  terminal_detail?: string;
 }
 
 // ── OAuth provider types ────────────────────────────────────────────────
@@ -4588,7 +4597,11 @@ export interface PluginPinnedIndexEntry {
   tags: string[];
   curated: boolean;
   pinned: boolean;
+  review?: string;
   install_state: string;
+  install_note?: string;
+  installed?: boolean;
+  installed_plugin?: string;
   install_code: string;
   install_capability: string;
   provenance: Record<string, string>;
@@ -4699,6 +4712,8 @@ export interface AgentPluginInstallResponse {
   ok: boolean;
   plugin_name?: string;
   warnings?: string[];
+  warning?: string;
+  review?: string;
   missing_env?: string[];
   after_install_path?: string | null;
   enabled?: boolean;
