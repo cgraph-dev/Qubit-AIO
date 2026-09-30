@@ -265,6 +265,177 @@ def _needs_web(text: str) -> bool:
     return any(re.search(p, t) for p in pats)
 
 
+_URL_RE = re.compile(r"https?://[^\s)>\]\"']+")
+
+
+def _cfg_get(cfg: Any, *path: str, default: Any = None) -> Any:
+    """Best-effort nested config read for Config objects and plain dicts.
+
+    The product ``Config.get(*path, default=...)`` is tried first; a plain
+    ``dict`` (or anything else without variadic ``get``) falls back to a
+    manual walk. Never raises; returns ``default`` when unreadable.
+    """
+    try:
+        return cfg.get(*path, default=default)
+    except TypeError:
+        pass
+    except Exception:  # noqa: BLE001 - config reads must never crash routing
+        return default
+    try:
+        node: Any = cfg
+        for part in path:
+            if isinstance(node, dict):
+                node = node.get(part)
+            else:
+                return default
+        return default if node is None else node
+    except Exception:  # noqa: BLE001 - config reads must never crash routing
+        return default
+
+
+def _web_env_key(cfg: Any, name: str) -> str:
+    """Read a KEY for the shared web path (canonical file or environment).
+
+    Mirrors ``VoiceOrchestrator._env_key`` without needing an instance:
+    the configured ``intent.deepseek_env`` path (or the canonical
+    ``~/.config/qubit-voicebridge/.env``), plus ``os.environ``. The legacy
+    ``~/.hermes/.env`` is never consulted. Values are never logged.
+    """
+    candidates = []
+    try:
+        configured = str(
+            _cfg_get(cfg, "intent", "deepseek_env", default="") or "")
+    except Exception:  # noqa: BLE001 - fall back to the canonical path
+        configured = ""
+    if configured.strip():
+        candidates.append(configured.strip())
+    else:
+        candidates.append("~/.config/qubit-voicebridge/.env")
+    for candidate in candidates:
+        env_path = Path(candidate).expanduser()
+        try:
+            lines = env_path.read_text(errors="replace").splitlines()
+        except Exception:  # noqa: BLE001 - missing file means next candidate
+            continue
+        for line in lines:
+            line = line.strip()
+            if line.startswith(name + "="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return os.environ.get(name, "")
+
+
+def _web_egress_allowed(cfg: Any, provider: str, model: str) -> bool:
+    """Standalone frontier-egress gate for the shared web path.
+
+    Same authority as ``VoiceOrchestrator._cloud_egress_allowed`` (the
+    canonical frontier policy); the shipped local-only default refuses with
+    a typed log and no network call. Never raises.
+    """
+    try:
+        from .providers.policy import FrontierPolicy
+        policy = FrontierPolicy.from_config(cfg)
+        allowed = bool(policy.is_allowed(provider, model))
+        if not allowed:
+            log_event("conversation.cloud.egress_denied",
+                      provider=provider, model=model,
+                      reason="frontier policy disabled or model not "
+                             "allowlisted")
+        return allowed
+    except Exception as exc:  # never let a policy probe crash the loop
+        log_event("conversation.cloud.egress_denied", provider=provider,
+                  model=model, error=str(exc)[:120])
+        return False
+
+
+def _extract_sources(answer: str, limit: int = 10) -> List[str]:
+    """Pull http(s) URLs out of a web answer (dedupe, order-preserving).
+
+    The gateway carries no citation field, so the only honest sources are
+    URLs the provider itself emitted. Nothing is invented: no URL in the
+    answer means an empty list. Each URL is redacted like any other text.
+    """
+    seen: List[str] = []
+    try:
+        for raw in _URL_RE.findall(answer or ""):
+            clean = redact_text(raw.rstrip(".,;:!?)]}'\""))
+            if clean and clean not in seen:
+                seen.append(clean)
+            if len(seen) >= limit:
+                break
+    except Exception:  # noqa: BLE001 - source extraction is best-effort
+        pass
+    return seen
+
+
+def answer_web_query(cfg: Any, text: str,
+                     *, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """Shared web-grounded answer path (Perplexity via frontier gateway).
+
+    This is the exact explicit-web block extracted from
+    ``VoiceOrchestrator._handle_conversation``: same web-intent gate
+    (``_needs_web`` or the word "perplexity"), same frontier egress check,
+    same gateway call (256 tokens, 45 s timeout), same think-strip and
+    redaction. Returns ``{"ok", "answer", "sources", "code"}`` — typed
+    ``WEB_UNAVAILABLE`` on any refusal/failure, never a fabricated answer.
+
+    ``api_key`` is an optional pass-through so instance callers keeping the
+    ``_perplexity_key`` seam (same canonical file/env source) share the
+    identical credential without re-reading; Wave C consumers call
+    ``answer_web_query(cfg, text)`` with no third argument.
+    """
+    t = text or ""
+    try:
+        enabled = _cfg_get(cfg, "intent", "perplexity_enabled", default=True)
+    except Exception:  # noqa: BLE001 - a bad flag must not crash routing
+        enabled = True
+    if enabled is None:
+        enabled = True
+    if (not enabled) or not (_needs_web(t) or "perplexity" in t.lower()):
+        return {"ok": False, "answer": "", "sources": [],
+                "code": "WEB_UNAVAILABLE"}
+    model = str(_cfg_get(cfg, "intent", "perplexity_model",
+                         default="sonar-pro") or "sonar-pro")
+    if not _web_egress_allowed(cfg, "perplexity", model):
+        return {"ok": False, "answer": "", "sources": [],
+                "code": "WEB_UNAVAILABLE"}
+    key = api_key if api_key else _web_env_key(cfg, "PERPLEXITY_API_KEY")
+    if not key:
+        log_event("conversation.perplexity.nokey",
+                  hint="set PERPLEXITY_API_KEY in "
+                       "~/.config/qubit-voicebridge/.env")
+        return {"ok": False, "answer": "", "sources": [],
+                "code": "WEB_UNAVAILABLE"}
+    url = str(_cfg_get(cfg, "intent", "perplexity_url",
+                       default="https://api.perplexity.ai/chat/completions")
+              or "https://api.perplexity.ai/chat/completions")
+    system = ("You are a concise voice assistant answering from current web "
+              "search. Give a short, accurate, up-to-date answer in 1-4 "
+              "sentences. Prefer facts over hedging. Be direct: no emojis, "
+              "no pleasantries, no filler words. "
+              "Reply in the SAME language as the current User message.")
+    prompt = f"{system}\n\n{t}"
+    from .providers import gateway as _gateway
+    from .providers.contracts import ProviderRequest
+    res = _gateway.run(
+        ProviderRequest(prompt=prompt, max_tokens=256, timeout_s=45.0,
+                        route="frontier", provider="perplexity",
+                        model=model),
+        cfg, base_url=str(url or ""), api_key=key)
+    if not res.ok:
+        log_event("conversation.perplexity.failed", code=res.code,
+                  error=str(res.message)[:160])
+        return {"ok": False, "answer": "", "sources": [],
+                "code": "WEB_UNAVAILABLE"}
+    log_event("conversation.perplexity", model=model)
+    from .local_llm import _strip_think
+    answer = redact_text(_strip_think((res.text or "").strip()))
+    if not answer:
+        return {"ok": False, "answer": "", "sources": [],
+                "code": "WEB_UNAVAILABLE"}
+    return {"ok": True, "answer": answer,
+            "sources": _extract_sources(answer), "code": "OK"}
+
+
 def _interrupt_decision_prompt(old_task: str, new_request: str) -> str:
     """Build the prompt handed to the agent after an interrupt: it decides
     whether to continue the paused work or switch to the user's new request."""
@@ -2560,7 +2731,8 @@ class VoiceOrchestrator:
             and self.cfg.get("intent", "perplexity_enabled", default=True) \
             and (_needs_web(text) or "perplexity" in text.lower())
         if web_ask:
-            reply = self._chat_perplexity(text)
+            web = answer_web_query(self.cfg, text)
+            reply = web.get("answer", "") if web.get("ok") else ""
         if not reply:
             if deepseek_ok and self.cfg.get("intent", "stream_speech",
                                             default=True):
@@ -2761,42 +2933,26 @@ class VoiceOrchestrator:
     def _chat_perplexity(self, text: str) -> str:
         """Web-grounded answer through the canonical frontier gateway.
 
-        Perplexity is an external provider: the gateway enforces the frontier
-        policy, exact allowlist, minimum-necessary egress, budgets, and
-        credential handling, so no direct provider request is issued here.
-        ``_cloud_egress_allowed`` pre-checks (defense in depth) so the shipped
-        local-only default refuses with no network call.
+        Thin wrapper over the shared :func:`answer_web_query` (same gate,
+        same gateway call, same timeouts/redaction); returns the answer
+        string ("" on any refusal/failure) for the legacy string callers.
+        The instance ``_perplexity_key`` seam (same canonical file/env
+        source) is passed through so key doubles keep working.
         """
-        from .providers import gateway as _gateway
-        from .providers.contracts import ProviderRequest
-        model = self._perplexity_model_name()
-        if not self._cloud_egress_allowed("perplexity", model):
+        try:
+            key: Optional[str] = None
+            try:
+                _key_fn = getattr(self, "_perplexity_key", None)
+                if callable(_key_fn):
+                    key = _key_fn() or None
+            except Exception:  # noqa: BLE001 - fall back to the shared read
+                key = None
+            return answer_web_query(self.cfg, text,
+                                    api_key=key).get("answer", "") or ""
+        except Exception as exc:  # noqa: BLE001 - never crash the loop
+            log_event("conversation.perplexity.failed", code="SHARED_PATH",
+                      error=str(exc)[:160])
             return ""
-        key = self._perplexity_key()
-        if not key:
-            log_event("conversation.perplexity.nokey",
-                      hint="set PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env")
-            return ""
-        url = self.cfg.get("intent", "perplexity_url",
-                           default="https://api.perplexity.ai/chat/completions")
-        system = ("You are a concise voice assistant answering from current web "
-                  "search. Give a short, accurate, up-to-date answer in 1-4 "
-                  "sentences. Prefer facts over hedging. Be direct: no emojis, "
-                  "no pleasantries, no filler words. "
-                  "Reply in the SAME language as the current User message.")
-        prompt = f"{system}\n\n{text}"
-        res = _gateway.run(
-            ProviderRequest(prompt=prompt, max_tokens=256, timeout_s=45.0,
-                            route="frontier", provider="perplexity",
-                            model=model),
-            self.cfg, base_url=str(url or ""), api_key=key)
-        if not res.ok:
-            log_event("conversation.perplexity.failed", code=res.code,
-                      error=str(res.message)[:160])
-            return ""
-        log_event("conversation.perplexity", model=model)
-        from .local_llm import _strip_think
-        return _strip_think((res.text or "").strip())
 
     def _chat_local_reply(self, text: str, conv_prompt: str,
                           llm_cfg: Dict[str, Any], mem_ctx: str):
