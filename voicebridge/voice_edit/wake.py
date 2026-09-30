@@ -376,6 +376,8 @@ class WakeMonitor:
                         if _asr_fallback_allows(self.cfg, pcm):
                             _trace("asr_fallback_probe", bytes=len(pcm))
                             self._handle_segment(pcm, forced=False)
+                        else:
+                            _trace("asr_fallback_skip", bytes=len(pcm))
                         continue
                 self._handle_segment(pcm, forced=hit)
         finally:

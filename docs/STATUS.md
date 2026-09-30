@@ -2215,3 +2215,38 @@ h_logs/MCP hunks — qubit_compat grew 80→431 diff lines mid-session).
   asr-OOM/noise/settings/frontend + its 2 test files) + this wave's wake
   fallback, OOM tests, and this STATUS entry. Left uncommitted (other
   lanes): listed at top.
+
+## 51. Wake root cause: room floor above the energy gate + USER.md brand — 2026-10-01
+
+**No milestone claimed.** Owner reports: (1) "nothing happens, no beep" on
+"hey qubit"; (2) a voice answer saying "Hermes configured as best personal
+assistant" + "kimi-k2.6" (screenshot).
+
+- **The Hermes/kimi answer — FIXED (user-data correction, not code).** The
+  brain recited `runtime/memories/USER.md` line 1 verbatim (injected live
+  per turn by `service._personal_context`, no cache): a Hermes-era
+  migration leftover ("Wants Hermes… Primary model is kimi-k2.6 via Kimi
+  Coding provider"). Backed up (`/tmp/USER.md.pre-brandfix-*`), corrected
+  to Qubit + the live tier (Spark local, deepseek fallback); personal
+  facts untouched. Takes effect next turn, no restart. **Owner call:**
+  `MEMORY.md`'s injected 800-char slice still carries stale lines
+  (openclaw-voice-bridge daemon note, ox-alpha-free model note, Hermes CLI
+  note) — same recitation risk if asked about; left for the owner (their
+  data, historical notes).
+- **No beep — root cause MEASURED, not guessed.** 20 s mic probe (same
+  ParecMic settings as the live loop): room floor RMS **0.0024–0.0044**,
+  speech 0.02–0.19 — but `wake.rms_gate` was **0.0018**, BELOW the floor.
+  The endpointer never completes a segment (zero `wake.segment` in 10 min
+  despite peaks 0.5): no KWS check, no fallback probe, no beep — silent by
+  design. `is_busy` NOT stuck (1 skip/10 min); beep path healthy (default
+  sink = Scarlett RUNNING, wav exists, enabled); KWS 3 hits ever
+  (confirms acoustic deafness, fallback was the right call). The
+  screenshot "heard 'Hey Qubit'" lines are Right-Ctrl turns, not wake.
+- **Fix:** `rms_gate` 0.0018 → **0.008** (2× measured max floor, far below
+  speech; `voice.yaml` state, backup `/tmp/voice.pre-rmsgate.yaml`,
+  revertible) + `asr_fallback_skip` trace so over-bound drops are visible
+  (wake.py, 21 tests green). Helper restarted; live view shows the gate;
+  a product-path beep was fired as a cue-audio check.
+- **Needs the owner:** (1) did you hear the double-beep? (2) say "hey
+  qubit" — report fire/miss; the journal now distinguishes `kws.hit` vs
+  fallback `wake.command` vs `asr_fallback_skip`.
