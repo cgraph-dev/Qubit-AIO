@@ -1227,8 +1227,8 @@ def qubit_ws_gate_code(path: str) -> Optional[str]:
 # legacy comment inside the overlay theme asset still names the old
 # ``hermes-theme-custom-css`` id; normalize it in the served shell so no
 # dashboard response carries a stale legacy visual reference. Wire/API
-# identifiers (``__HERMES_SESSION_TOKEN__``, ``__HERMES_BASE_PATH__``,
-# ``X-Hermes-Session-Token``) are load-bearing and are NOT touched here.
+# identifiers (``__QUBIT_SESSION_TOKEN__``, ``__QUBIT_BASE_PATH__``,
+# ``X-Qubit-Session-Token``) are load-bearing and are NOT touched here.
 LEGACY_THEME_CSS_STYLE_ID = "hermes-theme-custom-css"
 QUBIT_THEME_CSS_STYLE_ID = "qubit-theme-custom-css"
 
@@ -1236,8 +1236,8 @@ QUBIT_THEME_CSS_STYLE_ID = "qubit-theme-custom-css"
 def debrand_theme_style_id(markup: str) -> str:
     """Rewrite the stale legacy theme ``<style>`` id to the canonical Qubit id.
 
-    Only the theme style id is rewritten; every ``__HERMES_*`` wire identifier
-    is preserved verbatim.
+    Only the theme style id is rewritten here; the session wire identifiers
+    are owned by :meth:`_qubit_token_ok` / :meth:`_serve_qubit_index`.
     """
     return markup.replace(LEGACY_THEME_CSS_STYLE_ID, QUBIT_THEME_CSS_STYLE_ID)
 
@@ -1442,7 +1442,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
     # the Qubit-owned ``/agent`` prefix and dispatches through
     # voicebridge/qubit_compat.py on the same backend modules as CLI/voice.
     def _qubit_token_ok(self) -> bool:
-        qubit_tok = self.headers.get("X-Hermes-Session-Token", "")
+        # Primary wire identity is Qubit-owned. The legacy header is accepted
+        # as a read-only fallback so bundles cached before the rename keep
+        # working; it is never emitted (see _serve_qubit_index).
+        qubit_tok = (self.headers.get("X-Qubit-Session-Token", "") or
+                     self.headers.get("X-Hermes-Session-Token", ""))
         if qubit_tok:
             qp = "token=" in self.path.split("?", 1)[-1]
             ok, _reason = token_ok(self.app.api_token, qubit_tok, qp)
@@ -1477,11 +1481,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         token = self.app.api_token or ""
         safe = json.dumps(token)
-        # Public SPA base is the root. ``__HERMES_BASE_PATH__`` is retained as
+        # Public SPA base is the root. ``__QUBIT_BASE_PATH__`` is retained as
         # an internal compatibility identifier the frontend still reads (now
         # empty); ``__QUBIT_API_PREFIX__`` is the Qubit-owned API prefix.
-        inject = ('<script>window.__HERMES_SESSION_TOKEN__=%s;'
-                  'window.__HERMES_BASE_PATH__="";'
+        inject = ('<script>window.__QUBIT_SESSION_TOKEN__=%s;'
+                  'window.__QUBIT_BASE_PATH__="";'
                   'window.__QUBIT_API_PREFIX__="/agent";</script>' % safe)
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
@@ -3835,7 +3839,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._channel_ingress(path)
         elif path.startswith("/agent/"):
             # Qubit SPA POST backend (compat, same modules as CLI/voice).
-            # Auth: X-Hermes-Session-Token or X-Api-Token.
+            # Auth: X-Qubit-Session-Token or X-Api-Token.
             self._qubit_api("POST")
         else:
             self._send(404, b"not found")

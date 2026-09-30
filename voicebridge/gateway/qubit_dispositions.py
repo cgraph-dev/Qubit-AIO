@@ -8,7 +8,7 @@ upstream action is ``SAFE_EQUIVALENT`` (real local counterpart) or
 ``OPERATOR_ONLY`` (needs an external credential/service Qubit does not run).
 ``OPEN`` is never used as a silent substitute.
 
-``scripts/openclaw_upgrade_manifest.py`` reads this map instead of inferring a
+``scripts/qubit_upgrade_manifest.py`` reads this map instead of inferring a
 disposition from a bare registered-method name, and fails closed when an
 ``IMPLEMENTED`` entry is not actually registered or a refusal entry declares no
 typed code. This is the behavior record; the handler source is the evidence.
@@ -503,21 +503,21 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     # reuse the same confirmation-gated, project-root-confined git runner.
     "worktrees.list": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/worktrees.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/worktrees.py",
         "basis": ("`git worktree list --porcelain` through the scoped "
                   "`voicebridge.git_scope` runner, the same rows the dashboard "
                   "`/api/git/worktrees` read serves"),
     },
     "worktrees.branches": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/worktrees.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/worktrees.py",
         "basis": ("real `git for-each-ref` heads/remotes with checked-out "
                   "worktree mapping, the same projection as "
                   "`/api/git/branches`"),
     },
     "worktrees.create": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/worktrees.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/worktrees.py",
         "qubit_counterpart": "CLI `qubit worktree add <name> --confirm`",
         "basis": ("confirmation-gated, project-root-confined `git worktree "
                   "add` into `<root>/.worktrees/<name>` through the SAME "
@@ -525,7 +525,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     },
     "worktrees.remove": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/worktrees.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/worktrees.py",
         "qubit_counterpart": "CLI `qubit worktree remove <name> --confirm`",
         "basis": ("confirmation-gated `git worktree remove` + `git worktree "
                   "prune`, confined to the project root; nothing outside the "
@@ -534,7 +534,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "worktrees.restore": {
         "status": "SAFE_EQUIVALENT",
         "code": "WORKTREES_RESTORE_LOCAL_READD",
-        "evidence": "voicebridge/gateway/openclaw_handlers/worktrees.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/worktrees.py",
         "qubit_counterpart": "CLI `qubit worktree add <name> --confirm`",
         "basis": ("upstream replays a managed snapshot from its worktree "
                   "store; Qubit keeps no managed snapshot store, so this "
@@ -544,7 +544,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "worktrees.gc": {
         "status": "SAFE_EQUIVALENT",
         "code": "WORKTREES_GC_LOCAL_PRUNE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/worktrees.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/worktrees.py",
         "qubit_counterpart": "`git worktree prune` (via `qubit worktree`)",
         "basis": ("upstream runs a managed-cache sweep with owner retention "
                   "limits; Qubit runs the real local stale-metadata cleanup "
@@ -627,309 +627,309 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     # emits the typed code; the generator fails closed if it does not.
     "conversations.list": {
         "status": "SAFE_EQUIVALENT", "code": "CONVERSATIONS_LOCAL_SESSIONS",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "canonical chat-session store index (`qubit sessions`)",
         "basis": "upstream lists multi-party conversations; Qubit has one session authority",
     },
     "conversations.send": {
         "status": "SAFE_EQUIVALENT", "code": "CONVERSATIONS_LOCAL_SESSION_APPEND",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "canonical session transcript append (`qubit chat`)",
         "basis": "no separate conversation store; appends to the shared session",
     },
     "conversations.turn": {
         "status": "SAFE_EQUIVALENT", "code": "CONVERSATIONS_LOCAL_SESSION_TURN",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.chat_transport.turn (`/qubit-chat`)",
         "basis": "runs the canonical agent turn with policy/e-stop gating",
     },
     "conversations.turn.cancel": {
         "status": "SAFE_EQUIVALENT",
         "code": "CONVERSATIONS_LOCAL_SESSION_CANCEL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.chat_transport.cancel",
         "basis": "cancels the canonical in-flight turn",
     },
     "session.members.add": {
         "status": "SAFE_EQUIVALENT", "code": "SESSION_MEMBERS_LOCAL_SHARE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.session_share grant (`qubit sessions share`)",
         "basis": "Qubit is a single-operator share model, not multi-member ACLs",
     },
     "session.members.list": {
         "status": "SAFE_EQUIVALENT", "code": "SESSION_MEMBERS_LOCAL_SHARE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.session_share.list_shares",
         "basis": "lists the local revocable shares",
     },
     "session.members.listEvidence": {
         "status": "SAFE_EQUIVALENT", "code": "SESSION_MEMBERS_LOCAL_SHARE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.session_share evidence rows",
         "basis": "local share evidence, not remote member audit",
     },
     "session.members.remove": {
         "status": "SAFE_EQUIVALENT", "code": "SESSION_MEMBERS_LOCAL_SHARE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.session_share revoke",
         "basis": "revokes the local share",
     },
     "session.visibility.set": {
         "status": "SAFE_EQUIVALENT", "code": "SESSION_VISIBILITY_LOCAL_SHARE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.session_share visibility",
         "basis": "local share visibility instead of multi-tenant visibility",
     },
     "sessions.compaction.list": {
         "status": "SAFE_EQUIVALENT", "code": "COMPACTION_LOCAL_CHECKPOINTS",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.checkpoints.list_all (`qubit checkpoints`)",
         "basis": "canonical checkpoint journal, no conversation-compaction store",
     },
     "session.discussion.open": {
         "status": "SAFE_EQUIVALENT", "code": "DISCUSSION_LOCAL_COMMENTS",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.chat_stores comment thread",
         "basis": "the one per-session comment thread",
     },
     "sessions.files.reveal": {
         "status": "SAFE_EQUIVALENT", "code": "FILES_REVEAL_LOCAL_PATH",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "sessions.files.get / dashboard file viewer",
         "basis": "headless host never opens a file manager",
     },
     "sessions.fork": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_FORK_LOCAL_TRANSCRIPT_COPY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "QubitSessionStore.import_session (transcript copy)",
         "basis": "real transcript copy into a new session, not a branch tree",
     },
     "sessions.observer.visibility": {
         "status": "SAFE_EQUIVALENT", "code": "SESSION_OBSERVER_LOCAL_SHARE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.session_share.list_shares",
         "basis": "single-operator local revocable share",
     },
     "sessions.steer": {
         "status": "SAFE_EQUIVALENT", "code": "SESSIONS_STEER_LOCAL_INJECT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "canonical transcript append for the next turn",
         "basis": "no mid-turn steering channel; records for the next turn",
     },
     "sessions.title.prepare": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_TITLE_LOCAL_EXTRACTIVE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.summarizer.summarize (extractive)",
         "basis": "deterministic local title; no network/model call",
     },
     "sessions.usage.logs": {
         "status": "SAFE_EQUIVALENT", "code": "USAGE_LOGS_LOCAL_DAILY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.qubit_session_store.analytics_usage",
         "basis": "canonical daily usage series",
     },
     "terminal.upload": {
         "status": "SAFE_EQUIVALENT", "code": "TERMINAL_UPLOAD_LOCAL_DRAFT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "qubit_counterpart": "voicebridge.chat_stores.FileDraftStore.put",
         "basis": "e-stop-gated local draft store, not a remote transport",
     },
     "exec.approval.waitDecision": {
         "status": "SAFE_EQUIVALENT", "code": "EXEC_APPROVAL_NO_BLOCKING_WAIT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "qubit_counterpart": "exec.approval.list + exec.approval.get (`qubit approvals`)",
         "basis": "the confirmation journal is poll-based, with no blocking wait",
     },
     "plugin.approval.waitDecision": {
         "status": "SAFE_EQUIVALENT",
         "code": "PLUGIN_APPROVAL_NO_BLOCKING_WAIT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "qubit_counterpart": "plugin.approval.list",
         "basis": "poll-based confirmation journal, no blocking wait",
     },
     "question.waitAnswer": {
         "status": "SAFE_EQUIVALENT", "code": "QUESTION_NO_BLOCKING_WAIT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "qubit_counterpart": "question.list + question.resolve",
         "basis": "question prompts are answered in-process, no blocking wait",
     },
     "secrets.resolve": {
         "status": "SAFE_EQUIVALENT", "code": "SECRET_READ_REFUSED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "qubit_counterpart": "`qubit auth status` (reference names only)",
         "basis": "Qubit never resolves a secret value over the gateway",
     },
     "models.authLogout": {
         "status": "SAFE_EQUIVALENT", "code": "AUTH_LOGOUT_MANUAL_HANDOFF",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "qubit_counterpart": "`qubit auth status` + remove the env:/file: reference",
         "basis": "credential refs are operator-managed, not session-logout",
     },
     # ---- typed OPERATOR_ONLY gates (external prerequisite absent) ----
     "sessions.dispatch": {
         "status": "OPERATOR_ONLY", "code": "RUNTIME_CLOUD_UNAVAILABLE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "injected cloud-worker runtime transport",
     },
     "sessions.move": {
         "status": "OPERATOR_ONLY", "code": "RUNTIME_CLOUD_UNAVAILABLE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "injected cloud-worker runtime transport",
     },
     "sessions.reclaim": {
         "status": "OPERATOR_ONLY", "code": "RUNTIME_CLOUD_UNAVAILABLE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "injected cloud-worker runtime transport",
     },
     "sessions.github.confirm": {
         "status": "OPERATOR_ONLY", "code": "FORGE_API_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured git forge credential reference + network access",
     },
     "sessions.github.options": {
         "status": "OPERATOR_ONLY", "code": "FORGE_API_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured git forge credential reference + network access",
     },
     "sessions.github.publish": {
         "status": "OPERATOR_ONLY", "code": "FORGE_API_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured git forge credential reference + network access",
     },
     "sessions.github.status": {
         "status": "OPERATOR_ONLY", "code": "FORGE_API_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured git forge credential reference + network access",
     },
     "send": {
         "status": "OPERATOR_ONLY",
         "code": "MESSAGING_TRANSPORT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured messaging account and reachable provider transport",
     },
     "message.action": {
         "status": "OPERATOR_ONLY",
         "code": "MESSAGING_TRANSPORT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured messaging account and reachable provider transport",
     },
     "poll": {
         "status": "OPERATOR_ONLY",
         "code": "MESSAGING_TRANSPORT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions.py",
         "operator_prerequisite": "configured messaging account and reachable provider transport",
     },
     "environments.create": {
         "status": "OPERATOR_ONLY", "code": "ENVIRONMENT_CLOUD_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "operator_prerequisite": "injected cloud-worker provider transport",
     },
     "environments.destroy": {
         "status": "OPERATOR_ONLY", "code": "ENVIRONMENT_CLOUD_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "operator_prerequisite": "injected cloud-worker provider transport",
     },
     "gateway.restart.request": {
         "status": "OPERATOR_ONLY", "code": "GATEWAY_RESTART_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "operator_prerequisite": "operator restart of the Qubit service unit",
     },
     "update.hold": {
         "status": "OPERATOR_ONLY", "code": "UPDATE_HOLD_OPERATOR_ONLY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/system.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/system.py",
         "operator_prerequisite": "operator-managed update hold on the runtime image",
     },
     "channels.start": {
         "status": "OPERATOR_ONLY",
         "code": "CHANNEL_LISTENER_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "configured inbound channel transport + credential",
     },
     "channels.stop": {
         "status": "OPERATOR_ONLY",
         "code": "CHANNEL_LISTENER_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "configured inbound channel transport + credential",
     },
     "channels.logout": {
         "status": "OPERATOR_ONLY",
         "code": "CHANNEL_LISTENER_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "configured inbound channel transport + credential",
     },
     "projects.searchRemote": {
         "status": "OPERATOR_ONLY",
         "code": "PROJECT_REMOTE_SEARCH_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "configured git forge credential + network access",
     },
     "push.test": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "push.web.vapidPublicKey": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "push.web.subscribe": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "push.web.unsubscribe": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "push.web.test": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "push.web.preferences.get": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "push.web.preferences.set": {
         "status": "OPERATOR_ONLY", "code": "PUSH_WEB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": ("configured web-push service (VAPID keypair + "
                                   "subscription store) + browser permission"),
     },
     "tools.github.status": {
         "status": "OPERATOR_ONLY", "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "GitHub credential reference with required scopes + network access",
     },
     "tools.github.configure": {
         "status": "OPERATOR_ONLY", "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "GitHub credential reference with required scopes + network access",
     },
     "tools.github.authorize.start": {
         "status": "OPERATOR_ONLY", "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "GitHub credential reference with required scopes + network access",
     },
     "tools.github.authorize.poll": {
         "status": "OPERATOR_ONLY", "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "GitHub credential reference with required scopes + network access",
     },
     "tools.github.authorize.cancel": {
         "status": "OPERATOR_ONLY", "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/content.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/content.py",
         "operator_prerequisite": "GitHub credential reference with required scopes + network access",
     },
     # ---- sessions subscriptions/viewers (2026-09-21) ----
@@ -941,7 +941,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.subscribe": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_SUBSCRIPTIONS_LOCAL_REGISTRY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_advanced.py",
         "qubit_counterpart": "voicebridge.session_subscriptions registry "
                              "(request-scoped read; shared with /qubit-chat)",
         "basis": ("real in-process subscriber registry instead of upstream "
@@ -951,7 +951,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.messages.subscribe": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_SUBSCRIPTIONS_LOCAL_REGISTRY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_advanced.py",
         "qubit_counterpart": "voicebridge.session_subscriptions registry "
                              "(message-scoped subscription)",
         "basis": ("real in-process message-subscription registry; delivery is "
@@ -960,7 +960,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.messages.unsubscribe": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_SUBSCRIPTIONS_LOCAL_REGISTRY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_advanced.py",
         "qubit_counterpart": "voicebridge.session_subscriptions.unsubscribe",
         "basis": ("removes the real registry entry; symmetric with the local "
                   "subscribe counterpart"),
@@ -968,7 +968,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.viewers.set": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_VIEWERS_LOCAL_REGISTRY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_advanced.py",
         "qubit_counterpart": "voicebridge.session_subscriptions.set_viewers",
         "basis": ("sets the real viewer set on the in-process registry; Qubit "
                   "is single-operator so there is no cloud viewer directory"),
@@ -981,7 +981,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.branches.switch": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_BRANCH_SWITCH_LOCAL_RESTORE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_compaction.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_compaction.py",
         "qubit_counterpart": "voicebridge.session_compaction.switch_branch "
                              "(restore target transcript in place)",
         "basis": ("upstream flips a leaf pointer; Qubit's single transcript "
@@ -991,7 +991,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.compaction.branch": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_COMPACTION_BRANCH_LOCAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_compaction.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_compaction.py",
         "qubit_counterpart": "voicebridge.session_compaction.branch "
                              "(DB checkpoint registry + transcript copy)",
         "basis": ("upstream uses a file-backed checkpoint store; Qubit records "
@@ -1001,7 +1001,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "sessions.compaction.restore": {
         "status": "SAFE_EQUIVALENT",
         "code": "SESSIONS_COMPACTION_RESTORE_LOCAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/sessions_compaction.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/sessions_compaction.py",
         "qubit_counterpart": "voicebridge.session_compaction.restore "
                              "(replace_messages archive_dropped=True)",
         "basis": ("upstream restores from a file-backed checkpoint store; "
@@ -1016,7 +1016,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "exec.approvals.set": {
         "status": "SAFE_EQUIVALENT",
         "code": "EXEC_APPROVALS_LOCAL_JOURNAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/security.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/security.py",
         "qubit_counterpart": "`qubit approvals` + broker capability policy",
         "basis": ("upstream edits a gateway-writable exec-approvals allowlist "
                   "file; Qubit enforces approval through the shared confirmation "
@@ -1026,7 +1026,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "exec.approvals.node.get": {
         "status": "SAFE_EQUIVALENT",
         "code": "EXEC_APPROVALS_NODE_LOCAL_POLICY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/security.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/security.py",
         "qubit_counterpart": "voicebridge.node_host.show/capabilities + broker "
                              "confirmation policy",
         "basis": ("upstream reads a per-node exec-approvals allowlist; Qubit "
@@ -1036,7 +1036,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "exec.approvals.node.set": {
         "status": "OPERATOR_ONLY",
         "code": "EXEC_APPROVALS_NODE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/security.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/security.py",
         "operator_prerequisite": ("a paired node agent that owns its own exec "
                                   "policy"),
         "qubit_counterpart": "`qubit node enroll/revoke` + broker confirmation "
@@ -1045,7 +1045,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "attach.grant": {
         "status": "OPERATOR_ONLY",
         "code": "ATTACH_MCP_LOOPBACK_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/security.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/security.py",
         "operator_prerequisite": ("an MCP loopback attach server + a paired "
                                   "browser device identity"),
         "qubit_counterpart": "voicebridge.session_share + device tokens",
@@ -1053,7 +1053,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "attach.revoke": {
         "status": "OPERATOR_ONLY",
         "code": "ATTACH_MCP_LOOPBACK_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/security.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/security.py",
         "operator_prerequisite": ("an MCP loopback attach server + a paired "
                                   "browser device identity"),
         "qubit_counterpart": "voicebridge.session_share + device tokens",
@@ -1067,7 +1067,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "agents.files.set": {
         "status": "SAFE_EQUIVALENT",
         "code": "AGENTS_FILES_SET_BROKERED_WRITE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/agents.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/agents.py",
         "qubit_counterpart": ("brokered qubit_runtime.tools.file_operations "
                               "write + the shared confirmation journal"),
         "basis": ("upstream writes allowlisted agent workspace files directly "
@@ -1078,7 +1078,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "agent.wait": {
         "status": "SAFE_EQUIVALENT",
         "code": "AGENT_WAIT_LOCAL_TASK_STATE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/agents.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/agents.py",
         "qubit_counterpart": ("voicebridge.task_ledger.show + CLI "
                               "`qubit tasks show`"),
         "basis": ("upstream blocks until an agent run reaches a terminal "
@@ -1088,7 +1088,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "agents.create": {
         "status": "OPERATOR_ONLY",
         "code": "AGENTS_MULTI_AGENT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/agents.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/agents.py",
         "operator_prerequisite": ("an upstream multi-agent runtime; Qubit is "
                                   "intentionally a single unified agent"),
         "qubit_counterpart": ("the single canonical agent `qubit-worker` "
@@ -1097,7 +1097,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "agents.update": {
         "status": "OPERATOR_ONLY",
         "code": "AGENTS_MULTI_AGENT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/agents.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/agents.py",
         "operator_prerequisite": ("an upstream multi-agent runtime; Qubit is "
                                   "intentionally a single unified agent"),
         "qubit_counterpart": ("the single canonical agent `qubit-worker` "
@@ -1106,7 +1106,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "agents.delete": {
         "status": "OPERATOR_ONLY",
         "code": "AGENTS_MULTI_AGENT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/agents.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/agents.py",
         "operator_prerequisite": ("an upstream multi-agent runtime; Qubit is "
                                   "intentionally a single unified agent"),
         "qubit_counterpart": ("the single canonical agent `qubit-worker` "
@@ -1121,7 +1121,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "mcp.app.listResources": {
         "status": "SAFE_EQUIVALENT",
         "code": "MCP_RESOURCES_LOCAL_TOOL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/mcp_app.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/mcp_app.py",
         "qubit_counterpart": ("the MCP tool layer's `list_resources` "
                               "(qubit_runtime/tools/mcp_tool.py)"),
         "basis": ("upstream lists resources from an MCP app sandbox; Qubit's "
@@ -1132,7 +1132,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "mcp.app.readResource": {
         "status": "SAFE_EQUIVALENT",
         "code": "MCP_READ_RESOURCE_LOCAL_TOOL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/mcp_app.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/mcp_app.py",
         "qubit_counterpart": ("the MCP tool layer's `read_resource` "
                               "(qubit_runtime/tools/mcp_tool.py)"),
         "basis": ("upstream reads a resource through an MCP app sandbox; Qubit "
@@ -1142,7 +1142,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "mcp.app.listResourceTemplates": {
         "status": "OPERATOR_ONLY",
         "code": "MCP_RESOURCE_TEMPLATES_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/mcp_app.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/mcp_app.py",
         "operator_prerequisite": ("an MCP server/runtime that advertises "
                                   "resource templates"),
         "qubit_counterpart": ("the MCP tool layer's `list_resources` "
@@ -1151,7 +1151,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "mcp.app.updateModelContext": {
         "status": "OPERATOR_ONLY",
         "code": "MCP_APP_SANDBOX_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/mcp_app.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/mcp_app.py",
         "operator_prerequisite": ("an MCP App sandbox runtime + an active app "
                                   "view"),
         "qubit_counterpart": ("voicebridge.plugin_runtime.mcp_doctor "
@@ -1164,7 +1164,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     # naming the real counterpart.
     "board.update": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/board.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/board.py",
         "basis": ("applies tab_create/tab_update/tab_delete/tabs_reorder "
                   "through the canonical kanban tab primitives and returns the "
                   "real board snapshot; name-addressed widget ops fail closed "
@@ -1174,7 +1174,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "board.widget.grant": {
         "status": "SAFE_EQUIVALENT",
         "code": "BOARD_WIDGET_GRANT_LOCAL_ROLES",
-        "evidence": "voicebridge/gateway/openclaw_handlers/board.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/board.py",
         "qubit_counterpart": ("`qubit board role grant` (kanban.role_grant / "
                               "tab_role_grant)"),
         "basis": ("upstream decides a per-widget grant by name/revision/"
@@ -1185,7 +1185,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "board.event": {
         "status": "OPERATOR_ONLY",
         "code": "BOARD_EVENT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/board.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/board.py",
         "operator_prerequisite": ("a board widget sandbox runtime + signed "
                                   "view tickets"),
         "qubit_counterpart": "`qubit board log` (kanban board event log)",
@@ -1193,7 +1193,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "board.prompt.authorize": {
         "status": "OPERATOR_ONLY",
         "code": "BOARD_VIEW_TICKET_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/board.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/board.py",
         "operator_prerequisite": "a signed board view-ticket runtime",
         "qubit_counterpart": ("`qubit board roles` + the shared confirmation "
                               "journal"),
@@ -1201,7 +1201,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "board.action": {
         "status": "OPERATOR_ONLY",
         "code": "BOARD_ACTION_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/board.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/board.py",
         "operator_prerequisite": ("a board widget sandbox + capability "
                                   "authority runtime"),
         "qubit_counterpart": ("`qubit cron` (schedules) + the shared "
@@ -1210,7 +1210,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     # ---- surface-control family (2026-09-21) ----
     "controlUi.sessionPreview": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/surface_control.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/surface_control.py",
         "basis": ("real projection over the canonical chat-session store "
                   "(`QubitSessionStore.show`, the one SQLite state.db "
                   "authority the dashboard Sessions page also reads)"),
@@ -1218,7 +1218,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "controlUi.sessionPullRequests.subscribe": {
         "status": "SAFE_EQUIVALENT",
         "code": "CONTROLUI_SESSION_PR_SUBSCRIBE_LOCAL_REGISTRY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/surface_control.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/surface_control.py",
         "qubit_counterpart": ("voicebridge.session_subscriptions."
                               "SessionSubscriptionRegistry (shared with "
                               "sessions.subscribe)"),
@@ -1229,7 +1229,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     },
     "tools.invoke": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/surface_control.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/surface_control.py",
         "basis": ("executes through the canonical `CapabilityBroker` "
                   "(`build_host_broker().execute`) — the e-stop, policy, shared "
                   "confirmation journal, and audit path the CLI, dashboard, and "
@@ -1239,21 +1239,21 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "assistant.media.get": {
         "status": "SAFE_EQUIVALENT",
         "code": "MEDIA_NOT_SERVED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "CLI `qubit files read` + Qubit Chat attachment vision",
         "basis": "Qubit serves no binary media data URLs by policy; the real counterpart is the bounded redacted text file read and in-browser attachment rendering (same typed MEDIA_NOT_SERVED code as the /api/media route)",
     },
     "chat.toolTitles": {
         "status": "SAFE_EQUIVALENT",
         "code": "TOOL_TITLES_AGENT_PROVIDED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.qubit_session_store (agent-provided tool activity)",
         "basis": "utility-model tool titles are retired upstream (the pinned handler returns titles:{} disabled:true); Qubit likewise generates none and reports the canonical session's real agent-provided tool activity",
     },
     "controlUi.githubPreview": {
         "status": "OPERATOR_ONLY",
         "code": "FORGE_API_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "operator_prerequisite": "a configured forge credential (e.g. a GitHub/GitLab token) and a network-reachable forge API",
         "qubit_counterpart": "local change review: CLI `qubit git status|log|diff|show` and the dashboard git review surface",
         "basis": "no remote GitHub preview is fetched; Qubit runs no forge service and stores no forge token by default, so the typed code is returned",
@@ -1261,7 +1261,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "cron.scratch.get": {
         "status": "OPERATOR_ONLY",
         "code": "CRON_SCRATCH_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "an upstream per-job cron scratch store (cron_job_scratch); Qubit runs none",
         "qubit_counterpart": "voicebridge.schedules job fields + memory workspace notes (`qubit memory note`)",
         "basis": "Qubit's schedule store has no private per-job scratch column and no scratch store exists, so nothing is read",
@@ -1269,7 +1269,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "cron.scratch.set": {
         "status": "OPERATOR_ONLY",
         "code": "CRON_SCRATCH_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "an upstream per-job cron scratch store (cron_job_scratch); Qubit runs none",
         "qubit_counterpart": "voicebridge.schedules job fields + memory workspace notes (`qubit memory note`)",
         "basis": "Qubit's schedule store has no private per-job scratch column and no scratch store exists, so nothing is written",
@@ -1277,21 +1277,21 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "cron.update": {
         "status": "SAFE_EQUIVALENT",
         "code": "CRON_UPDATE_LOCAL_PAUSE_RESUME",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.schedules.set_paused / delete_job (`qubit cron pause|resume|rm`)",
         "basis": "upstream patches arbitrary cron job fields; Qubit's canonical schedule store updates only the enabled flag, so the real pause/resume mutation is applied for an `enabled` patch and other fields are refused with the own code, never fabricated",
     },
     "doctor.memory.resetGroundedShortTerm": {
         "status": "SAFE_EQUIVALENT",
         "code": "MEMORY_GROUNDED_SHORTTERM_LOCAL_RESET",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.memory.workspace.forget_note + list_notes/providers",
         "basis": "Qubit's canonical memory workspace is markdown-note based and has no grounded-short-term candidate artifact; the handler reads the real note inventory or forgets a named note through the canonical workspace",
     },
     "gateway.suspend.handoff": {
         "status": "OPERATOR_ONLY",
         "code": "SUSPEND_HANDOFF_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "a service manager that owns process exit (systemd/launchd external restart owner)",
         "qubit_counterpart": "operator `systemctl --user restart <qubit unit>` + the operator runbook",
         "basis": "upstream arms a host-lifecycle handoff that exits the gateway process; Qubit never exits its own process from a gateway call",
@@ -1299,21 +1299,21 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "gateway.suspend.prepare": {
         "status": "SAFE_EQUIVALENT",
         "code": "SUSPEND_PREPARE_LOCAL_POWER",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.power.PowerControl.status (`qubit power status`)",
         "basis": "upstream drains in-flight work and pauses the scheduler for a cooperative process suspension; Qubit reports the real local power/e-stop state and never drains or suspends its process",
     },
     "gateway.suspend.resume": {
         "status": "SAFE_EQUIVALENT",
         "code": "SUSPEND_RESUME_LOCAL_POWER",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.power.PowerControl.reset / global_enable (`qubit power reset` / `qubit power enable`)",
         "basis": "upstream releases a prepared suspension; Qubit has no suspension to release, so it reports the real local power/e-stop state and fabricates no resume",
     },
     "mentions.dismiss": {
         "status": "OPERATOR_ONLY",
         "code": "MENTIONS_INBOX_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "a human-mention inbox service backed by configured message channels",
         "qubit_counterpart": "voicebridge.automation outbox/orders (`qubit channels`)",
         "basis": "Qubit runs no human-mention inbox service, so no mention is dismissed",
@@ -1321,7 +1321,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "mentions.list": {
         "status": "OPERATOR_ONLY",
         "code": "MENTIONS_INBOX_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "a human-mention inbox service backed by configured message channels",
         "qubit_counterpart": "voicebridge.automation outbox/orders (`qubit channels`)",
         "basis": "Qubit runs no human-mention inbox service, so no mention is listed",
@@ -1329,14 +1329,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "models.authOrderSet": {
         "status": "SAFE_EQUIVALENT",
         "code": "AUTH_ORDER_LOCAL_PROFILE_PRIORITY",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.model_profiles_ops.select_session_model + list_model_profiles",
         "basis": "Qubit has no multi-credential auth store to reorder; provider selection is by canonical model profile (select_session_model) with its role/fallback chain, so the handler reports the real local profile ordering",
     },
     "nativeHook.invoke": {
         "status": "OPERATOR_ONLY",
         "code": "NATIVE_HOOK_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "operator_prerequisite": "a live native harness process exposing a registered hook relay (provider/relayId/generation)",
         "qubit_counterpart": "voicebridge.hooks (canonical hook declarations) + voicebridge.node_host",
         "basis": "relay invocation is a one-shot bridge into a live native harness; Qubit runs no native harness relay, so no hook is invoked",
@@ -1344,7 +1344,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.event": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1352,7 +1352,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.invoke.progress": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1360,7 +1360,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.invoke.result": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1368,7 +1368,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.pending.ack": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1376,7 +1376,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.pending.drain": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1384,7 +1384,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.pending.enqueue": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1392,7 +1392,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.pending.pull": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1400,7 +1400,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.pluginTools.update": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1408,14 +1408,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.rename": {
         "status": "SAFE_EQUIVALENT",
         "code": "NODE_RENAME_LOCAL_REENROLL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "qubit_counterpart": "voicebridge.node_host.revoke + voicebridge.node_host.enroll",
         "basis": "upstream renames a paired node label in place; Qubit's node host records a label only at enroll time and has no in-place rename primitive, so this confirmation-gated handler revokes and re-enrolls the same endpoint/capabilities under the new label (a new node id)",
     },
     "node.runnerInventory.update": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1423,7 +1423,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "node.skills.update": {
         "status": "OPERATOR_ONLY",
         "code": "NODE_DEVICE_RELAY_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "a paired node device/agent host running the native-harness relay (not part of the single local Qubit authority)",
         "qubit_counterpart": "voicebridge.node_host (enroll/revoke/show/dispatch) + `qubit node ...`",
         "basis": "upstream carries this through a connected paired node agent relay (queue/invoke-result/event/catalog publication); Qubit's canonical device host is enroll/revoke/show/dispatch only and runs no relay, so the typed code is returned and nothing is fabricated",
@@ -1431,21 +1431,21 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "plugins.sessionAction": {
         "status": "SAFE_EQUIVALENT",
         "code": "PLUGIN_SESSION_ACTION_LOCAL_INVOKE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.plugin_runtime.invoke (in-process plugin handler host; e-stop + shared confirmation journal)",
         "basis": "upstream invokes a plugin-declared session action through a session-extension registry; Qubit invokes the real in-process plugin handler through the canonical plugin runtime, a different contract, and emits its own code",
     },
     "plugins.uiDescriptors": {
         "status": "SAFE_EQUIVALENT",
         "code": "PLUGIN_UI_DESCRIPTORS_LOCAL_SURFACE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.qubit_plugins.dashboard_surface + voicebridge.plugin_runtime.list_plugins",
         "basis": "upstream reads a plugin-declared Control-UI descriptor registry; Qubit exposes the canonical plugin dashboard-surface registry instead and emits its own code",
     },
     "portal.close": {
         "status": "OPERATOR_ONLY",
         "code": "PORTAL_SERVICE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "a browser/portal hosting service (the upstream portal HTTP proxy listening on a local port)",
         "qubit_counterpart": "the canonical website-integration store (voicebridge.websites) + the operator's own browser",
         "basis": "Qubit runs no local-port portal HTTP-proxy service, so no portal proxy is closed",
@@ -1453,7 +1453,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "portal.list": {
         "status": "OPERATOR_ONLY",
         "code": "PORTAL_SERVICE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "a browser/portal hosting service (the upstream portal HTTP proxy listening on a local port)",
         "qubit_counterpart": "the canonical website-integration store (voicebridge.websites) + the operator's own browser",
         "basis": "Qubit runs no local-port portal HTTP-proxy service, so no portal is listed",
@@ -1461,7 +1461,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "portal.open": {
         "status": "OPERATOR_ONLY",
         "code": "PORTAL_SERVICE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "a browser/portal hosting service (the upstream portal HTTP proxy listening on a local port)",
         "qubit_counterpart": "the canonical website-integration store (voicebridge.websites) + the operator's own browser",
         "basis": "Qubit runs no local-port portal HTTP-proxy service, so no portal proxy is opened",
@@ -1469,49 +1469,49 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "progressCard.put": {
         "status": "SAFE_EQUIVALENT",
         "code": "PROGRESS_CARD_PUT_LOCAL_PROJECTION",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.session_activity.build_projection",
         "basis": "upstream writes a mutable progress card store; Qubit keeps no writable card store and builds the real read-only session activity projection instead",
     },
     "skills.bins": {
         "basis": "upstream collects skill executables from agent workspaces for node auto-allow; Qubit skills are read-only instructional/advisory material that ship no executables, so the handler returns the real bundled skill registry with an empty bins list",
         "code": "SKILLS_BINS_LOCAL_BUNDLED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills._bundled.bundled_skill_manifests (bundled skill registry)",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.curator.pin": {
         "basis": "upstream retired curator pin to a stub that always errors; Qubit keeps the real owner-gated pin on the verified-skill store",
         "code": "SKILLS_CURATOR_PIN_LOCAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.VerifiedSkillStore.pin",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.curator.restore": {
         "basis": "upstream retired curator restore to a stub that always errors; Qubit restores the real digest-verified, human-only Skill Workshop collection snapshot",
         "code": "SKILLS_CURATOR_RESTORE_LOCAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.workshop.SkillWorkshop.restore/rollback",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.curator.unpin": {
         "basis": "upstream retired curator unpin to a stub that always errors; Qubit keeps the real owner-gated unpin on the verified-skill store",
         "code": "SKILLS_CURATOR_UNPIN_LOCAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.VerifiedSkillStore.unpin",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.apply": {
         "basis": "upstream applies a pending proposal into the workspace; Qubit promotes the real quarantined verified-skill record through the owner-gated verdict",
         "code": "SKILLS_PROPOSALS_APPLY_LOCAL_VERDICT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.VerifiedSkillStore.apply_verdict(decision='verified')",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.evaluate": {
         "basis": "upstream runs an isolated model to evaluate a proposal; Qubit deliberately has no automated evaluator and verifies only by explicit human owner verdict",
         "code": "SKILLS_PROPOSALS_EVALUATE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "operator_prerequisite": "an isolated proposal-evaluation model runtime (Qubit has no self-evaluation path)",
         "qubit_counterpart": "voicebridge.verified_skills.VerifiedSkillStore.apply_verdict (human owner verdict) + voicebridge.evaluation promotion gate",
         "status": "OPERATOR_ONLY",
@@ -1519,14 +1519,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "skills.proposals.events.list": {
         "basis": "upstream lists per-proposal events from its proposal store; Qubit reads the real append-only verified-skill hash-chain journal",
         "code": "SKILLS_PROPOSALS_EVENTS_LOCAL_JOURNAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.state_journal.HashChainJournal (the verified-skill append-only journal)",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.historyScan": {
         "basis": "upstream scans session history to emit pending proposals; Qubit runs no session-history scanner",
         "code": "SKILLS_PROPOSALS_HISTORYSCAN_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "operator_prerequisite": "a session-history scan runtime (isolated model over the transcript) that emits pending proposals",
         "qubit_counterpart": "voicebridge.verified_skills.workshop.SkillWorkshop.author (authored/quarantined proposals)",
         "status": "OPERATOR_ONLY",
@@ -1534,42 +1534,42 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "skills.proposals.quarantine": {
         "basis": "upstream quarantines a proposal; Qubit performs the real verified-skill quarantine transition on the one store",
         "code": "SKILLS_PROPOSALS_QUARANTINE_LOCAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.VerifiedSkillStore.quarantine_revoked",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.reject": {
         "basis": "upstream rejects a pending proposal; Qubit performs the real owner-gated refutation on the one verified-skill store",
         "code": "SKILLS_PROPOSALS_REJECT_LOCAL_VERDICT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.VerifiedSkillStore.apply_verdict(decision='refuted')",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.requestRevision": {
         "basis": "upstream forwards free-text revision instructions to the owning agent chat session (chat.send followup); Qubit records them on the one canonical session authority",
         "code": "SKILLS_PROPOSALS_REQUESTREVISION_LOCAL_SESSION",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.qubit_session_store.QubitSessionStore.append (next turn consumes the instruction)",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.revise": {
         "basis": "upstream rewrites PROPOSAL.md in place; Qubit stages the real reviewed skill revision on the one durable confirmation journal",
         "code": "SKILLS_PROPOSALS_REVISE_LOCAL_STAGE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.mutations.handle_skill_mutation (stages a reviewed revision on the shared confirmation journal)",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.proposals.update": {
         "basis": "upstream proposes an update to an existing skill; Qubit stages the real updated reviewed manifest on the one durable confirmation journal",
         "code": "SKILLS_PROPOSALS_UPDATE_LOCAL_STAGE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.verified_skills.mutations.handle_skill_mutation (stages an updated reviewed manifest on the shared confirmation journal)",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.securityVerdicts": {
         "basis": "upstream fetches remote ClawHub skill security verdicts; Qubit runs no verdict service and fetches no remote verdicts",
         "code": "SKILLS_SECURITY_VERDICTS_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "operator_prerequisite": "a reachable skill security-verdict registry/endpoint and network access",
         "qubit_counterpart": "local bundled/verified skill validation (voicebridge.verified_skills._bundled + VerifiedSkillStore)",
         "status": "OPERATOR_ONLY",
@@ -1577,14 +1577,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "skills.update": {
         "basis": "upstream updates a skill config entry (enabled/key/env); Qubit mutates the real canonical permissioned skill record and refuses raw key/env values",
         "code": "SKILLS_UPDATE_LOCAL_CONFIG",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "qubit_counterpart": "voicebridge.permissions.PermissionsStore.enable_skill/disable_skill",
         "status": "SAFE_EQUIVALENT",
     },
     "skills.upload.begin": {
         "basis": "upstream begins a staged chunked skill-archive upload; Qubit runs no upload store and installs only reviewed local manifests",
         "code": "SKILLS_UPLOAD_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "operator_prerequisite": "a staged chunked upload store/transport for skill archives",
         "qubit_counterpart": "voicebridge.verified_skills.mutations (single-shot reviewed manifest) + verified_skills._transfer snapshot restore",
         "status": "OPERATOR_ONLY",
@@ -1592,7 +1592,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "skills.upload.chunk": {
         "basis": "upstream stores an uploaded archive chunk; Qubit runs no chunked upload store",
         "code": "SKILLS_UPLOAD_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "operator_prerequisite": "a staged chunked upload store/transport for skill archives",
         "qubit_counterpart": "voicebridge.verified_skills.mutations (single-shot reviewed manifest) + verified_skills._transfer snapshot restore",
         "status": "OPERATOR_ONLY",
@@ -1600,7 +1600,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "skills.upload.commit": {
         "basis": "upstream commits an uploaded skill archive for install; Qubit runs no upload store and downloads nothing",
         "code": "SKILLS_UPLOAD_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/skills_extra.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/skills_extra.py",
         "operator_prerequisite": "a staged chunked upload store/transport for skill archives",
         "qubit_counterpart": "voicebridge.verified_skills.mutations (single-shot reviewed manifest) + verified_skills._transfer snapshot restore",
         "status": "OPERATOR_ONLY",
@@ -1608,7 +1608,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.client.close": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a client-owned realtime provider session needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1616,7 +1616,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.client.create": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a client-owned realtime provider session (webrtc/provider-websocket) needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1624,35 +1624,35 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.client.steer": {
         "status": "SAFE_EQUIVALENT",
         "code": "TALK_CLIENT_STEER_LOCAL_TRANSCRIPT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream delivers session-scoped active-run voice control into the running provider turn; Qubit has no mid-turn steering channel (the realtime lane was removed), so the spoken control is appended to the canonical chat session for the next turn",
     },
     "talk.client.toolCall": {
         "status": "SAFE_EQUIVALENT",
         "code": "TALK_CLIENT_TOOLCALL_LOCAL_BROKER",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "qubit_counterpart": "voicebridge.broker.CapabilityBroker.execute (e-stop + policy + shared confirmation journal + audit)",
         "basis": "upstream forwards a client-owned realtime provider tool call through gateway policy (first tool is the agent consult); Qubit has no client-owned provider transport, so the call runs through the canonical CapabilityBroker and a mutating capability without a real confirmation is denied, never fabricated",
     },
     "talk.client.transcript": {
         "status": "SAFE_EQUIVALENT",
         "code": "TALK_CLIENT_TRANSCRIPT_LOCAL_STORE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "qubit_counterpart": "voicebridge.qubit_session_store.QubitSessionStore.append",
         "basis": "upstream appends a client-reported finalized {role,text} item with a per-voiceSession idempotent entryId; Qubit appends to the one canonical chat-session store and has no per-voiceSession entry-id dedupe",
     },
     "talk.mode": {
         "status": "SAFE_EQUIVALENT",
         "code": "TALK_MODE_LOCAL_SPEECH_PROFILE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "qubit_counterpart": "voicebridge.providers.speech.resolve_speech_dict/list_speech_profiles + the /qubit-chat voice path",
         "basis": "upstream sets and broadcasts a Gateway Talk-mode state to WebChat/Control UI clients; Qubit keeps no Talk mode store and has no server-push lane, so the handler reports the real resolved local speech/voice profile and its own code",
     },
     "talk.session.acknowledgeMark": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a live realtime provider transport needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1660,7 +1660,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.session.appendAudio": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a gateway-owned realtime relay or transcription session needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1668,7 +1668,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.session.cancelOutput": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a gateway-owned realtime relay session needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1676,7 +1676,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.session.close": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a gateway-owned realtime/relay/transcription Talk session needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1684,7 +1684,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.session.create": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a gateway-owned realtime/relay/transcription Talk session needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1692,7 +1692,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.session.steer": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a gateway-owned agent-backed realtime Talk session needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1700,7 +1700,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "talk.session.submitToolResult": {
         "status": "OPERATOR_ONLY",
         "code": "TALK_REALTIME_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/talk_node.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/talk_node.py",
         "operator_prerequisite": "an OpenAI Realtime (or equivalent) provider transport, which Qubit does not run",
         "qubit_counterpart": "voicebridge.chat_transport.stream_turn/turn over the QubitSessionStore, plus the /qubit-chat voice path (voicebridge/orchestrator.py)",
         "basis": "upstream a gateway-owned realtime relay provider bridge needs a live provider realtime/duplex transport; Qubit removed the realtime lane (the profile is resolved read-only and no adapter is started), so the typed code is returned and nothing is fabricated",
@@ -1708,7 +1708,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "taskSuggestions.accept": {
         "status": "OPERATOR_ONLY",
         "code": "TASK_SUGGESTIONS_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "an upstream model-proposed task-suggestion registry + run-control runtime; Qubit runs none",
         "qubit_counterpart": "durable scheduled work via voicebridge.schedules.create_job (`qubit cron add`) + the canonical chat session",
         "basis": "Qubit keeps no ephemeral task-suggestion registry, so no suggestion is accepted or dispatched",
@@ -1716,7 +1716,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "taskSuggestions.create": {
         "status": "OPERATOR_ONLY",
         "code": "TASK_SUGGESTIONS_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "an upstream model-proposed task-suggestion registry + run-control runtime; Qubit runs none",
         "qubit_counterpart": "durable scheduled work via voicebridge.schedules.create_job (`qubit cron add`) + the canonical chat session",
         "basis": "Qubit keeps no ephemeral task-suggestion registry, so no suggestion is created",
@@ -1724,7 +1724,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "taskSuggestions.dismiss": {
         "status": "OPERATOR_ONLY",
         "code": "TASK_SUGGESTIONS_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "an upstream model-proposed task-suggestion registry + run-control runtime; Qubit runs none",
         "qubit_counterpart": "durable scheduled work via voicebridge.schedules.create_job (`qubit cron add`) + the canonical chat session",
         "basis": "Qubit keeps no ephemeral task-suggestion registry, so no suggestion is dismissed",
@@ -1732,14 +1732,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "tasks.cancel": {
         "status": "SAFE_EQUIVALENT",
         "code": "TASKS_CANCEL_LOCAL_RECEIPT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.actions.ActionStore.cancel / voicebridge.chat_transport.cancel",
         "basis": "upstream cancels a detached task run by taskId; Qubit's task ledger is read-only and maps no taskId to a live run, so cancel delegates to the real action-receipt or in-flight chat-turn cancellation and emits its own code otherwise",
     },
     "tasks.dismiss": {
         "status": "OPERATOR_ONLY",
         "code": "TASKS_DISMISS_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "operator_prerequisite": "an upstream detached-task/subagent completion-delivery registry; Qubit keeps none",
         "qubit_counterpart": "the canonical read-only task ledger (`qubit tasks`)",
         "basis": "Qubit keeps no detached-task completion-delivery registry, so nothing is dismissed",
@@ -1747,47 +1747,47 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "tasks.retry": {
         "status": "SAFE_EQUIVALENT",
         "code": "TASKS_RETRY_LOCAL_RECEIPT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.actions.ActionStore.retry / voicebridge.chat_transport.retry_last",
         "basis": "upstream retries a detached task's completion delivery; Qubit's ledger stores no retry arguments, so retry delegates to the real action-receipt retry (exact args) or last-turn retry and emits its own code otherwise",
     },
     "tts.disable": {
         "status": "SAFE_EQUIVALENT",
         "code": "TTS_DISABLE_LOCAL_PROFILE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.providers.speech speech-out profile `enabled` + set_session_speech_profile",
         "basis": "upstream flips a global TTS auto-mode preference; Qubit has no global TTS enabled flag (the shipped default profile is immutable), so it surfaces the real per-speech-out-profile enabled state and never fabricates a global toggle",
     },
     "tts.enable": {
         "status": "SAFE_EQUIVALENT",
         "code": "TTS_ENABLE_LOCAL_PROFILE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.providers.speech speech-out profile `enabled` + set_session_speech_profile",
         "basis": "upstream flips a global TTS auto-mode preference; Qubit has no global TTS enabled flag (the shipped default profile is immutable), so it surfaces the real per-speech-out-profile enabled state and never fabricates a global toggle",
     },
     "tts.setPersona": {
         "status": "SAFE_EQUIVALENT",
         "code": "TTS_PERSONA_LOCAL_PROFILE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "qubit_counterpart": "voicebridge.providers.speech.set_session_speech_profile",
         "basis": "upstream selects a TTS persona bundle (provider + fallback + per-provider settings); Qubit keeps no persona-bundle store, so this selects a real persisted speech-out profile for a session and emits its own code",
     },
     "tts.setProvider": {
         "status": "IMPLEMENTED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/scheduler_media.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/scheduler_media.py",
         "basis": "persists tts.provider through the canonical confirm-gated settings write (voicebridge.qubit_compat.config_save), the exact setting voicebridge/orchestrator._make_tts reads to build the TTS adapter; an unknown provider is a typed GATEWAY_BAD_PARAMS refusal",
     },
     "ui.command": {
         "status": "SAFE_EQUIVALENT",
         "code": "UI_COMMAND_LOCAL_PANELS",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.gateway.panels.control_panels + panel_layout",
         "basis": "upstream broadcasts a UI command to Control-UI clients; Qubit has no client-push lane and reads the canonical control-panel state applied through the dashboard",
     },
     "users.authConnect.answer": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_AUTH_CONNECT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a live external provider OAuth/connect service and network access",
         "qubit_counterpart": "CLI `qubit auth login --provider <name>` (manual handoff)",
         "basis": "no external auth-connect session exists to answer; the typed code is returned",
@@ -1795,7 +1795,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.authConnect.cancel": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_AUTH_CONNECT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a live external provider OAuth/connect service and network access",
         "qubit_counterpart": "CLI `qubit auth login --provider <name>` (manual handoff)",
         "basis": "no external auth-connect session exists to cancel; the typed code is returned",
@@ -1803,14 +1803,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.authConnect.catalog": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_AUTH_CONNECT_CATALOG_LOCAL_PROVIDERS",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.providers.policy.FrontierPolicy configured providers + `qubit auth login`",
         "basis": "upstream catalogs external auth-connect providers/methods; Qubit returns its real configured provider registry and manual-handoff portals and emits its own code",
     },
     "users.authConnect.start": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_AUTH_CONNECT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a live external provider OAuth/connect service and network access",
         "qubit_counterpart": "CLI `qubit auth login --provider <name>` (manual handoff; Qubit never performs the OAuth dance)",
         "basis": "starting an external provider auth-connect session needs a live OAuth service Qubit does not run; the typed code is returned",
@@ -1818,7 +1818,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.authConnect.status": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_AUTH_CONNECT_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a live external provider OAuth/connect service and network access",
         "qubit_counterpart": "CLI `qubit auth login --provider <name>` (manual handoff)",
         "basis": "no external auth-connect session exists to report; the typed code is returned",
@@ -1826,7 +1826,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.github.authorize.cancel": {
         "status": "OPERATOR_ONLY",
         "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a started GitHub device-flow authorization (requires the live OAuth app)",
         "qubit_counterpart": "nothing to cancel locally; remove the credential reference with the operator's own tooling",
         "basis": "no GitHub device-flow authorization exists to cancel; the typed code is returned",
@@ -1834,7 +1834,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.github.authorize.poll": {
         "status": "OPERATOR_ONLY",
         "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a started GitHub device-flow authorization (requires the live OAuth app)",
         "qubit_counterpart": "CLI `qubit auth verify --provider github` (reference presence only)",
         "basis": "Qubit polls no external OAuth service and has no device-flow session in flight; the typed code is returned",
@@ -1842,7 +1842,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.github.authorize.start": {
         "status": "OPERATOR_ONLY",
         "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a live GitHub OAuth app/device-flow service and network access",
         "qubit_counterpart": "CLI `qubit auth login --provider github` (manual handoff in the operator's browser)",
         "basis": "the GitHub device-flow authorization needs a live github.com OAuth app Qubit does not run; no device flow is started and the typed code is returned",
@@ -1850,7 +1850,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.github.disconnect": {
         "status": "OPERATOR_ONLY",
         "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a linked GitHub account (requires the live OAuth app)",
         "qubit_counterpart": "voicebridge.credentials.remove (confirm-gated) removes the credential reference",
         "basis": "Qubit holds no personal GitHub connection to disconnect; the typed code is returned",
@@ -1858,7 +1858,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.github.status": {
         "status": "OPERATOR_ONLY",
         "code": "GITHUB_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a GitHub credential reference (env:/file:) with the required scopes and network access",
         "qubit_counterpart": "CLI `qubit auth status` + an operator-managed credential reference",
         "basis": "Qubit stores credential references only and runs no GitHub OAuth/app service, so no personal GitHub status is fetched; the typed code is returned",
@@ -1866,14 +1866,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.linkAuthProfile": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_LINK_AUTH_PROFILE_LOCAL_CREDENTIAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.credentials.add_reference (confirm-gated; references only)",
         "basis": "upstream links a shared credential to a user profile; Qubit is single-operator, so it performs the real confirm-gated credential-pool add from an env:/file: reference and emits its own code",
     },
     "users.linkEmail": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_EMAIL_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "an email/identity verification service",
         "qubit_counterpart": "voicebridge.qubit_compat.h_auth_me (loopback identity; email empty)",
         "basis": "Qubit has no email identity service and stores no operator email; the typed code is returned",
@@ -1881,63 +1881,63 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.list": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_LIST_LOCAL_SINGLE_OPERATOR",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.qubit_compat.h_auth_me (single loopback operator)",
         "basis": "upstream lists a multi-user profile directory; Qubit is single-operator with no profile store, so it returns the one real loopback operator identity and emits its own code",
     },
     "users.listAuthLinks": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_AUTH_LINKS_LOCAL_CREDENTIALS",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.auth_status.auth_status (credential references, names only)",
         "basis": "upstream lists per-user linked auth profiles; Qubit is single-operator with no per-user links, so it returns the canonical credential-reference inventory and emits its own code",
     },
     "users.listModelAccounts": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_MODEL_ACCOUNTS_LOCAL_PROFILES",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.model_profiles_ops.list_model_profiles",
         "basis": "upstream lists per-user model accounts; Qubit returns its canonical single-operator model-profile registry and emits its own code",
     },
     "users.mentionable": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_MENTIONABLE_LOCAL_OPERATOR",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.qubit_compat.h_auth_me (the one mentionable operator)",
         "basis": "upstream exposes a multi-user mention directory; Qubit has one operator, so the mentionable set is that real identity and the handler emits its own code",
     },
     "users.prefs.get": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_PREFS_LOCAL_DASHBOARD",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.qubit_compat dashboard prefs (font/theme handlers)",
         "basis": "upstream reads arbitrary per-profile key/values; Qubit returns the real persisted dashboard preferences (font/theme) and emits its own code",
     },
     "users.prefs.set": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_PREFS_LOCAL_DASHBOARD",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.qubit_compat h_font(setter) + h_theme_set",
         "basis": "upstream writes arbitrary per-profile key/values; Qubit persists only its real supported dashboard preferences (font/theme) and emits its own code",
     },
     "users.selectModelAccount": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_MODEL_ACCOUNT_LOCAL_SELECT",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.model_profiles_ops.select_session_model (confirm-gated)",
         "basis": "upstream selects a per-user model account; Qubit performs the real confirm-gated session->profile selection in its canonical registry and emits its own code",
     },
     "users.self": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_SELF_LOCAL_OPERATOR",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.qubit_compat.h_auth_me (loopback session identity)",
         "basis": "upstream resolves the authenticated multi-user profile; Qubit returns its one real loopback operator identity instead and emits its own code",
     },
     "users.setAvatar": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_AVATAR_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "an operator-managed avatar/media store and hosting",
         "qubit_counterpart": "voicebridge.device.profile (local device identity; no avatar field)",
         "basis": "Qubit keeps no operator avatar/media store and hosts no avatar media, so no avatar is written; the typed code is returned",
@@ -1945,7 +1945,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.setDisplayName": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_PROFILE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a multi-user profile store (Qubit is single-operator)",
         "qubit_counterpart": "voicebridge.qubit_compat.h_auth_me (fixed operator display name)",
         "basis": "Qubit is single-operator with no mutable multi-user profile store, so no display name is written; the typed code is returned",
@@ -1953,7 +1953,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.setRole": {
         "status": "OPERATOR_ONLY",
         "code": "USERS_PROFILE_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "operator_prerequisite": "a multi-user profile/role store (Qubit is single-operator)",
         "qubit_counterpart": "the fixed operator scopes advertised by the gateway `connect` handshake",
         "basis": "Qubit has no multi-user role store and fixed operator scopes, so no role is assigned; the typed code is returned",
@@ -1961,14 +1961,14 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "users.unlinkAuthProfile": {
         "status": "SAFE_EQUIVALENT",
         "code": "USERS_UNLINK_AUTH_PROFILE_LOCAL_CREDENTIAL",
-        "evidence": "voicebridge/gateway/openclaw_handlers/users.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/users.py",
         "qubit_counterpart": "voicebridge.credentials.remove (confirm-gated; references only)",
         "basis": "upstream unlinks a credential from a user profile; Qubit performs the real confirm-gated credential-pool removal and emits its own code",
     },
     "voicewake.routing.get": {
         "status": "OPERATOR_ONLY",
         "code": "WAKE_ROUTING_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "operator_prerequisite": "a configurable wake-trigger/routing store",
         "qubit_counterpart": "voicewake.get + voicebridge.wake.status (single shared audio listener)",
         "basis": "Qubit has no voice-wake routing configuration; wake detection routes through the one audio listener, so no routing config exists to read",
@@ -1976,7 +1976,7 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "voicewake.set": {
         "status": "OPERATOR_ONLY",
         "code": "WAKE_TRIGGERS_OPERATOR_REQUIRED",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "operator_prerequisite": "a configurable wake-trigger store (writable keywords/model bundle)",
         "qubit_counterpart": "voicewake.get + voicebridge.wake.status (single shared audio listener)",
         "basis": "Qubit has no writable wake-trigger store; wake phrases come from the operator-fetched sherpa-onnx keyword bundle, so no triggers are persisted",
@@ -1984,21 +1984,21 @@ PINNED_SURFACE_DISPOSITIONS: Dict[str, Dict[str, Any]] = {
     "wake": {
         "status": "SAFE_EQUIVALENT",
         "code": "WAKE_LOCAL_AUTOMATION",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.automation.queue_event + heartbeat_due (automation tick)",
         "basis": "upstream wakes the agent immediately or at the next heartbeat; Qubit queues a real internal automation event for the canonical tick (confirmation-gated) instead of a separate wake channel",
     },
     "wizard.cancel": {
         "status": "SAFE_EQUIVALENT",
         "code": "WIZARD_CANCEL_LOCAL_QUESTION_STORE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.question_prompt + voicebridge.lifecycle.audio_wizard",
         "basis": "Qubit has no step-wizard session registry to cancel; a pending prompt is settled through question.resolve and the audio wizard is a stateless readiness report, so the handler reports the real local state",
     },
     "wizard.next": {
         "status": "SAFE_EQUIVALENT",
         "code": "WIZARD_NEXT_LOCAL_QUESTION_STORE",
-        "evidence": "voicebridge/gateway/openclaw_handlers/misc_surface.py",
+        "evidence": "voicebridge/gateway/qubit_handlers/misc_surface.py",
         "qubit_counterpart": "voicebridge.question_prompt.answer + question_prompt.pending",
         "basis": "Qubit has no step-wizard session registry; the real counterpart is the canonical question-prompt store, which advances by answering a pending prompt and then reports the remaining pending prompts",
     },

@@ -208,7 +208,7 @@ async def _send(method: str, path: str, query: Dict[str, str],
                 headers: Dict[str, str], body: bytes):
     hdrs = dict(headers or {})
     if _token:
-        hdrs.setdefault("X-Hermes-Session-Token", _token)
+        hdrs.setdefault("X-Qubit-Session-Token", _token)
     req = _client.build_request(method, path, params=query or None,
                                 headers=hdrs or None, content=body)
     # Stage 2b: the fork may not make unrestricted outbound provider calls

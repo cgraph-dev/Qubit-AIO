@@ -1,6 +1,6 @@
 """9U — OpenClaw contractual-pin ``sessions`` family handlers are real.
 
-The family module ``voicebridge/gateway/openclaw_handlers/sessions.py`` composes
+The family module ``voicebridge/gateway/qubit_handlers/sessions.py`` composes
 into the single canonical gateway RPC registry. These tests invoke the handlers
 in-process against a temp Qubit config and assert real backend behavior/state:
 

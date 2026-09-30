@@ -63,7 +63,7 @@ def test_every_surface_reads_through_list_servers(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
     from voicebridge import runtime_inventory as RIN
     from voicebridge import voice_commands as VC
-    from voicebridge.gateway.openclaw_handlers import mcp_app
+    from voicebridge.gateway.qubit_handlers import mcp_app
 
     cfg = _cfg(tmp_path, monkeypatch)
     _seed(cfg)

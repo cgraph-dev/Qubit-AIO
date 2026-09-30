@@ -54,7 +54,7 @@ def _start_webui(tmp_path):
 def _http(port, method, path):
     req = urllib.request.Request(
         "http://127.0.0.1:%d%s" % (port, path), method=method)
-    req.add_header("X-Hermes-Session-Token", "test-token")
+    req.add_header("X-Qubit-Session-Token", "test-token")
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read() or b"{}")

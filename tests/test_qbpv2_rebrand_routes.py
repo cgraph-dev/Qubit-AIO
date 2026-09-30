@@ -147,7 +147,7 @@ def test_no_qubit_route_exists(server, path):
 def test_agent_prefix_reaches_compat_backend(server):
     status, loc, ctype, body = _raw(
         server, "/agent/api/status",
-        headers={"X-Hermes-Session-Token": "test-token"})
+        headers={"X-Qubit-Session-Token": "test-token"})
     assert status == 200, (status, body[:200])
     assert "application/json" in ctype, ctype
     out = json.loads(body)
@@ -190,7 +190,7 @@ def test_native_api_status_unchanged(server):
 def test_agent_chat_route_reaches_compat_backend(server):
     status, _, ctype, body = _raw(
         server, "/agent/api/qubit/chat/sessions",
-        headers={"X-Hermes-Session-Token": "test-token"})
+        headers={"X-Qubit-Session-Token": "test-token"})
     assert status == 200, (status, body[:200])
     assert "application/json" in ctype, ctype
     assert "sessions" in json.loads(body)

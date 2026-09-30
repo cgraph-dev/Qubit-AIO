@@ -201,7 +201,7 @@ def test_achievements_tab_is_qubit_branded_and_calls_real_backend():
     assert "/api/plugins/qubit-achievements" in text
     assert "Qubit Achievements" in text
     assert "tx(" in text, "achievements must resolve host translations"
-    clean = text.replace("X-Hermes-Session-Token", "")
+    clean = text.replace("X-Qubit-Session-Token", "")
     assert not _PRODUCT_NAME.search(clean), "achievements exposes upstream name"
 
 

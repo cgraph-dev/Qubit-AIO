@@ -127,7 +127,7 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
 
     try {
       const response = await fetch(`${url}/api/status`, {
-        headers: { 'X-Hermes-Session-Token': REMOTE_TOKEN },
+        headers: { 'X-Qubit-Session-Token': REMOTE_TOKEN },
       })
 
       if (response.ok) {

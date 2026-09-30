@@ -189,6 +189,25 @@ def reset_qubit_home_key_cache() -> None:
     _HOME_KEY_CACHE.clear()
 
 
+def normalize_scope(scope: str | Path | None) -> str | None:
+    """Normalize a WRITE-side registry scope key, preserving ``None``.
+
+    Two different contracts live on the same registries — do not unify them:
+
+    * **Write / slot paths** (``register_*``, ``snapshot_registration``,
+      ``restore_registration``, tool-registry slot lookup): ``None`` means
+      the process-global layer and must stay ``None``. Use this function.
+    * **Read paths** (``list_providers``, ``get_provider``): ``None`` means
+      "the active home's scope" and must go through :func:`qubit_home_key`
+      (falsy input resolves to the active default home). Using this
+      function there hides every scoped registration.
+
+    Both normalize non-None values identically (resolved absolute path,
+    normcase on Windows) so writes and reads agree on the key.
+    """
+    return qubit_home_key(scope) if scope is not None else None
+
+
 def get_process_qubit_home() -> Path:
     """Qubit home of the running process, ignoring task overrides.
 

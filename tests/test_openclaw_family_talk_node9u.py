@@ -24,10 +24,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-MODULE = "voicebridge/gateway/openclaw_handlers/talk_node.py"
-MODULE_PATH = "voicebridge.gateway.openclaw_handlers.talk_node"
+MODULE = "voicebridge/gateway/qubit_handlers/talk_node.py"
+MODULE_PATH = "voicebridge.gateway.qubit_handlers.talk_node"
 
 #: No pinned method in this family resolves to a mechanically-IMPLEMENTED
 #: handler; each is either a typed local counterpart or an operator-only gate.

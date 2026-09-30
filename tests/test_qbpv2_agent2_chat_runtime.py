@@ -74,7 +74,7 @@ def _start_webui(cfg, state):
 def _http(port, method, path, body=None, token="test-token", raw=False,
           upgrade_ws=False):
     data = None
-    headers = {"X-Hermes-Session-Token": token}
+    headers = {"X-Qubit-Session-Token": token}
     if body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"

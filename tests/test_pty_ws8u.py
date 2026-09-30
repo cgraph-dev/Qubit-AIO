@@ -103,7 +103,7 @@ def _mint(port, *, headers=None, body=None):
         f"http://127.0.0.1:{port}/agent/api/auth/ws-ticket", data=data,
         method="POST")
     req.add_header("Content-Type", "application/json")
-    for k, v in (headers or {"X-Hermes-Session-Token": "test-token"}).items():
+    for k, v in (headers or {"X-Qubit-Session-Token": "test-token"}).items():
         req.add_header(k, v)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
@@ -169,7 +169,7 @@ def test_auth_rejection_no_ticket_and_bad_ticket(tmp_path):
                             open_timeout=8):
                 pass
         # mint endpoint itself requires auth
-        status, _ = _mint(port, headers={"X-Hermes-Session-Token": "wrong"})
+        status, _ = _mint(port, headers={"X-Qubit-Session-Token": "wrong"})
         assert status == 401
     finally:
         ui.stop()
@@ -301,7 +301,7 @@ def test_browser_websocket_roundtrip(tmp_path):
                 """async (port) => {
                   const r = await fetch('/agent/api/auth/ws-ticket', {
                     method: 'POST',
-                    headers: {'X-Hermes-Session-Token': 'test-token',
+                    headers: {'X-Qubit-Session-Token': 'test-token',
                               'Content-Type': 'application/json'},
                     body: '{}'});
                   const {ticket} = await r.json();

@@ -50,7 +50,7 @@ _UPSTREAM_URL = re.compile(
 _UPSTREAM_HANDLE = re.compile(r"@NousResearch\b")
 # Standalone prose product word: excluded when glued into an identifier by
 # ``-``, ``_``, ``.``, ``/`` or ``@`` (so ``hermes-update``, ``NOUS_``,
-# ``__HERMES_BASE_PATH__``, ``hermes-kanban-*``, ``nous-blue`` and the
+# ``__QUBIT_BASE_PATH__``, ``hermes-kanban-*``, ``nous-blue`` and the
 # ``@nous-research/ui`` package id do not trip it).
 _PROSE = re.compile(
     r"(?<![A-Za-z0-9_\-./@])(Hermes|Nous|OpenClaw)(?![A-Za-z0-9_\-./@])"

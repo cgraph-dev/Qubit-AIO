@@ -60,7 +60,7 @@ def _live(tmp_path, monkeypatch, backend: bool = True):
 
 def _req(port, method, path, body=None):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=20)
-    headers = {"X-Hermes-Session-Token": "test-token"}
+    headers = {"X-Qubit-Session-Token": "test-token"}
     data = json.dumps(body) if body is not None else None
     if data is not None:
         headers["Content-Type"] = "application/json"

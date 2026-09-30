@@ -103,7 +103,7 @@ async function http(entry: Resident, route: string, body?: Record<string, string
     method: body ? 'POST' : 'GET',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'X-Hermes-Session-Token': token } : {})
+      ...(token ? { 'X-Qubit-Session-Token': token } : {})
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
     signal: AbortSignal.timeout(5000)
@@ -115,7 +115,7 @@ async function http(entry: Resident, route: string, body?: Record<string, string
 const client = createPoolRetirementClient(async (url, token, options) => {
   const response = await fetch(url, {
     method: options.method,
-    headers: { 'X-Hermes-Session-Token': token, 'Content-Type': 'application/json' },
+    headers: { 'X-Qubit-Session-Token': token, 'Content-Type': 'application/json' },
     body: JSON.stringify(options.body),
     signal: AbortSignal.timeout(options.timeoutMs)
   })

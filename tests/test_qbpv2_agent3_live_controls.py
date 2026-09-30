@@ -57,7 +57,7 @@ def _req(port, path, body=None, method=None):
         f"http://127.0.0.1:{port}{path}", data=data,
         method=method or ("POST" if body is not None else "GET"),
         headers={"Content-Type": "application/json",
-                 "X-Hermes-Session-Token": "test-token"})
+                 "X-Qubit-Session-Token": "test-token"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())

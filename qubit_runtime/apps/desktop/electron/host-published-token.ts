@@ -1,6 +1,6 @@
 // Session token published by a Qubit backend for same-user attach.
 //
-// `GET /` withholds `window.__HERMES_SESSION_TOKEN__` when the dashboard is
+// `GET /` withholds `window.__QUBIT_SESSION_TOKEN__` when the dashboard is
 // auth-gated. The backend still writes the live token next to its host
 // rendezvous record (`gateway/host_rendezvous.py`): `host-serve.token` for the
 // machine owner, `host-desktop-serve.token` for a Desktop-spawned child. The

@@ -1619,3 +1619,125 @@ the isolated SDD branch (`sdd/t15`); the live repo and `~/.hermes` are untouched
   reference tree itself is not byte-deterministic due to untracked files); the
   product `~/.config`/`~/.hermes` independence and the full gate + independent
   verifier remain open.
+
+## 35. 1:1 repair wave — stale service, TUI build, themes, onboarding, plugins — 2026-09-30
+
+**No `M1`/`VERIFIED`/`CODE_READY`/`COMPLETE` claimed.** All items below proven
+by command + observed output (live service `qubit-voicebridge`, fresh
+processes where noted). Full defect ledger:
+`docs/reports/QUBIT_VS_HERMES_DIAG_2026-09-30.md` (read-only pass); this
+section records the repairs.
+
+- **D1 (stale service) — FIXED by restart.** The live service predated its
+  tree: `/api/skills` → `[]` (CLI 189), `/api/chat/workspaces` → 404, while a
+  scratch instance on the same tree+data served 189/200. After
+  `systemctl --user restart`: skills **192**, workspaces **200**,
+  `model/options` **200 with providers** (D2 was the same stale process, not
+  code — the `LLAMACPP_ALIASES` symbol exists at
+  `qubit_runtime/qubit_cli/providers.py:489`).
+- **TUI build (half-rename) — FIXED.** `/chat` PTY died with 503: freshness
+  `false` forced a rebuild on every spawn and the build failed — 7 files
+  imported `@qubit/*` while the workspace graph was `@hermes/*`. Per owner
+  zero-brand direction the rename went FORWARD, not back: `@hermes/ink` →
+  `@qubit/ink`, `@hermes/shared` → `@qubit/shared`, `@hermes/plugin-sdk` →
+  `@qubit/plugin-sdk` (~510 files, specifiers only),
+  `packages/qubit-ink` + `apps/shared` + `bootstrap-installer` + `root-tests`
+  package names, `tui.mjs` alias key, `main_tui_launch.py` dev path
+  (`packages/hermes-ink` → `packages/qubit-ink`), root `package.json` name +
+  repo URLs → canonical. Allowlisted (cannot rename): Meta's `hermes-estree`/
+  `hermes-parser` registry packages, `@nous-research/ui` registry dep.
+  `qubit_runtime/node_modules/@hermes/` is gone. Rebuilt
+  `ui-tui/dist/entry.js`; freshness `true`. PTY probe: **101 + live Qubit
+  banner**; longer capture: status **`ready`**, no exit-1. Browser `/chat`:
+  terminal **open**, real multi-turn transcript, **zero console errors**.
+- **pm ABI crash — FIXED.** The TUI child died with
+  `No module named 'pydantic_core._pydantic_core'`: `pm/environments.py`
+  `activate_dependencies` prepended the committed **3.14** PM env's
+  site-packages onto the **3.12** dev interpreter (ref runs matched 3.14/3.14).
+  Added a fail-closed guard: on interpreter mismatch the foreign entries are
+  dropped from `sys.path`/`PYTHONPATH` with a stderr warning instead of
+  poisoning the process. `import tui_gateway.entry` + registry imports proven;
+  fresh service boots with the warning, no loader errors.
+- **Themes 1:1 — FIXED.** Backend served only the 1 overlay theme while the
+  vendored 8 built-ins (labels already rebranded) and the SPA presets sat
+  unused. `themes_response()` now serves 8 + `qubit` (**9 listed**);
+  `PUT /api/dashboard/theme` persists any listed theme (midnight round-trip
+  proven, bogus → 400, restored to qubit).
+- **Channel onboarding (QR) — PORTED.** The blanket `ONBOARDING_GUIDED` gates
+  are gone; 8 real routes delegate to the vendored implementation:
+  WhatsApp start → real pairing session, poll → real **`qr_payload`**
+  (wa.me blob, status waiting), cancel → OK; Telegram start → real
+  pairing_id + deep_link + qr_payload + expiry, cancel → OK. **Owner flag:**
+  the hosted Telegram bot URL carries the upstream name (`...HermesBot`) —
+  it is third-party infrastructure that cannot be rebranded; needs a ruling
+  (own bot vs exception vs disable).
+- **Plugins 1:1 listing — FIXED.** `qubit plugins list` showed 1 row vs
+  ref 61: the registry never enumerated the vendored bundled tree. Now
+  appends `plugins_cmd._discover_all_plugins()` rows with vendored
+  enable/disable state → **60 rows** (59 bundled + builtin). Plus the missing
+  `normalize_scope` ported 1:1 into `qubit_constants.py` (was killing the
+  `browser-firecrawl` load with ImportError); registries import clean.
+- **MCP verdict (no change).** Ref lists 2 servers, Qubit 1 — both point at
+  the same `graft` backend; the dropped `openclaw-voice-bridge-graft` is a
+  legacy-branded duplicate alias. Qubit advertises 6 tools + live invocation
+  receipts (find_code + find_all with real payloads); ref advertises none.
+  Functional parity met.
+- **Keys/config/voice-edit/logs — PROVEN live.** Env ref PUT → `is_set:true`
+  → DELETE → gone (literal secret values refused by design); config
+  16→17→16 round-trip with atomic backup; voice-edit settings
+  false→true→false persisted; `/api/logs` lines match `agent.log`
+  byte-for-byte.
+- **`/qubit-chat` on the shared backend — PROVEN + extended.** Local-brain
+  SSE turn → `LOCALBRAIN_OK`, receipt `provider:local,
+  identity:local/qubit-brain4`. Store lists terminal sessions (60 tui/cli
+  rows of 362) and serves their transcripts (real tui turn read back). New:
+  **summarize** button (local brain reports on the session — live 24 s
+  report verified in browser) and **open in /chat** deep link
+  (`/chat?resume=<id>` — terminal opened resumed on voice-chat, 54 msgs,
+  status open). Frontend rebuilt (`tsc` clean after removing a pre-existing
+  duplicate `sessionListNonce` declaration; `qubit-dist` rebuilt).
+- **Artifacts/tests.** `parity_inventory` regenerated (**1389 rows — 1274
+  PORTED / 115 GATED / 0 MISSING**); reachability regenerated (75 handlers);
+  voice coverage regenerated (**1142 real / 240 guard / 7 unresolved**);
+  new `tests/test_parity_wave22_channels_themes9u.py` **4 passed**;
+  `plugin_runtime9u` 13 + route-parity suites green.
+- **Still open:** Telegram-bot brand ruling; `HERMES_TUI_*` env contract
+  rename (deferred slice — Python launcher + TS must move together);
+  desktop/web builds unverified (no Electron toolchain); full M4 matrix +
+  independent verifier; `M1` ratification.
+
+## 36. Zero-brand slice — wire identity, JS packages, gateway modules — 2026-09-30
+
+**No milestone claimed.** Goal: no Hermes/OpenClaw trace on product surfaces.
+
+- **Session wire identity renamed.** `X-Hermes-Session-Token` →
+  `X-Qubit-Session-Token`, `__HERMES_{SESSION_TOKEN,BASE_PATH,AUTH_REQUIRED}__`
+  → `__QUBIT_*` across `voicebridge/`, `frontend/qubit-web`, desktop
+  electron, vendored `web/` (93 files). Server emits Qubit-only globals;
+  accepts the legacy header as a read-only fallback (old cached bundles keep
+  working). Proven: new 200, legacy 200, injected globals all Qubit.
+- **Plugin SDK globals renamed** (`__QUBIT_PLUGINS__` / `__QUBIT_PLUGIN_SDK__`
+  primary; legacy aliases assigned for third-party plugins), in-repo plugins
+  moved to the new names; dead `__HERMES_DASHBOARD_*`/`__HERMES_INITIAL_*`
+  reads renamed (never injected — behavior-neutral).
+- **Gateway modules renamed** (`openclaw_handlers` → `qubit_handlers`,
+  `openclaw_dispositions` → `qubit_dispositions`,
+  `scripts/openclaw_upgrade_manifest.py` → `scripts/qubit_upgrade_manifest.py`
+  + 28 importing files). Served `openclaw.*` RPC method strings unchanged
+  (third-party interop — owner call to rename the wire).
+- **Served bundle: zero `Hermes` (case-sensitive).** Case-insensitive
+  residuals are compat shims only: legacy localStorage read-fallbacks,
+  plugin-global aliases, `HERMES_QWEN_` credential env (deferred env slice).
+- **Tests reconciled.** Branding-manifest regenerated
+  (`HERMES_SOURCE_COMPARISON.json` rows=5493); wave3 suite green except one
+  pre-existing HTTP-boundary failure (proven failing on pristine HEAD too);
+  openclaw-family suites 82 passed; `test_qbpv2_reach_deadcode` failure is
+  pre-existing (`test_packaging_force_include9u`, untouched).
+- **Honest remainder (not product surface or needs ruling):** vendored fork
+  internals (~25k identifier lines — W9 deep slices); `HERMES_TUI_*` /
+  `HERMES_HOME` / `HERMES_QWEN_*` runtime env contracts (Python+TUI+desktop
+  must move together); served `openclaw.*` RPC names (interop); Telegram
+  bot URL (third-party infra); `LICENSE`/`THIRD_PARTY_NOTICES.md` + frozen
+  archives (legal/historical, must stay); Meta `hermes-estree`/`hermes-parser`
+  + `@nous-research/ui` registry deps (cannot rename); dev-only test names;
+  git history.

@@ -1711,9 +1711,9 @@ export default function SessionsPage() {
         const res = await fetch(api.exportSessionUrl(id, rowProfile(id)), {
           credentials: "include",
           headers: {
-            "X-Hermes-Session-Token":
-              (window as unknown as { __HERMES_SESSION_TOKEN__?: string })
-                .__HERMES_SESSION_TOKEN__ ?? "",
+            "X-Qubit-Session-Token":
+              (window as unknown as { __QUBIT_SESSION_TOKEN__?: string })
+                .__QUBIT_SESSION_TOKEN__ ?? "",
           },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

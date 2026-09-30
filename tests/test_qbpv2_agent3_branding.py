@@ -61,7 +61,7 @@ def test_served_plugin_bundles_carry_no_visible_upstream_name():
         for i, line in enumerate(src.splitlines(), 1):
             for bad in ("Hermes", "OpenClaw"):
                 if bad in line:
-                    assert "X-Hermes-Session-Token" in line, (name, i, line)
+                    assert "X-Qubit-Session-Token" in line, (name, i, line)
 
 
 @pytest.mark.skipif(not (DIST / "index.html").is_file(),

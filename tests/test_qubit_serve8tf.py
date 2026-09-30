@@ -4,7 +4,7 @@ Boots the real Qubit WebUI on loopback and proves:
 - /chat (and every root client route) serves the built dashboard shell with
   token + API-prefix injection; no /hermes/ path is served;
 - /agent/api/* compat endpoints answer with the Qubit token header
-  (X-Hermes-Session-Token) and reject without it;
+  (X-Qubit-Session-Token) and reject without it;
 - overlay plugin bundles + manifests are served at /dashboard-plugins/*;
 - SPA deep links fall back to the shell;
 - the classic Qubit pages still serve (no regression).
@@ -58,7 +58,7 @@ def _http(port, method, path, body=None, token="test-token",
     req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
                                  method=method, data=data)
     if token and qubit_token:
-        req.add_header("X-Hermes-Session-Token", token)
+        req.add_header("X-Qubit-Session-Token", token)
     elif token:
         req.add_header("X-Api-Token", token)
     if data is not None:
@@ -78,9 +78,9 @@ def test_qubit_shell_serves_with_injection(tmp_path):
         assert status == 200, status
         assert "text/html" in ctype
         text = body.decode()
-        assert "__HERMES_BASE_PATH__" in text and "__QUBIT_API_PREFIX__" in text
+        assert "__QUBIT_BASE_PATH__" in text and "__QUBIT_API_PREFIX__" in text
         assert "/agent" in text and "/hermes/" not in text
-        assert "__HERMES_SESSION_TOKEN__" in text
+        assert "__QUBIT_SESSION_TOKEN__" in text
         assert "Hermes" in text or "hermes" in text or "assets/" in text
     finally:
         ui.stop()
@@ -93,7 +93,7 @@ def test_qubit_spa_deep_link_falls_back(tmp_path):
         for deep in ("/sessions", "/skills", "/plugins"):
             status, _, body = _http(port, "GET", deep)
             assert status == 200, (deep, status)
-            assert b"__HERMES_BASE_PATH__" in body, deep
+            assert b"__QUBIT_BASE_PATH__" in body, deep
     finally:
         ui.stop()
 

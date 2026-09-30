@@ -4,8 +4,8 @@
  * dashboard_ops broker (same as CLI and voice). No fabricated status:
  * every card renders the real typed backend result. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React;
   var hooks = SDK.hooks;
   var fetchJSON = SDK.fetchJSON;
@@ -126,5 +126,5 @@
         }));
   }
 
-  window.__HERMES_PLUGINS__.register("qubit-devices", Devices);
+  window.__QUBIT_PLUGINS__.register("qubit-devices", Devices);
 })();

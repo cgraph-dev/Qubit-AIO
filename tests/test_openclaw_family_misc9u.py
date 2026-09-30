@@ -17,10 +17,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-MODULE_PATH = "voicebridge/gateway/openclaw_handlers/misc_surface.py"
-MODULE_NAME = "voicebridge.gateway.openclaw_handlers.misc_surface"
+MODULE_PATH = "voicebridge/gateway/qubit_handlers/misc_surface.py"
+MODULE_NAME = "voicebridge.gateway.qubit_handlers.misc_surface"
 
 SAFE = {
     "plugins.sessionAction": "PLUGIN_SESSION_ACTION_LOCAL_INVOKE",

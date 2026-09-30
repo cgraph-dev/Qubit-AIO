@@ -17,9 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-FAMILY_MODULE = "voicebridge/gateway/openclaw_handlers/sessions_advanced.py"
+FAMILY_MODULE = "voicebridge/gateway/qubit_handlers/sessions_advanced.py"
 
 #: The typed SAFE_EQUIVALENT codes this family emits (method -> code).
 SAFE_EQUIVALENT = {
@@ -72,7 +72,7 @@ def test_registered_implementations_pass_manifest_behavior_proof():
     methods, funcs, consts, origins = OUM._parse_rpc_handlers_multi(sources)
     registry = set(_registry().names())
     ours = {m for m, origin in origins.items()
-            if origin.endswith("openclaw_handlers/sessions_advanced.py")}
+            if origin.endswith("qubit_handlers/sessions_advanced.py")}
     assert ours == set(IMPLEMENTED) | set(SAFE_EQUIVALENT), sorted(ours)
     assert ours <= registry, f"unregistered: {ours - registry}"
     for method in sorted(ours):
@@ -89,7 +89,7 @@ def test_registered_implementations_pass_manifest_behavior_proof():
 
 
 def test_family_is_composed_into_default_registry():
-    from voicebridge.gateway.openclaw_handlers import FAMILY_MODULES
+    from voicebridge.gateway.qubit_handlers import FAMILY_MODULES
     assert "sessions_advanced" in FAMILY_MODULES
     names = set(_registry().names())
     assert set(IMPLEMENTED) <= names

@@ -1,5 +1,5 @@
 /* Qubit Boards — overlay plugin bundle (Qubit addition, dependency-free IIFE).
- * Uses only window.__HERMES_PLUGIN_SDK__ (React, hooks, fetchJSON).
+ * Uses only window.__QUBIT_PLUGIN_SDK__ (React, hooks, fetchJSON).
  * Full board mutations on the canonical store (same voicebridge/kanban.py
  * module as `qubit kanban` CLI and voice): create board, add card, move
  * card across boards/columns, complete card. Board tabs and canvas widgets
@@ -16,8 +16,8 @@
  * allow-scripts) and never as live DOM. Link widgets render as anchors and
  * never auto-fetch. No innerHTML/dangerouslySetInnerHTML is used. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React, hooks = SDK.hooks, fetchJSON = SDK.fetchJSON;
   var C = SDK.components || {};
   var e = React.createElement;
@@ -715,5 +715,5 @@
                 renderWidgetBody(w));
             })));
   }
-  window.__HERMES_PLUGINS__.register("qubit-boards", Boards);
+  window.__QUBIT_PLUGINS__.register("qubit-boards", Boards);
 })();

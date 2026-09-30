@@ -24,9 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-MODULE = "voicebridge/gateway/openclaw_handlers/scheduler_media.py"
+MODULE = "voicebridge/gateway/qubit_handlers/scheduler_media.py"
 MODULE_PATH = REPO_ROOT / MODULE
 
 IMPL = ("tts.setProvider",)
@@ -72,7 +72,7 @@ def _registry():
     from voicebridge.gateway.rpc import MethodRegistry
 
     mod = importlib.import_module(
-        "voicebridge.gateway.openclaw_handlers.scheduler_media")
+        "voicebridge.gateway.qubit_handlers.scheduler_media")
     reg = MethodRegistry()
     mod.register(reg)
     return reg

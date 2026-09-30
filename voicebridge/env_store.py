@@ -318,3 +318,85 @@ def remove_ref(cfg: Any, name: str) -> Dict[str, Any]:
     if existed:
         _save(cfg, data)
     return {"name": clean, "removed": existed, "count": len(data)}
+
+
+def _runtime_env_path(cfg: Any) -> Path:
+    """The canonical runtime ``.env`` this install's process/children read."""
+    from . import config as _config
+    return Path(_config.canonical_runtime_env_path())
+
+
+def write_secret(cfg: Any, name: str, value: str) -> Dict[str, Any]:
+    """Write a raw secret value to the canonical runtime ``.env`` (1:1 with the
+    reference Keys page).
+
+    The Keys page pastes a provider API key and expects it stored; the
+    canonical secret store is ``<runtime home>/.env`` (secrets only — root
+    AGENTS.md). The value is written atomically, ``chmod 600``, and is never
+    logged, returned, or echoed. Replaces an existing line with the same name;
+    appends otherwise. ``value`` must be non-empty and must not look like a
+    reference (references go through :func:`set_ref`).
+    """
+    clean = str(name or "").strip()
+    if not _ENV_VAR_RE.match(clean):
+        raise ValueError(
+            "env name must match ^[A-Za-z_][A-Za-z0-9_]*$")
+    secret = str(value or "")
+    if not secret or "\n" in secret or "\r" in secret:
+        raise ValueError("secret value is empty or malformed")
+    path = _runtime_env_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines: List[str] = []
+    if path.exists():
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            lines = []
+    replaced = False
+    out: List[str] = []
+    for line in lines:
+        stripped = line.strip()
+        key = stripped[len("export "):].strip() if stripped.startswith("export ") else stripped
+        k, sep, _v = key.partition("=")
+        if sep and k.strip() == clean:
+            out.append(f"{clean}={secret}")
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        out.append(f"{clean}={secret}")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text("\n".join(out) + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+    return {"name": clean, "stored": "env", "replaced": replaced}
+
+
+def remove_secret(cfg: Any, name: str) -> Dict[str, Any]:
+    """Remove ``name`` from the canonical runtime ``.env`` (no-op if absent)."""
+    clean = str(name or "").strip()
+    if not clean:
+        raise ValueError("env name required")
+    path = _runtime_env_path(cfg)
+    if not path.exists():
+        return {"name": clean, "removed": False}
+    try:
+        lines = path.read_text(errors="replace").splitlines()
+    except OSError:
+        return {"name": clean, "removed": False}
+    out: List[str] = []
+    removed = False
+    for line in lines:
+        stripped = line.strip()
+        key = stripped[len("export "):].strip() if stripped.startswith("export ") else stripped
+        k, sep, _v = key.partition("=")
+        if sep and k.strip() == clean:
+            removed = True
+            continue
+        out.append(line)
+    if removed:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text("\n".join(out) + ("\n" if out else ""))
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    return {"name": clean, "removed": removed}

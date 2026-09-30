@@ -19,9 +19,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-USERS_MODULE = "voicebridge/gateway/openclaw_handlers/users.py"
+USERS_MODULE = "voicebridge/gateway/qubit_handlers/users.py"
 
 SAFE = {
     "users.list": "USERS_LIST_LOCAL_SINGLE_OPERATOR",
@@ -67,7 +67,7 @@ def _cfg(tmp_path, monkeypatch):
 def _registry():
     from voicebridge.gateway.rpc import MethodRegistry
 
-    mod = importlib.import_module("voicebridge.gateway.openclaw_handlers.users")
+    mod = importlib.import_module("voicebridge.gateway.qubit_handlers.users")
     reg = MethodRegistry()
     mod.register(reg)
     return reg

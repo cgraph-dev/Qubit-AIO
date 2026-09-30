@@ -16,10 +16,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-MCP_MODULE = "voicebridge/gateway/openclaw_handlers/mcp_app.py"
-BOARD_MODULE = "voicebridge/gateway/openclaw_handlers/board.py"
+MCP_MODULE = "voicebridge/gateway/qubit_handlers/mcp_app.py"
+BOARD_MODULE = "voicebridge/gateway/qubit_handlers/board.py"
 
 MCP_SAFE = {
     "mcp.app.listResources": "MCP_RESOURCES_LOCAL_TOOL",

@@ -38,21 +38,21 @@ FLEET = REPO / "frontend/qubit-web/public/plugins/fleet.json"
 # production module, test, or script currently imports (cross-boundary handoff
 # W1-1, owner W2). Pinned so a *new* unreferenced module fails this gate.
 KNOWN_UNREFERENCED_MODULES: set = {
-    # ``voicebridge/gateway/openclaw_handlers/__init__.register_all`` composes
+    # ``voicebridge/gateway/qubit_handlers/__init__.register_all`` composes
     # these families with ``importlib.import_module(f"{__name__}.{name}")`` from
     # FAMILY_MODULES, so the AST import scanner cannot see the reference. Each
     # module exposes ``register(registry)`` and is reached through
     # ``voicebridge/gateway/rpc.py`` -> ``register_all``.
-    "voicebridge/gateway/openclaw_handlers/agents.py",
-    "voicebridge/gateway/openclaw_handlers/board.py",
-    "voicebridge/gateway/openclaw_handlers/content.py",
-    "voicebridge/gateway/openclaw_handlers/security.py",
-    "voicebridge/gateway/openclaw_handlers/sessions.py",
-    "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
-    "voicebridge/gateway/openclaw_handlers/sessions_compaction.py",
-    "voicebridge/gateway/openclaw_handlers/surface_control.py",
-    "voicebridge/gateway/openclaw_handlers/system.py",
-    "voicebridge/gateway/openclaw_handlers/worktrees.py",
+    "voicebridge/gateway/qubit_handlers/agents.py",
+    "voicebridge/gateway/qubit_handlers/board.py",
+    "voicebridge/gateway/qubit_handlers/content.py",
+    "voicebridge/gateway/qubit_handlers/security.py",
+    "voicebridge/gateway/qubit_handlers/sessions.py",
+    "voicebridge/gateway/qubit_handlers/sessions_advanced.py",
+    "voicebridge/gateway/qubit_handlers/sessions_compaction.py",
+    "voicebridge/gateway/qubit_handlers/surface_control.py",
+    "voicebridge/gateway/qubit_handlers/system.py",
+    "voicebridge/gateway/qubit_handlers/worktrees.py",
 }
 
 # Test files that assert repository artifacts (docs/manifests/scans) rather

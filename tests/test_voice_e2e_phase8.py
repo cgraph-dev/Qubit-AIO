@@ -278,8 +278,8 @@ def test_served_config_exposes_voice_input_engine(live_ui, page_factory):
     _wait_engine_settled(page)
     cfg = page.evaluate(
         """() => {
-          const t = window.__HERMES_SESSION_TOKEN__;
-          const headers = t ? { 'X-Hermes-Session-Token': t } : {};
+          const t = window.__QUBIT_SESSION_TOKEN__;
+          const headers = t ? { 'X-Qubit-Session-Token': t } : {};
           return fetch('/agent/api/config', { headers }).then(r => r.json());
         }"""
     )
@@ -316,8 +316,8 @@ def test_ui_engine_selection_reflects_normalized_config(live_ui, page_factory):
     _wait_engine_settled(page)
     real_cfg = page.evaluate(
         """() => {
-          const t = window.__HERMES_SESSION_TOKEN__;
-          const headers = t ? { 'X-Hermes-Session-Token': t } : {};
+          const t = window.__QUBIT_SESSION_TOKEN__;
+          const headers = t ? { 'X-Qubit-Session-Token': t } : {};
           return fetch('/agent/api/config', { headers }).then(r => r.json());
         }"""
     )
@@ -572,12 +572,12 @@ def test_running_server_exposes_voice_input_engine():
         html = urllib.request.urlopen(base + "/sessions", timeout=3).read().decode()
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"dashboard reachable but unreadable: {exc!r}")
-    m = re.search(r'__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"', html)
+    m = re.search(r'__QUBIT_SESSION_TOKEN__\s*=\s*"([^"]+)"', html)
     if not m:
         pytest.skip("running dashboard did not expose a session token")
 
     req = urllib.request.Request(
-        base + "/agent/api/config", headers={"X-Hermes-Session-Token": m.group(1)}
+        base + "/agent/api/config", headers={"X-Qubit-Session-Token": m.group(1)}
     )
     with urllib.request.urlopen(req, timeout=5) as resp:
         cfg = json.loads(resp.read().decode())

@@ -2,9 +2,10 @@
  * Qubit Dashboard Plugin SDK — typed contract (SPIKE)
  * ====================================================
  *
- * This is the public type surface for ``window.__HERMES_PLUGIN_SDK__`` and
- * ``window.__HERMES_PLUGINS__``, the globals the dashboard host exposes to
+ * This is the public type surface for ``window.__QUBIT_PLUGIN_SDK__`` and
+ * ``window.__QUBIT_PLUGINS__``, the globals the dashboard host exposes to
  * plugin bundles (see ``web/src/plugins/registry.ts::exposePluginSDK``).
+ * The legacy ``__HERMES_*`` aliases expose the same objects.
  *
  * STATUS: spike. This file documents the contract and gives plugin authors
  * (in-repo IIFEs and external bundles alike) editor types without bundling
@@ -58,7 +59,7 @@ export type FetchJSON = <T = unknown>(
  * binary/blob downloads). Same auth handling as ``fetchJSON`` but returns
  * the raw ``Response``, does not parse, does not throw on non-2xx, and does
  * not run the 401 redirect. Plugins MUST use this (or ``fetchJSON``) instead
- * of calling ``fetch`` with a hand-read ``window.__HERMES_SESSION_TOKEN__``.
+ * of calling ``fetch`` with a hand-read ``window.__QUBIT_SESSION_TOKEN__``.
  */
 export type AuthedFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -77,7 +78,7 @@ export type BuildWsUrl = (
 export type BuildWsAuthParam = () => Promise<[string, string]>;
 
 // ---------------------------------------------------------------------------
-// Registry surface (window.__HERMES_PLUGINS__)
+// Registry surface (window.__QUBIT_PLUGINS__)
 // ---------------------------------------------------------------------------
 
 export interface PluginRegistry {
@@ -88,7 +89,7 @@ export interface PluginRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// SDK surface (window.__HERMES_PLUGIN_SDK__)
+// SDK surface (window.__QUBIT_PLUGIN_SDK__)
 // ---------------------------------------------------------------------------
 
 export interface QubitPluginSDK {
@@ -176,6 +177,9 @@ export interface QubitPluginSDK {
 
 declare global {
   interface Window {
+    __QUBIT_PLUGIN_SDK__?: QubitPluginSDK;
+    __QUBIT_PLUGINS__?: PluginRegistry;
+    /** Legacy aliases (same objects) for third-party plugins. */
     __HERMES_PLUGIN_SDK__?: QubitPluginSDK;
     __HERMES_PLUGINS__?: PluginRegistry;
   }

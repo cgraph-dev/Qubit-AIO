@@ -57,7 +57,7 @@ def _post(port, path, body):
         f"http://127.0.0.1:{port}{path}",
         data=json.dumps(body).encode(), method="POST",
         headers={"Content-Type": "application/json",
-                 "X-Hermes-Session-Token": "test-token"})
+                 "X-Qubit-Session-Token": "test-token"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())

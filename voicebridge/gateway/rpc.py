@@ -36,8 +36,8 @@ OPERATOR_SCOPES = ("operator.read", "operator.write", "operator.admin",
 
 # Safe local-counterpart codes emitted by the Qubit delta handlers whose
 # upstream action needs a service Qubit does not run. ``scripts/
-# openclaw_upgrade_manifest.py`` asserts each declared code is emitted by the
-# registered handler, so these cannot drift from ``openclaw_dispositions``.
+# qubit_upgrade_manifest.py`` asserts each declared code is emitted by the
+# registered handler, so these cannot drift from ``qubit_dispositions``.
 ENVIRONMENT_PREPARE_CODE = "ENVIRONMENT_PREPARE_LOCAL_PLAN"
 UPDATE_REPORT_CODE = "UPDATE_REPORT_LOCAL_READ"
 PLUGIN_RELOAD_CODE = "PLUGIN_RELOAD_LOCAL_REREAD"
@@ -1644,7 +1644,7 @@ def default_registry() -> MethodRegistry:
     # OpenClaw contractual-pin family handlers. Each family module registers
     # real handlers over the same canonical Qubit backends; composing them here
     # keeps one registry, one listener, and one authority.
-    from .openclaw_handlers import register_all as _register_families
+    from .qubit_handlers import register_all as _register_families
     _register_families(registry)
     return registry
 

@@ -149,7 +149,7 @@ def _start(tmp_path):
 def _get(port, path, token="test-token"):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     conn.request("GET", path, headers={
-        "X-Hermes-Session-Token": token,
+        "X-Qubit-Session-Token": token,
         "Origin": f"http://127.0.0.1:{port}",
     })
     resp = conn.getresponse()

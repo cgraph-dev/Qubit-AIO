@@ -54,7 +54,7 @@ def _http(port, method, path, body=None, token="test-token"):
     req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
                                  method=method, data=data)
     if token:
-        req.add_header("X-Hermes-Session-Token", token)
+        req.add_header("X-Qubit-Session-Token", token)
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:

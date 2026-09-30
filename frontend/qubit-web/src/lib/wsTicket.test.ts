@@ -21,8 +21,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 describe("api.wsTicket", () => {
   beforeEach(() => {
-    (window as unknown as { __HERMES_SESSION_TOKEN__?: string })
-      .__HERMES_SESSION_TOKEN__ = "tok";
+    (window as unknown as { __QUBIT_SESSION_TOKEN__?: string })
+      .__QUBIT_SESSION_TOKEN__ = "tok";
   });
   afterEach(() => {
     vi.restoreAllMocks();

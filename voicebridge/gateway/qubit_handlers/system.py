@@ -13,7 +13,7 @@ contract store (``voicebridge.question_prompt``), the vault-reference registry
 (``voicebridge.actions``), device/pairing/node-host stores, the runtime image
 manager, the memory workspace, the plugin runtime and the lifecycle inventory.
 
-Policy (matches ``openclaw_handlers/__init__.py``):
+Policy (matches ``qubit_handlers/__init__.py``):
 
 * a method is registered ONLY when it has a real local counterpart that does
   work; a bare success literal is never registered;

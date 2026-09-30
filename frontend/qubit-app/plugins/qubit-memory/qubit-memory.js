@@ -3,8 +3,8 @@
  * learning ledger (curator). Backend: GET /api/memory, GET /api/curator,
  * POST /api/ops/run (memory_search) — the same modules as CLI and voice. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React;
   var hooks = SDK.hooks;
   var fetchJSON = SDK.fetchJSON;
@@ -117,5 +117,5 @@
             curator ? "No ledger data." : "Loading ledger…")));
   }
 
-  window.__HERMES_PLUGINS__.register("qubit-memory", Memory);
+  window.__QUBIT_PLUGINS__.register("qubit-memory", Memory);
 })();

@@ -1,5 +1,5 @@
 /* Qubit Gateway — overlay plugin bundle (Qubit addition, dependency-free IIFE).
- * Uses only window.__HERMES_PLUGIN_SDK__ (React, hooks, fetchJSON).
+ * Uses only window.__QUBIT_PLUGIN_SDK__ (React, hooks, fetchJSON).
  * Messaging accounts + gateway records on the canonical modules (same
  * voicebridge/messaging.py + gateway_peers.py as CLI and voice): add
  * account, add gateway, typed link check, remove. Records only — process
@@ -9,7 +9,7 @@
  * anything is staged); outputs carry the kind only. Mutations run the
  * shared confirmation journal: 409 staged + inline Confirm/Cancel. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
   if (!SDK) return;
   var React = SDK.React, hooks = SDK.hooks, fetchJSON = SDK.fetchJSON;
   var C = SDK.components || {};
@@ -251,5 +251,5 @@
             gId[1](""); gAcct[1](""); gKey[1]("");
           }}, "Add gateway")));
   }
-  window.__HERMES_PLUGINS__.register("qubit-gateway", Gateway);
+  window.__QUBIT_PLUGINS__.register("qubit-gateway", Gateway);
 })();

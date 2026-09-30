@@ -168,7 +168,7 @@ def test_served_bundle_rebrands_backend_product_names():
     for i, line in enumerate(src.splitlines(), 1):
         for bad in ("Hermes", "OpenClaw"):
             if bad in line:
-                assert "X-Hermes-Session-Token" in line, (i, line)
+                assert "X-Qubit-Session-Token" in line, (i, line)
 
 
 _REBRAND_JS = r"""

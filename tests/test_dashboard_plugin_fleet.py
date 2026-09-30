@@ -89,7 +89,7 @@ def _start(tmp_path):
     return ui, ui._server.server_address[1]
 
 
-def _get(port, path, token=None, header="X-Hermes-Session-Token"):
+def _get(port, path, token=None, header="X-Qubit-Session-Token"):
     import urllib.error
     import urllib.request
 

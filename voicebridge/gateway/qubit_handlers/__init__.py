@@ -10,7 +10,7 @@ A module is added only when the family has a real local counterpart. A family
 with no real counterpart stays ``OPEN`` in the generated manifest; it is never
 backed by a fabricated handler that only returns success.
 
-``scripts/openclaw_upgrade_manifest.py`` scans these modules alongside
+``scripts/qubit_upgrade_manifest.py`` scans these modules alongside
 ``voicebridge/gateway/rpc.py`` so each pinned method's evidence names the file
 that actually defines its handler.
 """

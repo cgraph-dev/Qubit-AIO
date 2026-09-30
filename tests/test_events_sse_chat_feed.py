@@ -4,7 +4,7 @@ Qubit keeps a single event path: the read-only SSE feed at
 ``GET /api/events/stream`` (``voicebridge.webui:WebUIHandler._events_stream``,
 route ``webui.py:1728``). The dashboard SPA consumes it with ``fetch`` + a
 ``ReadableStream`` reader because ``EventSource`` cannot attach the auth
-header (``X-Api-Token`` / ``X-Hermes-Session-Token``). These tests assert the
+header (``X-Api-Token`` / ``X-Qubit-Session-Token``). These tests assert the
 server side of that contract: fail-closed auth, the ``text/event-stream``
 framing, journal replay via ``Last-Event-ID`` / ``?last_seq=``, and
 heartbeats. The SPA side is covered by

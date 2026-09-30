@@ -29,7 +29,7 @@ def test_prose_words_rewritten_but_wire_identifiers_preserved():
 
     text = (
         "Hermes runs the agent. Nous Research built it. OpenClaw is the gateway.\n"
-        "Wire: X-Hermes-Session-Token and __HERMES_SESSION_TOKEN__ stay.\n"
+        "Wire: X-Qubit-Session-Token and __QUBIT_SESSION_TOKEN__ stay.\n"
         "Event: hermes.task_run.started stays. Service: hermes-gateway stays.\n"
     )
     new = debrand_skill_text(text, is_doc=True)
@@ -37,7 +37,7 @@ def test_prose_words_rewritten_but_wire_identifiers_preserved():
     assert "Nous Research" not in new and "Qubit Labs" in new
     assert "OpenClaw is" not in new
     # Load-bearing identifiers survive verbatim.
-    for kept in ("X-Hermes-Session-Token", "__HERMES_SESSION_TOKEN__",
+    for kept in ("X-Qubit-Session-Token", "__QUBIT_SESSION_TOKEN__",
                  "hermes.task_run.started", "hermes-gateway"):
         assert kept in new, kept
 

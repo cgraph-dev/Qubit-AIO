@@ -76,7 +76,7 @@ def _request(ui, method, path, body=None, token="test-token"):
     import urllib.request
 
     data = None
-    headers = {"X-Hermes-Session-Token": token}
+    headers = {"X-Qubit-Session-Token": token}
     if body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"

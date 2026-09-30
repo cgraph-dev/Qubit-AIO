@@ -1,9 +1,9 @@
 """9U — OpenClaw system/operator family handlers are behavior-proven.
 
-Two independent proofs, mirroring ``tests/test_openclaw_dispositions_b07m.py``:
+Two independent proofs, mirroring ``tests/test_qubit_dispositions_b07m.py``:
 
 1. static: every method registered by
-   ``voicebridge.gateway.openclaw_handlers.system`` resolves to a real handler
+   ``voicebridge.gateway.qubit_handlers.system`` resolves to a real handler
    (a backend attribute call/import) OR, for a typed refusal, actually emits
    its declared code — never a stub and never a fabricated success;
 2. runtime: the handlers are invoked in-process against a temp state dir and
@@ -20,9 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-HANDLER_FILE = REPO_ROOT / "voicebridge" / "gateway" / "openclaw_handlers" / "system.py"
+HANDLER_FILE = REPO_ROOT / "voicebridge" / "gateway" / "qubit_handlers" / "system.py"
 
 #: Typed refusals registered by the module, keyed by the code they must emit.
 REFUSALS = {

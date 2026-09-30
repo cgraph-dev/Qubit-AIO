@@ -16,7 +16,7 @@ the human/agent disposition pass can stamp IMPLEMENTED / SAFE_EQUIVALENT /
 OPERATOR_ONLY with real proof, never a fabricated result.
 
 Usage:
-    python scripts/openclaw_upgrade_manifest.py \
+    python scripts/qubit_upgrade_manifest.py \
         --clone /tmp/opencode/pinned/openclaw \
         --out docs/archive/2026-09-21/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json
 
@@ -62,7 +62,7 @@ ROW_NAME_RE = re.compile(r'^\s*\[\s*"([^"]+)"', re.M)
 QUBIT_RPC_REGISTRY_RE = re.compile(r'register\(\s*"([^"]+)"')
 # The behavior-based dispositions (IMPLEMENTED / SAFE_EQUIVALENT /
 # OPERATOR_ONLY, each with proof) live in
-# ``voicebridge/gateway/openclaw_dispositions.py``; the generator reads that
+# ``voicebridge/gateway/qubit_dispositions.py``; the generator reads that
 # map instead of inferring from a bare registered-method name.
 # Capability-bearing top-level areas (the manifest lists added files per area;
 # dependency/build/vendor trees are intentionally excluded).
@@ -133,12 +133,12 @@ def registry_sources(path: Path) -> list[Path]:
     """All registry files a disposition pass must scan for *path*.
 
     ``path`` is the canonical ``rpc.py``; the sibling
-    ``openclaw_handlers`` package (one module per implemented family) is an
+    ``qubit_handlers`` package (one module per implemented family) is an
     extension of the same registry and must be scanned so each pinned method's
     evidence names the file that defines its handler.
     """
     paths = [path]
-    package = path.parent / "openclaw_handlers"
+    package = path.parent / "qubit_handlers"
     if package.is_dir():
         paths.extend(sorted(p for p in package.glob("*.py")
                             if p.name != "__init__.py"))
@@ -272,7 +272,7 @@ def _load_dispositions():
     repo = Path(__file__).resolve().parents[1]
     if str(repo) not in sys.path:
         sys.path.insert(0, str(repo))
-    from voicebridge.gateway import openclaw_dispositions as OD  # noqa: E402
+    from voicebridge.gateway import qubit_dispositions as OD  # noqa: E402
     return OD.DISPOSITIONS
 
 
@@ -288,7 +288,7 @@ def _load_pinned_dispositions():
     repo = Path(__file__).resolve().parents[1]
     if str(repo) not in sys.path:
         sys.path.insert(0, str(repo))
-    from voicebridge.gateway import openclaw_dispositions as OD  # noqa: E402
+    from voicebridge.gateway import qubit_dispositions as OD  # noqa: E402
     return getattr(OD, "PINNED_SURFACE_DISPOSITIONS", {})
 
 
@@ -299,7 +299,7 @@ def _architecture_gated():
     repo = Path(__file__).resolve().parents[1]
     if str(repo) not in sys.path:
         sys.path.insert(0, str(repo))
-    from voicebridge.gateway import openclaw_dispositions as OD  # noqa: E402
+    from voicebridge.gateway import qubit_dispositions as OD  # noqa: E402
     return getattr(OD, "OPERATOR_ONLY_ARCHITECTURE", frozenset())
 
 
@@ -590,7 +590,7 @@ def main(argv: list | None = None) -> int:
 
     manifest = {
         "schema": "qubit-openclaw-upgrade-manifest/1",
-        "generated_by": "scripts/openclaw_upgrade_manifest.py",
+        "generated_by": "scripts/qubit_upgrade_manifest.py",
         "description": (
             "Deterministic contractual-pin -> latest upgrade/diff manifest. "
             "Delta rows and the full contractual-pin method surface are "

@@ -77,6 +77,11 @@ LEGAL_ATTRIBUTION_PHRASES = [
 #   * "in-process Hermes backend"   -> egress-guard developer diagnostics
 #   * LEGAL_ATTRIBUTION_PHRASES     -> required copyright/licence notices
 ALLOWED_SURFACE_PHRASES = [
+    "X-Qubit-Session-Token",
+    # Legacy session header: read-only fallback in webui._qubit_token_ok so
+    # bundles cached before the rename keep working. Never emitted (the
+    # server injects __QUBIT_SESSION_TOKEN__ only); first-party senders use
+    # the Qubit name.
     "X-Hermes-Session-Token",
     "never dispatch to OpenClaw; only speak the plan",
     "arguments forwarded to the Qubit-owned Hermes",
@@ -95,9 +100,9 @@ ALLOWED_SURFACE_PHRASES = [
 # Bundle identifiers/globals that are wire protocol or developer API, not
 # product-facing text (kept for compatibility).
 PROTOCOL_TOKENS = [
-    "X-Hermes-Session-Token",
-    "__HERMES_SESSION_TOKEN__",
-    "__HERMES_BASE_PATH__",
+    "X-Qubit-Session-Token",
+    "__QUBIT_SESSION_TOKEN__",
+    "__QUBIT_BASE_PATH__",
 ]
 
 _BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
@@ -287,7 +292,7 @@ def _get(port, path):
 
     req = urllib.request.Request(
         "http://127.0.0.1:%d%s" % (port, path), method="GET")
-    req.add_header("X-Hermes-Session-Token", "test-token")
+    req.add_header("X-Qubit-Session-Token", "test-token")
     with urllib.request.urlopen(req, timeout=8) as resp:
         return resp.status, resp.headers.get("Content-Type", ""), resp.read()
 
@@ -441,7 +446,9 @@ def test_served_theme_carries_full_visual_identity(tmp_path):
 
     status, payload = HC.dispatch(cfg, "GET", "/api/dashboard/themes", {}, {})
     assert status == 200 and payload["active"] == "qubit", payload
-    theme = payload["themes"][0]["definition"]
+    qubit_rows = [t for t in payload["themes"] if t.get("name") == "qubit"]
+    assert qubit_rows, payload
+    theme = qubit_rows[0]["definition"]
     assert theme == json.loads(THEME.read_text(encoding="utf-8")), \
         "served theme diverges from the recorded overlay file"
 

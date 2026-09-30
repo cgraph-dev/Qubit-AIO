@@ -5,7 +5,7 @@ carry it (desktop i18n + Electron strings, desktop/bootstrap package metadata,
 and the specific runtime strings repaired in this wave) while proving the
 wire/legal/provenance identifiers that MUST survive are still present.
 
-Wire identifiers (``X-Hermes-Session-Token``, ``HERMES_*`` env names,
+Wire identifiers (``X-Qubit-Session-Token``, ``HERMES_*`` env names,
 ``hermes:...`` IPC channels, ``hermes-agent`` install paths, ``~/.hermes``,
 the upstream provenance URL) are compatibility contract, not branding, and are
 asserted present on purpose.
@@ -56,7 +56,7 @@ BANNED_REGEXES = (
 #: de-branded (owner directive 2026-09-25) and no longer name the upstream owner.
 #: The canonical repository replaces every user-facing GitHub/release/docs link.
 ALLOWED_IDENTIFIERS = (
-    "X-Hermes-Session-Token",
+    "X-Qubit-Session-Token",
     "HERMES_DESKTOP_REMOTE_URL",
     "hermes:backend-exit",
     "hermes-agent",

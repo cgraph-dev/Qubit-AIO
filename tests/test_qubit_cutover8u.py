@@ -208,7 +208,7 @@ def test_flag_off_keeps_compat_behavior_and_rollback(tmp_path):
     try:
         req = urllib.request.Request(
             f"http://127.0.0.1:{ui._server.server_address[1]}/agent/api/status")
-        req.add_header("X-Hermes-Session-Token", "test-token")
+        req.add_header("X-Qubit-Session-Token", "test-token")
         with urllib.request.urlopen(req, timeout=15) as r:
             out = json.loads(r.read())
         # Qubit compat status shape, not the fork's raw /api/status.
@@ -242,14 +242,14 @@ def test_flag_on_serves_fork_reads_and_gates_sensitive(tmp_path):
         "port=ui._server.server_address[1]\n"
         "def get(path):\n"
         "    req=urllib.request.Request('http://127.0.0.1:%d%s'%(port,path))\n"
-        "    req.add_header('X-Hermes-Session-Token','test-token')\n"
+        "    req.add_header('X-Qubit-Session-Token','test-token')\n"
         "    try:\n"
         "        r=urllib.request.urlopen(req,timeout=20); return r.status, r.read().decode()\n"
         "    except urllib.error.HTTPError as e: return e.code, e.read().decode()\n"
         "def post(path, body):\n"
         "    data=json.dumps(body).encode()\n"
         "    req=urllib.request.Request('http://127.0.0.1:%d%s'%(port,path), method='POST', data=data)\n"
-        "    req.add_header('X-Hermes-Session-Token','test-token')\n"
+        "    req.add_header('X-Qubit-Session-Token','test-token')\n"
         "    req.add_header('Content-Type','application/json')\n"
         "    try:\n"
         "        r=urllib.request.urlopen(req,timeout=20); return r.status, r.read().decode()\n"
@@ -404,7 +404,7 @@ def test_webui_write_middleware_proxies_only_allowlisted_writes(
         data = json.dumps({"confirm": True}).encode()
         req = urllib.request.Request(
             f"http://127.0.0.1:{port}{path}", method="POST", data=data)
-        req.add_header("X-Hermes-Session-Token", "test-token")
+        req.add_header("X-Qubit-Session-Token", "test-token")
         req.add_header("Content-Type", "application/json")
         try:
             r = urllib.request.urlopen(req, timeout=15)

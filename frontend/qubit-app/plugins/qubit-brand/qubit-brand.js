@@ -4,8 +4,8 @@
  * (theming API, no vendored edits). Upstream names remain only in legal
  * notices, attribution, provenance, and compatibility records. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React;
   var e = React.createElement;
 
@@ -42,10 +42,10 @@
         style: {opacity: 0.7, fontSize: 13}},
         "No settings on this page; it records the brand surface only."));
   }
-  window.__HERMES_PLUGINS__.register("qubit-brand", QubitBrandPage);
-  if (window.__HERMES_PLUGINS__.registerSlot) {
-    window.__HERMES_PLUGINS__.registerSlot("qubit-brand", "header-left", QubitMark);
-    window.__HERMES_PLUGINS__.registerSlot("qubit-brand", "docs:top", DocsNotice);
+  window.__QUBIT_PLUGINS__.register("qubit-brand", QubitBrandPage);
+  if (window.__QUBIT_PLUGINS__.registerSlot) {
+    window.__QUBIT_PLUGINS__.registerSlot("qubit-brand", "header-left", QubitMark);
+    window.__QUBIT_PLUGINS__.registerSlot("qubit-brand", "docs:top", DocsNotice);
   }
 
   /* Docs page notice: the built-in Docs tab embeds the upstream docs site

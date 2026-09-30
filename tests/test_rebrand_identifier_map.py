@@ -56,7 +56,7 @@ EXPECTED_RENAMES = {
 NEVER_RENAME = (
     '"hermes_home"',             # persisted DB/JSON key (quote-adjacent)
     "metadata.hermes",           # read-old frontmatter key
-    "X-Hermes-Session-Token",    # wire header
+    "X-Qubit-Session-Token",    # wire header
     "HermesAgent/",              # User-Agent prefix value
     "window.__HERMES_PLUGINS__",  # frontend global
     "Copyright (c) 2025 Nous Research",  # legal attribution line
@@ -127,7 +127,7 @@ def test_never_rename_strings_survive(tmp_path):
         '    rec = {"hermes_home": str(hermes_home)}\n'
         '    fm = {"metadata": {"hermes": {"tags": []}}}\n'
         '    dot = "metadata.hermes"\n'
-        '    hdr = "X-Hermes-Session-Token"\n'
+        '    hdr = "X-Qubit-Session-Token"\n'
         '    ua = "HermesAgent/1.2.3"\n'
         '    js = "window.__HERMES_PLUGINS__"\n'
         '    legal = "Copyright (c) 2025 Nous Research"\n'

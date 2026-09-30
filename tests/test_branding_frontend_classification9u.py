@@ -8,8 +8,8 @@ tree is where a leak is introduced; the bundle scan only sees it after a build.
 The known residuals are exactly:
 
 * allowlisted wire identifiers (policy §2.2 / allowlist row 75):
-  ``X-Hermes-Session-Token``, ``__HERMES_SESSION_TOKEN__``,
-  ``__HERMES_BASE_PATH__``;
+  ``X-Qubit-Session-Token``, ``__QUBIT_SESSION_TOKEN__``,
+  ``__QUBIT_BASE_PATH__``;
 * the DocsPage provenance URL constant (allowlist row 72, owner ruling
   requested — see ``docs/archive/2026-09-22-pre-reset/QUBIT_BRANDING_RULING_REQUEST_2026-09-21.md`` §1a).
 
@@ -31,9 +31,9 @@ SRC = REPO / "frontend" / "qubit-web" / "src"
 # Allowlisted wire identifiers that legitimately remain in source (policy
 # §2.2; allowlist row 75).
 _WIRE_TOKENS = (
-    "X-Hermes-Session-Token",
-    "__HERMES_SESSION_TOKEN__",
-    "__HERMES_BASE_PATH__",
+    "X-Qubit-Session-Token",
+    "__QUBIT_SESSION_TOKEN__",
+    "__QUBIT_BASE_PATH__",
 )
 
 # The single documented provenance URL constant (allowlist row 72; owner

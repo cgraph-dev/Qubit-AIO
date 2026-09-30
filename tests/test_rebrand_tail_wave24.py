@@ -11,7 +11,7 @@ legacy brand in outbound, user-facing request headers:
 This wave de-brands those product-identity values to ``qubit-cli/`` /
 ``qubit-agent/`` / ``QubitAgent``. Preserved by rule (never flagged here):
 external model IDs, real ``*.nousresearch.com`` service endpoints, ``~/.hermes``
-read-old paths, wire identifiers (``X-Hermes-Session-Token``, the Slack
+read-old paths, wire identifiers (``X-Qubit-Session-Token``, the Slack
 ``hermes_*`` action ids, the OpenAI Codex ``originator``), and legal/provenance
 comments.
 

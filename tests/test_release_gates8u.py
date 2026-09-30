@@ -238,9 +238,9 @@ def test_served_dashboard_is_qubit_branded_with_injection(tmp_path):
         title = re.search(r"<title>(.*?)</title>", text, flags=re.S)
         assert title is not None, "served dashboard has no <title>"
         assert "Qubit" in title.group(1), title.group(1)
-        assert "__HERMES_SESSION_TOKEN__" in text, "session token not injected"
+        assert "__QUBIT_SESSION_TOKEN__" in text, "session token not injected"
         assert "test-token" in text, "loopback token value not injected"
-        assert "__HERMES_BASE_PATH__" in text, "base path not injected"
+        assert "__QUBIT_BASE_PATH__" in text, "base path not injected"
         assert "__QUBIT_API_PREFIX__" in text, "api prefix not injected"
         assert "/agent" in text, "api prefix value not injected"
     finally:

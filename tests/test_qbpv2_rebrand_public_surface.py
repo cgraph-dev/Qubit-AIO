@@ -26,9 +26,9 @@ DIST = REPO_ROOT / "frontend" / "qubit-dist"
 # Internal compatibility / wire-protocol identifiers (not product names) —
 # keep in sync with docs/archive/2026-09-21/QUBIT_REBRAND_ALLOWLIST.md.
 ALLOWED_PUBLIC_TOKENS = (
-    "__HERMES_BASE_PATH__",
-    "__HERMES_SESSION_TOKEN__",
-    "X-Hermes-Session-Token",
+    "__QUBIT_BASE_PATH__",
+    "__QUBIT_SESSION_TOKEN__",
+    "X-Qubit-Session-Token",
 )
 
 # The upstream mount must not exist at all.

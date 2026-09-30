@@ -2,7 +2,7 @@
 
 Two independent proofs:
 
-1. every disposition in ``voicebridge.gateway.openclaw_dispositions`` is checked
+1. every disposition in ``voicebridge.gateway.qubit_dispositions`` is checked
    against the AST of the real RPC handler: IMPLEMENTED handlers must perform
    backend work, and SAFE_EQUIVALENT / OPERATOR_ONLY handlers must actually
    emit the declared typed code;
@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
 
 def _cfg(tmp_path, monkeypatch):
@@ -37,7 +37,7 @@ def _cfg(tmp_path, monkeypatch):
 
 # ---------------------------------------------------------------- static proof
 def test_dispositions_match_registered_handler_behavior():
-    from voicebridge.gateway import openclaw_dispositions as OD
+    from voicebridge.gateway import qubit_dispositions as OD
     from voicebridge.gateway import rpc as R
 
     methods, funcs, consts = OUM._parse_rpc_handlers(

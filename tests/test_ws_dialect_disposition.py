@@ -98,7 +98,7 @@ def _start(tmp_path):
 def _req(port, method, path, body=None, headers=None, token="test-token"):
     hdrs = dict(headers or {})
     hdrs.setdefault("X-Api-Token", token)
-    hdrs.setdefault("X-Hermes-Session-Token", token)
+    hdrs.setdefault("X-Qubit-Session-Token", token)
     data = json.dumps(body).encode() if body is not None else None
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     conn.request(method, path, body=data, headers=hdrs)

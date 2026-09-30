@@ -25,7 +25,7 @@
    },
    {
     "qubit": "frontend/qubit-web/src/lib/wsTicket.test.ts",
-    "qubit_sha256": "048c29908307d2455e17aa3d14f1878f349b3484d3bf045db61a01b9d3a762da",
+    "qubit_sha256": "9bbd8e4f2016c6b65bfa4baa31e95d5df77bbbd12c92403f8f3de7223544c772",
     "role": "Qubit-added contract test for the Qubit-owned WS-ticket client (`POST /agent/api/auth/ws-ticket`) that the /chat terminal upgrade uses; no upstream counterpart.",
     "affected_regression_test": "tests/test_branding_parity_wave3.py"
    },
@@ -127,7 +127,7 @@
    },
    {
     "qubit": "frontend/qubit-web/src/lib/events-sse.ts",
-    "qubit_sha256": "1b94f798d60dc59ca3a009c7351bbef885ebd73fea092a4f0eab9eb278473208",
+    "qubit_sha256": "426edccb72c21525099fc20cb49895f46afb7d6bd2e9331527f802d2d9bf2b48",
     "role": "Qubit-added authenticated SSE reader for the single Qubit event path (`GET /api/events/stream`, served by `voicebridge/webui.py:_events_stream`): fetch + ReadableStream/TextDecoder frame parser (because `EventSource` cannot attach the dashboard auth header), `?last_seq=` journal replay cursor, id/event/data frames, comment heartbeats, and the `resync` overflow sentinel. No upstream counterpart: the vendored sidebar used WebSockets, which Qubit refuses with HTTP 426 `WS_SINGLE_PATH`.",
     "affected_regression_test": "frontend/qubit-web/src/lib/events-sse.test.ts"
    },
@@ -183,7 +183,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-approvals/qubit-approvals.js",
-    "qubit_sha256": "ef89b674e8e2bf16b190d2d8c18a11610ce591b25b9f675154272ddee268c31d",
+    "qubit_sha256": "c86d2d925d0853d0b36c8782dd35368d5385e45e1d57a8985454e050d97ee6bd",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -193,7 +193,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-boards/qubit-boards.js",
-    "qubit_sha256": "e9c479e0453509ef21f8d60910e752d93cb2ab3f40a770bc2a45562ca7034ce5",
+    "qubit_sha256": "d40d66fea3c411836b2d89f3a42f89ef8227825d90178e92969527de74db1e87",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -203,7 +203,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-brand/qubit-brand.js",
-    "qubit_sha256": "3e27c14d4e6eb3a30b0846c8219c3deb1442852378468317e962fb6af902afa8",
+    "qubit_sha256": "b8b1080da1ad24a10ad7afba9223f0cfb70b0b9e2a6c60f8aee44a43ad18fe5f",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -213,7 +213,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-devices/qubit-devices.js",
-    "qubit_sha256": "c09b7f8710d18bd3ca0f65cc0fe7953999194812c043d696400725db1df3695b",
+    "qubit_sha256": "4b645a2aa5f5445f0f5f7b342a840ba4817dcd624e828faf017d6eba2b4b2660",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -223,7 +223,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-gateway/qubit-gateway.js",
-    "qubit_sha256": "f5c01b3feb73d2cacb1bbfe7e8aed3e451159b64204335d4990a2aa234ca60ec",
+    "qubit_sha256": "796de5a1c679b0b4c9397c8c10462f578d99842968f5b00c06596f8a97cc85c1",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -233,7 +233,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-memory/qubit-memory.js",
-    "qubit_sha256": "388039b3302fa9b29401cfab1e5a48eb8f20b22e743ea109a247e8a13552d1fb",
+    "qubit_sha256": "8c0d2a94c25c10d7bc2e0462b2c3c272920a7917c9fd0afd5b379a1fecd29d3e",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -243,7 +243,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-models/qubit-models.js",
-    "qubit_sha256": "49160544fd81c22b7de2d95e564ae7e8cda9a04ee3b0da36e218ac9d6bde4428",
+    "qubit_sha256": "4f48fac35813a060148a3ff4a2f97da311c5c2db29cf45d7ac96418533c86c3f",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -253,7 +253,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-ops/qubit-ops.js",
-    "qubit_sha256": "fa88810b8df7b54d013f013b8a9a0b250b098caea1ed2c398dba5204b66727f7",
+    "qubit_sha256": "5eb5fccc6ebe35ecbdc7f4307d2c8cd08c9f0f9a639b63db07daacd7556a71d9",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -263,7 +263,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-reports/qubit-reports.js",
-    "qubit_sha256": "b4603ce61c73fd85f93bf9ee7778ab2ad20c2b12813b712d9b103fab42105ac3",
+    "qubit_sha256": "93ddaa9946d4e0ee1bd6c11150dfc421e1eb90c94e21a2f9707c4a0d79f50f5e",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -273,7 +273,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-runtime/qubit-runtime.js",
-    "qubit_sha256": "361dbd37fbb68fd47d5afacd2f592014020f57f3498be1844c9a7de9ac8ab37a",
+    "qubit_sha256": "d0ff1124a4fafd82948927a84b28d93199ff278f0fc3d7c6bb16cecbe0dea051",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -512,7 +512,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "9ba88d36e329c9bc5a5bd89ce5488e95c9c55ba1c41b786aadd0c7c3f3c26b7c",
    "qubit": "frontend/qubit-web/src/components/AuthWidget.tsx",
-   "qubit_sha256": "ec7dd409f6e30515b69521728930a5e37353257765ed6c71e295f818a7509f6c",
+   "qubit_sha256": "96f021b8c653e53fc07d9f5f23392e2d8daf40885beaa0b474555e3bcadda05e",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "9ba88d36e329c9bc5a5bd89ce5488e95c9c55ba1c41b786aadd0c7c3f3c26b7c",
@@ -564,7 +564,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "226ad17e5e532fd3619b7a97d18b7fe93d0de38f7e7401fe70ece076f5b870b5",
    "qubit": "frontend/qubit-web/src/components/ChatSidebar.test.tsx",
-   "qubit_sha256": "0d6b406c92608f241739b8a49c080846db0c96f0894e3b4f1e65a8946ae08df8",
+   "qubit_sha256": "cf1eb9595610bb1090503899ffd0f85eb6666dd75d4e1ea491630191365c4d17",
    "patch": "wave17/chat-sse-feed-tests: rewrite the vendored WebSocket transport tests to pin the SSE contract \u2014 authenticated fetch to `/api/events/stream`, id/data frame dispatch, `?last_seq=` resume on reconnect, terminal auth rejection, and abort on unmount; asserts no WebSocket is opened.",
    "reason": "Test-only companion to the ChatSidebar SSE migration; the vendored test exercised the retired `/api/events` WebSocket, which Qubit refuses with 426 `WS_SINGLE_PATH`. No runtime dependency or backend-route change.",
    "upstream_blob_sha256": "226ad17e5e532fd3619b7a97d18b7fe93d0de38f7e7401fe70ece076f5b870b5",
@@ -1383,7 +1383,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "b1558d75a8f6bbe851f12f9983d0095746e007ae3bf4b9f9012f0ac0ede19e05",
    "qubit": "frontend/qubit-web/src/lib/api.test.ts",
-   "qubit_sha256": "f3330dced5813b0e48c3b46cfed3468e300a4e4190be907d901739deb35f9605",
+   "qubit_sha256": "240055f76ca249d0d5315a789736a2b5cbb756e7c52900915d251ffefe9fc203",
    "patch": "wave2/public-rebrand-api-prefix-tests",
    "reason": "Update the vendored api tests to the Qubit-owned /agent API prefix. Test-only. Regression: tests/test_qbpv2_rebrand_public_surface.py.",
    "upstream_blob_sha256": "b1558d75a8f6bbe851f12f9983d0095746e007ae3bf4b9f9012f0ac0ede19e05",
@@ -1396,7 +1396,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
    "qubit": "frontend/qubit-web/src/lib/api.ts",
-   "qubit_sha256": "933680afbfa54b392b277cd3fcc176efe0c77828c04ba58e724ca1a8829d65fa",
+   "qubit_sha256": "437644baf12740458ab267398d928ffd13bee5e341d313648d19021bcf1bb020",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
@@ -1630,7 +1630,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "39a2ec1d34f416f75a4dcb853d6e7ba1fd97aa688482d5a2ba0585351cce9944",
    "qubit": "frontend/qubit-web/src/lib/dashboard-auth-reload.ts",
-   "qubit_sha256": "13aed042a6777d950981b14d711a33c49c90fcba0acb90868b1a55ac1c8a35a2",
+   "qubit_sha256": "afc7576055c521e96f40d33632089013146e25b3b62b422761abb3edee66a62e",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "39a2ec1d34f416f75a4dcb853d6e7ba1fd97aa688482d5a2ba0585351cce9944",
@@ -1734,11 +1734,11 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "b86db1264ee80f746dff70c709b24e7bc41ba3823b0f1774c6a8a5c3c5755bcc",
    "qubit": "frontend/qubit-web/src/lib/gatewayClient.test.ts",
-   "qubit_sha256": "b86db1264ee80f746dff70c709b24e7bc41ba3823b0f1774c6a8a5c3c5755bcc",
-   "patch": null,
-   "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline.",
+   "qubit_sha256": "ee9a2ef82d52a0112a67eaf0211341acbf62ed803dcda4ba1a69a8859600dd91",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "b86db1264ee80f746dff70c709b24e7bc41ba3823b0f1774c6a8a5c3c5755bcc",
-   "affected_regression_test": "tests/test_qubit_vendor8tf.py"
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -1955,7 +1955,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "dbc3445e56235ccc0f16a76c2a5731d13ca5f31cf2e980ee5f3d49acd65f5fa2",
    "qubit": "frontend/qubit-web/src/lib/profile-bootstrap.ts",
-   "qubit_sha256": "d3ac9aeda8e477a92e3ea1819bf830c725bfcf6aeece4e95abfdaf7258756546",
+   "qubit_sha256": "b60244348042124724f14f61cafaf61aadefe8790ae72d7ef40ee8bb3bc1cdfd",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "dbc3445e56235ccc0f16a76c2a5731d13ca5f31cf2e980ee5f3d49acd65f5fa2",
@@ -2514,7 +2514,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "83f836d954a53edd2063cadc171a0858dc53d221b80f9af17bda7b0e0eb54cbf",
    "qubit": "frontend/qubit-web/src/pages/ChatPage.tsx",
-   "qubit_sha256": "c14724cd33f00dc0a7cc5cae9ef7322af10beb7fdacee5398b740bae6191a72e",
+   "qubit_sha256": "4d20c3a8618b804bc66ac1033665b7d933d07134e874240b36814486ee5838b2",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "83f836d954a53edd2063cadc171a0858dc53d221b80f9af17bda7b0e0eb54cbf",
@@ -2553,7 +2553,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "99a72b939db339c0749678cf3ef2262d2fbd634ee162314a663cc05e7b77a13e",
    "qubit": "frontend/qubit-web/src/pages/DocsPage.tsx",
-   "qubit_sha256": "d77154fedba71a7b86ed4c897759ffb6716b6c5daa2de19a2daeec3c3132024e",
+   "qubit_sha256": "4c7e8dfa9838d140b2aeaa533e21694001e1bde842d8d8c64b4d945bb08b91dd",
    "patch": "Qubit rebrand: label the vendored docs iframe/link as upstream vendor documentation, keep the real provenance URL, and stop presenting it as Qubit's own docs",
    "reason": "Qubit identity promise (owner directive 2026-09-15): normal surfaces render Qubit while the genuine upstream docs URL is retained for attribution. Presentation-only; no logic or backend-route change.",
    "upstream_blob_sha256": "99a72b939db339c0749678cf3ef2262d2fbd634ee162314a663cc05e7b77a13e",
@@ -2709,7 +2709,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "bba893a19a462198548549b62a1156d343baa4402b22311286ab73673c00e804",
    "qubit": "frontend/qubit-web/src/pages/SessionsPage.tsx",
-   "qubit_sha256": "3bd988c10b784f4784881d92e104542e4d6edd25edfc989be130d7b5bbc8a21a",
+   "qubit_sha256": "0593be47cc103a869c379017ac5fecc13382b28003ff6bfc64f21fec94e8995d",
    "patch": "hermes_flow source label 'Hermes Flow' -> 'Qubit Flow' (owner rebrand; no logic change)",
    "reason": "Qubit rebrand of a product-facing session source label; the source id hermes_flow is unchanged for compatibility.",
    "upstream_blob_sha256": "bba893a19a462198548549b62a1156d343baa4402b22311286ab73673c00e804",
@@ -2722,7 +2722,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "9cdb802e1aeb60328e1701663cbb6fbddf7dca9275f946c2e13596b03a287f77",
    "qubit": "frontend/qubit-web/src/pages/SkillsPage.tsx",
-   "qubit_sha256": "3ed5044b3826ce6f736e08b36f03feaed68aeac2e47a7b87e2a1e6bd00213fed",
+   "qubit_sha256": "cff62d67581b848455ce4d67f4813f9bb7774e0ffc2537b209fc155d48f9f149",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "9cdb802e1aeb60328e1701663cbb6fbddf7dca9275f946c2e13596b03a287f77",
@@ -2800,7 +2800,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "f37ca0ab497efe1c8588f32afe677865b999c19393d71002ecfc004d30a7f990",
    "qubit": "frontend/qubit-web/src/plugins/registry.ts",
-   "qubit_sha256": "6fece9f54e45d43b28b17efa59ed6861cf77f9a7f266e39ecff7bfb8ed194620",
+   "qubit_sha256": "67a5c7df1a5eea92a70e2f0f9f67f4b8813c5713961fbf40e121b09243e49015",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "f37ca0ab497efe1c8588f32afe677865b999c19393d71002ecfc004d30a7f990",
@@ -2813,7 +2813,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "092b483dc1000d2de504b46d93faba88b2ea45d87a75a74265b41846a99c7417",
    "qubit": "frontend/qubit-web/src/plugins/sdk.d.ts",
-   "qubit_sha256": "9e94194fe2abb3f13080d9050ce4d77d8059687ad1cc21c67ff49c043c68313c",
+   "qubit_sha256": "3ec00bb9f7e955c7fac76471afd1e82a1a860c37a855a0924b1dcc19fdb1f4fc",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "092b483dc1000d2de504b46d93faba88b2ea45d87a75a74265b41846a99c7417",
@@ -2826,7 +2826,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "c65b4d964f69271bb4b4c728c9fc115411e3071d1dee19e7bfa4569b51f6d92b",
    "qubit": "frontend/qubit-web/src/plugins/slots.ts",
-   "qubit_sha256": "5df836b9681f7687982ca61d99406f81a831ab743195f4c1edbf1326bd287802",
+   "qubit_sha256": "af2bdcaaf2d6bf3c392fff4d46ef275c50cd2e1454fb4e68a879df3af4dcfa98",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "c65b4d964f69271bb4b4c728c9fc115411e3071d1dee19e7bfa4569b51f6d92b",

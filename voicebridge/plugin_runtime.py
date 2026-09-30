@@ -801,6 +801,53 @@ def status(cfg: Any) -> Dict[str, Any]:
             "estop": latched}
 
 
+def _bundled_rows() -> List[Dict[str, Any]]:
+    """Vendored bundled/user/entrypoint plugin rows (1:1 with the reference).
+
+    The reference ``plugins list`` enumerates the fork's bundled plugin tree
+    (``qubit_runtime/plugins/``) via the vendored discovery — 59 rows Hermes
+    shows that the Qubit registry never listed. These rows are read-only
+    metadata (id/key, version, description, source, enabled state from the
+    vendored allow-lists); lifecycle stays in this registry. A fork miss
+    yields no rows rather than breaking the list.
+    """
+    try:
+        from . import qubit_runtime as _QR
+        _QR.ensure_path()
+        from qubit_cli import plugins_cmd as _PC
+        entries = _PC._discover_all_plugins() or []
+        enabled = set(_PC._get_enabled_set() or [])
+        disabled = set(_PC._get_disabled_set() or [])
+        active = _PC._category_active_names() or frozenset()
+    except Exception:  # noqa: BLE001 - fork unavailable: builtins only
+        return []
+    rows: List[Dict[str, Any]] = []
+    for entry in entries:
+        try:
+            name, version, description, source, dir_path, key = entry
+        except (TypeError, ValueError):
+            continue
+        try:
+            status = _PC._plugin_status(name, enabled, disabled, key=key,
+                                        source=source, dir_path=dir_path,
+                                        active=active)
+        except Exception:  # noqa: BLE001 - status miss means disabled-safe
+            status = "disabled"
+        pid = str(key or name)
+        rows.append({
+            "id": pid, "kind": "", "entrypoint": "", "digest": "",
+            "label": str(name), "description": str(description or ""),
+            "provider": "", "version": str(version or ""),
+            "capabilities": [], "builtin": False,
+            "enabled": status == "enabled",
+            "source_kind": SOURCE_DIRECTORY if source == "bundled" else source,
+            "plugin_class": "", "install_dir": str(dir_path or ""),
+            "load_state": status, "setup_required": False,
+            "provides": {}, "warnings": [],
+        })
+    return rows
+
+
 def list_plugins(cfg: Any) -> Dict[str, Any]:
     """List registered plugins (built-ins first), redacted.
 
@@ -812,10 +859,19 @@ def list_plugins(cfg: Any) -> Dict[str, Any]:
         return refuse_estop("plugin list")
     rows = [dict(v) for v in _BUILTIN.values()]
     rows.extend(_load(cfg)["plugins"].values())
-    rows.sort(key=lambda r: r.get("id", ""))
+    rows.extend(_bundled_rows())
+    seen: set = set()
+    deduped: List[Dict[str, Any]] = []
+    for r in rows:
+        pid = str(r.get("id", ""))
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        deduped.append(r)
+    deduped.sort(key=lambda r: r.get("id", ""))
     return {"state": "OK", "schema": SCHEMA,
             "install_capability": INSTALL_CAPABILITY,
-            "plugins": [_public(r) for r in rows],
+            "plugins": [_public(r) for r in deduped],
             "catalog": plugin_catalog(cfg).get("plugins", [])}
 
 

@@ -360,13 +360,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // is a typed refusal because Qubit policy (PTY_NO_SHELL) refuses raw shells.
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
   // Bumped after a New-chat mint so `ChatSessionList` remounts and refetches,
-  // surfacing the freshly created session immediately.
-  const [sessionListNonce, setSessionListNonce] = useState(0);
-  const [terminalNoticeOpen, setTerminalNoticeOpen] = useState(false);
-  // Bumped after a New chat mint so `ChatSessionList` remounts and refetches,
   // surfacing the freshly created session immediately (its internal fetch only
   // runs on mount / manual Refresh).
   const [sessionListNonce, setSessionListNonce] = useState(0);
+  const [terminalNoticeOpen, setTerminalNoticeOpen] = useState(false);
   // A31: the side panel is one `role="complementary"` "Model & tools" wrapper
   // (the pinned Qubit structure) mounting the model box and session switcher.
   const [channel] = useState<string>(generateChatChannel);

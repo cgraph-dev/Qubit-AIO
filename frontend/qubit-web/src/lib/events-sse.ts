@@ -23,9 +23,9 @@
 export const EVENTS_STREAM_PATH = "/api/events/stream";
 
 const SSE_ACCEPT = "text/event-stream";
-const SESSION_HEADER = "X-Hermes-Session-Token";
+const SESSION_HEADER = "X-Qubit-Session-Token";
 // The native SSE gate (``_api_token_ok``) reads only ``X-Api-Token``; the
-// SPA's canonical header is ``X-Hermes-Session-Token``. Both carry the same
+// SPA's canonical header is ``X-Qubit-Session-Token``. Both carry the same
 // server-injected token, so send both and satisfy either gate.
 const API_TOKEN_HEADER = "X-Api-Token";
 
@@ -125,7 +125,7 @@ export function eventsStreamUrl(lastSeq: number | null, basePath = ""): string {
 function eventsStreamHeaders(): Headers {
   const headers = new Headers({ Accept: SSE_ACCEPT });
   const token =
-    typeof window !== "undefined" ? window.__HERMES_SESSION_TOKEN__ ?? "" : "";
+    typeof window !== "undefined" ? window.__QUBIT_SESSION_TOKEN__ ?? "" : "";
   if (token) {
     headers.set(SESSION_HEADER, token);
     headers.set(API_TOKEN_HEADER, token);
@@ -138,7 +138,7 @@ export interface EventsStreamRequest {
   lastSeq: number | null;
   /** Aborts the in-flight fetch and releases the reader on unmount/timeout. */
   signal: AbortSignal;
-  /** Server base path (``window.__HERMES_BASE_PATH__``); usually "". */
+  /** Server base path (``window.__QUBIT_BASE_PATH__``); usually "". */
   basePath?: string;
 }
 

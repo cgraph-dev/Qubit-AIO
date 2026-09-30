@@ -338,7 +338,7 @@ def test_gateway_card_browser(tmp_path):
     def api(method, path):
         req = urllib.request.Request(
             base + path, method=method,
-            headers={"X-Hermes-Session-Token": token,
+            headers={"X-Qubit-Session-Token": token,
                      "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=15) as r:

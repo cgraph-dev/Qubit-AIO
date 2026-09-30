@@ -4,8 +4,8 @@
  * degraded / error states; the raw backend payload stays available behind a
  * disclosure instead of being the whole page (no status-only tile). */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React, hooks = SDK.hooks, fetchJSON = SDK.fetchJSON;
   var e = React.createElement;
 
@@ -80,5 +80,5 @@
         e("pre", {style: Object.assign({}, S.code, {marginTop: 8})},
           JSON.stringify(data, null, 2).slice(0, 4000))));
   }
-  window.__HERMES_PLUGINS__.register("qubit-runtime", Runtime);
+  window.__QUBIT_PLUGINS__.register("qubit-runtime", Runtime);
 })();

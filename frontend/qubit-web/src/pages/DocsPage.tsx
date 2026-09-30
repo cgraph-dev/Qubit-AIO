@@ -110,9 +110,9 @@ async function fetchOpenApi(): Promise<OasDocument> {
   const prefix =
     (typeof window !== "undefined" && window.__QUBIT_API_PREFIX__) || "/agent";
   const token =
-    typeof window !== "undefined" ? window.__HERMES_SESSION_TOKEN__ : undefined;
+    typeof window !== "undefined" ? window.__QUBIT_SESSION_TOKEN__ : undefined;
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (token) headers["X-Hermes-Session-Token"] = token;
+  if (token) headers["X-Qubit-Session-Token"] = token;
   const res = await fetch(`${prefix}/openapi.json`, {
     credentials: "include",
     headers,

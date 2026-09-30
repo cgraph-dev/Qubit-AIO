@@ -1,13 +1,13 @@
 /* Qubit Operations — overlay plugin bundle (dependency-free IIFE).
- * Uses only window.__HERMES_PLUGIN_SDK__ (React, hooks, fetchJSON,
+ * Uses only window.__QUBIT_PLUGIN_SDK__ (React, hooks, fetchJSON,
  * authedFetch). Backend: GET /api/ops (catalog), POST /api/ops/run
  * (dashboard_ops.run_op — the SAME broker as CLI and voice), with
  * staged confirmations settled on the shared journal via
  * POST /api/ops/confirm|cancel. No frontend-only success: every control
  * surfaces the real backend state. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React;
   var hooks = SDK.hooks;
   var fetchJSON = SDK.fetchJSON;
@@ -282,5 +282,5 @@
               err) : null))));
   }
 
-  window.__HERMES_PLUGINS__.register("qubit-ops", Operations);
+  window.__QUBIT_PLUGINS__.register("qubit-ops", Operations);
 })();

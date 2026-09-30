@@ -197,7 +197,7 @@ def _get(port, path, token="test-token"):
 
     req = urllib.request.Request(
         "http://127.0.0.1:%d%s" % (port, path), method="GET")
-    req.add_header("X-Hermes-Session-Token", token)
+    req.add_header("X-Qubit-Session-Token", token)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()

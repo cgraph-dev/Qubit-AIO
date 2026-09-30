@@ -1,9 +1,9 @@
 declare global {
   interface Window {
     // Wire identifiers injected by the dashboard HTML (preserved as-is per the
-    // load-bearing-identifier rule; cf. __HERMES_SESSION_TOKEN__ in `@/lib/api`).
-    __HERMES_DASHBOARD_PROFILE__?: string;
-    __HERMES_INITIAL_PROFILE__?: string;
+    // load-bearing-identifier rule; cf. __QUBIT_SESSION_TOKEN__ in `@/lib/api`).
+    __QUBIT_DASHBOARD_PROFILE__?: string;
+    __QUBIT_INITIAL_PROFILE__?: string;
   }
 }
 
@@ -15,7 +15,7 @@ declare global {
 
 export function dashboardInitialProfile(): string {
   if (typeof window === "undefined") return "";
-  return window.__HERMES_INITIAL_PROFILE__ ?? "";
+  return window.__QUBIT_INITIAL_PROFILE__ ?? "";
 }
 
 /**
@@ -30,7 +30,7 @@ export function dashboardInitialProfile(): string {
  */
 export function dashboardServingProfile(): string {
   if (typeof window === "undefined") return "";
-  return window.__HERMES_DASHBOARD_PROFILE__ ?? "";
+  return window.__QUBIT_DASHBOARD_PROFILE__ ?? "";
 }
 
 export function initialProfileScope(

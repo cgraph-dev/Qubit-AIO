@@ -14,9 +14,9 @@
         "total": 566
       },
       "reference": {
-        "gated": 72,
+        "gated": 64,
         "missing": 0,
-        "ported": 751,
+        "ported": 759,
         "total": 823
       }
     },
@@ -34,9 +34,9 @@
         "total": 603
       },
       "route": {
-        "gated": 53,
+        "gated": 45,
         "missing": 0,
-        "ported": 224,
+        "ported": 232,
         "total": 277
       },
       "tool": {
@@ -46,9 +46,9 @@
         "total": 121
       }
     },
-    "gated": 123,
+    "gated": 115,
     "missing": 0,
-    "ported": 1266,
+    "ported": 1274,
     "total": 1389
   },
   "e2e_verified": false,
@@ -122,8 +122,8 @@
     "dashboard_ops.catalog": 566,
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
-    "qubit_compat.GATED": 64,
-    "qubit_compat.ROUTES": 454,
+    "qubit_compat.GATED": 61,
+    "qubit_compat.ROUTES": 459,
     "qubit_voice_top": 113,
     "reference_cli_sub": 317,
     "reference_cli_top": 71,
@@ -17474,28 +17474,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_tg_ob_cancel",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:799"
       },
       "id": "DELETE /api/messaging/telegram/onboarding/{pairing_id}",
       "method": "DELETE",
-      "qubit_counterpart": "DELETE /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "DELETE /api/messaging/telegram/onboarding/(?P<pairing_id>[^/]+) -> h_tg_ob_cancel",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit pairing list",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_wa_ob_cancel",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:640"
       },
       "id": "DELETE /api/messaging/whatsapp/onboarding/{pairing_id}",
       "method": "DELETE",
-      "qubit_counterpart": "DELETE /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "DELETE /api/messaging/whatsapp/onboarding/(?P<pairing_id>[^/]+) -> h_wa_ob_cancel",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit msg accounts",
@@ -18608,28 +18608,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_tg_ob_status",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:720"
       },
       "id": "GET /api/messaging/telegram/onboarding/{pairing_id}",
       "method": "GET",
-      "qubit_counterpart": "GET /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "GET /api/messaging/telegram/onboarding/(?P<pairing_id>[^/]+) -> h_tg_ob_status",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit pairing list",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_wa_ob_status",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:600"
       },
       "id": "GET /api/messaging/whatsapp/onboarding/{pairing_id}",
       "method": "GET",
-      "qubit_counterpart": "GET /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "GET /api/messaging/whatsapp/onboarding/(?P<pairing_id>[^/]+) -> h_wa_ob_status",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit msg accounts",
@@ -20148,56 +20148,56 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_tg_ob_start",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:697"
       },
       "id": "POST /api/messaging/telegram/onboarding/start",
       "method": "POST",
-      "qubit_counterpart": "POST /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "POST /api/messaging/telegram/onboarding/start -> h_tg_ob_start",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit projects create",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_tg_ob_apply",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:759"
       },
       "id": "POST /api/messaging/telegram/onboarding/{pairing_id}/apply",
       "method": "POST",
-      "qubit_counterpart": "POST /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "POST /api/messaging/telegram/onboarding/(?P<pairing_id>[^/]+)/apply -> h_tg_ob_apply",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit guard brain onboard apply",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_wa_ob_start",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:566"
       },
       "id": "POST /api/messaging/whatsapp/onboarding/start",
       "method": "POST",
-      "qubit_counterpart": "POST /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "POST /api/messaging/whatsapp/onboarding/start -> h_wa_ob_start",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit msg accounts",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_wa_ob_apply",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/messaging.py:609"
       },
       "id": "POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply",
       "method": "POST",
-      "qubit_counterpart": "POST /api/messaging/.*/onboarding.* -> __gate__",
+      "qubit_counterpart": "POST /api/messaging/whatsapp/onboarding/(?P<pairing_id>[^/]+)/apply -> h_wa_ob_apply",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit msg accounts",

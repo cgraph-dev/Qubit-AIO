@@ -4,8 +4,8 @@
  * (reports_list, insights) — the same journal/analytics modules as CLI
  * and voice. Every panel renders the real backend payload. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React;
   var hooks = SDK.hooks;
   var fetchJSON = SDK.fetchJSON;
@@ -194,5 +194,5 @@
       e("strong", null, String(value === undefined ? "—" : value)));
   }
 
-  window.__HERMES_PLUGINS__.register("qubit-reports", Reports);
+  window.__QUBIT_PLUGINS__.register("qubit-reports", Reports);
 })();

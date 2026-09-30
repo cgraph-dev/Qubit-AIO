@@ -312,13 +312,13 @@ def test_live_page_endpoints_answer_readonly():
             html = resp.read().decode("utf-8", "replace")
     except Exception:  # noqa: BLE001
         pytest.skip("live dashboard not running; controls auditor is DEGRADED")
-    match = re.search(r'window\.__HERMES_SESSION_TOKEN__="([^"]+)"', html)
+    match = re.search(r'window\.__QUBIT_SESSION_TOKEN__="([^"]+)"', html)
     if not match:
         pytest.skip("no session token served; controls auditor is DEGRADED")
     token = match.group(1)
     for path in _PAGE_ENDPOINTS:
         req = urllib.request.Request(
             _LIVE_BASE + "/agent" + path,
-            headers={"X-Hermes-Session-Token": token})
+            headers={"X-Qubit-Session-Token": token})
         with urllib.request.urlopen(req, timeout=15) as resp:
             assert resp.status == 200, path

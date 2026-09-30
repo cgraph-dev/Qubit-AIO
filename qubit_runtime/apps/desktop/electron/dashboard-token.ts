@@ -36,7 +36,7 @@ async function fetchPublicText(url, options: any = {}) {
 }
 
 function extractInjectedDashboardToken(html) {
-  const match = /window\.__HERMES_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")/.exec(String(html || ''))
+  const match = /window\.__QUBIT_SESSION_TOKEN__\s*=\s*("(?:\\.|[^"\\])*")/.exec(String(html || ''))
 
   if (!match) {
     return null

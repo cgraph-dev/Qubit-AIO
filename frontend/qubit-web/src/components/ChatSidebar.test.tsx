@@ -97,12 +97,12 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("WebSocket", webSocketSpy);
   reloadMocks.maybeReloadForLoopbackWsAuthFailure.mockReturnValue(false);
-  Object.defineProperty(window, "__HERMES_SESSION_TOKEN__", {
+  Object.defineProperty(window, "__QUBIT_SESSION_TOKEN__", {
     configurable: true,
     writable: true,
     value: "session-token-1",
   });
-  Object.defineProperty(window, "__HERMES_AUTH_REQUIRED__", {
+  Object.defineProperty(window, "__QUBIT_AUTH_REQUIRED__", {
     configurable: true,
     writable: true,
     value: false,
@@ -127,7 +127,7 @@ describe("ChatSidebar SSE event feed", () => {
     expect(url).toContain("/api/events/stream");
     const headers = init.headers as Headers;
     expect(headers.get("Accept")).toBe("text/event-stream");
-    expect(headers.get("X-Hermes-Session-Token")).toBe("session-token-1");
+    expect(headers.get("X-Qubit-Session-Token")).toBe("session-token-1");
     expect(headers.get("X-Api-Token")).toBe("session-token-1");
     expect(webSocketSpy).not.toHaveBeenCalled();
   });

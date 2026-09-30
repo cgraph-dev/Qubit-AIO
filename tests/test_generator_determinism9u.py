@@ -4,7 +4,7 @@ Four deterministic generators emit untracked artifacts:
 
 * ``scripts/page_coverage.py``             -> ``docs/generated/QUBIT_PAGE_COVERAGE_2026-09-21.json``
 * ``scripts/identifier_rename.py``         -> ``docs/archive/2026-09-21/QUBIT_IDENTIFIER_RENAME.json``
-* ``scripts/openclaw_upgrade_manifest.py`` -> ``docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json``
+* ``scripts/qubit_upgrade_manifest.py`` -> ``docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json``
 * ``scripts/openclaw_method_inventory.py`` -> ``docs/generated/QUBIT_OPENCLAW_METHOD_INVENTORY.json``
 
 For each, two independent renders must be byte-identical, and the render must
@@ -152,10 +152,10 @@ def test_identifier_rename_check_matches_on_disk_artifact():
         "regenerate with `python scripts/identifier_rename.py`")
 
 
-def test_openclaw_upgrade_manifest_is_deterministic(tmp_path, monkeypatch):
+def test_qubit_upgrade_manifest_is_deterministic(tmp_path, monkeypatch):
     _requires_clone(UPGRADE_CLONE)
-    mod = _load("openclaw_upgrade_manifest_gen9u",
-                "openclaw_upgrade_manifest.py")
+    mod = _load("qubit_upgrade_manifest_gen9u",
+                "qubit_upgrade_manifest.py")
     # The registry path is stored verbatim in the artifact, so run from the repo
     # root and use the generator's canonical relative default.
     monkeypatch.chdir(REPO)
@@ -166,10 +166,10 @@ def test_openclaw_upgrade_manifest_is_deterministic(tmp_path, monkeypatch):
     assert mod.main(argv + ["--out", str(out_b)]) == 0
     first = out_a.read_bytes()
     assert first == out_b.read_bytes(), (
-        "openclaw_upgrade_manifest.py is nondeterministic")
+        "qubit_upgrade_manifest.py is nondeterministic")
     assert first == UPGRADE_MANIFEST_ARTIFACT.read_bytes(), (
         "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json is "
-        "stale; regenerate with scripts/openclaw_upgrade_manifest.py")
+        "stale; regenerate with scripts/qubit_upgrade_manifest.py")
 
 
 def test_openclaw_method_inventory_is_deterministic(tmp_path, monkeypatch):

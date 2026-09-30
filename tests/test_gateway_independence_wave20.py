@@ -10,7 +10,7 @@ exists in those modules and that the control path resolves Qubit-owned units
 through the one broker/policy/audit/confirmation/e-stop chain.
 
 Deliberately NOT scanned (genuine wire/compat contract, owner decision D2):
-the OpenClaw ``openclaw.*`` RPC method names + the ``openclaw_handlers``
+the OpenClaw ``openclaw.*`` RPC method names + the ``qubit_handlers``
 package, and the vendored ``HERMES_*`` env names the fork still reads.
 """
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 This module owns the remaining contractual-pin sessions-family methods that are
 not part of the baseline read/create/delete slice in
-:mod:`voicebridge.gateway.openclaw_handlers.sessions`:
+:mod:`voicebridge.gateway.qubit_handlers.sessions`:
 
 * ``sessions.goal.*`` — a per-session goal persisted in the canonical store's
   ``model_config`` extension column (the same column the vendored runtime uses

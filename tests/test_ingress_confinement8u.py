@@ -364,7 +364,7 @@ def test_ops_run_and_confirm_share_one_canonical_path(tmp_path, monkeypatch):
 def _get(port, path, token="test-token"):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=20)
     conn.request("GET", path,
-                 headers={"X-Hermes-Session-Token": token})
+                 headers={"X-Qubit-Session-Token": token})
     resp = conn.getresponse()
     out = (resp.status, resp.read())
     conn.close()

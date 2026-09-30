@@ -78,7 +78,7 @@ def _mint(port, *, scope="stt", headers=None, body=None):
         f"http://127.0.0.1:{port}/agent/api/auth/ws-ticket", data=data,
         method="POST")
     req.add_header("Content-Type", "application/json")
-    for k, v in (headers or {"X-Hermes-Session-Token": "test-token"}).items():
+    for k, v in (headers or {"X-Qubit-Session-Token": "test-token"}).items():
         req.add_header(k, v)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:

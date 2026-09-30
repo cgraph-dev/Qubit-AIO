@@ -1193,7 +1193,7 @@ def _sess_poll(cfg: Any, params: Dict[str, Any]) -> Dict[str, Any]:
 # registry
 # --------------------------------------------------------------------------- #
 # Each method is registered with a literal ``registry.register("name", handler)``
-# call so ``scripts/openclaw_upgrade_manifest.py`` can prove (AST) which file
+# call so ``scripts/qubit_upgrade_manifest.py`` can prove (AST) which file
 # defines each handler. Only methods with a real canonical local backend (or a
 # named local counterpart / operator prerequisite) are registered; every other
 # contractual-pin family method stays explicitly OPEN.

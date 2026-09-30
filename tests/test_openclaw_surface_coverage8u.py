@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 MANIFEST = REPO_ROOT / "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"
-SCRIPT = REPO_ROOT / "scripts/openclaw_upgrade_manifest.py"
+SCRIPT = REPO_ROOT / "scripts/qubit_upgrade_manifest.py"
 DESCRIPTOR = "src/gateway/methods/core-descriptors.ts"
 
 TRUE_COUNTS = {"contractual_pin": 434, "observed_pin": 445}
@@ -39,7 +39,7 @@ ALLOWED = TERMINAL + ("OPERATOR_ONLY_ARCHITECTURE", "OPEN")
 
 def _load_script():
     spec = importlib.util.spec_from_file_location(
-        "openclaw_upgrade_manifest", SCRIPT)
+        "qubit_upgrade_manifest", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

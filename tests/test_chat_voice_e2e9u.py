@@ -261,7 +261,7 @@ def _mint(port, body=None):
         f"http://127.0.0.1:{port}/agent/api/auth/ws-ticket",
         data=json.dumps(body or {}).encode(), method="POST")
     req.add_header("Content-Type", "application/json")
-    req.add_header("X-Hermes-Session-Token", "test-token")
+    req.add_header("X-Qubit-Session-Token", "test-token")
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, json.loads(r.read())
@@ -278,7 +278,7 @@ def _raw_upgrade(port, path, *, origin=None):
         "Connection: Upgrade",
         f"Sec-WebSocket-Key: {key}",
         "Sec-WebSocket-Version: 13",
-        "X-Hermes-Session-Token: test-token",
+        "X-Qubit-Session-Token: test-token",
     ]
     if origin is not None:
         headers.append(f"Origin: {origin}")

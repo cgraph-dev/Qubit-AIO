@@ -6,8 +6,8 @@ theme comment still names ``hermes-theme-custom-css``; the webui head injection
 normalizes that reference in the served shell.
 
 D3/F7 constraint: the load-bearing wire identifiers
-(``__HERMES_SESSION_TOKEN__``, ``__HERMES_BASE_PATH__``,
-``X-Hermes-Session-Token``) are PRESERVED verbatim — they are never renamed.
+(``__QUBIT_SESSION_TOKEN__``, ``__QUBIT_BASE_PATH__``,
+``X-Qubit-Session-Token``) are PRESERVED verbatim — they are never renamed.
 """
 from __future__ import annotations
 
@@ -60,16 +60,16 @@ def _write_index(base: Path, html: str) -> Path:
 def test_debrand_helper_rewrites_only_theme_style_id():
     markup = (
         '<style id="hermes-theme-custom-css">'
-        "window.__HERMES_SESSION_TOKEN__;window.__HERMES_BASE_PATH__;"
-        "X-Hermes-Session-Token</style>"
+        "window.__QUBIT_SESSION_TOKEN__;window.__QUBIT_BASE_PATH__;"
+        "X-Qubit-Session-Token</style>"
     )
     out = ui.debrand_theme_style_id(markup)
     assert LEGACY not in out
     assert CANONICAL in out
     # Wire identifiers are preserved verbatim (never renamed).
-    assert "window.__HERMES_SESSION_TOKEN__" in out
-    assert "window.__HERMES_BASE_PATH__" in out
-    assert "X-Hermes-Session-Token" in out
+    assert "window.__QUBIT_SESSION_TOKEN__" in out
+    assert "window.__QUBIT_BASE_PATH__" in out
+    assert "X-Qubit-Session-Token" in out
 
 
 def test_served_head_replaces_stale_theme_style_id(tmp_path):
@@ -77,8 +77,8 @@ def test_served_head_replaces_stale_theme_style_id(tmp_path):
         tmp_path / "dist",
         "<!doctype html><html><head><title>Legacy title</title>"
         "<!-- applyTheme injects into <style id=\"hermes-theme-custom-css\"> -->"
-        "<script>window.__HERMES_SESSION_TOKEN__=\"t\";"
-        "window.__HERMES_BASE_PATH__=\"\";</script></head>"
+        "<script>window.__QUBIT_SESSION_TOKEN__=\"t\";"
+        "window.__QUBIT_BASE_PATH__=\"\";</script></head>"
         "<body><div id=\"root\"></div></body></html>",
     )
     _, html = _serve(base)
@@ -90,13 +90,13 @@ def test_served_head_title_is_qubit_and_wire_globs_preserved(tmp_path):
     base = _write_index(
         tmp_path / "dist",
         "<!doctype html><html><head><title>Whatever</title>"
-        "<script>window.__HERMES_SESSION_TOKEN__=\"t\";"
-        "window.__HERMES_BASE_PATH__=\"\";</script></head><body></body></html>",
+        "<script>window.__QUBIT_SESSION_TOKEN__=\"t\";"
+        "window.__QUBIT_BASE_PATH__=\"\";</script></head><body></body></html>",
     )
     _, html = _serve(base)
     assert "<title>Qubit Agent - Command Center</title>" in html
-    assert "window.__HERMES_SESSION_TOKEN__" in html
-    assert "window.__HERMES_BASE_PATH__" in html
+    assert "window.__QUBIT_SESSION_TOKEN__" in html
+    assert "window.__QUBIT_BASE_PATH__" in html
 
 
 def test_served_real_dist_head_has_no_legacy_theme_style_id():
@@ -106,8 +106,8 @@ def test_served_real_dist_head_has_no_legacy_theme_style_id():
     _, html = _serve(dist)
     assert LEGACY not in html
     # The wire globals the SPA reads must survive the head injection.
-    assert "window.__HERMES_SESSION_TOKEN__" in html
-    assert "window.__HERMES_BASE_PATH__" in html
+    assert "window.__QUBIT_SESSION_TOKEN__" in html
+    assert "window.__QUBIT_BASE_PATH__" in html
     # No visible legacy brand text in the served shell (wire identifiers aside).
     lowered = html.lower()
     for token in ("nousresearch", "nous research", "openclaw"):

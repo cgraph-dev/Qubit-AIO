@@ -24,9 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-FAMILY_MODULE = "voicebridge/gateway/openclaw_handlers/worktrees.py"
+FAMILY_MODULE = "voicebridge/gateway/qubit_handlers/worktrees.py"
 
 #: The typed SAFE_EQUIVALENT codes this family emits (method -> code).
 SAFE_EQUIVALENT = {
@@ -87,7 +87,7 @@ def test_registered_implementations_pass_manifest_behavior_proof():
     methods, funcs, consts, origins = OUM._parse_rpc_handlers_multi(sources)
     registry = set(_registry().names())
     ours = {m for m, origin in origins.items()
-            if origin.endswith("openclaw_handlers/worktrees.py")}
+            if origin.endswith("qubit_handlers/worktrees.py")}
     assert ours == set(IMPLEMENTED) | set(SAFE_EQUIVALENT), sorted(ours)
     assert ours <= registry, f"unregistered: {ours - registry}"
     for method in sorted(ours):

@@ -6,7 +6,7 @@ const TOKEN_RELOAD_STORAGE_KEY = "qubit.tokenReloadAttempted";
 const LEGACY_TOKEN_RELOAD_STORAGE_KEY = "hermes.tokenReloadAttempted";
 
 function dashboardAuthRequired(): boolean {
-  return typeof window !== "undefined" && !!window.__HERMES_AUTH_REQUIRED__;
+  return typeof window !== "undefined" && !!window.__QUBIT_AUTH_REQUIRED__;
 }
 
 function reloadDashboardWindow(): void {

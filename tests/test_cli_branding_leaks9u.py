@@ -166,7 +166,7 @@ def test_debrand_detector_closes_the_nousresearch_blind_spot():
     assert "upstream_url" in urls
 
     # detection is report-only: wire/provenance identifiers survive the pass.
-    for wire in ("X-Hermes-Session-Token", "__HERMES_BASE_PATH__",
+    for wire in ("X-Qubit-Session-Token", "__QUBIT_BASE_PATH__",
                  "HERMES_HOME", "NousResearch/hermes-media-studio"):
         new, _classes = mod._transform(f"value {wire} here")
         assert wire in new, (wire, new)

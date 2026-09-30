@@ -15,9 +15,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-MODULE = "voicebridge/gateway/openclaw_handlers/surface_control.py"
+MODULE = "voicebridge/gateway/qubit_handlers/surface_control.py"
 
 IMPL = ("controlUi.sessionPreview", "tools.invoke")
 SAFE = {

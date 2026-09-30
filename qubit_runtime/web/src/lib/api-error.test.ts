@@ -10,12 +10,12 @@ vi.mock("./dashboard-auth-reload", () => ({
 }));
 
 beforeEach(() => {
-  Object.defineProperty(window, "__HERMES_SESSION_TOKEN__", {
+  Object.defineProperty(window, "__QUBIT_SESSION_TOKEN__", {
     configurable: true,
     value: "tok",
     writable: true,
   });
-  Object.defineProperty(window, "__HERMES_AUTH_REQUIRED__", {
+  Object.defineProperty(window, "__QUBIT_AUTH_REQUIRED__", {
     configurable: true,
     value: false,
     writable: true,

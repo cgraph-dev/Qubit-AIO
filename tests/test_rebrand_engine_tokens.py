@@ -92,7 +92,7 @@ EXPECTED_IDENTIFIER_RENAMES = {
 NEVER_RENAME = (
     '"hermes_home"',             # persisted DB/JSON key (quoted)
     "metadata.hermes",           # read-old frontmatter key
-    "X-Hermes-Session-Token",
+    "X-Qubit-Session-Token",
     "HermesAgent/",
     "window.__HERMES_PLUGINS__",
     "HERMES_QWEN_",
@@ -135,7 +135,7 @@ def test_never_rename_literals_survive(tmp_path):
         '    rec = {"hermes_home": str(hermes_home), "x": hermes_home}\n'
         '    fm = {"metadata": {"hermes": {"tags": []}}}\n'
         '    dot = "metadata.hermes"\n'
-        '    hdr = "X-Hermes-Session-Token"\n'
+        '    hdr = "X-Qubit-Session-Token"\n'
         '    ua = "HermesAgent/1.0"\n'
         '    js = "window.__HERMES_PLUGINS__"\n'
         '    tok = os.environ.get("HERMES_QWEN_TOKEN")\n'

@@ -148,7 +148,7 @@ def test_each_ws_upgrade_returns_426_typed(server, path, code):
 
 
 def test_ws_upgrade_needs_no_browser_token(server):
-    # A browser WebSocket() cannot attach X-Hermes-Session-Token; the refusal
+    # A browser WebSocket() cannot attach X-Qubit-Session-Token; the refusal
     # gate must answer before auth (otherwise the client only sees a bare 401).
     # /console is a still-refused socket, so it proves the pre-auth gate.
     status, _, body = _upgrade(server, "/agent/api/console", token=None)

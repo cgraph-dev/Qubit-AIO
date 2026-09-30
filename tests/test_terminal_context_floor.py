@@ -268,7 +268,7 @@ def test_ws_ticket_mint_surfaces_the_context_error(tmp_path, monkeypatch):
             f"http://127.0.0.1:{port}/agent/api/auth/ws-ticket",
             data=b"{}", method="POST")
         req.add_header("Content-Type", "application/json")
-        req.add_header("X-Hermes-Session-Token", "test-token")
+        req.add_header("X-Qubit-Session-Token", "test-token")
         try:
             urllib.request.urlopen(req, timeout=8)
             raise AssertionError("expected 409 context-floor refusal")
@@ -354,7 +354,7 @@ def _mint(port, body=None):
         f"http://127.0.0.1:{port}/agent/api/auth/ws-ticket",
         data=json.dumps(body or {}).encode(), method="POST")
     req.add_header("Content-Type", "application/json")
-    req.add_header("X-Hermes-Session-Token", "test-token")
+    req.add_header("X-Qubit-Session-Token", "test-token")
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, json.loads(r.read())

@@ -11,7 +11,7 @@ Covers the 14 open ``dashboard:/...`` pages from ``docs/archive/2026-09-21/QUBIT
 2. rebrand — the served shell, the Qubit overlay source, and the patched
    product-surface baseline files expose no unrebranded product-facing
    "Hermes"/"OpenClaw" names (legal/provenance and protocol identifiers
-   such as ``X-Hermes-Session-Token`` are explicitly exempt);
+   such as ``X-Qubit-Session-Token`` are explicitly exempt);
 3. real backing route — every page's primary operation is driven through
    the production dispatcher / HTTP boundary used by CLI and voice, and
    returns truthful success or a typed-degraded gate (never 404/500 and
@@ -59,7 +59,7 @@ PAGE_BACKING = {
 
 # Protocol identifiers that legitimately keep the upstream name (wire
 # compatibility, not product identity).
-PROTOCOL_ALLOWED = {"X-Hermes-Session-Token"}
+PROTOCOL_ALLOWED = {"X-Qubit-Session-Token"}
 
 # Product-surface baseline files rebranded under the owner directive; each
 # carries a recorded patch in docs/HERMES_SOURCE_COMPARISON.json.
@@ -136,7 +136,7 @@ def _get(port, path, token="test-token", qubit=True):
         "http://127.0.0.1:%d%s" % (port, path), method="GET")
     if token:
         req.add_header(
-            "X-Hermes-Session-Token" if qubit else "X-Api-Token", token)
+            "X-Qubit-Session-Token" if qubit else "X-Api-Token", token)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()

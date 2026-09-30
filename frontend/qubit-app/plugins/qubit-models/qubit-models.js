@@ -1,5 +1,5 @@
 /* Qubit Models & Providers — overlay plugin bundle (dependency-free IIFE).
- * Uses only window.__HERMES_PLUGIN_SDK__ (React, hooks, fetchJSON).
+ * Uses only window.__QUBIT_PLUGIN_SDK__ (React, hooks, fetchJSON).
  * Every control calls the canonical resolver through the shared dashboard
  * op-dispatch (POST /api/ops/run -> voicebridge.dashboard_ops.run_op ->
  * voicebridge.model_profiles_ops -> providers/resolver). Reads execute;
@@ -8,7 +8,7 @@
  * (env:VAR/file:PATH): a raw value is refused typed, and key_ref is never
  * journaled. No second store, no second listener, no fabricated success. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
   if (!SDK) return;
   var React = SDK.React, hooks = SDK.hooks, fetchJSON = SDK.fetchJSON;
   var C = SDK.components || {};
@@ -460,5 +460,5 @@
               {key_ref: keyRef});
           }}, "Create")));
   }
-  window.__HERMES_PLUGINS__.register("qubit-models", Models);
+  window.__QUBIT_PLUGINS__.register("qubit-models", Models);
 })();

@@ -18,10 +18,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import openclaw_upgrade_manifest as OUM  # noqa: E402
+import qubit_upgrade_manifest as OUM  # noqa: E402
 
-MODULE_PATH = "voicebridge/gateway/openclaw_handlers/skills_extra.py"
-MODULE = "voicebridge.gateway.openclaw_handlers.skills_extra"
+MODULE_PATH = "voicebridge/gateway/qubit_handlers/skills_extra.py"
+MODULE = "voicebridge.gateway.qubit_handlers.skills_extra"
 
 SAFE = {
     "skills.bins": "SKILLS_BINS_LOCAL_BUNDLED",

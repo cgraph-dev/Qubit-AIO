@@ -246,7 +246,7 @@ def _http(port, method, path, body=None):
     data = _json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
                                  method=method, data=data)
-    req.add_header("X-Hermes-Session-Token", "test-token")
+    req.add_header("X-Qubit-Session-Token", "test-token")
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:

@@ -1,5 +1,5 @@
 /* Qubit Approvals — overlay plugin bundle (dependency-free IIFE).
- * Uses only window.__HERMES_PLUGIN_SDK__ (React, hooks, fetchJSON).
+ * Uses only window.__QUBIT_PLUGIN_SDK__ (React, hooks, fetchJSON).
  * Shell-wide pending-confirmation banner (header-banner slot) on the
  * SHARED journal: the same records CLI `qubit approvals`, voice yes/no,
  * and the classic dashboard settle. Confirm/Cancel POST the compat
@@ -8,8 +8,8 @@
  * when nothing is pending. Staged mutations answer 409 (never 2xx) so a
  * pending item can never look executed before it is. */
 (function () {
-  var SDK = window.__HERMES_PLUGIN_SDK__;
-  if (!SDK || !window.__HERMES_PLUGINS__) return;
+  var SDK = window.__QUBIT_PLUGIN_SDK__;
+  if (!SDK || !window.__QUBIT_PLUGINS__) return;
   var React = SDK.React;
   var hooks = SDK.hooks;
   var fetchJSON = SDK.fetchJSON;
@@ -172,9 +172,9 @@
           })));
   }
 
-  if (window.__HERMES_PLUGINS__.registerSlot) {
-    window.__HERMES_PLUGINS__.registerSlot(
+  if (window.__QUBIT_PLUGINS__.registerSlot) {
+    window.__QUBIT_PLUGINS__.registerSlot(
       "qubit-approvals", "header-banner", ApprovalsBanner);
   }
-  window.__HERMES_PLUGINS__.register("qubit-approvals", ApprovalsPage);
+  window.__QUBIT_PLUGINS__.register("qubit-approvals", ApprovalsPage);
 })();

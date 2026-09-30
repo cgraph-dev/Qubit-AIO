@@ -93,7 +93,7 @@ def _api(base: str, token: str, method: str, path: str, body=None):
         data=data,
         method=method,
         headers={
-            "X-Hermes-Session-Token": token,
+            "X-Qubit-Session-Token": token,
             "Content-Type": "application/json",
         },
     )

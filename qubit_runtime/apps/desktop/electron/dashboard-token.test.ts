@@ -19,18 +19,18 @@ import {
 } from './dashboard-token'
 
 test('extractInjectedDashboardToken reads the JSON-encoded dashboard token', () => {
-  const html = '<script>window.__HERMES_SESSION_TOKEN__="served-token";window.__HERMES_BASE_PATH__=""</script>'
+  const html = '<script>window.__QUBIT_SESSION_TOKEN__="served-token";window.__QUBIT_BASE_PATH__=""</script>'
   assert.equal(extractInjectedDashboardToken(html), 'served-token')
 })
 
 test('extractInjectedDashboardToken handles escaped token strings', () => {
-  const html = '<script>window.__HERMES_SESSION_TOKEN__="served\\\\token\\"quoted";</script>'
+  const html = '<script>window.__QUBIT_SESSION_TOKEN__="served\\\\token\\"quoted";</script>'
   assert.equal(extractInjectedDashboardToken(html), 'served\\token"quoted')
 })
 
 test('extractInjectedDashboardToken returns null for missing or malformed values', () => {
   assert.equal(extractInjectedDashboardToken('<html></html>'), null)
-  assert.equal(extractInjectedDashboardToken('<script>window.__HERMES_SESSION_TOKEN__={bad}</script>'), null)
+  assert.equal(extractInjectedDashboardToken('<script>window.__QUBIT_SESSION_TOKEN__={bad}</script>'), null)
 })
 
 test('dashboardIndexUrl preserves dashboard path prefixes', () => {
@@ -45,7 +45,7 @@ test('resolveServedDashboardToken uses the served token and logs when it differs
     fetchText: async url => {
       assert.equal(url, 'http://127.0.0.1:9120/')
 
-      return '<script>window.__HERMES_SESSION_TOKEN__="served-token";</script>'
+      return '<script>window.__QUBIT_SESSION_TOKEN__="served-token";</script>'
     },
     rememberLog: line => logs.push(line)
   })
@@ -100,7 +100,7 @@ test('isForeignBackendToken only flags a mismatched token from a dead child', ()
 test('adoptServedDashboardToken adopts drift from a live child', async () => {
   const token = await adoptServedDashboardToken('http://127.0.0.1:9120', 'spawn-token', {
     childAlive: () => true,
-    fetchText: async () => '<script>window.__HERMES_SESSION_TOKEN__="served-token";</script>'
+    fetchText: async () => '<script>window.__QUBIT_SESSION_TOKEN__="served-token";</script>'
   })
 
   assert.equal(token, 'served-token')
@@ -111,7 +111,7 @@ test('adoptServedDashboardToken refuses a foreign token when our child is dead',
     () =>
       adoptServedDashboardToken('http://127.0.0.1:9120', 'spawn-token', {
         childAlive: () => false,
-        fetchText: async () => '<script>window.__HERMES_SESSION_TOKEN__="squatter-token";</script>',
+        fetchText: async () => '<script>window.__QUBIT_SESSION_TOKEN__="squatter-token";</script>',
         label: 'Hermes backend for profile "work"'
       }),
     /profile "work".*process we did not spawn/

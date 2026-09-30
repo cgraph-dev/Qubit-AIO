@@ -186,7 +186,7 @@ async function startRemote(python: string, env: Record<string, string>, logPath:
           }
 
           return fetch(`${url}/api/status`, {
-            headers: { 'X-Hermes-Session-Token': REMOTE_TOKEN },
+            headers: { 'X-Qubit-Session-Token': REMOTE_TOKEN },
             signal: AbortSignal.timeout(2_000)
           })
             .then(response => response.status)

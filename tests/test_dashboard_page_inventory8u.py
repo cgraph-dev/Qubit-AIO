@@ -68,7 +68,7 @@ def _start(tmp_path):
 def _get(port, path, token="test-token"):
     req = urllib.request.Request(
         "http://127.0.0.1:%d%s" % (port, path), method="GET")
-    req.add_header("X-Hermes-Session-Token", token)
+    req.add_header("X-Qubit-Session-Token", token)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
@@ -136,7 +136,7 @@ def test_served_fleet_and_plugin_bundles_are_qubit_branded(tmp_path):
                 port, f"/plugins/{name}/dist/index.js")
             assert status == 200 and "javascript" in ctype, (name, status)
             # product-facing copy is Qubit; lowercase plugin ids/comments and
-            # the X-Hermes-Session-Token wire header are compatibility tokens.
+            # the X-Qubit-Session-Token wire header are compatibility tokens.
             assert b"Hermes Achievements" not in body, name
             assert b"Hermes Agent" not in body, name
             assert f'register("{name}"'.encode() in body, name
