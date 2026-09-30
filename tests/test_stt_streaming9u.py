@@ -449,3 +449,83 @@ def test_unavailable_backend_is_a_typed_refusal(tmp_path):
             assert err["code"] == "STT_UNAVAILABLE"
     finally:
         ui.stop()
+
+
+# ---------------------------------------------------------------------------
+# Accurate rescore (faster-whisper final wins over the streaming hypothesis)
+# ---------------------------------------------------------------------------
+def _stub_accurate(monkeypatch, text):
+    """Stub the whole-utterance rescore; records calls for gating asserts."""
+    import voicebridge.voice_edit.stt_client as SC
+
+    calls = []
+
+    def _fake(cfg, pcm, *, sample_rate=16000):
+        calls.append({"bytes": len(pcm), "sample_rate": sample_rate})
+        return text, ("" if text else "stub empty")
+
+    monkeypatch.setattr(SC, "transcribe_accurate", _fake)
+    return calls
+
+
+def _run_utterance(port, ticket, seconds=1.0):
+    """One start/audio/stop round-trip; returns (final, completed, seen)."""
+    with ws_connect(_ws_url(port, ticket), open_timeout=8) as ws:
+        ws.send(json.dumps({"type": "start", "request_id": "r",
+                            "format": "pcm_s16le", "sample_rate": 16000}))
+        _recv_json(ws)
+        ws.send(_frame(1, seconds))
+        ws.send(json.dumps({"type": "stop", "sequence": 2}))
+        final, seen = _drain_until(ws, "stt.final", timeout=30)
+        completed, _ = _drain_until(ws, "stt.completed", timeout=8)
+        return final, completed, seen
+
+
+def test_accurate_rescore_wins_over_streaming(tmp_path, monkeypatch):
+    _stub_accurate(monkeypatch, "Hello Qubit.")
+    ui, port = _start(tmp_path)
+    try:
+        _s, out = _mint(port, scope="stt")
+        final, completed, _ = _run_utterance(port, out["ticket"])
+        assert final["text"] == "Hello Qubit.", final
+        assert final["engine"] == "accurate", final
+        assert completed.get("final_text") == "Hello Qubit.", completed
+    finally:
+        ui.stop()
+
+
+def test_accurate_empty_keeps_streaming_final(tmp_path, monkeypatch):
+    _stub_accurate(monkeypatch, "")
+    ui, port = _start(tmp_path)
+    try:
+        _s, out = _mint(port, scope="stt")
+        final, completed, _ = _run_utterance(port, out["ticket"])
+        assert final["text"], final
+        assert "word" in final["text"], final
+        assert final["engine"] == "fake-window", final
+        assert completed.get("final_text") == final["text"]
+    finally:
+        ui.stop()
+
+
+def test_streaming_mode_skips_rescore(tmp_path, monkeypatch):
+    import voicebridge.voice_edit.stt_client as SC
+
+    def _boom(*_a, **_k):
+        raise AssertionError("rescore must not run in streaming mode")
+
+    monkeypatch.setattr(SC, "transcribe_accurate", _boom)
+    ui, port = _start(tmp_path)
+    try:
+        # stt_mode streaming disables the rescore (same gate as Right-Ctrl).
+        from voicebridge.config import Config
+        import yaml
+
+        p = tmp_path / "voice-streaming.yaml"
+        p.write_text("logging:\n  jsonl: false\nvoice_edit:\n  stt_mode: streaming\n")
+        ui.stt_ws.cfg = Config.load(p)
+        _s, out = _mint(port, scope="stt")
+        final, _, _ = _run_utterance(port, out["ticket"])
+        assert "word" in final["text"], final
+    finally:
+        ui.stop()

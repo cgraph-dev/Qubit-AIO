@@ -40,6 +40,10 @@ SCOPE_STT = "stt"
 
 MAX_AUDIO_BYTES = 1 << 20          # per-frame cap (1 MiB ~= 32 s @16k mono s16)
 MAX_UTTERANCE_S = 120.0            # hard cap on one request's audio
+#: Buffered PCM kept for the accurate rescore (2 MiB ~= 64 s @16k mono
+#: s16). Past the cap the streaming final stands alone and the rescore is
+#: skipped with a reason — bounding server RAM per request.
+RESCORE_MAX_BYTES = 1 << 21
 IDLE_TIMEOUT_S = 20.0             # no client frames -> close
 SUPPORTED_FORMATS = frozenset({"pcm_s16le", "pcm16", "s16le", "pcm"})
 MIN_SAMPLE_RATE = 8000
@@ -168,7 +172,8 @@ class SttWsServer:
             "req": None, "session": None, "seq": -1,
             "sr": TARGET_SR, "fmt": "pcm_s16le",
             "started": False, "audio_bytes": 0, "stop_at": None,
-            "engine": "local",
+            "engine": "local", "pcm": [], "pcm_bytes": 0,
+            "pcm_capped": False,
         }
         last_activity = time.monotonic()
         try:
@@ -307,6 +312,14 @@ class SttWsServer:
         if nbytes > MAX_AUDIO_BYTES * 4:  # ~120 s of 16-bit audio
             raise SttWsError("STT_TOO_LONG", "utterance exceeds the duration cap")
         st["audio_bytes"] = nbytes
+        # Buffer raw frames for the accurate rescore (bounded; the streaming
+        # session still gets every frame either way).
+        if not st.get("pcm_capped"):
+            if st.get("pcm_bytes", 0) + len(payload) > RESCORE_MAX_BYTES:
+                st["pcm_capped"] = True
+            else:
+                st.setdefault("pcm", []).append(bytes(payload))
+                st["pcm_bytes"] = st.get("pcm_bytes", 0) + len(payload)
         pcm = _s16le_to_float(payload)
         pcm = _resample_mono(pcm, int(st["sr"]), TARGET_SR)
         result = st["session"].accept(pcm)
@@ -314,6 +327,48 @@ class SttWsServer:
             self._send(sock, st, "stt.partial", sequence=sequence,
                        text=result.text, confidence=result.confidence,
                        segment=result.segment, replace=result.replace)
+
+    def _accurate_rescore(self, st: Dict[str, Any]) -> Dict[str, str]:
+        """Whole-utterance faster-whisper rescore of the buffered audio.
+
+        Returns ``{"text": ..., "engine": ..., "reason": ...}``: ``text`` is
+        "" when the rescore is disabled, unbuffered, capped, or failed — the
+        caller then keeps the streaming final. Mirrors the desktop helper's
+        two-stage design (streaming partials live, accurate final wins), so
+        the browser local-STT path gets the same words + punctuation the
+        Right-Ctrl path already enjoys. Never raises.
+        """
+        try:
+            mode = str((self.cfg.get("voice_edit", "stt_mode", default="accurate")
+                        if self.cfg is not None else "accurate") or "accurate"
+                       ).strip().lower()
+        except Exception:  # noqa: BLE001 - config-less read keeps rescore on
+            mode = "accurate"
+        if mode != "accurate":
+            return {"text": "", "engine": "", "reason": "stt_mode=" + mode}
+        chunks = st.get("pcm") or []
+        if not chunks:
+            if st.get("pcm_capped"):
+                return {"text": "", "engine": "",
+                        "reason": "utterance past rescore buffer cap"}
+            return {"text": "", "engine": "", "reason": "no buffered audio"}
+        try:
+            from .voice_edit.stt_client import transcribe_accurate
+        except Exception as exc:  # noqa: BLE001 - no rescore path available
+            return {"text": "", "engine": "",
+                    "reason": f"accurate unavailable: {type(exc).__name__}"}
+        try:
+            text, reason = transcribe_accurate(
+                self.cfg, b"".join(chunks),
+                sample_rate=int(st.get("sr") or TARGET_SR))
+        except Exception as exc:  # noqa: BLE001 - streaming final stands
+            return {"text": "", "engine": "",
+                    "reason": f"accurate failed: {type(exc).__name__}"}
+        text = str(text or "").strip()
+        if not text:
+            return {"text": "", "engine": "",
+                    "reason": reason or "accurate empty"}
+        return {"text": text, "engine": "accurate", "reason": ""}
 
     def _on_stop(self, sock: Any, st: Dict[str, Any], sequence: int) -> None:
         if not st["started"] or st["session"] is None:
@@ -326,17 +381,33 @@ class SttWsServer:
             final = session.finalize(st["stop_at"])
         finally:
             session.close()
-        if final is not None and not final.empty:
+        final_text = str(final.text).strip() if final is not None else ""
+        final_conf = float(final.confidence) if final is not None else 0.0
+        final_seg = int(final.segment) if final is not None else 0
+        winner = st.get("engine") or "streaming"
+        rescore_reason = ""
+        # The accurate rescore refines (or rescues, when streaming came back
+        # empty) the streaming final: words + punctuation from faster-whisper
+        # instead of the raw transducer hypothesis. A failed rescore keeps
+        # the streaming text.
+        res = self._accurate_rescore(st)
+        if res["text"]:
+            final_text, winner = res["text"], "accurate"
+        else:
+            rescore_reason = res["reason"]
+        if final_text:
+            st["engine"] = winner
             self._send(sock, st, "stt.final", sequence=sequence,
-                       text=final.text, confidence=final.confidence,
-                       segment=final.segment)
+                       text=final_text, confidence=final_conf,
+                       segment=final_seg)
             # One audit record -- char count only, never the transcript text.
             log_event("stt.final", engine=st["engine"], request_id=st["req"],
-                      chars=len(final.text),
-                      audio_ms=session.metrics.as_dict(st["stop_at"]).get("audio_ms"))
+                      chars=len(final_text),
+                      audio_ms=session.metrics.as_dict(st["stop_at"]).get("audio_ms"),
+                      rescore=winner, rescore_reason=rescore_reason or None)
         metrics = session.metrics.as_dict(st["stop_at"])
         self._send(sock, st, "stt.completed", sequence=sequence,
-                   final_text=(final.text if final else ""),
+                   final_text=final_text,
                    cancelled=False, metrics=metrics)
         self._reset_request(st)
 
@@ -364,7 +435,8 @@ class SttWsServer:
     @staticmethod
     def _reset_request(st: Dict[str, Any]) -> None:
         st.update(req=None, session=None, seq=-1, started=False,
-                  audio_bytes=0, stop_at=None)
+                  audio_bytes=0, stop_at=None, pcm=[], pcm_bytes=0,
+                  pcm_capped=False)
 
     def _emit_error(self, sock: Any, st: Dict[str, Any], code: str,
                     detail: str) -> None:

@@ -2010,3 +2010,34 @@ switching; no skips, everything must pass.
   console error text.
 - **Evidence.** 28 passed across ollama/follow/repair; service restarted;
   `/chat` 200; `:9119` untouched.
+
+## 46. Server-side accurate STT rescore for the browser path — 2026-09-30
+
+**No milestone claimed.** Owner: Chrome browser STT far beats Firefox local
+STT; Right-Ctrl/Firefox should write like Chrome when local STT is on.
+
+- **Why Chrome wins (no code can fully close it).** Chrome "browser" STT is
+  Google cloud recognition; Firefox ships no speech API at all, so Firefox
+  and Right-Ctrl must use the on-device pipeline. The fixable gap: the
+  browser path's final was the raw nemotron streaming hypothesis (no
+  punctuation, no vocabulary bias — "Cupid" despite "Qubit" in hotwords,
+  which nemotron structurally ignores: greedy_search only, hotwords are
+  zipformer-only), while Right-Ctrl already rescored with faster-whisper.
+- **Fix (`voicebridge/stt_ws.py`).** The WS server buffers PCM per request
+  (2 MiB cap ≈ 64 s; streaming still gets every frame) and, on stop, runs
+  the existing `transcribe_accurate` (faster-whisper small) when
+  `voice_edit.stt_mode` is `accurate` (already the configured default).
+  Accurate text wins (engine reported `accurate`); failures/empties keep
+  the streaming final with the reason audited. `stt.completed` carries the
+  winning text; audit stays char-count-only. No path removed (AUDIO_SETUP
+  rule: Chrome STT stays, local stays the offline fallback).
+- **Reviewed, not changed.** `min_confidence: 0.02` is deliberate (~off by
+  design; higher gates reject good transcripts). Hotword biasing on
+  nemotron is impossible (sherpa constraint); whisper takes vocabulary via
+  `initial_prompt` in the vendored stt local config — future lever.
+- **Live proof.** Piper-synthesized "Hello Qubit, how are you today? Can
+  you hear me well?" driven through the real WS ticket path → `stt.final`
+  `engine: accurate`, **punctuated, "Qubit" correct**. Service restarted.
+- **Tests.** 3 new E2E in `test_stt_streaming9u.py` (accurate wins /
+  empty-keeps-streaming / streaming-mode-skips; +1 engine-preservation
+  fix); 93 passed across the STT suites. `:9119` untouched.
