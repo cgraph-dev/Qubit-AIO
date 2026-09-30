@@ -403,13 +403,93 @@ ROUTE_EVIDENCE: Dict[Tuple[str, str], Dict[str, str]] = {
               "id_token/api_key/client_secret/password) stripped and legacy "
               "host URLs blanked. Kept off the fork proxy (safe_to_proxy=False).")),
     ("GET", "/api/providers/oauth/{provider_id}/poll/{session_id}"): dict(
-        status="GATED", code="OAUTH_MANUAL_HANDOFF",
-        backend="voicebridge/qubit_compat.py:_NO_OAUTH",
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:h_oauth_poll",
         test="tests/test_route_parity_p0_wave13.py::"
-             "test_oauth_poll_is_manual_handoff_refusal",
-        note=("Remote OAuth dance stays gated: the poll only serves sessions "
-              "created by POST /start, which Qubit refuses; the counterpart is "
-              "`qubit auth login`.")),
+             "test_oauth_poll_unknown_session_is_honest_404",
+        note=("Live Qubit handler (owner decision: port the device-code dance "
+              "1:1): delegates to the vendored poll; unknown/expired sessions "
+              "are an honest 404, mismatches an honest 400. No token material "
+              "is ever served.")),
+    ("POST", "/api/providers/oauth/{provider_id}/start"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:h_oauth_start",
+        test="tests/test_route_parity_p0_wave13.py::"
+             "test_oauth_start_rejects_unknown_and_external_providers",
+        note=("Live Qubit handler: starts the vendored device-code flow "
+              "(nous/openai-codex/minimax-oauth/xai-oauth); external-flow "
+              "providers get the honest 400 naming the CLI command. Display "
+              "fields only — tokens stay server-side.")),
+    ("DELETE", "/api/providers/oauth/{provider_id}"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:h_oauth_disconnect",
+        test="tests/test_route_parity_p0_wave13.py::"
+             "test_oauth_disconnect_stages_confirm",
+        note=("Live Qubit handler: confirm-gated disconnect through the one "
+              "confirm path; credential clearing is the vendored logic "
+              "(external providers refused, anthropic clears only the "
+              "Qubit-managed file).")),
+    ("DELETE", "/api/providers/oauth/sessions/{session_id}"): dict(
+        status="IMPLEMENTED", backend="voicebridge/qubit_compat.py:h_oauth_cancel",
+        test="tests/test_route_parity_p0_wave13.py::"
+             "test_oauth_submit_and_cancel_are_honest",
+        note=("Live Qubit handler: cancels a pending login (marks cancelled "
+              "before removal so a background poller stops); unknown sessions "
+              "answer ok:false, never a fabrication.")),
+    # Telegram/WhatsApp onboarding family: live since the W9 slices (the old
+    # ONBOARDING_GUIDED gates are gone). Telegram drives the hosted pairing
+    # service, WhatsApp spawns the local bridge; both proven live through the
+    # production dispatcher (real pairing start/status/cancel round-trip).
+    ("POST", "/api/messaging/telegram/onboarding/start"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_tg_ob_start",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_routes_are_registered_live",
+        note=("Live start returning a real pairing session (pairing_id + "
+              "qr_payload + deep_link + expires_at); proven live against the "
+              "pairing service. The deep_link names the upstream hosted bot "
+              "until the Qubit pairing service exists.")),
+    ("GET", "/api/messaging/telegram/onboarding/{pairing_id}"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_tg_ob_status",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_unknown_sessions_are_honest_misses",
+        note="Live status poll; unknown sessions are an honest 404."),
+    ("POST", "/api/messaging/telegram/onboarding/{pairing_id}/apply"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_tg_ob_apply",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_apply_validates_before_state",
+        note=("Validates allowed-user ids before any state lookup; saves the "
+              "bot token + allowlist and restarts the gateway.")),
+    ("DELETE", "/api/messaging/telegram/onboarding/{pairing_id}"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_tg_ob_cancel",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_cancel_unknown_is_ok_false",
+        note="Live cancel removing the pairing record."),
+    ("POST", "/api/messaging/whatsapp/onboarding/start"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_wa_ob_start",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_routes_are_registered_live",
+        note=("Live start spawning the local WhatsApp bridge pairing process; "
+              "fully local, no third-party service.")),
+    ("GET", "/api/messaging/whatsapp/onboarding/{pairing_id}"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_wa_ob_status",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_unknown_sessions_are_honest_misses",
+        note="Live status poll; unknown sessions are an honest 404."),
+    ("POST", "/api/messaging/whatsapp/onboarding/{pairing_id}/apply"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_wa_ob_apply",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_apply_validates_before_state",
+        note="Validates before state; saves and restarts the gateway."),
+    ("DELETE", "/api/messaging/whatsapp/onboarding/{pairing_id}"): dict(
+        status="IMPLEMENTED",
+        backend="voicebridge/qubit_compat.py:h_wa_ob_cancel",
+        test="tests/test_messaging_onboarding_dispatch9u.py::"
+             "test_onboarding_cancel_unknown_is_ok_false",
+        note="Live cancel removing the pairing record."),
     ("GET", "/api/credentials/pool"): dict(
         status="GATED", code="SECRET_NEVER_SERVED",
         backend="voicebridge/qubit_compat.py:_NO_SECRET",
@@ -1586,7 +1666,9 @@ PAGES = [
      'qubit_runtime/web/src/App.tsx:167'),
     ('/channels', 'ChannelsPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Platform list/update wired (GET /api/messaging/platforms 200); '
-     'onboarding flows are typed policy gates (ONBOARDING_GUIDED).',
+     'Telegram/WhatsApp onboarding is live (start/status/apply/cancel over '
+     'the vendored implementation — Telegram via the hosted pairing service, '
+     'WhatsApp via the local bridge).',
      'qubit_runtime/web/src/App.tsx:168'),
     ('/webhooks', 'WebhooksPage', 'hermes-dist SPA', 'IMPLEMENTED',
      'Webhook list/add/remove/toggle wired (GET /api/webhooks 200).',

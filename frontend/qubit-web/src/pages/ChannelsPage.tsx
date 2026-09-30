@@ -982,10 +982,10 @@ function WhatsAppOnboardingPanel({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          QR pairing needs the operator-guided WhatsApp onboarding bridge, which
-          is not enabled in this installation; selecting it returns the operator
-          prerequisite. Configure the WhatsApp credential reference manually
-          until the operator enables the bridge.
+          QR pairing runs locally: Qubit starts the WhatsApp bridge on this
+          machine (bridge dependencies install on demand) and shows its QR
+          here. No third-party service is involved — scan it from WhatsApp
+          Linked Devices.
         </p>
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
@@ -1367,15 +1367,16 @@ function TelegramOnboardingPanel({
             <span className="text-xs font-medium uppercase text-foreground">
               Automatic QR setup
             </span>
-            <Badge tone="warning">operator prerequisite</Badge>
+            <Badge tone="warning">upstream hosted service</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Automatic bot creation needs the operator-guided Telegram onboarding
-            bridge, which is not enabled in this installation. Selecting it
-            returns the operator prerequisite instead of connecting. Use{" "}
+            QR setup creates the bot through the upstream hosted pairing
+            service (bot: @NousHostedHermesBot) until the Qubit pairing
+            service exists — the created bot is yours, but the creation step
+            runs on third-party infrastructure. Prefer{" "}
             <span className="font-medium text-foreground">Manual setup</span>{" "}
             with a <code className="font-courier">@BotFather</code> token
-            reference to connect a bot now.
+            reference to connect without any third party.
           </p>
           <Button
             size="sm"

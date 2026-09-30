@@ -56,15 +56,16 @@ INDEX_NOT_FOUND_CODE = "PLUGIN_INDEX_NOT_FOUND"
 INDEX_REF_MISMATCH_CODE = "PLUGIN_INDEX_REF_MISMATCH"
 INDEX_PATH = Path(__file__).resolve().parent / "data" / "plugin_index_pinned.json"
 INDEX_INSTALL_DETAIL = (
-    "this entry is curated and pinned, but its remote source is not fetched by "
-    "Qubit. Installing it requires an operator to verify the repository and "
-    "license at the pinned ref, then install the verified source through the "
-    "canonical local install path. Raw remote fetch remains refused.")
+    "this entry is curated and pinned: confirming the install fetches its "
+    "remote source at exactly the pinned ref and installs it through the "
+    "vendored catalog pipeline (kill-list, platform check, exact-SHA clone, "
+    "pre-publish malware scan, admission-gated enable). Raw (non-index) "
+    "remote fetch remains refused.")
 INDEX_INSTALL_PREREQUISITE = (
-    "operator-verified pinned install: verify `repo`@`pinned_ref` (and its "
-    "license), fetch it out-of-band, then `qubit agent plugins install "
-    "<verified-dir>`; a direct Qubit remote fetch requires a hash-pinned "
-    "allowlist")
+    "POST /api/dashboard/agent-plugins/install "
+    '{"catalog_name": "<name>", "ref": "<pinned_ref>", "confirm": true} '
+    "(or settle the staged approval); arbitrary remote URLs stay refused — "
+    "only curated entries install, and only at their pinned ref")
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -368,10 +369,10 @@ def pinned_index_block(query: str = "") -> Dict[str, Any]:
     """The curated, pinned index block served alongside the local catalog.
 
     Clearly marked ``curated`` + ``pinned``. Every entry pins a full 40-char
-    commit SHA. The install affordance is operator-gated: the entry is verified
-    against the curated pin and routed through the canonical e-stop ->
-    confirmation -> audit path, but no repository is fetched (raw remote fetch
-    stays refused).
+    commit SHA. Confirming an install fetches the entry at exactly the pin
+    through the canonical e-stop -> confirmation -> audit path and the
+    vendored catalog pipeline; arbitrary (non-index) remote fetch stays
+    refused.
     """
     doc = _index_doc()
     entries = pinned_index_entries(query)
@@ -390,8 +391,8 @@ def pinned_index_block(query: str = "") -> Dict[str, Any]:
         "install_capability": _install_capability(),
         "entries": entries,
         "install": {
-            "state": "OPERATOR_GATED",
-            "code": INDEX_CODE,
+            "state": "READY",
+            "code": "PLUGIN_INDEX_INSTALLABLE",
             "detail": INDEX_INSTALL_DETAIL,
             "prerequisite": INDEX_INSTALL_PREREQUISITE,
             "endpoint": ("POST /api/dashboard/agent-plugins/install "
@@ -418,7 +419,7 @@ def _index_entry(catalog_name: str) -> Optional[Dict[str, Any]]:
 def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
                        confirmed: bool = False, confirmation_id: str = "",
                        requested_by: str = "dashboard:user") -> Dict[str, Any]:
-    """Pinned/verified install request for a curated index entry.
+    """Pinned/verified install of a curated index entry, fetched at the pin.
 
     Order (the canonical path, shared with every plugin mutation):
 
@@ -427,12 +428,18 @@ def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
     2. verify the pin: a caller-supplied ``ref`` must equal the curated
        ``pinned_ref`` (an off-pin ref is a typed ``PLUGIN_INDEX_REF_MISMATCH``);
     3. e-stop -> durable journal confirmation -> audit via the canonical
-       ``plugin_runtime`` authority; then
-    4. return the honest operator-gated gate: the pinned remote source is not
-       fetched, so nothing is installed until an operator verifies the repo and
-       license at the pinned ref.
+       ``plugin_runtime`` authority;
+    4. fetch the entry's upstream repository at exactly the curated pin and
+       install it through the vendored catalog pipeline
+       (``install_catalog_entry``): kill-list, unsupported-platform refusal,
+       exact-SHA clone, malware scan before publish, atomic publish with
+       provenance recorded at the actually-checked-out SHA, admission-gated
+       enable. The vendored YAML is cross-checked against the curated pin and
+       any drift is a loud refusal, never a silent substitution.
 
-    Never fetches, clones, or executes anything.
+    What stays refused: arbitrary (non-index) remote identifiers
+    (``BLOCKED_REMOTE_PLUGIN``) — only curated entries with a full 40-hex pin
+    are fetchable, and only at that pin.
     """
     from . import plugin_runtime as PR
 
@@ -455,16 +462,79 @@ def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
     PR._audit("index_install_request", requested_by,
               {"catalog_name": entry["name"], "pinned_ref": pin,
                "repo": entry.get("repo", "")})
-    return {
-        "ok": False, "state": "OPERATOR_GATED", "code": INDEX_CODE,
-        "catalog_name": entry["name"], "pinned_ref": pin,
-        "repo": entry.get("repo", ""),
-        "detail": INDEX_INSTALL_DETAIL,
-        "prerequisite": INDEX_INSTALL_PREREQUISITE,
+    _prepare_runtime(cfg)
+    from qubit_cli import plugin_catalog as _VC  # type: ignore
+    from qubit_cli import plugins_cmd_catalog as _VCC  # type: ignore
+    from qubit_cli.plugins_admission import AdmissionRefused  # type: ignore
+    from qubit_cli.plugins_cmd import (  # type: ignore
+        PluginOperationError, PluginScanBlocked, _set_plugin_enabled)
+    provenance = entry.get("provenance") or {}
+    upstream = str(provenance.get("source_name") or entry["name"])
+    upstream_repo = str(provenance.get("upstream_repo")
+                        or provenance.get("source_repo_url")
+                        or entry.get("repo") or "")
+    subdir = str(entry.get("subdir") or "")
+    cat_entry = None
+    try:
+        candidate = _VC.get_catalog_entry(upstream)
+    except Exception:
+        candidate = None
+    if candidate is not None:
+        if str(candidate.sha or "").lower() != pin:
+            raise PR.PluginRuntimeError(
+                INDEX_REF_MISMATCH_CODE,
+                f"curated pin {pin[:12]!r} does not match the vendored catalog "
+                f"sha {str(candidate.sha or '')[:12]!r} for {upstream!r}; "
+                f"refusing rather than installing drifted source")
+        cat_entry = candidate
+    else:
+        if not upstream_repo.startswith("https://"):
+            raise PR.PluginRuntimeError(
+                INDEX_NOT_FOUND_CODE,
+                f"no fetchable upstream source for {entry['name']!r}")
+        cat_entry = _VC.PluginCatalogEntry(
+            name=upstream, repo=upstream_repo, sha=pin,
+            description=str(entry.get("description") or ""),
+            maintainer=str(entry.get("maintainer") or ""),
+            tier=str(entry.get("tier") or "community"),
+            category=str(entry.get("category") or "general"),
+            subdir=subdir)
+    try:
+        _target, _manifest, installed_name = _VCC.install_catalog_entry(
+            cat_entry, force=False)
+    except PluginScanBlocked as exc:
+        raise PR.PluginRuntimeError(
+            PR.REFUSED_CODE,
+            f"plugin scan blocked install of {upstream!r}: {exc}") from exc
+    except PluginOperationError as exc:
+        raise PR.PluginRuntimeError(PR.REFUSED_CODE, str(exc)) from exc
+    try:
+        _set_plugin_enabled(installed_name, enable=True)
+        enabled = True
+        enable_note: str = ""
+    except AdmissionRefused as exc:
+        enabled = False
+        enable_note = f"installed but enable refused: {exc}"
+    try:
+        from qubit_cli.plugins_activation import (  # type: ignore
+            activate_plugin_now)
+        activation = activate_plugin_now(installed_name) if enabled else {}
+    except Exception as exc:  # noqa: BLE001 - activation is best-effort
+        activation = {"activation_error": str(exc)[:200]}
+    PR._audit("index_install", requested_by,
+              {"catalog_name": entry["name"], "pinned_ref": pin,
+               "plugin_name": installed_name, "enabled": enabled})
+    out: Dict[str, Any] = {
+        "ok": True, "state": "INSTALLED", "catalog_name": entry["name"],
+        "plugin_name": installed_name, "pinned_ref": pin,
+        "revision": pin, "enabled": enabled,
         "install_capability": PR.INSTALL_CAPABILITY,
-        "qubit_counterpart": ("CLI `qubit agent plugins install "
-                              "<operator-verified-dir>`"),
     }
+    if enable_note:
+        out["enable_note"] = enable_note
+    if activation:
+        out["activation"] = activation
+    return out
 
 
 def local_catalog(cfg: Any, *, query: str = "", source: str = "",

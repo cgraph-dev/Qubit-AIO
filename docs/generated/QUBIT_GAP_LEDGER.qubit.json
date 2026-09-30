@@ -21,8 +21,8 @@
   "dashboard_ops.catalog": 566,
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
-  "qubit_compat.ROUTES": 454,
-  "qubit_compat.GATED": 95,
+  "qubit_compat.ROUTES": 460,
+  "qubit_compat.GATED": 88,
   "cli_families": 114,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
@@ -36,7 +36,7 @@
  "counts_by_status": {
   "IMPLEMENTED": 713,
   "OPERATOR_ONLY": 3,
-  "SAFE_EQUIVALENT": 35
+  "SAFE_EQUIVALENT": 34
  },
  "counts_by_area": {
   "acp": 3,
@@ -94,7 +94,7 @@
   "gateway": 10,
   "ghost": 20,
   "git": 4,
-  "hermes_gated": 29,
+  "hermes_gated": 28,
   "hermes_plugin": 9,
   "hermes_skill": 28,
   "hermes_tool": 73,
@@ -185,12 +185,12 @@
   "worktree": 1
  },
  "counts_by_source": {
-  "qubit-surface": 751
+  "qubit-surface": 750
  },
  "tri_surface": {
   "has-cli has-dashboard": 48,
   "has-cli has-dashboard has-voice": 510,
-  "has-dashboard": 65,
+  "has-dashboard": 64,
   "has-dashboard has-voice": 4,
   "no-surface": 124
  },
@@ -8703,21 +8703,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "No live OAuth token dance is performed; enrollment is a manual handoff in the user's own browser. routes=10",
-   "needs": "owner"
-  },
-  {
-   "id": "hermes_gate_onboarding_guided",
-   "area": "hermes_gated",
-   "capability": "Gated upstream route: ONBOARDING_GUIDED",
-   "upstream_ref": "hermes-agent",
-   "qubit_backend": "voicebridge.qubit_compat",
-   "cli": "",
-   "dashboard": "CLI `qubit auth login` + msg account ops",
-   "voice": "",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Channel onboarding runs as guided manual enrollment, not an automatic token flow. routes=3",
+   "note": "No live OAuth token dance is performed; enrollment is a manual handoff in the user's own browser. routes=6",
    "needs": "owner"
   },
   {

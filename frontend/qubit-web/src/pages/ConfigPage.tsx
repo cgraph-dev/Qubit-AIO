@@ -106,6 +106,20 @@ function describeConfirmError(e: unknown): string {
   return `${e}`;
 }
 
+/** Extract the backend typed refusal code from a fetchJSON error
+ *  (`"<status>: {json envelope}"`). Returns null when there is no code. */
+function typedErrorCode(e: unknown): string | null {
+  const message = e instanceof Error ? e.message : String(e);
+  const match = message.match(/^\d+:\s*(\{[\s\S]*\})$/);
+  if (!match) return null;
+  try {
+    const envelope = JSON.parse(match[1]) as { code?: unknown };
+    return typeof envelope.code === "string" ? envelope.code : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ConfigPage() {
   const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [schema, setSchema] = useState<Record<
@@ -290,9 +304,31 @@ export default function ConfigPage() {
     try {
       await commitConfig(config);
     } catch (e) {
+      // CONFIG_NO_FIELDS means the server holds exactly what we sent (an
+      // unchanged whole-tree Save): converge on the server record and say so
+      // instead of reporting a failure.
+      if (typedErrorCode(e) === "CONFIG_NO_FIELDS") {
+        try {
+          setConfig(await api.getConfig());
+        } catch {
+          /* keep the local tree when the read-back fails */
+        }
+        showToast("Settings already up to date.", "success");
+        return;
+      }
       showToast(`${t.config.failedToSave}: ${describeConfirmError(e)}`, "error");
+      return;
     } finally {
       setSaving(false);
+    }
+    // Read-back proof: the toast above says the server holds the values, so
+    // converge the form on what the server actually serves (it drops unchanged
+    // leaves and never persists redacted placeholders). Without this the form
+    // and a post-refresh render can disagree until the next reload.
+    try {
+      setConfig(await api.getConfig());
+    } catch {
+      /* the save succeeded; a failed read-back keeps the local tree */
     }
   };
 
@@ -366,7 +402,15 @@ export default function ConfigPage() {
       setSaving(true);
       try {
         await commitConfig(imported);
-        setConfig(imported);
+        // Converge on the server record, not the file bytes: the backend
+        // drops unchanged leaves, refuses secret-shaped values, and rejects
+        // unknown keys, so an optimistic setConfig(imported) can disagree
+        // with the next refresh.
+        try {
+          setConfig(await api.getConfig());
+        } catch {
+          setConfig(imported);
+        }
         showToast(t.config.configImported, "success");
       } catch (err) {
         showToast(

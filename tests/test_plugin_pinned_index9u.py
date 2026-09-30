@@ -1,4 +1,5 @@
-"""Qubit curated, pinned remote plugin index (Owner Decision #1, 2026-09-23).
+"""Qubit curated, pinned remote plugin index (Owner Decision #1, 2026-09-23;
+install policy amended by owner: fetch curated entries at the pin).
 
 Proves, through the production compat dispatcher and the catalog module:
 
@@ -11,11 +12,13 @@ Proves, through the production compat dispatcher and the catalog module:
   (no fabricated entries);
 * ``GET /api/dashboard/plugins/hub`` surfaces the same ``catalog_index``;
 * the install path is pinned/verified and routed through the canonical
-  e-stop -> confirmation -> audit gate: no confirm is a typed 409, a confirmed
-  pinned install is an honest ``PLUGIN_INDEX_OPERATOR_GATED`` naming the pinned
-  ref, an off-pin ``ref`` is a typed mismatch, and an unknown name is a typed
-  404;
-* raw, unvetted remote fetch stays a typed ``BLOCKED_REMOTE_PLUGIN`` refusal.
+  e-stop -> confirmation -> audit gate, then fetched at exactly the pinned
+  SHA through the vendored catalog pipeline (kill-list, exact-SHA clone,
+  pre-publish scan, admission-gated enable): no confirm is a typed 409, an
+  off-pin ``ref`` is a typed mismatch, an unknown name is a typed 404, and
+  the fetch core receives the curated pin;
+* raw, unvetted (non-index) remote fetch stays a typed ``BLOCKED_REMOTE_PLUGIN``
+  refusal.
 """
 from __future__ import annotations
 
@@ -75,7 +78,8 @@ def test_catalog_serves_curated_pinned_index(tmp_path, monkeypatch):
     assert idx["schema"] == "qubit-pinned-plugin-index/1"
     assert idx["count"] == len(idx["entries"]) >= 1
     assert idx["license_note"]
-    assert idx["install"]["code"] == "PLUGIN_INDEX_OPERATOR_GATED"
+    assert idx["install"]["code"] == "PLUGIN_INDEX_INSTALLABLE"
+    assert idx["install"]["state"] == "READY"
     for entry in idx["entries"]:
         assert entry["name"]
         # B4-06: the served display row is de-branded; the real upstream source
@@ -144,26 +148,46 @@ def test_pinned_index_search_filters_real_entries(tmp_path, monkeypatch):
     assert out["pinned_index"]["entries"] == []
 
 
-def test_install_requires_confirmation_then_is_operator_gated(tmp_path, monkeypatch):
+def test_install_requires_confirmation_then_fetches_at_pin(tmp_path,
+                                                             monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    # No confirm -> canonical 409.
+    # No confirm -> canonical 409 (nothing fetched).
     code, out = HC.dispatch(
         cfg, "POST", "/api/dashboard/agent-plugins/install", {},
         {"catalog_name": "qubit-media-studio"})
     assert code == 409
     assert out["code"] == "PLUGIN_CONFIRM_REQUIRED"
-    # Confirmed pinned install -> honest operator-gated refusal naming the pin.
+    # Confirmed install goes to the vendored fetch core at the curated pin —
+    # hermetic here by stubbing the network boundary (the core), while the
+    # pin resolution, gate, and enable wiring stay real.
+    from voicebridge import plugin_catalog as PC
+
+    PC._prepare_runtime(cfg)
+    from qubit_cli import plugins_cmd_catalog as _VCC
+    calls = {}
+
+    def _fake_install(entry, **kw):
+        calls["repo"] = entry.repo
+        calls["sha"] = entry.sha
+        calls["ref"] = kw.get("ref")
+        return ("/tmp/fake-target", {"name": "fake-from-index"}, "fake-from-index")
+
+    monkeypatch.setattr(_VCC, "install_catalog_entry", _fake_install)
+    from qubit_cli import plugins_cmd as _PCM
+    monkeypatch.setattr(_PCM, "_set_plugin_enabled",
+                        lambda *a, **k: calls.setdefault("enabled", True))
+    import qubit_cli.plugins_activation as _PA
+    monkeypatch.setattr(_PA, "activate_plugin_now", lambda *a, **k: {})
     code, out = HC.dispatch(
         cfg, "POST", "/api/dashboard/agent-plugins/install", {},
-        {"catalog_name": "qubit-media-studio",
-         "ref": "e8d59971d2b7901405b39dac7b03bdd616272d0d", "confirm": True})
-    assert code == 403
-    assert out["code"] == "PLUGIN_INDEX_OPERATOR_GATED"
-    assert out["state"] == "OPERATOR_GATED"
-    assert out["pinned_ref"] == "e8d59971d2b7901405b39dac7b03bdd616272d0d"
-    assert out["prerequisite"]
+        {"catalog_name": "plugin-llm-example", "confirm": True})
+    assert code == 200, out
+    assert out["ok"] is True and out["state"] == "INSTALLED", out
+    assert out["revision"] == out["pinned_ref"]
+    assert calls["sha"] == out["pinned_ref"]
+    assert calls.get("enabled") is True
 
 
 def test_install_off_pin_ref_is_a_typed_mismatch(tmp_path, monkeypatch):
@@ -206,15 +230,35 @@ def test_install_from_index_refuses_while_estop_latched(tmp_path, monkeypatch):
                                      global_disable=False, issued_by="cli:user")
 
 
-def test_install_from_index_module_audits_and_never_fetches(tmp_path, monkeypatch):
+def test_install_from_index_module_audits_and_fetches_at_pin(tmp_path,
+                                                              monkeypatch):
     from voicebridge import plugin_catalog as PC
 
     cfg = _cfg(tmp_path, monkeypatch)
+    PC._prepare_runtime(cfg)
+    from qubit_cli import plugins_cmd_catalog as _VCC
+    calls = {}
+
+    def _fake_install(entry, **kw):
+        calls["name"] = entry.name
+        calls["repo"] = entry.repo
+        calls["sha"] = entry.sha
+        return ("/tmp/fake-target", {"name": "fake-from-index"}, "fake-from-index")
+
+    monkeypatch.setattr(_VCC, "install_catalog_entry", _fake_install)
+    from qubit_cli import plugins_cmd as _PCM
+    monkeypatch.setattr(_PCM, "_set_plugin_enabled", lambda *a, **k: None)
+    import qubit_cli.plugins_activation as _PA
+    monkeypatch.setattr(_PA, "activate_plugin_now", lambda *a, **k: {})
     out = PC.install_from_index(cfg, "qubit-telegram-business", confirmed=True,
                                 requested_by="test")
-    assert out["ok"] is False
-    assert out["code"] == PC.INDEX_CODE
+    assert out["ok"] is True and out["state"] == "INSTALLED", out
     assert out["pinned_ref"] == "e905f3bc5eeaa5a9dab9bc5155601b3ebec75757"
-    # No repository was cloned/copied into the plugin store.
+    assert out["revision"] == out["pinned_ref"]
+    # The core was asked for the curated upstream repo at exactly the pin.
+    assert calls["sha"] == out["pinned_ref"]
+    assert "hermes-telegram-business" in calls["repo"]
+    # Nothing reaches the network in this test: the fetch core is stubbed,
+    # and no plugin tree was published into the store.
     plugins_dir = Path(cfg.state_dir()) / "plugins"
     assert not plugins_dir.exists() or not any(plugins_dir.iterdir())

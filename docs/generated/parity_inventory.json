@@ -14,9 +14,9 @@
         "total": 566
       },
       "reference": {
-        "gated": 64,
+        "gated": 59,
         "missing": 0,
-        "ported": 759,
+        "ported": 764,
         "total": 823
       }
     },
@@ -34,9 +34,9 @@
         "total": 603
       },
       "route": {
-        "gated": 45,
+        "gated": 40,
         "missing": 0,
-        "ported": 232,
+        "ported": 237,
         "total": 277
       },
       "tool": {
@@ -46,9 +46,9 @@
         "total": 121
       }
     },
-    "gated": 115,
+    "gated": 110,
     "missing": 0,
-    "ported": 1274,
+    "ported": 1279,
     "total": 1389
   },
   "e2e_verified": false,
@@ -122,8 +122,8 @@
     "dashboard_ops.catalog": 566,
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
-    "qubit_compat.GATED": 61,
-    "qubit_compat.ROUTES": 459,
+    "qubit_compat.GATED": 57,
+    "qubit_compat.ROUTES": 460,
     "qubit_voice_top": 113,
     "reference_cli_sub": 317,
     "reference_cli_top": 71,
@@ -17544,28 +17544,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_oauth_cancel",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/oauth.py:775"
       },
       "id": "DELETE /api/providers/oauth/sessions/{session_id}",
       "method": "DELETE",
-      "qubit_counterpart": "DELETE /api/providers/oauth/sessions/(?P<id>[^/]+) -> __gate__",
+      "qubit_counterpart": "DELETE /api/providers/oauth/sessions/(?P<id>[^/]+) -> h_oauth_cancel",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit sessions",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_oauth_disconnect",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/oauth.py:665"
       },
       "id": "DELETE /api/providers/oauth/{provider_id}",
       "method": "DELETE",
-      "qubit_counterpart": "DELETE /api/providers/oauth/(?P<id>[^/]+) -> __gate__",
+      "qubit_counterpart": "DELETE /api/providers/oauth/(?P<id>[^/]+) -> h_oauth_disconnect",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit media gen catalog",
@@ -18916,14 +18916,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_oauth_poll",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/oauth.py:751"
       },
       "id": "GET /api/providers/oauth/{provider_id}/poll/{session_id}",
       "method": "GET",
-      "qubit_counterpart": "GET /api/providers/oauth/(?P<provider_id>[^/]+)/poll/(?P<session_id>[^/]+) -> __gate__",
+      "qubit_counterpart": "GET /api/providers/oauth/(?P<provider_id>[^/]+)/poll/(?P<session_id>[^/]+) -> h_oauth_poll",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit media gen catalog",
@@ -20554,28 +20554,28 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_oauth_start",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/oauth.py:720"
       },
       "id": "POST /api/providers/oauth/{provider_id}/start",
       "method": "POST",
-      "qubit_counterpart": "POST /api/providers/oauth.* -> __gate__",
+      "qubit_counterpart": "POST /api/providers/oauth/(?P<provider_id>[^/]+)/start -> h_oauth_start",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit media gen catalog",
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_oauth_submit",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/oauth.py:742"
       },
       "id": "POST /api/providers/oauth/{provider_id}/submit",
       "method": "POST",
-      "qubit_counterpart": "POST /api/providers/oauth.* -> __gate__",
+      "qubit_counterpart": "POST /api/providers/oauth/(?P<provider_id>[^/]+)/submit -> h_oauth_submit",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit media gen catalog",

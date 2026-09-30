@@ -1903,13 +1903,16 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="typed link state (read-only)")
     gw_link.add_argument("gateway_id")
     # Qubit-owned gateway control (Owner Decisions #10/#16): `status`/`start`/
-    # `stop`/`restart` drive the real Qubit messaging-gateway daemon through the
-    # one authority path (e-stop → confirmation → audit). `run` runs that daemon
-    # in the foreground; `install` installs its systemd unit (confirm-gated).
+    # `stop`/`restart`/`recover` drive the real Qubit messaging-gateway daemon
+    # through the one authority path (e-stop → confirmation → audit). `recover`
+    # is what the daemon unit names for a parked failed service
+    # (reset-failed, then start; a healthy unit is a no-op). `run` runs that
+    # daemon in the foreground; `install` installs its systemd unit
+    # (confirm-gated).
     gw_sub.add_parser("status", parents=[common],
                       help="real Qubit gateway (daemon) status — unit, pid, "
                            "health, restarts, live runtime + control socket")
-    for _gw_ctl in ("start", "stop", "restart"):
+    for _gw_ctl in ("start", "stop", "restart", "recover"):
         _gw_p = gw_sub.add_parser(
             _gw_ctl, parents=[common],
             help="control the Qubit gateway daemon (confirm-gated)")
@@ -7539,6 +7542,19 @@ def _cmd_gateway(cfg, args) -> int:
             from . import gateway_supervisor as GS
 
             out = GS.control(cfg, cmd, confirmed=confirm, actor="cli:user")
+            print(_json.dumps(out, indent=2, sort_keys=True))
+            if out.get("ok"):
+                return 0
+            code = str(out.get("code") or "")
+            return {"GATEWAY_CONFIRM_REQUIRED": 3, "GATEWAY_ESTOP": 3,
+                    "GATEWAY_SUPERVISION_UNAVAILABLE": 2}.get(code, 1)
+        elif cmd == "recover":
+            # The daemon unit parks in failed state after its restart burst
+            # and names exactly this verb (reset-failed, then start; a
+            # healthy unit is an idempotent no-op) — same authority path.
+            from . import gateway_supervisor as GS
+
+            out = GS.recover(cfg, confirmed=confirm, actor="cli:user")
             print(_json.dumps(out, indent=2, sort_keys=True))
             if out.get("ok"):
                 return 0

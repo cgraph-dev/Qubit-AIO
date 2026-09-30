@@ -10,8 +10,10 @@ Proves, through the production compat dispatcher:
   a secret (``token_preview`` and every token/secret-shaped key are stripped);
 * ``POST /api/gateway/migrate`` is a typed ``GATEWAY_MIGRATE_OPERATOR_OWNED``
   refusal naming the CLI counterpart, never a migration;
-* ``GET /api/providers/oauth/{provider_id}/poll/{session_id}`` is a typed
-  ``OAUTH_MANUAL_HANDOFF`` refusal naming ``qubit auth login``.
+* ``GET /api/providers/oauth/{provider_id}/poll/{session_id}`` is the live
+  vendored poll: an unknown/expired session is an honest 404 (never a
+  fabricated "pending"), and start/submit/cancel/disconnect follow the
+  reference shapes.
 
 Also pins the two parity-inventory generator fixes:
 
@@ -59,8 +61,18 @@ def test_p0_routes_are_registered_with_expected_disposition():
         assert route["disposition"] == disp, (method, path, route)
     poll, params = HC.match(
         "GET", "/api/providers/oauth/nous/poll/abc123")
-    assert poll is not None and poll["disposition"] == "gated"
+    assert poll is not None and poll["disposition"] == "implemented"
     assert params == {"provider_id": "nous", "session_id": "abc123"}
+    for method, path, handler in [
+        ("POST", "/api/providers/oauth/nous/start", "h_oauth_start"),
+        ("POST", "/api/providers/oauth/nous/submit", "h_oauth_submit"),
+        ("DELETE", "/api/providers/oauth/sessions/abc123", "h_oauth_cancel"),
+        ("DELETE", "/api/providers/oauth/nous", "h_oauth_disconnect"),
+    ]:
+        route, _ = HC.match(method, path)
+        assert route is not None and route["disposition"] == "implemented", (
+            method, path)
+        assert route["handler"] == handler, (method, path, route)
 
 
 # --------------------------------------------------------- implemented routes
@@ -141,15 +153,56 @@ def test_gateway_migrate_post_is_operator_owned_refusal(tmp_path, monkeypatch):
     assert "qubit gateway migrate" in out["qubit_counterpart"]
 
 
-def test_oauth_poll_is_manual_handoff_refusal(tmp_path, monkeypatch):
+def test_oauth_poll_unknown_session_is_honest_404(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     code, out = HC.dispatch(
         cfg, "GET", "/api/providers/oauth/nous/poll/abc123", {}, {})
-    assert code == 403
-    assert out["code"] == "OAUTH_MANUAL_HANDOFF"
-    assert "qubit auth login" in out["qubit_counterpart"]
+    assert code == 404
+    assert out["code"] == "OAUTH_ERROR"
+    assert "not found or expired" in out["detail"]
+
+
+def test_oauth_start_rejects_unknown_and_external_providers(tmp_path,
+                                                            monkeypatch):
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(
+        cfg, "POST", "/api/providers/oauth/nope/start", {}, {})
+    assert code == 400 and out["code"] == "OAUTH_ERROR"
+    assert "Unknown provider" in out["detail"]
+    code, out = HC.dispatch(
+        cfg, "POST", "/api/providers/oauth/anthropic/start", {}, {})
+    assert code == 400
+    assert "external CLI" in out["detail"]
+    assert "qubit auth add anthropic" in out["detail"]
+
+
+def test_oauth_submit_and_cancel_are_honest(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(
+        cfg, "POST", "/api/providers/oauth/nous/submit", {},
+        {"session_id": "x", "code": "y"})
+    assert code == 400 and out["code"] == "OAUTH_ERROR"
+    assert "not supported" in out["detail"]
+    code, out = HC.dispatch(
+        cfg, "DELETE", "/api/providers/oauth/sessions/abc123", {}, {})
+    assert code == 200 and out == {"ok": False,
+                                   "message": "session not found"}
+
+
+def test_oauth_disconnect_stages_confirm(tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    code, out = HC.dispatch(
+        cfg, "DELETE", "/api/providers/oauth/nous", {}, {})
+    assert code == 409 and out["code"] == "CONFIRM_REQUIRED"
+    assert out["confirmation_id"]
 
 
 # ------------------------------------------------- generator-bug regressions

@@ -476,8 +476,9 @@ export default function PluginsPage() {
     setIndexBusy(entry.name);
     try {
       // The backend verifies the curated pin, runs the canonical
-      // e-stop -> confirmation -> audit gate, and then honestly reports the
-      // operator gate: the pinned remote source is not fetched.
+      // e-stop -> confirmation -> audit gate, then fetches the entry at
+      // exactly the pinned ref through the catalog pipeline (kill-list,
+      // exact-SHA clone, pre-publish scan, admission-gated enable).
       await api.installAgentPluginFromIndex(entry.name, entry.pinned_ref);
       showToast(`${entry.label || entry.name} installed`, "success");
       await Promise.all([loadCatalog(), loadHub()]);
@@ -487,7 +488,7 @@ export default function PluginsPage() {
           e,
           e instanceof Error
             ? e.message
-            : `Install refused: pinned source not fetched (operator gate, ref ${entry.pinned_ref.slice(0, 8)})`,
+            : `Install failed for ${entry.name} at ref ${entry.pinned_ref.slice(0, 8)}`,
         ),
         "error",
       );
@@ -1239,13 +1240,14 @@ export default function PluginsPage() {
               data-testid="plugin-pinned-index-install-gate"
               className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
             >
-              {"Install is operator-gated"}: typed{" "}
+              {"Install fetches at the pinned ref"}: typed{" "}
               <span className="font-mono">
-                {pinnedIndex?.install?.code ?? "PLUGIN_INDEX_OPERATOR_GATED"}
+                {pinnedIndex?.install?.code ?? "PLUGIN_INDEX_INSTALLABLE"}
               </span>{" "}
               — the entry is verified against its pinned ref and routed through the canonical
-              confirm / audit / e-stop path, but the pinned remote source is not fetched until an
-              operator verifies the repository and license.
+              confirm / audit / e-stop path, then fetched at exactly that ref through the
+              catalog pipeline (kill-list, exact-SHA clone, pre-publish scan, admission-gated
+              enable). Arbitrary remote URLs stay refused.
             </p>
           </CardContent>
         </Card>
@@ -1548,9 +1550,9 @@ interface PinnedIndexRowProps {
 }
 
 /** One curated, pinned remote-index row. Shows the real source, the full
- *  pinned commit SHA, the license state, and provenance. Install is an honest
- *  operator-gated affordance: the backend verifies the pin and runs the
- *  canonical gate, but the remote source is never fetched here. */
+ *  pinned commit SHA, the license state, and provenance. Install fetches the
+ *  entry at exactly the pinned ref through the catalog pipeline after the
+ *  canonical gate. */
 function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
   const [open, setOpen] = useState(false);
   return (

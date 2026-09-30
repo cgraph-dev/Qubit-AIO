@@ -88,6 +88,15 @@ interface Props {
   title?: string;
   /** If true, hides "Persist globally" checkbox — always saves to config.yaml. */
   alwaysGlobal?: boolean;
+  /**
+   * Session authority override for the header's current-model line. The
+   * options payload reports the global picker context while a terminal
+   * session can resolve a different model (stored session model / PTY
+   * grant); showing the payload value there disagrees with the sidebar
+   * MODEL card. When present, the header shows this value labeled
+   * "this chat" instead of the payload's global "current".
+   */
+  currentOverride?: { provider?: string; model: string } | null;
 }
 
 export function ModelPickerDialog(props: Props) {
@@ -100,6 +109,7 @@ export function ModelPickerDialog(props: Props) {
     onClose,
     title = "Switch Model",
     alwaysGlobal = false,
+    currentOverride = null,
   } = props;
   const standalone = !!loader && !!onApply;
 
@@ -121,8 +131,13 @@ export function ModelPickerDialog(props: Props) {
   const applyOptions = (r: ModelOptionsResponse) => {
     const next = r?.providers ?? [];
     setProviders(next);
-    setCurrentModel(String(r?.model ?? ""));
-    setCurrentProviderSlug(String(r?.provider ?? ""));
+    // Session authority wins for the header line when the caller knows what
+    // the terminal actually runs (see currentOverride); the payload's
+    // top-level model/provider is the global picker context.
+    setCurrentModel(currentOverride?.model ?? String(r?.model ?? ""));
+    setCurrentProviderSlug(
+      currentOverride?.provider ?? String(r?.provider ?? ""),
+    );
     setSelectedSlug((prev) => {
       if (prev && next.some((p) => p.slug === prev)) return prev;
       return (next.find((p) => p.is_current) ?? next[0])?.slug ?? "";
@@ -190,6 +205,15 @@ export function ModelPickerDialog(props: Props) {
     // Deliberately omit props from deps — stable for the dialog's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The terminal grant can resolve after the options payload already set the
+  // header line; re-assert the session authority whenever it arrives.
+  useEffect(() => {
+    if (currentOverride) {
+      setCurrentModel(currentOverride.model);
+      setCurrentProviderSlug(currentOverride.provider ?? "");
+    }
+  }, [currentOverride]);
 
   // Esc closes.
   useEffect(() => {
@@ -376,7 +400,7 @@ export function ModelPickerDialog(props: Props) {
             {title}
           </h2>
           <p className="text-xs text-muted-foreground mt-1 font-mono">
-            current: {currentModel || "(unknown)"}
+            {currentOverride ? "this chat" : "current"}: {currentModel || "(unknown)"}
             {currentProviderSlug && ` · ${currentProviderSlug}`}
           </p>
         </header>

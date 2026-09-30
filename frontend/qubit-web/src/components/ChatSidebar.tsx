@@ -517,6 +517,17 @@ export function ChatSidebar({
           // config.yaml the agent boots from. Always persisted (alwaysGlobal).
           loader={() => api.getModelOptions(profile)}
           alwaysGlobal
+          // Header shows what this terminal session actually runs (the PTY
+          // grant), not the global picker context — otherwise the dialog
+          // disagrees with the MODEL card above it.
+          currentOverride={
+            terminalModel?.model
+              ? {
+                  provider: terminalModel.provider,
+                  model: terminalModel.model,
+                }
+              : null
+          }
           onApply={async ({ provider, model, confirmExpensiveModel }) => {
             setModelNotice(null);
             setPendingReloadModel(null);

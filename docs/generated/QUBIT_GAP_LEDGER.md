@@ -23,8 +23,8 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
   - upstream_pin: 3a9d69db306cd7f081e06254cb89c4bcc14a7107
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
-- `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 752 rows
-  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=95, qubit_compat.ROUTES=453, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
+- `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 750 rows
+  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=88, qubit_compat.ROUTES=460, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
@@ -35,25 +35,25 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 ## Counts
 
-- Total rows: **1447**
+- Total rows: **1445**
 - Code-side open rows (not terminal): **1**
-- SAFE_EQUIVALENT (closed for code readiness): **146**
+- SAFE_EQUIVALENT (closed for code readiness): **125**
 - OPERATOR_ONLY (manual/operator qualification): **10**
 - OPERATOR_ONLY_ARCHITECTURE (OPEN, architecture-gated; needs individual owner approval): **1**
 - Code-ready: **False**; fully complete (all manual qualified): **False**
 
 ### By status
 
-- IMPLEMENTED: 1290
+- IMPLEMENTED: 1309
 - OPERATOR_ONLY: 10
 - OPERATOR_ONLY_ARCHITECTURE: 1
-- SAFE_EQUIVALENT: 146
+- SAFE_EQUIVALENT: 125
 
 ### By source
 
 - hermes: 591
 - openclaw: 104
-- qubit: 752
+- qubit: 750
 
 ### By area
 
@@ -129,11 +129,11 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 - gateway-actions: 8
 - ghost: 20
 - git: 25
-- hermes_gated: 31
+- hermes_gated: 28
 - hermes_plugin: 9
 - hermes_skill: 28
 - hermes_tool: 73
-- hermes_web_page: 21
+- hermes_web_page: 22
 - hooks: 10
 - ide: 9
 - import_agent: 2
@@ -246,7 +246,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 ## Terminal gate rows (SAFE_EQUIVALENT / OPERATOR_ONLY)
 
-### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (146)
+### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (125)
 
 | id | source | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -256,16 +256,9 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:DELETE /api/local-models/models/{model_id}` | hermes | hardware | DELETE /api/local-models/models/{model_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:DELETE /api/mcp/oauth/flows/{flow_id}` | hermes | creds | DELETE /api/mcp/oauth/flows/{flow_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:DELETE /api/mcp/servers/{name}` | hermes | owner | DELETE /api/mcp/servers/{name} | tests/test_dashboard_control_confirm9u.py::test_mcp_enable_and_delete_stage_and_settle |
-| `api:DELETE /api/messaging/telegram/onboarding/{pairing_id}` | hermes | creds | DELETE /api/messaging/telegram/onboarding/{pairing_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:DELETE /api/messaging/whatsapp/onboarding/{pairing_id}` | hermes | creds | DELETE /api/messaging/whatsapp/onboarding/{pairing_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:DELETE /api/providers/oauth/sessions/{session_id}` | hermes | creds | DELETE /api/providers/oauth/sessions/{session_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:DELETE /api/providers/oauth/{provider_id}` | hermes | creds | DELETE /api/providers/oauth/{provider_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/audio/elevenlabs/voices` | hermes | creds | GET /api/audio/elevenlabs/voices | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/config/raw` | hermes | creds | GET /api/config/raw | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/credentials/pool` | hermes | creds | GET /api/credentials/pool | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:GET /api/files/download` | hermes | owner | GET /api/files/download | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:GET /api/files/stream` | hermes | owner | GET /api/files/stream | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:GET /api/fs/download` | hermes | owner | GET /api/fs/download | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/git/gh-auth` | hermes | creds | GET /api/git/gh-auth | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/git/review/ship-info` | hermes | creds | GET /api/git/review/ship-info | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/local-models/search` | hermes | hardware | GET /api/local-models/search | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
@@ -274,13 +267,9 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:GET /api/mcp/oauth/flows/{flow_id}` | hermes | creds | GET /api/mcp/oauth/flows/{flow_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/media` | hermes | owner | GET /api/media | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/memory/providers/{provider}/oauth/status` | hermes | creds | GET /api/memory/providers/{provider}/oauth/status | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:GET /api/messaging/telegram/onboarding/{pairing_id}` | hermes | creds | GET /api/messaging/telegram/onboarding/{pairing_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:GET /api/messaging/whatsapp/onboarding/{pairing_id}` | hermes | creds | GET /api/messaging/whatsapp/onboarding/{pairing_id} | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/ops/backup/download` | hermes | creds | GET /api/ops/backup/download | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:GET /api/profiles/{name}/desktop-overlay` | hermes | owner | GET /api/profiles/{name}/desktop-overlay | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:GET /api/providers/oauth/{provider_id}/poll/{session_id}` | hermes | creds | GET /api/providers/oauth/{provider_id}/poll/{session_id} | tests/test_route_parity_p0_wave13.py::test_oauth_poll_is_manual_handoff_refusal |
 | `api:GET /api/ssh/ownership` | hermes | owner | GET /api/ssh/ownership | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:HEAD /api/files/stream` | hermes | owner | HEAD /api/files/stream | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/audio/tts-lease` | hermes | hardware | POST /api/audio/tts-lease | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/audio/voice-live/session` | hermes | hardware | POST /api/audio/voice-live/session | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/auth/ws-ticket` | hermes | owner | POST /api/auth/ws-ticket | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
@@ -307,18 +296,11 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:POST /api/local-models/sideload` | hermes | hardware | POST /api/local-models/sideload | tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing |
 | `api:POST /api/mcp/catalog/install` | hermes | owner | POST /api/mcp/catalog/install | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/memory/providers/{provider}/oauth/start` | hermes | creds | POST /api/memory/providers/{provider}/oauth/start | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/messaging/telegram/onboarding/start` | hermes | creds | POST /api/messaging/telegram/onboarding/start | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/messaging/telegram/onboarding/{pairing_id}/apply` | hermes | creds | POST /api/messaging/telegram/onboarding/{pairing_id}/apply | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/messaging/whatsapp/onboarding/start` | hermes | creds | POST /api/messaging/whatsapp/onboarding/start | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply` | hermes | creds | POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/ops/checkpoints/prune` | hermes | owner | POST /api/ops/checkpoints/prune | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/ops/import-upload` | hermes | owner | POST /api/ops/import-upload | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/profiles/import` | hermes | owner | POST /api/profiles/import | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/profiles/sessions/pull-requests` | hermes | creds | POST /api/profiles/sessions/pull-requests | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/profiles/{name}/open-terminal` | hermes | owner | POST /api/profiles/{name}/open-terminal | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/providers/custom-endpoints/validate` | hermes | creds | POST /api/providers/custom-endpoints/validate | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/providers/oauth/{provider_id}/start` | hermes | creds | POST /api/providers/oauth/{provider_id}/start | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `api:POST /api/providers/oauth/{provider_id}/submit` | hermes | creds | POST /api/providers/oauth/{provider_id}/submit | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/providers/validate` | hermes | creds | POST /api/providers/validate | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/sessions/owner-backfill` | hermes | owner | POST /api/sessions/owner-backfill | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:PUT /api/config/raw` | hermes | creds | PUT /api/config/raw | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
@@ -365,10 +347,8 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `hermes_gate_backup_passphrase` | qubit | owner | Gated upstream route: BACKUP_PASSPHRASE | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_blocked_remote_source` | qubit | owner | Gated upstream route: BLOCKED_REMOTE_SOURCE | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_chat_image_overlay` | qubit | owner | Gated upstream route: CHAT_IMAGE_OVERLAY | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `hermes_gate_checkpoint_confirm_required` | qubit | owner | Gated upstream route: CHECKPOINT_CONFIRM_REQUIRED | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_cron_fire_external` | qubit | owner | Gated upstream route: CRON_FIRE_EXTERNAL | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_desktop_overlay_only` | qubit | owner | Gated upstream route: DESKTOP_OVERLAY_ONLY | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `hermes_gate_files_binary_stream` | qubit | owner | Gated upstream route: FILES_BINARY_STREAM | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_gateway_migrate_operator_owned` | qubit | owner | Gated upstream route: GATEWAY_MIGRATE_OPERATOR_OWNED | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_gh_auth_operator` | qubit | owner | Gated upstream route: GH_AUTH_OPERATOR | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_gh_pr_external` | qubit | owner | Gated upstream route: GH_PR_EXTERNAL | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
@@ -378,7 +358,6 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `hermes_gate_media_not_served` | qubit | owner | Gated upstream route: MEDIA_NOT_SERVED | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_network_probe_blocked` | qubit | owner | Gated upstream route: NETWORK_PROBE_BLOCKED | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_oauth_manual_handoff` | qubit | owner | Gated upstream route: OAUTH_MANUAL_HANDOFF | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
-| `hermes_gate_onboarding_guided` | qubit | owner | Gated upstream route: ONBOARDING_GUIDED | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_plugin_providers_qubit` | qubit | owner | Gated upstream route: PLUGIN_PROVIDERS_QUBIT | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_profile_import_review` | qubit | owner | Gated upstream route: PROFILE_IMPORT_REVIEW | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `hermes_gate_provider_external` | qubit | owner | Gated upstream route: PROVIDER_EXTERNAL | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |

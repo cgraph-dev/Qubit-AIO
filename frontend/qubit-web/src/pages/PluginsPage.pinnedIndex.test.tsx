@@ -4,8 +4,8 @@
  *
  * The page must render the curated + pinned entries with their full pinned
  * ref, and the install affordance must call the pinned-index install (name +
- * curated ref) and surface the honest operator-gated refusal — never a
- * fabricated success.
+ * curated ref) and surface the real outcome — success toast on install, the
+ * typed error otherwise. Never a fabricated success.
  */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -69,17 +69,17 @@ const pinnedIndex = {
       tags: ["media"],
       curated: true,
       pinned: true,
-      install_state: "OPERATOR_GATED",
-      install_code: "PLUGIN_INDEX_OPERATOR_GATED",
+      install_state: "READY",
+      install_code: "PLUGIN_INDEX_INSTALLABLE",
       install_capability: "plugin.install",
       provenance: { curation: "curated+pinned" },
     },
   ],
   install: {
-    state: "OPERATOR_GATED",
-    code: "PLUGIN_INDEX_OPERATOR_GATED",
-    detail: "operator gate",
-    prerequisite: "verify repo+license at pinned ref",
+    state: "READY",
+    code: "PLUGIN_INDEX_INSTALLABLE",
+    detail: "fetch at pin",
+    prerequisite: "confirm",
     endpoint: "POST /api/dashboard/agent-plugins/install",
   },
   raw_remote_fetch: {
@@ -186,7 +186,8 @@ describe("PluginsPage curated pinned index", () => {
     ).not.toBeNull();
   });
 
-  it("installs by name + curated ref and surfaces the operator-gated refusal", async () => {
+  it("installs by name + curated ref and toasts the real success", async () => {
+    apiMocks.installAgentPluginFromIndex.mockResolvedValue({ ok: true });
     await renderPage();
     await waitFor(() => container.textContent?.includes("Media Studio") === true);
     const section = container.querySelector(
@@ -204,7 +205,31 @@ describe("PluginsPage curated pinned index", () => {
       "hermes-media-studio",
       PINNED_REF,
     );
-    // The honest refusal is surfaced in the toast; no fabricated success.
+    // The real install resolves: success toast names the entry; the catalog
+    // reloads instead of showing a refusal.
+    await waitFor(
+      () => document.body.textContent?.includes("Media Studio installed") === true,
+    );
+  });
+
+  it("surfaces a typed install failure in the error toast, not success", async () => {
+    apiMocks.installAgentPluginFromIndex.mockRejectedValue(
+      new Error("PLUGIN_INDEX_REF_MISMATCH: REFUSED_PROOF"),
+    );
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Media Studio") === true);
+    const section = container.querySelector(
+      '[data-testid="plugin-pinned-index-section"]',
+    );
+    const button = section?.querySelector("button");
+    expect(button).not.toBeNull();
+    await act(async () => {
+      button?.click();
+    });
+    await waitFor(
+      () => apiMocks.installAgentPluginFromIndex.mock.calls.length > 0,
+    );
+    // The typed failure is surfaced in the toast; no fabricated success.
     await waitFor(
       () => document.body.textContent?.includes("REFUSED_PROOF") === true,
     );

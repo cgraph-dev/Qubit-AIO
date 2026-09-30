@@ -11563,6 +11563,10 @@ _CLI_GUARDS: Dict[str, Tuple[str, str]] = {
     "gateway restart": ("host service lifecycle; use `qubit gateway restart "
                         "--confirm` or the dashboard Gateway page",
                         "VOICE_HOST_SERVICE"),
+    "gateway recover": ("recovers a parked failed gateway service "
+                        "(reset-failed, then start); use `qubit gateway "
+                        "recover --confirm` or the dashboard Gateway page",
+                        "VOICE_HOST_SERVICE"),
     "gateway run": ("runs the gateway in the foreground; run `qubit gateway run` "
                     "in a terminal", "VOICE_HOST_SERVICE"),
     "gateway setup": ("interactive gateway setup; use the dashboard Gateway page "

@@ -1800,12 +1800,22 @@ export const api = {
   // OAuth provider management
   getOAuthProviders: () =>
     fetchJSON<OAuthProvidersResponse>("/api/providers/oauth"),
-  disconnectOAuthProvider: (providerId: string) =>
-    fetchJSON<{ ok: boolean; provider: string }>(
-      `/api/providers/oauth/${encodeURIComponent(providerId)}`,
-      {
-        method: "DELETE",
-      },
+  disconnectOAuthProvider: (
+    providerId: string,
+    confirm?: (detail: string) => boolean | Promise<boolean>,
+  ) =>
+    // Disconnect clears stored credentials, so the backend stages a typed
+    // 409 CONFIRM_REQUIRED first; the shared round-trip re-issues with the
+    // staged id once the caller confirms (the card already asked in-app).
+    runMutationWithConfirm(
+      () =>
+        fetchJSON<{ ok: boolean; provider: string }>(
+          `/api/providers/oauth/${encodeURIComponent(providerId)}`,
+          {
+            method: "DELETE",
+          },
+        ),
+      confirm,
     ),
   startOAuthLogin: (providerId: string) =>
     fetchJSON<OAuthStartResponse>(

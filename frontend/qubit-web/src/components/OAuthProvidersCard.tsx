@@ -79,7 +79,9 @@ export function OAuthProvidersCard({ onError, onSuccess }: Props) {
     setBusyId(provider.id);
     setDisconnectTarget(null);
     try {
-      await api.disconnectOAuthProvider(provider.id);
+      // The card's own ConfirmDialog already collected the human decision,
+      // so settle the backend's staged 409 without asking twice.
+      await api.disconnectOAuthProvider(provider.id, () => true);
       onSuccess?.(`${provider.name} ${t.oauth.disconnect.toLowerCase()}ed`);
       refresh();
     } catch (e) {

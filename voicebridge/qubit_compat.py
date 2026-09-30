@@ -7763,13 +7763,6 @@ _GATE_KANBAN_WRITE = _g(
     "the Qubit board schema. Board/task create, edit, move, complete, archive, "
     "comment and bulk update are native and confirmed on the one board store.",
     "CLI `qubit kanban` + dashboard /qubit-boards + pending-approvals banner")
-_GATE_OAUTH_DELETE = {
-    **_g("OAUTH_MANUAL_HANDOFF",
-         "No OAuth sessions are stored server-side; enrollment is a manual "
-         "handoff in your own browser.",
-         "CLI `qubit auth login` (manual-handoff guided enrollment)"),
-    "http": 404,
-}
 
 _r("GET", r"/api/status", "h_status")
 _r("GET", r"/api/runtime", "h_runtime")
@@ -7945,6 +7938,16 @@ _r("GET", r"/api/host/identity", "h_host_identity")
 # below (as a real handler, like ``blueprints``/``delivery``) so the proxy-first
 # read path cannot serve the fork's raw record (legacy portal host + token
 # fragment). See the GET /api/providers/oauth row there.
+# Live OAuth login family (owner decision: port the device-code dance 1:1 from
+# the vendored router instead of the OAUTH_MANUAL_HANDOFF refusal). Start is a
+# non-destructive login initiation (no confirm gate, like the reference);
+# disconnect clears credentials and stages through the one confirm path.
+_r("POST", r"/api/providers/oauth/(?P<provider_id>[^/]+)/start", "h_oauth_start")
+_r("POST", r"/api/providers/oauth/(?P<provider_id>[^/]+)/submit", "h_oauth_submit")
+_r("GET", r"/api/providers/oauth/(?P<provider_id>[^/]+)/poll/(?P<session_id>[^/]+)",
+   "h_oauth_poll")
+_r("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", "h_oauth_cancel")
+_r("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "h_oauth_disconnect")
 _r("GET", r"/api/curator", "h_curator")
 # Real on-demand curator control (persisted pause flag + explicit pass). The
 # routes are implemented here, ahead of the GATED table, so the operator
@@ -8368,15 +8371,12 @@ GATED: List[Dict[str, Any]] = [
     # handler. Registered in this authority table (as a real handler, the same
     # pattern as ``/api/cron/blueprints``) so ``qubit_asgi.gated_path`` keeps
     # the read on the Qubit path: the proxy-first path would return the fork's
-    # raw record (legacy portal host + a token fragment). POST (starting an
-    # OAuth flow) stays on the Qubit gate.
+    # raw record (legacy portal host + a token fragment).
     ("GET", r"/api/providers/oauth", "h_providers_oauth"),
-    ("POST", r"/api/providers/oauth.*", _NO_OAUTH),
-    # The reference's in-browser device-code poll has no Qubit construct: no
-    # live OAuth session is ever started, so there is nothing to poll. Typed
-    # manual-handoff refusal naming `qubit auth login` (not a bare 404).
-    ("GET", r"/api/providers/oauth/(?P<provider_id>[^/]+)/poll/(?P<session_id>[^/]+)",
-     _NO_OAUTH),
+    # The live login family (start/submit/poll/cancel/disconnect) is
+    # implemented above (owner decision: port the device-code dance 1:1), so
+    # no blanket POST/poll gate remains here. MCP OAuth flows and the memory
+    # memory-provider OAuth status stay manual-handoff (separate surfaces).
     ("GET", r"/api/mcp/oauth/flows", _NO_OAUTH),
     ("GET", r"/api/mcp/oauth/flows/[^/]+", _NO_OAUTH),
     # Curator pause/run are real implemented routes above; they are no longer
@@ -8422,8 +8422,8 @@ GATED: List[Dict[str, Any]] = [
     # DELETE remove route stays here (it is unshadowed and real).
     ("DELETE", r"/api/dashboard/agent-plugins/(?P<id>.+)", "agent_remove"),
     ("GET", r"/api/dashboard/plugins/hub", "plugins_hub"),
-    ("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", _GATE_OAUTH_DELETE),
-    ("DELETE", r"/api/providers/oauth/sessions/(?P<id>[^/]+)", _GATE_OAUTH_DELETE),
+    # OAuth cancel/disconnect are implemented above (live family); the old
+    # OAUTH_MANUAL_HANDOFF DELETE gates are gone with them.
     ("PUT", r"/api/env", "env_write"),
     ("DELETE", r"/api/env", "env_delete"),
     ("PUT", r"/api/memory/provider", "mem_provider_set"),
@@ -9173,6 +9173,234 @@ def h_providers_oauth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(providers=_scrub_portal_urls(_strip_secret_fields(providers)))
 
 
+def _oauth_fail(exc: Exception) -> Tuple[int, Dict[str, Any]]:
+    """Map a vendored OAuth ``HTTPException`` to its (status, typed payload).
+
+    Anything else is ``_fail``. The vendored detail strings are already
+    operator-facing ("Session not found or expired", "Provider mismatch",
+    "uses an external CLI; run ... manually"); they carry no secret material
+    (sessions hold device/user codes and vendor URLs, never tokens — tokens
+    are saved server-side by the poller workers into the auth store).
+    """
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status, {"ok": False, "code": "OAUTH_ERROR",
+                        "detail": _redact(str(getattr(exc, "detail", exc) or
+                                             "OAuth request failed"))[:400]}
+    return _fail(exc)
+
+
+def _oauth_vendored(cfg: Any) -> Any:
+    """Import the vendored OAuth router (port 1:1, never reimplemented)."""
+    _vendored_runtime(cfg)
+    from qubit_cli.web_routers import oauth as _O  # type: ignore
+    return _O
+
+
+def h_oauth_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/providers/oauth/{id}/start -> live device-code login start.
+
+    Delegates to the vendored implementation (the same device-code starters
+    the reference dashboard serves: ``nous``/``openai-codex``/``minimax-oauth``/
+    ``xai-oauth``); the compat HTTP boundary already authenticated the caller,
+    so the vendored ``_require_token`` (a second SPA-token check) is not
+    re-run — only its inner start logic. Returns the display fields only
+    (``session_id``/``user_code``/``verification_url``/``expires_in``); token
+    material never leaves the server (the background poller saves it into the
+    auth store). ``external``-flow providers get the honest 400 naming the CLI
+    command, exactly as the reference.
+    """
+    import asyncio
+
+    from fastapi import HTTPException as _HTTPException
+    try:
+        _O = _oauth_vendored(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    provider_id = str(p.get("provider_id", "") or "").strip()
+    profile = (q.get("profile") or "").strip() or None
+    try:
+        _O._gc_oauth_sessions()
+        _O._validate_oauth_profile(profile)
+        entry = next((e for e in _O._OAUTH_PROVIDER_CATALOG
+                      if e.get("id") == provider_id), None)
+        if entry is None:
+            raise _HTTPException(status_code=400,
+                                 detail=f"Unknown provider {provider_id}")
+        if entry.get("flow") == "external":
+            raise _HTTPException(
+                status_code=400,
+                detail=f"{provider_id} uses an external CLI; run "
+                       f"`{entry.get('cli_command', '')}` manually")
+        if entry.get("flow") != "device_code":
+            raise _HTTPException(status_code=400, detail="Unsupported flow")
+        out = asyncio.run(
+            _O._start_device_code_flow(provider_id, profile=profile))
+    except Exception as exc:
+        return _oauth_fail(exc)
+    try:
+        _audit("oauth_start", "dashboard:user",
+               {"provider": provider_id,
+                "session": str(out.get("session_id", ""))[:32]})
+    except Exception:
+        pass
+    return 200, {"ok": True, **out}
+
+
+def h_oauth_submit(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/providers/oauth/{id}/submit -> honest PKCE outcome.
+
+    The vendored implementation supports no PKCE submit (every provider is
+    device-code or external); this answers the same typed 400 for a known
+    provider instead of a dead 404, so the modal's PKCE branch shows the real
+    reason.
+    """
+    from fastapi import HTTPException as _HTTPException
+    try:
+        _O = _oauth_vendored(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    provider_id = str(p.get("provider_id", "") or "").strip()
+    try:
+        known = any(e.get("id") == provider_id
+                    for e in _O._OAUTH_PROVIDER_CATALOG)
+        if not known:
+            raise _HTTPException(status_code=400,
+                                 detail=f"Unknown provider {provider_id}")
+        raise _HTTPException(status_code=400,
+                             detail=f"submit not supported for {provider_id}")
+    except Exception as exc:
+        return _oauth_fail(exc)
+
+
+def h_oauth_poll(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/providers/oauth/{id}/poll/{session} -> live session status.
+
+    Read-only; directly delegates to the vendored poll (no second auth check
+    exists there either). Unknown/expired sessions are an honest 404, provider
+    or profile mismatches an honest 400 — never a fabricated "pending".
+    """
+    import asyncio
+
+    try:
+        _O = _oauth_vendored(cfg)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        out = asyncio.run(_O.poll_oauth_session(
+            str(p.get("provider_id", "") or ""),
+            str(p.get("session_id", "") or ""),
+            profile=(q.get("profile") or "").strip() or None))
+    except Exception as exc:
+        return _oauth_fail(exc)
+    return 200, {"ok": True, **out}
+
+
+def h_oauth_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/providers/oauth/sessions/{id} -> cancel a pending login.
+
+    Same semantics as the vendored cancel: the session is marked ``cancelled``
+    before removal so a background poller holding the dict stops instead of
+    completing the login after the user aborted. Non-destructive — no confirm
+    gate (the vendored route likewise needs only the token, which the compat
+    boundary already checked).
+    """
+    from fastapi import HTTPException as _HTTPException
+    try:
+        _O = _oauth_vendored(cfg)
+        from qubit_cli.web_server_oauth import (  # type: ignore
+            _oauth_sessions as _sessions,
+            _oauth_sessions_lock as _sessions_lock)
+    except Exception as exc:
+        return _fail(exc)
+    session_id = str(p.get("id", "") or "").strip()
+    profile = (q.get("profile") or "").strip() or None
+    try:
+        _O._gc_oauth_sessions()
+        requested = _O._oauth_profile_name(profile)
+        with _sessions_lock:
+            sess = _sessions.get(session_id)
+            if sess is not None:
+                if sess.get("profile") != requested:
+                    raise _HTTPException(
+                        status_code=400,
+                        detail="OAuth session profile mismatch")
+                sess["cancelled"] = True
+                _sessions.pop(session_id, None)
+    except Exception as exc:
+        return _oauth_fail(exc)
+    if sess is None:
+        return 200, {"ok": False, "message": "session not found"}
+    return 200, {"ok": True, "session_id": session_id}
+
+
+def h_oauth_disconnect(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/providers/oauth/{id} -> disconnect (confirm-gated).
+
+    Destructive (clears stored credentials), so it stages through the one
+    confirm path like every other compat mutation. The credential clearing
+    itself is the vendored logic verbatim: external providers are refused with
+    the manual path, ``anthropic`` clears only the Qubit-managed file (never
+    ``~/.claude/*``), and everything runs under the requested profile scope.
+    """
+    import asyncio
+
+    try:
+        _O = _oauth_vendored(cfg)
+        from qubit_cli.web_routers._common import (  # type: ignore
+            scoped_to_thread as _scoped)
+    except Exception as exc:
+        return _fail(exc)
+    provider_id = str(p.get("id", "") or "").strip()
+    profile = (q.get("profile") or "").strip() or None
+    guard = _compat_confirm(
+        cfg, "oauth.disconnect",
+        f"Disconnect {provider_id or 'provider'}: remove its stored OAuth "
+        f"credentials? Re-authentication will be needed to use it again.",
+        q, b)
+    if guard is not None:
+        return guard
+
+    def _run() -> Dict[str, Any]:
+        from fastapi import HTTPException as _HTTPException
+        catalog_by_id = {e["id"]: e for e in _O._build_oauth_catalog()}
+        provider = catalog_by_id.get(provider_id)
+        if provider is None:
+            raise _HTTPException(
+                status_code=400,
+                detail=f"Unknown provider: {provider_id}. Available: "
+                       f"{', '.join(sorted(catalog_by_id))}")
+        _O._reject_if_not_disconnectable(provider, {})
+        _O._reject_if_not_disconnectable(
+            provider, _O._resolve_provider_status(
+                provider_id, provider.get("status_fn")))
+        if provider_id == "anthropic":
+            cleared = _O._clear_anthropic_auth()
+            return {"ok": bool(cleared), "provider": provider_id}
+        from qubit_cli.auth import (  # type: ignore
+            clear_provider_auth, invalidate_nous_auth_status_cache)
+        cleared = clear_provider_auth(provider_id)
+        if provider_id == "nous":
+            invalidate_nous_auth_status_cache()
+        return {"ok": bool(cleared), "provider": provider_id}
+
+    try:
+        out = asyncio.run(_scoped(profile, _run))
+    except Exception as exc:
+        return _oauth_fail(exc)
+    try:
+        _audit("oauth_disconnect", "dashboard:user",
+               {"provider": provider_id, "cleared": out.get("ok")})
+    except Exception:
+        pass
+    return 200, {"ok": bool(out.get("ok")), "provider": provider_id}
+
+
 # Dashboard plugin assets (upstream ``GET /dashboard-plugins/<name>/<path>``).
 # The vendored handler
 # (``qubit_runtime/qubit_cli/web_routers/dashboard_ui.py::serve_plugin_asset``)
@@ -9182,9 +9410,14 @@ def h_providers_oauth(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 # overlay bundles from the same path; this resolver adds the vendored
 # user/bundled plugin dirs on ONE resolution shared by the ``/agent`` compat
 # route and the raw browser path (``webui._serve_qubit_plugin``).
-def resolve_plugin_asset(plugin_name: str, file_path: str
+def resolve_plugin_asset(plugin_name: str, file_path: str, cfg: Any = None
                          ) -> Tuple[int, str, Optional[bytes], Dict[str, Any]]:
     """Resolve one dashboard plugin asset: real bytes, or a typed miss."""
+    # Served per browser request (webui) as well as through the compat
+    # dispatcher, so the vendored path cannot be assumed warm from an earlier
+    # import — without this, plugin JS/CSS 404s in any process whose first
+    # plugin-asset call wins the import race.
+    _vendored_runtime(cfg)
     from qubit_cli.web_server import _get_dashboard_plugins
     from qubit_cli.web_routers.dashboard_ui import (
         _PLUGIN_ASSET_CONTENT_TYPES, _plugin_activated, _plugin_enable_sets)
@@ -9231,7 +9464,8 @@ def h_plugin_asset(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ``webui._serve_qubit_plugin``.
     """
     status, ctype, body, meta = resolve_plugin_asset(
-        str(p.get("plugin_name", "") or ""), str(p.get("file_path", "") or ""))
+        str(p.get("plugin_name", "") or ""), str(p.get("file_path", "") or ""),
+        cfg)
     if body is None:
         return status, meta
     return _ok(**meta, size=len(body),
@@ -11195,6 +11429,11 @@ def plugins_hub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     overlay_names = {m["name"] for m in _overlay_manifests()}
     hub_error = ""
     try:
+        # The vendored fork root is not on sys.path by default; without this
+        # the import below fails in any process whose first compat call is the
+        # hub (fresh tests, early dashboard loads), leaving plugins: [] plus a
+        # hub_error instead of the real fleet.
+        _vendored_runtime(cfg)
         from qubit_cli.web_server_dashboard import _merged_plugins_hub
         base = _jsonable(_merged_plugins_hub())
     except Exception as exc:
@@ -11327,6 +11566,7 @@ def plugins_reload(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                       "detail": _redact(exc.detail)[:300],
                       "qubit_counterpart": "CLI `qubit plugins reload`"}
     try:
+        _vendored_runtime(cfg)
         from qubit_cli.web_server_dashboard import _invalidate_plugins_hub_cache
         _invalidate_plugins_hub_cache()
     except Exception:
@@ -11529,12 +11769,14 @@ def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     CLI/voice use: a reviewed local manifest object, a ``<state_dir>/
     plugin-catalog`` identifier, or a local ``*.json`` path. A ``catalog_name``
     (+ optional ``ref``) selects a curated, pinned index entry: it is verified
-    against the curated pin and routed through the canonical e-stop ->
-    confirmation -> audit path, then honestly operator-gated (the pinned remote
-    source is not fetched). Confirmation is the shared durable
-    ``ApprovalJournal`` (``confirmation_id`` or an explicit ``confirm``), the
-    emergency stop is checked first, and a raw remote identifier is a typed
-    refusal — nothing is fetched, imported, or executed.
+    against the curated pin, routed through the canonical e-stop ->
+    confirmation -> audit path, then fetched at exactly the pinned SHA and
+    installed through the vendored catalog pipeline (kill-list, platform
+    check, exact-SHA clone, pre-publish malware scan, admission-gated
+    enable). Confirmation is the shared durable ``ApprovalJournal``
+    (``confirmation_id`` or an explicit ``confirm``), the emergency stop is
+    checked first, and a raw (non-index) remote identifier stays a typed
+    refusal.
     """
     from . import plugin_runtime as PR
     manifest = b.get("manifest")
@@ -11569,10 +11811,12 @@ def h_agent_plugin_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                           "detail": _redact(exc.detail)[:300],
                           "qubit_counterpart": "CLI `qubit agent plugins install "
                                                "<operator-verified-dir>`"}
-        _audit("plugin_index_install_refused", "dashboard:user",
-               {"code": out.get("code"), "catalog_name": catalog_name[:120],
-                "pinned_ref": str(out.get("pinned_ref", ""))[:40]})
-        return 403, out
+        _audit("plugin_index_install", "dashboard:user",
+               {"catalog_name": catalog_name[:120],
+                "plugin_name": str(out.get("plugin_name", ""))[:120],
+                "pinned_ref": str(out.get("pinned_ref", ""))[:40],
+                "enabled": out.get("enabled")})
+        return 200, {"ok": True, **out}
     if manifest is None and not identifier:
         return 400, {"ok": False, "code": PR.BAD_INPUT_CODE,
                      "detail": "install needs a manifest, an identifier, a "
@@ -14971,6 +15215,9 @@ HANDLERS: Dict[str, Handler] = {
     "h_gateway_migrate_plan": h_gateway_migrate_plan,
     "h_host_identity": h_host_identity,
     "h_providers_oauth": h_providers_oauth,
+    "h_oauth_start": h_oauth_start, "h_oauth_submit": h_oauth_submit,
+    "h_oauth_poll": h_oauth_poll, "h_oauth_cancel": h_oauth_cancel,
+    "h_oauth_disconnect": h_oauth_disconnect,
     "h_curator": h_curator, "h_curator_paused": h_curator_paused,
     "h_curator_run": h_curator_run, "h_env": h_env, "h_ops": h_ops,
     "h_ops_catalog": h_ops_catalog,
