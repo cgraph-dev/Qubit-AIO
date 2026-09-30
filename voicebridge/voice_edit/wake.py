@@ -232,6 +232,10 @@ class WakeMonitor:
                                       default=True)))
 
     def _do_transcribe(self, pcm: bytes) -> str:
+        # Honest consumer of ``voice_edit.noise_suppression``: the software
+        # NS/AGC stage runs on the captured utterance before either STT path
+        # (accurate or streaming). OFF → pcm unchanged (see _maybe_ns_filter).
+        pcm = _maybe_ns_filter(pcm, self.cfg)
         if self._transcribe is not None:
             return self._transcribe(pcm)
         # Accurate whole-utterance pass first (default); the streaming socket
@@ -340,7 +344,13 @@ class WakeMonitor:
                 ep.reset()
                 hit = kws_hit
                 kws_hit = False
-                if self._kws is not None:
+                if hit and self._kws is not None:
+                    # Reset ONLY on a hit (latch clear). Resetting after
+                    # every segment wiped the spotter's running context, so
+                    # a lone "hey qubit" following any other sound was
+                    # systematically missed (calibrated: first occurrence
+                    # missed, repetitions caught). The stream consumes audio
+                    # incrementally, so no reset is needed between misses.
                     try:
                         self._kws.reset()
                     except Exception:
@@ -435,6 +445,22 @@ def _mic_target_peak(cfg: Any, default: float = 0.6) -> float:
             return float(default)
         except Exception:
             return 0.6
+
+
+def _maybe_ns_filter(pcm: bytes, cfg: Any) -> bytes:
+    """Run the software NS/AGC stage when ``voice_edit.noise_suppression`` is on.
+
+    OFF (or unreadable cfg) → ``pcm`` returned unchanged. Never raises, so a
+    filter fault can never break capture. Unit-observable: ns ON audibly
+    changes a noisy utterance, OFF is byte-identical.
+    """
+    try:
+        from .noise import apply_capture_filter, enabled as _ns_on
+        if _ns_on(cfg):
+            return apply_capture_filter(pcm, True)
+    except Exception:
+        pass
+    return pcm
 
 
 def _normalize_pcm(pcm: bytes, target_peak: float = 0.6,

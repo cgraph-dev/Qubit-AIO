@@ -239,3 +239,47 @@ def test_monitor_disabled_not_started():
                     is_busy=lambda: False)
     assert m.enabled() is False
     assert m.start() is False
+
+
+def _run_loop(m, until, timeout_s=6.0):
+    import time as _t
+
+    m.start()
+    end = _t.time() + timeout_s
+    while _t.time() < end and not until():
+        _t.sleep(0.05)
+    m.stop()
+
+
+def test_kws_context_survives_non_hit_segments():
+    """The spotter resets ONLY on a hit, never after a plain segment.
+
+    Regression: resetting after every endpointed chunk wiped the KWS
+    running context, so a lone wake phrase following any other sound was
+    systematically missed (first occurrence missed, repetitions caught).
+    """
+    kws = FakeKws(hits=0)
+    m = WakeMonitor(FakeCfg(), on_command=lambda c: None,
+                    is_busy=lambda: False,
+                    mic_factory=lambda: SeqMic(
+                        [loud_frame(), loud_frame()] + [silent_frame()] * 4
+                        + [loud_frame(), loud_frame()] + [silent_frame()] * 4),
+                    transcribe=lambda pcm: "someone said something random",
+                    kws=kws)
+    _run_loop(m, lambda: kws.seen >= 12)
+    assert kws.resets == 0, kws.resets
+
+
+def test_kws_resets_after_a_hit():
+    """A hit still latches-clear so one phrase cannot double-fire."""
+    kws = FakeKws(hits=1)
+    commands = []
+    m = WakeMonitor(FakeCfg(), on_command=commands.append,
+                    is_busy=lambda: False,
+                    mic_factory=lambda: SeqMic(
+                        [loud_frame(), loud_frame()] + [silent_frame()] * 4),
+                    transcribe=lambda pcm: "hey qubit what's the time",
+                    kws=kws)
+    _run_loop(m, lambda: bool(commands))
+    assert commands == ["what's the time"]
+    assert kws.resets == 1, kws.resets

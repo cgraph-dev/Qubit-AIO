@@ -2041,3 +2041,29 @@ STT; Right-Ctrl/Firefox should write like Chrome when local STT is on.
 - **Tests.** 3 new E2E in `test_stt_streaming9u.py` (accurate wins /
   empty-keeps-streaming / streaming-mode-skips; +1 engine-preservation
   fix); 93 passed across the STT suites. `:9119` untouched.
+
+## 47. Wake-word misses: KWS reset only on hit — 2026-09-30
+
+**No milestone claimed.** Owner: "hey qubit" never fires (no beep, nothing);
+Firefox STT good after warmup (the §46 rescore working as designed).
+
+- **Ruled out (all healthy):** watcher alive (`wake: True`, engine `kws`,
+  77k+ `kws.frames` events, mic peaks ~0.2 over the 0.0018 gate); KWS model
+  present with the phrase table; the detector fires instantly on clean
+  synthetic speech (`HEY CUBIT` at 2.0 s). Zero hits / zero errors ever —
+  pure non-detection, not suppression (1 momentary `busy_skip`) or crash.
+- **Root cause (calibrated, not guessed).** Threshold sweeps (0.25/0.15/0.10)
+  changed nothing; instead the spotter systematically misses the FIRST
+  occurrence and catches repetitions (fresh stream: hit at 2.0 s, never at
+  0.3 s; warmed: 1.0 s + 2.0 s). The loop called `kws.reset()` after EVERY
+  endpointed segment, wiping running context — any lone "hey qubit"
+  following another sound was structurally missed.
+- **Fix (`voicebridge/voice_edit/wake.py`).** Reset the spotter latch only
+  after a hit (repeat-fire protection kept); misses keep full context.
+  Busy-skip reset untouched.
+- **Tests.** 2 new loop tests (context survives misses: 0 resets across 2
+  segments; hit latches-clear exactly once + command emits); file 18/18.
+  Helper restarted (`qubit-voice-typing` active, `wake: True`, `kws`).
+- **To the owner:** say "hey qubit" clearly a few times — check the journal
+  (`grep kws.hit events.jsonl`) or just whether it answers; report misses
+  AND any false beeps (threshold untouched at 0.25).
