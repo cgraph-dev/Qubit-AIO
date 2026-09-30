@@ -79,6 +79,8 @@ def _app_targets() -> Dict[str, List[str]]:
     targets.update(_OPERATOR.get("app_targets") or {})
     targets.setdefault("editor", ["xdg-open", home])
     targets.setdefault("vscode", ["code", home])
+    targets.setdefault("cursor", ["cursor"])
+    targets.setdefault("chromium", ["chromium"])
     targets.setdefault("files", ["xdg-open", home])
     return targets
 
@@ -606,7 +608,7 @@ ACTIONS: Dict[str, LocalAction] = {
     "mic_mute": LocalAction("mic_mute", "toggle microphone mute", _a_mic_mute,
                             patterns=[r"\b(mute|unmute) (the )?(microphone|mic)\b"]),
     "open_app": LocalAction("open_app", "launch an application", _a_open_app,
-                            patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|terminal|discord|telegram|files|fl studio|spotify)\b"]),
+                             patterns=[r"\b(open|launch|start|run) (the )?(browser|editor|vscode|cursor|chromium|terminal|discord|telegram|files|file-manager|file manager|fl studio|spotify)\b"]),
     # Project names are operator-local (config/local-actions.yaml
     # ``project_roots``); the patterns stay generic so no personal project
     # names are baked into the shipped product source.
@@ -681,10 +683,12 @@ ACTIONS: Dict[str, LocalAction] = {
 }
 
 APP_NAMES = {
-    "browser": "browser", "chrome": "browser", "firefox": "browser",
+    "browser": "browser", "chromium": "chromium", "chrome": "browser", "firefox": "browser",
     "editor": "editor", "vscode": "vscode", "vs code": "vscode", "code": "vscode",
+    "cursor": "cursor",
     "terminal": "terminal", "console": "terminal", "discord": "discord",
     "telegram": "telegram", "files": "files", "file manager": "files",
+    "file-manager": "files",
     "fl studio": "fl studio", "fl": "fl studio", "spotify": "spotify",
 }
 
