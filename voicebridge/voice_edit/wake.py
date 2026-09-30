@@ -344,17 +344,19 @@ class WakeMonitor:
                 ep.reset()
                 hit = kws_hit
                 kws_hit = False
-                if hit and self._kws is not None:
-                    # Reset ONLY on a hit (latch clear). Resetting after
-                    # every segment wiped the spotter's running context, so
-                    # a lone "hey qubit" following any other sound was
-                    # systematically missed (calibrated: first occurrence
-                    # missed, repetitions caught). The stream consumes audio
-                    # incrementally, so no reset is needed between misses.
-                    try:
-                        self._kws.reset()
-                    except Exception:
-                        pass
+                if self._kws is not None:
+                    if hit:
+                        # Reset ONLY on a hit (latch clear). Resetting after
+                        # every segment wiped the spotter's running context,
+                        # so a lone "hey qubit" following any other sound was
+                        # systematically missed (calibrated: first occurrence
+                        # missed, repetitions caught). The stream consumes
+                        # audio incrementally, so no reset is needed between
+                        # misses.
+                        try:
+                            self._kws.reset()
+                        except Exception:
+                            pass
                     with self._lock:
                         armed = time.monotonic() < self._armed_until
                     # With a keyword spotter, ASR runs ONLY for the utterance

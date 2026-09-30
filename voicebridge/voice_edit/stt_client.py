@@ -118,11 +118,31 @@ class ParecMic:
         except Exception:
             pass
 
+    def _sync_frame_bytes(self) -> None:
+        """Recompute the read size from the probed stream format.
+
+        Reads pull raw stream bytes, so the size must match the real format
+        (rate × channels × width), not the assumed 16k/mono/s16 the
+        constructor used. Called from :meth:`start` after the probe.
+        """
+        width = 4 if getattr(self, "_capture_s32", False) else 2
+        self._frame_bytes = max(
+            2, int(self._native_rate * self.frame_ms / 1000)
+            * self._native_channels * width)
+
     def start(self) -> None:
         import shutil
         which = self._which or shutil.which
         if which("parec"):
             self._probe_source_format()
+            self._sync_frame_bytes()
+            # Recompute AFTER the probe: the real stream format (e.g. the
+            # Scarlett's s32/4ch/48k) differs from the assumed 16k/mono/s16
+            # the constructor used. Without this, reads pull ~12.5 ms while
+            # every consumer (AGC, endpointer, KWS) assumes frame_ms — levels
+            # pump, utterances fragment into ~40 ms pieces, and the spotter
+            # goes deaf on real mic audio while working on clean files.
+            self._sync_frame_bytes()
             fmt = "s32le" if getattr(self, "_capture_s32", False) else "s16le"
             argv = ["parec", f"--format={fmt}", f"--rate={self._native_rate}",
                     f"--channels={self._native_channels}",

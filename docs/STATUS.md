@@ -2067,3 +2067,31 @@ Firefox STT good after warmup (the §46 rescore working as designed).
 - **To the owner:** say "hey qubit" clearly a few times — check the journal
   (`grep kws.hit events.jsonl`) or just whether it answers; report misses
   AND any false beeps (threshold untouched at 0.25).
+
+## 48. Mic frame-size fix — KWS deaf on real audio, perfect on files — 2026-09-30
+
+**No milestone claimed.** Owner: "hey qubit" never fires, no beep, nothing
+starts (after the §47 reset fix also held: watcher alive, 77k frames, mic
+peaks healthy, detector instant on TTS, zero hits ever).
+
+- **Root cause (measured, not guessed).** `ParecMic._frame_bytes` was computed
+  once from the assumed 16k/mono/s16 format, but the Scarlett streams
+  s32/4ch/48k and the probe never recomputed it: every read pulled **12.5 ms**
+  while AGC/endpointer/KWS assume 300 ms frames (24× off — proven live:
+  `frame_bytes 9600` vs correct `230400`, reads returned 400 B). Levels
+  pumped on slivers, utterances fragmented to ~40 ms, and the spotter went
+  deaf on mic audio while working on clean files. Same mangling fed
+  parakeet (empty on live captures) — while the browser path (own
+  conversion) always worked.
+- **Fix.** `_sync_frame_bytes()` recomputed after the probe in `start()`;
+  verified live (reads now 9600 B downstream frames). Full-chain proof:
+  TTS "hey qubit" through the exact native conversion (s32/4ch/48k →
+  loudest channel → 16k → AGC) fires KWS twice at 0.25.
+- **Regression caught by tests:** the first edit nested the no-hit ASR gate
+  inside the reset branch (every segment reached ASR); restored the gate
+  level — reset is hit-only, the keyword gate unchanged.
+- **Evidence.** 50 passed across wake/stt-client/stt-streaming (incl. 2 new
+  frame-bytes tests + 2 §47 loop tests). Helper restarted (watcher lives
+  there). `:9119` untouched.
+- **To the owner:** say "hey qubit" — if it beeps now, the chain is proven
+  on your voice; report misses/false beeps either way.

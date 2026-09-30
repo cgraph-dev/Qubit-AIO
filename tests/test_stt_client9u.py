@@ -216,3 +216,48 @@ def test_connect_failure_is_typed():
         loop.close()
     assert out == ""
     assert client.error is not None and client.error.code == "STT_CONNECT_FAILED"
+
+
+def test_parec_frame_bytes_follow_probed_format(monkeypatch):
+    """Reads must match the real stream format, not the assumed default.
+
+    Regression: ``_frame_bytes`` was computed once from 16k/mono/s16 while
+    the Scarlett streams s32/4ch/48k, so every read pulled ~12.5 ms while
+    AGC/endpointer/KWS assumed 300 ms frames (mangled levels, fragmented
+    utterances, deaf spotter on real mic audio).
+    """
+    import subprocess
+    from voicebridge.voice_edit.stt_client import ParecMic
+
+    out = ("Source #57\n"
+           "\tName: alsa_input.usb-Focusrite_Foo-00.analog-surround-40\n"
+           "\tSample Specification: s32le 4ch 48000Hz\n")
+
+    class _R:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def _fake_run(argv, **kwargs):
+        if "get-default-source" in argv:
+            return _R("alsa_input.usb-Focusrite_Foo-00.analog-surround-40\n")
+        return _R(out)
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    import shutil
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
+
+    mic = ParecMic(device="", frame_ms=300)
+    mic._probe_source_format()
+    assert (mic._native_rate, mic._native_channels) == (48000, 4)
+    mic._sync_frame_bytes()
+    assert mic._frame_bytes == 230400, mic._frame_bytes
+
+
+def test_parec_frame_bytes_default_without_pactl(monkeypatch):
+    from voicebridge.voice_edit.stt_client import ParecMic
+    import shutil
+
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    mic = ParecMic(device="", frame_ms=300)
+    mic._probe_source_format()
+    assert mic._frame_bytes == 9600
