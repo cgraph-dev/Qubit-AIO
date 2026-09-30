@@ -413,8 +413,19 @@ def _status_pressure(cfg: Any, home: Optional[Path]
 
 
 def _status_auth_gate(cfg: Any) -> Dict[str, Any]:
-    """Dashboard auth-gate readout (reference ``_auth_gate_status`` shape)."""
-    auth_required = bool(str(getattr(cfg, "api_token", "") or ""))
+    """Dashboard auth-gate readout (reference ``_auth_gate_status`` shape).
+
+    The live server gates on the configured ``webui.token`` (see the
+    ``api_token`` wiring: ``cfg.get("webui", "token")``); a bare
+    ``cfg.api_token`` attribute is honored as a fallback for runtimes that
+    set it directly. Either engaged means auth is required.
+    """
+    try:
+        configured = str(cfg.get("webui", "token", default="") or "")
+    except Exception:  # noqa: BLE001 - config-less read: no gate
+        configured = ""
+    auth_required = bool(configured or str(getattr(cfg, "api_token", "")
+                                           or ""))
     auth_providers: List[str] = []
     auth_flows: List[str] = []
     try:
@@ -524,18 +535,60 @@ def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # MemoryPressureBanner / SessionsPage platforms surfaces stop being dead.
     home: Optional[Path] = Path(state_dir) if state_dir else None
     daemon = gw.get("daemon") if isinstance(gw.get("daemon"), dict) else {}
-    platforms = daemon.get("platforms_map") if isinstance(daemon, dict) else {}
+    control = gw.get("control") if isinstance(gw.get("control"), dict) \
+        else {}
+    # Platforms: the daemon snapshot's map first (the real supervisor
+    # shape); the live control answer's map as fallback (older supervisor
+    # shape). Absent everywhere is {} — never invented names.
+    platforms = daemon.get("platforms_map") if isinstance(daemon, dict) \
+        else {}
+    if not isinstance(platforms, dict) or not platforms:
+        fallback = control.get("platforms") if isinstance(control, dict) \
+            else {}
+        if isinstance(fallback, dict) and fallback:
+            platforms = fallback
     if not isinstance(platforms, dict):
         platforms = {}
     memory, disk = _status_pressure(cfg, home)
     auth = _status_auth_gate(cfg)
     try:
-        active_agents = int((daemon or {}).get("active_agents") or 0)
+        active_agents = int((daemon or {}).get("active_agents")
+                            if (daemon or {}).get("active_agents")
+                            is not None
+                            else (control or {}).get("active_agents") or 0)
     except Exception:  # noqa: BLE001
         active_agents = 0
+    # Busy/drainable ported from the reference (``derive_gateway_busy`` /
+    # ``derive_gateway_drainable``): live + serving + agents > 0. The state
+    # prefers the daemon's self-reported ``gateway_state`` (native
+    # running/degraded vocabulary), then the control answer, then the
+    # supervisor rollup.
+    running = bool(gw.get("running"))
+    dstate = (daemon.get("gateway_state") or control.get("gateway_state")
+              or gw.get("state"))
+    try:
+        _vendored_runtime(cfg)
+        from gateway.status import parse_active_agents  # type: ignore
+
+        drainable = bool(running) and dstate in ("running", "degraded")
+        gateway_busy = bool(drainable
+                            and parse_active_agents(active_agents) > 0)
+    except Exception:  # noqa: BLE001 - status never breaks on the derive
+        drainable = False
+        gateway_busy = False
     components = _status_components(gw, platforms, home)
     overall = ("ok" if all(item.get("status") == "ok"
                            for item in components.values()) else "degraded")
+    # Update offer: consult the install-method authority (a git checkout can
+    # update in place; package/container/immutable trees get the operator
+    # command instead). Never a hardcoded False — SP-09 demands truth.
+    try:
+        from . import update_manager as UM
+
+        _im = UM.detect_install_method(cfg)
+        can_update = bool((_im or {}).get("supported_in_place"))
+    except Exception:  # noqa: BLE001 - unknown install: no offer
+        can_update = False
     install_id: Optional[str] = None
     try:
         _vendored_runtime(cfg)
@@ -550,11 +603,13 @@ def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                auth_required=auth["auth_required"],
                auth_providers=auth["auth_providers"],
                auth_flows=auth["auth_flows"],
-               can_update_qubit=False,
+               can_update_qubit=can_update,
                config_path=state_dir, config_version=1, env_path=state_dir,
                gateway_exit_reason=None, gateway_health_url=None,
                gateway_pid=gw.get("pid"), gateway_platforms=platforms,
-               gateway_running=bool(gw.get("running")),
+               gateway_running=running,
+               gateway_busy=gateway_busy,
+               gateway_drainable=drainable,
                gateway_state=(gw.get("state") if gw.get("running")
                               else (gw.get("active_state") or "unknown")),
                gateway_updated_at=None,
@@ -8462,6 +8517,14 @@ _r("POST", r"/api/plugins/qubit-achievements/rescan",
 _r("POST", r"/api/plugins/qubit-achievements/reset-state",
    "h_plugin_achievements_reset_state")
 _r("GET", r"/api/plugins/kanban/board", "h_plugin_kanban_board")
+# memory-wiki READ surface (installed user dashboard plugin): the plugin's
+# own core against a read-only Qubit state.db. Same shapes as its API.
+_r("GET", r"/api/plugins/memory-wiki/overview", "h_memwiki_overview")
+_r("GET", r"/api/plugins/memory-wiki/subjects", "h_memwiki_subjects")
+_r("GET", r"/api/plugins/memory-wiki/subjects/(?P<slug>[^/]+)",
+   "h_memwiki_subject")
+_r("GET", r"/api/plugins/memory-wiki/days", "h_memwiki_days")
+_r("GET", r"/api/plugins/memory-wiki/days/(?P<date>[^/]+)", "h_memwiki_day")
 _r("GET", r"/api/plugins/kanban/tasks/(?P<task_id>[^/]+)", "h_plugin_kanban_task")
 _r("GET", r"/api/plugins/kanban/stats", "h_plugin_kanban_stats")
 _r("GET", r"/api/plugins/kanban/assignees", "h_plugin_kanban_assignees")
@@ -9896,6 +9959,15 @@ def resolve_plugin_asset(plugin_name: str, file_path: str, cfg: Any = None
     name = str(plugin_name or "").strip()
     plugin = next((p for p in _get_dashboard_plugins()
                    if p.get("name") == name), None)
+    if plugin is None:
+        # A plugin installed after process start is absent from the cached
+        # registry: force one rescan before answering the miss, so newly
+        # installed dashboard tabs serve without a service restart.
+        try:
+            plugin = next((p for p in _get_dashboard_plugins(
+                force_rescan=True) if p.get("name") == name), None)
+        except Exception:
+            plugin = None
     if not plugin or not _plugin_activated(plugin, *_plugin_enable_sets()):
         return 404, "application/json", None, {
             "ok": False, "code": "PLUGIN_NOT_FOUND",
@@ -14763,6 +14835,163 @@ def h_plugin_kanban_attachment_download(
 
 
 # ---------------------------------------------------------------------------
+# memory-wiki READ surface -> the installed user plugin's core
+# ---------------------------------------------------------------------------
+# The user-installed ``memory-wiki`` dashboard plugin ships its tab JS but its
+# backend (``plugin_api.py``, a FastAPI router) cannot mount on this listener.
+# These five read-only handlers call the plugin's own
+# ``memory_wiki_core`` (loaded by path, same trick as the plugin) against a
+# read-only handle on the canonical Qubit ``state.db`` — the exact queries,
+# clamps, shapes, and 404s of the plugin API, never a reimplementation.
+_MEMWIKI_CORE_MODULE = "qubit_dashboard_plugin_memory_wiki_core"
+
+
+def _memwiki_paths(cfg: Any) -> Optional[Tuple[Any, Any]]:
+    """(core_file, memories_dir) for the installed memory-wiki, else None."""
+    try:
+        from . import qubit_runtime as _QR
+        home = _QR.runtime_home_for_cfg(cfg)
+    except Exception:
+        return None
+    core = Path(home) / "plugins" / "memory-wiki" / "dashboard" / \
+        "memory_wiki_core.py"
+    if not core.is_file():
+        return None
+    return core, Path(home) / "memories"
+
+
+def _memwiki_core(core_file: Any) -> Any:
+    import importlib.util as _ilu
+    import sys as _sys
+    mod = _sys.modules.get(_MEMWIKI_CORE_MODULE)
+    if mod is not None:
+        return mod
+    spec = _ilu.spec_from_file_location(_MEMWIKI_CORE_MODULE, str(core_file))
+    mod = _ilu.module_from_spec(spec)
+    _sys.modules[_MEMWIKI_CORE_MODULE] = mod
+    try:
+        spec.loader.exec_module(mod)
+    except Exception:
+        _sys.modules.pop(_MEMWIKI_CORE_MODULE, None)
+        raise
+    return mod
+
+
+def _memwiki_db(cfg: Any) -> Any:
+    """Read-only handle on the canonical Qubit state.db, or None."""
+    _vendored_runtime(cfg)
+    from qubit_state import SessionDB  # type: ignore
+    from . import qubit_runtime as _QR
+    db_path = _QR.runtime_home_for_cfg(cfg) / "state.db"
+    if not db_path.exists():
+        return None
+    return SessionDB(db_path=db_path, read_only=True)
+
+
+def _memwiki_call(cfg: Any, q: Dict[str, str], label: str,
+                  fn: Any) -> Tuple[int, Any]:
+    paths = _memwiki_paths(cfg)
+    if paths is None:
+        return 404, {"ok": False, "code": "PLUGIN_NOT_FOUND",
+                     "detail": "dashboard plugin 'memory-wiki' is not "
+                               "installed",
+                     "qubit_counterpart": "dashboard /plugins"}
+    core_file, memories_dir = paths
+    try:
+        core = _memwiki_core(core_file)
+    except Exception as exc:
+        return _fail(exc)
+    try:
+        db = _memwiki_db(cfg)
+        if db is None:
+            return _fail(ValueError("state.db missing"))
+        try:
+            return 200, fn(core, db, memories_dir)
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+    except Exception as exc:
+        return _fail(exc)
+
+
+def _memwiki_clamp(value: Any, low: int, high: int) -> int:
+    try:
+        return max(low, min(int(value), high))
+    except (TypeError, ValueError):
+        return low
+
+
+def h_memwiki_overview(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/plugins/memory-wiki/overview -> subjects + days + sessions."""
+    s_lim = _memwiki_clamp(q.get("subject_limit", 50), 1, 200)
+    d_lim = _memwiki_clamp(q.get("day_limit", 30), 1, 120)
+    return _memwiki_call(
+        cfg, q, "overview",
+        lambda core, db, mdir: core.build_memory_overview(
+            db, subject_limit=s_lim, day_limit=d_lim))
+
+
+def h_memwiki_subjects(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/plugins/memory-wiki/subjects -> subject rows."""
+    safe_limit = _memwiki_clamp(q.get("limit", 100), 1, 500)
+    query = str(q.get("q", "") or "").strip()
+    code, out = _memwiki_call(
+        cfg, q, "subjects",
+        lambda core, db, mdir: core.build_memory_subjects(
+            db, limit=safe_limit, query=query or None))
+    if code != 200:
+        return code, out
+    return 200, {"subjects": out, "query": query, "limit": safe_limit}
+
+
+def h_memwiki_subject(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/plugins/memory-wiki/subjects/{slug} -> one subject."""
+    slug = str(p.get("slug", "") or "")
+    code, out = _memwiki_call(
+        cfg, q, "subject",
+        lambda core, db, mdir: core.get_memory_subject(db, slug))
+    if code != 200:
+        return code, out
+    if out is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": "Memory subject not found"}
+    return 200, {"subject": out}
+
+
+def h_memwiki_days(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/plugins/memory-wiki/days -> daily logs."""
+    safe_limit = _memwiki_clamp(q.get("limit", 60), 1, 365)
+    code, out = _memwiki_call(
+        cfg, q, "days",
+        lambda core, db, mdir: core.build_daily_logs(
+            db, limit_days=safe_limit))
+    if code != 200:
+        return code, out
+    return 200, {"daily_logs": out, "limit": safe_limit}
+
+
+def h_memwiki_day(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/plugins/memory-wiki/days/{date} -> one daily log."""
+    date = str(p.get("date", "") or "")
+    code, out = _memwiki_call(
+        cfg, q, "day",
+        lambda core, db, mdir: core.get_daily_log(db, date))
+    if code != 200:
+        return code, out
+    if out is None:
+        return 404, {"ok": False, "code": "NOT_FOUND",
+                     "detail": "Memory day not found"}
+    return 200, {"daily_log": out}
+
+
+# ---------------------------------------------------------------------------
 # Kanban WRITE surface -> the AUTHORITATIVE Qubit-native store
 # ---------------------------------------------------------------------------
 # The vendored kanban dashboard plugin's read routes synthesize the vendored
@@ -15697,6 +15926,11 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_plugin_achievements_reset_state":
         _qubit_plugins.h_plugin_achievements_reset_state,
     "h_plugin_kanban_board": _qubit_plugins.h_plugin_kanban_board,
+    "h_memwiki_overview": h_memwiki_overview,
+    "h_memwiki_subjects": h_memwiki_subjects,
+    "h_memwiki_subject": h_memwiki_subject,
+    "h_memwiki_days": h_memwiki_days,
+    "h_memwiki_day": h_memwiki_day,
     "h_plugin_kanban_task": _qubit_plugins.h_plugin_kanban_task,
     "h_plugin_kanban_stats": _qubit_plugins.h_plugin_kanban_stats,
     "h_plugin_kanban_assignees": _qubit_plugins.h_plugin_kanban_assignees,

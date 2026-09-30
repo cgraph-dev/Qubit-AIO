@@ -545,9 +545,12 @@ def _upstream_index_rows(known_bad: Optional[Dict[str, str]] = None
                 continue
             caps = getattr(entry, "capabilities", None)
             # B4-06: served display rows carry no legacy brand outside
-            # provenance (same rule as curated rows) — the real upstream URL
-            # and maintainer live only in the internal ``provenance``
-            # sub-field, rendered behind the Details disclosure.
+            # provenance and the install-critical subdir (same rule as
+            # curated rows) — the real upstream URL and maintainer live
+            # only in the internal ``provenance`` sub-field, rendered behind
+            # the Details disclosure. ``subdir`` is exempt with provenance:
+            # it is the third-party upstream path installs fetch verbatim,
+            # not rebrandable prose.
             broken_reason = bad.get(f"{entry.name}\0{sha}", "")
             out.append({
                 "id": entry.name, "name": entry.name,

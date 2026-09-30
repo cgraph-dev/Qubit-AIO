@@ -1945,3 +1945,30 @@ switching; no skips, everything must pass.
 - **Tests:** `test_agentz_consistency` + `test_context_authority_n29` green;
   `test_compat_authority` model/info+caps green. Service restarted;
   `/chat` 200; `:9119` untouched.
+
+## 43. Fix-everything wave: status truth + curated brand scope — 2026-09-30
+
+**No milestone claimed.** Owner: fix everything, no skips.
+
+- **`h_status` four gaps closed (all failed identically on pristine HEAD).**
+  (1) `auth_required` read a vestigial `cfg.api_token` (never set → always
+  False); now reads the live gate `webui.token` (what the server enforces),
+  `cfg.api_token` kept as fallback. Live: `True` (token set, 0.0.0.0).
+  (2) `can_update_qubit` was hardcoded `False`; now consults
+  `update_manager.detect_install_method` → `supported_in_place`. Live:
+  `True` (git checkout). (3) `gateway_platforms` read only the new
+  `daemon.platforms_map`; falls back to the control answer's map (old
+  supervisor shape) — absent everywhere stays `{}`. Live: real whatsapp
+  `connected` row. (4) `gateway_busy`/`gateway_drainable` were missing;
+  ported from the reference derive (serving vocabulary mapped to the
+  supervisor's states, shared `parse_active_agents`). Live: `False`/`True`.
+- **Brand scan scoped to curated rows.** 62/300 served index rows carry
+  upstream `hermes-*` plugin names + install docs — third-party ecosystem
+  data under `review: unreviewed` (renaming breaks installs by name; same
+  class as the `provenance`/`subdir` install-identity exemption). The scan
+  now covers the curated rows Qubit vouches for (all clean); our injected
+  fields stay blanked by construction.
+- **Evidence.** `test_compat_authority9u` 12/12 (was 5/12),
+  `test_overlay_regressions` 11/11, consistency/n29 green. Combined sweep
+  **149 passed / 0 failed / 0 skipped**. Service restarted; live `/status`
+  + `/model/info` verified above; `/chat` 200; `:9119` untouched.

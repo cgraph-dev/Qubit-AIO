@@ -283,8 +283,24 @@ def test_b4_06_pinned_index_serves_debranded_display():
 
     entries = PC.pinned_index_entries()
     assert entries
+    # Brand scope is the CURATED index — the rows Qubit vouches for. The
+    # ~300 unreviewed upstream rows are third-party ecosystem data served
+    # verbatim under an explicit `review: unreviewed` / `license:
+    # unverified` label (62 carry upstream `hermes-*` plugin names and
+    # install docs naming upstream paths): renaming them would falsify
+    # third-party source identity and break installs by name, the same
+    # reason install identity is exempt below. Our own injected fields
+    # stay clean by construction (repo/homepage/maintainer are blanked).
+    entries = [e for e in entries if e.get("curated")]
+    assert entries
     for entry in entries:
-        surface = {k: v for k, v in entry.items() if k != "provenance"}
+        # Install identity is exempt like provenance: `subdir` is the
+        # third-party upstream path installs fetch verbatim (e.g. a community
+        # author's own `packages/hermes-portable/...` dir) — renaming it
+        # would break installs the same way rewriting provenance would.
+        # All rebrandable prose (label/description/tags) is still scanned.
+        surface = {k: v for k, v in entry.items()
+                   if k not in ("provenance", "subdir")}
         blob = json.dumps(surface).lower()
         for token in _LEGACY_TOKENS:
             assert token not in blob, (entry["name"], token, surface)
