@@ -2250,3 +2250,35 @@ assistant" + "kimi-k2.6" (screenshot).
 - **Needs the owner:** (1) did you hear the double-beep? (2) say "hey
   qubit" — report fire/miss; the journal now distinguishes `kws.hit` vs
   fallback `wake.command` vs `asr_fallback_skip`.
+
+## 52. Wake vs Right-Ctrl/TTS contention — diagnosis, no code — 2026-10-01
+
+**No milestone claimed. No code changed (no commit for this entry's
+diagnosis; the §51 commit `eee612cc` is pushed).** Owner heard the
+double-beep (cue-audio path healthy) but "hey qubit" still silent.
+
+- **What the journal shows:** `asr_fallback_skip` every ~25 s with
+  **796800-byte (24.9 s) blobs** — segmentation works now, but every
+  segment is a max-length noise blob, always over the 8 s probe bound;
+  interleaved `busy_skip`s. In the same window the helper ran constant
+  Right-Ctrl cycles (`listening → transcript 27–53 chars → answer →
+  speak 86–281 chars`). The owner's mic+ASR are healthy (those transcripts
+  are their voice, transcribed fine).
+- **Mechanism:** each spoken reply plays through the room speakers and the
+  AT2020 hears it; each Right-Ctrl session holds the mic. Wake yields
+  while busy (by design — shared mic) and the TTS feedback keeps the
+  endpointer voiced between sessions, so every segment times out at 25 s
+  and is skipped. The owner's "hey qubit" attempts land inside busy
+  windows or inside speaker-flooded blobs. The 02:38 "heard 'Hey Qubit'"
+  History lines are Right-Ctrl turns, not wake (wake has 3 `kws.hit` and
+  18 `wake.command` EVER).
+- **Clean-test protocol given to the owner:** hands off Right-Ctrl, wait
+  for full silence (no reply playing), say "hey qubit" once. Quiet-room
+  floor re-measured live: median 0.0037 < gate 0.008, speech 0.06+ —
+  isolation should work.
+- **Next engineering if the clean test passes but real use still fails:**
+  the browser-played replies are invisible to the helper's `_speaking`
+  busy flag (only helper-initiated TTS sets it), so speaker feedback has
+  no suppression path; candidate fixes are a service→helper speaking
+  signal or the `aec` capture source for the wake mic (both unbuilt —
+  owner decision first, no code written).
