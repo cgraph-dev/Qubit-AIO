@@ -300,7 +300,8 @@ def _assert_terminal_shares_canonical_store(qubit_home: Any,
 def _default_spawn(cols: int, rows: int, resume: str, profile: str,
                    *, env_overrides: Optional[Dict[str, str]] = None,
                    home_config: Optional[Dict[str, Any]] = None,
-                   cfg: Any = None
+                   cfg: Any = None,
+                   workspace_cwd: str = ""
                    ) -> Tuple[Any, Dict[str, Any]]:
     """Spawn the vendored Qubit terminal (``qubit --tui``) behind a PTY.
 
@@ -353,7 +354,8 @@ def _default_spawn(cols: int, rows: int, resume: str, profile: str,
     from qubit_cli.pty_bridge import PtyBridge, PtyUnavailableError  # type: ignore
 
     argv, cwd, env = _resolve_chat_argv(resume=session_id or None,
-                                        profile=profile or None)
+                                        profile=profile or None,
+                                        workspace_cwd=workspace_cwd or None)
     if env is None:
         env = dict(os.environ)
     env["QUBIT_HOME"] = str(qubit_home)
@@ -557,7 +559,8 @@ class PtyWsServer:
             requested_profile=str(requested_profile or ""),
             via=via, session=session, owner=owner, target=target)
 
-    def _production_spawn(self, cols: int, rows: int, resume: str, profile: str
+    def _production_spawn(self, cols: int, rows: int, resume: str, profile: str,
+                          workspace_cwd: str = ""
                           ) -> Tuple[Any, Dict[str, Any]]:
         """Guard + spawn the real terminal with the selected Qubit profile.
 
@@ -577,7 +580,21 @@ class PtyWsServer:
         overrides = terminal_profile_env(self.cfg, guard) if guard else None
         return _default_spawn(cols, rows, resume, "",
                               env_overrides=overrides, home_config=guard,
-                              cfg=self.cfg)
+                              cfg=self.cfg, workspace_cwd=workspace_cwd)
+
+    def _request_spawn(self, cols: int, rows: int, resume: str, profile: str,
+                       workspace_cwd: str = "") -> Tuple[Any, Dict[str, Any]]:
+        """Spawn via the production path (which accepts ``workspace_cwd``), or
+        an injected/spawn-overridden double (4-arg signature) unchanged.
+
+        Detects production by identity of the CURRENT ``_spawn`` binding, so a
+        test that overrides ``pty_ws._spawn`` after construction still wins.
+        """
+        spawn = self._spawn
+        if getattr(spawn, "__func__", None) is PtyWsServer._production_spawn:
+            return self._production_spawn(cols, rows, resume, profile,
+                                          workspace_cwd)
+        return spawn(cols, rows, resume, profile)
 
     def _estop_engaged(self) -> bool:
         if self._estop is not None:
@@ -625,7 +642,7 @@ class PtyWsServer:
 
     def serve(self, handler: Any, *, ticket_value: str, cols: int, rows: int,
               resume: str, profile: str, origin_ok: bool,
-              peer_ok: bool) -> None:
+              peer_ok: bool, workspace_cwd: str = "") -> None:
         """Run one WS-PTY session to completion (called from the handler thread)."""
         # 1) Auth + boundary checks BEFORE the handshake so a rejection is an
         #    HTTP status, never an accepted socket.
@@ -674,7 +691,8 @@ class PtyWsServer:
 
         # 2) Spawn the real terminal behind the vendored PTY bridge.
         try:
-            bridge, meta = self._spawn(cols, rows, resume, profile)
+            bridge, meta = self._request_spawn(cols, rows, resume, profile,
+                                               workspace_cwd)
         except (Exception, SystemExit) as exc:  # noqa: BLE001 - typed refusal
             # The vendored TUI launch path calls ``sys.exit`` on an
             # unrecoverable setup failure (e.g. a failed ``npm install`` while

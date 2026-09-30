@@ -183,6 +183,25 @@ def _fill_config_defaults(served: Any) -> Any:
     return out
 
 
+def _workspace_cwd(raw: Any) -> str:
+    """Validate the ``/chat`` workspace from ``?cwd=`` (absolute + existing dir).
+
+    Mirrors the reference: the picked workspace only applies to a FRESH chat;
+    an invalid path is ignored (the server default cwd is used) rather than
+    spawning the terminal in an attacker-chosen directory.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        p = Path(text)
+        if not p.is_absolute() or not p.is_dir():
+            return ""
+    except (OSError, ValueError):
+        return ""
+    return text
+
+
 # --------------------------------------------------------------------------
 # Fork read-proxy branding seam
 # --------------------------------------------------------------------------
@@ -1481,12 +1500,30 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         token = self.app.api_token or ""
         safe = json.dumps(token)
-        # Public SPA base is the root. ``__QUBIT_BASE_PATH__`` is retained as
-        # an internal compatibility identifier the frontend still reads (now
-        # empty); ``__QUBIT_API_PREFIX__`` is the Qubit-owned API prefix.
+        # Inject the active theme so the FIRST paint already uses it — otherwise
+        # the SPA paints the default palette and snap-flips to the saved theme
+        # after an async fetch (a visible refresh flash). The overlay theme
+        # carries its full definition; built-ins resolve locally by name.
+        theme_name = "default"
+        theme_def = None
+        try:
+            from . import qubit_compat as _HC
+            _o = getattr(self.app, "orch", None)
+            if _o is not None:
+                _tinfo = _HC.themes_response(_o.cfg)
+                theme_name = str(_tinfo.get("active") or "default")
+                for _t in _tinfo.get("themes", []) or []:
+                    if _t.get("name") == theme_name and _t.get("definition"):
+                        theme_def = _t["definition"]
+                        break
+        except Exception:  # noqa: BLE001 - theme boost is best-effort
+            pass
         inject = ('<script>window.__QUBIT_SESSION_TOKEN__=%s;'
                   'window.__QUBIT_BASE_PATH__="";'
-                  'window.__QUBIT_API_PREFIX__="/agent";</script>' % safe)
+                  'window.__QUBIT_API_PREFIX__="/agent";'
+                  'window.__QUBIT_THEME__=%s;'
+                  'window.__QUBIT_THEME_DEF__=%s;</script>'
+                  % (safe, json.dumps(theme_name), json.dumps(theme_def)))
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
         else:
@@ -2152,7 +2189,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             cols=_int("cols", 80), rows=_int("rows", 24),
             resume=q.get("resume", ""), profile=q.get("profile", ""),
             origin_ok=P.origin_allowed(self, self.app.allowed_origins),
-            peer_ok=P.peer_allowed(self))
+            peer_ok=P.peer_allowed(self),
+            workspace_cwd=_workspace_cwd(q.get("cwd", "")))
         return True
 
     def _maybe_stt_upgrade(self) -> bool:

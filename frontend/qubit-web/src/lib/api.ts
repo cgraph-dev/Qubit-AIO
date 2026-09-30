@@ -66,6 +66,11 @@ declare global {
      * WS-upgrade path from legacy ``?token=`` to single-use ``?ticket=``
      * fetched via :func:`getWsTicket`. */
     __QUBIT_AUTH_REQUIRED__?: boolean;
+    /** Server-injected active dashboard theme name + (for the overlay theme)
+     *  its full definition, so the FIRST paint uses the saved theme instead of
+     *  flipping to it after an async fetch. */
+    __QUBIT_THEME__?: string;
+    __QUBIT_THEME_DEF__?: unknown;
   }
 }
 const SESSION_HEADER = "X-Qubit-Session-Token";
@@ -1225,8 +1230,20 @@ export const api = {
     fetchJSON<Record<string, unknown>>(appendProfileParam("/api/config", profile)),
   getDefaults: () => fetchJSON<Record<string, unknown>>("/api/config/defaults"),
   getSchema: () => fetchJSON<{ fields: Record<string, unknown>; category_order: string[] }>("/api/config/schema"),
-  getModelInfo: (profile = getManagementProfile()) =>
-    fetchJSON<ModelInfoResponse>(appendProfileParam("/api/model/info", profile)),
+  getModelInfo: (
+    profile = getManagementProfile(),
+    model?: { provider?: string; model?: string },
+  ) => {
+    let url = appendProfileParam("/api/model/info", profile);
+    if (model?.model) {
+      const sep = url.includes("?") ? "&" : "?";
+      url += `${sep}model=${encodeURIComponent(model.model)}`;
+      if (model.provider) {
+        url += `&provider=${encodeURIComponent(model.provider)}`;
+      }
+    }
+    return fetchJSON<ModelInfoResponse>(url);
+  },
   getModelOptions: (
     profileOrOptions?: string | { profile?: string; refresh?: boolean },
   ) => {

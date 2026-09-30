@@ -1533,6 +1533,16 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ctx = int(r["ctx"] or 0)
     model = str(r["model"])
     provider = str(r["provider"])
+    # A caller may ask for a SPECIFIC model's capabilities (the /chat sidebar
+    # shows the terminal's resolved grant, which can differ from the default
+    # role). Reporting caps for the requested model keeps the reasoning
+    # selector gated on what the terminal actually runs, not the default role.
+    _req_model = str(q.get("model", "") or "").strip()
+    if _req_model:
+        model = _req_model
+        _req_provider = str(q.get("provider", "") or "").strip()
+        if _req_provider:
+            provider = _req_provider
     # B4-01/B4-02: derive capabilities and the auto-detected window from the
     # vendored metadata resolver — the exact source the reference
     # ``web_routers/models.py`` uses — instead of baking in placeholder values

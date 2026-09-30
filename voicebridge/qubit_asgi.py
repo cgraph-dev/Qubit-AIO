@@ -75,6 +75,11 @@ _thread: Optional[threading.Thread] = None
 _loop: Optional[asyncio.AbstractEventLoop] = None
 _client: Any = None
 _token: str = ""
+# The header name the vendored fork's HTTP server authenticates with. Read from
+# the fork (not hardcoded) so the proxy always matches the fork's own contract
+# after a rename — a mismatch made every proxied read (config/analytics/logs)
+# answer 401 and storm the dashboard.
+_session_header: str = ""
 _route_res: List[Pattern[str]] = []
 _start_error: Optional[BaseException] = None
 _ready = threading.Event()
@@ -167,6 +172,10 @@ async def _startup() -> None:
         sys.path.insert(0, repo)
 
         _token = str(getattr(ws, "_SESSION_TOKEN", "") or "")
+        global _session_header
+        _session_header = str(
+            getattr(ws, "_SESSION_HEADER_NAME", "")
+            or "X-Qubit-Session-Token")
         transport = httpx.ASGITransport(app=ws.app)
         _client = httpx.AsyncClient(transport=transport,
                                     base_url="http://hermes.internal")
@@ -208,7 +217,7 @@ async def _send(method: str, path: str, query: Dict[str, str],
                 headers: Dict[str, str], body: bytes):
     hdrs = dict(headers or {})
     if _token:
-        hdrs.setdefault("X-Qubit-Session-Token", _token)
+        hdrs.setdefault(_session_header or "X-Qubit-Session-Token", _token)
     req = _client.build_request(method, path, params=query or None,
                                 headers=hdrs or None, content=body)
     # Stage 2b: the fork may not make unrestricted outbound provider calls

@@ -7,14 +7,14 @@
  * read route on the single event path (WebSocket upgrades are refused with
  * the typed WS_SINGLE_PATH gate).
  *
- * Plain IIFE, no build step. Uses window.__HERMES_PLUGIN_SDK__ for React +
+ * Plain IIFE, no build step. Uses window.__QUBIT_PLUGIN_SDK__ for React +
  * shadcn primitives; HTML5 drag-and-drop for card movement on desktop and
  * a pointer-based fallback for touch.
  */
 (function () {
   "use strict";
 
-  const SDK = window.__HERMES_PLUGIN_SDK__;
+  const SDK = window.__QUBIT_PLUGIN_SDK__;
   if (!SDK) return;
 
   const { React } = SDK;
@@ -4776,7 +4776,7 @@
   // Register
   // -------------------------------------------------------------------------
 
-  if (window.__HERMES_PLUGINS__ && typeof window.__HERMES_PLUGINS__.register === "function") {
-    window.__HERMES_PLUGINS__.register("kanban", KanbanPage);
+  if (window.__QUBIT_PLUGINS__ && typeof window.__QUBIT_PLUGINS__.register === "function") {
+    window.__QUBIT_PLUGINS__.register("kanban", KanbanPage);
   }
 })();

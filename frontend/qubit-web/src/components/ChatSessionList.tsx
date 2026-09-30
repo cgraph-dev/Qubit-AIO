@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { useI18n } from "@/i18n";
+import { ChatWorkspacePicker } from "@/components/ChatWorkspacePicker";
 import { api, type ChatStoreSession } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -44,6 +45,10 @@ interface ChatSessionListProps {
    * when omitted we clear the resume param ourselves.
    */
   onNewChat?: () => void;
+  /** Picked workspace (absolute host path) for a FRESH chat; "" = server default. */
+  workspaceCwd?: string;
+  /** Owned by the host so the picker applies on the next New chat. */
+  onWorkspaceChange?: (cwd: string) => void;
 }
 
 function rowLabel(session: ChatStoreSession, untitled: string): string {
@@ -59,6 +64,9 @@ export function ChatSessionList({
   className,
   onPicked,
   onNewChat,
+  profile,
+  workspaceCwd,
+  onWorkspaceChange,
 }: ChatSessionListProps) {
   const { t } = useI18n();
   const [, setSearchParams] = useSearchParams();
@@ -236,6 +244,14 @@ export function ChatSessionList({
           <RefreshCw className={cn(loading && "animate-spin")} />
         </Button>
       </div>
+
+      {onWorkspaceChange && (
+        <ChatWorkspacePicker
+          profile={profile}
+          value={workspaceCwd ?? ""}
+          onChange={onWorkspaceChange}
+        />
+      )}
 
       <Button
         outlined

@@ -65,10 +65,10 @@
     "voicebridge/dashboard_ops.py": [
      "778: return HC.config_save(cfg, {}, body, {})"
     ],
-    "voicebridge/gateway/openclaw_handlers/scheduler_media.py": [
+    "voicebridge/gateway/qubit_handlers/scheduler_media.py": [
      "123: code, out = config_save(cfg, {}, body, {})"
     ],
-    "voicebridge/gateway/openclaw_handlers/system.py": [
+    "voicebridge/gateway/qubit_handlers/system.py": [
      "317: code, out = config_save(cfg, {}, body, {})"
     ]
    },
@@ -194,7 +194,7 @@
    "classification": "production_referenced",
    "route_test_reachable": true,
    "production_references": {
-    "voicebridge/gateway/openclaw_handlers/system.py": [
+    "voicebridge/gateway/qubit_handlers/system.py": [
      "295: code, body = env_delete(cfg, {}, {\"name\": name, \"confirm\": confirmed}, {})"
     ]
    },
@@ -210,7 +210,7 @@
    "classification": "production_referenced",
    "route_test_reachable": true,
    "production_references": {
-    "voicebridge/gateway/openclaw_handlers/system.py": [
+    "voicebridge/gateway/qubit_handlers/system.py": [
      "282: code, body = env_write(cfg, {}, {\"name\": name, \"value\": value,"
     ]
    },
@@ -235,7 +235,7 @@
    "classification": "production_referenced",
    "route_test_reachable": true,
    "production_references": {
-    "voicebridge/gateway/openclaw_handlers/users.py": [
+    "voicebridge/gateway/qubit_handlers/users.py": [
      "161: _c1, font = h_font(cfg, {}, {}, {})",
      "164: \"font\": str(font.get(\"font\") or \"system\"),"
     ]
@@ -301,7 +301,7 @@
    "classification": "production_referenced",
    "route_test_reachable": true,
    "production_references": {
-    "voicebridge/gateway/openclaw_handlers/users.py": [
+    "voicebridge/gateway/qubit_handlers/users.py": [
      "100: _status, body = h_auth_me(cfg, {}, {}, {})"
     ]
    },
@@ -318,7 +318,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "1820: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
+     "1861: for frame in HC.h_chat_stream(self.app.orch.cfg, {}, body, {}):"
     ]
    },
    "script_references": {},
@@ -894,7 +894,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "2861: code, out = _HC.h_power(self.app.orch.cfg,"
+     "2903: code, out = _HC.h_power(self.app.orch.cfg,"
     ]
    },
    "script_references": {},
@@ -921,7 +921,7 @@
    "classification": "production_referenced",
    "route_test_reachable": true,
    "production_references": {
-    "voicebridge/gateway/openclaw_handlers/users.py": [
+    "voicebridge/gateway/qubit_handlers/users.py": [
      "191: _c, out = h_theme_set(cfg, {}, {\"theme\": entries.get(\"theme\")}, {})"
     ]
    },
@@ -937,7 +937,7 @@
    "classification": "production_referenced",
    "route_test_reachable": true,
    "production_references": {
-    "voicebridge/gateway/openclaw_handlers/users.py": [
+    "voicebridge/gateway/qubit_handlers/users.py": [
      "162: _c2, themes = h_themes(cfg, {}, {}, {})"
     ]
    },
@@ -1081,7 +1081,7 @@
    "route_test_reachable": true,
    "production_references": {
     "voicebridge/webui.py": [
-     "3485: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
+     "3527: code, out = _HC.power_action(self.app.orch.cfg, {}, body, {})"
     ]
    },
    "script_references": {},

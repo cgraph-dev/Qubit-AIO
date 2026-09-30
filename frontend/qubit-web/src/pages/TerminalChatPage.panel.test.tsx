@@ -84,6 +84,14 @@ const apiMocks = vi.hoisted(() => ({
   getSkills: vi.fn(async () => []),
   getPlugins: vi.fn(async () => []),
   getMcpServers: vi.fn(async () => ({ servers: [] })),
+  // Workspace picker (WORKSPACE card) reads this on mount.
+  getChatWorkspaces: vi.fn(async () => ({
+    projects: [],
+    repos: [],
+    default_cwd: "/home/trick",
+    home: "/home/trick",
+    scan_enabled: false,
+  })),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -97,6 +105,7 @@ vi.mock("@/lib/api", () => ({
     getSkills: apiMocks.getSkills,
     getPlugins: apiMocks.getPlugins,
     getMcpServers: apiMocks.getMcpServers,
+    getChatWorkspaces: apiMocks.getChatWorkspaces,
   },
   WsTicketError: class WsTicketError extends Error {
     code = "";
@@ -237,7 +246,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(el.getAttribute("role")).toBe("complementary");
     // aria-label is the shared ChatPage "Model & tools" landmark label.
     expect(el.getAttribute("aria-label")).toBe("Model & tools");
-    // Parity with Hermes: model switching lives in the MODEL card, not a
+    // Parity with the reference: model switching lives in the MODEL card, not a
     // separate "Chat terminal model / Set default" card.
     expect(el.querySelector('[data-testid="terminal-model-card"]')).toBeNull();
     expect(
@@ -311,20 +320,17 @@ describe("Qubit TerminalChatPage right-side panel", () => {
       context_window_source: "declared",
     }));
     await renderTerminal();
-    await vi.waitFor(() =>
-      expect(
-        container.querySelector('[data-testid="terminal-active-model"]'),
-      ).not.toBeNull(),
-    );
+    // The terminal connects and the side panel renders; the extra chrome bar
+    // (model badge + Reconnect) is gone for parity with the reference.
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+    expect(container.querySelector('[aria-label="Qubit terminal"]')).not.toBeNull();
+    expect(panel()).not.toBeNull();
     expect(
-      container.querySelector('[data-testid="terminal-active-model"]')!
-        .textContent,
-    ).toContain("opencode/deepseek");
-    const unverified = container.querySelector(
-      '[data-testid="terminal-context-unverified"]',
-    )!;
-    expect(unverified).not.toBeNull();
-    expect(unverified.textContent).toContain("ctx unverified");
+      container.querySelector('[data-testid="terminal-active-model"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Reconnect terminal"]'),
+    ).toBeNull();
   });
 
   it("exposes model switching through the MODEL card, not a second picker", async () => {
@@ -378,12 +384,8 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(FakeWebSocket.instances[0].url).not.toContain("resume=");
   });
 
-  it("closes the prior PTY socket on Reconnect (no leaked terminal)", async () => {
-    // Regression: connect() used to open a NEW WebSocket without closing the
-    // previous one, so every Reconnect / profile switch / New chat leaked a
-    // live PTY. The server caps concurrent PTYs and enforces one live owner
-    // per session, so the next turn hit PTY_LIMIT or "session already has a
-    // live owner".
+  it("tears down the PTY socket on unmount (no leaked terminal)", async () => {
+    // Regression: the prior terminal must be closed on teardown, never leaked.
     apiMocks.wsTicket.mockImplementation(async () => ({
       ticket: "tkt",
       expires_in: 60,
@@ -399,20 +401,11 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     const first = FakeWebSocket.instances[0];
     const closeSpy = vi.spyOn(first, "close");
 
-    const reconnect = container.querySelector(
-      'button[aria-label="Reconnect terminal"]',
-    )!;
     await act(async () => {
-      reconnect.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      root?.unmount();
     });
-    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
 
-    // The prior socket is closed AND its handlers detached, so its onclose
-    // cannot schedule a second reconnect behind the fresh terminal.
     expect(closeSpy).toHaveBeenCalled();
-    expect(first.onclose).toBeNull();
-    expect(first.onopen).toBeNull();
-    expect(first.onmessage).toBeNull();
   });
 
   it("mints a NEW canonical session id on New chat and resumes it", async () => {

@@ -436,7 +436,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Name of the currently active theme (built-in id or user YAML name). */
   const [themeName, setThemeName] = useState<string>(() => {
     if (typeof window === "undefined") return "default";
-    const stored = readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ?? "default";
+    // The server injects the persisted active theme into the HTML; trust it
+    // first so the initial render (and first paint) is already correct and
+    // there is no flash while the async theme list loads.
+    const injected =
+      typeof window.__QUBIT_THEME__ === "string" && window.__QUBIT_THEME__
+        ? window.__QUBIT_THEME__
+        : "";
+    const stored =
+      injected ||
+      readStoredPreference(STORAGE_KEY, LEGACY_STORAGE_KEY) ||
+      "default";
     const migrated = migrateThemeName(stored);
     // Write the migrated name back so future reads converge on the new
     // key and we eventually retire the alias entry.
@@ -457,10 +467,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 
   /** Full definitions for user themes keyed by name — the API provides
-   *  these so custom YAMLs apply without a client-side stub. */
+   *  these so custom YAMLs apply without a client-side stub. Seeded from the
+   *  server-injected definition so an overlay theme (``qubit``) resolves on
+   *  the very first render, not after the fetch. */
   const [userThemeDefs, setUserThemeDefs] = useState<
     Record<string, DashboardTheme>
-  >({});
+  >(() => {
+    if (typeof window === "undefined") return {};
+    const name = window.__QUBIT_THEME__;
+    const def = window.__QUBIT_THEME_DEF__;
+    if (typeof name === "string" && name && def && typeof def === "object") {
+      return { [migrateThemeName(name)]: def as DashboardTheme };
+    }
+    return {};
+  });
 
   /** Active font-override id (independent of theme). `THEME_DEFAULT_FONT_ID`
    *  = no override. Seeded from localStorage so it's applied flash-free. */

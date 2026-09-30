@@ -16,7 +16,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XtermTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { PanelRightClose, PanelRightOpen, RotateCcw } from "lucide-react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { api } from "@/lib/api";
 import type { WsTicketGrant } from "@/lib/api";
@@ -51,6 +51,7 @@ function terminalWsUrl(
   cols: number,
   rows: number,
   resume?: string,
+  cwd?: string,
 ): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const qs = new URLSearchParams({
@@ -63,6 +64,9 @@ function terminalWsUrl(
   // spawning a fresh one. The server validates/ensures the id against the one
   // canonical store (`terminal_bridge.canonical_terminal_session`).
   if (resume) qs.set("resume", resume);
+  // Workspace for a FRESH chat (the server ignores it on resume, which keeps
+  // its own cwd). Same wire the reference uses: /api/pty?cwd=.
+  if (cwd) qs.set("cwd", cwd);
   return `${proto}//${window.location.host}/agent/api/pty?${qs.toString()}`;
 }
 
@@ -82,14 +86,14 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   const wsRef = useRef<WebSocket | null>(null);
   const disposedRef = useRef(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [state, setState] = useState<"connecting" | "open" | "closed" | "error">(
+  const [, setState] = useState<"connecting" | "open" | "closed" | "error">(
     "connecting",
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [grant, setGrant] = useState<WsTicketGrant | null>(null);
   // The profile the terminal last resolved (from the ticket grant); used when
   // minting the next ticket and in refusal copy. Not rendered as a picker —
-  // model switching lives in the MODEL card (`/api/model/set`), like Hermes.
+  // model switching lives in the MODEL card (`/api/model/set`), as in the reference.
   const selectedRef = useRef<string | null>(null);
   // Right-side panel (model control + status + sessions), collapsible and open
   // by default, matching the Qubit `/qubit-chat` ChatPage panel.
@@ -98,6 +102,14 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // surfacing the freshly created session immediately (its internal fetch only
   // runs on mount / manual Refresh).
   const [sessionListNonce, setSessionListNonce] = useState(0);
+  // Picked workspace for a FRESH chat (absolute host path; "" = server
+  // default). Sent on the PTY WS as ?cwd= and only affects fresh chats.
+  const [workspaceCwd, setWorkspaceCwd] = useState("");
+  // Read inside the connect closure without re-creating it on every change.
+  const workspaceRef = useRef("");
+  useEffect(() => {
+    workspaceRef.current = workspaceCwd;
+  }, [workspaceCwd]);
   const [channel] = useState<string>(generateTerminalChatChannel);
   // Stable indirection for the self-scheduled reconnect: `connect` cannot
   // reference itself inside its own initializer, so it schedules the latest
@@ -191,7 +203,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           selectedRef.current = ticket.profile_id;
         }
         const ws = new WebSocket(
-          terminalWsUrl(ticket.ticket, cols, rows, resumeRef.current),
+          terminalWsUrl(ticket.ticket, cols, rows, resumeRef.current, workspaceRef.current),
         );
         ws.binaryType = "arraybuffer";
         wsRef.current = ws;
@@ -327,87 +339,21 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           aria-label="Qubit terminal pane"
           className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
         >
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1">
-            <span className="text-xs font-semibold tracking-wide text-text-secondary">
-              {t.app.nav.chat} · Qubit
-            </span>
-            <span className="flex flex-wrap items-center gap-2">
-              {grant?.model ? (
-                <span
-                  data-testid="terminal-active-model"
-                  data-verified={
-                    grant.context_verified === false ? "false" : "true"
-                  }
-                  className="text-xs text-text-tertiary"
-                >
-                  {grant.provider ? `${grant.provider}/` : ""}
-                  {grant.model}
-                  {typeof grant.context_tokens === "number"
-                    ? ` · ${grant.context_tokens.toLocaleString()} ctx`
-                    : ""}
-                </span>
-              ) : null}
-              {grant?.context_verified === false ? (
-                <span
-                  role="status"
-                  data-testid="terminal-context-unverified"
-                  data-state="degraded"
-                  className="text-xs text-warning"
-                  title={
-                    grant.context_window_source
-                      ? `real window not resolved (${grant.context_window_source}); declared window trusted as flagged unverified`
-                      : "declared context window could not be cross-checked"
-                  }
-                >
-                  {t.app.nav.chat} ctx unverified
-                </span>
-              ) : null}
-              <span
-                data-state={
-                  state === "open"
-                    ? "ready"
-                    : state === "connecting"
-                      ? "loading"
-                      : "degraded"
-                }
-                className="text-xs text-text-tertiary"
-              >
-                {state}
-              </span>
-              <Button
-                size="sm"
-                outlined
-                aria-label="Reconnect terminal"
-                prefix={<RotateCcw className="h-3.5 w-3.5" />}
-                onClick={() => connectRef.current()}
-              >
-                Reconnect
-              </Button>
+          {!sidePanelOpen ? (
+            <div className="flex shrink-0 justify-end px-1">
               <Button
                 ghost
                 size="icon"
-                onClick={() => setSidePanelOpen((open) => !open)}
-                aria-expanded={sidePanelOpen}
+                onClick={() => setSidePanelOpen(true)}
+                aria-expanded={false}
                 aria-controls="chat-side-panel"
-                aria-label={
-                  sidePanelOpen
-                    ? "Collapse chat side panel"
-                    : "Show chat side panel"
-                }
-                title={
-                  sidePanelOpen
-                    ? "Collapse chat side panel"
-                    : "Show chat side panel"
-                }
+                aria-label="Show chat side panel"
+                title="Show side panel"
               >
-                {sidePanelOpen ? (
-                  <PanelRightClose className="h-4 w-4" />
-                ) : (
-                  <PanelRightOpen className="h-4 w-4" />
-                )}
+                <PanelRightOpen className="h-4 w-4" />
               </Button>
-            </span>
-          </div>
+            </div>
+          ) : null}
           {notice ? (
             <div
               role="alert"
@@ -431,6 +377,19 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             aria-label={modelToolsLabel}
             className="flex max-h-[50vh] min-h-0 shrink-0 flex-col gap-3 overflow-hidden lg:h-full lg:max-h-none lg:w-60"
           >
+            <div className="flex shrink-0 items-center justify-end">
+              <Button
+                ghost
+                size="icon"
+                onClick={() => setSidePanelOpen(false)}
+                aria-expanded
+                aria-controls="chat-side-panel"
+                aria-label="Collapse chat side panel"
+                title="Collapse side panel"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
+            </div>
             <div className="shrink-0">
               <Suspense fallback={<div aria-hidden="true" className="h-24" />}>
                 {/* The MODEL card must show the model the terminal actually
@@ -456,6 +415,8 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
                 activeSessionId={resumeParam || null}
                 profile={scopedProfile}
                 onNewChat={handleNewChat}
+                workspaceCwd={workspaceCwd}
+                onWorkspaceChange={setWorkspaceCwd}
               />
             </div>
           </div>

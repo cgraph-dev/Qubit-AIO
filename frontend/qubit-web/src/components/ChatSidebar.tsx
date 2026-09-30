@@ -143,8 +143,14 @@ export function ChatSidebar({
   );
 
   const refreshEffectiveModel = useCallback(() => {
+    // When the terminal grant names the model this session actually runs, read
+    // ITS capabilities (the reasoning gate must match the displayed model, not
+    // the default role).
+    const target = terminalModel?.model
+      ? { provider: terminalModel.provider, model: terminalModel.model }
+      : undefined;
     void api
-      .getModelInfo(profile)
+      .getModelInfo(profile, target)
       .then((r) => {
         if (r?.model) setEffectiveModel(String(r.model));
         setSupportsReasoning(!!r?.capabilities?.supports_reasoning);
@@ -154,7 +160,7 @@ export function ChatSidebar({
       .catch(() => {
         // Best-effort: keep the last known label rather than blanking it.
       });
-  }, [profile]);
+  }, [profile, terminalModel?.model, terminalModel?.provider]);
 
   // Profile or chat channel change tears down the stream. Bump `version` (same
   // path as the manual Reconnect button) so the SSE reader resubscribes —
