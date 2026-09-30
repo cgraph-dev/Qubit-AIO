@@ -2746,7 +2746,9 @@ def h_mcp_catalog_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         cfg, "mcp.catalog_install",
         f"Install catalog MCP server {name!r}: register its transport and "
         f"store {len(given)} credential(s) in the runtime .env?",
-        q, b)
+        q, b, payload={"name": name,
+                       "env": {str(k): str(v) for k, v in given.items()},
+                       "enable": bool(b.get("enable", True))})
     if guard is not None:
         return guard
     refs: Dict[str, str] = {}

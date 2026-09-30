@@ -400,7 +400,7 @@ export const en: Translations = {
     inactive: "inactive",
     installBtn: "Install",
     installHeading: "Install a reviewed plugin",
-    installHint: "Accepts a reviewed local plugin directory or a reviewed *.json manifest path. Remote Git / owner-repo installs are refused by policy (typed BLOCKED_REMOTE_PLUGIN) and are operator-gated.",
+    installHint: "Accepts a reviewed local plugin directory or a reviewed *.json manifest path. For remote plugins, install from the pinned index below (every entry fetches at its pinned SHA).",
     memoryProviderLabel: "Memory provider",
     missingEnvWarn: "Set these in Keys before the plugin can run:",
     noDashboardTab: "No dashboard tab",
@@ -428,7 +428,7 @@ export const en: Translations = {
     hideFromSidebar: "Hide from sidebar",
     catalogHeading: "Plugin catalog",
     catalogHint:
-      "Every plugin Qubit can actually load and manage: bundled agent plugins, vendored dashboard plugins, Qubit dashboard extensions, and user-installed plugins. Each row has a real manifest, loader, and provenance. The upstream remote index is refused by policy.",
+      "Every plugin Qubit can actually load and manage: bundled agent plugins, vendored dashboard plugins, Qubit dashboard extensions, and user-installed plugins. Each row has a real manifest, loader, and provenance. Remote plugins install from the pinned index below.",
     catalogSearchPlaceholder: "Search the catalog by name, description, or tool…",
     catalogAllSources: "All sources",
     catalogReload: "Reload plugins",

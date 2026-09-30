@@ -879,6 +879,23 @@ def _compat_runner(action: str) -> Optional[Callable[[Any, Dict[str, Any]], Any]
                 cfg, {}, {"confirm": True, "name": name,
                           "reference": str(staged.get("reference", ""))}, {})
         return _run
+    if action == "mcp.catalog_install":
+        # MCP catalog installs stage via ``_compat_confirm`` with the entry
+        # name + declared env + enable flag in the payload. The banner's
+        # id-only Confirm re-enters the same compat handler so the install
+        # executes exactly once instead of failing CONFIRM_UNSUPPORTED.
+        def _run(cfg: Any, payload: Dict[str, Any]) -> Any:
+            from . import qubit_compat as HC
+
+            staged = dict(payload or {})
+            body: Dict[str, Any] = {
+                "confirm": True,
+                "name": str(staged.get("name", "") or ""),
+                "env": staged.get("env") or {},
+                "enable": bool(staged.get("enable", True)),
+            }
+            return HC.h_mcp_catalog_install(cfg, {}, body, {})
+        return _run
     if action in ("cron.pause", "cron.resume", "cron.run_due"):
         # The cron row actions (pause/resume/trigger) stage via
         # ``_cron_mutate`` with ``payload={"id": job_id}``. Re-enter the same

@@ -21,9 +21,18 @@
       "license": "unverified",
       "tier": "official",
       "category": "desktop",
-      "capabilities": ["tools", "dashboard"],
+      "capabilities": [
+        "tools",
+        "dashboard"
+      ],
       "api_version": 1,
-      "tags": ["media", "image-gen", "video-gen", "dashboard", "desktop"],
+      "tags": [
+        "media",
+        "image-gen",
+        "video-gen",
+        "dashboard",
+        "desktop"
+      ],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
         "source_name": "hermes-media-studio",
@@ -48,9 +57,16 @@
       "license": "unverified",
       "tier": "official",
       "category": "platform",
-      "capabilities": ["platform"],
+      "capabilities": [
+        "platform"
+      ],
       "api_version": 1,
-      "tags": ["telegram", "gateway", "approvals", "messaging"],
+      "tags": [
+        "telegram",
+        "gateway",
+        "approvals",
+        "messaging"
+      ],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
         "source_name": "hermes-telegram-business",
@@ -75,9 +91,17 @@
       "license": "unverified",
       "tier": "official",
       "category": "tools",
-      "capabilities": ["commands", "llm"],
+      "capabilities": [
+        "commands",
+        "llm"
+      ],
       "api_version": 1,
-      "tags": ["example", "llm", "reference", "slash-command"],
+      "tags": [
+        "example",
+        "llm",
+        "reference",
+        "slash-command"
+      ],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
         "source_name": "plugin-llm-example",
@@ -102,9 +126,17 @@
       "license": "unverified",
       "tier": "official",
       "category": "tools",
-      "capabilities": ["commands", "llm"],
+      "capabilities": [
+        "commands",
+        "llm"
+      ],
       "api_version": 1,
-      "tags": ["example", "llm", "async", "reference"],
+      "tags": [
+        "example",
+        "llm",
+        "async",
+        "reference"
+      ],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
         "source_name": "plugin-llm-async-example",
@@ -123,15 +155,22 @@
       "description": "Switch Qubit browser tools between Chrome profiles via CDP.",
       "repo": "",
       "subdir": "",
-      "pinned_ref": "5b9c3257b464c0f926d4355149a8aed9c8f307b4",
+      "pinned_ref": "03d24e95e7b14125c5227797a3a6682c3d890c84",
       "homepage": "",
       "maintainer": "",
       "license": "unverified",
       "tier": "community",
       "category": "web",
-      "capabilities": ["tools"],
+      "capabilities": [
+        "tools"
+      ],
       "api_version": 1,
-      "tags": ["browser", "chrome", "cdp", "tools"],
+      "tags": [
+        "browser",
+        "chrome",
+        "cdp",
+        "tools"
+      ],
       "provenance": {
         "source_index": "qubit_runtime/qubit_cli/data/plugin_index.json",
         "source_name": "hermes-plugin-chrome-profiles",

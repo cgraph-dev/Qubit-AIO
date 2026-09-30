@@ -89,8 +89,12 @@ def test_catalog_serves_curated_pinned_index(tmp_path, monkeypatch):
         assert entry["provenance"]["upstream_repo"].startswith("https://")
         assert _SHA40.match(entry["pinned_ref"]), entry
         assert entry["license"] == "unverified"
-        assert entry["curated"] is True and entry["pinned"] is True
-        assert entry["provenance"]["curation"] == "curated+pinned"
+        assert entry["pinned"] is True
+        if entry.get("curated"):
+            assert entry["provenance"]["curation"] == "curated+pinned"
+        else:
+            assert entry["review"] == "unreviewed"
+            assert entry["provenance"]["curation"] == "upstream-unreviewed"
 
 
 def test_pinned_refs_match_the_vendored_source_index(tmp_path, monkeypatch):
@@ -142,7 +146,7 @@ def test_pinned_index_search_filters_real_entries(tmp_path, monkeypatch):
     code, out = _catalog(cfg, {"q": "telegram"})
     assert code == 200
     names = {e["name"] for e in out["pinned_index"]["entries"]}
-    assert names == {"qubit-telegram-business"}, names
+    assert "qubit-telegram-business" in names, names
     code, out = _catalog(cfg, {"q": "zzz-no-match"})
     assert code == 200
     assert out["pinned_index"]["entries"] == []
@@ -262,3 +266,104 @@ def test_install_from_index_module_audits_and_fetches_at_pin(tmp_path,
     # and no plugin tree was published into the store.
     plugins_dir = Path(cfg.state_dir()) / "plugins"
     assert not plugins_dir.exists() or not any(plugins_dir.iterdir())
+
+
+def test_upstream_catalog_rows_are_installable_unreviewed(tmp_path, monkeypatch):
+    from voicebridge import plugin_catalog as PC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    rows = PC.pinned_index_entries()
+    upstream = [r for r in rows if not r.get("curated")]
+    assert len(upstream) >= 290, len(upstream)
+    by_name = {r["name"]: r for r in rows}
+    adspirer = by_name.get("adspirer")
+    assert adspirer is not None and adspirer["pinned_ref"].startswith("4688c38")
+    assert adspirer["review"] == "unreviewed"
+    # Resolution by upstream name (the Hermes catalog key).
+    assert PC._index_entry("adspirer")["pinned_ref"] == adspirer["pinned_ref"]
+    # Unreviewed install goes through the same pinned pipeline (core stubbed;
+    # pin resolution + warning are real).
+    PC._prepare_runtime(cfg)
+    from qubit_cli import plugins_cmd_catalog as _VCC
+    calls = {}
+
+    def _fake_install(entry, **kw):
+        calls["repo"] = entry.repo
+        calls["sha"] = entry.sha
+        calls["ref"] = kw.get("ref")
+        return ("/tmp/fake-target", {"name": "fake-upstream"}, "fake-upstream")
+
+    monkeypatch.setattr(_VCC, "install_catalog_entry", _fake_install)
+    from qubit_cli import plugins_cmd as _PCM
+    monkeypatch.setattr(_PCM, "_set_plugin_enabled", lambda *a, **k: None)
+    import qubit_cli.plugins_activation as _PA
+    monkeypatch.setattr(_PA, "activate_plugin_now", lambda *a, **k: {})
+    out = PC.install_from_index(cfg, "adspirer", confirmed=True,
+                                requested_by="test")
+    assert out["ok"] is True and out["state"] == "INSTALLED", out
+    assert out["review"] == "unreviewed" and out["warning"], out
+    assert calls["sha"] == out["pinned_ref"]
+
+
+def test_subdir_missing_install_teaches_the_catalog(tmp_path, monkeypatch):
+    from voicebridge import plugin_catalog as PC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    PC._prepare_runtime(cfg)
+    from qubit_cli import plugins_cmd_catalog as _VCC
+    from qubit_cli.plugins_cmd import PluginOperationError
+
+    def _fake_missing(entry, **kw):
+        raise PluginOperationError(
+            "Plugin subdirectory 'plugins/qubit/markifact' does not exist "
+            "in the repository.")
+
+    monkeypatch.setattr(_VCC, "install_catalog_entry", _fake_missing)
+    import pytest as _pytest
+    with _pytest.raises(Exception) as excinfo:
+        PC.install_from_index(cfg, "markifact", confirmed=True,
+                              requested_by="test")
+    assert "does not exist in the repository" in str(excinfo.value)
+    rows = PC.pinned_index_entries(
+        known_bad=PC._known_bad_map(cfg))
+    row = next(r for r in rows if r["name"] == "markifact")
+    assert row["install_state"] == "BROKEN", row
+    assert row["install_code"] == "PLUGIN_INDEX_KNOWN_BAD", row
+    assert "missing" in row["install_note"]
+
+
+def test_index_rows_reflect_installed_state(tmp_path, monkeypatch):
+    from voicebridge import plugin_catalog as PC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    pin = next(r["pinned_ref"] for r in PC.pinned_index_entries()
+               if r["name"] == "agent-log")
+    monkeypatch.setattr(PC, "_installed_catalog_map", lambda: {
+        "agent-log": {"plugin": "agent-log", "revision": pin,
+                      "pinned": True}})
+    rows = {r["name"]: r for r in PC.pinned_index_entries()}
+    row = rows["agent-log"]
+    assert row["installed"] is True, row
+    assert row["install_state"] == "INSTALLED", row
+    assert row["installed_plugin"] == "agent-log", row
+
+
+def test_reinstall_at_same_pin_is_idempotent_success(tmp_path, monkeypatch):
+    from voicebridge import plugin_catalog as PC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    pin = next(r["pinned_ref"] for r in PC.pinned_index_entries()
+               if r["name"] == "agent-log")
+    monkeypatch.setattr(PC, "_installed_catalog_map", lambda: {
+        "agent-log": {"plugin": "agent-log", "revision": pin,
+                      "pinned": True}})
+    from qubit_cli import plugins_cmd_catalog as _VCC
+
+    def _boom(entry, **kw):
+        raise AssertionError("fetch core must not run for same-pin reinstall")
+
+    monkeypatch.setattr(_VCC, "install_catalog_entry", _boom)
+    out = PC.install_from_index(cfg, "agent-log", confirmed=True,
+                                requested_by="test")
+    assert out["ok"] is True and out.get("unchanged") is True, out
+    assert out["revision"] == pin

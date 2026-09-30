@@ -6,7 +6,7 @@
   "INTENTIONALLY_OMITTED": 25,
   "MISSING": 0,
   "OPENCLAW_OVERLAY": 0,
-  "QUBIT_ADDED": 31,
+  "QUBIT_ADDED": 33,
   "QUBIT_PATCHED": 6810,
   "UNCHANGED": 9227,
   "UNEXPLAINED": 0
@@ -175,6 +175,8 @@
  ],
  "eol_normalized_count": 16,
  "extra_local": [
+  ".hermes/bin/hermes",
+  ".hermes/bin/hermes-acp",
   "optional-skills/migration/qubit-migration/SKILL.md",
   "optional-skills/migration/qubit-migration/scripts/openclaw_to_hermes.py",
   "qubit_cli/install_source.py",
@@ -207,7 +209,7 @@
   "ui-tui/dist/entry.js",
   "ui-tui/dist/hermes-build.json"
  ],
- "file_count": 16084,
+ "file_count": 16086,
  "files": {
   ".coderabbit.yaml": {
    "classification": "UNCHANGED",
@@ -1209,6 +1211,32 @@
    "upstream_blob_sha256": "5bba63bc79b5f412c6d0e4654288e364f11fd619e449539ecefad31849406142",
    "upstream_mode": "100644",
    "upstream_sha256": "5bba63bc79b5f412c6d0e4654288e364f11fd619e449539ecefad31849406142"
+  },
+  ".hermes/bin/hermes": {
+   "classification": "QUBIT_ADDED",
+   "git_tracked": false,
+   "local_fs_mode": "100755",
+   "local_git_mode": null,
+   "patched": false,
+   "sha256": "05bb4db7d44fa3ee7bf670a4c61f2b03a316c8f804f77294210252a535e2e30a",
+   "symlink": false,
+   "upstream_blob": null,
+   "upstream_blob_sha256": null,
+   "upstream_mode": null,
+   "upstream_sha256": null
+  },
+  ".hermes/bin/hermes-acp": {
+   "classification": "QUBIT_ADDED",
+   "git_tracked": false,
+   "local_fs_mode": "100755",
+   "local_git_mode": null,
+   "patched": false,
+   "sha256": "595e3ca20de4a72706e3c3170929e7401c09cac7efd0deee9ec01043048c8d19",
+   "symlink": false,
+   "upstream_blob": null,
+   "upstream_blob_sha256": null,
+   "upstream_mode": null,
+   "upstream_sha256": null
   },
   ".mailmap": {
    "classification": "UNCHANGED",
@@ -75420,7 +75448,7 @@
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
    "patched": true,
-   "sha256": "763afc32f056067161f68006e556b7d5152553760b5a89e414e0e82ae014e101",
+   "sha256": "8938c85afb5a1725e9d41376178a6d7551652bbdef236e7c0daf61bc6a39764e",
    "symlink": false,
    "upstream_blob": "a5fe00d788c76cb82519717776b7103b886c3929",
    "upstream_blob_sha256": "2be15750985658e558fd2bf084af6ebecce668ebbda8093d3343590720681f35",
@@ -209333,7 +209361,7 @@
  ],
  "local_fs_mode_counts": {
   "100644": 15985,
-  "100755": 99
+  "100755": 101
  },
  "local_git_file_count": 16084,
  "local_git_mode_counts": {

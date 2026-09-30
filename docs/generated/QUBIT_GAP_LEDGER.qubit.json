@@ -22,7 +22,7 @@
   "dashboard_ops.EXTRA_OPS": 35,
   "voice_commands.CLI_COVERAGE": 114,
   "qubit_compat.ROUTES": 460,
-  "qubit_compat.GATED": 88,
+  "qubit_compat.GATED": 87,
   "cli_families": 114,
   "source_inventory.items": 6775,
   "source_inventory.surface_items": 1818,
@@ -8535,7 +8535,7 @@
    "voice": "",
    "status": "SAFE_EQUIVALENT",
    "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Remote fetch is refused; only local reviewed manifests install with explicit confirmation. routes=4",
+   "note": "Remote fetch is refused; only local reviewed manifests install with explicit confirmation. routes=3",
    "needs": "owner"
   },
   {

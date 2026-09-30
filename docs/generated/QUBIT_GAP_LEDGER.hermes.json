@@ -118,8 +118,8 @@
  "counts": {
   "total": 591,
   "by_status": {
-   "IMPLEMENTED": 502,
-   "SAFE_EQUIVALENT": 89
+   "IMPLEMENTED": 503,
+   "SAFE_EQUIVALENT": 88
   },
   "by_area": {
    "analytics-config": 4,
@@ -2342,13 +2342,13 @@
    "area": "mcp",
    "capability": "POST /api/mcp/catalog/install",
    "upstream_ref": "qubit_runtime/qubit_cli/web_routers/mcp.py:649",
-   "qubit_backend": "voicebridge/qubit_compat.py:__gate__",
+   "qubit_backend": "voicebridge/qubit_compat.py:h_mcp_catalog_install",
    "cli": "qubit mcp status",
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
-   "status": "SAFE_EQUIVALENT",
-   "proving_test": "tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed",
-   "note": "Typed policy gate BLOCKED_REMOTE_SOURCE via compat dispatcher.",
+   "status": "IMPLEMENTED",
+   "proving_test": "tests/test_mcp_catalog_install9u.py::test_install_registers_transport_and_refs_without_echo",
+   "note": "",
    "needs": "owner"
   },
   {

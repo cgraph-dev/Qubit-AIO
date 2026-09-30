@@ -172,7 +172,7 @@ describe("PluginsPage curated pinned index", () => {
   it("renders curated + pinned entries with their full pinned ref", async () => {
     await renderPage();
     await waitFor(() =>
-      container.textContent?.includes("Curated pinned plugin index") === true,
+      container.textContent?.includes("Plugin index · pinned") === true,
     );
     await waitFor(() => container.textContent?.includes("Media Studio") === true);
     expect(container.textContent).toContain(PINNED_REF);
@@ -184,6 +184,80 @@ describe("PluginsPage curated pinned index", () => {
     expect(
       container.querySelector('[data-testid="plugin-pinned-index-install-gate"]'),
     ).not.toBeNull();
+  });
+
+  it("marks unreviewed upstream rows with an unreviewed badge, not curated", async () => {
+    apiMocks.getPluginCatalog.mockResolvedValue({
+      ok: true,
+      state: "OK",
+      schema: "qubit-dashboard-plugin-catalog/1",
+      generated_at: "2026-09-23T00:00:00Z",
+      query: "",
+      source: "",
+      count: 1,
+      counts: {},
+      estop: false,
+      remote: { state: "REFUSED", code: "BLOCKED_REMOTE_PLUGIN" },
+      pinned_index: {
+        ...pinnedIndex,
+        count: 2,
+        entries: [
+          pinnedIndex.entries[0],
+          {
+            ...pinnedIndex.entries[0],
+            id: "adspirer",
+            name: "adspirer",
+            label: "Adspirer",
+            curated: false,
+            review: "unreviewed",
+          },
+        ],
+      },
+      install_capability: "plugin.install",
+      entries: [],
+    });
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Adspirer") === true);
+    expect(container.textContent).toContain("unreviewed");
+  });
+
+  it("shows installed instead of Install for already-installed rows", async () => {
+    apiMocks.getPluginCatalog.mockResolvedValue({
+      ok: true,
+      state: "OK",
+      schema: "qubit-dashboard-plugin-catalog/1",
+      generated_at: "2026-09-23T00:00:00Z",
+      query: "",
+      source: "",
+      count: 1,
+      counts: {},
+      estop: false,
+      remote: { state: "REFUSED", code: "BLOCKED_REMOTE_PLUGIN" },
+      pinned_index: {
+        ...pinnedIndex,
+        count: 1,
+        entries: [
+          {
+            ...pinnedIndex.entries[0],
+            installed: true,
+            installed_plugin: "hermes-media-studio",
+            install_state: "INSTALLED",
+          },
+        ],
+      },
+      install_capability: "plugin.install",
+      entries: [],
+    });
+    await renderPage();
+    await waitFor(() => container.textContent?.includes("Media Studio") === true);
+    const section = container.querySelector(
+      '[data-testid="plugin-pinned-index-section"]',
+    );
+    expect(section?.textContent).toContain("installed");
+    const installButtons = Array.from(
+      section?.querySelectorAll<HTMLButtonElement>("button") ?? [],
+    ).filter((b) => (b.textContent ?? "").trim() === "Install");
+    expect(installButtons).toHaveLength(0);
   });
 
   it("installs by name + curated ref and toasts the real success", async () => {

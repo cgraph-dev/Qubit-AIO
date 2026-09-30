@@ -475,12 +475,18 @@ export default function PluginsPage() {
   const onIndexInstall = async (entry: PluginPinnedIndexEntry) => {
     setIndexBusy(entry.name);
     try {
-      // The backend verifies the curated pin, runs the canonical
-      // e-stop -> confirmation -> audit gate, then fetches the entry at
-      // exactly the pinned ref through the catalog pipeline (kill-list,
-      // exact-SHA clone, pre-publish scan, admission-gated enable).
-      await api.installAgentPluginFromIndex(entry.name, entry.pinned_ref);
-      showToast(`${entry.label || entry.name} installed`, "success");
+      // The backend verifies the pin, runs the canonical e-stop ->
+      // confirmation -> audit gate, then fetches the entry at exactly the
+      // pinned ref through the catalog pipeline (kill-list, exact-SHA clone,
+      // pre-publish scan, admission-gated enable). Unreviewed entries carry
+      // a warning in the response — surface it, never a bare success.
+      const result = await api.installAgentPluginFromIndex(entry.name, entry.pinned_ref);
+      showToast(
+        result.warning
+          ? `${entry.label || entry.name} installed — ${result.warning}`
+          : `${entry.label || entry.name} installed`,
+        "success",
+      );
       await Promise.all([loadCatalog(), loadHub()]);
     } catch (e) {
       showToast(
@@ -1001,23 +1007,20 @@ export default function PluginsPage() {
 
           <CardContent className="flex flex-col gap-4">
 
-            {/* Honest capability note: Qubit's plugin admission accepts only a
-                reviewed local directory or reviewed *.json manifest. Any Git
-                URL / owner-repo / bare-index identifier is refused by policy
-                with a typed BLOCKED_REMOTE_PLUGIN (403) — nothing is fetched
-                or cloned. Say so up front instead of advertising an install
-                that can never complete. */}
+            {/* Capability note: this box accepts reviewed local directories /
+                *.json manifests. For remote plugins, use the pinned index
+                below — every entry installs at its pinned SHA. Arbitrary
+                non-index URLs stay refused (typed BLOCKED_REMOTE_PLUGIN). */}
             <p
               data-testid="plugin-install-remote-gate"
               className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
             >
-              Remote Git installs are refused by policy (typed{" "}
-              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span>) — no
-              repository is fetched, cloned, or executed. This control accepts
-              only a <span className="font-mono">reviewed local directory</span>{" "}
+              This control accepts only a <span className="font-mono">reviewed local directory</span>{" "}
               or a reviewed <span className="font-mono">*.json</span> manifest
-              path. Git/owner-repo installs are operator-gated and require the
-              reviewed install path (<span className="font-mono">qubit agent plugins install</span>).
+              path. For remote plugins, install from the pinned index below
+              (every entry fetches at its pinned SHA). Arbitrary remote URLs
+              stay refused (typed{" "}
+              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span>).
             </p>
 
             <div className="flex flex-col gap-2">
@@ -1144,16 +1147,6 @@ export default function PluginsPage() {
               </Select>
             </div>
 
-            <p
-              data-testid="plugin-catalog-remote-refusal"
-              className="border border-warning/40 bg-warning/5 px-3 py-2 text-xs tracking-[0.06em] text-text-secondary"
-            >
-              {t.pluginsPage.catalogRemoteRefused ?? "Raw remote fetch refused by policy"}: typed{" "}
-              <span className="font-mono">BLOCKED_REMOTE_PLUGIN</span> — no arbitrary remote
-              repository is fetched, cloned, or executed. The curated, pinned index is served
-              separately below; only reviewed local directories / manifests install.
-            </p>
-
             {catalogError ? (
               <p className="border border-destructive/50 px-3 py-2 text-xs text-destructive">
                 {catalogError}
@@ -1189,10 +1182,10 @@ export default function PluginsPage() {
         <Card data-testid="plugin-pinned-index-section">
           <CardHeader>
             <div className="min-w-0">
-              <CardTitle>{"Curated pinned plugin index"}</CardTitle>
+              <CardTitle>{"Plugin index · pinned"}</CardTitle>
               <p className="text-xs tracking-[0.08em] text-text-tertiary">
                 {
-                  "Curated remote plugin sources, each pinned to a full commit SHA. Install is operator-gated and verified at the pinned ref; raw unvetted remote fetch stays refused."
+                  "Remote plugin sources, each pinned to a full commit SHA. installs fetch at the pin through scan + admission; unreviewed rows are marked. Arbitrary remote URLs stay refused."
                 }
               </p>
             </div>
@@ -1208,7 +1201,7 @@ export default function PluginsPage() {
               />
               {pinnedIndex ? (
                 <span className="text-xs tracking-[0.06em] text-text-tertiary">
-                  {pinnedIndex.count} {"curated · pinned"} ·{" "}
+                  {pinnedIndex.count} {"plugins · pinned"} ·{" "}
                   <span className="font-mono">{pinnedIndex.source}</span>
                 </span>
               ) : null}
@@ -1560,7 +1553,11 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <span className="truncate text-sm font-semibold">{entry.label || entry.name}</span>
-          <Badge tone="secondary">curated</Badge>
+          {entry.curated ? (
+            <Badge tone="secondary">curated</Badge>
+          ) : (
+            <Badge tone="warning">unreviewed</Badge>
+          )}
           <Badge tone="outline">pinned</Badge>
           <Badge tone="outline">{entry.tier}</Badge>
           <Badge tone="outline">{entry.category}</Badge>
@@ -1569,10 +1566,14 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
           </span>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button size="sm" disabled={busy} onClick={() => void onInstall(entry)}>
-            {busy ? <Spinner /> : null}
-            {t.pluginsPage.catalogInstall ?? "Install"}
-          </Button>
+          {entry.installed ? (
+            <Badge tone="success">installed</Badge>
+          ) : (
+            <Button size="sm" disabled={busy || entry.install_state === "BROKEN"} onClick={() => void onInstall(entry)} title={entry.install_state === "BROKEN" ? (entry.install_note || "known uninstallable at this pin") : undefined}>
+              {busy ? <Spinner /> : null}
+              {t.pluginsPage.catalogInstall ?? "Install"}
+            </Button>
+          )}
           <Button ghost size="sm" onClick={() => setOpen((v) => !v)}>
             {open ? (
               <ChevronDown className="h-3.5 w-3.5" />
@@ -1588,6 +1589,11 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
       {entry.description ? (
         <p className="mt-2 text-xs text-text-secondary">{entry.description}</p>
       ) : null}
+      {entry.install_state === "BROKEN" ? (
+        <p className="mt-1 text-xs text-destructive">
+          {"Not installable at this pin"}: {entry.install_note || "known bad"}
+        </p>
+      ) : null}
       <p className="mt-1 text-xs text-text-tertiary">
         {"Pinned ref"}: <span className="font-mono">{entry.pinned_ref}</span>
       </p>
@@ -1595,13 +1601,13 @@ function PinnedIndexRow({ entry, busy, onInstall, t }: PinnedIndexRowProps) {
         <div className="mt-3 grid gap-1 border-t border-border pt-3 text-xs text-text-secondary">
           <div>
             {"Source"}:{" "}
-            <a className="underline" href={entry.repo} target="_blank" rel="noreferrer">
+            <a className="underline" href={entry.provenance?.upstream_repo || entry.repo} target="_blank" rel="noreferrer">
               third-party repository
               {entry.subdir ? ` (${entry.subdir})` : ""}
             </a>
           </div>
           <div>
-            {"Maintainer"}: {entry.maintainer || "—"}
+            {"Maintainer"}: {entry.maintainer || entry.provenance?.upstream_maintainer || "—"}
           </div>
           <div>
             {"License"}: {entry.license}

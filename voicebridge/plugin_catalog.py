@@ -4,11 +4,13 @@ Serves ``GET /api/dashboard/plugins/catalog`` and
 ``GET /api/dashboard/plugins/catalog/<id>``.
 
 The upstream reference serves a curated index of GitHub-pinned repositories
-(``hermes_cli/plugin_catalog.py`` + ``plugins_cmd_catalog.py``). Qubit policy
-refuses remote plugin acquisition (``BLOCKED_REMOTE_PLUGIN``), so that index is
-never fetched and is exposed only as a typed, operator-gated refusal that names
-the prerequisite. What Qubit CAN load and manage is served instead, with real
-provenance for every row:
+(``hermes_cli/plugin_catalog.py`` + ``plugins_cmd_catalog.py``). Qubit serves
+the same universe: the 5 curated entries plus every upstream catalog YAML as
+an installable row pinned at its YAML SHA (unreviewed rows are marked and
+carry a warning). A confirmed install fetches the entry at exactly its pin
+through the vendored catalog pipeline; arbitrary (non-index) remote
+identifiers stay a typed ``BLOCKED_REMOTE_PLUGIN`` refusal. What Qubit CAN
+load and manage is served instead, with real provenance for every row:
 
 * ``bundled``   — the vendored agent plugin fleet (``qubit_runtime/plugins``)
 * ``dashboard`` — vendored dashboard plugins with a real manifest + backend
@@ -67,6 +69,80 @@ INDEX_INSTALL_PREREQUISITE = (
     "(or settle the staged approval); arbitrary remote URLs stay refused — "
     "only curated entries install, and only at their pinned ref")
 _SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
+#: Local memo of index rows proven uninstallable (e.g. the upstream YAML's
+#: subdir does not exist at the pinned SHA — upstream data drift Hermes would
+#: hit identically). Keyed ``"<name>\0<pin>"`` -> reason. A failed install
+#: teaches the catalog instead of failing the same way forever.
+_KNOWN_BAD_FILENAME = "plugin-index-known-bad.json"
+_SUBDIR_MISSING_MARK = "does not exist in the repository"
+
+
+def _known_bad_path(cfg: Any) -> Path:
+    try:
+        base = Path(cfg.state_dir())
+    except Exception:
+        base = Path(".")
+    return base / _KNOWN_BAD_FILENAME
+
+
+def _installed_catalog_map() -> Dict[str, Dict[str, Any]]:
+    """Installed plugins keyed by catalog name: ``name -> {plugin, revision}``.
+
+    Reads the installer-owned metadata sidecar (the same record installs
+    write): ``catalog.name`` when present, plus the plugin dir name as a
+    fallback key. Empty on any failure — an unknown install state never
+    blocks serving the index.
+    """
+    try:
+        _prepare_runtime_no_home()
+        from qubit_cli.plugins_cmd_git import (  # type: ignore
+            _read_install_metadata)
+        meta = _read_install_metadata()
+    except Exception:
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for plugin_name, rec in (meta or {}).items():
+        if not isinstance(rec, dict):
+            continue
+        block = rec.get("catalog") or {}
+        keys = {str(plugin_name)}
+        if isinstance(block, dict) and block.get("name"):
+            keys.add(str(block["name"]))
+        for key in keys:
+            out[key.lower()] = {
+                "plugin": str(plugin_name),
+                "revision": str(rec.get("revision") or "").lower(),
+                "pinned": bool(rec.get("pinned")),
+            }
+    return out
+
+
+def _prepare_runtime_no_home() -> None:
+    from . import qubit_runtime as _QR
+    _QR.ensure_path()
+
+
+def _known_bad_map(cfg: Any = None) -> Dict[str, str]:
+    if cfg is None:
+        return {}
+    try:
+        raw = json.loads(_known_bad_path(cfg).read_text(encoding="utf-8"))
+        return dict(raw) if isinstance(raw, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _record_known_bad(cfg: Any, name: str, pin: str, reason: str) -> None:
+    try:
+        path = _known_bad_path(cfg)
+        memo = _known_bad_map(cfg)
+        memo[f"{name}\0{pin}"] = reason
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(json.dumps(memo, indent=2, sort_keys=True))
+        tmp.replace(path)
+    except OSError:
+        pass
 
 
 def _redact(text: Any) -> str:
@@ -347,25 +423,168 @@ def _install_capability() -> str:
         return "plugin.install"
 
 
-def pinned_index_entries(query: str = "") -> List[Dict[str, Any]]:
-    """The curated pinned index entries, optionally filtered by *query*."""
+def pinned_index_entries(query: str = "",
+                         known_bad: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+    """The curated pinned index entries plus the upstream catalog, optionally
+    filtered by *query*.
+
+    Curated rows come first (``review: "curated"``); the remaining upstream
+    catalog YAMLs follow as ``review: "unreviewed"`` installable rows pinned
+    at their YAML SHA. Upstream rows duplicating a curated entry (same repo +
+    subdir) are skipped — the curated row wins. Rows present in *known_bad*
+    (a previous install proved them uninstallable at this pin) are flagged
+    ``install_state: "BROKEN"`` with the reason instead of failing again.
+    """
+    bad = known_bad or {}
+    try:
+        installed = _installed_catalog_map()
+    except Exception:
+        installed = {}
     out: List[Dict[str, Any]] = []
     for raw in _index_doc().get("entries", []) or []:
         entry = _valid_index_entry(raw)
         if entry is None:
             continue
-        if query:
-            q = query.strip().lower()
-            hay = [entry["name"], entry["label"], entry["description"],
-                   entry["repo"], entry["maintainer"], entry["category"],
-                   entry["tier"], *entry["tags"], *entry["capabilities"]]
-            if not any(q in str(item).lower() for item in hay):
-                continue
+        _stamp_installed(entry, installed)
+        if query and not _entry_matches(entry, query):
+            continue
         out.append(entry)
+    for row in _upstream_index_rows(known_bad=bad):
+        _stamp_installed(row, installed)
+        if query and not _entry_matches(row, query):
+            continue
+        out.append(row)
     return out
 
 
-def pinned_index_block(query: str = "") -> Dict[str, Any]:
+def _stamp_installed(entry: Dict[str, Any],
+                     installed: Dict[str, Dict[str, Any]]) -> None:
+    """Stamp a served index row with local install state (never raises).
+
+    Matches the row's served id/name plus its upstream source name against
+    the installer metadata. A row installed at its served pin reports
+    ``installed: True`` with ``install_state: "INSTALLED"`` (unless a
+    known-bad flag already explains it); anything else installs normally.
+    """
+    try:
+        provenance = entry.get("provenance") or {}
+        candidates = [entry.get("id"), entry.get("name"),
+                      provenance.get("source_name")]
+        hit = next((installed[str(c).lower()] for c in candidates
+                    if c and str(c).lower() in installed), None)
+        if hit is None:
+            return
+        entry["installed"] = True
+        entry["installed_plugin"] = hit["plugin"]
+        entry["installed_revision"] = hit["revision"]
+        if entry.get("install_state") == "READY":
+            entry["install_state"] = "INSTALLED"
+    except Exception:
+        pass
+
+
+def _entry_matches(entry: Dict[str, Any], query: str) -> bool:
+    q = query.strip().lower()
+    provenance = entry.get("provenance") or {}
+    hay = [entry.get("name"), entry.get("label"), entry.get("description"),
+           entry.get("repo"), entry.get("maintainer"), entry.get("category"),
+           entry.get("tier"), provenance.get("source_name"),
+           provenance.get("upstream_repo"),
+           *entry.get("tags", []), *entry.get("capabilities", [])]
+    return any(q in str(item).lower() for item in hay)
+
+
+def _repo_key(repo: str) -> str:
+    """Normalize a repo URL/shorthand for dedupe comparisons."""
+    r = (repo or "").strip().lower()
+    r = re.sub(r"^https?://", "", r)
+    if r.endswith(".git"):
+        r = r[:-4]
+    return r.strip("/")
+
+
+def _upstream_index_rows(known_bad: Optional[Dict[str, str]] = None
+                       ) -> List[Dict[str, Any]]:
+    """Every upstream catalog YAML as an installable (unreviewed) index row.
+
+    The vendored ``plugin-catalog/`` tree is the trust anchor: each row pins
+    the YAML's own SHA, and installs re-verify it. Rows duplicating a curated
+    entry resolve to the curated row instead (matched by repo + subdir).
+    Never raises: YAML parse skips are warnings inside the loader, and a
+    missing tree yields no rows.
+    """
+    try:
+        # Fork root on sys.path (same ensure every catalog read performs;
+        # the YAML tree is read-only data, no home state is touched).
+        from . import qubit_runtime as _QR
+        _QR.ensure_path()
+        from qubit_cli import plugin_catalog as _VC  # type: ignore
+        yaml_rows = _VC.load_catalog()
+    except Exception:
+        return []
+    curated_repos = set()
+    for raw in _index_doc().get("entries", []) or []:
+        provenance = (raw.get("provenance") or {}) if isinstance(raw, dict) \
+            else {}
+        repo = str(provenance.get("upstream_repo")
+                   or provenance.get("source_repo")
+                   or raw.get("repo") or "").strip().lower()
+        subdir = str(raw.get("subdir") or "").strip().lower()
+        curated_repos.add((_repo_key(repo), subdir))
+    bad = known_bad or {}
+    out: List[Dict[str, Any]] = []
+    for entry in yaml_rows:
+        try:
+            repo = str(entry.repo or "").strip()
+            subdir = str(entry.subdir or "").strip()
+            sha = str(entry.sha or "").strip().lower()
+            key = (_repo_key(repo), subdir.lower())
+            if not repo.startswith("https://") or not _SHA40_RE.match(sha):
+                continue
+            if key in curated_repos:
+                continue
+            caps = getattr(entry, "capabilities", None)
+            # B4-06: served display rows carry no legacy brand outside
+            # provenance (same rule as curated rows) — the real upstream URL
+            # and maintainer live only in the internal ``provenance``
+            # sub-field, rendered behind the Details disclosure.
+            broken_reason = bad.get(f"{entry.name}\0{sha}", "")
+            out.append({
+                "id": entry.name, "name": entry.name,
+                "label": str(entry.title or entry.name),
+                "description": _bounded(entry.description or "", 400),
+                "repo": "", "subdir": subdir,
+                "pinned_ref": sha, "pinned_ref_short": sha[:8],
+                "homepage": "", "maintainer": "",
+                "license": "unverified",
+                "tier": str(entry.tier or "community"),
+                "category": str(entry.category or "general"),
+                "capabilities": _str_list(getattr(caps, "provides_tools", [])
+                                          + getattr(caps, "provides_hooks", [])),
+                "api_version": None,
+                "tags": ["unreviewed"],
+                "curated": False, "pinned": True,
+                "review": "unreviewed",
+                "install_state": "BROKEN" if broken_reason else "READY",
+                "install_code": ("PLUGIN_INDEX_KNOWN_BAD"
+                                 if broken_reason
+                                 else "PLUGIN_INDEX_INSTALLABLE"),
+                "install_note": broken_reason,
+                "install_capability": _install_capability(),
+                "provenance": {
+                    "source_name": entry.name,
+                    "upstream_repo": repo,
+                    "upstream_maintainer": str(entry.maintainer or ""),
+                    "curation": "upstream-unreviewed",
+                },
+            })
+        except Exception:
+            continue
+    return out
+
+
+def pinned_index_block(query: str = "",
+                       known_bad: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """The curated, pinned index block served alongside the local catalog.
 
     Clearly marked ``curated`` + ``pinned``. Every entry pins a full 40-char
@@ -375,7 +594,7 @@ def pinned_index_block(query: str = "") -> Dict[str, Any]:
     refused.
     """
     doc = _index_doc()
-    entries = pinned_index_entries(query)
+    entries = pinned_index_entries(query, known_bad=known_bad)
     return {
         "ok": True,
         "state": "CURATED_PINNED",
@@ -462,6 +681,25 @@ def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
     PR._audit("index_install_request", requested_by,
               {"catalog_name": entry["name"], "pinned_ref": pin,
                "repo": entry.get("repo", "")})
+    # Idempotent reinstall: already installed at exactly this pin is success
+    # with no fetch — never an ALREADY_EXISTS error for clicking Install twice.
+    try:
+        installed_here = _installed_catalog_map().get(
+            str(entry.get("name") or "").lower())
+    except Exception:
+        installed_here = None
+    if installed_here and installed_here.get("revision") == pin:
+        PR._audit("index_install_noop", requested_by,
+                  {"catalog_name": entry["name"], "pinned_ref": pin,
+                   "plugin_name": installed_here.get("plugin")})
+        return {
+            "ok": True, "state": "INSTALLED", "catalog_name": entry["name"],
+            "plugin_name": installed_here.get("plugin"), "pinned_ref": pin,
+            "revision": pin, "unchanged": True,
+            "detail": "already installed at the pinned ref; nothing fetched",
+            "review": "curated" if entry.get("curated") else "unreviewed",
+            "install_capability": PR.INSTALL_CAPABILITY,
+        }
     _prepare_runtime(cfg)
     from qubit_cli import plugin_catalog as _VC  # type: ignore
     from qubit_cli import plugins_cmd_catalog as _VCC  # type: ignore
@@ -507,6 +745,15 @@ def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
             PR.REFUSED_CODE,
             f"plugin scan blocked install of {upstream!r}: {exc}") from exc
     except PluginOperationError as exc:
+        # Upstream data drift (e.g. the YAML's subdir does not exist at the
+        # pinned SHA — Hermes fails the identical install the identical way):
+        # teach the catalog so the row shows BROKEN with the reason instead
+        # of failing the same way on every retry.
+        if _SUBDIR_MISSING_MARK in str(exc):
+            _record_known_bad(
+                cfg, entry["name"], pin,
+                f"subdir {subdir or upstream!r} missing at pin "
+                f"{pin[:12]} (upstream data drift)")
         raise PR.PluginRuntimeError(PR.REFUSED_CODE, str(exc)) from exc
     try:
         _set_plugin_enabled(installed_name, enable=True)
@@ -528,8 +775,15 @@ def install_from_index(cfg: Any, catalog_name: str, *, ref: str = "",
         "ok": True, "state": "INSTALLED", "catalog_name": entry["name"],
         "plugin_name": installed_name, "pinned_ref": pin,
         "revision": pin, "enabled": enabled,
+        "review": "curated" if entry.get("curated") else "unreviewed",
         "install_capability": PR.INSTALL_CAPABILITY,
     }
+    if not entry.get("curated"):
+        out["warning"] = (
+            "unreviewed upstream source: kill-list, platform check, "
+            "exact-SHA clone, and pre-publish scan passed, but no human "
+            "reviewed this plugin — check what it does before enabling it "
+            "broadly")
     if enable_note:
         out["enable_note"] = enable_note
     if activation:
@@ -743,7 +997,8 @@ def local_catalog(cfg: Any, *, query: str = "", source: str = "",
         "remote": {"state": "REFUSED", "code": REMOTE_CODE,
                    "detail": REMOTE_DETAIL,
                    "prerequisite": REMOTE_PREREQUISITE},
-        "pinned_index": pinned_index_block(query=query),
+        "pinned_index": pinned_index_block(
+            query=query, known_bad=_known_bad_map(cfg)),
         "install_capability": PR.INSTALL_CAPABILITY,
         "entries": rows,
     }

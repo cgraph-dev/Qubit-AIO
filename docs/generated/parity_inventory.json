@@ -14,9 +14,9 @@
         "total": 566
       },
       "reference": {
-        "gated": 59,
+        "gated": 58,
         "missing": 0,
-        "ported": 764,
+        "ported": 765,
         "total": 823
       }
     },
@@ -34,9 +34,9 @@
         "total": 603
       },
       "route": {
-        "gated": 40,
+        "gated": 39,
         "missing": 0,
-        "ported": 237,
+        "ported": 238,
         "total": 277
       },
       "tool": {
@@ -46,9 +46,9 @@
         "total": 121
       }
     },
-    "gated": 110,
+    "gated": 109,
     "missing": 0,
-    "ported": 1279,
+    "ported": 1280,
     "total": 1389
   },
   "e2e_verified": false,
@@ -122,7 +122,7 @@
     "dashboard_ops.catalog": 566,
     "page_coverage_rows": 0,
     "qubit_agent_top": 71,
-    "qubit_compat.GATED": 57,
+    "qubit_compat.GATED": 56,
     "qubit_compat.ROUTES": 460,
     "qubit_voice_top": 113,
     "reference_cli_sub": 317,
@@ -20050,14 +20050,14 @@
       "voice_intent_verified": false
     },
     {
-      "classification": "GATED",
+      "classification": "PORTED",
       "evidence": {
-        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=gated handler=__gate__",
+        "qubit": "voicebridge/qubit_compat.py ROUTES disposition=implemented handler=h_mcp_catalog_install",
         "reference": "~/.hermes/hermes-agent/hermes_cli/web_routers/mcp.py:492"
       },
       "id": "POST /api/mcp/catalog/install",
       "method": "POST",
-      "qubit_counterpart": "POST /api/mcp/catalog/install -> __gate__",
+      "qubit_counterpart": "POST /api/mcp/catalog/install -> h_mcp_catalog_install",
       "side": "reference",
       "surface": "route",
       "voice_intent": "qubit plugins catalog",

@@ -24,7 +24,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
   - upstream_tag: v2026.9.4
   - upstream_tree: /tmp/opencode/pinned/openclaw (read via git show 3a9d69db306cd7f081e06254cb89c4bcc14a7107, shallow clone)
 - `docs/generated/QUBIT_GAP_LEDGER.qubit.json` — schema `qubit-gap-ledger-section/1`, source `qubit-surface`, 750 rows
-  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=88, qubit_compat.ROUTES=460, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
+  - generated_from: cli_families=114, dashboard_ops.EXTRA_OPS=35, dashboard_ops.catalog=566, qubit_compat.GATED=87, qubit_compat.ROUTES=460, source_inventory.dispositioned=121, source_inventory.dispositioned_gated=4, source_inventory.dispositioned_implemented=117, source_inventory.distinct_uncovered=0, source_inventory.items=6775, source_inventory.parented_covered=1081, source_inventory.parented_uncovered=0, source_inventory.surface_items=1818, voice_commands.CLI_COVERAGE=114, voice_commands.REGISTRY=514
   - evidence: production backend + declared interfaces + live CLI tree + voice registry + linked tests/ AST proofs + direct source inventory
   - generator: scripts/rebuild_ledger_qubit.py
   - backend_flags: []
@@ -37,17 +37,17 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 - Total rows: **1445**
 - Code-side open rows (not terminal): **1**
-- SAFE_EQUIVALENT (closed for code readiness): **125**
+- SAFE_EQUIVALENT (closed for code readiness): **124**
 - OPERATOR_ONLY (manual/operator qualification): **10**
 - OPERATOR_ONLY_ARCHITECTURE (OPEN, architecture-gated; needs individual owner approval): **1**
 - Code-ready: **False**; fully complete (all manual qualified): **False**
 
 ### By status
 
-- IMPLEMENTED: 1309
+- IMPLEMENTED: 1310
 - OPERATOR_ONLY: 10
 - OPERATOR_ONLY_ARCHITECTURE: 1
-- SAFE_EQUIVALENT: 125
+- SAFE_EQUIVALENT: 124
 
 ### By source
 
@@ -246,7 +246,7 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 
 ## Terminal gate rows (SAFE_EQUIVALENT / OPERATOR_ONLY)
 
-### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (125)
+### SAFE_EQUIVALENT — Qubit-safe equivalents (closed; unsafe raw behavior explicitly refused) (124)
 
 | id | source | needs | capability | proving test |
 | --- | --- | --- | --- | --- |
@@ -294,7 +294,6 @@ Machine-generated from `docs/generated/QUBIT_GAP_LEDGER.*.json`. This merged rep
 | `api:POST /api/local-models/runtime/install` | hermes | hardware | POST /api/local-models/runtime/install | tests/test_local_models8u.py::test_confirmation_gate_precedes_broker |
 | `api:POST /api/local-models/server` | hermes | hardware | POST /api/local-models/server | tests/test_local_models8u.py::test_estop_latches_writes |
 | `api:POST /api/local-models/sideload` | hermes | hardware | POST /api/local-models/sideload | tests/test_local_models8u.py::test_every_write_is_a_typed_gate_and_writes_nothing |
-| `api:POST /api/mcp/catalog/install` | hermes | owner | POST /api/mcp/catalog/install | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/memory/providers/{provider}/oauth/start` | hermes | creds | POST /api/memory/providers/{provider}/oauth/start | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/ops/import-upload` | hermes | owner | POST /api/ops/import-upload | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
 | `api:POST /api/profiles/import` | hermes | owner | POST /api/profiles/import | tests/test_qubit_routes_parity8u.py::test_every_gated_route_is_typed |
