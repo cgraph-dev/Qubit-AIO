@@ -673,11 +673,14 @@ class VoiceEditService:
                 if not base.is_dir():
                     continue
                 parts = []
-                for name in ("USER.md", "MEMORY.md"):
+                # Bound the per-turn prompt: identity facts (USER.md) plus a
+                # short MEMORY.md slice — enough to ground the answer without
+                # paying prompt-processing latency for the whole file.
+                for name, cap in (("USER.md", 1500), ("MEMORY.md", 800)):
                     f = base / name
                     if f.is_file():
                         parts.append(f.read_text(
-                            encoding="utf-8", errors="replace")[:4000])
+                            encoding="utf-8", errors="replace")[:cap])
                 if parts:
                     return "\n\n".join(parts)
         except Exception:  # noqa: BLE001 - additive, never fatal
@@ -720,9 +723,9 @@ class VoiceEditService:
             try:
                 recent_n = int(_read_cfg(self.cfg, "voice_edit",
                                          "voice_recent_turns",
-                                         default=10) or 10)
+                                         default=4) or 4)
             except (TypeError, ValueError):
-                recent_n = 10
+                recent_n = 4
             recent_n = max(2, min(recent_n, 40))
             recent = msgs[-recent_n:]
             older = msgs[:-recent_n]
@@ -821,11 +824,20 @@ class VoiceEditService:
             # for a fuller answer. A per-turn style hint discourages repeating
             # stock openers/closers.
             max_tokens, reasoning, style = self._style_for(question)
+            # Simple chat runs on the fast small model (default brain); an
+            # explicit "explain/in detail/report" gets the stronger 4B for
+            # quality. Both are local; `voice_edit.detail_model` overrides.
+            model_override = ""
+            if reasoning == "medium":
+                model_override = str(_read_cfg(
+                    self.cfg, "voice_edit", "detail_model",
+                    default="qubit-spark4") or "")
             ctx = self._personal_context()
             if style:
                 ctx = f"{ctx}\n\nSTYLE: {style}" if ctx else f"STYLE: {style}"
             res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
+                              model=model_override,
                               max_tokens=max_tokens,
                               timeout_s=30.0,
                               reasoning=reasoning,

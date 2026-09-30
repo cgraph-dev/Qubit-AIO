@@ -81,7 +81,7 @@ class HelperClient:
         req.add_header("Content-Type", "application/json")
         if self.token:
             req.add_header("X-Api-Token", self.token)
-            req.add_header("X-Hermes-Session-Token", self.token)
+            req.add_header("X-Qubit-Session-Token", self.token)
         try:
             with self._opener(req, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8", "replace")
@@ -1008,8 +1008,19 @@ class DesktopHelper:
         if not spoken:
             self._speak(reply)
 
+    @staticmethod
+    def _spoken_excerpt(text: str, sentences: int = 2) -> str:
+        """First ``sentences`` sentences only — TTS time scales with length, so
+        speak the gist and keep the full text in the panel/history."""
+        import re
+        t = " ".join(str(text or "").split())
+        if not t:
+            return ""
+        parts = re.split(r"(?<=[.!?])\s+", t)
+        return " ".join(parts[:max(1, sentences)]).strip()
+
     def _speak(self, text: str) -> None:
-        """Speak ``text`` through the service's TTS, played locally.
+        """Speak the gist of ``text`` through the service's TTS, locally.
 
         Best-effort and non-fatal: a TTS/playback failure never changes the
         answer that was already shown. Disable with ``voice_edit.speak_answers``.
@@ -1021,8 +1032,11 @@ class DesktopHelper:
         import shutil
         import subprocess
         import tempfile
+        spoken = self._spoken_excerpt(text)
+        if not spoken:
+            return
         try:
-            wav = self.client.speak(str(text)[:600])
+            wav = self.client.speak(spoken[:400])
         except HelperError as exc:
             _trace("speak_error", code=exc.code)
             return
