@@ -3480,6 +3480,30 @@ def _platform_env_payload(entry: Dict[str, Any], refs: Dict[str, str],
     return rows
 
 
+def _live_gateway_platform_state(platform_id: str) -> Optional[str]:
+    """Live per-platform state from the daemon's own ``gateway_state.json``.
+
+    Read-only via :mod:`voicebridge.gateway_supervisor` (the daemon wrote the
+    file; reporting it is first-party evidence). ``None`` when the runtime is
+    absent/unreadable or the platform is unlisted — never a fabricated state.
+    """
+    try:
+        from . import gateway_supervisor as GS
+        record = GS.daemon_runtime_status()
+    except Exception:
+        return None
+    if not isinstance(record, dict):
+        return None
+    platforms_map = record.get("platforms_map")
+    if not isinstance(platforms_map, dict):
+        return None
+    entry = platforms_map.get(str(platform_id))
+    if not isinstance(entry, dict):
+        return None
+    state = str(entry.get("state") or entry.get("status") or "").strip().lower()
+    return state or None
+
+
 def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
                       accounts: List[Dict[str, Any]], gateway_running: bool
                       ) -> Dict[str, Any]:
@@ -3495,6 +3519,17 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
     ref_complete = (all(refs.get(k) for k in required) if required
                     else bool(refs))
     configured = bool(ref_complete or account_ok)
+    if not configured and gateway_running:
+        # Gateway-owned transports (WhatsApp QR bridge, bot platforms) prove
+        # themselves in the daemon's own gateway_state.json. The overlay store
+        # only knows credential *references* saved via CONFIGURE, so a channel
+        # paired outside it (QR scan) would otherwise read "not configured"
+        # while actually connected. The daemon's verdict is live first-party
+        # evidence, never fabricated here.
+        if _live_gateway_platform_state(pid) == "connected":
+            configured = True
+            link = {"state": "LINKED", "platform": pid,
+                    "detail": "live gateway reports connected"}
     store_enabled = rec.get("enabled")
     if isinstance(store_enabled, bool):
         enabled = store_enabled

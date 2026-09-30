@@ -252,6 +252,13 @@ export default function ChannelsPage() {
 
   const handleToggle = async (platform: MessagingPlatform) => {
     const next = !platform.enabled;
+    if (next && platform.id === "whatsapp" && !platform.configured) {
+      const ok = await askBrokerConfirm(
+        `Enable ${platform.name}`,
+        `WhatsApp isn't paired yet. Enabling is safe — the gateway stays up — but it won't connect until you use Pair with QR.\n\nEnable ${platform.name} anyway?`,
+      );
+      if (!ok) return;
+    }
     setTogglingId(platform.id);
     try {
       await api.updateMessagingPlatform(

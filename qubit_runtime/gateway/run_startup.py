@@ -1275,6 +1275,23 @@ class GatewayStartupMixin:
             logger.warning("\u2717 %s failed to connect", platform.value)
             # A failed connect() may have allocated ClientSessions / poll tasks / subprocesses.
             await self._safe_adapter_disconnect(adapter, platform)
+            if getattr(adapter, "fatal_error_code", None) == "whatsapp_not_paired":
+                # Owner decision, option 2 (2026-09-30): an enabled-but-unpaired
+                # WhatsApp must not park the gateway (exit 78 needs terminal
+                # recovery). Stay alive and queue it like a transient failure:
+                # pairing writes creds.json and the reconnect watcher picks it
+                # up with no restart. The platform reads "retrying" in runtime
+                # status until then.
+                logger.warning(
+                    "WhatsApp is enabled but not paired — staying up without "
+                    "it (pair from the dashboard or run `qubit whatsapp`); %s",
+                    adapter.fatal_error_message)
+                self._startup_queue_transient_failure(
+                    platform, adapter, platform_config,
+                    adapter.fatal_error_message or "whatsapp not paired",
+                    startup_retryable_errors,
+                )
+                continue
             if not adapter.has_fatal_error:
                 # No fatal error info means likely a transient issue -- queue for retry
                 self._startup_queue_transient_failure(
