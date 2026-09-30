@@ -85,3 +85,6 @@ build/
 coverage/
 htmlcov/
 .frontend-build/
+
+# Private/operator backup: runtime state + credentials — NEVER commit
+_private_backup/

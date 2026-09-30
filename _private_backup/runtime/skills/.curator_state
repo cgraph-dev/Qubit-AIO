@@ -1,9 +1,0 @@
-{
-  "last_report_path": "/home/trick/.local/state/qubit-voicebridge/runtime/logs/curator/20260928-000438",
-  "last_run_at": "2026-09-28T00:04:38.087508+00:00",
-  "last_run_duration_seconds": 10.383188,
-  "last_run_summary": "auto: 16 marked stale, 8 archived, 2 reactivated; llm: skipped (consolidation off)",
-  "last_run_summary_shown_at": "2026-09-20T23:38:40.894134+00:00",
-  "paused": false,
-  "run_count": 5
-}
