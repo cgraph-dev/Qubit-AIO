@@ -110,3 +110,28 @@ def test_install_registers_transport_and_refs_without_echo(tmp_path,
                                      "env:ASANA_CLIENT_SECRET"}
     assert seen["fields"]["transport"] == "http"
     assert "sekret456" not in str(out) and "cid123" not in str(out)
+
+
+def test_install_inlines_non_secret_url_template(tmp_path, monkeypatch):
+    from voicebridge import mcp_servers as MS
+    from voicebridge import env_store as ES
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(ES, "write_secret",
+                        lambda c, n, v: {"name": n})
+    seen = {}
+
+    def _fake_upsert(cfg_, name, fields, confirmed=False):
+        seen.update({"name": name, "fields": dict(fields)})
+        return {"state": "OK", "server": {"name": name}}
+
+    monkeypatch.setattr(MS, "upsert", _fake_upsert)
+    code, out = HC.dispatch(
+        cfg, "POST", "/api/mcp/catalog/install", {},
+        {"name": "n8n-official",
+         "env": {"N8N_MCP_SERVER_URL": "https://n8n.example.com/mcp"},
+         "confirm": True})
+    assert code == 200, out
+    assert seen["fields"]["url"] == "https://n8n.example.com/mcp", seen
+    assert "${" not in seen["fields"]["url"]
