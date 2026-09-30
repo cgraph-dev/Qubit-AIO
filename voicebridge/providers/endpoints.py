@@ -232,6 +232,13 @@ def _persist_runtime_model(cfg: Any, *, provider: str, model: str,
     The reference writes ``cfg["model"]`` and saves ``config.yaml``; Qubit's
     vendored TUI / ``configured_default_model`` read the same slot. Only a
     credential *reference* is ever written (``key_env``), never a raw key.
+
+    One writer rule: the node is rebuilt from scratch on every write, with
+    BOTH the ``model`` key (Qubit readers) and the ``default`` key (the
+    vendored picker context reads ``default``, never ``model``). Merging
+    instead once produced a Frankenstein slot (``model: spark17`` +
+    ``default: muse`` + a stale ``base_url``) that made the picker show two
+    CURRENT providers at once.
     """
     try:
         from .. import qubit_runtime
@@ -246,7 +253,8 @@ def _persist_runtime_model(cfg: Any, *, provider: str, model: str,
             loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
                 data = loaded
-        node: Dict[str, Any] = {"provider": provider, "model": model}
+        node: Dict[str, Any] = {"provider": provider, "model": model,
+                                "default": model}
         if base_url:
             node["base_url"] = base_url
         if key_ref:

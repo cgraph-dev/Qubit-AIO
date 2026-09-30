@@ -1972,3 +1972,41 @@ switching; no skips, everything must pass.
   `test_overlay_regressions` 11/11, consistency/n29 green. Combined sweep
   **149 passed / 0 failed / 0 skipped**. Service restarted; live `/status`
   + `/model/info` verified above; `/chat` 200; `:9119` untouched.
+
+## 2026-09-30 — skills/MCP usability fix (Tricky: "everything works in Hermes, Qubit must too")
+- **Skills audit:** 194 listed / 265 SKILL.md on disk (surplus = `.archive` + variants). 27 script refs missing on disk triaged with context: 12 false positives (upstream-repo commands: simpo/torchtitan/SAM/research-paper template/skill-authoring website script; finance `recalc.py` = excel-author's, which exists), 15 resolved for real.
+- **Stale `openclaw-voice-bridge` executable paths fixed** (repo moved to `qubit-voicebridge`; state/config old paths already work via Sep-7 symlinks): social-inbox-check, perplexity-web-search, professional-reporting, qubit-voice-mode, qubit-voice-bridge SKILL.md (project path, web_search template, 8× dead `openclaw-voice-bridge.service` refs → live `qubit-voicebridge.service`, systemd template name, gateway-dep claim corrected to `After=network.target ollama.service` per live unit).
+- **Bridge scripts:** `scripts/perplexity_search.py` created (copy of skill's real CDP implementation + clean exit-2 when CDP down); `web_search.py` resolves bridge-local first, Hermes fallback. Venv gained `websocket-client` + `ddgs` (skill promised both). Live verified: web_search DDG 1.1s, generate_report saved real report, weather live Bucharest 18°C, review_gmail rc=0.
+- **hamelnb cloned** to `~/.agent-skills/hamelnb` (jupyter-live-kernel skill's documented setup). **CLIs installed:** `ddgs` (uv tool), `op` 2.39.0 (~/.local/bin), `qmd` 2.8.3 (npm global, symlinked into ~/.local/bin).
+- **MCP registry 4 → 9 servers, 7 INVOCABLE** (all live `tools/list` probed): +context7 (2 tools), +openai-docs (5), +pixellab (95, auth `env:PIXELLAB_API_TOKEN`, allowlist capped at 64 by design), +playwright (25, stdio), +qubit-graft (repo scope, mirrors Hermes), deepwiki allowlist persisted (3). airtable/vercel stay OPERATOR_ONLY — OAuth needs the owner in dashboard/`mcporter auth`.
+- Not committed (repo files: `M scripts/web_search.py`, `?? scripts/perplexity_search.py`); no test sweep per implementation-first cadence.
+
+## 2026-09-30 — skill CLI gaps closed + Perplexity API verified
+- Installed: `sherlock-project`, `scrapling` (+scrapling-mcp), `pygount` (uv tool); `songsee`, `blogwatcher-cli` (go install); `xurl` (npm); `openhue` 0.24 (release tarball — skill's documented curl URL 404s, asset is `openhue_Linux_x86_64.tar.gz`); `@box/cli` under `$QUBIT_HOME/tools/box-cli` per skill. Full-matrix rescan: only macOS-only ×5 (platform-impossible), blender-mcp (needs app open), and creds-at-use-time skills remain.
+- Perplexity API key (keys page → runtime `.env`): live `sonar` call HTTP 200, correct echo. Key never printed.
+
+## 44. Runtime-slot single convention — picker shows one current — 2026-09-30
+
+**No milestone claimed.** Owner-approved fix for the double-CURRENT dialog.
+
+- **Root cause.** Two key conventions shared one dict in the runtime
+  `config.yaml` `model` slot: vendored readers use the `default` key,
+  Qubit's mirror wrote the `model` key, and nobody cleared stale keys —
+  successive switches merged into
+  `{provider: opencode-go, model: spark17, default: muse, base_url: …}`,
+  so the dialog's top line said muse while the resolver said spark17 and
+  two providers showed CURRENT.
+- **Fix.** `_persist_runtime_model` rebuilds the node from scratch on every
+  write with BOTH keys set to the same value (+ `base_url`/`key_env` only
+  when truthy). Live slot cleaned to
+  `{provider: ollama, model: spark17, default: spark17}`; options now
+  report top `ollama/qubit-spark17` with a single CURRENT row.
+- **Connect badge (investigated, server healthy).** The stuck `connecting`
+  badge is not a dead backend: `/api/events/stream` replays, the
+  browser-equivalent `POST /api/qubit/chat/stream` turns spark17 live
+  (`STREAMPATH_OK`), options/info/ticket all answer. The tab lived through
+  four restarts + two bundle rebuilds — reload the page (fresh `no-store`
+  shell + new asset hashes); if the badge persists, send the browser
+  console error text.
+- **Evidence.** 28 passed across ollama/follow/repair; service restarted;
+  `/chat` 200; `:9119` untouched.

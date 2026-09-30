@@ -109,3 +109,26 @@ def test_local_activation_mirrors_runtime_slot(tmp_path, monkeypatch):
     runtime_cfg = qubit_runtime.runtime_home_for_cfg(cfg) / "config.yaml"
     text = runtime_cfg.read_text(encoding="utf-8")
     assert "qubit-spark4" in text and "ollama" in text
+
+
+def test_runtime_slot_uses_single_key_convention(tmp_path, monkeypatch):
+    import yaml
+
+    from voicebridge import qubit_runtime
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    # A stale Frankenstein slot (mixed keys from successive switches) is
+    # rebuilt from scratch: one convention, no leftovers.
+    path = qubit_runtime.runtime_home_for_cfg(cfg) / "config.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(
+        {"model": {"provider": "opencode-go", "model": "qubit-spark17",
+                   "default": "muse-spark-1.3-contributor",
+                   "base_url": "https://opencode.ai/zen/go/v1"}}),
+        encoding="utf-8")
+    assert EP._persist_runtime_model(
+        cfg, provider="ollama", model="qubit-spark17",
+        base_url="", key_ref="") is True
+    node = yaml.safe_load(path.read_text(encoding="utf-8"))["model"]
+    assert node == {"provider": "ollama", "model": "qubit-spark17",
+                    "default": "qubit-spark17"}, node
