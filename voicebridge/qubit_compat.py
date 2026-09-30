@@ -1394,6 +1394,33 @@ def _terminal_session_model(cfg: Any) -> Optional[str]:
         return None
 
 
+def _picker_context_with_session_pin(cfg: Any) -> Any:
+    """The vendored picker context with the canonical session's model pinned.
+
+    Same one-model authority as :func:`h_model_info`: the ``/chat`` terminal
+    resumes its canonical session and honours that session's stored model, so
+    the picker must report the same effective model (a registered profile id
+    resolves to its model/provider). Without a stored session model the
+    configured context is returned unchanged.
+    """
+    from qubit_cli.inventory import load_picker_context  # type: ignore
+
+    ctx = load_picker_context()
+    sess_model = _terminal_session_model(cfg)
+    if not sess_model:
+        return ctx
+    try:
+        from .providers import resolver as _R
+
+        prof = _R.get_profile(cfg, sess_model)
+    except Exception:  # noqa: BLE001 - reporting must never raise
+        prof = None
+    if prof is not None:
+        return ctx.with_overrides(current_provider=prof.provider,
+                                  current_model=prof.model)
+    return ctx.with_overrides(current_model=sess_model)
+
+
 def _model_auto_context(provider: str, model: str, base_url: str = "") -> int:
     """Auto-detected context window (config override ignored), or 0 if unknown.
 
@@ -1515,13 +1542,13 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """
     try:
         _vendored_runtime(cfg)
-        from qubit_cli.inventory import build_model_options_payload, load_picker_context  # type: ignore
+        from qubit_cli.inventory import build_model_options_payload  # type: ignore
 
         def _truthy(value: Any) -> bool:
             return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
         payload = build_model_options_payload(
-            load_picker_context(),
+            _picker_context_with_session_pin(cfg),
             explicit_only=_truthy(q.get("explicit_only")),
             include_unconfigured=_truthy(q.get("include_unconfigured")),
             refresh=_truthy(q.get("refresh")),

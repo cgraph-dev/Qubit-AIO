@@ -327,13 +327,15 @@ def test_branding_verify_reports_partial_and_planned(tmp_path):
     v = P.branding_verify(cfg, repo=repo)
     assert v["state"] in ("PLANNED", "PARTIAL")
     assert v["files_remaining"]
-    # migrate only pyproject -> PARTIAL
-    (repo / "pyproject.toml").write_text(
-        (repo / "pyproject.toml").read_text().replace(
-            'name = "openclaw-voice-bridge"', 'name = "qubit-voicebridge"'))
+    # migrate only pyproject -> PARTIAL. Mirror the product's real per-file
+    # migration semantics: branding_plan rewrites every old-name occurrence in
+    # the file (generic token fallback), not merely the `name = ...` literal.
+    pp = repo / "pyproject.toml"
+    pp.write_text(pp.read_text().replace(P.OLD_NAME, P.NEW_NAME))
     v2 = P.branding_verify(cfg, repo=repo)
     assert v2["state"] == "PARTIAL"
     assert "pyproject.toml" not in v2["files_remaining"]
+    assert v2["files_remaining"], "other files remain on the old name"
 
 
 def test_branding_historical_ref_reported_but_does_not_fail(tmp_path):
@@ -609,12 +611,20 @@ def test_api_profiles_requires_auth(tmp_path, monkeypatch):
 def test_api_profiles_list_and_show(tmp_path, monkeypatch):
     ui, _, _ = _make_ui(tmp_path, monkeypatch)
     try:
+        # `/api/profiles` is the canonical reference profiles registry (agent
+        # profiles), reconciled onto qubit_cli/profiles.py; on a fresh registry
+        # the `default` profile is active. Assert the registry relationship
+        # (active id == its brain, present in the list), not a provider-manifest
+        # snapshot.
         st, body = _get(ui, "/api/profiles")
         assert st == 200
-        assert body["active"]["brain"] == "qubit-brain4"
+        active = body["active"]
+        assert active["id"] == "default"
+        assert active["brain"] == active["id"]
+        assert any(p["name"] == active["id"] for p in body["profiles"])
         st, body = _get(ui, "/api/profiles?kind=brain")
         assert st == 200
-        assert body["active"]["id"] == "qubit-brain4"
+        assert body["active"]["id"] == active["id"]
     finally:
         ui.stop()
 

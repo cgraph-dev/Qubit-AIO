@@ -1,0 +1,107 @@
+{
+  "bundle_hash": "sha256:0b68ee6523996f35ab30cbf86f9187610a7b44b8034f447729a43d125ff0bb1b",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/flash-attention",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 36,
+      "match": "pip install flash-attn --no-build-isolation",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 69,
+      "match": "pip install --upgrade torch",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 157,
+      "match": "pip install flash-attn --no-build-isolation",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 257,
+      "match": "FA3 is NOT included in `pip install flash-attn`. Build it from the `hopper/` subdirectory:",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 309,
+      "match": "pip install flash-attn --no-build-isolation",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 315,
+      "match": "pip install flash-attn --no-build-isolation",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 260,
+      "match": "git clone https://github.com/Dao-AILab/flash-attention.git",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/transformers-integration.md",
+      "line": 28,
+      "match": "pip install transformers>=4.36",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/transformers-integration.md",
+      "line": 29,
+      "match": "pip install flash-attn --no-build-isolation",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/transformers-integration.md",
+      "line": 249,
+      "match": "pip install flash-attn --no-build-isolation",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "git_clone",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:47.632527+00:00",
+  "summary": "flash-attention: safe \u2014 10 finding(s) in supply_chain",
+  "fresh": true
+}

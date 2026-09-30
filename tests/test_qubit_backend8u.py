@@ -23,7 +23,19 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 FORK = REPO / "qubit_runtime"
-PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
+# The vendored pin is owned by the manifest, not the test: read the revision
+# from the canonical provenance manifest (mirroring
+# voicebridge.qubit_runtime.manifest_path(), with the frozen archive as the
+# read-only fallback). Never hardcode the pin here — a pin move (owner
+# decisions #14/#15) must not require editing this test.
+_MANIFEST = REPO / "docs" / "generated" / "QUBIT_HERMES_VENDOR_MANIFEST.json"
+_ARCHIVE_MANIFEST = (REPO / "docs" / "archive" / "2026-09-21"
+                     / "QUBIT_HERMES_VENDOR_MANIFEST.json")
+
+
+def _manifest_revision() -> str:
+    mf = _MANIFEST if _MANIFEST.is_file() else _ARCHIVE_MANIFEST
+    return json.loads(mf.read_text(encoding="utf-8"))["upstream_revision"]
 
 
 def _free_port() -> int:
@@ -67,7 +79,8 @@ def test_backend_status_is_real_fork_app():
     assert out["title"] == "Qubit Agent"
     assert out["routes"] > 0
     assert out["start_server"] is True
-    assert out["upstream_revision"] == PIN
+    assert out["upstream_revision"] == _manifest_revision()
+    assert out["upstream_revision"], "manifest must record the vendored pin"
 
 
 def test_backend_app_is_from_the_fork():

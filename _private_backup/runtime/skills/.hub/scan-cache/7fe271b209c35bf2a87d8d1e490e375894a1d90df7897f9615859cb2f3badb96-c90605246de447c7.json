@@ -1,0 +1,13 @@
+{
+  "bundle_hash": "sha256:7fe271b209c35bf2a87d8d1e490e375894a1d90df7897f9615859cb2f3badb96",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/creative/creative-ideation",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [],
+  "rules": [],
+  "scanned_at": "2026-09-23T02:50:39.579272+00:00",
+  "summary": "creative-ideation: clean scan, no threats detected",
+  "fresh": true
+}

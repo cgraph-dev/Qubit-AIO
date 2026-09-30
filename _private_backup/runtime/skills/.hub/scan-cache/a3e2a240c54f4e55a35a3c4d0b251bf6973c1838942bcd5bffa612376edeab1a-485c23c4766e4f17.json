@@ -1,0 +1,53 @@
+{
+  "bundle_hash": "sha256:a3e2a240c54f4e55a35a3c4d0b251bf6973c1838942bcd5bffa612376edeab1a",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/tensorrt-llm",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 48,
+      "match": "# pip install (current stable GA)",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 49,
+      "match": "pip install tensorrt_llm",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "docker_pull",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 46,
+      "match": "docker pull nvcr.io/nvidia/tensorrt-llm/release:x.y.z",
+      "description": "pulls a Docker image at runtime"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/optimization.md",
+      "line": 208,
+      "match": "pip install tensorrt_llm[benchmark]",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "docker_pull",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:54.737483+00:00",
+  "summary": "tensorrt-llm: safe \u2014 4 finding(s) in supply_chain",
+  "fresh": true
+}

@@ -42,11 +42,17 @@ def _self(cfg, *, key=None, conversation=""):
     s.cfg = cfg
     for name in ("_deepseek_model_name", "_perplexity_model_name",
                  "_cloud_egress_allowed", "_chat_deepseek",
-                 "_chat_deepseek_stream", "_chat_perplexity"):
+                 "_chat_deepseek_stream", "_chat_perplexity",
+                 "_voice_conv_prompt"):
         setattr(s, name, getattr(VoiceOrchestrator, name).__get__(s))
     if key is not None:
         s._deepseek_key = lambda: key
         s._perplexity_key = lambda: key
+    # ``_voice_conv_prompt`` reads the canonical chat store first and falls
+    # back to the per-request snapshot / ``conversation``; stub the two
+    # runtime lookups so the real method is still the one under test.
+    s._voice_store = lambda: None
+    s._cur_ctx = lambda: None
     s.conversation = type("Conv", (), {
         "as_prompt": lambda self: conversation})()
     return s

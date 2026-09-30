@@ -328,6 +328,51 @@ DEFAULTS: Dict[str, Any] = {
             "auto_gain_control": True,
         },
     },
+    # System-wide voice typing / selected-text editing (the desktop helper and
+    # the /voice-edit surface). The defaults mirror
+    # ``voicebridge/voice_edit/settings.py`` so a config that omits the node
+    # resolves to the same values the settings view reports. Low-risk scalars
+    # only; ``enabled`` is the feature flag (`feature_flags` declares
+    # ("voice_edit", "enabled") -> False).
+    "voice_edit": {
+        "enabled": False,
+        "routing": "auto",                 # auto | local | api
+        "local_profile": "qubit-brain4",
+        "api_profile": "",
+        "allow_api": True,
+        "confirm_before_replace": True,
+        "auto_send": False,
+        "insertion_method": "clipboard_paste",
+        "default_action": "clarify",
+        "asr_device": "",
+        "stt_engine": "",
+        "stt_mode": "accurate",            # streaming | accurate
+        "stt_model": "small",              # tiny | base | small | medium | large-v3
+        "router": "deterministic",         # deterministic | brain
+        "hotkey_mode": "hold",
+        "request_ttl_s": 300.0,
+        "brain_router": True,
+        "brain_timeout_s": 4.0,
+        "block_fullscreen": True,
+        "beep": True,
+        "debug_log": False,
+        "mic_gain": 6.0,
+        "mic_target_peak": 0.5,
+        "release_tail_ms": 500,
+        "noise_suppression": False,
+        "disable_key_repeat": True,
+        "answer_questions": True,
+        "text_commands": False,
+        "capture_source": "auto",          # auto | raw | aec
+        "wake": {
+            "enabled": False,
+            "phrase": "hey qubit",
+            "silence_ms": 900,
+            "rms_gate": 0.0018,
+            "engine": "auto",              # auto | kws | asr
+            "kws_threshold": 0.25,
+        },
+    },
     "audio": {
         "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default
         "output_device_name": "",   # more robust: match by name substring (e.g. "ALC892 Analog")

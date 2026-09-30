@@ -671,7 +671,18 @@ class VoiceOrchestrator:
         Runs before TTS so the sherpa-onnx ORT (and its CUDA provider) is
         initialised before piper-tts imports the Python ``onnxruntime``; see the
         call site for why the order matters. Never fatal.
+
+        ``QUBIT_STT_PREWARM`` (env) disables it for short-lived processes (the
+        test suite): a background load still touching CUDA at interpreter
+        teardown aborts the process natively. The long-lived service leaves the
+        var unset and keeps warming the first utterance. The ``_stt_prewarmed``
+        marker also stops :meth:`WebUI._prewarm_stt` from repeating the load on
+        a second background thread.
         """
+        from .asr.streaming import prewarm, prewarm_env_disabled
+        self._stt_prewarmed = True
+        if prewarm_env_disabled():
+            return
         try:
             policy = self.cfg.get("asr", "prewarm", default="auto")
         except Exception:
@@ -679,7 +690,6 @@ class VoiceOrchestrator:
         if policy in (False, "false", "off", "none", ""):
             return
         try:
-            from .asr.streaming import prewarm
             engine = None if policy in (True, "true", "auto") else str(policy)
             result = prewarm(self.cfg, engine)
             log_event("stt.prewarm", ok=bool(result.get("ok")),

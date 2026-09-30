@@ -35,7 +35,8 @@ def _start(tmp_path):
     state = tmp_path / "state"
     state.mkdir(exist_ok=True)
     p = tmp_path / "voice.yaml"
-    p.write_text(f"logging:\n  jsonl_path: '{state}'\nwebui:\n  token: test-token\n")
+    p.write_text(f"logging:\n  jsonl_path: '{state}'\n"
+                 f"asr:\n  prewarm: false\nwebui:\n  token: test-token\n")
     cfg = Config.load(p)
 
     class _FakeOrch:

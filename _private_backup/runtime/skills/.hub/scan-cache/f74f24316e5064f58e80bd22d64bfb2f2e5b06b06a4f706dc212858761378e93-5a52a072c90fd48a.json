@@ -1,0 +1,137 @@
+{
+  "bundle_hash": "sha256:f74f24316e5064f58e80bd22d64bfb2f2e5b06b06a4f706dc212858761378e93",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/modal",
+  "verdict": "caution",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "python_os_environ",
+      "severity": "high",
+      "category": "exfiltration",
+      "file": "SKILL.md",
+      "line": 241,
+      "match": "token = os.environ[\"HF_TOKEN\"]",
+      "description": "accesses os.environ outside comments/docstrings (potential env dump)"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "SKILL.md",
+      "line": 62,
+      "match": "return subprocess.run([\"nvidia-smi\"], capture_output=True, text=True).stdout",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 48,
+      "match": "pip install modal",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "python_environ_get_secret",
+      "severity": "medium",
+      "category": "exfiltration",
+      "file": "references/troubleshooting.md",
+      "line": 371,
+      "match": "value = os.environ.get(\"KEY\")  # Use get() to handle missing",
+      "description": "reads secret via os.environ.get() (normal API-key access; informational)"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "references/troubleshooting.md",
+      "line": 158,
+      "match": "result = subprocess.run([\"nvidia-smi\"], capture_output=True, text=True)",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "references/troubleshooting.md",
+      "line": 458,
+      "match": "print(subprocess.run([\"nvidia-smi\"], capture_output=True, text=True).stdout)",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "references/troubleshooting.md",
+      "line": 459,
+      "match": "print(subprocess.run([\"pip\", \"list\"], capture_output=True, text=True).stdout)",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 24,
+      "match": "**Error**: `pip install modal` fails",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 29,
+      "match": "pip install --upgrade pip",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 32,
+      "match": "python3.11 -m pip install modal",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/troubleshooting.md",
+      "line": 35,
+      "match": "pip install modal --prefer-binary",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "exec_string",
+      "severity": "high",
+      "category": "obfuscation",
+      "file": "references/advanced-usage.md",
+      "line": 478,
+      "match": "result = sandbox.exec(\"python\", \"-c\", \"print('Hello from sandbox')\")",
+      "description": "exec() with string argument"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "references/advanced-usage.md",
+      "line": 60,
+      "match": "subprocess.run([\"python\", \"-m\", \"torch.distributed.launch\", \"train.py\"])",
+      "description": "Python subprocess execution"
+    }
+  ],
+  "rules": [
+    "exec_string",
+    "python_environ_get_secret",
+    "python_os_environ",
+    "python_subprocess",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:49.751162+00:00",
+  "summary": "modal: caution \u2014 13 finding(s) in execution, exfiltration, obfuscation, supply_chain",
+  "fresh": true
+}

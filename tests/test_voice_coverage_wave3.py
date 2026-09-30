@@ -179,7 +179,15 @@ def test_ledger_voice_unsupported_rows_are_registered():
 
 # --------------------------------------------------------- 3. alias parity
 def test_every_alias_resolves_to_its_own_production_entry():
-    """No alias may silently route to a different backend than its entry."""
+    """No alias may silently route to a *different backend* than its entry.
+
+    A handful of display aliases intentionally exist twice: the legacy ``_E``
+    entry and its newer CLI-family bridge ``_CB`` entry share one backend and
+    the bridge wins by design (``tests/test_voice_cli_family_bridges_wave13.py``
+    pins ``"qubit ghost list" -> cli_ghost_list`` and
+    ``"qubit verified skills" -> cli_verified_list``). What must never happen is
+    an alias reaching a backend other than the one its entry declares.
+    """
     from voicebridge import voice_commands as VC
 
     misrouted = []
@@ -187,9 +195,16 @@ def test_every_alias_resolves_to_its_own_production_entry():
         for alias in entry.aliases:
             res = VC.resolve("qubit, " + alias)
             got = res.entry.id if res.entry is not None else None
-            if res.kind not in (VC.MATCH, VC.CLARIFY) or got != entry.id:
+            # A CLARIFY is a match on the entry itself that still needs a
+            # required argument (e.g. "search sessions" -> sessions_search);
+            # it is not a misroute. Only the resolved backend matters.
+            if res.kind not in (VC.MATCH, VC.CLARIFY) or got is None:
                 misrouted.append((entry.id, alias, res.kind, got))
-    assert not misrouted, f"aliases not bound to their entry: {misrouted}"
+                continue
+            target = VC.REGISTRY.get(got)
+            if target is not None and target.backend != entry.backend:
+                misrouted.append((entry.id, alias, res.kind, got))
+    assert not misrouted, f"aliases routing to a foreign backend: {misrouted}"
 
 
 def test_wake_word_does_not_eat_command_words():

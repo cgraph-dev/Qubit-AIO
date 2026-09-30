@@ -31,10 +31,14 @@ class FakeIntent:
 
 
 class FakeClassifier:
-    def __init__(self, kind="conversation", raises=False):
+    def __init__(self, kind="conversation", raises=False, task_score=0.0):
         self.kind = kind
         self.raises = raises
+        self.task_score = task_score
         self.calls = []
+
+    def _task_hint_score(self, text):
+        return self.task_score
 
     def classify(self, text):
         self.calls.append(text)
@@ -220,6 +224,16 @@ def test_long_system_labelled_sentence_is_not_task():
     d = router.decide("please show me the system status of everything now",
                       has_selection=False)
     assert d.mode != "task"
+
+
+def test_actionable_system_labelled_request_is_task():
+    # A real task hint (score >= 1.0) that merely contained a system keyword
+    # must still be a task, not chat.
+    router = VoiceRouter(cfg_for(),
+                         classifier=FakeClassifier("system", task_score=1.0))
+    d = router.decide("help me write a python function", has_selection=False)
+    assert d.mode == "task"
+    assert d.reason == "system_non_actionable_action"
 
 
 def test_classifier_conversation_maps_to_chat():

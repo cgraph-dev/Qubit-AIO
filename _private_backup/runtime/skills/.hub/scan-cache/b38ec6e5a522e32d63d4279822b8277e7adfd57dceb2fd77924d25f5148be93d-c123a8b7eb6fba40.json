@@ -1,0 +1,25 @@
+{
+  "bundle_hash": "sha256:b38ec6e5a522e32d63d4279822b8277e7adfd57dceb2fd77924d25f5148be93d",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/training/trl-fine-tuning",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 23,
+      "match": "pip install trl transformers datasets peft accelerate",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:56.536342+00:00",
+  "summary": "trl-fine-tuning: safe \u2014 1 finding(s) in supply_chain",
+  "fresh": true
+}

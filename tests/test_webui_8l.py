@@ -79,9 +79,10 @@ def test_every_normal_route_serves_the_spa_shell(tmp_path):
     from voicebridge.webui import qubit_alias_target
     ui, port = _start(tmp_path)
     try:
-        # root is the SPA, reached via the public /sessions route
+        # Owner Ruling 3 (Option A): the root redirects to the /chat SPA route
+        # (not /sessions). The SPA shell is then asserted per-page below.
         status, loc = _http_status_location(port, "/")
-        assert (status, loc) == (302, "/sessions"), (status, loc)
+        assert (status, loc) == (302, "/chat"), (status, loc)
         for page in PAGES:
             if page in ("/classic/", "/token-setup"):
                 continue

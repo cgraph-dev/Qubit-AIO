@@ -89,6 +89,11 @@ def _redact_served(obj: Any, _depth: int = 0,
     if _depth > _SERVED_REDACT_DEPTH:
         return "[REDACTED]"
     if isinstance(obj, str):
+        # A binary data URL (base64 audio/image) is a payload, not user text:
+        # the secret-shaped substrings base64 randomly contains must not be
+        # redacted (which also truncated long audio at the 10k text cap).
+        if obj[:5] == "data:" and ";base64," in obj[:64]:
+            return obj
         return redact_text(obj) if _SERVED_SECRET_GATE.search(obj) else obj
     if isinstance(obj, dict):
         if _path is None:
@@ -4001,6 +4006,9 @@ class WebUI:
         self._asr_lock = threading.Lock()
         self._server: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
+        # Background STT warm-up thread (owned, cancellable, joined on stop).
+        self._prewarm_thread: Optional[threading.Thread] = None
+        self._prewarm_cancel = threading.Event()
         self._pending: Dict[str, Dict[str, Any]] = {}
         self._pending_lock = threading.Lock()
         self._results: Dict[str, Dict[str, Any]] = {}
@@ -4187,22 +4195,51 @@ class WebUI:
         Loading a streaming model is a one-time cost (Moonshine ~1 s,
         Nemotron 0.6B ~8 s); doing it at startup keeps the first utterance warm
         without delaying the listener. Policy: ``asr.prewarm`` (auto|false|<engine>).
+
+        Guard rails (the suite aborted natively because an owned daemon thread
+        was mid-CUDA-load at interpreter teardown):
+
+        * ``QUBIT_STT_PREWARM`` (env) can disable it outright — the test harness
+          sets it so an embedded WebUI never loads a CUDA recognizer in a
+          short-lived process.
+        * An unreadable/missing config fails closed (skip) instead of assuming
+          ``auto`` and starting a heavy load.
+        * A precursor run (``Orchestrator.start`` warms synchronously) is not
+          repeated by a second background load.
+        * The thread is owned (``_prewarm_thread``), cancellable
+          (``_prewarm_cancel``), and joined by :meth:`stop`.
         """
+        from .asr.streaming import prewarm, prewarm_env_disabled
+        if prewarm_env_disabled():
+            return
         orch = self.orch
         if orch is None:
             return
+        # The orchestrator already warmed the recognizer synchronously during
+        # start(); a second background load is redundant (and, in tests, the
+        # only reason a CUDA load happened at all).
+        if getattr(orch, "_stt_prewarmed", False):
+            return
+        cfg = getattr(orch, "cfg", None)
+        if cfg is None:
+            return
         try:
-            policy = orch.cfg.get("asr", "prewarm", default="auto")
+            policy = cfg.get("asr", "prewarm", default="auto")
         except Exception:
-            policy = "auto"
+            return
         if policy in (False, "false", "off", "none", ""):
             return
 
+        self._prewarm_cancel.clear()
+
         def _run() -> None:
+            if self._prewarm_cancel.is_set() or prewarm_env_disabled():
+                return
             try:
-                from .asr.streaming import prewarm
                 engine = None if policy in (True, "true", "auto") else str(policy)
-                result = prewarm(orch.cfg, engine)
+                result = prewarm(cfg, engine)
+                if self._prewarm_cancel.is_set():
+                    return
                 log_event("stt.prewarm", ok=bool(result.get("ok")),
                           engine=str(result.get("engine") or engine or "auto"),
                           load_ms=result.get("load_ms"),
@@ -4210,7 +4247,9 @@ class WebUI:
             except Exception:
                 log.exception("stt prewarm failed (non-fatal)")
 
-        threading.Thread(target=_run, daemon=True, name="stt-prewarm").start()
+        self._prewarm_thread = threading.Thread(
+            target=_run, daemon=True, name="stt-prewarm")
+        self._prewarm_thread.start()
 
     def stop(self) -> None:
         # Packet 8K closure: wake and close every event-stream subscriber FIRST
@@ -4239,6 +4278,17 @@ class WebUI:
         th = getattr(self, "_thread", None)
         if th is not None and th is not threading.current_thread():
             th.join(timeout=2.0)
+        # Owned STT warm-up: signal cancellation and join so it is not still
+        # touching sherpa-onnx/CUDA after this WebUI is gone (the native abort
+        # the suite hit). Bounded: a load already inside the native call cannot
+        # be interrupted, but in the service it has completed long before stop.
+        pw = getattr(self, "_prewarm_thread", None)
+        cancel = getattr(self, "_prewarm_cancel", None)
+        if cancel is not None:
+            cancel.set()
+        if pw is not None and pw is not threading.current_thread():
+            pw.join(timeout=5.0)
+        self._prewarm_thread = None
 
     # -- public API -------------------------------------------------------
     def status(self) -> Dict[str, Any]:

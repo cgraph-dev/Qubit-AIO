@@ -17,6 +17,9 @@ sys.path.insert(0, str(REPO_ROOT))
 
 CHAT_PAGE = (REPO_ROOT / "frontend" / "qubit-web" / "src" / "pages"
              / "ChatPage.tsx")
+# The one transcription authority: the page renders its typed `error` /
+# `fallbackReason` verbatim; the error codes live in the controller/adapters.
+VOICE_LIB = REPO_ROOT / "frontend" / "qubit-web" / "src" / "lib" / "voice"
 
 
 def _cfg(tmp_path, monkeypatch):
@@ -49,12 +52,25 @@ def test_chat_page_uses_the_qubit_safe_transport():
 def test_chat_page_has_typed_states_and_persistence():
     src = CHAT_PAGE.read_text(encoding="utf-8")
     for token in ("No messages yet", "Qubit is thinking", "role=\"alert\"",
-                  "Retry", "VOICE_UNSUPPORTED", "VOICE_TIMEOUT",
+                  "Retry", "voiceError", "voiceFallback",
                   "loadTranscript", "saveTranscript"):
         assert token in src, token
     # aria-busy / role=log so the transcript is announced and the loading
     # state is machine-visible.
     assert "aria-busy" in src and 'role="log"' in src
+    # The voice failure modes are typed, never silent. The page surfaces the
+    # controller's `error` (rendered in the `role="alert"` block above) and
+    # its `fallbackReason`; the typed codes live in the one transcription
+    # authority (controller + adapters), not as disconnected literals here.
+    voice_src = "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in sorted(VOICE_LIB.glob("*.ts"))
+        if not p.name.endswith(".test.ts"))
+    for code in ("VOICE_UNSUPPORTED", "VOICE_DENIED", "VOICE_NO_SPEECH",
+                 "VOICE_STT_UNAVAILABLE", "VOICE_STT_TIMEOUT"):
+        assert code in voice_src, code
+    # A missing engine is reported as a typed fallback, never a silent switch.
+    assert "fallbackReason" in voice_src
 
 
 def test_backend_chat_turn_returns_a_real_brain4_reply(tmp_path, monkeypatch):

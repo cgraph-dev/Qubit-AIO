@@ -1,0 +1,82 @@
+{
+  "bundle_hash": "sha256:413584ec59bb16d46ae874045c21c86a200353af710a7d78436e6a2a7d3dfdf2",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/autonomous-ai-agents/grok",
+  "verdict": "dangerous",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "curl_pipe_shell",
+      "severity": "critical",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 37,
+      "match": "- The official installer `curl -fsSL https://x.ai/cli/install.sh | bash` also",
+      "description": "curl piped to shell (download-and-execute)"
+    },
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 36,
+      "match": "- **Install (preferred):** `npm install -g @xai-official/grok`",
+      "description": "npm install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 280,
+      "match": "4. **Prefer npm install over the curl installer** \u2014 `npm install -g",
+      "description": "npm install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 205,
+      "match": "terminal(command=\"REVIEW=$(mktemp -d) && git clone https://github.com/user/repo.git $REVIEW && cd $REVIEW && gh pr ch...",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "agent_config_ref",
+      "severity": "low",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 49,
+      "match": "- **Claude Code / AGENTS.md compatible with zero config** \u2014 Grok auto-reads",
+      "description": "references agent config files (informational; only modification intent is scored)"
+    },
+    {
+      "pattern_id": "agent_config_ref",
+      "severity": "low",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 50,
+      "match": "`CLAUDE.md`, `.claude/` (skills, agents, MCPs, hooks, rules), and the",
+      "description": "references agent config files (informational; only modification intent is scored)"
+    },
+    {
+      "pattern_id": "agent_config_ref",
+      "severity": "low",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 51,
+      "match": "`AGENTS.md` family. Existing project context just works.",
+      "description": "references agent config files (informational; only modification intent is scored)"
+    }
+  ],
+  "rules": [
+    "agent_config_ref",
+    "curl_pipe_shell",
+    "git_clone",
+    "unpinned_npm_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:36.950380+00:00",
+  "summary": "grok: dangerous \u2014 7 finding(s) in persistence, supply_chain",
+  "fresh": true
+}

@@ -1,0 +1,52 @@
+{
+  "bundle_hash": "sha256:2905014c3f638160bdac3bf079c912cf3a2ef2390b1624ea67ab32c73ce498f3",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/instructor",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 33,
+      "match": "pip install instructor",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 36,
+      "match": "pip install \"instructor[anthropic]\"  # Anthropic Claude",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 37,
+      "match": "pip install \"instructor[openai]\"     # OpenAI",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 38,
+      "match": "pip install \"instructor[all]\"        # All providers",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:48.998240+00:00",
+  "summary": "instructor: safe \u2014 4 finding(s) in supply_chain",
+  "fresh": true
+}

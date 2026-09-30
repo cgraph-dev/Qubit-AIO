@@ -35,10 +35,35 @@ EXIT_FAIL = 2
 EXIT_DEGRADED = 4
 
 
+def _vendored_top_level_names() -> set[str]:
+    """Top-level import names provided by the vendored Qubit runtime source
+    tree (``qubit_runtime/``). Once ``qubit_runtime.ensure_path()`` puts that
+    tree on ``sys.path`` these are local modules, never undeclared PyPI
+    dependencies. The set is derived from the tree so it cannot drift from the
+    vendored source (mirrors ``voicebridge.release._vendored_top_level_names``
+    for the installed wheel)."""
+    root = REPO / "qubit_runtime"
+    names: set[str] = set()
+    if not root.is_dir():
+        return names
+    for entry in root.iterdir():
+        if entry.is_dir():
+            if (entry / "__init__.py").is_file():
+                names.add(entry.name)
+        elif entry.suffix == ".py" and entry.name != "__init__.py":
+            names.add(entry.stem)
+    return names
+
+
 def _scan() -> tuple[list[str], list[str]]:
-    """AST dependency-contract scan (reuses config_doctor logic)."""
+    """AST dependency-contract scan (reuses config_doctor logic). Imports of
+    the vendored runtime's top-level modules are local (reached through
+    ``qubit_runtime.ensure_path()``), so they are not undeclared third-party
+    imports even though they are absent from pyproject."""
     from scripts.config_doctor import _import_scan
+    vendored = _vendored_top_level_names()
     failures, warnings = _import_scan()
+    failures = [(mod, loc) for mod, loc in failures if mod not in vendored]
     return ([f"{mod} at {loc}" for mod, loc in failures],
             [f"{mod} at {loc}" for mod, loc in warnings])
 

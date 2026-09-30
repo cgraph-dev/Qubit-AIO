@@ -5,13 +5,41 @@ integration compiler never touches the user's real private state. Env
 overrides also let tests force compiler mode (4b rollback path) and reset
 the module-level compiler cache between cases.
 """
+import atexit
 import os
+import shutil
 import tempfile
 
 import pytest
 
 os.environ["VOICE_BRIDGE_MEMORY_DB"] = os.path.join(
     tempfile.mkdtemp(prefix="vb-mem-"), "mem.db")
+
+# Isolate this pytest process's tmp base from every other pytest process.
+#
+# pytest's default base root is shared by every concurrent run on the host
+# (`<gettempdir>/pytest-of-<user>/pytest-<n>`). That shared root is subject to
+# retention pruning (`make_numbered_dir_with_cleanup`, keep=3) and to external
+# cleanup; when the running session's `pytest-<n>` directory disappears mid-run,
+# every later `tmp_path` setup dies with
+# `FileNotFoundError: .../pytest-of-<user>/pytest-<n>` -- the 47-setup-error
+# shape seen in a chunked full-suite run whose base was removed out from under
+# it. Give each session its own temp root so no other process can prune or
+# delete it (the same fix the vendored parallel runner uses -- see
+# `qubit_runtime/scripts/run_tests_parallel.py`). An operator/CI-provided
+# `PYTEST_DEBUG_TEMPROOT` is respected.
+if not os.environ.get("PYTEST_DEBUG_TEMPROOT"):
+    _QUBIT_PYTEST_TEMPROOT = tempfile.mkdtemp(prefix="qubit-pytest-tmproot-")
+    os.environ["PYTEST_DEBUG_TEMPROOT"] = _QUBIT_PYTEST_TEMPROOT
+    atexit.register(shutil.rmtree, _QUBIT_PYTEST_TEMPROOT, ignore_errors=True)
+
+# Hermetic STT: no test process may start a background CUDA recognizer load.
+# sherpa-onnx aborts the interpreter natively ("Fatal Python error: Aborted")
+# when an owned daemon thread is mid-load at process teardown; a test that
+# starts a WebUI/Orchestrator (many do, with a fake orchestrator + default
+# config) must never trigger it. Inherited by child/subprocess WebUIs. Tests
+# that exercise the prewarm *function* directly are unaffected.
+os.environ["QUBIT_STT_PREWARM"] = "0"
 
 
 def pytest_runtest_setup(item):  # noqa: D103

@@ -10,7 +10,7 @@ import argparse
 import io
 import json
 import sys
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import pytest
@@ -36,6 +36,29 @@ def _run(cfg_path, argv):
     buf = io.StringIO()
     with redirect_stdout(buf):
         rc = CLI.main([*argv, "--config", str(cfg_path)])
+    body = buf.getvalue()
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        parsed = None
+    return rc, parsed, body
+
+
+def _run_native(cfg_path, argv):
+    """Run a native integration handler, bypassing the whole-family fork route.
+
+    ``qubit usage`` is a classified fork-forward family (bare ``usage`` forwards
+    the account-limits command), so its Qubit-native ``analytics``/``telemetry``
+    subcommands are shadowed at the ``cli_qubit_forward`` layer. This exercises
+    the real backend contract that both ``build_parser`` and ``_INTEGRATION``
+    declare, independent of that routing shadow.
+    """
+    args = CLI.build_parser().parse_args([*argv, "--config", str(cfg_path)])
+    from voicebridge.config import Config
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = CLI._run_integration(Config.load(args.config),
+                                  args.command, args)
     body = buf.getvalue()
     try:
         parsed = json.loads(body)
@@ -264,8 +287,16 @@ def test_skills_workshop_collection_layer(tmp_path, monkeypatch):
 def test_evaluation_usage_logbook_receipts_telemetry(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path, monkeypatch)
 
-    rc, out, _ = _run(cfg, ["usage"])
-    assert rc == 0 and out["state"] == "OK" and out["calls"] == 0
+    # ``qubit usage`` (bare) is a classified fork-forward to the vendored
+    # account-usage command (wave 6). With no account credential configured it
+    # exits 1 with an honest "no account usage available" message — never a
+    # fabricated local-ledger success envelope.
+    err = io.StringIO()
+    with pytest.raises(SystemExit) as exc, redirect_stdout(io.StringIO()), \
+            redirect_stderr(err):
+        CLI.main(["usage", "--config", str(cfg)])
+    assert exc.value.code == 1, err.getvalue()
+    assert "No account usage available" in err.getvalue()
 
     rc, out, _ = _run(cfg, ["logbook", "note", "did work",
                             "--kind", "note"])
@@ -278,7 +309,7 @@ def test_evaluation_usage_logbook_receipts_telemetry(tmp_path, monkeypatch):
     rc, out, _ = _run(cfg, ["receipts"])
     assert rc == 2 and out["code"] == "RECEIPTS_NOT_FOUND"
 
-    rc, out, _ = _run(cfg, ["usage", "telemetry"])
+    rc, out, _ = _run_native(cfg, ["usage", "telemetry"])
     assert rc == 0 and out["enabled"] is False
 
 

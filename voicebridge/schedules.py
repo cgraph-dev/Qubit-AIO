@@ -1591,6 +1591,14 @@ def _contract_dispatch(cfg: Any, task_text: str, *, session: str,
         if isinstance(result, dict):
             return result
         return {"state": "OK", "code": "OK", "detail": str(result)[:300]}
+    if out.get("state") == "failed":
+        # The broker envelope folds every non-executed outcome into ``failed``;
+        # the backend's own typed result (carried on the receipt) keeps the
+        # distinction between a directive FAILED and an unavailable runtime.
+        # Return it so a bad directive is not relabelled UNAVAILABLE.
+        result = (out.get("receipt") or {}).get("result")
+        if isinstance(result, dict) and result.get("state"):
+            return result
     return {"state": "UNAVAILABLE",
             "code": str(out.get("code")
                         or "SCHEDULE_DISPATCH_UNAVAILABLE"),

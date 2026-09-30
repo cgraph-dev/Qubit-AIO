@@ -27,6 +27,7 @@ browser's native capture rate.
 """
 from __future__ import annotations
 
+import os
 import threading
 import time
 from pathlib import Path
@@ -41,6 +42,26 @@ from .base import ASRUnavailable
 log = get_logger()
 
 SAMPLE_RATE = 16000
+
+#: Environment kill-switch for STT prewarm. A short-lived / embedded process
+#: (the test suite, a one-shot tool) must never start a background CUDA
+#: recognizer load that can outlive it: sherpa-onnx aborts the interpreter
+#: natively if process teardown races the provider. The long-lived service
+#: leaves this unset and keeps warming the first utterance.
+PREWARM_DISABLE_ENV = "QUBIT_STT_PREWARM"
+
+
+def prewarm_env_disabled() -> bool:
+    """True when the environment explicitly disables STT prewarm.
+
+    Enabled by default (unset); set ``QUBIT_STT_PREWARM=0|false|off|no|none``
+    to suppress it. Tests set this so an embedded WebUI/Orchestrator never
+    loads a CUDA recognizer in a process that is about to exit.
+    """
+    val = os.environ.get(PREWARM_DISABLE_ENV, "").strip().lower()
+    return val in ("0", "false", "off", "no", "none")
+
+
 #: Audio shorter than this is not decoded for a partial (avoids churn on the
 #: first frames and gives the recognizer a little context).
 MIN_PARTIAL_S = 0.30
@@ -676,6 +697,8 @@ __all__ = [
     "StreamingASRUnavailable",
     "open_streaming_session",
     "prewarm",
+    "prewarm_env_disabled",
+    "PREWARM_DISABLE_ENV",
     "cached_engines",
     "SAMPLE_RATE",
 ]

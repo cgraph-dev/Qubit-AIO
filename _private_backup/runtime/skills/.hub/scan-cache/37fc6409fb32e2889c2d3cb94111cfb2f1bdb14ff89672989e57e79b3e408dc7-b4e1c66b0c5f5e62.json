@@ -1,0 +1,13 @@
+{
+  "bundle_hash": "sha256:37fc6409fb32e2889c2d3cb94111cfb2f1bdb14ff89672989e57e79b3e408dc7",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/blockchain/solana",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [],
+  "rules": [],
+  "scanned_at": "2026-09-23T02:50:38.627257+00:00",
+  "summary": "solana: clean scan, no threats detected",
+  "fresh": true
+}

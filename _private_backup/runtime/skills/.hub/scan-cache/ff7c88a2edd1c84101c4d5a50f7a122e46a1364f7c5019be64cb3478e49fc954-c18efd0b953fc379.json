@@ -1,0 +1,53 @@
+{
+  "bundle_hash": "sha256:ff7c88a2edd1c84101c4d5a50f7a122e46a1364f7c5019be64cb3478e49fc954",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/creative/kanban-video-orchestrator",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "scripts/monitor.py",
+      "line": 37,
+      "match": "out = subprocess.run(",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "scripts/monitor.py",
+      "line": 46,
+      "match": "out = subprocess.run(",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "python_subprocess",
+      "severity": "medium",
+      "category": "execution",
+      "file": "scripts/monitor.py",
+      "line": 70,
+      "match": "out = subprocess.run(",
+      "description": "Python subprocess execution"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/kanban-setup.md",
+      "line": 120,
+      "match": "installs). If absent: `pip install pyyaml`.",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "python_subprocess",
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:50:40.555823+00:00",
+  "summary": "kanban-video-orchestrator: safe \u2014 4 finding(s) in execution, supply_chain",
+  "fresh": true
+}

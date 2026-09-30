@@ -46,10 +46,13 @@ def test_full_tree_save_skips_unchanged_served_secret_leaves(tmp_path,
     cfg = _cfg(tmp_path, monkeypatch)
     code, served = HC.dispatch(cfg, "GET", "/api/config", {}, {})
     assert code == 200, served
-    # The served tree really carries secret-shaped leaves (this is the shape
-    # that made the whole-tree Save a dead control).
+    # The served tree carries secret-shaped leaves, but never their raw value:
+    # the read boundary redacts them to ``[REDACTED]`` (this is the shape that
+    # made the whole-tree Save a dead control). The Save path treats the
+    # placeholder as an unchanged served leaf and skips it, leaving the stored
+    # value untouched.
     assert "webui" in served and "hotkey" in served, served
-    assert served["hotkey"]["hold_key"] == "ctrl_r", served.get("hotkey")
+    assert served["hotkey"]["hold_key"] == "[REDACTED]", served.get("hotkey")
 
     body = {"config": served}
     body["config"]["vad"]["enabled"] = False
@@ -63,9 +66,13 @@ def test_full_tree_save_skips_unchanged_served_secret_leaves(tmp_path,
 
     code, live = HC.dispatch(cfg, "GET", "/api/config", {}, {})
     assert live["vad"]["enabled"] is False, live.get("vad")
-    # The served secret leaves are untouched.
-    assert live["hotkey"]["hold_key"] == "ctrl_r", live.get("hotkey")
+    # The secret leaves are untouched: the read boundary still redacts them and
+    # the stored value underneath was never overwritten by the echoed
+    # placeholder.
+    assert live["hotkey"]["hold_key"] == "[REDACTED]", live.get("hotkey")
     assert live["webui"]["token"] == served["webui"]["token"], live.get("webui")
+    assert cfg.get("hotkey", "hold_key", default="") == "ctrl_r", \
+        cfg.get("hotkey", "hold_key", default="")
 
 
 def test_changed_served_secret_leaf_is_still_refused(tmp_path, monkeypatch):

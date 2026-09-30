@@ -49,11 +49,6 @@ _TERMINAL_CLASSES = {
     "alacritty", "kitty", "terminator", "tilix", "xfce4-terminal",
     "org.gnome.terminal", "wezterm", "foot", "st", "urxvt", "rxvt",
 }
-# Electron apps where paste chords can differ.
-_ELECTRON_HINTS = ("code", "code-oss", "vscodium", "slack", "discord",
-                   "obsidian", "element", "signal", "notion", "figma")
-
-
 def _looks_like_text(text: str) -> bool:
     """Reject binary-ish clipboard payloads (e.g. custom app MIME formats)."""
     if not text:

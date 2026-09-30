@@ -62,8 +62,19 @@ def test_bot_live_delivery_rejects_different_payload_for_same_id(tmp_path):
         delivery.deliver_to_live_owner(home, owner, "two", delivery_id="b" * 32)
 
 
-def test_cron_bot_chat_delivery_defer_write_path_no_longer_raises():
-    """The already-ported cron consumer calls atomic_json_write(fsync_dir=, mode=)."""
+def test_cron_bot_chat_delivery_defer_write_path_no_longer_raises(tmp_path,
+                                                                  monkeypatch):
+    """The already-ported cron consumer calls atomic_json_write(fsync_dir=, mode=).
+
+    ``defer`` writes under ``get_qubit_home()`` (the process QUBIT_HOME), so the
+    test pins a hermetic home: without it the vendored default resolves to the
+    read-only reference ``~/.hermes`` and reads a stale pending record left by a
+    previous run (whose status is not ``queued``).
+    """
+    home = tmp_path / "qhome"
+    home.mkdir()
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    monkeypatch.setenv("HOME", str(tmp_path))
     qubit_constants = __import__("qubit_constants")
     bcd = __import__("cron.bot_chat_delivery", fromlist=["x"])
     home = qubit_constants.get_qubit_home()

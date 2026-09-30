@@ -123,7 +123,10 @@ class TestItem1AirLLMUnit:
         assert "You are Qubit" in mf
 
     def test_repo_default_config_points_at_brain4(self):
-        cfg = yaml.safe_load((ROOT / "config" / "voice.yaml").read_text())
+        # W0 config authority: the repo ships the shipping template as
+        # config/voice.example.yaml (the installed voice.yaml is the sole read
+        # authority); assert the template still points at the 4B brain.
+        cfg = yaml.safe_load((ROOT / "config" / "voice.example.yaml").read_text())
         assert cfg["intent"]["local_llm"]["model"] == "qubit-brain4"
         assert cfg["summarizer"]["ollama_model"] == "qubit-brain4"
 

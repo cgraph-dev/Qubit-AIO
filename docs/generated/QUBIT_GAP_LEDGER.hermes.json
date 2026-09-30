@@ -2079,7 +2079,7 @@
    "dashboard": "hermes-dist MCP",
    "voice": "voice mcp",
    "status": "IMPLEMENTED",
-   "proving_test": "tests/test_mcp_capability_compat_wave20.py::test_disabled_server_returns_honest_disposition_without_spawning",
+   "proving_test": "tests/test_mcp_capabilities_redaction9u.py::test_capability_route_list_survives_transport_redaction",
    "note": "",
    "needs": "owner"
   },

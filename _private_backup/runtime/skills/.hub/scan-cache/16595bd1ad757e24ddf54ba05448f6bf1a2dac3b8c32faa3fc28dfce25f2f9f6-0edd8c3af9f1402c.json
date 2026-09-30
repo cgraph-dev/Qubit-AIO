@@ -1,0 +1,13 @@
+{
+  "bundle_hash": "sha256:16595bd1ad757e24ddf54ba05448f6bf1a2dac3b8c32faa3fc28dfce25f2f9f6",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/security/1password",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [],
+  "rules": [],
+  "scanned_at": "2026-09-23T02:51:06.283335+00:00",
+  "summary": "1password: clean scan, no threats detected",
+  "fresh": true
+}

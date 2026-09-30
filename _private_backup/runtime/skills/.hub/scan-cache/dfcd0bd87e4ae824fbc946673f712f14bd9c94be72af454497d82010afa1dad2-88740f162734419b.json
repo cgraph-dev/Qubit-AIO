@@ -1,0 +1,43 @@
+{
+  "bundle_hash": "sha256:dfcd0bd87e4ae824fbc946673f712f14bd9c94be72af454497d82010afa1dad2",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/mlops/huggingface-tokenizers",
+  "verdict": "safe",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 44,
+      "match": "pip install tokenizers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 47,
+      "match": "pip install tokenizers transformers",
+      "description": "pip install without version pinning"
+    },
+    {
+      "pattern_id": "unpinned_pip_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "references/integration.md",
+      "line": 561,
+      "match": "pip install tokenizers",
+      "description": "pip install without version pinning"
+    }
+  ],
+  "rules": [
+    "unpinned_pip_install"
+  ],
+  "scanned_at": "2026-09-23T02:51:10.023126+00:00",
+  "summary": "huggingface-tokenizers: safe \u2014 3 finding(s) in supply_chain",
+  "fresh": true
+}

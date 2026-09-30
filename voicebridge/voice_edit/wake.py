@@ -226,7 +226,9 @@ class WakeMonitor:
         from .noise import resolve_capture_device
         device = resolve_capture_device(self.cfg)
         gain = float(_cfg(self.cfg, "voice_edit", "mic_gain", default=12.0) or 12.0)
-        return ParecMic(device=device, frame_ms=300, gain=gain)
+        return ParecMic(device=device, frame_ms=300, gain=gain,
+                        agc=bool(_cfg(self.cfg, "voice_edit", "agc",
+                                      default=True)))
 
     def _do_transcribe(self, pcm: bytes) -> str:
         if self._transcribe is not None:

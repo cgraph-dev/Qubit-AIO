@@ -95,9 +95,24 @@ def test_config_put_secret_never_persisted(tmp_path, monkeypatch):
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
+    # An unknown top-level `api_key` is not a Qubit settings path, so it is
+    # honestly refused as UNKNOWN_CONFIG_KEY -- the key-existence check runs
+    # before the secret-shape filter so a typo is never misreported as a secret
+    # write.
     code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
                             {"api_key": "sk-live", "confirm": True})
+    assert (code, out["code"]) == (403, "UNKNOWN_CONFIG_KEY"), (code, out)
+    # A *known*, secret-shaped settings leaf is refused by the typed secret gate
+    # (never persisted).
+    code, out = HC.dispatch(cfg, "PUT", "/api/config", {},
+                            {"config": {"terminal":
+                                        {"docker_shared_container_key":
+                                            "sk-live"}},
+                             "confirm": True})
     assert (code, out["code"]) == (403, "SECRET_WRITE_REFUSED"), (code, out)
+    # Neither attempt leaked the secret into the served record / override store.
+    _code, live = HC.dispatch(cfg, "GET", "/api/config", {}, {})
+    assert "sk-live" not in str(live), live
 
 
 # ---------------------------------------------------------------------------

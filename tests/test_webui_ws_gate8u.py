@@ -183,15 +183,16 @@ def test_upstream_ws_path_is_gone(server):
 
 
 def test_normal_get_to_real_route_still_works(server):
-    # Corrected cutover: /api/status is a fork-declared, non-sensitive read, so
-    # /agent/api/status serves the fork's real status payload (rebranded), not
-    # the empty Qubit compat envelope. The WS gate must not interfere with it.
+    # /api/status is a Qubit-authoritative read (the sidebar/System gateway card
+    # must read the Qubit supervisor, not the vendored fork's own gateway), so
+    # the SPA `/agent/api/status` serves the Qubit compat status document, not
+    # the fork's raw status. The WS gate must not interfere with a normal GET.
     # See docs/archive/2026-09-21/QUBIT_HERMES_CUTOVER_MIGRATION.md.
     status, ctype, body = _http(server, "GET", "/agent/api/status")
     assert status == 200, (status, body[:200])
     assert "application/json" in ctype
     served = json.loads(body)
-    assert served.get("schema") is None, served
+    assert served.get("schema") == "qubit-runtime-status/1", served
     assert served.get("version") and served.get("release_date"), served
     assert "overall" in served and "components" in served, served
     status, _, body = _http(server, "GET", "/api/status")

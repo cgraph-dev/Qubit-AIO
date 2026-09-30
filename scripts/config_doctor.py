@@ -42,19 +42,56 @@ MISSING, DEGRADED, WARN, FAIL = "MISSING", "DEGRADED", "WARN", "FAIL"
 # gracefully, so their absence is a warning, not a fresh-install failure.
 OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
                     "pystray"}
-LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
-             # Qubit-owned vendored upstream fork (qubit_runtime/): local source,
-             # not a PyPI distribution. The fork's modules are top-level once
-             # ``qubit_runtime.ensure_path()`` puts the fork root on sys.path;
-             # ``toolsets`` is the toolset registry imported by the Qubit
-             # config overlay in voicebridge/qubit_asgi.py, and ``providers``
-             # is the fork's provider-profile registry imported (lazily, after
-             # ensure_path) by voicebridge/pty_ws.py.
-             "qubit_cli", "toolsets", "providers",
-             # Other vendored fork top-level modules imported lazily after
-             # ``qubit_runtime.ensure_path()``: ``agent`` (credential pool /
-             # runtime), ``tools`` (skills), and ``qubit_state`` (SessionDB).
-             "agent", "tools", "qubit_state"}
+# Core local source top-level packages that are never PyPI dependencies.
+LOCAL_TOP = {"voicebridge", "scripts", "browser_auto"}
+
+
+def _vendored_top_level_names() -> set[str]:
+    """Top-level import names provided by the vendored Qubit runtime.
+
+    The Qubit-owned fork ships as package data (``qubit_runtime/``); once
+    ``qubit_runtime.ensure_path()`` puts that tree on ``sys.path`` its
+    top-level packages/modules (``agent``, ``tools``, ``gateway``,
+    ``plugins``, ``cron``, ``providers``, ``qubit_cli``, ``qubit_state_*``,
+    …) are local source, not PyPI distributions.
+
+    Derive the names from the build/packaging declaration in
+    ``pyproject.toml`` — the hatch ``force-include`` tables, i.e. exactly the
+    vendored artifacts the wheel/sdist ship — so the allowlist cannot drift
+    from the vendored source (this mirrors
+    ``voicebridge.release._vendored_top_level_names``, which derives the same
+    names from the *installed* ``voicebridge/_data/qubit_runtime`` tree). A
+    missing registration here is a W9 vendor-import gap, so it is read from
+    packaging rather than hardcoded.
+
+    An importable top-level name is a directory mapping whose source dir has
+    an ``__init__.py`` (an importable package) or a top-level ``*.py`` file.
+    Data directories (``skills``, ``locales``, ``ui-tui``, …) have no
+    ``__init__.py`` and are correctly not treated as import names.
+    """
+    try:
+        data = tomllib.loads((REPO / "pyproject.toml").read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return set()
+    targets = (data.get("tool", {}).get("hatch", {})
+               .get("build", {}).get("targets", {}))
+    sources: set[str] = set()
+    for target in ("wheel", "sdist"):
+        sources |= set(targets.get(target, {}).get("force-include", {}))
+    names: set[str] = set()
+    for src in sources:
+        if not src.startswith("qubit_runtime/"):
+            continue
+        rel = src[len("qubit_runtime/"):]
+        source = REPO / "qubit_runtime" / rel
+        if source.is_dir():
+            # A directory mapping is an import name only when it is an
+            # importable package (has __init__.py); data dirs are not.
+            if "/" not in rel and (source / "__init__.py").is_file():
+                names.add(rel)
+        elif rel.endswith(".py") and "/" not in rel and rel != "__init__.py":
+            names.add(rel[:-3])
+    return names
 
 
 # Distribution-name -> import-name corrections (pip name differs from module).
@@ -81,6 +118,7 @@ def _import_scan() -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     pyproject.toml. Returns (failures, warnings) as (module, location)."""
     declared = _declared_modules()
     stdlib = set(sys.stdlib_module_names)
+    local = LOCAL_TOP | _vendored_top_level_names()
     failures: list[tuple[str, str]] = []
     warnings: list[tuple[str, str]] = []
     for py in sorted((REPO / "voicebridge").rglob("*.py")) + sorted((REPO / "scripts").glob("*.py")):
@@ -98,7 +136,7 @@ def _import_scan() -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
                 mods = [node.module]
             for m in mods:
                 top = m.split(".")[0]
-                if top in stdlib | declared | LOCAL_TOP:
+                if top in stdlib | declared | local:
                     continue
                 loc = f"{rel}:{node.lineno}"
                 if top in OPTIONAL_GUARDED:

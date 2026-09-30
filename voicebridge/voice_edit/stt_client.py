@@ -35,12 +35,13 @@ class ParecMic:
 
     def __init__(self, *, sample_rate: int = 16000, frame_ms: int = 300,
                  device: str = "", gain: float = 12.0,
-                 target_peak: float = 0.5,
+                 target_peak: float = 0.5, agc: bool = True,
                  popen: Optional[Callable[..., Any]] = None,
                  which: Optional[Callable[[str], Optional[str]]] = None) -> None:
         self.sample_rate = int(sample_rate)
         self.frame_ms = int(frame_ms)
         self.device = device
+        self.agc = bool(agc)
         # Automatic per-frame gain, mirroring the orchestrator's capture chain:
         # a quiet USB interface (~0.003 RMS) otherwise reaches the recognizer
         # far below the level ASR expects, which is why the same mic sounds
@@ -50,6 +51,13 @@ class ParecMic:
         self._popen = popen or subprocess.Popen
         self._which = which
         self._proc: Optional[Any] = None
+        # Speech-aware automatic gain (browser getUserMedia parity): lift quiet
+        # speech to a target RMS, but never amplify the noise floor between
+        # words (the old peak-normalizer boosted near-silence by ``gain``, which
+        # fed the recognizer room noise and cost words on soft speech).
+        self.target_rms = max(0.03, min(float(target_peak) * 0.25, 0.15))
+        self._agc = 1.0
+        self._noise_rms = 0.0015
         # Capture format is discovered from the source's real spec before
         # starting; requesting a format the source does not natively support
         # (e.g. s16/16k on a s32/48k/4ch device) makes PipeWire emit corrupted
@@ -156,7 +164,42 @@ class ParecMic:
         if not data:
             return None
         data = self._to_mono_16k(data)
-        return self._apply_gain(data)
+        return self._agc_process(data) if self.agc else self._apply_gain(data)
+
+    def _agc_process(self, data: bytes) -> bytes:
+        """Speech-aware AGC + noise-floor protection (browser-like capture).
+
+        Tracks an adaptive noise floor; speech frames are lifted toward
+        ``target_rms`` (bounded by ``gain``), non-speech frames are never
+        amplified (gain <= 1) so silence/noise does not compete with speech at
+        the recognizer. State is per-frame so the level stays stable across an
+        utterance.
+        """
+        try:
+            import numpy as np
+            a = np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0
+            if a.size == 0:
+                return data
+            rms = float(np.sqrt(np.mean(a * a)))
+            # Adaptive noise floor: follow downward quickly, upward slowly.
+            if rms < self._noise_rms:
+                self._noise_rms = 0.8 * self._noise_rms + 0.2 * rms
+            else:
+                self._noise_rms = 0.995 * self._noise_rms + 0.005 * rms
+            floor = max(self._noise_rms * 2.5, 0.0015)
+            if rms > floor:
+                desired = self.target_rms / max(rms, 1e-5)
+                desired = max(1.0, min(desired, self.gain))
+                self._agc = 0.6 * self._agc + 0.4 * desired
+                gain = self._agc
+            else:
+                # Between words: decay toward unity, never boost the floor.
+                self._agc = 0.85 * self._agc + 0.15 * 1.0
+                gain = min(self._agc, 1.0)
+            out = np.clip(a * gain, -1.0, 1.0)
+            return (out * 32767.0).astype("<i2").tobytes()
+        except Exception:
+            return data
 
     def _to_mono_16k(self, data: bytes) -> bytes:
         """Downmix to mono and resample the native capture format to 16 kHz."""

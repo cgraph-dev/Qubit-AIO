@@ -273,10 +273,23 @@ def test_vendored_dashboard_has_no_tiny_placeholder_page():
     """
     pages = sorted((WEB_SRC / "pages").glob("*.tsx"))
     real = [p for p in pages if not p.name.endswith(".test.tsx")]
-    # 21 pages: the 19 preserved dashboard pages plus the Qubit-added
-    # TerminalChatPage (`/chat` real terminal; ChatPage owns `/qubit-chat`)
-    # and AgentsPage (`/agents` canonical roster).
-    assert len(real) == 21, [p.name for p in real]
+    names = {p.name for p in real}
+    # The known route pages must all exist (the preserved dashboard pages plus
+    # the Qubit additions: TerminalChatPage `/chat`, ChatPage `/qubit-chat`,
+    # AgentsPage `/agents`, and VoiceEditPage `/voice-edit`). A relationship,
+    # not a frozen count, so a new substantial page does not fail the guard;
+    # the per-page line check below still rejects any tiny placeholder.
+    required_pages = {
+        "AgentsPage.tsx", "AnalyticsPage.tsx", "ChannelsPage.tsx",
+        "ChatPage.tsx", "ConfigPage.tsx", "CronPage.tsx", "DocsPage.tsx",
+        "EnvPage.tsx", "FilesPage.tsx", "LogsPage.tsx", "McpPage.tsx",
+        "ModelsPage.tsx", "PairingPage.tsx", "PluginsPage.tsx",
+        "ProfileBuilderPage.tsx", "ProfilesPage.tsx", "SessionsPage.tsx",
+        "SkillsPage.tsx", "SystemPage.tsx", "TerminalChatPage.tsx",
+        "VoiceEditPage.tsx", "WebhooksPage.tsx",
+    }
+    missing = required_pages - names
+    assert not missing, sorted(missing)
     for p in real:
         assert len(p.read_text(encoding="utf-8").splitlines()) >= 100, p.name
     docs = (WEB_SRC / "pages" / "DocsPage.tsx").read_text(encoding="utf-8")

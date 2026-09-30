@@ -599,6 +599,18 @@ def route_family(argv: list, cfg=None) -> Optional[FamilyRoute]:
                     "fork sentinel; use `qubit pause --confirm` (or "
                     "`qubit power emergency-stop --confirm`)"))
     sub = tail[0] if tail and not tail[0].startswith("-") else ""
+    # A native Qubit integration subcommand (e.g. `qubit usage analytics|
+    # telemetry`, `qubit runtime discovery`) must never be shadowed by the
+    # fork forward; the module's own contract is "a native Qubit command is
+    # never shadowed". A bare family (sub == "") keeps its existing
+    # fork-forward/refusal behavior.
+    if sub:
+        try:
+            from . import cli as _cli
+            if (family, sub) in getattr(_cli, "_INTEGRATION", {}):
+                return None
+        except Exception:  # noqa: BLE001 - a probe failure never widens forward
+            pass
     if family == "worktree" and sub in ("add", "remove", "switch") \
             and "--confirm" in raw:
         # Qubit-native, confirmation-gated git worktree lifecycle; the pinned

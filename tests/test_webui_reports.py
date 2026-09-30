@@ -63,7 +63,7 @@ def _start(tmp_path):
     _seed_bundle(state)
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl_path: '" + str(state) +
-                 "'\nwebui:\n  token: test-token\n")
+                 "'\nasr:\n  prewarm: false\nwebui:\n  token: test-token\n")
     cfg = Config.load(p)
 
     class _FakeOrch:
@@ -304,7 +304,7 @@ def test_fresh_process_serves_canonical_reports(tmp_path):
     _seed_bundle(state)
     cfg = tmp_path / "voice.yaml"
     cfg.write_text("logging:\n  jsonl_path: '" + str(state) +
-                   "'\nwebui:\n  token: test-token\n")
+                   "'\nasr:\n  prewarm: false\nwebui:\n  token: test-token\n")
     script = r"""
 import json, sys
 from pathlib import Path

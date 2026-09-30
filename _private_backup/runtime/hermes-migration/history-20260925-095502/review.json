@@ -1,0 +1,39 @@
+{
+  "added_lines": 1,
+  "backup_dir": "/tmp/opencode/history-fix-20260925-095502",
+  "created_at": 1790319302.7636485,
+  "destination": "/home/trick/.local/state/qubit-voicebridge/runtime/.hermes_history",
+  "destination_existed": true,
+  "destination_patterns": {
+    "huggingface_token": 1
+  },
+  "destination_redacted_lines": [
+    731
+  ],
+  "destination_redactions": 1,
+  "dry_run": false,
+  "existing_lines": 1328,
+  "patterns": {
+    "bearer": 1,
+    "huggingface_token": 1,
+    "openai_sk": 5,
+    "tailscale_key": 1
+  },
+  "redactions": 9,
+  "schema": "qubit-cli-history-import/1",
+  "source": "/home/trick/.hermes/.hermes_history",
+  "source_lines": 1514,
+  "source_present": true,
+  "source_redacted_lines": [
+    33,
+    57,
+    108,
+    600,
+    609,
+    918,
+    1081,
+    1457
+  ],
+  "source_redactions": 8,
+  "state": "OK"
+}

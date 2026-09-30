@@ -917,9 +917,11 @@ def test_blueprint_instantiate_is_real_confirm_gated(tmp_path, monkeypatch):
     from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
-    payload = {"blueprint": "standup",
-               "values": {"prompt": "summarize notes",
-                          "when": "once in 10 minutes"}}
+    # ``morning-brief`` is a real vendored catalog blueprint; the handler fills
+    # its schedule template server-side and creates the job through the same
+    # confirm-gated ``schedules`` path.
+    payload = {"blueprint": "morning-brief",
+               "values": {"time": "07:30"}}
 
     code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
                             {}, payload)
@@ -929,13 +931,21 @@ def test_blueprint_instantiate_is_real_confirm_gated(tmp_path, monkeypatch):
     code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
                             {}, {**payload, "confirm": True})
     assert code == 200, (code, out)
-    assert out["name"] == "standup", out
-    assert len(S.list_jobs(cfg)["jobs"]) == 1, S.list_jobs(cfg)
+    assert out["name"] == "Morning briefing", out
+    jobs = S.list_jobs(cfg)["jobs"]
+    assert len(jobs) == 1, jobs
+    assert jobs[0]["cron_expr"] == "30 7 * * *", jobs
 
-    # A blueprint with no schedule expression is a typed 400.
+    # A known blueprint with an invalid slot value is a typed 400; an unknown
+    # blueprint key is an honest 404 against the real vendored catalog.
+    code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
+                            {}, {"blueprint": "morning-brief",
+                                 "values": {"time": "not-a-time"},
+                                 "confirm": True})
+    assert (code, out["code"]) == (400, "BLUEPRINT_BAD_FILL"), (code, out)
     code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
                             {}, {"blueprint": "x", "confirm": True})
-    assert (code, out["code"]) == (400, "BLUEPRINT_BAD_FILL"), (code, out)
+    assert (code, out["code"]) == (404, "BLUEPRINT_NOT_FOUND"), (code, out)
 
 
 def test_files_upload_is_real_text_broker_with_binary_gate(tmp_path,

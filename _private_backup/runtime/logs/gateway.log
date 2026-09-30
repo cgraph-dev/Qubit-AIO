@@ -1,0 +1,318 @@
+2026-09-23 16:31:02,238 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-23 16:31:02,252 INFO gateway.run: Starting Qubit Gateway...
+2026-09-23 16:31:02,252 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-23 16:31:02,258 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-23 16:31:02,259 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-23 16:31:02,259 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-23 16:31:02,268 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-23 16:31:02,288 WARNING gateway.run: No messaging platforms enabled.
+2026-09-23 16:31:02,288 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-23 16:31:02,427 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-23 16:31:02,635 INFO gateway.run: Turn machinery warmed in 0.3s (33 tool schema(s) materialized)
+2026-09-23 16:31:02,637 INFO gateway.run: Press Ctrl+C to stop
+2026-09-23 16:31:02,639 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-23 16:31:02,714 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-23 16:31:02,715 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-23 16:31:07,715 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-23 16:38:52,616 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-23 16:38:52,616 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2309 parent_name=systemd loadavg_1m=2.23 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-23 16:38:52,617 INFO gateway.run: Stopping gateway...
+2026-09-23 16:38:52,618 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-23 16:38:52,625 INFO gateway.run: Shutdown phase: drain done at +0.01s (drain took 0.01s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-23 16:38:52,625 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.01s
+2026-09-23 16:38:52,627 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.01s
+2026-09-23 16:38:52,627 INFO gateway.run: Shutdown phase: executor quiesced at +0.01s
+2026-09-23 16:38:52,628 INFO gateway.run: Shutdown phase: SessionDB close done at +0.01s
+2026-09-23 16:38:52,628 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-23 16:38:52,633 INFO gateway.run: Gateway stopped (total teardown 0.02s)
+2026-09-23 16:38:52,633 INFO gateway.run: Gateway housekeeping stopped
+2026-09-23 16:38:52,734 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-23 16:38:53,823 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-23 16:38:53,838 INFO gateway.run: Starting Qubit Gateway...
+2026-09-23 16:38:53,838 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-23 16:38:53,843 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-23 16:38:53,844 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-23 16:38:53,844 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-23 16:38:53,852 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-23 16:38:53,870 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-23 16:38:53,871 WARNING gateway.run: No messaging platforms enabled.
+2026-09-23 16:38:53,871 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-23 16:38:53,955 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-23 16:38:54,214 INFO gateway.run: Turn machinery warmed in 0.3s (33 tool schema(s) materialized)
+2026-09-23 16:38:54,215 INFO gateway.run: Press Ctrl+C to stop
+2026-09-23 16:38:54,217 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-23 16:38:54,288 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-23 16:38:54,290 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-23 16:38:59,290 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-23 16:54:45,833 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-23 16:54:45,833 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2309 parent_name=systemd loadavg_1m=5.19 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-23 16:54:45,834 INFO gateway.run: Stopping gateway...
+2026-09-23 16:54:45,835 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-23 16:54:45,844 INFO gateway.run: Shutdown phase: drain done at +0.01s (drain took 0.01s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-23 16:54:45,845 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.01s
+2026-09-23 16:54:45,846 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.01s
+2026-09-23 16:54:45,847 INFO gateway.run: Shutdown phase: executor quiesced at +0.01s
+2026-09-23 16:54:45,847 INFO gateway.run: Shutdown phase: SessionDB close done at +0.01s
+2026-09-23 16:54:45,848 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-23 16:54:45,852 INFO gateway.run: Gateway stopped (total teardown 0.02s)
+2026-09-23 16:54:45,853 INFO gateway.run: Gateway housekeeping stopped
+2026-09-23 16:54:45,953 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-23 16:54:47,193 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-23 16:54:47,208 INFO gateway.run: Starting Qubit Gateway...
+2026-09-23 16:54:47,209 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-23 16:54:47,214 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-23 16:54:47,215 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-23 16:54:47,215 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-23 16:54:47,223 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-23 16:54:47,245 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-23 16:54:47,246 WARNING gateway.run: No messaging platforms enabled.
+2026-09-23 16:54:47,246 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-23 16:54:47,343 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-23 16:54:47,618 INFO gateway.run: Turn machinery warmed in 0.4s (33 tool schema(s) materialized)
+2026-09-23 16:54:47,619 INFO gateway.run: Press Ctrl+C to stop
+2026-09-23 16:54:47,621 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-23 16:54:47,707 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-23 16:54:47,708 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-23 16:54:52,709 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-23 17:04:28,861 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-23 17:04:28,861 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2309 parent_name=systemd loadavg_1m=12.63 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-23 17:04:28,863 INFO gateway.run: Stopping gateway...
+2026-09-23 17:04:28,863 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-23 17:04:29,693 INFO gateway.run: Shutdown phase: drain done at +0.83s (drain took 0.83s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-23 17:04:29,693 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.83s
+2026-09-23 17:04:29,695 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.83s
+2026-09-23 17:04:29,695 INFO gateway.run: Shutdown phase: executor quiesced at +0.83s
+2026-09-23 17:04:29,696 INFO gateway.run: Shutdown phase: SessionDB close done at +0.83s
+2026-09-23 17:04:29,696 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-23 17:04:29,727 INFO gateway.run: Gateway stopped (total teardown 0.86s)
+2026-09-23 17:04:29,727 INFO gateway.run: Gateway housekeeping stopped
+2026-09-23 17:04:29,828 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-23 17:04:31,735 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-23 17:04:31,757 INFO gateway.run: Starting Qubit Gateway...
+2026-09-23 17:04:31,758 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-23 17:04:31,766 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-23 17:04:31,767 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-23 17:04:31,767 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-23 17:04:31,779 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-23 17:04:31,807 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-23 17:04:31,809 WARNING gateway.run: No messaging platforms enabled.
+2026-09-23 17:04:31,809 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-23 17:04:32,399 INFO gateway.run: Turn machinery warmed in 0.4s (33 tool schema(s) materialized)
+2026-09-23 17:04:32,466 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-23 17:04:32,473 INFO gateway.run: Press Ctrl+C to stop
+2026-09-23 17:04:32,475 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-23 17:04:32,558 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-23 17:04:32,559 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-23 17:04:37,559 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-23 18:26:15,408 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-23 18:26:15,408 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2309 parent_name=systemd loadavg_1m=5.04 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-23 18:26:15,410 INFO gateway.run: Stopping gateway...
+2026-09-23 18:26:15,410 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-23 18:26:15,419 INFO gateway.run: Shutdown phase: drain done at +0.01s (drain took 0.01s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-23 18:26:15,419 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.01s
+2026-09-23 18:26:15,421 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.01s
+2026-09-23 18:26:15,422 INFO gateway.run: Shutdown phase: executor quiesced at +0.01s
+2026-09-23 18:26:15,423 INFO gateway.run: Shutdown phase: SessionDB close done at +0.01s
+2026-09-23 18:26:15,423 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-23 18:26:15,428 INFO gateway.run: Gateway stopped (total teardown 0.02s)
+2026-09-23 18:26:15,428 INFO gateway.run: Gateway housekeeping stopped
+2026-09-23 18:26:15,529 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-23 18:26:16,721 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-23 18:26:16,738 INFO gateway.run: Starting Qubit Gateway...
+2026-09-23 18:26:16,739 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-23 18:26:16,744 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-23 18:26:16,745 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-23 18:26:16,745 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-23 18:26:16,754 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-23 18:26:16,775 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-23 18:26:16,776 WARNING gateway.run: No messaging platforms enabled.
+2026-09-23 18:26:16,776 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-23 18:26:16,878 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-23 18:26:17,179 INFO gateway.run: Turn machinery warmed in 0.4s (33 tool schema(s) materialized)
+2026-09-23 18:26:17,180 INFO gateway.run: Press Ctrl+C to stop
+2026-09-23 18:26:17,181 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-23 18:26:17,260 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-23 18:26:17,261 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-23 18:26:22,263 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-24 07:22:08,395 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-24 07:22:08,395 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2309 parent_name=systemd loadavg_1m=2.93 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-24 07:22:08,399 INFO gateway.run: Stopping gateway...
+2026-09-24 07:22:08,399 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-24 07:22:08,489 INFO gateway.run: Shutdown phase: drain done at +0.09s (drain took 0.09s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-24 07:22:08,489 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.09s
+2026-09-24 07:22:08,491 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.09s
+2026-09-24 07:22:08,492 INFO gateway.run: Shutdown phase: executor quiesced at +0.09s
+2026-09-24 07:22:08,520 INFO gateway.run: Shutdown phase: SessionDB close done at +0.12s
+2026-09-24 07:22:08,522 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-24 07:22:08,530 INFO gateway.run: Gateway stopped (total teardown 0.13s)
+2026-09-24 07:22:08,531 INFO gateway.run: Gateway housekeeping stopped
+2026-09-24 07:22:08,632 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-25 04:13:06,667 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-25 04:13:06,695 INFO gateway.run: Starting Qubit Gateway...
+2026-09-25 04:13:06,696 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-25 04:13:06,703 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-25 04:13:06,703 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-25 04:13:06,703 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-25 04:13:06,711 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-25 04:13:06,730 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-25 04:13:06,731 WARNING gateway.run: No messaging platforms enabled.
+2026-09-25 04:13:06,731 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-25 04:13:06,849 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-25 04:13:07,114 INFO gateway.run: Turn machinery warmed in 0.4s (33 tool schema(s) materialized)
+2026-09-25 04:13:07,116 INFO gateway.run: Press Ctrl+C to stop
+2026-09-25 04:13:07,117 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-25 04:13:07,136 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-25 04:13:07,137 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-25 04:13:12,138 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-25 05:12:13,393 INFO gateway.run: Spillover cache cleanup: removed 1 stale file(s)
+2026-09-25 05:18:16,893 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-25 05:18:16,893 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2433 parent_name=systemd loadavg_1m=3.99 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-25 05:18:16,895 INFO gateway.run: Stopping gateway...
+2026-09-25 05:18:16,895 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-25 05:18:16,904 INFO gateway.run: Shutdown phase: drain done at +0.01s (drain took 0.01s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-25 05:18:16,904 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.01s
+2026-09-25 05:18:16,906 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.01s
+2026-09-25 05:18:16,907 INFO gateway.run: Shutdown phase: executor quiesced at +0.01s
+2026-09-25 05:18:16,908 INFO gateway.run: Shutdown phase: SessionDB close done at +0.01s
+2026-09-25 05:18:16,908 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-25 05:18:16,912 INFO gateway.run: Gateway stopped (total teardown 0.02s)
+2026-09-25 05:18:16,913 INFO gateway.run: Gateway housekeeping stopped
+2026-09-25 05:18:17,013 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-25 05:18:18,212 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-25 05:18:18,227 INFO gateway.run: Starting Qubit Gateway...
+2026-09-25 05:18:18,228 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-25 05:18:18,233 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-25 05:18:18,233 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-25 05:18:18,234 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-25 05:18:18,262 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-25 05:18:18,280 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-25 05:18:18,281 WARNING gateway.run: No messaging platforms enabled.
+2026-09-25 05:18:18,282 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-25 05:18:18,360 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-25 05:18:18,667 INFO gateway.run: Turn machinery warmed in 0.4s (33 tool schema(s) materialized)
+2026-09-25 05:18:18,668 INFO gateway.run: Press Ctrl+C to stop
+2026-09-25 05:18:18,676 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-25 05:18:18,756 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-25 05:18:18,758 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-25 05:18:23,759 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-25 09:22:22,977 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-25 09:22:22,977 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2433 parent_name=systemd loadavg_1m=8.27 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-25 09:22:22,980 INFO gateway.run: Stopping gateway...
+2026-09-25 09:22:22,981 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-25 09:22:22,985 INFO gateway.run: Shutdown phase: drain done at +0.01s (drain took 0.00s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-25 09:22:22,986 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.01s
+2026-09-25 09:22:22,988 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.01s
+2026-09-25 09:22:22,990 INFO gateway.run: Shutdown phase: executor quiesced at +0.01s
+2026-09-25 09:22:22,992 INFO gateway.run: Shutdown phase: SessionDB close done at +0.01s
+2026-09-25 09:22:22,992 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-25 09:22:22,997 INFO gateway.run: Gateway stopped (total teardown 0.02s)
+2026-09-25 09:22:22,998 INFO gateway.run: Gateway housekeeping stopped
+2026-09-25 09:22:23,098 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-25 09:22:24,790 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-25 09:22:24,816 INFO gateway.run: Starting Qubit Gateway...
+2026-09-25 09:22:24,817 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-25 09:22:24,832 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-25 09:22:24,832 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-25 09:22:24,833 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-25 09:22:24,847 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-25 09:22:24,867 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-25 09:22:24,868 WARNING gateway.run: No messaging platforms enabled.
+2026-09-25 09:22:24,869 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-25 09:22:24,982 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-25 09:22:25,361 INFO gateway.run: Turn machinery warmed in 0.5s (33 tool schema(s) materialized)
+2026-09-25 09:22:25,362 INFO gateway.run: Press Ctrl+C to stop
+2026-09-25 09:22:25,365 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-25 09:22:25,389 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-25 09:22:25,390 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-25 09:22:30,391 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-25 11:21:48,430 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-25 11:21:48,430 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2433 parent_name=systemd loadavg_1m=1.62 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-25 11:21:48,432 INFO gateway.run: Stopping gateway...
+2026-09-25 11:21:48,434 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-25 11:21:48,440 INFO gateway.run: Shutdown phase: drain done at +0.01s (drain took 0.01s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-25 11:21:48,440 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.01s
+2026-09-25 11:21:48,442 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.01s
+2026-09-25 11:21:48,442 INFO gateway.run: Shutdown phase: executor quiesced at +0.01s
+2026-09-25 11:21:48,452 INFO gateway.run: Shutdown phase: SessionDB close done at +0.02s
+2026-09-25 11:21:48,453 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-25 11:21:48,457 INFO gateway.run: Gateway stopped (total teardown 0.02s)
+2026-09-25 11:21:48,458 INFO gateway.run: Gateway housekeeping stopped
+2026-09-25 11:21:48,558 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-25 11:21:49,776 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-25 11:21:49,795 INFO gateway.run: Starting Qubit Gateway...
+2026-09-25 11:21:49,795 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-25 11:21:49,801 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-25 11:21:49,801 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-25 11:21:49,802 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-25 11:21:49,811 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-25 11:21:49,831 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-25 11:21:49,832 WARNING gateway.run: No messaging platforms enabled.
+2026-09-25 11:21:49,832 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-25 11:21:50,066 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-25 11:21:50,247 INFO gateway.run: Turn machinery warmed in 0.4s (33 tool schema(s) materialized)
+2026-09-25 11:21:50,248 INFO gateway.run: Press Ctrl+C to stop
+2026-09-25 11:21:50,251 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-25 11:21:50,269 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-25 11:21:50,271 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-25 11:21:55,272 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-27 00:25:16,175 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-27 01:25:22,421 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-27 05:03:28,573 INFO gateway.run: Received SIGTERM — initiating shutdown
+2026-09-27 05:03:28,574 WARNING gateway.run: Shutdown context: signal=SIGTERM under_systemd=yes parent_pid=2433 parent_name=systemd loadavg_1m=13.02 parent_cmdline='/usr/lib/systemd/systemd --user'
+2026-09-27 05:03:28,581 INFO gateway.run: Stopping gateway...
+2026-09-27 05:03:28,582 INFO gateway.run: Shutdown phase: notify_active_sessions done at +0.00s
+2026-09-27 05:03:28,690 INFO gateway.run: Shutdown phase: drain done at +0.11s (drain took 0.11s, timed_out=False, active_at_start=0, active_now=0, cron_at_start=0, cron_now=0, api_at_start=0, api_now=0, deferred_at_start=0, deferred_now=0)
+2026-09-27 05:03:28,690 INFO gateway.run: Shutdown phase: all adapters disconnected at +0.11s
+2026-09-27 05:03:28,713 INFO gateway.run: Shutdown phase: final-cleanup tool kill done at +0.13s
+2026-09-27 05:03:28,715 INFO gateway.run: Shutdown phase: executor quiesced at +0.13s
+2026-09-27 05:03:28,756 INFO gateway.run: Shutdown phase: SessionDB close done at +0.18s
+2026-09-27 05:03:28,758 INFO gateway.run: Gateway stopped by an unexpected signal — persisting gateway_state=running so container_boot auto-starts on the next boot (issue #42675)
+2026-09-27 05:03:28,855 INFO gateway.run: Gateway stopped (total teardown 0.27s)
+2026-09-27 05:03:28,856 INFO gateway.run: Gateway housekeeping stopped
+2026-09-27 05:03:28,957 INFO gateway.run: Exiting with code 1 (signal-initiated shutdown without restart request) so the service manager can revive the gateway.
+2026-09-27 05:03:32,586 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-27 05:03:32,617 INFO gateway.run: Starting Qubit Gateway...
+2026-09-27 05:03:32,618 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-27 05:03:32,625 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-27 05:03:32,625 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-27 05:03:32,626 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-27 05:03:34,810 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-27 05:03:34,838 INFO gateway.run: Previous gateway exited cleanly — skipping session suspension
+2026-09-27 05:03:34,840 WARNING gateway.run: No messaging platforms enabled.
+2026-09-27 05:03:34,840 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-27 05:03:35,095 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-27 05:03:36,234 INFO gateway.run: Turn machinery warmed in 1.3s (33 tool schema(s) materialized)
+2026-09-27 05:03:36,236 INFO gateway.run: Press Ctrl+C to stop
+2026-09-27 05:03:36,242 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-27 05:03:36,267 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-27 05:03:36,268 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-27 05:03:41,270 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)
+2026-09-27 07:02:46,180 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-27 13:03:12,978 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-27 18:03:40,550 INFO gateway.run: Bot DM cache cleanup: removed 50 stale file(s)
+2026-09-27 20:03:55,670 INFO gateway.run: Bot DM cache cleanup: removed 27 stale file(s)
+2026-09-27 21:04:02,081 INFO gateway.run: Bot DM cache cleanup: removed 23 stale file(s)
+2026-09-27 22:04:07,866 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-27 23:04:13,501 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-28 03:04:39,435 INFO gateway.run: curator: curator: snapshot created (2026-09-28T00-04-38Z)
+2026-09-28 03:04:50,372 INFO gateway.run: curator: curator: auto: 16 marked stale, 8 archived, 2 reactivated; llm: skipped (consolidation off)
+2026-09-28 08:05:40,608 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-29 04:07:57,022 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-29 05:08:04,296 INFO gateway.run: Bot DM cache cleanup: removed 25 stale file(s)
+2026-09-29 10:21:34,545 INFO gateway.control_socket: Gateway control socket listening at /home/trick/.local/state/qubit-voicebridge/runtime/gateway.sock
+2026-09-29 10:21:38,136 WARNING gateway.lifecycle_ledger: Previous gateway life (pid=2796893, started_at=2026-09-27T02:03:32.588314+00:00) exited UNCLEANLY (no exit path ran — SIGKILL / OOM / VM death). last_heartbeat_at=2026-09-29T03:58:47.745518+00:00 last_mem={'rss_kib': 246016, 'mem_total_kib': 65764080, 'mem_available_kib': 40100480, 'swap_used_kib': 8310592} suspected_oom=False
+2026-09-29 10:21:39,002 INFO gateway.run: Starting Qubit Gateway...
+2026-09-29 10:21:39,003 INFO gateway.run: Session storage: /home/trick/.local/state/qubit-voicebridge/runtime/sessions
+2026-09-29 10:21:39,009 WARNING gateway.run: Stale systemd unit detected: qubit-gateway.service has TimeoutStopSec=90s but drain_timeout=180s cron_drain_timeout=30s (expected >=210s). systemd may SIGKILL the gateway mid-drain. Run `qubit gateway install --force` to regenerate the unit, or shorten agent.restart_drain_timeout / agent.cron_drain_timeout.
+2026-09-29 10:21:39,009 INFO gateway.run: Agent budget: max_iterations=90 (agent.max_turns from config.yaml, or HERMES_MAX_ITERATIONS from .env, or default 500)
+2026-09-29 10:21:39,010 INFO gateway.run: Secret redaction: ENABLED (tool output, logs, and chat responses are scrubbed before delivery)
+2026-09-29 10:21:39,021 WARNING gateway.run: No env user allowlists configured. Messaging platforms default to pairing/allowlist policies and will deny unknown senders unless you configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id) or explicitly opt in with GATEWAY_ALLOW_ALL_USERS=true plus dm_policy/group_policy: open on the platform.
+2026-09-29 10:21:39,044 WARNING gateway.run: No messaging platforms enabled.
+2026-09-29 10:21:39,044 INFO gateway.run: Gateway will continue running for cron job execution.
+2026-09-29 10:21:39,245 INFO gateway.run: Channel directory built: 0 target(s)
+2026-09-29 10:21:39,624 INFO gateway.run: Turn machinery warmed in 0.6s (33 tool schema(s) materialized)
+2026-09-29 10:21:39,626 INFO gateway.run: Press Ctrl+C to stop
+2026-09-29 10:21:39,630 INFO gateway.run: Gateway housekeeping started (interval=60s)
+2026-09-29 10:21:39,651 INFO gateway.run: kanban dispatcher: holding singleton dispatcher lock (/home/trick/.local/state/qubit-voicebridge/runtime/kanban/.dispatcher.lock)
+2026-09-29 10:21:39,652 INFO gateway.run: kanban dispatcher: kanban.max_in_progress unset; using memory-derived default max_in_progress=8 (set kanban.max_in_progress in config.yaml to override)
+2026-09-29 10:21:44,653 INFO gateway.run: kanban dispatcher: embedded in gateway (interval=60.0s)

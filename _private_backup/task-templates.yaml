@@ -1,0 +1,224 @@
+templates:
+- name: weather-bucharest
+  match:
+  - weather (in|for|at|near)? (bucharest|bucuresti|corest)
+  - (bucharest|bucuresti|corest).*(weather|forecast|temperature|rain)
+  - what('?s|s) (the )?weather.*(bucharest|bucuresti|today|now)
+  - weather.*(today|now|current)
+  kind: local-script
+  ack: Checking the weather.
+  summary_words: 40
+  script: '~/Projects/Repos/qubit-voicebridge/.venv/bin/python ~/Projects/Repos/qubit-voicebridge/scripts/weather.py
+    "{question}" 1500
+
+    '
+- name: search-web
+  match:
+  - '(use )?(perplexity|search the web|search|look up|google|find out|research) (for
+    |about |on |: )?(.*)'
+  - (what|who|when|where|why|how) (is|are|was|were|did|does|will|can) (the |a |an
+    )?(latest|new|current|best|price|cost|weather|news|version|release|date|time)[^?]*(\?|$)
+  - (is|are) (there|it|this|that) (a |an |any )?(new|latest|better|cheaper)?( version|
+    price| deal| offer)?
+  - 'latest (version|news|release|price|update) (of|on|for) '
+  - what('?s| is) (the )?(latest|new|current|best) (version|price|news|release|model|phone|game|movie|album|book|update)
+  kind: local-script
+  ack: Searching the web.
+  summary_words: 35
+  script: '~/Projects/Repos/qubit-voicebridge/.venv/bin/python ~/Projects/Repos/qubit-voicebridge/scripts/web_search.py
+    "{question}" 1500
+
+    '
+- name: projects-status
+  match:
+  - check (my )?(projects|repos|repositories) (status|state)
+  - status of (my )?projects
+  - what('s| is) the (status|state) of (my )?projects?
+  kind: coding
+  task: 'Inspect ~/Projects/Repos/ and list the main projects with: current git branch,
+    dirty/uncommitted changes, and how many commits ahead/behind origin. Report each
+    project on one line, keep it concise.
+
+    '
+  ack: Checking your projects.
+- name: cgraph-status
+  match:
+  - cgraph (status|state)
+  - how('s| is) cgraph (going|doing|looking)
+  - (update|news) on cgraph
+  kind: coding
+  task: 'Check the CGraph monorepo at ~/Projects/Repos/CGraph Umbrella/: git status,
+    branch, uncommitted changes, and whether cgraph-web is deployed (Vercel). Summarize
+    in 3-4 short lines.
+
+    '
+  ack: Checking CGraph.
+- name: bridge-status
+  match:
+  - (voice )?(bridge|assistant) (status|health|state)
+  - are you (ok|okay|fine|healthy|working|up)
+  - is the bridge (working|up|ok)
+  kind: conversation
+  task: 'Report your own status: ASR engine, model, gateway route, in one sentence.'
+  ack: ''
+- name: daily-plan
+  match:
+  - (what('s| is)|make|show|give me) (my |the )?(daily )?(plan|schedule|agenda)
+  - what do i (have|need) (to do|today)
+  kind: coding
+  task: 'Read today''s notes in ~/.config/qubit-voicebridge/workspace/memory/ and any TODO/plan files
+    in ~/Projects/Repos, and list the user''s top 3-5 items for today. If nothing
+    is found, say so and suggest asking for a plan.
+
+    '
+  ack: Pulling up your plan.
+- name: git-sync
+  match:
+  - (sync|push|publish) (my )?changes
+  - (commit and push|git push)
+  - sync (the )?(repo|repository)
+  kind: coding
+  task: 'For the CURRENT project in ~/Projects/Repos (or the one the user just mentioned):
+    review uncommitted changes, write a clear conventional commit message, commit,
+    and push to origin. Do NOT force-push. Report the commit hash and branch.
+
+    '
+  ack: Syncing your changes.
+- name: check-email
+  match:
+  - (check|read|look at|open|scan|review) (my |the )?(email|inbox|mails|messages?
+    in (my )?inbox)
+  - (any|do i have) (new|important|unread) (email|emails|mail)
+  - (what's|what is) (new|important|unread) in (my )?inbox
+  - verify my emails
+  kind: coding
+  task: 'Check the user''s email inbox. List any NEW messages and flag which ones
+    look IMPORTANT (sender, subject, why it matters — urgent deadlines, payment/account
+    notifications, replies waiting on the user). Summarize in 3-5 short lines. If
+    email access is not configured, say exactly what is needed to enable it.
+
+    '
+  ack: Checking your email.
+- name: check-dms
+  match:
+  - (check|read|look at|open|scan|review) (my )?(private )?(messages|dms?|inbox)(
+    please)?
+  - (any|do i have) (new|unread) (private )?(messages|dms?)(?! (on|in) (facebook|instagram|messenger))
+  - (check|see|look at) (my )?(whatsapp|discord|telegram|signal)
+  - any (new|unread) (whatsapp|discord|telegram|signal) (messages|dms?)
+  kind: coding
+  task: 'Check the user''s private messages / DMs (WhatsApp, Discord, or whichever
+    platform is configured). List new messages and flag anything IMPORTANT (time-sensitive,
+    actionable, from key contacts). Summarize in 3-5 short lines. If a platform is
+    not configured, say exactly what is needed.
+
+    '
+  ack: Checking your messages.
+- name: look-at-image
+  match:
+  - (look at|check|read|see|analyze|view|inspect) (this |that |the |an |a )?(image|picture|photo|screenshot|png|jpg)
+  - (what'?s|what is) (in|on|shown in) (this |that |the )?(image|picture|photo|screenshot)
+  - read (the |this )?(text )?(from|in) (this |the )?image
+  - (analyze|describe|look at) (my |the )?screenshot
+  kind: coding
+  task: 'The user wants you to look at an image (screenshot, photo, or file they will
+    point you to — check ~/Pictures or /tmp for recent screenshots if no path is given).
+    Use your vision capability to describe what''s in it and answer their question
+    about it. If they asked to read text, extract the text accurately. Reply concisely
+    in 2-4 sentences.
+
+    '
+  ack: Looking at the image.
+- name: watch-video
+  match:
+  - (watch|analyze|look at|check|view|see) (this |that |the |a )?(video|clip|recording)
+  - (what'?s|what is) (happening|going on) in (this |that |the )?video
+  - (summarize|describe) (this |that |the )?video
+  kind: coding
+  task: 'The user wants you to analyze a video (they will give a path or URL, or check
+    recent captures in ~/Videos or /tmp). Use your video analysis capability to describe
+    what happens and answer their question. Reply concisely in 2-4 sentences.
+
+    '
+  ack: Watching the video.
+- name: read-website
+  match:
+  - (read|check|look at|open|fetch|summarize|analyze) (this |that |the |a )?(website|webpage|page|site|url|link)
+  - (what'?s|what is) (on|at) (this |that |the )?(website|webpage|page|url)
+  - (check|read) (the )?(latest|current) (article|post|page)
+  kind: coding
+  task: 'The user wants you to look at a website or webpage (they will give a URL,
+    or check the browser for the current page). Fetch it, extract the key content,
+    and summarize what''s there or answer their question. Reply concisely in 2-4 sentences.
+
+    '
+  ack: Reading the page.
+- name: vscode-task
+  match:
+  - (use|open|work in|work on) (the )?(vscode|vs code|editor|ide) (to|and|on)
+  - (open|look at|review|fix|edit|refactor|inspect) (the )?(code|project|repo) (in|with|using)
+    (vscode|vs code|the editor)
+  - agent (should|shouldn'?t|can|to) use (the )?vscode
+  kind: coding
+  task: 'The user wants coding work done with VS Code in the loop. Use the VS Code
+    CLI (code --reuse-window <path>) to open relevant files/projects, inspect them,
+    and do the requested edits. Use your full tool set (files, terminal, browser,
+    repos). Reply concisely with what was done.
+
+    '
+  ack: Using VS Code.
+- name: check-email
+  match:
+  - (check|read|see|look at|any|what('?s| is) (new|new in))? (my |the )?(gmail|email|emails|inbox|mail)(
+    please)?
+  - (what|any) (new )?(email|emails|messages?) (did|have|do) i (get|receive)
+  - latest (email|emails|mail)
+  kind: coding
+  task: 'Run the inbox script verbatim (no paraphrase): `python ~/Projects/Repos/qubit-voicebridge/scripts/review_gmail.py 12`. It outputs Categories, per-email From|Subject|When (e.g. 2 hours ago), and a final "Spoken:" line with the latest 3. Speak that Spoken line verbatim as your reply (who + subject + how long ago), then append the Categories line. Do NOT say "check notifications yourself".
+
+    '
+  ack: Checking your inbox.
+- name: check-messenger
+  match:
+  - (check|read|see|any|what('?s| is) (new|new in))? (my )?(messenger|facebook|fb)
+    (messages|chats?|dm|dms)( please)?
+  - (what|any) (new )?(messages?) (on|in) (messenger|facebook|fb)
+  - latest (messenger|facebook) (messages|chats)
+  kind: coding
+  task: 'Run the social-inbox-check skill: read the Messenger chat list with read_messenger.py
+    3 (logged-in Chromium profile over CDP, zero tokens). Speak a 2-sentence summary:
+    who messaged, the preview, and how long ago. Mention unread chats first.
+
+    '
+  ack: Checking Messenger.
+- name: check-instagram
+  match:
+  - (check|read|see|any|what('?s| is) (new|new in))? (my )?instagram (messages|dms?|direct|inbox)(
+    please)?
+  - (what|any) (new )?(messages?) (on|in) instagram
+  - latest instagram (messages|dms)
+  kind: coding
+  task: 'Run the social-inbox-check skill: read the Instagram DM inbox with read_instagram.py
+    3 (logged-in Chromium profile over CDP, zero tokens). Speak a 2-sentence summary:
+    who messaged, the preview, and how long ago. Mention unread conversations first.
+
+    '
+  ack: Checking Instagram.
+- name: graphify-query
+  match:
+  - (query|ask|search|look up|check) (the |in )?(cgraph )?(knowledge )?graph
+  - (what|who|how|where) (is|are|does|connects|links|relates) .*(in|across|within)
+    (the )?(cgraph )?(codebase|repo|project|graph)
+  - (what|how) (connects|links|relates|is) .*(to|with|and) (the |the )?(web|backend|api|socket|chat|logger|stripe|packages)
+  - graphify
+  - (find|trace) (the )?(call|dependency|path|import|relation).*(cgraph|in the codebase)
+  - (what does|how does|what is|how is) (the )?(web app|backend|api client|stripe|webhook|socket|logger|chat|module|component)[
+    a-z]* (do|work|connect|handle|use)
+  - (explain|describe|summarize) (the )?(stripe|webhook|socket|logger|api client|backend|web
+    app)[ a-z]* (in|from|of) (the )?(cgraph|codebase|repo)
+  kind: local-script
+  ack: Checking the code graph.
+  summary_words: 40
+  script: '~/Projects/Repos/CGraph-graphify/graphify-query.sh "{question}"
+
+    '

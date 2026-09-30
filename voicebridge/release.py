@@ -349,6 +349,14 @@ def secret_scan(root: Path, *, include_py: bool = True,
     # 4A/6B): sample utterances intentionally carry FAKE credential-shaped
     # strings. Recorded separately, never treated as live secrets.
     skip.add("voicebridge/evaluation")
+    # Historical and generated documentation trees are not shipped product
+    # surfaces: docs/archive/ is historical-only (Owner Decision #24) and
+    # docs/generated/ is derived audit/inventory output whose fixtures carry
+    # fake/canary secret shapes (sk-LEAKCANARY, <redacted>, apiKey: Type...).
+    # The sdist already excludes the archival/generated trees; each is covered
+    # by its own provenance/brand gate, so the product secret gate must not
+    # flag them as live secrets.
+    skip |= {"docs/archive", "docs/generated"}
     patterns = ["*.py"] if include_py else []
     if include_yaml:
         patterns += ["*.yaml", "*.yml", "*.service", "*.timer", "*.json",

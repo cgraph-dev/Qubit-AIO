@@ -161,7 +161,7 @@ def test_agent_turn_spawns_no_subprocess(stub_model, monkeypatch):
 def test_session_direct_answer_without_tools(stub_model, monkeypatch):
     import voicebridge.planner as _pl
 
-    monkeypatch.setattr(_pl, "plan", lambda _t: None)
+    monkeypatch.setattr(_pl, "plan", lambda _t, cfg=None: None)
     executed = []
     res = A.run_session(None, "summarize this", session="sess-1",
                         execute_tool=lambda t, a: executed.append((t, a)))
@@ -177,7 +177,7 @@ def test_session_runs_planned_tool_then_summarizes(stub_model, monkeypatch):
     proposal = _pl.TypedProposal(tool="local.volume_up", version="1.0.0",
                                  arguments={}, confidence=0.9,
                                  requires_confirmation=False)
-    monkeypatch.setattr(_pl, "plan", lambda _t: proposal)
+    monkeypatch.setattr(_pl, "plan", lambda _t, cfg=None: proposal)
     executed = []
     res = A.run_session(None, "turn it up", session="sess-2",
                         execute_tool=lambda t, a: executed.append((t, a))
@@ -193,7 +193,7 @@ def test_session_unknown_tool_reports_failure(stub_model, monkeypatch):
     proposal = _pl.TypedProposal(tool="local.nonexistent_xyz",
                                  version="1.0.0", arguments={},
                                  confidence=0.9, requires_confirmation=False)
-    monkeypatch.setattr(_pl, "plan", lambda _t: proposal)
+    monkeypatch.setattr(_pl, "plan", lambda _t, cfg=None: proposal)
 
     def _boom(tool, args):
         raise ValueError(f"unknown agent tool {tool!r}")
@@ -207,7 +207,7 @@ def test_session_unknown_tool_reports_failure(stub_model, monkeypatch):
 def test_session_cancel_before_summary(stub_model, monkeypatch):
     import voicebridge.planner as _pl
 
-    monkeypatch.setattr(_pl, "plan", lambda _t: None)
+    monkeypatch.setattr(_pl, "plan", lambda _t, cfg=None: None)
     res = A.run_session(None, "work", session="sess-4",
                         execute_tool=None, cancelled=lambda: True)
     assert res["state"] == "CANCELLED", res
@@ -216,7 +216,7 @@ def test_session_cancel_before_summary(stub_model, monkeypatch):
 def test_session_concurrent_isolation(stub_model, monkeypatch):
     import voicebridge.planner as _pl
 
-    monkeypatch.setattr(_pl, "plan", lambda _t: None)
+    monkeypatch.setattr(_pl, "plan", lambda _t, cfg=None: None)
     results = {}
 
     def _run(name):

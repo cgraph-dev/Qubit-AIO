@@ -1,0 +1,155 @@
+{
+  "bundle_hash": "sha256:17e956c0532cd46d62ef43b50ab34bdfdae3620c08776360533c9717369eae34",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/research/gitnexus-explorer",
+  "verdict": "caution",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 29,
+      "match": "- **cloudflared** \u2014 for tunneling (auto-installed to ~/.local/bin if missing)",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 161,
+      "match": "# Install cloudflared if needed (no sudo)",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 162,
+      "match": "if ! command -v cloudflared &>/dev/null; then",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 164,
+      "match": "curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \\",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 165,
+      "match": "-o ~/.local/bin/cloudflared",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 166,
+      "match": "chmod +x ~/.local/bin/cloudflared",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 171,
+      "match": "cloudflared tunnel --config /dev/null --url http://localhost:8888 --no-autoupdate --protocol http2",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 183,
+      "match": "pkill -f cloudflared",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 193,
+      "match": "- **`--config /dev/null` is required for cloudflared** if the user has an existing",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "tunnel_service",
+      "severity": "high",
+      "category": "network",
+      "file": "SKILL.md",
+      "line": 194,
+      "match": "named tunnel config at `~/.cloudflared/config.yml`. Without it, the catch-all",
+      "description": "uses tunneling service for external access"
+    },
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 46,
+      "match": "cd \"$GITNEXUS_DIR/gitnexus-shared\" && npm install && npm run build",
+      "description": "npm install without version pinning"
+    },
+    {
+      "pattern_id": "git_clone",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 45,
+      "match": "git clone https://github.com/abhigyanpatwari/GitNexus.git \"$GITNEXUS_DIR\"",
+      "description": "clones a git repository at runtime"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 97,
+      "match": "no sudo, no nginx.",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 161,
+      "match": "# Install cloudflared if needed (no sudo)",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "agent_config_ref",
+      "severity": "low",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 201,
+      "match": "- **The web UI does NOT create `.claude/` or `CLAUDE.md`.** Those are created by",
+      "description": "references agent config files (informational; only modification intent is scored)"
+    }
+  ],
+  "rules": [
+    "agent_config_ref",
+    "git_clone",
+    "sudo_usage",
+    "tunnel_service",
+    "unpinned_npm_install"
+  ],
+  "scanned_at": "2026-09-23T02:51:04.638810+00:00",
+  "summary": "gitnexus-explorer: caution \u2014 15 finding(s) in network, persistence, privilege_escalation, supply_chain",
+  "fresh": true
+}

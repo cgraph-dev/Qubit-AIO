@@ -48,6 +48,9 @@ class NullOverlay:
     def show_preview(self, payload: Dict[str, Any]) -> None:
         pass
 
+    def append_history(self, line: str) -> None:
+        pass
+
     def show_error(self, code: str, detail: str) -> None:
         self.set_status("error", f"{code}: {detail}")
 
@@ -117,6 +120,43 @@ class PreviewOverlay:
         self._edit_entry.pack(fill="x", pady=(8, 0))
         self._edit_entry.pack_forget()
         self._edit_entry.bind("<Control-Return>", lambda e: self._submit_edit())
+        # Persistent history: every interaction (dictation, answer, edit, task)
+        # is appended here so the text does not vanish after one utterance.
+        hist = tk.Frame(outer, bg=_BG)
+        hist.pack(fill="both", expand=True, pady=(8, 0))
+        head = tk.Frame(hist, bg=_BG)
+        head.pack(fill="x")
+        tk.Label(head, text="History", bg=_BG, fg=_MUTED,
+                 font=("Sans", 9, "bold"), anchor="w").pack(side="left")
+        tk.Button(head, text="Clear", command=self._clear_history,
+                  bg="#21262d", fg=_FG, relief="flat", padx=8).pack(side="right")
+        self._history_text = tk.Text(hist, height=8, width=72, wrap="word",
+                                     bg="#0b0f14", fg=_FG, relief="flat")
+        self._history_text.pack(side="left", fill="both", expand=True)
+        _sb = tk.Scrollbar(hist, command=self._history_text.yview)
+        _sb.pack(side="right", fill="y")
+        self._history_text.configure(yscrollcommand=_sb.set, state="disabled")
+        self._history_seq = 0
+
+    def append_history(self, line: str) -> None:
+        """Append one line to the persistent history (safe from any thread)."""
+        try:
+            self._history_text.configure(state="normal")
+            self._history_seq += 1
+            self._history_text.insert("end", f"{self._history_seq:>3}  {line}\n")
+            self._history_text.see("end")
+            self._history_text.configure(state="disabled")
+        except Exception:
+            pass
+
+    def _clear_history(self) -> None:
+        try:
+            self._history_text.configure(state="normal")
+            self._history_text.delete("1.0", "end")
+            self._history_text.configure(state="disabled")
+            self._history_seq = 0
+        except Exception:
+            pass
 
     def _act(self, action: str, payload: Optional[Dict[str, Any]] = None):
         self._on_action(action, payload or {})

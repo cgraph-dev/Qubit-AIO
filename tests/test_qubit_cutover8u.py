@@ -211,9 +211,11 @@ def test_flag_off_keeps_compat_behavior_and_rollback(tmp_path):
         req.add_header("X-Hermes-Session-Token", "test-token")
         with urllib.request.urlopen(req, timeout=15) as r:
             out = json.loads(r.read())
-        # Qubit compat status shape, not the fork's raw /api/status.
+        # Qubit compat status shape, not the fork's raw /api/status. The fork
+        # document is identified by its legacy keys (``hermes_home``,
+        # ``can_update_hermes``); the Qubit compat document never carries them.
         assert out.get("schema") == "qubit-runtime-status/1", out
-        assert "overall" not in out, "flag off must not serve the fork"
+        assert "hermes_home" not in out and "can_update_hermes" not in out, out
     finally:
         ui.stop()
 
@@ -273,8 +275,12 @@ def test_flag_on_serves_fork_reads_and_gates_sensitive(tmp_path):
         "  'reads': reads}))\n")
     assert out["status"] == 200
     served = json.loads(out["body"])
-    # Fork status document, never the empty Qubit compat envelope.
-    assert served.get("schema") is None, served
+    # `/api/status` is a Qubit-authoritative read (the sidebar/System gateway
+    # card must read the Qubit supervisor, not the vendored fork's own gateway),
+    # so the SPA `/agent/api/status` serves the Qubit compat status document via
+    # the ``qubit_read_authority`` override even with the flag on. The remaining
+    # non-authoritative reads below are still fork-served.
+    assert served.get("schema") == "qubit-runtime-status/1", served
     assert served.get("version") and served.get("release_date"), served
     assert "overall" in served and "components" in served, served
     # The env read is the fork's real (non-empty) environment document.
@@ -295,7 +301,9 @@ def test_flag_on_serves_fork_reads_and_gates_sensitive(tmp_path):
     raw = json.loads(out["raw_body"])
     assert out["raw_status"] == 403, (out["raw_status"], raw)
     assert raw.get("code") == "SECRET_NEVER_SERVED", raw
-    # The once-shadowed routes now serve the fork's real data shape.
+    # The once-shadowed reads now serve the real dashboard data shape: the
+    # Qubit-authoritative routes (`/api/sessions`, `/api/profiles`) from the
+    # compat handler, the rest fork-served. The served keys match either way.
     expected_fork_keys = {
         "/api/sessions": ("sessions", "total", "limit", "offset"),
         "/api/profiles": ("profiles",),
@@ -331,18 +339,25 @@ def test_write_policy_is_fail_closed_and_never_bypasses_a_gate(
     cfg, _state = _wcfg(tmp_path)
 
     # Nothing is a cutover write until the operator allowlists it.
+    # (`/api/sessions/owner-backfill` is a still-gated Qubit route: the
+    # implemented `/api/sessions/import` is now a real confirm-gated handler,
+    # not a 501 gate, so it is no longer the gate-path exemplar.)
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST", set())
-    assert HA.write_policy(cfg, "POST", "/api/sessions/import") == (False, None)
-    assert HA.safe_write_to_proxy("POST", "/api/sessions/import") is False
+    assert HA.write_policy(
+        cfg, "POST", "/api/sessions/owner-backfill") == (False, None)
+    assert HA.safe_write_to_proxy(
+        "POST", "/api/sessions/owner-backfill") is False
 
     # Allowlisted, but a Qubit-typed gate still refuses; the fork is never used.
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
-                        {("POST", "/api/sessions/import")})
-    allowed, refusal = HA.write_policy(cfg, "POST", "/api/sessions/import")
+                        {("POST", "/api/sessions/owner-backfill")})
+    allowed, refusal = HA.write_policy(
+        cfg, "POST", "/api/sessions/owner-backfill")
     assert allowed is False and refusal is not None, (allowed, refusal)
     assert refusal[0] == 501 and \
         refusal[1]["code"] == "SESSIONS_RECEIPT_STORE", refusal
-    assert HA.safe_write_to_proxy("POST", "/api/sessions/import") is False
+    assert HA.safe_write_to_proxy(
+        "POST", "/api/sessions/owner-backfill") is False
 
     # The one Qubit emergency stop refuses an allowlisted write.
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
@@ -378,7 +393,7 @@ def test_webui_write_middleware_proxies_only_allowlisted_writes(
     monkeypatch.setattr(HA, "known_route", lambda _p: True)
     monkeypatch.setattr(HA, "WRITE_PROXY_ALLOWLIST",
                         {("POST", "/api/cron/jobs"),
-                         ("POST", "/api/sessions/import")})
+                         ("POST", "/api/sessions/owner-backfill")})
 
     class _FakeOrch:
         _route = "local"
@@ -411,7 +426,7 @@ def test_webui_write_middleware_proxies_only_allowlisted_writes(
         assert st == 200 and out.get("proxied_by_fork") is True, (st, out)
         assert calls == [("POST", "/api/cron/jobs")], calls
         # Allowlisted but Qubit-gated: the typed gate wins; no fork call.
-        st, out = _post("/agent/api/sessions/import")
+        st, out = _post("/agent/api/sessions/owner-backfill")
         assert st == 501 and out.get("code") == "SESSIONS_RECEIPT_STORE", out
         assert calls == [("POST", "/api/cron/jobs")], calls
     finally:

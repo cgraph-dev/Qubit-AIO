@@ -317,20 +317,41 @@ def test_config_write_stages_and_refuses_on_estop(cfg):
 # Keys reference add / update / remove (refs only)
 # ---------------------------------------------------------------------------
 def test_env_reference_add_update_remove(cfg):
+    from voicebridge import config as C
+
+    env_path = Path(C.canonical_runtime_env_path())
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    env_path.write_text("CLOSURE_REF_TOKEN=present\n")
+
+    # ``is_set`` means the credential actually resolves (UI audit D1), so the
+    # add round-trips to True only for a resolvable ``env:`` target.
     code, out = _dispatch(cfg, "PUT", "/api/env",
-                          {"name": "CLOSURE_REF", "value": "vault:alpha",
+                          {"name": "CLOSURE_REF",
+                           "value": "env:CLOSURE_REF_TOKEN",
                            "confirm": True})
-    assert code == 200 and out["ok"] is True and out["value"] == "vault:alpha", out
+    assert code == 200 and out["ok"] is True \
+        and out["value"] == "env:CLOSURE_REF_TOKEN", out
     code, out = _dispatch(cfg, "GET", "/api/env")
     assert out["CLOSURE_REF"]["is_set"] is True, out.get("CLOSURE_REF")
 
-    # Update: same key, new reference.
+    # Update: same key, a reference with no resolvable target -> honest False.
     code, out = _dispatch(cfg, "PUT", "/api/env",
-                          {"name": "CLOSURE_REF", "value": "vault:beta",
+                          {"name": "CLOSURE_REF",
+                           "value": "env:CLOSURE_REF_MISSING",
                            "confirm": True})
-    assert code == 200 and out["value"] == "vault:beta", out
+    assert code == 200 and out["value"] == "env:CLOSURE_REF_MISSING", out
     code, out = _dispatch(cfg, "GET", "/api/env")
-    assert "vault:beta" in out["CLOSURE_REF"]["description"], out["CLOSURE_REF"]
+    assert out["CLOSURE_REF"]["is_set"] is False, out.get("CLOSURE_REF")
+    assert "env:CLOSURE_REF_MISSING" in out["CLOSURE_REF"]["description"], \
+        out["CLOSURE_REF"]
+
+    # A ``vault:`` reference has no Qubit-side resolver: registered, not set.
+    code, out = _dispatch(cfg, "PUT", "/api/env",
+                          {"name": "CLOSURE_REF", "value": "vault:alpha",
+                           "confirm": True})
+    assert code == 200 and out["value"] == "vault:alpha", out
+    code, out = _dispatch(cfg, "GET", "/api/env")
+    assert out["CLOSURE_REF"]["is_set"] is False, out.get("CLOSURE_REF")
 
     # Remove.
     code, out = _dispatch(cfg, "DELETE", "/api/env",

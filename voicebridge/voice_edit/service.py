@@ -150,11 +150,11 @@ class VoiceEditService:
         if not answer:
             return
         try:
-            from ..agent import _persist_session_turn, resolve_session_id
+            from ..agent import _persist_session_turn
             store = self._canonical_store()
             if store is None:
                 return
-            sid = resolve_session_id(self.cfg, None)
+            sid = self._voice_session()
             _persist_session_turn(store, sid, "user", question,
                                   model=model or None)
             _persist_session_turn(store, sid, "assistant", answer,
@@ -238,7 +238,12 @@ class VoiceEditService:
                                         default=False)),
             "request_ttl_s": self.ttl(),
             "active_requests": len(self._reqs),
-            "privacy": "no selected text is logged or persisted",
+            "privacy": (
+                "debug logging is ON: spoken transcript and dictated text "
+                "are recorded locally"
+                if _dbg.enabled(self.cfg)
+                else "no selected text is logged or persisted"
+            ),
         }
 
     def begin(self, *, session_id: str = "", request_id: str = "",
@@ -630,6 +635,37 @@ class VoiceEditService:
                 "discarded_interim_only": not req.applied,
                 "request_id": request_id}
 
+    def _voice_session(self) -> str:
+        """The stable session id for the spoken conversation.
+
+        A dedicated session keeps the voice dialogue coherent instead of
+        mixing it with unrelated dashboard/chat turns (and test probes) in the
+        shared default session; it is still the SAME one canonical store.
+        """
+        try:
+            from ..agent import resolve_session_id
+            return resolve_session_id(self.cfg, "voice-chat")
+        except Exception:
+            return "voice-chat"
+
+    def _conversation_context(self, pending: str) -> str:
+        """Bounded prior-turn context from the ONE canonical session store.
+
+        Reuses :func:`voicebridge.agent._session_context` (the same
+        ``context_policy`` window ``/qubit-chat`` and the worker turns use), so
+        a spoken follow-up sees what was just said instead of starting blank.
+        """
+        try:
+            from ..agent import _session_context
+            store = self._canonical_store()
+            if store is None:
+                return ""
+            text, _meta = _session_context(store, self._voice_session(),
+                                           self.cfg, pending)
+            return str(text or "")
+        except Exception:  # noqa: BLE001 - context is additive, non-fatal
+            return ""
+
     def _known_model_profile(self, profile_id: str) -> bool:
         """True when ``profile_id`` names a real configured model profile.
 
@@ -697,7 +733,12 @@ class VoiceEditService:
                 "escalate": bool(profile)})
         try:
             from ..providers import gateway as GW
-            res = GW.run_role(question, self.cfg, role="chat",
+            # Conversation memory: fold the bounded prior transcript so a
+            # follow-up ("more details") keeps the subject.
+            convo = self._conversation_context(question)
+            prompt = (f"Recent conversation:\n{convo}\n\nUser: {question}"
+                      if convo else question)
+            res = GW.run_role(prompt, self.cfg, role="chat",
                               profile_id=profile or None,
                               max_tokens=300 if mode == "task" else 200,
                               timeout_s=60.0 if mode == "task" else 30.0,
@@ -778,7 +819,8 @@ class VoiceEditService:
         # one canonical session store (inside run_session) and are audited.
         try:
             from .tool_task import run_tool_task
-            res = run_tool_task(self.cfg, clean, estop_engaged=self._estop)
+            res = run_tool_task(self.cfg, clean, confirmed=True,
+                                estop_engaged=self._estop)
         except Exception as exc:
             code = str(getattr(exc, "code", "") or "VOICE_EDIT_TASK_FAILED")
             self._audit("voice_edit.task.error", {
@@ -799,7 +841,9 @@ class VoiceEditService:
         if not ok:
             return {"ok": False, "mode": "task_result",
                     "code": str(res.get("code") or "VOICE_EDIT_TASK_EMPTY"),
-                    "detail": str(res.get("detail", "") or "")[:200]}
+                    "detail": str(res.get("detail", "") or "")[:200],
+                    "reply": reply, "tool_used": tool_used,
+                    "task_text": clean, "request_id": request_id}
         return {"ok": True, "mode": "task_result", "reply": reply,
                 "tool_used": tool_used, "task_text": clean,
                 "request_id": request_id,

@@ -203,7 +203,7 @@ WAVE1_DISPATCH = [
     ("GET", "/api/mcp/servers", {}, {}),
     ("GET", "/api/mcp/catalog", {}, {}),
     ("POST", "/api/mcp/servers/wave1-mcp/test", {}, {}),
-    ("POST", "/api/messaging/platforms/wave1-msg/test", {}, {}),
+    ("POST", "/api/messaging/platforms/slack/test", {}, {}),
     ("PUT", "/api/messaging/platforms/wave1-msg", {},
      {"enabled": False, "confirm": True}),
     ("POST", "/api/pairing/clear-pending", {}, {"confirm": True}),
@@ -256,8 +256,16 @@ def test_wave1_dispatch_non_refusal_success(tmp_path, monkeypatch):
     for method, path, q, b in WAVE1_DISPATCH:
         code, out = HC.dispatch(cfg, method, path, q, b)
         assert code == 200, (method, path, code, str(out)[:200])
-        assert isinstance(out, dict) and out.get("ok") is not False, \
-            (method, path, out)
+        assert isinstance(out, dict), (method, path, out)
+        if path.rstrip("/").endswith("/test"):
+            # Probe routes report the real backend verdict. The seeded
+            # ``wave1-mcp`` server is not a live MCP endpoint, so the honest
+            # probe answer is ``ok: false`` / ``connected: false`` -- never a
+            # fabricated success and never a typed-refusal shape.
+            if out.get("ok") is False:
+                assert out.get("connected") is False, (method, path, out)
+            continue
+        assert out.get("ok") is not False, (method, path, out)
 
 
 # --------------------------------------------------------------------------
@@ -408,10 +416,16 @@ def test_messaging_platform_test_reads_real_link_state(tmp_path, monkeypatch):
     _seed_account(cfg)
 
     code, out = HC.dispatch(cfg, "POST",
-                            "/api/messaging/platforms/wave1-msg/test", {}, {})
+                            "/api/messaging/platforms/slack/test", {}, {})
     assert code == 200 and out["ok"] is True, (code, out)
-    assert out["state"] in ("linked", "degraded"), out
+    assert out["state"] == "connected", out
     assert out["reachable"] is True, out
+
+    # The seeded CLI account is bound to the ``slack`` catalog platform row the
+    # Channels page serves; the bare account id is not a catalog channel.
+    code, out = HC.dispatch(cfg, "POST",
+                            "/api/messaging/platforms/wave1-msg/test", {}, {})
+    assert code == 404 and out["code"] == "MSG_NOT_FOUND", (code, out)
 
 
 def test_event_publish_appends_to_single_journal(tmp_path, monkeypatch):

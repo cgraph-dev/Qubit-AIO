@@ -260,16 +260,22 @@ def test_env_get_reports_is_set_from_runtime_env_without_leaking(ui):
 
     path = Path(C.canonical_runtime_env_path())
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("OPENCODE_GO_API_KEY=sk-canary-DO-NOT-LEAK\n")
+    path.write_text("OPENCODE_GO_API_KEY=sk-canary-DO-NOT-LEAK\n"
+                    "AI9_REF_SECRET=resolvable\n")
 
-    # a reference-only key must also read as set (unchanged behavior)
-    ES.set_ref(cfg, "AI9_REF_KEY", "vault:ai9")
+    # ``is_set`` means the credential actually resolves (UI audit D1): a
+    # resolvable ``env:`` reference reads as set, while a ``vault:`` entry has
+    # no Qubit-side resolver and honestly reads as not set.
+    ES.set_ref(cfg, "AI9_REF_KEY", "env:AI9_REF_SECRET")
+    ES.set_ref(cfg, "AI9_VAULT_KEY", "vault:ai9")
 
     status, env = _request(server, "GET", "/agent/api/env")
     assert status == 200, env
     assert env["AI9_REF_KEY"]["is_set"] is True, env.get("AI9_REF_KEY")
+    assert env["AI9_VAULT_KEY"]["is_set"] is False, env.get("AI9_VAULT_KEY")
     assert env["OPENCODE_GO_API_KEY"]["is_set"] is True, \
         env.get("OPENCODE_GO_API_KEY")
     blob = json.dumps(env)
     assert "sk-canary-DO-NOT-LEAK" not in blob
+    assert "resolvable" not in blob
     assert env["OPENCODE_GO_API_KEY"].get("redacted_value") is None

@@ -37,7 +37,25 @@ FLEET = REPO / "frontend/qubit-web/public/plugins/fleet.json"
 # ``voicebridge/qubit_backend.py`` is a programmatic entry point that no
 # production module, test, or script currently imports (cross-boundary handoff
 # W1-1, owner W2). Pinned so a *new* unreferenced module fails this gate.
-KNOWN_UNREFERENCED_MODULES: set = set()
+#
+# The ``openclaw_handlers/*`` family modules below are reachable only through
+# the dynamic dispatch in ``voicebridge/gateway/openclaw_handlers/__init__.py``
+# (``FAMILY_MODULES`` -> ``importlib.import_module(f"{__name__}.{name}")``). The
+# AST scanner cannot resolve the f-string, so they are pinned here rather than
+# reported as dead. A new family module must be added to ``FAMILY_MODULES`` and
+# to this set together.
+KNOWN_UNREFERENCED_MODULES: set = {
+    "voicebridge/gateway/openclaw_handlers/agents.py",
+    "voicebridge/gateway/openclaw_handlers/board.py",
+    "voicebridge/gateway/openclaw_handlers/content.py",
+    "voicebridge/gateway/openclaw_handlers/security.py",
+    "voicebridge/gateway/openclaw_handlers/sessions.py",
+    "voicebridge/gateway/openclaw_handlers/sessions_advanced.py",
+    "voicebridge/gateway/openclaw_handlers/sessions_compaction.py",
+    "voicebridge/gateway/openclaw_handlers/surface_control.py",
+    "voicebridge/gateway/openclaw_handlers/system.py",
+    "voicebridge/gateway/openclaw_handlers/worktrees.py",
+}
 
 # Test files that assert repository artifacts (docs/manifests/scans) rather
 # than exercising ``voicebridge``/``qubit_runtime`` code. They are not "dead
@@ -67,12 +85,39 @@ ARTIFACT_ONLY_TESTS = {
     "test_qbpv_oc4_openclaw_pin.py",
     "test_route_labels8tf.py",
     "test_source_inventory.py",
+    # Guard generated artifacts / generator scripts (loaded by path or scanned
+    # as files); they exercise no ``voicebridge``/``qubit_runtime`` runtime code.
+    "test_branding_frontend_classification9u.py",
+    "test_branding_runtime_surfaces8u.py",
+    "test_controls_e2e_audit.py",
+    "test_forensic_audit_harness.py",
+    "test_generator_determinism9u.py",
+    "test_identifier_rename_generator9u.py",
+    "test_openclaw_operator_only_review9u.py",
+    "test_packaging_force_include9u.py",
+    "test_public_surface_branding_wave22.py",
+    "test_route_e2e_audit.py",
+    "test_ui_tui_vendor_gap12_9u.py",
+    "test_vendor_manifest_test_classification.py",
+    "test_voice_coverage_report.py",
 }
 
 _PROD_IMPORT_RE = re.compile(
     r"(from\s+voicebridge|import\s+voicebridge"
     r"|from\s+qubit_runtime|import\s+qubit_runtime"
-    r"|import_module\(\s*[\"'](?:voicebridge|qubit_runtime))")
+    # Vendored top-level packages imported after ``qubit_runtime`` is put on
+    # ``sys.path`` (the W9 slices: ``qubit_cli``, ``tools``, ``cron``,
+    # ``gateway``, ``agent``, ``tui_gateway``, ...). These are real production
+    # imports even though the dotted ``qubit_runtime.`` prefix is absent.
+    r"|from\s+(?:qubit_cli|tools|cron|gateway|agent|tui_gateway|utils|"
+    r"providers|plugins|qubit_state)\b"
+    r"|import\s+(?:qubit_cli|tools|cron|gateway|agent|tui_gateway|utils|"
+    r"providers|plugins|qubit_state)\b"
+    r"|(?:import_module|__import__)\(\s*[\"'](?:voicebridge|qubit_runtime|"
+    r"qubit_cli|tools|cron|gateway|agent|tui_gateway|utils|providers|plugins|"
+    r"qubit_state)\b"
+    r"|voicebridge\.(?:cli|webui|qubit_compat)"
+    r"|-m[\"']?\s*,?\s*[\"']voicebridge)")
 
 
 # ---------------------------------------------------------------------------

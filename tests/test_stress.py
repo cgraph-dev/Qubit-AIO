@@ -667,7 +667,7 @@ def test_mic_gain_avoids_over_amp():
         cfg = Config.load(pathlib.Path(td) / "none.yaml")
         g = float(cfg.get("mic", "gain", default=4.0))
         assert 1.0 <= g <= 6.0, f"mic gain {g} risks over-amplification/distortion"
-    repo = pathlib.Path("config/voice.yaml").read_text()
+    repo = pathlib.Path("config/voice.example.yaml").read_text()
     # the shipped config must not default to the distorting x8
     import re
     m = re.search(r"gain:\s*([\d.]+)", repo)

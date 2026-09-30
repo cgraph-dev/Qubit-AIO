@@ -168,6 +168,7 @@ summarizer:
 #   http://<this-pc-ip>:8890   (chat)   ·   /activity  (agent dashboard)
 webui:
   enabled: true
+  speak_web_locally: false # browser plays the reply once; keep false to avoid double-speech
   host: 0.0.0.0            # 0.0.0.0 = reachable from the LAN (phone)
   port: 8890
   script_timeout_s: 60     # local-script tools (e.g. Perplexity search) cap

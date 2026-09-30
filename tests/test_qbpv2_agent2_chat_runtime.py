@@ -415,16 +415,32 @@ def test_activity_alias_redirects_to_logs(tmp_path, monkeypatch):
 
 
 def test_served_chat_chunk_opens_no_raw_pty_websocket():
-    """The built normal-chat chunks must not open a WebSocket or a raw
-    /api/pty path (that is what produced the code-1006 reconnect loop)."""
+    """The built normal-chat chunks must not speak the raw PTY/TUI WebSocket
+    *dialect* — that is what produced the code-1006 reconnect loop.
+
+    ``new WebSocket`` is intentionally NOT the marker: the Qubit voice client
+    legitimately opens one against the authenticated, single-use
+    ``/agent/api/audio/stt/ws`` socket. The forbidden surface is the raw PTY
+    wire protocol itself — its upgrade URL (``/api/pty``), its resize frame
+    opcode (``\\x1b[RESIZE:<cols>;<rows>]``) and its ticket/reconnect
+    bookkeeping — which is built only by the terminal page, never by normal
+    chat.
+    """
     dist = REPO_ROOT / "frontend" / "qubit-dist" / "assets"
     chunks = sorted(dist.glob("ChatPage-*.js"))
     if not chunks:
         pytest.skip("hermes-dist not built (npm build step)")
     blob = "\n".join(p.read_text(encoding="utf-8", errors="replace")
                      for p in chunks)
-    assert "new WebSocket" not in blob
-    assert "/api/pty" not in blob
+    # Forbidden: the raw PTY/TUI dialect (URL + resize opcode + bookkeeping).
+    for marker in ("/api/pty", "agent/api/pty", "[RESIZE:",
+                   "PTY_TICKET_TIMEOUT_MS", "reconnectNonce"):
+        assert marker not in blob, marker
+    # A WebSocket here is only acceptable when it belongs to the typed,
+    # ticket-authenticated local STT client — never the raw PTY transport.
+    if "new WebSocket" in blob:
+        assert "sttWsUrl" in blob, \
+            "a WebSocket exists in the chat chunk that is not the STT client"
 
 
 # --------------------------------------------- local_llm retry regression

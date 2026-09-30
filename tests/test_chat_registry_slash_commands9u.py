@@ -28,18 +28,31 @@ registry / live-session read path without an agent.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOT = REPO_ROOT / "qubit_runtime"
 sys.path.insert(0, str(RUNTIME_ROOT))
 
-# Importing tui_gateway.server reassigns sys.stdout for the JSON-RPC transport;
-# restore it so the hermetic gate keeps capturing test output.
+# Importing tui_gateway.server has two module-level side effects:
+#   * it reassigns sys.stdout for the JSON-RPC transport, and
+#   * it calls load_qubit_dotenv() at import time, which with QUBIT_HOME unset
+#     reads the operator's real ~/.hermes/.env straight into os.environ.
+# This module is imported at collection time, before any test runs, so the
+# injected credentials (OPENAI_API_KEY, ...) would leak into every later test —
+# e.g. test_media_generate_* then sees a "configured" provider and returns
+# state OK instead of its typed FAILED gate. Pin a throwaway QUBIT_HOME and
+# restore the environment around the import so neither the credentials nor the
+# import's TERMINAL_* defaults escape this module.
 _stdout = sys.stdout
-from tui_gateway import server as tui_server  # noqa: E402
+_import_home = tempfile.mkdtemp(prefix="qubit-tui-gateway-import-")
+with mock.patch.dict(os.environ, {"QUBIT_HOME": _import_home}):
+    from tui_gateway import server as tui_server  # noqa: E402
 
 sys.stdout = _stdout
 

@@ -1,0 +1,83 @@
+{
+  "bundle_hash": "sha256:9d456c4473dff35ea29eb64e855c524f3c16081305fc034b9563822d7c0ce619",
+  "scanner_version": "skills-guard-v6",
+  "source": "official",
+  "source_url": "official/research/qmd",
+  "verdict": "caution",
+  "trust_level": "builtin",
+  "findings": [
+    {
+      "pattern_id": "systemd_service",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 309,
+      "match": "cat > ~/.config/systemd/user/qmd-daemon.service << 'EOF'",
+      "description": "references or enables systemd service"
+    },
+    {
+      "pattern_id": "macos_launchd",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 274,
+      "match": "cat > ~/Library/LaunchAgents/com.qmd.daemon.plist << 'EOF'",
+      "description": "macOS launch agent/daemon persistence"
+    },
+    {
+      "pattern_id": "macos_launchd",
+      "severity": "medium",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 301,
+      "match": "launchctl load ~/Library/LaunchAgents/com.qmd.daemon.plist",
+      "description": "macOS launch agent/daemon persistence"
+    },
+    {
+      "pattern_id": "unpinned_npm_install",
+      "severity": "medium",
+      "category": "supply_chain",
+      "file": "SKILL.md",
+      "line": 61,
+      "match": "npm install -g @tobilu/qmd",
+      "description": "npm install without version pinning"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 44,
+      "match": "curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "sudo_usage",
+      "severity": "high",
+      "category": "privilege_escalation",
+      "file": "SKILL.md",
+      "line": 45,
+      "match": "sudo apt-get install -y nodejs",
+      "description": "uses sudo (privilege escalation)"
+    },
+    {
+      "pattern_id": "hermes_config_ref",
+      "severity": "low",
+      "category": "persistence",
+      "file": "SKILL.md",
+      "line": 229,
+      "match": "Add to `~/.hermes/config.yaml`:",
+      "description": "references Hermes configuration files (informational; only modification intent is scored)"
+    }
+  ],
+  "rules": [
+    "hermes_config_ref",
+    "macos_launchd",
+    "sudo_usage",
+    "systemd_service",
+    "unpinned_npm_install"
+  ],
+  "scanned_at": "2026-09-23T02:51:05.773872+00:00",
+  "summary": "qmd: caution \u2014 7 finding(s) in persistence, privilege_escalation, supply_chain",
+  "fresh": true
+}
