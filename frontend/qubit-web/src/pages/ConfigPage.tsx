@@ -139,6 +139,11 @@ export default function ConfigPage() {
   // confirm callback, plus the copy shown in the dialog.
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmSaveDetail, setConfirmSaveDetail] = useState("");
+  // Set on every real save: the dashboard record is live immediately, but
+  // running processes read config at boot — the banner below says so and
+  // offers the gateway restart. Cleared on reload.
+  const [restartNeeded, setRestartNeeded] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const saveDecisionRef = useRef<((ok: boolean) => void) | null>(null);
   const { toast, showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,6 +308,7 @@ export default function ConfigPage() {
     setSaving(true);
     try {
       await commitConfig(config);
+      setRestartNeeded(true);
     } catch (e) {
       // CONFIG_NO_FIELDS means the server holds exactly what we sent (an
       // unchanged whole-tree Save): converge on the server record and say so
@@ -402,6 +408,7 @@ export default function ConfigPage() {
       setSaving(true);
       try {
         await commitConfig(imported);
+        setRestartNeeded(true);
         // Converge on the server record, not the file bytes: the backend
         // drops unchanged leaves, refuses secret-shaped values, and rejects
         // unknown keys, so an optimistic setConfig(imported) can disagree
@@ -493,6 +500,40 @@ export default function ConfigPage() {
     <div className="flex flex-col gap-4">
       <PluginSlot name="config:top" />
       <Toast toast={toast} />
+
+      {restartNeeded && (
+        <Card className="border-warning/50">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              Settings saved — the dashboard record is live now. Running
+              processes read config at boot: restart the gateway, and restart
+              the dashboard service{" "}
+              <code className="bg-muted/50 px-1">
+                systemctl --user restart qubit-voicebridge
+              </code>{" "}
+              to apply everywhere.
+            </div>
+            <Button
+              size="sm"
+              className="uppercase"
+              disabled={restarting}
+              onClick={() => {
+                setRestarting(true);
+                api
+                  .restartGateway()
+                  .then(() => {
+                    showToast("Gateway restarting…", "success");
+                    setRestartNeeded(false);
+                  })
+                  .catch((e) => showToast(`Failed to restart: ${e}`, "error"))
+                  .finally(() => setRestarting(false));
+              }}
+            >
+              {restarting ? "Restarting…" : "Restart gateway"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-center gap-2 sm:flex-1">

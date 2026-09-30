@@ -12249,9 +12249,30 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     _audit("config_apply", "dashboard:user",
            {"keys": sorted(values)[:20], "count": len(values),
             "home_applied": applied_to_home})
+    # The dashboard serves its boot-loaded record merged with overrides, so a
+    # PUT would otherwise be invisible to running code until restart. Refresh
+    # the in-process record in place (the same object every holder reads) so
+    # per-request readers converge immediately. Separate OS processes (the
+    # gateway, helper services) and boot-built singletons still read config
+    # at boot — reported honestly below instead of implied.
+    try:
+        live_data = getattr(cfg, "data", None)
+        if isinstance(live_data, dict):
+            for dotted, value in values.items():
+                try:
+                    _set_dotted(live_data, dotted, value)
+                except Exception:
+                    continue
+    except Exception:
+        pass
     return _ok(ok=True, config=values, count=len(values),
                applied_to_home=applied_to_home,
                path=str(path),
+               live_now=["dashboard settings record"],
+               restart_required=["qubit-gateway", "qubit-voicebridge"],
+               restart_reason=("running processes read config at boot; the "
+                               "dashboard record is live now — restart both "
+                               "services to apply everywhere"),
                rollback=f"restore {path.name}.bak (atomic previous state) or "
                         f"PUT the prior {len(previous)} overrides back",
                qubit_counterpart="dashboard Settings (classic) + CLI config "
