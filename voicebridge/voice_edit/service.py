@@ -635,6 +635,29 @@ class VoiceEditService:
                 "discarded_interim_only": not req.applied,
                 "request_id": request_id}
 
+    def _style_for(self, question: str) -> "tuple[int, str, str]":
+        """(max_tokens, reasoning, style_instruction) for a spoken answer.
+
+        Short, simple questions get one natural sentence; an explicit ask for
+        detail ("explain", "in detail", "report", "why", "steps") gets room
+        for a fuller answer. The instruction also tells the model to vary its
+        wording so replies don't sound like a recording.
+        """
+        import re
+        detail = bool(re.search(
+            r"\b(explain|in detail|details?|report|why|how (do|does|to)|steps?|"
+            r"describe|elaborate|compare|summari[sz]e|walk me through|"
+            r"tell me (more|about)|pros and cons|breakdown)\b",
+            question or "", re.I))
+        if detail:
+            return 500, "medium", (
+                "Answer in a clear, well-structured way with the key points. "
+                "Vary your phrasing each turn; don't reuse a stock opener/closer.")
+        return 80, "minimal", (
+            "Answer in ONE short, natural sentence — say only what's needed. "
+            "Vary your wording every turn; never repeat the same opener or "
+            "closer (e.g. don't end every reply with 'anything else').")
+
     def _personal_context(self) -> str:
         """The operator's canonical personal knowledge (bounded).
 
@@ -793,15 +816,21 @@ class VoiceEditService:
             # correctly); folding it into the prompt string made the small
             # local model echo the last answer.
             convo = self._conversation_context(question)
-            # Short spoken answers: minimal reasoning + a tight output cap
-            # keeps voice latency low (the reply is spoken by the helper).
+            # Shorter, more varied spoken answers: simple questions get one
+            # natural sentence; an explicit "explain/in detail/report" gets room
+            # for a fuller answer. A per-turn style hint discourages repeating
+            # stock openers/closers.
+            max_tokens, reasoning, style = self._style_for(question)
+            ctx = self._personal_context()
+            if style:
+                ctx = f"{ctx}\n\nSTYLE: {style}" if ctx else f"STYLE: {style}"
             res = GW.run_role(question, self.cfg, role="chat",
                               profile_id=profile or None,
-                              max_tokens=120,
+                              max_tokens=max_tokens,
                               timeout_s=30.0,
-                              reasoning="minimal",
+                              reasoning=reasoning,
                               conversation_prompt=convo,
-                              context=self._personal_context())
+                              context=ctx)
         except Exception as exc:
             return {"ok": False, "code": "VOICE_EDIT_ASK_FAILED",
                     "detail": str(exc)[:160]}
